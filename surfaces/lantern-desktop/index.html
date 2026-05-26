@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lantern Desktop - Games</title>
+  <meta http-equiv="Cache-Control" content="no-store">
+  <meta name="description" content="Kid-safe Lantern Desktop hub for Games, Music, Gmail, Orch/Suzie, and Arch Check">
+  <style>
+    :root {
+      --bg: #06111f;
+      --panel: rgba(15, 23, 42, .86);
+      --card: #10213a;
+      --card2: #172b49;
+      --border: rgba(148, 163, 184, .28);
+      --text: #e5f0ff;
+      --muted: #9fb3cc;
+      --bright: #ffffff;
+      --blue: #38bdf8;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --pink: #fb7185;
+      --purple: #a78bfa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, .22), transparent 36rem),
+        radial-gradient(circle at bottom right, rgba(167, 139, 250, .20), transparent 34rem),
+        var(--bg);
+      color: var(--text);
+      padding: 28px;
+    }
+    .shell { max-width: 1180px; margin: 0 auto; }
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+    .eyebrow { color: var(--blue); text-transform: uppercase; letter-spacing: .16em; font-weight: 800; font-size: 12px; margin: 0 0 8px; }
+    h1 { margin: 0; font-size: clamp(34px, 6vw, 72px); line-height: .92; letter-spacing: -0.05em; color: var(--bright); }
+    .subtitle { color: var(--muted); font-size: 17px; max-width: 760px; margin: 14px 0 0; }
+    .badge-stack { display: grid; gap: 10px; min-width: 220px; }
+    .badge { border: 1px solid var(--border); background: rgba(15, 23, 42, .72); border-radius: 18px; padding: 12px 14px; }
+    .badge span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .badge strong { display: block; color: var(--bright); font-size: 17px; margin-top: 3px; }
+    .grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .tile {
+      position: relative;
+      min-height: 220px;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 20px;
+      background: linear-gradient(145deg, var(--card), var(--card2));
+      box-shadow: 0 18px 55px rgba(0, 0, 0, .22);
+      overflow: hidden;
+    }
+    .tile:after {
+      content: "";
+      position: absolute;
+      inset: auto -35px -45px auto;
+      width: 120px;
+      height: 120px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: .12;
+    }
+    .tile.games { color: var(--green); }
+    .tile.music { color: var(--purple); }
+    .tile.gmail { color: var(--pink); }
+    .tile.orch { color: var(--blue); }
+    .tile.arch { color: var(--amber); }
+    .icon { font-size: 42px; margin-bottom: 14px; }
+    .tile h2 { margin: 0 0 8px; color: var(--bright); font-size: 24px; }
+    .tile p { color: var(--muted); margin: 0 0 14px; line-height: 1.45; }
+    .tile .safe { color: #d9f99d; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .rules, .commands {
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 20px;
+      background: var(--panel);
+      margin-top: 16px;
+    }
+    .rules h2, .commands h2 { margin: 0 0 12px; color: var(--bright); }
+    ul, ol { margin: 0; padding-left: 24px; color: #dbeafe; }
+    li { margin: 7px 0; }
+    code, pre { font-family: Consolas, "Cascadia Mono", monospace; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #020617; color: #dbeafe; border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+    .footer { color: var(--muted); margin-top: 18px; font-size: 13px; }
+    @media (max-width: 1020px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } header { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { body { padding: 18px; } .grid { grid-template-columns: 1fr; } .tile { min-height: 190px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <p class="eyebrow">Lantern OS</p>
+        <h1>Games Tab</h1>
+        <p class="subtitle">A kid-safe desktop hub for RetroArch, music, Gmail-with-parent, Orch/Suzie, and Arch readiness. This screen shows choices; it does not launch, download, buy, or change the computer by itself.</p>
+      </div>
+      <aside class="badge-stack" aria-label="Status">
+        <div class="badge"><span>Mode</span><strong>Show my son</strong></div>
+        <div class="badge"><span>Launch rule</span><strong>Ask parent</strong></div>
+        <div class="badge"><span>Game rule</span><strong>Legal files only</strong></div>
+      </aside>
+    </header>
+
+    <section class="grid" aria-label="Desktop tabs">
+      <article class="tile games">
+        <div class="icon">🎮</div>
+        <h2>Games</h2>
+        <p>RetroArch and approved retro games. Homebrew, public-domain, or personally owned game files only.</p>
+        <div class="safe">Ask Dad to launch</div>
+      </article>
+      <article class="tile music">
+        <div class="icon">🎵</div>
+        <h2>Music</h2>
+        <p>Owned/local songs, public-domain tracks, or Creative Commons music. No purchases from this page.</p>
+        <div class="safe">Listen safe</div>
+      </article>
+      <article class="tile gmail">
+        <div class="icon">✉️</div>
+        <h2>Gmail</h2>
+        <p>Check mail with a parent nearby. Do not type passwords, change recovery info, or click scary links alone.</p>
+        <div class="safe">Parent nearby</div>
+      </article>
+      <article class="tile orch">
+        <div class="icon">🧠</div>
+        <h2>Orch</h2>
+        <p>Suzie Work Station status board for helpers, queues, and MCP boundaries. View status only.</p>
+        <div class="safe">No agent start</div>
+      </article>
+      <article class="tile arch">
+        <div class="icon">🐧</div>
+        <h2>Arch Check</h2>
+        <p>Penguin computer readiness. Disk shrinking and boot changes are parent/operator only.</p>
+        <div class="safe">Read-only check</div>
+      </article>
+    </section>
+
+    <section class="rules">
+      <h2>House Rules</h2>
+      <ol>
+        <li>No downloads unless a parent says yes.</li>
+        <li>No passwords, account recovery, payments, or purchases from this page.</li>
+        <li>Games must be homebrew, public-domain, or from files the family legally owns.</li>
+        <li>Orch/Suzie is a status board here; it does not start helpers or move tasks.</li>
+        <li>Arch/Dual Boot changes are grown-up physical computer work only.</li>
+      </ol>
+    </section>
+
+    <section class="commands">
+      <h2>Parent Launch Notes</h2>
+      <p>Start Suzie Work Station:</p>
+      <pre>cd "$env:USERPROFILE\Documents\gm-agent-orchestrator"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-Dashboard.ps1
+
+Open: http://localhost:8765/dashboard/index-v2.html</pre>
+      <p>RetroArch: open from the Start menu or the approved local install path. Do not use this page to source ROMs.</p>
+      <p>Arch Check: use Lantern OS dual-boot prep as a parent/operator action only.</p>
+    </section>
+
+    <p class="footer">Lantern Desktop - converged Games tab. Built for safe showing, not automatic execution.</p>
+  </main>
+</body>
+</html>
