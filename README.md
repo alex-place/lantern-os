@@ -96,3 +96,11 @@ Open the Movie 1 operator cockpit:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Open-TonyGarage.ps1
 ```
+
+## Local Controls Command
+
+Open the local control bridge and validate dashboard/MCP/Lantern health:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-LanternLocalControls.ps1
+```

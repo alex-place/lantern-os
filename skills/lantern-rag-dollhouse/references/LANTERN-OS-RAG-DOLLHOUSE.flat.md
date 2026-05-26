@@ -305,6 +305,7 @@ The latest convergence pass moved scattered work into these durable surfaces:
 | Arc Reactor confidence | `skills/arc-reactor-confidence/SKILL.md` | `local_inspected` | Movie 1/2/3 readiness scoring and power-state model |
 | Arc Reactor status | `data/arc-reactor/status.json` | `local_inspected` | current confidence state |
 | Arc Reactor 12-step model | `reports/ARC-REACTOR-12-STEP-CONVERGENCE-MODEL.md` | `local_inspected` | past/present/future/actual-results convergence table |
+| Local Controls / AccessX bridge | `manifests/LOCAL-CONTROLS-ACCESSX.md` | `local_inspected` | Windows local-control bridge until in-house apps |
 | Store release lanes | `manifests/STORE-RELEASE-LANES.md` | `local_inspected` | local store now, Steam candidate later |
 | Free SDK lane | `manifests/FREE-SDKS-ONLINE.md` | `local_inspected` | free online SDK/tool choices for store-flexible builds |
 | v1 readiness test | `reports/V1-READINESS-TEST-2026-05-26.md` | `local_inspected` | gate test and Movie confidence |
@@ -356,6 +357,22 @@ Avengers:                held
 
 Scores rise only with evidence: outreach sends, paid pilots, install proof,
 store pages/builds, users, devices, uptime, or recovery evidence.
+
+## 19B. Local Controls / AccessX Bridge
+
+Until Lantern has full in-house apps, run the local-control bridge:
+
+```text
+scripts/Start-LanternLocalControls.ps1
+C:\Users\alexp\scripts\Start-LanternLocalControls.ps1
+```
+
+It opens Tony Garage, checks dashboard/MCP/Lantern health, detects AccessX, and
+saves validation to:
+
+```text
+manifests/validation/LOCAL-CONTROLS-LATEST.json
+```
 
 ## 20. Store And Old Workstream Surfaces
 
