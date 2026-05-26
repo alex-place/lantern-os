@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-05-26T11:26:20.039Z",
+  "ok": true,
+  "base": "http://127.0.0.1:4177",
+  "results": [
+    {
+      "path": "/api/health",
+      "ok": true,
+      "statusCode": 200
+    },
+    {
+      "path": "/api/status",
+      "ok": true,
+      "statusCode": 200
+    },
+    {
+      "path": "/api/arc-reactor",
+      "ok": true,
+      "statusCode": 200
+    },
+    {
+      "path": "/api/wallet",
+      "ok": true,
+      "statusCode": 200
+    },
+    {
+      "path": "/api/readiness",
+      "ok": true,
+      "statusCode": 200
+    },
+    {
+      "path": "/api/rag-cache",
+      "ok": true,
+      "statusCode": 200
+    }
+  ]
+}

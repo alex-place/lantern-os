@@ -1,0 +1,65 @@
+﻿{
+    "generatedAt":  "2026-05-26T07:26:20.0608783-04:00",
+    "ok":  true,
+    "failed":  [
+
+               ],
+    "checks":  [
+                   {
+                       "name":  "doctype",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "viewport",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "skip-link",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "main-target",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "cache-busted-css",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "deferred-js",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "new-tab-class",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "image-alt",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "focus-visible",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "reduced-motion",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "mobile-media",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "noopener",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "target-blank",
+                       "ok":  true
+                   },
+                   {
+                       "name":  "cache-bust-js",
+                       "ok":  true
+                   }
+               ]
+}

@@ -307,6 +307,7 @@ The latest convergence pass moved scattered work into these durable surfaces:
 | Arc Reactor 12-step model | `reports/ARC-REACTOR-12-STEP-CONVERGENCE-MODEL.md` | `local_inspected` | past/present/future/actual-results convergence table |
 | Local Controls / AccessX bridge | `manifests/LOCAL-CONTROLS-ACCESSX.md` | `local_inspected` | Windows local-control bridge until in-house apps |
 | External LLM / Web RAG cache | `manifests/EXTERNAL-LLM-WEB-RAG-CACHE.md` | `local_inspected` | filtered compressed cache for other-LLM/search research |
+| Lantern Garage full-stack app | `manifests/LANTERN-GARAGE-FULLSTACK-APP.md` | `local_inspected` | local Node app with APIs and cockpit UI |
 | Store release lanes | `manifests/STORE-RELEASE-LANES.md` | `local_inspected` | local store now, Steam candidate later |
 | Free SDK lane | `manifests/FREE-SDKS-ONLINE.md` | `local_inspected` | free online SDK/tool choices for store-flexible builds |
 | v1 readiness test | `reports/V1-READINESS-TEST-2026-05-26.md` | `local_inspected` | gate test and Movie confidence |
@@ -506,3 +507,31 @@ Allowed states:
 - `rejected`.
 
 Rule: cache compressed claims and citations, not raw web dumps.
+
+## 22. Lantern Garage Full-Stack App
+
+The first in-house app exists at:
+
+```text
+apps/lantern-garage/
+scripts/Start-LanternGarageApp.ps1
+scripts/Test-LanternGarageApp.ps1
+manifests/LANTERN-GARAGE-FULLSTACK-APP.md
+```
+
+It serves:
+
+```text
+http://127.0.0.1:4177
+```
+
+API surfaces:
+
+- `/api/health`;
+- `/api/status`;
+- `/api/arc-reactor`;
+- `/api/wallet`;
+- `/api/readiness`;
+- `/api/rag-cache`;
+- `/api/actions/run-loop`;
+- `/api/actions/local-controls`.

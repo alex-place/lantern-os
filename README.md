@@ -36,6 +36,7 @@ explicitly marked held by the operator.
 - Windows desktop/start-menu launcher bundle
 - Shareholder HTML index at `surfaces/shareholder-index/index.html`
 - Tony Garage operator cockpit at `surfaces/tony-garage/index.html`
+- Lantern Garage full-stack app at `apps/lantern-garage/`
 - Arc Reactor confidence skill at `skills/arc-reactor-confidence/SKILL.md`
 - Arc Reactor status at `data/arc-reactor/status.json`
 - Store release lanes at `manifests/STORE-RELEASE-LANES.md`
@@ -97,10 +98,27 @@ Open the Movie 1 operator cockpit:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Open-TonyGarage.ps1
 ```
 
+If the browser shows stale styling, reopen through the launcher or refresh with
+cache bypass. The garage surface cache-busts its CSS, image, and document links.
+
 ## Local Controls Command
 
 Open the local control bridge and validate dashboard/MCP/Lantern health:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-LanternLocalControls.ps1
+```
+
+## Full-Stack App Command
+
+Start the in-house Lantern Garage app:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-LanternGarageApp.ps1
+```
+
+Then open:
+
+```text
+http://127.0.0.1:4177
 ```

@@ -4,10 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lantern Garage</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <meta name="description" content="Lantern OS Tony Garage local operator cockpit">
+  <link rel="stylesheet" href="styles.css?v=20260526-0719">
+  <script defer src="garage.js?v=20260526-0719"></script>
 </head>
 <body>
-  <main class="garage-shell">
+  <a class="skip-link" href="#main">Skip to garage controls</a>
+  <main id="main" class="garage-shell" tabindex="-1">
     <header class="hero">
       <div>
         <p class="eyebrow">Lantern OS</p>
@@ -18,17 +22,17 @@
         </p>
       </div>
       <aside class="status-stack" aria-label="Garage status">
-        <div class="status-row"><span>Repo</span><strong>pushed master</strong></div>
-        <div class="status-row"><span>Loop</span><strong>0 issues</strong></div>
-        <div class="status-row"><span>Suit Stage</span><strong>Movie 1 garage</strong></div>
+        <div class="status-row"><span>Repo</span><strong><span class="sr-only">Status: </span>pushed master</strong></div>
+        <div class="status-row"><span>Loop</span><strong><span class="sr-only">Status: </span>0 issues</strong></div>
+        <div class="status-row"><span>Suit Stage</span><strong><span class="sr-only">Status: </span>Movie 1 garage</strong></div>
       </aside>
     </header>
 
     <section class="command-band" aria-label="Primary actions">
-      <a class="command primary" href="../../artifacts/LANTERN-OS-WHITEPAPER-v0.1.pdf"><span>Print</span><strong>Whitepaper</strong></a>
-      <a class="command" href="../../artifacts/ADS-ARCHITECTURE-REVIEW-v0.1.pdf"><span>Review</span><strong>ADS Architecture</strong></a>
-      <a class="command" href="../../data/cash-loop/OUTREACH-SEND-PACKET.md"><span>Send</span><strong>Cash Sprint</strong></a>
-      <a class="command" href="../../dual-boot/WORKFORWARD-2026-05-26.md"><span>Prep</span><strong>Dual Boot</strong></a>
+      <a class="command primary new-tab" href="../../artifacts/LANTERN-OS-WHITEPAPER-v0.1.pdf"><span>Print</span><strong>Whitepaper</strong><em>opens new tab</em></a>
+      <a class="command new-tab" href="../../artifacts/ADS-ARCHITECTURE-REVIEW-v0.1.pdf"><span>Review</span><strong>ADS Architecture</strong><em>opens new tab</em></a>
+      <a class="command new-tab" href="../../data/cash-loop/OUTREACH-SEND-PACKET.md"><span>Send</span><strong>Cash Sprint</strong><em>opens new tab</em></a>
+      <a class="command new-tab" href="../../dual-boot/WORKFORWARD-2026-05-26.md"><span>Prep</span><strong>Dual Boot</strong><em>opens new tab</em></a>
     </section>
 
     <section class="systems" aria-label="Garage systems">
@@ -42,8 +46,8 @@
           <div><dt>Movie 2</dt><dd>54, needs public proof</dd></div>
           <div><dt>Movie 3</dt><dd>22, fleet mapped</dd></div>
         </dl>
-        <a href="../../reports/ARC-REACTOR-CONFIDENCE-READ.md">Open reactor read</a>
-        <a href="../../reports/ARC-REACTOR-12-STEP-CONVERGENCE-MODEL.md">Open 12-step model</a>
+        <a class="new-tab" href="../../reports/ARC-REACTOR-CONFIDENCE-READ.md">Open reactor read</a>
+        <a class="new-tab" href="../../reports/ARC-REACTOR-12-STEP-CONVERGENCE-MODEL.md">Open 12-step model</a>
       </article>
 
       <article class="system-panel">
@@ -53,7 +57,7 @@
           <div><dt>Whitepaper</dt><dd>v0.1 built and printable</dd></div>
           <div><dt>ADS review</dt><dd>blockers converted to action paths</dd></div>
         </dl>
-        <a href="../../reports/LANTERN-OS-WHITEPAPER-v0.1.md">Open source</a>
+        <a class="new-tab" href="../../reports/LANTERN-OS-WHITEPAPER-v0.1.md">Open source</a>
       </article>
 
       <article class="system-panel">
@@ -63,7 +67,7 @@
           <div><dt>Assets</dt><dd>42 hashed files</dd></div>
           <div><dt>Evidence</dt><dd>Bitcoin, Ethereum, governance, COMET LEAP</dd></div>
         </dl>
-        <a href="../../skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md">Open RAG house</a>
+        <a class="new-tab" href="../../skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md">Open RAG house</a>
       </article>
 
       <article class="system-panel">
@@ -73,7 +77,7 @@
           <div><dt>Install</dt><dd>held until D: shrink</dd></div>
           <div><dt>Next</dt><dd>100-250 GB unallocated</dd></div>
         </dl>
-        <a href="../../dual-boot/Start-DualBootPrep.ps1">Open prep launcher</a>
+        <a class="new-tab" href="../../dual-boot/Start-DualBootPrep.ps1">Open prep launcher</a>
       </article>
 
       <article class="system-panel">
@@ -83,7 +87,7 @@
           <div><dt>Draft invoice</dt><dd>$199 RAG cleanup</dd></div>
           <div><dt>Rule</dt><dd>no fake revenue</dd></div>
         </dl>
-        <a href="../../data/wallet/local-cash-wallet.json">Open wallet</a>
+        <a class="new-tab" href="../../data/wallet/local-cash-wallet.json">Open wallet</a>
       </article>
     </section>
 
@@ -98,15 +102,15 @@
         </ol>
       </div>
       <figure class="chart-frame">
-        <img src="../../skills/lantern-rag-dollhouse/assets/images/charts/comet_leaper_confidence_curve.png" alt="COMET LEAP confidence curve">
+        <img src="../../skills/lantern-rag-dollhouse/assets/images/charts/comet_leaper_confidence_curve.png?v=20260526-0719" alt="Line chart showing COMET LEAP confidence changing over time">
         <figcaption>Confidence is earned by looped proof, not vibes.</figcaption>
       </figure>
     </section>
 
     <footer>
-      <a href="../../reports/ADS-ARCHITECTURE-REVIEW-v0.1.md">ADS source</a>
-      <a href="../../manifests/BLOCKER-FIX-2026-05-26.md">Blocker fixes</a>
-      <a href="../../docs/V1-READINESS-GATES.md">v1 gates</a>
+      <a class="new-tab" href="../../reports/ADS-ARCHITECTURE-REVIEW-v0.1.md">ADS source</a>
+      <a class="new-tab" href="../../manifests/BLOCKER-FIX-2026-05-26.md">Blocker fixes</a>
+      <a class="new-tab" href="../../docs/V1-READINESS-GATES.md">v1 gates</a>
     </footer>
   </main>
 </body>

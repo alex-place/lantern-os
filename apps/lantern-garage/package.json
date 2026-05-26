@@ -1,0 +1,13 @@
+{
+  "name": "lantern-garage-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first Lantern OS garage full-stack app.",
+  "scripts": {
+    "start": "node server.js",
+    "validate": "node validate.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

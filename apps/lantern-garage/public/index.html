@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Lantern Garage App</title>
+  <link rel="stylesheet" href="styles.css?v=20260526-0725">
+  <script defer src="app.js?v=20260526-0725"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to controls</a>
+  <main id="main" class="shell" tabindex="-1">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Lantern OS Full Stack</p>
+        <h1>Garage App</h1>
+        <p class="subtitle">Live local APIs for Arc Reactor, wallet, dual boot, RAG cache, local controls, and v1 readiness.</p>
+      </div>
+      <section class="reactor" aria-label="Arc Reactor status">
+        <div class="reactor-core"><span id="movie1">--</span></div>
+        <p id="phase">Loading reactor...</p>
+      </section>
+    </header>
+
+    <section class="actions" aria-label="Primary controls">
+      <button id="refresh" type="button">Refresh Status</button>
+      <button id="runLoop" type="button">Run Loop</button>
+      <button id="localControls" type="button">Local Controls</button>
+      <a target="_blank" rel="noopener noreferrer" href="/repo/artifacts/LANTERN-OS-WHITEPAPER-v0.1.pdf">Whitepaper</a>
+      <a target="_blank" rel="noopener noreferrer" href="/repo/artifacts/ADS-ARCHITECTURE-REVIEW-v0.1.pdf">ADS</a>
+    </section>
+
+    <section class="grid" aria-label="System panels">
+      <article class="panel">
+        <h2>Power</h2>
+        <dl>
+          <div><dt>Movie 1</dt><dd id="m1">--</dd></div>
+          <div><dt>Movie 2</dt><dd id="m2">--</dd></div>
+          <div><dt>Movie 3</dt><dd id="m3">--</dd></div>
+          <div><dt>Avengers</dt><dd id="avengers">--</dd></div>
+        </dl>
+      </article>
+
+      <article class="panel">
+        <h2>Wallet</h2>
+        <dl>
+          <div><dt>Cleared</dt><dd id="cash">--</dd></div>
+          <div><dt>Pending</dt><dd id="pending">--</dd></div>
+          <div><dt>Invoices</dt><dd id="invoices">--</dd></div>
+        </dl>
+      </article>
+
+      <article class="panel">
+        <h2>Dual Boot</h2>
+        <dl>
+          <div><dt>Prep</dt><dd id="prep">--</dd></div>
+          <div><dt>Install</dt><dd id="install">--</dd></div>
+          <div><dt>Summary</dt><dd id="bootSummary">--</dd></div>
+        </dl>
+      </article>
+
+      <article class="panel">
+        <h2>Local Controls</h2>
+        <dl>
+          <div><dt>Dashboard</dt><dd id="dashboard">--</dd></div>
+          <div><dt>MCP</dt><dd id="mcp">--</dd></div>
+          <div><dt>AccessX</dt><dd id="accessx">--</dd></div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="wide">
+      <article class="panel">
+        <h2>RAG Cache</h2>
+        <ul id="ragCache"></ul>
+      </article>
+      <article class="panel log-panel">
+        <h2>Action Log</h2>
+        <pre id="log" aria-live="polite">Ready.</pre>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

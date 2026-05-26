@@ -24,6 +24,33 @@ body {
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+  padding: 10px 12px;
+  background: var(--ink);
+  color: #ffffff;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 .garage-shell {
   width: min(1240px, calc(100% - 28px));
   margin: 0 auto;
@@ -117,6 +144,7 @@ dt {
   padding: 14px;
   color: inherit;
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .command.primary {
@@ -125,6 +153,12 @@ dt {
 }
 
 .command strong { font-size: 1.16rem; }
+
+.command em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+}
 
 .system-panel {
   min-height: 250px;
@@ -200,6 +234,13 @@ a {
   margin-bottom: 8px;
 }
 
+a:focus-visible,
+.command:focus-visible,
+main:focus-visible {
+  outline: 3px solid #0b5f59;
+  outline-offset: 3px;
+}
+
 .workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 480px);
@@ -255,4 +296,20 @@ footer {
   .command-band,
   .systems { grid-template-columns: 1fr; }
   .garage-shell { width: min(100% - 18px, 1240px); padding-top: 12px; }
+  h1 { font-size: 3rem; }
+  .hero { gap: 14px; padding-top: 18px; }
+  .status-row { align-items: flex-start; flex-direction: column; }
+  .command { min-height: 76px; }
+  .system-panel { min-height: auto; }
+  .reactor-core { width: 108px; height: 108px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
