@@ -34,6 +34,7 @@ explicitly marked held by the operator.
 ## Initial Surfaces
 
 - Windows desktop/start-menu launcher bundle
+- Shareholder HTML index at `surfaces/shareholder-index/index.html`
 - NixOS dual-boot configuration path
 - COMET LEAP 30-day model artifact manifest
 - Buffett/COMET LEAP planning document references
