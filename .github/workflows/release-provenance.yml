@@ -1,0 +1,46 @@
+name: Release provenance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hash-release-artifacts:
+    runs-on: ubuntu-latest
+    outputs:
+      digests: ${{ steps.hash.outputs.digests }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify v1 release artifacts exist
+        run: |
+          test -f artifacts/COMET-LEAP-TOKEN-BURN-REVENUE-CONVERGENCE-v1.pdf
+          test -f reports/COMET-LEAP-TOKEN-BURN-REVENUE-CONVERGENCE-v1.md
+          test -f manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md
+          test -f manifests/foundry-shareholder-repos.md
+
+      - name: Generate subject hashes
+        id: hash
+        run: |
+          set -euo pipefail
+          files="
+          artifacts/COMET-LEAP-TOKEN-BURN-REVENUE-CONVERGENCE-v1.pdf
+          reports/COMET-LEAP-TOKEN-BURN-REVENUE-CONVERGENCE-v1.md
+          manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md
+          manifests/foundry-shareholder-repos.md
+          "
+          echo "hashes=$(sha256sum $files | base64 -w0)" >> "${GITHUB_OUTPUT}"
+
+  provenance:
+    needs: [hash-release-artifacts]
+    permissions:
+      actions: read
+      id-token: write
+      contents: read
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.hash-release-artifacts.outputs.digests }}"
+      upload-assets: false

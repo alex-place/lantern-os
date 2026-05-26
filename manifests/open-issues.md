@@ -73,3 +73,20 @@ The convergence loop fixes the first 2-4 actionable issues before expansion.
    - Fix: treat phones as Foundry edge nodes first; hold true phone dual boot
      until exact device, backup, boot path, risk, and rollback are verified.
    - Status: fixed.
+
+## Fixed in Latest Adds Loop
+
+1. `LATEST-ADDS-CI-001`: Jekyll Docker workflow did not match the repo's static
+   shareholder surface.
+   - Fix: replaced it with `.github/workflows/static-surface-ci.yml`.
+   - Status: fixed.
+
+2. `LATEST-ADDS-SLSA-001`: SLSA workflow hashed fake placeholder artifacts.
+   - Fix: replaced it with `.github/workflows/release-provenance.yml` hashing
+     real Lantern artifacts.
+   - Status: fixed.
+
+3. `LATEST-ADDS-RELEASE-001`: Provenance was wired to release creation before
+   v1.0.0 approval.
+   - Fix: made provenance manual-only and disabled release asset upload.
+   - Status: fixed.

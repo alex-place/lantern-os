@@ -1,0 +1,54 @@
+name: Static surface CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify shareholder index exists
+        run: |
+          test -f surfaces/shareholder-index/index.html
+          test -f surfaces/shareholder-index/styles.css
+
+      - name: Check required Lantern documents
+        run: |
+          test -f README.md
+          test -f AGENTS.md
+          test -f docs/CONVERGENCE-LOOP.md
+          test -f manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md
+          test -f manifests/foundry-shareholder-repos.md
+          test -f dual-boot/SONS-PC-READINESS.md
+
+      - name: Verify HTML surface links
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          html_path = Path("surfaces/shareholder-index/index.html")
+          html = html_path.read_text(encoding="utf-8")
+          hrefs = re.findall(r'href="([^"]+)"', html)
+          missing = []
+          for href in hrefs:
+            if href.startswith(("http://", "https://", "#")):
+              continue
+            target = (html_path.parent / href).resolve()
+            try:
+              target.relative_to(Path.cwd().resolve())
+            except ValueError:
+              missing.append(f"{href} leaves repo")
+              continue
+            if not target.exists():
+              missing.append(href)
+          if missing:
+            raise SystemExit("Missing HTML targets: " + ", ".join(missing))
