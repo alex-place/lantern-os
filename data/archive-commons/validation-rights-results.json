@@ -1,0 +1,30 @@
+﻿{
+    "generatedAt":  "2026-05-26T07:00:43.5952583-04:00",
+    "mode":  "archive_advancedsearch",
+    "rowsRequested":  1,
+    "policy":  "metadata-first; rights-gated; no bulk media downloads",
+    "items":  [
+                  {
+                      "state":  "metadata_only",
+                      "source":  "internet_archive_advancedsearch",
+                      "identifier":  "swak220",
+                      "title":  "Skeptics with a K: Episode #220",
+                      "creator":  "Merseyside Skeptics Society",
+                      "date":  "2018-03-22T00:00:00Z",
+                      "mediatype":  "audio",
+                      "collection":  [
+                                         "podcasts_mirror_gnuarchives",
+                                         "podcasts_mirror"
+                                     ],
+                      "licenseurl":  "https://creativecommons.org/licenses/by/4.0/",
+                      "rights":  null,
+                      "publicdate":  "2020-04-24T16:51:31Z",
+                      "itemUrl":  "https://archive.org/details/swak220",
+                      "metadataUrl":  "https://archive.org/metadata/swak220",
+                      "rightsState":  "candidate_open_rights",
+                      "downloadAllowed":  false,
+                      "downloadDecision":  "candidate_download_after_operator_review",
+                      "reviewAction":  "Operator must verify license, expected size, storage target, and rollback plan before download."
+                  }
+              ]
+}

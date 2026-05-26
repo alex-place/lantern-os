@@ -300,6 +300,18 @@ The latest convergence pass moved scattered work into these durable surfaces:
 | Ethereum governance | `manifests/evidence/ethereum-governance.md` | `operator_asserted` | governance page excerpt provided by operator |
 | Lantern whitepaper | `reports/LANTERN-OS-WHITEPAPER-v0.1.md` | `local_inspected` | canonical whitepaper source |
 | ADS architecture review | `reports/ADS-ARCHITECTURE-REVIEW-v0.1.md` | `local_inspected` | architecture decision-system review |
+| Blocker fix pass | `manifests/BLOCKER-FIX-2026-05-26.md` | `local_inspected` | dual-boot prep, cash send, orchestrator dirty fix, rights gate |
+
+## 18. Latest Blocker Fix Pass
+
+Four blockers were converted into concrete states:
+
+| Former Blocker | Fixed State | Path |
+|---|---|---|
+| dual boot requires physical action | prep launcher and saved validation path | `dual-boot/Start-DualBootPrep.ps1` |
+| cash sprint has no cleared cash | send-ready packet and factual ledger writer | `data/cash-loop/OUTREACH-SEND-PACKET.md`, `scripts/Add-WalletLedgerEvent.ps1` |
+| orchestrator repo dirty | dirty health-check fix committed and pushed | `gm-agent-orchestrator` commit `f4eb6b5` |
+| Archive media rights unclear | explicit rights gate; downloads disabled by default | `data/archive-commons/RIGHTS-REVIEW-GATE.md`, `scripts/Invoke-ArchiveCommonsBatch.ps1` |
 
 ## 15. Dual Boot Current Reality
 

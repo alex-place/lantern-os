@@ -18,6 +18,54 @@ $outputPath = Join-Path $root $Output
 $outputDir = Split-Path -Parent $outputPath
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
+function Get-RightsDecision {
+    param(
+        [string]$LicenseUrl,
+        [string]$Rights,
+        [string]$Title = "",
+        [string]$Collection = "",
+        [string]$Source = "internet_archive"
+    )
+
+    $combined = @($LicenseUrl, $Rights, $Title, $Collection) -join " "
+    $openSignal = $combined -match "creativecommons|creative commons|public domain|publicdomain|cc0|gpl|mit license|apache license|bsd license|open source"
+    $restrictedSignal = $combined -match "controlled digital lending|borrow|commercial|all rights reserved"
+
+    if ($Source -eq "wayback") {
+        return [pscustomobject]@{
+            rightsState = "needs_rights_review"
+            downloadAllowed = $false
+            downloadDecision = "allow_metadata_only"
+            reviewAction = "Use as citation metadata only; Wayback capture does not grant republishing rights."
+        }
+    }
+
+    if ($restrictedSignal -and -not $openSignal) {
+        return [pscustomobject]@{
+            rightsState = "held"
+            downloadAllowed = $false
+            downloadDecision = "reject_likely_restricted"
+            reviewAction = "Do not download; rights signal suggests restriction or controlled access."
+        }
+    }
+
+    if ($openSignal) {
+        return [pscustomobject]@{
+            rightsState = "candidate_open_rights"
+            downloadAllowed = $false
+            downloadDecision = "candidate_download_after_operator_review"
+            reviewAction = "Operator must verify license, expected size, storage target, and rollback plan before download."
+        }
+    }
+
+    return [pscustomobject]@{
+        rightsState = "needs_rights_review"
+        downloadAllowed = $false
+        downloadDecision = "hold_no_rights_signal"
+        reviewAction = "Keep metadata only until license or redistribution rights are verified."
+    }
+}
+
 function Invoke-ArchiveSearch {
     param(
         [string]$SearchQuery,
@@ -48,6 +96,7 @@ function Invoke-ArchiveSearch {
     $response = Invoke-RestMethod -Uri $fullUri -Method Get
 
     foreach ($doc in $response.response.docs) {
+        $rightsDecision = Get-RightsDecision -LicenseUrl $doc.licenseurl -Rights $doc.rights -Title $doc.title -Collection (($doc.collection -join " "))
         [pscustomobject]@{
             state = "metadata_only"
             source = "internet_archive_advancedsearch"
@@ -62,11 +111,10 @@ function Invoke-ArchiveSearch {
             publicdate = $doc.publicdate
             itemUrl = "https://archive.org/details/$($doc.identifier)"
             metadataUrl = "https://archive.org/metadata/$($doc.identifier)"
-            rightsState = if (($doc.licenseurl -match "creativecommons|publicdomain|cc0") -or ($doc.rights -match "public domain|creative commons|cc0")) {
-                "candidate_open_rights"
-            } else {
-                "needs_rights_review"
-            }
+            rightsState = $rightsDecision.rightsState
+            downloadAllowed = $rightsDecision.downloadAllowed
+            downloadDecision = $rightsDecision.downloadDecision
+            reviewAction = $rightsDecision.reviewAction
         }
     }
 }
@@ -94,6 +142,7 @@ function Invoke-WaybackCdx {
     if ($rows.Count -le 1) { return @() }
 
     foreach ($row in $rows[1..($rows.Count - 1)]) {
+        $rightsDecision = Get-RightsDecision -Source "wayback"
         [pscustomobject]@{
             state = "metadata_only"
             source = "wayback_cdx"
@@ -104,7 +153,10 @@ function Invoke-WaybackCdx {
             digest = $row[4]
             length = $row[5]
             replayUrl = "https://web.archive.org/web/$($row[0])/$($row[1])"
-            rightsState = "needs_rights_review"
+            rightsState = $rightsDecision.rightsState
+            downloadAllowed = $rightsDecision.downloadAllowed
+            downloadDecision = $rightsDecision.downloadDecision
+            reviewAction = $rightsDecision.reviewAction
         }
     }
 }

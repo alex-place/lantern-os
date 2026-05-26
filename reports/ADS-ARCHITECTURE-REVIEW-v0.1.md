@@ -34,14 +34,18 @@ The architecture is strong enough for:
 - school/art packet sharing;
 - local wallet and invoice tracking.
 
-It is not yet v1.0.0 because the following remain unresolved:
+It is not yet v1.0.0 because the following remain held or operator-action
+dependent:
 
 - no operator approval for v1 release;
-- dual boot install still requires physical disk/installer action;
-- cash sprint has draft invoice state but no cleared cash yet;
-- orchestrator repo is dirty outside this repo;
-- Archive/Wayback/media lane is metadata-first and still needs rights review
-  before media ingestion.
+- dual boot install is now prep-scripted, but partition shrink and installer
+  action remain physical operator steps;
+- cash sprint is now send-ready, but cleared cash remains `$0` until money
+  actually clears;
+- orchestrator dirty state was fixed and pushed in `gm-agent-orchestrator`
+  commit `f4eb6b5`;
+- Archive/Wayback/media lane now has an explicit rights gate; full downloads
+  remain held until operator rights/storage review.
 
 ## Architecture Map
 
@@ -52,11 +56,11 @@ It is not yet v1.0.0 because the following remain unresolved:
 | Evidence Plane | manifests and evidence records | `manifests/` | PASS: Bitcoin/Ethereum/governance anchors recorded |
 | Decision Plane | Bayesian world model | `data/world-model/belief-ledger.jsonl` | CANDIDATE: ledger exists, needs continuous polling |
 | Money Plane | Local wallet and invoice drafts | `data/wallet/` | PASS: factual ledger, no fake revenue |
-| Execution Plane | Orchestrator queue | `C:\Users\alexp\Documents\gm-agent-orchestrator` | CANDIDATE: task queued, repo dirty |
+| Execution Plane | Orchestrator queue | `C:\Users\alexp\Documents\gm-agent-orchestrator` | PASS: dirty health-check fix pushed in `f4eb6b5`; cash task queued |
 | Device Plane | Dual boot bundle | `dual-boot/` | CANDIDATE: prep-ready, install held |
 | Product Plane | Whitepaper, atlas, cash sprint | `reports/` and `artifacts/` | PASS: printable artifacts exist |
 | Learning Plane | Gage school art packet | `school-packets/gage-high-intel-art/` | PASS: packet exists, privacy-aware framing |
-| Commons Plane | Archive/Wayback/OSS batch | `scripts/Invoke-ArchiveCommonsBatch.ps1` | HOLD: rights review before downloads |
+| Commons Plane | Archive/Wayback/OSS batch | `scripts/Invoke-ArchiveCommonsBatch.ps1` | CANDIDATE/HOLD: explicit rights gate added; downloads still operator-held |
 
 ## Top Decisions
 
@@ -92,8 +96,8 @@ It is not yet v1.0.0 because the following remain unresolved:
 | Physical disk mutation during dual boot | high | hard boundary in docs/scripts | operator-only Disk Management step |
 | Fake revenue or blurred wallet state | high | cleared cash remains `$0` | record sent/paid events only when real |
 | Repo sprawl returning | medium | master repo and RAG flat file | update dollhouse after every sprint |
-| Orchestrator dirty state | medium | inspected, not overwritten | review `config/local-services.json` and service script separately |
-| External media rights | medium | metadata-first commons lane | add rights column before downloads |
+| Orchestrator dirty state | resolved | committed and pushed `f4eb6b5` | keep supervisor health checks responsive |
+| External media rights | medium | metadata-first commons lane plus rights gate | operator verifies rights before downloads |
 | Whitepaper overclaiming | medium | v0.1 draft status and boundaries | revise after first cash result |
 | V1 release too early | high | release gate hold | operator says promote only after gates pass |
 
@@ -105,10 +109,10 @@ It is not yet v1.0.0 because the following remain unresolved:
 | RAG Integrity | pass | 42 copied assets, SHA manifest rebuilt | rehash after any asset add |
 | Whitepaper | pass | Markdown and PDF built | use as canonical public artifact |
 | Wallet | pass | local wallet JSON and JSONL parse | record only factual events |
-| Cash Sprint | candidate | P0 orch task queued, invoice draft exists | send/record 5 warm messages |
+| Cash Sprint | candidate/send-ready | P0 orch task queued, send packet and invoice draft exist | send/record 5 warm messages |
 | Dual Boot Prep | candidate | prep-ready, no failures | run elevated and shrink D: manually |
 | Dual Boot Install | held | 0 GB unallocated space | operator physical action |
-| Commons Batch | held/candidate | metadata script exists | rights review before ingestion |
+| Commons Batch | candidate/held-downloads | metadata script and rights gate exist | downloads need operator rights/storage review |
 | v1.0.0 | held | operator approval missing | no release/tag yet |
 
 ## Current Dual Boot ADS Finding
@@ -122,7 +126,8 @@ primary blocker: 0.0 GB unallocated install space
 D: free:         1636.9 GB of 1863.0 GB
 ```
 
-ADS decision: promote preparation, hold installation.
+ADS decision: promote preparation, hold installation. Preparation is now
+scripted by `dual-boot/Start-DualBootPrep.ps1`.
 
 Next physical step:
 
@@ -140,8 +145,20 @@ pendingInvoiceUsd: 199
 firstInvoice:      INV-COMET-LEAP-RAG-001
 ```
 
-ADS decision: promote local ledger, hold payment-provider integration until a
-real buyer needs a real payment path.
+ADS decision: promote local ledger and send packet, hold payment-provider
+integration until a real buyer needs a real payment path.
+
+Send-ready packet:
+
+```text
+data/cash-loop/OUTREACH-SEND-PACKET.md
+```
+
+Wallet event logger:
+
+```text
+scripts/Add-WalletLedgerEvent.ps1
+```
 
 ## Current RAG ADS Finding
 
@@ -167,6 +184,17 @@ asset manifest before pushing.
 6. Shrink D: manually by 100-250GB only after backup/key checks.
 7. Rerun readiness and save the result.
 8. Update this ADS review after the first cash outcome or dual-boot prep change.
+
+## Blocker Fix Pass
+
+The operator-requested blocker fix pass created:
+
+- `dual-boot/Start-DualBootPrep.ps1`;
+- `data/cash-loop/OUTREACH-SEND-PACKET.md`;
+- `scripts/Add-WalletLedgerEvent.ps1`;
+- `data/archive-commons/RIGHTS-REVIEW-GATE.md`;
+- `manifests/BLOCKER-FIX-2026-05-26.md`;
+- orchestrator fix commit `f4eb6b5`.
 
 ## Architecture Verdict
 

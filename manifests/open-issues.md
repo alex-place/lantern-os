@@ -194,3 +194,28 @@ The convergence loop fixes the first 2-4 actionable issues before expansion.
 5. `CASH-LOOP-002`: Cash loop language still implied creating new offers.
    - Fix: tightened Day 1 and sprint language to execute existing offers only.
    - Status: fixed.
+
+## Fixed in Blocker Fix Pass
+
+1. `DUALBOOT-PREP-001`: Dual boot blocker needed a one-command prep path
+   without unsafe automation.
+   - Fix: added `dual-boot/Start-DualBootPrep.ps1`.
+   - Status: fixed; physical install remains held.
+
+2. `CASH-SEND-001`: Cash sprint had an invoice draft but no send packet or
+   factual event writer.
+   - Fix: added `data/cash-loop/OUTREACH-SEND-PACKET.md` and
+     `scripts/Add-WalletLedgerEvent.ps1`.
+   - Status: fixed; cleared cash still requires real payment.
+
+3. `ORCH-DIRTY-001`: Orchestrator dirty state needed validation and closure.
+   - Fix: validated dashboard/MCP health and pushed `gm-agent-orchestrator`
+     commit `f4eb6b5`.
+   - Status: fixed.
+
+4. `ARCHIVE-RIGHTS-001`: Archive/Wayback lane needed explicit rights decisions
+   before media ingestion.
+   - Fix: added `data/archive-commons/RIGHTS-REVIEW-GATE.md` and updated
+     `scripts/Invoke-ArchiveCommonsBatch.ps1` to emit `downloadAllowed=false`
+     plus a `downloadDecision`.
+   - Status: fixed; downloads remain operator-held.

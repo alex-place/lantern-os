@@ -1,0 +1,90 @@
+﻿{
+    "generatedAt":  "2026-05-26T07:00:02.3226205-04:00",
+    "readyForPrep":  true,
+    "readyForInstall":  false,
+    "pass":  8,
+    "warn":  4,
+    "fail":  0,
+    "held":  1,
+    "checks":  [
+                   {
+                       "check":  "Elevation",
+                       "status":  "warn",
+                       "message":  "Not running elevated; BitLocker, Secure Boot, reagentc, and BCD checks may be incomplete.",
+                       "nextAction":  "Run PowerShell as Administrator for final pre-install validation."
+                   },
+                   {
+                       "check":  "Firmware Mode",
+                       "status":  "pass",
+                       "message":  "UEFI detected.",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Windows",
+                       "status":  "pass",
+                       "message":  "Microsoft Windows 11 Pro 10.0.26200",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Secure Boot",
+                       "status":  "warn",
+                       "message":  "Secure Boot status could not be read without elevation or firmware support.",
+                       "nextAction":  "Check Secure Boot in firmware setup or rerun elevated."
+                   },
+                   {
+                       "check":  "Disk 1 Partition Style",
+                       "status":  "pass",
+                       "message":  "PNY CS900 500GB SSD: GPT, 466 GB, Healthy.",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Disk 0 Partition Style",
+                       "status":  "pass",
+                       "message":  "ST2000DM008-2FR102: GPT, 1863 GB, Healthy.",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Volume C: Free Space",
+                       "status":  "pass",
+                       "message":  "35.6 GB free of 464.9 GB",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Volume D: Free Space",
+                       "status":  "pass",
+                       "message":  "1,636.9 GB free of 1,863.0 GB",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Shrink Candidate",
+                       "status":  "pass",
+                       "message":  "At least one volume has 100GB+ free: D:.",
+                       "nextAction":  "Shrink one candidate in Disk Management to create unallocated space."
+                   },
+                   {
+                       "check":  "EFI System Partition",
+                       "status":  "pass",
+                       "message":  "EFI partition present.",
+                       "nextAction":  ""
+                   },
+                   {
+                       "check":  "Unallocated Install Space",
+                       "status":  "warn",
+                       "message":  "Only 0.0 GB unallocated. Windows is dual-boot-capable, but the Linux installer will need unallocated space.",
+                       "nextAction":  "Shrink D: or C: from Windows Disk Management before installing NixOS."
+                   },
+                   {
+                       "check":  "BitLocker",
+                       "status":  "warn",
+                       "message":  "Not checked because this shell is not elevated.",
+                       "nextAction":  "Run elevated and back up recovery keys before partition changes."
+                   },
+                   {
+                       "check":  "Physical Install Boundary",
+                       "status":  "held",
+                       "message":  "The actual OS install, partition shrink, bootloader choice, and reboot must be done by the operator at the keyboard.",
+                       "nextAction":  "Use dual-boot/INSTALL-CHECKLIST.md."
+                   }
+               ],
+    "summary":  "PC is dual-boot-capable, but install space is not prepared yet."
+}
