@@ -35,11 +35,31 @@ explicitly marked held by the operator.
 
 - Windows desktop/start-menu launcher bundle
 - Shareholder HTML index at `surfaces/shareholder-index/index.html`
+- Printable Super Jarvis front page at `artifacts/SUPER-JARVIS-LANTERN-OS-FRONT-PAGE.pdf`
 - COMET LEAP agile methodology skill at `skills/comet-leap-agile/SKILL.md`
+- Flat Lantern RAG dollhouse skill at `skills/lantern-rag-dollhouse/SKILL.md`
+- Super Jarvis Lantern OS router skill at `skills/super-jarvis-lantern-os/SKILL.md`
+- Clean Storm Agile sprint skill at `skills/clean-storm-agile/SKILL.md`
+- Bayesian world-model skill at `skills/bayesian-world-model/SKILL.md`
+- Archive/Wayback/commons batch skill at `skills/archive-commons-batch/SKILL.md`
 - NixOS dual-boot configuration path
 - COMET LEAP 30-day model artifact manifest
 - Buffett/COMET LEAP planning document references
 - Lantern app/runtime surface references
+
+## Printable Report
+
+Use this front page for quick print/share:
+
+```text
+artifacts/SUPER-JARVIS-LANTERN-OS-FRONT-PAGE.pdf
+```
+
+Master convergence PDF:
+
+```text
+artifacts/COMET-LEAP-TOKEN-BURN-REVENUE-CONVERGENCE-v1.pdf
+```
 
 ## Non-Goals For This Repo
 

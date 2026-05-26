@@ -40,12 +40,14 @@ Read these before changing the report:
    - official web source;
    - operator assertion;
    - projection.
-7. Update Markdown first.
-8. Regenerate the PDF with `scripts/Build-MasterConvergencePdf.ps1`.
-9. Validate PDF header, page extraction, and remote link.
-10. Record what changed in `manifests/open-issues.md` or a dated convergence
+7. Use `skills/bayesian-world-model/SKILL.md` when a claim needs a prior,
+   posterior, confidence drift, or durable belief-ledger row.
+8. Update Markdown first.
+9. Regenerate the PDF with `scripts/Build-MasterConvergencePdf.ps1`.
+10. Validate PDF header, page extraction, and remote link.
+11. Record what changed in `manifests/open-issues.md` or a dated convergence
     manifest.
-11. Commit and push when validation passes.
+12. Commit and push when validation passes.
 
 ## Master PDF Rules
 

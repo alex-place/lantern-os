@@ -1,0 +1,64 @@
+﻿{
+    "generatedAt":  "2026-05-26T06:04:49.5741793-04:00",
+    "mode":  "archive_advancedsearch",
+    "rowsRequested":  3,
+    "policy":  "metadata-first; rights-gated; no bulk media downloads",
+    "items":  [
+                  {
+                      "state":  "metadata_only",
+                      "source":  "internet_archive_advancedsearch",
+                      "identifier":  "20230715_20230715_1646",
+                      "title":  "محسن المشعلي يامرحبا",
+                      "creator":  null,
+                      "date":  null,
+                      "mediatype":  "audio",
+                      "collection":  [
+                                         "opensource_audio"
+                                     ],
+                      "licenseurl":  null,
+                      "rights":  null,
+                      "publicdate":  "2023-07-15T16:46:43Z",
+                      "itemUrl":  "https://archive.org/details/20230715_20230715_1646",
+                      "metadataUrl":  "https://archive.org/metadata/20230715_20230715_1646",
+                      "rightsState":  "needs_rights_review"
+                  },
+                  {
+                      "state":  "metadata_only",
+                      "source":  "internet_archive_advancedsearch",
+                      "identifier":  "20220326_20220326_2055",
+                      "title":  "د. محمد محق جماعة طالبان",
+                      "creator":  null,
+                      "date":  null,
+                      "mediatype":  "audio",
+                      "collection":  [
+                                         "opensource_audio",
+                                         "community"
+                                     ],
+                      "licenseurl":  null,
+                      "rights":  null,
+                      "publicdate":  "2022-03-26T20:56:32Z",
+                      "itemUrl":  "https://archive.org/details/20220326_20220326_2055",
+                      "metadataUrl":  "https://archive.org/metadata/20220326_20220326_2055",
+                      "rightsState":  "needs_rights_review"
+                  },
+                  {
+                      "state":  "metadata_only",
+                      "source":  "internet_archive_advancedsearch",
+                      "identifier":  "programa-charruas-de-oro",
+                      "title":  "Charrúas de Oro _ Trashumantes en Radio",
+                      "creator":  null,
+                      "date":  null,
+                      "mediatype":  "audio",
+                      "collection":  [
+                                         "opensource_audio",
+                                         "community"
+                                     ],
+                      "licenseurl":  null,
+                      "rights":  null,
+                      "publicdate":  "2021-06-06T18:02:53Z",
+                      "itemUrl":  "https://archive.org/details/programa-charruas-de-oro",
+                      "metadataUrl":  "https://archive.org/metadata/programa-charruas-de-oro",
+                      "rightsState":  "needs_rights_review"
+                  }
+              ]
+}

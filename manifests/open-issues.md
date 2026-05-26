@@ -102,3 +102,57 @@ The convergence loop fixes the first 2-4 actionable issues before expansion.
    manifests and commits.
    - Fix: added `skills/comet-leap-agile/references/past-convergences.md`.
    - Status: fixed.
+
+## Fixed in Lantern RAG Dollhouse Skill Loop
+
+1. `LANTERN-RAG-001`: Literal PDF and image artifacts were not bundled inside a
+   dedicated RAG dollhouse skill.
+   - Fix: added `skills/lantern-rag-dollhouse` with copied COMET LEAP PDFs,
+     30-day images, chart images, and SHA256 manifest.
+   - Status: fixed.
+
+2. `LANTERN-RAG-002`: The dollhouse lacked a single flat file separating
+   local-inspected repos, copied assets, GitHub metadata-only repos, and future
+   clone targets.
+   - Fix: added
+     `skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md`.
+   - Status: fixed.
+
+## Fixed in Super Jarvis / Archive Commons Loop
+
+1. `SUPER-JARVIS-001`: Lantern OS did not have one top-level skill router.
+   - Fix: added `skills/super-jarvis-lantern-os/SKILL.md`.
+   - Status: fixed.
+
+2. `ARCHIVE-COMMONS-001`: Archive.org, Wayback, OSS, free music, movies, and
+   games lacked a rights-aware batch lane.
+   - Fix: added `skills/archive-commons-batch/SKILL.md` and
+     `scripts/Invoke-ArchiveCommonsBatch.ps1`.
+   - Status: fixed.
+
+## Fixed in Clean Storm Agile Loop
+
+1. `CLEAN-STORM-001`: The fast repeatable sprint method was not captured as a
+   dedicated skill.
+   - Fix: added `skills/clean-storm-agile/SKILL.md`.
+   - Status: fixed.
+
+2. `CLEAN-STORM-002`: The 12-step lightning loop was not visible as a manifest.
+   - Fix: added `manifests/CLEAN-STORM-AGILE-METHOD.md`.
+   - Status: fixed.
+
+## Fixed in Bayesian World Model Loop
+
+1. `BAYES-WORLD-001`: The dollhouse lacked an explicit real-time polled
+   Bayesian belief layer.
+   - Fix: added `skills/bayesian-world-model/SKILL.md` and
+     `manifests/BAYESIAN-WORLD-MODEL.md`.
+   - Status: fixed.
+
+## Fixed in Printable Front Page Loop
+
+1. `PRINT-FRONT-001`: The Super Jarvis / Lantern OS state did not have a
+   printable front-page report.
+   - Fix: added `reports/SUPER-JARVIS-LANTERN-OS-FRONT-PAGE.md` and generated
+     `artifacts/SUPER-JARVIS-LANTERN-OS-FRONT-PAGE.pdf`.
+   - Status: fixed.
