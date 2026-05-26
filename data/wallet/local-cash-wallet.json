@@ -1,0 +1,39 @@
+{
+  "name": "Lantern Local Cash Wallet",
+  "generatedAt": "2026-05-26T07:00:00-04:00",
+  "repo": "https://github.com/alex-place/lantern-os",
+  "localRoot": "C:\\tmp\\lantern-os",
+  "currency": "USD",
+  "type": "local_ledger_not_bank_or_crypto_wallet",
+  "clearedCashUsd": 0,
+  "pendingInvoiceUsd": 199,
+  "draftInvoiceUsd": 199,
+  "receivedPayments": [],
+  "pendingInvoices": [
+    {
+      "invoiceId": "INV-COMET-LEAP-RAG-001",
+      "offer": "Local RAG / Repo Cleanup Sprint",
+      "amountUsd": 199,
+      "status": "draft_ready_to_send",
+      "invoicePath": "data/wallet/invoices/INV-COMET-LEAP-RAG-001.md",
+      "proofAssets": [
+        "artifacts/COMET-LEAP-11-DAY-CASH-SPRINT.pdf",
+        "reports/LANTERN-PRODUCT-UNIVERSE-ATLAS.md",
+        "skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md"
+      ]
+    }
+  ],
+  "existingOffersOnly": [
+    "COMET LEAP Founder Report Pack",
+    "Local RAG / Repo Cleanup Sprint",
+    "Windows / Lantern Setup Session",
+    "Parent / Homeschool Creative Learning Packet",
+    "Small-Business AI Cleanup and Training Session"
+  ],
+  "rules": [
+    "Do not record payment until funds clear.",
+    "Do not create new offers during the 11-day sprint.",
+    "Record outreach, objections, invoices, and cleared cash as ledger events.",
+    "Keep secrets and private payment credentials out of Git."
+  ]
+}

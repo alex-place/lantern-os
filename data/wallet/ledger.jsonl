@@ -1,0 +1,2 @@
+{"timestamp":"2026-05-26T07:00:00-04:00","event":"wallet_created","amountUsd":0,"balanceUsd":0,"status":"local_ledger_created","evidence":"Created Lantern Local Cash Wallet for COMET LEAP 11-day cash sprint; no revenue recorded."}
+{"timestamp":"2026-05-26T07:00:00-04:00","event":"invoice_drafted","invoiceId":"INV-COMET-LEAP-RAG-001","offer":"Local RAG / Repo Cleanup Sprint","amountUsd":199,"balanceUsd":0,"status":"draft_ready_to_send","evidence":"Existing offer from reports/COMET-LEAP-11-DAY-CASH-SPRINT.md."}

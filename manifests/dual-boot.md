@@ -1,6 +1,7 @@
 # Dual Boot Manifest
 
-Status: complete dual boot installer bundle ready for operator review.
+Status: complete dual boot installer bundle ready for operator review, with
+current PC readiness now validated for prep.
 
 ## Source Assets
 
@@ -38,9 +39,43 @@ Complete dual boot installer now available in `dual-boot/` directory:
 - [x] Rollback and recovery procedures captured
 - [x] NixOS configuration usage guide created
 - [x] Boundary rules enforced (no unattended disk/BCD/firmware mutation)
+- [x] Current PC read-only readiness run completed on 2026-05-26
 - [ ] Operator review and approval
+- [ ] Elevated administrator readiness run
+- [ ] D: shrink creates 100-250GB unallocated install space
 - [ ] At least one successful test installation
 - [ ] Post-installation validation logged
+
+## Current PC Readiness Snapshot
+
+Latest local result:
+
+```text
+readyForPrep:    true
+readyForInstall: false
+failures:        0
+held:            1 physical install boundary
+```
+
+Reason install is not ready yet:
+
+```text
+Unallocated install space: 0.0 GB
+```
+
+The current machine is dual-boot-capable, but needs the operator to create
+unallocated space first. D: is the safe candidate from the read-only scan:
+
+```text
+D: free: 1636.9 GB of 1863.0 GB
+```
+
+Durable readiness record:
+
+```text
+data/dual-boot/latest-readiness.json
+dual-boot/WORKFORWARD-2026-05-26.md
+```
 
 ## Promotion Status
 
@@ -72,12 +107,14 @@ This dual boot bundle is complete and ready for operator review and physical ins
 
 ## Next Steps
 
-1. Operator reviews all documentation in `dual-boot/README.md`
-2. Run `Test-DualBootReadiness.ps1` to validate system
-3. Review hardware against `HARDWARE-ASSUMPTIONS.md`
-4. Prepare system (backup, media, checklist)
-5. Follow `INSTALL-CHECKLIST.md` step by step
-6. After successful install, run convergence loop
-7. Log validation results to `manifests/validation/`
-8. Approve for promotion to v1.0.0
-
+1. Run `Test-DualBootReadiness.ps1` from elevated PowerShell.
+2. Back up BitLocker recovery keys if BitLocker is enabled.
+3. Create recovery media and confirm critical file backup.
+4. Shrink D: by 100-250GB using Windows Disk Management.
+5. Leave the new space unallocated.
+6. Rerun readiness and confirm `readyForInstall: true`.
+7. Review `dual-boot/INSTALL-CHECKLIST.md`.
+8. Boot NixOS USB and proceed only with operator physical approval.
+9. After successful install, run convergence loop.
+10. Log validation results to `manifests/validation/`.
+11. Approve for promotion to v1.0.0 only after operator review.

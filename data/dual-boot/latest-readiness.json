@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-05-26T06:48:12-04:00",
+  "machine": "current Windows PC",
+  "readyForPrep": true,
+  "readyForInstall": false,
+  "summary": "PC is dual-boot-capable, but install space is not prepared yet.",
+  "passes": 8,
+  "warnings": 4,
+  "failures": 0,
+  "held": 1,
+  "observed": {
+    "firmware": "UEFI detected",
+    "windows": "Microsoft Windows 11 Pro 10.0.26200",
+    "disk1": "PNY CS900 500GB SSD, GPT, 466 GB, Healthy",
+    "disk0": "ST2000DM008-2FR102, GPT, 1863 GB, Healthy",
+    "cFree": "35.6 GB free of 464.9 GB",
+    "dFree": "1636.9 GB free of 1863.0 GB",
+    "shrinkCandidate": "D:",
+    "efiSystemPartition": "present",
+    "unallocatedInstallSpace": "0.0 GB"
+  },
+  "warnings": [
+    "Not running elevated; BitLocker, Secure Boot, reagentc, and BCD checks may be incomplete.",
+    "Secure Boot status could not be read without elevation or firmware support.",
+    "Only 0.0 GB unallocated. Windows is dual-boot-capable, but the Linux installer will need unallocated space.",
+    "BitLocker was not checked because this shell is not elevated."
+  ],
+  "nextPhysicalActions": [
+    "Run dual-boot/Test-DualBootReadiness.ps1 from an elevated PowerShell.",
+    "Back up important files and confirm Windows recovery media.",
+    "Back up BitLocker recovery keys if BitLocker is enabled.",
+    "Use Windows Disk Management to shrink D: and create 100-250 GB unallocated space.",
+    "Rerun readiness validation and confirm readyForInstall becomes true.",
+    "Only then boot NixOS USB and follow dual-boot/INSTALL-CHECKLIST.md."
+  ],
+  "hardBoundary": "No script in this repo may resize partitions, mutate BCD, change firmware boot order, format disks, or install an OS unattended."
+}

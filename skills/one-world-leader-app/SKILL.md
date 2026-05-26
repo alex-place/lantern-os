@@ -40,6 +40,7 @@ Read:
 | Learning Packets | K-12 to adult explanations | school/art/math packet |
 | Commons Library | public-domain/CC/OSS media metadata | archive batch output |
 | Product Lab | convert knowledge into offers | 11-day cash sprint |
+| Local Wallet | invoices, factual cash events, cleared cash | `data/wallet/local-cash-wallet.json` |
 | Local OS | Windows, dual boot, phone, server farm | readiness/inventory |
 | Shareholder View | progress, gates, money, risk | front-page reports |
 
@@ -52,10 +53,10 @@ Read:
 5. Build one useful packet/tool.
 6. Attach evidence and rights state.
 7. Price one manual service offer.
-8. Validate with one real user.
-9. Record objections and outcomes.
-10. Trim unused scope.
-11. Ship the artifact.
+8. Draft or send one invoice through the local wallet.
+9. Validate with one real user.
+10. Record objections, outcomes, and cleared cash only.
+11. Trim unused scope and ship the artifact.
 12. Feed the result back into the world model.
 
 ## Boundaries
@@ -71,7 +72,13 @@ Read:
 The first slice is not a giant platform. It is:
 
 ```text
-One World Leader -> Product Atlas -> 11-Day Cash Sprint -> One paid packet
+One World Leader -> Product Atlas -> 11-Day Cash Sprint -> Local Wallet -> One paid packet
 ```
 
 Build this first, then expand.
+
+## Local Wallet
+
+Use `data/wallet/` to hold invoice drafts and factual cash state. Never record
+fake revenue. Draft invoices, sent invoices, objections, and cleared payments
+are separate events in `data/wallet/ledger.jsonl`.

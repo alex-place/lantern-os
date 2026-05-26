@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-05-26T06:48:12-04:00",
+  "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\dual-boot\\Test-DualBootReadiness.ps1 -Json",
+  "readyForPrep": true,
+  "readyForInstall": false,
+  "pass": 8,
+  "warn": 4,
+  "fail": 0,
+  "held": 1,
+  "summary": "PC is dual-boot-capable, but install space is not prepared yet.",
+  "primaryBlocker": "0.0 GB unallocated install space",
+  "operatorNextAction": "Shrink D: by 100-250 GB in Windows Disk Management after elevated validation, backup, and BitLocker recovery-key check.",
+  "boundary": "Physical disk, firmware, bootloader, and OS install steps remain operator-held."
+}
