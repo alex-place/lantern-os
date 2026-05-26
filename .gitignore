@@ -1,0 +1,10 @@
+# Local/generated
+*.log
+*.tmp
+__pycache__/
+.venv/
+
+# Large promoted artifacts should be added intentionally with manifest updates.
+artifacts/*
+!artifacts/.gitkeep
+
