@@ -1,23 +1,48 @@
 {
-  "generatedAt": "2026-05-26T07:12:00-04:00",
-  "name": "Lantern Arc Reactor",
-  "meaning": "Confidence and power-state scorecard for moving from garage prototype to public platform.",
-  "movie1GarageConfidence": 88,
-  "movie2PublicPlatformConfidence": 54,
-  "movie3DistributedFleetConfidence": 22,
-  "avengersState": "held_until_v1_users_cash_devices_recovery",
-  "currentPhase": "Movie 1 garage with early Movie 2 systems forming",
+  "generatedAt": "2026-05-26T18:45:00-04:00",
+  "name": "Lantern Arc Reactor MK II Confidence Model",
+  "meaning": "Proof-weighted confidence scorecard for moving from garage prototype to public platform without fake certainty.",
+  "modelVersion": "mk2-proof-weighted-calibration",
+  "movie1GarageConfidence": 92,
+  "movie2PublicPlatformConfidence": 61,
+  "movie3DistributedFleetConfidence": 29,
+  "avengersState": "held_until_public_proof_cash_users_devices_recovery_and_mcp_canary",
+  "currentPhase": "Movie 1 garage proven; Movie 2 proof loop forming",
+  "confidenceRule": "Scores rise only from evidence receipts, observed outcomes, repeated validation, paid/user proof, and canary-passed automation. Ambition and aesthetic confidence do not raise the score.",
+  "evidenceLanes": {
+    "repoAndReports": 0.92,
+    "desktopSurface": 0.9,
+    "ragAndDataCenter": 0.68,
+    "cashAndPublicProof": 0.35,
+    "mcpAndDiscordCanary": 0.28,
+    "hardwareSuitReactor": 0.32,
+    "patientPacketSystem": 0.74,
+    "fourDGms": 0.55
+  },
   "raisesMovie2": [
     "5 outreach sends recorded in the wallet ledger",
     "1 paid pilot or hard rejection batch",
+    "1 public proof page or demo artifact",
+    "1 user/customer/stakeholder feedback receipt",
+    "Discord lounge bot health check passes without leaking secrets",
+    "MCP canary validates actual exposed tools before any command execution",
     "D: shrunk and dual boot readyForInstall=true",
-    "Itch prototype page/build created",
     "one workflow used by someone other than the operator"
+  ],
+  "calibrationProtocol": [
+    "Forecast before action",
+    "Record evidence class",
+    "Record outcome",
+    "Score miss/hit with Brier-style error thinking",
+    "Update confidence only after observed evidence",
+    "Keep dissent and blockers visible"
   ],
   "boundaries": [
     "No fake revenue",
     "No unattended disk mutation",
+    "No Discord-to-MCP command execution before canary",
     "No v1.0.0 tag without operator approval",
-    "No store fee until product target is chosen"
+    "No store fee until product target is chosen",
+    "No medical or PPE claim without evidence"
   ]
 }
