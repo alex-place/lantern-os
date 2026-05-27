@@ -1,0 +1,16 @@
+payer: mookman1111
+amount_usd: 20
+lane: pilot_support
+offer: Mookman $20 Wallet Version - Founder Setup Support
+payment_method: held_until_operator_selects_method
+receipt_id: held_until_paid
+paid_at: held_until_paid
+status: pending_payment
+deliverable: private repo setup path + Discord lounge bot health-check priority + Lantern OS wallet receipt
+confidence_effect: none_until_payment_and_setup_evidence
+not_equity: true
+not_investment_return: true
+not_token: true
+not_ownership: true
+no_secrets_in_repo: true
+next_action: operator sends payment note and records non-sensitive receipt metadata after payment
