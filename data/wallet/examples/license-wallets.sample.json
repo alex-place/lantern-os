@@ -1,0 +1,80 @@
+{
+  "schema": "../license-wallet.schema.json",
+  "generatedAt": "2026-05-26T00:00:00-04:00",
+  "status": "redacted_examples_only_not_live_wallets",
+  "rules": [
+    "These are internal entitlement ledger examples, not stored-value accounts.",
+    "Do not store raw PIID, payment tokens, PayPal secrets, Stripe secrets, Apple Pay tokens, card data, bank data, seed phrases, or government identifiers here.",
+    "Only payment_cleared events can raise clearedCashUsd.",
+    "Apple Pay intake must occur through a merchant processor before any entitlement event is recorded."
+  ],
+  "wallets": [
+    {
+      "licenseWalletId": "lw_alex_operator_001",
+      "userId": "user_alex_operator_redacted",
+      "licenseId": "lantern-os-founder-operator-seat-001",
+      "walletType": "internal_entitlement_ledger_not_stored_value",
+      "paymentProvider": "manual_invoice",
+      "acceptedMethods": ["manual_invoice"],
+      "currency": "USD",
+      "clearedCashUsd": 0,
+      "pendingUsd": 0,
+      "transferable": false,
+      "withdrawable": false,
+      "redeemableForCash": false,
+      "accessEntitlements": [
+        "lantern_os_operator",
+        "super_jarvis_unified_skill",
+        "tony_garage_local_surface",
+        "private_piid_house_policy"
+      ],
+      "events": [
+        {
+          "eventId": "evt_alex_license_wallet_created_001",
+          "timestamp": "2026-05-26T00:00:00-04:00",
+          "type": "license_created",
+          "amountUsd": 0,
+          "evidenceClass": "operator_asserted",
+          "note": "Redacted operator license wallet example created for repo-safe setup planning."
+        },
+        {
+          "eventId": "evt_alex_entitlement_granted_001",
+          "timestamp": "2026-05-26T00:00:00-04:00",
+          "type": "entitlement_granted",
+          "amountUsd": 0,
+          "evidenceClass": "source_repo_evidence",
+          "note": "Operator access entitlement example; not a payment event."
+        }
+      ]
+    },
+    {
+      "licenseWalletId": "lw_mookman_creator_001",
+      "userId": "user_mookman_redacted",
+      "licenseId": "lantern-os-creator-seat-mookman-001",
+      "walletType": "internal_entitlement_ledger_not_stored_value",
+      "paymentProvider": "none",
+      "acceptedMethods": [],
+      "currency": "USD",
+      "clearedCashUsd": 0,
+      "pendingUsd": 0,
+      "transferable": false,
+      "withdrawable": false,
+      "redeemableForCash": false,
+      "accessEntitlements": [
+        "creator_report_view",
+        "mookman11_report_workspace",
+        "public_safe_profile_packet_pending_confirmation"
+      ],
+      "events": [
+        {
+          "eventId": "evt_mookman_license_wallet_created_001",
+          "timestamp": "2026-05-26T00:00:00-04:00",
+          "type": "license_created",
+          "amountUsd": 0,
+          "evidenceClass": "operator_asserted",
+          "note": "Redacted Mookman license wallet example created for repo-safe setup planning. Identity/payment/profile linkage remains gated."
+        }
+      ]
+    }
+  ]
+}
