@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: lantern-os
+    runtime: node
+    rootDir: apps/lantern-garage
+    buildCommand: npm install --omit=dev
+    startCommand: node render-server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
