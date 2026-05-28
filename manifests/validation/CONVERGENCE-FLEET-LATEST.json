@@ -1,0 +1,11 @@
+{
+  "agentsPerStep": 3,
+  "claimBoundary": "design_contract_not_live_worker_proof",
+  "generatedAt": "2026-05-28T16:10:00+00:00",
+  "expectedRingSlots": 36,
+  "loopStepCount": 12,
+  "missing": [],
+  "ok": true,
+  "poolTarget": 64,
+  "roleMatrixRows": 12
+}
