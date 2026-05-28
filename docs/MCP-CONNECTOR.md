@@ -10,6 +10,12 @@ The connector exists to verify the real local MCP surface before any operator, C
 
 It does not grant authority by itself. It records reachability, visible endpoints, safety boundaries, and next action.
 
+## Work Split
+
+MCP work is split in `manifests/MCP-WORK-SPLIT.md` across connector contract, connector probe, fleet count validation, runtime count report, tool descriptor review, RAG/memory routing, and OS issue review lanes.
+
+The 12x3 convergence ring in `manifests/CONVERGENCE-LOOP-AGENT-FLEET.md` may review these lanes, but live MCP tool and live worker claims remain held until current local evidence exists.
+
 ## Commands
 
 Verify local MCP health and tool discovery candidates:
@@ -22,6 +28,12 @@ Write the latest validation JSON to:
 
 ```text
 manifests/validation/MCP-CONNECTOR-LATEST.json
+```
+
+Validate the designed convergence fleet counts:
+
+```powershell
+python .\scripts\Test-ConvergenceAgentFleet.py --write-json .\manifests\validation\CONVERGENCE-FLEET-LATEST.json
 ```
 
 Build the internal RAG-house index without copying file bodies:
@@ -88,12 +100,14 @@ Unsafe meaning, not allowed by this connector:
 - Streaming chat to GPT/Codex/Claude is held until each endpoint, token, terms, and local bridge are verified.
 - Linux/NixOS primary boot is held until physical boot state and rollback are verified.
 - Removing Windows or mutating partitions remains blocked.
+- Live 36-agent or 64-worker claims are held until a current local orchestrator count report exists.
 
 ## Promotion Gate
 
 A connector update is shippable only when:
 
 - `scripts/Test-LanternMcpConnector.ps1` runs and writes validation JSON;
+- `scripts/Test-ConvergenceAgentFleet.py` validates the designed fleet counts;
 - `scripts/Update-InternalHouseRag.ps1` generates the flat RAG file and manifest;
 - no secrets or private folders are included;
 - validation output is reviewed before any agent write action;
