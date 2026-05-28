@@ -1,6 +1,7 @@
 param(
     [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
-    [int]$FixWindow = 4
+    [int]$FixWindow = 4,
+    [switch]$CloudVirtualization
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,14 +92,19 @@ $sourceStates = foreach ($repo in $sourceRepos) {
             exists = $true
             dirty = ($status.Count -gt 0)
             changedCount = $status.Count
+            state = if ($status.Count -gt 0) { "local_dirty" } else { "local_clean" }
         }
     } else {
-        Add-Issue $issues "SOURCE-MISSING-$repo" "medium" "Source repo missing: $repo" "Update manifests to current source paths."
+        if (-not $CloudVirtualization) {
+            Add-Issue $issues "SOURCE-MISSING-$repo" "medium" "Source repo missing: $repo" "Update manifests to current source paths."
+        }
         [pscustomobject]@{
             repo = $repo
             exists = $false
             dirty = $false
             changedCount = 0
+            state = if ($CloudVirtualization) { "cloud_metadata_only" } else { "missing" }
+            boundary = if ($CloudVirtualization) { "Local source tree is not visible from GitHub Actions; inspect locally before mutation." } else { "Local source tree expected but missing." }
         }
     }
 }
@@ -111,9 +117,19 @@ $dualBootIssue = [pscustomobject]@{
 }
 $held.Add($dualBootIssue) | Out-Null
 
+if ($CloudVirtualization) {
+    $held.Add([pscustomobject]@{
+        id = "LANTERN-OS-CLOUD-LOCAL-001"
+        severity = "held"
+        summary = "Cloud virtualization cannot see local-only MCP endpoints, dirty worktrees, Windows Store apps, or private disks."
+        fix = "Validate repo invariants in cloud; validate local runtime through Start-LanternLocalControls.ps1 on the operator machine."
+    }) | Out-Null
+}
+
 $result = [pscustomobject]@{
     generatedAt = (Get-Date).ToString("o")
     root = $Root
+    mode = if ($CloudVirtualization) { "cloud_virtualization" } else { "local" }
     method = "Lantern OS 12-step convergence loop"
     fixWindow = $FixWindow
     issueCount = $issues.Count
@@ -122,6 +138,8 @@ $result = [pscustomobject]@{
     sourceRepos = $sourceStates
     nextAction = if ($issues.Count -gt 0) {
         "Fix the first $([Math]::Min($FixWindow, $issues.Count)) actionable issue(s), then rerun."
+    } elseif ($CloudVirtualization) {
+        "Cloud repo invariants passed. Run local controls on the operator machine before MCP/local runtime mutation."
     } else {
         "No local loop issues found. Review held issues and choose the next promotion candidate."
     }
@@ -135,4 +153,3 @@ if ($issues.Count -gt 0) {
 }
 
 exit 0
-
