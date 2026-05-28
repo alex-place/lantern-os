@@ -219,3 +219,20 @@ The convergence loop fixes the first 2-4 actionable issues before expansion.
      `scripts/Invoke-ArchiveCommonsBatch.ps1` to emit `downloadAllowed=false`
      plus a `downloadDecision`.
    - Status: fixed; downloads remain operator-held.
+
+## Fixed in Discord and Evidence Audit Pass
+
+1. `LANTERN-OS-DISCORD-001`: Discord lounge bot visibility had no local health
+   gate or minimal status runtime.
+   - Fix: added `scripts/Test-DiscordBotHealth.ps1`,
+     `scripts/Start-DiscordLoungeBot.ps1`, and
+     `src/discord_lounge_bot/{README.md,bot.py}`.
+   - Status: fixed for status-only channel-scoped bot scaffold; command/MCP
+     execution remains intentionally disabled.
+
+2. `LANTERN-OS-EVIDENCE-001`: `mookman1111` request needed a non-fabricated
+   evidence-first report path.
+   - Fix: added `reports/MOOKMAN1111-EVIDENCE-AUDIT-2026-05-27.md` with source
+     table, verified-vs-unknown split, and real-image boundary.
+   - Status: fixed as safe evidence audit; richer profile requires canonical
+     owner links.
