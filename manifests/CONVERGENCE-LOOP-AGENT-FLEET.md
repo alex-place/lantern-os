@@ -89,6 +89,16 @@ Not allowed without fresh local evidence:
 - public release without the review gate;
 - v1.0.0 readiness without operator approval and convergence evidence.
 
+## Live Fleet Proof Receipt
+
+Before any public `fleet active` claim, point to and refresh:
+
+```text
+manifests/validation/LIVE-FLEET-PROOF-LATEST.json
+```
+
+That receipt must include `generatedAt`, `orchestratorBaseUrl`, `mcpHealth`, `toolsVisible`, `workerPoolTarget`, `activeWorkers`, `idleWorkers`, `queuedJobs`, `failedWorkers`, `ringSlotsAssigned`, `ringSlotsHealthy`, `consensusReceipts`, and `claimBoundary`. If any live runtime field is `null`, empty, or `not_observed`, the only allowed public claim remains that the fleet design contract exists; `fleet active` is held until fresh local orchestrator proof fills those fields.
+
 ## Validation
 
 Run:
