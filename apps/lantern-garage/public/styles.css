@@ -769,3 +769,72 @@ main:focus-visible {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Product lane upgrade: always-on links, auth tiers, validator clarity */
+.user-capacity {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.link-dock {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.link-dock a {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border: 1px solid rgba(30, 95, 137, 0.38);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--blue);
+  font-weight: 850;
+  text-align: center;
+  text-decoration: none;
+}
+
+.link-dock a:hover,
+.link-dock a:focus {
+  border-color: var(--arc);
+  box-shadow: inset 0 0 0 2px rgba(8, 117, 111, 0.18);
+  outline: 3px solid rgba(8, 117, 111, 0.2);
+  outline-offset: 2px;
+}
+
+.access-panel {
+  box-shadow: inset 0 4px 0 var(--arc);
+}
+
+.access-panel dd {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.validator-panel {
+  min-height: 100%;
+}
+
+.quick-reply {
+  min-height: auto;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(8, 117, 111, 0.42);
+  outline-offset: 2px;
+}

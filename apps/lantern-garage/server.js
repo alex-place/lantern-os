@@ -572,6 +572,59 @@ function parseMirrorEnv() {
     }));
 }
 
+
+function getAccessModel() {
+  return {
+    generatedAt: new Date().toISOString(),
+    audienceTarget: "dozens_of_users",
+    activeUserSoftCap: 48,
+    authBoundary: "This is an access contract for the dashboard surface. Real identity, billing, and founder authorization must be wired before private or paid actions leave local mode.",
+    tiers: [
+      {
+        id: "public",
+        label: "Public",
+        priceUsdMonthly: null,
+        authRequired: false,
+        summary: "Always-on public proof, health checks, public reports, cloud mirrors, and safe documentation.",
+        features: ["/api/health", "/api/status", "public PDFs", "read-only readiness"]
+      },
+      {
+        id: "auth_0",
+        label: "$0 Auth",
+        priceUsdMonthly: 0,
+        authRequired: true,
+        summary: "Free signed-in workspace for saved notes, RAG intake, and user preference continuity.",
+        features: ["saved notes", "RAG intake", "workspace continuity"]
+      },
+      {
+        id: "auth_20",
+        label: "$20 Auth",
+        priceUsdMonthly: 20,
+        authRequired: true,
+        summary: "Supporter workspace for queue visibility, report packets, and a weekly operator digest.",
+        features: ["queue visibility", "report packets", "weekly digest"]
+      },
+      {
+        id: "auth_200",
+        label: "$200 Auth",
+        priceUsdMonthly: 200,
+        authRequired: true,
+        summary: "Pilot workspace for guided cleanup sessions, report review, and direct operator scheduling.",
+        features: ["pilot review", "cleanup session", "operator scheduling"]
+      },
+      {
+        id: "founder",
+        label: "Founder",
+        priceUsdMonthly: null,
+        authRequired: true,
+        founderOnly: true,
+        summary: "Founder-only controls for local dispatch, release promotion, secrets, billing setup, and boot-sensitive decisions.",
+        features: ["local controls", "agent dispatch", "release gates", "private receipts"]
+      }
+    ]
+  };
+}
+
 function getCloudMirrorStatus() {
   const manifest = readJson(path.relative(repoRoot, cloudMirrorsPath), {});
   const manifestMirrors = Array.isArray(manifest.cloudMirrors) ? manifest.cloudMirrors : [];
@@ -697,6 +750,11 @@ async function route(req, res) {
 
   if (url.pathname === "/api/mining-lab") {
     sendJson(res, getMiningLabStatus());
+    return;
+  }
+
+  if (url.pathname === "/api/access-model") {
+    sendJson(res, getAccessModel());
     return;
   }
 

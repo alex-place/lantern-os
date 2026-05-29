@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-29T17:54:47.884Z",
+  "generatedAt": "2026-05-29T18:35:12.780Z",
   "ok": true,
   "base": "http://127.0.0.1:4177",
   "results": [
@@ -35,6 +35,11 @@
     },
     {
       "path": "/api/cloud-mirrors",
+      "ok": true,
+      "statusCode": 200
+    },
+    {
+      "path": "/api/access-model",
       "ok": true,
       "statusCode": 200
     },

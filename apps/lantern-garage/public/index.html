@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Cache-Control" content="no-store">
   <title>Lantern OS</title>
-  <link rel="stylesheet" href="styles.css?v=20260529-dashboard">
-  <script defer src="app.js?v=20260529-dashboard"></script>
+  <link rel="stylesheet" href="styles.css?v=20260529-product-lanes">
+  <script defer src="app.js?v=20260529-product-lanes"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to controls</a>
@@ -15,12 +15,13 @@
       <div>
         <p class="eyebrow">Lantern OS Local Dashboard</p>
         <h1>Lantern OS</h1>
-        <p class="subtitle">Chat first, then the real state: RAG memory, cash truth, mining lab, dual-boot readiness, local controls, field notes, outreach, launch gates, and cloud mirrors.</p>
+        <p class="subtitle">First-class dashboard for dozens of users: always-on links, public proof, auth lanes, founder-only gates, validator health, agent queue, RAG memory, cash truth, local controls, and cloud mirrors.</p>
         <a class="local-url" href="http://127.0.0.1:4177">http://127.0.0.1:4177</a>
       </div>
       <section class="reactor" aria-label="Arc Reactor status">
         <div class="reactor-core"><span id="movie1">--</span></div>
         <p id="phase">Loading reactor...</p>
+        <p class="user-capacity" id="userCapacity">Dozens-ready: checking...</p>
       </section>
     </header>
 
@@ -63,6 +64,17 @@
       <a target="_blank" rel="noopener noreferrer" href="/repo/artifacts/ADS-ARCHITECTURE-REVIEW-v0.1.pdf">ADS</a>
       <a target="_blank" rel="noopener noreferrer" href="/view?path=reports/ARC-REACTOR-12-STEP-CONVERGENCE-MODEL.md">Arc Model</a>
       <a target="_blank" rel="noopener noreferrer" href="/repo/artifacts/ARC-REACTOR-MKII-CONVERGENCE-UPDATE-2026-05-26.pdf">MK II PDF</a>
+    </section>
+
+    <section class="link-dock" aria-label="Always-on product links">
+      <a target="_blank" rel="noopener noreferrer" href="/api/health">Health</a>
+      <a target="_blank" rel="noopener noreferrer" href="/api/status">Status JSON</a>
+      <a target="_blank" rel="noopener noreferrer" href="/api/access-model">Access Model</a>
+      <a target="_blank" rel="noopener noreferrer" href="/api/cloud-mirrors">Mirror JSON</a>
+      <a target="_blank" rel="noopener noreferrer" href="/view?path=docs/V1-READINESS-GATES.md">Readiness Gates</a>
+      <a target="_blank" rel="noopener noreferrer" href="/view?path=docs/INNOVATOR-EVIDENCE-METHOD.md">Evidence Method</a>
+      <a target="_blank" rel="noopener noreferrer" href="/view?path=manifests/open-issues.md">Open Issues</a>
+      <a target="_blank" rel="noopener noreferrer" href="/view?path=manifests/cloud-mirrors.json">Cloud Mirrors</a>
     </section>
 
     <section class="grid" aria-label="System panels">
@@ -113,6 +125,17 @@
         <ul id="mirrorList" class="compact-list mirror-list"></ul>
       </article>
 
+      <article class="panel access-panel">
+        <h2>Access Lanes</h2>
+        <dl>
+          <div><dt>Public</dt><dd id="publicLane">always-on proof + docs</dd></div>
+          <div><dt>$0 Auth</dt><dd id="authZeroLane">notes + saved workspace</dd></div>
+          <div><dt>$20</dt><dd id="authTwentyLane">operator queue + reports</dd></div>
+          <div><dt>$200</dt><dd id="authTwoHundredLane">pilot workspace + review</dd></div>
+          <div><dt>Founder</dt><dd id="founderLane">local controls held</dd></div>
+        </dl>
+      </article>
+
       <article class="panel mining-lab-panel" id="miningLabPanel" hidden>
         <h2>Mining Lab</h2>
         <dl>
@@ -153,6 +176,19 @@
         <div class="evidence-footer">
           <span id="fleetCounts">Q:-- A:-- D:-- F:--</span>
           <button type="button" id="dispatchAll" class="action-chip">Dispatch All</button>
+        </div>
+      </article>
+      <article class="evidence-panel validator-panel">
+        <div class="evidence-header">
+          <h2>Validators</h2>
+          <span class="badge badge-live" id="validatorBadge">CHECKING</span>
+        </div>
+        <table class="evidence-table">
+          <thead><tr><th>Validator</th><th>State</th><th>Next action</th></tr></thead>
+          <tbody id="validatorBody"><tr><td colspan="3" class="muted">Loading...</td></tr></tbody>
+        </table>
+        <div class="evidence-footer">
+          <span id="validatorCounts">0 pass | 0 held</span>
         </div>
       </article>
       <article class="evidence-panel hff-panel">

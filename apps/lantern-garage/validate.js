@@ -13,6 +13,7 @@ const checks = [
   ["/api/readiness", (x) => typeof x.readyForPrep === "boolean"],
   ["/api/mining-lab", (x) => x.ready === true && x.shortcutRule === "single_lantern_shortcut"],
   ["/api/cloud-mirrors", (x) => x.deployProvider === "Render" && x.cloudMirrorCount >= 2],
+  ["/api/access-model", (x) => x.audienceTarget === "dozens_of_users" && Array.isArray(x.tiers) && x.tiers.some((tier) => tier.id === "founder" && tier.founderOnly === true)],
   ["/api/rag-cache", (x) => Array.isArray(x)],
 ];
 
