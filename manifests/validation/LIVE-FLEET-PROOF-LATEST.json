@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-05-28T22:22:14+00:00",
+  "orchestratorBaseUrl": null,
+  "mcpHealth": {
+    "status": "not_observed",
+    "evidence": "No local orchestrator health endpoint was available from this repo environment."
+  },
+  "toolsVisible": [],
+  "workerPoolTarget": 64,
+  "activeWorkers": null,
+  "idleWorkers": null,
+  "queuedJobs": null,
+  "failedWorkers": null,
+  "ringSlotsAssigned": 36,
+  "ringSlotsHealthy": null,
+  "consensusReceipts": {
+    "expected": 12,
+    "observed": 0,
+    "status": "not_observed"
+  },
+  "claimBoundary": "receipt_shape_only_not_live_fleet_proof; public fleet-active claims require fresh local orchestrator evidence showing MCP health, visible tools, worker counts, queue counts, failed workers, healthy ring slots, and consensus receipts"
+}
