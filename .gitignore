@@ -24,3 +24,6 @@ private/**
 # Large promoted artifacts should be added intentionally with manifest updates.
 artifacts/*
 !artifacts/.gitkeep
+# Node modules
+node_modules/
+**/node_modules/
