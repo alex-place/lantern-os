@@ -2,7 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const base = `http://127.0.0.1:${process.env.LANTERN_GARAGE_PORT || 4177}`;
+const base = (process.env.LANTERN_GARAGE_BASE_URL || `http://127.0.0.1:${process.env.LANTERN_GARAGE_PORT || 4177}`).replace(/\/$/, "");
 const repoRoot = path.resolve(__dirname, "..", "..");
 const validationPath = path.join(repoRoot, "manifests", "validation", "LANTERN-GARAGE-APP-LATEST.json");
 const checks = [

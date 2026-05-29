@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "lantern-garage-deployment-receipt/v1",
+  "generatedAt": "2026-05-28T22:24:12.596Z",
+  "commitSha": "c2bf7559adb73d92bcd4602b696d708e0a32d90c",
+  "image": {
+    "dockerfile": "Dockerfile",
+    "tag": "lantern-garage:local-c2bf7559adb7",
+    "digest": null,
+    "buildStatus": "blocked_environment",
+    "buildBlockedBy": "docker CLI is not installed in this execution environment",
+    "buildCommand": "docker build -t lantern-garage:local-c2bf7559adb7 .",
+    "buildExitCode": 127
+  },
+  "runtime": {
+    "requiredEnvironment": {
+      "LANTERN_GARAGE_HOST": "0.0.0.0",
+      "LANTERN_GARAGE_PORT": "4177"
+    },
+    "localSmokeRun": {
+      "status": "passed",
+      "baseUrl": "http://127.0.0.1:4177",
+      "hostBind": "0.0.0.0"
+    }
+  },
+  "deployment": {
+    "selectedHost": "Render web service from render.yaml",
+    "status": "held",
+    "dashboardUrl": null,
+    "dashboardUrlVisibility": "not_recorded",
+    "holdReason": "No cloud/container-host credentials or preselected deployment target URL are available in this non-interactive environment; no secrets were requested or recorded.",
+    "docsDashboardUrlUpdate": "skipped_no_public_safe_url"
+  },
+  "health": {
+    "path": "/api/health",
+    "baseUrl": "http://127.0.0.1:4177",
+    "status": "passed_local_smoke_only",
+    "httpStatus": 200,
+    "body": {
+      "ok": true,
+      "service": "lantern-garage",
+      "generatedAt": "2026-05-28T22:24:12.442Z"
+    }
+  },
+  "validation": {
+    "command": "LANTERN_GARAGE_BASE_URL=http://127.0.0.1:4177 node apps/lantern-garage/validate.js",
+    "status": "passed_local_smoke_only",
+    "deployedBaseUrl": null,
+    "note": "validate.js now accepts LANTERN_GARAGE_BASE_URL for deployed validation; deployed validation remains held until a cloud URL exists.",
+    "results": [
+      {
+        "path": "/api/health",
+        "ok": true,
+        "statusCode": 200
+      },
+      {
+        "path": "/api/status",
+        "ok": true,
+        "statusCode": 200
+      },
+      {
+        "path": "/api/arc-reactor",
+        "ok": true,
+        "statusCode": 200
+      },
+      {
+        "path": "/api/wallet",
+        "ok": true,
+        "statusCode": 200
+      },
+      {
+        "path": "/api/readiness",
+        "ok": true,
+        "statusCode": 200
+      },
+      {
+        "path": "/api/rag-cache",
+        "ok": true,
+        "statusCode": 200
+      }
+    ],
+    "generatedAt": "2026-05-28T22:24:12.596Z"
+  },
+  "secretsBoundary": [
+    "No secrets recorded.",
+    "No private source mounts recorded.",
+    "No MCP tokens recorded.",
+    "No private dashboard screenshots recorded."
+  ],
+  "operatorActionRequired": [
+    "Run docker build -t lantern-garage:local-c2bf7559adb7 . on a host with Docker.",
+    "Push the image to the selected registry and deploy it to the selected container host.",
+    "Set LANTERN_GARAGE_BASE_URL to the deployed URL and rerun apps/lantern-garage/validate.js.",
+    "Record the deployed dashboard URL and immutable image digest once available."
+  ],
+  "commitShaScope": "repository HEAD at validation attempt before receipt/support-file commit; no cloud deployment image was produced in this environment"
+}

@@ -5,7 +5,8 @@ const { spawn, spawnSync } = require("child_process");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const publicRoot = path.join(__dirname, "public");
-const port = Number(process.env.LANTERN_GARAGE_PORT || 4177);
+const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177);
+const host = process.env.LANTERN_GARAGE_HOST || process.env.HOST || "127.0.0.1";
 const conversationLogPath = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
 const flatRagHousePath = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");
 const flatRagHouseManifestPath = path.join(repoRoot, "manifests", "FLAT-RAG-HOUSE-LATEST.md");
@@ -569,6 +570,6 @@ server.on("error", (error) => {
   throw error;
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Lantern Garage app listening on http://127.0.0.1:${port}`);
+server.listen(port, host, () => {
+  console.log(`Lantern Garage app listening on http://${host}:${port}`);
 });

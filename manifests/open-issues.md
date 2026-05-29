@@ -31,6 +31,14 @@ The convergence loop fixes the first 2-4 actionable issues before expansion.
    - Reason: remote GitHub can store the design contract and validation receipt, but cannot prove local worker process counts.
    - Status: held until operator-machine orchestrator count report exists.
 
+3. `LANTERN-OS-SOURCE-HFF-LOCAL-001`: HFF scan source repo path is not visible in this Linux execution environment.
+   - Reason: the configured Windows path `C:\tmp\human-flourishing-frameworks-scan` requires operator-machine access; do not invent or mutate replacement source paths from the cloud container.
+   - Status: held until operator-machine source inspection is available.
+
+4. `LANTERN-OS-SOURCE-ORCH-LOCAL-001`: gm-agent-orchestrator source repo path is not visible in this Linux execution environment.
+   - Reason: the configured Windows path `C:\Users\alexp\Documents\gm-agent-orchestrator` requires operator-machine access; do not invent or mutate replacement source paths from the cloud container.
+   - Status: held until operator-machine source inspection is available.
+
 ## Open
 
 1. `LANTERN-OS-PROMOTE-001`: Promote selected COMET LEAP artifacts into
