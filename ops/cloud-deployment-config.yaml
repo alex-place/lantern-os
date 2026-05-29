@@ -5,6 +5,18 @@
 version: "3.8"
 
 services:
+  # Windsurf Developer Interface
+  windsurf-dev:
+    image: nginx:alpine
+    container_name: windsurf-dev-cloud
+    ports:
+      - "8080:80"
+    volumes:
+      - ../surfaces/windsurf-dev:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    networks:
+      - lantern-cloud-network
+
   # Lantern Garage Web Application
   lantern-garage:
     build:

@@ -98,6 +98,7 @@ No dependency can skip local status, remote, branch, build/test, secrets/env, ar
 | `local_inspected` | `C:\Users\alexp\Documents\gm-agent-orchestrator` | `execution_dependency` | local MCP/orchestrator source |
 | `local_inspected` | `C:\Users\alexp\Documents\lantern-symbolic-sandbox` | `rag_dependency` | symbolic sandbox |
 | `local_inspected` | `C:\tmp\human-flourishing-frameworks-scan` | `rag_dependency` | COMET LEAP source |
+| `local_inspected` | `C:\tmp\lantern-os\surfaces\windsurf-dev` | `execution_dependency` | Windsurf-inspired developer interface |
 | `local_observed` | `C:\tmp\hff-lantern-recovery` | `retired_reference` | recovery evidence only |
 | `local_observed` | `C:\tmp\hff-evidence-master-clean` | `retired_reference` | evidence only |
 | `local_observed` | `C:\tmp\hff-master-clean` | `retired_reference` | evidence only |
