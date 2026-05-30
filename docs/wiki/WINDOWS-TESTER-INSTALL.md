@@ -115,6 +115,12 @@ http://127.0.0.1:4177
 - Chat answers without asking for secrets.
 - Art Matrix opens and left/right panel controls work.
 - `$1000` demo deck explains what Lantern sells.
+- Lantern Reader opens the game-theory/wargame card:
+
+```text
+http://127.0.0.1:4177/view?path=manifests/evidence/game-theory-wargame-reader-2026-05-29.md
+```
+
 - Cloud panel says AWS is pending unless a verified AWS URL exists.
 - Discord/voice features stay health-check gated.
 - No old Tony Garage, Render, or random flat-file front page becomes the main

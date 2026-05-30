@@ -121,13 +121,49 @@ $sourceRepos = @(
 
 $sourceStates = foreach ($repo in $sourceRepos) {
     if (Test-Path -LiteralPath $repo) {
-        $status = @(git -C $repo status --short 2>$null)
+        $status = @()
+        $gitStatusError = $null
+        $gitStatusMode = "normal"
+        try {
+            $status = @(git -C $repo status --short 2>&1)
+            if ($LASTEXITCODE -ne 0) {
+                $gitStatusError = ($status -join " ")
+                $status = @()
+            }
+        } catch {
+            $gitStatusError = $_.Exception.Message
+            $status = @()
+        }
+
+        if ($gitStatusError -and $gitStatusError -like "*dubious ownership*") {
+            try {
+                $retryStatus = @(git -c "safe.directory=$repo" -c "core.excludesFile=" -C $repo status --short 2>&1)
+                if ($LASTEXITCODE -eq 0) {
+                    $status = $retryStatus
+                    $gitStatusError = $null
+                    $gitStatusMode = "safe_directory_read_only_retry"
+                }
+                else {
+                    $gitStatusError = ($retryStatus -join " ")
+                }
+            }
+            catch {
+                $gitStatusError = $_.Exception.Message
+            }
+        }
+
+        if ($gitStatusError) {
+            Add-Issue $issues "SOURCE-GIT-STATUS-FAILED-$($repo.Replace('\', '-').Replace(':', ''))" "high" "Git status failed for source repo: $repo" "Fix git safe-directory/ownership or inspect manually before source repo mutation."
+        }
+
         [pscustomobject]@{
             repo = $repo
             exists = $true
-            dirty = ($status.Count -gt 0)
+            dirty = if ($gitStatusError) { $null } else { ($status.Count -gt 0) }
             changedCount = $status.Count
-            state = if ($status.Count -gt 0) { "local_dirty" } else { "local_clean" }
+            state = if ($gitStatusError) { "git_status_failed" } elseif ($status.Count -gt 0) { "local_dirty" } else { "local_clean" }
+            gitStatusError = $gitStatusError
+            gitStatusMode = $gitStatusMode
         }
     } else {
         if (-not $CloudVirtualization) {

@@ -1,6 +1,6 @@
 ﻿{
     "schema":  "lantern.one_ide_status.v1",
-    "generatedAt":  "2026-05-30T01:41:39.2032885Z",
+    "generatedAt":  "2026-05-30T02:28:14.1471149Z",
     "mode":  "read_only_preflight",
     "boundaries":  [
                        "do_not_reset_clean_sync_or_dispatch_dirty_worktrees",
@@ -15,20 +15,35 @@
                       "isGit":  true,
                       "dirty":  true,
                       "branch":  "master...origin/master",
-                      "dirtyCount":  11,
+                      "dirtyCount":  26,
                       "status":  [
                                      "## master...origin/master",
+                                     " M README.md",
                                      " M apps/lantern-garage/server.js",
+                                     " M artifacts/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v3.pdf",
+                                     " M artifacts/LANTERN-BASELINE-MODEL-v1.pdf",
+                                     " M data/baseline-model/v1.json",
                                      " M data/kalshi/kalshi-watchlist-latest.json",
                                      " M data/rag-house/flat-rag-house-latest.json",
+                                     " M docs/LANTERN-DESKTOP-TESTER.md",
+                                     " M docs/wiki/WINDOWS-TESTER-INSTALL.md",
                                      " M manifests/FLAT-RAG-HOUSE-LATEST.md",
+                                     " M manifests/LANTERN-BASELINE-MODEL-v1.md",
                                      " M manifests/validation/LOCAL-CONTROLS-LATEST.json",
                                      " M reports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT.md",
-                                     " M scripts/Get-OneIdeStatus.ps1",
                                      " M scripts/New-KalshiKofiRevenueReport.ps1",
+                                     " M tests/test_baseline_model_v1.py",
                                      " M tests/test_dashboard_ux.py",
+                                     " M tests/test_desktop_tester_release.py",
                                      " M tests/test_kalshi_kofi_report.py",
-                                     " M tests/test_one_ide_control_plane.py"
+                                     "?? data/kalshi/kalshi-paper-trade-tickets-latest.json",
+                                     "?? manifests/evidence/game-theory-wargame-reader-2026-05-29.md",
+                                     "?? manifests/evidence/kalshi-api-docs-and-trade-gate-2026-05-29.md",
+                                     "?? manifests/evidence/public-puzzle-math-bounty-radar-2026-05-30.md",
+                                     "?? scripts/New-KalshiPaperTradeTickets.ps1",
+                                     "?? tests/test_game_theory_wargame_reader.py",
+                                     "?? tests/test_kalshi_paper_trade_tickets.py",
+                                     "?? tests/test_public_bounty_radar.py"
                                  ]
                   },
                   {

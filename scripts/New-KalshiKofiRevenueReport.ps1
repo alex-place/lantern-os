@@ -293,6 +293,8 @@ $lines.Add("Profit range is gross per contract if buying YES at the displayed as
 $lines.Add("")
 $lines.Add("After loading more data: Lantern can emit a manual-approval queue, but it still cannot place live trades. A human must approve any account action after independent probability, rule, fee, slippage, and max-loss checks.")
 $lines.Add("")
+$lines.Add("Paper-ticket output: `data/kalshi/kalshi-paper-trade-tickets-latest.json`. Trade docs gate: `manifests/evidence/kalshi-api-docs-and-trade-gate-2026-05-29.md`.")
+$lines.Add("")
 $lines.Add("Spread course: custom HFT/spread-capture research is preserved. Wider spreads can be desirable for a maker strategy, but only after orderbook depth, queue position, fees, latency, and cancel/fill risk are modeled.")
 $lines.Add("")
 $lines.Add('## `$19` Manual Review Gate')

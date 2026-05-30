@@ -1,6 +1,6 @@
 # Kalshi + Ko-fi Watchlist Revenue Report
 
-Generated: 2026-05-29T21:53:43.6805924-04:00
+Generated: 2026-05-29T22:15:31.4060179-04:00
 
 Status: current public-data manual-review candidates and outreach packet; no trades executed.
 
@@ -26,10 +26,10 @@ Status: current public-data manual-review candidates and outreach packet; no tra
 | Open markets pulled | 5000 |
 | Public pages pulled | 5 / 5 |
 | Cursor present | True |
-| Empty/no-activity markets | 2794 |
-| Wide-spread research-only markets | 711 |
-| Excluded below 20-cent midpoint | 1393 |
-| Excluded below $5.00 visible activity | 3156 |
+| Empty/no-activity markets | 2833 |
+| Wide-spread research-only markets | 776 |
+| Excluded below 20-cent midpoint | 1295 |
+| Excluded below $5.00 visible activity | 3188 |
 | Watchlist rows emitted | 20 |
 | Manual-approval queue rows | 3 |
 | Executable trade recommendations | 0 |
@@ -47,6 +47,8 @@ Filters applied: do not include market values below 20 cents of YES midpoint, an
 Profit range is gross per contract if buying YES at the displayed ask: maximum loss is the ask paid; maximum gross profit is $1.00 minus the ask, before fees and slippage. Confidence is data-quality confidence only, not outcome probability.
 
 After loading more data: Lantern can emit a manual-approval queue, but it still cannot place live trades. A human must approve any account action after independent probability, rule, fee, slippage, and max-loss checks.
+
+Paper-ticket output: data/kalshi/kalshi-paper-trade-tickets-latest.json. Trade docs gate: manifests/evidence/kalshi-api-docs-and-trade-gate-2026-05-29.md.
 
 Spread course: custom HFT/spread-capture research is preserved. Wider spreads can be desirable for a maker strategy, but only after orderbook depth, queue position, fees, latency, and cancel/fill risk are modeled.
 
@@ -68,9 +70,9 @@ These rows are the closest thing to a trade queue after the deeper public-data l
 
 | Rank | Ticker | Mid | Gross P/L | Data Conf. | Required Before Trade |
 |---:|---|---:|---|---:|---|
-| 1 | KXLOWTCHI-26MAY30-T58 | 0.585 | -0.59 to +0.41 | 70% | independent probability + human approval + max-loss budget |
-| 2 | KXHIGHTSEA-26MAY30-B64.5 | 0.225 | -0.23 to +0.77 | 70% | independent probability + human approval + max-loss budget |
-| 3 | KXMLBTOTAL-26MAY301610MILHOU-9 | 0.515 | -0.52 to +0.48 | 70% | independent probability + human approval + max-loss budget |
+| 1 | KXMLBTOTAL-26MAY301605KCTEX-9 | 0.445 | -0.45 to +0.55 | 70% | independent probability + human approval + max-loss budget |
+| 2 | KXSPOTIFYD-26MAY29-HAT | 0.955 | -0.96 to +0.04 | 70% | independent probability + human approval + max-loss budget |
+| 3 | KXHIGHTPHX-26MAY30-B92.5 | 0.385 | -0.39 to +0.61 | 70% | independent probability + human approval + max-loss budget |
 
 ## Custom HFT / Spread-Capture Research Queue
 
@@ -78,36 +80,36 @@ This is the custom HFT direction: spread-aware, maker-style research. It is not 
 
 | Rank | Ticker | Mid | Spread | Activity | Gross P/L | Required Before Live |
 |---:|---|---:|---:|---:|---|---|
-| 1 | KXWNBA1HSPREAD-26MAY29ATLPDX-ATL5 | 0.500 | 0.020 | 7424.61 | -0.51 to +0.49 | orderbook depth + fee model + latency sim + human approval |
-| 2 | KXMLBTOTAL-26MAY301605KCTEX-8 | 0.540 | 0.020 | 6810.38 | -0.55 to +0.45 | orderbook depth + fee model + latency sim + human approval |
-| 3 | KXAAAGASD-26MAY30-4.340 | 0.970 | 0.020 | 4800.61 | -0.98 to +0.02 | orderbook depth + fee model + latency sim + human approval |
-| 4 | KXHIGHLAX-26MAY30-B68.5 | 0.240 | 0.020 | 4336.09 | -0.25 to +0.75 | orderbook depth + fee model + latency sim + human approval |
-| 5 | KXHIGHTDAL-26MAY30-B92.5 | 0.580 | 0.020 | 1931.49 | -0.59 to +0.41 | orderbook depth + fee model + latency sim + human approval |
+| 1 | KXITFMATCH-26MAY29SHIKIM-KIM | 0.240 | 0.020 | 9007.95 | -0.25 to +0.75 | orderbook depth + fee model + latency sim + human approval |
+| 2 | KXAAAGASW-26JUN01-4.290 | 0.980 | 0.020 | 6557.6 | -0.99 to +0.01 | orderbook depth + fee model + latency sim + human approval |
+| 3 | KXHIGHLAX-26MAY30-B68.5 | 0.220 | 0.020 | 4417.37 | -0.23 to +0.77 | orderbook depth + fee model + latency sim + human approval |
+| 4 | KXMLBSPREAD-26MAY292005KCTEX-TEX8 | 0.680 | 0.020 | 4059.5 | -0.69 to +0.31 | orderbook depth + fee model + latency sim + human approval |
+| 5 | KXHIGHAUS-26MAY30-T90 | 0.290 | 0.020 | 2677.12 | -0.30 to +0.70 | orderbook depth + fee model + latency sim + human approval |
 
 ## Top Watchlist
 
 | Rank | Ticker | Title | Mid | Spread | Gross P/L | Data Conf. | Activity | 24h Vol | OI | Close | Gate |
 |---:|---|---|---:|---:|---|---:|---:|---:|---:|---|---|
-| 1 | KXLOWTCHI-26MAY30-T58 | Will the minimum temperature be >58?? on May 30, 2026? | 0.585 | 0.010 | -0.59 to +0.41 | 70% | 2526.65 | 2526.65 | 1001.26 | 2026-05-31T06:00:00Z | no execution |
-| 2 | KXHIGHTSEA-26MAY30-B64.5 | Will the maximum temperature be 64-65?? on May 30, 2026? | 0.225 | 0.010 | -0.23 to +0.77 | 70% | 823.09 | 823.09 | 579.08 | 2026-05-31T08:00:00Z | no execution |
-| 3 | KXMLBTOTAL-26MAY301610MILHOU-9 | Milwaukee vs Houston Total Runs? | 0.515 | 0.010 | -0.52 to +0.48 | 70% | 1541 | 1541 | 907 | 2026-06-02T20:10:00Z | no execution |
-| 4 | KXMLBSPREAD-26MAY302205NYYATH-NYY2 | New York Y wins by over 1.5 runs? | 0.465 | 0.010 | -0.47 to +0.53 | 70% | 1522.71 | 1522.71 | 1317.56 | 2026-06-03T02:05:00Z | no execution |
-| 5 | KXSPOTIFYGLOBALD-26MAY29-HAT | Top Global Song on Spotify on May 29, 2026? | 0.975 | 0.010 | -0.98 to +0.02 | 70% | 3360.64 | 3360.64 | 3069.64 | 2026-05-30T03:59:00Z | no execution |
-| 6 | KXBRENTD-26JUN0117-T86.50 | Will the brent crude oil close price be above 86.50 USD/Bbl on June 01, 2026 at 5:00 PM EDT? | 0.845 | 0.010 | -0.85 to +0.15 | 70% | 1609 | 1609 | 1609 | 2026-06-01T21:00:00Z | no execution |
-| 7 | KXBRENTD-26JUN0117-T83.00 | Will the brent crude oil close price be above 83.00 USD/Bbl on June 01, 2026 at 5:00 PM EDT? | 0.945 | 0.010 | -0.95 to +0.05 | 70% | 777.71 | 777.71 | 768.71 | 2026-06-01T21:00:00Z | no execution |
-| 8 | KXHIGHTSFO-26MAY30-B67.5 | Will the maximum temperature be 67-68?? on May 30, 2026? | 0.345 | 0.010 | -0.35 to +0.65 | 70% | 2116.79 | 2116.79 | 1146.34 | 2026-05-31T08:00:00Z | no execution |
-| 9 | KXITFMATCH-26MAY29SHIKIM-KIM | Will Dong Ju Kim win the Shin vs Kim: M15 Gimcheon Semifinal match? | 0.215 | 0.010 | -0.22 to +0.78 | 70% | 616.6 | 603.67 | 616.6 | 2026-06-13T02:00:00Z | no execution |
-| 10 | KXMLBTOTAL-26MAY301410DETCWS-8 | Detroit vs Chicago WS Total Runs? | 0.535 | 0.010 | -0.54 to +0.46 | 70% | 582.4 | 582.4 | 582.4 | 2026-06-02T18:10:00Z | no execution |
-| 11 | KXSPOTIFYD-26MAY29-HAT | Top USA Song on Spotify on May 29, 2026? | 0.965 | 0.010 | -0.97 to +0.03 | 70% | 1328.59 | 1321.53 | 1321.53 | 2026-05-30T03:59:00Z | no execution |
-| 12 | KXHIGHLAX-26MAY30-B72.5 | Will the **high temp in LA** be 72-73?? on May 30, 2026? | 0.215 | 0.010 | -0.22 to +0.78 | 70% | 2876.31 | 2876.31 | 1757.75 | 2026-05-31T07:59:00Z | no execution |
-| 13 | KXHIGHLAX-26MAY30-B70.5 | Will the **high temp in LA** be 70-71?? on May 30, 2026? | 0.515 | 0.010 | -0.52 to +0.48 | 70% | 1646.98 | 1646.98 | 1201.78 | 2026-05-31T07:59:00Z | no execution |
-| 14 | KXVOTEHUBTRUMPUPDOWN-26JUN04 | Will Donald Trump's approval rating be above 39.3% for Jun 4, 2026? | 0.445 | 0.010 | -0.45 to +0.55 | 70% | 2996.46 | 2996.46 | 2767.76 | 2026-06-05T03:59:00Z | no execution |
-| 15 | KXHIGHTDAL-26MAY30-B94.5 | Will the maximum temperature be 94-95?? on May 30, 2026? | 0.225 | 0.010 | -0.23 to +0.77 | 70% | 591.36 | 591.36 | 573.78 | 2026-05-31T06:00:00Z | no execution |
-| 16 | KXMLBSPREAD-26MAY301915ATLCIN-ATL2 | Atlanta wins by over 1.5 runs? | 0.435 | 0.010 | -0.44 to +0.56 | 70% | 805.03 | 805.03 | 805.03 | 2026-06-02T23:15:00Z | no execution |
+| 1 | KXMLBTOTAL-26MAY301605KCTEX-9 | Kansas City vs Texas Total Runs? | 0.445 | 0.010 | -0.45 to +0.55 | 70% | 728.33 | 709 | 675.33 | 2026-06-02T20:05:00Z | no execution |
+| 2 | KXSPOTIFYD-26MAY29-HAT | Top USA Song on Spotify on May 29, 2026? | 0.955 | 0.010 | -0.96 to +0.04 | 70% | 2190.36 | 2096.6 | 1923.26 | 2026-05-30T03:59:00Z | no execution |
+| 3 | KXHIGHTPHX-26MAY30-B92.5 | Will the maximum temperature be 92-93?? on May 30, 2026? | 0.385 | 0.010 | -0.39 to +0.61 | 70% | 923.51 | 923.51 | 640.81 | 2026-05-31T07:00:00Z | no execution |
+| 4 | KXMLBTOTAL-26MAY302205NYYATH-10 | New York Y vs A's Total Runs? | 0.505 | 0.010 | -0.51 to +0.49 | 70% | 3112 | 3112 | 3059 | 2026-06-03T02:05:00Z | no execution |
+| 5 | KXLOWTDEN-26MAY30-T48 | Will the minimum temperature be <48?? on May 30, 2026? | 0.295 | 0.010 | -0.30 to +0.70 | 70% | 1229.19 | 1229.19 | 476.17 | 2026-05-31T07:00:00Z | no execution |
+| 6 | KXHIGHTATL-26MAY30-T85 | Will the maximum temperature be >85?? on May 30, 2026? | 0.315 | 0.010 | -0.32 to +0.68 | 70% | 3169.23 | 3169.23 | 1476.88 | 2026-05-31T05:00:00Z | no execution |
+| 7 | KXHIGHTATL-26MAY30-B84.5 | Will the maximum temperature be 84-85?? on May 30, 2026? | 0.415 | 0.010 | -0.42 to +0.58 | 70% | 1742.43 | 1738.43 | 1206.38 | 2026-05-31T05:00:00Z | no execution |
+| 8 | KXMLBSPREAD-26MAY301915ATLCIN-ATL2 | Atlanta wins by over 1.5 runs? | 0.435 | 0.010 | -0.44 to +0.56 | 70% | 1295.03 | 837.83 | 1295.03 | 2026-06-02T23:15:00Z | no execution |
+| 9 | KXHIGHTSFO-26MAY30-T68 | Will the maximum temperature be >68?? on May 30, 2026? | 0.205 | 0.010 | -0.21 to +0.79 | 70% | 2746.96 | 2739.96 | 1968.37 | 2026-05-31T08:00:00Z | no execution |
+| 10 | KXHIGHTSFO-26MAY30-B67.5 | Will the maximum temperature be 67-68?? on May 30, 2026? | 0.375 | 0.010 | -0.38 to +0.62 | 70% | 2139.42 | 2117.81 | 1168.97 | 2026-05-31T08:00:00Z | no execution |
+| 11 | KXHIGHLAX-26MAY30-B72.5 | Will the **high temp in LA** be 72-73?? on May 30, 2026? | 0.215 | 0.010 | -0.22 to +0.78 | 70% | 2879.31 | 2879.31 | 1760.75 | 2026-05-31T07:59:00Z | no execution |
+| 12 | KXHIGHTSEA-26MAY30-B64.5 | Will the maximum temperature be 64-65?? on May 30, 2026? | 0.235 | 0.010 | -0.24 to +0.76 | 70% | 854.09 | 828.09 | 606.08 | 2026-05-31T08:00:00Z | no execution |
+| 13 | KXHIGHTSEA-26MAY30-B62.5 | Will the maximum temperature be 62-63?? on May 30, 2026? | 0.415 | 0.010 | -0.42 to +0.58 | 70% | 812.15 | 812.15 | 448.61 | 2026-05-31T08:00:00Z | no execution |
+| 14 | KXSPOTIFYGLOBALD-26MAY29-HAT | Top Global Song on Spotify on May 29, 2026? | 0.975 | 0.010 | -0.98 to +0.02 | 70% | 3360.64 | 3360.64 | 3069.64 | 2026-05-30T03:59:00Z | no execution |
+| 15 | KXITFMATCH-26MAY29MAGDEL-MAG | Will Alan Magadan win the Magadan vs Dellavedova: M15 Gimcheon Semifinal match? | 0.465 | 0.010 | -0.47 to +0.53 | 70% | 25186.29 | 7027.43 | 21730.8 | 2026-06-13T02:00:00Z | no execution |
+| 16 | KXITFMATCH-26MAY29MAGDEL-DEL | Will Matthew Dellavedova win the Magadan vs Dellavedova: M15 Gimcheon Semifinal match? | 0.545 | 0.010 | -0.55 to +0.45 | 70% | 18008.48 | 1593.69 | 16662.16 | 2026-06-13T02:00:00Z | no execution |
 | 17 | KXAPRPOTUS-26JUN05-39.4 | Will the President's approval rating be between 39.3 and 39.5 according to RealClearPolitics? | 0.225 | 0.010 | -0.23 to +0.77 | 70% | 654.42 | 654.42 | 623.42 | 2026-06-05T15:00:00Z | no execution |
-| 18 | KXHIGHTSATX-26MAY30-T89 | Will the maximum temperature be <89?? on May 30, 2026? | 0.475 | 0.010 | -0.48 to +0.52 | 70% | 1246.71 | 1246.71 | 565.55 | 2026-05-31T06:00:00Z | no execution |
-| 19 | KXAPRPOTUS-26JUN05-39.7 | Will the President's approval rating be between 39.6 and 39.8 according to RealClearPolitics? | 0.245 | 0.010 | -0.25 to +0.75 | 70% | 797.24 | 797.24 | 709.85 | 2026-06-05T15:00:00Z | no execution |
-| 20 | KXBRENTD-26JUN0117-T84.00 | Will the brent crude oil close price be above 84.00 USD/Bbl on June 01, 2026 at 5:00 PM EDT? | 0.925 | 0.010 | -0.93 to +0.07 | 70% | 615.09 | 615.09 | 577 | 2026-06-01T21:00:00Z | no execution |
+| 18 | KXBRENTD-26JUN0117-T83.00 | Will the brent crude oil close price be above 83.00 USD/Bbl on June 01, 2026 at 5:00 PM EDT? | 0.945 | 0.010 | -0.95 to +0.05 | 70% | 777.71 | 777.71 | 768.71 | 2026-06-01T21:00:00Z | no execution |
+| 19 | KXMLBSPREAD-26MAY301410DETCWS-CWS2 | Chicago WS wins by over 1.5 runs? | 0.295 | 0.010 | -0.30 to +0.70 | 70% | 601 | 601 | 601 | 2026-06-02T18:10:00Z | no execution |
+| 20 | KXMLBTOTAL-26MAY301605KCTEX-8 | Kansas City vs Texas Total Runs? | 0.525 | 0.010 | -0.53 to +0.47 | 70% | 11298.5 | 11292.12 | 3460.74 | 2026-06-02T20:05:00Z | no execution |
 
 ## Stats Model
 

@@ -213,6 +213,12 @@ Master convergence PDF:
 artifacts/COMET-LEAP-TOKEN-BURN-REVENUE-CONVERGENCE-v1.pdf
 ```
 
+Public bounty radar:
+
+```text
+artifacts/PUBLIC-PUZZLE-MATH-BOUNTY-RADAR-2026-05-30.pdf
+```
+
 ---
 
 ## Non-Goals For This Repo

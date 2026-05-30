@@ -42,6 +42,24 @@ Status: baseline updated; v1.0.0 promotion still held.
 | `artifacts/ONE-IDE-STATUS-LATEST.pdf` | One IDE status PDF receipt. |
 | `artifacts/LANTERN-BASELINE-MODEL-v1.pdf` | Baseline model PDF receipt. |
 
+## Strategy Reader Receipts
+
+| Receipt | Status |
+|---|---|
+| `manifests/evidence/game-theory-wargame-reader-2026-05-29.md` | Five local game-theory/wargame PDFs indexed as summary-only Lantern Reader evidence. |
+| Source count | 5 PDFs, 1758 pages, SHA256 hashes recorded. |
+| Promoted signals | game theory strategy, wargame simulation, HFT spread game modeling, adversarial decision training. |
+| Blocked uses | live trading edge claims, autonomous HFT execution without human approval, operational military guidance, copyrighted text dumps. |
+
+## Public Bounty Receipts
+
+| Receipt | Status |
+|---|---|
+| `manifests/evidence/public-puzzle-math-bounty-radar-2026-05-30.md` | Current public puzzle/math bounty radar from official source pages. |
+| `artifacts/PUBLIC-PUZZLE-MATH-BOUNTY-RADAR-2026-05-30.pdf` | Printable `!one` receipt for bounty lanes and boundaries. |
+| Ranked first | ARC-AGI-3 plus ARC Paper Prize starter lane. |
+| Held | No prize claim, proof claim, hidden benchmark leakage, or live trading. |
+
 ## Baseline Model
 
 | Lane | Baseline |

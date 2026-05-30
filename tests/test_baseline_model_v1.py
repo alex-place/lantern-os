@@ -26,6 +26,11 @@ def test_baseline_model_v1_records_ingest_counts_and_aws_truth() -> None:
     assert model["statsEvidence"]["kalshiPublicSnapshot"]["marketsPulled"] >= 5000
     assert model["statsEvidence"]["kalshiPublicSnapshot"]["actionableTradeCount"] == 0
     assert model["statsEvidence"]["kalshiPublicSnapshot"]["customHftSpreadQueueRows"] <= 5
+    assert model["bountyEvidence"]["publicPuzzleMathRadar"]["rankedFirst"] == "ARC-AGI-3 plus ARC Paper Prize starter lane"
+    assert "no prize claim" in model["bountyEvidence"]["publicPuzzleMathRadar"]["boundary"]
+    assert model["strategyReaderEvidence"]["gameTheoryWargameReader"]["sourceCount"] == 5
+    assert model["strategyReaderEvidence"]["gameTheoryWargameReader"]["totalPages"] == 1758
+    assert "hft_spread_game_model_reference" in model["strategyReaderEvidence"]["gameTheoryWargameReader"]["promotedSignals"]
     assert model["statsEvidence"]["oneIdeStatus"]["mode"] == "read_only_preflight"
     assert model["statsEvidence"]["oneIdeStatus"]["failedServiceCount"] == 0
 
@@ -55,6 +60,12 @@ def test_baseline_model_v1_markdown_links_receipt_and_blocks_promotion() -> None
         "Stats Receipts",
         "markets below `$5.00` visible activity excluded",
         "custom HFT/spread-capture research queue",
+        "Strategy Reader Receipts",
+        "Five local game-theory/wargame PDFs",
+        "1758 pages",
+        "Public Bounty Receipts",
+        "public-puzzle-math-bounty-radar-2026-05-30.md",
+        "ARC-AGI-3 plus ARC Paper Prize starter lane",
         "artifacts/ONE-IDE-STATUS-LATEST.pdf",
     ]
     missing = [phrase for phrase in required if phrase not in text]

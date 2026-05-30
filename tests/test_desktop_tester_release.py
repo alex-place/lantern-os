@@ -21,6 +21,8 @@ def test_desktop_tester_doc_answers_download_request() -> None:
         ".\\Start-LanternDesktopTester.ps1",
         "http://127.0.0.1:4177",
         "not equity, not securities, not a token",
+        "game-theory-wargame-reader-2026-05-29.md",
+        "custom HFT/spread simulation",
         "Old static pages such as Tony Garage, Shareholder Index, Agent Fleet, and",
         "Do not enter secrets",
     ]
@@ -69,6 +71,7 @@ def test_windows_tester_wiki_has_free_paid_and_release_boundaries() -> None:
         "lantern-desktop-tester-latest.zip",
         "https://ko-fi.com/alexplace",
         "not equity, not",
+        "game-theory/wargame card",
         "What Not To Enter",
         "AWS keys",
     ]

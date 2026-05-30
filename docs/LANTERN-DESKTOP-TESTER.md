@@ -74,16 +74,31 @@ front pages.
 - Chat-first interaction.
 - The $1000 demo slideshow.
 - 20-panel Art Matrix.
+- Lantern Reader access to public-safe evidence cards.
 - Local/cloud URL map.
 - Wallet truth with cleared cash separate from invoices.
 - Safe command lane for `!one`, `!converge`, and `!superjarvis`.
 - Discord/voice docs, but no live bot token or voice mutation.
+
+## Lantern Reader Pack
+
+Open the bounded game-theory and wargame reader card:
+
+```text
+http://127.0.0.1:4177/view?path=manifests/evidence/game-theory-wargame-reader-2026-05-29.md
+```
+
+This card indexes five local PDFs by metadata, hashes, page counts, and
+compressed strategy signals. It does not copy book text into the repo. Use it
+for strategy modeling, custom HFT/spread simulation, and game/wargame decision
+practice, not live trading or operational military guidance.
 
 ## What Testers Should Report
 
 - Did the start script open the dashboard?
 - Did chat answer?
 - Did the demo deck explain what Lantern sells?
+- Did the Lantern Reader open the game-theory/wargame card?
 - Did any link still point to an old front page?
 - Did any feature imply fake revenue, fake cloud health, or fake Discord access?
 

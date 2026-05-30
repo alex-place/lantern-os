@@ -63,6 +63,45 @@
     },
     "baselinePdf": "artifacts/LANTERN-BASELINE-MODEL-v1.pdf"
   },
+  "bountyEvidence": {
+    "publicPuzzleMathRadar": {
+      "manifest": "manifests/evidence/public-puzzle-math-bounty-radar-2026-05-30.md",
+      "pdf": "artifacts/PUBLIC-PUZZLE-MATH-BOUNTY-RADAR-2026-05-30.pdf",
+      "rankedFirst": "ARC-AGI-3 plus ARC Paper Prize starter lane",
+      "nearTermPrizePools": [
+        "ARC-AGI-3: 850000 USD",
+        "ARC-AGI-2: 700000 USD",
+        "ARC Paper Prize: 450000 USD",
+        "ICML AI for Math / TCS Proving: 8000 USD"
+      ],
+      "moonshotPrizePools": [
+        "Clay Millennium Prize Problems: 1000000 USD per unsolved problem",
+        "AMS Beal Prize: 1000000 USD"
+      ],
+      "boundary": "no prize claim, no proof claim, no hidden benchmark leakage, no live trading"
+    }
+  },
+  "strategyReaderEvidence": {
+    "gameTheoryWargameReader": {
+      "manifest": "manifests/evidence/game-theory-wargame-reader-2026-05-29.md",
+      "pdf": "artifacts/GAME-THEORY-WARGAME-READER-2026-05-29.pdf",
+      "sourceCount": 5,
+      "totalPages": 1758,
+      "rightsState": "summary_only",
+      "promotedSignals": [
+        "game_theory_strategy_reference",
+        "wargame_simulation_reference",
+        "hft_spread_game_model_reference",
+        "adversarial_decision_training_reference"
+      ],
+      "blockedUses": [
+        "live_trading_edge_claim",
+        "autonomous_hft_execution_without_human_approval",
+        "operational_military_guidance",
+        "copyrighted_text_dump"
+      ]
+    }
+  },
   "pendingEvidenceCards": [
     {
       "path": "manifests/evidence/codex-thread-019e75ae-80d8-76a2-8a24-d1bff3b85fa1-2026-05-29.md",
