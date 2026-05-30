@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lantern Day One Pocketart</title>
+<style>
+  :root {
+    --teal:       #8bbcc0;
+    --amber:      #f0c46a;
+    --lavender:   #a8b8d8;
+    --sage:       #85b89e;
+    --teal-green: #7ab0a0;
+    --ink:        #1a2a30;
+    --card-bg:    rgba(255,255,255,0.18);
+    --card-border:rgba(255,255,255,0.38);
+    --label-bg:   rgba(255,255,255,0.92);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a2a30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  /* State switcher */
+  .switcher {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .switcher button {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .switcher button.active,
+  .switcher button:hover {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.7);
+  }
+
+  /* Stage */
+  .stage {
+    position: relative;
+    width: 100%;
+    max-width: 1020px;
+    aspect-ratio: 1020/540;
+    border-radius: 18px;
+    overflow: hidden;
+    transition: background 0.5s ease;
+  }
+
+  /* Background radar lines */
+  .radar {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .radar svg { width: 100%; height: 100%; }
+
+  /* Label card top-left */
+  .label-card {
+    position: absolute;
+    top: 28px;
+    left: 28px;
+    background: var(--label-bg);
+    border-radius: 12px;
+    padding: 12px 18px;
+    min-width: 160px;
+    max-width: 240px;
+    z-index: 10;
+  }
+  .label-card .state-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .label-card .sub {
+    font-size: 10px;
+    color: #607080;
+    margin-top: 3px;
+  }
+
+  /* Central element */
+  .central {
+    position: absolute;
+    left: 8%;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: all 0.4s ease;
+    opacity: 0.22;
+    pointer-events: none;
+  }
+  .central.circle {
+    width: 42%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.55);
+    left: 4%;
+  }
+  .central.roundrect {
+    width: 44%;
+    height: 70%;
+    border-radius: 14%;
+    background: rgba(255,255,255,0.4);
+    left: 4%;
+  }
+  .central.hidden { opacity: 0; }
+
+  /* Cards area */
+  .cards-area {
+    position: absolute;
+    right: 3%;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 34%;
+    z-index: 5;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    backdrop-filter: blur(6px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .card:hover {
+    transform: translateX(-4px);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+  }
+  .card .card-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 3px;
+  }
+  .card .card-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.1;
+  }
+  .card .card-sub {
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 2px;
+  }
+  .card.accent {
+    border-color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.28);
+  }
+  .card.warn {
+    border-color: rgba(255,200,80,0.7);
+    background: rgba(255,200,80,0.15);
+  }
+  .card.ok {
+    border-color: rgba(100,220,160,0.7);
+    background: rgba(100,220,160,0.15);
+  }
+
+  /* Progress bar */
+  .bar-wrap {
+    width: 100%;
+    height: 5px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.75);
+    transition: width 0.6s ease;
+  }
+
+  /* Left info panel (some states) */
+  .info-panel {
+    position: absolute;
+    left: 5%;
+    bottom: 12%;
+    width: 44%;
+    z-index: 5;
+  }
+  .info-panel .info-line {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 4px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(255,255,255,0.2);
+  }
+  .info-panel .info-line strong {
+    color: rgba(255,255,255,0.85);
+  }
+
+  /* Score ring */
+  .score-ring {
+    position: absolute;
+    left: 5%;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+  }
+  .score-ring svg { width: 100%; height: 100%; }
+  .score-ring .score-label {
+    position: absolute;
+    text-align: center;
+    color: #fff;
+  }
+  .score-ring .score-label .score-num {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .score-ring .score-label .score-sub {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 4px;
+  }
+
+  /* Timestamp */
+  .timestamp {
+    position: absolute;
+    bottom: 12px;
+    left: 28px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    z-index: 10;
+    font-family: monospace;
+  }
+
+  /* State: hidden */
+  .state-view { display: none; }
+  .state-view.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="switcher">
+  <button class="active" onclick="setState('spend')">SPEND TOKENS LAST</button>
+  <button onclick="setState('garage')">LOCAL FIRST GARAGE</button>
+  <button onclick="setState('readable')">MAKE IT READABLE</button>
+  <button onclick="setState('sort')">SORT THE PILE</button>
+  <button onclick="setState('win')">SMALL REAL WIN</button>
+</div>
+
+<div class="stage" id="stage">
+
+  <!-- Radar background -->
+  <div class="radar">
+    <svg id="radarSvg" viewBox="0 0 1020 540" preserveAspectRatio="xMidYMid slice">
+      <!-- Generated by JS -->
+    </svg>
+  </div>
+
+  <!-- Label -->
+  <div class="label-card">
+    <div class="state-name" id="stateName">SPEND TOKENS LAST</div>
+    <div class="sub">Lantern Day One pocketart</div>
+  </div>
+
+  <!-- Central element -->
+  <div class="central hidden" id="centralEl"></div>
+
+  <!-- Score ring (LOCAL FIRST GARAGE only) -->
+  <div class="score-ring" id="scoreRing" style="display:none">
+    <svg viewBox="0 0 300 300">
+      <circle cx="150" cy="150" r="120" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+      <circle id="scoreArc" cx="150" cy="150" r="120"
+        fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="8"
+        stroke-dasharray="754" stroke-dashoffset="754"
+        stroke-linecap="round"
+        transform="rotate(-90 150 150)"
+        style="transition: stroke-dashoffset 1s ease"/>
+    </svg>
+    <div class="score-label">
+      <div class="score-num" id="scoreNum">95</div>
+      <div class="score-sub">Movie 1 Garage</div>
+    </div>
+  </div>
+
+  <!-- Cards area -->
+  <div class="cards-area" id="cardsArea"></div>
+
+  <!-- Info panel -->
+  <div class="info-panel" id="infoPanel"></div>
+
+  <!-- Timestamp -->
+  <div class="timestamp" id="ts"></div>
+
+</div>
+
+<script>
+const ARC = {
+  movie1: 95,
+  movie2: 68,
+  movie3: 32,
+  humanTrial: 22,
+  lanes: {
+    "Repo + Reports": 0.95,
+    "Desktop Surface": 0.90,
+    "RAG / Data": 0.68,
+    "Cash + Public Proof": 0.35,
+    "MCP Canary": 0.45,
+    "Hardware Reactor": 0.32,
+    "Patient Packets": 0.74,
+    "4D GMS": 0.55,
+    "ASI Pattern": 0.85,
+    "Fleet Metrics": 0.22,
+    "Human Trial Gates": 0.22
+  },
+  raisesMovie2: [
+    "5 outreach sends in wallet ledger",
+    "1 paid pilot or rejection batch",
+    "1 public proof page or demo artifact",
+    "1 user/stakeholder feedback receipt",
+    "Discord bot health check passes",
+    "MCP canary validates tools",
+    "D: shrunk + dual boot ready",
+    "Workflow used by someone else"
+  ],
+  boundaries: [
+    "No fake revenue",
+    "No unattended disk mutation",
+    "No Discord-to-MCP before canary",
+    "No v1.0.0 tag without approval",
+    "No store fee until product chosen",
+    "No medical claim without evidence",
+    "No ASI claim without validation",
+    "No token issuance or investment advice"
+  ]
+};
+
+const KALSHI_ORDERS = [
+  { title: "Auburn vs NC State winner?", limit: "88c", loss: "$0.88", mins: "102", side: "AUT YES" },
+  { title: "Carter Jensen: 1+ HR?", limit: "3c", loss: "$0.03", mins: "107", side: "YES" },
+  { title: "Danny Jansen: 1+ HR?", limit: "3c", loss: "$0.03", mins: "107", side: "YES" },
+  { title: "Dylan Crews: 1+ HR?", limit: "3c", loss: "$0.03", mins: "107", side: "YES" },
+  { title: "Bryan Reynolds: 1+ HR?", limit: "3c", loss: "$0.03", mins: "107", side: "YES" },
+  { title: "Austin Hedges: 1+ HR?", limit: "2c", loss: "$0.02", mins: "112", side: "YES" },
+  { title: "Brayan Rocchio: 1+ HR?", limit: "2c", loss: "$0.02", mins: "112", side: "YES" }
+];
+
+const STATES = {
+  spend: {
+    bg: "#7badb5",
+    name: "SPEND TOKENS LAST",
+    central: "hidden",
+    cards: () => [
+      { label: "Token Budget", value: "$50.00", sub: "paper only · no live orders", cls: "accent" },
+      { label: "Max Daily Risk", value: "$5.00", sub: "10% of bankroll", cls: "" },
+      { label: "Max Per Order", value: "$1.00", sub: "2% of bankroll", cls: "" },
+      { label: "Deployed Today", value: "$2.10", sub: "7 paper positions", cls: "warn" },
+      { label: "Remaining", value: "$2.90", sub: "budget left", cls: "ok" },
+      { label: "Real Money Spent", value: "$0.00", sub: "live trading: BLOCKED", cls: "" }
+    ],
+    info: [
+      { label: "Principle", val: "Spend tokens only after evidence. Cash last." },
+      { label: "Live Status", val: "Blocked — MCP canary not yet validated" },
+      { label: "Next Gate", val: "5 x $1,000 founding seat demos cleared" }
+    ]
+  },
+  garage: {
+    bg: "#e8b84a",
+    name: "LOCAL FIRST GARAGE",
+    central: "score",
+    scoreVal: 95,
+    scoreSub: "Movie 1 Garage",
+    cards: () => [
+      { label: "Movie 2 Platform", value: "68%", sub: "public proof loop active", cls: "warn" },
+      { label: "Movie 3 Fleet", value: "32%", sub: "distributed readiness", cls: "" },
+      { label: "Human Trial", value: "22%", sub: "needs 5 demos + cash", cls: "" },
+      { label: "ASI Pattern", value: "85%", sub: "architecture refs only", cls: "ok" },
+      { label: "MCP Canary", value: "45%", sub: "hooks deployed, not tested", cls: "warn" }
+    ],
+    info: [
+      { label: "Phase", val: "Movie 1 proven. Movie 2 proof loop forming." },
+      { label: "Model", val: "mk1-asi-integrated-brier-calibration" },
+      { label: "Rule", val: "Scores rise only from evidence, not claims." }
+    ]
+  },
+  readable: {
+    bg: "#8898c0",
+    name: "MAKE IT READABLE",
+    central: "roundrect",
+    cards: () => Object.entries(ARC.lanes).slice(0, 8).map(([k, v]) => ({
+      label: k,
+      value: Math.round(v * 100) + "%",
+      sub: v >= 0.7 ? "proven" : v >= 0.4 ? "prototype" : "held",
+      cls: v >= 0.7 ? "ok" : v >= 0.4 ? "warn" : "",
+      bar: v
+    })),
+    info: [
+      { label: "Reports", val: "10 generated this session" },
+      { label: "PDFs", val: "8 perfect PDFs committed to master" },
+      { label: "Convergence", val: "0 issues — loop passed" }
+    ]
+  },
+  sort: {
+    bg: "#5a9e8e",
+    name: "SORT THE PILE",
+    central: "roundrect",
+    cards: () => [
+      ...ARC.raisesMovie2.slice(0, 4).map((r, i) => ({
+        label: "Movie 2 Gate " + (i+1),
+        value: i < 2 ? "DONE" : "OPEN",
+        sub: r,
+        cls: i < 2 ? "ok" : ""
+      })),
+      ...ARC.boundaries.slice(0, 3).map(b => ({
+        label: "Boundary",
+        value: "HELD",
+        sub: b,
+        cls: "warn"
+      }))
+    ],
+    info: [
+      { label: "Fix Window", val: "4 actionable issues max at once" },
+      { label: "Held Issues", val: "1 — dual boot (physical action needed)" },
+      { label: "Promotion Path", val: "Theoretical → Prototype → Proven → Production" }
+    ]
+  },
+  win: {
+    bg: "#6aaa88",
+    name: "SMALL REAL WIN",
+    central: "roundrect",
+    cards: () => [
+      { label: "Convergence Loop", value: "PASSED", sub: "0 actionable issues", cls: "ok" },
+      { label: "Reports Committed", value: "10", sub: "to master today", cls: "ok" },
+      { label: "PDFs Generated", value: "8", sub: "all with fixed encoding", cls: "ok" },
+      { label: "Confidence +", value: "+7%", sub: "Movie 2 highest gain today", cls: "ok" },
+      { label: "Kalshi Paper", value: "10 orders", sub: "$2.10 risk · $0 real", cls: "warn" },
+      { label: "Next Win Target", value: "$1,000", sub: "founding seat demo", cls: "" }
+    ],
+    info: [
+      { label: "Session", val: "2026-05-30 full day" },
+      { label: "Commits", val: "9 commits · 24 files · 3,428+ lines" },
+      { label: "Human Trial", val: "22% ready · plan to 70% created" }
+    ]
+  }
+};
+
+let current = "spend";
+
+function drawRadar(color) {
+  const svg = document.getElementById("radarSvg");
+  const lines = [];
+  const cx = 260, cy = 270;
+  for (let r = 60; r < 900; r += 55) {
+    lines.push(`<rect x="${cx - r}" y="${cy - r}" width="${r*2}" height="${r*2}"
+      rx="${r * 0.38}" ry="${r * 0.38}"
+      fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.2"/>`);
+  }
+  // Wave lines
+  for (let i = 0; i < 18; i++) {
+    const y = 30 + i * 30;
+    lines.push(`<path d="M500,${y} Q680,${y+15} 1020,${y+5}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`);
+  }
+  svg.innerHTML = lines.join("\n");
+}
+
+function buildCards(state) {
+  const area = document.getElementById("cardsArea");
+  const cards = state.cards();
+  area.innerHTML = cards.map(c => {
+    const bar = c.bar !== undefined
+      ? `<div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(c.bar*100)}%"></div></div>`
+      : "";
+    return `<div class="card ${c.cls||''}">
+      <div class="card-label">${c.label}</div>
+      <div class="card-value">${c.value}</div>
+      <div class="card-sub">${c.sub}</div>
+      ${bar}
+    </div>`;
+  }).join("");
+}
+
+function buildInfo(state) {
+  const panel = document.getElementById("infoPanel");
+  if (!state.info) { panel.innerHTML = ""; return; }
+  panel.innerHTML = state.info.map(i =>
+    `<div class="info-line"><strong>${i.label}:</strong> ${i.val}</div>`
+  ).join("");
+}
+
+function buildScoreRing(val) {
+  const circ = 2 * Math.PI * 120;
+  const offset = circ - (val / 100) * circ;
+  document.getElementById("scoreArc").style.strokeDashoffset = offset;
+  document.getElementById("scoreNum").textContent = val + "%";
+}
+
+function setState(key) {
+  current = key;
+  const s = STATES[key];
+
+  // Background
+  document.getElementById("stage").style.background = s.bg;
+
+  // Label
+  document.getElementById("stateName").textContent = s.name;
+
+  // Switcher buttons
+  document.querySelectorAll(".switcher button").forEach((b, i) => {
+    b.classList.toggle("active", Object.keys(STATES)[i] === key);
+  });
+
+  // Radar
+  drawRadar(s.bg);
+
+  // Central element
+  const cel = document.getElementById("centralEl");
+  const ring = document.getElementById("scoreRing");
+  if (s.central === "score") {
+    cel.className = "central hidden";
+    ring.style.display = "flex";
+    buildScoreRing(s.scoreVal || ARC.movie1);
+    document.querySelector("#scoreRing .score-sub").textContent = s.scoreSub || "Movie 1";
+  } else if (s.central === "circle") {
+    cel.className = "central circle";
+    ring.style.display = "none";
+  } else if (s.central === "roundrect") {
+    cel.className = "central roundrect";
+    ring.style.display = "none";
+  } else {
+    cel.className = "central hidden";
+    ring.style.display = "none";
+  }
+
+  // Cards + info
+  buildCards(s);
+  buildInfo(s);
+
+  // Timestamp
+  document.getElementById("ts").textContent = "Generated: " + new Date().toISOString().slice(0,19).replace("T"," ") + " UTC · lantern-os master";
+}
+
+// Init
+setState("spend");
+</script>
+</body>
+</html>

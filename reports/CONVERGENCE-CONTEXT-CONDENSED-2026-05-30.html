@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convergence Context — Lantern Day One Pocketart</title>
+<style>
+  :root {
+    --bg: #d4922a;
+    --bg2: #e8b04a;
+    --card-bg: rgba(255,255,255,0.14);
+    --card-border: rgba(255,255,255,0.32);
+    --label-bg: rgba(255,255,255,0.92);
+    --ink: #2a1a08;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 100%);
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  .radar-bg {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0;
+  }
+  .radar-bg svg { width: 100%; height: 100%; }
+
+  /* Label */
+  .label-card {
+    position: fixed;
+    top: 22px; left: 22px;
+    background: var(--label-bg);
+    border-radius: 12px;
+    padding: 11px 16px;
+    z-index: 20;
+    min-width: 200px;
+  }
+  .label-card .state-name {
+    font-size: 11px; font-weight: 800;
+    letter-spacing: 0.14em; color: var(--ink);
+    text-transform: uppercase;
+  }
+  .label-card .sub { font-size: 9px; color: #806030; margin-top: 3px; }
+
+  /* Layout */
+  .layout {
+    position: relative; z-index: 5;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+    padding: 90px 28px 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; }
+    .left-col { display: none; }
+  }
+
+  /* Score ring column */
+  .left-col { position: sticky; top: 90px; }
+
+  .ring-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .ring-wrap svg { width: 100%; height: 100%; }
+  .ring-center {
+    position: absolute;
+    text-align: center;
+    color: #fff;
+  }
+  .ring-center .rnum {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  .ring-center .rsub {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .ring-center .rphase {
+    font-size: 10px;
+    opacity: 0.55;
+    margin-top: 6px;
+    max-width: 120px;
+    line-height: 1.4;
+  }
+
+  .score-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .score-tab {
+    background: var(--card-bg);
+    border: 1.2px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all 0.18s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .score-tab:hover, .score-tab.active {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.6);
+    transform: translateX(4px);
+  }
+  .score-tab .st-label { font-size: 10px; color: rgba(255,255,255,0.6); font-weight: 600; flex: 1; }
+  .score-tab .st-val { font-size: 18px; font-weight: 800; color: #fff; }
+  .score-tab .st-bar {
+    position: absolute; bottom: 0; left: 0;
+    height: 2px; border-radius: 0 0 10px 10px;
+    background: rgba(255,255,255,0.5);
+  }
+
+  /* Right column */
+  .right-col { display: flex; flex-direction: column; gap: 20px; }
+
+  .section-head {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 10px;
+  }
+
+  /* Cards */
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--card-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    backdrop-filter: blur(6px);
+    transition: transform 0.18s;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card .clabel { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 4px; }
+  .card .cval { font-size: 20px; font-weight: 800; color: #fff; line-height: 1; }
+  .card .csub { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 3px; }
+  .card .cbar { width:100%; height:4px; background:rgba(255,255,255,0.18); border-radius:3px; margin-top:6px; overflow:hidden; }
+  .card .cbar-fill { height:100%; border-radius:3px; background:rgba(255,255,255,0.7); }
+  .card.ok { border-color: rgba(80,220,140,0.5); }
+  .card.warn { border-color: rgba(255,200,60,0.5); }
+  .card.held { border-color: rgba(255,255,255,0.2); opacity: 0.75; }
+
+  /* Phase timeline */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item {
+    display: flex;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    align-items: flex-start;
+  }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    margin-top: 3px; flex-shrink: 0;
+  }
+  .tl-dot.done { background: rgba(80,220,140,0.8); box-shadow: 0 0 6px rgba(80,220,140,0.4); }
+  .tl-dot.active { background: rgba(255,200,60,0.9); box-shadow: 0 0 6px rgba(255,200,60,0.5); }
+  .tl-dot.held { background: rgba(255,255,255,0.25); }
+  .tl-text { flex: 1; }
+  .tl-title { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.9); margin-bottom: 2px; }
+  .tl-sub { font-size: 10px; color: rgba(255,255,255,0.5); line-height: 1.5; }
+
+  /* Next actions */
+  .next-list { display: flex; flex-direction: column; gap: 8px; }
+  .next-item {
+    background: var(--card-bg);
+    border: 1.2px solid var(--card-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.8);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .next-item .ni-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; color: #fff;
+    flex-shrink: 0;
+  }
+
+  .footer {
+    position: fixed; bottom: 10px; left: 22px;
+    font-size: 9px; color: rgba(255,255,255,0.22);
+    z-index: 20; font-family: monospace;
+  }
+</style>
+</head>
+<body>
+
+<!-- Radar -->
+<div class="radar-bg">
+  <svg viewBox="0 0 1100 900" preserveAspectRatio="xMidYMid slice">
+    <defs><style>
+      .rl{fill:none;stroke:rgba(255,255,255,0.065);stroke-width:1.3;}
+      .wl{fill:none;stroke:rgba(255,255,255,0.04);stroke-width:1;}
+    </style></defs>
+    <circle class="rl" cx="320" cy="460" r="180"/>
+    <circle class="rl" cx="320" cy="460" r="260"/>
+    <circle class="rl" cx="320" cy="460" r="350"/>
+    <circle class="rl" cx="320" cy="460" r="450"/>
+    <circle class="rl" cx="320" cy="460" r="560"/>
+    <path class="wl" d="M0,100 Q550,80 1100,110"/>
+    <path class="wl" d="M0,160 Q550,140 1100,170"/>
+    <path class="wl" d="M0,220 Q550,200 1100,230"/>
+    <path class="wl" d="M0,280 Q550,260 1100,290"/>
+    <path class="wl" d="M0,340 Q550,320 1100,350"/>
+    <path class="wl" d="M0,400 Q550,380 1100,410"/>
+    <path class="wl" d="M0,460 Q550,440 1100,470"/>
+    <path class="wl" d="M0,520 Q550,500 1100,530"/>
+    <path class="wl" d="M0,580 Q550,560 1100,590"/>
+  </svg>
+</div>
+
+<!-- Label -->
+<div class="label-card">
+  <div class="state-name">LOCAL FIRST GARAGE</div>
+  <div class="sub">Lantern Day One pocketart · Convergence Context</div>
+</div>
+
+<div class="layout">
+
+  <!-- Left: Score ring -->
+  <div class="left-col">
+    <div class="ring-wrap">
+      <svg viewBox="0 0 300 300">
+        <circle cx="150" cy="150" r="120" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+        <circle id="ringArc" cx="150" cy="150" r="120"
+          fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="10"
+          stroke-dasharray="754" stroke-dashoffset="754"
+          stroke-linecap="round"
+          transform="rotate(-90 150 150)"
+          style="transition:stroke-dashoffset 1.2s ease"/>
+        <circle cx="150" cy="150" r="92" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      </svg>
+      <div class="ring-center">
+        <div class="rnum" id="ringNum">95%</div>
+        <div class="rsub" id="ringLabel">Movie 1 Garage</div>
+        <div class="rphase">Local-first proven</div>
+      </div>
+    </div>
+
+    <div class="score-tabs">
+      <div class="score-tab active" onclick="setRing(95,'Movie 1 Garage','Local-first proven',this)">
+        <div class="st-label">Movie 1 Garage</div>
+        <div class="st-val">95%</div>
+      </div>
+      <div class="score-tab" onclick="setRing(68,'Movie 2 Platform','Public proof loop active',this)">
+        <div class="st-label">Movie 2 Platform</div>
+        <div class="st-val">68%</div>
+      </div>
+      <div class="score-tab" onclick="setRing(32,'Movie 3 Fleet','Distributed readiness',this)">
+        <div class="st-label">Movie 3 Fleet</div>
+        <div class="st-val">32%</div>
+      </div>
+      <div class="score-tab" onclick="setRing(22,'Human Trial','5 demos + cash needed',this)">
+        <div class="st-label">Human Trial Demo</div>
+        <div class="st-val">22%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Content -->
+  <div class="right-col">
+
+    <!-- Evidence Lanes -->
+    <div>
+      <div class="section-head">Evidence Lanes</div>
+      <div class="cards-row">
+        <div class="card ok">
+          <div class="clabel">Repo + Reports</div>
+          <div class="cval">95%</div>
+          <div class="csub">10 reports committed</div>
+          <div class="cbar"><div class="cbar-fill" style="width:95%"></div></div>
+        </div>
+        <div class="card ok">
+          <div class="clabel">Desktop Surface</div>
+          <div class="cval">90%</div>
+          <div class="csub">pocketart deployed</div>
+          <div class="cbar"><div class="cbar-fill" style="width:90%"></div></div>
+        </div>
+        <div class="card ok">
+          <div class="clabel">ASI Pattern</div>
+          <div class="cval">85%</div>
+          <div class="csub">architecture refs only</div>
+          <div class="cbar"><div class="cbar-fill" style="width:85%"></div></div>
+        </div>
+        <div class="card ok">
+          <div class="clabel">Patient Packets</div>
+          <div class="cval">74%</div>
+          <div class="csub">de-identified</div>
+          <div class="cbar"><div class="cbar-fill" style="width:74%"></div></div>
+        </div>
+        <div class="card warn">
+          <div class="clabel">RAG / Data</div>
+          <div class="cval">68%</div>
+          <div class="csub">indexed, not fully proven</div>
+          <div class="cbar"><div class="cbar-fill" style="width:68%"></div></div>
+        </div>
+        <div class="card warn">
+          <div class="clabel">MCP Canary</div>
+          <div class="cval">45%</div>
+          <div class="csub">hooks deployed, not tested</div>
+          <div class="cbar"><div class="cbar-fill" style="width:45%"></div></div>
+        </div>
+        <div class="card warn">
+          <div class="clabel">4D GMS</div>
+          <div class="cval">55%</div>
+          <div class="csub">design contract</div>
+          <div class="cbar"><div class="cbar-fill" style="width:55%"></div></div>
+        </div>
+        <div class="card held">
+          <div class="clabel">Cash + Public Proof</div>
+          <div class="cval">35%</div>
+          <div class="csub">needs 5 demos</div>
+          <div class="cbar"><div class="cbar-fill" style="width:35%"></div></div>
+        </div>
+        <div class="card held">
+          <div class="clabel">Hardware Reactor</div>
+          <div class="cval">32%</div>
+          <div class="csub">design only</div>
+          <div class="cbar"><div class="cbar-fill" style="width:32%"></div></div>
+        </div>
+        <div class="card held">
+          <div class="clabel">Human Trial Gates</div>
+          <div class="cval">22%</div>
+          <div class="csub">plan created, not executed</div>
+          <div class="cbar"><div class="cbar-fill" style="width:22%"></div></div>
+        </div>
+        <div class="card held">
+          <div class="clabel">Fleet Metrics</div>
+          <div class="cval">22%</div>
+          <div class="csub">distributed not deployed</div>
+          <div class="cbar"><div class="cbar-fill" style="width:22%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase timeline -->
+    <div>
+      <div class="section-head">Convergence Phase Timeline</div>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot done"></div>
+          <div class="tl-text">
+            <div class="tl-title">Movie 1 — Local Garage (95%)</div>
+            <div class="tl-sub">RAG + reports + desktop surface + safety hooks all proven locally. Convergence loop passes 0 issues.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot active"></div>
+          <div class="tl-text">
+            <div class="tl-title">Movie 2 — Public Platform (68%) — ACTIVE</div>
+            <div class="tl-sub">Needs: 5 outreach sends, 1 paid pilot, MCP canary validated, D: dual-boot ready, 1 public demo artifact.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot held"></div>
+          <div class="tl-text">
+            <div class="tl-title">Movie 3 — Distributed Fleet (32%) — HELD</div>
+            <div class="tl-sub">Blocked until Movie 2 cleared cash and fleet evidence. Design contract only.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot held"></div>
+          <div class="tl-text">
+            <div class="tl-title">Human Trial Demo (22%) — HELD</div>
+            <div class="tl-sub">Requires 5 x $1,000 demos cleared, MCP canary validated, rollback paths tested, safety gates confirmed.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next actions -->
+    <div>
+      <div class="section-head">Next Safe Actions</div>
+      <div class="next-list">
+        <div class="next-item"><div class="ni-num">1</div>Execute 5 x $1,000 founding seat demos — collect cleared cash receipts</div>
+        <div class="next-item"><div class="ni-num">2</div>Run MCP canary with real tool exposure — validate all exposed tools</div>
+        <div class="next-item"><div class="ni-num">3</div>Test rollback paths with real recovery scenarios — measure recovery time</div>
+        <div class="next-item"><div class="ni-num">4</div>Record 5 outreach sends in wallet ledger — advance Movie 2</div>
+        <div class="next-item"><div class="ni-num">5</div>Shrink D: and set dual-boot readyForInstall=true</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">Generated: 2026-05-30T17:10 UTC-04 · mk1-asi-integrated-brier-calibration · ASI patterns are architecture refs only · no capability claims</div>
+
+<script>
+function setRing(val, label, phase, el) {
+  const circ = 2 * Math.PI * 120;
+  document.getElementById("ringArc").style.strokeDashoffset = circ - (val / 100) * circ;
+  document.getElementById("ringNum").textContent = val + "%";
+  document.getElementById("ringLabel").textContent = label;
+  document.querySelectorAll(".score-tab").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+}
+
+// Animate on load
+window.addEventListener("load", () => {
+  const circ = 2 * Math.PI * 120;
+  setTimeout(() => {
+    document.getElementById("ringArc").style.strokeDashoffset = circ - 0.95 * circ;
+  }, 200);
+});
+</script>
+</body>
+</html>
