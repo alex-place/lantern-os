@@ -18,6 +18,9 @@ def test_paper_trade_ticket_script_blocks_live_execution() -> None:
         "independent_probability_missing",
         "fee_and_slippage_model_missing",
         "$candidateRows = @($watchlist) + @($hftQueue)",
+        "[double]$BudgetUsd = 50.0",
+        "posterior_odds = prior_odds * likelihood_ratio_evidence",
+        "EV_yes_per_contract = p_posterior - price_yes_before_fees",
     ]
     missing = [phrase for phrase in required if phrase not in text]
     assert missing == []
@@ -44,9 +47,37 @@ def test_paper_trade_ticket_json_is_review_queue_only() -> None:
     assert data["liveTradingStatus"] == "blocked"
     assert data["ticketCount"] <= 8
     assert "No authenticated Kalshi request" in data["boundary"]
+    assert data["budgetPolicy"]["bankrollUsd"] == 50.0
+    assert data["budgetPolicy"]["maxDailyPaperLossUsd"] == 5.0
+    assert data["budgetPolicy"]["maxPerMarketPaperLossUsd"] == 1.0
+    assert data["budgetPolicy"]["liveSpendUsd"] == 0
+    assert data["budgetPolicy"]["allocatedPaperRiskUsd"] <= 5.0
+    assert data["bayesianMath"]["currentPosteriorStatus"] == "not_estimated"
     for ticket in data["tickets"]:
         assert ticket["action"] == "paper_buy_limit"
         assert ticket["status"] == "paper_only_requires_human_approval"
         assert ticket["visibleActivityUsd"] >= 5.0
+        assert ticket["paperMaxLossUsd"] <= 1.0
+        assert ticket["closeTime"]
+        assert "market close/settlement rules" in ticket["whenKnown"]
         assert ticket["outcomeConfidence"] == "not_estimated"
         assert "human_approval_missing" in ticket["blockers"]
+
+
+def test_kalshi_bayesian_50_dollar_brief_explains_math_and_boundaries() -> None:
+    text = read("manifests/evidence/kalshi-bayesian-50-dollar-brief-2026-05-30.md")
+    required = [
+        "MLB totals/spreads",
+        "When We Know",
+        "posterior_odds = prior_odds * likelihood_ratio_evidence",
+        "logit(posterior) = logit(prior) + sum(weight_i * feature_i)",
+        "EV_yes_per_contract = p_posterior - price_yes_before_fees",
+        "kelly_fraction",
+        "Live spend now",
+        "`$0`",
+        "Paper daily max loss",
+        "`$5.00`",
+        "Current posterior status: `not_estimated`",
+    ]
+    missing = [phrase for phrase in required if phrase not in text]
+    assert missing == []
