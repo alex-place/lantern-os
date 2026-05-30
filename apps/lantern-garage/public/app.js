@@ -182,6 +182,7 @@ async function postAction(path, label, trigger) {
       const realSpend = Number(result.realMoneyUsd || 0).toFixed(2);
       log(`${label} paper orders: ${result.paperOrderCount}; real spend $${realSpend}; live trading ${result.liveTradingStatus || "blocked"}.`);
     }
+    if (result.paperBlock) renderKalshiBlock(result);
     return result;
   } finally {
     if (trigger) {
@@ -190,6 +191,35 @@ async function postAction(path, label, trigger) {
       trigger.removeAttribute("aria-busy");
     }
   }
+}
+
+function renderKalshiBlock(result) {
+  const block = result.paperBlock || {};
+  const orders = block.orders || [];
+  setText("kalshiBlockMode", result.liveTradingStatus || "blocked");
+  setText("kalshiBlockOrders", String(result.paperOrderCount ?? orders.length));
+  setText("kalshiBlockRisk", `$${Number(block.allocatedPaperRiskUsd || 0).toFixed(2)} paper`);
+  setText("kalshiBlockSpend", `$${Number(result.realMoneyUsd || 0).toFixed(2)}`);
+  const receipt = $("kalshiBlockReceipt");
+  if (receipt && result.receiptPath) receipt.href = `/view?path=${encodeURIComponent(result.receiptPath)}`;
+
+  const list = $("kalshiBlockList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!orders.length) {
+    const li = document.createElement("li");
+    li.textContent = "No current near-term tickets returned.";
+    list.appendChild(li);
+    return;
+  }
+  orders.forEach((order) => {
+    const li = document.createElement("li");
+    const limit = Number(order.limitCents || 0);
+    const loss = Number(order.maxLossUsd || 0).toFixed(2);
+    const minutes = Number(order.minutesToKnown || 0).toFixed(1);
+    li.textContent = `${order.ticker}: ${limit}c limit, $${loss} max loss, ${minutes}m, ${order.status || "paper"}`;
+    list.appendChild(li);
+  });
 }
 
 async function ingestFlatRagHouse() {

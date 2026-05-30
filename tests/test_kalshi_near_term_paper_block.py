@@ -13,6 +13,7 @@ def test_near_term_paper_block_script_blocks_live_and_filters_window() -> None:
     text = read("scripts/New-KalshiNearTermPaperBlock.ps1")
     required = [
         "[int]$WindowMinutes = 20",
+        "[int]$MinLimitCents = 1",
         "Live trading is blocked from this script",
         "Get-SoonestFutureTime",
         "paper_buy_limit_maker",
@@ -37,6 +38,8 @@ def test_near_term_paper_block_json_is_paper_only() -> None:
         assert order["orderStatus"] == "paper_open_unfilled"
         assert order["liveOrderStatus"] == "not_submitted"
         assert order["realMoneyUsd"] == 0
+        assert order["paperLimitCents"] >= 1
+        assert order["paperMaxLossUsd"] >= 0.01
         assert order["minutesToKnown"] <= 20
         assert order["outcomeConfidence"] == "not_estimated"
 

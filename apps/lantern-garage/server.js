@@ -1422,6 +1422,20 @@ async function route(req, res) {
       paperOrderCount: payload?.paperOrderCount ?? null,
       realMoneyUsd: payload?.realMoneyUsd ?? 0,
       liveTradingStatus: payload?.liveTradingStatus || "blocked",
+      paperBlock: payload ? {
+        generatedAt: payload.generatedAt,
+        windowMinutes: payload.windowMinutes,
+        allocatedPaperRiskUsd: payload.budgetPolicy?.allocatedPaperRiskUsd ?? 0,
+        remainingDailyPaperRiskUsd: payload.budgetPolicy?.remainingDailyPaperRiskUsd ?? 0,
+        orders: (payload.orders || []).slice(0, 10).map((order) => ({
+          ticker: order.ticker,
+          title: order.title,
+          limitCents: order.paperLimitCents,
+          maxLossUsd: order.paperMaxLossUsd,
+          minutesToKnown: order.minutesToKnown,
+          status: order.orderStatus,
+        })),
+      } : null,
     }, result.code === 0 ? 200 : 500);
     return;
   }

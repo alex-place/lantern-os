@@ -7,6 +7,7 @@ param(
     [double]$MaxDailyLossPct = 0.10,
     [double]$MaxPerOrderLossPct = 0.02,
     [double]$MinVisibleActivityUsd = 5.0,
+    [int]$MinLimitCents = 1,
     [string]$OutputPath = "",
     [string]$ReceiptPath = "",
     [switch]$AllowLive
@@ -106,6 +107,7 @@ foreach ($market in @($allMarkets.ToArray())) {
     if ($visibleActivityUsd -lt $MinVisibleActivityUsd) { continue }
     if ($null -eq $bid -or $null -eq $ask -or $bid -le 0 -or $ask -le 0 -or $ask -lt $bid) { continue }
     $limitCents = [int][math]::Floor($bid * 100)
+    if ($limitCents -lt $MinLimitCents) { continue }
     $paperMaxLossUsd = [math]::Round($limitCents / 100.0, 2)
     if ($paperMaxLossUsd -gt $maxPerOrderPaperLossUsd) { continue }
     $minutesToKnown = [math]::Round(($settleTime - $generatedAt).TotalMinutes, 2)

@@ -26,6 +26,8 @@ def test_local_server_has_one_command_entrypoint() -> None:
         'url.pathname === "/api/command" && req.method === "POST"',
         'runLanternCommand("!converge")',
         'url.pathname === "/api/actions/kalshi-near-term-paper-block"',
+        "paperBlock: payload ?",
+        "allocatedPaperRiskUsd",
     ]
     missing = [phrase for phrase in required if phrase not in text]
     assert missing == []
@@ -54,6 +56,8 @@ def test_dashboard_uses_command_chips_and_endpoint() -> None:
         'api("/api/command"',
         'postCommand("!converge", "Loop")',
         "nearTermKalshiBlock",
+        "kalshiBlockList",
+        "function renderKalshiBlock(result)",
         "/api/actions/kalshi-near-term-paper-block",
     ]
     missing = [phrase for phrase in required if phrase not in text]
