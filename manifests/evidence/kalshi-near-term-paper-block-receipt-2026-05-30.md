@@ -6,7 +6,7 @@ Status: near-term paper block executed locally; live trading remains blocked.
 
 | Field | Value |
 |---|---:|
-| Window minutes | 30 |
+| Window minutes | 20 |
 | Markets pulled | 5000 |
 | Candidates within window | 0 |
 | Paper orders opened | 0 |
