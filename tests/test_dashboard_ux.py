@@ -24,7 +24,7 @@ def test_dashboard_uses_plain_console_skin() -> None:
     html = read("apps/lantern-garage/public/index.html")
     css = read("apps/lantern-garage/public/styles.css")
     assert 'data-style="plain-dashboard"' in html
-    assert "20260529-plain-console" in html
+    assert "20260530-kalshi-packet" in html
     required = [
         'body[data-style="plain-dashboard"]',
         "--paper: #f6f2ea",
