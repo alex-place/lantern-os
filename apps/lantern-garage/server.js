@@ -319,7 +319,7 @@ function parseMcpToolContent(data) {
 
 async function getFleetSnapshot() {
   try {
-    const data = await callMcpTool("get_agent_status", {}, 8000);
+    const data = await callMcpTool("get_agent_status", {}, mcpReadOnlyTimeoutMs);
     const parsed = parseMcpToolContent(data);
     return {
       ok: true,
@@ -339,9 +339,28 @@ async function getFleetSnapshot() {
   }
 }
 
-async function runAgentDispatchBatch(startedAt) {
+function summarizeDispatchFleet(fleet) {
+  const agents = Array.isArray(fleet.agents) ? fleet.agents : [];
+  const availability = fleet.raw?.availability || {};
+  const parsedAvailableCount = Number(availability.availableCount);
+  const availableCount = Number.isFinite(parsedAvailableCount)
+    ? parsedAvailableCount
+    : agents.filter((agent) => agent.available === true && !agent.currentTask).length;
+  const dispatchableSlots = agents
+    .filter((agent) => agentDispatchSlots.includes(agent.slot))
+    .filter((agent) => agent.available === true && !agent.currentTask)
+    .map((agent) => agent.slot);
+  const nextHumanAction = availability.nextHumanAction
+    || fleet.raw?.nextAction?.action
+    || fleet.raw?.headline
+    || fleet.error
+    || "Refresh MCP fleet status after clearing stale slots, failed tasks, or dirty worktrees.";
+  return { availableCount, dispatchableSlots, nextHumanAction };
+}
+
+async function runAgentDispatchBatch(startedAt, slots = agentDispatchSlots) {
   const results = [];
-  for (const slot of agentDispatchSlots) {
+  for (const slot of slots) {
     try {
       const data = await callMcpTool("start_agent", { slot }, 12000);
       const parsed = parseMcpToolContent(data);
@@ -355,7 +374,7 @@ async function runAgentDispatchBatch(startedAt) {
       updatedAt: new Date().toISOString(),
       results,
     });
-    if (slot !== agentDispatchSlots[agentDispatchSlots.length - 1]) {
+    if (slot !== slots[slots.length - 1]) {
       await sleep(agentDispatchDelayMs);
     }
   }
@@ -394,13 +413,45 @@ async function dispatchAllAgents() {
       results: [],
     };
   }
+  const fleet = await getFleetSnapshot();
+  const dispatchSummary = summarizeDispatchFleet(fleet);
+  if (!fleet.ok || dispatchSummary.dispatchableSlots.length === 0) {
+    await writeAgentDispatchState({
+      lastDispatchAt: lastDispatchAt || 0,
+      running: false,
+      updatedAt: new Date().toISOString(),
+      held: true,
+      results: [],
+      fleetCounts: fleet.counts || {},
+      nextHumanAction: dispatchSummary.nextHumanAction,
+    });
+    return {
+      code: 3,
+      held: true,
+      canDispatch: false,
+      message: "Dispatch held: no safe agent slots available.",
+      mcpOk: fleet.ok,
+      availableCount: dispatchSummary.availableCount,
+      nextHumanAction: dispatchSummary.nextHumanAction,
+      counts: fleet.counts || {},
+      agents: (fleet.agents || []).map((agent) => ({
+        slot: agent.slot,
+        available: agent.available === true,
+        currentTask: agent.currentTask || null,
+        reason: agent.reason || null,
+      })),
+      results: [],
+    };
+  }
+  const dispatchableSlots = dispatchSummary.dispatchableSlots;
   await writeAgentDispatchState({
     lastDispatchAt: now,
     running: true,
     updatedAt: new Date().toISOString(),
     results: [],
+    slots: dispatchableSlots,
   });
-  activeAgentDispatch = runAgentDispatchBatch(now).finally(() => {
+  activeAgentDispatch = runAgentDispatchBatch(now, dispatchableSlots).finally(() => {
     activeAgentDispatch = null;
   });
   return {
@@ -410,7 +461,7 @@ async function dispatchAllAgents() {
     rateLimited: false,
     cooldownMs: agentDispatchCooldownMs,
     delayMs: agentDispatchDelayMs,
-    slots: agentDispatchSlots,
+    slots: dispatchableSlots,
     results: [],
   };
 }

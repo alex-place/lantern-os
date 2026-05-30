@@ -32,7 +32,7 @@ Status: public-data watchlist and outreach packet; no trades executed.
 | Trade readiness | research only; not actionable-trade ready |
 | Manual review budget requested | $19 |
 
-## $19 Manual Review Gate
+## `$19` Manual Review Gate
 
 Lantern is ready to prepare a public-data watchlist and research packet. It is not ready to make actionable trades, place orders, manage funds, or recommend that the operator buy or sell a market.
 

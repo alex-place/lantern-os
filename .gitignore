@@ -18,6 +18,7 @@ secrets/
 data/private/**
 !data/private/
 !data/private/README.md
+data/operator-notes/agent-dispatch-state.json
 private/**
 .local-private/**
 

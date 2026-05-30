@@ -137,3 +137,25 @@ def test_orchestrator_dependency_contract_is_visible_and_read_only() -> None:
     haystack = "\n".join([html, js, css, server, manifest, docs, script])
     missing = [phrase for phrase in required if phrase not in haystack]
     assert missing == []
+
+
+def test_fleet_dispatch_is_preflight_guarded() -> None:
+    server = read("apps/lantern-garage/server.js")
+    js = read("apps/lantern-garage/public/app.js")
+    required_server = [
+        "summarizeDispatchFleet",
+        'callMcpTool("get_agent_status", {}, mcpReadOnlyTimeoutMs)',
+        "Dispatch held: no safe agent slots available.",
+        "canDispatch: false",
+        "runAgentDispatchBatch(now, dispatchableSlots)",
+        "nextHumanAction",
+    ]
+    required_js = [
+        "dispatch.disabled",
+        "Dispatch Held",
+        "result.held",
+        "No safe agent slots are available.",
+    ]
+    missing = [phrase for phrase in required_server if phrase not in server]
+    missing += [phrase for phrase in required_js if phrase not in js]
+    assert missing == []

@@ -580,6 +580,10 @@ async function refreshFleet() {
     $("fleetBadge").textContent = "OFFLINE";
     $("fleetBadge").className = "badge badge-blocked";
     $("fleetCounts").textContent = `MCP offline: ${error.message}`;
+    const dispatch = $("dispatchAll");
+    dispatch.disabled = true;
+    dispatch.textContent = "Dispatch Held";
+    dispatch.title = "MCP fleet status is offline; no agent dispatch is allowed.";
   }
 }
 
@@ -588,6 +592,18 @@ function renderFleet(data) {
   body.innerHTML = "";
   const agents = data.agents || [];
   const activeCount = agents.filter((agent) => agent.currentTask).length;
+  const availability = data.raw?.availability || {};
+  const parsedAvailableCount = Number(availability.availableCount);
+  const availableCount = Number.isFinite(parsedAvailableCount)
+    ? parsedAvailableCount
+    : agents.filter((agent) => agent.available && !agent.currentTask).length;
+  const canDispatch = availableCount > 0
+    && agents.some((agent) => agent.available && !agent.currentTask && agent.slot !== "operator-intake");
+  const nextHumanAction = availability.nextHumanAction || data.raw?.headline || "";
+  const dispatch = $("dispatchAll");
+  dispatch.disabled = !canDispatch;
+  dispatch.textContent = canDispatch ? "Dispatch Ready" : "Dispatch Held";
+  dispatch.title = canDispatch ? "Rate-limited MCP dispatch is available." : (nextHumanAction || "No safe agent slots are available.");
   $("fleetBadge").textContent = activeCount > 0 ? `${activeCount} ACTIVE` : "IDLE";
   $("fleetBadge").className = activeCount > 0 ? "badge badge-live" : "badge badge-medium";
   agents.forEach((agent) => {
@@ -603,7 +619,8 @@ function renderFleet(data) {
     body.appendChild(tr);
   });
   const counts = data.counts || {};
-  $("fleetCounts").textContent = `Q:${counts.queue ?? "--"} A:${counts.active ?? "--"} D:${counts.done ?? "--"} F:${counts.failed ?? "--"}`;
+  const queueText = `Q:${counts.queue ?? "--"} A:${counts.active ?? "--"} D:${counts.done ?? "--"} F:${counts.failed ?? "--"}`;
+  $("fleetCounts").textContent = nextHumanAction ? `${queueText} | ${nextHumanAction}` : queueText;
 }
 
 async function refreshHff() {
@@ -679,6 +696,11 @@ async function init() {
   $("dispatchAll").addEventListener("click", async () => {
     log("Dispatching local MCP agent slots...");
     const result = await api("/api/actions/dispatch-all", { method: "POST", body: "{}" });
+    if (result.held) {
+      log(`${result.message || "Dispatch held."} ${result.nextHumanAction || ""}`.trim());
+      await refreshFleet();
+      return;
+    }
     if (result.rateLimited) {
       log(`Dispatch held: retry in ${Math.ceil((result.retryAfterMs || 0) / 1000)} seconds.`);
       return;
