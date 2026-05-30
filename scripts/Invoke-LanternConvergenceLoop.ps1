@@ -29,7 +29,6 @@ function Test-PathRelative {
 }
 
 $issues = [System.Collections.Generic.List[object]]::new()
-$fixed = [System.Collections.Generic.List[object]]::new()
 $held = [System.Collections.Generic.List[object]]::new()
 
 $required = @(
