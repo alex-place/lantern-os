@@ -33,6 +33,7 @@ def test_one_ide_status_probe_is_read_only_and_checks_drift_surfaces() -> None:
         "config\\local-services.json",
         "manifests\\cloud-mirrors.json",
         "manifests\\validation\\MCP-CONNECTOR-LATEST.json",
+        "dirtyCount = 0",
         "do_not_reset_clean_sync_or_dispatch_dirty_worktrees",
     ]
     missing = [phrase for phrase in required if phrase not in text]
@@ -41,3 +42,19 @@ def test_one_ide_status_probe_is_read_only_and_checks_drift_surfaces() -> None:
     blocked = ["git reset", "git clean", "start_agent", "sync_repository", "Move-Item"]
     present = [phrase for phrase in blocked if phrase in text]
     assert present == []
+
+
+def test_one_ide_latest_receipt_records_hold_and_artifacts() -> None:
+    text = read("manifests/ONE-IDE-STATUS-LATEST.md")
+    required = [
+        "Lantern One IDE Status Receipt",
+        "read-only preflight",
+        "MCP connector",
+        "ready_tools_visible",
+        "Hold mutation",
+        "manifests/validation/ONE-IDE-STATUS-LATEST.json",
+        "reports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT.md",
+        "executable trade recommendations at 0",
+    ]
+    missing = [phrase for phrase in required if phrase not in text]
+    assert missing == []

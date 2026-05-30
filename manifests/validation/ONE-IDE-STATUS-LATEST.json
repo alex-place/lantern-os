@@ -1,0 +1,251 @@
+﻿{
+    "schema":  "lantern.one_ide_status.v1",
+    "generatedAt":  "2026-05-30T01:41:39.2032885Z",
+    "mode":  "read_only_preflight",
+    "boundaries":  [
+                       "do_not_reset_clean_sync_or_dispatch_dirty_worktrees",
+                       "do_not_trust_cloud_url_until_health_and_root_routes_pass",
+                       "healthUrl_beats_cached_status_when_present",
+                       "actual_mcp_tools_beat_advertised_claims"
+                   ],
+    "repos":  [
+                  {
+                      "path":  "C:\\tmp\\lantern-os",
+                      "exists":  true,
+                      "isGit":  true,
+                      "dirty":  true,
+                      "branch":  "master...origin/master",
+                      "dirtyCount":  11,
+                      "status":  [
+                                     "## master...origin/master",
+                                     " M apps/lantern-garage/server.js",
+                                     " M data/kalshi/kalshi-watchlist-latest.json",
+                                     " M data/rag-house/flat-rag-house-latest.json",
+                                     " M manifests/FLAT-RAG-HOUSE-LATEST.md",
+                                     " M manifests/validation/LOCAL-CONTROLS-LATEST.json",
+                                     " M reports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT.md",
+                                     " M scripts/Get-OneIdeStatus.ps1",
+                                     " M scripts/New-KalshiKofiRevenueReport.ps1",
+                                     " M tests/test_dashboard_ux.py",
+                                     " M tests/test_kalshi_kofi_report.py",
+                                     " M tests/test_one_ide_control_plane.py"
+                                 ]
+                  },
+                  {
+                      "path":  "C:\\Users\\alexp\\.codex\\worktrees\\4e17\\human-flourishing-frameworks-scan",
+                      "exists":  true,
+                      "isGit":  true,
+                      "dirty":  false,
+                      "branch":  "codex/plan-safe-multicoin-mining",
+                      "dirtyCount":  0,
+                      "status":  [
+                                     "## codex/plan-safe-multicoin-mining"
+                                 ]
+                  },
+                  {
+                      "path":  "C:\\Users\\alexp\\Documents\\gm-agent-orchestrator",
+                      "exists":  true,
+                      "isGit":  true,
+                      "dirty":  true,
+                      "branch":  "master...origin/p0/four-agent-fleet-baseline",
+                      "dirtyCount":  6,
+                      "status":  [
+                                     "## master...origin/p0/four-agent-fleet-baseline",
+                                     " M scripts/Start-OrchMcpServer.Tools.ps1",
+                                     " M scripts/Start-OrchMcpServer.ps1",
+                                     " M tests/Test-OrchMcpOpsToolsContract.ps1",
+                                     " M tests/Test-OrchMcpServerContracts.ps1",
+                                     "?? scripts/Test-OrchTunnelCanary.ps1",
+                                     "?? tests/Test-OrchTunnelCanary.ps1"
+                                 ]
+                  }
+              ],
+    "services":  [
+                     {
+                         "name":  "gpt-web-api",
+                         "url":  "http://localhost:3000/health",
+                         "checked":  true,
+                         "ok":  true,
+                         "statusCode":  200,
+                         "error":  null
+                     },
+                     {
+                         "name":  "dashboard",
+                         "url":  "http://localhost:8765/dashboard/index-v2.html",
+                         "checked":  true,
+                         "ok":  true,
+                         "statusCode":  200,
+                         "error":  null
+                     },
+                     {
+                         "name":  "lantern",
+                         "url":  "http://127.0.0.1:5173/api/lantern/health",
+                         "checked":  true,
+                         "ok":  true,
+                         "statusCode":  200,
+                         "error":  null
+                     },
+                     {
+                         "name":  "mcp",
+                         "url":  "http://127.0.0.1:8787/health",
+                         "checked":  true,
+                         "ok":  true,
+                         "statusCode":  200,
+                         "error":  null
+                     },
+                     {
+                         "name":  "ngrok",
+                         "url":  "",
+                         "checked":  false,
+                         "ok":  null,
+                         "statusCode":  null,
+                         "error":  "no_health_url"
+                     }
+                 ],
+    "agentWorktrees":  [
+                           {
+                               "name":  "alex",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\alex",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "user/alex"
+                           },
+                           {
+                               "name":  "claude-main",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\claude-main",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/claude-main"
+                           },
+                           {
+                               "name":  "codex-main",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\codex-main",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/codex-main"
+                           },
+                           {
+                               "name":  "gemini-flash",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\gemini-flash",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/gemini-flash"
+                           },
+                           {
+                               "name":  "gemini-lite",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\gemini-lite",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/gemini-lite"
+                           },
+                           {
+                               "name":  "gemini-main",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\gemini-main",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/gemini-main"
+                           },
+                           {
+                               "name":  "gpt-main",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\gpt-main",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/gpt-main"
+                           },
+                           {
+                               "name":  "gpt-web",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\gpt-web",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  true,
+                               "dirtyCount":  3,
+                               "branch":  "agent/gpt-web"
+                           },
+                           {
+                               "name":  "headless",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\headless",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/headless"
+                           },
+                           {
+                               "name":  "headless-2",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\headless-2",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "agent/headless-2"
+                           },
+                           {
+                               "name":  "hff-docs-rps-only",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\hff-docs-rps-only",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "docs/regulatory-primitive-stack-only...origin/master [behind 89]"
+                           },
+                           {
+                               "name":  "hff-railway-port-fix",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\hff-railway-port-fix",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  true,
+                               "dirtyCount":  1,
+                               "branch":  "codex/fix-railway-port-start...origin/codex/fix-railway-port-start"
+                           },
+                           {
+                               "name":  "human-flourishing-frameworks-sandbox",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\human-flourishing-frameworks-sandbox",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  false,
+                               "dirtyCount":  0,
+                               "branch":  "codex/adoption-write-token...origin/codex/adoption-write-token"
+                           },
+                           {
+                               "name":  "operator-intake",
+                               "path":  "C:\\Users\\alexp\\Documents\\agent-worktrees\\operator-intake",
+                               "exists":  true,
+                               "isGit":  true,
+                               "dirty":  true,
+                               "dirtyCount":  3,
+                               "branch":  "agent/operator-manual-operator-intake"
+                           }
+                       ],
+    "cloudMirrors":  {
+
+                     },
+    "mcpConnector":  {
+                         "exists":  true,
+                         "status":  "ready_tools_visible",
+                         "primarySourceId":  "gm-agent-orchestrator-local",
+                         "totalToolCount":  null,
+                         "readyWithToolsCount":  null,
+                         "path":  "C:\\tmp\\lantern-os\\manifests\\validation\\MCP-CONNECTOR-LATEST.json"
+                     },
+    "risk":  {
+                 "dirtyRepoCount":  2,
+                 "dirtyAgentWorktreeCount":  3,
+                 "failedServiceCount":  0,
+                 "failedCloudMirrorCount":  0,
+                 "recommendedAction":  "hold mutation; reconcile dirty worktrees in one IDE board first"
+             }
+}

@@ -31,6 +31,17 @@ Status: baseline updated; v1.0.0 promotion still held.
 | `data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md` | `41E2CEA4DD71464CE0BE5D8337F50A04AA75AC17F38B995E8AFB430188E69798` |
 | `C:/tmp/human-flourishing-frameworks-scan/COMET-LEAPER-FOUNDER-MONEY-CONFIDENCE-REPORT-v1.pdf` | `667FB35EECF60A0B7AA91D0E90AA56449325C0405B05B789832B696736959593` |
 
+## Stats Receipts
+
+| Receipt | Status |
+|---|---|
+| `data/kalshi/kalshi-watchlist-latest.json` | Public Kalshi snapshot refreshed from 1,000 open markets; 20 watchlist rows; values below 20 cents excluded. |
+| `reports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT.md` | Profit range and data-confidence fields added; executable trade recommendations remain 0. |
+| `artifacts/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2.pdf` | Stats PDF receipt for the bounded Kalshi report. |
+| `manifests/validation/ONE-IDE-STATUS-LATEST.json` | `!one` read-only preflight receipt with repo, MCP, local service, cloud mirror, and agent worktree status. |
+| `artifacts/ONE-IDE-STATUS-LATEST.pdf` | One IDE status PDF receipt. |
+| `artifacts/LANTERN-BASELINE-MODEL-v1.pdf` | Baseline model PDF receipt. |
+
 ## Baseline Model
 
 | Lane | Baseline |

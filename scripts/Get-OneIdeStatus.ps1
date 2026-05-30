@@ -13,14 +13,14 @@ $ErrorActionPreference = "Stop"
 function Get-GitSnapshot {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) {
-        return [ordered]@{ path = $Path; exists = $false; isGit = $false; dirty = $null; status = @("missing") }
+        return [ordered]@{ path = $Path; exists = $false; isGit = $false; dirty = $null; branch = $null; dirtyCount = 0; status = @("missing") }
     }
 
     $status = @()
     try {
         $status = @(git -C $Path status --short --branch 2>$null)
     } catch {
-        return [ordered]@{ path = $Path; exists = $true; isGit = $false; dirty = $null; status = @("git_status_failed") }
+        return [ordered]@{ path = $Path; exists = $true; isGit = $false; dirty = $null; branch = $null; dirtyCount = 0; status = @("git_status_failed") }
     }
 
     $dirtyLines = @($status | Where-Object { $_ -and -not $_.StartsWith("## ") })

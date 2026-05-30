@@ -34,6 +34,30 @@
     "awsDockerfile": "apps/lantern-garage/Dockerfile",
     "retiredSurfaces": "manifests/retired-surfaces.md"
   },
+  "statsEvidence": {
+    "kalshiPublicSnapshot": {
+      "data": "data/kalshi/kalshi-watchlist-latest.json",
+      "report": "reports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT.md",
+      "pdf": "artifacts/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2.pdf",
+      "marketsPulled": 1000,
+      "minMidCents": 20,
+      "excludedBelowMinValueMarkets": 418,
+      "watchlistRows": 20,
+      "actionableTradeCount": 0,
+      "confidenceMeaning": "data_quality_only_not_outcome_probability"
+    },
+    "oneIdeStatus": {
+      "json": "manifests/validation/ONE-IDE-STATUS-LATEST.json",
+      "markdown": "manifests/ONE-IDE-STATUS-LATEST.md",
+      "pdf": "artifacts/ONE-IDE-STATUS-LATEST.pdf",
+      "mode": "read_only_preflight",
+      "dirtyRepoCount": 2,
+      "dirtyAgentWorktreeCount": 3,
+      "failedServiceCount": 0,
+      "recommendedAction": "hold mutation; reconcile dirty worktrees in one IDE board first"
+    },
+    "baselinePdf": "artifacts/LANTERN-BASELINE-MODEL-v1.pdf"
+  },
   "pendingEvidenceCards": [
     {
       "path": "manifests/evidence/codex-thread-019e75ae-80d8-76a2-8a24-d1bff3b85fa1-2026-05-29.md",

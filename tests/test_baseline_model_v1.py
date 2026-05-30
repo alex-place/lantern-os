@@ -20,6 +20,10 @@ def test_baseline_model_v1_records_ingest_counts_and_aws_truth() -> None:
     assert model["ingestion"]["downloadMergeRecords"] >= 20
     assert model["truthBoundaries"]["clearedCashUsd"] == 0
     assert model["truthBoundaries"]["pendingInvoiceUsd"] == 199
+    assert model["statsEvidence"]["kalshiPublicSnapshot"]["minMidCents"] == 20
+    assert model["statsEvidence"]["kalshiPublicSnapshot"]["actionableTradeCount"] == 0
+    assert model["statsEvidence"]["oneIdeStatus"]["mode"] == "read_only_preflight"
+    assert model["statsEvidence"]["oneIdeStatus"]["failedServiceCount"] == 0
 
 
 def test_baseline_model_v1_clears_old_docs_by_retirement_manifest() -> None:
@@ -44,6 +48,9 @@ def test_baseline_model_v1_markdown_links_receipt_and_blocks_promotion() -> None
         "AWS service URL is not verified yet",
         "v1.0.0 tag remains held",
         "data/baseline-model/v1.json",
+        "Stats Receipts",
+        "values below 20 cents excluded",
+        "artifacts/ONE-IDE-STATUS-LATEST.pdf",
     ]
     missing = [phrase for phrase in required if phrase not in text]
     assert missing == []

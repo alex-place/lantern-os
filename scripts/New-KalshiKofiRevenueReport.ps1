@@ -1,6 +1,7 @@
 param(
     [int]$Limit = 1000,
     [int]$Top = 20,
+    [int]$MinMidCents = 20,
     [string]$OutputDataPath = "",
     [string]$OutputReportPath = ""
 )
@@ -65,6 +66,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $OutputReportPath)
 
 $response = Invoke-RestMethod -Uri $endpoint -Method Get -TimeoutSec 45
 $markets = @($response.markets)
+$minMid = [math]::Round($MinMidCents / 100.0, 4)
 
 $scored = foreach ($market in $markets) {
     $bid = Convert-ToNumber $market.yes_bid_dollars
@@ -91,6 +93,30 @@ $scored = foreach ($market in $markets) {
     $timeScore = if ($null -eq $daysToClose) { 4 } elseif ($daysToClose -lt 0) { 0 } elseif ($daysToClose -le 14) { 12 } elseif ($daysToClose -le 60) { 9 } else { 5 }
     $quoteScore = if ($ask -gt 0 -and $bid -gt 0) { 12 } elseif ($ask -gt 0 -or $bid -gt 0) { 5 } else { 0 }
     $score = [math]::Round([math]::Max(0, $liquidityScore + $volumeScore + $openInterestScore + $timeScore + $quoteScore - $spreadPenalty - $clarityPenalty), 2)
+    $maxLossPerContract = if ($ask -gt 0) { [math]::Round($ask, 4) } else { $null }
+    $grossProfitIfYes = if ($ask -gt 0) { [math]::Round(1 - $ask, 4) } else { $null }
+    $grossProfitRange = if ($null -ne $maxLossPerContract -and $null -ne $grossProfitIfYes) {
+        ("-{0:N2} to +{1:N2}" -f $maxLossPerContract, $grossProfitIfYes)
+    }
+    else {
+        "not quoted"
+    }
+    $dataConfidenceScore = [math]::Min(70, [math]::Round($score, 0))
+    $dataConfidence = if ($null -eq $spread -or $null -eq $mid) {
+        "low"
+    }
+    elseif ($mid -lt $minMid) {
+        "held_below_min_value"
+    }
+    elseif ($spread -le 0.02 -and $volume24h -ge 500 -and $openInterest -ge 500) {
+        "medium_data_quality"
+    }
+    elseif ($spread -le 0.05 -and ($volume24h -ge 100 -or $openInterest -ge 100)) {
+        "low_medium_data_quality"
+    }
+    else {
+        "low_data_quality"
+    }
 
     $activityClass = if ($liquidity -le 0 -and $volume24h -le 0 -and $openInterest -le 0) {
         "avoid_empty"
@@ -119,7 +145,13 @@ $scored = foreach ($market in $markets) {
         volume = $volume
         liquidity = $liquidity
         openInterest = $openInterest
+        maxLossPerContract = $maxLossPerContract
+        grossProfitIfYes = $grossProfitIfYes
+        grossProfitRange = $grossProfitRange
         score = $score
+        dataConfidence = $dataConfidence
+        dataConfidenceScore = $dataConfidenceScore
+        outcomeConfidence = "not_estimated"
         activityClass = $activityClass
         modelGate = "needs_independent_probability_before_trade"
         action = "watch_or_research_only_no_execution"
@@ -127,12 +159,13 @@ $scored = foreach ($market in $markets) {
 }
 
 $watchlist = @($scored |
-    Where-Object { $_.activityClass -ne "avoid_empty" } |
+    Where-Object { $_.activityClass -ne "avoid_empty" -and $null -ne $_.yesMid -and $_.yesMid -ge $minMid } |
     Sort-Object @{ Expression = "score"; Descending = $true }, @{ Expression = "liquidity"; Descending = $true } |
     Select-Object -First $Top)
 
 $emptyCount = @($scored | Where-Object { $_.activityClass -eq "avoid_empty" }).Count
 $wideSpreadCount = @($scored | Where-Object { $_.activityClass -eq "research_only_wide_spread" }).Count
+$belowMinCount = @($scored | Where-Object { $null -ne $_.yesMid -and $_.yesMid -lt $minMid }).Count
 $watchCount = @($watchlist | Where-Object { $_.activityClass -eq "watchlist" }).Count
 
 $payload = [ordered]@{
@@ -149,10 +182,12 @@ $payload = [ordered]@{
     model = "liquidity_spread_watchlist_v0"
     tradeReadiness = "not_ready_for_actionable_trades_research_only"
     manualReviewBudgetUsd = 19
+    minMidCents = $MinMidCents
     totalOpenMarketsPulled = $markets.Count
     cursorPresent = -not [string]::IsNullOrWhiteSpace([string]$response.cursor)
     emptyOrNoActivityMarkets = $emptyCount
     wideSpreadResearchOnlyMarkets = $wideSpreadCount
+    excludedBelowMinValueMarkets = $belowMinCount
     watchlistCount = $watchlist.Count
     actionableTradeCount = 0
     watchlist = $watchlist
@@ -165,7 +200,7 @@ $lines.Add("# Kalshi + Ko-fi Watchlist Revenue Report")
 $lines.Add("")
 $lines.Add("Generated: $generatedAt")
 $lines.Add("")
-$lines.Add("Status: public-data watchlist and outreach packet; no trades executed.")
+$lines.Add("Status: current public-data manual-review candidates and outreach packet; no trades executed.")
 $lines.Add("")
 $lines.Add("## Boundary")
 $lines.Add("")
@@ -190,12 +225,23 @@ $lines.Add("| Open markets pulled | $($markets.Count) |")
 $lines.Add("| Cursor present | $($payload.cursorPresent) |")
 $lines.Add("| Empty/no-activity markets | $emptyCount |")
 $lines.Add("| Wide-spread research-only markets | $wideSpreadCount |")
+$lines.Add("| Excluded below $MinMidCents-cent midpoint | $belowMinCount |")
 $lines.Add("| Watchlist rows emitted | $($watchlist.Count) |")
 $lines.Add("| Executable trade recommendations | 0 |")
 $lines.Add("| Trade readiness | research only; not actionable-trade ready |")
 $lines.Add("| Manual review budget requested | `$19` |")
 $lines.Add("")
-$lines.Add("## `$19` Manual Review Gate")
+$lines.Add("## Right Now Answer")
+$lines.Add("")
+$lines.Add("Executable trades to make right now: **0**.")
+$lines.Add("")
+$lines.Add("Best current use of this data: manually review the top watchlist rows, open the market rules in Kalshi, and build an independent probability note before any trade decision. Tight spread and activity make a market worth reading first; they do not prove edge.")
+$lines.Add("")
+$lines.Add("Filter applied: do not include market values below $MinMidCents cents of YES midpoint.")
+$lines.Add("")
+$lines.Add("Profit range is gross per contract if buying YES at the displayed ask: maximum loss is the ask paid; maximum gross profit is `$1.00` minus the ask, before fees and slippage. Confidence is data-quality confidence only, not outcome probability.")
+$lines.Add("")
+$lines.Add('## `$19` Manual Review Gate')
 $lines.Add("")
 $lines.Add("Lantern is ready to prepare a public-data watchlist and research packet. It is not ready to make actionable trades, place orders, manage funds, or recommend that the operator buy or sell a market.")
 $lines.Add("")
@@ -209,8 +255,8 @@ $lines.Add("- final trading decisions remain outside Lantern.")
 $lines.Add("")
 $lines.Add("## Top Watchlist")
 $lines.Add("")
-$lines.Add("| Rank | Ticker | Title | Mid | Spread | 24h Vol | Liquidity | OI | Close | Score | Gate |")
-$lines.Add("|---:|---|---|---:|---:|---:|---:|---:|---|---:|---|")
+$lines.Add("| Rank | Ticker | Title | Mid | Spread | Gross P/L | Data Conf. | 24h Vol | OI | Close | Gate |")
+$lines.Add("|---:|---|---|---:|---:|---|---:|---:|---:|---|---|")
 $rank = 0
 foreach ($item in $watchlist) {
     $rank += 1
@@ -219,7 +265,7 @@ foreach ($item in $watchlist) {
     $title = $title.Replace("|", "/")
     $mid = if ($null -eq $item.yesMid) { "--" } else { "{0:N3}" -f $item.yesMid }
     $spread = if ($null -eq $item.spread) { "--" } else { "{0:N3}" -f $item.spread }
-    $lines.Add(("| {0} | `{1}` | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | no execution |" -f $rank, $item.ticker, $title, $mid, $spread, $item.volume24h, $item.liquidity, $item.openInterest, $item.closeTime, $item.score))
+    $lines.Add(("| {0} | `{1}` | {2} | {3} | {4} | {5} | {6}% | {7} | {8} | {9} | no execution |" -f $rank, $item.ticker, $title, $mid, $spread, $item.grossProfitRange, $item.dataConfidenceScore, $item.volume24h, $item.openInterest, $item.closeTime))
 }
 $lines.Add("")
 $lines.Add("## Stats Model")

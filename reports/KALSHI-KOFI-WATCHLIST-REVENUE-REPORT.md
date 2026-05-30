@@ -1,8 +1,8 @@
 # Kalshi + Ko-fi Watchlist Revenue Report
 
-Generated: 2026-05-29T20:20:33.7120887-04:00
+Generated: 2026-05-29T21:37:30.2048148-04:00
 
-Status: public-data watchlist and outreach packet; no trades executed.
+Status: current public-data manual-review candidates and outreach packet; no trades executed.
 
 ## Boundary
 
@@ -25,12 +25,23 @@ Status: public-data watchlist and outreach packet; no trades executed.
 |---|---:|
 | Open markets pulled | 1000 |
 | Cursor present | True |
-| Empty/no-activity markets | 791 |
-| Wide-spread research-only markets | 29 |
+| Empty/no-activity markets | 659 |
+| Wide-spread research-only markets | 63 |
+| Excluded below 20-cent midpoint | 418 |
 | Watchlist rows emitted | 20 |
 | Executable trade recommendations | 0 |
 | Trade readiness | research only; not actionable-trade ready |
 | Manual review budget requested | $19 |
+
+## Right Now Answer
+
+Executable trades to make right now: **0**.
+
+Best current use of this data: manually review the top watchlist rows, open the market rules in Kalshi, and build an independent probability note before any trade decision. Tight spread and activity make a market worth reading first; they do not prove edge.
+
+Filter applied: do not include market values below 20 cents of YES midpoint.
+
+Profit range is gross per contract if buying YES at the displayed ask: maximum loss is the ask paid; maximum gross profit is $1.00 minus the ask, before fees and slippage. Confidence is data-quality confidence only, not outcome probability.
 
 ## `$19` Manual Review Gate
 
@@ -46,28 +57,28 @@ The $19 lane is a manual-review budget marker only:
 
 ## Top Watchlist
 
-| Rank | Ticker | Title | Mid | Spread | 24h Vol | Liquidity | OI | Close | Score | Gate |
-|---:|---|---|---:|---:|---:|---:|---:|---|---:|---|
-| 1 | KXMLBHR-26MAY292210AZSEA-SEACYOUNG2-1 | Cole Young: 1+ home runs? | 0.075 | 0.010 | 656.48 | 0 | 773.91 | 2026-06-02T02:10:00Z | 72 | no execution |
-| 2 | KXMLBHR-26MAY292210AZSEA-SEALRALEY20-1 | Luke Raley: 1+ home runs? | 0.135 | 0.010 | 1293.3 | 0 | 1451.05 | 2026-06-02T02:10:00Z | 72 | no execution |
-| 3 | KXMLBHR-26MAY292140NYYATH-ATHCTHOMAS32-1 | Colby Thomas: 1+ home runs? | 0.125 | 0.010 | 587.89 | 0 | 587.89 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 4 | KXMLBHIT-26MAY292140NYYATH-NYYTGRISHAM12-2 | Trent Grisham: 2+ hits? | 0.235 | 0.010 | 714 | 0 | 733 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 5 | KXMLBHR-26MAY292140NYYATH-ATHBROOKER25-1 | Brent Rooker: 1+ home runs? | 0.155 | 0.010 | 666.69 | 0 | 666.69 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 6 | KXMLBHIT-26MAY292140NYYATH-NYYBRICE22-2 | Ben Rice: 2+ hits? | 0.275 | 0.010 | 1003.44 | 0 | 1003.44 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 7 | KXMLBHR-26MAY292140NYYATH-ATHSLANGELIERS23-1 | Shea Langeliers: 1+ home runs? | 0.205 | 0.010 | 887.26 | 0 | 995.26 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 8 | KXMLBHR-26MAY292140NYYATH-NYYTGRISHAM12-1 | Trent Grisham: 1+ home runs? | 0.175 | 0.010 | 685.25 | 0 | 866.53 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 9 | KXMLBSPREAD-26MAY291910BOSCLE-CLE5 | Guardians wins by over 4.5 runs? | 0.145 | 0.010 | 6125.01 | 0 | 5314.65 | 2026-06-01T23:10:00Z | 72 | no execution |
-| 10 | KXMLBSPREAD-26MAY291840ATLCIN-ATL7 | Braves wins by over 6.5 runs? | 0.065 | 0.010 | 1690.17 | 0 | 1650.73 | 2026-06-01T22:40:00Z | 72 | no execution |
-| 11 | KXMLBHR-26MAY292140NYYATH-NYYJCHISHOLM13-1 | Jazz Chisholm Jr.: 1+ home runs? | 0.155 | 0.010 | 2606.89 | 0 | 3067.6 | 2026-06-02T01:40:00Z | 72 | no execution |
-| 12 | KXMLBSPREAD-26MAY291910MIANYM-NYM5 | Mets wins by over 4.5 runs? | 0.340 | 0.020 | 7316.32 | 0 | 5737.72 | 2026-06-01T23:10:00Z | 71 | no execution |
-| 13 | KXMLBHR-26MAY292210AZSEA-SEADCANZONE8-1 | Dominic Canzone: 1+ home runs? | 0.120 | 0.020 | 801.15 | 0 | 801.15 | 2026-06-02T02:10:00Z | 71 | no execution |
-| 14 | KXMLBHR-26MAY292140NYYATH-ATHZGELOF20-1 | Zack Gelof: 1+ home runs? | 0.105 | 0.010 | 550 | 0 | 550 | 2026-06-02T01:40:00Z | 71 | no execution |
-| 15 | KXMLBSPREAD-26MAY291840ATLCIN-ATL6 | Braves wins by over 5.5 runs? | 0.070 | 0.020 | 3532.53 | 0 | 3248.69 | 2026-06-01T22:40:00Z | 71 | no execution |
-| 16 | KXMLBTOTAL-26MAY291845MINPIT-15 | Minnesota vs Pittsburgh Total Runs? | 0.360 | 0.020 | 13162.73 | 0 | 9175.42 | 2026-06-01T22:45:00Z | 71 | no execution |
-| 17 | KXMLBHR-26MAY292140NYYATH-NYYBRICE22-1 | Ben Rice: 1+ home runs? | 0.210 | 0.020 | 3914.42 | 0 | 4558.34 | 2026-06-02T01:40:00Z | 71 | no execution |
-| 18 | KXMLBHR-26MAY292215PHILAD-PHIAGARCA53-1 | Adolis Garc??a: 1+ home runs? | 0.135 | 0.010 | 454.69 | 0 | 454.69 | 2026-06-02T02:15:00Z | 71 | no execution |
-| 19 | KXMLBTOTAL-26MAY291845MINPIT-16 | Minnesota vs Pittsburgh Total Runs? | 0.240 | 0.020 | 7360.23 | 0 | 6788.63 | 2026-06-01T22:45:00Z | 71 | no execution |
-| 20 | KXMLBTOTAL-26MAY291845MINPIT-14 | Minnesota vs Pittsburgh Total Runs? | 0.460 | 0.020 | 19702.85 | 0 | 14019.09 | 2026-06-01T22:45:00Z | 71 | no execution |
+| Rank | Ticker | Title | Mid | Spread | Gross P/L | Data Conf. | 24h Vol | OI | Close | Gate |
+|---:|---|---|---:|---:|---|---:|---:|---:|---|---|
+| 1 | KXMLBHR-26MAY292140NYYATH-ATHSLANGELIERS23-1 | Shea Langeliers: 1+ home runs? | 0.205 | 0.010 | -0.21 to +0.79 | 70% | 1576.57 | 2663.15 | 2026-06-02T01:40:00Z | no execution |
+| 2 | KXMLBSPREAD-26MAY292005KCTEX-TEX6 | Rangers wins by over 5.5 runs? | 0.655 | 0.010 | -0.66 to +0.34 | 70% | 1254.95 | 3295.92 | 2026-06-02T00:05:00Z | no execution |
+| 3 | KXMLBTOTAL-26MAY291910MIANYM-13 | Miami vs New York M Total Runs? | 0.565 | 0.010 | -0.57 to +0.43 | 70% | 21669.71 | 17945.2 | 2026-06-01T23:10:00Z | no execution |
+| 4 | KXMLBHRR-26MAY292140NYYATH-ATHCTHOMAS32-2 | Colby Thomas: 2+ hits + runs + RBIs? | 0.485 | 0.010 | -0.49 to +0.51 | 70% | 753 | 753 | 2026-06-02T01:40:00Z | no execution |
+| 5 | KXMLBHRR-26MAY292140NYYATH-NYYJCHISHOLM13-2 | Jazz Chisholm Jr.: 2+ hits + runs + RBIs? | 0.530 | 0.020 | -0.54 to +0.46 | 70% | 1334.91 | 2234.07 | 2026-06-02T01:40:00Z | no execution |
+| 6 | KXMLBTOTAL-26MAY291910MIANYM-14 | Miami vs New York M Total Runs? | 0.350 | 0.020 | -0.36 to +0.64 | 70% | 17842.12 | 14101.59 | 2026-06-01T23:10:00Z | no execution |
+| 7 | KXMLBTB-26MAY292140NYYATH-NYYJCHISHOLM13-2 | Jazz Chisholm Jr.: 2+ total bases? | 0.400 | 0.020 | -0.41 to +0.59 | 70% | 662.41 | 1053.66 | 2026-06-02T01:40:00Z | no execution |
+| 8 | KXMLBTB-26MAY292140NYYATH-NYYBRICE22-2 | Ben Rice: 2+ total bases? | 0.475 | 0.010 | -0.48 to +0.52 | 70% | 407.65 | 407.65 | 2026-06-02T01:40:00Z | no execution |
+| 9 | KXMLBTOTAL-26MAY291910MIANYM-15 | Miami vs New York M Total Runs? | 0.275 | 0.030 | -0.29 to +0.71 | 69% | 1840.72 | 1175.28 | 2026-06-01T23:10:00Z | no execution |
+| 10 | KXMLBSPREAD-26MAY292005KCTEX-TEX5 | Rangers wins by over 4.5 runs? | 0.795 | 0.030 | -0.81 to +0.19 | 69% | 1486.93 | 1268.08 | 2026-06-02T00:05:00Z | no execution |
+| 11 | KXMLBHRR-26MAY292210AZSEA-SEALRALEY20-2 | Luke Raley: 2+ hits + runs + RBIs? | 0.395 | 0.030 | -0.41 to +0.59 | 69% | 2377.21 | 2377.21 | 2026-06-02T02:10:00Z | no execution |
+| 12 | KXMLBTB-26MAY292140NYYATH-ATHSLANGELIERS23-2 | Shea Langeliers: 2+ total bases? | 0.460 | 0.040 | -0.48 to +0.52 | 68% | 907.19 | 1033.52 | 2026-06-02T01:40:00Z | no execution |
+| 13 | KXMLBHIT-26MAY292140NYYATH-NYYPGOLDSCHMIDT48-2 | Paul Goldschmidt: 2+ hits? | 0.240 | 0.040 | -0.26 to +0.74 | 68% | 1296 | 1296 | 2026-06-02T01:40:00Z | no execution |
+| 14 | KXMLBHRR-26MAY292140NYYATH-ATHSLANGELIERS23-2 | Shea Langeliers: 2+ hits + runs + RBIs? | 0.545 | 0.030 | -0.56 to +0.44 | 68% | 536.26 | 665.3 | 2026-06-02T01:40:00Z | no execution |
+| 15 | KXMLBHRR-26MAY292140NYYATH-ATHBROOKER25-2 | Brent Rooker: 2+ hits + runs + RBIs? | 0.480 | 0.020 | -0.49 to +0.51 | 68% | 319.2 | 319.2 | 2026-06-02T01:40:00Z | no execution |
+| 16 | KXATPCHALLENGERMATCH-26MAY30TSENEU-NEU | Will Lukas Neumayer win the Tseng vs Neumayer: Semifinal match? | 0.665 | 0.010 | -0.67 to +0.33 | 67% | 442.18 | 428 | 2026-06-13T12:00:00Z | no execution |
+| 17 | KXMLBHIT-26MAY292140NYYATH-NYYTGRISHAM12-2 | Trent Grisham: 2+ hits? | 0.230 | 0.060 | -0.26 to +0.74 | 66% | 733 | 733 | 2026-06-02T01:40:00Z | no execution |
+| 18 | KXATPCHALLENGERMATCH-26MAY30BLAFEL-BLA | Will Dali Blanch win the Blanch vs Feldbausch: Semifinal match? | 0.445 | 0.010 | -0.45 to +0.55 | 66% | 351 | 351 | 2026-06-13T11:10:00Z | no execution |
+| 19 | KXMLBHRR-26MAY292140NYYATH-NYYBRICE22-2 | Ben Rice: 2+ hits + runs + RBIs? | 0.585 | 0.030 | -0.60 to +0.40 | 66% | 353.12 | 582.79 | 2026-06-02T01:40:00Z | no execution |
+| 20 | KXMLBTB-26MAY292210AZSEA-SEACEMERSON85-2 | Colt Emerson: 2+ total bases? | 0.280 | 0.020 | -0.29 to +0.71 | 66% | 245.36 | 245.36 | 2026-06-02T02:10:00Z | no execution |
 
 ## Stats Model
 
