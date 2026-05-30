@@ -7,12 +7,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install deps first for layer caching.
+# Build needs the package dir present (pyproject declares packages = ["app"]).
 COPY pyproject.toml ./
+COPY app ./app
 RUN pip install --upgrade pip && pip install .
 
-# App code + static assets.
-COPY app ./app
+# Static assets (served at runtime).
 COPY static ./static
 
 # Non-root runtime user.
