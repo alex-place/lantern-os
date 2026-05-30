@@ -10,7 +10,7 @@ Status: near-term paper block executed locally; live trading remains blocked.
 | Markets pulled | 5000 |
 | Candidates within window | 8 |
 | Paper orders opened | 8 |
-| Paper risk allocated | $2.99 |
+| Paper risk allocated | $3.69 |
 | Real money spent | $0.00 |
 
 ## Boundary
@@ -24,14 +24,14 @@ Status: near-term paper block executed locally; live trading remains blocked.
 
 | Rank | Ticker | Title | Limit | Max Loss | Minutes | Known Time | Status |
 |---:|---|---|---:|---:|---:|---|---|
-| 1 | KXETH15M-26MAY300015-15 | ETH price up in next 15 mins? | 1c | $0.01 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
-| 2 | KXSOL15M-26MAY300015-15 | SOL price up in next 15 mins? | 46c | $0.46 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
-| 3 | KXNCAASBGAME-26MAY292130UCLAARK-UCLA | Will UCLA win the Arkansas vs UCLA softball game? | 99c | $0.99 | 16.61 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
-| 4 | KXBTC15M-26MAY300015-15 | BTC price up in next 15 mins? | 1c | $0.01 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
-| 5 | KXDOGE15M-26MAY300015-15 | DOGE price up in next 15 mins? | 35c | $0.35 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
-| 6 | KXHYPE15M-26MAY300015-15 | HYPE price up in next 15 mins? | 8c | $0.08 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
-| 7 | KXXRP15M-26MAY300015-15 | XRP price up in next 15 mins? | 10c | $0.10 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
-| 8 | KXBNB15M-26MAY300015-15 | BNB price up in next 15 mins? | 99c | $0.99 | 1.61 | 2026-05-30T04:15:00.0000000Z | paper_open_unfilled |
+| 1 | KXETH15M-26MAY300030-30 | ETH price up in next 15 mins? | 44c | $0.44 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 2 | KXSOL15M-26MAY300030-30 | SOL price up in next 15 mins? | 44c | $0.44 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 3 | KXNCAASBGAME-26MAY292130UCLAARK-UCLA | Will UCLA win the Arkansas vs UCLA softball game? | 99c | $0.99 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 4 | KXBTC15M-26MAY300030-30 | BTC price up in next 15 mins? | 43c | $0.43 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 5 | KXDOGE15M-26MAY300030-30 | DOGE price up in next 15 mins? | 34c | $0.34 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 6 | KXHYPE15M-26MAY300030-30 | HYPE price up in next 15 mins? | 33c | $0.33 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 7 | KXXRP15M-26MAY300030-30 | XRP price up in next 15 mins? | 42c | $0.42 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
+| 8 | KXBNB15M-26MAY300030-30 | BNB price up in next 15 mins? | 30c | $0.30 | 14.42 | 2026-05-30T04:30:00.0000000Z | paper_open_unfilled |
 
 ## Files
 
