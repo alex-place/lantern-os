@@ -1,24 +1,22 @@
 {
-    "schema":  "lantern.kalshi.near_term_paper_block.v1",
-    "generatedAt":  "2026-05-30T21:20:08.1735106Z",
-    "windowMinutes":  30,
-    "windowEnd":  "2026-05-30T21:50:08.1735106Z",
-    "pagesPulled":  5,
-    "marketsPulled":  5000,
-    "candidatesWithinWindow":  0,
-    "boundary":  "Paper block only. No authenticated Kalshi request, no real order, no custody, no guaranteed profit, no investment advice.",
-    "liveTradingStatus":  "blocked",
-    "realMoneyUsd":  0,
-    "budgetPolicy":  {
-                         "bankrollUsd":  50,
-                         "maxDailyPaperLossUsd":  5,
-                         "maxPerOrderPaperLossUsd":  1,
-                         "allocatedPaperRiskUsd":  0,
-                         "remainingDailyPaperRiskUsd":  5,
-                         "liveSpendUsd":  0
-                     },
-    "paperOrderCount":  0,
-    "orders":  [
-
-               ]
+  "schema": "lantern.kalshi.near_term_paper_block.v1",
+  "generatedAt": "2026-05-30T22:28:03.8846475Z",
+  "windowMinutes": 20,
+  "windowEnd": "2026-05-30T22:48:03.8846475Z",
+  "pagesPulled": 5,
+  "marketsPulled": 5000,
+  "candidatesWithinWindow": 0,
+  "boundary": "Paper block only. No authenticated Kalshi request, no real order, no custody, no guaranteed profit, no investment advice.",
+  "liveTradingStatus": "blocked",
+  "realMoneyUsd": 0,
+  "budgetPolicy": {
+    "bankrollUsd": 50.0,
+    "maxDailyPaperLossUsd": 5.0,
+    "maxPerOrderPaperLossUsd": 1.0,
+    "allocatedPaperRiskUsd": 0.0,
+    "remainingDailyPaperRiskUsd": 5.0,
+    "liveSpendUsd": 0
+  },
+  "paperOrderCount": 0,
+  "orders": []
 }

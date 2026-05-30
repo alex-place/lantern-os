@@ -1,0 +1,13 @@
+KALSHI LIVE TRADING IS DISARMED.
+
+While this file exists, scripts/Invoke-KalshiLiveOrder.ps1 will refuse to submit any
+real-money order (it falls back to a blocked/dry-run result). Dry runs still work.
+
+To ARM live trading (you accept full financial risk):
+  - Delete this file:  rm data/kalshi/LIVE-KILL-SWITCH
+  - Then run the script with -Live.
+
+To DISARM again instantly:
+  - Recreate this file, or set env KALSHI_KILL_SWITCH=1.
+
+This is an intentional, operator-controlled safety gate. Keep it armed by default.

@@ -4,6 +4,10 @@
 __pycache__/
 .venv/
 
+# Real-money runtime data: never commit live trade history or live receipts.
+data/kalshi/kalshi-live-ledger.jsonl
+manifests/evidence/kalshi-live-order-receipt-*.md
+
 # Secrets and local environment
 .env
 .env.*
