@@ -117,7 +117,7 @@ Combines three independent analyses into one unified strategic view:
 
 ### Executive Summary
 
-The highest-probability path to $200 this week is a fixed-scope, manually delivered offer built from assets your repositories already prove you can create: a repo/RAG cleanup sprint, a local-first AI and MCP audit/setup session, or a founder-grade report pack. That is a better fit than trying to sell boxed software immediately, because lantern-os explicitly describes itself as a pre-v1 staging and release-control repo, while human-flourishing-frameworks describes itself as early development, not production-ready, and still tied to synthetic/demo data; both repositories currently show no published releases, and the Human Flourishing Frameworks README still contains a placeholder license notice instead of an actual license.
+The highest-probability path to $200 this week is a fixed-scope, manually delivered offer built from assets your repositories already prove you can create: a repo/RAG cleanup sprint, a local-first AI and MCP audit/setup session, or a founder-grade report pack. This is a better fit than trying to sell boxed software immediately, because lantern-os explicitly describes itself as a pre-v1 staging and release-control repo, while human-flourishing-frameworks describes itself as early development, not production-ready, and still tied to synthetic/demo data. Both repositories currently show no published releases, and the Human Flourishing Frameworks README still contains a placeholder license notice instead of an actual license.
 
 Your own Lantern OS documents already arrive at almost the same conclusion. The COMET LEAP 11-Day Cash Sprint says the best cash path is "manual, local-first, and offer-led," and names five existing offers: founder report pack, local RAG/repo cleanup sprint, Windows/Lantern setup session, parent creative learning packet, and small-business AI cleanup/training. The companion Product Universe Atlas maps those same assets into concrete product families and first buyers, and the Arc Reactor Confidence skill treats one paid pilot as one of the clearest next proofs that matter.
 
@@ -125,11 +125,15 @@ The commercial translation is straightforward: optimize for one $199–$299 sale
 
 ### Prioritized Monetization Options
 
+<!-- pagebreak -->
+
 | Priority | Option | Price path to $200 | Estimated time to $200 | What you deliver | Minimal resources | Risk / effort |
 |----------|--------|-------------------|----------------------|-----------------|-------------------|---------------|
-| Top | Repo/RAG cleanup sprint (Lantern cash sprint + product atlas + RAG dollhouse) | 1 x $199 pilot or 2 x $125 slots | 1–3 days | Audit one messy repo/folder/PDF set; build a flat RAG file or cleaned knowledge map; add a short findings memo; 30-minute handoff | Existing scripts, GitHub repo, one checkout link, before/after sample | Low-medium |
-| Top | Local-first AI / MCP audit and setup session (MCP connector + local launch runbook + scripts) | 1 x $199 or 2 x $99 | Same day–3 days | Inspect tool exposure, local-only boundaries, startup scripts, trust assumptions, and next actions; optionally help the buyer get a local workflow running | Live call, PowerShell, a proof checklist, payment link | Medium |
-| Top | Founder report pack or technical memo (cash sprint + custom report lib + tested PDF packet) | 1 x $199–$299 | 1–4 days | Executive summary, architecture page, evidence table, roadmap, validation notes, cleaned PDF | Report template, PDF export, one buyer brief | Low-medium |
+| Top | Repo/RAG cleanup sprint | 1 x $199 pilot or 2 x $125 slots | 1–3 days | Audit one messy repo/folder/PDF set; build a flat RAG file or cleaned knowledge map; add a short findings memo; 30-minute handoff | Existing scripts, GitHub repo, one checkout link, before/after sample | Low-medium |
+| Top | Local-first AI / MCP audit and setup session | 1 x $199 or 2 x $99 | Same day–3 days | Inspect tool exposure, local-only boundaries, startup scripts, trust assumptions, and next actions; optionally help the buyer get a local workflow running | Live call, PowerShell, a proof checklist, payment link | Medium |
+| Top | Founder report pack or technical memo | 1 x $199–$299 | 1–4 days | Executive summary, architecture page, evidence table, roadmap, validation notes, cleaned PDF | Report template, PDF export, one buyer brief | Low-medium |
+
+<!-- pagebreak -->
 
 ### Seven-Day Action Plan
 
@@ -147,7 +151,11 @@ The commercial translation is straightforward: optimize for one $199–$299 sale
 | Jun 02 | Delivery | Deliver first paid artifact |
 | Jun 03 | Secondary packaging | Publish Gumroad mini-bundle |
 | Jun 03 | Secondary packaging | Request testimonial or permission for proof |
-| Jun 04 | Secondary packaging | Add README pitch / sponsorship tier |
+
+
+<!-- pagebreak -->
+
+ This action plan assumes the ability to spend focused effort over seven days, accept payment through an existing method, and send direct outreach to a warm or semi-warm network.
 
 ---
 
