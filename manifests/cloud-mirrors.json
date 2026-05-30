@@ -3,7 +3,7 @@
   "deployProvider": "AWS ECS Fargate",
   "deployBranch": "master",
   "mirrorPolicy": "Local is primary; AWS cloud URLs are mirrors and must not create separate dashboards. No AWS URL is verified until /, /api/health, and /api/cloud-mirrors pass.",
-  "lastChecked": "2026-05-29",
+  "lastChecked": "2026-05-30",
   "awsRuntime": {
     "target": "ECS Fargate or compatible AWS container service",
     "imageSource": "apps/lantern-garage/Dockerfile",
@@ -12,6 +12,23 @@
     "status": "aws_service_url_pending_operator_deploy"
   },
   "cloudMirrors": [],
+  "appServices": [
+    {
+      "name": "Lantern Trade Chat",
+      "app": "apps/lantern-trade-chat",
+      "provider": "AWS App Runner (compatible AWS container service)",
+      "region": "us-east-1",
+      "url": "https://p2rsjfppsr.us-east-1.awsapprunner.com",
+      "imageSource": "apps/lantern-trade-chat/Dockerfile",
+      "imageRepository": "528081867536.dkr.ecr.us-east-1.amazonaws.com/lantern-trade-chat",
+      "containerPort": 8080,
+      "mode": "demo (login-walled; LANTERN_LIVE_ENABLED=0)",
+      "verifiedEndpoints": ["/ -> 200", "/api/health -> 200"],
+      "note": "Distinct trading app, not a dashboard mirror. /api/cloud-mirrors is N/A for this service; verification gate is / and /api/health.",
+      "status": "aws_app_runner_running_demo_mode",
+      "verifiedAt": "2026-05-30"
+    }
+  ],
   "retiredMirrors": [
     {
       "name": "Lantern OS Render",

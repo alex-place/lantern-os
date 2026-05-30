@@ -43,8 +43,25 @@ KALSHI_BASES = {
     "prod": "https://api.elections.kalshi.com",
 }
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = REPO_ROOT / "data" / "kalshi"
+def _data_dir() -> Path:
+    """Resolve the kalshi data dir.
+
+    Order: explicit LANTERN_DATA_DIR env -> repo `data/kalshi` if running from a
+    checkout -> a writable fallback under HOME (for containers/standalone). This
+    must never raise at import time (it runs on every boot).
+    """
+    override = os.environ.get("LANTERN_DATA_DIR")
+    if override:
+        return Path(override)
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "data" / "kalshi"
+        if candidate.is_dir():
+            return candidate
+    return Path(os.environ.get("HOME", "/tmp")) / ".lantern" / "kalshi"
+
+
+DATA_DIR = _data_dir()
 
 
 @dataclass(frozen=True)
