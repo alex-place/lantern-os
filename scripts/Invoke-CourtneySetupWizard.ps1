@@ -39,25 +39,25 @@ function Get-UserInput {
         [string]$Default
     )
     if ($Default) {
-        $promptText = "$Prompt [$Default]: "
+        $promptText = "${Prompt} [$Default]: "
     } else {
-        $promptText = "$Prompt: "
+        $promptText = "${Prompt}: "
     }
-    $input = Read-Host $promptText
-    if ([string]::IsNullOrWhiteSpace($input)) {
+    $userInput = Read-Host $promptText
+    if ([string]::IsNullOrWhiteSpace($userInput)) {
         return $Default
     }
-    return $input
+    return $userInput
 }
 
 function Get-YesNo {
     param([string]$Prompt, [bool]$Default = $true)
     $defaultText = if ($Default) { "Y/n" } else { "y/N" }
-    $input = Read-Host "$Prompt [$defaultText]"
-    if ([string]::IsNullOrWhiteSpace($input)) {
+    $userInput = Read-Host "$Prompt [$defaultText]"
+    if ([string]::IsNullOrWhiteSpace($userInput)) {
         return $Default
     }
-    return $input -eq "Y" -or $input -eq "y"
+    return $userInput -eq "Y" -or $userInput -eq "y"
 }
 
 # Clear screen
@@ -80,6 +80,7 @@ if (Test-Command "node") {
 } else {
     Write-Error "Node.js not found"
     Write-Info "Please install Node.js from https://nodejs.org (LTS version recommended)"
+    Write-Info "After installation, restart PowerShell and run this wizard again."
     $prereqsOk = $false
 }
 
@@ -90,6 +91,7 @@ if (Test-Command "git") {
 } else {
     Write-Error "Git not found"
     Write-Info "Please install Git from https://git-scm.com/download/win"
+    Write-Info "After installation, restart PowerShell and run this wizard again."
     $prereqsOk = $false
 }
 
