@@ -15,6 +15,16 @@ git pull origin master
 
 ---
 
+## Alternative: Use Setup Wizard
+
+If you haven't installed Lantern OS yet, use the interactive installer wizard:
+
+1. Download: `lantern-os-courtney-installer-2026-05-30.zip` from artifacts
+2. Extract and run: `Invoke-CourtneySetupWizard.ps1`
+3. The wizard will handle everything automatically
+
+---
+
 ## Verify
 
 After pulling, verify you're up to date:

@@ -54,7 +54,23 @@ If Windsurf has issues, you can also use:
 
 ---
 
-## Part 2: Lantern OS Installation (Current Method)
+## Part 2: Lantern OS Installation (Recommended Method)
+
+### Quick Install with Wizard
+
+**New! Use the interactive installer wizard:**
+
+1. Download: `lantern-os-courtney-installer-2026-05-30.zip` from the artifacts folder
+2. Extract the zip to any folder
+3. Double-click: `Invoke-CourtneySetupWizard.ps1`
+4. Follow the prompts - the wizard will:
+   - Check prerequisites
+   - Clone the repository
+   - Configure Git
+   - Create a desktop shortcut
+   - Set up the local-cloud bridge
+
+### Manual Installation (If Wizard Fails)
 
 ### Prerequisites
 - Windows 10 or 11
