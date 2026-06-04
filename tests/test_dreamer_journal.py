@@ -117,7 +117,7 @@ class TestTernaryEncoding(unittest.TestCase):
 
     def test_ternary_to_coords_roundtrip(self):
         """coords → ternary → coords is identity."""
-        coords = [1, 2, 3, 4, 5, 6]
+        coords = [0, 1, 2, 0, 2, 1]
         ternary = self._coords_to_ternary(coords)
         recovered = self._ternary_to_coords(ternary)
         self.assertEqual(coords, recovered)

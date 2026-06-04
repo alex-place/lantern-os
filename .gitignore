@@ -45,6 +45,9 @@ data/dreamer/notebooks/*.jsonl
 .tmp.drivedownload/
 .claude/worktrees/
 data/dream_journal/*.jsonl
+data/dream_journal/csf/*.csf
+data/status/agent-monitor-latest.json
+data/conversations/garage-conversations.jsonl
 
 # Deployment weight reduction (static site deploy)
 .git/

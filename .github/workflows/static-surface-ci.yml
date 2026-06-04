@@ -45,7 +45,7 @@ jobs:
           test -f manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md
           test -f manifests/foundry-shareholder-repos.md
           test -f manifests/open-issues.md
-          test -f dual-boot/SONS-PC-READINESS.md
+          test -f archive/root-cleanup-2026-06-04/dual-boot/SONS-PC-READINESS.md
 
   html-links:
     name: HTML link integrity

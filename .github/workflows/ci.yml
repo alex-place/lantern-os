@@ -54,20 +54,22 @@ jobs:
           from pathlib import Path
           import re
 
-          index = Path("surfaces/shareholder-index/index.html").read_text()
+          html_path = Path("surfaces/shareholder-index/index.html")
+          index = html_path.read_text()
           hrefs = re.findall(r'href=["\']([^"\']+)["\']', index)
 
           missing = []
           for href in hrefs:
             if href.startswith(("http", "#")):
               continue
-            if not Path(href).exists():
+            target = (html_path.parent / href).resolve()
+            if not target.exists():
               missing.append(href)
 
           if missing:
-            print(f"Γ£ù Missing links: {missing}")
+            print(f"Missing links: {missing}")
             exit(1)
-          print(f"Γ£ô All {len(hrefs)} links valid")
+          print(f"All {len(hrefs)} links valid")
           EOF
 
   # ============================================================================

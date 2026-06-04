@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def test_mind_body_spirit_video_report_is_off_hold_with_publication_gates():
-    report = Path('reports/MIND-BODY-SPIRIT-SHINE-VIDEO-CONVERGENCE.md')
+    report = Path('archive/reports-2026-06-04/MIND-BODY-SPIRIT-SHINE-VIDEO-CONVERGENCE.md')
     text = report.read_text(encoding='utf-8')
 
     required_phrases = [
@@ -20,7 +20,7 @@ def test_mind_body_spirit_video_report_is_off_hold_with_publication_gates():
 
 
 def test_mind_body_spirit_video_report_does_not_claim_public_release_ready():
-    report = Path('reports/MIND-BODY-SPIRIT-SHINE-VIDEO-CONVERGENCE.md')
+    report = Path('archive/reports-2026-06-04/MIND-BODY-SPIRIT-SHINE-VIDEO-CONVERGENCE.md')
     text = report.read_text(encoding='utf-8').lower()
 
     forbidden_claims = [

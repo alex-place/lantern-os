@@ -35,7 +35,7 @@ class CapabilityClaim:
     def verify(self) -> "CapabilityClaim":
         now = datetime.now(timezone.utc)
         self.verified_at = now.isoformat()
-        if self.validity_seconds:
+        if self.validity_seconds is not None:
             expiry = now + timedelta(seconds=self.validity_seconds)
             self.expires_at = expiry.isoformat()
         return self
@@ -87,7 +87,8 @@ class HonestyTracker:
         if not recent:
             return 1.0
         hits = sum(1 for c in recent if c["matched"])
-        return round(hits / len(recent), 3)
+        prior_hits, prior_total = 3, 3
+        return round((hits + prior_hits) / (len(recent) + prior_total), 3)
 
     def snapshot(self) -> Dict[str, Any]:
         return {aid: {"score": self.score(aid), "total_checks": len(v)} for aid, v in self._checks.items()}
@@ -114,6 +115,8 @@ class CapabilityGate:
         }
 
     def register_claim(self, claim: CapabilityClaim) -> None:
+        if not claim.verified_at:
+            claim.verify()
         self._claims[claim.agent_id] = claim
 
     def check(self, agent_id: str, required: Set[str], boundary: Optional[str] = None,

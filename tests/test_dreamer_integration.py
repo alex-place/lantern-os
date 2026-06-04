@@ -14,6 +14,17 @@ import unittest
 BASE = "http://127.0.0.1:4177"
 
 
+def _server_reachable():
+    try:
+        urllib.request.urlopen(BASE + "/", timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+_SKIP_MSG = "Lantern Garage server not running on port 4177"
+
+
 def api(method, path, data=None):
     """Simple HTTP client for tests."""
     url = BASE + path
@@ -34,6 +45,7 @@ def api(method, path, data=None):
         return {"status": 0, "body": str(e)}
 
 
+@unittest.skipUnless(_server_reachable(), _SKIP_MSG)
 class TestCreateEntryWorkflow(unittest.TestCase):
     """POST entry → GET entries → GET stats."""
 
@@ -94,6 +106,7 @@ class TestCreateEntryWorkflow(unittest.TestCase):
         self.assertIsInstance(r["body"]["count"], int)
 
 
+@unittest.skipUnless(_server_reachable(), _SKIP_MSG)
 class TestChatWorkflow(unittest.TestCase):
     """Chat API tests."""
 
@@ -130,6 +143,7 @@ class TestChatWorkflow(unittest.TestCase):
             self.assertIn("data:", data)
 
 
+@unittest.skipUnless(_server_reachable(), _SKIP_MSG)
 class TestUserIsolation(unittest.TestCase):
     """User-scoped data isolation."""
 
@@ -142,6 +156,7 @@ class TestUserIsolation(unittest.TestCase):
         self.assertEqual(r2["status"], 200)
 
 
+@unittest.skipUnless(_server_reachable(), _SKIP_MSG)
 class TestBoundaryMessages(unittest.TestCase):
     """Safety boundary verification."""
 
@@ -161,6 +176,7 @@ class TestBoundaryMessages(unittest.TestCase):
         self.assertNotRegex(reply, r"you must|you should|you need to")
 
 
+@unittest.skipUnless(_server_reachable(), _SKIP_MSG)
 class TestConcurrentSafety(unittest.TestCase):
     """Concurrent request handling."""
 

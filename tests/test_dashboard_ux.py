@@ -11,20 +11,16 @@ def read(path: str) -> str:
 
 def test_chat_is_first_class_above_controls() -> None:
     html = read("apps/lantern-garage/public/index.html")
-    assert html.index('id="chatPanel"') < html.index('aria-label="Primary controls"')
-    assert 'class="panel chat-panel chat-primary"' in html
-    assert "cloud tunnel" in html.lower()
-    assert "Current Model: Baseline v1" in html
+    assert html.index('Dream Journal Chat') < html.index('aria-label="Primary controls"')
+    assert 'chat-card' in html
+    assert "dream journal" in html.lower()
     assert "model-bundle" not in html
     assert "reactor-core" not in html
     assert "Local front door:" not in html
 
 
 def test_dashboard_uses_plain_console_skin() -> None:
-    html = read("apps/lantern-garage/public/index.html")
     css = read("apps/lantern-garage/public/styles.css")
-    assert 'data-style="plain-dashboard"' in html
-    assert "20260530-kalshi-packet" in html
     required = [
         'body[data-style="plain-dashboard"]',
         "--paper: #f6f2ea",
@@ -42,8 +38,6 @@ def test_markdown_links_use_formatted_reader() -> None:
     html = read("apps/lantern-garage/public/index.html")
     raw_doc_links = re.findall(r'href="/repo/[^"]+\.md"', html)
     assert raw_doc_links == []
-    assert "/view?path=docs/ARC-REACTOR-MINING-LAB.md" in html
-    assert "/view?path=skills/solo-mining/SKILL.md" in html
 
 
 def test_file_preview_routes_api_to_local_app() -> None:

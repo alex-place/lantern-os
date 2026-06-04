@@ -117,7 +117,7 @@ class ProviderRegistry:
     def __init__(self) -> None:
         self._providers: Dict[str, ProviderCapacityState] = {}
         self._priority: List[str] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def register(self, provider_id: str, env_key: Optional[str] = None, priority: Optional[int] = None) -> None:
         with self._lock:

@@ -95,7 +95,7 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-          text = Path('reports/COMET-LEAP-ORCH-CHALLENGE-SCIENCE-FIRST.md').read_text(encoding='utf-8').lower()
+          text = Path('archive/reports-2026-06-04/COMET-LEAP-ORCH-CHALLENGE-SCIENCE-FIRST.md').read_text(encoding='utf-8').lower()
           required = [
               'status: candidate',
               'science-only frame',
