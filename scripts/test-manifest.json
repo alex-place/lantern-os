@@ -1,0 +1,7 @@
+[
+  {
+    "title": "[DOCS] Validate issue templates render correctly in GitHub UI",
+    "body": "This is a test issue created by `scripts/issue-batch.js`.\n\n**Purpose:** Verify the batch issue creation workflow works end-to-end.\n\n**Acceptance Criteria:**\n- [ ] Issue appears in GitHub with correct labels\n- [ ] Template body is readable\n- [ ] Batch script logs success\n\nIf this issue is open for > 24 hours, close it.",
+    "labels": ["docs", "test"]
+  }
+]

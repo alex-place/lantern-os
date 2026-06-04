@@ -1,0 +1,58 @@
+name: Bug Report
+description: File a bug report for Lantern OS
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report Etiquette
+        - Search existing issues before filing.
+        - One bug per issue. Do not bundle.
+        - Include reproduction steps, expected vs actual behavior.
+        - Attach logs, screenshots, or `.md` traces when possible.
+  - type: input
+    id: surface
+    attributes:
+      label: Affected Surface
+      description: Which app, API, or component?
+      placeholder: e.g., lantern-garage, dream-chat-orion, discord-bot
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction Steps
+      description: Step-by-step instructions to trigger the bug.
+      placeholder: |
+        1. Start server with `node server.js`
+        2. Open `http://127.0.0.1:4177/dream-chat-orion.html`
+        3. Type "hello" and press Send
+        4. Observe no response
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: Node v24.15.0, Windows 11, Chrome 126
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-flight Checklist
+      options:
+        - label: I have searched existing issues.
+        - label: I have included reproduction steps.
+        - label: I have attached logs or traces if available.

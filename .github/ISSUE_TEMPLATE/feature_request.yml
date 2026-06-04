@@ -1,0 +1,39 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[FEAT] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request Etiquette
+        - Check the roadmap (`DREAM-JOURNAL-ROADMAP.md`) first.
+        - One feature per issue. Split large ideas into sub-issues.
+        - Explain the user value, not just the implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Opportunity
+      description: What is missing or painful today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Links to roadmap items, related issues, or prior art.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-flight Checklist
+      options:
+        - label: I have checked the roadmap.
+        - label: This is one feature, not a bundle.
+        - label: I have explained user value.

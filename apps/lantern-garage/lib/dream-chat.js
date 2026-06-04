@@ -139,8 +139,9 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (anthropicKey && (!rp || rp === "claude" || rp === "anthropic")) {
     try {
+      const anthropicModel = String(process.env.ANTHROPIC_MODEL || "claude-3-haiku-20240307").replace(/\[[0-9;]*m/g, "").trim();
       const payload = JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-3-haiku-20240307",
+        model: anthropicModel,
         max_tokens: 256,
         system: agent.systemPrompt,
         messages: [{ role: "user", content: userPrompt }],

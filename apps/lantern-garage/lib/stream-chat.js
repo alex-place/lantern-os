@@ -73,8 +73,9 @@ async function handleStreamChat(req, url, res) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (anthropicKey && message && (!requestedProvider || requestedProvider === "claude" || requestedProvider === "anthropic")) {
     try {
+      const anthropicModel = String(process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-20241022").replace(/\[[0-9;]*m/g, "").trim();
       const payload = JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-20241022",
+        model: anthropicModel,
         max_tokens: 1024,
         stream: true,
         system: systemPrompt,
