@@ -20,10 +20,14 @@ intent.
 
 ### Dream Chat
 - `!convergance` sync alias — quick chat command to trigger convergence loop
+- Dream door hero uses `.webp` asset with optimized gradients and clipping fix
+
+## [1.1.0-rc.1] — 2026-06-06 — Parallax Dream Door + Deploy Fix
+
+### Dream Chat
 - Parallax zoom into dream door on scroll — background scales 1×→2.8×, hero text fades, glow orb drifts
 - Scroll hint with bounce animation on empty state
 - `.door-bg` element extracted from pseudo-element for GPU-transform parity
-- Dream door hero uses `.webp` asset with optimized gradients and clipping fix
 
 ### Deploy
 - Fixed GitHub Actions workflow (`actions/checkout@v4`, `actions/setup-python@v5`)
