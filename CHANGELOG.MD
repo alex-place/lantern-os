@@ -7,12 +7,23 @@ release date. This project is currently private and local-first, so release
 notes should be honest about what was verified locally and what remains design
 intent.
 
-## [1.1.0-rc.1] — 2026-06-06 — Parallax Dream Door + Deploy Fix
+## [1.2.0] — 2026-06-06 — Auto-Update + Convergance Sync
+
+### Auto-Update
+- `POST /api/actions/update` — git pull origin master → npm install → auto-restart server (detached spawn)
+- `GET /api/version` — returns commit SHA, tag, branch, and date from git
+- Client-side `update-checker.js` polls every 60s comparing local version to GitHub API latest master
+  - Shows fixed banner with "Update & Restart" button when master diverges
+  - Local dev: button POSTs to `/api/actions/update` and auto-reloads after restart
+  - GitHub Pages: button hard-refreshes the page
+- MCP tool `update_lantern_os` — agents can trigger full update pipeline via MCP protocol
 
 ### Dream Chat
+- `!convergance` sync alias — quick chat command to trigger convergence loop
 - Parallax zoom into dream door on scroll — background scales 1×→2.8×, hero text fades, glow orb drifts
 - Scroll hint with bounce animation on empty state
 - `.door-bg` element extracted from pseudo-element for GPU-transform parity
+- Dream door hero uses `.webp` asset with optimized gradients and clipping fix
 
 ### Deploy
 - Fixed GitHub Actions workflow (`actions/checkout@v4`, `actions/setup-python@v5`)

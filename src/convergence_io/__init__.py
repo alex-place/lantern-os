@@ -29,4 +29,4 @@ __all__ = [
     "DataClassification", "ClassificationLabel", "DREAM_LABELS",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
