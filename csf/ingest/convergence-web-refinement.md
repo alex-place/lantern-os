@@ -1,6 +1,6 @@
 # Convergence Web Refinement — v1.0.2+ Roadmap
 
-**Status:** Research complete — Phase B implementation in progress  
+**Status:** Design contract — pending web research validation  
 **Slot:** `dream_journal/convergence_web_refinement` (priority 8)  
 **Owner:** Agent pool (any)  
 **Effort estimate:** 2–3 sessions  
@@ -125,8 +125,8 @@ jobs:
 
 - [x] `python src/convergence_io_engine.py loop` produces artifact in CI — implemented in `.github/workflows/ci.yml` (job `convergence-loop`)
 - [ ] PR with `promotion_ready=false` is blocked by CI gate — gate logic added; needs live PR test
-- [x] `manifests/objective-current.json` changes Phase 4 output — Already implemented in _phase_state_objective
-- [x] Drift between two runs is detectable and reported — Already implemented in _detect_drift
+- [x] `manifests/objective-current.json` changes Phase 4 output — Phase B (implemented 2026-06-09)
+- [x] Drift between two runs is detectable and reported — Phase B (implemented 2026-06-09)
 - [ ] `git tag -l "convergence-good-*"` shows rollback targets — Phase C
 
 ---

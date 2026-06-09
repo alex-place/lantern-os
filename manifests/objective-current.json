@@ -1,9 +1,13 @@
 {
-  "version": "2",
-  "updated_at": "2026-06-08T11:38:00Z",
-  "objective": "Maintain convergence loop stability and address route test validation consensus",
-  "priority": 1,
-  "tags": ["convergence", "validation", "testing"],
-  "owner": "keystone",
-  "previous_completed": "Stabilize convergence loop: fix SlotManager claim bug, reduce memory pressure, and wire objective manifest + drift detection into Phase 4"
+  "version": 1,
+  "objective": "v1.0.0 Foundation — solid core with provider gateway, convergence validation, local-first architecture, and Dream Journal Orion Edition",
+  "focus_areas": [
+    "Lantern Garage server with full API surface",
+    "Dream Journal chat with multi-persona routing",
+    "Convergence loop with 12-step validation",
+    "Multi-provider AI gateway (Gemini, Claude, OpenAI, Ollama)",
+    "CSF memory engine v2 (async, multi-signal, procedural tier)"
+  ],
+  "target_release": "v1.0.0",
+  "updated_at": "2026-06-09T21:00:00Z"
 }
