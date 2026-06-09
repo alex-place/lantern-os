@@ -127,7 +127,7 @@ jobs:
 - [ ] PR with `promotion_ready=false` is blocked by CI gate — gate logic added; needs live PR test
 - [x] `manifests/objective-current.json` changes Phase 4 output — Phase B (implemented 2026-06-09)
 - [x] Drift between two runs is detectable and reported — Phase B (implemented 2026-06-09)
-- [ ] `git tag -l "convergence-good-*"` shows rollback targets — Phase C
+- [x] `git tag -l "convergence-good-*"` shows rollback targets — Phase C (implemented 2026-06-09)
 
 ---
 

@@ -1,0 +1,33 @@
+name: Monoworkstream Gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: ["master"]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  gate:
+    name: Single-workstream check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check open PR count (excluding exempt branches)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Count open PRs that target master from non-exempt branches
+          # Exempt: gh-pages (deploy branch), master (long-lived)
+          open_count=$(gh pr list --state open --json headRefName,baseRefName \
+            --jq '[.[] | select(.baseRefName == "master" and .headRefName != "gh-pages")] | length')
+          echo "Open PRs targeting master: $open_count"
+          if [ "$open_count" -gt 1 ]; then
+            echo "::error::Monoworkstream violation: $open_count PRs open targeting master. Only 1 feature PR allowed at a time."
+            echo "Close or merge existing PRs before opening a new one."
+            exit 1
+          fi
+          echo "Monoworkstream gate passed ($open_count PR open)"

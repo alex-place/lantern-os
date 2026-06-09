@@ -49,8 +49,8 @@
     {
       "id": "dream_journal/convergence_web_refinement",
       "priority": 9,
-      "status": "active",
-      "description": "Phase A complete (CI artifact + gate logic). Phase B active: objective manifest parser + drift detection in src/convergence_io_engine.py. Phase C pending: branch protection + rollback tag script."
+      "status": "completed",
+      "description": "All phases complete: A (CI artifact + PR promotion gate), B (objective manifest parser + drift detection), C (monoworkstream gate workflow + rollback tag scripts)."
     },
     {
       "id": "convergence/validation_ring",
