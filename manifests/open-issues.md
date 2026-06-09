@@ -409,20 +409,19 @@ Documentation: See `docs/DASHBOARD-CONSOLIDATION.md`
    - Fix: directory is intentional — contains `human-flourishing-frameworks/` app.py and export_snapshot.py. HFF is a core integration with explicit validation job (`hff-integration-exists`).
    - Status: resolved; `integrations/` is an allowed top-level directory by design.
 
+3. `VALIDATION-RING-001`: `flourishing.js` route had no test coverage.
+   - Fix: added `tests/test_flourishing.js` with 8 tests covering all HFF endpoints.
+   - Validation ring result: 10/10 consensus passed (was 9/10).
+   - Status: fixed.
+
 ## Active Gaps (Current Loop)
 
-1. `VALIDATION-RING-001`: `flourishing.js` route has no test coverage.
-   - Detected by: validation ring phase 9 (`run_validation_ring`)
-   - Evidence: 9/10 routes pass consensus; `route-test-flourishing` fails consensus (rejected, medium severity)
-   - Status: open. Needs test file referencing `flourishing` route or direct `test_flourishing.js`.
-   - Next: create `tests/test_flourishing.js` or add flourishing coverage to existing test suite.
-
-2. `GEMINI-GROUNDING-001`: Gemini grounding with Google Search not verified.
+1. `GEMINI-GROUNDING-001`: Gemini grounding with Google Search not verified.
    - Detected by: agent slot `dream_journal/gemini_grounding_test` (priority 7, queued)
    - Status: queued. Requires paid Gemini API key with grounding enabled.
-   - Next: obtain paid key, set GEMINI_GROUNDING=true, run verification.
+   - Next: operator adds `GEMINI_API_KEY` to `.env`, sets `GEMINI_GROUNDING=true`, runs verification.
 
-3. `VOICE-STT-001`: Backend Vosk STT fallback not implemented.
+2. `VOICE-STT-001`: Backend Vosk STT fallback not implemented.
    - Detected by: agent slot `dream_journal/voice_server_stt` (priority 8, queued)
    - Status: queued. Needs Vosk model installation + POST /api/dream/transcribe route.
    - Next: install Vosk, add transcribe route to dream.js, create test.
