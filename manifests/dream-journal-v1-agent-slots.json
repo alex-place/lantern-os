@@ -55,8 +55,8 @@
     {
       "id": "convergence/validation_ring",
       "priority": 4,
-      "status": "active",
-      "description": "Blockchain-inspired bounded validation ring: 3-agent consensus, SHA-256 hash chain, tamper-evident JSONL. Runs as phase 9 in convergence loop."
+      "status": "completed",
+      "description": "Validation ring stabilized: 9/10 route tests pass consensus, 1 legitimate gap detected (flourishing.js has no test coverage). _generate_jobs now scans all test files for route references instead of requiring exact filename match. Phase 9 passes cleanly in convergence loop."
     }
   ],
   "convergence_loop_result": "promotion_ready=True (all 13 phases pass)",

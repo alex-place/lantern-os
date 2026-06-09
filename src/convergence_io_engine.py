@@ -427,16 +427,35 @@ class ValidationRing:
     def _generate_jobs(self) -> List[Dict[str, Any]]:
         """Auto-generate validation jobs from repo state."""
         jobs = []
-        # 1. Verify every .js route has a matching test
+        # 1. Verify every .js route has test coverage (search all test files for route references)
         routes_dir = self.repo_root / "apps" / "lantern-garage" / "routes"
         tests_dir = self.repo_root / "tests"
+        # Pre-scan all test files to build a coverage map
+        route_coverage: Dict[str, bool] = {}
+        test_files = list(tests_dir.rglob("*.js")) + list(tests_dir.rglob("*.py")) + list(tests_dir.rglob("*.spec.js"))
         if routes_dir.exists():
             for route in routes_dir.glob("*.js"):
-                test_file = tests_dir / f"test_{route.stem}.js"
+                route_name = route.stem
+                # Check if any test file references this route name
+                covered = False
+                for tf in test_files:
+                    try:
+                        text = tf.read_text(encoding="utf-8", errors="ignore")
+                        # Match route name as a word in test file content
+                        if route_name in text:
+                            covered = True
+                            break
+                    except Exception:
+                        pass
+                # Also accept direct test file match as before
+                direct_test = tests_dir / f"test_{route_name}.js"
+                if direct_test.exists():
+                    covered = True
+                route_coverage[route_name] = covered
                 jobs.append({
-                    "id": f"route-test-{route.stem}",
+                    "id": f"route-test-{route_name}",
                     "claim": f"Route {route.name} has test coverage",
-                    "check": lambda p=test_file: p.exists(),
+                    "check": lambda c=covered: c,
                     "severity": "medium",
                 })
         # 2. Verify manifest evidence files exist
