@@ -2290,7 +2290,7 @@ class HeadlessAgentDaemon:
             return []
         try:
             data = json.loads(slots_path.read_text(encoding="utf-8"))
-            slots = data.get("agent_slots", [])
+            slots = data.get("slots", [])
             return [s for s in slots if s.get("status") == "queued"]
         except Exception:
             return []
@@ -2301,7 +2301,7 @@ class HeadlessAgentDaemon:
             return
         try:
             data = json.loads(slots_path.read_text(encoding="utf-8"))
-            for s in data.get("agent_slots", []):
+            for s in data.get("slots", []):
                 if s.get("id") == slot_id:
                     s["status"] = status
                     break

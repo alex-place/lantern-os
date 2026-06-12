@@ -3,7 +3,7 @@
   "upstream_pr": "https://github.com/alex-place/lantern-os/pull/186",
   "strategy": "action_pooling \u2014 read-only tasks batch; ref docs/ACTION-POOLING-AND-BATCHING.md",
   "token_budget": "max_tokens=1024 per provider call; context slimmed via symbol mesh (top 8 symbols passed); CSF compression on save",
-  "agent_slots": [
+  "slots": [
     {
       "id": "dream_journal/agents_slots_route",
       "priority": 1,
