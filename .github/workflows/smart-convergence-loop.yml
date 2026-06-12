@@ -28,6 +28,15 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Sync GitHub issues to agent slots
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\scripts\orchestration\Sync-GitHubIssuesToAgentSlots.ps1 `
+            -Root . `
+            -Owner alex-place `
+            -Repo lantern-os
+
       - name: Run smart convergence loop
         shell: pwsh
         run: |

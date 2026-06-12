@@ -86,7 +86,6 @@ do {
 } while ($page -le 20)
 
 Write-Host "Fetched $($issues.Count) total issues" -ForegroundColor Cyan
-Write-Host "Fetched $($issues.Count) total issues" -ForegroundColor Cyan
 
 # Filter for dream-journal agent-task issues
 $targetIssues = @($issues | Where-Object { 
