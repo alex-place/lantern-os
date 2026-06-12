@@ -1,0 +1,36 @@
+## Summary
+
+Implements accessibility features for non-technical users per product vision #350 (Lantern OS as cockpit for kids, grandparents, and the needy).
+
+## Changes
+
+### UI Simplification
+- Simplified header with emoji icons (💬 Chat, 🚪 Explore, 📊 Dashboard)
+- Larger text and buttons for easier interaction
+- Simple Mode (👶) hides complex UI elements (observer panel, theme toggle, status badges)
+
+### Voice Interaction
+- Voice Mode (🎙️) enables speech recognition using Web Speech API
+- Microphone button appears in input area when voice mode is active
+- Speech-to-text fills message input automatically
+
+### Support Workflows
+- Added "Help Someone Else" section with three workflows:
+  - Help grandkid with homework
+  - Help neighbor with tech problems
+  - Help friend learn to code
+
+## Related Issues
+
+- #350 - Product Vision: Lantern OS as Cockpit for Everyone
+- #332 - Journal and Three Doors RP responsiveness (persona prompt improvements)
+
+## Testing
+
+- Test Simple Mode toggle hides complex UI
+- Test Voice Mode with Web Speech API (Chrome/Edge)
+- Test support workflow prompts fill correctly
+
+## Breaking Changes
+
+None. All changes are additive UI enhancements.

@@ -1,6 +1,6 @@
 {
   "schema": "lantern.status_cube.v1",
-  "generated_at": "2026-06-11T09:07:47.072431+00:00",
+  "generated_at": "2026-06-12T08:47:19.177805+00:00",
   "artifacts": {
     "test-artifact": {
       "artifact_id": "test-artifact",
@@ -61,7 +61,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.837971+00:00",
-      "updated_at": "2026-06-11T09:07:47.052266+00:00",
+      "updated_at": "2026-06-12T08:47:19.144735+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -78,7 +78,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.837971+00:00",
-      "updated_at": "2026-06-11T09:07:47.052266+00:00",
+      "updated_at": "2026-06-12T08:47:19.144735+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -95,7 +95,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.837971+00:00",
-      "updated_at": "2026-06-11T09:07:47.052266+00:00",
+      "updated_at": "2026-06-12T08:47:19.146745+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -112,7 +112,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.837971+00:00",
-      "updated_at": "2026-06-11T09:07:47.052266+00:00",
+      "updated_at": "2026-06-12T08:47:19.146745+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -129,7 +129,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.838984+00:00",
-      "updated_at": "2026-06-11T09:07:47.052785+00:00",
+      "updated_at": "2026-06-12T08:47:19.146745+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -146,7 +146,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.838984+00:00",
-      "updated_at": "2026-06-11T09:07:47.053299+00:00",
+      "updated_at": "2026-06-12T08:47:19.146745+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -163,7 +163,7 @@
         "t": ""
       },
       "created_at": "2026-06-09T21:23:15.838984+00:00",
-      "updated_at": "2026-06-11T09:07:47.053299+00:00",
+      "updated_at": "2026-06-12T08:47:19.146745+00:00",
       "owner": "",
       "description": "",
       "timeline": [],
@@ -192,10 +192,10 @@
     "health": {
       "dimension": "health",
       "posterior": 0.6667,
-      "evidence_count": 19,
-      "success_count": 19,
-      "confidence": 0.5935,
-      "last_updated": "2026-06-11T09:07:47.072431+00:00",
+      "evidence_count": 21,
+      "success_count": 21,
+      "confidence": 0.6111,
+      "last_updated": "2026-06-12T08:47:19.177805+00:00",
       "sensors": [
         "hff_sensors",
         "hff_api"
@@ -204,10 +204,10 @@
     "animal": {
       "dimension": "animal",
       "posterior": 0.6667,
-      "evidence_count": 18,
-      "success_count": 18,
-      "confidence": 0.5837,
-      "last_updated": "2026-06-11T09:07:47.072431+00:00",
+      "evidence_count": 20,
+      "success_count": 20,
+      "confidence": 0.6026,
+      "last_updated": "2026-06-12T08:47:19.177805+00:00",
       "sensors": [
         "hff_world_model"
       ]
@@ -215,10 +215,10 @@
     "ecosystem": {
       "dimension": "ecosystem",
       "posterior": 0.6667,
-      "evidence_count": 18,
-      "success_count": 18,
-      "confidence": 0.5837,
-      "last_updated": "2026-06-11T09:07:47.072431+00:00",
+      "evidence_count": 20,
+      "success_count": 20,
+      "confidence": 0.6026,
+      "last_updated": "2026-06-12T08:47:19.177805+00:00",
       "sensors": [
         "hff_integration"
       ]
@@ -226,10 +226,10 @@
     "economy": {
       "dimension": "economy",
       "posterior": 0.6667,
-      "evidence_count": 19,
-      "success_count": 19,
-      "confidence": 0.5935,
-      "last_updated": "2026-06-11T09:07:47.072431+00:00",
+      "evidence_count": 21,
+      "success_count": 21,
+      "confidence": 0.6111,
+      "last_updated": "2026-06-12T08:47:19.177805+00:00",
       "sensors": [
         "wallet_ledger",
         "cash_loop"
@@ -237,11 +237,11 @@
     },
     "culture": {
       "dimension": "culture",
-      "posterior": 0.6664,
-      "evidence_count": 19,
-      "success_count": 18,
-      "confidence": 0.5934,
-      "last_updated": "2026-06-11T09:07:47.072431+00:00",
+      "posterior": 0.6665,
+      "evidence_count": 21,
+      "success_count": 20,
+      "confidence": 0.6111,
+      "last_updated": "2026-06-12T08:47:19.177805+00:00",
       "sensors": [
         "lore",
         "three_doors"
@@ -2497,6 +2497,266 @@
       "confidence": 0.95,
       "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
       "projected_at": "2026-06-11T09:07:47.061962+00:00"
+    },
+    {
+      "artifact_id": "test-artifact",
+      "projected_coordinate": {
+        "x": "apps",
+        "y": "product",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=2, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "status-cube-module",
+      "projected_coordinate": {
+        "x": "repo",
+        "y": "control",
+        "z": "candidate",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.4,
+      "rationale": "Current boundary=candidate, evidence_passes=0, projected to candidate",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-apps",
+      "projected_coordinate": {
+        "x": "apps",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-skills",
+      "projected_coordinate": {
+        "x": "skills",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-scripts",
+      "projected_coordinate": {
+        "x": "scripts",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-docs",
+      "projected_coordinate": {
+        "x": "docs",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-archive",
+      "projected_coordinate": {
+        "x": "archive",
+        "y": "control",
+        "z": "candidate",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.3,
+      "rationale": "Current boundary=held, evidence_passes=0, projected to candidate",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-data",
+      "projected_coordinate": {
+        "x": "data",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "location-surfaces",
+      "projected_coordinate": {
+        "x": "surfaces",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "three-doors-game",
+      "projected_coordinate": {
+        "x": "apps",
+        "y": "product",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:46:53.514059+00:00"
+    },
+    {
+      "artifact_id": "test-artifact",
+      "projected_coordinate": {
+        "x": "apps",
+        "y": "product",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=2, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.159485+00:00"
+    },
+    {
+      "artifact_id": "status-cube-module",
+      "projected_coordinate": {
+        "x": "repo",
+        "y": "control",
+        "z": "candidate",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.4,
+      "rationale": "Current boundary=candidate, evidence_passes=0, projected to candidate",
+      "projected_at": "2026-06-12T08:47:19.159485+00:00"
+    },
+    {
+      "artifact_id": "location-apps",
+      "projected_coordinate": {
+        "x": "apps",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.159485+00:00"
+    },
+    {
+      "artifact_id": "location-skills",
+      "projected_coordinate": {
+        "x": "skills",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.159485+00:00"
+    },
+    {
+      "artifact_id": "location-scripts",
+      "projected_coordinate": {
+        "x": "scripts",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.159485+00:00"
+    },
+    {
+      "artifact_id": "location-docs",
+      "projected_coordinate": {
+        "x": "docs",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.159485+00:00"
+    },
+    {
+      "artifact_id": "location-archive",
+      "projected_coordinate": {
+        "x": "archive",
+        "y": "control",
+        "z": "candidate",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.3,
+      "rationale": "Current boundary=held, evidence_passes=0, projected to candidate",
+      "projected_at": "2026-06-12T08:47:19.160594+00:00"
+    },
+    {
+      "artifact_id": "location-data",
+      "projected_coordinate": {
+        "x": "data",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.160594+00:00"
+    },
+    {
+      "artifact_id": "location-surfaces",
+      "projected_coordinate": {
+        "x": "surfaces",
+        "y": "control",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.160594+00:00"
+    },
+    {
+      "artifact_id": "three-doors-game",
+      "projected_coordinate": {
+        "x": "apps",
+        "y": "product",
+        "z": "proven",
+        "t": "1w"
+      },
+      "horizon": "1w",
+      "confidence": 0.95,
+      "rationale": "Current boundary=proven, evidence_passes=0, projected to proven",
+      "projected_at": "2026-06-12T08:47:19.160594+00:00"
     }
   ],
   "last_navigated": "repo:control::"
