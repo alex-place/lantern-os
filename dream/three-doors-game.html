@@ -660,17 +660,25 @@ function validateProgress(data) {
   if (!Array.isArray(validated.visited)) validated.visited = [];
   if (!Array.isArray(validated.completedChallenges)) validated.completedChallenges = [];
   
-  // Validate objects
-  if (typeof validated.sceneVisits !== "object") validated.sceneVisits = {};
+  // Validate objects (check for null and non-object types)
+  if (typeof validated.sceneVisits !== "object" || validated.sceneVisits === null || Array.isArray(validated.sceneVisits)) {
+    validated.sceneVisits = {};
+  }
   
   // Validate booleans
   if (typeof validated.poemSolved !== "boolean") validated.poemSolved = false;
   if (typeof validated.loopCompleted !== "boolean") validated.loopCompleted = false;
   
   // Validate numbers
-  if (typeof validated.poemAttempts !== "number") validated.poemAttempts = 0;
-  if (typeof validated.loop_count !== "number") validated.loop_count = 0;
-  if (typeof validated.stage_index !== "number") validated.stage_index = 0;
+  if (typeof validated.poemAttempts !== "number" || isNaN(validated.poemAttempts)) validated.poemAttempts = 0;
+  if (typeof validated.loop_count !== "number" || isNaN(validated.loop_count)) validated.loop_count = 0;
+  if (typeof validated.stage_index !== "number" || isNaN(validated.stage_index)) validated.stage_index = 0;
+  
+  // Validate challenge-specific numbers
+  if (typeof validated.shiniesFound !== "number" || isNaN(validated.shiniesFound)) validated.shiniesFound = 0;
+  if (typeof validated.futurePathsVisited !== "number" || isNaN(validated.futurePathsVisited)) validated.futurePathsVisited = 0;
+  if (typeof validated.glitchesFound !== "number" || isNaN(validated.glitchesFound)) validated.glitchesFound = 0;
+  if (typeof validated.sigilLocationsVisited !== "number" || isNaN(validated.sigilLocationsVisited)) validated.sigilLocationsVisited = 0;
   
   return validated;
 }

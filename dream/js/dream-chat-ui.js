@@ -1,0 +1,511 @@
+// ── Personal Cube Integration ────────────────────────────────────────────────
+let personalContext = null;
+
+function sanitizePersonalContext(context) {
+  if (!context || typeof context !== 'object') return {};
+  const allowedFields = ['github', 'providers', 'environment', 'priorities', 'timestamp'];
+  const sanitized = {};
+  for (const field of allowedFields) {
+    if (context[field] !== undefined) sanitized[field] = context[field];
+  }
+  delete sanitized.error;
+  return sanitized;
+}
+
+async function loadPersonalCube() {
+  try {
+    const resp = await fetch('/api/cubes/alex/personal');
+    if (resp.ok) {
+      personalContext = await resp.json();
+      updatePersonalInsights(personalContext);
+    } else {
+      personalContext = { error: 'API unavailable', timestamp: new Date().toISOString() };
+    }
+  } catch (e) {
+    personalContext = { error: 'Network error', timestamp: new Date().toISOString() };
+  }
+}
+
+function updatePersonalInsights(cube) {
+  const githubBadge = document.getElementById('github-status-badge');
+  if (githubBadge && cube.github) {
+    const openIssues = cube.github.issues?.filter(i => i.state === 'open').length || 0;
+    const openPRs = cube.github.prs?.filter(p => p.state === 'open').length || 0;
+    githubBadge.textContent = `GitHub: ${openIssues} issues, ${openPRs} PRs`;
+    githubBadge.style.display = 'block';
+  }
+  if (cube.providers) {
+    for (const [provider, status] of Object.entries(cube.providers)) {
+      const indicator = document.getElementById(`provider-${provider}-status`);
+      if (indicator) {
+        indicator.className = status.configured ? 'status-indicator ok' : 'status-indicator err';
+        indicator.textContent = status.configured ? '✓' : '✗';
+      }
+    }
+  }
+  if (cube.environment) {
+    const envStatus = document.getElementById('environment-status');
+    if (envStatus) {
+      const serverStatus = cube.environment.server?.running ? 'Running' : 'Stopped';
+      const gitStatus = cube.environment.git?.isDirty ? 'Dirty' : 'Clean';
+      envStatus.textContent = `Env: ${serverStatus}, Git: ${gitStatus}`;
+    }
+  }
+  if (cube.priorities && cube.priorities.nextActions) {
+    const prioritiesPanel = document.getElementById('priorities-panel');
+    if (prioritiesPanel) {
+      prioritiesPanel.innerHTML = cube.priorities.nextActions.map(p =>
+        `<div class="priority-item">
+          <span class="priority-badge ${p.priority}">${p.priority}</span>
+          <span class="priority-title">#${p.number}: ${p.title}</span>
+        </div>`
+      ).join('');
+    }
+  }
+}
+
+loadPersonalCube();
+setInterval(loadPersonalCube, 300000);
+
+// ── Modal controls ────────────────────────────────────────────────────────────
+function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+
+function startVoiceInput() {
+  if (!window.voiceMode || !window.recognition) return;
+  try { window.recognition.start(); } catch (e) { console.error('Failed to start recognition:', e); }
+}
+
+// ── Cube delta writer ─────────────────────────────────────────────────────────
+async function writeCubeDelta(eventType, symbols, payloadRef) {
+  try {
+    await fetch('/api/cubes/alex/delta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_surface: 'journal',
+        event_type: eventType,
+        symbols: symbols || [],
+        payload_ref: payloadRef || '',
+      }),
+    });
+  } catch (e) { /* silent — cube is best-effort */ }
+}
+
+// ── Connector sidecar ─────────────────────────────────────────────────────────
+function focusKey(inputId) {
+  const el = document.getElementById(inputId);
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+}
+
+async function updateConnectorStatuses() {
+  try {
+    const r = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
+    const mcpStatus = document.getElementById('mcp-status');
+    const mcpBtn = document.getElementById('mcp-btn');
+    if (r.ok) {
+      mcpStatus.textContent = 'Connected';
+      mcpStatus.className = 'connector-card-status ok';
+      mcpBtn.textContent = 'Disconnect';
+      mcpBtn.onclick = disconnectMcp;
+      mcpBtn.classList.remove('primary');
+    } else { throw new Error('HTTP ' + r.status); }
+  } catch (e) {
+    const mcpStatus = document.getElementById('mcp-status');
+    const mcpBtn = document.getElementById('mcp-btn');
+    if (mcpStatus) { mcpStatus.textContent = 'Disconnected'; mcpStatus.className = 'connector-card-status pending'; }
+    if (mcpBtn) { mcpBtn.textContent = 'Connect'; mcpBtn.onclick = connectMcp; mcpBtn.classList.add('primary'); }
+  }
+
+  const providers = [
+    { key: 'ANTHROPIC_API_KEY', id: 'claude' },
+    { key: 'GEMINI_API_KEY', id: 'gemini' },
+    { key: 'OPENAI_API_KEY', id: 'openai' },
+    { key: 'XAI_API_KEY', id: 'grok' },
+  ];
+  for (const p of providers) {
+    const hasKey = !!localStorage.getItem(p.key);
+    const badge = document.getElementById('conn-status-' + p.id);
+    const input = document.getElementById('key-' + p.id);
+    if (badge) {
+      if (hasKey || (input && input.value.length > 0)) {
+        badge.textContent = 'Ready'; badge.className = 'connector-card-status ok';
+      } else {
+        badge.textContent = 'No key'; badge.className = 'connector-card-status err';
+      }
+    }
+  }
+}
+
+async function connectMcp() {
+  const mcpStatus = document.getElementById('mcp-status');
+  const mcpBtn = document.getElementById('mcp-btn');
+  mcpStatus.textContent = 'Connecting…';
+  mcpStatus.className = 'connector-card-status pending';
+  mcpBtn.disabled = true;
+  try {
+    const health = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
+    if (!health.ok) throw new Error('MCP server not responding');
+    const width = 500, height = 600;
+    const left = (screen.width - width) / 2, top = (screen.height - height) / 2;
+    const popup = window.open(
+      'http://127.0.0.1:8772/oauth/register?client_name=LanternOSJournal&redirect_uri=http://127.0.0.1:4177/oauth/callback',
+      'mcpOAuth', `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+    );
+    const checkClosed = setInterval(() => {
+      if (popup.closed) { clearInterval(checkClosed); updateConnectorStatuses(); mcpBtn.disabled = false; }
+    }, 500);
+  } catch (e) {
+    mcpStatus.textContent = 'Error'; mcpStatus.className = 'connector-card-status err';
+    mcpBtn.disabled = false;
+    alert('MCP connection failed: ' + e.message);
+  }
+}
+
+function disconnectMcp() {
+  localStorage.removeItem('MCP_OAUTH_TOKEN');
+  updateConnectorStatuses();
+}
+
+async function testWebSearch() {
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = 'Testing…'; btn.disabled = true;
+  try {
+    const r = await fetch('http://127.0.0.1:8772/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'Lantern OS', max_results: 3 } } }),
+    });
+    const data = await r.json();
+    if (data.result && data.result.success) {
+      alert('Web search works! Found ' + data.result.result_count + ' results.\nTop: ' + (data.result.results[0]?.title || '?'));
+    } else {
+      alert('Web search returned: ' + (data.result?.error || 'unknown error'));
+    }
+  } catch (e) { alert('Web search test failed: ' + e.message); }
+  finally { btn.textContent = original; btn.disabled = false; }
+}
+
+// Refresh connector statuses when settings opens
+const _origOpenSettings = openSettings;
+openSettings = function() { _origOpenSettings(); updateConnectorStatuses(); };
+
+// ── Markdown + PR link renderer ───────────────────────────────────────────────
+function renderMarkdown(text) {
+  let h = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
+  h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
+  h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(
+    /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)/g,
+    '<a href="https://github.com/$1/$2/pull/$3" target="_blank" rel="noopener" class="pr-pill">🔗 PR #$3 — $1/$2 →</a>'
+  );
+  h = h.replace(
+    /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/(\d+)/g,
+    '<a href="https://github.com/$1/$2/issues/$3" target="_blank" rel="noopener" class="issue-pill">⚑ Issue #$3 — $1/$2 →</a>'
+  );
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+
+// ── Conversation state ────────────────────────────────────────────────────────
+let isSending = false;
+const history = [];
+
+const FALLBACKS = [
+  "No AI providers are set up. Add an API key in Settings (⚙) to get started.",
+  "All providers offline. Check Settings to add an API key or start a local model.",
+  "Connection quiet. Try again in a moment, or check Settings for API keys.",
+  "No provider answered. Open Settings (⚙) to configure Gemini, Claude, or OpenAI.",
+  "AI unavailable. Add a provider key in Settings, or run: ollama serve for local mode.",
+];
+
+// ── Quick-start chip helpers ──────────────────────────────────────────────────
+function fillPrompt(text) {
+  const input = document.getElementById('input');
+  input.value = text; input.focus();
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+}
+
+function fillAndSend(text) {
+  const input = document.getElementById('input');
+  input.value = text;
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+  sendMessage();
+}
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+function hideEmptyState() {
+  const el = document.getElementById('empty-state');
+  if (el) el.style.display = 'none';
+}
+
+function addUserBubble(text) {
+  hideEmptyState();
+  const container = document.getElementById('messages');
+  const msg = document.createElement('div');
+  msg.className = 'message user';
+  msg.innerHTML = `<div class="message-content">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function createAgentBubble(isError) {
+  const container = document.getElementById('messages');
+  const msg = document.createElement('div');
+  msg.className = 'message agent' + (isError ? ' error' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'message-content';
+  const cursor = document.createElement('span');
+  cursor.className = 'stream-cursor';
+  bubble.appendChild(cursor);
+  msg.appendChild(bubble);
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return { msg, bubble, cursor };
+}
+
+// ── Main send ─────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('input');
+  const text = input.value.trim();
+  if (!text || isSending) return;
+
+  // Three-doors game — bypass normal chat stream
+  const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i);
+  if (kingdomeMatch) {
+    hideEmptyState();
+    input.value = '';
+    startThreeDoors();
+    return;
+  }
+
+  isSending = true;
+  document.getElementById('send-btn').disabled = true;
+
+  addUserBubble(text);
+  input.value = '';
+  input.style.height = 'auto';
+  history.push({ role: 'user', text });
+  writeCubeDelta('chat_message', [], 'conversation:' + Date.now());
+
+  const { msg, bubble, cursor } = createAgentBubble(false);
+  const container = document.getElementById('messages');
+
+  let fullText = '';
+  let serverErrorText = '';
+  let didError = false;
+  let routeLabel = '';
+  let routeDecision = null;
+
+  try {
+    const routeResp = await fetch('/api/dream/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (routeResp.ok) routeDecision = (await routeResp.json()).route;
+  } catch (e) { /* route card is best-effort */ }
+
+  if (routeDecision) {
+    const card = document.createElement('div');
+    card.className = 'route-card';
+    const wait = routeDecision.requires_convergence ? 'Waiting for result' : 'Direct route';
+    card.textContent = `Routing to ${routeDecision.agent} - ${wait}`;
+    bubble.insertBefore(card, cursor);
+  }
+
+  try {
+    const provider = document.getElementById('provider-select')?.value || '';
+    const resp = await fetch('/api/dream/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        user: 'dream-chat',
+        agent: '',
+        provider,
+        history: history.slice(-10),
+        personalContext: sanitizePersonalContext(personalContext || {}),
+        routeIntent: routeDecision?.intent || '',
+      }),
+      signal: AbortSignal.timeout(90000),
+    });
+
+    if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === 'token' && evt.text) {
+            fullText += evt.text;
+            cursor.remove();
+            bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
+            bubble.appendChild(cursor);
+            container.scrollTop = container.scrollHeight;
+          } else if (evt.type === 'error') {
+            didError = true;
+            if (evt.text) serverErrorText = evt.text;
+            if (!fullText) bubble.style.color = 'var(--muted)';
+          } else if (evt.type === 'done') {
+            if (evt.cleanText) fullText = evt.cleanText;
+            if (evt.routeLabel) routeLabel = evt.routeLabel;
+          }
+        } catch { /* skip malformed line */ }
+      }
+    }
+  } catch (e) { didError = true; }
+
+  cursor.remove();
+
+  if (!fullText) {
+    fullText = serverErrorText || FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
+    msg.classList.add('error');
+    bubble.style.color = 'var(--muted)';
+    bubble.style.fontStyle = 'italic';
+  }
+
+  bubble.innerHTML = renderMarkdown(fullText);
+
+  if (routeLabel) {
+    const sig = document.createElement('div');
+    sig.className = 'msg-route-sig';
+    sig.setAttribute('aria-label', `Active route: ${routeLabel}`);
+    sig.textContent = routeLabel;
+    msg.appendChild(sig);
+  }
+
+  if (!didError) history.push({ role: 'assistant', text: fullText });
+
+  isSending = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ── Auto-expand textarea ──────────────────────────────────────────────────────
+document.getElementById('input').addEventListener('input', e => {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+});
+
+// ── Observer side panel ───────────────────────────────────────────────────────
+function toggleObserver() {
+  const panel = document.getElementById('observer-panel');
+  const btn = document.getElementById('observer-toggle-btn');
+  const collapsed = panel.classList.toggle('collapsed');
+  if (btn) btn.classList.toggle('active', !collapsed);
+  if (!collapsed) refreshObserver();
+}
+
+function refreshObserver() {
+  fetch('/api/csf/stats').then(r => r.ok ? r.json() : null).then(data => {
+    if (!data) return;
+    const symList = document.getElementById('obs-symbols');
+    if (data.top10 && data.top10.length > 0) {
+      symList.innerHTML = data.top10.slice(0, 8).map(s =>
+        `<span class="obs-symbol-chip${s.count >= 3 ? ' hot' : ''}">${s.token} ×${s.count}</span>`
+      ).join('');
+    } else { symList.textContent = 'none yet'; }
+    document.getElementById('obs-dilation').textContent =
+      data.delta_count ? `${data.delta_count} entries` : '—';
+  }).catch(() => {});
+
+  fetch('/api/csf/deltas?limit=5').then(r => r.ok ? r.json() : null).then(data => {
+    if (!data || !data.length) return;
+    const last = data[data.length - 1];
+    const moods = data.filter(d => d.mood_abs != null).map(d => d.mood_abs);
+    if (moods.length >= 2) {
+      const first = moods[0], latest = moods[moods.length - 1];
+      const diff = latest - first;
+      const label = Math.abs(diff) < 0.1 ? 'stable' : diff > 0 ? '↑ rising' : '↓ falling';
+      document.getElementById('obs-mood-arc').textContent = `${label} (${first.toFixed(1)} → ${latest.toFixed(1)})`;
+      document.getElementById('obs-mood-fill').style.width = `${Math.round(latest * 100)}%`;
+    }
+    const deltaLines = [];
+    if (last.symbols_added?.length) deltaLines.push(`+symbols: ${last.symbols_added.slice(0,3).join(', ')}`);
+    if (last.tags_added?.length) deltaLines.push(`+tags: ${last.tags_added.slice(0,3).join(', ')}`);
+    if (last.mood_delta != null && Math.abs(last.mood_delta) >= 0.05)
+      deltaLines.push(`mood ${last.mood_delta > 0 ? '+' : ''}${last.mood_delta}`);
+    document.getElementById('obs-last-delta').textContent = deltaLines.join(' · ') || 'no change';
+    if (last.convergence != null) {
+      const pct = Math.round(last.convergence * 100);
+      document.getElementById('obs-convergence').textContent = `${pct}%`;
+      document.getElementById('obs-conv-fill').style.width = `${pct}%`;
+    }
+  }).catch(() => {});
+}
+
+setInterval(() => {
+  if (!document.getElementById('observer-panel').classList.contains('collapsed')) refreshObserver();
+}, 30000);
+
+// ── Context management ────────────────────────────────────────────────────────
+let contextMode = { search: true, memory: true, trading: false };
+
+function updateContext() {
+  contextMode = {
+    search: document.getElementById('ctx-search').checked,
+    memory: document.getElementById('ctx-memory').checked,
+    trading: document.getElementById('ctx-trading').checked,
+  };
+  localStorage.setItem('contextMode', JSON.stringify(contextMode));
+}
+
+try {
+  const saved = JSON.parse(localStorage.getItem('contextMode') || '{}');
+  Object.assign(contextMode, saved);
+  document.getElementById('ctx-search').checked = contextMode.search;
+  document.getElementById('ctx-memory').checked = contextMode.memory;
+  document.getElementById('ctx-trading').checked = contextMode.trading;
+} catch (e) {}
+
+// ── Performance monitoring ────────────────────────────────────────────────────
+let perfStats = { totalTokens: 0, totalCost: 0, lastLatency: 0 };
+
+function togglePerfMonitor() {
+  const enabled = document.getElementById('ctx-perf').checked;
+  document.getElementById('perf-monitor').style.display = enabled ? 'block' : 'none';
+  localStorage.setItem('perfMonitorEnabled', enabled);
+}
+
+const perfEnabled = localStorage.getItem('perfMonitorEnabled') === 'true';
+if (perfEnabled) {
+  document.getElementById('ctx-perf').checked = true;
+  document.getElementById('perf-monitor').style.display = 'block';
+}
+
+function updatePerfStats(tokens, cost, latency) {
+  perfStats.totalTokens += tokens || 0;
+  perfStats.totalCost += cost || 0;
+  perfStats.lastLatency = latency || 0;
+  document.getElementById('perf-tokens').textContent = perfStats.totalTokens.toLocaleString();
+  document.getElementById('perf-cost').textContent = '$' + perfStats.totalCost.toFixed(3);
+  document.getElementById('perf-latency').textContent = perfStats.lastLatency + 'ms';
+}
+
+const origFetch = window.fetch;
+window.fetch = async function(...args) {
+  const startTime = Date.now();
+  const response = await origFetch.apply(this, args);
+  if (args[0] && args[0].includes('dream/chat')) {
+    const latency = Date.now() - startTime;
+    const tokens = parseInt(response.headers?.get('X-Tokens-Used') || '0');
+    const cost = parseFloat(response.headers?.get('X-Cost-Usd') || '0');
+    if (tokens || cost) updatePerfStats(tokens, cost, latency);
+  }
+  return response;
+};

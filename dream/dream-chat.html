@@ -9,596 +9,65 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/dream-chat.css">
+  <link rel="stylesheet" href="/css/dream-chat-ui.css">
   <title>Journal</title>
-  <style>
-    #header-status { font-size: 11px; color: var(--muted); margin-left: 6px; }
-
-    /* Main container */
-    .app {
-      display: flex;
-      flex-direction: row;
-      height: 100vh;
-      width: 100%;
-      overflow: hidden;
-    }
-
-    @media (max-width: 768px) {
-      .app-main { margin-left: 0; }
-      .site-nav { flex-direction: column; padding: 8px; gap: 8px; }
-      .nav-links { display: none; }
-      .nav-actions { flex-direction: column; gap: 4px; }
-      .nav-cta { display: none; }
-      .input-wrapper { flex-direction: column; }
-      .send-button { width: 100%; }
-      .perf-monitor { bottom: 8px; right: 8px; font-size: 10px; padding: 8px 12px; }
-    }
-
-    @media (max-width: 480px) {
-      .chat-container { padding: 12px; }
-      .message-content { max-width: 90%; }
-      .modal-content { margin: 16px; }
-      .input-container { padding: 12px; }
-      .empty-state { padding: 20px; }
-      .empty-state h2 { font-size: 16px; }
-    }
-
-    .app-main {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 0;
-      min-width: 0;
-      overflow: hidden;
-    }
-
-    /* Messages area - clean and spacious */
-    .chat-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .empty-state {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      gap: 20px;
-      padding: 40px;
-    }
-    .empty-icon { font-size: 48px; opacity: 0.5; }
-    .empty-state h2 {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .empty-state p {
-      color: var(--muted);
-      max-width: 300px;
-      line-height: 1.5;
-    }
-
-    /* Message bubbles */
-    .message {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 4px;
-      animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .message.user { justify-content: flex-end; }
-    .message-content {
-      max-width: 70%;
-      padding: 10px 14px;
-      border-radius: 12px;
-      line-height: 1.5;
-      word-wrap: break-word;
-    }
-    .message.user .message-content {
-      background: var(--accent);
-      color: white;
-    }
-    .message.agent .message-content {
-      background: var(--surface2);
-      color: var(--text);
-    }
-
-    /* Input area - modern and prominent */
-    .input-container {
-      padding: 16px 20px 20px;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-      flex-shrink: 0;
-    }
-    .input-wrapper {
-      display: flex;
-      gap: 8px;
-      align-items: flex-end;
-    }
-
-    .input-field {
-      flex: 1;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 11px 14px;
-      color: var(--text);
-      font-size: 15px;
-      font-family: inherit;
-      outline: none;
-      transition: all 0.2s;
-      resize: none;
-      max-height: 100px;
-    }
-    .input-field:focus {
-      border-color: var(--accent);
-      background: var(--surface2);
-    }
-    .input-field::placeholder { color: var(--muted); }
-    .send-button {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      border: none;
-      background: var(--accent);
-      color: white;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
-      flex-shrink: 0;
-      font-size: 18px;
-    }
-    .send-button:hover { background: var(--accent-hover); }
-    .send-button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* Performance monitor */
-    .perf-monitor {
-      position: fixed;
-      bottom: 16px;
-      right: 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 11px;
-      color: var(--muted);
-      max-width: 200px;
-      z-index: 999;
-      opacity: 0.7;
-      transition: opacity 0.2s;
-    }
-    .perf-monitor:hover { opacity: 1; }
-    .perf-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin: 2px 0;
-    }
-    .perf-label { font-weight: 600; }
-    .perf-value { text-align: right; color: var(--text); }
-
-    /* Modal overlays */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: flex-end;
-      z-index: 100;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-    }
-    .modal-overlay.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .modal-content {
-      width: 100%;
-      max-width: 600px;
-      background: var(--surface);
-      border-radius: 16px 16px 0 0;
-      max-height: 80vh;
-      overflow-y: auto;
-      margin-left: auto;
-      margin-right: auto;
-      transform: translateY(100%);
-      transition: transform 0.3s ease;
-    }
-    .modal-overlay.open .modal-content {
-      transform: translateY(0);
-    }
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px;
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      background: var(--surface);
-    }
-    .modal-header h2 {
-      font-size: 18px;
-      font-weight: 600;
-    }
-    .modal-close {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
-    }
-    .modal-close:hover {
-      background: var(--surface2);
-      color: var(--text);
-    }
-    .modal-body {
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    /* Form elements */
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .form-label {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .form-input {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      outline: none;
-      transition: all 0.2s;
-    }
-    .form-input:focus {
-      border-color: var(--accent);
-    }
-    .form-input::placeholder { color: var(--muted); }
-
-    /* Settings card */
-    .setting-card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .setting-card-icon { font-size: 20px; }
-    .setting-card-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .setting-card-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text);
-    }
-    .setting-card-status {
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .setting-card-status.ok { color: #34d399; }
-    .setting-card-status.err { color: var(--accent); }
-
-    /* Button styles */
-    .button-primary {
-      background: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .button-primary:hover { background: var(--accent-hover); }
-    .button-secondary {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .button-secondary:hover {
-      border-color: var(--text);
-      color: var(--text);
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-    /* Streaming cursor */
-    .stream-cursor {
-      display: inline-block; width: 2px; height: 1em;
-      background: var(--accent); margin-left: 2px;
-      vertical-align: text-bottom;
-      animation: blink 0.7s step-end infinite;
-    }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-
-    /* Quick-start chips */
-    .starter-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
-    .starter-chip {
-      background: var(--surface2); border: 1px solid var(--border);
-      color: var(--muted); font-size: 0.82rem; font-family: inherit;
-      padding: 6px 14px; border-radius: 20px; cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .starter-chip:hover { border-color: var(--accent); color: var(--text); }
-
-    /* Error / muted agent text */
-    .message.agent.error .message-content { color: var(--muted); font-style: italic; }
-
-    /* TTS word highlighting */
-    .tts-word { border-radius: 2px; transition: background 0.08s; }
-    .tts-active { background: rgba(255, 220, 50, 0.22); }
-
-    /* Personal insights styles */
-    .status-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 4px;
-    }
-    .status-indicator.ok { background: #34d399; }
-    .status-indicator.err { background: var(--accent); }
-    .status-indicator.pending { background: #fbbf24; }
-
-    .priority-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px;
-      background: var(--surface2);
-      border-radius: 6px;
-      margin-bottom: 4px;
-    }
-    .priority-badge {
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 4px;
-      text-transform: uppercase;
-    }
-    .priority-badge.p0 { background: var(--accent); color: white; }
-    .priority-badge.p1 { background: #fbbf24; color: black; }
-    .priority-badge.p2 { background: #34d399; color: white; }
-    .priority-badge.p3 { background: var(--muted); color: var(--text); }
-    .priority-title {
-      font-size: 12px;
-      color: var(--text);
-      flex: 1;
-    }
-
-    /* Connector sidecar */
-    .connector-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .connector-card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: border-color 0.15s;
-    }
-    .connector-card:hover { border-color: var(--accent); }
-    .connector-card-icon { font-size: 20px; width: 28px; text-align: center; }
-    .connector-card-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-    .connector-card-title { font-size: 14px; font-weight: 500; color: var(--text); }
-    .connector-card-meta { font-size: 11px; color: var(--muted); }
-    .connector-card-status {
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 8px;
-      border-radius: 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      white-space: nowrap;
-    }
-    .connector-card-status.ok { color: #34d399; border-color: #34d39933; background: #34d39911; }
-    .connector-card-status.err { color: var(--accent); border-color: var(--accent)33; background: var(--accent)11; }
-    .connector-card-status.pending { color: #fbbf24; border-color: #fbbf2433; background: #fbbf2411; }
-    .connector-btn {
-      font-size: 12px;
-      padding: 6px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-    .connector-btn:hover { border-color: var(--accent); color: var(--text); }
-    .connector-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
-    .connector-btn.primary:hover { background: var(--accent-hover); }
-
-    /* Message footer: source · latency · turn */
-    .msg-footer {
-      font-size: 0.67rem;
-      color: var(--muted);
-      padding: 0 4px;
-      align-self: flex-start;
-      opacity: 0.65;
-      letter-spacing: 0.02em;
-    }
-    .msg-footer.offline { opacity: 0.45; }
-    .msg-footer.anthropic { color: var(--accent); opacity: 0.8; }
-    .msg-footer.ollama { color: #4ade80; opacity: 0.8; }
-    .msg-footer.grok { color: #e2c97e; opacity: 0.8; }
-    .msg-footer.gemini { color: #4fc3f7; opacity: 0.8; }
-    /* Route signature: who/what the user is talking to */
-    .msg-route-sig {
-      font-size: 0.68rem;
-      color: var(--accent, #e2c97e);
-      opacity: 0.7;
-      padding: 2px 4px;
-      align-self: flex-start;
-      letter-spacing: 0.04em;
-    }
-    /* Routing card: shown in bubble while backend delegates */
-    .route-card {
-      font-size: 0.75rem;
-      color: var(--accent-dim, #a08840);
-      opacity: 0.8;
-      padding: 2px 0 4px;
-      font-style: italic;
-      letter-spacing: 0.02em;
-    }
-    /* Heartbeat animation for mandala in simple mode */
-    @keyframes heartbeat {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.15); opacity: 0.8; }
-    }
-  </style>
 </head>
 <body>
 <div class="app">
   <div class="app-main">
-  <!-- Header -->
-  <nav class="site-nav">
-    <a class="nav-brand" href="/">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-      <span style="font-size:18px;font-weight:600">Lantern OS</span>
-    </a>
-    <div class="nav-links">
-      <a href="/dream-chat.html" class="active" style="font-size:16px;padding:12px 16px">💬 Chat</a>
-      <a href="/three-doors-game.html" style="font-size:16px;padding:12px 16px">🚪 Explore</a>
-      <a href="/flourishing" style="font-size:16px;padding:12px 16px">📊 Dashboard</a>
-    </div>
-    <div class="nav-actions">
-      <button class="nav-btn" id="simple-mode-btn" onclick="toggleSimpleMode()" title="Simple Mode" style="font-size:20px;padding:8px 12px">👶</button>
-      <button class="nav-btn" id="voice-btn" onclick="toggleVoice()" title="Voice Mode" style="font-size:20px;padding:8px 12px">🎙️</button>
-      <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
-    </div>
-  </nav>
 
-  <!-- Chat area -->
-  <div class="chat-container" id="messages" role="log" aria-label="Conversation messages" aria-live="polite">
-    <div class="empty-state" id="empty-state">
-      <div style="text-align:center;padding:40px 20px">
-        <div style="font-size:64px;margin-bottom:16px">🏮</div>
-        <h1 style="font-size:28px;font-weight:600;margin-bottom:8px;color:var(--text)">Welcome to Lantern OS</h1>
-        <p style="font-size:15px;color:var(--muted);max-width:400px;margin:0 auto 24px">Your cockpit for helping others. Write a reflection, ask a question, or help someone with their challenges.</p>
-        
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
-          <button onclick="fillPrompt('Today I noticed that ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-            <span style="font-size:24px">📝</span>
-            <span>Record a thought</span>
-          </button>
-          <button onclick="fillPrompt('I keep thinking about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-            <span style="font-size:24px">🔄</span>
-            <span>Explore thoughts</span>
-          </button>
-          <button onclick="fillPrompt('What do you know about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-            <span style="font-size:24px">✨</span>
-            <span>Ask a question</span>
-          </button>
-          <button onclick="fillAndSend('!explore')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#a78bfa';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'" title="Start interactive story">
-            <span style="font-size:24px">🚪</span>
-            <span>Start a story</span>
-          </button>
-        </div>
-        
-        <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border)">
-          <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Help Someone Else</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
-            <button onclick="fillPrompt('Help me help my grandkid with homework')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
-              <span style="font-size:24px">👶</span>
-              <span>Help with homework</span>
-            </button>
-            <button onclick="fillPrompt('Help me help my neighbor with tech problems')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
-              <span style="font-size:24px">🤝</span>
-              <span>Help with tech</span>
-            </button>
-            <button onclick="fillPrompt('Help me help a friend learn to code')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
-              <span style="font-size:24px">💻</span>
-              <span>Teach coding</span>
-            </button>
-          </div>
-        </div>
-        
-        <div style="margin-top:24px">
-          <button onclick="toggleTradingSection()" id="trading-toggle" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:8px 16px;border-radius:20px;transition:all 0.2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
-            <span id="trading-toggle-text">Show Trading & Markets</span> <span id="trading-toggle-icon">▼</span>
-          </button>
-          <div id="trading-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
-              <button onclick="fillPrompt('Buy 10 shares of AAPL')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#10b981';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-                <span style="font-size:24px">💰</span>
-                <span>Execute a trade</span>
-              </button>
-              <button onclick="fillPrompt('Check my portfolio')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#3b82f6';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-                <span style="font-size:24px">📊</span>
-                <span>View portfolio</span>
-              </button>
-              <button onclick="fillPrompt('What are the trading signals for today?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-                <span style="font-size:24px">📈</span>
-                <span>Trading signals</span>
-              </button>
-              <button onclick="fillPrompt('What is the market status?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
-                <span style="font-size:24px">🌐</span>
-                <span>Market status</span>
-              </button>
-            </div>
+    <!-- Header -->
+    <nav class="site-nav">
+      <a class="nav-brand" href="/">
+        <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+        <span style="font-size:18px;font-weight:600">Lantern OS</span>
+      </a>
+      <div class="nav-links">
+        <a href="/dream-chat.html" class="active" style="font-size:16px;padding:12px 16px">💬 Chat</a>
+        <a href="/three-doors-game.html" style="font-size:16px;padding:12px 16px">🚪 Explore</a>
+        <a href="/flourishing" style="font-size:16px;padding:12px 16px">📊 Dashboard</a>
+      </div>
+      <div class="nav-actions">
+        <button class="nav-btn" id="voice-btn" onclick="
+          if (!window.voiceMode) window.voiceMode = false;
+          window.voiceMode = !window.voiceMode;
+          this.style.opacity = window.voiceMode ? '1' : '0.5';
+          this.style.background = window.voiceMode ? 'rgba(161,139,250,0.2)' : 'transparent';
+          this.style.border = window.voiceMode ? '2px solid #a78bfa' : 'none';
+          const voiceInputBtn = document.getElementById('voice-input-btn');
+          if (voiceInputBtn) voiceInputBtn.style.display = window.voiceMode ? 'block' : 'none';
+        " title="Voice Mode" style="font-size:20px;padding:8px 12px">🎙️</button>
+        <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
+      </div>
+    </nav>
+
+    <!-- Chat area -->
+    <div class="chat-container" id="messages" role="log" aria-label="Conversation messages" aria-live="polite">
+      <div class="empty-state" id="empty-state">
+        <div style="text-align:center;padding:40px 20px">
+          <div style="font-size:48px;margin-bottom:12px">🏮</div>
+          <h1 style="font-size:26px;font-weight:600;margin-bottom:6px;color:var(--text)">Keystone Desk</h1>
+          <p style="font-size:14px;color:var(--muted);max-width:340px;margin:0 auto 28px;line-height:1.5">Route work to Keystone, Lantern, or Founder — or just ask anything.</p>
+          <div class="starter-chips">
+            <button class="starter-chip" onclick="fillPrompt('What open GitHub issues should I tackle first?')">Open issues?</button>
+            <button class="starter-chip" onclick="fillPrompt('Help me plan what to work on today')">Plan today</button>
+            <button class="starter-chip" onclick="fillPrompt('Summarize open pull requests that need review')">Review PRs</button>
+            <button class="starter-chip" onclick="fillPrompt('What is the current agent fleet status and what are they working on?')">Agent status</button>
+            <button class="starter-chip" onclick="fillAndSend('!explore')">Explore ↗</button>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Input area -->
-  <div class="input-container">
-    <div class="input-wrapper">
-      <button id="voice-input-btn" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
-      <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
-      <button class="send-button" id="send-btn" onclick="sendMessage()" title="Send">↑</button>
+    <!-- Input area -->
+    <div class="input-container">
+      <div class="input-wrapper">
+        <button id="voice-input-btn" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
+        <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+        <button class="send-button" id="send-btn" onclick="sendMessage()" title="Send">↑</button>
+      </div>
     </div>
-  </div>
+
   </div><!-- /.app-main -->
 
   <!-- Observer side panel -->
@@ -643,18 +112,9 @@
 
 <!-- Performance Monitor -->
 <div class="perf-monitor" id="perf-monitor" style="display:none">
-  <div class="perf-row">
-    <span class="perf-label">Tokens:</span>
-    <span class="perf-value" id="perf-tokens">0</span>
-  </div>
-  <div class="perf-row">
-    <span class="perf-label">Cost:</span>
-    <span class="perf-value" id="perf-cost">$0</span>
-  </div>
-  <div class="perf-row">
-    <span class="perf-label">Latency:</span>
-    <span class="perf-value" id="perf-latency">0ms</span>
-  </div>
+  <div class="perf-row"><span class="perf-label">Tokens:</span><span class="perf-value" id="perf-tokens">0</span></div>
+  <div class="perf-row"><span class="perf-label">Cost:</span><span class="perf-value" id="perf-cost">$0</span></div>
+  <div class="perf-row"><span class="perf-label">Latency:</span><span class="perf-value" id="perf-latency">0ms</span></div>
 </div>
 
 <!-- Settings modal -->
@@ -665,6 +125,7 @@
       <button class="modal-close" onclick="closeSettings()">×</button>
     </div>
     <div class="modal-body">
+
       <div class="form-group">
         <label class="form-label">AI Provider</label>
         <select id="provider-select" class="form-input">
@@ -726,12 +187,11 @@
         <a href="https://console.x.ai" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
       </div>
 
-      <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 0;">
+      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
 
       <div class="form-group">
         <label class="form-label">Connectors</label>
         <div class="connector-grid">
-          <!-- MCP OAuth -->
           <div class="connector-card">
             <span class="connector-card-icon">🔌</span>
             <div class="connector-card-info">
@@ -741,8 +201,6 @@
             <span class="connector-card-status pending" id="mcp-status">Disconnected</span>
             <button class="connector-btn primary" id="mcp-btn" onclick="connectMcp()">Connect</button>
           </div>
-
-          <!-- Web Search -->
           <div class="connector-card">
             <span class="connector-card-icon">🔍</span>
             <div class="connector-card-info">
@@ -752,8 +210,6 @@
             <span class="connector-card-status ok" id="search-status">Ready</span>
             <button class="connector-btn" onclick="testWebSearch()">Test</button>
           </div>
-
-          <!-- Claude -->
           <div class="connector-card">
             <span class="connector-card-icon">✦</span>
             <div class="connector-card-info">
@@ -763,8 +219,6 @@
             <span class="connector-card-status err" id="conn-status-claude">No key</span>
             <button class="connector-btn" onclick="focusKey('key-claude')">Add Key</button>
           </div>
-
-          <!-- Gemini -->
           <div class="connector-card">
             <span class="connector-card-icon">🌐</span>
             <div class="connector-card-info">
@@ -774,8 +228,6 @@
             <span class="connector-card-status err" id="conn-status-gemini">No key</span>
             <button class="connector-btn" onclick="focusKey('key-gemini')">Add Key</button>
           </div>
-
-          <!-- ChatGPT -->
           <div class="connector-card">
             <span class="connector-card-icon">◈</span>
             <div class="connector-card-info">
@@ -785,8 +237,6 @@
             <span class="connector-card-status err" id="conn-status-openai">No key</span>
             <button class="connector-btn" onclick="focusKey('key-openai')">Add Key</button>
           </div>
-
-          <!-- Grok -->
           <div class="connector-card">
             <span class="connector-card-icon">𝕏</span>
             <div class="connector-card-info">
@@ -799,7 +249,7 @@
         </div>
       </div>
 
-      <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 0;">
+      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
 
       <div class="form-group">
         <label class="form-label">Context Modes</label>
@@ -823,719 +273,13 @@
         </div>
       </div>
 
-      <hr style="border: none; border-top: 1px solid var(--border); margin: 8px 0;">
-
-      <div class="form-group">
-        <label class="form-label">Dream Actions</label>
-        <button class="button-primary" onclick="openLogDream()" style="width: 100%;">+ Record a Dream</button>
-      </div>
     </div>
   </div>
 </div>
 
 <script src="js/dream-chat.js?v=20260612"></script>
 <script src="/js/theme-toggle.js"></script>
-<script>
-  // ── Personal Cube Integration ───────────────────────────────────────
-  let personalContext = null;
-
-  async function loadPersonalCube() {
-    try {
-      const resp = await fetch('/api/cubes/alex/personal');
-      if (resp.ok) {
-        personalContext = await resp.json();
-        updatePersonalInsights(personalContext);
-        console.log('[personal-cube] Loaded:', personalContext);
-      }
-    } catch (e) {
-      console.error('[personal-cube] Failed to load:', e);
-    }
-  }
-
-  function updatePersonalInsights(cube) {
-    // Update GitHub status badge
-    const githubBadge = document.getElementById('github-status-badge');
-    if (githubBadge && cube.github) {
-      const openIssues = cube.github.issues?.filter(i => i.state === 'open').length || 0;
-      const openPRs = cube.github.prs?.filter(p => p.state === 'open').length || 0;
-      githubBadge.textContent = `GitHub: ${openIssues} issues, ${openPRs} PRs`;
-      githubBadge.style.display = 'block';
-    }
-
-    // Update provider health indicators
-    if (cube.providers) {
-      for (const [provider, status] of Object.entries(cube.providers)) {
-        const indicator = document.getElementById(`provider-${provider}-status`);
-        if (indicator) {
-          indicator.className = status.configured ? 'status-indicator ok' : 'status-indicator err';
-          indicator.textContent = status.configured ? '✓' : '✗';
-        }
-      }
-    }
-
-    // Update environment status
-    if (cube.environment) {
-      const envStatus = document.getElementById('environment-status');
-      if (envStatus) {
-        const serverStatus = cube.environment.server?.running ? 'Running' : 'Stopped';
-        const gitStatus = cube.environment.git?.isDirty ? 'Dirty' : 'Clean';
-        envStatus.textContent = `Env: ${serverStatus}, Git: ${gitStatus}`;
-      }
-    }
-
-    // Update current priorities
-    if (cube.priorities && cube.priorities.nextActions) {
-      const prioritiesPanel = document.getElementById('priorities-panel');
-      if (prioritiesPanel) {
-        prioritiesPanel.innerHTML = cube.priorities.nextActions.map(p => 
-          `<div class="priority-item">
-            <span class="priority-badge ${p.priority}">${p.priority}</span>
-            <span class="priority-title">#${p.number}: ${p.title}</span>
-          </div>`
-        ).join('');
-      }
-    }
-  }
-
-  // Load personal cube on page load
-  loadPersonalCube();
-  // Refresh personal cube every 5 minutes
-  setInterval(loadPersonalCube, 300000);
-
-  // ── Modal controls ─────────────────────────────────────────────────
-  function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
-  function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
-  function openLogDream() { alert('Log entry coming soon'); closeSettings(); }
-
-  // ── Simple Mode ───────────────────────────────────────────────────
-  let simpleMode = false;
-  function toggleSimpleMode() {
-    simpleMode = !simpleMode;
-    const btn = document.getElementById('simple-mode-btn');
-    btn.style.opacity = simpleMode ? '1' : '0.5';
-    btn.style.background = simpleMode ? 'rgba(52,211,153,0.2)' : 'transparent';
-    btn.style.border = simpleMode ? '2px solid #34d399' : 'none';
-    
-    // Animate mandala heartbeat
-    const mandala = document.querySelector('.nav-brand img');
-    if (mandala) {
-      if (simpleMode) {
-        mandala.style.animation = 'heartbeat 1.5s ease-in-out infinite';
-      } else {
-        mandala.style.animation = '';
-      }
-    }
-    
-    // Hide complex UI elements
-    const observerBtn = document.getElementById('observer-toggle-btn');
-    const themeBtn = document.getElementById('theme-toggle');
-    const headerStatus = document.getElementById('header-status');
-    const githubBadge = document.getElementById('github-status-badge');
-    const envStatus = document.getElementById('environment-status');
-    
-    if (observerBtn) observerBtn.style.display = simpleMode ? 'none' : '';
-    if (themeBtn) themeBtn.style.display = simpleMode ? 'none' : '';
-    if (headerStatus) headerStatus.style.display = simpleMode ? 'none' : '';
-    if (githubBadge) githubBadge.style.display = simpleMode ? 'none' : '';
-    if (envStatus) envStatus.style.display = simpleMode ? 'none' : '';
-    
-    // Simplify starter chips
-    const starterChips = document.getElementById('starter-chips');
-    if (starterChips) {
-      starterChips.style.display = simpleMode ? 'none' : '';
-    }
-    
-    // Show simple mode message
-    if (simpleMode) {
-      const chat = document.getElementById('messages');
-      const el = document.createElement('div');
-      el.className = 'message agent';
-      el.innerHTML = `<div class="agent-avatar">👶</div><div class="message-content" style="background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.3)"><div style="font-size:13px;font-weight:600;color:#34d399;margin-bottom:4px">Simple Mode On</div><div style="font-size:12px">Big buttons, easy to use. Tap 💬 to chat, 🚪 to explore.</div></div>`;
-      chat.appendChild(el);
-      chat.scrollTop = chat.scrollHeight;
-    }
-  }
-
-  // ── Voice Mode ───────────────────────────────────────────────────
-  let voiceMode = false;
-  let recognition = null;
-  function toggleVoice() {
-    voiceMode = !voiceMode;
-    const btn = document.getElementById('voice-btn');
-    const voiceInputBtn = document.getElementById('voice-input-btn');
-    btn.style.opacity = voiceMode ? '1' : '0.5';
-    btn.style.background = voiceMode ? 'rgba(161,139,250,0.2)' : 'transparent';
-    btn.style.border = voiceMode ? '2px solid #a78bfa' : 'none';
-    
-    // Animate mandala heartbeat
-    const mandala = document.querySelector('.nav-brand img');
-    if (mandala) {
-      if (voiceMode) {
-        mandala.style.animation = 'heartbeat 1.5s ease-in-out infinite';
-      } else if (!simpleMode) {
-        mandala.style.animation = '';
-      }
-    }
-    
-    if (voiceMode && !recognition) {
-      // Initialize speech recognition
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
-        
-        recognition.onresult = (event) => {
-          const transcript = event.results[0][0].transcript;
-          const input = document.getElementById('input');
-          if (input) {
-            input.value = transcript;
-            input.focus();
-          }
-        };
-        
-        recognition.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-        };
-      } else {
-        alert('Voice mode not supported in this browser');
-        voiceMode = false;
-        btn.style.opacity = '0.5';
-        return;
-      }
-    }
-    
-    // Show/hide voice input button
-    if (voiceInputBtn) {
-      voiceInputBtn.style.display = voiceMode ? 'block' : 'none';
-    }
-    
-    if (voiceMode) {
-      const chat = document.getElementById('messages');
-      const el = document.createElement('div');
-      el.className = 'message agent';
-      el.innerHTML = `<div class="agent-avatar">🎙️</div><div class="message-content" style="background:rgba(161,139,250,0.08);border-color:rgba(161,139,250,0.3)"><div style="font-size:13px;font-weight:600;color:#a78bfa;margin-bottom:4px">Voice Mode On</div><div style="font-size:12px">Tap the microphone button to speak your message.</div></div>`;
-      chat.appendChild(el);
-      chat.scrollTop = chat.scrollHeight;
-    }
-  }
-
-  function startVoiceInput() {
-    if (!voiceMode || !recognition) return;
-    try {
-      recognition.start();
-    } catch (e) {
-      console.error('Failed to start recognition:', e);
-    }
-  }
-
-  function toggleTradingSection() {
-    const section = document.getElementById('trading-section');
-    const toggleText = document.getElementById('trading-toggle-text');
-    const toggleIcon = document.getElementById('trading-toggle-icon');
-    
-    if (section.style.display === 'none') {
-      section.style.display = 'block';
-      toggleText.textContent = 'Hide Trading & Markets';
-      toggleIcon.textContent = '▲';
-    } else {
-      section.style.display = 'none';
-      toggleText.textContent = 'Show Trading & Markets';
-      toggleIcon.textContent = '▼';
-    }
-  }
-
-  // ── Cube delta writer ────────────────────────────────────────────
-  async function writeCubeDelta(eventType, symbols, payloadRef) {
-    try {
-      await fetch('/api/cubes/alex/delta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source_surface: 'journal',
-          event_type: eventType,
-          symbols: symbols || [],
-          payload_ref: payloadRef || '',
-        }),
-      });
-    } catch (e) { /* silent — cube is best-effort */ }
-  }
-  function saveKey() {}
-
-  // ── Connector sidecar ────────────────────────────────────────────
-  function focusKey(inputId) {
-    const el = document.getElementById(inputId);
-    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
-  }
-
-  async function updateConnectorStatuses() {
-    // Check MCP health
-    try {
-      const r = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
-      const mcpStatus = document.getElementById('mcp-status');
-      const mcpBtn = document.getElementById('mcp-btn');
-      if (r.ok) {
-        const data = await r.json();
-        mcpStatus.textContent = 'Connected';
-        mcpStatus.className = 'connector-card-status ok';
-        mcpBtn.textContent = 'Disconnect';
-        mcpBtn.onclick = disconnectMcp;
-        mcpBtn.classList.remove('primary');
-      } else {
-        throw new Error('HTTP ' + r.status);
-      }
-    } catch (e) {
-      const mcpStatus = document.getElementById('mcp-status');
-      const mcpBtn = document.getElementById('mcp-btn');
-      mcpStatus.textContent = 'Disconnected';
-      mcpStatus.className = 'connector-card-status pending';
-      mcpBtn.textContent = 'Connect';
-      mcpBtn.onclick = connectMcp;
-      mcpBtn.classList.add('primary');
-    }
-
-    // Check API key statuses from localStorage / env
-    const providers = [
-      { key: 'ANTHROPIC_API_KEY', id: 'claude', label: 'Claude' },
-      { key: 'GEMINI_API_KEY', id: 'gemini', label: 'Gemini' },
-      { key: 'OPENAI_API_KEY', id: 'openai', label: 'ChatGPT' },
-      { key: 'XAI_API_KEY', id: 'grok', label: 'Grok' },
-    ];
-    for (const p of providers) {
-      const hasKey = !!localStorage.getItem(p.key);
-      const badge = document.getElementById('conn-status-' + p.id);
-      const input = document.getElementById('key-' + p.id);
-      if (badge) {
-        if (hasKey || (input && input.value.length > 0)) {
-          badge.textContent = 'Ready';
-          badge.className = 'connector-card-status ok';
-        } else {
-          badge.textContent = 'No key';
-          badge.className = 'connector-card-status err';
-        }
-      }
-    }
-  }
-
-  async function connectMcp() {
-    const mcpStatus = document.getElementById('mcp-status');
-    const mcpBtn = document.getElementById('mcp-btn');
-    mcpStatus.textContent = 'Connecting…';
-    mcpStatus.className = 'connector-card-status pending';
-    mcpBtn.disabled = true;
-
-    try {
-      // Step 1: Health check
-      const health = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
-      if (!health.ok) throw new Error('MCP server not responding');
-
-      // Step 2: OAuth registration (open in popup)
-      const width = 500, height = 600;
-      const left = (screen.width - width) / 2;
-      const top = (screen.height - height) / 2;
-      const popup = window.open(
-        'http://127.0.0.1:8772/oauth/register?client_name=LanternOSJournal&redirect_uri=http://127.0.0.1:4177/oauth/callback',
-        'mcpOAuth',
-        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
-      );
-
-      // Poll for popup close
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          updateConnectorStatuses();
-          mcpBtn.disabled = false;
-        }
-      }, 500);
-    } catch (e) {
-      mcpStatus.textContent = 'Error';
-      mcpStatus.className = 'connector-card-status err';
-      mcpBtn.disabled = false;
-      alert('MCP connection failed: ' + e.message);
-    }
-  }
-
-  function disconnectMcp() {
-    localStorage.removeItem('MCP_OAUTH_TOKEN');
-    updateConnectorStatuses();
-  }
-
-  async function testWebSearch() {
-    const btn = event.target;
-    const original = btn.textContent;
-    btn.textContent = 'Testing…';
-    btn.disabled = true;
-    try {
-      const r = await fetch('http://127.0.0.1:8772/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 1,
-          method: 'tools/call',
-          params: { name: 'web_search', arguments: { query: 'Lantern OS', max_results: 3 } }
-        }),
-      });
-      const data = await r.json();
-      if (data.result && data.result.success) {
-        alert('Web search works! Found ' + data.result.result_count + ' results.\nTop: ' + (data.result.results[0]?.title || '?'));
-      } else {
-        alert('Web search returned: ' + (data.result?.error || 'unknown error'));
-      }
-    } catch (e) {
-      alert('Web search test failed: ' + e.message);
-    } finally {
-      btn.textContent = original;
-      btn.disabled = false;
-    }
-  }
-
-  // Update connector badges when settings opens
-  const _origOpenSettings = openSettings;
-  openSettings = function() {
-    _origOpenSettings();
-    updateConnectorStatuses();
-  };
-
-  // ── Conversation state ─────────────────────────────────────────────
-  let isSending = false;
-  const history = [];
-
-  // Fallback messages — shown ONLY when all providers fail (never as a normal reply)
-  const FALLBACKS = [
-    "No AI providers are set up. Add an API key in Settings (⚙) to get started.",
-    "All providers offline. Check Settings to add an API key or start a local model.",
-    "Connection quiet. Try again in a moment, or check Settings for API keys.",
-    "No provider answered. Open Settings (⚙) to configure Gemini, Claude, or OpenAI.",
-    "AI unavailable. Add a provider key in Settings, or run: ollama serve for local mode.",
-  ];
-
-  // ── Quick-start chip fill ──────────────────────────────────────────
-  function fillPrompt(text) {
-    const input = document.getElementById('input');
-    input.value = text;
-    input.focus();
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-  }
-
-  function fillAndSend(text) {
-    const input = document.getElementById('input');
-    input.value = text;
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-    sendMessage();
-  }
-
-  // ── DOM helpers ────────────────────────────────────────────────────
-  function hideEmptyState() {
-    const el = document.getElementById('empty-state');
-    if (el) el.style.display = 'none';
-  }
-
-
-  function addUserBubble(text) {
-    hideEmptyState();
-    const container = document.getElementById('messages');
-    const msg = document.createElement('div');
-    msg.className = 'message user';
-    msg.innerHTML = `<div class="message-content">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
-    container.appendChild(msg);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  function createAgentBubble(isError) {
-    const container = document.getElementById('messages');
-    const msg = document.createElement('div');
-    msg.className = 'message agent' + (isError ? ' error' : '');
-    const bubble = document.createElement('div');
-    bubble.className = 'message-content';
-    const cursor = document.createElement('span');
-    cursor.className = 'stream-cursor';
-    bubble.appendChild(cursor);
-    msg.appendChild(bubble);
-    container.appendChild(msg);
-    container.scrollTop = container.scrollHeight;
-    return { msg, bubble, cursor };
-  }
-
-  // ── Main send ──────────────────────────────────────────────────────
-  async function sendMessage() {
-    const input = document.getElementById('input');
-    const text = input.value.trim();
-    if (!text || isSending) return;
-
-    // Kingdome of Hearts interactive game — bypass normal chat stream
-    const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i);
-    if (kingdomeMatch) {
-      hideEmptyState();
-      input.value = '';
-      startThreeDoors();
-      return;
-    }
-
-    isSending = true;
-    document.getElementById('send-btn').disabled = true;
-
-    addUserBubble(text);
-    input.value = '';
-    input.style.height = 'auto';
-    history.push({ role: 'user', text });
-    writeCubeDelta('chat_message', [], 'conversation:' + Date.now());
-
-    const { msg, bubble, cursor } = createAgentBubble(false);
-    const container = document.getElementById('messages');
-
-    let fullText = '';
-    let serverErrorText = '';
-    let didError = false;
-    let routeLabel = '';
-    let routeDecision = null;
-
-    try {
-      const routeResp = await fetch('/api/dream/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-        signal: AbortSignal.timeout(3000),
-      });
-      if (routeResp.ok) routeDecision = (await routeResp.json()).route;
-    } catch (e) { /* route card is best-effort */ }
-
-    if (routeDecision) {
-      const card = document.createElement('div');
-      card.className = 'route-card';
-      const wait = routeDecision.requires_convergence ? 'Waiting for result' : 'Direct route';
-      card.textContent = `Routing to ${routeDecision.agent} - ${wait}`;
-      bubble.insertBefore(card, cursor);
-    }
-
-    try {
-      const provider = document.getElementById('provider-select')?.value || '';
-      const resp = await fetch('/api/dream/chat/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          user: 'dream-chat',
-          agent: '',
-          provider,
-          history: history.slice(-10),
-          personalContext: personalContext || {},  // NEW: inject personal cube data
-          routeIntent: routeDecision?.intent || '',
-        }),
-        signal: AbortSignal.timeout(90000),
-      });
-
-      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const evt = JSON.parse(line.slice(6));
-            if (evt.type === 'token' && evt.text) {
-              fullText += evt.text;
-              cursor.remove();
-              // Strip [DOORS:...] during streaming
-              bubble.textContent = fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd();
-              bubble.appendChild(cursor);
-              container.scrollTop = container.scrollHeight;
-            } else if (evt.type === 'error') {
-              // Server reported an error — capture its text; may be followed by tokens so don't stop
-              didError = true;
-              if (evt.text) serverErrorText = evt.text;
-              if (!fullText) {
-                bubble.style.color = 'var(--muted)';
-              }
-            } else if (evt.type === 'done') {
-              if (evt.cleanText) fullText = evt.cleanText;
-              if (evt.routeLabel) routeLabel = evt.routeLabel;
-            }
-          } catch { /* skip malformed line */ }
-        }
-      }
-    } catch (e) {
-      didError = true;
-    }
-
-    // Remove streaming cursor
-    cursor.remove();
-
-    if (!fullText) {
-      // Use server error text if available, otherwise random fallback
-      fullText = serverErrorText || FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
-      msg.classList.add('error');
-      bubble.style.color = 'var(--muted)';
-      bubble.style.fontStyle = 'italic';
-    }
-
-    bubble.textContent = fullText;
-
-    if (routeLabel) {
-      const sig = document.createElement('div');
-      sig.className = 'msg-route-sig';
-      sig.setAttribute('aria-label', `Active route: ${routeLabel}`);
-      sig.textContent = routeLabel;
-      msg.appendChild(sig);
-    }
-
-    if (!didError) {
-      history.push({ role: 'assistant', text: fullText });
-    }
-
-    isSending = false;
-    document.getElementById('send-btn').disabled = false;
-  }
-
-  // ── Auto-expand textarea ───────────────────────────────────────────
-  document.getElementById('input').addEventListener('input', e => {
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-  });
-
-  // ── Observer side panel ───────────────────────────────────────────
-  function toggleObserver() {
-    const panel = document.getElementById('observer-panel');
-    const btn = document.getElementById('observer-toggle-btn');
-    const collapsed = panel.classList.toggle('collapsed');
-    btn.classList.toggle('active', !collapsed);
-    if (!collapsed) refreshObserver();
-  }
-
-  function refreshObserver() {
-    fetch('/api/csf/stats').then(r => r.ok ? r.json() : null).then(data => {
-      if (!data) return;
-      // Recurring symbols
-      const symList = document.getElementById('obs-symbols');
-      if (data.top10 && data.top10.length > 0) {
-        symList.innerHTML = data.top10.slice(0, 8).map(s =>
-          `<span class="obs-symbol-chip${s.count >= 3 ? ' hot' : ''}">${s.token} ×${s.count}</span>`
-        ).join('');
-      } else {
-        symList.textContent = 'none yet';
-      }
-      document.getElementById('obs-dilation').textContent =
-        data.delta_count ? `${data.delta_count} entries` : '—';
-    }).catch(() => {});
-
-    fetch('/api/csf/deltas?limit=5').then(r => r.ok ? r.json() : null).then(data => {
-      if (!data || !data.length) return;
-      const last = data[data.length - 1];
-      // Mood arc
-      const moods = data.filter(d => d.mood_abs != null).map(d => d.mood_abs);
-      if (moods.length >= 2) {
-        const first = moods[0], latest = moods[moods.length - 1];
-        const diff = latest - first;
-        const label = Math.abs(diff) < 0.1 ? 'stable' : diff > 0 ? '↑ rising' : '↓ falling';
-        document.getElementById('obs-mood-arc').textContent = `${label} (${first.toFixed(1)} → ${latest.toFixed(1)})`;
-        document.getElementById('obs-mood-fill').style.width = `${Math.round(latest * 100)}%`;
-      }
-      // Last delta
-      const deltaLines = [];
-      if (last.symbols_added?.length) deltaLines.push(`+symbols: ${last.symbols_added.slice(0,3).join(', ')}`);
-      if (last.tags_added?.length) deltaLines.push(`+tags: ${last.tags_added.slice(0,3).join(', ')}`);
-      if (last.mood_delta != null && Math.abs(last.mood_delta) >= 0.05)
-        deltaLines.push(`mood ${last.mood_delta > 0 ? '+' : ''}${last.mood_delta}`);
-      document.getElementById('obs-last-delta').textContent = deltaLines.join(' · ') || 'no change';
-      // Convergence
-      if (last.convergence != null) {
-        const pct = Math.round(last.convergence * 100);
-        document.getElementById('obs-convergence').textContent = `${pct}%`;
-        document.getElementById('obs-conv-fill').style.width = `${pct}%`;
-      }
-    }).catch(() => {});
-  }
-
-  // Refresh observer every 30s if open
-  setInterval(() => {
-    if (!document.getElementById('observer-panel').classList.contains('collapsed')) refreshObserver();
-  }, 30000);
-
-  // ====== CONTEXT MANAGEMENT ======
-  let contextMode = {
-    search: true,
-    memory: true,
-    trading: false,
-  };
-
-  function updateContext() {
-    contextMode = {
-      search: document.getElementById('ctx-search').checked,
-      memory: document.getElementById('ctx-memory').checked,
-      trading: document.getElementById('ctx-trading').checked,
-    };
-    localStorage.setItem('contextMode', JSON.stringify(contextMode));
-  }
-
-  // Load context mode from storage
-  try {
-    const saved = JSON.parse(localStorage.getItem('contextMode') || '{}');
-    Object.assign(contextMode, saved);
-    document.getElementById('ctx-search').checked = contextMode.search;
-    document.getElementById('ctx-memory').checked = contextMode.memory;
-    document.getElementById('ctx-trading').checked = contextMode.trading;
-  } catch (e) {}
-
-  // ====== PERFORMANCE MONITORING ======
-  let perfStats = {
-    totalTokens: 0,
-    totalCost: 0,
-    lastLatency: 0,
-  };
-
-  function togglePerfMonitor() {
-    const enabled = document.getElementById('ctx-perf').checked;
-    document.getElementById('perf-monitor').style.display = enabled ? 'block' : 'none';
-    localStorage.setItem('perfMonitorEnabled', enabled);
-  }
-
-  // Load perf monitor preference
-  const perfEnabled = localStorage.getItem('perfMonitorEnabled') === 'true';
-  if (perfEnabled) {
-    document.getElementById('ctx-perf').checked = true;
-    document.getElementById('perf-monitor').style.display = 'block';
-  }
-
-  function updatePerfStats(tokens, cost, latency) {
-    perfStats.totalTokens += tokens || 0;
-    perfStats.totalCost += cost || 0;
-    perfStats.lastLatency = latency || 0;
-
-    document.getElementById('perf-tokens').textContent = perfStats.totalTokens.toLocaleString();
-    document.getElementById('perf-cost').textContent = '$' + perfStats.totalCost.toFixed(3);
-    document.getElementById('perf-latency').textContent = perfStats.lastLatency + 'ms';
-  }
-
-  // Hook into the original stream fetch to capture metrics
-  const origFetch = window.fetch;
-  window.fetch = async function(...args) {
-    const startTime = Date.now();
-    const response = await origFetch.apply(this, args);
-
-    // Capture metrics from /api/dream/chat/stream responses
-    if (args[0] && args[0].includes('dream/chat')) {
-      const latency = Date.now() - startTime;
-      // Extract tokens/cost from response headers or body
-      const tokens = parseInt(response.headers?.get('X-Tokens-Used') || '0');
-      const cost = parseFloat(response.headers?.get('X-Cost-Usd') || '0');
-      if (tokens || cost) {
-        updatePerfStats(tokens, cost, latency);
-      }
-    }
-
-    return response;
-  };
-</script>
+<script src="/js/dream-chat-ui.js"></script>
 <script src="js/convergance-sync.js"></script>
 </body>
 </html>
