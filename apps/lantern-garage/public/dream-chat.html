@@ -489,6 +489,11 @@
       font-style: italic;
       letter-spacing: 0.02em;
     }
+    /* Heartbeat animation for mandala in simple mode */
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.8; }
+    }
   </style>
 </head>
 <body>
@@ -862,6 +867,18 @@
     simpleMode = !simpleMode;
     const btn = document.getElementById('simple-mode-btn');
     btn.style.opacity = simpleMode ? '1' : '0.5';
+    btn.style.background = simpleMode ? 'rgba(52,211,153,0.2)' : 'transparent';
+    btn.style.border = simpleMode ? '2px solid #34d399' : 'none';
+    
+    // Animate mandala heartbeat
+    const mandala = document.querySelector('.nav-brand img');
+    if (mandala) {
+      if (simpleMode) {
+        mandala.style.animation = 'heartbeat 1.5s ease-in-out infinite';
+      } else {
+        mandala.style.animation = '';
+      }
+    }
     
     // Hide complex UI elements
     const observerBtn = document.getElementById('observer-toggle-btn');
@@ -901,6 +918,18 @@
     const btn = document.getElementById('voice-btn');
     const voiceInputBtn = document.getElementById('voice-input-btn');
     btn.style.opacity = voiceMode ? '1' : '0.5';
+    btn.style.background = voiceMode ? 'rgba(161,139,250,0.2)' : 'transparent';
+    btn.style.border = voiceMode ? '2px solid #a78bfa' : 'none';
+    
+    // Animate mandala heartbeat
+    const mandala = document.querySelector('.nav-brand img');
+    if (mandala) {
+      if (voiceMode) {
+        mandala.style.animation = 'heartbeat 1.5s ease-in-out infinite';
+      } else if (!simpleMode) {
+        mandala.style.animation = '';
+      }
+    }
     
     if (voiceMode && !recognition) {
       // Initialize speech recognition
