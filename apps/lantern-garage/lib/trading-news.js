@@ -86,10 +86,29 @@ function _csfEntityRecord(item, memoryId) {
  */
 async function recordNewsItem(item) {
   const key = String(item.id || item.url || item.headline || JSON.stringify(item)).slice(0, 80);
+  const memId = `trading_news_${_shortHash(key)}`;
+  
+  // Check existing file for deduplication (prevents race condition)
+  const fs = require("fs");
+  try {
+    const existingLines = fs.readFileSync(NEWS_REGISTRY, "utf8").trim().split("\n").filter(Boolean);
+    for (const line of existingLines) {
+      try {
+        const existing = JSON.parse(line);
+        if (existing.memory_id === memId) {
+          // Already exists, skip
+          return existing;
+        }
+      } catch {}
+    }
+  } catch (e) {
+    // File doesn't exist yet, continue
+  }
+  
+  // Also check in-memory set for fast path
   if (_seenNews.has(key)) return;
   _seenNews.add(key);
 
-  const memId = `trading_news_${_shortHash(key)}`;
   const rec = _csfEntityRecord(item, memId);
 
   await Promise.all([
