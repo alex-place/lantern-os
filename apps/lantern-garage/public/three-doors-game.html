@@ -983,21 +983,23 @@ function submitPoem() {
   const input = document.getElementById("poem-answer");
   if (!input) return;
   const val = input.value.trim().toLowerCase();
-  const accepted = ["yourself","myself","i am","the one","silence","love","the lantern","the light","convergence","me","i"];
+  // Accepted answers based on CSF lore: "silence", "the name", "yourself", "the lantern", "the light"
+  const accepted = ["yourself","myself","i am","the one","silence","love","the lantern","the light","convergence","me","i","the name","name"];
   if (accepted.some(a => val.includes(a))) {
     playerProgress.poemSolved = true;
     saveProgress();
     awardPrize("kingdome-crown");
-    // Refresh scene to show doors
+    // Refresh scene to show doors with King's response
     appendUserMsg("Answer: \"" + input.value.trim() + "\"");
     const scene = SCENES["kingdome-garden"];
-    const data = { scene_key: "kingdome-garden", text: scene.text, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [] };
+    const kingResponse = `The King nods slowly, his crown of vines and cursors blinking in recognition. *\"Correct,\"* he says, his voice like old light through moss. *\"You understand what was lost at the beginning is the thing that was gained. The doors are now open to you.\"*`;
+    const data = { scene_key: "kingdome-garden", text: scene.text + "\n\n" + kingResponse, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [] };
     appendSceneMsg("kingdome-garden", data, "", "offline");
   } else {
     const chat = document.getElementById("chat");
     const el = document.createElement("div");
     el.className = "message agent";
-    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content" style="font-size:13px;color:var(--muted)">The King waits. The garden holds its breath. Try again.</div>`;
+    el.innerHTML = `<div class="agent-avatar">👑</div><div class="message-content" style="font-size:13px;color:var(--muted)">The King waits. The garden holds its breath. *\"Think deeper,\"* he says. *\"What was lost at the beginning is the thing that was gained.\"*</div>`;
     chat.appendChild(el);
     chat.scrollTop = chat.scrollHeight;
   }
