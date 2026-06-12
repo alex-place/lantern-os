@@ -274,12 +274,11 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text || isSending) return;
 
-  // Three-doors game — bypass normal chat stream
+  // Three-doors game lives on its own page now — Lantern guides there, not in chat
   const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i);
   if (kingdomeMatch) {
-    hideEmptyState();
     input.value = '';
-    startThreeDoors();
+    window.location.href = '/three-doors-game.html';
     return;
   }
 

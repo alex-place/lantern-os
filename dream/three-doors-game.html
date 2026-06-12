@@ -200,7 +200,7 @@
     <!-- Custom / free-text input -->
     <div style="display:flex;gap:8px;align-items:center">
       <input id="custom-door-input" type="text"
-        placeholder="or describe your own door..."
+        placeholder="name your own door — or just talk to Lantern..."
         style="flex:1;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color 0.15s"
         onfocus="this.style.borderColor='var(--accent)'"
         onblur="this.style.borderColor='var(--border)'"
@@ -1027,6 +1027,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
   // Scene art
   const canvasId = "cvs-" + sceneKey + "-" + Date.now();
   const imgId = "img-" + sceneKey + "-" + Date.now();
+  const descId = "desc-" + sceneKey + "-" + Date.now();
 
   // History breadcrumb
   const breadcrumb = history.length > 1
@@ -1085,7 +1086,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
         <canvas id="${canvasId}" width="800" height="450"></canvas>
         <div class="sd-badge">SD prompt — hover to copy</div>
       </div>
-      <div style="font-size:14px;line-height:1.6;margin-bottom:10px">${md(displayText)}</div>
+      <div id="${descId}" style="font-size:14px;line-height:1.6;margin-bottom:10px">${md(displayText)}</div>
       ${foxPresent ? `<div class="fox-line">🏮 Lantern, your guide, is with you.</div>` : ""}
       ${doorHTML}
     </div>`;
@@ -1459,14 +1460,106 @@ function submitCustomDoor() {
   const val = input.value.trim();
   if (!val) return;
   const upper = val.toUpperCase();
-  // If player typed A, B, or C — route to known door
-  const knownDoor = gameState.doors?.find(d => d.label.toUpperCase() === upper);
+  // Door label (A/B/C) or full door name — route to known door
+  const knownDoor = gameState.doors?.find(d =>
+    d.label.toUpperCase() === upper || d.name.toUpperCase() === upper);
   if (knownDoor) {
     chooseDoor(knownDoor.label, knownDoor.name);
-  } else {
-    // Custom door — use the player's text as the door name
-    chooseDoor("CUSTOM", val);
+    return;
   }
+  // Single word — the player named their own door (engine accepts one-word custom doors)
+  if (!/\s/.test(val)) {
+    chooseDoor("CUSTOM", val);
+    return;
+  }
+  // Anything conversational — talk to Lantern, in persona, inside the scene
+  input.value = "";
+  askLantern(val);
+}
+
+// ── Freeform conversation with Lantern — the guide answers mid-scene ──
+const lanternHistory = [];
+let lanternBusy = false;
+async function askLantern(text) {
+  if (lanternBusy) return;
+  lanternBusy = true;
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  appendUserMsg(esc(text));
+  appendTyping();
+
+  // First history entry anchors Lantern in the current scene
+  const sceneText = (SCENES[gameState?.scene_key]?.text || gameState?.text || "")
+    .replace(/\*\*/g, "").replace(/\*/g, "").slice(0, 300);
+  const sceneCtx = {
+    role: "assistant",
+    text: `Scene: ${gameState?.scene_key || "the Kingdome"} (loop ${gameState?.loop_count ?? 0}). ${sceneText}`,
+  };
+
+  let fullText = "";
+  let bubble = null;
+  try {
+    const resp = await fetch("/api/dream/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        user: userId,
+        agent: "lantern",
+        surface: "three-doors",
+        history: [sceneCtx, ...lanternHistory.slice(-5)],
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!resp.ok || !resp.body) throw new Error("chat " + resp.status);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === "token" && (evt.text || evt.token)) {
+            fullText += evt.text || evt.token;
+            if (!bubble) {
+              removeTyping();
+              const chat = document.getElementById("chat");
+              const el = document.createElement("div");
+              el.className = "message agent";
+              el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content"></div>`;
+              chat.appendChild(el);
+              bubble = el.querySelector(".message-content");
+            }
+            bubble.innerHTML = md(esc(fullText.replace(/\[DOORS:[^\]]*\]?/i, "").trimEnd()));
+            const chat = document.getElementById("chat");
+            chat.scrollTop = chat.scrollHeight;
+          } else if (evt.type === "done" && evt.cleanText) {
+            fullText = evt.cleanText;
+            if (bubble) bubble.innerHTML = md(esc(fullText));
+          }
+        } catch { /* skip malformed line */ }
+      }
+    }
+  } catch (e) { /* fall through to fallback below */ }
+
+  removeTyping();
+  if (!fullText) {
+    const chat = document.getElementById("chat");
+    const el = document.createElement("div");
+    el.className = "message agent";
+    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content"><em>Lantern's flame flickers — it can't find words right now. Try again, or choose a door.</em></div>`;
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+  } else {
+    lanternHistory.push({ role: "user", text }, { role: "assistant", text: fullText });
+  }
+  lanternBusy = false;
 }
 
 // ── API calls ─────────────────────────────────────────────────────
@@ -1487,15 +1580,14 @@ async function apiDoors(action, choice) {
 
 async function apiNarrate(sceneKey, sceneText) {
   // Local-only narration: provider "local" routes to Ollama (lantern-csf-dream);
-  // no cloud provider is contacted. Keystone narrates; Lantern is the guide.
-  const persona = `You are Keystone — keeper of thresholds and narrator of the Three Doors dream world. Lantern, the lantern-headed guide, walks beside the dreamer. Narrate in 2 sentences: what this moment means, what lingers, or one quiet question. Don't restate what they see.`;
+  // no cloud provider is contacted. Lantern is the voice of the game.
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15000);
   try {
     const r = await fetch("/api/dream/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: `Scene: ${sceneKey}. ${sceneText.replace(/\*\*/g,"").replace(/\*/g,"").slice(0, 280)}`, agent: "keystone", provider: "local" }),
+      body: JSON.stringify({ message: `Scene: ${sceneKey}. ${sceneText.replace(/\*\*/g,"").replace(/\*/g,"").slice(0, 280)}`, agent: "lantern", provider: "local" }),
       signal: ctrl.signal,
     });
     if (!r.ok) throw new Error("chat API " + r.status);
