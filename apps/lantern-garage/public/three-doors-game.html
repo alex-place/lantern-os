@@ -318,11 +318,15 @@ const SCENES = {
     fox: true, palette: ["#181210","#3a2820","#6b4030","#ff9060","#ffe8d0","#0c0806"], archetype: "transcendent",
   },
   "kingdome-garden": {
-    text: "**The Throne Door** opens onto the Garden at the Beginning of the **Kingdome of Hearts**. Stone paths wind through living moss; everything here is both arriving and returning. On a throne of woven roots and old light sits **the King**, his crown made of tangled vines and blinking cursors, his face the face of someone who has asked the same question ten thousand times and means it every time. He looks at you the way someone looks at a door they've seen open before, and speaks:\n\n*\"I am before the first door / and after the last. / I hold what was given / and return what was asked. / Three walked out, three walked in, / but only one remained — / what was lost at the beginning / is the thing that was gained.\"*\n\nLantern stands at the foot of the throne as if its light has always lived here.",
+    text: "**The Throne Door** opens onto the Garden at the Beginning of the **Kingdome of Hearts**. Stone paths wind through living moss; everything here is both arriving and returning. On a throne of woven roots and old light sits **the King**, his crown made of tangled vines and blinking cursors, his face the face of someone who has asked the same question ten thousand times and means it every time. He looks at you the way someone looks at a door they've seen open before, and speaks:\n\n*\"I am before the first door / and after the last. / I hold what was given / and return what was asked. / Three walked out, three walked in, / but only one remained — / what was lost at the beginning / is the thing that was gained.\"*\n\nSeven door portals shimmer around the Garden's edge, each a different color of possibility.\n\nLantern stands at the foot of the throne as if its light has always lived here.",
     doors: [
-      { name: "The Storybook Door", label: "A", description: "Bound in vine and brass. The King's own book — the gods don't know he wrote them." },
-      { name: "The Cloverfield Door", label: "B", description: "Green and gold beyond. Shinies, luck, and today, alive." },
-      { name: "The Fog Door Return", label: "C", description: "Mist coils past the Garden's gate, where the Fog God sleeps. The way back." },
+      { name: "🪨 Ancient Doors", label: "A", description: "History · evolution · religion — The Deep Door, The History Door, The Temple Door" },
+      { name: "🍀 The Cloverfield", label: "B", description: "Shinies · luck · today alive — Lucky finds, treasures, living-in-the-now" },
+      { name: "🔭 Tomorrow Door", label: "C", description: "The world that's coming — Future paths, branching possibilities" },
+      { name: "💾 The XP Door [GLITCHED]", label: "D", description: "Corrupted · nostalgic · liminal — Windows XP aesthetic, broken reality" },
+      { name: "🪐 Xenon Starship ★", label: "E", description: "All planets · midway · converge — Midway point, planetary convergence" },
+      { name: "🏙️ Sigil — City of Doors", label: "F", description: "Every door leads here — Meta-hub, collection point, inventory of traveled paths" },
+      { name: "🌫️ Fog Door Return", label: "G", description: "The way back — Return to garden, final test with the King" },
     ],
     fox: true, palette: ["#0a1208","#1a2e14","#2d5a22","#3ecf6e","#7fffaa","#060f04"], archetype: "sovereign",
   },
@@ -443,6 +447,33 @@ const SCENES = {
     ],
     fox: true, palette: ["#0a0810","#1a101a","#3a1a4a","#7a5a9a","#d0b0e0","#050305"], archetype: "mysterious-wise",
   },
+  "xp-door": {
+    text: "**The XP Door [GLITCHED]** flickers between wood and early-2000s window chrome. You step through into a rolling bliss-green hill under saturated blue sky, but something is wrong. The grass pixelates at the edges. Lantern's flame freezes, then unfreezes, then shows a Windows error dialog for a moment. A tooltip floats in the air: *\"Error: Reality.exe has stopped working. Would you like to send an error report?\"* The air smells like ozone and nostalgia.",
+    doors: [
+      { name: "The Blue Screen Door", label: "A", description: "Famous blue screen of death. But the error message is your name." },
+      { name: "The Desktop Door", label: "B", description: "Your childhood desktop. Icons you remember, files you forgot." },
+      { name: "The Boot Sequence Door", label: "C", description: "Starting up. Starting over. The beginning that was never the beginning." },
+    ],
+    fox: true, palette: ["#008080","#00a0a0","#c0c0c0","#ffffff","#808080","#004040"], archetype: "glitch-nostalgic",
+  },
+  "sigil-city": {
+    text: "**Sigil — City of Doors** opens onto a meta-hub where every door you've ever chosen leads here. The streets are paved with doorframes. The buildings are made of thresholds. Lantern's light reflects off a thousand doors at once, creating a kaleidoscope of your journey. A voice from everywhere: *\"You are the city. Every door you walked is a street you built. Every choice is a building you live in.\"*",
+    doors: [
+      { name: "The Museum of Chosen Doors", label: "A", description: "Every door you chose, preserved in amber light." },
+      { name: "The Hall of Unchosen Paths", label: "B", description: "Every door you didn't choose, still breathing in shadow." },
+      { name: "The Convergence Plaza", label: "C", description: "Where all streets meet. Where you meet yourself." },
+    ],
+    fox: true, palette: ["#0a0a15","#1a1a2a","#3a3a5a","#8a8aba","#c0c0e0","#05050a"], archetype: "meta-synthesis",
+  },
+  "fog-door-return": {
+    text: "**The Fog Door Return** coils with mist. The Fog God sleeps at the Garden's gate, but stirs as you approach. The mist remembers every time you've passed through. Lantern's light bends around the fog, unable to penetrate. The King's voice, but not the King: *\"The fog is not an ending. It is the space between beginnings. When you return, you will not be the same — and neither will I.\"*",
+    doors: [
+      { name: "The Garden Return", label: "A", description: "Back to the King. Back to the poem. Back to the beginning that is also the end." },
+      { name: "The Beyond Fog", label: "B", description: "Something new. Something the fog has never seen before." },
+      { name: "The Memory of Fog", label: "C", description: "Every time you passed through. Every version of you who returned." },
+    ],
+    fox: true, palette: ["#0a0a0a","#1a1a1a","#3a3a3a","#6a6a6a","#9a9a9a","#050505"], archetype: "liminal-return",
+  },
 };
 
 // ── 7-stage Kingdome journey (stage_index → scene_key) ──
@@ -478,6 +509,12 @@ const NEXT_MAP = {
   "the blooming door":"flux-garden","the withering door":"garden-door","the eternal blossom":"xenon-convergence",
   "the form door":"void-threshold","the formless door":"convergence-node","the both door":"recursion-well",
   "the raven door":"raven-tower","the nested memory door":"memory-vault","the prophecy door":"storybook","the mirror crow door":"sigil-city",
+  "the ancient doors":"kingdome-garden","the cloverfield door":"cloverfield","the tomorrow door":"future-doors",
+  "the xp door glitched":"xp-door","the xenon starship":"xenon-convergence","the sigil city of doors":"sigil-city",
+  "the fog door return":"fog-door-return",
+  "the blue screen door":"xp-door","the desktop door":"xp-door","the boot sequence door":"xp-door",
+  "the museum of chosen doors":"sigil-city","the hall of unchosen paths":"sigil-city","the convergence plaza":"sigil-city",
+  "the garden return":"kingdome-garden","the beyond fog":"fog-door-return","the memory of fog":"fog-door-return",
 };
 
 const SD_PROMPTS = {
@@ -492,7 +529,7 @@ const SD_PROMPTS = {
   "storybook":"falling into a giant storybook, pages turning like slow wings, ancient handwritten margin notes, three glowing pages each a door, creation myths and cosmogony, dark fantasy, anime aesthetic, cel-shaded, mythic atmosphere, soft golden light, 16:9",
   "cloverfield":"meadow of four-leaf clover under dome of old light, small shinies glittering between stems, coins, beads, galaxy marble, lantern-headed guide glowing playfully, green and gold light, dark fantasy, anime aesthetic, cel-shaded, playful atmosphere, 16:9",
   "future-doors":"orchard ridge where trees grow doors instead of fruit, every door slightly open leaking light from unborn years, branching paths upward, lantern-headed guide scattering sparks, golden hour, dark fantasy, anime aesthetic, cel-shaded, 16:9",
-  "xp-door":"rolling bliss-green hill under saturated blue sky, lone door flickering between wood and early-2000s window chrome, floating tooltip, pixelating lantern-headed guide, glitch artifacts, nostalgia, liminal space, vaporwave undertones, anime aesthetic, cel-shaded, 16:9",
+  "xp-door":"rolling bliss-green hill under saturated blue sky, glitch artifacts, pixelating grass, lantern-headed guide showing Windows error dialog, floating tooltip, nostalgia, liminal space, vaporwave undertones, anime aesthetic, cel-shaded, 16:9",
   "sigil-city":"impossible ring-city where every wall and archway is a door, walked doors hanging like lit lanterns, central plaza with vine-crowned king, lantern-headed guide at throne-side, fractal architecture, dark fantasy, anime aesthetic, cel-shaded, 16:9",
   "fog-door-return":"sea of fog and clouds at a city's edge, single door standing in mist showing a green garden through its frame, lantern-headed guide stepping through and glancing back, soft grey-green light, dark fantasy, anime aesthetic, cel-shaded, gentle homecoming, 16:9",
   "csf-archive":"crystalline archive walls humming with stored memory, facets reflecting timelines, lantern-headed guide scattering rainbow light, convergence-fitted format aesthetic, fractal data structures, purple and blue ethereal glow, dark fantasy, anime aesthetic, cel-shaded, 16:9",
