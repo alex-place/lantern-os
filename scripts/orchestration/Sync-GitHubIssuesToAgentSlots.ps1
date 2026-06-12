@@ -44,7 +44,6 @@ if ([string]::IsNullOrWhiteSpace($Root)) {
 }
 
 $SlotsPath = Join-Path $Root "manifests\dream-journal-v1-agent-slots.json"
-$GitHubCacheScript = Join-Path $Root "scripts\orchestration\Get-GitHubDataCache.ps1"
 
 # Ensure slots file exists
 if (-not (Test-Path -LiteralPath $SlotsPath)) {
@@ -123,6 +122,7 @@ foreach ($issue in $targetIssues) {
         id = $slotId
         priority = $priority
         status = "queued"
+        type = "github_issue"
         description = $issue.title
         github_issue = @{
             number = $issue.number

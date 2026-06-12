@@ -371,6 +371,44 @@
     .tts-word { border-radius: 2px; transition: background 0.08s; }
     .tts-active { background: rgba(255, 220, 50, 0.22); }
 
+    /* Personal insights styles */
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    .status-indicator.ok { background: #34d399; }
+    .status-indicator.err { background: var(--accent); }
+    .status-indicator.pending { background: #fbbf24; }
+
+    .priority-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--surface2);
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+    .priority-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .priority-badge.p0 { background: var(--accent); color: white; }
+    .priority-badge.p1 { background: #fbbf24; color: black; }
+    .priority-badge.p2 { background: #34d399; color: white; }
+    .priority-badge.p3 { background: var(--muted); color: var(--text); }
+    .priority-title {
+      font-size: 12px;
+      color: var(--text);
+      flex: 1;
+    }
+
     /* Connector sidecar */
     .connector-grid {
       display: flex;
@@ -470,6 +508,8 @@
     </div>
     <div class="nav-actions">
       <span id="header-status" style="display:none">· connecting…</span>
+      <span id="github-status-badge" style="display:none;font-size:11px;color:var(--muted);margin-right:8px"></span>
+      <span id="environment-status" style="display:none;font-size:11px;color:var(--muted);margin-right:8px"></span>
       <button class="nav-btn observer-toggle" id="observer-toggle-btn" onclick="toggleObserver()" title="Observer panel">◈</button>
       <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
       <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
@@ -535,6 +575,13 @@
       <div>
         <div class="obs-section-title">Dilation Ratio</div>
         <div class="obs-value" id="obs-dilation">1.0×</div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+      <div>
+        <div class="obs-section-title">Current Priorities</div>
+        <div id="priorities-panel">
+          <div style="font-size:11px;color:var(--muted)">Loading…</div>
+        </div>
       </div>
     </div>
   </aside>
@@ -735,6 +782,72 @@
 <script src="js/dream-chat.js?v=20260612"></script>
 <script src="/js/theme-toggle.js"></script>
 <script>
+  // ── Personal Cube Integration ───────────────────────────────────────
+  let personalContext = null;
+
+  async function loadPersonalCube() {
+    try {
+      const resp = await fetch('/api/cubes/alex/personal');
+      if (resp.ok) {
+        personalContext = await resp.json();
+        updatePersonalInsights(personalContext);
+        console.log('[personal-cube] Loaded:', personalContext);
+      }
+    } catch (e) {
+      console.error('[personal-cube] Failed to load:', e);
+    }
+  }
+
+  function updatePersonalInsights(cube) {
+    // Update GitHub status badge
+    const githubBadge = document.getElementById('github-status-badge');
+    if (githubBadge && cube.github) {
+      const openIssues = cube.github.issues?.filter(i => i.state === 'open').length || 0;
+      const openPRs = cube.github.prs?.filter(p => p.state === 'open').length || 0;
+      githubBadge.textContent = `GitHub: ${openIssues} issues, ${openPRs} PRs`;
+      githubBadge.style.display = 'block';
+    }
+
+    // Update provider health indicators
+    if (cube.providers) {
+      for (const [provider, status] of Object.entries(cube.providers)) {
+        const indicator = document.getElementById(`provider-${provider}-status`);
+        if (indicator) {
+          indicator.className = status.configured ? 'status-indicator ok' : 'status-indicator err';
+          indicator.textContent = status.configured ? '✓' : '✗';
+        }
+      }
+    }
+
+    // Update environment status
+    if (cube.environment) {
+      const envStatus = document.getElementById('environment-status');
+      if (envStatus) {
+        const serverStatus = cube.environment.server?.running ? 'Running' : 'Stopped';
+        const gitStatus = cube.environment.git?.isDirty ? 'Dirty' : 'Clean';
+        envStatus.textContent = `Env: ${serverStatus}, Git: ${gitStatus}`;
+      }
+    }
+
+    // Update current priorities
+    if (cube.priorities && cube.priorities.nextActions) {
+      const prioritiesPanel = document.getElementById('priorities-panel');
+      if (prioritiesPanel) {
+        prioritiesPanel.innerHTML = cube.priorities.nextActions.map(p => 
+          `<div class="priority-item">
+            <span class="priority-badge ${p.priority}">${p.priority}</span>
+            <span class="priority-title">#${p.number}: ${p.title}</span>
+          </div>`
+        ).join('');
+      }
+    }
+  }
+
+  // Load personal cube on page load
+  loadPersonalCube();
+  // Refresh personal cube every 5 minutes
+  setInterval(loadPersonalCube, 300000);
+
   // ── Modal controls ─────────────────────────────────────────────────
   function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
   function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
@@ -996,6 +1109,7 @@
           agent: '',
           provider,
           history: history.slice(-10),
+          personalContext: personalContext || {},  // NEW: inject personal cube data
         }),
         signal: AbortSignal.timeout(90000),
       });

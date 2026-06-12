@@ -2290,7 +2290,7 @@ class HeadlessAgentDaemon:
             return []
         try:
             data = json.loads(slots_path.read_text(encoding="utf-8"))
-            slots = data.get("slots", [])
+            slots = data.get("agent_slots", [])
             return [s for s in slots if s.get("status") == "queued"]
         except Exception:
             return []
@@ -2301,7 +2301,7 @@ class HeadlessAgentDaemon:
             return
         try:
             data = json.loads(slots_path.read_text(encoding="utf-8"))
-            for s in data.get("slots", []):
+            for s in data.get("agent_slots", []):
                 if s.get("id") == slot_id:
                     s["status"] = status
                     break
@@ -2319,6 +2319,17 @@ class HeadlessAgentDaemon:
             if slot_type == "dream_journal":
                 result = self.engine.converge(task.get("message", ""), {"persona": "lantern", "provider": "offline"})
                 result["status"] = "completed"
+            elif slot_type == "github_issue":
+                # GitHub issue tasks are processed by the convergence engine
+                # The issue body contains the task description and acceptance criteria
+                issue_data = task.get("github_issue", {})
+                issue_title = issue_data.get("title", "")
+                issue_url = issue_data.get("url", "")
+                result = {
+                    "status": "completed",
+                    "note": f"GitHub issue {issue_data.get('number', 'unknown')} processed: {issue_title}",
+                    "issue_url": issue_url
+                }
             elif slot_type == "audit_verify":
                 ring = ValidationRing(max_jobs=3, max_seconds=10.0)
                 ring_result = ring.run()

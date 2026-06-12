@@ -8,36 +8,42 @@
       "id": "dream_journal/agents_slots_route",
       "priority": 1,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Wire /api/agents/slots in routes/dreamer.js \u2014 route wired with fallback to manifest JSON"
     },
     {
       "id": "dream_journal/three_doors_test",
       "priority": 2,
       "status": "completed",
+      "type": "dream_journal",
       "description": "test_three_doors.js: verify [DOORS:] parsed, cleanText strips it, 3 chips rendered in browser"
     },
     {
       "id": "dream_journal/ctf_persistence",
       "priority": 3,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Persist CTF glyphs in dream entries; surface in stats/search; update entry schema in dream.js"
     },
     {
       "id": "dream_journal/tts_voice_select",
       "priority": 5,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Add TTS voice selector to settings drawer (name/rate/pitch from SpeechSynthesis.getVoices)"
     },
     {
       "id": "dream_journal/pcsf_live_refresh",
       "priority": 6,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Auto-update data/pcsf/*.pcsf.json on server start from live provider + journal state"
     },
     {
       "id": "dream_journal/gemini_grounding_test",
       "priority": 7,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Verify GEMINI_GROUNDING=true with paid key; update .env.example + health.pcsf.json",
       "updated_at": "2026-06-10T11:43:58.818067+00:00"
     },
@@ -45,6 +51,7 @@
       "id": "dream_journal/voice_server_stt",
       "priority": 8,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Backend Vosk STT fallback for non-Chrome; route POST /api/dream/transcribe",
       "updated_at": "2026-06-10T11:43:59.080820+00:00"
     },
@@ -52,12 +59,14 @@
       "id": "dream_journal/convergence_web_refinement",
       "priority": 9,
       "status": "completed",
+      "type": "dream_journal",
       "description": "Research web-based convergence loop refinements: GitOps best practices, monorepo CI convergence patterns, automated evidence collection, and promotion gate strategies. Output: csf/ingest/convergence-web-refinement.md with implementation sketch. Phase B (objective manifest + drift detection) already implemented in convergence_io_engine.py."
     },
     {
       "id": "convergence/validation_ring",
       "priority": 4,
       "status": "active",
+      "type": "audit_verify",
       "description": "Blockchain-inspired bounded validation ring: 3-agent consensus, SHA-256 hash chain, tamper-evident JSONL. Runs as phase 9 in convergence loop."
     }
   ],

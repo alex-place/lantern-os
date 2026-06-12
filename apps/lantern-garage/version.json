@@ -1,7 +1,7 @@
 {
-  "version": "1.2.5",
-  "buildId": "1.2.5+2026-06-10.235834",
-  "timestamp": "2026-06-10T23:58:34.191Z",
-  "branch": "master",
-  "commit": "1441d9e"
+  "version": "1.3.4",
+  "buildId": "1.3.4+2026-06-12.080741",
+  "timestamp": "2026-06-12T08:07:41.650Z",
+  "branch": "feat/github-issues-to-agent-slots-sync",
+  "commit": "a49db6b"
 }
