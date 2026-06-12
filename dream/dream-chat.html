@@ -1290,6 +1290,25 @@
     let serverErrorText = '';
     let didError = false;
     let routeLabel = '';
+    let routeDecision = null;
+
+    try {
+      const routeResp = await fetch('/api/dream/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+        signal: AbortSignal.timeout(3000),
+      });
+      if (routeResp.ok) routeDecision = (await routeResp.json()).route;
+    } catch (e) { /* route card is best-effort */ }
+
+    if (routeDecision) {
+      const card = document.createElement('div');
+      card.className = 'route-card';
+      const wait = routeDecision.requires_convergence ? 'Waiting for result' : 'Direct route';
+      card.textContent = `Routing to ${routeDecision.agent} - ${wait}`;
+      bubble.insertBefore(card, cursor);
+    }
 
     try {
       const provider = document.getElementById('provider-select')?.value || '';
@@ -1303,6 +1322,7 @@
           provider,
           history: history.slice(-10),
           personalContext: personalContext || {},  // NEW: inject personal cube data
+          routeIntent: routeDecision?.intent || '',
         }),
         signal: AbortSignal.timeout(90000),
       });

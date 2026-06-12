@@ -364,7 +364,7 @@
   }
 
   // ── Stream agent response ───────────────────────────────────────────────────
-  function streamAgentResponse(message) {
+  async function streamAgentResponse(message) {
     stopSpeaking();
     isStreaming = true;
     sendBtn.disabled = true;
@@ -394,7 +394,16 @@
     let fullText = "";
     let hasTokens = false;
     const provider = providerSelect.value;
-    const routeIntent = detectRouteIntent(message);
+    let routeDecision = null;
+    try {
+      const routeResp = await fetch(`${serverBase}/api/dream/route`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      if (routeResp.ok) routeDecision = (await routeResp.json()).route;
+    } catch {}
+    const routeIntent = routeDecision?.intent || detectRouteIntent(message);
     // Only send a persona agent name when the user has explicitly opted into RP
     const isRpIntent = routeIntent === "dream_chat";
     const agent = directModeEnabled ? "" : (isRpIntent ? detectAgent(message) : "");
@@ -402,12 +411,19 @@
     const historyToSend = conversationHistory.slice(0, -1).slice(-6); // last 6 turns before this message
 
     // Show routing card in the bubble before first token arrives
-    if (routeIntent === "coding_change") {
+    if (routeDecision) {
+      const rc = document.createElement("div");
+      rc.className = "route-card";
+      const wait = routeDecision.requires_convergence ? "Waiting for result" : "Direct route";
+      rc.textContent = `Routing to ${routeDecision.agent} - ${wait}`;
+      bubble.insertBefore(rc, cursor);
+    }
+    if (!routeDecision && routeIntent === "coding_change") {
       const rc = document.createElement("div");
       rc.className = "route-card";
       rc.textContent = "⚙ Routing to Keystone…";
       bubble.insertBefore(rc, cursor);
-    } else if (routeIntent === "technical_debug") {
+    } else if (!routeDecision && routeIntent === "technical_debug") {
       const rc = document.createElement("div");
       rc.className = "route-card";
       rc.textContent = "⚙ Routing to debug interface…";
