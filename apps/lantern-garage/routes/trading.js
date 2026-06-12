@@ -288,6 +288,12 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // ── AI Trader Integration Routes ──────────────────────────────────────────
+  // Proxies to the Independent AI Trader's REST API (port 5555, see
+  // C:\Independant AI Trader\src\ai_trader_api.py). That service only
+  // exposes /health, /api/status, /api/watchlist, /api/zones, /api/signals,
+  // /api/positions, /api/alerts, and /api/control/{pause,resume,close-position}
+  // — routes below map onto those. Endpoints with no equivalent there
+  // (signal generation, trade history, metrics) return 501.
 
   // GET /api/trading/ai-trader/health
   // Check AI trader microservice health
@@ -310,7 +316,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (url.pathname === '/api/trading/ai-trader/signals' && req.method === 'GET') {
     try {
       const limit = url.searchParams.get('limit') || 10;
-      const result = await callAITrader(`/api/ai-trader/signals?limit=${limit}`);
+      const result = await callAITrader(`/api/signals?limit=${limit}`);
       sendJson(res, result.data, result.status);
     } catch (error) {
       sendJson(res, { error: 'Failed to fetch signals', details: error.message }, 500);
@@ -319,24 +325,18 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // POST /api/trading/ai-trader/signals/generate
-  // Manually trigger signal generation
+  // No equivalent on the AI trader's REST API — signal generation runs on
+  // its own background scanner, not on demand via HTTP.
   if (url.pathname === '/api/trading/ai-trader/signals/generate' && req.method === 'POST') {
-    try {
-      const body = await deps.collectRequestBody(req);
-      const payload = body ? JSON.parse(body) : {};
-      const result = await callAITrader('/api/ai-trader/signals/generate', 'POST', payload);
-      sendJson(res, result.data, result.status);
-    } catch (error) {
-      sendJson(res, { error: 'Signal generation failed', details: error.message }, 500);
-    }
+    sendJson(res, { error: 'Not implemented: AI trader has no on-demand signal generation endpoint' }, 501);
     return true;
   }
 
   // GET /api/trading/ai-trader/portfolio
-  // Get current portfolio state from AI trader
+  // Get current open positions from AI trader
   if (url.pathname === '/api/trading/ai-trader/portfolio' && req.method === 'GET') {
     try {
-      const result = await callAITrader('/api/ai-trader/portfolio');
+      const result = await callAITrader('/api/positions');
       sendJson(res, result.data, result.status);
     } catch (error) {
       sendJson(res, { error: 'Portfolio fetch failed', details: error.message }, 500);
@@ -345,49 +345,32 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/ai-trader/trades
-  // Get trade history from AI trader
+  // No equivalent on the AI trader's REST API — it does not expose trade
+  // history over HTTP.
   if (url.pathname === '/api/trading/ai-trader/trades' && req.method === 'GET') {
-    try {
-      const limit = url.searchParams.get('limit') || 50;
-      const result = await callAITrader(`/api/ai-trader/trades?limit=${limit}`);
-      sendJson(res, result.data, result.status);
-    } catch (error) {
-      sendJson(res, { error: 'Trade history fetch failed', details: error.message }, 500);
-    }
+    sendJson(res, { error: 'Not implemented: AI trader has no trade history endpoint' }, 501);
     return true;
   }
 
   // POST /api/trading/ai-trader/trades
-  // Log a new trade
+  // No equivalent on the AI trader's REST API.
   if (url.pathname === '/api/trading/ai-trader/trades' && req.method === 'POST') {
-    try {
-      const body = await deps.collectRequestBody(req);
-      const payload = body ? JSON.parse(body) : {};
-      const result = await callAITrader('/api/ai-trader/trades', 'POST', payload);
-      sendJson(res, result.data, result.status);
-    } catch (error) {
-      sendJson(res, { error: 'Trade logging failed', details: error.message }, 500);
-    }
+    sendJson(res, { error: 'Not implemented: AI trader has no trade logging endpoint' }, 501);
     return true;
   }
 
   // GET /api/trading/ai-trader/metrics
-  // Get performance metrics
+  // No equivalent on the AI trader's REST API.
   if (url.pathname === '/api/trading/ai-trader/metrics' && req.method === 'GET') {
-    try {
-      const result = await callAITrader('/api/ai-trader/metrics');
-      sendJson(res, result.data, result.status);
-    } catch (error) {
-      sendJson(res, { error: 'Metrics fetch failed', details: error.message }, 500);
-    }
+    sendJson(res, { error: 'Not implemented: AI trader has no metrics endpoint' }, 501);
     return true;
   }
 
   // POST /api/trading/ai-trader/scanner/start
-  // Start background signal scanner
+  // Maps to the AI trader's /api/control/resume (clears its paused flag)
   if (url.pathname === '/api/trading/ai-trader/scanner/start' && req.method === 'POST') {
     try {
-      const result = await callAITrader('/api/ai-trader/scanner/start', 'POST');
+      const result = await callAITrader('/api/control/resume', 'POST');
       sendJson(res, result.data, result.status);
     } catch (error) {
       sendJson(res, { error: 'Scanner start failed', details: error.message }, 500);
@@ -396,10 +379,10 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // POST /api/trading/ai-trader/scanner/stop
-  // Stop background signal scanner
+  // Maps to the AI trader's /api/control/pause (sets its paused flag)
   if (url.pathname === '/api/trading/ai-trader/scanner/stop' && req.method === 'POST') {
     try {
-      const result = await callAITrader('/api/ai-trader/scanner/stop', 'POST');
+      const result = await callAITrader('/api/control/pause', 'POST');
       sendJson(res, result.data, result.status);
     } catch (error) {
       sendJson(res, { error: 'Scanner stop failed', details: error.message }, 500);
@@ -408,10 +391,10 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/ai-trader/scanner/status
-  // Get scanner status
+  // Maps to the AI trader's /api/status, which includes a `paused` flag
   if (url.pathname === '/api/trading/ai-trader/scanner/status' && req.method === 'GET') {
     try {
-      const result = await callAITrader('/api/ai-trader/scanner/status');
+      const result = await callAITrader('/api/status');
       sendJson(res, result.data, result.status);
     } catch (error) {
       sendJson(res, { error: 'Scanner status check failed', details: error.message }, 500);
@@ -423,7 +406,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Get complete AI trader system status
   if (url.pathname === '/api/trading/ai-trader/status' && req.method === 'GET') {
     try {
-      const result = await callAITrader('/api/ai-trader/status');
+      const result = await callAITrader('/api/status');
       sendJson(res, result.data, result.status);
     } catch (error) {
       sendJson(res, { error: 'Status check failed', details: error.message }, 503);
