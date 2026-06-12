@@ -497,22 +497,18 @@
   <!-- Header -->
   <nav class="site-nav">
     <a class="nav-brand" href="/">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
-      Lantern OS
+      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+      <span style="font-size:18px;font-weight:600">Lantern OS</span>
     </a>
     <div class="nav-links">
-      <a href="/dream-chat.html" class="active">Journal</a>
-      <a href="/three-doors-game.html">Explore</a>
-      <a href="/flourishing">Dashboard</a>
-      <a href="/knowledgecenter.html">Help</a>
+      <a href="/dream-chat.html" class="active" style="font-size:16px;padding:12px 16px">💬 Chat</a>
+      <a href="/three-doors-game.html" style="font-size:16px;padding:12px 16px">🚪 Explore</a>
+      <a href="/flourishing" style="font-size:16px;padding:12px 16px">📊 Dashboard</a>
     </div>
     <div class="nav-actions">
-      <span id="header-status" style="display:none">· connecting…</span>
-      <span id="github-status-badge" style="display:none;font-size:11px;color:var(--muted);margin-right:8px"></span>
-      <span id="environment-status" style="display:none;font-size:11px;color:var(--muted);margin-right:8px"></span>
-      <button class="nav-btn observer-toggle" id="observer-toggle-btn" onclick="toggleObserver()" title="Observer panel">◈</button>
-      <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
-      <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+      <button class="nav-btn" id="simple-mode-btn" onclick="toggleSimpleMode()" title="Simple Mode" style="font-size:20px;padding:8px 12px">👶</button>
+      <button class="nav-btn" id="voice-btn" onclick="toggleVoice()" title="Voice Mode" style="font-size:20px;padding:8px 12px">🎙️</button>
+      <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
     </div>
   </nav>
 
@@ -529,6 +525,12 @@
         <button onclick="fillAndSend('!explore')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='var(--border)'" title="Start interactive story">🚪 Start an interactive story…</button>
       </div>
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Help Someone Else</div>
+        <button onclick="fillPrompt('Help me help my grandkid with homework')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='var(--border)'">👶 Help grandkid with homework…</button>
+        <button onclick="fillPrompt('Help me help my neighbor with tech problems')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='var(--border)'">🤝 Help neighbor with tech…</button>
+        <button onclick="fillPrompt('Help me help a friend learn to code')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='var(--border)'">💻 Help friend learn code…</button>
+      </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px">
         <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Trading & Markets</div>
         <button onclick="fillPrompt('Buy 10 shares of AAPL')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='var(--border)'">💰 Execute a trade…</button>
         <button onclick="fillPrompt('Check my portfolio')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='var(--border)'">📊 View your portfolio…</button>
@@ -541,6 +543,7 @@
   <!-- Input area -->
   <div class="input-container">
     <div class="input-wrapper">
+      <button id="voice-input-btn" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
       <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
       <button class="send-button" id="send-btn" onclick="sendMessage()" title="Send">↑</button>
     </div>
@@ -852,6 +855,105 @@
   function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
   function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
   function openLogDream() { alert('Log entry coming soon'); closeSettings(); }
+
+  // ── Simple Mode ───────────────────────────────────────────────────
+  let simpleMode = false;
+  function toggleSimpleMode() {
+    simpleMode = !simpleMode;
+    const btn = document.getElementById('simple-mode-btn');
+    btn.style.opacity = simpleMode ? '1' : '0.5';
+    
+    // Hide complex UI elements
+    const observerBtn = document.getElementById('observer-toggle-btn');
+    const themeBtn = document.getElementById('theme-toggle');
+    const headerStatus = document.getElementById('header-status');
+    const githubBadge = document.getElementById('github-status-badge');
+    const envStatus = document.getElementById('environment-status');
+    
+    if (observerBtn) observerBtn.style.display = simpleMode ? 'none' : '';
+    if (themeBtn) themeBtn.style.display = simpleMode ? 'none' : '';
+    if (headerStatus) headerStatus.style.display = simpleMode ? 'none' : '';
+    if (githubBadge) githubBadge.style.display = simpleMode ? 'none' : '';
+    if (envStatus) envStatus.style.display = simpleMode ? 'none' : '';
+    
+    // Simplify starter chips
+    const starterChips = document.getElementById('starter-chips');
+    if (starterChips) {
+      starterChips.style.display = simpleMode ? 'none' : '';
+    }
+    
+    // Show simple mode message
+    if (simpleMode) {
+      const chat = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'message agent';
+      el.innerHTML = `<div class="agent-avatar">👶</div><div class="message-content" style="background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.3)"><div style="font-size:13px;font-weight:600;color:#34d399;margin-bottom:4px">Simple Mode On</div><div style="font-size:12px">Big buttons, easy to use. Tap 💬 to chat, 🚪 to explore.</div></div>`;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  // ── Voice Mode ───────────────────────────────────────────────────
+  let voiceMode = false;
+  let recognition = null;
+  function toggleVoice() {
+    voiceMode = !voiceMode;
+    const btn = document.getElementById('voice-btn');
+    const voiceInputBtn = document.getElementById('voice-input-btn');
+    btn.style.opacity = voiceMode ? '1' : '0.5';
+    
+    if (voiceMode && !recognition) {
+      // Initialize speech recognition
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          const input = document.getElementById('input');
+          if (input) {
+            input.value = transcript;
+            input.focus();
+          }
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+        };
+      } else {
+        alert('Voice mode not supported in this browser');
+        voiceMode = false;
+        btn.style.opacity = '0.5';
+        return;
+      }
+    }
+    
+    // Show/hide voice input button
+    if (voiceInputBtn) {
+      voiceInputBtn.style.display = voiceMode ? 'block' : 'none';
+    }
+    
+    if (voiceMode) {
+      const chat = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'message agent';
+      el.innerHTML = `<div class="agent-avatar">🎙️</div><div class="message-content" style="background:rgba(161,139,250,0.08);border-color:rgba(161,139,250,0.3)"><div style="font-size:13px;font-weight:600;color:#a78bfa;margin-bottom:4px">Voice Mode On</div><div style="font-size:12px">Tap the microphone button to speak your message.</div></div>`;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  function startVoiceInput() {
+    if (!voiceMode || !recognition) return;
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start recognition:', e);
+    }
+  }
 
   // ── Cube delta writer ────────────────────────────────────────────
   async function writeCubeDelta(eventType, symbols, payloadRef) {
