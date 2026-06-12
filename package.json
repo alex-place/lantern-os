@@ -1,8 +1,8 @@
 {
   "name": "lantern-os",
-  "version": "1.3.0",
+  "version": "1.3.5",
   "private": true,
-  "description": "Lantern OS \u2014 Dream Journal",
+  "description": "Lantern OS — Dream Journal",
   "scripts": {
     "setup": "node scripts/ensure-rust.js && node scripts/build-csf-rust.js",
     "postinstall": "npm run setup",

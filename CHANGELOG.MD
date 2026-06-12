@@ -1,3 +1,84 @@
+## [1.3.5] - 2026-06-12
+**Build:** 1.3.5+2026-06-12.081000
+**Commit:** a49db6b
+
+feat: GitHub issues to agent slots sync automation
+
+- Create Sync-GitHubIssuesToAgentSlots.ps1 to bridge GitHub issue queue to agent slots manifest
+- Fetches issues labeled dream-journal + agent-task, converts to slot entries with priority mapping
+- Integrates into smart-convergence-loop.yml workflow (runs every 6h)
+- Preserves existing non-GitHub slots (e.g., validation ring)
+- Grant write permissions to smart-convergence-loop workflow for manifest updates
+- Fix surfaces/index.html broken links (removed non-existent directories, added Creator Dashboard)
+- Create 5 Three Doors GitHub issues (hub scene, poem mechanic, challenge system, prize pipeline, progress persistence)
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+---
+
+## [1.3.3] - 2026-06-12
+**Build:** 1.3.3+2026-06-12.080508
+**Commit:** a49db6b
+
+fix: grant write permissions to smart-convergence-loop workflow
+
+Required for Sync-GitHubIssuesToAgentSlots.ps1 to update agent slots manifest
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+---
+
+## [1.3.2] - 2026-06-12
+**Build:** 1.3.2+2026-06-12.080500
+**Commit:** a49db6b
+
+fix: grant write permissions to smart-convergence-loop workflow
+
+Required for Sync-GitHubIssuesToAgentSlots.ps1 to update agent slots manifest
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+---
+
+## [1.3.1] - 2026-06-12
+**Build:** 1.3.1+2026-06-12.080219
+**Commit:** a49db6b
+
+fix: grant write permissions to smart-convergence-loop workflow
+
+Required for Sync-GitHubIssuesToAgentSlots.ps1 to update agent slots manifest
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+# 📚 Before pushing: Did you read these?
+#    □ QUICKSTART.md (dual-boot system)
+#    □ AGENTS.md (monoworkstream rules)
+#    □ CLAUDE.md (project architecture)
+
+---
+
 ## [1.3.0] — 2026-06-10 — ORION v1.0 + CSF Delta Memory + Dream Chat Full-Width
 
 **Build:** 1.3.0+2026-06-10  
