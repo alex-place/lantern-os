@@ -52,7 +52,7 @@ if (-not (Test-Path -LiteralPath $SlotsPath)) {
         upstream_pr = ""
         strategy = "GitHub issue queue sync via Sync-GitHubIssuesToAgentSlots.ps1"
         token_budget = "max_tokens=1024 per provider call; context slimmed via symbol mesh"
-        agent_slots = @()
+        slots = @()
     }
     $initialSlots | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $SlotsPath -Encoding utf8
     Write-Host "Created initial slots file: $SlotsPath" -ForegroundColor Cyan
@@ -88,14 +88,16 @@ Write-Host "Fetched $($issues.Count) total issues" -ForegroundColor Cyan
 
 # Filter for dream-journal agent-task issues
 $targetIssues = @($issues | Where-Object { 
-    $_.labels -contains "dream-journal" -and $_.labels -contains "agent-task" -and $_.state -eq "open"
+    ($_.labels | ForEach-Object { $_.name }) -contains "dream-journal" -and 
+    ($_.labels | ForEach-Object { $_.name }) -contains "agent-task" -and 
+    $_.state -eq "open"
 })
 Write-Host "Found $($targetIssues.Count) open dream-journal agent-task issues" -ForegroundColor Cyan
 
 # Read existing slots
 $existingSlots = Get-Content -LiteralPath $SlotsPath -Raw | ConvertFrom-Json
 $existingSlotsMap = @{}
-foreach ($slot in $existingSlots.agent_slots) {
+foreach ($slot in $existingSlots.slots) {
     $existingSlotsMap[$slot.id] = $slot
 }
 
@@ -152,7 +154,7 @@ foreach ($issue in $targetIssues) {
 }
 
 # Preserve existing non-GitHub slots (e.g., validation ring)
-foreach ($slot in $existingSlots.agent_slots) {
+foreach ($slot in $existingSlots.slots) {
     if (-not $slot.id.StartsWith("github/issue-")) {
         $newSlots.Add($slot)
     }
@@ -164,7 +166,7 @@ $updatedSlots = @{
     upstream_pr = $existingSlots.upstream_pr
     strategy = $existingSlots.strategy
     token_budget = $existingSlots.token_budget
-    agent_slots = @($newSlots)
+    slots = @($newSlots)
     convergence_loop_result = $existingSlots.convergence_loop_result
     validation_ring = $existingSlots.validation_ring
     notes = "Synced from GitHub issues at $(Get-Date -Format o). $($addedCount) added, $($updatedCount) updated, $($unchangedCount) unchanged."
