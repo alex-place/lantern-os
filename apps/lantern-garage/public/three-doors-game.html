@@ -1013,25 +1013,84 @@ function skipPoem() {
   appendSceneMsg("kingdome-garden", data, "", "offline");
 }
 
+// ── Challenge System ───────────────────────────────────────────────
+const CHALLENGES = {
+  "kingdome-garden": [
+    { id: "poem-master", name: "Poem Master", description: "Solve the King's poem on first try", reward: "kingdome-crown", check: (p) => p.poemSolved && p.poemAttempts === 1 },
+    { id: "king-audience", name: "King's Audience", description: "Visit the Garden 3 times", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["kingdome-garden"] || 0) >= 3 },
+  ],
+  "cloverfield": [
+    { id: "lucky-find", name: "Lucky Find", description: "Find a shiny in the Cloverfield", reward: "lorekeeper-badge", check: (p) => p.shiniesFound >= 1 },
+    { id: "four-leaf", name: "Four-Leaf Master", description: "Visit Cloverfield 5 times", reward: "speedwalker-badge", check: (p) => (p.sceneVisits?.["cloverfield"] || 0) >= 5 },
+  ],
+  "future-doors": [
+    { id: "time-traveler", name: "Time Traveler", description: "Visit all Future Door sub-paths", reward: "xenon-navigator-badge", check: (p) => p.futurePathsVisited >= 3 },
+  ],
+  "xp-door": [
+    { id: "glitch-hunter", name: "Glitch Hunter", description: "Find all XP Door corruption sequences", reward: "glitch-hunter-badge", check: (p) => p.glitchesFound >= 3 },
+  ],
+  "xenon-convergence": [
+    { id: "convergence-master", name: "Convergence Master", description: "Reach Xenon Starship twice", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["xenon-convergence"] || 0) >= 2 },
+  ],
+  "sigil-city": [
+    { id: "city-explorer", name: "City Explorer", description: "Visit all Sigil City sub-locations", reward: "lorekeeper-badge", check: (p) => p.sigilLocationsVisited >= 3 },
+  ],
+  "fog-door-return": [
+    { id: "return-journey", name: "Return Journey", description: "Complete the full loop and return", reward: "kingdome-crown", check: (p) => p.loopCompleted },
+  ],
+};
+
+// Global challenges (not tied to specific scenes)
+const GLOBAL_CHALLENGES = [
+  { id: "speedwalker", name: "Speedwalker", description: "Complete a first full loop of the Kingdome", reward: "speedwalker-badge", check: (p) => (p.loop_count || 0) >= 1 },
+  { id: "lorekeeper", name: "Lorekeeper", description: "Walk every stage of the journey", reward: "lorekeeper-badge", check: (p) => STAGES.every(s => p.visited?.includes(s)) },
+  { id: "xenon-navigator", name: "Xenon Navigator", description: "Reach the convergence AND the City of Doors", reward: "xenon-navigator-badge", check: (p) => p.visited?.includes("xenon-convergence") && p.visited?.includes("sigil-city") },
+  { id: "synthesasia-master", name: "Synthesasia Master", description: "Complete 3 full loops", reward: "synthesasia-badge", check: (p) => (p.loop_count || 0) >= 3 },
+];
+
 function checkChallenges(sceneKey, turnCount) {
-  // Speedwalker: complete a first full loop of the Kingdome
-  if ((playerProgress.loop_count || 0) >= 1 && !playerProgress.speedwalker) {
-    playerProgress.speedwalker = true;
-    saveProgress();
-    awardPrize("speedwalker-badge");
+  // Track scene visits
+  if (!playerProgress.sceneVisits) playerProgress.sceneVisits = {};
+  playerProgress.sceneVisits[sceneKey] = (playerProgress.sceneVisits[sceneKey] || 0) + 1;
+  
+  // Track poem attempts
+  if (sceneKey === "kingdome-garden" && !playerProgress.poemSolved) {
+    playerProgress.poemAttempts = (playerProgress.poemAttempts || 0) + 1;
   }
-  // Lorekeeper: walk every stage of the journey
-  if (STAGES.every(s => playerProgress.visited?.includes(s)) && !playerProgress.lorekeeper) {
-    playerProgress.lorekeeper = true;
-    saveProgress();
-    awardPrize("lorekeeper-badge");
+  
+  // Check scene-specific challenges
+  const sceneChallenges = CHALLENGES[sceneKey] || [];
+  for (const challenge of sceneChallenges) {
+    if (!playerProgress.completedChallenges?.includes(challenge.id) && challenge.check(playerProgress)) {
+      playerProgress.completedChallenges = playerProgress.completedChallenges || [];
+      playerProgress.completedChallenges.push(challenge.id);
+      saveProgress();
+      awardPrize(challenge.reward);
+      showChallengeComplete(challenge);
+    }
   }
-  // Xenon Navigator: reach the convergence AND the City of Doors
-  if (playerProgress.visited?.includes("xenon-convergence") && playerProgress.visited?.includes("sigil-city") && !playerProgress.xenonNavigator) {
-    playerProgress.xenonNavigator = true;
-    saveProgress();
-    awardPrize("xenon-navigator-badge");
+  
+  // Check global challenges
+  for (const challenge of GLOBAL_CHALLENGES) {
+    if (!playerProgress.completedChallenges?.includes(challenge.id) && challenge.check(playerProgress)) {
+      playerProgress.completedChallenges = playerProgress.completedChallenges || [];
+      playerProgress.completedChallenges.push(challenge.id);
+      saveProgress();
+      awardPrize(challenge.reward);
+      showChallengeComplete(challenge);
+    }
   }
+  
+  saveProgress();
+}
+
+function showChallengeComplete(challenge) {
+  const chat = document.getElementById("chat");
+  const el = document.createElement("div");
+  el.className = "message agent";
+  el.innerHTML = `<div class="agent-avatar">🏆</div><div class="message-content" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.3)"><div style="font-size:12px;font-weight:600;color:#fbbf24;margin-bottom:4px">Challenge Complete</div><div style="font-size:13px">${challenge.name}: ${challenge.description}</div></div>`;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 // ── Pollinations.ai async image loader ───────────────────────────
