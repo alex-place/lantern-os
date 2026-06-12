@@ -76,9 +76,26 @@
     .last-update{ font-size:.7rem; color:var(--muted); margin-top:10px; }
 
     /* ── Tab bar ── */
-    .tab-bar{ display:flex; gap:6px; margin-bottom:14px; }
+    .tab-bar{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
     .tab{ font-family:var(--mono); font-size:11px; padding:6px 14px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--muted); cursor:pointer; transition:all .15s; letter-spacing:.05em; }
     .tab.active,.tab:hover{ background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
+
+    /* ── Timeline rail ── */
+    .timeline-rail{ position:relative; padding-left:24px; }
+    .timeline-rail::before{ content:''; position:absolute; left:7px; top:0; bottom:0; width:2px; background:var(--border); }
+    .tl-item{ position:relative; margin-bottom:14px; }
+    .tl-dot{ position:absolute; left:-21px; top:5px; width:10px; height:10px; border-radius:50%; border:2px solid var(--border); background:var(--surface2); }
+    .tl-dot.high{ border-color:var(--danger); background:rgba(239,68,68,.2); }
+    .tl-dot.medium{ border-color:var(--gold); background:rgba(245,158,11,.15); }
+    .tl-dot.low{ border-color:var(--border); background:var(--surface2); }
+    .tl-card{ background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; transition:border-color .15s; cursor:pointer; }
+    .tl-card:hover{ border-color:var(--accent); }
+    .tl-time{ font-family:var(--mono); font-size:10px; color:var(--muted); margin-bottom:4px; }
+    .tl-headline{ font-size:12px; font-weight:500; line-height:1.4; color:var(--text); margin-bottom:6px; }
+    .tl-meta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .tl-badge{ font-family:var(--mono); font-size:9px; font-weight:600; padding:2px 6px; border-radius:4px; }
+    .tl-date-divider{ font-family:var(--mono); font-size:10px; color:var(--gold); letter-spacing:.1em; text-transform:uppercase; margin:18px 0 10px; position:relative; }
+    .tl-date-divider::after{ content:''; position:absolute; right:0; top:50%; width:calc(100% - 100px); height:1px; background:var(--border); }
 
     /* ── Filters ── */
     .filter-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
@@ -160,9 +177,20 @@
         <button class="tab active" onclick="setTab('all')">All News</button>
         <button class="tab" onclick="setTab('stocks')">Stocks</button>
         <button class="tab" onclick="setTab('market')">Broad Market</button>
+        <button class="tab" onclick="setView('timeline')" id="tab-timeline">⏱ Timeline</button>
+        <button class="tab" onclick="setView('grid')" id="tab-grid" style="background:var(--accent-dim);color:var(--accent);border-color:var(--accent)">⊞ Grid</button>
       </div>
       <div class="filter-row">
         <input class="filter-input" id="searchInput" placeholder="Search headlines..." oninput="applyFilters()">
+        <div class="impact-filter">
+          <span>Sentiment:</span>
+          <select id="sentimentFilter" onchange="applyFilters()">
+            <option value="">All</option>
+            <option value="high">🔴 High</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="low">⚪ Low</option>
+          </select>
+        </div>
         <div class="impact-filter">
           <span>Min impact:</span>
           <select id="impactFilter" onchange="applyFilters()">
@@ -185,17 +213,32 @@
 <script>
 let allNews = [];
 let currentTab = 'all';
+let currentView = 'grid';
 let activeTickerFilter = null;
 
 function setTab(tab) {
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['all','stocks','market'][i] === tab));
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    if (i < 3) t.classList.toggle('active', ['all','stocks','market'][i] === tab);
+  });
+  applyFilters();
+}
+
+function setView(view) {
+  currentView = view;
+  const tl = document.getElementById('tab-timeline');
+  const gr = document.getElementById('tab-grid');
+  const active = 'background:var(--accent-dim);color:var(--accent);border-color:var(--accent)';
+  const inactive = '';
+  tl.style.cssText = view === 'timeline' ? active : inactive;
+  gr.style.cssText = view === 'grid' ? active : inactive;
   applyFilters();
 }
 
 function applyFilters() {
-  const search     = document.getElementById('searchInput').value.toLowerCase();
-  const minImpact  = parseInt(document.getElementById('impactFilter').value);
+  const search    = document.getElementById('searchInput').value.toLowerCase();
+  const minImpact = parseInt(document.getElementById('impactFilter').value);
+  const sentiment = document.getElementById('sentimentFilter').value;
   let filtered = allNews;
 
   if (currentTab === 'stocks')  filtered = filtered.filter(n => n.symbols && n.symbols.length > 0);
@@ -203,8 +246,56 @@ function applyFilters() {
   if (activeTickerFilter)       filtered = filtered.filter(n => n.symbols && n.symbols.includes(activeTickerFilter));
   if (search)                   filtered = filtered.filter(n => (n.headline||'').toLowerCase().includes(search));
   if (minImpact > 0)            filtered = filtered.filter(n => n.impact >= minImpact);
+  if (sentiment)                filtered = filtered.filter(n => impactToSentiment(n.impact) === sentiment);
 
-  renderNews(filtered);
+  if (currentView === 'timeline') renderTimeline(filtered);
+  else renderNews(filtered);
+}
+
+function impactToSentiment(impact) {
+  if (impact >= 70) return 'high';
+  if (impact >= 40) return 'medium';
+  return 'low';
+}
+
+function renderTimeline(items) {
+  const el = document.getElementById('newsContainer');
+  if (!items.length) {
+    el.innerHTML = '<div class="loading">No articles match your filters.</div>';
+    return;
+  }
+  const sorted = [...items].sort((a, b) => new Date(b.published || b.date) - new Date(a.published || a.date));
+  const groups = {};
+  sorted.forEach(n => {
+    const d = n.date || (n.published ? n.published.slice(0,10) : 'Unknown');
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(n);
+  });
+  let html = '<div class="timeline-rail">';
+  Object.keys(groups).sort((a,b) => b.localeCompare(a)).forEach(date => {
+    html += `<div class="tl-date-divider">${formatDate(date)}</div>`;
+    groups[date].forEach(n => {
+      const sent = impactToSentiment(n.impact);
+      const impactClass = sent === 'high' ? 'impact-high' : sent === 'medium' ? 'impact-med' : 'impact-low';
+      const impactLabel = sent === 'high' ? '🔴 HIGH' : sent === 'medium' ? '🟡 MED' : '⚪ LOW';
+      const tickers = (n.symbols||[]).slice(0,4).map(s => `<span class="news-ticker-tag">${s}</span>`).join('');
+      const timeStr = n.published ? new Date(n.published).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+      html += `
+        <div class="tl-item">
+          <div class="tl-dot ${sent}"></div>
+          <div class="tl-card" onclick="window.open('${n.url}','_blank')">
+            <div class="tl-time">${timeStr} · ${n.source || ''}</div>
+            <div class="tl-headline">${n.headline}</div>
+            <div class="tl-meta">
+              <span class="tl-badge ${impactClass}">${impactLabel} ${n.impact}</span>
+              ${tickers}
+            </div>
+          </div>
+        </div>`;
+    });
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function renderNews(items) {
@@ -325,6 +416,15 @@ function loadNews() {
 
       buildTickerFilters(ticker_news);
       applyFilters();
+
+      // Persist to CSF (fire-and-forget; server dedupes by id)
+      allNews.forEach(item => {
+        fetch('/api/trading/news/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item),
+        }).catch(() => {});
+      });
     })
     .catch(err => {
       document.getElementById('newsContainer').innerHTML =

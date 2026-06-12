@@ -371,6 +371,44 @@
     .tts-word { border-radius: 2px; transition: background 0.08s; }
     .tts-active { background: rgba(255, 220, 50, 0.22); }
 
+    /* Personal insights styles */
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    .status-indicator.ok { background: #34d399; }
+    .status-indicator.err { background: var(--accent); }
+    .status-indicator.pending { background: #fbbf24; }
+
+    .priority-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--surface2);
+      border-radius: 6px;
+      margin-bottom: 4px;
+    }
+    .priority-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .priority-badge.p0 { background: var(--accent); color: white; }
+    .priority-badge.p1 { background: #fbbf24; color: black; }
+    .priority-badge.p2 { background: #34d399; color: white; }
+    .priority-badge.p3 { background: var(--muted); color: var(--text); }
+    .priority-title {
+      font-size: 12px;
+      color: var(--text);
+      flex: 1;
+    }
+
     /* Connector sidecar */
     .connector-grid {
       display: flex;
@@ -451,6 +489,11 @@
       font-style: italic;
       letter-spacing: 0.02em;
     }
+    /* Heartbeat animation for mandala in simple mode */
+    @keyframes heartbeat {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.8; }
+    }
   </style>
 </head>
 <body>
@@ -459,41 +502,91 @@
   <!-- Header -->
   <nav class="site-nav">
     <a class="nav-brand" href="/">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
-      Lantern OS
+      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+      <span style="font-size:18px;font-weight:600">Lantern OS</span>
     </a>
     <div class="nav-links">
-      <a href="/dream-chat.html" class="active">Journal</a>
-      <a href="/three-doors-game.html">Explore</a>
-      <a href="/flourishing">Dashboard</a>
-      <a href="/knowledgecenter.html">Help</a>
+      <a href="/dream-chat.html" class="active" style="font-size:16px;padding:12px 16px">💬 Chat</a>
+      <a href="/three-doors-game.html" style="font-size:16px;padding:12px 16px">🚪 Explore</a>
+      <a href="/flourishing" style="font-size:16px;padding:12px 16px">📊 Dashboard</a>
     </div>
     <div class="nav-actions">
-      <span id="header-status" style="display:none">· connecting…</span>
-      <button class="nav-btn observer-toggle" id="observer-toggle-btn" onclick="toggleObserver()" title="Observer panel">◈</button>
-      <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
-      <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+      <button class="nav-btn" id="simple-mode-btn" onclick="toggleSimpleMode()" title="Simple Mode" style="font-size:20px;padding:8px 12px">👶</button>
+      <button class="nav-btn" id="voice-btn" onclick="toggleVoice()" title="Voice Mode" style="font-size:20px;padding:8px 12px">🎙️</button>
+      <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
     </div>
   </nav>
 
   <!-- Chat area -->
   <div class="chat-container" id="messages" role="log" aria-label="Conversation messages" aria-live="polite">
     <div class="empty-state" id="empty-state">
-      <div class="empty-icon" style="opacity:0.5;font-size:48px">📝</div>
-      <h2>What's on your mind?</h2>
-      <p>Write a reflection, ask a question, or just think out loud. Everything stays private on your device.</p>
-      <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px;margin-top:8px">
-        <button onclick="fillPrompt('Today I noticed that ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📝 Record a thought…</button>
-        <button onclick="fillPrompt('I keep thinking about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🔄 Explore a recurring thought…</button>
-        <button onclick="fillPrompt('What do you know about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">✨ Ask about a topic…</button>
-        <button onclick="fillAndSend('!explore')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='var(--border)'" title="Start interactive story">🚪 Start an interactive story…</button>
-      </div>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px">
-        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Trading & Markets</div>
-        <button onclick="fillPrompt('Buy 10 shares of AAPL')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='var(--border)'">💰 Execute a trade…</button>
-        <button onclick="fillPrompt('Check my portfolio')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='var(--border)'">📊 View your portfolio…</button>
-        <button onclick="fillPrompt('What are the trading signals for today?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='var(--border)'">📈 Ask for trading signals…</button>
-        <button onclick="fillPrompt('What is the market status?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🌐 Check market status…</button>
+      <div style="text-align:center;padding:40px 20px">
+        <div style="font-size:64px;margin-bottom:16px">🏮</div>
+        <h1 style="font-size:28px;font-weight:600;margin-bottom:8px;color:var(--text)">Welcome to Lantern OS</h1>
+        <p style="font-size:15px;color:var(--muted);max-width:400px;margin:0 auto 24px">Your cockpit for helping others. Write a reflection, ask a question, or help someone with their challenges.</p>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
+          <button onclick="fillPrompt('Today I noticed that ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+            <span style="font-size:24px">📝</span>
+            <span>Record a thought</span>
+          </button>
+          <button onclick="fillPrompt('I keep thinking about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+            <span style="font-size:24px">🔄</span>
+            <span>Explore thoughts</span>
+          </button>
+          <button onclick="fillPrompt('What do you know about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+            <span style="font-size:24px">✨</span>
+            <span>Ask a question</span>
+          </button>
+          <button onclick="fillAndSend('!explore')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#a78bfa';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'" title="Start interactive story">
+            <span style="font-size:24px">🚪</span>
+            <span>Start a story</span>
+          </button>
+        </div>
+        
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Help Someone Else</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
+            <button onclick="fillPrompt('Help me help my grandkid with homework')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
+              <span style="font-size:24px">👶</span>
+              <span>Help with homework</span>
+            </button>
+            <button onclick="fillPrompt('Help me help my neighbor with tech problems')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
+              <span style="font-size:24px">🤝</span>
+              <span>Help with tech</span>
+            </button>
+            <button onclick="fillPrompt('Help me help a friend learn to code')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
+              <span style="font-size:24px">💻</span>
+              <span>Teach coding</span>
+            </button>
+          </div>
+        </div>
+        
+        <div style="margin-top:24px">
+          <button onclick="toggleTradingSection()" id="trading-toggle" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:8px 16px;border-radius:20px;transition:all 0.2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+            <span id="trading-toggle-text">Show Trading & Markets</span> <span id="trading-toggle-icon">▼</span>
+          </button>
+          <div id="trading-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
+              <button onclick="fillPrompt('Buy 10 shares of AAPL')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#10b981';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">💰</span>
+                <span>Execute a trade</span>
+              </button>
+              <button onclick="fillPrompt('Check my portfolio')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#3b82f6';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">📊</span>
+                <span>View portfolio</span>
+              </button>
+              <button onclick="fillPrompt('What are the trading signals for today?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">📈</span>
+                <span>Trading signals</span>
+              </button>
+              <button onclick="fillPrompt('What is the market status?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">🌐</span>
+                <span>Market status</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -501,6 +594,7 @@
   <!-- Input area -->
   <div class="input-container">
     <div class="input-wrapper">
+      <button id="voice-input-btn" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
       <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
       <button class="send-button" id="send-btn" onclick="sendMessage()" title="Send">↑</button>
     </div>
@@ -535,6 +629,13 @@
       <div>
         <div class="obs-section-title">Dilation Ratio</div>
         <div class="obs-value" id="obs-dilation">1.0×</div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+      <div>
+        <div class="obs-section-title">Current Priorities</div>
+        <div id="priorities-panel">
+          <div style="font-size:11px;color:var(--muted)">Loading…</div>
+        </div>
       </div>
     </div>
   </aside>
@@ -735,10 +836,215 @@
 <script src="js/dream-chat.js?v=20260612"></script>
 <script src="/js/theme-toggle.js"></script>
 <script>
+  // ── Personal Cube Integration ───────────────────────────────────────
+  let personalContext = null;
+
+  async function loadPersonalCube() {
+    try {
+      const resp = await fetch('/api/cubes/alex/personal');
+      if (resp.ok) {
+        personalContext = await resp.json();
+        updatePersonalInsights(personalContext);
+        console.log('[personal-cube] Loaded:', personalContext);
+      }
+    } catch (e) {
+      console.error('[personal-cube] Failed to load:', e);
+    }
+  }
+
+  function updatePersonalInsights(cube) {
+    // Update GitHub status badge
+    const githubBadge = document.getElementById('github-status-badge');
+    if (githubBadge && cube.github) {
+      const openIssues = cube.github.issues?.filter(i => i.state === 'open').length || 0;
+      const openPRs = cube.github.prs?.filter(p => p.state === 'open').length || 0;
+      githubBadge.textContent = `GitHub: ${openIssues} issues, ${openPRs} PRs`;
+      githubBadge.style.display = 'block';
+    }
+
+    // Update provider health indicators
+    if (cube.providers) {
+      for (const [provider, status] of Object.entries(cube.providers)) {
+        const indicator = document.getElementById(`provider-${provider}-status`);
+        if (indicator) {
+          indicator.className = status.configured ? 'status-indicator ok' : 'status-indicator err';
+          indicator.textContent = status.configured ? '✓' : '✗';
+        }
+      }
+    }
+
+    // Update environment status
+    if (cube.environment) {
+      const envStatus = document.getElementById('environment-status');
+      if (envStatus) {
+        const serverStatus = cube.environment.server?.running ? 'Running' : 'Stopped';
+        const gitStatus = cube.environment.git?.isDirty ? 'Dirty' : 'Clean';
+        envStatus.textContent = `Env: ${serverStatus}, Git: ${gitStatus}`;
+      }
+    }
+
+    // Update current priorities
+    if (cube.priorities && cube.priorities.nextActions) {
+      const prioritiesPanel = document.getElementById('priorities-panel');
+      if (prioritiesPanel) {
+        prioritiesPanel.innerHTML = cube.priorities.nextActions.map(p => 
+          `<div class="priority-item">
+            <span class="priority-badge ${p.priority}">${p.priority}</span>
+            <span class="priority-title">#${p.number}: ${p.title}</span>
+          </div>`
+        ).join('');
+      }
+    }
+  }
+
+  // Load personal cube on page load
+  loadPersonalCube();
+  // Refresh personal cube every 5 minutes
+  setInterval(loadPersonalCube, 300000);
+
   // ── Modal controls ─────────────────────────────────────────────────
   function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
   function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
   function openLogDream() { alert('Log entry coming soon'); closeSettings(); }
+
+  // ── Simple Mode ───────────────────────────────────────────────────
+  let simpleMode = false;
+  function toggleSimpleMode() {
+    simpleMode = !simpleMode;
+    const btn = document.getElementById('simple-mode-btn');
+    btn.style.opacity = simpleMode ? '1' : '0.5';
+    btn.style.background = simpleMode ? 'rgba(52,211,153,0.2)' : 'transparent';
+    btn.style.border = simpleMode ? '2px solid #34d399' : 'none';
+    
+    // Animate mandala heartbeat
+    const mandala = document.querySelector('.nav-brand img');
+    if (mandala) {
+      if (simpleMode) {
+        mandala.style.animation = 'heartbeat 1.5s ease-in-out infinite';
+      } else {
+        mandala.style.animation = '';
+      }
+    }
+    
+    // Hide complex UI elements
+    const observerBtn = document.getElementById('observer-toggle-btn');
+    const themeBtn = document.getElementById('theme-toggle');
+    const headerStatus = document.getElementById('header-status');
+    const githubBadge = document.getElementById('github-status-badge');
+    const envStatus = document.getElementById('environment-status');
+    
+    if (observerBtn) observerBtn.style.display = simpleMode ? 'none' : '';
+    if (themeBtn) themeBtn.style.display = simpleMode ? 'none' : '';
+    if (headerStatus) headerStatus.style.display = simpleMode ? 'none' : '';
+    if (githubBadge) githubBadge.style.display = simpleMode ? 'none' : '';
+    if (envStatus) envStatus.style.display = simpleMode ? 'none' : '';
+    
+    // Simplify starter chips
+    const starterChips = document.getElementById('starter-chips');
+    if (starterChips) {
+      starterChips.style.display = simpleMode ? 'none' : '';
+    }
+    
+    // Show simple mode message
+    if (simpleMode) {
+      const chat = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'message agent';
+      el.innerHTML = `<div class="agent-avatar">👶</div><div class="message-content" style="background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.3)"><div style="font-size:13px;font-weight:600;color:#34d399;margin-bottom:4px">Simple Mode On</div><div style="font-size:12px">Big buttons, easy to use. Tap 💬 to chat, 🚪 to explore.</div></div>`;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  // ── Voice Mode ───────────────────────────────────────────────────
+  let voiceMode = false;
+  let recognition = null;
+  function toggleVoice() {
+    voiceMode = !voiceMode;
+    const btn = document.getElementById('voice-btn');
+    const voiceInputBtn = document.getElementById('voice-input-btn');
+    btn.style.opacity = voiceMode ? '1' : '0.5';
+    btn.style.background = voiceMode ? 'rgba(161,139,250,0.2)' : 'transparent';
+    btn.style.border = voiceMode ? '2px solid #a78bfa' : 'none';
+    
+    // Animate mandala heartbeat
+    const mandala = document.querySelector('.nav-brand img');
+    if (mandala) {
+      if (voiceMode) {
+        mandala.style.animation = 'heartbeat 1.5s ease-in-out infinite';
+      } else if (!simpleMode) {
+        mandala.style.animation = '';
+      }
+    }
+    
+    if (voiceMode && !recognition) {
+      // Initialize speech recognition
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          const input = document.getElementById('input');
+          if (input) {
+            input.value = transcript;
+            input.focus();
+          }
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+        };
+      } else {
+        alert('Voice mode not supported in this browser');
+        voiceMode = false;
+        btn.style.opacity = '0.5';
+        return;
+      }
+    }
+    
+    // Show/hide voice input button
+    if (voiceInputBtn) {
+      voiceInputBtn.style.display = voiceMode ? 'block' : 'none';
+    }
+    
+    if (voiceMode) {
+      const chat = document.getElementById('messages');
+      const el = document.createElement('div');
+      el.className = 'message agent';
+      el.innerHTML = `<div class="agent-avatar">🎙️</div><div class="message-content" style="background:rgba(161,139,250,0.08);border-color:rgba(161,139,250,0.3)"><div style="font-size:13px;font-weight:600;color:#a78bfa;margin-bottom:4px">Voice Mode On</div><div style="font-size:12px">Tap the microphone button to speak your message.</div></div>`;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  function startVoiceInput() {
+    if (!voiceMode || !recognition) return;
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start recognition:', e);
+    }
+  }
+
+  function toggleTradingSection() {
+    const section = document.getElementById('trading-section');
+    const toggleText = document.getElementById('trading-toggle-text');
+    const toggleIcon = document.getElementById('trading-toggle-icon');
+    
+    if (section.style.display === 'none') {
+      section.style.display = 'block';
+      toggleText.textContent = 'Hide Trading & Markets';
+      toggleIcon.textContent = '▲';
+    } else {
+      section.style.display = 'none';
+      toggleText.textContent = 'Show Trading & Markets';
+      toggleIcon.textContent = '▼';
+    }
+  }
 
   // ── Cube delta writer ────────────────────────────────────────────
   async function writeCubeDelta(eventType, symbols, payloadRef) {
@@ -996,6 +1302,7 @@
           agent: '',
           provider,
           history: history.slice(-10),
+          personalContext: personalContext || {},  // NEW: inject personal cube data
         }),
         signal: AbortSignal.timeout(90000),
       });

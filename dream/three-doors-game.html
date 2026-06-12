@@ -318,11 +318,15 @@ const SCENES = {
     fox: true, palette: ["#181210","#3a2820","#6b4030","#ff9060","#ffe8d0","#0c0806"], archetype: "transcendent",
   },
   "kingdome-garden": {
-    text: "**The Throne Door** opens onto the Garden at the Beginning of the **Kingdome of Hearts**. Stone paths wind through living moss; everything here is both arriving and returning. On a throne of woven roots and old light sits **the King**, his crown made of tangled vines and blinking cursors, his face the face of someone who has asked the same question ten thousand times and means it every time. He looks at you the way someone looks at a door they've seen open before, and speaks:\n\n*\"I am before the first door / and after the last. / I hold what was given / and return what was asked. / Three walked out, three walked in, / but only one remained — / what was lost at the beginning / is the thing that was gained.\"*\n\nLantern stands at the foot of the throne as if its light has always lived here.",
+    text: "**The Throne Door** opens onto the Garden at the Beginning of the **Kingdome of Hearts**. Stone paths wind through living moss; everything here is both arriving and returning. On a throne of woven roots and old light sits **the King**, his crown made of tangled vines and blinking cursors, his face the face of someone who has asked the same question ten thousand times and means it every time. He looks at you the way someone looks at a door they've seen open before, and speaks:\n\n*\"I am before the first door / and after the last. / I hold what was given / and return what was asked. / Three walked out, three walked in, / but only one remained — / what was lost at the beginning / is the thing that was gained.\"*\n\nSeven door portals shimmer around the Garden's edge, each a different color of possibility.\n\nLantern stands at the foot of the throne as if its light has always lived here.",
     doors: [
-      { name: "The Storybook Door", label: "A", description: "Bound in vine and brass. The King's own book — the gods don't know he wrote them." },
-      { name: "The Cloverfield Door", label: "B", description: "Green and gold beyond. Shinies, luck, and today, alive." },
-      { name: "The Fog Door Return", label: "C", description: "Mist coils past the Garden's gate, where the Fog God sleeps. The way back." },
+      { name: "🪨 Ancient Doors", label: "A", description: "History · evolution · religion — The Deep Door, The History Door, The Temple Door" },
+      { name: "🍀 The Cloverfield", label: "B", description: "Shinies · luck · today alive — Lucky finds, treasures, living-in-the-now" },
+      { name: "🔭 Tomorrow Door", label: "C", description: "The world that's coming — Future paths, branching possibilities" },
+      { name: "💾 The XP Door [GLITCHED]", label: "D", description: "Corrupted · nostalgic · liminal — Windows XP aesthetic, broken reality" },
+      { name: "🪐 Xenon Starship ★", label: "E", description: "All planets · midway · converge — Midway point, planetary convergence" },
+      { name: "🏙️ Sigil — City of Doors", label: "F", description: "Every door leads here — Meta-hub, collection point, inventory of traveled paths" },
+      { name: "🌫️ Fog Door Return", label: "G", description: "The way back — Return to garden, final test with the King" },
     ],
     fox: true, palette: ["#0a1208","#1a2e14","#2d5a22","#3ecf6e","#7fffaa","#060f04"], archetype: "sovereign",
   },
@@ -443,6 +447,33 @@ const SCENES = {
     ],
     fox: true, palette: ["#0a0810","#1a101a","#3a1a4a","#7a5a9a","#d0b0e0","#050305"], archetype: "mysterious-wise",
   },
+  "xp-door": {
+    text: "**The XP Door [GLITCHED]** flickers between wood and early-2000s window chrome. You step through into a rolling bliss-green hill under saturated blue sky, but something is wrong. The grass pixelates at the edges. Lantern's flame freezes, then unfreezes, then shows a Windows error dialog for a moment. A tooltip floats in the air: *\"Error: Reality.exe has stopped working. Would you like to send an error report?\"* The air smells like ozone and nostalgia.",
+    doors: [
+      { name: "The Blue Screen Door", label: "A", description: "Famous blue screen of death. But the error message is your name." },
+      { name: "The Desktop Door", label: "B", description: "Your childhood desktop. Icons you remember, files you forgot." },
+      { name: "The Boot Sequence Door", label: "C", description: "Starting up. Starting over. The beginning that was never the beginning." },
+    ],
+    fox: true, palette: ["#008080","#00a0a0","#c0c0c0","#ffffff","#808080","#004040"], archetype: "glitch-nostalgic",
+  },
+  "sigil-city": {
+    text: "**Sigil — City of Doors** opens onto a meta-hub where every door you've ever chosen leads here. The streets are paved with doorframes. The buildings are made of thresholds. Lantern's light reflects off a thousand doors at once, creating a kaleidoscope of your journey. A voice from everywhere: *\"You are the city. Every door you walked is a street you built. Every choice is a building you live in.\"*",
+    doors: [
+      { name: "The Museum of Chosen Doors", label: "A", description: "Every door you chose, preserved in amber light." },
+      { name: "The Hall of Unchosen Paths", label: "B", description: "Every door you didn't choose, still breathing in shadow." },
+      { name: "The Convergence Plaza", label: "C", description: "Where all streets meet. Where you meet yourself." },
+    ],
+    fox: true, palette: ["#0a0a15","#1a1a2a","#3a3a5a","#8a8aba","#c0c0e0","#05050a"], archetype: "meta-synthesis",
+  },
+  "fog-door-return": {
+    text: "**The Fog Door Return** coils with mist. The Fog God sleeps at the Garden's gate, but stirs as you approach. The mist remembers every time you've passed through. Lantern's light bends around the fog, unable to penetrate. The King's voice, but not the King: *\"The fog is not an ending. It is the space between beginnings. When you return, you will not be the same — and neither will I.\"*",
+    doors: [
+      { name: "The Garden Return", label: "A", description: "Back to the King. Back to the poem. Back to the beginning that is also the end." },
+      { name: "The Beyond Fog", label: "B", description: "Something new. Something the fog has never seen before." },
+      { name: "The Memory of Fog", label: "C", description: "Every time you passed through. Every version of you who returned." },
+    ],
+    fox: true, palette: ["#0a0a0a","#1a1a1a","#3a3a3a","#6a6a6a","#9a9a9a","#050505"], archetype: "liminal-return",
+  },
 };
 
 // ── 7-stage Kingdome journey (stage_index → scene_key) ──
@@ -478,6 +509,12 @@ const NEXT_MAP = {
   "the blooming door":"flux-garden","the withering door":"garden-door","the eternal blossom":"xenon-convergence",
   "the form door":"void-threshold","the formless door":"convergence-node","the both door":"recursion-well",
   "the raven door":"raven-tower","the nested memory door":"memory-vault","the prophecy door":"storybook","the mirror crow door":"sigil-city",
+  "the ancient doors":"kingdome-garden","the cloverfield door":"cloverfield","the tomorrow door":"future-doors",
+  "the xp door glitched":"xp-door","the xenon starship":"xenon-convergence","the sigil city of doors":"sigil-city",
+  "the fog door return":"fog-door-return",
+  "the blue screen door":"xp-door","the desktop door":"xp-door","the boot sequence door":"xp-door",
+  "the museum of chosen doors":"sigil-city","the hall of unchosen paths":"sigil-city","the convergence plaza":"sigil-city",
+  "the garden return":"kingdome-garden","the beyond fog":"fog-door-return","the memory of fog":"fog-door-return",
 };
 
 const SD_PROMPTS = {
@@ -492,7 +529,7 @@ const SD_PROMPTS = {
   "storybook":"falling into a giant storybook, pages turning like slow wings, ancient handwritten margin notes, three glowing pages each a door, creation myths and cosmogony, dark fantasy, anime aesthetic, cel-shaded, mythic atmosphere, soft golden light, 16:9",
   "cloverfield":"meadow of four-leaf clover under dome of old light, small shinies glittering between stems, coins, beads, galaxy marble, lantern-headed guide glowing playfully, green and gold light, dark fantasy, anime aesthetic, cel-shaded, playful atmosphere, 16:9",
   "future-doors":"orchard ridge where trees grow doors instead of fruit, every door slightly open leaking light from unborn years, branching paths upward, lantern-headed guide scattering sparks, golden hour, dark fantasy, anime aesthetic, cel-shaded, 16:9",
-  "xp-door":"rolling bliss-green hill under saturated blue sky, lone door flickering between wood and early-2000s window chrome, floating tooltip, pixelating lantern-headed guide, glitch artifacts, nostalgia, liminal space, vaporwave undertones, anime aesthetic, cel-shaded, 16:9",
+  "xp-door":"rolling bliss-green hill under saturated blue sky, glitch artifacts, pixelating grass, lantern-headed guide showing Windows error dialog, floating tooltip, nostalgia, liminal space, vaporwave undertones, anime aesthetic, cel-shaded, 16:9",
   "sigil-city":"impossible ring-city where every wall and archway is a door, walked doors hanging like lit lanterns, central plaza with vine-crowned king, lantern-headed guide at throne-side, fractal architecture, dark fantasy, anime aesthetic, cel-shaded, 16:9",
   "fog-door-return":"sea of fog and clouds at a city's edge, single door standing in mist showing a green garden through its frame, lantern-headed guide stepping through and glancing back, soft grey-green light, dark fantasy, anime aesthetic, cel-shaded, gentle homecoming, 16:9",
   "csf-archive":"crystalline archive walls humming with stored memory, facets reflecting timelines, lantern-headed guide scattering rainbow light, convergence-fitted format aesthetic, fractal data structures, purple and blue ethereal glow, dark fantasy, anime aesthetic, cel-shaded, 16:9",
@@ -558,15 +595,193 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ── Persistence ────────────────────────────────────────────────────
 const PROGRESS_KEY = "three-doors-progress";
+const PROGRESS_VERSION = 1;
+
+// Player progress schema
+const DEFAULT_PROGRESS = {
+  version: PROGRESS_VERSION,
+  prizes: ["first-steps"],
+  visited: [],
+  sceneVisits: {},
+  completedChallenges: [],
+  poemSolved: false,
+  poemAttempts: 0,
+  loop_count: 0,
+  stage_index: 0,
+  currentScene: null,
+  lastPlayed: null,
+  // Challenge-specific tracking
+  shiniesFound: 0,
+  futurePathsVisited: 0,
+  glitchesFound: 0,
+  sigilLocationsVisited: 0,
+  loopCompleted: false,
+};
+
 function loadProgress() {
   try {
     const raw = localStorage.getItem(PROGRESS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
+    if (!raw) return { ...DEFAULT_PROGRESS };
+    
+    const data = JSON.parse(raw);
+    
+    // Version migration
+    if (data.version !== PROGRESS_VERSION) {
+      console.log("[Three Doors] Migrating progress from version", data.version, "to", PROGRESS_VERSION);
+      return migrateProgress(data);
+    }
+    
+    // Validate progress structure
+    return validateProgress(data);
+  } catch (e) {
+    console.error("[Three Doors] Failed to load progress:", e);
+    return { ...DEFAULT_PROGRESS };
+  }
 }
+
 function saveProgress() {
-  localStorage.setItem(PROGRESS_KEY, JSON.stringify(playerProgress));
+  try {
+    playerProgress.lastPlayed = new Date().toISOString();
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(playerProgress));
+    
+    // Optional: sync to backend if available
+    syncProgressToBackend();
+  } catch (e) {
+    console.error("[Three Doors] Failed to save progress:", e);
+  }
 }
+
+function validateProgress(data) {
+  // Ensure all required fields exist
+  const validated = { ...DEFAULT_PROGRESS, ...data };
+  
+  // Validate arrays
+  if (!Array.isArray(validated.prizes)) validated.prizes = ["first-steps"];
+  if (!Array.isArray(validated.visited)) validated.visited = [];
+  if (!Array.isArray(validated.completedChallenges)) validated.completedChallenges = [];
+  
+  // Validate objects
+  if (typeof validated.sceneVisits !== "object") validated.sceneVisits = {};
+  
+  // Validate booleans
+  if (typeof validated.poemSolved !== "boolean") validated.poemSolved = false;
+  if (typeof validated.loopCompleted !== "boolean") validated.loopCompleted = false;
+  
+  // Validate numbers
+  if (typeof validated.poemAttempts !== "number") validated.poemAttempts = 0;
+  if (typeof validated.loop_count !== "number") validated.loop_count = 0;
+  if (typeof validated.stage_index !== "number") validated.stage_index = 0;
+  
+  return validated;
+}
+
+function migrateProgress(oldData) {
+  // Migration logic for future version changes
+  const migrated = { ...DEFAULT_PROGRESS, ...oldData, version: PROGRESS_VERSION };
+  return migrated;
+}
+
+async function syncProgressToBackend() {
+  try {
+    await fetch("/api/three-doors/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(playerProgress),
+    });
+  } catch (e) {
+    // Backend sync is optional, fail silently
+  }
+}
+
+async function loadProgressFromBackend() {
+  try {
+    const resp = await fetch("/api/three-doors/progress");
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.lastPlayed) {
+        // Merge backend progress with local progress
+        playerProgress = validateProgress({ ...playerProgress, ...data });
+        saveProgress();
+        return true;
+      }
+    }
+  } catch (e) {
+    // Backend sync is optional, fail silently
+  }
+  return false;
+}
+
+function resetProgress() {
+  if (confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
+    localStorage.removeItem(PROGRESS_KEY);
+    playerProgress = { ...DEFAULT_PROGRESS };
+    saveProgress();
+    location.reload();
+  }
+}
+
+function exportProgress() {
+  const data = JSON.stringify(playerProgress, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `three-doors-progress-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importProgress() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        playerProgress = validateProgress(data);
+        saveProgress();
+        alert("Progress imported successfully!");
+        location.reload();
+      } catch (err) {
+        alert("Invalid progress file: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+// ── Prize System ───────────────────────────────────────────────────
+const PRIZES = {
+  "first-steps": { name: "First Steps", icon: "🌿", rarity: "common", description: "You took your first step into the Kingdome", unlockable: false },
+  "kingdome-crown": { name: "Crown of the Kingdome", icon: "👑", rarity: "legendary", description: "Solved the King's poem and earned his recognition", unlockable: false },
+  "speedwalker-badge": { name: "Speedwalker", icon: "⚡", rarity: "rare", description: "Completed a full loop of the Kingdome", unlockable: false },
+  "lorekeeper-badge": { name: "Lorekeeper", icon: "📖", rarity: "rare", description: "Walked every stage of the journey", unlockable: false },
+  "glitch-hunter-badge": { name: "Glitch Hunter", icon: "💾", rarity: "epic", description: "Found all XP Door corruption sequences", unlockable: false },
+  "xenon-navigator-badge": { name: "Xenon Navigator", icon: "✨", rarity: "epic", description: "Reached both Xenon Starship and Sigil City", unlockable: false },
+  "synthesasia-badge": { name: "Synthesasia in Threes", icon: "◈", rarity: "legendary", description: "Mastered pattern recognition through 3 loops", unlockable: false },
+  "poem-master": { name: "Poem Master", icon: "📜", rarity: "epic", description: "Solved the King's poem on the first try", unlockable: false },
+  "lucky-find": { name: "Lucky Find", icon: "🍀", rarity: "common", description: "Found a shiny in the Cloverfield", unlockable: false },
+  "time-traveler": { name: "Time Traveler", icon: "⏰", rarity: "rare", description: "Visited all Future Door sub-paths", unlockable: false },
+  "convergence-master": { name: "Convergence Master", icon: "🌌", rarity: "epic", description: "Reached Xenon Starship twice", unlockable: false },
+  "city-explorer": { name: "City Explorer", icon: "🏙️", rarity: "rare", description: "Visited all Sigil City sub-locations", unlockable: false },
+  "return-journey": { name: "Return Journey", icon: "🌫️", rarity: "legendary", description: "Completed the full loop and returned", unlockable: false },
+  // Unlockable prizes (can be redeemed)
+  "golden-key": { name: "Golden Key", icon: "🔑", rarity: "legendary", description: "Unlocks special doors in future updates", unlockable: true, cost: 5 },
+  "fox-whisper": { name: "Fox Whisper", icon: "🦊", rarity: "epic", description: "The fox will give you hints", unlockable: true, cost: 3 },
+  "time-shard": { name: "Time Shard", icon: "💎", rarity: "rare", description: "Rewind one door choice", unlockable: true, cost: 2 },
+};
+
+const RARITY_COLORS = {
+  common: "#9ca3af",
+  rare: "#3b82f6",
+  epic: "#a855f7",
+  legendary: "#fbbf24",
+};
+
 function awardPrize(prizeId) {
   if (!playerProgress.prizes) playerProgress.prizes = [];
   if (!playerProgress.prizes.includes(prizeId)) {
@@ -575,29 +790,69 @@ function awardPrize(prizeId) {
     showPrizeToast(prizeId);
   }
 }
+
 function showPrizeToast(prizeId) {
-  const names = {
-    "kingdome-crown": "Crown of the Kingdome",
-    "speedwalker-badge": "Speedwalker",
-    "lorekeeper-badge": "Lorekeeper",
-    "glitch-hunter-badge": "Glitch Hunter",
-    "xenon-navigator-badge": "Xenon Navigator",
-    "synthesasia-badge": "Synthesasia in Threes",
-    "first-steps": "First Steps",
-  };
-  const icons = {
-    "kingdome-crown": "👑",
-    "speedwalker-badge": "⚡",
-    "lorekeeper-badge": "📖",
-    "glitch-hunter-badge": "💾",
-    "xenon-navigator-badge": "✨",
-    "synthesasia-badge": "◈",
-    "first-steps": "🌿",
-  };
+  const prize = PRIZES[prizeId];
+  if (!prize) return;
+  const rarityColor = RARITY_COLORS[prize.rarity] || "#9ca3af";
   const chat = document.getElementById("chat");
   const el = document.createElement("div");
   el.className = "message agent";
-  el.innerHTML = `<div class="agent-avatar">${icons[prizeId] || "🎁"}</div><div class="message-content" style="background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.3)"><div style="font-size:12px;font-weight:600;color:#34d399;margin-bottom:4px">Prize Unlocked</div><div style="font-size:13px">${names[prizeId] || prizeId}</div></div>`;
+  el.innerHTML = `<div class="agent-avatar">${prize.icon}</div><div class="message-content" style="background:${rarityColor}15;border-color:${rarityColor}40"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${rarityColor};margin-bottom:4px">${prize.rarity} Prize</div><div style="font-size:13px;font-weight:600">${prize.name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${prize.description}</div></div>`;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function showPrizeInventory() {
+  const prizes = playerProgress.prizes || [];
+  const unlocked = prizes.filter(p => PRIZES[p]?.unlockable);
+  const earned = prizes.filter(p => !PRIZES[p]?.unlockable);
+  
+  let html = `<div style="margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">🎁 Prize Inventory (${prizes.length})</div>`;
+  
+  if (earned.length > 0) {
+    html += `<div style="margin-bottom:12px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Earned Badges</div>`;
+    html += earned.map(p => {
+      const prize = PRIZES[p];
+      const rarityColor = RARITY_COLORS[prize.rarity] || "#9ca3af";
+      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin:4px">
+        <span style="font-size:16px">${prize.icon}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:${rarityColor}">${prize.name}</div>
+          <div style="font-size:10px;color:var(--muted)">${prize.rarity}</div>
+        </div>
+      </div>`;
+    }).join("");
+    html += `</div>`;
+  }
+  
+  if (unlocked.length > 0) {
+    html += `<div><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Unlockable Items</div>`;
+    html += unlocked.map(p => {
+      const prize = PRIZES[p];
+      const rarityColor = RARITY_COLORS[prize.rarity] || "#9ca3af";
+      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface);border:1px solid ${rarityColor}40;border-radius:8px;margin:4px">
+        <span style="font-size:16px">${prize.icon}</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:${rarityColor}">${prize.name}</div>
+          <div style="font-size:10px;color:var(--muted)">${prize.description}</div>
+        </div>
+      </div>`;
+    }).join("");
+    html += `</div>`;
+  }
+  
+  if (prizes.length === 0) {
+    html += `<div style="font-size:12px;color:var(--muted)">No prizes earned yet. Complete challenges to earn prizes!</div>`;
+  }
+  
+  html += `</div>`;
+  
+  const chat = document.getElementById("chat");
+  const el = document.createElement("div");
+  el.className = "message agent";
+  el.innerHTML = `<div class="agent-avatar">🎁</div><div class="message-content">${html}</div>`;
   chat.appendChild(el);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -946,21 +1201,23 @@ function submitPoem() {
   const input = document.getElementById("poem-answer");
   if (!input) return;
   const val = input.value.trim().toLowerCase();
-  const accepted = ["yourself","myself","i am","the one","silence","love","the lantern","the light","convergence","me","i"];
+  // Accepted answers based on CSF lore: "silence", "the name", "yourself", "the lantern", "the light"
+  const accepted = ["yourself","myself","i am","the one","silence","love","the lantern","the light","convergence","me","i","the name","name"];
   if (accepted.some(a => val.includes(a))) {
     playerProgress.poemSolved = true;
     saveProgress();
     awardPrize("kingdome-crown");
-    // Refresh scene to show doors
+    // Refresh scene to show doors with King's response
     appendUserMsg("Answer: \"" + input.value.trim() + "\"");
     const scene = SCENES["kingdome-garden"];
-    const data = { scene_key: "kingdome-garden", text: scene.text, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [] };
+    const kingResponse = `The King nods slowly, his crown of vines and cursors blinking in recognition. *\"Correct,\"* he says, his voice like old light through moss. *\"You understand what was lost at the beginning is the thing that was gained. The doors are now open to you.\"*`;
+    const data = { scene_key: "kingdome-garden", text: scene.text + "\n\n" + kingResponse, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [] };
     appendSceneMsg("kingdome-garden", data, "", "offline");
   } else {
     const chat = document.getElementById("chat");
     const el = document.createElement("div");
     el.className = "message agent";
-    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content" style="font-size:13px;color:var(--muted)">The King waits. The garden holds its breath. Try again.</div>`;
+    el.innerHTML = `<div class="agent-avatar">👑</div><div class="message-content" style="font-size:13px;color:var(--muted)">The King waits. The garden holds its breath. *\"Think deeper,\"* he says. *\"What was lost at the beginning is the thing that was gained.\"*</div>`;
     chat.appendChild(el);
     chat.scrollTop = chat.scrollHeight;
   }
@@ -974,25 +1231,84 @@ function skipPoem() {
   appendSceneMsg("kingdome-garden", data, "", "offline");
 }
 
+// ── Challenge System ───────────────────────────────────────────────
+const CHALLENGES = {
+  "kingdome-garden": [
+    { id: "poem-master", name: "Poem Master", description: "Solve the King's poem on first try", reward: "kingdome-crown", check: (p) => p.poemSolved && p.poemAttempts === 1 },
+    { id: "king-audience", name: "King's Audience", description: "Visit the Garden 3 times", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["kingdome-garden"] || 0) >= 3 },
+  ],
+  "cloverfield": [
+    { id: "lucky-find", name: "Lucky Find", description: "Find a shiny in the Cloverfield", reward: "lorekeeper-badge", check: (p) => p.shiniesFound >= 1 },
+    { id: "four-leaf", name: "Four-Leaf Master", description: "Visit Cloverfield 5 times", reward: "speedwalker-badge", check: (p) => (p.sceneVisits?.["cloverfield"] || 0) >= 5 },
+  ],
+  "future-doors": [
+    { id: "time-traveler", name: "Time Traveler", description: "Visit all Future Door sub-paths", reward: "xenon-navigator-badge", check: (p) => p.futurePathsVisited >= 3 },
+  ],
+  "xp-door": [
+    { id: "glitch-hunter", name: "Glitch Hunter", description: "Find all XP Door corruption sequences", reward: "glitch-hunter-badge", check: (p) => p.glitchesFound >= 3 },
+  ],
+  "xenon-convergence": [
+    { id: "convergence-master", name: "Convergence Master", description: "Reach Xenon Starship twice", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["xenon-convergence"] || 0) >= 2 },
+  ],
+  "sigil-city": [
+    { id: "city-explorer", name: "City Explorer", description: "Visit all Sigil City sub-locations", reward: "lorekeeper-badge", check: (p) => p.sigilLocationsVisited >= 3 },
+  ],
+  "fog-door-return": [
+    { id: "return-journey", name: "Return Journey", description: "Complete the full loop and return", reward: "kingdome-crown", check: (p) => p.loopCompleted },
+  ],
+};
+
+// Global challenges (not tied to specific scenes)
+const GLOBAL_CHALLENGES = [
+  { id: "speedwalker", name: "Speedwalker", description: "Complete a first full loop of the Kingdome", reward: "speedwalker-badge", check: (p) => (p.loop_count || 0) >= 1 },
+  { id: "lorekeeper", name: "Lorekeeper", description: "Walk every stage of the journey", reward: "lorekeeper-badge", check: (p) => STAGES.every(s => p.visited?.includes(s)) },
+  { id: "xenon-navigator", name: "Xenon Navigator", description: "Reach the convergence AND the City of Doors", reward: "xenon-navigator-badge", check: (p) => p.visited?.includes("xenon-convergence") && p.visited?.includes("sigil-city") },
+  { id: "synthesasia-master", name: "Synthesasia Master", description: "Complete 3 full loops", reward: "synthesasia-badge", check: (p) => (p.loop_count || 0) >= 3 },
+];
+
 function checkChallenges(sceneKey, turnCount) {
-  // Speedwalker: complete a first full loop of the Kingdome
-  if ((playerProgress.loop_count || 0) >= 1 && !playerProgress.speedwalker) {
-    playerProgress.speedwalker = true;
-    saveProgress();
-    awardPrize("speedwalker-badge");
+  // Track scene visits
+  if (!playerProgress.sceneVisits) playerProgress.sceneVisits = {};
+  playerProgress.sceneVisits[sceneKey] = (playerProgress.sceneVisits[sceneKey] || 0) + 1;
+  
+  // Track poem attempts
+  if (sceneKey === "kingdome-garden" && !playerProgress.poemSolved) {
+    playerProgress.poemAttempts = (playerProgress.poemAttempts || 0) + 1;
   }
-  // Lorekeeper: walk every stage of the journey
-  if (STAGES.every(s => playerProgress.visited?.includes(s)) && !playerProgress.lorekeeper) {
-    playerProgress.lorekeeper = true;
-    saveProgress();
-    awardPrize("lorekeeper-badge");
+  
+  // Check scene-specific challenges
+  const sceneChallenges = CHALLENGES[sceneKey] || [];
+  for (const challenge of sceneChallenges) {
+    if (!playerProgress.completedChallenges?.includes(challenge.id) && challenge.check(playerProgress)) {
+      playerProgress.completedChallenges = playerProgress.completedChallenges || [];
+      playerProgress.completedChallenges.push(challenge.id);
+      saveProgress();
+      awardPrize(challenge.reward);
+      showChallengeComplete(challenge);
+    }
   }
-  // Xenon Navigator: reach the convergence AND the City of Doors
-  if (playerProgress.visited?.includes("xenon-convergence") && playerProgress.visited?.includes("sigil-city") && !playerProgress.xenonNavigator) {
-    playerProgress.xenonNavigator = true;
-    saveProgress();
-    awardPrize("xenon-navigator-badge");
+  
+  // Check global challenges
+  for (const challenge of GLOBAL_CHALLENGES) {
+    if (!playerProgress.completedChallenges?.includes(challenge.id) && challenge.check(playerProgress)) {
+      playerProgress.completedChallenges = playerProgress.completedChallenges || [];
+      playerProgress.completedChallenges.push(challenge.id);
+      saveProgress();
+      awardPrize(challenge.reward);
+      showChallengeComplete(challenge);
+    }
   }
+  
+  saveProgress();
+}
+
+function showChallengeComplete(challenge) {
+  const chat = document.getElementById("chat");
+  const el = document.createElement("div");
+  el.className = "message agent";
+  el.innerHTML = `<div class="agent-avatar">🏆</div><div class="message-content" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.3)"><div style="font-size:12px;font-weight:600;color:#fbbf24;margin-bottom:4px">Challenge Complete</div><div style="font-size:13px">${challenge.name}: ${challenge.description}</div></div>`;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 // ── Pollinations.ai async image loader ───────────────────────────
