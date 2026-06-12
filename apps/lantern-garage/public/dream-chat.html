@@ -520,27 +520,73 @@
   <!-- Chat area -->
   <div class="chat-container" id="messages" role="log" aria-label="Conversation messages" aria-live="polite">
     <div class="empty-state" id="empty-state">
-      <div class="empty-icon" style="opacity:0.5;font-size:48px">📝</div>
-      <h2>What's on your mind?</h2>
-      <p>Write a reflection, ask a question, or just think out loud. Everything stays private on your device.</p>
-      <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px;margin-top:8px">
-        <button onclick="fillPrompt('Today I noticed that ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">📝 Record a thought…</button>
-        <button onclick="fillPrompt('I keep thinking about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🔄 Explore a recurring thought…</button>
-        <button onclick="fillPrompt('What do you know about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">✨ Ask about a topic…</button>
-        <button onclick="fillAndSend('!explore')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='var(--border)'" title="Start interactive story">🚪 Start an interactive story…</button>
-      </div>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px">
-        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Help Someone Else</div>
-        <button onclick="fillPrompt('Help me help my grandkid with homework')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='var(--border)'">👶 Help grandkid with homework…</button>
-        <button onclick="fillPrompt('Help me help my neighbor with tech problems')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='var(--border)'">🤝 Help neighbor with tech…</button>
-        <button onclick="fillPrompt('Help me help a friend learn to code')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#34d399'" onmouseout="this.style.borderColor='var(--border)'">💻 Help friend learn code…</button>
-      </div>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px">
-        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Trading & Markets</div>
-        <button onclick="fillPrompt('Buy 10 shares of AAPL')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='var(--border)'">💰 Execute a trade…</button>
-        <button onclick="fillPrompt('Check my portfolio')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='var(--border)'">📊 View your portfolio…</button>
-        <button onclick="fillPrompt('What are the trading signals for today?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='#f59e0b'" onmouseout="this.style.borderColor='var(--border)'">📈 Ask for trading signals…</button>
-        <button onclick="fillPrompt('What is the market status?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);cursor:pointer;text-align:left;font-size:13px;transition:border-color 0.15s;font-family:inherit" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🌐 Check market status…</button>
+      <div style="text-align:center;padding:40px 20px">
+        <div style="font-size:64px;margin-bottom:16px">🏮</div>
+        <h1 style="font-size:28px;font-weight:600;margin-bottom:8px;color:var(--text)">Welcome to Lantern OS</h1>
+        <p style="font-size:15px;color:var(--muted);max-width:400px;margin:0 auto 24px">Your cockpit for helping others. Write a reflection, ask a question, or help someone with their challenges.</p>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
+          <button onclick="fillPrompt('Today I noticed that ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+            <span style="font-size:24px">📝</span>
+            <span>Record a thought</span>
+          </button>
+          <button onclick="fillPrompt('I keep thinking about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+            <span style="font-size:24px">🔄</span>
+            <span>Explore thoughts</span>
+          </button>
+          <button onclick="fillPrompt('What do you know about ')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+            <span style="font-size:24px">✨</span>
+            <span>Ask a question</span>
+          </button>
+          <button onclick="fillAndSend('!explore')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#a78bfa';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'" title="Start interactive story">
+            <span style="font-size:24px">🚪</span>
+            <span>Start a story</span>
+          </button>
+        </div>
+        
+        <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Help Someone Else</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
+            <button onclick="fillPrompt('Help me help my grandkid with homework')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
+              <span style="font-size:24px">👶</span>
+              <span>Help with homework</span>
+            </button>
+            <button onclick="fillPrompt('Help me help my neighbor with tech problems')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
+              <span style="font-size:24px">🤝</span>
+              <span>Help with tech</span>
+            </button>
+            <button onclick="fillPrompt('Help me help a friend learn to code')" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#34d399';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(52,211,153,0.3)';this.style.transform='translateY(0)'">
+              <span style="font-size:24px">💻</span>
+              <span>Teach coding</span>
+            </button>
+          </div>
+        </div>
+        
+        <div style="margin-top:24px">
+          <button onclick="toggleTradingSection()" id="trading-toggle" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:8px 16px;border-radius:20px;transition:all 0.2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+            <span id="trading-toggle-text">Show Trading & Markets</span> <span id="trading-toggle-icon">▼</span>
+          </button>
+          <div id="trading-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:500px;margin:0 auto">
+              <button onclick="fillPrompt('Buy 10 shares of AAPL')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#10b981';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">💰</span>
+                <span>Execute a trade</span>
+              </button>
+              <button onclick="fillPrompt('Check my portfolio')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#3b82f6';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">📊</span>
+                <span>View portfolio</span>
+              </button>
+              <button onclick="fillPrompt('What are the trading signals for today?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">📈</span>
+                <span>Trading signals</span>
+              </button>
+              <button onclick="fillPrompt('What is the market status?')" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);cursor:pointer;text-align:center;font-size:14px;transition:all 0.2s;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px" onmouseover="this.style.borderColor='#f59e0b';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                <span style="font-size:24px">🌐</span>
+                <span>Market status</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -981,6 +1027,22 @@
       recognition.start();
     } catch (e) {
       console.error('Failed to start recognition:', e);
+    }
+  }
+
+  function toggleTradingSection() {
+    const section = document.getElementById('trading-section');
+    const toggleText = document.getElementById('trading-toggle-text');
+    const toggleIcon = document.getElementById('trading-toggle-icon');
+    
+    if (section.style.display === 'none') {
+      section.style.display = 'block';
+      toggleText.textContent = 'Hide Trading & Markets';
+      toggleIcon.textContent = '▲';
+    } else {
+      section.style.display = 'none';
+      toggleText.textContent = 'Show Trading & Markets';
+      toggleIcon.textContent = '▼';
     }
   }
 
