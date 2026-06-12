@@ -9,6 +9,7 @@ const TradingAPIBridge = require('../lib/trading-api-bridge');
 const TraderAgent = require('../lib/trader-agent');
 const tradingMemory = require('../lib/trading-memory');
 const tradingStore = require('../lib/trading-store');
+const tradingNews = require('../lib/trading-news');
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
 
 // Initialize local trader agent (replaces external AI Trader service)
@@ -336,7 +337,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     try {
       const proxyPath = DASHBOARD_PROXY_ROUTES[url.pathname];
       const data = await callDashboard(proxyPath);
-      // CSF memory wiring: write orders and agent-log to CSF on state change
+      // CSF memory wiring: write orders, agent-log, and news to CSF on state change
       if (proxyPath === '/api/orders' && Array.isArray(data?.orders || data)) {
         const orders = data.orders || data;
         for (const o of orders) { recordOrder(o).catch(() => {}); }
@@ -344,6 +345,10 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       if (proxyPath === '/api/agent-log' && Array.isArray(data?.logs || data)) {
         const logs = data.logs || data;
         for (const s of logs) { recordSignal(s).catch(() => {}); }
+      }
+      if (proxyPath === '/api/news-feed') {
+        const items = [...(data?.ticker_news || []), ...(data?.broad_news || [])];
+        for (const item of items) { tradingNews.recordNewsItem(item).catch(() => {}); }
       }
       sendJson(res, data, 200);
     } catch (error) {
@@ -581,6 +586,56 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, { records, count: records.length }, 200);
     } catch (error) {
       sendJson(res, { error: 'CSF query failed', details: error.message }, 500);
+    }
+    return true;
+  }
+
+  // ── Trading Phase 3: News CSF integration (#324) ─────────────────────────
+
+  // GET /api/trading/news/recent?limit=50&ticker=SPY&sentiment=high
+  // Recent news items persisted as CSF Entity records, newest first.
+  if (url.pathname === '/api/trading/news/recent' && req.method === 'GET') {
+    try {
+      const limit = Number(url.searchParams.get('limit')) || 50;
+      const ticker = url.searchParams.get('ticker') || '';
+      const sentiment = url.searchParams.get('sentiment') || '';
+      const records = tradingNews.queryRecentNews({ limit, ticker, sentiment });
+      sendJson(res, { records, count: records.length }, 200);
+    } catch (error) {
+      sendJson(res, { error: 'News query failed', details: error.message, records: [] }, 500);
+    }
+    return true;
+  }
+
+  // POST /api/trading/news/record
+  // Explicitly record a news item into CSF (used by the UI or external ingestion).
+  if (url.pathname === '/api/trading/news/record' && req.method === 'POST') {
+    try {
+      const body = await collectRequestBody(req);
+      const item = body ? JSON.parse(body) : {};
+      await tradingNews.recordNewsItem(item);
+      sendJson(res, { ok: true }, 201);
+    } catch (error) {
+      sendJson(res, { error: 'News record failed', details: error.message }, 400);
+    }
+    return true;
+  }
+
+  // POST /api/trading/news/link-trade
+  // Record a news→trade influence relation when a trade follows a news item
+  // for the same ticker within the configured window.
+  if (url.pathname === '/api/trading/news/link-trade' && req.method === 'POST') {
+    try {
+      const body = await collectRequestBody(req);
+      const { newsId, orderId, ticker, windowMinutes } = body ? JSON.parse(body) : {};
+      if (!newsId || !orderId) {
+        sendJson(res, { error: 'newsId and orderId required' }, 400);
+        return true;
+      }
+      await tradingNews.linkNewsTrade({ newsId, orderId, ticker, windowMinutes });
+      sendJson(res, { ok: true, relation: `${newsId} → ${orderId}` }, 201);
+    } catch (error) {
+      sendJson(res, { error: 'Link failed', details: error.message }, 400);
     }
     return true;
   }
