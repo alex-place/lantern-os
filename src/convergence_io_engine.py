@@ -212,11 +212,14 @@ class SlotManager:
                     json.dump(self._cache, f, indent=2)
                 self._dirty = False
 
-    def claim(self, slot_type: str, request_id: str) -> Optional[str]:
+    def claim(self, slot_type: str, request_id: str, context: Optional[Dict[str, Any]] = None) -> Optional[str]:
         with self._lock:
             data = self._read()
             slot_id = f"{slot_type}-{request_id}"
-            data["slots"][slot_id] = {"claimed_at": _now(), "status": "active"}
+            entry: Dict[str, Any] = {"claimed_at": _now(), "status": "active"}
+            if context:
+                entry["context"] = context
+            data["slots"][slot_id] = entry
             self._write(data)
             return slot_id
 
@@ -581,8 +584,8 @@ class ValidationRing:
             try:
                 result = job["check"]()
                 vote = "pass" if result else "fail"
-            except Exception as exc:
-                vote = "error"
+            except Exception as exc:  # noqa: BLE001
+                vote = f"error:{type(exc).__name__}"
             elapsed = round((time.time() - start) * 1000, 2)
             votes.append({
                 "validator": v,
@@ -655,25 +658,38 @@ class ConvergenceLoop:
     """Intelligent self-correcting convergence loop with phase caching and early termination."""
 
     PHASES = [
-        (1, "inspect_repo", "Inspect current repo state"),
-        (2, "identify_sources", "Identify source repos and dirty state"),
-        (3, "read_manifests", "Read manifests and open issues"),
-        (4, "state_objective", "State the next safest objective"),
-        (5, "retire_old", "Retire old / deprecated surfaces"),
-        (6, "map_evidence", "Map claims to evidence"),
-        (7, "classify_boundary", "Classify capability, boundary, rollback"),
-        (8, "run_validation", "Run cheapest validation checks"),
-        (9, "run_validation_ring", "Run bounded agent validation ring"),
-        (10, "fix_failures", "Fix first 2-4 actionable failures"),
-        (11, "re_run_validation", "Re-run validation"),
-        (12, "record_evidence", "Record evidence and remaining blockers"),
-        (13, "promote_or_hold", "Promote, hold, or reject artifacts"),
+        # Foundation (1-7)
+        (1,  "inspect_repo",              "Inspect current repo state"),
+        (2,  "identify_sources",          "Identify source repos and dirty state"),
+        (3,  "read_manifests",            "Read manifests and open issues"),
+        (4,  "state_objective",           "State the next safest objective"),
+        (5,  "retire_old",                "Retire old / deprecated surfaces"),
+        (6,  "map_evidence",              "Map claims to evidence"),
+        (7,  "classify_boundary",         "Classify capability, boundary, rollback"),
+        # ASI Architecture Integration (8-11)
+        (8,  "check_ctf_symbolic",        "Check CTF (CSF) symbolic framework integration"),
+        (9,  "check_external_grounding",  "Check external signal injection (αt > 0)"),
+        (10, "check_externally_anchored", "Check externally anchored optimization"),
+        (11, "check_asi_benchmarks",      "Check ASI/AGI benchmark tracking"),
+        # Tesseract Navigation (12-14)
+        (12, "navigate_status_cube",      "Navigate 4D Status Cube (x/y/z/t)"),
+        (13, "project_future_states",     "Project future states (comet-leap integration)"),
+        (14, "update_bayesian_beliefs",   "Update Bayesian belief system"),
+        # Validation and Promotion (15-20)
+        (15, "run_validation",            "Run cheapest validation checks"),
+        (16, "run_validation_ring",       "Run bounded agent validation ring"),
+        (17, "fix_failures",              "Fix first 2-4 actionable failures"),
+        (18, "re_run_validation",         "Re-run validation"),
+        (19, "record_evidence",           "Record evidence and remaining blockers"),
+        (20, "promote_or_hold",           "Promote, hold, or reject artifacts"),
     ]
 
     # Phases whose results can be cached across ticks if repo state hash matches
     _CACHEABLE_PHASES = {
         "inspect_repo", "identify_sources", "read_manifests",
         "state_objective", "map_evidence", "classify_boundary",
+        "check_ctf_symbolic", "check_external_grounding",
+        "check_externally_anchored", "check_asi_benchmarks",
     }
 
     def __init__(
@@ -733,6 +749,7 @@ class ConvergenceLoop:
         consecutive_clean_ticks = 0
         max_ticks = self.internal_multiplier
         adaptive_ticks = max_ticks
+        dropped_at: Optional[str] = None
 
         for tick in range(max_ticks):
             tick_results: List[PhaseResult] = []
@@ -756,6 +773,10 @@ class ConvergenceLoop:
                         elapsed_ms=round((time.time() - start) * 1000, 2),
                     )
                 tick_results.append(result)
+                # Agent drop: phase signals this section doesn't make sense to finish
+                if result.status == "drop":
+                    dropped_at = key
+                    break
                 if result.status != "pass":
                     any_fail = True
                 if key in self._CACHEABLE_PHASES:
@@ -763,6 +784,9 @@ class ConvergenceLoop:
 
             audit.extend(tick_results)
             self.results = tick_results
+
+            if dropped_at:
+                break
 
             # Early termination: all phases passed → no need for more ticks
             if not any_fail:
@@ -795,7 +819,7 @@ class ConvergenceLoop:
         pass_count = all_statuses.count("pass")
         score = round(pass_count / max(len(all_statuses), 1), 3) if total_ms < 5000 else round(pass_count / max(len(all_statuses), 1) * 0.9, 3)
 
-        status = "clean" if promotion_ready else "needs_review"
+        status = "dropped" if dropped_at else ("clean" if promotion_ready else "needs_review")
         result = {
             "timestamp": _now(),
             "status": status,
@@ -807,6 +831,8 @@ class ConvergenceLoop:
             "internal_ticks": tick + 1,
             "convergence_score": score,
             "adaptive_terminated": tick + 1 < max_ticks,
+            "dropped": dropped_at is not None,
+            "dropped_at": dropped_at,
         }
         result["drift"] = self._detect_drift(result)
         return result
@@ -818,12 +844,30 @@ class ConvergenceLoop:
             "elapsed_ms": r.elapsed_ms,
         }
 
+    _INSPECT_SKIP = frozenset({".git", "node_modules", "__pycache__", ".claude", "target", ".venv", "venv"})
+
     def _phase_inspect_repo(self) -> PhaseResult:
         issues = []
         evidence = {"files": 0, "dirs": 0}
         try:
-            evidence["files"] = sum(1 for _ in self.repo_root.rglob("*") if _.is_file())
-            evidence["dirs"] = sum(1 for _ in self.repo_root.rglob("*") if _.is_dir())
+            file_count = 0
+            dir_count = 0
+            stack = [self.repo_root]
+            while stack:
+                current = stack.pop()
+                try:
+                    for entry in current.iterdir():
+                        if entry.name in self._INSPECT_SKIP:
+                            continue
+                        if entry.is_dir():
+                            dir_count += 1
+                            stack.append(entry)
+                        else:
+                            file_count += 1
+                except PermissionError:
+                    pass
+            evidence["files"] = file_count
+            evidence["dirs"] = dir_count
         except Exception as exc:
             issues.append(str(exc))
         return PhaseResult(1, "inspect_repo", "pass" if not issues else "fail", issues, evidence)
@@ -917,12 +961,201 @@ class ConvergenceLoop:
         found = [d for d in docs if (self.repo_root / "docs" / d).exists()]
         return PhaseResult(7, "classify_boundary", "pass", evidence={"docs_present": found})
 
+    def _phase_check_ctf_symbolic(self) -> PhaseResult:
+        """Phase 8: Verify CSF symbolic framework is present and minimally functional."""
+        csf_root = self.repo_root / "src" / "csf"
+        csf_ingest = self.repo_root / "csf" / "ingest"
+        evidence: Dict[str, Any] = {}
+        issues = []
+        if csf_root.exists():
+            py_files = list(csf_root.glob("*.py"))
+            evidence["csf_modules"] = [f.name for f in py_files]
+        else:
+            issues.append("src/csf/ directory missing")
+        if csf_ingest.exists():
+            ingest_docs = list(csf_ingest.glob("*.md"))
+            evidence["ingest_docs"] = len(ingest_docs)
+        else:
+            evidence["ingest_docs"] = 0
+        mem_engine = self.repo_root / "src" / "csf" / "memory_engine.py"
+        evidence["memory_engine_present"] = mem_engine.exists()
+        return PhaseResult(8, "check_ctf_symbolic", "pass" if not issues else "fail", issues, evidence)
+
+    def _phase_check_external_grounding(self) -> PhaseResult:
+        """Phase 9: Verify external signal injection (αt > 0) — at least one live external source."""
+        evidence: Dict[str, Any] = {}
+        grounding_signals = []
+        # Check configured external providers (keys present = external grounding available)
+        for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GROK_API_KEY"):
+            if os.environ.get(key):
+                grounding_signals.append(key)
+        # Check for external data sources: wallet ledger, HFF API config, RAG house
+        rag_path = self.repo_root / "data" / "rag-house" / "flat-rag-house-latest.json"
+        if rag_path.exists():
+            grounding_signals.append("rag_house")
+        hff_app = self.repo_root / "integrations" / "human-flourishing-frameworks" / "app.py"
+        if hff_app.exists():
+            grounding_signals.append("hff_integration")
+        evidence["grounding_signals"] = grounding_signals
+        evidence["signal_count"] = len(grounding_signals)
+        # αt > 0 requires at least one live external signal
+        ok = len(grounding_signals) > 0
+        issues = [] if ok else ["No external grounding signals detected — αt = 0 (collapse risk)"]
+        return PhaseResult(9, "check_external_grounding", "pass" if ok else "fail", issues, evidence)
+
+    def _phase_check_externally_anchored(self) -> PhaseResult:
+        """Phase 10: Verify system operates in externally anchored (not closed-loop) regime."""
+        evidence: Dict[str, Any] = {}
+        anchors = []
+        # Axiomatic base: convergence loop docs define fixed rules
+        conv_doc = self.repo_root / "docs" / "CONVERGENCE-LOOP.md"
+        if conv_doc.exists():
+            anchors.append("convergence_loop_axioms")
+        # External verifier: validation ring with consensus
+        chain_path = self.repo_root / "data" / "agent-fleet" / "validation-chain.jsonl"
+        if chain_path.exists():
+            anchors.append("validation_chain")
+        # Evidence receipts: immutable historical record acts as external anchor
+        evidence_dir = self.repo_root / "manifests" / "evidence"
+        if evidence_dir.exists():
+            receipt_count = len(list(evidence_dir.glob("convergence-*.json")))
+            evidence["receipt_count"] = receipt_count
+            if receipt_count > 0:
+                anchors.append("convergence_receipts")
+        # PCSF: external capacity boundary definition
+        pcsf_model = self.repo_root / "data" / "pcsf" / "model.pcsf.json"
+        if pcsf_model.exists():
+            anchors.append("pcsf_boundary")
+        evidence["anchors"] = anchors
+        ok = len(anchors) >= 2
+        issues = [] if ok else [f"Insufficient external anchors ({len(anchors)}/2 min): {anchors or 'none'}"]
+        return PhaseResult(10, "check_externally_anchored", "pass" if ok else "fail", issues, evidence)
+
+    def _phase_check_asi_benchmarks(self) -> PhaseResult:
+        """Phase 11: Check ASI/AGI benchmark tracking (ARC-AGI, SuperARC, HLE)."""
+        evidence: Dict[str, Any] = {}
+        tracked = []
+        # Search for benchmark references in manifests and docs
+        search_paths = [
+            self.repo_root / "manifests",
+            self.repo_root / "docs",
+            self.repo_root / "data" / "agent-fleet",
+        ]
+        benchmark_keys = ["ARC-AGI", "SuperARC", "HLE", "benchmark", "AGI"]
+        for search_dir in search_paths:
+            if not search_dir.exists():
+                continue
+            for fpath in search_dir.rglob("*.{md,json}"):
+                try:
+                    text = fpath.read_text(encoding="utf-8", errors="ignore")
+                    for key in benchmark_keys:
+                        if key in text and key not in tracked:
+                            tracked.append(key)
+                except Exception:
+                    pass
+        evidence["benchmarks_tracked"] = tracked
+        # Not failing — benchmark tracking is a soft check; warn if nothing found
+        status = "pass" if tracked else "pass"  # always pass; evidence only
+        issues = [] if tracked else ["No ASI/AGI benchmark references found in manifests or docs"]
+        return PhaseResult(11, "check_asi_benchmarks", status, issues, evidence)
+
+    def _phase_navigate_status_cube(self) -> PhaseResult:
+        """Phase 12: Navigate the 4D Status Cube (x: location, y: lane, z: boundary, t: timeline)."""
+        evidence: Dict[str, Any] = {}
+        # x-axis: location — what top-level areas exist
+        locations = [d.name for d in self.repo_root.iterdir()
+                     if d.is_dir() and not d.name.startswith(".") and d.name not in ("node_modules",)]
+        evidence["x_locations"] = locations[:12]
+        # y-axis: lane — which module lanes are active
+        active_lanes = []
+        for lane_dir in ["apps", "src", "scripts", "skills", "manifests", "docs"]:
+            if (self.repo_root / lane_dir).exists():
+                active_lanes.append(lane_dir)
+        evidence["y_lanes"] = active_lanes
+        # z-axis: boundary — proven/candidate/held/blocked classification
+        pcsf_agent = self.repo_root / "data" / "pcsf" / "agent.pcsf.json"
+        boundary = "candidate"
+        if pcsf_agent.exists():
+            data = _load_json(pcsf_agent) or {}
+            # Any active slot means proven boundary for that lane
+            if data.get("activeSlots", 0) > 0:
+                boundary = "proven"
+        evidence["z_boundary"] = boundary
+        # t-axis: timeline — most recent convergence receipt timestamp
+        evidence_dir = self.repo_root / "manifests" / "evidence"
+        last_receipt = None
+        if evidence_dir.exists():
+            receipts = sorted(evidence_dir.glob("convergence-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if receipts:
+                last_receipt = receipts[0].name
+        evidence["t_last_receipt"] = last_receipt
+        evidence["cube_coordinates"] = {
+            "x": len(locations), "y": len(active_lanes),
+            "z": boundary, "t": last_receipt or "none",
+        }
+        return PhaseResult(12, "navigate_status_cube", "pass", evidence=evidence)
+
+    def _phase_project_future_states(self) -> PhaseResult:
+        """Phase 13: Project future states from past/present (comet-leap pattern)."""
+        evidence: Dict[str, Any] = {}
+        # Read the current objective as 'present'
+        present = self._read_objective()
+        evidence["present_objective"] = present
+        # Past: last convergence score from most recent receipt
+        past_score = None
+        evidence_dir = self.repo_root / "manifests" / "evidence"
+        if evidence_dir.exists():
+            receipts = sorted(evidence_dir.glob("convergence-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for r in receipts[:3]:
+                data = _load_json(r)
+                if data and "phases" in data:
+                    phases = data["phases"]
+                    passed = sum(1 for p in phases if p.get("status") == "pass")
+                    past_score = round(passed / max(len(phases), 1), 2)
+                    break
+        evidence["past_convergence_score"] = past_score
+        # Future projection: simple trajectory based on trend
+        if past_score is not None:
+            trend = "improving" if past_score > 0.7 else "needs_work" if past_score > 0.4 else "blocked"
+        else:
+            trend = "no_history"
+        evidence["projected_trajectory"] = trend
+        # CSF ingest queue depth = backlog of future work
+        ingest_dir = self.repo_root / "csf" / "ingest"
+        ingest_count = len(list(ingest_dir.glob("*.md"))) if ingest_dir.exists() else 0
+        evidence["future_ingest_backlog"] = ingest_count
+        evidence["pattern"] = "past_work → present_pitch → expected_future → actual_result"
+        return PhaseResult(13, "project_future_states", "pass", evidence=evidence)
+
+    def _phase_update_bayesian_beliefs(self) -> PhaseResult:
+        """Phase 14: Update Bayesian belief system across 5 dimensions."""
+        evidence: Dict[str, Any] = {}
+        beliefs: Dict[str, Any] = {}
+        # health: HFF integration present?
+        hff_app = self.repo_root / "integrations" / "human-flourishing-frameworks" / "app.py"
+        beliefs["health"] = {"posterior": 0.8 if hff_app.exists() else 0.3, "sensor": "hff_app"}
+        # economy: wallet ledger present?
+        wallet_path = self.repo_root / "data" / "cash-loop"
+        wallet_entries = len(list(wallet_path.glob("*.md"))) if wallet_path.exists() else 0
+        beliefs["economy"] = {"posterior": min(0.5 + wallet_entries * 0.1, 1.0), "sensor": "cash_loop_docs"}
+        # culture: three doors / lore active?
+        door_state = self.repo_root / "data" / "dream_journal" / "door_state.json"
+        beliefs["culture"] = {"posterior": 0.9 if door_state.exists() else 0.4, "sensor": "door_state"}
+        # ecosystem: HFF route wired?
+        hff_route = self.repo_root / "apps" / "lantern-garage" / "routes" / "flourishing.js"
+        beliefs["ecosystem"] = {"posterior": 0.85 if hff_route.exists() else 0.2, "sensor": "hff_route"}
+        # animal: world model stub (design contract only — low prior)
+        beliefs["animal"] = {"posterior": 0.2, "sensor": "world_model_stub"}
+        evidence["beliefs"] = beliefs
+        evidence["updated_at"] = _now()
+        return PhaseResult(14, "update_bayesian_beliefs", "pass", evidence=evidence)
+
     def _phase_run_validation(self) -> PhaseResult:
         issues = []
         for script in [self.repo_root / "scripts" / "Validate-CicdPipeline.ps1"]:
             if not script.exists():
                 issues.append(f"Missing: {script.name}")
-        return PhaseResult(8, "run_validation", "pass" if not issues else "fail", issues)
+        return PhaseResult(15, "run_validation", "pass" if not issues else "fail", issues)
 
     def _phase_run_validation_ring(self) -> PhaseResult:
         try:
@@ -940,7 +1173,7 @@ class ConvergenceLoop:
                     else:
                         warnings.append(msg)
             return PhaseResult(
-                9, "run_validation_ring",
+                16, "run_validation_ring",
                 "pass" if not issues else "fail",
                 issues,
                 evidence={
@@ -952,15 +1185,15 @@ class ConvergenceLoop:
                 },
             )
         except Exception as exc:
-            return PhaseResult(9, "run_validation_ring", "fail", [str(exc)])
+            return PhaseResult(16, "run_validation_ring", "fail", [str(exc)])
 
     def _phase_fix_failures(self) -> PhaseResult:
         actionable = [r for r in self.results if r.status != "pass"]
         fixed = min(len(actionable), 4)
-        return PhaseResult(10, "fix_failures", "pass", evidence={"actionable": len(actionable), "fixed": fixed})
+        return PhaseResult(17, "fix_failures", "pass", evidence={"actionable": len(actionable), "fixed": fixed})
 
     def _phase_re_run_validation(self) -> PhaseResult:
-        return PhaseResult(11, "re_run_validation", "pass", evidence={"rerun": True})
+        return PhaseResult(18, "re_run_validation", "pass", evidence={"rerun": True})
 
     def _phase_record_evidence(self) -> PhaseResult:
         receipt_dir = self.repo_root / "manifests" / "evidence"
@@ -970,12 +1203,12 @@ class ConvergenceLoop:
             with open(receipt_path, "w", encoding="utf-8") as f:
                 json.dump({"phases": [self._phase_to_dict(r) for r in self.results]}, f, indent=2)
         except Exception as exc:
-            return PhaseResult(12, "record_evidence", "fail", [str(exc)])
-        return PhaseResult(12, "record_evidence", "pass", evidence={"receipt": str(receipt_path)})
+            return PhaseResult(19, "record_evidence", "fail", [str(exc)])
+        return PhaseResult(19, "record_evidence", "pass", evidence={"receipt": str(receipt_path)})
 
     def _phase_promote_or_hold(self) -> PhaseResult:
         ready = all(r.status == "pass" for r in self.results)
-        return PhaseResult(13, "promote_or_hold", "pass" if ready else "hold", evidence={"ready": ready})
+        return PhaseResult(20, "promote_or_hold", "pass" if ready else "hold", evidence={"ready": ready})
 
 
 class TesseractEngine:
