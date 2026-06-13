@@ -298,25 +298,6 @@ async function sendMessage() {
   let serverErrorText = '';
   let didError = false;
   let routeLabel = '';
-  let routeDecision = null;
-
-  try {
-    const routeResp = await fetch('/api/dream/route', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
-      signal: AbortSignal.timeout(3000),
-    });
-    if (routeResp.ok) routeDecision = (await routeResp.json()).route;
-  } catch (e) { /* route card is best-effort */ }
-
-  if (routeDecision) {
-    const card = document.createElement('div');
-    card.className = 'route-card';
-    const wait = routeDecision.requires_convergence ? 'Waiting for result' : 'Direct route';
-    card.textContent = `Routing to ${routeDecision.agent} - ${wait}`;
-    bubble.insertBefore(card, cursor);
-  }
 
   try {
     const provider = document.getElementById('provider-select')?.value || '';
@@ -326,11 +307,9 @@ async function sendMessage() {
       body: JSON.stringify({
         message: text,
         user: 'dream-chat',
-        agent: '',
         provider,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
-        routeIntent: routeDecision?.intent || '',
       }),
       signal: AbortSignal.timeout(90000),
     });
@@ -351,7 +330,14 @@ async function sendMessage() {
         if (!line.startsWith('data: ')) continue;
         try {
           const evt = JSON.parse(line.slice(6));
-          if (evt.type === 'token' && evt.text) {
+          if (evt.type === 'route') {
+            if (!document.querySelector('.route-card')) {
+              const rc = document.createElement('div');
+              rc.className = 'route-card';
+              rc.textContent = evt.label || `${evt.agentName} · ${evt.surface}`;
+              bubble.insertBefore(rc, cursor);
+            }
+          } else if (evt.type === 'token' && evt.text) {
             fullText += evt.text;
             cursor.remove();
             bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
