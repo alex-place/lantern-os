@@ -1232,6 +1232,10 @@ class TesseractEngine:
         self._cache_manager: Any = None
         self._persona_cache: Dict[str, str] = {}
         self._persona_cache_max = 1000
+        # Backpressure: reject requests when too many are in-flight
+        self._queue_depth: int = 0
+        self._max_queue_depth: int = 8
+        self._queue_lock = threading.Lock()
         if _CSF_CACHE_AVAILABLE:
             try:
                 self._cache_manager = CsfCacheManager()
@@ -1260,6 +1264,20 @@ class TesseractEngine:
 
     def converge(self, message: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         params = params or {}
+
+        # Backpressure gate — reject when queue is saturated
+        with self._queue_lock:
+            if self._queue_depth >= self._max_queue_depth:
+                return {
+                    "text": f"[429] Too many requests in flight ({self._queue_depth}/{self._max_queue_depth}). Try again shortly.",
+                    "persona": params.get("persona", "lantern"),
+                    "provider": "none",
+                    "source": "backpressure",
+                    "retry_after": 5,
+                    "timing": {},
+                }
+            self._queue_depth += 1
+
         ctx = ConvergenceContext(
             persona=params.get("persona", "lantern"),
             provider=params.get("provider"),
@@ -1349,12 +1367,16 @@ class TesseractEngine:
                 "persona": ctx.persona, "provider": provider,
                 "total_ms": total_ms, "trace": trace, "error": str(exc),
             })
+            with self._queue_lock:
+                self._queue_depth = max(0, self._queue_depth - 1)
             return {
                 "text": f"[Engine held: {exc}] The dream door stays open.",
                 "persona": ctx.persona, "provider": provider,
                 "source": "engine_fallback", "timing": ctx.timing,
             }
         total_ms = round((time.time() - start_total) * 1000, 2)
+        with self._queue_lock:
+            self._queue_depth = max(0, self._queue_depth - 1)
         self.metrics.record_latency("converge", total_ms)
         self.metrics.record_throughput("requests")
         # Adaptive quality feedback: slow responses degrade persona weight
@@ -1366,6 +1388,14 @@ class TesseractEngine:
             "result_preview": str(result.get("text", ""))[:120],
             "quality_score": round(quality, 3),
         })
+        # Build trace_tree summary for callers that want span analysis
+        exit_spans = [t for t in trace if t.get("phase") == "exit"]
+        slowest = max(exit_spans, key=lambda t: t.get("elapsed_ms", 0.0), default=None) if exit_spans else None
+        surface_result["trace_tree"] = {
+            "spans": exit_spans,
+            "slowest": slowest,
+            "total_ms": total_ms,
+        }
         return surface_result
 
     def _surface(self, ctx: ConvergenceContext, message: str) -> ConvergenceContext:
@@ -1693,6 +1723,86 @@ class TesseractEngine:
             },
             "issues": issues,
             "http": http_result,
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  ConvergenceReceipt — diff utility for run-over-run comparison
+# ═══════════════════════════════════════════════════════════════════
+
+class ConvergenceReceipt:
+    """
+    Utility for comparing two convergence run receipts.
+
+    Usage:
+        diff = ConvergenceReceipt.diff(prev_receipt, curr_receipt)
+        # diff["regressions"]  — phase names that went from pass → fail
+        # diff["fixed_issues"] — {phase, issue} pairs that disappeared
+        # diff["new_issues"]   — {phase, issue} pairs that appeared
+        # diff["manifest_drift"] — evidence field changes between runs
+        # diff["unchanged"]    — True if no meaningful difference
+        # diff["has_previous"] — False if prev_receipt is empty
+    """
+
+    @staticmethod
+    def diff(prev: Dict[str, Any], curr: Dict[str, Any]) -> Dict[str, Any]:
+        has_previous = bool(prev.get("phases"))
+
+        prev_phases: Dict[str, Dict[str, Any]] = {
+            p["name"]: p for p in prev.get("phases", [])
+        }
+        curr_phases: Dict[str, Dict[str, Any]] = {
+            p["name"]: p for p in curr.get("phases", [])
+        }
+
+        regressions: List[str] = []
+        fixed_issues: List[Dict[str, str]] = []
+        new_issues: List[Dict[str, str]] = []
+        manifest_drift: Dict[str, Any] = {}
+
+        for name, curr_p in curr_phases.items():
+            prev_p = prev_phases.get(name, {})
+            prev_status = prev_p.get("status", "missing")
+            curr_status = curr_p.get("status", "missing")
+
+            # Regressions: was passing, now failing
+            if prev_status == "pass" and curr_status not in ("pass", "hold"):
+                regressions.append(name)
+
+            # Fixed issues: issues in prev that are no longer in curr
+            prev_issue_set = set(prev_p.get("issues", []))
+            curr_issue_set = set(curr_p.get("issues", []))
+            for issue in prev_issue_set - curr_issue_set:
+                fixed_issues.append({"phase": name, "issue": issue})
+
+            # New issues: issues in curr that weren't in prev
+            for issue in curr_issue_set - prev_issue_set:
+                new_issues.append({"phase": name, "issue": issue})
+
+            # Evidence drift: compare evidence dicts field by field
+            prev_ev = prev_p.get("evidence", {}) or {}
+            curr_ev = curr_p.get("evidence", {}) or {}
+            for key in set(list(prev_ev.keys()) + list(curr_ev.keys())):
+                pv = prev_ev.get(key)
+                cv = curr_ev.get(key)
+                if pv != cv:
+                    manifest_drift[f"{name}.{key}"] = {"from": pv, "to": cv}
+
+        unchanged = (
+            has_previous
+            and not regressions
+            and not new_issues
+            and not fixed_issues
+            and not manifest_drift
+        )
+
+        return {
+            "has_previous": has_previous,
+            "regressions": regressions,
+            "fixed_issues": fixed_issues,
+            "new_issues": new_issues,
+            "manifest_drift": manifest_drift,
+            "unchanged": unchanged,
         }
 
 

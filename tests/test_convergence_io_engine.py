@@ -183,7 +183,9 @@ def test_nap_safety_returns_structure_even_without_psutil():
 
 
 def _setup_repo_for_loop(tmp_path):
-    """Create minimal repo structure so ConvergenceLoop phases pass."""
+    """Create minimal repo structure so all 20 ConvergenceLoop phases pass."""
+    import json as _json
+
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
     (scripts_dir / "Validate-CicdPipeline.ps1").write_text("# placeholder", encoding="utf-8")
@@ -194,6 +196,22 @@ def _setup_repo_for_loop(tmp_path):
     docs_dir.mkdir(parents=True, exist_ok=True)
     (docs_dir / "CONVERGENCE-LOOP.md").write_text("# doc", encoding="utf-8")
     (docs_dir / "CSF-FORMAT-SPECIFICATION.md").write_text("# spec", encoding="utf-8")
+    # Phase 8 (check_ctf_symbolic): src/csf/ with at least one .py module
+    csf_dir = tmp_path / "src" / "csf"
+    csf_dir.mkdir(parents=True, exist_ok=True)
+    (csf_dir / "memory_engine.py").write_text("# stub", encoding="utf-8")
+    # Phase 9 (check_external_grounding): RAG house as external signal
+    rag_dir = tmp_path / "data" / "rag-house"
+    rag_dir.mkdir(parents=True, exist_ok=True)
+    (rag_dir / "flat-rag-house-latest.json").write_text(
+        _json.dumps({"sources": [], "recentConversations": []}), encoding="utf-8"
+    )
+    # Phase 10 (check_externally_anchored): PCSF model as second anchor
+    pcsf_dir = tmp_path / "data" / "pcsf"
+    pcsf_dir.mkdir(parents=True, exist_ok=True)
+    (pcsf_dir / "model.pcsf.json").write_text(_json.dumps({"version": "1.0"}), encoding="utf-8")
+    # ValidationRing needs data/agent-fleet
+    (tmp_path / "data" / "agent-fleet").mkdir(parents=True, exist_ok=True)
 
 
 def test_convergence_loop_default_multiplier_is_five(tmp_path):
@@ -213,8 +231,8 @@ def test_convergence_loop_custom_multiplier_and_dilation(tmp_path):
     result = loop.run()
     assert result["internal_ticks"] == 2
     assert result["promotion_ready"] is True
-    # 1 internal tick * 11 + 1 final tick * 13 = 24
-    assert len(result["phases"]) == 24
+    # 1 internal tick * 18 (20 - 2 external) + 1 final tick * 20 = 38
+    assert len(result["phases"]) == 38
 
 
 def test_convergence_loop_external_io_phases_only_on_final_tick(tmp_path):
@@ -241,7 +259,7 @@ def test_convergence_loop_respects_zero_multiplier(tmp_path):
     result = loop.run()
     # min(1, 0) clamps to 1
     assert result["internal_ticks"] == 1
-    assert len(result["phases"]) == 13
+    assert len(result["phases"]) == 20
 
 
 def test_convergence_loop_includes_safety_telemetry(tmp_path):
