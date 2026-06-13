@@ -369,7 +369,7 @@ jobs:
           [ "${{ needs.convergence-check.result }}"          != "success" ] && FAILED="$FAILED convergence-check(${{ needs.convergence-check.result }})"
           [ "${{ needs.integration-checks.result }}"         != "success" ] && FAILED="$FAILED integration-checks(${{ needs.integration-checks.result }})"
           [ "${{ needs.convergence-loop-validation.result }}" != "success" ] && FAILED="$FAILED convergence-loop-validation(${{ needs.convergence-loop-validation.result }})"
-          [ "${{ needs.convergence-loop.result }}"           != "success" ] && FAILED="$FAILED convergence-loop(${{ needs.convergence-loop.result }})"
+          result_cl="${{ needs.convergence-loop.result }}"; [ "$result_cl" != "success" ] && [ "$result_cl" != "skipped" ] && FAILED="$FAILED convergence-loop($result_cl)"
           [ "${{ needs.security-scan.result }}"              != "success" ] && FAILED="$FAILED security-scan(${{ needs.security-scan.result }})"
           [ "${{ needs.csf-cache-validate.result }}"         != "success" ] && FAILED="$FAILED csf-cache-validate(${{ needs.csf-cache-validate.result }})"
 

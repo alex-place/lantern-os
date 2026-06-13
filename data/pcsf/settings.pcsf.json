@@ -1,0 +1,33 @@
+{
+  "pcsf_type": "settings",
+  "pcsf_version": "1.0.0",
+  "component": "settings",
+  "description": "Global runtime settings for Lantern OS. Controls UI preferences, feature flags, experimental surfaces, and operator overrides.",
+  "generated_at": "2026-06-05T00:00:00Z",
+  "state": "available",
+  "profile_id": "default",
+  "ui": {
+    "theme": "dark",
+    "font_scale": 1.0,
+    "sidebar_collapsed": false,
+    "journal_tab": "entries",
+    "animations_enabled": true,
+    "sound_enabled": false
+  },
+  "features": {
+    "dream_journal": true,
+    "dream_chat": true,
+    "agent_status": true,
+    "archive_export": true,
+    "symbol_timeline": true,
+    "lucid_dreaming": false,
+    "discord_bot": false,
+    "swarm_orchestration": false
+  },
+  "operator": {
+    "debug_mode": false,
+    "verbose_logging": false,
+    "convergence_loop": true,
+    "auto_archive": false
+  }
+}
