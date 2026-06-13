@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/dream-chat.css">
   <link rel="stylesheet" href="/css/dream-chat-ui.css">
-  <title>Journal</title>
+  <title>Dream Chat — Lantern OS</title>
 </head>
 <body>
 <div class="app">
@@ -28,16 +28,17 @@
         <a href="/flourishing" style="font-size:16px;padding:12px 16px">📊 Dashboard</a>
       </div>
       <div class="nav-actions">
-        <button class="nav-btn" id="voice-btn" onclick="
+        <button class="nav-btn" id="voice-btn" aria-label="Toggle voice mode" aria-pressed="false" onclick="
           if (!window.voiceMode) window.voiceMode = false;
           window.voiceMode = !window.voiceMode;
+          this.setAttribute('aria-pressed', window.voiceMode);
           this.style.opacity = window.voiceMode ? '1' : '0.5';
           this.style.background = window.voiceMode ? 'rgba(161,139,250,0.2)' : 'transparent';
           this.style.border = window.voiceMode ? '2px solid #a78bfa' : 'none';
           const voiceInputBtn = document.getElementById('voice-input-btn');
           if (voiceInputBtn) voiceInputBtn.style.display = window.voiceMode ? 'block' : 'none';
         " title="Voice Mode" style="font-size:20px;padding:8px 12px">🎙️</button>
-        <button class="nav-btn" id="settings-btn" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
+        <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
       </div>
     </nav>
 
@@ -62,9 +63,9 @@
     <!-- Input area -->
     <div class="input-container">
       <div class="input-wrapper">
-        <button id="voice-input-btn" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
-        <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
-        <button class="send-button" id="send-btn" onclick="sendMessage()" title="Send">↑</button>
+        <button id="voice-input-btn" aria-label="Start voice input" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
+        <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+        <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
     </div>
 
@@ -118,11 +119,11 @@
 </div>
 
 <!-- Settings modal -->
-<div class="modal-overlay" id="settings-modal" onclick="if(event.target===event.currentTarget) closeSettings()">
+<div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onclick="if(event.target===event.currentTarget) closeSettings()">
   <div class="modal-content">
     <div class="modal-header">
-      <h2>Settings</h2>
-      <button class="modal-close" onclick="closeSettings()">×</button>
+      <h2 id="settings-title">Settings</h2>
+      <button class="modal-close" aria-label="Close settings" onclick="closeSettings()">×</button>
     </div>
     <div class="modal-body">
 

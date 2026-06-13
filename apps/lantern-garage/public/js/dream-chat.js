@@ -123,9 +123,11 @@
   function toggleKeystoneMcp() {
     directModeEnabled = !directModeEnabled;
     keystoneMcpEnabled = directModeEnabled; // legacy compat
-    mcpToggle.classList.toggle("active", directModeEnabled);
-    document.querySelector(".app").classList.toggle("mcp-mode", directModeEnabled);
-    document.querySelector(".input-area").classList.toggle("mcp-mode", directModeEnabled);
+    if (mcpToggle) mcpToggle.classList.toggle("active", directModeEnabled);
+    const appEl = document.querySelector(".app");
+    if (appEl) appEl.classList.toggle("mcp-mode", directModeEnabled);
+    const inputArea = document.querySelector(".input-area");
+    if (inputArea) inputArea.classList.toggle("mcp-mode", directModeEnabled);
   }
   document.addEventListener("keydown", (e) => {
     if (e.key === "d" && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "INPUT") {
@@ -167,7 +169,6 @@
       if (r.ok) {
         const data = await r.json();
         agents = data.agents || [];
-        originalAgents = agents;
         originalAgents = agents;
         if (statusDot) statusDot.className = "dot online";
         if (statusLabel) statusLabel.textContent = "online";
@@ -329,6 +330,27 @@
       return;
     }
 
+    // !convergance log an issue <title> — POST to non-stream handler
+    if (/^!convergan?ce\s+log\s+an?\s+issue\s+/i.test(text)) {
+      if (emptyState) emptyState.style.display = "none";
+      appendUserBubble(text);
+      inputEl.value = "";
+      const sysRow = document.createElement("div");
+      sysRow.className = "msg-row agent";
+      sysRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble">Logging issue…</div>`;
+      messagesEl.appendChild(sysRow);
+      scrollToBottom();
+      fetch(`${serverBase}/api/dream/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      })
+        .then(r => r.json())
+        .then(d => { sysRow.querySelector(".bubble").textContent = d.reply || "Done."; scrollToBottom(); })
+        .catch(e => { sysRow.querySelector(".bubble").textContent = `Failed: ${e.message}`; scrollToBottom(); });
+      return;
+    }
+
     // Allow backend-streaming bang commands through; reject truly unknown ones
     const STREAMING_BANGS = ["swarm", "converge", "convergance", "self-edit", "selfedit", "code", "review"];
     const bangMatch = text.match(/^!(\S+)/);
@@ -448,7 +470,14 @@
                 cursor.remove();
                 // Strip [DOORS:...] tag during streaming; chips rendered on done
                 const visibleText = fullText.replace(/\[DOORS:[^\]]*\]?/i, "").replace(/\n{3,}/g, "\n\n").trimEnd();
-                bubble.textContent = visibleText;
+                // Use a dedicated text node so the route-card child isn't wiped
+                let textNode = bubble.querySelector(".bubble-text");
+                if (!textNode) {
+                  textNode = document.createElement("span");
+                  textNode.className = "bubble-text";
+                  bubble.appendChild(textNode);
+                }
+                textNode.textContent = visibleText;
                 bubble.appendChild(cursor);
                 scrollToBottom();
               }
