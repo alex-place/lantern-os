@@ -1,4 +1,7 @@
 name: Monoworkstream Gate
+# Enforces per-agent workstream rule: only 1 open feature PR to master at a time.
+# Prevents conflicting merges and ensures serial review. Exempt: gh-pages (deploy), master (long-lived).
+# See AGENTS.md for complete monoworkstream rules and branch naming conventions.
 
 on:
   pull_request:
