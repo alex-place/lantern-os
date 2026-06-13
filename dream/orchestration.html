@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keystone Orchestration — Agent Work Dashboard</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .orch-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .orch-header { margin-bottom: 30px; border-bottom: 2px solid var(--accent); padding-bottom: 15px; }
+    .orch-header h1 { margin: 0; font-size: 28px; display: flex; align-items: center; gap: 10px; }
+    .orch-header p { margin: 5px 0 0 0; color: var(--muted); font-size: 14px; }
+
+    .orch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .orch-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 8px; }
+    .orch-card h2 { margin: 0 0 15px 0; font-size: 18px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+    .stat { background: var(--bg); padding: 12px; border-radius: 4px; }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    .stat-value { font-size: 24px; font-weight: bold; color: var(--accent); }
+
+    .agent-list { display: flex; flex-direction: column; gap: 10px; }
+    .agent-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--accent); }
+    .agent-name { font-weight: bold; }
+    .agent-status { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #888; margin-left: 8px; }
+    .agent-status.idle { background: #4a9eff; }
+    .agent-status.working { background: #ffaa00; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .work-queue { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+    .work-item { padding: 12px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--accent); }
+    .work-issue { font-weight: bold; color: var(--accent); }
+    .work-title { font-size: 13px; margin: 5px 0; }
+    .work-status { font-size: 11px; color: var(--muted); }
+
+    .info-box { padding: 15px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--success, #4ade80); margin-top: 15px; font-size: 13px; line-height: 1.6; }
+    .info-box strong { color: var(--accent); }
+
+    .action-buttons { display: flex; gap: 10px; margin-top: 15px; }
+    .btn-small { padding: 8px 12px; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+    .btn-small:hover { opacity: 0.9; }
+
+    .refresh-time { font-size: 11px; color: var(--muted); margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <span style="font-size:20px">⚙️</span>
+    <span style="font-size:18px;font-weight:600">Keystone Orchestration</span>
+  </a>
+  <div class="nav-links">
+    <a href="/" style="padding:12px 16px">← Back</a>
+  </div>
+</nav>
+
+<div class="orch-container">
+  <div class="orch-header">
+    <h1>⚙️ Keystone Agent Orchestration</h1>
+    <p>Real-time view of autonomous agent work queue, slots, and status</p>
+  </div>
+
+  <!-- Queue Status -->
+  <div class="orch-grid">
+    <div class="orch-card">
+      <h2>📊 Queue Status</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value" id="statPending">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">In Progress</div>
+          <div class="stat-value" id="statInProgress">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Completed</div>
+          <div class="stat-value" id="statCompleted">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Failed</div>
+          <div class="stat-value" id="statFailed">0</div>
+        </div>
+      </div>
+      <div class="info-box">
+        <strong>Total Issues in Queue:</strong> <span id="queueTotal">—</span><br>
+        <strong>Success Rate:</strong> <span id="successRate">—</span>
+      </div>
+    </div>
+
+    <!-- Agent Slots -->
+    <div class="orch-card">
+      <h2>🤖 Agent Lanes</h2>
+      <div class="agent-list" id="agentList">
+        <div style="color: var(--muted); font-size: 12px;">Loading agent status...</div>
+      </div>
+      <div class="action-buttons">
+        <button class="btn-small" onclick="refreshStatus()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Work Queue -->
+    <div class="orch-card">
+      <h2>📋 Work Queue</h2>
+      <div class="work-queue" id="workQueue">
+        <div style="color: var(--muted); font-size: 12px;">Loading queue...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Work -->
+  <div class="orch-card">
+    <h2>🔄 Active Work & Recent Completions</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <div>
+        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted);">Currently Working On:</h3>
+        <div id="activeWork" style="padding: 12px; background: var(--bg); border-radius: 4px; min-height: 60px;">
+          <span style="color: var(--muted);">No active work</span>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted);">Recently Completed:</h3>
+        <div id="recentWork" style="padding: 12px; background: var(--bg); border-radius: 4px; min-height: 60px; font-size: 12px;">
+          <span style="color: var(--muted);">No completed work</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh-time" id="refreshTime">Last update: never</div>
+</div>
+
+<script>
+async function refreshStatus() {
+  try {
+    // Fetch queue status
+    let queueData = { queue: { pending: 0, assigned: 0, completed: 0, failed: 0 } };
+    try {
+      const queueResp = await fetch("/api/queue/status");
+      if (queueResp.ok) {
+        queueData = await queueResp.json();
+      }
+    } catch (e) {
+      console.warn("Queue API unavailable, using defaults");
+    }
+
+    // Fetch agent status (queue-specific slot data)
+    let agentData = { slots: [] };
+    try {
+      const agentResp = await fetch("/api/queue/agents");
+      if (agentResp.ok) {
+        agentData = await agentResp.json();
+      }
+    } catch (e) {
+      console.warn("Queue agents API unavailable, using defaults");
+    }
+
+    // Update queue stats
+    document.getElementById("statPending").textContent = queueData.queue?.pending || 0;
+    document.getElementById("statInProgress").textContent = queueData.queue?.assigned || 0;
+    document.getElementById("statCompleted").textContent = queueData.queue?.completed || 0;
+    document.getElementById("statFailed").textContent = queueData.queue?.failed || 0;
+
+    const total = (queueData.queue?.pending || 0) + (queueData.queue?.assigned || 0) + (queueData.queue?.completed || 0) + (queueData.queue?.failed || 0);
+    const completed = queueData.queue?.completed || 0;
+    const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    document.getElementById("queueTotal").textContent = total;
+    document.getElementById("successRate").textContent = successRate + "%";
+
+    // Update agent slots
+    const agentHTML = (agentData.slots || []).map(slot => `
+      <div class="agent-item">
+        <span class="agent-name">
+          ${slot.id}
+          <span class="agent-status ${slot.status === 'working' ? 'working' : 'idle'}"></span>
+        </span>
+        <span style="font-size: 12px; color: var(--muted);">
+          ${slot.status === 'working' ? `⏱️ Issue #${slot.currentWork}` : '✓ Ready'}
+        </span>
+      </div>
+    `).join("");
+    document.getElementById("agentList").innerHTML = agentHTML || '<div style="color: var(--muted);">No agents available</div>';
+
+    // Fetch and display work queue
+    const pendingResp = await fetch("/api/queue/list/pending");
+    const pendingData = await pendingResp.json();
+    const workHTML = (pendingData.items || []).slice(0, 5).map(item => `
+      <div class="work-item">
+        <span class="work-issue">Issue #${item.issueNumber}</span>
+        <div class="work-title">${item.title || 'Untitled'}</div>
+        <div class="work-status">Priority: ${item.priority || 0}</div>
+      </div>
+    `).join("");
+    document.getElementById("workQueue").innerHTML = workHTML || '<div style="color: var(--muted);">No pending work</div>';
+
+    // Update refresh time
+    const now = new Date().toLocaleTimeString();
+    document.getElementById("refreshTime").textContent = `Last update: ${now}`;
+
+  } catch (err) {
+    console.error("Error refreshing status:", err);
+    document.getElementById("refreshTime").textContent = `Error: ${err.message}`;
+  }
+}
+
+// Auto-refresh every 5 seconds
+setInterval(refreshStatus, 5000);
+
+// Initial load
+refreshStatus();
+</script>
+
+</body>
+</html>

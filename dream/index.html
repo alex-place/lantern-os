@@ -74,6 +74,14 @@
       <span class="panel-arrow">Open system status →</span>
     </a>
 
+    <a class="panel" href="/operations.html" id="operations-panel" data-prod-hidden>
+      <span class="panel-icon">⚙️</span>
+      <span class="panel-label">Operations</span>
+      <h2>Keystone Control Center</h2>
+      <p>Unified command center for orchestration, agent status, leaderboard, and settings.</p>
+      <span class="panel-arrow">Open Operations →</span>
+    </a>
+
     <a class="panel" href="/leaderboard" data-prod-hidden>
       <span class="panel-icon">🏆</span>
       <span class="panel-label">Convergence</span>
@@ -216,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadState() {
-    const [health, version, git, status, routing, agents, dreamer, search] = await Promise.all([
+    const [health, version, git, status, routing, agents, dreamer, search, mesh, workers, thisNode] = await Promise.all([
       fetchJson('/api/health'),
       fetchJson('/version.json'),
       fetchJson('/api/version'),
@@ -225,6 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
       fetchJson('/api/agents'),
       fetchJson('/api/dreamer?user=dreamer'),
       fetchJson('/api/dream/search'),
+      fetchJson('/api/nodes/mesh'),
+      fetchJson('/api/agents/workers'),
+      fetchJson('/api/nodes/this'),
     ]);
 
     // Server + version
@@ -272,6 +283,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const agentList = agents?.agents || [];
     const agentNames = agentList.map(a => a.name).join(', ') || 'none';
     $('stat-agents').textContent = agentList.length + ' agent' + (agentList.length === 1 ? '' : 's') + ' available: ' + agentNames;
+
+    // Node Mesh & Workers
+    const nodeCount = mesh?.nodeCount || 0;
+    const aliveCount = mesh?.aliveCount || 0;
+    const nodeList = mesh?.nodes || [];
+    const workersList = workers?.agents || [];
+    const totalWorkers = workers?.totalWorkers || 0;
+
+    if (nodeCount > 0) {
+      $('nodes-status').textContent = aliveCount + ' of ' + nodeCount + ' node' + (nodeCount === 1 ? '' : 's') + ' online';
+      const nodeHTML = nodeList.slice(0, 5).map(n => {
+        const alive = n.isAlive ? '🟢' : '🔴';
+        return `${alive} ${n.nodeName} (${n.agents ? n.agents.length : 0} agents, ${n.workerCount || 0} worker${n.workerCount === 1 ? '' : 's'}) — ${n.lastSeenAgo}`;
+      }).join('<br>');
+      $('nodes-list').innerHTML = nodeHTML;
+    } else {
+      $('nodes-status').textContent = 'No nodes registered yet. Machines running Lantern OS will appear here.';
+      $('nodes-list').innerHTML = '';
+    }
+
+    if (workersList.length > 0) {
+      const topWorkers = workersList.slice(0, 3).map(w => `${w.agent} (${w.totalWorkers})`).join(', ');
+      $('workers-summary').textContent = 'Total workers: ' + totalWorkers + ' across ' + workersList.length + ' agent' + (workersList.length === 1 ? '' : 's') + '. Top: ' + topWorkers;
+    } else if (totalWorkers === 0 && nodeCount === 0) {
+      $('workers-summary').textContent = 'Register nodes to see active workers and collaborators.';
+    }
 
     // Dreamer / notebook
     const entries = dreamer?.entries || [];

@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Keystone Operations — Lantern OS</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .ops-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .ops-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 0;
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 30px;
+    }
+    .ops-header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ops-header .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-left: auto;
+    }
+
+    .ops-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .ops-tab-btn {
+      padding: 12px 16px;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .ops-tab-btn:hover {
+      color: var(--text);
+      background: var(--surface);
+    }
+    .ops-tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .ops-content { display: none; }
+    .ops-content.active { display: block; animation: fadeIn 0.2s ease-in; }
+    @keyframes fadeIn { from { opacity: 0.8; } to { opacity: 1; } }
+
+    .ops-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+    .ops-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .ops-card h2 {
+      margin: 0 0 15px 0;
+      font-size: 16px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ops-stat { display: flex; flex-direction: column; gap: 4px; }
+    .ops-stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .ops-stat-value { font-size: 28px; font-weight: bold; color: var(--accent); }
+
+    .ops-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .ops-table th, .ops-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .ops-table th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .ops-table tr:hover {
+      background: var(--surface2);
+    }
+
+    .ops-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ops-list-item {
+      padding: 10px 12px;
+      background: var(--bg);
+      border-radius: 4px;
+      border-left: 3px solid var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ops-list-item .label { font-weight: 500; }
+    .ops-list-item .value { color: var(--muted); font-size: 12px; }
+
+    .ops-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 15px;
+    }
+    .ops-btn {
+      padding: 8px 12px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .ops-btn:hover { opacity: 0.9; }
+    .ops-btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .ops-btn-secondary:hover { background: var(--surface2); }
+
+    .ops-status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .ops-status-dot.online { background: #4ade80; }
+    .ops-status-dot.idle { background: #0ea5e9; }
+    .ops-status-dot.working { background: #f59e0b; }
+    .ops-status-dot.offline { background: #6b7280; }
+
+    @media (max-width: 768px) {
+      .ops-grid { grid-template-columns: 1fr; }
+      .ops-header { flex-direction: column; align-items: flex-start; }
+      .ops-header .subtitle { margin-left: 0; margin-top: 8px; }
+      .ops-tabs { gap: 0; }
+      .ops-tab-btn { flex: 1; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <span style="font-size:20px">⚙️</span>
+    <span style="font-size:18px;font-weight:600">Keystone Operations</span>
+  </a>
+  <div class="nav-links">
+    <a href="/" style="padding:12px 16px">← Back</a>
+  </div>
+  <div class="nav-actions">
+    <button id="refresh-btn" style="padding:8px 12px;background:var(--accent);color:var(--bg);border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;">🔄 Refresh</button>
+    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="padding:8px 12px;background:transparent;border:none;cursor:pointer;font-size:18px;">🌙</button>
+  </div>
+</nav>
+
+<div class="ops-container">
+  <div class="ops-header">
+    <h1>⚙️ Keystone Agent Operations</h1>
+    <span class="subtitle" id="last-update">Initializing…</span>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="ops-tabs">
+    <button class="ops-tab-btn active" data-tab="orchestration">📊 Orchestration</button>
+    <button class="ops-tab-btn" data-tab="agents">🤖 Agent Status</button>
+    <button class="ops-tab-btn" data-tab="leaderboard">🏆 Leaderboard</button>
+    <button class="ops-tab-btn" data-tab="settings">⚡ Settings</button>
+  </div>
+
+  <!-- Tab: Orchestration -->
+  <div id="tab-orchestration" class="ops-content active">
+    <div class="ops-grid">
+      <!-- Queue Status Card -->
+      <div class="ops-card">
+        <h2>📊 Queue Status</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;">
+          <div class="ops-stat">
+            <span class="ops-stat-label">Pending</span>
+            <span class="ops-stat-value" id="q-pending">—</span>
+          </div>
+          <div class="ops-stat">
+            <span class="ops-stat-label">In Progress</span>
+            <span class="ops-stat-value" id="q-assigned">—</span>
+          </div>
+          <div class="ops-stat">
+            <span class="ops-stat-label">Completed</span>
+            <span class="ops-stat-value" id="q-completed">—</span>
+          </div>
+          <div class="ops-stat">
+            <span class="ops-stat-label">Failed</span>
+            <span class="ops-stat-value" id="q-failed">—</span>
+          </div>
+        </div>
+        <div style="padding:10px;background:var(--bg);border-radius:4px;border-left:3px solid var(--accent);">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Total Issues</div>
+          <div style="font-size:20px;font-weight:bold;color:var(--accent);" id="q-total">—</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;">Success Rate: <span id="q-success">—</span></div>
+        </div>
+      </div>
+
+      <!-- Agent Lanes Card -->
+      <div class="ops-card">
+        <h2>🤖 Agent Lanes</h2>
+        <div class="ops-list" id="agent-lanes-list">
+          <div style="color:var(--muted);font-size:12px;">Loading agent status…</div>
+        </div>
+        <div class="ops-actions">
+          <button class="ops-btn ops-btn-secondary" onclick="refreshDashboard()">🔄 Refresh Now</button>
+        </div>
+      </div>
+
+      <!-- Work Queue Preview -->
+      <div class="ops-card">
+        <h2>📋 Work Queue (Next 5)</h2>
+        <div class="ops-list" id="work-queue-list">
+          <div style="color:var(--muted);font-size:12px;">Loading queue…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Work Section -->
+    <div class="ops-card" style="margin-top:20px;">
+      <h2>🔄 Active Work & Recent Completions</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div>
+          <h3 style="margin:0 0 10px 0;font-size:13px;color:var(--muted);">Currently Working On:</h3>
+          <div id="active-work" style="padding:12px;background:var(--bg);border-radius:4px;min-height:60px;font-size:13px;">
+            <span style="color:var(--muted);">No active work</span>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin:0 0 10px 0;font-size:13px;color:var(--muted);">Recently Completed:</h3>
+          <div id="recent-work" style="padding:12px;background:var(--bg);border-radius:4px;min-height:60px;font-size:12px;">
+            <span style="color:var(--muted);">No completed work</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Agent Status -->
+  <div id="tab-agents" class="ops-content">
+    <div class="ops-grid">
+      <div class="ops-card">
+        <h2>🤖 Fleet Overview</h2>
+        <div class="ops-list" id="agent-status-list">
+          <div style="color:var(--muted);font-size:12px;">Loading agent status…</div>
+        </div>
+      </div>
+
+      <div class="ops-card">
+        <h2>🌐 Node Mesh</h2>
+        <div class="ops-list" id="mesh-status-list">
+          <div style="color:var(--muted);font-size:12px;">Loading mesh status…</div>
+        </div>
+      </div>
+
+      <div class="ops-card">
+        <h2>⚙️ System Health</h2>
+        <div id="system-health" style="color:var(--muted);font-size:12px;">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Leaderboard -->
+  <div id="tab-leaderboard" class="ops-content">
+    <div class="ops-card">
+      <h2>🏆 Top Agents (All Tasks)</h2>
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Tasks</th>
+            <th>Success Rate</th>
+            <th>Avg Latency</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body">
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Loading leaderboard…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ops-card" style="margin-top:20px;">
+      <h2>⚡ Provider Health</h2>
+      <div class="ops-list" id="provider-health-list">
+        <div style="color:var(--muted);font-size:12px;">Loading provider status…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Settings -->
+  <div id="tab-settings" class="ops-content">
+    <div class="ops-card">
+      <h2>⚡ AI Provider Configuration</h2>
+      <div class="ops-list" id="provider-config-list">
+        <div style="color:var(--muted);font-size:12px;">Loading provider configuration…</div>
+      </div>
+      <div class="ops-actions" style="margin-top:20px;">
+        <button class="ops-btn" onclick="openProviderSettings()">⚙️ Manage Providers</button>
+        <a href="/settings/providers.html" class="ops-btn ops-btn-secondary" style="text-decoration:none;text-align:center;">Open Legacy Settings</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/dashboard-api.js"></script>
+<script src="/js/dashboard-state.js"></script>
+<script src="/js/dashboard-ui.js"></script>
+<script src="/js/theme-toggle.js"></script>
+<script>
+// Tab switching
+document.querySelectorAll('.ops-tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabName = btn.dataset.tab;
+
+    // Update active button
+    document.querySelectorAll('.ops-tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Update active content
+    document.querySelectorAll('.ops-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+
+    // Save to URL hash
+    window.location.hash = tabName;
+  });
+});
+
+// Restore tab from URL hash
+const initialTab = window.location.hash.slice(1) || 'orchestration';
+const initialBtn = document.querySelector(`[data-tab="${initialTab}"]`);
+if (initialBtn) initialBtn.click();
+
+// Global refresh function
+async function refreshDashboard() {
+  dashboardUI.showInfo('Refreshing…', 0);
+  dashboardAPI.clearCache();
+
+  try {
+    const data = await dashboardAPI.getSystemStatus();
+    updateAllTabs(data.data);
+    dashboardUI.showSuccess('Dashboard updated', 3000);
+  } catch (err) {
+    dashboardUI.showError('Failed to refresh: ' + err.message);
+  }
+}
+
+// Refresh button
+document.getElementById('refresh-btn').addEventListener('click', refreshDashboard);
+
+// Update all tabs with new data
+async function updateAllTabs(data) {
+  if (!data) {
+    dashboardUI.showWarning('No data received from server');
+    return;
+  }
+
+  // Update timestamp
+  document.getElementById('last-update').textContent =
+    `Last update: ${dashboardUI.formatTimestamp(data.timestamp, true)}`;
+
+  // Update Orchestration tab
+  if (data.queue) {
+    document.getElementById('q-pending').textContent = data.queue.pending || 0;
+    document.getElementById('q-assigned').textContent = data.queue.assigned || 0;
+    document.getElementById('q-completed').textContent = data.queue.completed || 0;
+    document.getElementById('q-failed').textContent = data.queue.failed || 0;
+    document.getElementById('q-total').textContent = data.queue.totalIssues || 0;
+    document.getElementById('q-success').textContent = dashboardUI.formatPercent(data.queue.successRate || 0);
+  }
+
+  // Update agent lanes - show personas with active counts
+  if (data.agents) {
+    const lanesList = document.getElementById('agent-lanes-list');
+    if (data.agents.personas && data.agents.personas.length > 0) {
+      const slotStats = data.agents.slots || { active: 0, total: 0 };
+      lanesList.innerHTML = `
+        <div class="ops-list-item">
+          <span class="label">🤖 Active Agents</span>
+          <span class="value">${slotStats.active}/${slotStats.total}</span>
+        </div>
+        <div class="ops-list-item">
+          <span class="label">🔆 Personas Online</span>
+          <span class="value">${data.agents.personas.length}</span>
+        </div>
+      ` + data.agents.personas.slice(0, 6).map(p => `
+        <div class="ops-list-item">
+          <span class="label">${p.symbol} ${p.name}</span>
+          <span class="value" style="font-size:11px;">${p.role}</span>
+        </div>
+      `).join('');
+    } else {
+      lanesList.innerHTML = '<div style="color:var(--muted);font-size:12px;">No agents available</div>';
+    }
+  }
+
+  // Update work queue preview
+  try {
+    const pending = await dashboardAPI.getQueuePending(5);
+    const queueList = document.getElementById('work-queue-list');
+    if (pending.items && pending.items.length > 0) {
+      queueList.innerHTML = pending.items.map(item => `
+        <div class="ops-list-item">
+          <span class="label">Issue #${item.issueNumber}</span>
+          <span class="value">${item.title || 'Untitled'}</span>
+        </div>
+      `).join('');
+    } else {
+      queueList.innerHTML = '<div style="color:var(--muted);font-size:12px;">No pending work</div>';
+    }
+  } catch (err) {
+    console.warn('Could not load pending queue:', err);
+  }
+
+  // Update active work (in_progress items)
+  try {
+    const inProgress = await dashboardAPI.getQueuePending(10); // Reuse API with different endpoint
+    const activeWorkDiv = document.getElementById('active-work');
+    // Fetch actual in_progress items via direct API call
+    const resp = await fetch('/api/queue/list/in_progress');
+    const inProgData = await resp.json();
+    if (inProgData.items && inProgData.items.length > 0) {
+      activeWorkDiv.innerHTML = inProgData.items.slice(0, 3).map(item => `
+        <div class="ops-list-item">
+          <span class="label">Issue #${item.issueNumber}</span>
+          <span class="value" style="color:var(--accent);">${item.title || 'Untitled'}</span>
+        </div>
+      `).join('');
+    } else {
+      activeWorkDiv.innerHTML = '<div style="color:var(--muted);font-size:12px;">No active work</div>';
+    }
+  } catch (err) {
+    document.getElementById('active-work').innerHTML = '<div style="color:var(--muted);font-size:12px;">No active work</div>';
+  }
+
+  // Update recent completions (completed items)
+  try {
+    const resp = await fetch('/api/queue/list/completed');
+    const completedData = await resp.json();
+    const recentWorkDiv = document.getElementById('recent-work');
+    if (completedData.items && completedData.items.length > 0) {
+      recentWorkDiv.innerHTML = completedData.items.slice(0, 3).map(item => `
+        <div class="ops-list-item">
+          <span class="label">Issue #${item.issueNumber}</span>
+          <span class="value" style="color:var(--success);">${item.title || 'Untitled'}</span>
+        </div>
+      `).join('');
+    } else {
+      recentWorkDiv.innerHTML = '<div style="color:var(--muted);font-size:12px;">No completed work</div>';
+    }
+  } catch (err) {
+    document.getElementById('recent-work').innerHTML = '<div style="color:var(--muted);font-size:12px;">No completed work</div>';
+  }
+
+  // Update Agent Status tab
+  if (data.agents) {
+    const statusList = document.getElementById('agent-status-list');
+    const personas = data.agents.personas || [];
+    statusList.innerHTML = personas.map(p => `
+      <div class="ops-list-item">
+        <span class="label">${p.symbol} ${p.name}</span>
+        <span class="value">${p.role}</span>
+      </div>
+    `).join('');
+  }
+
+  // Update mesh status
+  if (data.mesh) {
+    const meshList = document.getElementById('mesh-status-list');
+    if (data.mesh.nodes && data.mesh.nodes.length > 0) {
+      meshList.innerHTML = data.mesh.nodes.map(node => `
+        <div class="ops-list-item">
+          <span class="label">${node.hostname}</span>
+          <span class="value">
+            <span class="ops-status-dot ${node.status}"></span>
+            ${node.status}
+          </span>
+        </div>
+      `).join('');
+    } else {
+      meshList.innerHTML = '<div style="color:var(--muted);font-size:12px;">No nodes connected</div>';
+    }
+  }
+
+  // Update system health
+  if (data.system) {
+    const healthDiv = document.getElementById('system-health');
+    healthDiv.innerHTML = `
+      <div class="ops-list-item">
+        <span class="label">Status</span>
+        <span class="value">${data.system.health}</span>
+      </div>
+      <div class="ops-list-item" style="margin-top:8px;">
+        <span class="label">Version</span>
+        <span class="value" style="font-family:monospace;font-size:11px;">${data.system.version?.commit || 'unknown'}</span>
+      </div>
+    `;
+  }
+
+  // Update leaderboard
+  if (data.leaderboard && data.leaderboard.topOverall) {
+    const tbody = document.getElementById('leaderboard-body');
+    if (data.leaderboard.topOverall.length > 0) {
+      tbody.innerHTML = data.leaderboard.topOverall.map(agent => `
+        <tr>
+          <td>${agent.agentName}</td>
+          <td>${agent.taskCount || 0}</td>
+          <td>${dashboardUI.formatPercent(agent.successRate || 0)}</td>
+          <td>${dashboardUI.formatDuration(agent.avgLatency || 0)}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No leaderboard data</td></tr>';
+    }
+  }
+
+  // Update provider config
+  if (data.providers) {
+    const configList = document.getElementById('provider-config-list');
+    if (data.providers.configured && data.providers.configured.length > 0) {
+      configList.innerHTML = data.providers.configured.map(p => `
+        <div class="ops-list-item">
+          <span class="label">${p.name}</span>
+          <span class="value">${p.model || 'unconfigured'}</span>
+        </div>
+      `).join('');
+    } else {
+      configList.innerHTML = '<div style="color:var(--muted);font-size:12px;">No providers configured</div>';
+    }
+  }
+
+  // Update provider health
+  const healthList = document.getElementById('provider-health-list');
+  if (data.providers && data.providers.health) {
+    const entries = Object.entries(data.providers.health).filter(([_, v]) => v);
+    if (entries.length > 0) {
+      healthList.innerHTML = entries.map(([name, health]) => `
+        <div class="ops-list-item">
+          <span class="label">${name}</span>
+          <span class="value">
+            <span class="ops-status-dot ${health.status || 'offline'}"></span>
+            ${health.status || 'unknown'}
+          </span>
+        </div>
+      `).join('');
+    }
+  }
+}
+
+// Function to open legacy provider settings
+function openProviderSettings() {
+  window.open('/settings/providers.html', '_blank');
+}
+
+// Initial load and periodic refresh
+async function initDashboard() {
+  try {
+    dashboardUI.showInfo('Initializing dashboard…', 0);
+    const response = await dashboardAPI.getSystemStatus();
+    // Handle both {ok, data: {...}} and direct data object
+    const data = response.data || response;
+    updateAllTabs(data);
+    dashboardUI.showSuccess('Dashboard ready', 2000);
+  } catch (err) {
+    dashboardUI.showError('Failed to load dashboard: ' + err.message);
+  }
+}
+
+// Auto-refresh every 5 seconds
+setInterval(async () => {
+  try {
+    dashboardAPI.clearCache(); // Force fresh fetch
+    const response = await dashboardAPI.getSystemStatus();
+    // Handle both {ok, data: {...}} and direct data object
+    const data = response.data || response;
+    updateAllTabs(data);
+  } catch (err) {
+    console.error('Auto-refresh failed:', err);
+  }
+}, 5000);
+
+// Initialize on load
+window.addEventListener('load', initDashboard);
+initDashboard();
+</script>
+
+</body>
+</html>

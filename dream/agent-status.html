@@ -139,6 +139,35 @@
     </div>
   </div>
 
+  <!-- Lantern Node Mesh -->
+  <div class="section">
+    <h2>🌐 Lantern Node Mesh</h2>
+    <div class="two-col">
+      <div class="card-grid" id="mesh-summary">
+        <div class="card"><span class="loading">Checking mesh…</span></div>
+      </div>
+      <div class="card-grid" id="workers-summary-card">
+        <div class="card"><span class="loading">Loading workers…</span></div>
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-top:16px;">
+      <table>
+        <thead><tr><th>Node</th><th>Status</th><th>Agents</th><th>Workers</th><th>Platform</th><th>Last Seen</th></tr></thead>
+        <tbody id="mesh-nodes">
+          <tr><td colspan="6" class="loading">No nodes registered…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap" style="margin-top:16px;">
+      <table>
+        <thead><tr><th>Agent</th><th>Total Workers</th><th>Worker Nodes</th></tr></thead>
+        <tbody id="agent-workers">
+          <tr><td colspan="3" class="loading">Loading agent workers…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- AI Model Slots -->
   <div class="section">
     <h2>AI Model Slots</h2>
@@ -206,7 +235,7 @@
     $("last-updated").textContent = "Updated " + now.toLocaleTimeString();
 
     const [
-      health, version, agents, slots, actions, status, keystone, tess
+      health, version, agents, slots, actions, status, keystone, tess, mesh, agentWorkers
     ] = await Promise.all([
       fetchJson("/api/health"),
       fetchJson("/api/version"),
@@ -216,6 +245,8 @@
       fetchJson("/api/status"),
       fetchJson("/api/keystone/status"),
       fetchJson("/api/agents/status"),
+      fetchJson("/api/nodes/mesh"),
+      fetchJson("/api/agents/workers"),
     ]);
 
     // Convergence Agent Fleet
@@ -331,6 +362,73 @@
       `).join("");
     } else {
       personasEl.innerHTML = `<div class="card"><span class="error">No personas registered</span></div>`;
+    }
+
+    // Lantern Node Mesh
+    const meshSummary = $("mesh-summary");
+    const workersSummaryCard = $("workers-summary-card");
+    const meshNodesEl = $("mesh-nodes");
+    const agentWorkersEl = $("agent-workers");
+
+    const nodeCount = mesh?.nodeCount || 0;
+    const aliveCount = mesh?.aliveCount || 0;
+    const nodeList = mesh?.nodes || [];
+    const workersList = agentWorkers?.agents || [];
+    const totalWorkers = agentWorkers?.totalWorkers || 0;
+
+    if (nodeCount > 0) {
+      meshSummary.innerHTML = `
+        <div class="card">
+          <div class="icon">🌐</div>
+          <h3>${nodeCount}</h3>
+          <div class="meta">Total Nodes</div>
+        </div>
+        <div class="card">
+          <div class="icon">🟢</div>
+          <h3>${aliveCount}</h3>
+          <div class="meta">Online</div>
+        </div>
+      `;
+      meshNodesEl.innerHTML = nodeList.map(n => {
+        const statusCls = n.isAlive ? "live" : "held";
+        return `<tr>
+          <td><strong>${n.nodeName}</strong></td>
+          <td>${pill(statusCls, n.isAlive ? "Online" : "Offline")}</td>
+          <td>${n.agents ? n.agents.length : 0}</td>
+          <td>${n.workerCount || 0}</td>
+          <td>${n.platform} / ${n.arch}</td>
+          <td>${n.lastSeenAgo || "—"}</td>
+        </tr>`;
+      }).join("");
+    } else {
+      meshSummary.innerHTML = `<div class="card"><span class="error">No nodes registered to mesh</span></div>`;
+      meshNodesEl.innerHTML = `<tr><td colspan="6" class="error">No nodes have registered to the mesh yet</td></tr>`;
+    }
+
+    if (workersList.length > 0) {
+      workersSummaryCard.innerHTML = `
+        <div class="card">
+          <div class="icon">👥</div>
+          <h3>${totalWorkers}</h3>
+          <div class="meta">Total Workers</div>
+        </div>
+        <div class="card">
+          <div class="icon">⚙️</div>
+          <h3>${workersList.length}</h3>
+          <div class="meta">Agent Types</div>
+        </div>
+      `;
+      agentWorkersEl.innerHTML = workersList.map(w => {
+        const nodeNames = (w.workerNodes || []).map(n => n.nodeName).join(", ");
+        return `<tr>
+          <td><strong>${w.agent}</strong></td>
+          <td>${w.totalWorkers}</td>
+          <td style="font-size:0.75rem;color:var(--muted);">${nodeNames || "—"}</td>
+        </tr>`;
+      }).join("");
+    } else {
+      workersSummaryCard.innerHTML = `<div class="card"><span class="error">No workers active</span></div>`;
+      agentWorkersEl.innerHTML = `<tr><td colspan="3" class="error">No agents have active workers</td></tr>`;
     }
 
     // AI Model Slots
