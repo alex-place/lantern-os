@@ -42,9 +42,12 @@ def _graph_with_resources(*providers) -> CEGraph:
 
 
 def _default_state(**overrides) -> SystemState:
+    from convergence_io.ceg import ResourceState
     s = SystemState(
-        resource_health={"anthropic": 1.0, "openai": 0.9, "ollama": 0.8},
-        resource_latency={"anthropic": 500.0, "openai": 600.0, "ollama": 200.0},
+        resources=ResourceState(
+            health={"anthropic": 1.0, "openai": 0.9, "ollama": 0.8},
+            latency_ms={"anthropic": 500.0, "openai": 600.0, "ollama": 200.0},
+        ),
     )
     for k, v in overrides.items():
         setattr(s, k, v)

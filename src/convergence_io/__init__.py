@@ -25,11 +25,14 @@ from .status_cube import StatusCube, StatusArtifact, StatusCoordinate, BayesianB
 from .ceg import (
     CEGraph, NodeKind, EdgeKind,
     IntentNode, ResourceNode, ConstraintNode, AuthorityNode, MemoryNode, TraceNode,
+    UIProjectionNode, FeatureState,
     ExecutionContract, ExecutionConstraints, ExecutionPlan, ExecutionStep,
-    PCSFOptimizer, SystemState, CostWeights, Severity, ResourceKind,
+    PCSFOptimizer, SystemState, ResourceState, MemoryState, PolicyState,
+    CostWeights, Severity, ResourceKind,
+    CEGExecutor, ExecutorStep,
 )
 from .dilation import DilationField, SwapConvergenceGuard, dilation
-from .hot_swap import HotSwapRegistry, SwapEvent, SwapTrigger, SwapPolicy
+from .hot_swap import HotSwapRegistry, SwapEvent, SwapTrigger, SwapPolicy, SwapHysteresis
 
 __all__ = [
     # v0.1 primitives
@@ -45,10 +48,13 @@ __all__ = [
     "IntentNode", "ResourceNode", "ConstraintNode", "AuthorityNode", "MemoryNode", "TraceNode",
     "ExecutionContract", "ExecutionConstraints", "ExecutionPlan", "ExecutionStep",
     "PCSFOptimizer", "SystemState", "CostWeights", "Severity", "ResourceKind",
+    # v0.4 CEG additions
+    "UIProjectionNode", "FeatureState", "ResourceState", "MemoryState", "PolicyState",
+    "CEGExecutor", "ExecutorStep",
     # v0.3 Dilation
     "DilationField", "SwapConvergenceGuard", "dilation",
-    # v0.3 HotSwap
-    "HotSwapRegistry", "SwapEvent", "SwapTrigger", "SwapPolicy",
+    # v0.3/v0.4 HotSwap
+    "HotSwapRegistry", "SwapEvent", "SwapTrigger", "SwapPolicy", "SwapHysteresis",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

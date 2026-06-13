@@ -136,8 +136,36 @@ class TraceNode(NodeBase):
     actor_node_id: str = ""
 
 
+# ── v0.4: Feature activation state ───────────────────────────────────────────
+
+class FeatureState(Enum):
+    """Lifecycle state for a CEG feature node."""
+    INACTIVE  = "inactive"    # not yet scheduled
+    SCHEDULED = "scheduled"   # PCSF eligible, awaiting resources
+    ACTIVE    = "active"      # currently executing
+    SUSPENDED = "suspended"   # swapped out, state preserved
+
+
+# ── v0.4: UIProjectionNode ────────────────────────────────────────────────────
+
+@dataclass
+class UIProjectionNode(NodeBase):
+    """
+    Maps a subgraph onto a UI surface.
+
+    The UI renders only nodes/panels that are ACTIVE in the feature graph.
+    Projection is re-evaluated on every PCSF tick.
+    """
+    kind: NodeKind = NodeKind.PROJECTION
+    view_type: str = "panel"             # panel | cockpit | debug | compact
+    filter: str = ""                      # graph query selecting source nodes
+    render_policy: str = "always"         # always | on_active | on_stable
+    feature_state: FeatureState = FeatureState.INACTIVE
+    source_node_ids: List[str] = field(default_factory=list)
+
+
 # Union type alias (for type hints)
-AnyNode = IntentNode | ResourceNode | ConstraintNode | AuthorityNode | MemoryNode | TraceNode
+AnyNode = IntentNode | ResourceNode | ConstraintNode | AuthorityNode | MemoryNode | TraceNode | UIProjectionNode
 
 
 # ── Edge types ────────────────────────────────────────────────────────────────
@@ -149,9 +177,10 @@ class EdgeKind(Enum):
     EXECUTES_ON     = "executes_on"
     TRANSFORMS_INTO = "transforms_into"
     OBSERVES        = "observes"
-    # v0.4 extension points
-    DERIVES_FROM    = "derives_from"
-    PROJECTS_TO     = "projects_to"
+    # v0.4 edges
+    DERIVES_FROM    = "derives_from"   # memory/context provenance
+    PROJECTS_TO     = "projects_to"    # graph → UI projection
+    SWAPS_TO        = "swaps_to"       # hot-swap successor link
 
 
 @dataclass(frozen=True)
@@ -212,14 +241,58 @@ class ExecutionPlan:
 # ── System state ──────────────────────────────────────────────────────────────
 
 @dataclass
+class ResourceState:
+    """R — resource health and latency snapshots."""
+    health: Dict[str, float] = field(default_factory=dict)    # provider_id → 0..1
+    latency_ms: Dict[str, float] = field(default_factory=dict)  # provider_id → ms
+
+
+@dataclass
+class MemoryState:
+    """M — active memory node count and last-update timestamp."""
+    active_nodes: int = 0
+    last_updated: float = field(default_factory=time.time)
+    entries: Dict[str, Any] = field(default_factory=dict)  # node_id → content summary
+
+
+@dataclass
+class PolicyState:
+    """P — active policy/constraint IDs and NAP profile."""
+    active_constraints: List[str] = field(default_factory=list)
+    nap_profile_id: str = ""
+    authority_scope: str = "operator"
+
+
+@dataclass
 class SystemState:
-    """Snapshot of mutable runtime state — passed to the optimizer each tick."""
-    resource_health: Dict[str, float] = field(default_factory=dict)   # provider_id → 0..1
-    resource_latency: Dict[str, float] = field(default_factory=dict)  # provider_id → ms
-    memory_load: int = 0       # number of active MemoryNodes
-    active_constraints: List[str] = field(default_factory=list)       # satisfied constraint ids
+    """
+    S(t) = (G, R, M, P)  — formal v0.4 system state.
+
+    S(t+1) = δ(S(t), event)
+    Passed to the optimizer and executor on every tick.
+    """
+    resources: ResourceState = field(default_factory=ResourceState)
+    memory: MemoryState = field(default_factory=MemoryState)
+    policy: PolicyState = field(default_factory=PolicyState)
     tick: int = 0
     timestamp: float = field(default_factory=time.time)
+
+    # Convenience accessors (backward-compatible with v0.3 callers)
+    @property
+    def resource_health(self) -> Dict[str, float]:
+        return self.resources.health
+
+    @property
+    def resource_latency(self) -> Dict[str, float]:
+        return self.resources.latency_ms
+
+    @property
+    def memory_load(self) -> int:
+        return self.memory.active_nodes
+
+    @property
+    def active_constraints(self) -> List[str]:
+        return self.policy.active_constraints
 
 
 # ── PCSF optimizer ────────────────────────────────────────────────────────────
@@ -442,3 +515,211 @@ class CEGraph:
     def advance_tick(self) -> int:
         self._tick += 1
         return self._tick
+
+
+# ── v0.4: CEGExecutor — formal execution loop ─────────────────────────────────
+
+@dataclass
+class ExecutorStep:
+    """One step of the CEG execution loop."""
+    tick: int
+    plan: Optional["ExecutionPlan"] = None
+    swap_events: List[Any] = field(default_factory=list)
+    nap_violations: List[str] = field(default_factory=list)
+    trace_ids: List[str] = field(default_factory=list)
+    complete: bool = False
+    elapsed_ms: float = 0.0
+
+
+class CEGExecutor:
+    """
+    Formal v0.4 execution loop:
+
+    while not complete:
+        observe S(t)
+        update D                          ← dilation field
+        evaluate constraints (NAP + EC)   ← new explicit step
+        PCSF.reoptimize()
+        if swap_required: execute_swap()
+        execute_step()
+        emit_trace()
+        update M                          ← memory update
+
+    S(t+1) = delta(S(t), event)
+    """
+
+    def __init__(
+        self,
+        graph: CEGraph,
+        optimizer: "PCSFOptimizer",
+        hot_swap: Optional[Any] = None,   # HotSwapRegistry
+        dilation: Optional[Any] = None,   # DilationField
+        max_ticks: int = 20,
+    ) -> None:
+        self.graph = graph
+        self.optimizer = optimizer
+        self.hot_swap = hot_swap
+        self.dilation = dilation
+        self.max_ticks = max_ticks
+        self._history: List[ExecutorStep] = []
+
+    def _observe(self, state: SystemState) -> SystemState:
+        """Observe current resource health + latency from graph nodes."""
+        for node in self.graph.nodes_by_kind(NodeKind.RESOURCE):
+            if isinstance(node, ResourceNode):
+                if node.provider_id not in state.resources.health:
+                    state.resources.health[node.provider_id] = node.health
+                if node.provider_id not in state.resources.latency_ms:
+                    state.resources.latency_ms[node.provider_id] = node.latency_target_ms
+        state.memory.active_nodes = len(list(self.graph.nodes_by_kind(NodeKind.MEMORY)))
+        return state
+
+    def _evaluate_constraints(self, state: SystemState) -> List[str]:
+        """Check all ConstraintNodes; return list of violated constraint predicates."""
+        violations = []
+        for node in self.graph.nodes_by_kind(NodeKind.CONSTRAINT):
+            if not isinstance(node, ConstraintNode):
+                continue
+            # Re-check known NAP predicates against system state
+            if node.predicate == "no_pii" and node.satisfied is False:
+                violations.append(node.predicate)
+            elif node.predicate.startswith("max_cost") and node.satisfied is False:
+                violations.append(node.predicate)
+            elif node.satisfied is False and node.severity == Severity.HARD:
+                violations.append(node.predicate)
+        return violations
+
+    def _update_memory(self, state: SystemState, step: ExecutorStep) -> None:
+        """M: update memory state after a step executes."""
+        state.memory.active_nodes = len(list(self.graph.nodes_by_kind(NodeKind.MEMORY)))
+        state.memory.last_updated = time.time()
+        for nid in step.trace_ids:
+            state.memory.entries[nid] = {"tick": step.tick, "event": "trace"}
+
+    def _emit_trace(self, tick: int, event: str, actor_id: str = "") -> str:
+        """Emit a TraceNode into the graph; return its ID."""
+        trace = TraceNode(
+            label=f"exec:tick-{tick}",
+            event=event,
+            actor_node_id=actor_id,
+        )
+        self.graph.add_node(trace)
+        return trace.node_id
+
+    def _update_ui_projections(self, plan: Optional["ExecutionPlan"]) -> None:
+        """Update UIProjectionNode feature states based on active plan."""
+        active_node_ids = set()
+        if plan and plan.feasible:
+            active_node_ids = {step.node_id for step in plan.steps}
+
+        for node in self.graph.nodes_by_kind(NodeKind.PROJECTION):
+            if not isinstance(node, UIProjectionNode):
+                continue
+            sources_active = any(nid in active_node_ids for nid in node.source_node_ids)
+            if sources_active:
+                node.feature_state = FeatureState.ACTIVE
+            elif node.feature_state == FeatureState.ACTIVE:
+                node.feature_state = FeatureState.SUSPENDED
+
+    def run(
+        self,
+        contract: "ExecutionContract",
+        state: Optional[SystemState] = None,
+    ) -> List[ExecutorStep]:
+        """
+        Execute the formal loop until contract is satisfied or max_ticks reached.
+        Returns list of ExecutorStep records (one per tick).
+        """
+        state = state or SystemState()
+        current_plan: Optional[ExecutionPlan] = None
+        self._history = []
+
+        for tick in range(self.max_ticks):
+            start = time.time()
+            step = ExecutorStep(tick=tick)
+
+            # 1. Observe S(t)
+            state = self._observe(state)
+            state.tick = tick
+            state.timestamp = time.time()
+
+            # 2. Update dilation field D
+            if self.dilation is not None:
+                for node in self.graph.nodes_by_kind(NodeKind.RESOURCE):
+                    if isinstance(node, ResourceNode):
+                        health = state.resources.health.get(node.provider_id, node.health)
+                        lat = state.resources.latency_ms.get(node.provider_id, node.latency_target_ms)
+                        ratio = lat / max(node.latency_target_ms, 1.0)
+                        self.dilation.update_from_health(node.node_id, health, ratio)
+                self.dilation.apply_to_graph(self.graph)
+
+            # 3. Evaluate constraints (NAP + ExecutionContract)
+            violations = self._evaluate_constraints(state)
+            step.nap_violations = violations
+            if violations and any(
+                isinstance(n, ConstraintNode) and n.predicate in violations and n.severity == Severity.CRITICAL
+                for n in self.graph.nodes_by_kind(NodeKind.CONSTRAINT)
+            ):
+                # Critical constraint → abort
+                step.complete = True
+                step.elapsed_ms = round((time.time() - start) * 1000, 2)
+                self._history.append(step)
+                break
+
+            # 4. PCSF reoptimize
+            current_plan = self.optimizer.reoptimize(current_plan, self.graph, contract, state) \
+                if current_plan else self.optimizer.optimize(self.graph, contract, state)
+            step.plan = current_plan
+
+            # 5. Hot-swap if required
+            if self.hot_swap is not None:
+                swap_events = self.hot_swap.check_and_swap(
+                    self.graph,
+                    state.resources.health,
+                    state.resources.latency_ms,
+                    contract.constraints.max_cost,
+                    tick,
+                )
+                step.swap_events = swap_events
+                if swap_events:
+                    # Re-optimize after swap
+                    current_plan = self.optimizer.optimize(self.graph, contract, state)
+                    step.plan = current_plan
+
+            # 6. Execute step
+            if current_plan and current_plan.feasible and current_plan.steps:
+                node_id = current_plan.steps[0].node_id
+                trace_id = self._emit_trace(tick, f"execute:{node_id}", node_id)
+                step.trace_ids.append(trace_id)
+
+            # 7. Update projections (UI state)
+            self._update_ui_projections(current_plan)
+
+            # 8. Update M (memory state)
+            self._update_memory(state, step)
+
+            step.elapsed_ms = round((time.time() - start) * 1000, 2)
+
+            # Completion check: plan is feasible and no violations
+            if current_plan and current_plan.feasible and not violations:
+                step.complete = True
+                self._history.append(step)
+                break
+
+            self._history.append(step)
+
+        return self._history
+
+    def summary(self) -> Dict[str, Any]:
+        if not self._history:
+            return {"ticks": 0, "complete": False, "violations": [], "swaps": 0}
+        last = self._history[-1]
+        total_swaps = sum(len(s.swap_events) for s in self._history)
+        all_violations = list({v for s in self._history for v in s.nap_violations})
+        return {
+            "ticks": len(self._history),
+            "complete": last.complete,
+            "violations": all_violations,
+            "swaps": total_swaps,
+            "final_plan_feasible": last.plan.feasible if last.plan else False,
+        }

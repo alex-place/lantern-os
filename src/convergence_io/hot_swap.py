@@ -30,6 +30,7 @@ Usage:
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -236,4 +237,83 @@ class HotSwapRegistry:
             "total_swaps": len(self._history),
             "successful_swaps": sum(1 for e in self._history if e.success),
             "rollbacks": sum(1 for e in self._history if e.rollback_used),
+        }
+
+
+# ── v0.4: SwapHysteresis ──────────────────────────────────────────────────────
+
+class SwapHysteresis:
+    """
+    Stability condition for hot-swaps — prevents oscillatory provider switching.
+
+    swap_allowed(v) only if:
+        improvement_score > epsilon          # minimum gain threshold
+        AND cooldown_elapsed                 # time since last swap
+        AND stability(v) > threshold         # node stability score
+
+    Stability score: exponential moving average of health observations.
+    Decays toward 0 when health is poor, recovers slowly when health improves.
+    """
+
+    def __init__(
+        self,
+        epsilon: float = 0.05,          # minimum improvement to justify swap
+        cooldown_s: float = 30.0,       # seconds between swaps per node
+        stability_threshold: float = 0.6,  # node must be this stable to be swappable
+        stability_alpha: float = 0.2,   # EMA weight for stability updates
+    ) -> None:
+        self.epsilon = epsilon
+        self.cooldown_s = cooldown_s
+        self.stability_threshold = stability_threshold
+        self.stability_alpha = stability_alpha
+        self._last_swap_time: Dict[str, float] = {}
+        self._stability: Dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def observe_health(self, node_id: str, health: float) -> float:
+        """Update stability EMA for node_id. Returns new stability score."""
+        with self._lock:
+            current = self._stability.get(node_id, health)
+            updated = (1 - self.stability_alpha) * current + self.stability_alpha * health
+            self._stability[node_id] = updated
+            return updated
+
+    def stability(self, node_id: str) -> float:
+        return self._stability.get(node_id, 0.5)
+
+    def cooldown_elapsed(self, node_id: str) -> bool:
+        last = self._last_swap_time.get(node_id, 0.0)
+        return (time.time() - last) >= self.cooldown_s
+
+    def swap_allowed(
+        self,
+        old_node_id: str,
+        new_node_id: str,
+        improvement_score: float,
+    ) -> Tuple[bool, str]:
+        """
+        Returns (allowed, reason).
+
+        improvement_score: e.g. (new_health - old_health) / max(old_health, 0.01)
+        """
+        if improvement_score <= self.epsilon:
+            return False, f"improvement {improvement_score:.3f} ≤ epsilon {self.epsilon}"
+        if not self.cooldown_elapsed(old_node_id):
+            elapsed = time.time() - self._last_swap_time.get(old_node_id, 0.0)
+            return False, f"cooldown: {elapsed:.1f}s < {self.cooldown_s}s"
+        stab = self.stability(old_node_id)
+        if stab < self.stability_threshold:
+            return False, f"stability {stab:.3f} < threshold {self.stability_threshold}"
+        return True, "ok"
+
+    def record_swap(self, node_id: str) -> None:
+        with self._lock:
+            self._last_swap_time[node_id] = time.time()
+
+    def summary(self) -> Dict[str, Any]:
+        return {
+            "epsilon": self.epsilon,
+            "cooldown_s": self.cooldown_s,
+            "stability_threshold": self.stability_threshold,
+            "tracked_nodes": len(self._stability),
         }

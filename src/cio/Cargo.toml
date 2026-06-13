@@ -1,0 +1,26 @@
+[package]
+name = "cio"
+version = "1.0.0"
+edition = "2021"
+authors = ["Lantern OS Project"]
+description = "CIO — Convergence IO Execution Kernel (Rust reference implementation)"
+license = "MIT"
+repository = "https://github.com/alex-place/lantern-os"
+rust-version = "1.70"
+
+# v1.0 intentionally has no external dependencies:
+# - No Tokio (async runtime introduced in v1.1)
+# - No real LLM backend bindings
+# - No distributed execution
+# Pure typed skeleton — stdlib only
+[dependencies]
+
+[dev-dependencies]
+
+[[bin]]
+name = "cio"
+path = "src/main.rs"
+
+[lib]
+name = "cio"
+path = "src/lib.rs"
