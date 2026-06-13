@@ -168,15 +168,18 @@
 
 <nav class="site-nav">
   <a class="nav-brand" href="/">
-    <span style="font-size:20px">⚙️</span>
-    <span style="font-size:18px;font-weight:600">Keystone Operations</span>
+    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
+    Lantern OS
   </a>
   <div class="nav-links">
-    <a href="/" style="padding:12px 16px">← Back</a>
+    <a href="/">Home</a>
+    <a href="/operations.html" class="active">Ops Hub</a>
+    <a href="/agent-status.html">System</a>
+    <a href="/agent-leaderboard.html">Leaderboard</a>
   </div>
   <div class="nav-actions">
-    <button id="refresh-btn" style="padding:8px 12px;background:var(--accent);color:var(--bg);border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;">🔄 Refresh</button>
-    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="padding:8px 12px;background:transparent;border:none;cursor:pointer;font-size:18px;">🌙</button>
+    <button id="refresh-btn" class="nav-btn" title="Refresh dashboard">🔄</button>
+    <button id="theme-toggle" class="nav-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
   </div>
 </nav>
 

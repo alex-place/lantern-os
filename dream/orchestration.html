@@ -48,11 +48,18 @@
 
 <nav class="site-nav">
   <a class="nav-brand" href="/">
-    <span style="font-size:20px">⚙️</span>
-    <span style="font-size:18px;font-weight:600">Keystone Orchestration</span>
+    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
+    Lantern OS
   </a>
   <div class="nav-links">
-    <a href="/" style="padding:12px 16px">← Back</a>
+    <a href="/">Home</a>
+    <a href="/operations.html">Ops Hub</a>
+    <a href="/orchestration.html" class="active">Orchestration</a>
+    <a href="/agent-status.html">System</a>
+    <a href="/agent-leaderboard.html">Leaderboard</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
   </div>
 </nav>
 
@@ -212,5 +219,6 @@ setInterval(refreshStatus, 5000);
 refreshStatus();
 </script>
 
+<script src="/js/theme-toggle.js"></script>
 </body>
 </html>
