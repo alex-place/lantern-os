@@ -123,9 +123,11 @@
   function toggleKeystoneMcp() {
     directModeEnabled = !directModeEnabled;
     keystoneMcpEnabled = directModeEnabled; // legacy compat
-    mcpToggle.classList.toggle("active", directModeEnabled);
-    document.querySelector(".app").classList.toggle("mcp-mode", directModeEnabled);
-    document.querySelector(".input-area").classList.toggle("mcp-mode", directModeEnabled);
+    if (mcpToggle) mcpToggle.classList.toggle("active", directModeEnabled);
+    const appEl = document.querySelector(".app");
+    if (appEl) appEl.classList.toggle("mcp-mode", directModeEnabled);
+    const inputArea = document.querySelector(".input-area");
+    if (inputArea) inputArea.classList.toggle("mcp-mode", directModeEnabled);
   }
   document.addEventListener("keydown", (e) => {
     if (e.key === "d" && !e.ctrlKey && !e.metaKey && !e.altKey && e.target.tagName !== "TEXTAREA" && e.target.tagName !== "INPUT") {
@@ -167,7 +169,6 @@
       if (r.ok) {
         const data = await r.json();
         agents = data.agents || [];
-        originalAgents = agents;
         originalAgents = agents;
         if (statusDot) statusDot.className = "dot online";
         if (statusLabel) statusLabel.textContent = "online";
@@ -263,8 +264,8 @@
         });
       return;
     }
-    // !convergence runs the Lantern convergence loop + version check + auto-update
-    if (text === "!convergence") {
+    // !convergence / !convergance — loop + agent status + version
+    if (/^!convergan?ce$/i.test(text)) {
       inputEl.value = "";
       triggerAutoupdate("Auto-update");
       const sysRow = document.createElement("div");
@@ -273,18 +274,18 @@
       messagesEl.appendChild(sysRow);
       scrollToBottom();
 
-      const runLoop = fetch(`${serverBase}/api/actions/run-loop`, { method: "POST" });
+      const runLoop     = fetch(`${serverBase}/api/actions/run-loop`, { method: "POST" });
       const fetchVersion = fetch(`${serverBase}/api/version`).then(r => r.ok ? r.json() : null).catch(() => null);
+      const fetchAgents  = fetch(`${serverBase}/api/dream/status/agents`).then(r => r.ok ? r.json() : null).catch(() => null);
 
-      Promise.all([runLoop, fetchVersion])
-        .then(async ([loopR, versionD]) => {
+      Promise.all([runLoop, fetchVersion, fetchAgents])
+        .then(async ([loopR, versionD, agentD]) => {
           const d = await loopR.json();
           const rawOut = d.stdout || "";
           const rawErr = d.stderr || "";
-          const tag = versionD?.version?.semver || versionD?.version?.tag || "unknown";
+          const tag    = versionD?.version?.semver || versionD?.version?.tag || "unknown";
           const commit = versionD?.version?.commit ? versionD.version.commit.slice(0, 7) : "?";
 
-          // Extract JSON from stdout (convergence loop prints it at the end)
           let promo = "";
           try {
             const jsonMatch = rawOut.match(/\{[\s\S]*"promotion_ready"[\s\S]*\}/);
@@ -294,11 +295,18 @@
             }
           } catch {}
 
-          const out = rawOut.slice(0, 700);
-          const err = rawErr.slice(0, 300);
+          const out = rawOut.slice(0, 500);
+          const err = rawErr.slice(0, 200);
 
-          sysRow.querySelector(".bubble").innerHTML =
-            `<b>Convergence loop</b> ${loopR.ok ? "✓" : "✗"} <code>${tag}</code> <code>${commit}</code> ${promo}<pre style="margin-top:6px;white-space:pre-wrap;font-size:12px;opacity:0.85;">${escapeHtml(out)}${err ? "\n---stderr---\n" + escapeHtml(err) : ""}</pre>`;
+          const agentBlock = agentD?.text
+            ? `\n\n<b>Agent Fleet</b>\n<pre style="margin-top:4px;white-space:pre-wrap;font-size:12px;color:var(--accent);opacity:0.9;">${escapeHtml(agentD.text)}</pre>`
+            : "";
+
+          const bubble = sysRow.querySelector(".bubble");
+          bubble.innerHTML =
+            `<b>Convergence loop</b> ${loopR.ok ? "✓" : "✗"} <code>${tag}</code> <code>${commit}</code> ${promo}` +
+            agentBlock +
+            (out ? `\n<pre style="margin-top:6px;white-space:pre-wrap;font-size:11px;opacity:0.7;">${escapeHtml(out)}${err ? "\n---stderr---\n" + escapeHtml(err) : ""}</pre>` : "");
           scrollToBottom();
         })
         .catch((e) => {
@@ -326,6 +334,27 @@
       analytics.messagesSent++;
       analytics.record("send", "Kingdome of Hearts game started");
       startThreeDoors();
+      return;
+    }
+
+    // !convergance log an issue <title> — POST to non-stream handler
+    if (/^!convergan?ce\s+log\s+an?\s+issue\s+/i.test(text)) {
+      if (emptyState) emptyState.style.display = "none";
+      appendUserBubble(text);
+      inputEl.value = "";
+      const sysRow = document.createElement("div");
+      sysRow.className = "msg-row agent";
+      sysRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble">Logging issue…</div>`;
+      messagesEl.appendChild(sysRow);
+      scrollToBottom();
+      fetch(`${serverBase}/api/dream/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      })
+        .then(r => r.json())
+        .then(d => { sysRow.querySelector(".bubble").textContent = d.reply || "Done."; scrollToBottom(); })
+        .catch(e => { sysRow.querySelector(".bubble").textContent = `Failed: ${e.message}`; scrollToBottom(); });
       return;
     }
 
@@ -448,7 +477,14 @@
                 cursor.remove();
                 // Strip [DOORS:...] tag during streaming; chips rendered on done
                 const visibleText = fullText.replace(/\[DOORS:[^\]]*\]?/i, "").replace(/\n{3,}/g, "\n\n").trimEnd();
-                bubble.textContent = visibleText;
+                // Use a dedicated text node so the route-card child isn't wiped
+                let textNode = bubble.querySelector(".bubble-text");
+                if (!textNode) {
+                  textNode = document.createElement("span");
+                  textNode.className = "bubble-text";
+                  bubble.appendChild(textNode);
+                }
+                textNode.textContent = visibleText;
                 bubble.appendChild(cursor);
                 scrollToBottom();
               }

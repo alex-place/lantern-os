@@ -9,14 +9,12 @@
   overflow: hidden;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 580px) {
   .app-main { margin-left: 0; }
-  .site-nav { flex-direction: column; padding: 8px; gap: 8px; }
+  .site-nav { padding: 0 12px; }
   .nav-links { display: none; }
-  .nav-actions { flex-direction: column; gap: 4px; }
   .nav-cta { display: none; }
-  .input-wrapper { flex-direction: column; }
-  .send-button { width: 100%; }
+  .input-wrapper { flex-direction: row; }
   .perf-monitor { bottom: 8px; right: 8px; font-size: 10px; padding: 8px 12px; }
 }
 
@@ -443,9 +441,20 @@
   font-size: 0.68rem;
   color: var(--accent, #e2c97e);
   opacity: 0.7;
-  padding: 2px 4px;
+  padding: 2px 8px;
   align-self: flex-start;
   letter-spacing: 0.04em;
+}
+.msg-row.agent .msg-route-sig,
+.msg-row.agent .msg-footer,
+.msg-row.agent .msg-label {
+  align-self: flex-start;
+  text-align: left;
+}
+.msg-row.user .msg-label {
+  align-self: flex-end;
+  text-align: right;
+  padding-right: 8px;
 }
 
 /* Routing card shown while backend delegates */
