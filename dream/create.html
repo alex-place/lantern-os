@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#7c6af7">
+  <title>Content Creator — Lantern OS</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    :root {
+      --bg: #0b0d14;
+      --surface: #13161f;
+      --surface2: #1a1d2a;
+      --border: #252840;
+      --text: #e8eaf6;
+      --muted: #7880a4;
+      --accent: #7c6af7;
+      --green: #4caf82;
+      --gold: #e2c97e;
+      --danger: #e05555;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 24px 80px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      width: 34px;
+      height: 34px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    header p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .nav {
+      margin-left: auto;
+      display: flex;
+      gap: 16px;
+      font-size: 0.82rem;
+    }
+
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .nav a:hover {
+      color: var(--text);
+    }
+
+    .form-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .form-section h2 {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 18px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.1);
+    }
+
+    .form-group textarea {
+      grid-column: 1 / -1;
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .upload-zone {
+      grid-column: 1 / -1;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent);
+      background: rgba(124, 106, 247, 0.05);
+    }
+
+    .upload-zone.dragging {
+      border-color: var(--accent);
+      background: rgba(124, 106, 247, 0.1);
+    }
+
+    .upload-zone p {
+      margin: 0 0 8px;
+      color: var(--muted);
+    }
+
+    .upload-zone .icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .upload-zone input[type="file"] {
+      display: none;
+    }
+
+    .file-input-button {
+      display: inline-block;
+      padding: 8px 16px;
+      background: var(--accent);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: opacity 0.2s ease;
+    }
+
+    .file-input-button:hover {
+      opacity: 0.9;
+    }
+
+    .file-preview {
+      grid-column: 1 / -1;
+      padding: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .file-preview.show {
+      display: block;
+    }
+
+    .file-preview-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .file-preview-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .file-preview-size {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .file-preview-remove {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 4px 8px;
+    }
+
+    .file-preview-remove:hover {
+      opacity: 0.8;
+    }
+
+    .form-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    .recent-entries {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+
+    .recent-entries h2 {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 18px;
+    }
+
+    .entry-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .entry-item {
+      padding: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .entry-title {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .entry-time {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .entry-type {
+      display: inline-block;
+      padding: 2px 8px;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-message {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .status-message.show {
+      display: block;
+    }
+
+    .status-message.success {
+      background: rgba(76, 175, 130, 0.1);
+      border: 1px solid var(--green);
+      color: var(--green);
+    }
+
+    .status-message.error {
+      background: rgba(224, 85, 85, 0.1);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+
+    .status-message.loading {
+      background: rgba(124, 106, 247, 0.1);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Site nav -->
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
+    Lantern OS
+  </a>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Journal</a>
+    <a href="/flourishing">Dashboard</a>
+    <a href="/knowledgecenter.html">Help</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode">☀</button>
+    <a class="nav-cta" href="/create.html">Create</a>
+  </div>
+</nav>
+
+<div class="page">
+  <!-- Header -->
+  <header>
+    <div class="logo">✦</div>
+    <div>
+      <h1>Content Creator</h1>
+      <p>Upload and share your dreams, moments, and creative work</p>
+    </div>
+  </header>
+
+  <!-- Status message -->
+  <div id="status" class="status-message"></div>
+
+  <!-- Creation form -->
+  <form id="create-form" class="form-section">
+    <h2>New Entry</h2>
+
+    <div class="form-grid">
+      <!-- Entry type -->
+      <div class="form-group">
+        <label for="type">Entry Type</label>
+        <select id="type" name="type" required>
+          <option value="video">Video</option>
+          <option value="note">Note</option>
+          <option value="project">Project</option>
+          <option value="highlight">Highlight</option>
+          <option value="dream">Dream</option>
+        </select>
+      </div>
+
+      <!-- Title -->
+      <div class="form-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" placeholder="Give your entry a name" required>
+      </div>
+
+      <!-- Project/Collection -->
+      <div class="form-group">
+        <label for="project">Project / Collection</label>
+        <input type="text" id="project" name="project" placeholder="Optional">
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" placeholder="What's this about?"></textarea>
+      </div>
+
+      <!-- Tags -->
+      <div class="form-group">
+        <label for="tags">Tags (comma-separated)</label>
+        <input type="text" id="tags" name="tags" placeholder="dream, creative, personal">
+      </div>
+
+      <!-- File upload -->
+      <div class="form-group">
+        <label>File Upload</label>
+        <div id="upload-zone" class="upload-zone">
+          <div class="icon">📁</div>
+          <p><strong>Drag and drop a file here</strong></p>
+          <p style="font-size: 0.85rem;">or</p>
+          <button type="button" class="file-input-button" onclick="document.getElementById('file-input').click()">Choose File</button>
+          <input type="file" id="file-input" name="file" accept="video/*,audio/*,image/*,.pdf,.doc,.docx">
+        </div>
+
+        <!-- File preview -->
+        <div id="file-preview" class="file-preview">
+          <div class="file-preview-info">
+            <div>
+              <div class="file-preview-name" id="file-name"></div>
+              <div class="file-preview-size" id="file-size"></div>
+            </div>
+            <button type="button" class="file-preview-remove" onclick="clearFile()">Remove</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form actions -->
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="resetForm()">Clear</button>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Save Entry</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Recent entries -->
+  <div class="recent-entries">
+    <h2>Recent Entries</h2>
+    <div id="recent-list" class="entry-list">
+      <p style="color: var(--muted);">Loading entries...</p>
+    </div>
+  </div>
+</div>
+
+<script src="/js/theme-toggle.js"></script>
+<script>
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const filePreview = document.getElementById('file-preview');
+const form = document.getElementById('create-form');
+const statusEl = document.getElementById('status');
+const submitBtn = document.getElementById('submit-btn');
+
+// Drag and drop
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadZone.classList.add('dragging');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+  uploadZone.classList.remove('dragging');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragging');
+  if (e.dataTransfer.files.length > 0) {
+    fileInput.files = e.dataTransfer.files;
+    updateFilePreview();
+  }
+});
+
+fileInput.addEventListener('change', updateFilePreview);
+
+function updateFilePreview() {
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-size').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+    filePreview.classList.add('show');
+  } else {
+    filePreview.classList.remove('show');
+  }
+}
+
+function clearFile() {
+  fileInput.value = '';
+  filePreview.classList.remove('show');
+}
+
+function resetForm() {
+  form.reset();
+  clearFile();
+  statusEl.classList.remove('show', 'success', 'error', 'loading');
+}
+
+function showStatus(message, type) {
+  statusEl.textContent = message;
+  statusEl.className = `status-message show ${type}`;
+  if (type !== 'loading') {
+    setTimeout(() => statusEl.classList.remove('show'), 5000);
+  }
+}
+
+// Form submission
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formData = new FormData();
+
+  // Pack form data as JSON
+  const entry = {
+    title: document.getElementById('title').value,
+    type: document.getElementById('type').value,
+    project: document.getElementById('project').value,
+    description: document.getElementById('description').value,
+    tags: document.getElementById('tags').value
+  };
+  formData.append('entry', JSON.stringify(entry));
+
+  if (fileInput.files.length > 0) {
+    formData.append('file', fileInput.files[0]);
+  }
+
+  submitBtn.disabled = true;
+  showStatus('Saving entry...', 'loading');
+
+  try {
+    const response = await fetch('/api/dreamer/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      showStatus('✓ Entry saved successfully', 'success');
+      resetForm();
+      loadRecentEntries();
+    } else {
+      const error = await response.json();
+      showStatus(`✗ Error: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Load recent entries
+async function loadRecentEntries() {
+  try {
+    const response = await fetch('/api/dreamer?user=dreamer');
+    if (response.ok) {
+      const data = await response.json();
+      const list = document.getElementById('recent-list');
+
+      if (data.entries.length === 0) {
+        list.innerHTML = '<p style="color: var(--muted);">No entries yet. Create your first entry above.</p>';
+        return;
+      }
+
+      const recent = data.entries.slice(0, 5).reverse();
+      list.innerHTML = recent.map(entry => {
+        // Handle multiple possible field names for title
+        const title = entry.title || entry.name || 'Untitled';
+
+        // Handle multiple possible field names for timestamp/date
+        let dateStr = 'Unknown date';
+        const timestamp = entry.timestamp || entry.recordedAt || entry.createdAt;
+        if (timestamp) {
+          try {
+            const date = new Date(timestamp);
+            if (!isNaN(date.getTime())) {
+              dateStr = date.toLocaleDateString();
+            }
+          } catch (e) {
+            dateStr = 'Invalid date';
+          }
+        }
+
+        const type = entry.kind || entry.type || 'entry';
+        return `
+          <div class="entry-item">
+            <div>
+              <div class="entry-title">${title}</div>
+              <div class="entry-time">${dateStr}</div>
+            </div>
+            <span class="entry-type">${type}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    console.error('Error loading entries:', err);
+  }
+}
+
+// Initial load
+loadRecentEntries();
+
+// Reload every 30 seconds
+setInterval(loadRecentEntries, 30000);
+</script>
+
+</body>
+</html>
