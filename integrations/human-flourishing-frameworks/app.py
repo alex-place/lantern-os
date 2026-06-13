@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Human Flourishing Frameworks - Main Flask Application
 
@@ -23,6 +23,17 @@ from adoption_tracker import (
 from mesh_network import (
     init_mesh_db, get_mesh_violations, sync_with_mesh
 )
+# Regulatory researcher (autonomous scan of public regulatory APIs)
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+try:
+    from regulatory_researcher import researcher as regulatory_researcher, FLOURISHING_DIMS
+    _HAS_REGULATORY = True
+except Exception as _re:
+    regulatory_researcher = None
+    FLOURISHING_DIMS = []
+    _HAS_REGULATORY = False
+
 from data_sources import get_mock_violations, get_compas_summary
 from seed_data import ALL_SEED_MEASUREMENTS
 from agent_system import (
