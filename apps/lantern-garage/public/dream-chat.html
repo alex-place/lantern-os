@@ -33,12 +33,12 @@
           window.voiceMode = !window.voiceMode;
           this.setAttribute('aria-pressed', window.voiceMode);
           this.style.opacity = window.voiceMode ? '1' : '0.5';
-          this.style.background = window.voiceMode ? 'rgba(161,139,250,0.2)' : 'transparent';
-          this.style.border = window.voiceMode ? '2px solid #a78bfa' : 'none';
+          this.style.background = window.voiceMode ? 'rgba(161,139,250,0.2)' : '';
+          this.style.borderColor = window.voiceMode ? '#a78bfa' : '';
           const voiceInputBtn = document.getElementById('voice-input-btn');
           if (voiceInputBtn) voiceInputBtn.style.display = window.voiceMode ? 'block' : 'none';
-        " title="Voice Mode" style="font-size:20px;padding:8px 12px">🎙️</button>
-        <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings" style="font-size:20px;padding:8px 12px">⚙️</button>
+        " title="Voice Mode">🎙️</button>
+        <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
       </div>
     </nav>
 
