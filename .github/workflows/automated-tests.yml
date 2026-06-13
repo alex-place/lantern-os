@@ -45,7 +45,8 @@ jobs:
       - name: Validate Markdown Structure
         shell: pwsh
         run: |
-          $reports = Get-ChildItem -Path reports, offers, manifests -Filter "*.md" -Recurse -ErrorAction SilentlyContinue
+          $searchPaths = @('reports', 'manifests') | Where-Object { Test-Path $_ }
+          $reports = if ($searchPaths) { Get-ChildItem -Path $searchPaths -Filter "*.md" -Recurse -ErrorAction SilentlyContinue } else { @() }
           $issues = @()
           foreach ($report in $reports) {
             $content = Get-Content $report.FullName -Raw

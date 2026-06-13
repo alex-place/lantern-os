@@ -27,6 +27,9 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install dependencies
+        run: npm ci --prefix apps/lantern-garage
+
       - name: Validate HTML
         run: |
           npx html-validate apps/lantern-garage/public/dream-chat.html || true
@@ -35,8 +38,13 @@ jobs:
         run: |
           node apps/lantern-garage/server.js &
           PID=$!
-          sleep 3
-          curl -sf http://127.0.0.1:4177/api/status || (echo "Server failed to start"; kill $PID 2>/dev/null; exit 1)
+          # Retry loop — server may take 5-10s on cold CI runner
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:4177/api/health && break
+            echo "Waiting for server... ($i/20)"
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4177/api/health || (echo "Server did not start in time"; kill $PID 2>/dev/null; exit 1)
           curl -sf http://127.0.0.1:4177/api/agents || (echo "Agents endpoint missing"; kill $PID 2>/dev/null; exit 1)
           kill $PID 2>/dev/null
-          echo "✓ Server starts and /api/agents responds"
+          echo "✓ Server starts and responds"
