@@ -118,6 +118,21 @@ const DASHBOARD_PROXY_ROUTES = {
   '/api/trading/dashboard/news-feed': '/api/news-feed',
 };
 
+// trading.html itself fetches these same dashboard paths directly (bare,
+// against this server's own origin) rather than via /api/trading/dashboard/*
+// — proxy them 1:1 to the dashboard service (port 5050) too, including the
+// /demo variants used when the "Demo Data" toggle is on.
+const DIRECT_DASHBOARD_PROXY_PATHS = new Set([
+  '/api/positions',
+  '/api/positions/demo',
+  '/api/market-status',
+  '/api/market-status/demo',
+  '/api/watchlist-prices',
+  '/api/watchlist-prices/demo',
+  '/api/ai-trader/signals',
+  '/api/ai-trader/signals/demo',
+]);
+
 module.exports = async function tradingRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
   const bridge = new TradingAPIBridge();
@@ -220,6 +235,19 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         const logs = data.logs || data;
         for (const s of logs) { recordSignal(s).catch(() => {}); }
       }
+      sendJson(res, data, 200);
+    } catch (error) {
+      sendJson(res, { error: error.message }, 502);
+    }
+    return true;
+  }
+
+  // GET /api/{positions,market-status,watchlist-prices,ai-trader/signals}[/demo]
+  // Bare-path proxy for trading.html's direct fetches — see
+  // DIRECT_DASHBOARD_PROXY_PATHS above.
+  if (req.method === 'GET' && DIRECT_DASHBOARD_PROXY_PATHS.has(url.pathname)) {
+    try {
+      const data = await callDashboard(url.pathname + (url.search || ''));
       sendJson(res, data, 200);
     } catch (error) {
       sendJson(res, { error: error.message }, 502);
