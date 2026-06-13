@@ -1571,6 +1571,39 @@ class TesseractEngine:
         except Exception:
             pass
 
+    def _csf_agent_summary(self) -> Dict[str, Any]:
+        """Summarise pending csf-agent specs for the inspect view."""
+        try:
+            from csf_agent.loop import get_pending_specs
+            from csf_agent.scanner import scan_issues
+            from csf_agent.embedder import CSFEmbedder
+            from csf_agent.scorer import score_issues
+
+            pending = get_pending_specs()
+            if pending:
+                return {
+                    "pending_specs": len(pending),
+                    "specs": [s["name"] for s in pending[:5]],
+                    "status": "awaiting_operator_review",
+                }
+            # No pending specs — show top scored issue as a hint
+            issues = scan_issues()
+            if not issues:
+                return {"pending_specs": 0, "status": "no pending specs — run loop.py --once"}
+            ranked = score_issues(issues, CSFEmbedder())
+            top = ranked[0]
+            return {
+                "pending_specs": 0,
+                "status": "no pending specs — run loop.py --once",
+                "top_issue": {
+                    "number": top["number"],
+                    "title": top["title"],
+                    "score": top["score"],
+                },
+            }
+        except Exception as exc:
+            return {"pending_specs": 0, "status": f"csf_agent unavailable: {exc}"}
+
     def inspect(self) -> Dict[str, Any]:
         return {
             "timestamp": _now(),
@@ -1581,6 +1614,7 @@ class TesseractEngine:
             "slots_active": self.slots.active_count("dream_journal"),
             "dream_journal_slots_active": self.slots.active_count("dream_journal"),
             "circuits": {k: v.state.value for k, v in self._circuit_cache.items()},
+            "csf_agent": self._csf_agent_summary(),
         }
 
     def health_check(self, url: str = "http://127.0.0.1:4177/api/status") -> Dict[str, Any]:
