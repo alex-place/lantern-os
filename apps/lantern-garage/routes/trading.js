@@ -765,24 +765,24 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         // Fetch supporting data in parallel if not supplied
         const [zonesResult, marketResult, agentLogResult] = await Promise.all([
           params.zones_data   ? Promise.resolve({ zones: params.zones_data })
-                              : traderAgent.callAction('scan_market', { watchlist: [params.asset] }).catch(() => ({})),
+                              : traderAgent._callPython('scan_market', { watchlist: [params.asset] }).catch(() => ({})),
           params.market_status ? Promise.resolve(params.market_status)
-                               : traderAgent.callAction('get_market_status', {}).catch(() => ({})),
-          traderAgent.callAction('get_agent_log', {}).catch(() => ({ logs: [] })),
+                               : traderAgent._callPython('get_market_status', {}).catch(() => ({})),
+          traderAgent._callPython('scan_market', {}).catch(() => ({ logs: [] })).catch(() => ({ logs: [] })),
         ]);
         const evaluateArgs = {
           asset:         params.asset,
           zones_data:    zonesResult.zones || zonesResult || {},
           market_status: marketResult,
-          agent_log:     (agentLogResult.logs || []),
+          agent_log:     (agentLogResult.signals || agentLogResult.logs || []),
         };
-        const result = await traderAgent.callAction('evaluate_asset', evaluateArgs);
+        const result = await traderAgent._callPython('evaluate_asset', evaluateArgs);
 
         // Persist to CSF memory as a TRACE record
         try {
           const { recordSignal } = require('../lib/trading-memory');
           await recordSignal({
-            id:        ,
+            id:        `tesseract-${result.asset}-${Date.now()}`,
             symbol:    result.asset,
             type:      'tesseract_evaluation',
             action:    result.action,
@@ -808,13 +808,117 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     req.on('data', d => body += d);
     req.on('end', async () => {
       try {
-        if (!traderAgent) {
-          sendJson(res, { error: 'TraderAgent not initialised' }, 503);
-          return;
-        }
         const params = body ? JSON.parse(body) : {};
-        const result = await traderAgent.callAction('evaluate_watchlist', params);
-        sendJson(res, result);
+        const DEFAULT_WL = ['SPY', 'AAPL', 'TSLA', 'NVDA', 'MSFT'];
+        const watchlist = params.watchlist || DEFAULT_WL;
+        const zones    = params.zones_data    || {};
+        const market   = params.market_status || {};
+        const agentLog = params.agent_log     || [];
+
+        // Pure-JS TradingTesseract (mirrors trading_tesseract.py exactly)
+        function classifyTime(z, m) {
+          if (!m.market_open) return 'eod';
+          const ts = z.timestamp || z.updated_at;
+          if (ts) {
+            const ageS = (Date.now() - new Date(ts).getTime()) / 1000;
+            if (ageS < 60)   return 'realtime';
+            if (ageS < 3600) return 'intraday';
+            return 'session';
+          }
+          return 'intraday';
+        }
+        function classifyMarket(m) {
+          const vix = (m.vix_regime || '').toUpperCase();
+          if (vix === 'HIGH' || vix === 'EXTREME') return 'volatile';
+          const spy = parseFloat(m.spy_day_change_pct || 0);
+          if (spy >  0.8) return 'bullish';
+          if (spy < -0.8) return 'bearish';
+          if (vix === 'CALM') return 'calm';
+          return 'neutral';
+        }
+        function classifySignal(asset, z, log) {
+          for (let i = log.length - 1; i >= Math.max(0, log.length - 50); i--) {
+            const e = log[i];
+            const sym = (e.symbol || e.asset || e.ticker || '').toUpperCase();
+            if (sym !== asset.toUpperCase()) continue;
+            const s = (e.signal_strength || e.strength || '').toLowerCase();
+            if (['strong','moderate','weak','invalid'].includes(s)) return s;
+            const sc = parseFloat(e.score || e.confidence || 0);
+            if (sc >= 0.75) return 'strong';
+            if (sc >= 0.45) return 'moderate';
+            if (sc > 0)     return 'weak';
+          }
+          const az = z[asset] || {};
+          const top = parseFloat(az.top || az.resistance || 0);
+          const bot = parseFloat(az.bottom || az.support || 0);
+          const mid = parseFloat(az.mid || az.entry_price || 0);
+          if (!top || !bot || !mid) return 'invalid';
+          const spread = (top - bot) / mid;
+          if (spread < 0.02) return 'strong';
+          if (spread < 0.05) return 'moderate';
+          return 'weak';
+        }
+        function classifyLayer(log, asset) {
+          for (let i = log.length - 1; i >= Math.max(0, log.length - 50); i--) {
+            const e = log[i];
+            const sym = (e.symbol || e.asset || e.ticker || '').toUpperCase();
+            if (sym !== asset.toUpperCase()) continue;
+            const a = (e.agent || e.layer || '').toLowerCase();
+            if (['scanner','riley','mft','risk','claude','execution'].includes(a)) return a;
+            if (a.includes('claude'))  return 'claude';
+            if (a.includes('mft'))     return 'mft';
+            if (a.includes('riley'))   return 'riley';
+            if (a.includes('risk'))    return 'risk';
+            if (a.includes('execut'))  return 'execution';
+          }
+          return 'scanner';
+        }
+        function classifyState(asset, m) {
+          for (const p of (m.positions || [])) {
+            const sym = (p.symbol || p.ticker || '').toUpperCase();
+            if (sym !== asset.toUpperCase()) continue;
+            return parseFloat(p.qty || p.quantity || 0) !== 0 ? 'in_trade' : 'closed';
+          }
+          return 'watching';
+        }
+        const SIG_SC  = {strong:1.0, moderate:0.6, weak:0.3, invalid:0.0};
+        const MKT_SC  = {bullish:1.0, neutral:0.5, calm:0.5, volatile:0.35, bearish:0.1};
+        const ST_SC   = {watching:0.5, active:0.8, in_trade:0.9, closed:0.0, rejected:0.0};
+        const LYR_SC  = {claude:1.0, mft:0.85, riley:0.75, scanner:0.6, risk:0.5, execution:0.4};
+        const TIME_SC = {realtime:1.0, intraday:0.8, session:0.6, eod:0.4};
+        function confidence(cube) {
+          return Math.round(10000 * (
+            0.35 * (SIG_SC[cube.signal]      || 0) +
+            0.30 * (MKT_SC[cube.market]      || 0.5) +
+            0.15 * (ST_SC[cube.asset_state]  || 0) +
+            0.10 * (LYR_SC[cube.layer]       || 0.5) +
+            0.10 * (TIME_SC[cube.time]       || 0.5)
+          )) / 10000;
+        }
+        function deriveAction(conf, cube) {
+          if (cube.signal === 'invalid')                                       return 'skip';
+          if (['closed','rejected'].includes(cube.asset_state))               return 'skip';
+          if (cube.market === 'volatile' && conf < 0.55)                      return 'hold';
+          if (conf >= 0.72 && ['bullish','neutral','calm'].includes(cube.market)) return 'buy';
+          if (conf >= 0.55)                                                    return 'watch';
+          if (cube.market === 'bearish' && ['weak','invalid'].includes(cube.signal)) return 'skip';
+          return 'hold';
+        }
+
+        const now = new Date().toISOString();
+        const evaluations = watchlist.map(asset => {
+          const cube = {
+            time:        classifyTime(zones, market),
+            market:      classifyMarket(market),
+            signal:      classifySignal(asset, zones, agentLog),
+            layer:       classifyLayer(agentLog, asset),
+            asset_state: classifyState(asset, market),
+          };
+          const conf = confidence(cube);
+          return { asset: asset.toUpperCase(), cube, confidence: conf, action: deriveAction(conf, cube), evaluated_at: now };
+        }).sort((a, b) => b.confidence - a.confidence);
+
+        sendJson(res, { evaluations, count: evaluations.length, evaluated_at: now });
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -825,3 +929,5 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
 
   return false;
 };
+
+

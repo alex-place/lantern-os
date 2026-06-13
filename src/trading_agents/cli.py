@@ -45,11 +45,18 @@ try:
         alpaca,
     )
 except ImportError as e:
-    print(json.dumps({
-        "error": f"Failed to import agents: {str(e)}",
-        "type": "import_error"
-    }))
-    sys.exit(1)
+    # agents.py not available — evaluate_* actions still work without it
+    scan_all = None
+    get_portfolio_equity = None
+    get_open_positions = None
+    is_market_hours = lambda: False
+    is_crypto = lambda t: False
+    get_profile = lambda t: {}
+    agent_log = []
+    DEFAULT_WATCHLIST = ["SPY", "AAPL", "TSLA", "NVDA", "MSFT"]
+    ASSET_PROFILES = {}
+    alpaca = None
+    _agents_import_error = str(e)
 
 
 def action_scan_market(args):
@@ -534,3 +541,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
