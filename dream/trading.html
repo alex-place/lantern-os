@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
@@ -193,6 +193,72 @@
     }
 
     /* ── Signal cards ── */
+
+    /* TradingTesseract Signal Panel */
+    .tesseract-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tesseract-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tesseract-asset {
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+    }
+    .tesseract-action {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .tesseract-action.buy    { background: rgba(16,185,129,0.15); color: var(--success); }
+    .tesseract-action.watch  { background: rgba(245,158,11,0.15);  color: var(--warning); }
+    .tesseract-action.hold   { background: rgba(99,102,241,0.15);  color: #818cf8; }
+    .tesseract-action.skip   { background: rgba(107,114,128,0.15); color: var(--muted-text); }
+    .tesseract-confidence {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .tesseract-confidence-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #818cf8, #10b981);
+      transition: width 0.4s ease;
+    }
+    .tesseract-dims {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .tesseract-dim {
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--muted-text);
+      border: 1px solid var(--border);
+    }
+    .tesseract-timestamp {
+      font-size: 0.72rem;
+      color: var(--muted-text);
+    }
+    #tesseract-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
     .signal-card {
       background: var(--surface2);
       border-left: 4px solid var(--info);
@@ -296,6 +362,48 @@
       background: rgba(16, 185, 129, 0.1);
     }
 
+    /* Phase 5: mini-chart cards */
+    .price-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .price-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .price-card-symbol { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.04em; }
+    .price-card-badge {
+      font-size: 0.68rem; padding: 2px 6px; border-radius: 3px;
+      font-weight: 600; text-transform: uppercase;
+    }
+    .price-card-badge.simulated { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .price-card-badge.live      { background: rgba(16,185,129,0.15);  color: var(--success); }
+    .price-card-price { font-size: 1.1rem; font-weight: 600; }
+    .price-card-change { font-size: 0.8rem; }
+    .price-card-change.up   { color: var(--success); }
+    .price-card-change.down { color: var(--danger); }
+    .price-card canvas { border-radius: 4px; width: 100%; display: block; }
+    .price-card-ranges {
+      display: flex; gap: 4px;
+    }
+    .range-btn {
+      font-size: 0.68rem; padding: 2px 7px; border-radius: 3px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--muted-text); transition: all 0.15s;
+    }
+    .range-btn.active { background: var(--primary, #818cf8); color: #fff; border-color: transparent; }
+    #price-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+    }
     .watchlist-change.down {
       color: var(--danger);
       background: rgba(239, 68, 68, 0.1);
@@ -552,16 +660,35 @@
     <div id="signals-source" style="font-size: 0.75rem; color: var(--muted-text); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: none;"></div>
   </div>
 
-  <!-- ── Watchlist ── -->
-  <div class="card full">
-    <h2 style="cursor: pointer; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8" title="Click for data source" onclick="showSource('watchlist')">📊 Stock Prices</h2>
-    <div class="watchlist" id="watchlist" style="text-align: center; color: var(--muted-text); padding: 48px 24px; grid-template-columns: 1fr;">
-      <div>
-        <p style="margin: 0 0 8px; font-size: 1.05rem;">No prices available</p>
-        <p style="margin: 0; font-size: 0.9rem;">Enable demo mode or add Alpaca API keys to see live stock prices</p>
+  <!-- ── TradingTesseract Signal Panel (Phase 4) ── -->
+  <div class="card full" id="tesseract-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+      <h2 style="margin:0; cursor:pointer; opacity:0.8; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8" title="5-dimension asset evaluation">🧊 Signal Panel</h2>
+      <button onclick="runTesseract()" id="tesseract-btn" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem;">Evaluate Now</button>
+    </div>
+    <p style="margin:0 0 12px; font-size:0.82rem; color:var(--muted-text);">5D evaluation: time · market · signal · layer · asset_state</p>
+    <div id="tesseract-grid" style="color:var(--muted-text); text-align:center; padding:32px 0;">
+      <p style="margin:0;">Click <strong>Evaluate Now</strong> to run TradingTesseract on your watchlist</p>
+    </div>
+    <div id="tesseract-source" style="font-size:0.75rem; color:var(--muted-text); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); display:none;"></div>
+  </div>
+
+
+  <!-- ── Stock Prices + Mini Charts (Phase 5) ── -->
+  <div class="card full" id="price-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <h2 style="margin:0; cursor:pointer; opacity:0.8; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8" title="Click for data source" onclick="showSource('price-panel-src')">📊 Stock Prices</h2>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span id="price-range-label" style="font-size:0.78rem; color:var(--muted-text);">Range:</span>
+        <button class="range-btn active" id="range-1D" onclick="setChartRange('1D')">1D</button>
+        <button class="range-btn"        id="range-5D" onclick="setChartRange('5D')">5D</button>
+        <button class="range-btn"        id="range-1M" onclick="setChartRange('1M')">1M</button>
       </div>
     </div>
-    <div id="watchlist-source" style="font-size: 0.75rem; color: var(--muted-text); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: none;"></div>
+    <div id="price-grid" style="color:var(--muted-text); text-align:center; padding:32px 0;">
+      <p style="margin:0;">Loading price data...</p>
+    </div>
+    <div id="price-panel-src" style="font-size:0.75rem; color:var(--muted-text); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); display:none;"></div>
   </div>
 
   <!-- ── Activity Feed ── -->
@@ -918,38 +1045,134 @@ async function loadMarketStatus() {
   }
 }
 
-async function loadWatchlist() {
+// ── Phase 5: Canvas sparkline chart engine ────────────────────────────────
+let _chartRange = '1D';
+const _chartData = {};  // { AAPL: { ticks, source } }
+
+function setChartRange(range) {
+  _chartRange = range;
+  ['1D','5D','1M'].forEach(r => {
+    const btn = document.getElementById('range-' + r);
+    if (btn) btn.classList.toggle('active', r === range);
+  });
+  loadPriceFeed();
+}
+
+/**
+ * Draw a sparkline on a canvas element.
+ * @param {HTMLCanvasElement} canvas
+ * @param {number[]} closes  — array of close prices
+ * @param {boolean} up       — overall trend direction (green/red)
+ * @param {number[]} markerIdxs — bar indices where signal markers go
+ */
+function drawSparkline(canvas, closes, up, markerIdxs = []) {
+  const W = canvas.offsetWidth || 200;
+  const H = 52;
+  canvas.width  = W * (window.devicePixelRatio || 1);
+  canvas.height = H * (window.devicePixelRatio || 1);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, W, H);
+  if (!closes || closes.length < 2) return;
+
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const pad = 4;
+  const range = max - min || 1;
+  const xStep = (W - pad * 2) / (closes.length - 1);
+
+  const toX = i  => pad + i * xStep;
+  const toY = v  => pad + (1 - (v - min) / range) * (H - pad * 2);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, up ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(toX(0), H);
+  ctx.lineTo(toX(0), toY(closes[0]));
+  closes.forEach((v, i) => { if (i > 0) ctx.lineTo(toX(i), toY(v)); });
+  ctx.lineTo(toX(closes.length - 1), H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(closes[0]));
+  closes.forEach((v, i) => { if (i > 0) ctx.lineTo(toX(i), toY(v)); });
+  ctx.strokeStyle = up ? '#10b981' : '#ef4444';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  // Signal markers
+  markerIdxs.forEach(idx => {
+    if (idx < 0 || idx >= closes.length) return;
+    ctx.beginPath();
+    ctx.arc(toX(idx), toY(closes[idx]), 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#818cf8';
+    ctx.fill();
+  });
+}
+
+async function loadPriceFeed() {
   try {
-    const endpoint = DEMO_MODE ? '/api/watchlist-prices/demo' : '/api/watchlist-prices';
-    const res = await fetch(endpoint);
-    const items = await res.json();
-    const container = document.getElementById('watchlist');
+    const res  = await fetch('/api/trading/price-feed/watchlist?range=' + _chartRange);
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
 
-    if (items && items.length > 0) {
-      container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(120px, 1fr))';
-      container.style.textAlign = 'left';
-      container.innerHTML = items.map(item => {
-        const price = item.price || 0;
-        const change = item.chg_pct || 0;
-        return `
-          <div class="watchlist-item" style="cursor: pointer; transition: all 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-            <div class="watchlist-symbol">${item.ticker}</div>
-            <div class="watchlist-price" style="color: ${change >= 0 ? 'var(--success)' : 'var(--danger)'};">$${price.toFixed(2)}</div>
-            <div class="watchlist-change ${change >= 0 ? 'up' : 'down'}">
-              ${change >= 0 ? '↑' : '↓'} ${Math.abs(change).toFixed(2)}%
-            </div>
-          </div>
-        `;
-      }).join('');
+    data.forEach(d => { _chartData[d.symbol] = d; });
+
+    const grid = document.getElementById('price-grid');
+    const src  = document.getElementById('price-panel-src');
+    if (!grid) return;
+
+    grid.style.cssText = '';
+    const allSimulated = data.every(d => d.source !== 'live');
+
+    grid.innerHTML = data.map(d => {
+      const closes  = (d.ticks || []).map(t => t.close);
+      const cur     = d.current_price || (closes.length ? closes[closes.length - 1] : 0);
+      const open    = d.open_price    || (closes.length ? closes[0] : 0);
+      const chgPct  = open ? ((cur - open) / open) * 100 : 0;
+      const up      = chgPct >= 0;
+      return `<div class="price-card" data-symbol="${d.symbol}">
+        <div class="price-card-header">
+          <span class="price-card-symbol">${d.symbol}</span>
+          <span class="price-card-badge ${d.source}">${d.source === 'live' ? 'LIVE' : 'SIM'}</span>
+        </div>
+        <div class="price-card-price" style="color:${up ? 'var(--success)' : 'var(--danger)'}">$${cur.toFixed(2)}</div>
+        <div class="price-card-change ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(chgPct).toFixed(2)}%</div>
+        <canvas id="chart-${d.symbol}" height="52"></canvas>
+      </div>`;
+    }).join('');
+
+    // Draw sparklines after DOM is ready
+    requestAnimationFrame(() => {
+      data.forEach(d => {
+        const canvas  = document.getElementById('chart-' + d.symbol);
+        if (!canvas) return;
+        const closes  = (d.ticks || []).map(t => t.close);
+        const open    = d.open_price || (closes.length ? closes[0] : 0);
+        const cur     = d.current_price || (closes.length ? closes[closes.length - 1] : 0);
+        drawSparkline(canvas, closes, cur >= open, []);
+      });
+    });
+
+    if (src) {
+      src.textContent = allSimulated
+        ? 'SIMULATED data — connect Alpaca keys for live prices'
+        : 'Live prices via Alpaca • GET /api/trading/price-feed/watchlist';
+      src.style.display = 'block';
     }
-
-    const sourceEl = document.getElementById('watchlist-source');
-    const sourceText = DEMO_MODE ? '📋 Demo Data' : 'Not connected';
-    sourceEl.textContent = `${sourceText}`;
-    sourceEl.style.display = 'block';
   } catch (e) {
-    console.error('Failed to load watchlist:', e);
+    console.error('loadPriceFeed failed:', e);
   }
+}
+
+async function loadWatchlist() {
+  await loadPriceFeed();
 }
 
 async function loadSignals() {
@@ -994,6 +1217,77 @@ async function loadSignals() {
   } catch (e) {
     console.error('Failed to load signals:', e);
   }
+}
+
+
+async function loadTesseract(showToast) {
+  try {
+    const btn = document.getElementById('tesseract-btn');
+    if (btn) { btn.textContent = 'Evaluating...'; btn.disabled = true; }
+
+    const res = await fetch('/api/trading/evaluate-watchlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    const grid = document.getElementById('tesseract-grid');
+    const src  = document.getElementById('tesseract-source');
+
+    if (data.error) {
+      grid.innerHTML = '<p style="color:var(--danger); margin:0;">Tesseract error: ' + data.error + '</p>';
+      return;
+    }
+
+    const evals = data.evaluations || [];
+    if (!evals.length) {
+      grid.innerHTML = '<p style="margin:0; color:var(--muted-text);">No assets evaluated</p>';
+      return;
+    }
+
+    const actionColor = a => a === 'buy' ? 'var(--success)' : a === 'watch' ? 'var(--warning)' : a === 'hold' ? '#818cf8' : 'var(--muted-text)';
+
+    grid.style.cssText = '';  // reset placeholder padding
+    grid.innerHTML = evals.map(e => {
+      const pct = Math.round(e.confidence * 100);
+      const c = e.cube || {};
+      return '<div class="tesseract-card">' +
+        '<div class="tesseract-header">' +
+          '<span class="tesseract-asset">' + e.asset + '</span>' +
+          '<span class="tesseract-action ' + e.action + '">' + e.action + '</span>' +
+        '</div>' +
+        '<div class="tesseract-confidence" title="' + pct + '% confidence">' +
+          '<div class="tesseract-confidence-fill" style="width:' + pct + '%"></div>' +
+        '</div>' +
+        '<div class="tesseract-dims">' +
+          '<span class="tesseract-dim">⏱ ' + (c.time || '-') + '</span>' +
+          '<span class="tesseract-dim">📈 ' + (c.market || '-') + '</span>' +
+          '<span class="tesseract-dim">⚡ ' + (c.signal || '-') + '</span>' +
+          '<span class="tesseract-dim">🔧 ' + (c.layer || '-') + '</span>' +
+          '<span class="tesseract-dim">📦 ' + (c.asset_state || '-') + '</span>' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+          '<span style="font-size:0.82rem; font-weight:600; color:' + actionColor(e.action) + '">' + pct + '% confidence</span>' +
+          '<span class="tesseract-timestamp">' + new Date(e.evaluated_at).toLocaleTimeString() + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    if (src) {
+      src.textContent = 'TradingTesseract v1 — POST /api/trading/evaluate-watchlist';
+      src.style.display = 'block';
+    }
+  } catch (err) {
+    const grid = document.getElementById('tesseract-grid');
+    if (grid) grid.innerHTML = '<p style="color:var(--danger); margin:0;">Failed: ' + err.message + '</p>';
+  } finally {
+    const btn = document.getElementById('tesseract-btn');
+    if (btn) { btn.textContent = 'Evaluate Now'; btn.disabled = false; }
+  }
+}
+
+async function runTesseract() {
+  await loadTesseract(true);
 }
 
 async function loadAllData() {
