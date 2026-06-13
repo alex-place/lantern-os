@@ -1,16 +1,23 @@
 {
-  "generatedAt": "2026-06-06T22:39:06.551Z",
-  "root": "c:\\Users\\angela\\Github\\lantern-os",
+  "generatedAt": "2026-06-13T05:25:28.192Z",
+  "root": "C:\\Users\\angela\\Github\\lantern-os\\.claude\\worktrees\\dreamy-brattain-6efcb9",
   "mode": "scan-only",
   "iterations": [
     {
       "iteration": 1,
-      "issueCount": 1,
+      "issueCount": 2,
       "leadingIssues": [
+        {
+          "id": "GIT:DIRTY",
+          "severity": "medium",
+          "summary": "Uncommitted changes:\nM apps/data/conversations/garage-conversations.jsonl\n M data/cubes/alex.private/deltas/deltas.jsonl\n M data/pcsf/settings.pcsf.json\n M manifests/validation/CONVERGENCE-MANAGER-LATEST.json\n M scripts/convergence-manager.js\n?? apps/lantern-garage/cloud-server.js",
+          "fix": "Commit or stash all changes before shipping",
+          "autoFixFn": null
+        },
         {
           "id": "GIT:STASH",
           "severity": "low",
-          "summary": "Stashed work exists:\nstash@{0}: On master: auto-stash before worktree cleanup\nstash@{1}: WIP on master: 163156c chore(pcsf): expand to v2.0.0 — full model rosters June 2026, fix deprecated defaults\nstash@{2}: WIP on master: dff0723 fix: orchestrator crash, stream routing, test suite, schema & deps",
+          "summary": "Stashed work exists:\nstash@{0}: On master: lfs-pointer-fix-pre-upstream-merge\nstash@{1}: WIP on master: 163156c chore(pcsf): expand to v2.0.0 — full model rosters June 2026, fix deprecated defaults\nstash@{2}: WIP on master: dff0723 fix: orchestrator crash, stream routing, test suite, schema & deps",
           "fix": "Pop, commit, or drop stash entries before shipping",
           "autoFixFn": null
         }
@@ -18,6 +25,6 @@
       "fixed": []
     }
   ],
-  "finalIssueCount": 1,
+  "finalIssueCount": 2,
   "status": "needs_review"
 }
