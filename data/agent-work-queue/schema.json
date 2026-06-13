@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentWorkQueueEntry",
+  "description": "A single unit of work pulled from the GitHub issue pool and assigned to an agent lane.",
+  "type": "object",
+  "required": ["id", "issue_number", "title", "status", "lane", "queued_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique entry ID: wq-<issue>-<epoch_ms>"
+    },
+    "issue_number": { "type": "integer" },
+    "issue_url":    { "type": "string", "format": "uri" },
+    "title":        { "type": "string" },
+    "body_excerpt": { "type": "string", "maxLength": 500 },
+    "labels":       { "type": "array", "items": { "type": "string" } },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "assigned", "in_progress", "completed", "failed", "skipped"]
+    },
+    "lane": {
+      "type": "string",
+      "description": "Agent lane prefix: claude/, gemini/, codex/, devin/, grok/, openai/, human/"
+    },
+    "agent_id":     { "type": ["string", "null"] },
+    "branch":       { "type": ["string", "null"] },
+    "pr_number":    { "type": ["integer", "null"] },
+    "queued_at":    { "type": "string", "format": "date-time" },
+    "assigned_at":  { "type": ["string", "null"] },
+    "completed_at": { "type": ["string", "null"] },
+    "receipt":      { "type": ["object", "null"] }
+  }
+}
