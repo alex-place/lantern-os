@@ -361,6 +361,111 @@
       border: 1px solid var(--accent);
       color: var(--accent);
     }
+
+    .tools-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-top: 24px;
+    }
+
+    .tools-section h2 {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 18px;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .tool-btn {
+      padding: 12px 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tool-btn:hover {
+      border-color: var(--accent);
+      background: rgba(124, 106, 247, 0.1);
+      color: var(--accent);
+    }
+
+    .tool-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .tool-icon {
+      font-size: 1.2rem;
+    }
+
+    .results-panel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .results-panel.show {
+      display: block;
+    }
+
+    .results-panel h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-item {
+      font-size: 0.85rem;
+      color: var(--text);
+      margin-bottom: 8px;
+      padding: 8px;
+      background: rgba(124, 106, 247, 0.05);
+      border-radius: 4px;
+    }
+
+    .result-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      margin: 6px 0;
+    }
+
+    .stat-label {
+      color: var(--muted);
+    }
+
+    .stat-value {
+      color: var(--accent);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -466,6 +571,56 @@
       </div>
     </div>
   </form>
+
+  <!-- Creator Suite Tools -->
+  <div class="tools-section">
+    <h2>Creator Suite V9 Tools</h2>
+    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 16px;">
+      Analyze uploads, generate variants, captions, and more
+    </p>
+
+    <!-- Analysis Tools -->
+    <h3 style="color: var(--muted); font-size: 0.8rem; margin-bottom: 12px; text-transform: uppercase;">Analysis & Processing</h3>
+    <div class="tools-grid">
+      <button type="button" class="tool-btn" onclick="analyzeHighlights()" id="analyze-btn">
+        <span class="tool-icon">🎬</span>
+        <span>Analyze Highlights</span>
+      </button>
+      <button type="button" class="tool-btn" onclick="generateVariants()" id="variants-btn" disabled>
+        <span class="tool-icon">📊</span>
+        <span>Generate Variants</span>
+      </button>
+      <button type="button" class="tool-btn" onclick="generateCaptions()" id="captions-btn" disabled>
+        <span class="tool-icon">📝</span>
+        <span>Generate Captions</span>
+      </button>
+      <button type="button" class="tool-btn" onclick="detectSafeZones()" id="safezones-btn" disabled>
+        <span class="tool-icon">🎯</span>
+        <span>Detect Safe Zones</span>
+      </button>
+    </div>
+
+    <!-- Results Panels -->
+    <div id="highlights-panel" class="results-panel">
+      <h3>Highlight Analysis</h3>
+      <div id="highlights-content"></div>
+    </div>
+
+    <div id="variants-panel" class="results-panel">
+      <h3>Retention Variants (A/B/C)</h3>
+      <div id="variants-content"></div>
+    </div>
+
+    <div id="captions-panel" class="results-panel">
+      <h3>Generated Captions</h3>
+      <div id="captions-content"></div>
+    </div>
+
+    <div id="safezones-panel" class="results-panel">
+      <h3>Safe Zones Detected</h3>
+      <div id="safezones-content"></div>
+    </div>
+  </div>
 
   <!-- Recent entries -->
   <div class="recent-entries">
@@ -627,6 +782,309 @@ async function loadRecentEntries() {
     }
   } catch (err) {
     console.error('Error loading entries:', err);
+  }
+}
+
+// Creator Suite Tool Functions
+
+let currentEntry = null;
+let currentHighlightTimeline = null;
+
+// Track uploaded entry for processing
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formData = new FormData();
+
+  // Pack form data as JSON
+  const entry = {
+    title: document.getElementById('title').value,
+    type: document.getElementById('type').value,
+    project: document.getElementById('project').value,
+    description: document.getElementById('description').value,
+    tags: document.getElementById('tags').value
+  };
+  formData.append('entry', JSON.stringify(entry));
+
+  if (fileInput.files.length > 0) {
+    formData.append('file', fileInput.files[0]);
+  }
+
+  submitBtn.disabled = true;
+  showStatus('Saving entry...', 'loading');
+
+  try {
+    const response = await fetch('/api/dreamer/upload', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      currentEntry = result.record;
+      showStatus('✓ Entry saved successfully', 'success');
+      resetForm();
+      loadRecentEntries();
+
+      // Enable analysis tools
+      document.getElementById('analyze-btn').disabled = false;
+    } else {
+      const error = await response.json();
+      showStatus(`✗ Error: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+async function analyzeHighlights() {
+  if (!currentEntry || !currentEntry.file || !currentEntry.file.path) {
+    showStatus('✗ Please upload a video first', 'error');
+    return;
+  }
+
+  const analyzeBtn = document.getElementById('analyze-btn');
+  analyzeBtn.disabled = true;
+  showStatus('Queuing analysis job...', 'loading');
+
+  try {
+    // Queue the job (returns immediately with jobId)
+    const response = await fetch('/api/creator/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoPath: currentEntry.file.path,
+        options: {
+          fps: 5,
+          motionThreshold: 0.15,
+          audioThreshold: 0.7,
+          minHighlightDuration: 1.0,
+          maxHighlightDuration: 30.0
+        }
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      const jobId = result.jobId;
+
+      showStatus('Queued! Waiting for analysis to start...', 'loading');
+
+      // Start polling for job progress
+      pollJobProgress(jobId, 'highlights');
+    } else {
+      const error = await response.json();
+      showStatus(`✗ Failed to queue job: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    analyzeBtn.disabled = false;
+  }
+}
+
+async function pollJobProgress(jobId, panelType) {
+  const maxAttempts = 300; // 2.5 minutes max (300 * 500ms)
+  let attempts = 0;
+
+  const pollInterval = setInterval(async () => {
+    attempts++;
+
+    try {
+      const response = await fetch(`/api/creator/job/${jobId}`);
+      if (!response.ok) return;
+
+      const job = await response.json();
+
+      // Update status message with progress
+      showStatus(`${job.progressMessage} (${job.progress}%)`, 'loading');
+
+      // Display progress
+      const panel = document.getElementById(`${panelType}-panel`);
+      const content = document.getElementById(`${panelType}-content`);
+
+      if (job.status === 'processing' || job.status === 'pending') {
+        // Show progress bar
+        let html = `<div style="margin-bottom: 12px;">
+          <div style="font-size: 0.85rem; margin-bottom: 6px;">
+            <strong>${job.progressMessage}</strong>
+          </div>
+          <div style="background: var(--surface2); height: 24px; border-radius: 4px; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, var(--accent), #4caf82); height: 100%; width: ${job.progress}%; transition: width 0.3s; display: flex; align-items: center; justify-content: center;">
+              <span style="font-size: 0.7rem; color: white; font-weight: 600;">${job.progress}%</span>
+            </div>
+          </div>
+        </div>`;
+        content.innerHTML = html;
+        panel.classList.add('show');
+      } else if (job.status === 'complete') {
+        clearInterval(pollInterval);
+
+        // Display results
+        displayJobResults(job, panelType);
+        showStatus(`✓ ${job.type} complete!`, 'success');
+      } else if (job.status === 'failed') {
+        clearInterval(pollInterval);
+        showStatus(`✗ Job failed: ${job.error}`, 'error');
+      }
+
+      // Timeout after max attempts
+      if (attempts >= maxAttempts) {
+        clearInterval(pollInterval);
+        showStatus('✗ Job timeout', 'error');
+      }
+    } catch (err) {
+      console.error('Poll error:', err);
+    }
+  }, 500); // Poll every 500ms
+}
+
+function displayJobResults(job, panelType) {
+  const panel = document.getElementById(`${panelType}-panel`);
+  const content = document.getElementById(`${panelType}-content`);
+
+  if (!job.result) {
+    content.innerHTML = '<div class="result-item">No results available</div>';
+    panel.classList.add('show');
+    return;
+  }
+
+  let html = '';
+
+  if (panelType === 'highlights' && job.result.timeline) {
+    const timeline = job.result.timeline;
+    currentHighlightTimeline = timeline;
+
+    html = `<div class="result-stat">
+      <span class="stat-label">Duration:</span>
+      <span class="stat-value">${timeline.duration.toFixed(1)}s</span>
+    </div>`;
+    html += `<div class="result-stat">
+      <span class="stat-label">Highlights Found:</span>
+      <span class="stat-value">${timeline.highlights.length}</span>
+    </div>`;
+
+    if (timeline.topHighlights && timeline.topHighlights.length > 0) {
+      html += `<div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">`;
+      timeline.topHighlights.slice(0, 3).forEach((hl, idx) => {
+        html += `<div class="result-item">
+          <strong>#${idx + 1}</strong> ${hl.start.toFixed(1)}s - ${hl.end.toFixed(1)}s
+          <div style="font-size: 0.8rem; color: var(--accent); margin-top: 4px;">
+            Score: ${(hl.score * 100).toFixed(0)}% — ${hl.reason}
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // Enable variant/caption buttons
+    document.getElementById('variants-btn').disabled = false;
+    document.getElementById('captions-btn').disabled = false;
+  }
+
+  content.innerHTML = html;
+  panel.classList.add('show');
+}
+
+async function generateVariants() {
+  if (!currentHighlightTimeline) {
+    showStatus('✗ Please analyze highlights first', 'error');
+    return;
+  }
+
+  const variantsBtn = document.getElementById('variants-btn');
+  variantsBtn.disabled = true;
+  showStatus('Queuing variant generation...', 'loading');
+
+  try {
+    const response = await fetch('/api/creator/variants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ highlightTimeline: currentHighlightTimeline })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      pollJobProgress(result.jobId, 'variants');
+    } else {
+      const error = await response.json();
+      showStatus(`✗ Failed to queue: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    variantsBtn.disabled = false;
+  }
+}
+
+async function generateCaptions() {
+  if (!currentHighlightTimeline) {
+    showStatus('✗ Please analyze highlights first', 'error');
+    return;
+  }
+
+  const captionsBtn = document.getElementById('captions-btn');
+  captionsBtn.disabled = true;
+  showStatus('Queuing caption generation...', 'loading');
+
+  try {
+    const response = await fetch('/api/creator/captions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        highlightTimeline: currentHighlightTimeline,
+        strategy: 'gaming',
+        format: 'all'
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      pollJobProgress(result.jobId, 'captions');
+    } else {
+      const error = await response.json();
+      showStatus(`✗ Failed to queue: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    captionsBtn.disabled = false;
+  }
+}
+
+async function detectSafeZones() {
+  if (!currentEntry || !currentEntry.file?.path) {
+    showStatus('✗ Please upload a video first', 'error');
+    return;
+  }
+
+  const safezonesBtn = document.getElementById('safezones-btn');
+  safezonesBtn.disabled = true;
+  showStatus('Queuing safe zone detection...', 'loading');
+
+  try {
+    const response = await fetch('/api/creator/safe-zones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoPath: currentEntry.file.path,
+        frameData: { width: 1920, height: 1080 }
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      pollJobProgress(result.jobId, 'safezones');
+    } else {
+      const error = await response.json();
+      showStatus(`✗ Failed to queue: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    safezonesBtn.disabled = false;
   }
 }
 
