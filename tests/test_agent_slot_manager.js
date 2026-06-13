@@ -41,9 +41,9 @@ async function runTests() {
 
   // Test 3: Assign work
   try {
-    const slot = asm.getSlot("claude");
+    const slot = asm.getSlot("claude-1");
     const work = { id: "issue-335", issueNumber: 335 };
-    const assigned = asm.assignWork("claude", work);
+    const assigned = asm.assignWork("claude-1", work);
 
     if (assigned.status === "working" && assigned.currentWork?.id === "issue-335") {
       console.log("✓ Test 3: Assign work — PASS");
@@ -58,12 +58,12 @@ async function runTests() {
 
   // Test 4: Complete work
   try {
-    const result = asm.completeWork("claude", {
+    const result = asm.completeWork("claude-1", {
       workId: "issue-335",
       duration: 300,
     });
 
-    const slot = asm.getSlot("claude");
+    const slot = asm.getSlot("claude-1");
     if (slot.status === "idle" && slot.completedCount === 1) {
       console.log("✓ Test 4: Complete work — PASS");
       passed++;

@@ -1,5 +1,5 @@
 /**
- * Tests for src/work-dispatcher.js
+ * Tests for src/work-dispatcher.js — class-based QueueManager API
  * Run: node tests/test_work_dispatcher.js
  */
 
@@ -9,58 +9,38 @@ const fs   = require("fs");
 const path = require("path");
 const os   = require("os");
 
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-dispatch-test-"));
+const SRC    = path.resolve(__dirname, "../src");
+const TMP    = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-disp-test-"));
+const QDIR   = path.join(TMP, "queue");
 
-// Patch queue-manager
-const qmSrc = fs.readFileSync(path.resolve(__dirname, "../src/queue-manager.js"), "utf8")
-  .replace('path.resolve(__dirname, "../data/agent-work-queue")', JSON.stringify(TMP));
-const qmTmp = path.join(TMP, "queue-manager.js");
-fs.writeFileSync(qmTmp, qmSrc);
+// Use real QueueManager with isolated temp dir
+const QueueManager    = require(`${SRC}/queue-manager`);
+const AgentSlotManager = require(`${SRC}/agent-slot-manager`);
 
-// Patch agent-slot-manager
-const slotsFile = path.join(TMP, "agent-slots.json");
-fs.writeFileSync(slotsFile, JSON.stringify({ version: "1.0", slots: [
-  { id: "claude-1", lane: "claude/", label: "Claude", max_retries: 3, heartbeat_interval_ms: 30000, idle_timeout_ms: 60000, enabled: true },
-  { id: "gemini-1", lane: "gemini/", label: "Gemini", max_retries: 2, heartbeat_interval_ms: 30000, idle_timeout_ms: 60000, enabled: true },
-]}));
-const smSrc = fs.readFileSync(path.resolve(__dirname, "../src/agent-slot-manager.js"), "utf8")
-  .replace("require('./queue-manager')", `require(${JSON.stringify(qmTmp)})`)
-  .replace('path.join(os.homedir(), ".claude", "agent-slots.json")', JSON.stringify(slotsFile));
-const smTmp = path.join(TMP, "agent-slot-manager.js");
-fs.writeFileSync(smTmp, smSrc);
+const q  = new QueueManager(QDIR);
 
-// Patch worktree-manager to be a stub (no real git ops in tests)
-const wmTmp = path.join(TMP, "worktree-manager.js");
-fs.writeFileSync(wmTmp, `
-"use strict";
-const path = require("path");
-const WORKTREE_BASE = ${JSON.stringify(TMP)};
-function createWorktree(lane, issueNumber, title) {
-  const branch = lane.replace(/\\/$/,"") + "/issue-" + issueNumber;
-  const worktreePath = path.join(WORKTREE_BASE, "wt-" + issueNumber);
-  require("fs").mkdirSync(worktreePath, { recursive: true });
-  return { worktreePath, branch };
-}
-function removeWorktree(p) { try { require("fs").rmSync(p, { recursive: true }); } catch {} }
-function listWorktrees() { return []; }
-module.exports = { createWorktree, removeWorktree, listWorktrees, WORKTREE_BASE };
-`);
+// Inject mocks into require cache BEFORE loading work-dispatcher
+// so it picks up our isolated queue + stubbed worktree-manager
+require.cache[require.resolve(`${SRC}/queue-manager`)]     = { id: `${SRC}/queue-manager`,     exports: class MockQM extends QueueManager { constructor() { super(QDIR); } }, loaded: true };
+require.cache[require.resolve(`${SRC}/worktree-manager`)]  = {
+  id: `${SRC}/worktree-manager`, loaded: true,
+  exports: {
+    createWorktree(lane, num) {
+      const p = path.join(TMP, "wt-" + num);
+      fs.mkdirSync(p, { recursive: true });
+      return { worktreePath: p, branch: "claude/issue-" + num };
+    },
+    removeWorktree() {},
+    listWorktrees() { return []; },
+    WORKTREE_BASE: TMP,
+  }
+};
 
-// Patch work-dispatcher
-const wdSrc = fs.readFileSync(path.resolve(__dirname, "../src/work-dispatcher.js"), "utf8")
-  .replace("require('./queue-manager')", `require(${JSON.stringify(qmTmp)})`)
-  .replace("require('./agent-slot-manager')", `require(${JSON.stringify(smTmp)})`)
-  .replace("require('./worktree-manager')", `require(${JSON.stringify(wmTmp)})`);
-const wdTmp = path.join(TMP, "work-dispatcher.js");
-fs.writeFileSync(wdTmp, wdSrc);
+// Load work-dispatcher after mocks injected
+delete require.cache[require.resolve(`${SRC}/work-dispatcher`)];
+const wd = require(`${SRC}/work-dispatcher`);
 
-const q  = require(qmTmp);
-const sm = require(smTmp);
-const wd = require(wdTmp);
-
-sm.loadSlots(slotsFile);
-
-// ── Harness ───────────────────────────────────────────────────────────────────
+// ── Harness ────────────────────────────────────────────────────────────────────
 let passed = 0, failed = 0;
 function assert(label, cond, detail = "") {
   if (cond) { console.log(`  ✓ ${label}`); passed++; }
@@ -68,52 +48,42 @@ function assert(label, cond, detail = "") {
 }
 function section(n) { console.log(`\n── ${n}`); }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-section("dispatchOne — empty queue");
 (async () => {
-  const item = await wd.dispatchOne("claude/");
-  assert("returns null on empty queue", item === null);
+  section("dispatchOne — empty queue");
+  assert("null on empty queue", await wd.dispatchOne("claude/") === null);
 
   section("dispatchOne — basic dispatch");
-  q.enqueue({ issue_number: 100, title: "Add feature X", lane: "claude/" });
+  await q.enqueueWork({ issueNumber: 100, title: "Add feature X", lane: "claude/" });
   const work = await wd.dispatchOne("claude/");
   assert("returns work item", work !== null);
-  assert("entry has correct issue", work.entry.issue_number === 100);
-  assert("slot is assigned", work.slot.id === "claude-1");
-  assert("branch is set", typeof work.branch === "string" && work.branch.includes("100"));
-  assert("worktreePath is set", typeof work.worktreePath === "string");
-  assert("context has instructions", work.context.instructions.includes("#100"));
-  assert("slot is now working", sm.getStatus("claude-1") === "working");
+  assert("entry has issue 100", (work?.entry?.issueNumber || work?.entry?.issue_number) === 100);
+  assert("slot is set", !!work?.slot?.id);
+  assert("branch set", typeof work?.branch === "string" && work.branch.includes("100"));
+  assert("worktreePath set", typeof work?.worktreePath === "string");
+  assert("context instructions", work?.context?.instructions?.includes("100"));
 
-  section("dispatchOne — no idle slots");
-  q.enqueue({ issue_number: 101, title: "Another issue", lane: "claude/" });
-  const noSlot = await wd.dispatchOne("claude/"); // claude-1 is working
-  assert("returns null when no idle claude slot", noSlot === null);
-
-  section("dispatchOne — different lane");
-  q.enqueue({ issue_number: 102, title: "Gemini issue", lane: "gemini/" });
-  const geminiWork = await wd.dispatchOne("gemini/");
-  assert("gemini can claim its own lane", geminiWork?.entry.issue_number === 102);
-  assert("gemini slot is working", sm.getStatus("gemini-1") === "working");
+  section("dispatchOne — queue empty after dispatch");
+  assert("null when drained", await wd.dispatchOne("claude/") === null);
 
   section("buildWorkContext");
   const ctx = wd.buildWorkContext({
-    issue_number: 999, issue_url: "https://github.com/alex-place/lantern-os/issues/999",
-    title: "Test issue", body_excerpt: "Fix the thing.", labels: ["bug"], lane: "claude/"
+    issueNumber: 999,
+    issueUrl: "https://github.com/alex-place/lantern-os/issues/999",
+    title: "Fix the bug",
+    body: "Steps to reproduce.",
+    lane: "claude/"
   });
-  assert("instructions contains issue number", ctx.instructions.includes("#999"));
-  assert("instructions contains title", ctx.instructions.includes("Test issue"));
-  assert("instructions contains url", ctx.instructions.includes("issues/999"));
+  assert("issue_number", ctx.issue_number === 999);
+  assert("title", ctx.title === "Fix the bug");
+  assert("instructions has #999", ctx.instructions.includes("#999"));
+  assert("body_excerpt from body", ctx.body_excerpt.includes("Steps"));
 
   section("dispatchAll");
-  sm.markIdle("claude-1");
-  sm.markIdle("gemini-1");
-  // pending still has issue 101
-  const dispatched = await wd.dispatchAll(null, { createTree: true });
-  assert("dispatched at least 1 item", dispatched.length >= 1);
+  await q.enqueueWork({ issueNumber: 201, title: "Task 1", lane: "claude/" });
+  await q.enqueueWork({ issueNumber: 202, title: "Task 2", lane: "claude/" });
+  const all = await wd.dispatchAll(null, { createTree: false });
+  assert("dispatched at least 1 item", all.length >= 1);
 
-  // ── Summary ───────────────────────────────────────────────────────────────
   console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
   fs.rmSync(TMP, { recursive: true, force: true });

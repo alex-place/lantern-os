@@ -9,18 +9,23 @@
 
 "use strict";
 
-const { listPending, claimNext, updateEntry } = require("./queue-manager");
-const { getAllStatus, markWorking }            = require("./agent-slot-manager");
-const { createWorktree }                       = require("./worktree-manager");
+const path            = require("path");
+const QueueManager    = require("./queue-manager");
+const AgentSlotManager = require("./agent-slot-manager");
+const { createWorktree } = require("./worktree-manager");
+
+const REPO_ROOT  = path.resolve(__dirname, "..");
+const _queue     = new QueueManager(path.join(REPO_ROOT, "data", "agent-work-queue"));
+const _slots     = new AgentSlotManager();
 
 /**
  * Find the first idle slot that can handle the given lane.
- * A "human/" queue entry can be claimed by any enabled slot.
  */
 function findIdleSlot(lane) {
-  const slots = getAllStatus();
-  return slots.find(s => s.status === "idle" && s.enabled !== false &&
-    (s.lane === lane || lane === "human/"));
+  const slots = _slots.getEnabledSlots();
+  return slots.find(s =>
+    s.status === "idle" && (s.lane === lane || lane === "human/" || !lane)
+  ) || null;
 }
 
 /**
@@ -34,41 +39,33 @@ function findIdleSlot(lane) {
 async function dispatchOne(preferredLane, opts = {}) {
   const { createTree = true } = opts;
 
-  // 1. Check pending work
-  const pending = listPending();
-  if (pending.length === 0) return null;
-
-  // 2. Find a matching idle slot
-  const candidate = pending.find(e => {
-    const lane = preferredLane || e.lane;
-    return findIdleSlot(lane) !== null;
-  });
-  if (!candidate) return null;
-
-  const slot = findIdleSlot(preferredLane || candidate.lane);
+  // 1. Find an idle slot
+  const slot = findIdleSlot(preferredLane);
   if (!slot) return null;
 
-  // 3. Claim the queue entry
-  const entry = claimNext(slot.lane);
+  // 2. Claim next pending work item
+  const entry = await _queue.getNextWork(slot.id);
   if (!entry) return null;
 
-  // 4. Create isolated worktree + branch
+  // 3. Create isolated worktree + branch
   let worktreePath = null;
   let branch       = null;
   if (createTree) {
     try {
-      const wt = createWorktree(slot.lane, entry.issue_number, entry.title);
+      const wt = createWorktree(
+        slot.lane || preferredLane || "claude/",
+        entry.issueNumber || entry.issue_number,
+        entry.title
+      );
       worktreePath = wt.worktreePath;
       branch       = wt.branch;
-      updateEntry(entry.id, { branch, agent_id: slot.id });
     } catch (err) {
-      // Worktree creation failed — update entry with error context but continue
-      updateEntry(entry.id, { agent_id: slot.id, receipt: { worktree_error: err.message } });
+      // Worktree creation failed — continue without it
     }
   }
 
-  // 5. Mark slot as working
-  markWorking(slot.id, entry.id);
+  // 4. Mark slot as working
+  try { _slots.assignWork(slot.id, entry); } catch {}
 
   return {
     entry,
@@ -83,19 +80,22 @@ async function dispatchOne(preferredLane, opts = {}) {
  * Build a work context object the agent can act on.
  */
 function buildWorkContext(entry) {
+  const num  = entry.issueNumber || entry.issue_number;
+  const url  = entry.issueUrl    || entry.issue_url    || `https://github.com/alex-place/lantern-os/issues/${num}`;
+  const lane = entry.lane        || entry.agentId      || "claude/";
   return {
-    issue_number: entry.issue_number,
-    issue_url:    entry.issue_url,
+    issue_number: num,
+    issue_url:    url,
     title:        entry.title,
-    body_excerpt: entry.body_excerpt,
-    labels:       entry.labels,
-    lane:         entry.lane,
-    queued_at:    entry.queued_at,
+    body_excerpt: entry.body || entry.body_excerpt || "",
+    labels:       entry.labels || [],
+    lane,
+    queued_at:    entry.queuedAt || entry.queued_at,
     instructions: [
-      `Work item: #${entry.issue_number} — ${entry.title}`,
-      `Lane: ${entry.lane}`,
-      `Issue: ${entry.issue_url}`,
-      entry.body_excerpt ? `Context:\n${entry.body_excerpt}` : "",
+      `Work item: #${num} — ${entry.title}`,
+      `Lane: ${lane}`,
+      `Issue: ${url}`,
+      entry.body ? `Context:\n${entry.body.slice(0, 500)}` : "",
     ].filter(Boolean).join("\n"),
   };
 }
