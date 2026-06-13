@@ -1,0 +1,15 @@
+{
+  "id": "issue-362",
+  "issueNumber": 362,
+  "title": "Consolidate orchestration/agent/leaderboard/provider dashboards",
+  "description": "",
+  "priority": 0,
+  "assignedTo": null,
+  "assignedAt": null,
+  "status": "pending",
+  "branch": null,
+  "targetDate": null,
+  "retries": 0,
+  "createdAt": "2026-06-13T08:08:23.544Z",
+  "updatedAt": "2026-06-13T08:08:23.545Z"
+}

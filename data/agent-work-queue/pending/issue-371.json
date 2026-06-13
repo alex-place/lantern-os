@@ -1,0 +1,15 @@
+{
+  "id": "issue-371",
+  "issueNumber": 371,
+  "title": "Repository Cleanup: Archive old code and remove temp artifacts",
+  "description": "",
+  "priority": 0,
+  "assignedTo": null,
+  "assignedAt": null,
+  "status": "pending",
+  "branch": null,
+  "targetDate": null,
+  "retries": 0,
+  "createdAt": "2026-06-13T08:08:23.540Z",
+  "updatedAt": "2026-06-13T08:08:23.543Z"
+}
