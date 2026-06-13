@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Trading API Routes
  * Serves market data, AI recommendations, and broker integration
  * Integrates with local TraderAgent (Python subprocess) for single-app architecture
@@ -11,6 +11,14 @@ const tradingMemory = require('../lib/trading-memory');
 const tradingStore = require('../lib/trading-store');
 const tradingNews = require('../lib/trading-news');
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
+const { TradingPriceFeed } = require('../lib/trader-price-feed');
+
+// Shared price feed instance (caches ticks for 1 min)
+let _priceFeed = null;
+function getPriceFeed() {
+  if (!_priceFeed) _priceFeed = new TradingPriceFeed(traderAgent);
+  return _priceFeed;
+}
 
 // Initialize local trader agent (replaces external AI Trader service)
 let traderAgent = null;
@@ -926,6 +934,39 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     return true;
   }
 
+
+  // ── Price Feed (Phase 5) ──────────────────────────────────────────────────
+
+  // GET /api/trading/price-feed?symbol=AAPL&range=1D
+  // Returns: { symbol, range, ticks, source, current_price, open_price, generated_at }
+  if (url.pathname === '/api/trading/price-feed' && req.method === 'GET') {
+    const symbol = (url.searchParams.get('symbol') || 'SPY').toUpperCase();
+    const range  = url.searchParams.get('range') || '1D';
+    try {
+      const data = await getPriceFeed().getTicks(symbol, range);
+      sendJson(res, data);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/price-feed/watchlist?range=1D
+  // Returns: [{ symbol, range, ticks, source, current_price, ... }, ...]
+  if (url.pathname === '/api/trading/price-feed/watchlist' && req.method === 'GET') {
+    const range     = url.searchParams.get('range') || '1D';
+    const DEFAULT_WL = ['SPY', 'AAPL', 'TSLA', 'NVDA', 'MSFT'];
+    const watchlist = url.searchParams.get('symbols')
+      ? url.searchParams.get('symbols').split(',').map(s => s.trim().toUpperCase())
+      : DEFAULT_WL;
+    try {
+      const results = await getPriceFeed().getWatchlistTicks(watchlist, range);
+      sendJson(res, results);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+    }
+    return true;
+  }
 
   return false;
 };
