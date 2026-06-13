@@ -394,41 +394,8 @@
     let fullText = "";
     let hasTokens = false;
     const provider = providerSelect.value;
-    let routeDecision = null;
-    try {
-      const routeResp = await fetch(`${serverBase}/api/dream/route`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
-      if (routeResp.ok) routeDecision = (await routeResp.json()).route;
-    } catch {}
-    const routeIntent = routeDecision?.intent || detectRouteIntent(message);
-    // Only send a persona agent name when the user has explicitly opted into RP
-    const isRpIntent = routeIntent === "dream_chat";
-    const agent = directModeEnabled ? "" : (isRpIntent ? detectAgent(message) : "");
     // POST with history for multi-turn context; history excludes current message (already appended)
     const historyToSend = conversationHistory.slice(0, -1).slice(-6); // last 6 turns before this message
-
-    // Show routing card in the bubble before first token arrives
-    if (routeDecision) {
-      const rc = document.createElement("div");
-      rc.className = "route-card";
-      const wait = routeDecision.requires_convergence ? "Waiting for result" : "Direct route";
-      rc.textContent = `Routing to ${routeDecision.agent} - ${wait}`;
-      bubble.insertBefore(rc, cursor);
-    }
-    if (!routeDecision && routeIntent === "coding_change") {
-      const rc = document.createElement("div");
-      rc.className = "route-card";
-      rc.textContent = "⚙ Routing to Keystone…";
-      bubble.insertBefore(rc, cursor);
-    } else if (!routeDecision && routeIntent === "technical_debug") {
-      const rc = document.createElement("div");
-      rc.className = "route-card";
-      rc.textContent = "⚙ Routing to debug interface…";
-      bubble.insertBefore(rc, cursor);
-    }
 
     fetch(`${serverBase}/api/dream/chat/stream`, {
       method: "POST",
@@ -436,10 +403,8 @@
       body: JSON.stringify({
         message,
         provider: provider || undefined,
-        agent: agent || undefined,
         history: historyToSend,
         mcp: directModeEnabled,
-        routeIntent,
       }),
     })
       .then((res) => {
@@ -452,6 +417,8 @@
         let buf = "";
 
         let streamFinished = false;
+        let routeInfo = null;
+        let receiptInfo = null;
         function processLines(lines) {
           for (const line of lines) {
             if (!line.startsWith("data:")) continue;
@@ -459,6 +426,19 @@
             if (!raw) continue;
             try {
               const evt = JSON.parse(raw);
+              if (evt.type === "route") {
+                routeInfo = evt;
+                // Show routing card with info from actual server-side routing decision
+                if (!document.querySelector(".route-card")) {
+                  const rc = document.createElement("div");
+                  rc.className = "route-card";
+                  rc.textContent = evt.label || `${evt.agentName} · ${evt.surface}`;
+                  bubble.insertBefore(rc, cursor);
+                }
+              }
+              if (evt.type === "receipt") {
+                receiptInfo = evt;
+              }
               if (evt.type === "token" && evt.text) {
                 if (!hasTokens) { hasTokens = true; setThinking(false); }
                 fullText += evt.text;
