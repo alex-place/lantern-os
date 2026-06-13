@@ -104,6 +104,7 @@ const routes = [
   require("./routes/surfaces"),
   require("./routes/self-edit"),
   require("./routes/personal-cube"),
+  require("./routes/agent-status"),
 ];
 
 async function route(req, res) {

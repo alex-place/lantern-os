@@ -264,8 +264,8 @@
         });
       return;
     }
-    // !convergence runs the Lantern convergence loop + version check + auto-update
-    if (text === "!convergence") {
+    // !convergence / !convergance — loop + agent status + version
+    if (/^!convergan?ce$/i.test(text)) {
       inputEl.value = "";
       triggerAutoupdate("Auto-update");
       const sysRow = document.createElement("div");
@@ -274,18 +274,18 @@
       messagesEl.appendChild(sysRow);
       scrollToBottom();
 
-      const runLoop = fetch(`${serverBase}/api/actions/run-loop`, { method: "POST" });
+      const runLoop     = fetch(`${serverBase}/api/actions/run-loop`, { method: "POST" });
       const fetchVersion = fetch(`${serverBase}/api/version`).then(r => r.ok ? r.json() : null).catch(() => null);
+      const fetchAgents  = fetch(`${serverBase}/api/dream/status/agents`).then(r => r.ok ? r.json() : null).catch(() => null);
 
-      Promise.all([runLoop, fetchVersion])
-        .then(async ([loopR, versionD]) => {
+      Promise.all([runLoop, fetchVersion, fetchAgents])
+        .then(async ([loopR, versionD, agentD]) => {
           const d = await loopR.json();
           const rawOut = d.stdout || "";
           const rawErr = d.stderr || "";
-          const tag = versionD?.version?.semver || versionD?.version?.tag || "unknown";
+          const tag    = versionD?.version?.semver || versionD?.version?.tag || "unknown";
           const commit = versionD?.version?.commit ? versionD.version.commit.slice(0, 7) : "?";
 
-          // Extract JSON from stdout (convergence loop prints it at the end)
           let promo = "";
           try {
             const jsonMatch = rawOut.match(/\{[\s\S]*"promotion_ready"[\s\S]*\}/);
@@ -295,11 +295,18 @@
             }
           } catch {}
 
-          const out = rawOut.slice(0, 700);
-          const err = rawErr.slice(0, 300);
+          const out = rawOut.slice(0, 500);
+          const err = rawErr.slice(0, 200);
 
-          sysRow.querySelector(".bubble").innerHTML =
-            `<b>Convergence loop</b> ${loopR.ok ? "✓" : "✗"} <code>${tag}</code> <code>${commit}</code> ${promo}<pre style="margin-top:6px;white-space:pre-wrap;font-size:12px;opacity:0.85;">${escapeHtml(out)}${err ? "\n---stderr---\n" + escapeHtml(err) : ""}</pre>`;
+          const agentBlock = agentD?.text
+            ? `\n\n<b>Agent Fleet</b>\n<pre style="margin-top:4px;white-space:pre-wrap;font-size:12px;color:var(--accent);opacity:0.9;">${escapeHtml(agentD.text)}</pre>`
+            : "";
+
+          const bubble = sysRow.querySelector(".bubble");
+          bubble.innerHTML =
+            `<b>Convergence loop</b> ${loopR.ok ? "✓" : "✗"} <code>${tag}</code> <code>${commit}</code> ${promo}` +
+            agentBlock +
+            (out ? `\n<pre style="margin-top:6px;white-space:pre-wrap;font-size:11px;opacity:0.7;">${escapeHtml(out)}${err ? "\n---stderr---\n" + escapeHtml(err) : ""}</pre>` : "");
           scrollToBottom();
         })
         .catch((e) => {
