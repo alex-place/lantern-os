@@ -15,11 +15,21 @@
 
 'use strict';
 
+// Seed prices anchored to real market data — June 13, 2026
+// Sources: Yahoo Finance, CNBC, MarketBeat (searched 2026-06-13)
+// VIX: 19.44 (CALM regime, just under 20 threshold)
+// Market: SPY near ATH ~$742, broad bull market with sector rotation
+//   AI/tech (NVDA, AMD) in correction; Energy/Materials leading
+//   S&P 500 year-end targets: GS 8000, UBS 7700, Reuters median 7620
 const SEED_PRICES = {
-  SPY:  545.0,  QQQ:  470.0,  AAPL: 191.0,
-  TSLA: 248.0,  NVDA: 910.0,  MSFT: 432.0,
-  AMZN: 195.0,  META: 530.0,  GOOGL: 178.0,
-  AMD:  165.0,  INTC:  30.0,  NFLX: 675.0,
+  // ETFs
+  SPY:  742.45,  QQQ:  716.31,
+  // Mega-cap tech  (NVDA post 10:1 split Jun-2024; AI correction underway)
+  AAPL: 291.52,  MSFT: 387.71,  NVDA: 205.16,
+  TSLA: 400.77,  AMZN: 240.00,  GOOGL: 340.00,
+  META: 730.00,
+  // Semiconductors / other
+  AMD:  135.00,  INTC:  22.50,  NFLX: 1100.00,
 };
 
 const RANGE_BARS = { '1D': 78, '5D': 100, '1M': 120 }; // bars to generate per range

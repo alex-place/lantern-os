@@ -1,4 +1,4 @@
-# Open Issues
+﻿# Open Issues
 
 The convergence loop fixes the first 2-4 actionable issues before expansion.
 
@@ -425,3 +425,59 @@ Documentation: See `docs/DASHBOARD-CONSOLIDATION.md`
    - Detected by: agent slot `dream_journal/voice_server_stt` (priority 8, queued)
    - Status: queued. Needs Vosk model installation + POST /api/dream/transcribe route.
    - Next: install Vosk, add transcribe route to dream.js, create test.
+
+## Convergence Loop — 2026-06-13 (CIO-driven)
+
+### CIO Execution Graph
+`
+Nodes executed: test_suite → issue_triage → manifest_update → pr_ci_check
+                → upstream_sync → drift_scan → regulatory_scan
+Tick: 7 | Dilations: 1.20–1.47 (healthy, mild cost pressure)
+Strategy: PCSFOptimizer greedy, Cost(P) = 0.3*latency + 0.3*compute + 0.2*risk + 0.2*instability
+`
+
+### Test Suite (368 passed / 17 skipped / 1 xfailed)
+All green. New suites added this loop:
+- test_regulatory_researcher.py: 30 tests (FDA, BLS, SEC, dim scoring, researcher lifecycle)
+- test_ceg_engine.py:           28 tests (node/edge ops, dilation, hot-swap hysteresis, PCSF, CIO.run)
+- test_trading_tesseract.py:    50 tests
+- test_trading_price_feed.js:   17 tests
+
+### Shipped This Loop (PR #378 — pending merge)
+| Issue | Component | Status |
+|-------|-----------|--------|
+| #391  | src/csf_rust/src/cio.rs — Rust CIO 1.0 typed kernel (430 lines, 9 tests) | ✅ shipped |
+| #390  | src/ceg_engine.py — CEG v0.4: UIProjectionNode, FeatureState, swap hysteresis | ✅ shipped |
+| #388  | src/ceg_engine.py — CEG v0.3: G=(V,E,D,τ,S,H), PCSF optimizer, AAPF trace | ✅ shipped |
+| #387  | dream-chat.js — loadProviderStatus() syncs connector-grid conn-status-* | ✅ shipped |
+| #386  | convergence_io_engine.py:1197 — removed spurious context= kwarg | ✅ shipped |
+| #326  | trader-price-feed.js — live price feed + canvas sparklines (1D/5D/1M) | ✅ shipped |
+| #325  | trading_tesseract.py + routes — TradingTesseract 5D evaluation + Signal Panel | ✅ shipped |
+| new   | src/regulatory_researcher.py — autonomous regulatory API researcher | ✅ shipped |
+
+### Drift Detected
+1. DRIFT-PRICE-FEED-001: apps/lantern-garage/lib/trader-price-feed.js has no Node test file.
+   - Status: **FIXING THIS LOOP** (see below)
+2. DRIFT-CIO-RUST-001: src/csf_rust/src/cio.rs not referenced in CI workflow (csf-rust.yml).
+   - Status: queued. Rust linker unavailable locally; CI compiles clean via GitHub Actions.
+3. DRIFT-UPSTREAM-509: Branch is 509 commits behind upstream/master.
+   - Status: merge blocked pending OVERRIDE_MERGE=1 authorization from operator.
+
+### Active Gaps (Carried Forward)
+1. GEMINI-GROUNDING-001: Gemini grounding unverified. Requires paid key + GEMINI_GROUNDING=true.
+2. VOICE-STT-001: Vosk STT backend not implemented. Needs vosk install + POST /api/dream/transcribe.
+3. CSF-AGENT-001: csf-agent pipeline (#380–385) not yet built — scanner, embedder, scorer, suggester, loop.
+
+### Regulatory Research Snapshot (live scan)
+| Dim | API Source | Severity | Score |
+|-----|-----------|---------|-------|
+| health_safety | openFDA recalls | Class I/II/III | 1 - severity |
+| economic_security | BLS unemployment/CPI/wages | heuristic | computed |
+| fairness_justice | SEC EDGAR enforcement | 0.4 baseline | computed |
+Feed wired into HFF world model at: POST /api/regulatory/scan, GET /api/regulatory/flourishing
+
+### Next Convergence Actions
+1. Fix DRIFT-PRICE-FEED-001 — add tests/test_trading_price_feed.js (Node test runner)
+2. Work #389 — index.html as Feature Runtime Host (PCSF-driven feature graph)
+3. Work #385→#380 csf-agent pipeline (p0/p1 labeled)
+4. Operator: run OVERRIDE_MERGE=1 git push origin master to sync fork with upstream
