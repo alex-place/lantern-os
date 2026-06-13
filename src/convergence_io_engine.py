@@ -1,4 +1,4 @@
-"""
+﻿"""
 Convergence I/O Engine — Lantern OS
 
 Executable 4-layer hypercube + 12-step convergence loop.
@@ -1196,8 +1196,7 @@ class TesseractEngine:
 
     def _interface_slot_claim(self, ctx: ConvergenceContext) -> ConvergenceContext:
         slot_id = self.slots.claim(
-            "dream_journal", ctx.request_id,
-            context={"persona": ctx.persona, "request_id": ctx.request_id}
+            "dream_journal", ctx.request_id
         )
         ctx.slot_id = slot_id
         return ctx

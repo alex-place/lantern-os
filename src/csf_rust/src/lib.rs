@@ -1,4 +1,4 @@
-//! CSF — Convergence-Fitted Searchable Binary Archive (Rust v1.0)
+﻿//! CSF — Convergence-Fitted Searchable Binary Archive (Rust v1.0)
 //!
 //! Production-grade, memory-safe, streaming-native implementation of the
 //! CSF specification. Designed for files larger than RAM and workloads
@@ -22,6 +22,7 @@ pub mod security;
 pub mod sparse;
 pub mod streaming;
 pub mod wavefront;
+pub mod cio;
 
 use thiserror::Error;
 

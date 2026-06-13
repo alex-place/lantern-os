@@ -1,4 +1,4 @@
-  const messagesEl = document.getElementById("messages");
+﻿  const messagesEl = document.getElementById("messages");
   const inputEl = document.getElementById("input");
   const sendBtn = document.getElementById("send-btn");
   const statusDot = document.getElementById("status-dot");
