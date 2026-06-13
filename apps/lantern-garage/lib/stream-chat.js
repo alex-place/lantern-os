@@ -28,9 +28,10 @@ const maxConversationTextLength = 4000;
 const FALLBACK_DOORS = ["Tell me more about that", "What happened next?", "How are you feeling about it?"];
 
 // Conversation history compaction thresholds
-const FULL_FIDELITY_RECENT_TURNS = 2;
-const MID_FIDELITY_TURNS = 2;
-const MID_FIDELITY_CHAR_LIMIT = 200;
+// Increased for richer RP context (issue #332 — journal/Three Doors felt flat)
+const FULL_FIDELITY_RECENT_TURNS = 6;
+const MID_FIDELITY_TURNS = 4;
+const MID_FIDELITY_CHAR_LIMIT = 400;
 const LOW_FIDELITY_WORD_LIMIT = 10;
 
 // Conversation history compaction: tiered summarization to reduce provider token costs.
@@ -963,7 +964,7 @@ async function handleStreamChat(req, url, res) {
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {
         contents: [{ role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] }],
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
+        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7 },
       };
       if (groundingEnabled) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];
@@ -1050,7 +1051,8 @@ async function handleStreamChat(req, url, res) {
       }
       const payload = JSON.stringify({
         model: claudeModel,
-        max_tokens: 1024,
+        max_tokens: isRpMode ? 1536 : 1024,
+        temperature: isRpMode ? 0.88 : undefined,
         stream: true,
         system: systemPrompt,
         messages: [...compacted.map(h => ({ role: h.role, content: h.text })), { role: "user", content: message }],
