@@ -47,13 +47,13 @@
         <div style="text-align:center;padding:40px 20px">
           <div style="font-size:48px;margin-bottom:12px">🏮</div>
           <h1 style="font-size:26px;font-weight:600;margin-bottom:6px;color:var(--text)">Keystone Desk</h1>
-          <p style="font-size:14px;color:var(--muted);max-width:340px;margin:0 auto 28px;line-height:1.5">Keystone answers here — ask anything. Lantern guides in the Explore game.</p>
+          <p style="font-size:14px;color:var(--muted);max-width:340px;margin:0 auto 28px;line-height:1.5">Ask anything. Speak or type. Keystone helps you get answers.</p>
           <div class="starter-chips">
-            <button class="starter-chip" onclick="fillPrompt('What open GitHub issues should I tackle first?')">Open issues?</button>
-            <button class="starter-chip" onclick="fillPrompt('Help me plan what to work on today')">Plan today</button>
-            <button class="starter-chip" onclick="fillPrompt('Summarize open pull requests that need review')">Review PRs</button>
-            <button class="starter-chip" onclick="fillPrompt('What is the current agent fleet status and what are they working on?')">Agent status</button>
-            <button class="starter-chip" onclick="fillAndSend('!explore')">Explore ↗</button>
+            <button class="starter-chip" onclick="fillPrompt('Help me understand what to do today')">What should I do?</button>
+            <button class="starter-chip" onclick="fillPrompt('What work needs to be done?')">What work is there?</button>
+            <button class="starter-chip" onclick="fillPrompt('Tell me a story')">Tell me a story</button>
+            <button class="starter-chip" onclick="fillPrompt('Help me learn something new')">Teach me</button>
+            <button class="starter-chip" onclick="fillAndSend('!explore')">Play game ↗</button>
           </div>
         </div>
       </div>
@@ -70,8 +70,8 @@
 
   </div><!-- /.app-main -->
 
-  <!-- Observer side panel -->
-  <aside class="observer-panel collapsed" id="observer-panel">
+  <!-- Observer side panel (hidden by default for simplicity) -->
+  <aside class="observer-panel collapsed hidden" id="observer-panel" style="display:none">
     <div class="observer-panel-header">
       <span class="observer-panel-title">◈ Observer</span>
       <button class="observer-panel-close" onclick="toggleObserver()" title="Close">×</button>
