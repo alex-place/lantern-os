@@ -256,14 +256,14 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
       const recentDreams = readRecentDreams(5);
       const provStart = Date.now();
 
-      // Check for !convergence command
+      // Check for !convergence / !convergance command
       let result;
-      if (message.toLowerCase().trim().startsWith("!convergence")) {
+      if (/^!convergan?ce/i.test(message.toLowerCase().trim())) {
         const requestedAgent = body.agent || "";
         const agent = requestedAgent
           ? require("../lib/dream-chat").AGENT_PERSONAS.find(a => a.id === requestedAgent) || selectAgent(message)
           : selectAgent(message);
-        result = await handleConvergenceCommand(recentDreams, agent);
+        result = await handleConvergenceCommand(recentDreams, agent, message);
       } else {
         result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "");
       }

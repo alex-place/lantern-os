@@ -214,7 +214,39 @@ function parseBangCommand(input) {
   return { name: m[1].toLowerCase(), args: (m[2] || "").trim() };
 }
 
-async function handleConvergenceCommand(recentDreams, agent) {
+async function handleConvergenceCommand(recentDreams, agent, rawMessage) {
+  const msg = String(rawMessage || "").trim();
+
+  // !convergance log an issue <title>
+  const issueMatch = msg.match(/^!convergan[ce]+\s+log\s+an?\s+issue\s+(.+)/i);
+  if (issueMatch) {
+    const title = issueMatch[1].trim();
+    const { execSync } = require("child_process");
+    try {
+      const out = execSync(
+        `gh issue create --repo alex-place/lantern-os --title ${JSON.stringify(title)} --body "Logged via !convergance loop"`,
+        { encoding: "utf-8", timeout: 15000 }
+      ).trim();
+      const url = (out.match(/https:\/\/github\.com\/\S+/) || [])[0] || out;
+      return {
+        reply: `✦ Issue logged: ${url}`,
+        agent: agent.name,
+        suggestions: ["View issues", "Run !convergance", "Continue"],
+        online: true,
+        source: "convergence",
+      };
+    } catch (err) {
+      return {
+        reply: `⚠ Could not log issue (gh CLI): ${err.message.split("\n")[0]}`,
+        agent: agent.name,
+        suggestions: [],
+        online: false,
+        source: "convergence",
+      };
+    }
+  }
+
+
   // !convergence: Local synthesis of recent dreams using LLM
   if (!recentDreams || recentDreams.length === 0) {
     return {
