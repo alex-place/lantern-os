@@ -1,633 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kalshi Dashboard — Lantern OS</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalshi Terminal — Progress Dashboard</title>
 <style>
-  :root {
-    --bg0: #0a0c10;
-    --bg1: #12151c;
-    --bg2: #1a1f29;
-    --border: #2a313d;
-    --text: #e8eaf0;
-    --text2: #a4adbf;
-    --text3: #7b8498;
-    --green: #00d4aa;
-    --red: #ff5f6d;
-    --amber: #f5a623;
-    --blue: #4a9eff;
-    --mono: 'IBM Plex Mono', ui-monospace, monospace;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    background: var(--bg0);
-    color: var(--text);
-    font-family: system-ui, -apple-system, sans-serif;
-    font-size: 14px;
-  }
-
-  .layout {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 60px 1fr auto;
-    height: 100vh;
-  }
-
-  /* ── Header ── */
-  .header {
-    background: var(--bg1);
-    border-bottom: 1px solid var(--border);
-    padding: 0 20px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
-
-  .logo {
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    font-size: 14px;
-  }
-
-  .spacer {
-    flex: 1;
-  }
-
-  .stat-group {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-  }
-
-  .stat {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-family: var(--mono);
-    font-size: 11px;
-  }
-
-  .stat-label {
-    color: var(--text3);
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .stat-value {
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  .stat-value.live {
-    color: var(--green);
-  }
-
-  .stat-value.positive {
-    color: var(--green);
-  }
-
-  .stat-value.negative {
-    color: var(--red);
-  }
-
-  .btn {
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 6px 12px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--bg2);
-    color: var(--text2);
-    cursor: pointer;
-    text-decoration: none;
-  }
-
-  .btn:hover {
-    border-color: var(--blue);
-    color: var(--blue);
-  }
-
-  /* ── Main content ── */
-  .main {
-    overflow-y: auto;
-    padding: 16px 20px;
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 16px;
-  }
-
-  .section-title {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text2);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 12px;
-    margin-top: 0;
-  }
-
-  /* ── Games grid ── */
-  .games-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 12px;
-  }
-
-  .game-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .game-card.high-conviction {
-    border-color: var(--green);
-    box-shadow: 0 0 0 1px var(--green) inset;
-  }
-
-  .game-card.signal {
-    border-color: var(--amber);
-  }
-
-  .game-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: start;
-    gap: 10px;
-  }
-
-  .game-title {
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text);
-  }
-
-  .game-time {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    white-space: nowrap;
-  }
-
-  .badges {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .badge {
-    font-family: var(--mono);
-    font-size: 9px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text2);
-  }
-
-  .badge.momentum {
-    background: rgba(0, 212, 170, 0.15);
-    color: var(--green);
-  }
-
-  .badge.liquid {
-    background: rgba(74, 158, 255, 0.15);
-    color: var(--blue);
-  }
-
-  .badge.urgent {
-    background: rgba(245, 166, 35, 0.15);
-    color: var(--amber);
-  }
-
-  .odds-display {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .odd {
-    background: var(--bg1);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 8px 10px;
-    text-align: center;
-  }
-
-  .odd-side {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text2);
-    margin-bottom: 2px;
-  }
-
-  .odd-price {
-    font-family: var(--mono);
-    font-weight: 600;
-    font-size: 16px;
-    color: var(--text);
-  }
-
-  .conviction-bar {
-    height: 4px;
-    background: var(--bg1);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .conviction-fill {
-    height: 100%;
-    border-radius: 2px;
-  }
-
-  .reason {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text2);
-    line-height: 1.3;
-  }
-
-  .action-buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .btn-small {
-    font-family: var(--mono);
-    font-size: 10px;
-    padding: 6px 10px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-    background: var(--bg1);
-    color: var(--text2);
-    cursor: pointer;
-  }
-
-  .btn-small.pass {
-    border-color: var(--red);
-    color: var(--red);
-  }
-
-  .btn-small.take {
-    border-color: var(--green);
-    color: var(--green);
-  }
-
-  /* ── Sidebar ── */
-  .sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .panel {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 12px;
-  }
-
-  .panel-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text2);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 10px;
-    margin-top: 0;
-  }
-
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .info-row:last-child {
-    border-bottom: none;
-  }
-
-  .info-label {
-    color: var(--text2);
-  }
-
-  .info-value {
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  .status-dot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    margin-right: 6px;
-  }
-
-  .status-dot.active {
-    background: var(--green);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .status-dot.inactive {
-    background: var(--text3);
-  }
-
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.4;
-    }
-  }
-
-  /* ── Footer ── */
-  .footer {
-    background: var(--bg1);
-    border-top: 1px solid var(--border);
-    padding: 10px 20px;
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text2);
-    text-align: center;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text2);
-  }
-
-  .empty-state p {
-    margin: 8px 0;
-  }
-
-  /* Loading skeleton */
-  .skeleton {
-    background: linear-gradient(90deg, var(--bg2) 25%, var(--bg1) 50%, var(--bg2) 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s infinite;
-  }
-
-  @keyframes loading {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Monaco', monospace; background: linear-gradient(135deg, #0a0c10 0%, #1a1d28 100%); color: #00ff00; padding: 20px; min-height: 100vh; }
+  .container { max-width: 1400px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #00ff00; padding-bottom: 20px; }
+  h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 0 0 10px #00ff00; }
+  .timestamp { color: #00cc00; font-size: 0.9em; }
+  .section { background: rgba(0, 20, 0, 0.8); border: 2px solid #00ff00; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .section h2 { font-size: 1.5em; margin-bottom: 20px; color: #00ff00; border-bottom: 2px solid #00cc00; padding-bottom: 10px; }
+  .phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+  .phase-card { background: rgba(0, 10, 0, 0.9); border: 1px solid #00cc00; border-radius: 6px; padding: 15px; }
+  .phase-name { color: #00ff00; font-weight: bold; margin-bottom: 8px; font-size: 1.05em; }
+  .phase-status { color: #00aa00; margin-bottom: 8px; font-weight: bold; }
+  .phase-desc { color: #00cc00; font-size: 0.9em; margin-bottom: 8px; line-height: 1.4; }
+  .training-loops { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+  .loop-card { background: rgba(0, 10, 0, 0.9); border: 1px solid #00cc00; border-radius: 6px; padding: 15px; }
+  .loop-card h3 { color: #00ff00; margin-bottom: 10px; }
+  .loop-interval { color: #00cc00; font-size: 0.9em; margin-bottom: 10px; }
+  .data-files { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+  .file-card { background: rgba(0, 10, 0, 0.9); border: 1px solid #00cc00; border-radius: 6px; padding: 15px; }
+  .file-card h3 { color: #00ff00; margin-bottom: 10px; font-size: 1em; }
+  .file-detail { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.9em; color: #00cc00; }
+  .goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+  .goal-item { background: rgba(0, 10, 0, 0.9); border: 1px solid #00cc00; border-radius: 6px; padding: 15px; }
+  .goal-target { color: #00ff00; font-weight: bold; margin-bottom: 8px; }
+  .goal-status { text-align: center; padding: 8px; border-radius: 4px; background: #00aa00; color: #000; font-weight: bold; font-size: 0.9em; }
+  .loading { text-align: center; padding: 40px 20px; color: #00ff00; font-size: 1.2em; }
+  .error { background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; color: #ff6666; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+  .refresh-btn { background: #00ff00; color: #000; border: none; padding: 12px 24px; border-radius: 6px; font-family: 'Monaco', monospace; font-weight: bold; cursor: pointer; margin: 20px auto; display: block; font-size: 1em; }
+  .refresh-btn:hover { background: #00cc00; box-shadow: 0 0 10px #00ff00; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+  .status-running { animation: pulse 1.5s ease-in-out infinite; }
 </style>
 </head>
 <body>
-<div class="layout">
-  <!-- Header -->
-  <div class="header">
-    <div class="logo">Kalshi Dashboard</div>
-    <div class="spacer"></div>
-    <div class="stat-group">
-      <div class="stat">
-        <div class="stat-label">Collector</div>
-        <div class="stat-value live" id="collectorStatus">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Markets</div>
-        <div class="stat-value" id="marketCount">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Signals</div>
-        <div class="stat-value" id="signalCount">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Snapshot</div>
-        <div class="stat-value" id="snapshotTime">—</div>
-      </div>
-      <a href="/kalshi-terminal.html" class="btn">Swipe Deck →</a>
-    </div>
+  <div class="container">
+    <header>
+      <h1>🧠 Kalshi Terminal — Progress Dashboard</h1>
+      <div class="timestamp" id="timestamp">Loading...</div>
+    </header>
+    <button class="refresh-btn" onclick="refreshDashboard()">🔄 Refresh</button>
+    <div id="content"></div>
   </div>
-
-  <!-- Main -->
-  <div class="main">
-    <div>
-      <h2 class="section-title">High-Conviction Games</h2>
-      <div class="games-grid" id="gamesGrid">
-        <div class="empty-state">Loading games...</div>
-      </div>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <!-- Collector Status -->
-      <div class="panel">
-        <h3 class="panel-title">Collector Status</h3>
-        <div class="info-row">
-          <span class="info-label">Status</span>
-          <span class="info-value"><span class="status-dot active" id="statusDot"></span><span id="runningStatus">—</span></span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Polling</span>
-          <span class="info-value" id="pollingRate">6s</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Uptime</span>
-          <span class="info-value" id="uptime">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Last Snapshot</span>
-          <span class="info-value" id="lastSnapshot">—</span>
-        </div>
-      </div>
-
-      <!-- Filters -->
-      <div class="panel">
-        <h3 class="panel-title">Signal Filters</h3>
-        <div class="info-row">
-          <span class="info-label">Momentum</span>
-          <span class="info-value">±3¢+</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Liquidity</span>
-          <span class="info-value">50+ vol</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Urgency</span>
-          <span class="info-value">≤24h</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Conviction</span>
-          <span class="info-value">≥65%</span>
-        </div>
-      </div>
-
-      <!-- Quick Stats -->
-      <div class="panel">
-        <h3 class="panel-title">Quick Stats</h3>
-        <div class="info-row">
-          <span class="info-label">Total Markets</span>
-          <span class="info-value" id="totalMarkets">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Avg Spread</span>
-          <span class="info-value" id="avgSpread">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">High Conv</span>
-          <span class="info-value" id="highConvCount">—</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    Auto-refreshing every 6 seconds · Tight-band snapshot collector · Practice mode (dry-run only)
-  </div>
-</div>
 
 <script>
-const API = '/api/trading/kalshi';
-let startTime = Date.now();
-let lastSnapshot = null;
-
-const fmtTime = (ms) => {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-};
-
-const fmtCountdown = (closeTime) => {
-  const ms = Date.parse(closeTime) - Date.now();
-  if (ms < 0) return 'expired';
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-};
-
-async function loadDashboard() {
-  try {
-    // Get collector status
-    const collectorRes = await fetch(`${API}/collector-status`);
-    const collector = await collectorRes.json();
-
-    document.getElementById('collectorStatus').textContent = collector.running ? 'LIVE' : 'OFFLINE';
-    document.getElementById('statusDot').className = `status-dot ${collector.running ? 'active' : 'inactive'}`;
-    document.getElementById('runningStatus').textContent = collector.running ? 'Running' : 'Stopped';
-
-    if (collector.lastSnapshot) {
-      lastSnapshot = collector.lastSnapshot;
-      document.getElementById('marketCount').textContent = collector.lastSnapshot.marketCount;
-      document.getElementById('snapshotTime').textContent = new Date(collector.lastSnapshot.generatedAt).toLocaleTimeString();
-      document.getElementById('lastSnapshot').textContent = new Date(collector.lastSnapshot.generatedAt).toLocaleTimeString();
-      document.getElementById('uptime').textContent = fmtTime(Date.now() - startTime);
+  async function refreshDashboard() {
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="loading">⏳ Fetching...</div>';
+    try {
+      const response = await fetch('/api/trading/kalshi/dashboard/progress');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      renderDashboard(data);
+    } catch (error) {
+      content.innerHTML = `<div class="error">❌ ${error.message}</div>`;
     }
-
-    // Get suggestions for high-conviction games
-    const suggestRes = await fetch(`${API}/suggestions?limit=60`);
-    const suggestions = await suggestRes.json();
-
-    // Filter: high conviction, momentum, liquidity, urgency
-    const filtered = (suggestions.cards || [])
-      .filter((c) => c.kind === 'entry' && c.conviction >= 50)
-      .sort((a, b) => b.conviction - a.conviction)
-      .slice(0, 12); // Top 12
-
-    document.getElementById('signalCount').textContent = filtered.length;
-    document.getElementById('totalMarkets').textContent = suggestions.cards?.length || 0;
-    document.getElementById('highConvCount').textContent = (suggestions.cards || []).filter((c) => c.conviction >= 65).length;
-
-    // Calc avg spread
-    if (suggestions.cards && suggestions.cards.length > 0) {
-      const spreads = suggestions.cards
-        .map((c) => {
-          const spread = Math.abs((c.yesCents || 0) - (c.noCents || 0));
-          return spread;
-        })
-        .filter((s) => s > 0);
-      const avgSpread = spreads.length > 0 ? (spreads.reduce((a, b) => a + b) / spreads.length).toFixed(1) : '—';
-      document.getElementById('avgSpread').textContent = `${avgSpread}¢`;
-    }
-
-    // Render game cards
-    const grid = document.getElementById('gamesGrid');
-    if (filtered.length === 0) {
-      grid.innerHTML = '<div class="empty-state"><p>No high-conviction signals right now.</p><p style="font-size:12px;color:var(--text3)">Waiting for momentum ≥3¢, conviction ≥65%</p></div>';
-      return;
-    }
-
-    grid.innerHTML = filtered
-      .map((card) => {
-        const yesPct = card.yesPct || 50;
-        const noPct = 100 - yesPct;
-        const momentum = Math.abs(parseInt(card.yesCents) - 50);
-        const hasLiquidity = true; // assume from collector
-        const minsClose = card.minsToClose;
-        const isUrgent = minsClose < 1440;
-
-        return `
-          <div class="game-card high-conviction">
-            <div class="game-header">
-              <div>
-                <div class="game-title">${card.title}</div>
-              </div>
-              <div class="game-time">${fmtCountdown(card.close)}</div>
-            </div>
-            <div class="badges">
-              ${momentum >= 3 ? `<span class="badge momentum">→ ${momentum}¢</span>` : ''}
-              ${hasLiquidity ? `<span class="badge liquid">liquid</span>` : ''}
-              ${isUrgent ? `<span class="badge urgent">≤24h</span>` : ''}
-            </div>
-            <div class="odds-display">
-              <div class="odd">
-                <div class="odd-side">${card.yesLabel}</div>
-                <div class="odd-price">${card.yesCents}¢</div>
-              </div>
-              <div class="odd">
-                <div class="odd-side">${card.noLabel}</div>
-                <div class="odd-price">${card.noCents}¢</div>
-              </div>
-            </div>
-            <div class="conviction-bar">
-              <div class="conviction-fill" style="width:${card.conviction}%;background:${card.conviction >= 75 ? 'var(--green)' : card.conviction >= 65 ? 'var(--amber)' : 'var(--blue)'}"></div>
-            </div>
-            <div class="reason">${card.reason}</div>
-            <div class="action-buttons">
-              <button class="btn-small pass">← Pass</button>
-              <button class="btn-small take">Take →</button>
-            </div>
-          </div>
-        `;
-      })
-      .join('');
-  } catch (error) {
-    console.error('Dashboard load error:', error);
-    document.getElementById('gamesGrid').innerHTML = `<div class="empty-state"><p>Error loading dashboard</p></div>`;
   }
-}
-
-// Initial load
-loadDashboard();
-
-// Refresh every 6 seconds
-setInterval(loadDashboard, 6000);
-
-// Update uptime display
-setInterval(() => {
-  document.getElementById('uptime').textContent = fmtTime(Date.now() - startTime);
-}, 1000);
+  function renderDashboard(report) {
+    const html = `
+      <section class="section">
+        <h2>📊 5 Phases — All Complete ✅</h2>
+        <div class="phases">
+          ${Object.values(report.phases).map(p => `
+            <div class="phase-card">
+              <div class="phase-name">${p.name}</div>
+              <div class="phase-status">${p.status}</div>
+              <div class="phase-desc">${p.description}</div>
+              <div style="color: #ffff00; font-size: 0.9em; margin-top: 10px;">Impact: ${p.impact}</div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+      <section class="section">
+        <h2>🔄 4 Parallel Training Loops</h2>
+        <div class="training-loops">
+          ${Object.values(report.trainingLoops).map(l => `
+            <div class="loop-card">
+              <h3>${l.name}</h3>
+              <div class="loop-interval">⏱️ ${l.interval}</div>
+              <div style="color: #00cc00; font-size: 0.85em; margin-bottom: 10px;">${l.purpose}</div>
+              <div style="color: #ffff00;">→ ${l.dataTarget}</div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+      <section class="section">
+        <h2>📁 Data Files</h2>
+        <div class="data-files">
+          ${Object.values(report.dataFiles).map(f => `
+            <div class="file-card">
+              <h3>${f.file}</h3>
+              <div style="color: #00cc00; font-size: 0.85em; margin-bottom: 10px;">${f.purpose}</div>
+              <div class="file-detail">
+                <span>Size:</span>
+                <span style="color: #ffff00;">${f.size}</span>
+              </div>
+              <div class="file-detail">
+                <span>Records:</span>
+                <span style="color: #ffff00;">${f.records || f.stats?.markets || 'N/A'}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+      <section class="section">
+        <h2>🎯 Core Goals</h2>
+        <div class="goals">
+          ${Object.values(report.goals).map(g => `
+            <div class="goal-item">
+              <div class="goal-target">${g.target}</div>
+              <div style="color: #00cc00; font-size: 0.9em; margin-bottom: 8px;">${g.approach}</div>
+              <div class="goal-status">${g.status}</div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    `;
+    document.getElementById('content').innerHTML = html;
+    document.getElementById('timestamp').textContent = `Generated: ${new Date().toLocaleString()}`;
+  }
+  refreshDashboard();
+  setInterval(refreshDashboard, 30000);
 </script>
 </body>
 </html>
