@@ -271,7 +271,29 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     document.getElementById("status-line").textContent =
       "Loop " + ((sceneData.loop_count ?? 0) + 1) + " · Stage " +
       (sceneData.stage_index + 1) + "/" + (sceneData.stage_count || 7) + arch;
+    updateStageBreadcrumb(sceneData.stage_index, sceneData.loop_count ?? 0);
   }
+}
+
+// Stage breadcrumb — 7 dots showing current position + loop counter
+const STAGE_LABELS = ["Garden","Present","Future","XP","Xenon","Sigil","Fog"];
+function updateStageBreadcrumb(stageIndex, loopCount) {
+  const bar = document.getElementById("stage-breadcrumb");
+  const crumbs = document.getElementById("stage-crumbs");
+  const badge = document.getElementById("stage-loop-badge");
+  if (!bar || !crumbs) return;
+
+  bar.style.display = "flex";
+  badge.textContent = "Loop " + (loopCount + 1);
+
+  crumbs.innerHTML = STAGE_LABELS.map((label, i) => {
+    const active = i === stageIndex;
+    const visited = i < stageIndex || (loopCount > 0 && i > stageIndex);
+    const color = active ? "var(--accent)" : visited ? "var(--muted)" : "var(--border)";
+    const weight = active ? "600" : "400";
+    return (i > 0 ? `<span style="color:var(--border)">›</span>` : "") +
+      `<span style="color:${color};font-weight:${weight};cursor:default" title="Stage ${i+1}: ${label}">${label}</span>`;
+  }).join("");
 }
 
 // ── Async scene text refresh — unique LLM take on each visit ─────
