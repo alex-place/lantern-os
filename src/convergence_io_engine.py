@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 import urllib.request
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -230,6 +230,36 @@ class SlotManager:
                 data["slots"][slot_id]["status"] = "released"
                 data["slots"][slot_id]["released_at"] = _now()
                 self._write(data)
+            # PR-003 fix: flush immediately on release so state survives restart
+            if self._dirty and self._cache is not None:
+                try:
+                    with open(self.path, "w", encoding="utf-8") as f:
+                        json.dump(self._cache, f, indent=2)
+                    self._dirty = False
+                except Exception:
+                    pass
+
+    def purge_released(self, older_than_hours: float = 24.0) -> int:
+        """TD-003 fix: remove released slots older than `older_than_hours`. Returns count removed."""
+        cutoff_s = older_than_hours * 3600
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            data = self._read()
+            before = len(data.get("slots", {}))
+            data["slots"] = {
+                sid: info
+                for sid, info in data.get("slots", {}).items()
+                if not (
+                    info.get("status") == "released"
+                    and _parse_timestamp(info.get("released_at"))
+                    and (now - _parse_timestamp(info["released_at"])).total_seconds() > cutoff_s
+                )
+            }
+            removed = before - len(data["slots"])
+            if removed > 0:
+                self._write(data)
+                self.flush()
+            return removed
 
     def active_count(self, slot_type: str) -> int:
         data = self._read()
@@ -788,10 +818,31 @@ class ConvergenceLoop:
             if dropped_at:
                 break
 
-            # Early termination: all phases passed → no need for more ticks
+            # Early termination: all phases passed → run external IO phases then exit
             if not any_fail:
                 consecutive_clean_ticks += 1
                 if consecutive_clean_ticks >= 2 or tick >= adaptive_ticks - 1:
+                    # CR-001 fix: on a true early exit (not the natural final tick),
+                    # run external IO phases so receipts are written and promotion
+                    # decisions are made. On the final tick they already ran above.
+                    if tick < max_ticks - 1:
+                        external_tick: List[PhaseResult] = []
+                        for num, key, desc in self.PHASES:
+                            if key not in external_io_phases:
+                                continue
+                            start = time.time()
+                            method = getattr(self, f"_phase_{key}")
+                            try:
+                                result = method()
+                            except Exception as exc:
+                                result = PhaseResult(
+                                    phase=num, name=key, status="fail",
+                                    issues_found=[str(exc)],
+                                    elapsed_ms=round((time.time() - start) * 1000, 2),
+                                )
+                            external_tick.append(result)
+                        audit.extend(external_tick)
+                        self.results = tick_results + external_tick
                     break
             else:
                 consecutive_clean_ticks = 0
@@ -1199,12 +1250,21 @@ class ConvergenceLoop:
         receipt_dir = self.repo_root / "manifests" / "evidence"
         receipt_dir.mkdir(parents=True, exist_ok=True)
         receipt_path = receipt_dir / f"convergence-{_now().replace(':', '-').replace('+', '-')}.json"
+        evidence: Dict[str, Any] = {}
         try:
             with open(receipt_path, "w", encoding="utf-8") as f:
                 json.dump({"phases": [self._phase_to_dict(r) for r in self.results]}, f, indent=2)
+            evidence["receipt"] = str(receipt_path)
         except Exception as exc:
             return PhaseResult(19, "record_evidence", "fail", [str(exc)])
-        return PhaseResult(19, "record_evidence", "pass", evidence={"receipt": str(receipt_path)})
+        # TD-003 / PR-003: prune stale released slots while we have disk access
+        try:
+            slots = SlotManager()
+            purged = slots.purge_released(older_than_hours=24.0)
+            evidence["slots_purged"] = purged
+        except Exception:
+            pass
+        return PhaseResult(19, "record_evidence", "pass", evidence=evidence)
 
     def _phase_promote_or_hold(self) -> PhaseResult:
         ready = all(r.status == "pass" for r in self.results)
@@ -1230,7 +1290,7 @@ class TesseractEngine:
         self._circuit_cache: Dict[str, CircuitBreaker] = {}
         self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tesseract")
         self._cache_manager: Any = None
-        self._persona_cache: Dict[str, str] = {}
+        self._persona_cache: OrderedDict = OrderedDict()  # true LRU
         self._persona_cache_max = 1000
         # Backpressure: reject requests when too many are in-flight
         self._queue_depth: int = 0
@@ -1241,6 +1301,16 @@ class TesseractEngine:
                 self._cache_manager = CsfCacheManager()
             except Exception:
                 pass
+
+    def close(self) -> None:
+        """PR-004 fix: shut down the thread pool cleanly. Call when done with the engine."""
+        self._executor.shutdown(wait=False)
+
+    def __del__(self) -> None:
+        try:
+            self._executor.shutdown(wait=False)
+        except Exception:
+            pass
 
     def _init_cells(self) -> None:
         for layer in Layer:
@@ -1419,10 +1489,13 @@ class TesseractEngine:
         elif any(k in lower for k in ("wish", "protect", "founder", "home", "return")):
             persona = "founder"
         ctx.persona = persona
-        # LRU-style cache eviction
-        if len(self._persona_cache) >= self._persona_cache_max:
-            self._persona_cache.clear()
-        self._persona_cache[preview] = persona
+        # True LRU eviction via OrderedDict
+        if preview in self._persona_cache:
+            self._persona_cache.move_to_end(preview)
+        else:
+            self._persona_cache[preview] = persona
+            if len(self._persona_cache) > self._persona_cache_max:
+                self._persona_cache.popitem(last=False)  # evict oldest
         return ctx
 
     def _surface_load_dreams(self, ctx: ConvergenceContext) -> ConvergenceContext:
