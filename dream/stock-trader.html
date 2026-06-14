@@ -14,6 +14,10 @@
     --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:#4a9eff;
     --purple:#a78bfa;--gold:#f5a623;
     --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+    /* TradingView-style chart contrast */
+    --tv-text-primary:#ffffff;--tv-text-secondary:#d1d4dc;
+    --tv-grid:rgba(255,255,255,.06);--tv-axis:rgba(255,255,255,.65);
+    --tv-candle-up:#26a69a;--tv-candle-down:#ef5350;
   }
   html,body{height:100%;background:var(--bg0);color:var(--text0);font-family:var(--sans);font-size:13px;overflow-x:hidden}
   /* ── Layout ── */
@@ -21,7 +25,7 @@
   .header{grid-column:1/-1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
   .sidebar{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;padding:8px 0}
   .main{overflow-y:auto;padding:12px;background:var(--bg0)}
-  .footer{grid-column:1/-1;background:var(--bg1);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 260px;gap:1px;max-height:180px}
+  .footer{grid-column:1/-1;background:var(--bg1);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 260px;gap:8px;padding:8px;max-height:196px;box-sizing:border-box}
   /* ── Header ── */
   .logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green);letter-spacing:.08em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
@@ -33,11 +37,12 @@
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .nav-link{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;margin-left:auto}
-  .nav-link:hover{color:var(--text0)}
+  .nav-link{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;margin-left:auto;transition:background .15s,color .15s}
+  .nav-link:hover{color:var(--text0);background:var(--bg3)}
   /* ── Sidebar watchlist ── */
-  .wl-item{padding:6px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .1s}
+  .wl-item{padding:6px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s}
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
+  .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
   .wl-sym{font-family:var(--mono);font-size:11px;font-weight:600}
   .wl-row{display:flex;justify-content:space-between;align-items:center}
   .wl-price{font-family:var(--mono);font-size:10px;color:var(--text1)}
@@ -52,7 +57,8 @@
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-  .card{background:var(--bg1);border:1px solid var(--border);border-radius:6px;overflow:hidden;transition:border-color .15s}
+  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s}
+  .card:hover{border-color:rgba(255,255,255,.12)}
   .card.state-open{border-color:rgba(0,212,170,.35);grid-column:span 2}
   .card.state-watching{border-color:rgba(74,158,255,.25)}
   .card.state-quiet{opacity:.75}
@@ -63,6 +69,13 @@
   .state-open .card-state{background:rgba(0,212,170,.12);color:var(--green)}
   .state-watching .card-state{background:rgba(74,158,255,.12);color:var(--blue)}
   .state-quiet .card-state{background:rgba(92,99,112,.1);color:var(--text2)}
+  /* Live market-regime badge (shown in place of QUIET when the market is
+     actually moving — see marketRegime() / regimeBadgeInfo()) */
+  .card-state.regime-bullish{background:rgba(0,212,170,.12);color:var(--green)}
+  .card-state.regime-bearish{background:rgba(255,95,109,.12);color:var(--red)}
+  .card-state.regime-breakout{background:rgba(245,166,35,.18);color:var(--amber)}
+  .card-state.regime-volatile{background:rgba(245,166,35,.12);color:var(--amber)}
+  .card-state.regime-trending{background:rgba(74,158,255,.12);color:var(--blue)}
   /* Confidence badge */
   .conf-badge{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;display:flex;gap:6px;flex-wrap:wrap;margin:0 14px 6px}
   .conf-badge.bull{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);color:var(--green)}
@@ -78,7 +91,7 @@
   .card.state-quiet .zone-ladder{height:130px}
   /* Order ticket trigger row */
   .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
-  .order-ticket button{flex:1;font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em}
+  .order-ticket button{flex:1;font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
   .btn-buy{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.3)}
   .btn-buy:hover{background:rgba(0,212,170,.22)}
   .btn-sell{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.3)}
@@ -90,13 +103,13 @@
   .chart-canvas{position:absolute;inset:0;width:100%;height:100%}
   .ladder-overlay{position:absolute;left:0;right:52px;top:0;bottom:16px}
   /* Header chart controls */
-  .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
-  .chart-ctrl:hover{color:var(--text0)}
+  .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
   /* Chart range presets (1D/5D/1M) */
   .range-group{display:flex;gap:2px}
-  .range-btn{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
-  .range-btn:hover{color:var(--text0)}
-  .range-btn.active{background:var(--bg3);color:var(--text0);border-color:var(--text1)}
+  .range-btn{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  .range-btn:hover{color:var(--text0);background:var(--bg3)}
+  .range-btn.active{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.18);color:#fff}
   /* Fullscreen ticker chart */
   .fs-bg{position:fixed;inset:0;background:rgba(5,6,8,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
   .fs-bg.hidden{display:none}
@@ -152,8 +165,8 @@
   .ot-submit.sell{background:rgba(255,95,109,.15);color:var(--red);border-color:var(--red)}
   .ot-submit.sell:hover{background:rgba(255,95,109,.28)}
   /* ── Footer panels ── */
-  .fpanel{padding:10px 14px;overflow-y:auto;max-height:180px}
-  .panel-title{font-family:var(--mono);font-size:9px;color:var(--text2);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
+  .fpanel{padding:10px 14px;overflow-y:auto;max-height:180px;background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px}
+  .panel-title{font-family:var(--mono);font-size:9px;color:var(--tv-text-secondary);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
   /* Agent log */
   .log-item{font-family:var(--mono);font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);display:grid;grid-template-columns:45px 55px 1fr;gap:4px;align-items:start}
   .log-time{color:var(--text2)}.log-agent{font-weight:600}
@@ -163,7 +176,7 @@
   .order-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:9px;border-bottom:1px solid rgba(255,255,255,.03)}
   /* Market status */
   .mkt-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:10px}
-  .mkt-label{color:var(--text2)}.mkt-val{color:var(--text0)}
+  .mkt-label{color:var(--tv-text-secondary)}.mkt-val{color:var(--tv-text-primary)}
 </style>
 </head>
 <body>
@@ -363,6 +376,14 @@ const TICK_SIZE = 0.01;
 const AXIS_W = 52, AXIS_H = 16;
 const MIN_VISIBLE_BARS = 10;
 
+// TradingView-style chart colors (canvas can't read CSS custom properties,
+// so these mirror the --tv-* vars defined in :root).
+const CHART_AXIS_FONT   = '10px "IBM Plex Mono",monospace';
+const CHART_AXIS_COLOR  = 'rgba(255,255,255,.65)';
+const CHART_GRID_COLOR  = 'rgba(255,255,255,.06)';
+const CHART_CANDLE_UP   = '#26a69a';
+const CHART_CANDLE_DOWN = '#ef5350';
+
 // Per-chart zoom/pan view, keyed by the overlay element id (e.g.
 // 'overlay-SPY' or 'overlay-fs' for the fullscreen chart). `visibleBars`/
 // `barOffset` control the horizontal (time) window into barsData; `yMin`/
@@ -387,6 +408,104 @@ function tickerState(d){
   const c = d.last_signal?.confidence || d.confidence || 0;
   return c >= 45 ? 'watching' : 'quiet';
 }
+
+// ── Live market-regime classification ───────────────────────────────────────
+// Cards with no open position and no high-confidence AI signal fall through
+// to tickerState()==='quiet'. Rather than show a permanently-static "QUIET"
+// label, derive a live regime from the bars/price data that already streams
+// into the dashboard (loadBars/loadWatchlistPrices), so the badge reflects
+// what the market is actually doing for each symbol right now.
+const ATR_VOLATILE_THRESHOLD = 1.5;   // ATR% of price
+const TREND_STRENGTH_THRESHOLD = 70;  // % of recent bars moving one direction
+function marketRegime(ticker){
+  const bars = barsData[ticker] || [];
+  const wl = wlPrices.find(t => t.ticker === ticker);
+  const priceChangePercent = wl ? (wl.chg_pct || 0) : 0;
+
+  if(bars.length < 5){
+    return { state:'quiet', priceChangePercent, volumeRatio:0, atrPercent:0, trendStrength:0, momentum:0 };
+  }
+
+  const closes = bars.map(b => b.close);
+  const last = closes[closes.length-1];
+
+  // Momentum: % change over the last few bars
+  const lookback = Math.min(5, closes.length-1);
+  const momentum = ((last - closes[closes.length-1-lookback]) / closes[closes.length-1-lookback]) * 100;
+
+  // ATR% — average true range over recent bars, as a % of price
+  const trCount = Math.min(14, bars.length-1);
+  let trSum = 0;
+  for(let i=bars.length-trCount; i<bars.length; i++){
+    const b = bars[i], prev = bars[i-1];
+    trSum += Math.max(b.high-b.low, Math.abs(b.high-prev.close), Math.abs(b.low-prev.close));
+  }
+  const atrPercent = (trSum/trCount) / last * 100;
+
+  // Volume ratio — most recent bar vs. the average of prior bars
+  const volCount = Math.min(20, bars.length-1);
+  const recentVol = bars[bars.length-1].volume || 0;
+  let volSum = 0;
+  for(let i=bars.length-1-volCount; i<bars.length-1; i++) volSum += bars[i].volume || 0;
+  const avgVol = volCount > 0 ? volSum/volCount : 0;
+  const volumeRatio = avgVol > 0 ? recentVol/avgVol : 1;
+
+  // Trend strength — % of recent bars moving in the dominant direction
+  const dirCount = Math.min(10, bars.length-1);
+  let up=0, down=0;
+  for(let i=bars.length-dirCount; i<bars.length; i++){
+    if(bars[i].close > bars[i-1].close) up++;
+    else if(bars[i].close < bars[i-1].close) down++;
+  }
+  const trendStrength = Math.max(up,down)/dirCount*100;
+
+  let state;
+  if(volumeRatio > 1.8 && Math.abs(priceChangePercent) > 2)       state = 'breakout';
+  else if(priceChangePercent > 1 && momentum > 0)                  state = 'bullish';
+  else if(priceChangePercent < -1 && momentum < 0)                 state = 'bearish';
+  else if(atrPercent > ATR_VOLATILE_THRESHOLD)                     state = 'volatile';
+  else if(trendStrength > TREND_STRENGTH_THRESHOLD)                state = 'trending';
+  else                                                              state = 'quiet';
+
+  return { state, priceChangePercent, volumeRatio, atrPercent, trendStrength, momentum };
+}
+
+// Badge text/class for a card's state pill. OPEN/WATCHING stay as-is;
+// QUIET is replaced by the live marketRegime() so the label actually moves
+// (QUIET -> BULLISH -> BREAKOUT -> VOLATILE -> ... ) without a page refresh.
+const _lastRegime = {};
+function regimeBadgeInfo(ticker, state){
+  if(state !== 'quiet') return { text: state.toUpperCase(), cls: '' };
+  const regime = marketRegime(ticker);
+  if(_lastRegime[ticker] !== regime.state){
+    _lastRegime[ticker] = regime.state;
+    console.debug('[marketState]', {
+      symbol: ticker, state: regime.state,
+      priceChangePercent: regime.priceChangePercent,
+      volumeRatio: regime.volumeRatio,
+      atrPercent: regime.atrPercent,
+      trendStrength: regime.trendStrength,
+      momentum: regime.momentum,
+    });
+  }
+  return { text: regime.state.toUpperCase(), cls: regime.state !== 'quiet' ? ' regime-'+regime.state : '' };
+}
+
+// Refresh just the state-pill text/class for every watchlist ticker —
+// called from the price/bars pollers so the regime badge updates live
+// without waiting for the full 30s card rebuild.
+function updateRegimeBadges(){
+  wlPrices.forEach(t => {
+    const d = zonesData[t.ticker] || {};
+    if(tickerState(d) !== 'quiet') return;
+    const stateEl = document.getElementById('state-'+t.ticker);
+    if(!stateEl) return;
+    const badge = regimeBadgeInfo(t.ticker, 'quiet');
+    stateEl.textContent = badge.text;
+    stateEl.className = 'card-state'+badge.cls;
+  });
+}
+
 function getCurrentPrice(ticker){
   const wp = wlPrices.find(t => t.ticker === ticker);
   return wp ? wp.price : 0;
@@ -434,18 +553,18 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const y   = p => ((rMax-p)/rng)*ph;
 
   // Price axis: faint gridlines across the plot + labels in the right gutter
-  ctx.font = '9px "IBM Plex Mono",monospace';
+  ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
   const PRICE_TICKS = 4;
   for(let i=0;i<=PRICE_TICKS;i++){
     const price = rMin + rng*i/PRICE_TICKS;
     const yy = Math.round(y(price)) + 0.5;
-    ctx.strokeStyle = 'rgba(255,255,255,.05)';
+    ctx.strokeStyle = CHART_GRID_COLOR;
     ctx.beginPath();
     ctx.moveTo(0, yy);
     ctx.lineTo(pw, yy);
     ctx.stroke();
-    ctx.fillStyle = '#5c6370';
+    ctx.fillStyle = CHART_AXIS_COLOR;
     ctx.textAlign = 'left';
     ctx.textBaseline = i===0 ? 'top' : (i===PRICE_TICKS ? 'bottom' : 'middle');
     ctx.fillText(fmt(price, price>=100?2:4), pw+4, yy);
@@ -458,7 +577,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // first/last ticks are edge-aligned (left/right) instead of centered so
     // their labels stay within the plot area and never bleed into the price
     // gutter on the right or get clipped on the left.
-    ctx.fillStyle = '#5c6370';
+    ctx.fillStyle = CHART_AXIS_COLOR;
     ctx.textBaseline = 'bottom';
     const TIME_TICKS = 4;
     const firstD = new Date(String(bars[0].timestamp).replace(' ','T'));
@@ -478,7 +597,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const b = bars[i];
         const x = i*slotW + slotW/2;
         const up = b.close >= b.open;
-        const color = up ? '#00d4aa' : '#ff5f6d';
+        const color = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
         ctx.strokeStyle = color;
         ctx.fillStyle   = color;
         ctx.lineWidth   = 1;
@@ -663,7 +782,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   // Timeframe badge (top-left, always above the price line/label)
   if(chartTimeframe){
     html += `<div style="position:absolute;left:4px;top:2px;z-index:7;
-      font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:rgba(154,160,173,.9);
+      font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--tv-axis);
       background:var(--bg1);padding:1px 4px;border-radius:2px;pointer-events:none;">${chartTimeframe.toUpperCase()}</div>`;
   }
 
@@ -707,6 +826,8 @@ function buildCard(ticker, d){
     if(near) watchHtml = `<div style="font-family:var(--mono);font-size:8px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
   }
 
+  const badge = regimeBadgeInfo(ticker, state);
+
   return `
 <div class="card state-${state}" id="card-${ticker}">
   <div class="card-header">
@@ -715,7 +836,7 @@ function buildCard(ticker, d){
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span class="card-price" id="cp-${ticker}">—</span>
-      <span class="card-state" id="state-${ticker}">${state.toUpperCase()}</span>
+      <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
   <div id="meta-${ticker}">${confHtml}${watchHtml}</div>
@@ -752,7 +873,11 @@ function updateCardMeta(ticker, d){
   }
 
   const stateEl = document.getElementById('state-'+ticker);
-  if(stateEl) stateEl.textContent = state.toUpperCase();
+  if(stateEl){
+    const badge = regimeBadgeInfo(ticker, state);
+    stateEl.textContent = badge.text;
+    stateEl.className = 'card-state'+badge.cls;
+  }
 
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
@@ -1210,6 +1335,7 @@ async function loadZones(){
       const el = document.getElementById('cp-'+t.ticker);
       if(el) el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
     });
+    updateRegimeBadges();
     renderFullscreenChart();
   }catch(e){ console.warn('zones load failed',e); }
   finally{ zonesLoading = false; }
@@ -1228,6 +1354,7 @@ async function loadWatchlistPrices(){
       if(el) el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
       renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
     });
+    updateRegimeBadges();
     renderFullscreenChart();
   }catch(e){}
   finally{ pricesLoading = false; }
@@ -1246,6 +1373,7 @@ async function loadBars(){
       barsData[ticker] = bars[ticker].bars || [];
     }
     wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
+    updateRegimeBadges();
     renderFullscreenChart();
   }catch(e){ console.warn('bars load failed', e); }
   finally{ barsLoading = false; }
