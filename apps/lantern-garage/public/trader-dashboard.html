@@ -356,6 +356,25 @@ let fullscreenTicker = null;
 let otTicker = null, otSide = 'buy', otOrderType = 'market';
 const TICK_SIZE = 0.01;
 
+// ── Chart layout + zoom/pan state ────────────────────────────────────────────
+// AXIS_W: right-gutter width reserved for price labels. AXIS_H: bottom-strip
+// height reserved for time labels. Shared by renderChart() and the
+// wheel/drag handlers so hit-testing matches what's actually drawn.
+const AXIS_W = 52, AXIS_H = 16;
+const MIN_VISIBLE_BARS = 10;
+
+// Per-chart zoom/pan view, keyed by the overlay element id (e.g.
+// 'overlay-SPY' or 'overlay-fs' for the fullscreen chart). `visibleBars`/
+// `barOffset` control the horizontal (time) window into barsData; `yMin`/
+// `yMax` override the auto price range when set. `lastRMin`/`lastRMax`
+// record the most recently rendered price range so wheel/drag handlers can
+// map cursor position to a price without recomputing the auto range.
+const chartView = {};
+function getChartView(key){
+  if(!chartView[key]) chartView[key] = { barOffset:0, visibleBars:null, yMin:null, yMax:null, lastRMin:null, lastRMax:null };
+  return chartView[key];
+}
+
 // Range presets map onto the existing bar-resolution timeframes: 1D shows
 // today's session at 5m bars, 5D at hourly bars, 1M at daily bars.
 const RANGE_TIMEFRAMES = { '1D': '5m', '5D': '1h', '1M': '1d' };
@@ -409,7 +428,6 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   ctx.clearRect(0,0,w,h);
   if(rMax<=rMin) return;
 
-  const AXIS_W = 52, AXIS_H = 16;
   const pw  = Math.max(0, w - AXIS_W);
   const ph  = Math.max(0, h - AXIS_H);
   const rng = rMax - rMin;
@@ -436,9 +454,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   if(bars && bars.length >= 2){
     const n = bars.length, slotW = pw/n;
 
-    // Time axis: a few evenly-spaced bar timestamps along the bottom
+    // Time axis: a few evenly-spaced bar timestamps along the bottom. The
+    // first/last ticks are edge-aligned (left/right) instead of centered so
+    // their labels stay within the plot area and never bleed into the price
+    // gutter on the right or get clipped on the left.
     ctx.fillStyle = '#5c6370';
-    ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const TIME_TICKS = 4;
     const firstD = new Date(String(bars[0].timestamp).replace(' ','T'));
@@ -448,7 +468,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       const idx = Math.min(n-1, Math.round(i*(n-1)/TIME_TICKS));
       const label = formatBarTime(bars[idx].timestamp, timeframe, multiDay);
       if(!label) continue;
-      ctx.fillText(label, idx*slotW + slotW/2, h-2);
+      if(i===0){ ctx.textAlign='left'; ctx.fillText(label, 2, h-2); }
+      else if(i===TIME_TICKS){ ctx.textAlign='right'; ctx.fillText(label, pw-2, h-2); }
+      else { ctx.textAlign='center'; ctx.fillText(label, idx*slotW + slotW/2, h-2); }
     }
 
     if(type==='candle'){
@@ -491,23 +513,30 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
 }
 
 const _ladderSig = {};
-function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl){
+function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl, force){
   const canvas  = canvasEl  || document.getElementById('chart-'+ticker);
   const overlay = overlayEl || document.getElementById('overlay-'+ticker);
   if(!overlay) return;
 
   // Skip the HTML + canvas rebuild when nothing that affects the rendered
   // output has changed — the 5s price poll re-renders all 16 ladders even
-  // when most prices haven't moved.
+  // when most prices haven't moved. `force` bypasses this for zoom/pan
+  // updates, which change chartView state without changing d/price/bars.
   const bars = barsData[ticker] || [];
   const sigKey = overlay.id || ticker;
-  const prevSig = _ladderSig[sigKey];
-  if(prevSig && prevSig.overlay===overlay && prevSig.price===currentPrice && prevSig.d===d
-     && prevSig.bars===bars && prevSig.chartType===chartType && prevSig.chartTimeframe===chartTimeframe){
-    return;
+  if(!force){
+    const prevSig = _ladderSig[sigKey];
+    if(prevSig && prevSig.overlay===overlay && prevSig.price===currentPrice && prevSig.d===d
+       && prevSig.bars===bars && prevSig.chartType===chartType && prevSig.chartTimeframe===chartTimeframe){
+      return;
+    }
   }
   _ladderSig[sigKey] = {overlay, price:currentPrice, d, bars, chartType, chartTimeframe};
 
+  _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, sigKey);
+}
+
+function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   // Price fallback chain
   let priceLabel = null;
   if(!currentPrice || currentPrice <= 0){
@@ -539,24 +568,44 @@ function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl){
   }
   const pos   = d.position;
   const zones = (d.zones||[]).slice(0,12);
+  const view  = getChartView(viewKey);
 
-  // Determine display range
-  let rMin = currentPrice * 0.97, rMax = currentPrice * 1.03;
-  if(pos){
-    if(pos.stop)  { rMin=Math.min(rMin,pos.stop*0.998);  rMax=Math.max(rMax,pos.stop*1.002);  }
-    if(pos.tp)    { rMin=Math.min(rMin,pos.tp*0.998);    rMax=Math.max(rMax,pos.tp*1.002);    }
-    if(pos.entry) { rMin=Math.min(rMin,pos.entry*0.998); rMax=Math.max(rMax,pos.entry*1.002); }
+  // Horizontal zoom/pan: slice to the visible bar window. visibleBars===null
+  // means "show everything" (the default, auto-fit view).
+  let viewBars = bars;
+  if(bars.length > 0 && view.visibleBars != null){
+    const vb = Math.max(MIN_VISIBLE_BARS, Math.min(view.visibleBars, bars.length));
+    const maxOffset = Math.max(0, bars.length - vb);
+    const offset = Math.min(Math.max(0, view.barOffset||0), maxOffset);
+    view.visibleBars = vb;
+    view.barOffset   = offset;
+    viewBars = bars.slice(bars.length-offset-vb, bars.length-offset);
   }
-  // Expand to include nearby zones
-  for(const z of zones){
-    if(z.mid){ if(z.mid>rMax*0.998) rMax=z.mid*1.002; if(z.mid<rMin*1.002) rMin=z.mid*0.998; }
-  }
-  // Expand to include the historical chart range
-  for(const b of bars){
-    if(b.high>rMax) rMax=b.high*1.002;
-    if(b.low <rMin) rMin=b.low *0.998;
+
+  // Determine display range — a manual yMin/yMax (from vertical zoom/pan)
+  // takes over completely; otherwise auto-fit to price/zones/visible bars.
+  let rMin, rMax;
+  if(view.yMin != null && view.yMax != null){
+    rMin = view.yMin; rMax = view.yMax;
+  } else {
+    rMin = currentPrice * 0.97; rMax = currentPrice * 1.03;
+    if(pos){
+      if(pos.stop)  { rMin=Math.min(rMin,pos.stop*0.998);  rMax=Math.max(rMax,pos.stop*1.002);  }
+      if(pos.tp)    { rMin=Math.min(rMin,pos.tp*0.998);    rMax=Math.max(rMax,pos.tp*1.002);    }
+      if(pos.entry) { rMin=Math.min(rMin,pos.entry*0.998); rMax=Math.max(rMax,pos.entry*1.002); }
+    }
+    // Expand to include nearby zones
+    for(const z of zones){
+      if(z.mid){ if(z.mid>rMax*0.998) rMax=z.mid*1.002; if(z.mid<rMin*1.002) rMin=z.mid*0.998; }
+    }
+    // Expand to include the visible chart range
+    for(const b of viewBars){
+      if(b.high>rMax) rMax=b.high*1.002;
+      if(b.low <rMin) rMin=b.low *0.998;
+    }
   }
   const rng = rMax - rMin; if(rng<=0) return;
+  view.lastRMin = rMin; view.lastRMax = rMax;
 
   const pct  = p => (((rMax-p)/rng)*100).toFixed(2)+'%';
   const hpct = (t,b) => (Math.max(0.3,(t-b)/rng*100)).toFixed(2)+'%';
@@ -619,7 +668,20 @@ function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl){
   }
 
   overlay.innerHTML = html;
-  if(canvas) renderChart(canvas, bars, rMin, rMax, chartType, chartTimeframe);
+  if(canvas) renderChart(canvas, viewBars, rMin, rMax, chartType, chartTimeframe);
+}
+
+// Re-render a ticker's card chart and (if it's currently shown) the
+// fullscreen chart, bypassing the _ladderSig memo — used after zoom/pan/
+// reset since those change chartView without changing d/price/bars.
+function renderTicker(ticker){
+  if(!ticker) return;
+  const card = document.getElementById('card-'+ticker);
+  if(card) renderZoneLadder(ticker, zonesData[ticker]||{}, getCurrentPrice(ticker), null, null, true);
+  if(fullscreenTicker===ticker){
+    renderZoneLadder(ticker, zonesData[ticker]||{}, getCurrentPrice(ticker),
+      document.getElementById('chart-fs'), document.getElementById('overlay-fs'), true);
+  }
 }
 
 // ── Build one ticker card ───────────────────────────────────────────────────
@@ -944,6 +1006,160 @@ document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(!document.getElementById('otBg').classList.contains('hidden')) closeOrderTicket();
   else closeFullscreenChart();
+});
+
+// ── Chart zoom/pan/reset interactions ────────────────────────────────────────
+// Resolve a .zone-ladder element to its data ticker, chartView key, and
+// canvas. 'ladder-fs' (the fullscreen chart) maps to fullscreenTicker.
+function _ladderTarget(ladderEl){
+  const suffix = ladderEl.id.slice('ladder-'.length);
+  const dataTicker = suffix==='fs' ? fullscreenTicker : suffix;
+  if(!dataTicker) return null;
+  const canvas  = document.getElementById('chart-'+suffix);
+  const overlay = document.getElementById('overlay-'+suffix);
+  if(!canvas || !overlay) return null;
+  return { dataTicker, viewKey: overlay.id, canvas };
+}
+
+// Wheel over the right price gutter zooms the price (vertical) scale; wheel
+// anywhere else over the chart zooms the time (horizontal) scale. Both keep
+// the value under the cursor fixed in place.
+document.addEventListener('wheel', function(e){
+  const ladder = e.target.closest('.zone-ladder');
+  if(!ladder) return;
+  const target = _ladderTarget(ladder);
+  if(!target) return;
+  const { dataTicker, viewKey, canvas } = target;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const w = rect.width, h = rect.height;
+  if(x<0||x>w||y<0||y>h) return;
+  e.preventDefault();
+
+  const view = getChartView(viewKey);
+  const factor = e.deltaY < 0 ? 0.85 : 1/0.85; // scroll up = zoom in
+
+  if(x >= w-AXIS_W){
+    // Vertical zoom on the price axis — taller/shorter candles
+    const ph = h-AXIS_H;
+    if(ph<=0 || view.lastRMin==null || view.lastRMax==null) return;
+    const rng = view.lastRMax - view.lastRMin;
+    const yFrac = Math.max(0,Math.min(1,y/ph));
+    const priceAtCursor = view.lastRMax - yFrac*rng;
+    const currentPrice = getCurrentPrice(dataTicker) || priceAtCursor;
+    const minRng = Math.max(currentPrice*0.001, 0.01);
+    const maxRng = Math.max(currentPrice*2, minRng*10);
+    const newRng = Math.max(minRng, Math.min(maxRng, rng*factor));
+    const newMax = priceAtCursor + yFrac*newRng;
+    view.yMin = newMax - newRng;
+    view.yMax = newMax;
+  } else {
+    // Horizontal zoom on the time axis (or main plot area) — wider/thinner
+    // candles, showing fewer/more bars of price history
+    const bars = barsData[dataTicker] || [];
+    const pw = w-AXIS_W;
+    const n = bars.length;
+    if(n < 2 || pw<=0) return;
+    const oldVisible = Math.min(n, view.visibleBars || n);
+    const oldOffset  = Math.min(Math.max(0, view.barOffset||0), n-oldVisible);
+    const xFrac = Math.max(0,Math.min(1,x/pw));
+    const oldStart  = n - oldOffset - oldVisible;
+    const cursorIdx = oldStart + xFrac*oldVisible;
+
+    const newVisible = Math.max(MIN_VISIBLE_BARS, Math.min(n, Math.round(oldVisible*factor)));
+    const newStart = Math.max(0, Math.min(n-newVisible, cursorIdx - xFrac*newVisible));
+
+    view.visibleBars = newVisible;
+    view.barOffset   = n - newVisible - newStart;
+  }
+
+  renderTicker(dataTicker);
+}, {passive:false});
+
+// Drag inside the plot area pans the view: horizontally across bars (once
+// horizontally zoomed) and vertically across the price range.
+let _chartDrag = null;
+document.addEventListener('mousedown', function(e){
+  if(e.button !== 0) return;
+  const ladder = e.target.closest('.zone-ladder');
+  if(!ladder) return;
+  const target = _ladderTarget(ladder);
+  if(!target) return;
+  const { dataTicker, viewKey, canvas } = target;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const w = rect.width, h = rect.height;
+  if(x<0||x>w||y<0||y>h || x>=w-AXIS_W || y>=h-AXIS_H) return; // axes handle zoom/reset, not pan
+
+  const view = getChartView(viewKey);
+  const bars = barsData[dataTicker] || [];
+  const visibleBars = Math.min(bars.length, view.visibleBars || bars.length) || 1;
+  _chartDrag = {
+    ladder, dataTicker, viewKey,
+    startX: e.clientX, startY: e.clientY,
+    pw: w-AXIS_W, ph: h-AXIS_H,
+    n: bars.length, visibleBars,
+    startOffset: Math.min(Math.max(0,view.barOffset||0), Math.max(0,bars.length-visibleBars)),
+    startYMin: view.lastRMin, startYMax: view.lastRMax
+  };
+  ladder.style.cursor = 'grabbing';
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', function(e){
+  if(_chartDrag){
+    const drag = _chartDrag;
+    const view = getChartView(drag.viewKey);
+    const dx = e.clientX-drag.startX, dy = e.clientY-drag.startY;
+
+    if(drag.n > drag.visibleBars && drag.pw>0){
+      const slotW = drag.pw/drag.visibleBars;
+      const maxOffset = drag.n-drag.visibleBars;
+      view.visibleBars = drag.visibleBars;
+      view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + Math.round(dx/slotW)));
+    }
+    if(drag.startYMin!=null && drag.startYMax!=null && drag.ph>0){
+      const rng = drag.startYMax-drag.startYMin;
+      const delta = (dy/drag.ph)*rng;
+      view.yMin = drag.startYMin + delta;
+      view.yMax = drag.startYMax + delta;
+    }
+    renderTicker(drag.dataTicker);
+    return;
+  }
+
+  // Cursor feedback for the interactive regions (axes vs. pannable plot).
+  const ladder = e.target.closest('.zone-ladder');
+  if(!ladder) return;
+  const target = _ladderTarget(ladder);
+  if(!target){ ladder.style.cursor=''; return; }
+  const rect = target.canvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const w = rect.width, h = rect.height;
+  if(x<0||x>w||y<0||y>h){ ladder.style.cursor=''; return; }
+  ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : 'grab';
+});
+
+document.addEventListener('mouseup', function(){
+  if(!_chartDrag) return;
+  _chartDrag.ladder.style.cursor = '';
+  _chartDrag = null;
+});
+
+// Double-click the bottom time-axis strip resets zoom/pan to the default
+// auto-fit view.
+document.addEventListener('dblclick', function(e){
+  const ladder = e.target.closest('.zone-ladder');
+  if(!ladder) return;
+  const target = _ladderTarget(ladder);
+  if(!target) return;
+  const { dataTicker, viewKey, canvas } = target;
+  const rect = canvas.getBoundingClientRect();
+  const y = e.clientY-rect.top, h = rect.height;
+  if(y < 0 || y > h || y < h-AXIS_H) return;
+  e.preventDefault();
+  delete chartView[viewKey];
+  renderTicker(dataTicker);
 });
 
 // ── Watchlist add/remove ─────────────────────────────────────────────────────
