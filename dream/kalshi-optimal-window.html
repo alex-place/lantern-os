@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optimal Window — Kalshi Live</title>
+<style>
+  :root {
+    --bg0: #0a0c10;
+    --bg1: #12151c;
+    --bg2: #1a1f29;
+    --border: #2a313d;
+    --text: #e8eaf0;
+    --text2: #a4adbf;
+    --text3: #7b8498;
+    --green: #00d4aa;
+    --red: #ff5f6d;
+    --amber: #f5a623;
+    --blue: #4a9eff;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg0); color: var(--text); font-family: system-ui; font-size: 14px; }
+
+  .header {
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    justify-content: space-between;
+  }
+
+  .title { font-size: 18px; font-weight: 700; letter-spacing: 0.04em; }
+  .subtitle { font-size: 12px; color: var(--text2); }
+
+  .stats {
+    display: flex;
+    gap: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+  }
+
+  .stat-label { color: var(--text3); text-transform: uppercase; font-size: 9px; }
+  .stat-value { color: var(--green); font-weight: 600; font-size: 14px; }
+
+  .container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .market-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .market-card.hot {
+    border-color: var(--amber);
+    background: rgba(245, 166, 35, 0.05);
+  }
+
+  .market-info h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .props {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.4;
+    max-height: 60px;
+    overflow-y: auto;
+  }
+
+  .timer {
+    text-align: center;
+  }
+
+  .countdown {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--amber);
+    margin-bottom: 4px;
+  }
+
+  .countdown.urgent { color: var(--red); }
+  .countdown.soon { color: var(--amber); }
+
+  .close-label {
+    font-size: 10px;
+    color: var(--text2);
+  }
+
+  .action {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg1);
+    color: var(--text2);
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .btn:hover { border-color: var(--blue); color: var(--blue); }
+  .btn.take { border-color: var(--green); color: var(--green); }
+
+  .empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text2);
+  }
+
+  .footer {
+    padding: 12px 20px;
+    background: var(--bg1);
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="title">Optimal Window</div>
+    <div class="subtitle">Games closing in next 90 minutes (peak prediction accuracy)</div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-label">Available</span>
+      <span class="stat-value" id="available">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Hottest</span>
+      <span class="stat-value" id="hottest">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="markets">
+  <div class="empty">Loading markets in optimal window...</div>
+</div>
+
+<div class="footer">
+  Auto-refresh every 10s · Optimal window: 5–90 minutes until close · In-game prediction peak
+</div>
+
+<script>
+const API = '/api/trading/kalshi';
+
+async function loadOptimalWindow() {
+  try {
+    const res = await fetch(`${API}/live-markets?status=open&limit=500`);
+    const data = await res.json();
+    const markets = data.markets || [];
+
+    const now = Date.now();
+    const _5mins = 5 * 60 * 1000;
+    const _90mins = 90 * 60 * 1000;
+
+    // Filter: 5-90 minute window
+    const optimal = markets
+      .map(m => ({
+        ...m,
+        msUntilClose: Date.parse(m.close_time) - now,
+        minsUntilClose: Math.round((Date.parse(m.close_time) - now) / 60000)
+      }))
+      .filter(m => m.msUntilClose > _5mins && m.msUntilClose <= _90mins)
+      .sort((a, b) => a.msUntilClose - b.msUntilClose);
+
+    document.getElementById('available').textContent = optimal.length;
+    document.getElementById('hottest').textContent = optimal.length > 0
+      ? optimal[0].minsUntilClose + 'm'
+      : '—';
+
+    const container = document.getElementById('markets');
+
+    if (optimal.length === 0) {
+      container.innerHTML = '<div class="empty"><p>No markets in optimal window (5–90 mins)</p></div>';
+      return;
+    }
+
+    container.innerHTML = optimal
+      .map((m, idx) => {
+        const isHot = idx === 0 && m.minsUntilClose <= 15;
+        const countdownClass = m.minsUntilClose <= 5 ? 'urgent' : m.minsUntilClose <= 15 ? 'urgent' : 'soon';
+
+        return `
+          <div class="market-card ${isHot ? 'hot' : ''}">
+            <div class="market-info">
+              <h3>${m.title?.slice(0, 60) || m.ticker?.slice(0, 40)}</h3>
+              <div class="props">${m.title?.slice(0, 150) || 'Multi-game prop'}</div>
+            </div>
+            <div class="timer">
+              <div class="countdown ${countdownClass}">${m.minsUntilClose}m</div>
+              <div class="close-label">${new Date(m.close_time).toLocaleTimeString()}</div>
+            </div>
+            <div class="action">
+              <button class="btn take" onclick="alert('Swipe deck coming soon')">Take</button>
+              <button class="btn" onclick="alert('Chart coming soon')">Chart</button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+  } catch (error) {
+    console.error(error);
+    document.getElementById('markets').innerHTML = '<div class="empty">Error loading markets</div>';
+  }
+}
+
+loadOptimalWindow();
+setInterval(loadOptimalWindow, 10000);
+</script>
+
+</body>
+</html>

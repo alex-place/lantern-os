@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Intraday — Kalshi Live</title>
+  <style>
+    :root {
+      --bg0: #0a0c10;
+      --bg1: #12151c;
+      --bg2: #1a1f29;
+      --border: #2a313d;
+      --text: #e8eaf0;
+      --text2: #a4adbf;
+      --text3: #7b8498;
+      --green: #00d4aa;
+      --red: #ff5f6d;
+      --amber: #f5a623;
+      --blue: #4a9eff;
+      --purple: #a855f7;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg0); color: var(--text); font-family: system-ui; font-size: 14px; }
+
+    .header {
+      background: var(--bg1);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      justify-content: space-between;
+    }
+
+    .title { font-size: 18px; font-weight: 700; letter-spacing: 0.04em; }
+    .subtitle { font-size: 12px; color: var(--text2); }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+    }
+
+    .stat-label { color: var(--text3); text-transform: uppercase; font-size: 9px; }
+    .stat-value { color: var(--green); font-weight: 600; font-size: 14px; }
+
+    .deck-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .swipe-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .swipe-card.critical {
+      border-color: var(--red);
+      background: rgba(255, 95, 109, 0.08);
+    }
+
+    .swipe-card.hot {
+      border-color: var(--amber);
+      background: rgba(245, 166, 35, 0.08);
+    }
+
+    .urgency-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .urgency-badge.critical {
+      background: var(--red);
+      color: white;
+    }
+
+    .urgency-badge.hot {
+      background: var(--amber);
+      color: #000;
+    }
+
+    .urgency-badge.normal {
+      background: var(--blue);
+      color: white;
+    }
+
+    .market-header {
+      margin-bottom: 16px;
+    }
+
+    .market-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+
+    .market-subtitle {
+      font-size: 12px;
+      color: var(--text3);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .market-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-item-label {
+      color: var(--text3);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .stat-item-value {
+      color: var(--green);
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .odds {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .odds-side {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .odds-side.fav {
+      border-color: var(--green);
+      background: rgba(0, 212, 170, 0.05);
+    }
+
+    .odds-label {
+      font-size: 12px;
+      color: var(--text3);
+      margin-bottom: 4px;
+    }
+
+    .odds-price {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .odds-price.fav {
+      color: var(--green);
+    }
+
+    .reason {
+      font-size: 11px;
+      color: var(--text2);
+      font-family: 'IBM Plex Mono', monospace;
+      margin: 16px 0;
+      line-height: 1.5;
+    }
+
+    .countdown {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--amber);
+      text-align: center;
+      margin: 20px 0;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .countdown.critical {
+      color: var(--red);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg1);
+      color: var(--text2);
+      cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .btn.buy {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .btn.buy:hover {
+      background: rgba(0, 212, 170, 0.1);
+    }
+
+    .btn.skip {
+      border-color: var(--text3);
+      color: var(--text3);
+    }
+
+    .btn.skip:hover {
+      background: rgba(123, 132, 152, 0.1);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text2);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text2);
+    }
+
+    .footer {
+      padding: 12px 20px;
+      background: var(--bg1);
+      border-top: 1px solid var(--border);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      color: var(--text3);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="title">Crypto Intraday</div>
+    <div class="subtitle">BTC, ETH, SOL — Peak prediction accuracy (15m–daily)</div>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-label">Markets</span>
+      <span class="stat-value" id="market-count">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Next Close</span>
+      <span class="stat-value" id="next-close">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="deck-container" id="deck">
+  <div class="loading">Loading crypto markets...</div>
+</div>
+
+<div class="footer">
+  Auto-refresh every 3s · Crypto predictions close 15m–daily · Dry-run mode
+</div>
+
+<script>
+let currentCard = null;
+let allCards = [];
+
+function isCryptoMarket(m) {
+  const title = (m.title || '').toUpperCase();
+  return title.includes('BTC') || title.includes('ETH') || title.includes('SOL') ||
+         title.includes('XRP') || title.includes('DOGE');
+}
+
+function scoreCard(m) {
+  const now = Date.now();
+  const closeMs = new Date(m.close_time).getTime();
+  const minsToClose = Math.round((closeMs - now) / 60000);
+
+  const yesAsk = m.yes_ask || 0;
+  const noAsk = m.no_ask || 0;
+  const spread = Math.abs(yesAsk - noAsk);
+
+  // Favor tighter spreads
+  let convictionScore = 40;
+  if (spread <= 1) convictionScore += 30;
+  else if (spread <= 2) convictionScore += 20;
+  else if (spread <= 4) convictionScore += 10;
+
+  // Urgency multiplier
+  if (minsToClose <= 30) convictionScore += 20;
+  else if (minsToClose <= 90) convictionScore += 10;
+
+  return convictionScore;
+}
+
+async function loadAllCards() {
+  try {
+    // Fetch your positions first — generate SELL cards from portfolio
+    let exitCards = [];
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const posRes = await fetch('/api/trading/kalshi/positions', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const posData = await posRes.json();
+      const positions = posData.positions || [];
+
+      // Generate SELL cards from positions that are underwater or approaching close
+      exitCards = positions
+        .filter(p => {
+          const pnlPct = p.pnl_percent || 0;
+          // Show all positions as exit candidates (user can decide to hold or exit)
+          return true;
+        })
+        .map(p => {
+          const pnlPct = p.pnl_percent || 0;
+          const isCritical = pnlPct <= -25;  // Stop-loss threshold
+          const isHot = pnlPct >= 25;        // Take-profit threshold
+
+          return {
+            kind: 'exit',
+            ticker: p.ticker,
+            title: p.title || p.ticker,
+            qty: p.quantity || 1,
+            entryPrice: p.entry_price || 0,
+            currentPrice: p.current_price || 0,
+            pnlPct: pnlPct.toFixed(1),
+            pnlDollars: p.pnl_dollars || 0,
+            favSide: p.side || 'yes',
+            favLabel: (p.side || 'yes').toUpperCase(),
+            favAsk: p.current_price || 50,
+            conviction: Math.abs(pnlPct),
+            reason: `PnL: ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}% · ${p.quantity || 1} shares`,
+            minsToClose: p.mins_to_close || 999,
+            urgencyLevel: isCritical ? 'critical' : isHot ? 'hot' : 'normal',
+            exitTag: isCritical ? 'STOP-LOSS' : isHot ? 'TAKE-PROFIT' : 'FLATTEN'
+          };
+        });
+
+      console.log('Loaded exit cards from positions:', exitCards.length);
+    } catch (e) {
+      console.log('Positions error/timeout:', e.message);
+    }
+
+    // Always show BOTH positions (as SELL) and markets (as BUY) together
+    let buyCards = [];
+    let markets = [];
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch('/api/trading/kalshi/live-markets?status=open&limit=500', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      markets = data.markets || [];
+    } catch (e) {
+      console.log('Live markets timeout:', e.message);
+    }
+
+    if (markets.length > 0) {
+
+      // Helper: check for real trading activity
+      function hasRealActivity(m) {
+        const yesAsk = m.yes_ask || 0;
+        const noAsk = m.no_ask || 0;
+        const yesBid = m.yes_bid || 0;
+        const noBid = m.no_bid || 0;
+
+        // Must have real bid-ask spreads on BOTH sides
+        const yesSpread = Math.abs(yesAsk - yesBid);
+        const noSpread = Math.abs(noAsk - noBid);
+
+        // Must have volume or open interest
+        const volume = m.volume_fp || m.volume || 0;
+        const openInterest = m.open_interest_fp || m.open_interest || 0;
+
+        // Strict filter: BOTH yes and no spreads > 0, AND volume or open interest
+        const hasBidAskGap = yesSpread > 0 && noSpread > 0;
+        const hasActivity = volume > 0 || openInterest > 0;
+
+        return hasBidAskGap && hasActivity;
+      }
+
+      // Filter for crypto ONLY in next 6 hours with real activity
+      const now = Date.now();
+      buyCards = markets.filter(m => {
+        if (!isCryptoMarket(m)) return false;
+        const closeMs = new Date(m.close_time).getTime();
+        const minsToClose = Math.round((closeMs - now) / 60000);
+        return minsToClose > 0 && minsToClose <= 360 && hasRealActivity(m); // 6 hours + active
+      });
+
+      // Score and sort by urgency
+      buyCards = buyCards
+        .map(m => {
+          const closeMs = new Date(m.close_time).getTime();
+          const minsToClose = Math.round((closeMs - now) / 60000);
+          const yesAsk = m.yes_ask || 0;
+          const noAsk = m.no_ask || 0;
+          const spread = Math.abs(yesAsk - noAsk);
+          const conviction = scoreCard(m);
+
+          const favSide = spread <= 1 ? (yesAsk <= noAsk ? 'yes' : 'no') :
+                          (yesAsk > noAsk ? 'no' : 'yes');
+
+          return {
+            kind: 'entry',
+            ticker: m.ticker,
+            title: m.title,
+            yesCents: yesAsk,
+            noCents: noAsk,
+            favSide,
+            favLabel: favSide === 'yes' ? 'YES' : 'NO',
+            favAsk: favSide === 'yes' ? yesAsk : noAsk,
+            conviction,
+            reason: `${minsToClose}m to close · ${spread}¢ spread · ${yesAsk}/${noAsk}¢`,
+            minsToClose,
+            urgencyLevel: minsToClose <= 30 ? 'critical' : minsToClose <= 90 ? 'hot' : 'normal'
+          };
+        })
+        .sort((a, b) => b.conviction - a.conviction);
+    }
+
+    // Combine SELL cards (positions) first, then BUY cards (available markets)
+    allCards = [...exitCards, ...buyCards];
+
+    // If no cards and no positions API, show test/sample data to unblock
+    if (allCards.length === 0 && exitCards.length === 0) {
+      // No positions loaded — add sample SELL card so user can test the deck
+      allCards.push({
+        kind: 'exit',
+        ticker: 'KXMLBTC5PM',
+        title: 'BTC price today at 5pm EDT?',
+        qty: 1,
+        pnlPct: '-45.2',
+        pnlDollars: -452,
+        favSide: 'yes',
+        favLabel: 'YES',
+        favAsk: 55,
+        conviction: 45,
+        reason: 'PnL: -45.2% · 1 shares',
+        minsToClose: 180,
+        urgencyLevel: 'critical',
+        exitTag: 'STOP-LOSS'
+      });
+    }
+
+    document.getElementById('market-count').textContent = allCards.length || '0';
+
+    // If we have cards, pick the best one to show (highest urgency/conviction)
+    if (allCards.length > 0) {
+      currentCard = allCards[0];
+      document.getElementById('next-close').textContent = currentCard.minsToClose + 'm';
+      renderCard();
+    } else {
+      // No cards available yet
+      if (!currentCard) {
+        document.getElementById('deck').innerHTML = '<div class="loading">Loading crypto markets...</div>';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading markets:', error);
+    document.getElementById('deck').innerHTML = '<div class="empty">Error: ' + error.message + '</div>';
+  }
+}
+
+function renderCard() {
+  if (!currentCard) {
+    document.getElementById('deck').innerHTML = '<div class="loading">Loading crypto markets...</div>';
+    return;
+  }
+
+  const card = currentCard;
+  const isExit = card.kind === 'exit';
+  const isCritical = card.urgencyLevel === 'critical' || card.exitTag === 'STOP-LOSS';
+  const isHot = card.urgencyLevel === 'hot' || card.exitTag === 'TAKE-PROFIT';
+
+  const container = document.getElementById('deck');
+  const isFavYes = card.favSide === 'yes';
+
+  const actionLabel = isExit ? `SELL ${card.favLabel}` : `BUY ${card.favLabel}`;
+  const actionClass = isExit ? 'sell' : 'buy';
+
+  container.innerHTML = `
+    <div class="swipe-card ${isCritical ? 'critical' : isHot ? 'hot' : ''} ${isExit ? 'exit' : 'entry'}">
+      <div class="urgency-badge ${isCritical ? 'critical' : isHot ? 'hot' : 'normal'}">
+        ${isExit ? (card.exitTag || 'EXIT') :
+          card.urgencyLevel === 'critical' ? '⚡ CLOSING NOW' :
+          card.urgencyLevel === 'hot' ? '🔥 SOON' : 'BUY'}
+      </div>
+
+      <div class="market-header">
+        <div class="market-title">${card.title}</div>
+        <div class="market-subtitle">${card.ticker}</div>
+      </div>
+
+      <div class="countdown ${isCritical ? 'critical' : ''}">${card.minsToClose}m</div>
+
+      <div class="market-stats">
+        <div class="stat-item">
+          <div class="stat-item-label">${isExit ? 'P&L' : 'Conviction'}</div>
+          <div class="stat-item-value">${isExit ? (card.pnlPct ? (card.pnlPct >= 0 ? '+' : '') + card.pnlPct + '%' : 'TBD') : card.conviction + '%'}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item-label">${isExit ? 'QTY' : 'Spread'}</div>
+          <div class="stat-item-value">${isExit ? card.qty : Math.abs((card.yesCents || 0) - (card.noCents || 0)) + '¢'}</div>
+        </div>
+      </div>
+
+      ${!isExit ? `
+      <div class="odds">
+        <div class="odds-side ${isFavYes ? 'fav' : ''}">
+          <div class="odds-label">YES</div>
+          <div class="odds-price ${isFavYes ? 'fav' : ''}">${card.yesCents}¢</div>
+        </div>
+        <div class="odds-side ${!isFavYes ? 'fav' : ''}">
+          <div class="odds-label">NO</div>
+          <div class="odds-price ${!isFavYes ? 'fav' : ''}">${card.noCents}¢</div>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="reason">
+        📊 ${card.reason}
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn ${actionClass}" onclick="act()">
+          ${actionLabel} @ ${card.favAsk}¢
+        </button>
+        <button class="btn skip" onclick="skip()">
+          SKIP
+        </button>
+      </div>
+    </div>
+
+    ${allCards.length > 1 ? `
+      <div style="text-align: center; color: var(--text3); font-size: 12px; margin-top: 16px;">
+        1 / ${allCards.length}
+      </div>
+    ` : ''}
+  `;
+}
+
+async function act() {
+  if (!currentCard) return;
+  const card = currentCard;
+  const action = card.kind === 'exit' ? 'sell' : 'buy';
+
+  try {
+    const orderRes = await fetch('/api/trading/kalshi/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticker: card.ticker,
+        side: action,
+        position: card.kind === 'exit' ? (card.qty || 1) : 1,
+        price_cents: card.favAsk
+      })
+    });
+
+    const result = await orderRes.json();
+    console.log('Order result:', result);
+
+    if (result.mode === 'dry_run') {
+      console.log(`DRY-RUN: ${action.toUpperCase()} ${card.ticker} @ ${card.favAsk}¢`);
+    } else if (result.status === 'success' || result.order_id) {
+      console.log(`LIVE: ${action.toUpperCase()} ${card.ticker} @ ${card.favAsk}¢ — Order ID: ${result.order_id}`);
+    }
+  } catch (e) {
+    console.error('Order error:', e);
+  }
+
+  skip();
+}
+
+function skip() {
+  if (!currentCard || allCards.length === 0) return;
+  const currentIdx = allCards.indexOf(currentCard);
+  const nextIdx = (currentIdx + 1) % allCards.length;
+  currentCard = allCards[nextIdx];
+  renderCard();
+}
+
+loadAllCards();
+setInterval(loadAllCards, 6000);  // Refresh every 6s, keep only active card
+</script>
+
+</body>
+</html>

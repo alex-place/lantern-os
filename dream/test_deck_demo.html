@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Deck Demo — What You'd See</title>
+  <style>
+    :root {
+      --bg0: #0a0c10;
+      --bg1: #12151c;
+      --bg2: #1a1f29;
+      --border: #2a313d;
+      --text: #e8eaf0;
+      --text2: #a4adbf;
+      --text3: #7b8498;
+      --green: #00d4aa;
+      --red: #ff5f6d;
+      --amber: #f5a623;
+      --blue: #4a9eff;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg0); color: var(--text); font-family: system-ui; font-size: 14px; }
+
+    .header {
+      background: var(--bg1);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .title { font-size: 18px; font-weight: 700; }
+    .subtitle { font-size: 12px; color: var(--text2); }
+
+    .deck-container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+
+    .swipe-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 340px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .swipe-card.critical {
+      border-color: var(--red);
+      background: rgba(255, 95, 109, 0.08);
+    }
+
+    .swipe-card.hot {
+      border-color: var(--amber);
+      background: rgba(245, 166, 35, 0.08);
+    }
+
+    .swipe-card.exit {
+      border-color: var(--red);
+    }
+
+    .urgency-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .urgency-badge.critical { background: var(--red); color: white; }
+    .urgency-badge.hot { background: var(--amber); color: #000; }
+    .urgency-badge.normal { background: var(--blue); color: white; }
+
+    .market-header { margin-bottom: 16px; }
+    .market-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .market-subtitle { font-size: 12px; color: var(--text3); font-family: monospace; }
+
+    .market-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: var(--bg1);
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .stat-item-label { color: var(--text3); font-size: 10px; text-transform: uppercase; }
+    .stat-item-value { color: var(--green); font-weight: 600; font-size: 14px; }
+
+    .odds {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .odds-side {
+      background: var(--bg1);
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .odds-side.fav {
+      border: 2px solid var(--green);
+    }
+
+    .odds-label { color: var(--text3); font-size: 10px; text-transform: uppercase; }
+    .odds-price { color: var(--text); font-weight: 600; font-size: 16px; margin-top: 4px; }
+
+    .reason { color: var(--text3); font-size: 12px; margin: 12px 0; }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 12px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .btn.buy {
+      background: var(--green);
+      color: #000;
+    }
+
+    .btn.sell {
+      background: var(--red);
+      color: white;
+    }
+
+    .btn.skip {
+      background: var(--bg1);
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      opacity: 0.9;
+    }
+
+    .card-counter {
+      text-align: center;
+      color: var(--text3);
+      font-size: 12px;
+      margin-top: 12px;
+    }
+
+    .status {
+      text-align: center;
+      padding: 20px;
+      color: var(--text3);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .demo-note {
+      background: rgba(74, 158, 255, 0.1);
+      border: 1px solid var(--blue);
+      border-radius: 6px;
+      padding: 12px;
+      margin: 20px;
+      font-size: 12px;
+      color: var(--blue);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="title">🎮 Crypto Intraday — Kalshi Live</div>
+      <div class="subtitle">Tinder-style trading game</div>
+    </div>
+  </div>
+
+  <div class="demo-note">
+    <strong>🎯 Demo Mode:</strong> Showing what the deck would display with real data. Your actual positions are pulled from /api/trading/kalshi/positions, available markets from /api/trading/kalshi/live-markets (filtered for crypto + 6h window + real activity).
+  </div>
+
+  <div class="deck-container" id="deck">
+    <!-- Card 1: SELL (Position) -->
+    <div class="swipe-card critical exit">
+      <div class="urgency-badge critical">STOP-LOSS</div>
+      <div class="market-header">
+        <div class="market-title">BTC price today at 5pm EDT?</div>
+        <div class="market-subtitle">KXMLBTC5PM</div>
+      </div>
+
+      <div class="market-stats">
+        <div class="stat-item">
+          <div class="stat-item-label">P&L</div>
+          <div class="stat-item-value">-45.2%</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item-label">QTY</div>
+          <div class="stat-item-value">1</div>
+        </div>
+      </div>
+
+      <div class="reason">📊 P&L: -45.2% · 1 shares</div>
+
+      <div class="action-buttons">
+        <button class="btn sell">SELL YES @ 55¢</button>
+        <button class="btn skip">SKIP</button>
+      </div>
+    </div>
+    <div class="card-counter">1 / 7</div>
+
+    <!-- Card 2: BUY (Entry Opportunity) -->
+    <div class="swipe-card hot">
+      <div class="urgency-badge hot">🔥 SOON</div>
+      <div class="market-header">
+        <div class="market-title">BTC 15 min · $64,276.27 target</div>
+        <div class="market-subtitle">KXMLBTC15MIN</div>
+      </div>
+
+      <div class="market-stats">
+        <div class="stat-item">
+          <div class="stat-item-label">Conviction</div>
+          <div class="stat-item-value">68%</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item-label">Spread</div>
+          <div class="stat-item-value">2¢</div>
+        </div>
+      </div>
+
+      <div class="odds">
+        <div class="odds-side fav">
+          <div class="odds-label">YES</div>
+          <div class="odds-price">46¢</div>
+        </div>
+        <div class="odds-side">
+          <div class="odds-label">NO</div>
+          <div class="odds-price">54¢</div>
+        </div>
+      </div>
+
+      <div class="reason">📊 15m to close · 2¢ spread · 46/54¢</div>
+
+      <div class="action-buttons">
+        <button class="btn buy">BUY YES @ 46¢</button>
+        <button class="btn skip">SKIP</button>
+      </div>
+    </div>
+    <div class="card-counter">2 / 7</div>
+
+    <!-- Card 3: BUY (Entry Opportunity) -->
+    <div class="swipe-card">
+      <div class="urgency-badge normal">BUY</div>
+      <div class="market-header">
+        <div class="market-title">ETH price range today at 5pm EDT?</div>
+        <div class="market-subtitle">KXMLETH5PM</div>
+      </div>
+
+      <div class="market-stats">
+        <div class="stat-item">
+          <div class="stat-item-label">Conviction</div>
+          <div class="stat-item-value">52%</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item-label">Spread</div>
+          <div class="stat-item-value">3¢</div>
+        </div>
+      </div>
+
+      <div class="odds">
+        <div class="odds-side">
+          <div class="odds-label">YES</div>
+          <div class="odds-price">38¢</div>
+        </div>
+        <div class="odds-side fav">
+          <div class="odds-label">NO</div>
+          <div class="odds-price">62¢</div>
+        </div>
+      </div>
+
+      <div class="reason">📊 145m to close · 3¢ spread · 38/62¢</div>
+
+      <div class="action-buttons">
+        <button class="btn buy">BUY NO @ 62¢</button>
+        <button class="btn skip">SKIP</button>
+      </div>
+    </div>
+    <div class="card-counter">3 / 7</div>
+  </div>
+
+  <div class="status">
+    <strong>How it works:</strong><br>
+    ✓ SELL cards (red) = Your open positions from portfolio<br>
+    ✓ BUY cards (blue/green) = Available crypto intraday entry opportunities<br>
+    ✓ Auto-rotates every 2 seconds unless you interact<br>
+    ✓ Click BUY/SELL to place a dry-run order, then auto-advance to next card
+  </div>
+</body>
+</html>

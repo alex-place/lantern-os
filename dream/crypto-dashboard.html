@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Dashboard — Lantern Garage</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      background: #0a0e27;
+      color: #e0e6ed;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .status {
+      font-size: 12px;
+      color: #8892b0;
+      margin-bottom: 24px;
+    }
+
+    .status.updating {
+      color: #00ff88;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #0f1419;
+      border: 1px solid #1e2749;
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: #00d9ff;
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.1);
+    }
+
+    .price-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .price-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .symbol {
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .timestamp {
+      font-size: 10px;
+      color: #8892b0;
+    }
+
+    .prices {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .price-item {
+      background: #1a2341;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .price-label {
+      color: #8892b0;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .price-value {
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 2px;
+      color: #00ff88;
+    }
+
+    .spread {
+      background: #1a2341;
+      padding: 8px;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .spread-label {
+      color: #8892b0;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .spread-value {
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 2px;
+      color: #00d9ff;
+    }
+
+    .volume {
+      font-size: 11px;
+      color: #8892b0;
+      margin-top: 8px;
+    }
+
+    .news-container {
+      margin-top: 32px;
+    }
+
+    .news-card {
+      background: #0f1419;
+      border: 1px solid #1e2749;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+
+    .news-card:hover {
+      border-color: #00d9ff;
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.1);
+    }
+
+    .news-item {
+      flex: 1;
+    }
+
+    .news-symbol {
+      font-weight: 600;
+      font-size: 14px;
+      color: #00ff88;
+      margin-bottom: 4px;
+    }
+
+    .news-name {
+      font-size: 12px;
+      color: #8892b0;
+    }
+
+    .news-type {
+      display: inline-block;
+      background: #1a2341;
+      color: #00d9ff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .news-rank {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00d9ff;
+      padding: 0 16px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #8892b0;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .refresh-btn {
+      background: linear-gradient(135deg, #00d9ff, #00ff88);
+      color: #0a0e27;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .refresh-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 217, 255, 0.3);
+    }
+
+    .refresh-btn:active {
+      transform: translateY(0);
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+
+    .auto-refresh-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #8892b0;
+      font-size: 12px;
+    }
+
+    input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #00d9ff;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Crypto Dashboard</h1>
+    <div class="status" id="status">Initializing...</div>
+
+    <div class="controls">
+      <button class="refresh-btn" onclick="refreshPrices()">Refresh Now</button>
+      <label class="auto-refresh-toggle">
+        <input type="checkbox" id="autoRefresh" checked>
+        Auto-refresh every 5s
+      </label>
+    </div>
+
+    <div class="section-title">Real-Time Prices</div>
+    <div class="grid" id="pricesContainer">
+      <div class="empty-state">
+        <p>Loading crypto prices...</p>
+      </div>
+    </div>
+
+    <div class="section-title">Trending Now</div>
+    <div class="news-container" id="newsContainer">
+      <div class="empty-state">
+        <p>Loading crypto news...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pricesContainer = document.getElementById('pricesContainer');
+    const newsContainer = document.getElementById('newsContainer');
+    const statusDiv = document.getElementById('status');
+    const autoRefreshCheckbox = document.getElementById('autoRefresh');
+    let autoRefreshInterval = null;
+
+    const SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE'];
+
+    function formatPrice(value) {
+      return parseFloat(value).toFixed(3);
+    }
+
+    function formatTime(isoString) {
+      try {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch {
+        return 'N/A';
+      }
+    }
+
+    async function refreshPrices() {
+      try {
+        statusDiv.textContent = 'Fetching prices...';
+        statusDiv.className = 'status updating';
+
+        const [pricesResp, newsResp] = await Promise.all([
+          fetch('/api/trading/crypto/prices'),
+          fetch('/api/trading/crypto/news')
+        ]);
+
+        const pricesData = await pricesResp.json();
+        const newsData = await newsResp.json();
+
+        renderPrices(pricesData.prices || {});
+        renderNews(newsData.news || []);
+
+        statusDiv.textContent = `Last updated: ${formatTime(new Date().toISOString())}`;
+        statusDiv.className = 'status';
+      } catch (error) {
+        console.error('Error fetching crypto data:', error);
+        statusDiv.textContent = `Error: ${error.message}`;
+        statusDiv.className = 'status';
+      }
+    }
+
+    function renderPrices(prices) {
+      if (!prices || Object.keys(prices).length === 0) {
+        pricesContainer.innerHTML = '<div class="empty-state"><p>No crypto prices available.</p></div>';
+        return;
+      }
+
+      pricesContainer.innerHTML = SYMBOLS
+        .filter(symbol => prices[symbol])
+        .map(symbol => {
+          const price = prices[symbol];
+          const yesAsk = parseFloat(price.yes_ask) || 0;
+          const noAsk = parseFloat(price.no_ask) || 0;
+          const spread = price.spread || 0;
+          const volume = parseFloat(price.volume) || 0;
+          const openInterest = parseFloat(price.open_interest) || 0;
+
+          return `
+            <div class="card price-card">
+              <div class="price-header">
+                <div class="symbol">${symbol}</div>
+                <div class="timestamp">${formatTime(price.timestamp)}</div>
+              </div>
+              <div class="prices">
+                <div class="price-item">
+                  <div class="price-label">YES Ask</div>
+                  <div class="price-value">$${formatPrice(yesAsk)}</div>
+                </div>
+                <div class="price-item">
+                  <div class="price-label">NO Ask</div>
+                  <div class="price-value">$${formatPrice(noAsk)}</div>
+                </div>
+              </div>
+              <div class="spread">
+                <div class="spread-label">Spread</div>
+                <div class="spread-value">$${formatPrice(spread)}</div>
+              </div>
+              <div class="volume">
+                📊 Vol: ${volume.toFixed(0)} | OI: ${openInterest.toFixed(0)}
+              </div>
+              <div class="volume" style="margin-top: 4px; font-size: 10px; color: #5a6b7c;">
+                Market: ${price.title || 'N/A'}
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function renderNews(news) {
+      if (!news || news.length === 0) {
+        newsContainer.innerHTML = '<div class="empty-state"><p>No crypto news available.</p></div>';
+        return;
+      }
+
+      newsContainer.innerHTML = news
+        .slice(0, 10)
+        .map(item => `
+          <div class="news-card">
+            <div class="news-item">
+              <div class="news-symbol">
+                ${item.symbol || 'N/A'}
+                <span class="news-type">${item.type || 'news'}</span>
+              </div>
+              <div class="news-name">${item.name || 'Unknown'}</div>
+            </div>
+            <div class="news-rank">#${item.rank}</div>
+          </div>
+        `)
+        .join('');
+    }
+
+    function startAutoRefresh() {
+      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+      if (autoRefreshCheckbox.checked) {
+        autoRefreshInterval = setInterval(refreshPrices, 5000);
+        refreshPrices();
+      }
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+    }
+
+    autoRefreshCheckbox.addEventListener('change', () => {
+      if (autoRefreshCheckbox.checked) {
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
+    });
+
+    startAutoRefresh();
+  </script>
+</body>
+</html>
