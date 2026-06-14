@@ -980,6 +980,12 @@
         if (cardEl) cardEl.classList.toggle("connected", configured);
         if (inputEl2 && configured) inputEl2.placeholder = "••••••••  (set — enter new key to replace)";
         if (!configured) anyMissing = true;
+        // Sync connector-section badge (#conn-status-{id}) to match — single source of truth
+        const connBadge = document.getElementById(`conn-status-${id}`);
+        if (connBadge) {
+          connBadge.textContent = configured ? "Connected" : "No key";
+          connBadge.className = `connector-card-status ${configured ? "ok" : "err"}`;
+        }
       }
       document.getElementById("settings-btn").classList.toggle("has-error", anyMissing && data._any === false);
       // Discord Bot status

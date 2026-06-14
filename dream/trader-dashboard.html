@@ -48,6 +48,12 @@
   .wl-chg{font-family:var(--mono);font-size:9px;font-weight:600}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
   .wl-signal{font-family:var(--mono);font-size:8px;margin-top:2px}
+  .wl-add{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border)}
+  .wl-add input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:10px;padding:4px 6px;border-radius:3px}
+  .wl-add button{background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:3px;cursor:pointer}
+  .wl-add button:hover{color:var(--text0)}
+  .wl-remove{font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer;padding:0 4px}
+  .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
   .card{background:var(--bg1);border:1px solid var(--border);border-radius:6px;overflow:hidden;transition:border-color .15s}
@@ -74,6 +80,21 @@
   .zone-ladder{position:relative;height:220px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
   .card.state-open .zone-ladder{height:280px}
   .card.state-quiet .zone-ladder{height:130px}
+  /* Order ticket */
+  .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
+  .order-ticket input{width:56px;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:10px;padding:3px 5px;border-radius:3px}
+  .order-ticket input.sltp{width:44px}
+  .order-ticket button{font-family:var(--mono);font-size:10px;font-weight:600;padding:3px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em}
+  .btn-buy{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.3)}
+  .btn-buy:hover{background:rgba(0,212,170,.22)}
+  .btn-sell{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.3)}
+  .btn-sell:hover{background:rgba(255,95,109,.22)}
+  /* Chart canvas + overlay */
+  .chart-canvas{position:absolute;left:0;right:64px;top:0;bottom:0;width:calc(100% - 64px);height:100%}
+  .ladder-overlay{position:absolute;inset:0}
+  /* Header chart controls */
+  .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
+  .chart-ctrl:hover{color:var(--text0)}
   /* ── Footer panels ── */
   .fpanel{padding:10px 14px;overflow-y:auto;max-height:180px}
   .panel-title{font-family:var(--mono);font-size:9px;color:var(--text2);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
@@ -121,13 +142,30 @@
   <div class="hstat" title="VIX — the market's &quot;fear gauge&quot;. Higher numbers mean a more nervous, jumpy market."><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat" title="Positions — how many stocks the assistant is currently holding."><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
   <div class="hstat" title="Market — whether the U.S. stock market is open or closed right now."><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
+  <select id="chartTypeSelect" class="chart-ctrl" onchange="changeChartType(this.value)">
+    <option value="line">Line</option>
+    <option value="candle">Candles</option>
+  </select>
+  <select id="chartTfSelect" class="chart-ctrl" onchange="changeTimeframe(this.value)">
+    <option value="1m">1m</option>
+    <option value="5m" selected>5m</option>
+    <option value="15m">15m</option>
+    <option value="1h">1h</option>
+    <option value="4h">4h</option>
+    <option value="1d">1d</option>
+  </select>
   <div class="pulse" title="Live — the dashboard is refreshing automatically."></div>
   <button class="help-btn" onclick="toggleHelp(true)">❓ What is this?</button>
-  <a href="/" class="nav-link">← Back</a>
+  <a href="/trading-news.html" class="nav-link">News →</a>
+  <a href="/" class="nav-link" style="margin-left:8px">← Back</a>
 </div>
 
 <!-- Sidebar -->
 <div class="sidebar">
+  <div class="wl-add">
+    <input type="text" id="wlAddInput" placeholder="Add ticker" maxlength="10" onkeydown="if(event.key==='Enter')addWatchlistTicker()">
+    <button onclick="addWatchlistTicker()">+</button>
+  </div>
   <div id="wlList"></div>
 </div>
 
@@ -195,9 +233,12 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') toggleHelp(false)
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
-let zonesData    = {};
-let wlPrices     = [];
-let activeTicker = null;
+let zonesData      = {};
+let wlPrices       = [];
+let activeTicker   = null;
+let barsData       = {};
+let chartType      = 'line';
+let chartTimeframe = '5m';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmt(n, d=2){ return n == null ? '—' : Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}); }
@@ -221,9 +262,67 @@ function zlLine(topPct, color, label, textColor){
     background:rgba(10,12,15,.8);padding:1px 3px;border-radius:2px;white-space:nowrap;">${label}</div>`;
 }
 
+// ── Candlestick / line chart renderer ────────────────────────────────────────
+function renderChart(canvas, bars, rMin, rMax, type){
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if(w<=0 || h<=0) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(w*dpr);
+  canvas.height = Math.round(h*dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  if(!bars || bars.length < 2 || rMax<=rMin) return;
+
+  const rng   = rMax - rMin;
+  const y     = p => h - ((p-rMin)/rng)*h;
+  const n     = bars.length;
+  const slotW = w/n;
+
+  if(type==='candle'){
+    for(let i=0;i<n;i++){
+      const b = bars[i];
+      const x = i*slotW + slotW/2;
+      const up = b.close >= b.open;
+      const color = up ? '#00d4aa' : '#ff5f6d';
+      ctx.strokeStyle = color;
+      ctx.fillStyle   = color;
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y(b.high));
+      ctx.lineTo(x, y(b.low));
+      ctx.stroke();
+      const bodyTop = y(Math.max(b.open,b.close));
+      const bodyBot = y(Math.min(b.open,b.close));
+      const bw = Math.max(1, slotW*0.6);
+      ctx.fillRect(x-bw/2, bodyTop, bw, Math.max(1, bodyBot-bodyTop));
+    }
+  }else{
+    const pts = bars.map((b,i)=>[i*slotW + slotW/2, y(b.close)]);
+    // area fill under the line
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], h);
+    for(const [x,yy] of pts) ctx.lineTo(x,yy);
+    ctx.lineTo(pts[n-1][0], h);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(74,158,255,.08)';
+    ctx.fill();
+    // line
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for(let i=1;i<n;i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.strokeStyle = '#4a9eff';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+  }
+}
+
 function renderZoneLadder(ticker, d, currentPrice){
   const el = document.getElementById('ladder-'+ticker);
   if(!el) return;
+  const canvas  = document.getElementById('chart-'+ticker);
+  const overlay = document.getElementById('overlay-'+ticker);
+  if(!overlay) return;
 
   // Price fallback chain
   let priceLabel = null;
@@ -245,9 +344,10 @@ function renderZoneLadder(ticker, d, currentPrice){
     if(!currentPrice || currentPrice <= 0){
       currentPrice = getCurrentPrice(ticker);
       if(!currentPrice || currentPrice <= 0){
-        el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+        overlay.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
           + 'height:100%;font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:var(--text2)'
           + '">Waiting for price data</div>';
+        if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
         return;
       }
       priceLabel = 'live';
@@ -255,6 +355,7 @@ function renderZoneLadder(ticker, d, currentPrice){
   }
   const pos   = d.position;
   const zones = (d.zones||[]).slice(0,12);
+  const bars  = barsData[ticker] || [];
 
   // Determine display range
   let rMin = currentPrice * 0.97, rMax = currentPrice * 1.03;
@@ -266,6 +367,11 @@ function renderZoneLadder(ticker, d, currentPrice){
   // Expand to include nearby zones
   for(const z of zones){
     if(z.mid){ if(z.mid>rMax*0.998) rMax=z.mid*1.002; if(z.mid<rMin*1.002) rMin=z.mid*0.998; }
+  }
+  // Expand to include the historical chart range
+  for(const b of bars){
+    if(b.high>rMax) rMax=b.high*1.002;
+    if(b.low <rMin) rMin=b.low *0.998;
   }
   const rng = rMax - rMin; if(rng<=0) return;
 
@@ -322,7 +428,8 @@ function renderZoneLadder(ticker, d, currentPrice){
     font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;color:${lineColor};
     background:var(--bg1);padding:1px 4px;border-radius:2px;white-space:nowrap;">${priceText}</div>`;
 
-  el.innerHTML = html;
+  overlay.innerHTML = html;
+  if(canvas) renderChart(canvas, bars, rMin, rMax, chartType);
 }
 
 // ── Build one ticker card ───────────────────────────────────────────────────
@@ -360,16 +467,26 @@ function buildCard(ticker, d){
     </div>
   </div>
   ${confHtml}${watchHtml}
-  <div class="zone-ladder" id="ladder-${ticker}"></div>
+  <div class="zone-ladder" id="ladder-${ticker}">
+    <canvas class="chart-canvas" id="chart-${ticker}"></canvas>
+    <div class="ladder-overlay" id="overlay-${ticker}"></div>
+  </div>
+  <div class="order-ticket">
+    <input type="number" id="qty-${ticker}" value="1" min="0" step="any" title="Quantity">
+    <input type="number" class="sltp" id="sl-${ticker}" placeholder="SL" min="0" step="any" title="Stop loss">
+    <input type="number" class="sltp" id="tp-${ticker}" placeholder="TP" min="0" step="any" title="Take profit">
+    <button class="btn-buy" onclick="placeOrder('${ticker}','buy')">BUY</button>
+    <button class="btn-sell" onclick="placeOrder('${ticker}','sell')">SELL</button>
+  </div>
 </div>`;
 }
 
 // ── Render all cards ─────────────────────────────────────────────────────────
 function renderCards(){
   const grid = document.getElementById('cardsGrid');
-  const sorted = Object.keys(zonesData).filter(t=>!zonesData[t]?.is_crypto).sort((a,b)=>{
+  const sorted = wlPrices.map(t=>t.ticker).sort((a,b)=>{
     const order={open:0,watching:1,quiet:2};
-    return order[tickerState(zonesData[a])] - order[tickerState(zonesData[b])];
+    return order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})];
   });
   grid.setAttribute('aria-busy','false');
   if(!sorted.length){
@@ -381,6 +498,41 @@ function renderCards(){
   sorted.forEach(t => renderZoneLadder(t, zonesData[t]||{}, getCurrentPrice(t)));
 }
 
+// ── Order placement ──────────────────────────────────────────────────────────
+async function placeOrder(ticker, side){
+  const qtyEl = document.getElementById('qty-'+ticker);
+  const slEl  = document.getElementById('sl-'+ticker);
+  const tpEl  = document.getElementById('tp-'+ticker);
+  const qty = qtyEl ? Number(qtyEl.value) : 0;
+  if(!qty || qty <= 0){ alert('Enter a quantity greater than 0'); return; }
+  const stopLoss   = slEl && slEl.value !== '' ? Number(slEl.value) : null;
+  const takeProfit = tpEl && tpEl.value !== '' ? Number(tpEl.value) : null;
+
+  let msg = `${side.toUpperCase()} ${qty} ${ticker} at market (paper account)?`;
+  if(stopLoss)   msg += `\nStop loss: $${stopLoss}`;
+  if(takeProfit) msg += `\nTake profit: $${takeProfit}`;
+  if(!confirm(msg)) return;
+
+  try{
+    const body = { ticker, side, qty, type: 'market' };
+    if(stopLoss)   body.stopLoss   = stopLoss;
+    if(takeProfit) body.takeProfit = takeProfit;
+    const r = await fetch('/api/trading/orders/place', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const result = await r.json();
+    if(!r.ok || result.status !== 'placed'){
+      alert('Order failed: ' + (result.error || r.statusText));
+      return;
+    }
+    await Promise.all([loadOrders(), loadPortfolio()]);
+  }catch(e){
+    alert('Order failed: ' + e.message);
+  }
+}
+
 // ── Watchlist sidebar ─────────────────────────────────────────────────────────
 function renderWatchlist(){
   document.getElementById('wlList').innerHTML = wlPrices.map(t=>{
@@ -390,7 +542,7 @@ function renderWatchlist(){
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
     const sigTxt = dir ? `<div class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${d.confidence||sig.confidence||0}%</div>` : '';
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" onclick="focusTicker('${t.ticker}')">
-      <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span></div>
+      <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}% <span class="wl-remove" onclick="removeWatchlistTicker('${t.ticker}',event)">×</span></span></div>
       <div class="wl-row"><span class="wl-price">$${t.price>100?t.price.toLocaleString():t.price.toFixed(4)}</span></div>
       ${sigTxt}
     </div>`;
@@ -404,8 +556,45 @@ function focusTicker(t){
   renderWatchlist();
 }
 
+// ── Watchlist add/remove ─────────────────────────────────────────────────────
+async function addWatchlistTicker(){
+  const input = document.getElementById('wlAddInput');
+  const ticker = (input.value || '').trim().toUpperCase();
+  if(!ticker) return;
+  try{
+    const r = await fetch('/api/trading/watchlist', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ticker })
+    });
+    const result = await r.json();
+    if(!r.ok){ alert('Failed to add ticker: ' + (result.error || r.statusText)); return; }
+    input.value = '';
+    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    renderCards();
+  }catch(e){
+    alert('Failed to add ticker: ' + e.message);
+  }
+}
+
+async function removeWatchlistTicker(ticker, evt){
+  if(evt) evt.stopPropagation();
+  try{
+    const r = await fetch('/api/trading/watchlist/'+encodeURIComponent(ticker), { method: 'DELETE' });
+    const result = await r.json();
+    if(!r.ok){ alert('Failed to remove ticker: ' + (result.error || r.statusText)); return; }
+    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    renderCards();
+  }catch(e){
+    alert('Failed to remove ticker: ' + e.message);
+  }
+}
+
 // ── Data loaders ─────────────────────────────────────────────────────────────
+let zonesLoading = false;
 async function loadZones(){
+  if(zonesLoading) return;
+  zonesLoading = true;
   try{
     const r = await fetch('/api/trading/zones');
     const data = await r.json();
@@ -416,18 +605,51 @@ async function loadZones(){
       if(el) el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
     });
   }catch(e){ console.warn('zones load failed',e); }
+  finally{ zonesLoading = false; }
 }
 
+let pricesLoading = false;
 async function loadWatchlistPrices(){
+  if(pricesLoading) return;
+  pricesLoading = true;
   try{
     const r = await fetch('/api/trading/watchlist-prices');
-    wlPrices = (await r.json()).filter(t => !t.is_crypto);
+    wlPrices = await r.json();
     renderWatchlist();
     wlPrices.forEach(t=>{
       const el = document.getElementById('cp-'+t.ticker);
       if(el) el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
+      renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
     });
   }catch(e){}
+  finally{ pricesLoading = false; }
+}
+
+let barsLoading = false;
+async function loadBars(){
+  if(barsLoading) return;
+  barsLoading = true;
+  try{
+    const r = await fetch('/api/trading/bars-multi?timeframe='+chartTimeframe);
+    const d = await r.json();
+    const bars = d.bars || {};
+    barsData = {};
+    for(const ticker of Object.keys(bars)){
+      barsData[ticker] = bars[ticker].bars || [];
+    }
+    wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
+  }catch(e){ console.warn('bars load failed', e); }
+  finally{ barsLoading = false; }
+}
+
+function changeChartType(type){
+  chartType = type;
+  wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
+}
+
+function changeTimeframe(tf){
+  chartTimeframe = tf;
+  loadBars();
 }
 
 async function loadPortfolio(){
@@ -525,13 +747,16 @@ async function fullRefresh(){
 // ── Init ──────────────────────────────────────────────────────────────────────
 function startDashboard(){
   fullRefresh();
+  loadBars();
   loadAgentLog();
   loadOrders();
   loadKalshi();
-  setInterval(fullRefresh,  30000);
-  setInterval(loadAgentLog, 5000);
-  setInterval(loadOrders,   60000);
-  setInterval(loadKalshi,   30000);
+  setInterval(fullRefresh,         30000);
+  setInterval(loadWatchlistPrices,  5000);
+  setInterval(loadBars,            15000);
+  setInterval(loadAgentLog,         5000);
+  setInterval(loadOrders,          60000);
+  setInterval(loadKalshi,          30000);
 }
 document.addEventListener('DOMContentLoaded', startDashboard);
 

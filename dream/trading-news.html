@@ -142,7 +142,7 @@
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Journal</a>
-    <a href="/trading.html">Trading</a>
+    <a href="/trader-dashboard.html">Trading</a>
     <a href="/trading-news.html" class="active">News</a>
     <a href="/flourishing">Dashboard</a>
     <a href="/knowledgecenter.html">Help</a>
@@ -377,59 +377,81 @@ function loadNews() {
   fetch('/api/trading/dashboard/news-feed')
     .then(r => r.json())
     .then(data => {
-      if (data.error) {
-        document.getElementById('newsContainer').innerHTML =
-          '<div class="loading" style="color:var(--danger)">News API error: ' + data.error + '</div>';
+      const tickerNews = data.ticker_news || [];
+      const broadNews = data.broad_news || [];
+      if (data.error || (tickerNews.length === 0 && broadNews.length === 0)) {
+        loadNewsFromCSF();
         return;
       }
-      const ticker_news = data.ticker_news || [];
-      const broad_news  = data.broad_news  || [];
-      allNews = [...ticker_news, ...broad_news];
+      processNews(tickerNews, broadNews, true);
+    })
+    .catch(() => loadNewsFromCSF());
+}
 
-      // Deduplicate by id
-      const seen = new Set();
-      allNews = allNews.filter(n => { if(seen.has(n.id)) return false; seen.add(n.id); return true; });
-
-      // Set accurate period label
-      if (allNews.length > 0) {
-        const dates = allNews.map(n => n.date).filter(Boolean).sort();
-        const oldest = dates[0];
-        const d = new Date(oldest);
-        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        document.getElementById('statPeriod').textContent = label + ' — Today';
-      } else {
-        document.getElementById('statPeriod').textContent = 'Last 30 Days';
-      }
-
-      document.getElementById('statTotal').textContent = allNews.length;
-      document.getElementById('statHigh').textContent  = allNews.filter(n => n.impact >= 70).length;
-      const tickers = new Set();
-      allNews.forEach(n => (n.symbols||[]).forEach(s => tickers.add(s)));
-      document.getElementById('statTickers').textContent = tickers.size;
-      document.getElementById('lastUpdate').textContent  = 'Updated ' + new Date().toLocaleTimeString();
-
-      if (allNews.length === 0) {
-        document.getElementById('newsContainer').innerHTML =
-          '<div class="loading">No recent news articles found.</div>';
-        return;
-      }
-
-      buildTickerFilters(ticker_news);
-      applyFilters();
-
-      // Persist to CSF (fire-and-forget; server dedupes by id)
-      allNews.forEach(item => {
-        fetch('/api/trading/news/record', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item),
-        }).catch(() => {});
-      });
+// Fallback when the dashboard news-feed (port 5050) has no data: pull
+// from the local CSF news registry instead, which is always populated.
+function loadNewsFromCSF() {
+  fetch('/api/trading/news/recent?limit=100')
+    .then(r => r.json())
+    .then(data => {
+      const items = (data.records || []).map(r => ({
+        id: r.news_id, headline: r.headline, source: r.source, url: r.url,
+        published: r.published, date: r.date, symbols: r.symbols || [], impact: r.impact,
+      }));
+      const ticker_news = items.filter(n => n.symbols && n.symbols.length > 0);
+      const broad_news  = items.filter(n => !n.symbols || n.symbols.length === 0);
+      processNews(ticker_news, broad_news, false);
     })
     .catch(err => {
       document.getElementById('newsContainer').innerHTML =
         '<div class="loading" style="color:var(--danger)">Failed to load news: ' + err.message + '</div>';
     });
+}
+
+function processNews(ticker_news, broad_news, persistToCSF) {
+  allNews = [...ticker_news, ...broad_news];
+
+  // Deduplicate by id
+  const seen = new Set();
+  allNews = allNews.filter(n => { if(seen.has(n.id)) return false; seen.add(n.id); return true; });
+
+  // Set accurate period label
+  if (allNews.length > 0) {
+    const dates = allNews.map(n => n.date).filter(Boolean).sort();
+    const oldest = dates[0];
+    const d = new Date(oldest);
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    document.getElementById('statPeriod').textContent = label + ' — Today';
+  } else {
+    document.getElementById('statPeriod').textContent = 'Last 30 Days';
+  }
+
+  document.getElementById('statTotal').textContent = allNews.length;
+  document.getElementById('statHigh').textContent  = allNews.filter(n => n.impact >= 70).length;
+  const tickers = new Set();
+  allNews.forEach(n => (n.symbols||[]).forEach(s => tickers.add(s)));
+  document.getElementById('statTickers').textContent = tickers.size;
+  document.getElementById('lastUpdate').textContent  = 'Updated ' + new Date().toLocaleTimeString();
+
+  if (allNews.length === 0) {
+    document.getElementById('newsContainer').innerHTML =
+      '<div class="loading">No recent news articles found.</div>';
+    return;
+  }
+
+  buildTickerFilters(ticker_news);
+  applyFilters();
+
+  if (persistToCSF) {
+    // Persist to CSF (fire-and-forget; server dedupes by id)
+    allNews.forEach(item => {
+      fetch('/api/trading/news/record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      }).catch(() => {});
+    });
+  }
 }
 
 loadNews();

@@ -117,23 +117,33 @@ async function updateConnectorStatuses() {
     if (mcpBtn) { mcpBtn.textContent = 'Connect'; mcpBtn.onclick = connectMcp; mcpBtn.classList.add('primary'); }
   }
 
+  // Provider connector badges — authoritative source is server /api/settings/providers.
+  // localStorage is a fallback for offline mode only.
   const providers = [
     { key: 'ANTHROPIC_API_KEY', id: 'claude' },
     { key: 'GEMINI_API_KEY', id: 'gemini' },
     { key: 'OPENAI_API_KEY', id: 'openai' },
     { key: 'XAI_API_KEY', id: 'grok' },
   ];
+
+  let serverKeys = null;
+  try {
+    const pr = await fetch('/api/settings/providers', { signal: AbortSignal.timeout(3000) });
+    if (pr.ok) serverKeys = await pr.json();
+  } catch { /* fall through to localStorage */ }
+
   for (const p of providers) {
-    const hasKey = !!localStorage.getItem(p.key);
     const badge = document.getElementById('conn-status-' + p.id);
+    if (!badge) continue;
+
+    // Prefer server truth; fall back to input field or localStorage
+    const serverConfigured = serverKeys ? !!(serverKeys[p.key]) : null;
     const input = document.getElementById('key-' + p.id);
-    if (badge) {
-      if (hasKey || (input && input.value.length > 0)) {
-        badge.textContent = 'Ready'; badge.className = 'connector-card-status ok';
-      } else {
-        badge.textContent = 'No key'; badge.className = 'connector-card-status err';
-      }
-    }
+    const localConfigured = !!localStorage.getItem(p.key) || !!(input && input.value.length > 0);
+    const configured = serverConfigured !== null ? serverConfigured : localConfigured;
+
+    badge.textContent = configured ? 'Connected' : 'No key';
+    badge.className = `connector-card-status ${configured ? 'ok' : 'err'}`;
   }
 }
 
