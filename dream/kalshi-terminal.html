@@ -456,6 +456,23 @@ function fmtCountdown(card){
   return {txt:'⏱ —', cls:''};
 }
 
+function fmtStrategyFitness(fitness){
+  if(!fitness) return '';
+  const pnl=(fitness.pnl||0).toFixed(1);
+  const dd=(fitness.drawdown||0).toFixed(1);
+  const stab=(fitness.stability||0).toFixed(1);
+  const cnt=fitness.count||0;
+  return `<div style="margin-top:8px;padding:8px;border-radius:4px;background:var(--bg);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
+    <div style="margin-bottom:4px;font-weight:600">Strategy Fitness</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span>PnL: <b>${pnl}%</b></span>
+      <span>Drawdown: <b>${dd}%</b></span>
+      <span>Stability: <b>${stab}</b></span>
+      <span style="margin-left:auto">${cnt} trades</span>
+    </div>
+  </div>`;
+}
+
 function cardInner(card){
   const noPct=100-(card.yesPct||0);
   const cd=fmtCountdown(card);
@@ -463,6 +480,9 @@ function cardInner(card){
   const isPosition=card.kind==='position';
   const isExit=card.kind==='exit';
   const isSell=isPosition||isExit;
+  const regimeLabel=card.regime?`<span class="card-klass" style="color:var(--gold);font-size:11px">${card.regime.toUpperCase()}</span>`:'';
+  const strategyReason=card.strategy_id&&card.regime?`<div class="reason" style="margin-top:8px;color:var(--gold)">Selected ${card.strategy_id} for ${card.regime} regime</div>`:'';
+  const fitnessDisplay=fmtStrategyFitness(card.strategy_fitness);
 
   // ── Position card (open Kalshi holding) ─────────────────────────────────────
   if(isPosition){
@@ -485,7 +505,7 @@ function cardInner(card){
     return `
       <div class="stamp take">EXIT</div><div class="stamp pass">HOLD</div>
       ${ribbon}
-      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span><span class="card-klass position">YOUR POSITION</span></div>
+      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${regimeLabel}<span class="card-klass position">YOUR POSITION</span></div>
       <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
       <div class="fav ${favClass}">
         <div class="fav-tag">${card.qty||1} × ${fav.toUpperCase()} — Exit position</div>
@@ -496,6 +516,8 @@ function cardInner(card){
           <div class="conv-num" style="color:${pnlColor}">${netSign}${netPct}%${feeStr?' net':''}</div>
         </div>
         <div class="reason">Entered @ ${card.entryCents||'?'}¢ · ${stale?'settled':'P&L: '+grossSign+grossPct+'%'} · <span style="color:var(--muted)">${feeStr||'no exit fee'}</span>${netDollars?` <span style="float:right;color:${pnlColor}">${netDollars}</span>`:''}</div>
+        ${strategyReason}
+        ${fitnessDisplay}
       </div>
       <div class="card-meta">
         <span class="meta-badge">${card.ticker?.split('-')[0]||'POS'}</span>
@@ -524,7 +546,7 @@ function cardInner(card){
     const why3=parseSideWhy(card);
     return `
       <div class="stamp take">LOCK IN</div><div class="stamp pass">SKIP</div>
-      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span><span class="card-klass convergence">PROFIT PLAY</span></div>
+      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${regimeLabel}<span class="card-klass convergence">PROFIT PLAY</span></div>
       <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
       <div class="fav yes">
         <div class="fav-tag">Buy ${fav.toUpperCase()} — lock in ${profit}¢ profit (${roi}% ROI)</div>
@@ -535,6 +557,8 @@ function cardInner(card){
           <div class="conv-num" style="color:var(--green)">${card.favAsk}% probability</div>
         </div>
         <div class="reason">${card.reason||''}</div>
+        ${strategyReason}
+        ${fitnessDisplay}
       </div>
       <div class="card-meta">
         <span class="meta-badge">${card.ticker?.split('-')[0]||'MKT'}</span>
@@ -573,7 +597,7 @@ function cardInner(card){
   return `
     <div class="stamp take">${isSell?'EXIT':'TAKE'}</div><div class="stamp pass">PASS</div>
     ${ribbon}
-    <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${stateBadge}<span class="card-klass ${klLabel}">${klLabel.toUpperCase()}</span></div>
+    <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${regimeLabel}${stateBadge}<span class="card-klass ${klLabel}">${klLabel.toUpperCase()}</span></div>
     <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
     <div class="fav ${favClass}">
       <div class="fav-tag">${isSell?'Exit recommended':'Best entry now'}</div>
@@ -584,6 +608,8 @@ function cardInner(card){
         <div class="conv-num">${card.conviction}% ${convLabel}</div>
       </div>
       <div class="reason">${card.reason||''}</div>
+      ${strategyReason}
+      ${fitnessDisplay}
       ${traceHtml}
     </div>
     <div class="card-meta">
