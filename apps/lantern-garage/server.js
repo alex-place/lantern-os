@@ -107,6 +107,7 @@ const routes = [
   require("./routes/leaderboard"),
   require("./routes/surfaces"),
   require("./routes/self-edit"),
+  require("./routes/features"),
   require("./routes/personal-cube"),
   require("./routes/agent-status"),
   require("./routes/pr-review"),
