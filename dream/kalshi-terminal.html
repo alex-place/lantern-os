@@ -24,20 +24,27 @@
   --shadow:0 2px 12px rgba(0,0,0,.45);
   --shadow-hover:0 4px 24px rgba(0,0,0,.6);
 }
+[data-theme="light"]{
+  --bg:#f0f2f7;
+  --surface:#ffffff;
+  --surface2:#f5f7fb;
+  --border:#d0d5e0;
+  --text:#1a1f2e;
+  --muted:#6b7280;
+  --accent:#1a6fcf;
+  --accent-dim:#dbeafe;
+  --green:#059669;
+  --gold:#d97706;
+  --danger:#dc2626;
+  --shadow:0 2px 12px rgba(0,0,0,.10);
+  --shadow-hover:0 4px 24px rgba(0,0,0,.18);
+}
 body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
 /* ── nav status indicators ───────────────────────────────── */
 .nav-stat{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
 .nav-stat b{color:var(--text);font-weight:600}
 
-/* ── mode bar ────────────────────────────────────────────── */
-.mode-bar{font-size:11px;text-align:center;padding:4px 16px;
-  background:var(--bg);border-bottom:1px solid var(--border);color:var(--muted);
-  font-family:'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.02em}
-
-/* ── sync progress bar ───────────────────────────────────── */
-.sync-bar{height:2px;background:var(--border);overflow:hidden;flex-shrink:0}
-.sync-fill{height:100%;background:var(--accent);transform-origin:left;will-change:transform}
 
 /* ── card stage ──────────────────────────────────────────── */
 .deck{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -55,7 +62,7 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 /* card content */
 .card-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:4px;gap:8px}
 .card-klass{font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:10px}
-.card-klass.position{color:var(--accent)}.card-klass.exit{color:var(--danger)}.card-klass.engine,.card-klass.suggestion{color:var(--gold)}.card-klass.crypto{color:var(--green)}
+.card-klass.position{color:var(--accent)}.card-klass.exit{color:var(--danger)}.card-klass.engine,.card-klass.suggestion{color:var(--gold)}.card-klass.crypto{color:var(--green)}.card-klass.convergence{color:var(--green);font-size:11px}
 .countdown{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px}
 .countdown.soon{color:var(--gold)}.countdown.now{color:var(--danger)}
 
@@ -81,8 +88,25 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
   border:1px solid var(--danger);color:var(--danger);margin-bottom:8px;font-weight:600;letter-spacing:.04em}
 .ribbon.profit{background:rgba(52,211,153,.08);border-color:var(--green);color:var(--green)}
 
+/* market meta strip */
+.card-meta{display:flex;gap:12px;align-items:center;padding:8px 0 4px;font-size:11px;
+  color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace;border-top:1px solid var(--border);margin-top:auto}
+.card-meta span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-meta .meta-badge{padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);font-size:10px;font-weight:600;letter-spacing:.06em}
+
+/* card actions */
+.card-actions{display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.card-actions button{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);transition:all .15s}
+.card-actions .btn-pass,.card-actions .btn-skip{color:var(--muted);border-color:var(--border)}
+.card-actions .btn-pass:hover,.card-actions .btn-skip:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.card-actions .btn-take,.card-actions .btn-exit,.card-actions .btn-lockin,.card-actions .btn-hold{background:var(--green);color:#000;border-color:var(--green)}
+.card-actions .btn-take:hover,.card-actions .btn-exit:hover,.card-actions .btn-lockin:hover,.card-actions .btn-hold:hover{background:color-mix(in srgb,var(--green) 85%,#fff)}
+
+/* hide actions from peek cards */
+.card.peek .card-actions,.card.peek2 .card-actions{display:none}
+
 /* sides */
-.sides{display:flex;gap:8px;margin-top:auto;padding-top:8px}
+.sides{display:flex;gap:8px;padding-top:8px}
 .side{flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 6px;text-align:center;background:var(--bg)}
 .side .lbl{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-transform:uppercase;letter-spacing:.08em;font-family:'IBM Plex Mono',ui-monospace,monospace}
@@ -109,8 +133,20 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .reload{font-size:12px;padding:8px 20px;border-radius:8px;border:1px solid var(--accent);
   background:rgba(6,182,212,.1);color:var(--accent);cursor:pointer;font-weight:600}
 
-/* action buttons — use site.css btn-primary / btn-ghost */
-.actions{display:flex;gap:12px;align-items:center;justify-content:center;padding:12px 16px 8px}
+/* action buttons — live inside each card */
+.actions{display:none}
+.card-actions{display:flex;gap:12px;align-items:center;justify-content:center;
+  padding:10px 0 2px;margin-top:auto;border-top:1px solid var(--border)}
+.btn-pass{font-size:16px;font-weight:700;padding:10px 28px;border-radius:12px;border:2px solid var(--danger);
+  background:rgba(220,38,38,.1);color:var(--danger);cursor:pointer;letter-spacing:.03em;transition:all .15s;min-width:110px}
+.btn-pass:hover{background:rgba(220,38,38,.22);transform:scale(1.04)}
+.btn-take{font-size:16px;font-weight:700;padding:10px 28px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#059669,#00d4aa);color:#fff;cursor:pointer;letter-spacing:.03em;transition:all .15s;min-width:110px;box-shadow:0 3px 14px rgba(0,180,130,.35)}
+.btn-take:hover{filter:brightness(1.08);transform:scale(1.04)}
+.peek .card-actions,.peek2 .card-actions{display:none}
+/* theme toggle */
+.theme-toggle{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;color:var(--muted);font-size:13px;transition:border-color .2s}
+.theme-toggle:hover{border-color:var(--accent);color:var(--text)}
 
 /* focus visible for keyboard navigation */
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -130,21 +166,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #sdot{vertical-align:middle;margin-right:4px;transition:background .3s}
 #sdot.pulse{animation:dotpulse .5s ease-out}
 
-/* simulated book */
-.pbook{padding:6px 16px 10px;max-height:140px;overflow-y:auto;border-top:1px solid var(--border);flex-shrink:0}
-.pbook-hdr{font-size:10px;letter-spacing:.1em;color:var(--muted);margin-bottom:5px;
-  display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;font-weight:600}
-.prow{font-size:12px;display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;
-  background:var(--surface);margin-bottom:3px;border:1px solid var(--border)}
-.prow.sl{border-color:var(--danger)}.prow.tp{border-color:var(--green)}
-.pticker{color:var(--muted);min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
-.pside-yes{color:var(--green);font-weight:600}.pside-no{color:var(--danger);font-weight:600}
-.ppnl{min-width:44px;text-align:right;font-family:ui-monospace,monospace;font-size:11px}
-.ppnl.pos{color:var(--green)}.ppnl.neg{color:var(--danger)}
-.ptag{font-size:10px;padding:1px 6px;border-radius:4px;border:1px solid;font-weight:600}
-.ptag.sl{color:var(--danger);border-color:var(--danger)}.ptag.tp{color:var(--green);border-color:var(--green)}
-.pclose{margin-left:auto;cursor:pointer;color:var(--muted);font-size:13px;background:none;border:none;padding:2px 4px}
-.pclose:hover{color:var(--text)}
+/* side why — brief rationale under the % */
+.side-why{font-size:9px;color:var(--muted);margin-top:3px;line-height:1.3;
+  font-family:'IBM Plex Mono',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* image gallery panel */
 .image-gallery{padding:8px 16px;border-top:1px solid var(--border);flex-shrink:0;max-height:180px;overflow-y:auto}
@@ -191,11 +215,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     <span class="nav-stat" id="cCreds" aria-label="Credentials status">—</span>
     <span id="cMode" aria-label="Trading mode"><span class="pill held">—</span></span>
     <span class="nav-stat" id="cFresh" aria-label="Data freshness"><span class="dot" id="sdot"></span>—</span>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode" onclick="toggleTheme()">☀</button>
   </div>
 </nav>
 
-<div class="sync-bar" role="presentation"><div class="sync-fill" id="syncFill"></div></div>
-<div class="mode-bar" id="note" role="complementary" aria-label="Mode instructions">Loading…</div>
 
 <main class="deck">
   <article class="stage" id="stage" role="region" aria-label="Current market position"></article>
@@ -208,8 +231,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <div class="progress" id="progress" aria-live="polite" aria-label="Deck progress" role="status"></div>
 <div class="actions" role="region" aria-label="Card action buttons">
-  <button class="btn-ghost" id="bPass" aria-label="Pass on current position" onclick="act('pass')" style="font-size:15px">← Pass</button>
-  <button class="btn-primary" id="bTake" aria-label="Take current position" onclick="act('take')" style="font-size:15px">Take it →</button>
+  <button class="btn-pass" id="bPass" aria-label="Pass on current position" onclick="act('pass')">✕ Pass</button>
+  <button class="btn-take" id="bTake" aria-label="Take current position" onclick="act('take')">✓ Take it</button>
 </div>
 
 <div class="image-gallery" id="imageGallery" style="display:none" aria-label="Market chart and news images">
@@ -229,13 +252,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
-<aside class="pbook" id="pbook" style="display:none" aria-label="Open paper positions">
-  <div class="pbook-hdr">
-    <h2 style="font-size:10px;letter-spacing:.1em;color:var(--muted);margin:0;display:inline-block;text-transform:uppercase;font-weight:600">Simulated Book</h2>
-    <span id="pbook-count" style="color:var(--muted)"></span>
-  </div>
-  <div id="pbook-rows"></div>
-</aside>
 
 <script>
 const API='/api/trading/kalshi';
@@ -243,13 +259,26 @@ const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
 let lastSyncMs=0, lastDetCount=null;
 
+function toggleTheme(){
+  const el=document.documentElement;
+  const next=el.getAttribute('data-theme')==='dark'?'light':'dark';
+  el.setAttribute('data-theme',next);
+  document.getElementById('themeToggle').textContent=next==='dark'?'☀':'🌙';
+  try{localStorage.setItem('kalshi-theme',next);}catch(_){}
+}
+
 async function j(path,opts){ try{const r=await fetch(API+path,opts);return await r.json();}catch(e){return{error:e.message};} }
 const c=v=>v==null?'—':v;
 
 async function loadConnection(){
   conn=await j('/connection');
-  const envDot=document.getElementById('envDot');
-  if(envDot) envDot.className='dot '+(conn.env==='prod'?'online':'warn');
+  // Kalshi exchange down or network error
+  if(conn.error || conn.exchangeActive===false){
+    document.getElementById('cEnv').innerHTML='<span class="dot offline"></span><span style="color:var(--danger)">offline</span>';
+    document.getElementById('cCreds').innerHTML='<span style="color:var(--muted)">—</span>';
+    document.getElementById('cMode').innerHTML='<span class="pill held">OFFLINE</span>';
+    return;
+  }
   document.getElementById('cEnv').innerHTML=`<span class="dot ${conn.env==='prod'?'online':'warn'}" id="envDot"></span><b>${c(conn.env)}</b>`;
   const credOk=conn.credentials;
   document.getElementById('cCreds').innerHTML=credOk
@@ -259,9 +288,6 @@ async function loadConnection(){
   document.getElementById('cMode').innerHTML=live
     ?'<span class="pill live">LIVE</span>'
     :'<span class="pill held">DRY-RUN</span>';
-  document.getElementById('note').textContent=live
-    ?'⚠ LIVE MODE — swipe right sells the position at current bid. Left = hold.'
-    :'Practice mode — orders not sent. Set KALSHI_TRADING_ENABLED=1 for live trading.';
 }
 async function loadBalance(){
   const d=await j('/balance');
@@ -270,10 +296,12 @@ async function loadBalance(){
 }
 
 // ── syncDeck: initial load + live merge every SYNC_MS ────────────────────────
+// Show only positions marked for EXIT (sell/close) — no open holds
 async function syncDeck(){
-  const d=await j('/positions-deck');
+  const d=await j('/positions-deck?exitsOnly=true');
   if(!d.cards) return;
-  const fresh=d.cards;
+  // Drop positions that expired more than 5 minutes ago — they can't be acted on
+  const fresh=d.cards.filter(c=>c.minsToClose==null||c.minsToClose>-5);
   liveMap={}; for(const x of fresh) liveMap[x.ticker]=x;
   markFresh(d.count);
 
@@ -295,17 +323,19 @@ async function syncDeck(){
   // 2. inject brand-new tickers right after current position
   const newCards=fresh.filter(c=>!acted.has(c.ticker)&&!pending.has(c.ticker));
   if(newCards.length) deck.splice(Math.min(idx+1,deck.length),0,...newCards);
-  // 3. prune expired positions (not in fresh) — keep IE/crypto fill cards
+  // 3. prune expired positions (not in fresh), and expired/weak suggestion cards
   for(let i=deck.length-1;i>idx;i--){
     const isPosCard=deck[i].kind==='position'||deck[i].kind==='exit';
-    if(isPosCard&&!freshSet.has(deck[i].ticker)) deck.splice(i,1);
+    if(isPosCard&&!freshSet.has(deck[i].ticker)){ deck.splice(i,1); continue; }
+    const isSugg=!isPosCard;
+    if(isSugg&&!isSuggestionTradeable(deck[i])) deck.splice(i,1);
   }
   // 4. auto-resurface: were at end, new cards have arrived
   if(wasAtEnd&&idx<deck.length){
     document.getElementById('end').style.display='none';
     render(); return;
   }
-  if(idx>=deck.length) return;
+  if(idx>=deck.length){ maybePrefetch(); return; }
   // 5. patch front in place (no full re-render — preserves swipe state)
   if(!dragging) patchFront(deck[idx]);
   const rem=deck.length-idx;
@@ -317,13 +347,6 @@ function markFresh(count){
   lastSyncMs=Date.now(); lastDetCount=count;
   const dot=document.getElementById('sdot');
   if(dot){ dot.classList.add('pulse'); setTimeout(()=>dot.classList.remove('pulse'),500); }
-  const fill=document.getElementById('syncFill');
-  if(fill){
-    fill.style.transition='none'; fill.style.transform='scaleX(1)';
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      fill.style.transition=`transform ${SYNC_MS}ms linear`; fill.style.transform='scaleX(0)';
-    }));
-  }
   updateFreshnessChip();
 }
 function updateFreshnessChip(){
@@ -332,6 +355,20 @@ function updateFreshnessChip(){
   const ageStr=age==null?'—':age<2?'live':age<60?`${age}s ago`:`${Math.floor(age/60)}m ago`;
   const cnt=lastDetCount!=null?` · <b>${lastDetCount}</b>`:'';
   chip.innerHTML=`<span class="dot ${age!=null&&age<30?'online':'warn'}" id="sdot"></span>${ageStr}${cnt}`;
+}
+
+// Minimum quality bar for suggestion cards (entry/crypto/engine/convergence)
+function isSuggestionTradeable(c){
+  if(c.minsToClose!=null && c.minsToClose<=0) return false;   // expired
+  if(c.favAsk==null) return false;                             // no live ask
+  if(c.kind==='convergence'){
+    if(c.favAsk>90) return false;  // <10¢ profit — not worth it
+    if(c.favAsk<80) return false;  // not converged enough to be reliable
+    return true;
+  }
+  if(c.favAsk<4 || c.favAsk>96) return false;                 // already resolved (entry cards)
+  if((c.conviction||0)<45) return false;                       // edge too thin
+  return true;
 }
 
 // ── blended deck prefetch (20-card buffer) ────────────────────────────────────
@@ -346,9 +383,9 @@ async function maybePrefetch(){
       j('/impossibility-deck').then(d=>d.cards||[]),
       j('/crypto-intraday').then(d=>d.cards||[]),
     ]);
-    const ieDet=ie.filter(c=>c.stateLabel==='DETERMINED'&&!pendingTickers.has(c.ticker));
-    const ieConf=ie.filter(c=>c.stateLabel==='CONFIDENT'&&!pendingTickers.has(c.ticker));
-    const fill=cry.filter(c=>!pendingTickers.has(c.ticker));
+    const ieDet=ie.filter(c=>c.stateLabel==='DETERMINED'&&!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
+    const ieConf=ie.filter(c=>c.stateLabel==='CONFIDENT'&&!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
+    const fill=cry.filter(c=>!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
     const toAdd=[...ieDet,...ieConf,...fill].slice(0,DECK_TARGET-remaining);
     if(!toAdd.length) return;
     deck.push(...toAdd);
@@ -380,6 +417,29 @@ function sideLabels(card){
   const n=shortLabel(card.noLabel,'NO');
   // If API returns identical labels for both sides, fall back to YES/NO
   return y===n ? {y:'YES',n:'NO'} : {y,n};
+}
+// Parse threshold from favLabel/yesLabel ("$64,500 or above") → side rationale.
+function parseSideWhy(card){
+  // Try favLabel first ("$64,500 or above"), then title, then ticker
+  const src = card.favLabel || card.yesLabel || card.title || '';
+  const m = src.match(/\$([\d,]+(?:\.\d+)?)\s*(?:or\s*(above|below))?/i);
+  if(m){
+    const price = m[0].replace(/\s+or\s+\w+/i,'').trim();
+    const isAbove = !m[2] || m[2].toLowerCase()==='above';
+    return {
+      y: isAbove ? `▲ resolves above ${price}` : `▼ resolves below ${price}`,
+      n: isAbove ? `▼ resolves below ${price}` : `▲ resolves above ${price}`
+    };
+  }
+  // Fallback: parse ticker T-suffix (e.g. KXBTCD-26JUN14-T64499.99)
+  const t=(card.ticker||'').match(/T([\d.]+)$/);
+  if(t){
+    const p='$'+parseFloat(t[1]).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+    return {y:`▲ resolves above ${p}`, n:`▼ resolves below ${p}`};
+  }
+  // Final fallback: compact reason
+  const r=(card.reason||'').replace(/\d+m to close\s*·?\s*/,'').slice(0,30);
+  return {y:r, n:r};
 }
 function convColor(v){ return v>=66?'var(--green)':v>=45?'var(--gold)':'var(--muted)'; }
 function fmtCountdown(card){
@@ -414,35 +474,85 @@ function cardInner(card){
     const netDollars = card.netPnlCents!=null?(card.netPnlCents>=0?'+':'')+((card.netPnlCents/100).toFixed(2)):null;
     const fee = card.exitFeeCents;
     const feeStr = fee!=null ? `−${fee}¢ fee` : '';
-    const maxPayout = card.maxPayoutCents!=null?'$'+(card.maxPayoutCents/100).toFixed(2):null;
     const tag=card.exitTag;
+    const stale=card.marketFound===false;
     const ribbonCls=tag==='TAKE-PROFIT'?'ribbon profit':'ribbon';
-    const ribbon=tag?`<div class="${ribbonCls}">⚠ ${tag} · net ${netSign}${netPct}%</div>`:'';
+    const ribbon=tag?`<div class="${ribbonCls}">⚠ ${tag} · net ${netSign}${netPct}%</div>`
+      :stale?`<div class="ribbon">⏸ MARKET CLOSED — position may have settled</div>`:'';
     const favClass=fav==='yes'?'yes':'no';
+    const bidStr=stale?'market closed':`${card.favAsk!=null?card.favAsk+'¢':'mkt'} bid`;
+    const why=parseSideWhy(card);
     return `
-      <div class="stamp take">SELL</div><div class="stamp pass">HOLD</div>
+      <div class="stamp take">EXIT</div><div class="stamp pass">HOLD</div>
       ${ribbon}
       <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span><span class="card-klass position">YOUR POSITION</span></div>
       <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
       <div class="fav ${favClass}">
-        <div class="fav-tag">${card.qty||1} × ${fav.toUpperCase()} · cash out</div>
-        <div class="fav-act">● SELL ${cleanTitle(card.favLabel,fav)}</div>
-        <div class="fav-px">@ ${card.favAsk!=null?card.favAsk+'¢':'mkt'} bid · ${card.qty||1} contract${(card.qty||1)>1?'s':''}</div>
+        <div class="fav-tag">${card.qty||1} × ${fav.toUpperCase()} — Exit position</div>
+        <div class="fav-act">● ${fav.toUpperCase()} ${cleanTitle(card.favLabel,card.ticker)}</div>
+        <div class="fav-px">@ ${bidStr} · ${card.qty||1} contract${(card.qty||1)>1?'s':''}</div>
         <div class="conv-row">
           <div class="conv-bar"><div class="conv-fill" style="width:${Math.min(100,Math.abs(netPct)*2)}%;background:${pnlColor}"></div></div>
           <div class="conv-num" style="color:${pnlColor}">${netSign}${netPct}%${feeStr?' net':''}</div>
         </div>
-        <div class="reason">entry ${card.entryCents||'?'}¢ · gross ${grossSign}${grossPct}% · <span style="color:var(--muted)">${feeStr||'no fee data'}</span>${netDollars?` <span style="float:right;color:${pnlColor}">${netDollars}</span>`:''}</div>
+        <div class="reason">Entered @ ${card.entryCents||'?'}¢ · ${stale?'settled':'P&L: '+grossSign+grossPct+'%'} · <span style="color:var(--muted)">${feeStr||'no exit fee'}</span>${netDollars?` <span style="float:right;color:${pnlColor}">${netDollars}</span>`:''}</div>
+      </div>
+      <div class="card-meta">
+        <span class="meta-badge">${card.ticker?.split('-')[0]||'POS'}</span>
+        <span style="flex:1">${card.ticker?.slice(-20)||''}</span>
+        ${card.maxPayoutCents?`<span>max $${(card.maxPayoutCents/100).toFixed(2)}</span>`:''}
       </div>
       <div class="sides">
         ${(sl=>{
-          return `<div class="side yes"><div class="lbl">${sl.y}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div></div>
-        <div class="side no"><div class="lbl">${sl.n}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div></div>`;
+          const yPct=stale?'—':card.yesPct==null?'—':card.yesPct+'%';
+          const nPct=stale?'—':card.yesPct==null?'—':noPct+'%';
+          return `<div class="side yes"><div class="lbl">${sl.y}</div><div class="pct">${yPct}</div><div class="side-why">${why.y}</div></div>
+        <div class="side no"><div class="lbl">${sl.n}</div><div class="pct">${nPct}</div><div class="side-why">${why.n}</div></div>`;
         })(sideLabels(card))}
+      </div>
+      <div class="card-actions">
+        <button class="btn-hold" onclick="act('pass')">✕ Hold</button>
+        <button class="btn-exit" onclick="act('take')">✓ Exit</button>
       </div>`;
   }
 
   // ── Entry / exit card (engine suggestions) ───────────────────────────────────
+  // ── Convergence-profit card (high-probability side, 75-97¢) ─────────────────
+  if(card.kind==='convergence'){
+    const profit=card.profitCents||(100-(card.favAsk||0));
+    const roi=card.favAsk?Math.round(profit/(card.favAsk)*100):0;
+    const why3=parseSideWhy(card);
+    return `
+      <div class="stamp take">LOCK IN</div><div class="stamp pass">SKIP</div>
+      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span><span class="card-klass convergence">PROFIT PLAY</span></div>
+      <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
+      <div class="fav yes">
+        <div class="fav-tag">Buy ${fav.toUpperCase()} — lock in ${profit}¢ profit (${roi}% ROI)</div>
+        <div class="fav-act">${fav==='yes'?'▲':'▼'} BUY ${cleanTitle(card.favLabel,fav)}</div>
+        <div class="fav-px">@ ${card.favAsk}¢ ask · profit at resolution: <b style="color:var(--green)">+${profit}¢</b></div>
+        <div class="conv-row">
+          <div class="conv-bar"><div class="conv-fill" style="width:${card.favAsk}%;background:var(--green)"></div></div>
+          <div class="conv-num" style="color:var(--green)">${card.favAsk}% probability</div>
+        </div>
+        <div class="reason">${card.reason||''}</div>
+      </div>
+      <div class="card-meta">
+        <span class="meta-badge">${card.ticker?.split('-')[0]||'MKT'}</span>
+        <span style="flex:1">${card.ticker?.slice(-18)||''}</span>
+        ${card.minsToClose!=null?`<span>${card.minsToClose<60?card.minsToClose+'m':Math.round(card.minsToClose/60)+'h'} left</span>`:''}
+      </div>
+      <div class="sides">
+        ${(sl=>{
+          return `<div class="side yes"><div class="lbl">${sl.y}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div><div class="side-why">${why3.y}</div></div>
+        <div class="side no"><div class="lbl">${sl.n}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div><div class="side-why">${why3.n}</div></div>`;
+        })(sideLabels(card))}
+      </div>
+      <div class="card-actions">
+        <button class="btn-skip" onclick="act('pass')">✕ Skip</button>
+        <button class="btn-lockin" onclick="act('take')">✓ Lock In</button>
+      </div>`;
+  }
+
   const favClass=isExit?(card.exitTag==='TAKE-PROFIT'?'yes':'no'):fav;
   const ribbonClass=isExit&&card.exitTag==='TAKE-PROFIT'?'ribbon profit':'ribbon';
   const ribbon=isExit?`<div class="${ribbonClass}">⚠ SELL NOW · ${card.exitTag}${card.pnlPct!=null?' '+(card.pnlPct>=0?'+':'')+card.pnlPct+'%':''}</div>`:'';
@@ -459,13 +569,14 @@ function cardInner(card){
   const stateBadge=(!isSell&&sl)?`<span class="state-badge ${sl}">${sl}</span>`:'';
   const traceHtml=(!isSell&&card.trace&&card.trace.length)?
     `<div class="engine-trace">${card.trace.map(t=>`<span class="trace-chip">${t.constraint} −${t.eliminated}</span>`).join('')}</div>`:'';
+  const why2=parseSideWhy(card);
   return `
-    <div class="stamp take">${isSell?'SELL':'TAKE'}</div><div class="stamp pass">PASS</div>
+    <div class="stamp take">${isSell?'EXIT':'TAKE'}</div><div class="stamp pass">PASS</div>
     ${ribbon}
     <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${stateBadge}<span class="card-klass ${klLabel}">${klLabel.toUpperCase()}</span></div>
     <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
     <div class="fav ${favClass}">
-      <div class="fav-tag">${isSell?'High-priority exit':'Favorable now'}</div>
+      <div class="fav-tag">${isSell?'Exit recommended':'Best entry now'}</div>
       <div class="fav-act">${act}</div>
       <div class="fav-px">${px}</div>
       <div class="conv-row">
@@ -475,9 +586,20 @@ function cardInner(card){
       <div class="reason">${card.reason||''}</div>
       ${traceHtml}
     </div>
+    <div class="card-meta">
+      <span class="meta-badge">${card.ticker?.split('-')[0]||'MKT'}</span>
+      <span style="flex:1">${card.ticker?.slice(-18)||''}</span>
+      ${card.minsToClose!=null?`<span>${card.minsToClose<60?card.minsToClose+'m':Math.round(card.minsToClose/60)+'h'} left</span>`:''}
+    </div>
     <div class="sides">
-      <div class="side yes"><div class="lbl">${card.yesLabel||'YES'}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div></div>
-      <div class="side no"><div class="lbl">${card.noLabel||'NO'}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div></div>
+      ${(sl=>{
+        return `<div class="side yes"><div class="lbl">${sl.y}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div><div class="side-why">${why2.y}</div></div>
+      <div class="side no"><div class="lbl">${sl.n}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div><div class="side-why">${why2.n}</div></div>`;
+      })(sideLabels(card))}
+    </div>
+    <div class="card-actions">
+      <button class="btn-pass" onclick="act('pass')">✕ Pass</button>
+      <button class="btn-take" onclick="act('take')">✓ ${isSell?'Exit':'Take'}</button>
     </div>`;
 }
 
@@ -491,6 +613,7 @@ function render(){
   const remaining=deck.length-idx;
   document.getElementById('progress').textContent=remaining>0?`${remaining} of ${deck.length} · soonest first`:'';
   if(idx>=deck.length){ stage.innerHTML=''; document.getElementById('end').style.display='flex'; return; }
+  document.getElementById('end').style.display='none';
   let html='';
   if(deck[idx+2]){
     html+=`<div class="card peek2">${cardInner(deck[idx+2])}</div>`;
@@ -515,28 +638,97 @@ setInterval(()=>{
   if(c){ c.textContent=cd.txt; c.className='countdown '+cd.cls; }
 },1000);
 
-// ── swipe ────────────────────────────────────────────────────────────────────
+// ── swipe with deadzone + minimum distance + velocity ────────────────────────
+// RIGHT (take): ≥150px swipe right → EXIT position (hard commit)
+// LEFT (pass): ≥150px swipe left → HOLD position (hard commit)
+// Deadzone: ±10px to ignore accidental taps
+// Time: must complete within 500ms (velocity = distance/time)
 function attachSwipe(el){
   if(!el) return;
-  let startX=0,startY=0,dx=0,dy=0;
+  const DEADZONE=10, MIN_SWIPE=150, MAX_SWIPE_TIME=500;
+  let startX=0,startY=0,startMs=0,dx=0,dy=0,active=false;
   const take=el.querySelector('.stamp.take'), pass=el.querySelector('.stamp.pass');
-  const down=e=>{dragging=true;startX=(e.touches?e.touches[0]:e).clientX;startY=(e.touches?e.touches[0]:e).clientY;el.style.cursor='grabbing';el.style.transition='none';};
-  const move=e=>{
-    if(!dragging)return;
-    const p=e.touches?e.touches[0]:e;
-    dx=p.clientX-startX; dy=p.clientY-startY;
-    el.style.transform=`translate(${dx}px,${dy}px) rotate(${dx*0.05}deg)`;
-    take.style.opacity=Math.max(0,Math.min(1,dx/110));
-    pass.style.opacity=Math.max(0,Math.min(1,-dx/110));
+
+  const down=e=>{
+    dragging=true; active=true;
+    startX=(e.touches?e.touches[0]:e).clientX;
+    startY=(e.touches?e.touches[0]:e).clientY;
+    startMs=Date.now();
+    el.style.cursor='grabbing';
+    el.style.transition='none';
+    dx=0; dy=0;
   };
+
+  const move=e=>{
+    if(!dragging||!active) return;
+    const p=e.touches?e.touches[0]:e;
+    dx=p.clientX-startX;
+    dy=p.clientY-startY;
+
+    // Deadzone: if still in deadzone, don't show feedback
+    const inDeadzone=Math.abs(dx)<DEADZONE && Math.abs(dy)<DEADZONE;
+    if(inDeadzone){
+      el.style.transform='';
+      take.style.opacity=0;
+      pass.style.opacity=0;
+      return;
+    }
+
+    // Prevent vertical swipes (check if dx >> dy)
+    if(Math.abs(dy) > Math.abs(dx)*0.5){
+      active=false;  // not a horizontal swipe
+      return;
+    }
+
+    // Show feedback proportional to swipe distance
+    const swipePercent=Math.min(1, Math.abs(dx)/MIN_SWIPE);
+    el.style.transform=`translate(${dx}px,0) rotate(${dx*0.03}deg)`;
+
+    if(dx>DEADZONE){
+      take.style.opacity=swipePercent*0.8;
+      pass.style.opacity=0;
+    } else if(dx<-DEADZONE){
+      pass.style.opacity=swipePercent*0.8;
+      take.style.opacity=0;
+    } else {
+      take.style.opacity=0;
+      pass.style.opacity=0;
+    }
+  };
+
   const up=()=>{
-    if(!dragging)return; dragging=false; el.style.cursor='grab'; el.style.transition='transform .25s ease';
-    if(dx>120) flyOut('take'); else if(dx<-120) flyOut('pass');
-    else { el.style.transform=''; take.style.opacity=0; pass.style.opacity=0; }
+    if(!dragging) return;
+    dragging=false;
+    active=false;
+    el.style.cursor='grab';
+    el.style.transition='transform .25s ease';
+
+    const elapsed=Date.now()-startMs;
+    const absDx=Math.abs(dx);
+
+    // Require: min distance (150px) AND fast enough (<500ms)
+    if(elapsed<=MAX_SWIPE_TIME && absDx>=MIN_SWIPE){
+      if(dx>MIN_SWIPE) flyOut('take');        // RIGHT → EXIT
+      else if(dx<-MIN_SWIPE) flyOut('pass');  // LEFT → HOLD
+      else { reset(); }
+    } else {
+      reset();
+    }
+  };
+
+  const reset=()=>{
+    el.style.transform='';
+    take.style.opacity=0;
+    pass.style.opacity=0;
     dx=dy=0;
   };
-  el.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-  el.addEventListener('touchstart',down,{passive:true}); el.addEventListener('touchmove',move,{passive:true}); el.addEventListener('touchend',up);
+
+  el.addEventListener('mousedown',down);
+  window.addEventListener('mousemove',move);
+  window.addEventListener('mouseup',up);
+  el.addEventListener('touchstart',down,{passive:true});
+  el.addEventListener('touchmove',move,{passive:true});
+  el.addEventListener('touchend',up);
 }
 function flyOut(dir){
   const el=document.getElementById('front'); if(!el) return;
@@ -546,22 +738,48 @@ function flyOut(dir){
   setTimeout(()=>act(dir,true),180);
 }
 
+function blockTake(reason){
+  const t=document.getElementById('toast');
+  t.className='toast err show';
+  t.textContent='✕ Blocked — '+reason;
+  clearTimeout(blockTake._h); blockTake._h=setTimeout(()=>t.classList.remove('show'),3000);
+  idx++; render();
+}
+
 // ── act ───────────────────────────────────────────────────────────────────────
 async function act(dir,fromSwipe){
   if(busy||idx>=deck.length) return;
   if(dir==='pass'){ if(!fromSwipe) return flyOut('pass'); idx++; render(); return; }
   if(dir==='take' && !fromSwipe) return flyOut('take');
+
+  // ── Guard: refuse bad takes before anything fires ─────────────────────────
+  const card=deck[idx];
+  const isSell=card.kind==='exit'||card.kind==='position';
+  if(!isSell){
+    // Suggestion / signal / convergence card — enforce quality bar
+    if(card.minsToClose!=null&&card.minsToClose<=0){ blockTake('Market expired — time window closed'); return; }
+    if(card.marketFound===false){ blockTake('Market closed — no live data'); return; }
+    if(card.favAsk==null){ blockTake('No live ask price — cannot trade'); return; }
+    if(card.kind==='convergence'){
+      if(card.favAsk>90){ blockTake(`Margin too thin (${100-(card.favAsk||0)}¢ profit) — need 10¢ min`); return; }
+    } else {
+      if(card.favAsk<4||card.favAsk>96){ blockTake(`Market converged (${card.favAsk}¢) — no edge`); return; }
+      if((card.conviction||0)<40){ blockTake(`Edge too thin — ${card.conviction||0}% conviction`); return; }
+    }
+  } else {
+    // Position / exit card — only block if truly stale with no price
+    if(card.marketFound===false&&card.favAsk==null){ blockTake('Market settled — check your portfolio'); return; }
+  }
+
   busy=true;
   try {
-    const card=deck[idx];
     const side=card.favSide;
-    const isSell=card.kind==='exit'||card.kind==='position';
     const action=isSell?'sell':'buy';
     const qty=isSell?(card.qty||1):1;
     const o={ticker:card.ticker,side,action,type:'limit',count:qty,limitCents:card.favAsk||50};
     const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
     showResult(res,card);
-    if(!isSell && (res.mode==='dry_run'||res.mode==='live')) recordPaperTrade(card);
+    // paper recording removed — real live data only
     idx++; render();
     if(res.mode==='live') loadBalance();
   } catch(e) {
@@ -589,51 +807,6 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft') act('pass');
 });
 
-// ── simulated book ────────────────────────────────────────────────────────────
-const closingIds=new Set();
-
-function recordPaperTrade(card){
-  j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ticker:card.ticker,title:card.title||card.ticker,
-      side:card.favSide,action:'buy',count:1,limitCents:card.favAsk||50})});
-}
-
-async function closePaper(id,exitTag){
-  if(closingIds.has(id)) return;
-  closingIds.add(id);
-  await j('/paper-close',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id,exitTag})});
-}
-
-async function pollPaperBook(){
-  const d=await j('/paper-positions');
-  const positions=(d.positions||[]).filter(p=>!p.resolved&&!p.expired&&!p.error);
-  const el=document.getElementById('pbook');
-  if(positions.length===0){ el.style.display='none'; return; }
-  el.style.display='';
-  document.getElementById('pbook-count').textContent=positions.length+' open';
-  for(const p of positions){
-    if(p.autoExit&&!closingIds.has(p.id)) closePaper(p.id,p.autoExit);
-  }
-  const rows=positions.map(p=>{
-    const pct=p.pnlPct;
-    const pnlClass=pct==null?'':pct>=0?'pos':'neg';
-    const pnlTxt=pct==null?'...':(pct>=0?'+':'')+pct+'%';
-    const rowCls=p.autoExit==='STOP-LOSS'?'sl':p.autoExit==='TAKE-PROFIT'?'tp':'';
-    const tag=p.autoExit
-      ?`<span class="ptag ${p.autoExit==='STOP-LOSS'?'sl':'tp'}">${p.autoExit}</span>`
-      :(p.minsToClose!=null?`<span style="color:var(--muted)">${p.minsToClose}m</span>`:'');
-    const sideClass=p.side==='yes'?'pside-yes':'pside-no';
-    return `<div class="prow ${rowCls}">
-      <span class="pticker">${(p.title||p.ticker).slice(0,28)}</span>
-      <span class="${sideClass}">${p.side.toUpperCase()} @${p.entryCents||'?'}¢</span>
-      <span class="ppnl ${pnlClass}">${pnlTxt}</span>
-      ${tag}
-      <button class="pclose" aria-label="Close ${(p.title||p.ticker).slice(0,28)} position" onclick="closePaper('${p.id}','MANUAL');pollPaperBook()">×</button>
-    </div>`;
-  }).join('');
-  document.getElementById('pbook-rows').innerHTML=rows;
-}
 
 // ── image gallery ────────────────────────────────────────────────────────────
 let imageGalleryOpen=true;
@@ -685,10 +858,12 @@ document.addEventListener('keydown',e=>{
 });
 
 function init(){
-  loadConnection(); loadBalance(); syncDeck(); pollPaperBook(); loadImages();
+  // Restore saved theme
+  try{const t=localStorage.getItem('kalshi-theme');if(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀':'🌙';}}catch(_){}
+  loadConnection(); loadBalance(); syncDeck(); loadImages();
   setInterval(loadConnection,20000);
   setInterval(loadBalance,30000);
-  setInterval(()=>{ syncDeck(); pollPaperBook(); },SYNC_MS);
+  setInterval(syncDeck,SYNC_MS);
   setInterval(loadImages,60000);
 }
 document.addEventListener('DOMContentLoaded',init);
