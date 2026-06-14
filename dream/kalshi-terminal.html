@@ -375,6 +375,12 @@ function shortLabel(lbl,fallback){
   const clean=lbl.replace(/^(yes|no)\s+/i,'').trim();
   return clean.length>22?clean.slice(0,20)+'…':clean||fallback;
 }
+function sideLabels(card){
+  const y=shortLabel(card.yesLabel,'YES');
+  const n=shortLabel(card.noLabel,'NO');
+  // If API returns identical labels for both sides, fall back to YES/NO
+  return y===n ? {y:'YES',n:'NO'} : {y,n};
+}
 function convColor(v){ return v>=66?'var(--green)':v>=45?'var(--gold)':'var(--muted)'; }
 function fmtCountdown(card){
   if(card.close){
@@ -429,8 +435,10 @@ function cardInner(card){
         <div class="reason">entry ${card.entryCents||'?'}¢ · gross ${grossSign}${grossPct}% · <span style="color:var(--muted)">${feeStr||'no fee data'}</span>${netDollars?` <span style="float:right;color:${pnlColor}">${netDollars}</span>`:''}</div>
       </div>
       <div class="sides">
-        <div class="side yes"><div class="lbl">${shortLabel(card.yesLabel,'YES')}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div></div>
-        <div class="side no"><div class="lbl">${shortLabel(card.noLabel,'NO')}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div></div>
+        ${(sl=>{
+          return `<div class="side yes"><div class="lbl">${sl.y}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div></div>
+        <div class="side no"><div class="lbl">${sl.n}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div></div>`;
+        })(sideLabels(card))}
       </div>`;
   }
 
