@@ -7,6 +7,8 @@
 const http = require('http');
 const TradingAPIBridge = require('../lib/trading-api-bridge');
 const TraderAgent = require('../lib/trader-agent');
+const kalshiApi = require('../lib/kalshi-api');
+const kalshiLedger = require('../lib/kalshi-paper-ledger');
 const tradingMemory = require('../lib/trading-memory');
 const tradingStore = require('../lib/trading-store');
 const tradingNews = require('../lib/trading-news');
@@ -455,6 +457,144 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, { events }, 200);
     } catch (error) {
       sendJson(res, { error: 'Failed to fetch KALSHI events', details: error.message }, 503);
+    }
+    return true;
+  }
+
+  // ── Kalshi v2 authenticated endpoints (#397) ─────────────────────────────
+
+  // GET /api/trading/kalshi/balance
+  // Returns account balance in cents. Requires RSA credentials.
+  if (url.pathname === '/api/trading/kalshi/balance' && req.method === 'GET') {
+    if (!kalshiApi.hasCredentials()) {
+      sendJson(res, { error: 'Kalshi RSA credentials not configured (KALSHI_API_KEY_ID + KALSHI_PRIVATE_KEY)' }, 401);
+      return true;
+    }
+    try {
+      const data = await kalshiApi.getBalance();
+      sendJson(res, data);
+    } catch (err) {
+      sendJson(res, { error: err.message, status: err.status }, err.status || 502);
+    }
+    return true;
+  }
+
+  // GET /api/trading/kalshi/positions
+  // Returns open portfolio positions. Requires RSA credentials.
+  if (url.pathname === '/api/trading/kalshi/positions' && req.method === 'GET') {
+    if (!kalshiApi.hasCredentials()) {
+      sendJson(res, { error: 'Kalshi RSA credentials not configured' }, 401);
+      return true;
+    }
+    try {
+      const data = await kalshiApi.getPositions();
+      sendJson(res, data);
+    } catch (err) {
+      sendJson(res, { error: err.message, status: err.status }, err.status || 502);
+    }
+    return true;
+  }
+
+  // GET /api/trading/kalshi/markets
+  // Public — all open markets, optionally filtered by series_ticker or category.
+  if (url.pathname === '/api/trading/kalshi/markets' && req.method === 'GET') {
+    try {
+      const params = {};
+      if (url.searchParams.get('series_ticker')) params.series_ticker = url.searchParams.get('series_ticker');
+      if (url.searchParams.get('limit'))         params.limit = url.searchParams.get('limit');
+      const data = await kalshiApi.getMarkets(params);
+      sendJson(res, data);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 503);
+    }
+    return true;
+  }
+
+  // GET /api/trading/kalshi/crypto-markets  (#398)
+  // Discover BTC/ETH/SOL/XRP/DOGE 15-min markets via series_ticker filter.
+  if (url.pathname === '/api/trading/kalshi/crypto-markets' && req.method === 'GET') {
+    try {
+      const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+      const markets = await kalshiApi.getCryptoMarkets(limit);
+      sendJson(res, { markets, count: markets.length, series: kalshiApi.CRYPTO_SERIES });
+    } catch (err) {
+      sendJson(res, { error: err.message }, 503);
+    }
+    return true;
+  }
+
+  // GET /api/trading/kalshi/series  (#398 helper)
+  // Returns all available series tickers for market discovery.
+  if (url.pathname === '/api/trading/kalshi/series' && req.method === 'GET') {
+    try {
+      const data = await kalshiApi.getSeries();
+      sendJson(res, data);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 503);
+    }
+    return true;
+  }
+
+  // ── Kalshi paper trading endpoints ────────────────────────────────────────
+
+  // POST /api/trading/kalshi/paper-trade  — open a paper position
+  if (url.pathname === '/api/trading/kalshi/paper-trade' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await collectRequestBody(req));
+      const position = kalshiLedger.openPosition(body);
+      sendJson(res, { ok: true, position }, 201);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 400);
+    }
+    return true;
+  }
+
+  // POST /api/trading/kalshi/paper-close  — close a paper position
+  if (url.pathname === '/api/trading/kalshi/paper-close' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await collectRequestBody(req));
+      const { id, exitPriceCents, exitTag } = body;
+      if (!id) { sendJson(res, { error: 'id required' }, 400); return true; }
+      const record = kalshiLedger.closePosition(id, exitPriceCents || 50, exitTag || 'MANUAL');
+      if (!record) { sendJson(res, { error: 'position not found' }, 404); return true; }
+      sendJson(res, { ok: true, record });
+    } catch (err) {
+      sendJson(res, { error: err.message }, 400);
+    }
+    return true;
+  }
+
+  // GET /api/trading/kalshi/paper-positions  — open positions with live P&L
+  if (url.pathname === '/api/trading/kalshi/paper-positions' && req.method === 'GET') {
+    try {
+      const open = kalshiLedger.getOpenPositions();
+      // Enrich with live bid prices if available (best-effort, no auth needed for orderbook)
+      const priceMap = new Map();
+      await Promise.allSettled(
+        open.map(async (p) => {
+          try {
+            const ob = await kalshiApi.getOrderbook(p.ticker);
+            const bestBid = ob?.orderbook?.yes?.[0]?.[0] ?? p.entryCents;
+            priceMap.set(p.ticker, bestBid);
+          } catch { /* leave at entry price */ }
+        })
+      );
+      const positions = kalshiLedger.evaluatePositions(priceMap);
+      sendJson(res, { positions, count: positions.length });
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/kalshi/paper-history  — closed trade history (#400)
+  if (url.pathname === '/api/trading/kalshi/paper-history' && req.method === 'GET') {
+    try {
+      const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+      const history = kalshiLedger.getHistory(limit);
+      sendJson(res, history);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
     }
     return true;
   }
