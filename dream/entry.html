@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#7c6af7">
+  <title>Entry Details — Lantern OS</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    :root {
+      --bg: #0b0d14;
+      --surface: #13161f;
+      --surface2: #1a1d2a;
+      --border: #252840;
+      --text: #e8eaf6;
+      --muted: #7880a4;
+      --accent: #7c6af7;
+      --green: #4caf82;
+      --gold: #e2c97e;
+      --danger: #e05555;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    header .entry-meta {
+      margin-left: auto;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .back-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .video-player {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .video-player video {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+
+    .video-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .tab-button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab-button:hover {
+      color: var(--text);
+    }
+
+    .tab-button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .info-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .info-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .info-value {
+      font-size: 0.95rem;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    .badge-success {
+      background: rgba(76, 175, 130, 0.2);
+      color: var(--green);
+    }
+
+    .badge-processing {
+      background: rgba(226, 201, 126, 0.2);
+      color: var(--gold);
+    }
+
+    .badge-error {
+      background: rgba(224, 85, 85, 0.2);
+      color: var(--danger);
+    }
+
+    .highlights-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .highlight-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .highlight-header {
+      background: var(--surface);
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .highlight-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .highlight-score {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .highlight-bar {
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      margin-top: 6px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .highlight-fill {
+      height: 100%;
+      background: var(--accent);
+    }
+
+    .no-data {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .status-timeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .status-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .status-step.active {
+      border-color: var(--accent);
+      background: rgba(124, 106, 247, 0.1);
+    }
+
+    .status-step.completed {
+      border-color: var(--green);
+      background: rgba(76, 175, 130, 0.1);
+    }
+
+    .status-step-number {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .status-step.completed .status-step-number {
+      color: var(--green);
+    }
+
+    .status-step-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .artifacts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .artifact-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .artifact-icon {
+      font-size: 2.4rem;
+    }
+
+    .artifact-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+
+    .artifact-size {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .artifact-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .download-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .download-btn:hover {
+      background: var(--accent-hover);
+      opacity: 0.9;
+    }
+
+    .download-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .status-timeline {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .artifacts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <a href="/create.html" class="back-link">← Back to Dashboard</a>
+
+  <header>
+    <div>
+      <h1 id="entry-title">Loading...</h1>
+      <div class="entry-meta">
+        <span id="entry-date"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-button active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-button" onclick="switchTab('analysis')">Analysis</button>
+    <button class="tab-button" onclick="switchTab('renders')">Renders</button>
+    <button class="tab-button" onclick="switchTab('metadata')">Metadata</button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div id="overview" class="tab-panel active">
+    <!-- Status Timeline (Phase 10) -->
+    <div style="margin-bottom: 32px;">
+      <h3 style="margin: 0 0 16px; font-size: 1rem;">Processing Status</h3>
+      <div class="status-timeline" id="status-timeline">
+        <div class="status-step completed">
+          <div class="status-step-number">✓</div>
+          <div class="status-step-label">Uploaded</div>
+        </div>
+        <div class="status-step">
+          <div class="status-step-number">2</div>
+          <div class="status-step-label">Analyzing</div>
+        </div>
+        <div class="status-step">
+          <div class="status-step-number">3</div>
+          <div class="status-step-label">Generating</div>
+        </div>
+        <div class="status-step">
+          <div class="status-step-number">✓</div>
+          <div class="status-step-label">Complete</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div>
+        <div class="video-label">Original Upload</div>
+        <div class="video-player" id="original-player">
+          <p class="no-data">No video available</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="video-label">Highlight Render</div>
+        <div class="video-player" id="highlight-player">
+          <p class="no-data">No highlight render yet</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output Artifacts (Phase 9) -->
+    <div style="margin-top: 32px;">
+      <h3 style="margin: 0 0 16px; font-size: 1rem;">Generated Outputs</h3>
+      <div class="artifacts-grid" id="artifacts-grid">
+        <p class="no-data">No artifacts yet</p>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-label">Status</div>
+        <div class="info-value">
+          <span id="status-badge" class="badge badge-processing">Processing</span>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Created</div>
+        <div class="info-value" id="entry-created">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Description</div>
+        <div class="info-value" id="entry-description">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Project</div>
+        <div class="info-value" id="entry-project">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Tags</div>
+        <div class="info-value" id="entry-tags">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Type</div>
+        <div class="info-value" id="entry-type">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analysis Tab -->
+  <div id="analysis" class="tab-panel">
+    <div id="analysis-content" class="no-data">Loading analysis...</div>
+  </div>
+
+  <!-- Renders Tab -->
+  <div id="renders" class="tab-panel">
+    <h3>Render Outputs</h3>
+    <div class="content-grid">
+      <div>
+        <div class="video-label">Variant A</div>
+        <div class="video-player" id="variantA-player">
+          <p class="no-data">Not generated</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="video-label">Variant B</div>
+        <div class="video-player" id="variantB-player">
+          <p class="no-data">Not generated</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="video-label">Variant C</div>
+        <div class="video-player" id="variantC-player">
+          <p class="no-data">Not generated</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metadata Tab -->
+  <div id="metadata" class="tab-panel">
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-label">Entry ID</div>
+        <div class="info-value" id="metadata-id">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Type</div>
+        <div class="info-value" id="metadata-type">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Created</div>
+        <div class="info-value" id="metadata-created">—</div>
+      </div>
+
+      <div class="info-box">
+        <div class="info-label">Updated</div>
+        <div class="info-value" id="metadata-updated">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/theme-toggle.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const entryId = params.get("id");
+
+if (!entryId) {
+  document.body.innerHTML = '<p style="padding: 24px; color: red;">Entry ID required</p>';
+} else {
+  loadEntry();
+}
+
+async function loadEntry() {
+  try {
+    const response = await fetch(`/api/creator-entries/${entryId}`);
+    if (!response.ok) {
+      document.body.innerHTML = '<p style="padding: 24px; color: red;">Entry not found</p>';
+      return;
+    }
+
+    const data = await response.json();
+    const entry = data.entry;
+    const analysis = data.analysis;
+
+    // Format timestamps with timezone (Phase 6)
+    const createdDate = new Date(entry.createdAt);
+    const formattedCreated = formatDateTime(createdDate);
+
+    // Update page title
+    document.getElementById("entry-title").textContent = entry.title;
+    document.getElementById("entry-date").textContent = formattedCreated;
+
+    // Update overview tab
+    document.getElementById("entry-created").textContent = formattedCreated;
+    document.getElementById("entry-description").textContent = entry.description || "—";
+    document.getElementById("entry-project").textContent = entry.project || "—";
+    document.getElementById("entry-tags").textContent = entry.tags.join(", ") || "—";
+    document.getElementById("entry-type").textContent = entry.type || "—";
+
+    // Update metadata tab
+    document.getElementById("metadata-id").textContent = entry.id;
+    document.getElementById("metadata-type").textContent = entry.type;
+    document.getElementById("metadata-created").textContent = formattedCreated;
+    document.getElementById("metadata-updated").textContent = formattedCreated;
+
+    // Update status timeline (Phase 10)
+    updateStatusTimeline(entry.status);
+
+    // Load video players (Phase 7-8)
+    loadVideoPlayers(entry);
+
+    // Load artifacts (Phase 9)
+    loadArtifacts(entry);
+
+    // Load analysis
+    if (analysis) {
+      loadAnalysis(analysis);
+    } else {
+      document.getElementById("analysis-content").innerHTML =
+        '<p class="no-data">No analysis available yet</p>';
+    }
+
+    // Update status badge
+    const statusBadge = document.getElementById("status-badge");
+    if (entry.status === "analyzing") {
+      statusBadge.className = "badge badge-processing";
+      statusBadge.textContent = "🟡 Analyzing";
+    } else if (entry.status === "ready") {
+      statusBadge.className = "badge badge-success";
+      statusBadge.textContent = "🟢 Complete";
+    } else if (entry.status === "failed") {
+      statusBadge.className = "badge badge-error";
+      statusBadge.textContent = "🔴 Failed";
+    } else {
+      statusBadge.className = "badge badge-processing";
+      statusBadge.textContent = "📥 Uploaded";
+    }
+  } catch (err) {
+    console.error("Error loading entry:", err);
+    document.body.innerHTML =
+      '<p style="padding: 24px; color: red;">Error loading entry: ' +
+      err.message +
+      "</p>";
+  }
+}
+
+// Phase 6: Format timestamp with timezone
+function formatDateTime(date) {
+  const options = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short'
+  };
+  return date.toLocaleDateString('en-US', options);
+}
+
+// Phase 10: Update status timeline based on current status
+function updateStatusTimeline(status) {
+  const timeline = document.getElementById('status-timeline');
+  const steps = timeline.querySelectorAll('.status-step');
+
+  // Map statuses to step indices
+  const statusMap = {
+    'uploaded': 0,
+    'analyzing': 1,
+    'generating': 2,
+    'ready': 3,
+    'failed': -1
+  };
+
+  const currentStep = statusMap[status] ?? 0;
+
+  steps.forEach((step, index) => {
+    step.classList.remove('active', 'completed');
+
+    if (currentStep === -1) {
+      // Failed state
+      step.style.opacity = '0.5';
+    } else if (index < currentStep) {
+      step.classList.add('completed');
+    } else if (index === currentStep) {
+      step.classList.add('active');
+    }
+  });
+}
+
+// Phase 9: Load and display artifacts
+function loadArtifacts(entry) {
+  const artifactsGrid = document.getElementById('artifacts-grid');
+  const artifacts = [];
+
+  // Map entry renders and analysis to artifacts
+  if (entry.filePath) {
+    artifacts.push({
+      name: 'Original Video',
+      icon: '🎬',
+      path: entry.filePath,
+      type: 'video/mp4'
+    });
+  }
+
+  if (entry.renders?.highlight) {
+    artifacts.push({
+      name: 'Highlight Render',
+      icon: '⭐',
+      path: entry.renders.highlight,
+      type: 'video/mp4'
+    });
+  }
+
+  if (entry.renders?.variantA) {
+    artifacts.push({
+      name: 'Variant A',
+      icon: '📊',
+      path: entry.renders.variantA,
+      type: 'video/mp4'
+    });
+  }
+
+  if (entry.renders?.variantB) {
+    artifacts.push({
+      name: 'Variant B',
+      icon: '📊',
+      path: entry.renders.variantB,
+      type: 'video/mp4'
+    });
+  }
+
+  if (entry.renders?.variantC) {
+    artifacts.push({
+      name: 'Variant C',
+      icon: '📊',
+      path: entry.renders.variantC,
+      type: 'video/mp4'
+    });
+  }
+
+  if (entry.thumbnail) {
+    artifacts.push({
+      name: 'Thumbnail',
+      icon: '🖼️',
+      path: entry.thumbnail,
+      type: 'image/jpeg'
+    });
+  }
+
+  if (artifacts.length === 0) {
+    artifactsGrid.innerHTML = '<p class="no-data">No artifacts generated yet</p>';
+    return;
+  }
+
+  artifactsGrid.innerHTML = artifacts.map(artifact => `
+    <div class="artifact-card">
+      <div class="artifact-icon">${artifact.icon}</div>
+      <div class="artifact-name">${artifact.name}</div>
+      <div class="artifact-size" id="size-${artifact.path}">...</div>
+      <div class="artifact-actions">
+        <a href="/${artifact.path}" class="download-btn" download>
+          ⬇️ Download
+        </a>
+      </div>
+    </div>
+  `).join('');
+
+  // Load file sizes
+  artifacts.forEach(artifact => {
+    fetchFileSize(artifact.path);
+  });
+}
+
+// Fetch file size for display
+async function fetchFileSize(path) {
+  try {
+    const response = await fetch(`/${path}`, { method: 'HEAD' });
+    const size = response.headers.get('content-length');
+    if (size) {
+      const sizeEl = document.getElementById(`size-${path}`);
+      if (sizeEl) {
+        sizeEl.textContent = formatFileSize(parseInt(size));
+      }
+    }
+  } catch (err) {
+    // Size fetch failed, leave blank
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+}
+
+function loadVideoPlayers(entry) {
+  // Original video
+  if (entry.filePath) {
+    const videoPath = "/" + entry.filePath;
+    document.getElementById("original-player").innerHTML = `
+      <video controls preload="metadata" style="width: 100%; border-radius: 10px;">
+        <source src="${videoPath}" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    `;
+  }
+
+  // Highlight render
+  if (entry.renders.highlight) {
+    const videoPath = "/" + entry.renders.highlight;
+    document.getElementById("highlight-player").innerHTML = `
+      <video controls preload="metadata" style="width: 100%; border-radius: 10px;">
+        <source src="${videoPath}" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    `;
+  }
+
+  // Variants
+  const variants = ["variantA", "variantB", "variantC"];
+  for (const variant of variants) {
+    if (entry.renders[variant]) {
+      const videoPath = "/" + entry.renders[variant];
+      document.getElementById(`${variant}-player`).innerHTML = `
+        <video controls preload="metadata" style="width: 100%; border-radius: 10px;">
+          <source src="${videoPath}" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      `;
+    }
+  }
+}
+
+function loadAnalysis(analysis) {
+  let html = "";
+
+  if (analysis.highlights && analysis.highlights.length > 0) {
+    html += "<h4>Highlights Detected</h4>";
+    html += '<div class="highlights-list">';
+
+    for (let i = 0; i < analysis.highlights.length; i++) {
+      const hl = analysis.highlights[i];
+      const score = (hl.score * 100).toFixed(0);
+      html += `
+        <div class="highlight-item">
+          <div class="highlight-header">
+            <div class="highlight-title">Highlight ${i + 1}</div>
+            <div class="highlight-score">${hl.start.toFixed(1)}s - ${hl.end.toFixed(1)}s</div>
+            <div class="highlight-bar">
+              <div class="highlight-fill" style="width: ${score}%;"></div>
+            </div>
+            <div class="highlight-score" style="margin-top: 8px;">${score}% match</div>
+          </div>
+        </div>
+      `;
+    }
+
+    html += "</div>";
+  } else {
+    html = '<p class="no-data">No analysis data available</p>';
+  }
+
+  document.getElementById("analysis-content").innerHTML = html;
+}
+
+function switchTab(tabName) {
+  // Hide all panels
+  const panels = document.querySelectorAll(".tab-panel");
+  panels.forEach((panel) => panel.classList.remove("active"));
+
+  // Deactivate all buttons
+  const buttons = document.querySelectorAll(".tab-button");
+  buttons.forEach((btn) => btn.classList.remove("active"));
+
+  // Show selected panel
+  document.getElementById(tabName).classList.add("active");
+
+  // Activate clicked button
+  event.target.classList.add("active");
+}
+</script>
+</body>
+</html>

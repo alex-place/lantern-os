@@ -4,108 +4,165 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#7c6af7">
-  <title>Content Creator — Lantern OS</title>
+  <title>Creator Dashboard — Lantern OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
     :root {
-      --bg: #0b0d14;
-      --surface: #13161f;
-      --surface2: #1a1d2a;
-      --border: #252840;
-      --text: #e8eaf6;
-      --muted: #7880a4;
-      --accent: #7c6af7;
-      --green: #4caf82;
-      --gold: #e2c97e;
-      --danger: #e05555;
-    }
-
-    html, body {
-      min-height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Segoe UI", system-ui, sans-serif;
-      font-size: 15px;
-      line-height: 1.6;
-      margin: 0;
+      --radius: 14px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
+      --shadow-hover: 0 4px 16px rgba(0,0,0,0.1);
     }
 
     .page {
-      max-width: 960px;
+      max-width: 1120px;
       margin: 0 auto;
-      padding: 24px 24px 80px;
+      padding: 32px 24px 80px;
     }
 
-    header {
-      display: flex;
+    /* ── Header / Page Title ── */
+    .page-header {
+      margin-bottom: 48px;
+    }
+
+    .page-header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin: 0 0 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .page-header p {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    /* ── Hero Section ── */
+    .hero {
+      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px;
+      margin-bottom: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
       align-items: center;
+    }
+
+    .hero-content h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.3px;
+    }
+
+    .hero-content p {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin: 0 0 24px;
+      line-height: 1.6;
+    }
+
+    .hero-actions {
+      display: flex;
       gap: 12px;
-      padding-bottom: 18px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
+      flex-wrap: wrap;
     }
 
-    .logo {
-      width: 34px;
-      height: 34px;
-      background: var(--accent);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-
-    header h1 {
-      font-size: 1.1rem;
+    .hero-actions button {
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.95rem;
       font-weight: 600;
-      margin: 0;
+      cursor: pointer;
+      transition: all 0.2s ease;
     }
 
-    header p {
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin: 0;
+    .hero-actions .btn-primary {
+      background: var(--accent);
+      color: white;
     }
 
-    .nav {
-      margin-left: auto;
-      display: flex;
-      gap: 16px;
-      font-size: 0.82rem;
+    .hero-actions .btn-primary:hover {
+      background: var(--accent-hover);
+      box-shadow: var(--shadow-hover);
     }
 
-    .nav a {
-      color: var(--muted);
-      text-decoration: none;
-    }
-
-    .nav a:hover {
+    .hero-actions .btn-secondary {
+      background: var(--surface);
       color: var(--text);
+      border: 1px solid var(--border);
     }
 
-    .form-section {
+    .hero-actions .btn-secondary:hover {
+      border-color: var(--accent);
+      background: var(--surface2);
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .stat-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 12px;
       padding: 24px;
-      margin-bottom: 24px;
+      text-align: center;
     }
 
-    .form-section h2 {
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+    .stat-value {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
       color: var(--muted);
-      margin: 0 0 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Section Headers ── */
+    .section-header {
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .section-header h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .section-header p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    /* ── Upload Form ── */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 48px;
     }
 
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
     }
 
     .form-group {
@@ -115,9 +172,9 @@
     }
 
     .form-group label {
-      font-size: 0.82rem;
+      font-size: 0.9rem;
       font-weight: 600;
-      color: var(--muted);
+      color: var(--text);
     }
 
     .form-group input,
@@ -126,10 +183,16 @@
       background: var(--surface2);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 10px 12px;
+      padding: 12px 16px;
       color: var(--text);
       font-family: inherit;
       font-size: 0.95rem;
+    }
+
+    .form-group input::placeholder,
+    .form-group select::placeholder,
+    .form-group textarea::placeholder {
+      color: var(--muted);
     }
 
     .form-group input:focus,
@@ -137,63 +200,67 @@
     .form-group textarea:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.1);
+      box-shadow: 0 0 0 3px var(--accent-dim);
     }
 
     .form-group textarea {
       grid-column: 1 / -1;
-      min-height: 100px;
+      min-height: 120px;
       resize: vertical;
     }
 
     .upload-zone {
       grid-column: 1 / -1;
       border: 2px dashed var(--border);
-      border-radius: 8px;
-      padding: 32px;
+      border-radius: 12px;
+      padding: 48px 32px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s ease;
+      background: var(--surface2);
     }
 
     .upload-zone:hover {
       border-color: var(--accent);
-      background: rgba(124, 106, 247, 0.05);
+      background: var(--accent-dim);
     }
 
     .upload-zone.dragging {
       border-color: var(--accent);
-      background: rgba(124, 106, 247, 0.1);
-    }
-
-    .upload-zone p {
-      margin: 0 0 8px;
-      color: var(--muted);
+      background: var(--accent-dim);
     }
 
     .upload-zone .icon {
-      font-size: 32px;
-      margin-bottom: 12px;
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .upload-zone p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .upload-zone .file-input-button {
+      display: inline-block;
+      padding: 10px 24px;
+      background: var(--accent);
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .upload-zone .file-input-button:hover {
+      background: var(--accent-hover);
     }
 
     .upload-zone input[type="file"] {
       display: none;
-    }
-
-    .file-input-button {
-      display: inline-block;
-      padding: 8px 16px;
-      background: var(--accent);
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 600;
-      transition: opacity 0.2s ease;
-    }
-
-    .file-input-button:hover {
-      opacity: 0.9;
     }
 
     .file-preview {
@@ -213,16 +280,16 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
     }
 
     .file-preview-name {
       font-weight: 600;
       color: var(--text);
+      font-size: 0.95rem;
     }
 
     .file-preview-size {
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       color: var(--muted);
     }
 
@@ -233,6 +300,8 @@
       cursor: pointer;
       font-size: 0.9rem;
       padding: 4px 8px;
+      font-weight: 600;
+      transition: opacity 0.2s ease;
     }
 
     .file-preview-remove:hover {
@@ -244,11 +313,14 @@
       display: flex;
       gap: 12px;
       justify-content: flex-end;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
     }
 
     .btn {
-      padding: 10px 20px;
-      border-radius: 6px;
+      padding: 10px 24px;
+      border-radius: 8px;
       border: none;
       font-size: 0.95rem;
       font-weight: 600;
@@ -262,11 +334,11 @@
     }
 
     .btn-primary:hover {
-      opacity: 0.9;
+      background: var(--accent-hover);
     }
 
     .btn-primary:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
       cursor: not-allowed;
     }
 
@@ -280,64 +352,14 @@
       border-color: var(--accent);
     }
 
-    .recent-entries {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-    }
-
-    .recent-entries h2 {
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin: 0 0 18px;
-    }
-
-    .entry-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .entry-item {
-      padding: 12px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .entry-title {
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .entry-time {
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-
-    .entry-type {
-      display: inline-block;
-      padding: 2px 8px;
-      background: var(--accent);
-      color: white;
-      border-radius: 4px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
+    /* ── Status Messages ── */
     .status-message {
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
       display: none;
+      border: 1px solid;
+      font-size: 0.95rem;
     }
 
     .status-message.show {
@@ -345,83 +367,110 @@
     }
 
     .status-message.success {
-      background: rgba(76, 175, 130, 0.1);
-      border: 1px solid var(--green);
+      background: rgba(52, 211, 153, 0.1);
+      border-color: var(--green);
       color: var(--green);
     }
 
     .status-message.error {
-      background: rgba(224, 85, 85, 0.1);
-      border: 1px solid var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+      border-color: var(--danger);
       color: var(--danger);
     }
 
     .status-message.loading {
-      background: rgba(124, 106, 247, 0.1);
-      border: 1px solid var(--accent);
+      background: rgba(6, 182, 212, 0.1);
+      border-color: var(--accent);
       color: var(--accent);
     }
 
-    .tools-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-      margin-top: 24px;
-    }
-
-    .tools-section h2 {
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin: 0 0 18px;
-    }
-
+    /* ── Tools Grid ── */
     .tools-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-bottom: 48px;
     }
 
-    .tool-btn {
-      padding: 12px 16px;
-      background: var(--surface2);
+    .tool-card {
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      border-radius: var(--radius);
+      padding: 24px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 6px;
+      gap: 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
     }
 
-    .tool-btn:hover {
+    .tool-card:hover {
       border-color: var(--accent);
-      background: rgba(124, 106, 247, 0.1);
-      color: var(--accent);
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
     }
 
-    .tool-btn:disabled {
-      opacity: 0.5;
+    .tool-card.disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .tool-card-icon {
+      font-size: 2.4rem;
+    }
+
+    .tool-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .tool-card-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 0;
+      flex: 1;
+    }
+
+    .tool-card-status {
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: var(--surface2);
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .tool-card-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tool-card-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .tool-card-btn:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
     }
 
-    .tool-icon {
-      font-size: 1.2rem;
-    }
-
+    /* ── Results Panel ── */
     .results-panel {
       background: var(--surface2);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 16px;
+      padding: 20px;
       margin-top: 16px;
       max-height: 400px;
       overflow-y: auto;
@@ -433,21 +482,21 @@
     }
 
     .results-panel h3 {
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       font-weight: 600;
       color: var(--accent);
-      margin: 0 0 12px;
-      padding-bottom: 8px;
+      margin: 0 0 16px;
+      padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
     }
 
     .result-item {
       font-size: 0.85rem;
       color: var(--text);
-      margin-bottom: 8px;
-      padding: 8px;
-      background: rgba(124, 106, 247, 0.05);
-      border-radius: 4px;
+      margin-bottom: 12px;
+      padding: 12px;
+      background: var(--surface);
+      border-radius: 6px;
     }
 
     .result-stat {
@@ -455,7 +504,8 @@
       justify-content: space-between;
       align-items: center;
       font-size: 0.85rem;
-      margin: 6px 0;
+      margin: 8px 0;
+      padding: 6px 0;
     }
 
     .stat-label {
@@ -465,6 +515,163 @@
     .stat-value {
       color: var(--accent);
       font-weight: 600;
+    }
+
+    /* ── Projects Library ── */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .project-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .project-card:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+
+    .project-thumbnail {
+      aspect-ratio: 16 / 9;
+      background: var(--surface2);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .project-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .project-thumbnail .status-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 1.5rem;
+    }
+
+    .project-info {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .project-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 0;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .project-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .project-meta-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--border);
+    }
+
+    .project-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .project-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .project-actions a {
+      flex: 1;
+      display: block;
+      text-align: center;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .project-actions a:hover {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+    }
+
+    .empty-state .icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    .empty-state p {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 32px;
+        padding: 32px 24px;
+      }
+
+      .hero-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header h1 {
+        font-size: 1.8rem;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .projects-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tools-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      }
     }
   </style>
 </head>
@@ -488,145 +695,198 @@
 </nav>
 
 <div class="page">
-  <!-- Header -->
-  <header>
-    <div class="logo">✦</div>
-    <div>
-      <h1>Content Creator</h1>
-      <p>Upload and share your dreams, moments, and creative work</p>
-    </div>
-  </header>
+  <!-- Page Header -->
+  <div class="page-header">
+    <h1>Creator Dashboard</h1>
+    <p>Create, edit, analyze, and publish content from one place</p>
+  </div>
 
-  <!-- Status message -->
-  <div id="status" class="status-message"></div>
-
-  <!-- Creation form -->
-  <form id="create-form" class="form-section">
-    <h2>New Entry</h2>
-
-    <div class="form-grid">
-      <!-- Entry type -->
-      <div class="form-group">
-        <label for="type">Entry Type</label>
-        <select id="type" name="type" required>
-          <option value="video">Video</option>
-          <option value="note">Note</option>
-          <option value="project">Project</option>
-          <option value="highlight">Highlight</option>
-          <option value="dream">Dream</option>
-        </select>
-      </div>
-
-      <!-- Title -->
-      <div class="form-group">
-        <label for="title">Title</label>
-        <input type="text" id="title" name="title" placeholder="Give your entry a name" required>
-      </div>
-
-      <!-- Project/Collection -->
-      <div class="form-group">
-        <label for="project">Project / Collection</label>
-        <input type="text" id="project" name="project" placeholder="Optional">
-      </div>
-
-      <!-- Description -->
-      <div class="form-group">
-        <label for="description">Description</label>
-        <textarea id="description" name="description" placeholder="What's this about?"></textarea>
-      </div>
-
-      <!-- Tags -->
-      <div class="form-group">
-        <label for="tags">Tags (comma-separated)</label>
-        <input type="text" id="tags" name="tags" placeholder="dream, creative, personal">
-      </div>
-
-      <!-- File upload -->
-      <div class="form-group">
-        <label>File Upload</label>
-        <div id="upload-zone" class="upload-zone">
-          <div class="icon">📁</div>
-          <p><strong>Drag and drop a file here</strong></p>
-          <p style="font-size: 0.85rem;">or</p>
-          <button type="button" class="file-input-button" onclick="document.getElementById('file-input').click()">Choose File</button>
-          <input type="file" id="file-input" name="file" accept="video/*,audio/*,image/*,.pdf,.doc,.docx">
-        </div>
-
-        <!-- File preview -->
-        <div id="file-preview" class="file-preview">
-          <div class="file-preview-info">
-            <div>
-              <div class="file-preview-name" id="file-name"></div>
-              <div class="file-preview-size" id="file-size"></div>
-            </div>
-            <button type="button" class="file-preview-remove" onclick="clearFile()">Remove</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Form actions -->
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="resetForm()">Clear</button>
-        <button type="submit" class="btn btn-primary" id="submit-btn">Save Entry</button>
+  <!-- Hero Section -->
+  <div class="hero">
+    <div class="hero-content">
+      <h2>Welcome to Creator Tools</h2>
+      <p>Upload your content, analyze highlights, generate variants, and create captions with AI-powered tools.</p>
+      <div class="hero-actions">
+        <button class="btn-primary" onclick="document.querySelector('.upload-zone').scrollIntoView({ behavior: 'smooth' })">Upload Content</button>
+        <button class="btn-secondary" onclick="document.getElementById('recent-list').scrollIntoView({ behavior: 'smooth' })">View Projects</button>
       </div>
     </div>
-  </form>
-
-  <!-- Creator Suite Tools -->
-  <div class="tools-section">
-    <h2>Creator Suite V9 Tools</h2>
-    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 16px;">
-      Analyze uploads, generate variants, captions, and more
-    </p>
-
-    <!-- Analysis Tools -->
-    <h3 style="color: var(--muted); font-size: 0.8rem; margin-bottom: 12px; text-transform: uppercase;">Analysis & Processing</h3>
-    <div class="tools-grid">
-      <button type="button" class="tool-btn" onclick="analyzeHighlights()" id="analyze-btn">
-        <span class="tool-icon">🎬</span>
-        <span>Analyze Highlights</span>
-      </button>
-      <button type="button" class="tool-btn" onclick="generateVariants()" id="variants-btn" disabled>
-        <span class="tool-icon">📊</span>
-        <span>Generate Variants</span>
-      </button>
-      <button type="button" class="tool-btn" onclick="generateCaptions()" id="captions-btn" disabled>
-        <span class="tool-icon">📝</span>
-        <span>Generate Captions</span>
-      </button>
-      <button type="button" class="tool-btn" onclick="detectSafeZones()" id="safezones-btn" disabled>
-        <span class="tool-icon">🎯</span>
-        <span>Detect Safe Zones</span>
-      </button>
-    </div>
-
-    <!-- Results Panels -->
-    <div id="highlights-panel" class="results-panel">
-      <h3>Highlight Analysis</h3>
-      <div id="highlights-content"></div>
-    </div>
-
-    <div id="variants-panel" class="results-panel">
-      <h3>Retention Variants (A/B/C)</h3>
-      <div id="variants-content"></div>
-    </div>
-
-    <div id="captions-panel" class="results-panel">
-      <h3>Generated Captions</h3>
-      <div id="captions-content"></div>
-    </div>
-
-    <div id="safezones-panel" class="results-panel">
-      <h3>Safe Zones Detected</h3>
-      <div id="safezones-content"></div>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="total-projects">0</div>
+        <div class="stat-label">Total Projects</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="videos-processed">0</div>
+        <div class="stat-label">Videos Processed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="highlights-generated">0</div>
+        <div class="stat-label">Highlights Generated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="captions-generated">0</div>
+        <div class="stat-label">Captions Generated</div>
+      </div>
     </div>
   </div>
 
-  <!-- Recent entries -->
-  <div class="recent-entries">
-    <h2>Recent Entries</h2>
-    <div id="recent-list" class="entry-list">
-      <p style="color: var(--muted);">Loading entries...</p>
+  <!-- Status Messages -->
+  <div id="status" class="status-message"></div>
+
+  <!-- Upload Form -->
+  <div class="form-card">
+    <div class="section-header">
+      <div>
+        <h2>Upload New Project</h2>
+        <p>Add a new video, image, or document to your library</p>
+      </div>
+    </div>
+
+    <form id="create-form">
+      <div class="form-grid">
+        <!-- Entry Type -->
+        <div class="form-group">
+          <label for="type">Project Type</label>
+          <select id="type" name="type" required>
+            <option value="video">Video</option>
+            <option value="note">Note</option>
+            <option value="project">Project</option>
+            <option value="highlight">Highlight</option>
+            <option value="dream">Dream</option>
+          </select>
+        </div>
+
+        <!-- Title -->
+        <div class="form-group">
+          <label for="title">Project Title</label>
+          <input type="text" id="title" name="title" placeholder="Give your project a name" required>
+        </div>
+
+        <!-- Project/Collection -->
+        <div class="form-group">
+          <label for="project">Collection / Series</label>
+          <input type="text" id="project" name="project" placeholder="Optional: Organize by series">
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" placeholder="What's this project about?"></textarea>
+        </div>
+
+        <!-- Tags -->
+        <div class="form-group">
+          <label for="tags">Tags (comma-separated)</label>
+          <input type="text" id="tags" name="tags" placeholder="e.g. gaming, creative, personal">
+        </div>
+
+        <!-- File Upload -->
+        <div class="form-group">
+          <label>Upload File</label>
+          <div id="upload-zone" class="upload-zone">
+            <span class="icon">📁</span>
+            <p><strong>Drag and drop your file here</strong></p>
+            <p style="font-size: 0.85rem; margin: 0 0 12px;">or</p>
+            <button type="button" class="file-input-button" onclick="document.getElementById('file-input').click()">Choose File</button>
+            <input type="file" id="file-input" name="file" accept="video/*,audio/*,image/*,.pdf,.doc,.docx">
+          </div>
+
+          <!-- File Preview -->
+          <div id="file-preview" class="file-preview">
+            <div class="file-preview-info">
+              <div>
+                <div class="file-preview-name" id="file-name"></div>
+                <div class="file-preview-size" id="file-size"></div>
+              </div>
+              <button type="button" class="file-preview-remove" onclick="clearFile()">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="resetForm()">Clear Form</button>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Save Project</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Creator Suite Tools -->
+  <div style="margin-bottom: 48px;">
+    <div class="section-header" style="margin-bottom: 24px;">
+      <div>
+        <h2>Creator Tools</h2>
+        <p>Analyze uploads, generate variants, captions, and more</p>
+      </div>
+    </div>
+
+    <div class="tools-grid">
+      <div class="tool-card" id="highlight-tool">
+        <div class="tool-card-icon">🎬</div>
+        <h3 class="tool-card-title">Highlight Detection</h3>
+        <p class="tool-card-desc">Find the best moments automatically with motion, audio, and scene analysis.</p>
+        <div class="tool-card-status" id="highlight-status">Ready</div>
+        <button class="tool-card-btn" onclick="analyzeHighlights()" id="analyze-btn">Run Analysis</button>
+        <div id="highlights-panel" class="results-panel">
+          <h3>Highlight Analysis Results</h3>
+          <div id="highlights-content"></div>
+        </div>
+      </div>
+
+      <div class="tool-card disabled" id="variants-tool">
+        <div class="tool-card-icon">📊</div>
+        <h3 class="tool-card-title">Generate Variants</h3>
+        <p class="tool-card-desc">Create A/B/C retention variants optimized for different platforms.</p>
+        <div class="tool-card-status" id="variants-status">Waiting for analysis</div>
+        <button class="tool-card-btn" onclick="generateVariants()" id="variants-btn" disabled>Generate</button>
+        <div id="variants-panel" class="results-panel">
+          <h3>Retention Variants (A/B/C)</h3>
+          <div id="variants-content"></div>
+        </div>
+      </div>
+
+      <div class="tool-card disabled" id="captions-tool">
+        <div class="tool-card-icon">📝</div>
+        <h3 class="tool-card-title">Generate Captions</h3>
+        <p class="tool-card-desc">Automatically generate captions and subtitles from your video.</p>
+        <div class="tool-card-status" id="captions-status">Waiting for analysis</div>
+        <button class="tool-card-btn" onclick="generateCaptions()" id="captions-btn" disabled>Generate</button>
+        <div id="captions-panel" class="results-panel">
+          <h3>Generated Captions</h3>
+          <div id="captions-content"></div>
+        </div>
+      </div>
+
+      <div class="tool-card disabled" id="safezones-tool">
+        <div class="tool-card-icon">🎯</div>
+        <h3 class="tool-card-title">Safe Zones</h3>
+        <p class="tool-card-desc">Detect safe areas for text and graphics on your video.</p>
+        <div class="tool-card-status" id="safezones-status">Waiting for analysis</div>
+        <button class="tool-card-btn" onclick="detectSafeZones()" id="safezones-btn" disabled>Detect</button>
+        <div id="safezones-panel" class="results-panel">
+          <h3>Safe Zones Detected</h3>
+          <div id="safezones-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Projects Library -->
+  <div>
+    <div class="section-header" style="margin-bottom: 24px;">
+      <div>
+        <h2>Projects</h2>
+        <p>Your uploaded content and analysis results</p>
+      </div>
+    </div>
+
+    <div id="recent-list" class="projects-grid">
+      <div class="empty-state">
+        <div class="icon">📚</div>
+        <p>No projects yet. Upload your first project above.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -692,43 +952,78 @@ function showStatus(message, type) {
 }
 
 // Form submission
+let currentEntry = null;
+let currentHighlightTimeline = null;
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const formData = new FormData();
-
-  // Pack form data as JSON
-  const entry = {
-    title: document.getElementById('title').value,
+  const entryData = {
+    title: document.getElementById('title').value || `Video ${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString('en-US', { hour12: false }).split(':').slice(0, 2).join('-')}`,
     type: document.getElementById('type').value,
     project: document.getElementById('project').value,
     description: document.getElementById('description').value,
     tags: document.getElementById('tags').value
   };
-  formData.append('entry', JSON.stringify(entry));
+
+  formData.append('entry', JSON.stringify(entryData));
 
   if (fileInput.files.length > 0) {
     formData.append('file', fileInput.files[0]);
   }
 
   submitBtn.disabled = true;
-  showStatus('Saving entry...', 'loading');
+  showStatus('Saving project...', 'loading');
 
   try {
-    const response = await fetch('/api/dreamer/upload', {
+    // Upload file via dreamer endpoint
+    const uploadResponse = await fetch('/api/dreamer/upload', {
       method: 'POST',
       body: formData
     });
 
-    if (response.ok) {
-      const result = await response.json();
-      showStatus('✓ Entry saved successfully', 'success');
-      resetForm();
-      loadRecentEntries();
-    } else {
-      const error = await response.json();
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.json();
       showStatus(`✗ Error: ${error.error}`, 'error');
+      submitBtn.disabled = false;
+      return;
     }
+
+    const uploadResult = await uploadResponse.json();
+    const filePath = uploadResult.file?.path;
+
+    // Create entry in new entry store
+    const entryCreateResponse = await fetch('/api/creator-entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: entryData.title,
+        description: entryData.description,
+        project: entryData.project,
+        tags: Array.isArray(entryData.tags) ? entryData.tags : (entryData.tags || '').split(',').map(t => t.trim()).filter(Boolean),
+        type: entryData.type,
+        filePath: filePath
+      })
+    });
+
+    if (!entryCreateResponse.ok) {
+      const error = await entryCreateResponse.json();
+      showStatus(`✗ Error: ${error.error}`, 'error');
+      submitBtn.disabled = false;
+      return;
+    }
+
+    const entryResult = await entryCreateResponse.json();
+    currentEntry = entryResult.entry;
+
+    showStatus('✓ Project saved successfully', 'success');
+    resetForm();
+    loadRecentEntries();
+
+    // Enable analysis tools
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('highlight-tool').classList.remove('disabled');
   } catch (err) {
     showStatus(`✗ Error: ${err.message}`, 'error');
   } finally {
@@ -739,43 +1034,51 @@ form.addEventListener('submit', async (e) => {
 // Load recent entries
 async function loadRecentEntries() {
   try {
-    const response = await fetch('/api/dreamer?user=dreamer');
+    const response = await fetch('/api/creator-entries');
     if (response.ok) {
       const data = await response.json();
       const list = document.getElementById('recent-list');
 
-      if (data.entries.length === 0) {
-        list.innerHTML = '<p style="color: var(--muted);">No entries yet. Create your first entry above.</p>';
+      if (!data.entries || data.entries.length === 0) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">📚</div><p>No projects yet. Upload your first project above.</p></div>';
         return;
       }
 
-      const recent = data.entries.slice(0, 5).reverse();
-      list.innerHTML = recent.map(entry => {
-        // Handle multiple possible field names for title
-        const title = entry.title || entry.name || 'Untitled';
+      // Update stats
+      updateStats(data.entries);
 
-        // Handle multiple possible field names for timestamp/date
-        let dateStr = 'Unknown date';
-        const timestamp = entry.timestamp || entry.recordedAt || entry.createdAt;
-        if (timestamp) {
-          try {
-            const date = new Date(timestamp);
-            if (!isNaN(date.getTime())) {
-              dateStr = date.toLocaleDateString();
-            }
-          } catch (e) {
-            dateStr = 'Invalid date';
-          }
-        }
+      // Sort by date, newest first
+      const sorted = [...data.entries].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        const type = entry.kind || entry.type || 'entry';
+      list.innerHTML = sorted.map(entry => {
+        const title = entry.title || `Video ${new Date(entry.createdAt).toLocaleDateString()}`;
+        const thumbnail = entry.thumbnail ? '/' + entry.thumbnail : '/placeholder.png';
+        const createdDate = new Date(entry.createdAt);
+        const formattedDate = createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+                             ' • ' + createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+        let statusBadge = '📥';
+        if (entry.status === 'analyzing') statusBadge = '🟡';
+        else if (entry.status === 'ready') statusBadge = '🟢';
+        else if (entry.status === 'failed') statusBadge = '🔴';
+
         return `
-          <div class="entry-item">
-            <div>
-              <div class="entry-title">${title}</div>
-              <div class="entry-time">${dateStr}</div>
+          <div class="project-card">
+            <div class="project-thumbnail">
+              <img src="${thumbnail}" alt="${title}" onerror="this.src='/placeholder.png';">
+              <div class="status-badge">${statusBadge}</div>
             </div>
-            <span class="entry-type">${type}</span>
+            <div class="project-info">
+              <h3 class="project-title">${title}</h3>
+              <div class="project-meta">
+                <span>${formattedDate}</span>
+                ${entry.project ? `<div class="project-meta-sep"></div><span>${entry.project}</span>` : ''}
+              </div>
+              ${entry.description ? `<p class="project-desc">${entry.description}</p>` : ''}
+              <div class="project-actions">
+                <a href="/entry.html?id=${entry.id}">View</a>
+              </div>
+            </div>
           </div>
         `;
       }).join('');
@@ -785,62 +1088,21 @@ async function loadRecentEntries() {
   }
 }
 
-// Creator Suite Tool Functions
+function updateStats(entries) {
+  const totalProjects = entries.length;
+  const videosProcessed = entries.filter(e => e.type === 'video' && e.status === 'ready').length;
+  const highlightsGenerated = entries.filter(e => e.analysis).length;
+  const captionsGenerated = entries.filter(e => e.renders?.highlight).length;
 
-let currentEntry = null;
-let currentHighlightTimeline = null;
+  document.getElementById('total-projects').textContent = totalProjects;
+  document.getElementById('videos-processed').textContent = videosProcessed;
+  document.getElementById('highlights-generated').textContent = highlightsGenerated;
+  document.getElementById('captions-generated').textContent = captionsGenerated;
+}
 
-// Track uploaded entry for processing
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const formData = new FormData();
-
-  // Pack form data as JSON
-  const entry = {
-    title: document.getElementById('title').value,
-    type: document.getElementById('type').value,
-    project: document.getElementById('project').value,
-    description: document.getElementById('description').value,
-    tags: document.getElementById('tags').value
-  };
-  formData.append('entry', JSON.stringify(entry));
-
-  if (fileInput.files.length > 0) {
-    formData.append('file', fileInput.files[0]);
-  }
-
-  submitBtn.disabled = true;
-  showStatus('Saving entry...', 'loading');
-
-  try {
-    const response = await fetch('/api/dreamer/upload', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      currentEntry = result.record;
-      showStatus('✓ Entry saved successfully', 'success');
-      resetForm();
-      loadRecentEntries();
-
-      // Enable analysis tools
-      document.getElementById('analyze-btn').disabled = false;
-    } else {
-      const error = await response.json();
-      showStatus(`✗ Error: ${error.error}`, 'error');
-    }
-  } catch (err) {
-    showStatus(`✗ Error: ${err.message}`, 'error');
-  } finally {
-    submitBtn.disabled = false;
-  }
-});
-
+// Creator Suite Functions
 async function analyzeHighlights() {
-  if (!currentEntry || !currentEntry.file || !currentEntry.file.path) {
+  if (!currentEntry || !currentEntry.filePath) {
     showStatus('✗ Please upload a video first', 'error');
     return;
   }
@@ -850,12 +1112,11 @@ async function analyzeHighlights() {
   showStatus('Queuing analysis job...', 'loading');
 
   try {
-    // Queue the job (returns immediately with jobId)
     const response = await fetch('/api/creator/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        videoPath: currentEntry.file.path,
+        videoPath: currentEntry.filePath,
         options: {
           fps: 5,
           motionThreshold: 0.15,
@@ -868,12 +1129,7 @@ async function analyzeHighlights() {
 
     if (response.ok) {
       const result = await response.json();
-      const jobId = result.jobId;
-
-      showStatus('Queued! Waiting for analysis to start...', 'loading');
-
-      // Start polling for job progress
-      pollJobProgress(jobId, 'highlights');
+      pollJobProgress(result.jobId, 'highlights');
     } else {
       const error = await response.json();
       showStatus(`✗ Failed to queue job: ${error.error}`, 'error');
@@ -886,7 +1142,7 @@ async function analyzeHighlights() {
 }
 
 async function pollJobProgress(jobId, panelType) {
-  const maxAttempts = 300; // 2.5 minutes max (300 * 500ms)
+  const maxAttempts = 300;
   let attempts = 0;
 
   const pollInterval = setInterval(async () => {
@@ -897,22 +1153,18 @@ async function pollJobProgress(jobId, panelType) {
       if (!response.ok) return;
 
       const job = await response.json();
-
-      // Update status message with progress
       showStatus(`${job.progressMessage} (${job.progress}%)`, 'loading');
 
-      // Display progress
       const panel = document.getElementById(`${panelType}-panel`);
       const content = document.getElementById(`${panelType}-content`);
 
       if (job.status === 'processing' || job.status === 'pending') {
-        // Show progress bar
         let html = `<div style="margin-bottom: 12px;">
           <div style="font-size: 0.85rem; margin-bottom: 6px;">
             <strong>${job.progressMessage}</strong>
           </div>
           <div style="background: var(--surface2); height: 24px; border-radius: 4px; overflow: hidden;">
-            <div style="background: linear-gradient(90deg, var(--accent), #4caf82); height: 100%; width: ${job.progress}%; transition: width 0.3s; display: flex; align-items: center; justify-content: center;">
+            <div style="background: linear-gradient(90deg, var(--accent), var(--green)); height: 100%; width: ${job.progress}%; transition: width 0.3s; display: flex; align-items: center; justify-content: center;">
               <span style="font-size: 0.7rem; color: white; font-weight: 600;">${job.progress}%</span>
             </div>
           </div>
@@ -921,16 +1173,13 @@ async function pollJobProgress(jobId, panelType) {
         panel.classList.add('show');
       } else if (job.status === 'complete') {
         clearInterval(pollInterval);
-
-        // Display results
-        displayJobResults(job, panelType);
+        await displayJobResults(job, panelType);
         showStatus(`✓ ${job.type} complete!`, 'success');
       } else if (job.status === 'failed') {
         clearInterval(pollInterval);
         showStatus(`✗ Job failed: ${job.error}`, 'error');
       }
 
-      // Timeout after max attempts
       if (attempts >= maxAttempts) {
         clearInterval(pollInterval);
         showStatus('✗ Job timeout', 'error');
@@ -938,10 +1187,10 @@ async function pollJobProgress(jobId, panelType) {
     } catch (err) {
       console.error('Poll error:', err);
     }
-  }, 500); // Poll every 500ms
+  }, 500);
 }
 
-function displayJobResults(job, panelType) {
+async function displayJobResults(job, panelType) {
   const panel = document.getElementById(`${panelType}-panel`);
   const content = document.getElementById(`${panelType}-content`);
 
@@ -956,6 +1205,23 @@ function displayJobResults(job, panelType) {
   if (panelType === 'highlights' && job.result.timeline) {
     const timeline = job.result.timeline;
     currentHighlightTimeline = timeline;
+
+    if (currentEntry && currentEntry.id) {
+      try {
+        await fetch(`/api/creator-entries/${currentEntry.id}/analysis`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            duration: timeline.duration,
+            highlights: timeline.highlights,
+            topHighlights: timeline.topHighlights,
+            metadata: timeline.metadata
+          })
+        });
+      } catch (err) {
+        console.error('Error saving analysis:', err);
+      }
+    }
 
     html = `<div class="result-stat">
       <span class="stat-label">Duration:</span>
@@ -981,7 +1247,12 @@ function displayJobResults(job, panelType) {
 
     // Enable variant/caption buttons
     document.getElementById('variants-btn').disabled = false;
+    document.getElementById('variants-tool').classList.remove('disabled');
+    document.getElementById('variants-status').textContent = 'Ready';
+
     document.getElementById('captions-btn').disabled = false;
+    document.getElementById('captions-tool').classList.remove('disabled');
+    document.getElementById('captions-status').textContent = 'Ready';
   }
 
   content.innerHTML = html;
@@ -1055,7 +1326,7 @@ async function generateCaptions() {
 }
 
 async function detectSafeZones() {
-  if (!currentEntry || !currentEntry.file?.path) {
+  if (!currentEntry || !currentEntry.filePath) {
     showStatus('✗ Please upload a video first', 'error');
     return;
   }
@@ -1069,7 +1340,7 @@ async function detectSafeZones() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        videoPath: currentEntry.file.path,
+        videoPath: currentEntry.filePath,
         frameData: { width: 1920, height: 1080 }
       })
     });
@@ -1090,8 +1361,6 @@ async function detectSafeZones() {
 
 // Initial load
 loadRecentEntries();
-
-// Reload every 30 seconds
 setInterval(loadRecentEntries, 30000);
 </script>
 
