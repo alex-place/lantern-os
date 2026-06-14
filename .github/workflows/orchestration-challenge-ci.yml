@@ -17,6 +17,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   workflow-inventory:
     name: Workflow inventory
@@ -119,7 +122,7 @@ jobs:
       - name: Install pytest and bot test dependencies
         run: |
           python -m pip install --upgrade pytest pytest-asyncio pytest-timeout
-          python -m pip install "discord.py>=2.3.2" dpytest
+          python -m pip install "discord.py>=2.3.2" dpytest numpy
       - name: Run tests
         run: |
           python -m pytest tests -q --timeout=30 \

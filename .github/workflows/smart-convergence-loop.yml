@@ -12,6 +12,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GH_TOKEN: ${{ github.token }}
+
 jobs:
   cloud-convergence:
     name: Cloud repository convergence scan
@@ -22,13 +26,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Sync GitHub issues to agent slots
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
