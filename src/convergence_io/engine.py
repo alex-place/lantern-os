@@ -67,7 +67,9 @@ class ConvergenceIO:
         self.authority_gate.add_profile(dreamer_safety_nap())
 
         # Register default capability claims so the engine is usable out-of-the-box
-        for default_agent in ("auto", "lantern", "orion", ""):
+        # Includes all dream-chat agents so classifyIntent() results route cleanly
+        for default_agent in ("auto", "lantern", "orion", "keystone", "blinkbug",
+                               "waterfall", "xenon", "founder", ""):
             claim = CapabilityClaim(
                 agent_id=default_agent,
                 provider_id="pcsf-chain",

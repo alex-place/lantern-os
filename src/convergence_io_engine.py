@@ -1893,6 +1893,16 @@ if __name__ == "__main__":
     p_converge.add_argument("--persona", default="lantern")
     p_converge.add_argument("--provider", default=None)
 
+    # route-chat: ConvergenceIO primitive stack (DCF+NAP+CCF+PCSF+AAPF)
+    # wired to unified_agent_connector for real LLM calls.
+    # This is the recommended production chat path per the architecture audit.
+    p_route = sub.add_parser("route-chat")
+    p_route.add_argument("--message", default="Hello")
+    p_route.add_argument("--agent", default="auto")
+    p_route.add_argument("--kind", default="dream")
+    p_route.add_argument("--tier", default="wanderer")
+    p_route.add_argument("--system-prompt", default="")
+
     p_inspect = sub.add_parser("inspect")
 
     p_loop = sub.add_parser("loop")
@@ -1912,6 +1922,58 @@ if __name__ == "__main__":
         engine = TesseractEngine()
         result = engine.converge(args.message, {"persona": args.persona, "provider": args.provider})
         print(json.dumps(result, indent=2))
+    elif args.command == "route-chat":
+        # Wire ConvergenceIO.route_chat() to unified_agent_connector handlers.
+        # This activates the full primitive stack: DCF→NAP→CCF→PCSF→AAPF.
+        try:
+            from convergence_io.engine import ConvergenceIO
+            cio = ConvergenceIO(repo_root=REPO_ROOT)
+
+            # Register provider handlers from unified_agent_connector
+            try:
+                from unified_agent_connector import get_connector
+                connector = get_connector()
+
+                def _make_handler(provider_id: str) -> Any:
+                    def _handler(message: str, system_prompt: str = "", **kw: Any) -> Dict[str, Any]:
+                        tokens = []
+                        try:
+                            gen = connector.stream(
+                                message,
+                                persona_id=kw.get("agent_id", "lantern"),
+                                provider=provider_id,
+                                context=system_prompt,
+                            )
+                            for token in gen:
+                                if isinstance(token, str):
+                                    tokens.append(token)
+                        except Exception:
+                            return {}
+                        return {"text": "".join(tokens), "agent_name": kw.get("agent_id", "lantern")}
+                    return _handler
+
+                for pid in ["anthropic", "openai", "gemini", "ollama"]:
+                    cio.register_provider_handler(pid, _make_handler(pid))
+            except Exception:
+                pass  # No connector — PCSF will fall to offline
+
+            route_result = cio.route_chat(
+                message=args.message,
+                agent_id=args.agent,
+                kind=args.kind,
+                tier=args.tier,
+                system_prompt=args.system_prompt,
+            )
+            print(json.dumps({
+                "text":         route_result.text,
+                "persona":      route_result.agent_name,
+                "provider":     route_result.provider_used,
+                "source":       route_result.source,
+                "provenance_id": route_result.provenance_id,
+                "latency_ms":   route_result.latency_ms,
+            }))
+        except Exception as exc:
+            print(json.dumps({"text": f"[route-chat error: {exc}]", "source": "error", "persona": args.agent}))
     elif args.command == "inspect":
         engine = TesseractEngine()
         print(json.dumps(engine.inspect(), indent=2))

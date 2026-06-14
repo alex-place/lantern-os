@@ -760,7 +760,7 @@ async function handleStreamChat(req, url, res) {
   if (routeDecision.requires_convergence && !isKeystoneDebug && surfaceMode !== "three-doors") {
     sendToken(`Routing to ${routeLabel}...\n`);
     const convResult = await convergeMessage(message, routeDecision.agent, requestedProvider || null, {
-      timeoutMs: Number(process.env.CONVERGENCE_ROUTE_TIMEOUT_MS || 8000),
+      timeoutMs: Number(process.env.CONVERGENCE_ROUTE_TIMEOUT_MS || 20000),
     });
     if (convResult.reply && !convResult.error) {
       await appendConversationEntry({
