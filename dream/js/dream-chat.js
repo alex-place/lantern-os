@@ -468,6 +468,66 @@
               if (evt.type === "receipt") {
                 receiptInfo = evt;
               }
+              if (evt.type === "image" && evt.url) {
+                // Display image in the message bubble
+                cursor.remove();
+                let imgContainer = bubble.querySelector(".bubble-images");
+                if (!imgContainer) {
+                  imgContainer = document.createElement("div");
+                  imgContainer.className = "bubble-images";
+                  bubble.appendChild(imgContainer);
+                }
+                const img = document.createElement("img");
+                img.src = evt.url;
+                img.alt = evt.alt || "Response image";
+                img.className = "bubble-image";
+                img.style.maxWidth = "100%";
+                img.style.height = "auto";
+                img.style.borderRadius = "6px";
+                img.style.marginTop = "8px";
+                img.style.cursor = "pointer";
+                img.onclick = () => {
+                  // Open image in modal on click
+                  const modal = document.createElement("div");
+                  modal.className = "image-modal-overlay";
+                  modal.style.position = "fixed";
+                  modal.style.top = "0";
+                  modal.style.left = "0";
+                  modal.style.width = "100%";
+                  modal.style.height = "100%";
+                  modal.style.background = "rgba(0,0,0,0.9)";
+                  modal.style.display = "flex";
+                  modal.style.justifyContent = "center";
+                  modal.style.alignItems = "center";
+                  modal.style.zIndex = "10000";
+                  const closeBtn = document.createElement("button");
+                  closeBtn.textContent = "✕";
+                  closeBtn.style.position = "absolute";
+                  closeBtn.style.top = "20px";
+                  closeBtn.style.right = "20px";
+                  closeBtn.style.background = "rgba(255,255,255,0.2)";
+                  closeBtn.style.border = "1px solid white";
+                  closeBtn.style.color = "white";
+                  closeBtn.style.fontSize = "24px";
+                  closeBtn.style.cursor = "pointer";
+                  closeBtn.style.padding = "10px 16px";
+                  closeBtn.style.borderRadius = "4px";
+                  closeBtn.onclick = () => modal.remove();
+                  const modalImg = document.createElement("img");
+                  modalImg.src = evt.url;
+                  modalImg.alt = evt.alt || "Expanded image";
+                  modalImg.style.maxWidth = "90%";
+                  modalImg.style.maxHeight = "90%";
+                  modalImg.style.borderRadius = "8px";
+                  modal.appendChild(closeBtn);
+                  modal.appendChild(modalImg);
+                  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+                  document.body.appendChild(modal);
+                };
+                imgContainer.appendChild(img);
+                bubble.appendChild(cursor);
+                scrollToBottom();
+              }
               if (evt.type === "token" && evt.text) {
                 if (!hasTokens) { hasTokens = true; setThinking(false); }
                 fullText += evt.text;

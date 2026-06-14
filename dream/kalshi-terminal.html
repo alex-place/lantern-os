@@ -4,8 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/css/site.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap">
 <title>Kalshi Terminal — Lantern OS</title>
 <style>
+/* ── palette override: match kalshi-dashboard aesthetic ── */
+[data-theme="dark"]{
+  --bg:#0a0c10;
+  --surface:#12151c;
+  --surface2:#1a1f29;
+  --border:#2a313d;
+  --text:#e8eaf0;
+  --muted:#a4adbf;
+  --accent:#4a9eff;
+  --accent-dim:#1a2d4d;
+  --green:#00d4aa;
+  --gold:#f5a623;
+  --danger:#ff5f6d;
+  --shadow:0 2px 12px rgba(0,0,0,.45);
+  --shadow-hover:0 4px 24px rgba(0,0,0,.6);
+}
 body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
 /* ── nav status indicators ───────────────────────────────── */
@@ -13,8 +31,9 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .nav-stat b{color:var(--text);font-weight:600}
 
 /* ── mode bar ────────────────────────────────────────────── */
-.mode-bar{font-size:12px;text-align:center;padding:5px 16px;
-  background:var(--surface);border-bottom:1px solid var(--border);color:var(--muted)}
+.mode-bar{font-size:11px;text-align:center;padding:4px 16px;
+  background:var(--bg);border-bottom:1px solid var(--border);color:var(--muted);
+  font-family:'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.02em}
 
 /* ── sync progress bar ───────────────────────────────────── */
 .sync-bar{height:2px;background:var(--border);overflow:hidden;flex-shrink:0}
@@ -26,36 +45,36 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .stage{position:relative;width:min(440px,94vw);height:min(500px,62vh)}
 
 .card{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;
+  border-radius:10px;padding:18px;display:flex;flex-direction:column;
   box-shadow:var(--shadow);will-change:transform;touch-action:none;cursor:grab;user-select:none}
-.card.front{box-shadow:var(--shadow-hover);z-index:2}
-.card.peek{transform:scale(.94) translateY(16px);filter:brightness(.72);z-index:1;pointer-events:none;border-color:var(--border)}
-.card.peek2{transform:scale(.88) translateY(32px);filter:brightness(.55);z-index:0;pointer-events:none;border-color:var(--border)}
+.card.front{box-shadow:var(--shadow-hover);z-index:2;border-color:#3a4355}
+.card.peek{transform:scale(.94) translateY(18px);filter:brightness(.65);z-index:1;pointer-events:none}
+.card.peek2{transform:scale(.88) translateY(36px);filter:brightness(.45);z-index:0;pointer-events:none}
 .card.exit{border-color:var(--danger)}
 
 /* card content */
-.card-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:2px}
+.card-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:4px;gap:8px}
 .card-klass{font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:10px}
 .card-klass.position{color:var(--accent)}.card-klass.exit{color:var(--danger)}.card-klass.engine,.card-klass.suggestion{color:var(--gold)}.card-klass.crypto{color:var(--green)}
-.countdown{font-weight:600;font-family:ui-monospace,monospace;font-size:11px}
+.countdown{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px}
 .countdown.soon{color:var(--gold)}.countdown.now{color:var(--danger)}
 
-.card-q{font-size:19px;font-weight:700;line-height:1.3;margin:8px 0 8px;color:var(--text);
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card-q{font-size:17px;font-weight:600;line-height:1.4;margin:8px 0 12px;color:var(--text);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 
 /* favorable hero */
-.fav{border-radius:10px;padding:13px;margin:4px 0 10px;border:1px solid var(--border);background:var(--bg)}
-.fav.yes{border-color:var(--green)}.fav.no{border-color:var(--danger)}
+.fav{border-radius:8px;padding:12px 14px;margin:8px 0 12px;border:1px solid var(--border);background:var(--bg)}
+.fav.yes{border-color:var(--green);background:rgba(0,212,170,.04)}.fav.no{border-color:var(--danger);background:rgba(255,95,109,.04)}
 .fav-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .fav-act{font-size:21px;font-weight:800;margin:6px 0 4px;line-height:1.2;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .fav.yes .fav-act{color:var(--green)}.fav.no .fav-act{color:var(--danger)}
-.fav-px{font-size:12px;color:var(--muted);font-family:ui-monospace,monospace}
+.fav-px{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace}
 .conv-row{display:flex;align-items:center;gap:8px;margin-top:10px}
-.conv-bar{flex:1;height:5px;border-radius:3px;background:var(--surface2);overflow:hidden}
-.conv-fill{height:100%;border-radius:3px}
-.conv-num{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);min-width:54px;text-align:right}
-.reason{font-size:11px;color:var(--muted);margin-top:6px;min-height:13px;font-family:ui-monospace,monospace}
+.conv-bar{flex:1;height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.conv-fill{height:100%;border-radius:2px}
+.conv-num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:var(--muted);min-width:54px;text-align:right}
+.reason{font-size:11px;color:var(--muted);margin-top:6px;min-height:13px;font-family:'IBM Plex Mono',ui-monospace,monospace}
 
 /* exit ribbon */
 .ribbon{font-size:11px;padding:5px 10px;border-radius:7px;background:rgba(239,68,68,.1);
@@ -63,10 +82,11 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .ribbon.profit{background:rgba(52,211,153,.08);border-color:var(--green);color:var(--green)}
 
 /* sides */
-.sides{display:flex;gap:8px;margin-top:auto}
-.side{flex:1;border:1px solid var(--border);border-radius:8px;padding:7px;text-align:center;background:var(--bg)}
-.side .lbl{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.side .pct{font-family:ui-monospace,monospace;font-size:18px;font-weight:700;margin-top:2px}
+.sides{display:flex;gap:8px;margin-top:auto;padding-top:8px}
+.side{flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 6px;text-align:center;background:var(--bg)}
+.side .lbl{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-transform:uppercase;letter-spacing:.08em;font-family:'IBM Plex Mono',ui-monospace,monospace}
+.side .pct{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:19px;font-weight:600;margin-top:3px}
 .side.yes .pct{color:var(--green)}.side.no .pct{color:var(--danger)}
 
 /* stamps */
@@ -80,11 +100,11 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .state-badge.DETERMINED{color:var(--green);border-color:var(--green);background:rgba(52,211,153,.1)}
 .state-badge.CONFIDENT{color:var(--gold);border-color:var(--gold);background:rgba(251,191,36,.1)}
 .state-badge.UNCERTAIN{color:var(--muted);border-color:var(--border)}
-.engine-trace{font-family:ui-monospace,monospace;font-size:9px;color:var(--muted);margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+.engine-trace{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9px;color:var(--muted);margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
 .trace-chip{padding:1px 5px;border-radius:3px;background:var(--surface);border:1px solid var(--border)}
 
 /* progress + end screen */
-.progress{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:center;padding:3px}
+.progress{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:center;padding:3px}
 .end{text-align:center;color:var(--muted);font-size:15px;display:none;flex-direction:column;gap:12px;align-items:center}
 .reload{font-size:12px;padding:8px 20px;border-radius:8px;border:1px solid var(--accent);
   background:rgba(6,182,212,.1);color:var(--accent);cursor:pointer;font-weight:600}
@@ -100,8 +120,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* toast */
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(80px);
-  background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;
-  font-size:12px;font-family:ui-monospace,monospace;max-width:90vw;opacity:0;transition:.25s;z-index:50;white-space:pre-wrap}
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;
+  font-size:12px;font-family:'IBM Plex Mono',ui-monospace,monospace;max-width:90vw;opacity:0;transition:.25s;z-index:50;white-space:pre-wrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.dry{border-color:var(--green)}.toast.live{border-color:var(--danger)}.toast.err{border-color:var(--gold)}
 
@@ -125,6 +145,31 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ptag.sl{color:var(--danger);border-color:var(--danger)}.ptag.tp{color:var(--green);border-color:var(--green)}
 .pclose{margin-left:auto;cursor:pointer;color:var(--muted);font-size:13px;background:none;border:none;padding:2px 4px}
 .pclose:hover{color:var(--text)}
+
+/* image gallery panel */
+.image-gallery{padding:8px 16px;border-top:1px solid var(--border);flex-shrink:0;max-height:180px;overflow-y:auto}
+.image-gallery-title{font-size:10px;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;
+  display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;font-weight:600}
+.image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px}
+.image-item{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border);
+  background:var(--surface);aspect-ratio:1;cursor:pointer;transition:all .2s}
+.image-item:hover{border-color:var(--accent);transform:scale(1.05);box-shadow:0 0 12px rgba(6,182,212,.3)}
+.image-item img{width:100%;height:100%;object-fit:cover}
+.image-item-loader{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:24px;animation:spin .8s linear infinite}
+@keyframes spin{100%{transform:rotate(360deg)}}
+
+/* image modal */
+.image-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;
+  justify-content:center;z-index:100;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s}
+.image-modal-overlay.active{opacity:1;pointer-events:auto}
+.image-modal-content{position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;gap:12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px}
+.image-modal-img{max-width:100%;max-height:70vh;object-fit:contain}
+.image-modal-close{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);
+  color:var(--text);border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:16px;
+  transition:background .2s}
+.image-modal-close:hover{background:rgba(0,0,0,.8)}
 </style>
 </head>
 <body>
@@ -165,6 +210,21 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <div class="actions" role="region" aria-label="Card action buttons">
   <button class="btn-ghost" id="bPass" aria-label="Pass on current position" onclick="act('pass')" style="font-size:15px">← Pass</button>
   <button class="btn-primary" id="bTake" aria-label="Take current position" onclick="act('take')" style="font-size:15px">Take it →</button>
+</div>
+
+<div class="image-gallery" id="imageGallery" style="display:none" aria-label="Market chart and news images">
+  <div class="image-gallery-title">
+    <span>📊 Market Charts</span>
+    <button onclick="toggleGallery()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">▼</button>
+  </div>
+  <div class="image-grid" id="imageGrid"></div>
+</div>
+
+<div class="image-modal-overlay" id="imageModal" onclick="closeImageModal(event)">
+  <div class="image-modal-content" onclick="event.stopPropagation()">
+    <button class="image-modal-close" onclick="closeImageModal()">✕</button>
+    <img id="modalImage" class="image-modal-img" src="" alt="Full size image">
+  </div>
 </div>
 
 <div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
@@ -299,6 +359,22 @@ async function maybePrefetch(){
   finally{ prefetching=false; }
 }
 
+function cleanTitle(title,ticker){
+  if(!title) return ticker||'Market';
+  // Strip leading "yes " / "no " prefix from raw position labels
+  let clean=title.replace(/^(yes|no)\s+/i,'').trim();
+  // Only split on compound-market separators (", yes " / ", no "), NOT currency commas
+  const m=clean.match(/^(.+?),\s*(yes |no )/i);
+  if(m) clean=m[1].trim();
+  return clean.length>52?clean.slice(0,49)+'…':clean;
+}
+function shortLabel(lbl,fallback){
+  if(!lbl||lbl===fallback) return fallback;
+  // Garbage check: concatenated position list
+  if(/,\s*(yes|no)\s/i.test(lbl)) return fallback;
+  const clean=lbl.replace(/^(yes|no)\s+/i,'').trim();
+  return clean.length>22?clean.slice(0,20)+'…':clean||fallback;
+}
 function convColor(v){ return v>=66?'var(--green)':v>=45?'var(--gold)':'var(--muted)'; }
 function fmtCountdown(card){
   if(card.close){
@@ -341,10 +417,10 @@ function cardInner(card){
       <div class="stamp take">SELL</div><div class="stamp pass">HOLD</div>
       ${ribbon}
       <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span><span class="card-klass position">YOUR POSITION</span></div>
-      <h3 class="card-q">${card.title||card.ticker}</h3>
+      <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
       <div class="fav ${favClass}">
         <div class="fav-tag">${card.qty||1} × ${fav.toUpperCase()} · cash out</div>
-        <div class="fav-act">● SELL ${card.favLabel||fav.toUpperCase()}</div>
+        <div class="fav-act">● SELL ${cleanTitle(card.favLabel,fav)}</div>
         <div class="fav-px">@ ${card.favAsk!=null?card.favAsk+'¢':'mkt'} bid · ${card.qty||1} contract${(card.qty||1)>1?'s':''}</div>
         <div class="conv-row">
           <div class="conv-bar"><div class="conv-fill" style="width:${Math.min(100,Math.abs(netPct)*2)}%;background:${pnlColor}"></div></div>
@@ -353,8 +429,8 @@ function cardInner(card){
         <div class="reason">entry ${card.entryCents||'?'}¢ · gross ${grossSign}${grossPct}% · <span style="color:var(--muted)">${feeStr||'no fee data'}</span>${netDollars?` <span style="float:right;color:${pnlColor}">${netDollars}</span>`:''}</div>
       </div>
       <div class="sides">
-        <div class="side yes"><div class="lbl">${card.yesLabel||'YES'}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div></div>
-        <div class="side no"><div class="lbl">${card.noLabel||'NO'}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div></div>
+        <div class="side yes"><div class="lbl">${shortLabel(card.yesLabel,'YES')}</div><div class="pct">${card.yesPct==null?'—':card.yesPct+'%'}</div></div>
+        <div class="side no"><div class="lbl">${shortLabel(card.noLabel,'NO')}</div><div class="pct">${card.yesPct==null?'—':noPct+'%'}</div></div>
       </div>`;
   }
 
@@ -363,9 +439,10 @@ function cardInner(card){
   const ribbonClass=isExit&&card.exitTag==='TAKE-PROFIT'?'ribbon profit':'ribbon';
   const ribbon=isExit?`<div class="${ribbonClass}">⚠ SELL NOW · ${card.exitTag}${card.pnlPct!=null?' '+(card.pnlPct>=0?'+':'')+card.pnlPct+'%':''}</div>`:'';
   const klLabel=card.kind==='crypto'?'crypto':isExit?'exit':'signal';
+  const favLbl=card.favLabel?cleanTitle(card.favLabel,fav):fav.toUpperCase();
   const act=isSell
-    ? `● SELL ${card.favLabel||fav.toUpperCase()}`
-    : `${fav==='yes'?'▲':'▼'} BUY ${card.favLabel||fav.toUpperCase()}`;
+    ? `● SELL ${favLbl}`
+    : `${fav==='yes'?'▲':'▼'} BUY ${favLbl}`;
   const px=isSell
     ? `@ ${card.favAsk!=null?card.favAsk+'¢':'mkt'} · ${card.qty||1} contract${(card.qty||1)>1?'s':''}`
     : `@ ${card.favAsk!=null?card.favAsk+'¢':'mkt'} · 1 contract`;
@@ -378,7 +455,7 @@ function cardInner(card){
     <div class="stamp take">${isSell?'SELL':'TAKE'}</div><div class="stamp pass">PASS</div>
     ${ribbon}
     <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${stateBadge}<span class="card-klass ${klLabel}">${klLabel.toUpperCase()}</span></div>
-    <h3 class="card-q">${card.title||card.ticker}</h3>
+    <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
     <div class="fav ${favClass}">
       <div class="fav-tag">${isSell?'High-priority exit':'Favorable now'}</div>
       <div class="fav-act">${act}</div>
@@ -550,11 +627,61 @@ async function pollPaperBook(){
   document.getElementById('pbook-rows').innerHTML=rows;
 }
 
+// ── image gallery ────────────────────────────────────────────────────────────
+let imageGalleryOpen=true;
+
+async function loadImages(){
+  try{
+    const res=await fetch('/api/images');
+    const data=await res.json();
+    if(data.images&&data.images.length>0){
+      document.getElementById('imageGallery').style.display='';
+      renderImages(data.images);
+    }
+  }catch(e){
+    console.error('Failed to load images:',e);
+  }
+}
+
+function renderImages(images){
+  const grid=document.getElementById('imageGrid');
+  grid.innerHTML=images.slice(0,12).map(img=>`
+    <div class="image-item" onclick="openImageModal('${img.url||'/images/'+img.id}','${(img.filename||'image').replace(/'/g,"\\'")}')" title="${img.filename||'Image'}">
+      <img src="${img.url||'/images/'+img.id}" alt="${img.filename||'Market image'}" loading="lazy" onerror="this.parentElement.innerHTML='⚠'">
+    </div>
+  `).join('');
+}
+
+function openImageModal(url,title){
+  document.getElementById('modalImage').src=url;
+  document.getElementById('modalImage').alt=title;
+  document.getElementById('imageModal').classList.add('active');
+  document.body.style.overflow='hidden';
+}
+
+function closeImageModal(e){
+  if(e&&e.target!==document.getElementById('imageModal')) return;
+  document.getElementById('imageModal').classList.remove('active');
+  document.body.style.overflow='';
+}
+
+function toggleGallery(){
+  const gallery=document.getElementById('imageGallery');
+  const grid=document.getElementById('imageGrid');
+  imageGalleryOpen=!imageGalleryOpen;
+  grid.style.display=imageGalleryOpen?'':'none';
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeImageModal();
+});
+
 function init(){
-  loadConnection(); loadBalance(); syncDeck(); pollPaperBook();
+  loadConnection(); loadBalance(); syncDeck(); pollPaperBook(); loadImages();
   setInterval(loadConnection,20000);
   setInterval(loadBalance,30000);
   setInterval(()=>{ syncDeck(); pollPaperBook(); },SYNC_MS);
+  setInterval(loadImages,60000);
 }
 document.addEventListener('DOMContentLoaded',init);
 </script>

@@ -40,6 +40,23 @@
     .stat { background: rgba(0, 170, 85, 0.1); padding: 10px; border: 1px solid #00aa55; }
     .stat-label { font-size: 11px; color: #00aa55; }
     .stat-value { font-size: 18px; color: #00ff88; font-weight: bold; }
+
+    .image-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+    .image-item { border: 1px solid #00aa55; padding: 10px; background: rgba(0, 170, 85, 0.05); cursor: pointer; transition: all 0.2s; }
+    .image-item:hover { background: rgba(0, 170, 85, 0.15); border-color: #00ff88; }
+    .image-item img { max-width: 100%; height: auto; border: 1px solid #00ff88; }
+    .image-item .image-label { margin-top: 8px; font-size: 11px; color: #00aa55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .image-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; justify-content: center; align-items: center; }
+    .image-modal.active { display: flex; }
+    .image-modal-content { position: relative; max-width: 90%; max-height: 90%; }
+    .image-modal img { width: 100%; height: auto; border: 2px solid #00ff88; }
+    .image-modal .close-btn { position: absolute; top: -30px; right: 0; background: none; border: none; color: #00ff88; font-size: 24px; cursor: pointer; }
+
+    .image-upload { margin: 15px 0; padding: 15px; background: rgba(0, 170, 85, 0.05); border: 2px dashed #00aa55; }
+    .image-upload input[type="file"] { display: none; }
+    .image-upload label { cursor: pointer; color: #00ff88; display: block; text-align: center; }
+    .image-upload label:hover { color: #00dd66; }
   </style>
 </head>
 <body>
@@ -137,6 +154,26 @@
     <h2>💻 Claude Code Response (for comparison)</h2>
     <div class="response-panel">
       <pre id="claudeResponse">Ready for input...</pre>
+    </div>
+  </div>
+
+  <!-- IMAGE GALLERY -->
+  <div class="panel">
+    <h2>🖼️ Image Gallery</h2>
+    <div class="image-upload">
+      <label for="imageUpload">
+        📤 Click to upload image or drag & drop
+      </label>
+      <input type="file" id="imageUpload" accept="image/*" multiple />
+    </div>
+    <div id="imageGallery" class="image-gallery"></div>
+  </div>
+
+  <!-- IMAGE MODAL -->
+  <div id="imageModal" class="image-modal">
+    <div class="image-modal-content">
+      <button class="close-btn" onclick="closeImageModal()">&times;</button>
+      <img id="modalImage" src="" alt="Expanded view" />
     </div>
   </div>
 
@@ -285,6 +322,196 @@ function updateStats() {
     document.getElementById("statLatency").textContent = avgLatency + "ms";
   }
 }
+
+// Image Gallery Functions
+const imageStore = [];
+
+function initImageUpload() {
+  const fileInput = document.getElementById("imageUpload");
+  const imageGallery = document.getElementById("imageGallery");
+
+  fileInput.addEventListener("change", (e) => {
+    handleImageFiles(e.target.files);
+  });
+
+  // Drag & drop support
+  imageGallery.parentElement.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.style.opacity = "0.5";
+  });
+
+  imageGallery.parentElement.addEventListener("dragleave", (e) => {
+    e.currentTarget.style.opacity = "1";
+  });
+
+  imageGallery.parentElement.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.style.opacity = "1";
+    handleImageFiles(e.dataTransfer.files);
+  });
+}
+
+function handleImageFiles(files) {
+  const gallery = document.getElementById("imageGallery");
+
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageData = {
+        id: Date.now() + Math.random(),
+        src: e.target.result,
+        name: file.name,
+        timestamp: new Date().toLocaleString(),
+      };
+
+      imageStore.push(imageData);
+      addImageToGallery(imageData);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function addImageToGallery(imageData) {
+  const gallery = document.getElementById("imageGallery");
+  const item = document.createElement("div");
+  item.className = "image-item";
+  item.onclick = () => openImageModal(imageData.src, imageData.name);
+
+  item.innerHTML = `
+    <img src="${imageData.src}" alt="${imageData.name}" />
+    <div class="image-label" title="${imageData.name}">
+      ${imageData.name}
+    </div>
+    <div style="font-size: 9px; color: #006633; margin-top: 4px;">
+      ${imageData.timestamp}
+    </div>
+  `;
+
+  gallery.appendChild(item);
+}
+
+function openImageModal(src, alt) {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("modalImage");
+  img.src = src;
+  img.alt = alt;
+  modal.classList.add("active");
+}
+
+function closeImageModal() {
+  document.getElementById("imageModal").classList.remove("active");
+}
+
+// Server synchronization
+async function uploadImageToServer(base64Data, filename) {
+  try {
+    const resp = await fetch("/api/image/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: base64Data, name: filename }),
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const result = await resp.json();
+    console.log("Image uploaded to server:", result);
+    return result;
+  } catch (err) {
+    console.error("Failed to upload image to server:", err);
+    return null;
+  }
+}
+
+async function loadServerImages() {
+  try {
+    const resp = await fetch("/api/images");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    const data = await resp.json();
+    const gallery = document.getElementById("imageGallery");
+
+    // Clear existing images
+    gallery.innerHTML = "";
+
+    // Add server images
+    for (const image of data.images || []) {
+      const item = document.createElement("div");
+      item.className = "image-item";
+      item.onclick = () => openImageModal(image.url, image.filename);
+
+      item.innerHTML = `
+        <img src="${image.url}" alt="${image.filename}" />
+        <div class="image-label" title="${image.filename}">
+          ${image.filename}
+        </div>
+        <div style="font-size: 9px; color: #006633; margin-top: 4px;">
+          ${new Date(image.timestamp).toLocaleString()}
+        </div>
+      `;
+
+      gallery.appendChild(item);
+    }
+  } catch (err) {
+    console.error("Failed to load server images:", err);
+  }
+}
+
+// Override handleImageFiles to upload to server
+const originalHandleImageFiles = handleImageFiles;
+function handleImageFiles(files) {
+  const gallery = document.getElementById("imageGallery");
+
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64Data = e.target.result;
+
+      // Show locally immediately
+      const imageData = {
+        id: Date.now() + Math.random(),
+        src: base64Data,
+        name: file.name,
+        timestamp: new Date().toLocaleString(),
+      };
+
+      imageStore.push(imageData);
+      addImageToGallery(imageData);
+
+      // Upload to server in background
+      await uploadImageToServer(base64Data, file.name);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// Initialize on page load
+document.addEventListener("DOMContentLoaded", async () => {
+  initImageUpload();
+  await loadServerImages();
+});
+
+// Close modal when clicking outside the image
+document.getElementById("imageModal").addEventListener("click", (e) => {
+  if (e.target.id === "imageModal") {
+    closeImageModal();
+  }
+});
+
+// Add keyboard support
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeImageModal();
+  }
+});
+
+// Refresh gallery every 30 seconds if new images are uploaded
+setInterval(loadServerImages, 30000);
 </script>
 
 </body>

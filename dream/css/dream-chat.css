@@ -379,6 +379,39 @@
       50% { opacity: 0; }
     }
 
+    /* Images in bubbles */
+    .bubble-images {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .bubble-image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .bubble-image:hover {
+      transform: scale(1.02);
+      box-shadow: var(--shadow-hover);
+    }
+
+    /* Image modal overlay */
+    .image-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
     /* Suggestions */
     .suggestions {
       display: flex;
