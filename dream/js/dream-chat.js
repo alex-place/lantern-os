@@ -264,49 +264,61 @@
         });
       return;
     }
-    // !convergence / !convergance — loop + agent status + version
-    if (/^!convergan?ce$/i.test(text)) {
+    // !convergence / !convergance — loop + agent status + inspect + version
+    if (/^!converg(?:ence|ance)$/i.test(text)) {
       inputEl.value = "";
-      triggerAutoupdate("Auto-update");
       const sysRow = document.createElement("div");
       sysRow.className = "msg-row agent";
-      sysRow.innerHTML = `<div class="msg-label">System</div><div class="bubble">Running convergence loop…</div>`;
+      sysRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Running convergence loop…</div>`;
       messagesEl.appendChild(sysRow);
       scrollToBottom();
 
-      const runLoop     = fetch(`${serverBase}/api/actions/run-loop`, { method: "POST" });
+      const runLoop      = fetch(`${serverBase}/api/actions/run-loop`, { method: "POST" });
       const fetchVersion = fetch(`${serverBase}/api/version`).then(r => r.ok ? r.json() : null).catch(() => null);
       const fetchAgents  = fetch(`${serverBase}/api/dream/status/agents`).then(r => r.ok ? r.json() : null).catch(() => null);
+      const fetchInspect = fetch(`${serverBase}/api/actions/inspect`).then(r => r.ok ? r.json() : null).catch(() => null);
 
-      Promise.all([runLoop, fetchVersion, fetchAgents])
-        .then(async ([loopR, versionD, agentD]) => {
+      Promise.all([runLoop, fetchVersion, fetchAgents, fetchInspect])
+        .then(async ([loopR, versionD, agentD, inspectD]) => {
           const d = await loopR.json();
           const rawOut = d.stdout || "";
-          const rawErr = d.stderr || "";
-          const tag    = versionD?.version?.semver || versionD?.version?.tag || "unknown";
+          const tag    = versionD?.version?.semver || versionD?.version?.tag || "–";
           const commit = versionD?.version?.commit ? versionD.version.commit.slice(0, 7) : "?";
 
-          let promo = "";
+          // Parse convergence score + promotion from loop JSON output
+          let score = null, promo = null;
           try {
-            const jsonMatch = rawOut.match(/\{[\s\S]*"promotion_ready"[\s\S]*\}/);
-            if (jsonMatch) {
-              const loopJson = JSON.parse(jsonMatch[0]);
-              promo = loopJson.promotion_ready ? "✓ promotion_ready" : "✗ not ready";
-            }
+            const m = rawOut.match(/\{[\s\S]*"promotion_ready"[\s\S]*?\}/);
+            if (m) { const j = JSON.parse(m[0]); score = j.convergence_score; promo = j.promotion_ready; }
           } catch {}
 
-          const out = rawOut.slice(0, 500);
-          const err = rawErr.slice(0, 200);
+          const scoreStr = score != null ? `score ${(score * 100).toFixed(0)}%` : "";
+          const promoStr = promo === true ? "✓ promotion_ready" : promo === false ? "✗ not ready" : "";
+          const header = `<b>Convergence</b> ${loopR.ok ? "✓" : "✗"} · <code>${tag}</code> <code>${commit}</code> ${scoreStr} ${promoStr}`.trim();
 
-          const agentBlock = agentD?.text
-            ? `\n\n<b>Agent Fleet</b>\n<pre style="margin-top:4px;white-space:pre-wrap;font-size:12px;color:var(--accent);opacity:0.9;">${escapeHtml(agentD.text)}</pre>`
-            : "";
+          // Agent fleet block
+          let agentBlock = "";
+          if (agentD?.text) {
+            agentBlock = `<div style="margin-top:10px;padding:8px;background:var(--surface2);border-radius:6px;font-size:12px"><b>Agent Fleet</b><pre style="margin:4px 0 0;white-space:pre-wrap;color:var(--accent);opacity:0.9;">${escapeHtml(agentD.text)}</pre></div>`;
+          } else if (agentD?.queue) {
+            const q = agentD.queue;
+            agentBlock = `<div style="margin-top:10px;padding:8px;background:var(--surface2);border-radius:6px;font-size:12px"><b>Queue</b> — ${q.pending} pending · ${q.working} working · ${q.completed} done</div>`;
+          }
+
+          // CSF-agent top issue from inspect
+          let csfBlock = "";
+          const csf = inspectD?.csf_agent;
+          if (csf) {
+            if (csf.pending_specs > 0) {
+              csfBlock = `<div style="margin-top:8px;padding:8px;background:rgba(161,139,250,0.08);border-left:2px solid var(--accent);font-size:12px"><b>CSF Agent</b> · ${csf.pending_specs} spec${csf.pending_specs > 1 ? "s" : ""} awaiting review<br><span style="opacity:0.7">${(csf.specs || []).map(s => escapeHtml(s)).join(", ")}</span></div>`;
+            } else if (csf.top_issue) {
+              const t = csf.top_issue;
+              csfBlock = `<div style="margin-top:8px;padding:8px;background:rgba(6,182,212,0.06);border-left:2px solid var(--accent);font-size:12px"><b>Top Issue</b> · #${t.number} <a href="https://github.com/alex-place/lantern-os/issues/${t.number}" target="_blank" style="color:var(--accent)">${escapeHtml(t.title)}</a><br><span style="opacity:0.6">score ${(t.score * 100).toFixed(0)}% · run loop.py --once to generate spec</span></div>`;
+            }
+          }
 
           const bubble = sysRow.querySelector(".bubble");
-          bubble.innerHTML =
-            `<b>Convergence loop</b> ${loopR.ok ? "✓" : "✗"} <code>${tag}</code> <code>${commit}</code> ${promo}` +
-            agentBlock +
-            (out ? `\n<pre style="margin-top:6px;white-space:pre-wrap;font-size:11px;opacity:0.7;">${escapeHtml(out)}${err ? "\n---stderr---\n" + escapeHtml(err) : ""}</pre>` : "");
+          bubble.innerHTML = header + agentBlock + csfBlock;
           scrollToBottom();
         })
         .catch((e) => {
@@ -338,7 +350,7 @@
     }
 
     // !convergance log an issue <title> — POST to non-stream handler
-    if (/^!convergan?ce\s+log\s+an?\s+issue\s+/i.test(text)) {
+    if (/^!converg(?:ence|ance)\s+log\s+an?\s+issue\s+/i.test(text)) {
       if (emptyState) emptyState.style.display = "none";
       appendUserBubble(text);
       inputEl.value = "";
