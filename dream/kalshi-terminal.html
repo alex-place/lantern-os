@@ -795,6 +795,14 @@ async function act(dir,fromSwipe){
       if(card.favAsk<4||card.favAsk>96){ blockTake(`Market converged (${card.favAsk}¢) — no edge`); return; }
       if((card.conviction||0)<40){ blockTake(`Edge too thin — ${card.conviction||0}% conviction`); return; }
     }
+    // Cash sufficiency check for buy orders
+    const orderCostCents=card.favAsk||0;
+    const balData=await j('/balance');
+    const balanceCents=balData.error?0:(balData.balance||balData.balance_cents||0);
+    if(balanceCents<orderCostCents){
+      blockTake(`Insufficient balance — need $${(orderCostCents/100).toFixed(2)}, have $${(balanceCents/100).toFixed(2)}`);
+      return;
+    }
   } else {
     // Position / exit card — only block if truly stale with no price
     if(card.marketFound===false&&card.favAsk==null){ blockTake('Market settled — check your portfolio'); return; }
