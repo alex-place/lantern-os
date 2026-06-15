@@ -148,7 +148,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
           return { id, filename: f, url: `/images/${f}`, size: stat.size, timestamp: stat.mtime.toISOString() };
         })
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      sendJson(res, { images, count: images.length });
+      sendJson(res, { images, count: images.length }, 200);
     } catch (err) {
       sendJson(res, { error: err.message, images: [] }, 500);
     }
@@ -161,7 +161,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
     try {
       const success = deleteImage(imageId);
       if (success) {
-        sendJson(res, { success: true, id: imageId });
+        sendJson(res, { success: true, id: imageId }, 200);
       } else {
         sendJson(res, { error: "Image not found" }, 404);
       }
