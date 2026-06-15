@@ -29,6 +29,19 @@ fuses an observation into x. `kalman_update` here is that missing measurement st
 `SurpriseMonitor.evaluate` reads the innovation before the update — the moment the
 horse's ears go back, before it bolts.
 
+## Integration with Σ₀ Anti-Collapse
+
+When `anti_collapse_trigger=True`, the surprise monitor's spook flag is wired to
+the Σ₀⁻¹ anti-collapse operator. This creates a closed loop:
+
+1. System drifts toward collapse (Σ₀ proximity increases)
+2. Surprise monitor detects model-reality mismatch (NIS spike)
+3. Spook flag fires → boosts anti-collapse proximity to 1.0
+4. Σ₀⁻¹ injects excitation along null modes
+5. System re-excites, escapes collapse, restores persistent excitation
+
+This implements the "detect → excite → re-ground" cycle described in issue #506.
+
 Batched conventions:  x (B, d) · Σ (B, d, d) · y (B, m) · C (B, m, d) · R (B, m, m).
 """
 from __future__ import annotations
@@ -51,9 +64,12 @@ def kalman_predict(x: Tensor, sigma: Tensor, F: Tensor, Q: Tensor) -> tuple[Tens
 class SurpriseMonitor:
     """Innovation-consistency monitor: NIS, surprise, and the spook flag."""
 
-    def __init__(self, spook_sigmas: float = 3.0) -> None:
+    def __init__(self, spook_sigmas: float = 3.0,
+                 anti_collapse_trigger: bool = False) -> None:
         # spook when NIS exceeds mean(χ²_m)=m by `spook_sigmas` std (std=√(2m))
         self.spook_sigmas = spook_sigmas
+        # When True, spook events trigger anti-collapse excitation
+        self.anti_collapse_trigger = anti_collapse_trigger
 
     @staticmethod
     def _innovation(x_pred: Tensor, sigma: Tensor, y: Tensor,

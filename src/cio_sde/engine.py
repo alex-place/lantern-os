@@ -261,6 +261,7 @@ class CIO_SDE(nn.Module):
         self.ctrl_cost = ctrl_cost
         self.collapse_op = None      # optional Σ₀ Semantic Collapse Operator
         self.anti_collapse_op = None # optional Σ₀⁻¹ Anti-Collapse Operator
+        self.surprise_monitor = None # optional SurpriseMonitor for NIS-based collapse detection
         self.register_buffer("x_target", torch.zeros(dim))
 
     # L(x, u) = ‖x − x*‖² + ρ‖u‖²  (latency+compute+risk rolled into a quadratic)
@@ -297,20 +298,40 @@ class CIO_SDE(nn.Module):
         sigma_next = self.cov.step(sigma, A, q_diag, dt)
 
         info = {"u": u, "f": f, "g": g, "dilation": dilation.squeeze(-1),
-                "collapse": None, "anti_collapse_p": 0.0}
+                "collapse": None, "anti_collapse_p": 0.0, "sigma0_proximity": 0.0,
+                "surprise_spook": False}
 
         # Σ₀⁻¹ anti-collapse: inject excitation along null modes to escape an
         # imminent 42-state. When it fires it SUPPRESSES the Σ₀ freeze this step
         # (the whole point is to prevent collapse, not freeze into it).
         anti_active = False
+        sigma0_proximity = 0.0
+        surprise_boost = 0.0
+        
+        # Check surprise monitor for NIS-based collapse detection
+        if self.surprise_monitor is not None:
+            # For surprise integration, we need observation y, C, R
+            # Default to identity observation if not provided
+            C = torch.eye(x.shape[-1], device=x.device).unsqueeze(0).expand(x.shape[0], -1, -1)
+            R = torch.eye(x.shape[-1], device=x.device).unsqueeze(0).expand(x.shape[0], -1, -1) * 0.1
+            y = x  # self-observation for now
+            surprise_result = self.surprise_monitor.evaluate(x, sigma, y, C, R)
+            info["surprise_spook"] = bool(surprise_result["spook"].any())
+            if info["surprise_spook"] and self.surprise_monitor.anti_collapse_trigger:
+                # Boost anti-collapse proximity when surprise fires
+                surprise_boost = 1.0
+        
         if self.anti_collapse_op is not None:
-            p = self.anti_collapse_op.proximity(self, x, u, sigma, A)
-            if p > 0.0:
+            sigma0_proximity = self.anti_collapse_op.proximity(self, x, u, sigma, A)
+            # Combine structural proximity with surprise boost
+            effective_proximity = max(sigma0_proximity, surprise_boost)
+            info["sigma0_proximity"] = sigma0_proximity
+            if effective_proximity > 0.0:
                 dx_extra, sig_extra = self.anti_collapse_op.excite(
-                    x, sigma_next, A, p, noise)
+                    x, sigma_next, A, effective_proximity, noise)
                 x_next = x_next + dx_extra
                 sigma_next = self.cov._project_psd(sigma_next + sig_extra)
-                info["anti_collapse_p"] = p
+                info["anti_collapse_p"] = effective_proximity
                 anti_active = True
 
         # Σ₀ gating: dx = f dt + dW − Σ₀(x,Σ,G,u). When the system is

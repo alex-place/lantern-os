@@ -8,6 +8,7 @@ from src.cio_sde import (
     free_energy, gaussian_kl,
     SemanticCollapseOperator, CollapseOutcome,
     collapse_certificate, lyapunov_value, AntiCollapseOperator,
+    SurpriseMonitor,
 )
 
 
@@ -241,3 +242,49 @@ def test_anti_collapse_dormant_when_safe():
         m, x0, m.pcsf(x0, s0),
         s0, torch.eye(4).expand(8, 4, 4).clone())
     assert p == 0.0
+
+
+# ── Surprise Monitor Integration ───────────────────────────────────────────────
+
+def test_surprise_monitor_integration():
+    """Surprise monitor fires NIS canary and triggers anti-collapse excitation."""
+    m = _model()
+    # Create a system that will drift toward collapse
+    for p in m.graph.active.drift_net.parameters():
+        torch.nn.init.zeros_(p)
+    
+    # Wire surprise monitor to anti-collapse
+    m.surprise_monitor = SurpriseMonitor(spook_sigmas=3.0, anti_collapse_trigger=True)
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    m.collapse_op = SemanticCollapseOperator()
+    
+    x0, s0 = _init_state(scale=0.01)
+    _, _, tr = rollout(m, x0, s0, steps=30, base_seed=1)
+    
+    # Check that surprise spook fired at least once
+    spook_steps = [s["step"] for s in tr.steps if s.get("surprise_spook", False)]
+    assert len(spook_steps) > 0, "Surprise canary should fire during collapse approach"
+    
+    # Check that anti-collapse was triggered (proximity > 0)
+    anti_collapse_steps = [s for s in tr.steps if s.get("anti_collapse_p", 0) > 0]
+    assert len(anti_collapse_steps) > 0, "Anti-collapse should be triggered by surprise"
+    
+    # Check that system did not freeze (Σ₀ suppressed)
+    assert len(tr.collapses) == 0, "Σ₀ should be suppressed by anti-collapse"
+    
+    # Check that system re-excited (state norm increased)
+    norms = tr.x_norms()
+    assert norms[-1] > norms[0] * 2, "System should re-excite after surprise trigger"
+
+
+def test_sigma0_proximity_exposed():
+    """Σ₀ proximity signal is exposed in rollout trace."""
+    m = _model()
+    m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
+    x0, s0 = _init_state(scale=1.0)
+    _, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
+    
+    # Check that sigma0_proximity is recorded in trace
+    for step in tr.steps:
+        assert "sigma0_proximity" in step
+        assert 0.0 <= step["sigma0_proximity"] <= 1.0
