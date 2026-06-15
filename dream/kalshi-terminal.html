@@ -883,14 +883,58 @@ function toggleGallery(){
   grid.style.display=imageGalleryOpen?'':'none';
 }
 
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') closeImageModal();
+});
+
+// Polling interval references for visibility-based pausing
+let connInterval, balInterval, syncInterval, imgInterval;
+
 function init(){
   // Restore saved theme
   try{const t=localStorage.getItem('kalshi-theme');if(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀':'🌙';}}catch(_){}
   loadConnection(); loadBalance(); syncDeck(); loadImages();
-  setInterval(loadConnection,20000);
-  setInterval(loadBalance,30000);
-  setInterval(syncDeck,SYNC_MS);
-  setInterval(loadImages,60000);
+  
+  // Start polling with normal intervals
+  connInterval=setInterval(loadConnection,20000);
+  balInterval=setInterval(loadBalance,30000);
+  syncInterval=setInterval(syncDeck,SYNC_MS);
+  imgInterval=setInterval(loadImages,60000);
+  
+  // Pause/resume on visibility change to save API quota and battery
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      // Clear all intervals when tab is hidden
+      clearInterval(connInterval);
+      clearInterval(balInterval);
+      clearInterval(syncInterval);
+      clearInterval(imgInterval);
+      
+      // Set slow fallback intervals (30s for syncDeck, others 2x slower)
+      connInterval=setInterval(loadConnection,40000);
+      balInterval=setInterval(loadBalance,60000);
+      syncInterval=setInterval(syncDeck,30000);
+      imgInterval=setInterval(loadImages,120000);
+    }else{
+      // Clear slow intervals
+      clearInterval(connInterval);
+      clearInterval(balInterval);
+      clearInterval(syncInterval);
+      clearInterval(imgInterval);
+      
+      // Restore normal intervals
+      connInterval=setInterval(loadConnection,20000);
+      balInterval=setInterval(loadBalance,30000);
+      syncInterval=setInterval(syncDeck,SYNC_MS);
+      imgInterval=setInterval(loadImages,60000);
+      
+      // Immediate refresh on tab focus
+      loadConnection();
+      loadBalance();
+      syncDeck();
+      loadImages();
+    }
+  });
 }
 document.addEventListener('DOMContentLoaded',init);
 </script>
