@@ -149,4 +149,16 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     sendJson(res, { ok: true, data: tessData, generatedAt: new Date().toISOString() });
     return true;
   }
+  if (url.pathname === "/api/convergence/audit") {
+    try {
+      const { getAuditStats, getRecentEntries } = require(path.join(deps.repoRoot, "src", "convergence-audit"));
+      const stats = getAuditStats();
+      const recent = getRecentEntries(50);
+      sendJson(res, { ok: true, stats, recent, generatedAt: new Date().toISOString() });
+      return true;
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+      return true;
+    }
+  }
 };

@@ -319,16 +319,28 @@ SKIP_ALL_CHECKS=1 git commit -m "EMERGENCY: critical hotfix"
 
 ---
 
-## Monoworkstream Rule (Single-Dev Workflow)
+## Multi-Contributor Workstream Rule
 
-This repo enforces a **single workstream**: only one open feature PR at a time.
+This repo supports **multiple humans working in parallel** while maintaining quality gates.
 
+### AI Agents: One-PR-per-lane
+- AI agents (claude/, gemini/, codex/, devin/, grok/, openai/) are limited to **one open PR per agent lane**
+- This prevents AI agents from creating conflicting work in the same lane
+- Example: Only one `claude/*` PR can be open at a time
+
+### Humans: One-PR-per-contributor
+- Multiple humans can work in parallel on different branches
+- Each human contributor is limited to **one open PR at a time**
+- This prevents individual humans from creating conflicting work
+- Example: Alex can have one PR, while another contributor can have a different PR simultaneously
+
+### Rules
 - **Commits and pushes to a branch that already has an open PR are always allowed.**
-- **No new branches while any PR is open.** The pre-commit and pre-push hooks enforce this via GitHub CLI.
+- **No new branches while you have an open PR.** The pre-push hook enforces this via GitHub CLI.
 - **Exempt branches:** `gh-pages` (static site deploy) and `master` are long-lived branches and never count as a workstream.
 - **Emergency bypass:** `SKIP_MONOWORKSTREAM=1 git commit ...` or `SKIP_MONOWORKSTREAM=1 git push ...`
 
-**Note:** Multiple agents running concurrently via `.claude/agent-slots.json` is a core design feature, not a monoworkstream violation. The rule applies to Git branches / PRs, not to active agent slots.
+**Note:** Multiple agents running concurrently via `.claude/agent-slots.json` is a core design feature, not a workstream violation. The rule applies to Git branches / PRs, not to active agent slots.
 
 ---
 

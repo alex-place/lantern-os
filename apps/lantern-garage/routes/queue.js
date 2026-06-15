@@ -39,6 +39,28 @@ module.exports = async function queueRoutes(req, res, url, deps) {
       const raw = await collectRequestBody(req);
       const payload = JSON.parse(raw);
 
+      // If only issueNumber provided, fetch from GitHub
+      let title = payload.title;
+      let description = payload.description || "";
+      let labels = payload.labels || [];
+
+      if (payload.issueNumber && !title) {
+        try {
+          const { execSync } = require("child_process");
+          const ghData = execSync(
+            `gh issue view ${payload.issueNumber} --repo alex-place/lantern-os --json title,body,labels`,
+            { encoding: "utf8", timeout: 10000 }
+          );
+          const issue = JSON.parse(ghData);
+          title = issue.title;
+          description = issue.body || "";
+          labels = issue.labels?.map(l => l.name) || [];
+        } catch (ghErr) {
+          console.warn("[Queue] GitHub fetch failed, using minimal data:", ghErr.message);
+          title = title || `Issue #${payload.issueNumber}`;
+        }
+      }
+
       // Ensure queue directory exists
       const queuePath = path.join(repoRoot, "data", "agent-work-queue", "pending");
       if (!fs.existsSync(queuePath)) {
@@ -48,8 +70,9 @@ module.exports = async function queueRoutes(req, res, url, deps) {
       const work = {
         id: `issue-${payload.issueNumber}`,
         issueNumber: payload.issueNumber,
-        title: payload.title,
-        description: payload.description || "",
+        title,
+        description,
+        labels,
         priority: payload.priority || 0,
         assignedTo: null,
         assignedAt: null,
@@ -78,28 +101,31 @@ module.exports = async function queueRoutes(req, res, url, deps) {
     }
   }
 
-  // ── GET /api/queue/list/:status ──
-  if (url.pathname.startsWith("/api/queue/list/") && req.method === "GET") {
+  // ── GET /api/queue/list ──
+  if (url.pathname === "/api/queue/list" && req.method === "GET") {
     try {
-      const status = url.pathname.replace("/api/queue/list/", "");
+      const status = url.searchParams.get("status") || "pending";
       const queuePath = path.join(repoRoot, "data", "agent-work-queue", status);
 
       let items = [];
       if (fs.existsSync(queuePath)) {
-        // Read JSONL files
-        const files = fs.readdirSync(queuePath).filter((f) => f.endsWith(".jsonl"));
+        // Read JSON files (not JSONL)
+        const files = fs.readdirSync(queuePath).filter((f) => f.endsWith(".json"));
         files.forEach((f) => {
-          const content = fs.readFileSync(path.join(queuePath, f), "utf8");
-          const lines = content.trim().split("\n").filter((l) => l.length > 0);
-          lines.forEach((line) => {
-            try {
-              items.push(JSON.parse(line));
-            } catch (e) {
-              // Skip malformed lines
-            }
-          });
+          try {
+            const content = fs.readFileSync(path.join(queuePath, f), "utf8");
+            items.push(JSON.parse(content));
+          } catch (e) {
+            console.warn(`[Queue] Failed to parse ${f}:`, e.message);
+          }
         });
       }
+
+      // Sort by priority (descending) and creation time (ascending)
+      items.sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
 
       sendJson(res, {
         status,
@@ -108,6 +134,90 @@ module.exports = async function queueRoutes(req, res, url, deps) {
       });
       return true;
     } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+      return true;
+    }
+  }
+
+  // ── DELETE /api/queue/item/:id ──
+  if (url.pathname.startsWith("/api/queue/item/") && req.method === "DELETE") {
+    try {
+      const id = url.pathname.replace("/api/queue/item/", "");
+      const status = url.searchParams.get("status") || "pending";
+      const queuePath = path.join(repoRoot, "data", "agent-work-queue", status);
+      const itemPath = path.join(queuePath, `${id}.json`);
+
+      if (!fs.existsSync(itemPath)) {
+        sendJson(res, { error: `Item ${id} not found in ${status}` }, 404);
+        return true;
+      }
+
+      // Safety check: don't allow deleting assigned items
+      if (status === "assigned") {
+        sendJson(res, { error: "Cannot delete assigned items - use recover instead" }, 400);
+        return true;
+      }
+
+      fs.unlinkSync(itemPath);
+      sendJson(res, {
+        ok: true,
+        message: `Deleted item ${id} from ${status}`,
+      });
+      return true;
+    } catch (err) {
+      console.error("[Queue] Delete error:", err);
+      sendJson(res, { error: err.message }, 500);
+      return true;
+    }
+  }
+
+  // ── POST /api/queue/recover ──
+  if (url.pathname === "/api/queue/recover" && req.method === "POST") {
+    try {
+      const QueueManager = require(path.join(repoRoot, "src", "queue-manager"));
+      const queueManager = new QueueManager(path.join(repoRoot, "data", "agent-work-queue"));
+      const recovered = queueManager.recoverStaleAssigned();
+
+      sendJson(res, {
+        ok: true,
+        recovered: recovered.length,
+        items: recovered,
+        message: `Recovered ${recovered.length} stale assigned items`,
+      });
+      return true;
+    } catch (err) {
+      console.error("[Queue] Recover error:", err);
+      sendJson(res, { error: err.message }, 500);
+      return true;
+    }
+  }
+
+  // ── POST /api/queue/prioritize/:id ──
+  if (url.pathname.startsWith("/api/queue/prioritize/") && req.method === "POST") {
+    try {
+      const id = url.pathname.replace("/api/queue/prioritize/", "");
+      const queuePath = path.join(repoRoot, "data", "agent-work-queue", "pending");
+      const itemPath = path.join(queuePath, `${id}.json`);
+
+      if (!fs.existsSync(itemPath)) {
+        sendJson(res, { error: `Item ${id} not found in pending` }, 404);
+        return true;
+      }
+
+      const item = JSON.parse(fs.readFileSync(itemPath, "utf8"));
+      // Boost priority to max + 1
+      item.priority = 9999;
+      item.updatedAt = new Date().toISOString();
+      fs.writeFileSync(itemPath, JSON.stringify(item, null, 2));
+
+      sendJson(res, {
+        ok: true,
+        item,
+        message: `Prioritized item ${id}`,
+      });
+      return true;
+    } catch (err) {
+      console.error("[Queue] Prioritize error:", err);
       sendJson(res, { error: err.message }, 500);
       return true;
     }

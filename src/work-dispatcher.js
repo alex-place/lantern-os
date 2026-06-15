@@ -24,19 +24,49 @@ _queue.recoverStaleAssigned();
 
 /**
  * Return true if the lane already has an open PR — monoworkstream check.
+ * For AI agents: strict one-PR-per-lane (claude/, gemini/, etc.)
+ * For humans: per-contributor check (allow multiple humans, block same human with multiple PRs)
  * Bypass with SKIP_MONOWORKSTREAM=1.
  */
 function laneHasOpenPR(lane) {
   if (process.env.SKIP_MONOWORKSTREAM === "1") return false;
   const prefix = lane ? lane.replace(/\/$/, "") : null;
   if (!prefix) return false;
+  
+  // AI agents: strict one-PR-per-lane
+  const aiAgents = ["claude", "gemini", "codex", "devin", "grok", "openai"];
+  const isAiAgent = aiAgents.some(agent => prefix.startsWith(agent));
+  
   try {
-    const out = execSync(
-      `gh pr list --repo alex-place/lantern-os --state open --json headRefName`,
-      { encoding: "utf8", timeout: 10000 }
-    );
-    const prs = JSON.parse(out || "[]");
-    return prs.some((pr) => pr.headRefName.startsWith(prefix + "/"));
+    if (isAiAgent) {
+      // Check for any PR starting with this agent prefix
+      const out = execSync(
+        `gh pr list --repo alex-place/lantern-os --state open --json headRefName`,
+        { encoding: "utf8", timeout: 10000 }
+      );
+      const prs = JSON.parse(out || "[]");
+      return prs.some((pr) => pr.headRefName.startsWith(prefix + "/"));
+    } else {
+      // Humans: check per-contributor (not all humans)
+      const currentUser = execSync(
+        `gh api user --jq '.login'`,
+        { encoding: "utf8", timeout: 10000 }
+      ).trim();
+      
+      const out = execSync(
+        `gh pr list --repo alex-place/lantern-os --state open --json author,headRefName`,
+        { encoding: "utf8", timeout: 10000 }
+      );
+      const prs = JSON.parse(out || "[]");
+      
+      // Count PRs by this specific human (excluding AI agent lanes)
+      const humanPrs = prs.filter((pr) => 
+        pr.author?.login === currentUser && 
+        !aiAgents.some(agent => pr.headRefName.startsWith(agent + "/"))
+      );
+      
+      return humanPrs.length > 0;
+    }
   } catch {
     // gh not available or network error — allow dispatch to proceed
     return false;
