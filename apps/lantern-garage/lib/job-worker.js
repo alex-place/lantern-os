@@ -76,6 +76,13 @@ class JobWorker {
           });
           break;
 
+        case "safezones":
+          result = await processSafeZonesJob(job, this.repoRoot, (percent, msg) => {
+            job.setProgress(percent, msg);
+            this.jobQueue.updateJob(job);
+          });
+          break;
+
         default:
           throw new Error(`Unknown job type: ${job.type}`);
       }
@@ -156,11 +163,21 @@ async function processAnalyzeJob(job, repoRoot, updateProgress) {
   if (job.input.entryId) {
     try {
       const entryStore = require("./entry-store");
+      // Persist the timeline as analysis.json so Variants/Captions can be
+      // regenerated later from stored data without re-running ffmpeg.
+      entryStore.saveAnalysis(repoRoot, job.input.entryId, timelineJSON);
       entryStore.updateEntry(repoRoot, job.input.entryId, {
         scoreV10: scoreV10 || undefined,
         variantsV10: variantsV10 ? variantsV10.variants : undefined,
         captions: captions.map((c) => c.toJSON()),
+        status: "ready",
       });
+      // Stamp completion times for the stages this analyze produced, so the
+      // workspace can show "Analysis ✓ <timestamp>" after any refresh.
+      const stages = ["analyzed"];
+      if (variantsV10 && variantsV10.variants && variantsV10.variants.length) stages.push("variants");
+      if (captions && captions.length) stages.push("captions");
+      entryStore.touchStages(repoRoot, job.input.entryId, stages);
     } catch (e) {
       console.error("[job-worker] persist V10 results to entry failed:", e.message);
     }
@@ -227,7 +244,10 @@ async function processExportJob(job, repoRoot, updateProgress) {
     fs.mkdirSync(exportsDir, { recursive: true });
   }
 
-  const exportFile = path.join(exportsDir, `${job.id}-${format}.mp4`);
+  // Sanitize the format for use in a filename — "9:16" has a colon, which is an
+  // invalid path char on Windows (NTFS treats ':' as an ADS separator).
+  const safeFormat = String(format || "short").replace(/[^a-z0-9_-]/gi, "_");
+  const exportFile = path.join(exportsDir, `${job.id}-${safeFormat}.mp4`);
 
   // ── SafeZoneDetectorV2 crop plan (V10) ──
   // For crop mode, optionally compute a crop window that avoids slicing through
@@ -353,6 +373,34 @@ async function processExportJob(job, repoRoot, updateProgress) {
 
   const stats = fs.statSync(exportFile);
 
+  // ── Register the render onto the project (persistence fix) ──
+  // Previously the export landed only in data/creator/exports/ and was lost from
+  // the workspace on refresh. Now we copy it into the project's renders/ folder
+  // and record it (id/variant/path/duration/createdAt) so the Render Viewer shows
+  // it after any refresh or restart.
+  let renderRecord = null;
+  if (job.input.entryId && (validation.ok || validation.skipped)) {
+    try {
+      const entryStore = require("./entry-store");
+      const renderKey = job.input.renderKey || job.input.variant || "highlight";
+      // saveRender copies the file into entries/<id>/renders/ and sets renders[key]
+      entryStore.saveRender(repoRoot, job.input.entryId, renderKey, path.relative(repoRoot, exportFile));
+      const saved = entryStore.getEntry(repoRoot, job.input.entryId);
+      const renderRelPath = saved && saved.renders ? saved.renders[renderKey] : null;
+      renderRecord = entryStore.addRenderRecord(repoRoot, job.input.entryId, {
+        variant: renderKey,
+        renderKey,
+        path: renderRelPath || path.relative(repoRoot, exportFile),
+        durationSec: encodeInfo && typeof encodeInfo.durationTarget === "number" ? encodeInfo.durationTarget : null,
+        sizeBytes: stats.size,
+        validation: { ok: validation.ok === true, skipped: validation.skipped === true },
+      });
+      entryStore.touchStages(repoRoot, job.input.entryId, ["rendered"]);
+    } catch (e) {
+      console.error("[job-worker] register render onto entry failed:", e.message);
+    }
+  }
+
   updateProgress(100, "Export complete");
 
   return {
@@ -362,7 +410,45 @@ async function processExportJob(job, repoRoot, updateProgress) {
     created: stats.birthtime,
     encode: encodeInfo,
     validation,
+    renderRecord,
   };
+}
+
+async function processSafeZonesJob(job, repoRoot, updateProgress) {
+  const { videoPath } = job.input;
+  const fullPath = path.join(repoRoot, videoPath);
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`Video not found: ${videoPath}`);
+  }
+
+  updateProgress(15, "Sampling frames for facecam/HUD detection");
+
+  const meta = await probeSource(fullPath);
+  let result;
+  if (!meta.width || !meta.height) {
+    result = { status: "unavailable", reason: "source dimensions unknown (probe failed)" };
+  } else {
+    const plan = await analyzeForCrop(fullPath, { srcWidth: meta.width, srcHeight: meta.height });
+    result = plan; // { status, regions, cropPlan, framesSampled, ... } — honest "unavailable" when detection fails
+  }
+
+  updateProgress(85, "Persisting safe zones");
+
+  // Persist onto the project so crop previews reload after a refresh.
+  if (job.input.entryId) {
+    try {
+      const entryStore = require("./entry-store");
+      entryStore.updateEntry(repoRoot, job.input.entryId, {
+        safezones: { ...result, computedAt: new Date().toISOString() },
+      });
+      entryStore.touchStages(repoRoot, job.input.entryId, ["safezones"]);
+    } catch (e) {
+      console.error("[job-worker] persist safezones failed:", e.message);
+    }
+  }
+
+  updateProgress(100, "Safe zone detection complete");
+  return result;
 }
 
 async function processJob(job, repoRoot) {

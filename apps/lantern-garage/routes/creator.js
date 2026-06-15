@@ -168,9 +168,9 @@ module.exports = async function creatorRoutes(req, res, url, deps) {
         return true;
       }
 
-      const job = jobQueue.enqueue("analyze", {
+      const job = jobQueue.enqueue("safezones", {
         videoPath: body.videoPath,
-        options: { detectSafeZones: true },
+        entryId: body.entryId || null, // persist crop plan onto the project
       });
 
       sendJson(res, {

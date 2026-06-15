@@ -67,6 +67,17 @@ function probeSource(inputPath) {
   });
 }
 
+// Merge options over DEFAULTS but IGNORE undefined values, so a caller that
+// passes { width: undefined } (e.g. an export request that omits dimensions)
+// does not blow away the default and produce scale=undefined.
+function withDefaults(options = {}) {
+  const out = { ...DEFAULTS };
+  for (const [k, v] of Object.entries(options)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
 function isValidRect(rect) {
   if (!rect || typeof rect !== "object") return false;
   const { x, y, width, height } = rect;
@@ -119,7 +130,7 @@ function buildVideoFilter(fit, w, h, fps, cropRect) {
  * @returns {Promise<{outputPath, durationTarget, fit, hadAudioSource, fps, width, height}>}
  */
 async function reencodeToShortForm(inputPath, outputPath, options = {}) {
-  const cfg = { ...DEFAULTS, ...options };
+  const cfg = withDefaults(options);
   if (!fs.existsSync(inputPath)) {
     throw new Error(`source not found: ${inputPath}`);
   }
@@ -250,7 +261,7 @@ function runFfmpeg(args, timeoutMs) {
  * @returns {Promise<{outputPath, segments:number, durationTarget, fit, hadAudioSource}>}
  */
 async function renderSegments(inputPath, outputPath, segments, options = {}) {
-  const cfg = { ...DEFAULTS, ...options };
+  const cfg = withDefaults(options);
   if (!fs.existsSync(inputPath)) throw new Error(`source not found: ${inputPath}`);
   if (!Array.isArray(segments) || segments.length === 0) throw new Error("no segments to render");
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });

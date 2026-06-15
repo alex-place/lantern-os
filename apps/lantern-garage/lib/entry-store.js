@@ -65,6 +65,24 @@ function createEntry(repoRoot, entryData) {
   return metadata;
 }
 
+// Backfill structural fields older entries may lack, so a project created before
+// these features existed still opens and operates in the workspace. Pure: returns
+// a normalized copy and never throws on a partial entry.
+function normalizeEntry(data) {
+  if (!data || typeof data !== "object") return data;
+  return {
+    ...data,
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    status: data.status || "uploaded",
+    renders: {
+      highlight: null, variantA: null, variantB: null, variantC: null,
+      ...(data.renders || {}),
+    },
+    renderRecords: Array.isArray(data.renderRecords) ? data.renderRecords : [],
+    stages: (data.stages && typeof data.stages === "object") ? data.stages : {},
+  };
+}
+
 function getEntry(repoRoot, entryId) {
   const metadataPath = path.join(getEntryDir(repoRoot, entryId), "metadata.json");
 
@@ -73,7 +91,64 @@ function getEntry(repoRoot, entryId) {
   }
 
   const data = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
-  return data;
+  return normalizeEntry(data);
+}
+
+// Record a per-stage completion timestamp (analyzed/variants/captions/safezones/
+// rendered). Merged so each stage keeps its own time across re-runs.
+function touchStages(repoRoot, entryId, stageNames) {
+  const entry = getEntry(repoRoot, entryId);
+  if (!entry) return null;
+  const stages = { ...(entry.stages || {}) };
+  const now = new Date().toISOString();
+  for (const name of [].concat(stageNames || [])) stages[name] = now;
+  return updateEntry(repoRoot, entryId, { stages });
+}
+
+// Append a render record (the viewer's source of truth). Records carry their own
+// id so they can be individually deleted/re-rendered.
+function addRenderRecord(repoRoot, entryId, record) {
+  const entry = getEntry(repoRoot, entryId);
+  if (!entry) throw new Error(`Entry ${entryId} not found`);
+  const id = record.id || `render-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const full = {
+    id,
+    variant: record.variant || record.renderKey || "highlight",
+    renderKey: record.renderKey || record.variant || "highlight",
+    path: record.path,                 // repo-relative, served via /media/
+    durationSec: typeof record.durationSec === "number" ? record.durationSec : null,
+    sizeBytes: typeof record.sizeBytes === "number" ? record.sizeBytes : null,
+    createdAt: record.createdAt || new Date().toISOString(),
+    validation: record.validation || null,
+  };
+  const renderRecords = [...(entry.renderRecords || []), full];
+  updateEntry(repoRoot, entryId, { renderRecords });
+  return full;
+}
+
+function removeRenderRecord(repoRoot, entryId, renderId) {
+  const entry = getEntry(repoRoot, entryId);
+  if (!entry) throw new Error(`Entry ${entryId} not found`);
+  const records = entry.renderRecords || [];
+  const target = records.find((r) => r.id === renderId);
+  if (!target) return entry;
+
+  // Best-effort delete the file from disk (inside the project dir).
+  try {
+    const abs = path.join(repoRoot, target.path);
+    if (fs.existsSync(abs)) fs.unlinkSync(abs);
+  } catch (e) { /* best-effort cleanup */ }
+
+  // Clear the back-compat renders[type] pointer if it referenced this file.
+  const renders = { ...(entry.renders || {}) };
+  for (const k of Object.keys(renders)) {
+    if (renders[k] === target.path) renders[k] = null;
+  }
+
+  return updateEntry(repoRoot, entryId, {
+    renderRecords: records.filter((r) => r.id !== renderId),
+    renders,
+  });
 }
 
 function updateEntry(repoRoot, entryId, updates) {
@@ -180,7 +255,7 @@ function listEntries(repoRoot) {
     const metadataPath = path.join(entriesDir, dir, "metadata.json");
     if (fs.existsSync(metadataPath)) {
       const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
-      entries.push(metadata);
+      entries.push(normalizeEntry(metadata));
     }
   }
 
@@ -220,6 +295,10 @@ module.exports = {
   createEntry,
   getEntry,
   updateEntry,
+  normalizeEntry,
+  touchStages,
+  addRenderRecord,
+  removeRenderRecord,
   saveAnalysis,
   getAnalysis,
   saveRender,

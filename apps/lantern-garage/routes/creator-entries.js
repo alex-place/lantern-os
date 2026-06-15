@@ -221,6 +221,77 @@ module.exports = async function creatorEntriesRoutes(req, res, url, deps) {
   }
 
   // =========================================================================
+  // POST /api/creator-entries/:id/regenerate-variants
+  // =========================================================================
+  // Re-derive ranked variants from the project's STORED analysis (no ffmpeg).
+  // Works on any reopened project, persists, and survives refresh.
+  const regenVariantsMatch = url.pathname.match(/^\/api\/creator-entries\/([^/]+)\/regenerate-variants$/);
+  if (regenVariantsMatch && req.method === "POST") {
+    try {
+      const entryId = regenVariantsMatch[1];
+      const analysis = entryStore.getAnalysis(repoRoot, entryId);
+      if (!analysis || !Array.isArray(analysis.highlights)) {
+        sendJson(res, { error: "No stored analysis — run Analyze Highlights first" }, 409);
+        return true;
+      }
+      const variants = ci.generateVariantsV10(analysis, {});
+      entryStore.updateEntry(repoRoot, entryId, { variantsV10: variants.variants });
+      entryStore.touchStages(repoRoot, entryId, ["variants"]);
+      sendJson(res, { success: true, variants: variants.variants });
+      return true;
+    } catch (error) {
+      console.error("[creator-entries] regenerate-variants error:", error.message);
+      sendJson(res, { error: error.message }, 500);
+      return true;
+    }
+  }
+
+  // =========================================================================
+  // POST /api/creator-entries/:id/regenerate-captions
+  // =========================================================================
+  // Re-derive captions from the project's STORED analysis (no ffmpeg).
+  const regenCaptionsMatch = url.pathname.match(/^\/api\/creator-entries\/([^/]+)\/regenerate-captions$/);
+  if (regenCaptionsMatch && req.method === "POST") {
+    try {
+      const entryId = regenCaptionsMatch[1];
+      const analysis = entryStore.getAnalysis(repoRoot, entryId);
+      if (!analysis || !Array.isArray(analysis.highlights)) {
+        sendJson(res, { error: "No stored analysis — run Analyze Highlights first" }, 409);
+        return true;
+      }
+      const { generateCaptions } = require("../lib/caption-engine");
+      const captions = generateCaptions(analysis, null, "gaming");
+      const captionsJson = captions.map((c) => c.toJSON());
+      entryStore.updateEntry(repoRoot, entryId, { captions: captionsJson });
+      entryStore.touchStages(repoRoot, entryId, ["captions"]);
+      sendJson(res, { success: true, captions: captionsJson });
+      return true;
+    } catch (error) {
+      console.error("[creator-entries] regenerate-captions error:", error.message);
+      sendJson(res, { error: error.message }, 500);
+      return true;
+    }
+  }
+
+  // =========================================================================
+  // DELETE /api/creator-entries/:id/render/:renderId - Delete a render
+  // =========================================================================
+  const deleteRenderMatch = url.pathname.match(/^\/api\/creator-entries\/([^/]+)\/render\/([^/]+)$/);
+  if (deleteRenderMatch && req.method === "DELETE") {
+    try {
+      const entryId = deleteRenderMatch[1];
+      const renderId = deleteRenderMatch[2];
+      const updated = entryStore.removeRenderRecord(repoRoot, entryId, renderId);
+      sendJson(res, { success: true, renderRecords: updated.renderRecords });
+      return true;
+    } catch (error) {
+      console.error("[creator-entries] delete render error:", error.message);
+      sendJson(res, { error: error.message }, 500);
+      return true;
+    }
+  }
+
+  // =========================================================================
   // POST /api/creator-entries/:id/thumbnail - Save thumbnail
   // =========================================================================
   const thumbnailMatch = url.pathname.match(/^\/api\/creator-entries\/([^/]+)\/thumbnail$/);
