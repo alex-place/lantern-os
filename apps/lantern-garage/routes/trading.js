@@ -778,6 +778,20 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         return sendJson(res, overview, 200), true;
       }
 
+      // GET — Real-Time Dashboard: Live positions + portfolio metrics
+      if (url.pathname === '/api/trading/kalshi/realtime/dashboard' && req.method === 'GET') {
+        try {
+          const { buildDashboard, getRecentTrades, calculatePerformanceMetrics } = require('../lib/kalshi-realtime-dashboard');
+          const dashboard = await buildDashboard();
+          const recentTrades = getRecentTrades(20);
+          const performanceMetrics = calculatePerformanceMetrics(recentTrades);
+          return sendJson(res, { ...dashboard, recentTrades, performanceMetrics }, 200), true;
+        } catch (e) {
+          console.error('[Trading Routes] Real-time dashboard error:', e.message);
+          return sendJson(res, { error: e.message }, 500), true;
+        }
+      }
+
       // GET — Impossibility Engine deck: constraint-elimination over short-window markets
       // Returns same card shape as crypto-intraday + { determined, stateLabel, knowledge, trace }
       if (url.pathname === '/api/trading/kalshi/impossibility-deck' && req.method === 'GET') {
