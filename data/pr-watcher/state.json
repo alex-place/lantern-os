@@ -1,9 +1,9 @@
 {
-  "483": {
-    "number": 483,
-    "title": "fix: light mode UX and WCAG accessibility remediation",
-    "updatedAt": 1781499703000,
-    "firstSeenAt": 1781499745416,
-    "reviewedAt": null
+  "498": {
+    "number": 498,
+    "title": "fix(ui): Consolidate keyboard event handlers #459",
+    "updatedAt": 1781501859000,
+    "firstSeenAt": 1781501728550,
+    "reviewedAt": 1781502096856
   }
 }
