@@ -347,6 +347,86 @@ async function sendMessage() {
     return;
   }
 
+  // !ask <question> — deterministic convergence agent (no LLM): answer + actions
+  const askMatch = text.match(/^!ask\s+(.+)/i);
+  if (askMatch) {
+    input.value = '';
+    input.style.height = 'auto';
+    const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    addUserBubble(text);
+    const messages = document.getElementById('messages');
+    const sysRow = document.createElement('div');
+    sysRow.className = 'msg-row agent';
+    sysRow.innerHTML = '<div class="msg-label">Convergence</div><div class="bubble" style="font-size:13px">Routing locally…</div>';
+    messages.appendChild(sysRow);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    try {
+      const r = await fetch(`${base}/api/convergence/agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: askMatch[1].trim() }),
+      });
+      const d = await r.json();
+      const bubble = sysRow.querySelector('.bubble');
+      const badge = d.grounded ? '⚡ Instant answer · from live repo data' : '⚡ Instant answer · no AI cost';
+      const meta = `<div style="font-size:11px;opacity:0.55;margin-top:8px">${badge}</div>`;
+      bubble.innerHTML = `<div style="white-space:pre-wrap;line-height:1.5">${esc(d.answer || '(no answer)')}</div>` + meta;
+      const acts = Array.isArray(d.actions) ? d.actions : [];
+      if (acts.length) {
+        const wrap = document.createElement('div');
+        wrap.className = 'starter-chips';
+        wrap.style.marginTop = '10px';
+        acts.forEach(a => {
+          const btn = document.createElement('button');
+          btn.className = 'starter-chip';
+          btn.textContent = a.label;
+          if (a.href) btn.onclick = () => { window.location.href = a.href; };
+          else if (a.autonomous && a.issue) {
+            btn.onclick = async () => {
+              btn.disabled = true;
+              btn.textContent = 'Working…';
+              try {
+                const workResp = await fetch(`${base}/api/convergence/autonomous-work`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ issue: a.issue }),
+                });
+                const workResult = await workResp.json();
+                if (workResult.ok) {
+                  btn.textContent = '✓ Done';
+                  btn.style.color = '#4ade80';
+                  const resultRow = document.createElement('div');
+                  resultRow.className = 'msg-row agent';
+                  resultRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">✓ Auto-worked #${workResult.issue}<br><a href="${workResult.prUrl}" target="_blank" style="color:var(--accent)">View PR</a></div>`;
+                  messages.appendChild(resultRow);
+                } else {
+                  btn.textContent = '✗ Failed';
+                  btn.style.color = '#f87171';
+                  const errorRow = document.createElement('div');
+                  errorRow.className = 'msg-row agent';
+                  errorRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px;color:#f87171">✗ Auto-work failed: ${workResult.error}</div>`;
+                  messages.appendChild(errorRow);
+                }
+                if (typeof scrollToBottom === 'function') scrollToBottom();
+              } catch (e) {
+                btn.textContent = '✗ Error';
+                btn.style.color = '#f87171';
+              }
+            };
+          }
+          else if (a.command) btn.onclick = () => fillAndSend(a.command);
+          wrap.appendChild(btn);
+        });
+        bubble.appendChild(wrap);
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+    } catch (e) {
+      sysRow.querySelector('.bubble').textContent = `Convergence agent failed: ${e.message}`;
+    }
+    return;
+  }
+
   isSending = true;
   document.getElementById('send-btn').disabled = true;
 
