@@ -101,7 +101,7 @@ class EventQueueConsumer {
   /**
    * Process a single event
    */
-  _processEvent(event) {
+  async _processEvent(event) {
     const { eventId, payload, traceId } = event;
 
     // GATE 1: Check if already executed (idempotency guard)
