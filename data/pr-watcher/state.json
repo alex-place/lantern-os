@@ -1,9 +1,23 @@
 {
-  "483": {
-    "number": 483,
-    "title": "fix: light mode UX and WCAG accessibility remediation",
-    "updatedAt": 1781499703000,
-    "firstSeenAt": 1781499745416,
+  "492": {
+    "number": 492,
+    "title": "docs: TradingView UI redesign deployment summary",
+    "updatedAt": 1781501418000,
+    "firstSeenAt": 1781500945456,
+    "reviewedAt": null
+  },
+  "493": {
+    "number": 493,
+    "title": "fix(kalshi-terminal): consolidate duplicate keydown listeners",
+    "updatedAt": 1781501412000,
+    "firstSeenAt": 1781501248659,
+    "reviewedAt": null
+  },
+  "494": {
+    "number": 494,
+    "title": "feat(convergence): Three-Doors 7-stage loop + Kalshi nightly scheduler",
+    "updatedAt": 1781501339000,
+    "firstSeenAt": 1781501306481,
     "reviewedAt": null
   }
 }

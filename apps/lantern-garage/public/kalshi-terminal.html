@@ -890,12 +890,18 @@ function toggleGallery(){
   grid.style.display=imageGalleryOpen?'':'none';
 }
 
-// Consolidated keyboard shortcut handler (arrow keys + escape)
-document.addEventListener('keydown',e=>{
-  if(e.key==='ArrowRight') act('take');
-  else if(e.key==='ArrowLeft') act('pass');
-  else if(e.key==='Escape') closeImageModal();
-});
+// ── Consolidated event handler: keyboard shortcuts + document lifecycle ──────
+(function initEventHandlers(){
+  // Single keydown handler consolidates all keyboard shortcuts
+  const handleKeydown=e=>{
+    switch(e.key){
+      case 'ArrowRight': act('take'); break;
+      case 'ArrowLeft': act('pass'); break;
+      case 'Escape': closeImageModal(); break;
+    }
+  };
+  document.addEventListener('keydown',handleKeydown);
+})()
 
 // Polling interval references for visibility-based pausing
 let connInterval, balInterval, syncInterval, imgInterval;
