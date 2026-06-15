@@ -841,13 +841,6 @@ function showResult(res,card){
   clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3200);
 }
 
-document.addEventListener('keydown',e=>{
-  if(e.key==='ArrowRight') act('take');
-  else if(e.key==='ArrowLeft') act('pass');
-  else if(e.key==='Escape') closeImageModal();
-});
-
-
 // ── image gallery ────────────────────────────────────────────────────────────
 let imageGalleryOpen=true;
 
@@ -897,8 +890,11 @@ function toggleGallery(){
   grid.style.display=imageGalleryOpen?'':'none';
 }
 
+// Consolidated keyboard shortcut handler (arrow keys + escape)
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') closeImageModal();
+  if(e.key==='ArrowRight') act('take');
+  else if(e.key==='ArrowLeft') act('pass');
+  else if(e.key==='Escape') closeImageModal();
 });
 
 // Polling interval references for visibility-based pausing
