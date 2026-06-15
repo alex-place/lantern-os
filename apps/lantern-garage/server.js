@@ -98,6 +98,7 @@ const routes = [
   require("./routes/web-images"),
   require("./routes/three-doors-image-pool"),
   require("./routes/three-doors-convergence"),
+  require("./routes/convergence-dispatch"),
   require("./routes/flourishing"),
   require("./routes/claims"),
   require("./routes/cubes"),
