@@ -61,7 +61,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
             path: imgPath,
             seed,
             output: output.slice(-500),
-          });
+          }, 200);
           return;
         }
 
@@ -85,7 +85,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
           prompt: prompt || null,
           path: imgPath,
           output: output.slice(-500),
-        });
+        }, 200);
       } catch (err) {
         sendJson(res, { error: err.message, stderr: err.stderr?.toString() }, 500);
       }
@@ -104,9 +104,9 @@ module.exports = function imageRoutes(req, res, url, deps) {
         })
         .sort((a, b) => new Date(b.mtime) - new Date(a.mtime))
         .slice(0, 50);
-      sendJson(res, { images: files, dir: imgDir });
+      sendJson(res, { images: files, dir: imgDir }, 200);
     } catch (err) {
-      sendJson(res, { images: [], error: err.message });
+      sendJson(res, { images: [], error: err.message }, 500);
     }
     return true;
   }
@@ -127,7 +127,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
         const buffer = Buffer.from(base64.replace(/^data:image\/[^;]+;base64,/, ""), "base64");
         const result = saveImage(buffer, name);
 
-        sendJson(res, result);
+        sendJson(res, result, 201);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -148,7 +148,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
           return { id, filename: f, url: `/images/${f}`, size: stat.size, timestamp: stat.mtime.toISOString() };
         })
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      sendJson(res, { images, count: images.length });
+      sendJson(res, { images, count: images.length }, 200);
     } catch (err) {
       sendJson(res, { error: err.message, images: [] }, 500);
     }
@@ -161,7 +161,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
     try {
       const success = deleteImage(imageId);
       if (success) {
-        sendJson(res, { success: true, id: imageId });
+        sendJson(res, { success: true, id: imageId }, 200);
       } else {
         sendJson(res, { error: "Image not found" }, 404);
       }
