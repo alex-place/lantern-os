@@ -517,6 +517,45 @@
 
     .scorev10-disclaimer { font-size: 0.72rem; color: var(--muted); margin: 6px 0 0; }
 
+    /* Workspace actions (re-run buttons that operate on the stored project) */
+    .workspace-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .wa-btn {
+      padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text); font-weight: 600;
+      font-size: 0.88rem; cursor: pointer; transition: all 0.2s; font-family: inherit;
+    }
+    .wa-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .wa-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .wa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .wa-status { margin-top: 10px; font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
+    .wa-progress { height: 8px; background: var(--surface2); border-radius: 5px; overflow: hidden; margin-top: 8px; display: none; }
+    .wa-progress.show { display: block; }
+    .wa-progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.3s; }
+
+    /* Stage status badges */
+    .stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+    .stage-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+    .stage-box.done { border-left-color: var(--green); }
+    .stage-name { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+    .stage-state { font-size: 0.9rem; font-weight: 600; margin-top: 4px; color: var(--muted); }
+    .stage-box.done .stage-state { color: var(--green); }
+    .stage-time { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    /* Render viewer (Generated Shorts) */
+    .render-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 12px; }
+    .render-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    .render-card video { width: 100%; background: #000; display: block; }
+    .render-meta { padding: 10px 12px; font-size: 0.8rem; color: var(--muted); }
+    .render-meta b { color: var(--text); display: block; font-size: 0.9rem; margin-bottom: 2px; word-break: break-word; }
+    .render-actions { display: flex; gap: 6px; padding: 0 12px 12px; }
+    .render-actions a, .render-actions button {
+      flex: 1; text-align: center; padding: 6px 8px; font-size: 0.78rem; font-weight: 600;
+      border-radius: 6px; border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); text-decoration: none; cursor: pointer; font-family: inherit;
+    }
+    .render-actions a:hover, .render-actions button:hover { border-color: var(--accent); color: var(--accent); }
+    .render-actions .del:hover { border-color: var(--danger); color: var(--danger); }
+
     .variant-export-btn {
       padding: 7px 14px;
       background: var(--accent);
@@ -596,6 +635,23 @@
       </div>
     </div>
 
+    <!-- Workspace Actions — re-run any stage on the STORED project, after any refresh -->
+    <div style="margin-bottom: 28px;">
+      <h3 style="margin: 0 0 12px; font-size: 1rem;">Workspace Actions</h3>
+      <div class="workspace-actions">
+        <button class="wa-btn primary" id="wa-analyze" onclick="runAnalyze()">Analyze Highlights</button>
+        <button class="wa-btn" id="wa-variants" onclick="runRegenVariants()">Generate Variants</button>
+        <button class="wa-btn" id="wa-captions" onclick="runRegenCaptions()">Generate Captions</button>
+        <button class="wa-btn" id="wa-safezones" onclick="runSafeZones()">Detect Safe Zones</button>
+        <button class="wa-btn" id="wa-render" onclick="runRenderShorts()">Render Shorts</button>
+      </div>
+      <div class="wa-status" id="wa-status"></div>
+      <div class="wa-progress" id="wa-progress"><div class="wa-progress-fill" id="wa-progress-fill"></div></div>
+
+      <!-- Per-stage status badges with timestamps -->
+      <div class="stage-grid" id="stage-grid"></div>
+    </div>
+
     <div class="content-grid">
       <div>
         <div class="video-label">Original Upload</div>
@@ -609,6 +665,15 @@
         <div class="video-player" id="highlight-player">
           <p class="no-data">No highlight render yet</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Generated Shorts — persistent render viewer (playback/download/delete/re-render) -->
+    <div style="margin-top: 32px;" id="renders-section">
+      <h3 style="margin: 0 0 4px; font-size: 1rem;">Generated Shorts</h3>
+      <div class="section-sub">Rendered exports for this project. Persist across refresh and restart.</div>
+      <div class="render-grid" id="render-grid">
+        <p class="no-data">No renders yet — use Render Shorts or a variant's Render &amp; Export.</p>
       </div>
     </div>
 
@@ -743,6 +808,7 @@
 <script>
 const params = new URLSearchParams(window.location.search);
 const entryId = params.get("id");
+let currentProject = null;
 
 if (!entryId) {
   document.body.innerHTML = '<p style="padding: 24px; color: red;">Entry ID required</p>';
@@ -800,6 +866,11 @@ async function loadEntry() {
 
     // Load V10 overall score + predictions panel
     loadScoreV10(entry);
+
+    // Persistent workspace: keep the project, render stage badges + render viewer
+    currentProject = entry;
+    loadStages(entry);
+    loadRenderViewer(entry);
 
     // Load analysis
     if (analysis) {
@@ -1131,6 +1202,183 @@ function loadScoreV10(entry) {
       <p class="scorev10-disclaimer">Structural estimates — not calibrated against real outcome data.</p>
     </div>
   `;
+}
+
+// ── Persistent Workspace: re-run actions on the STORED project ──────────────
+function waStatus(msg) { const e = document.getElementById('wa-status'); if (e) e.textContent = msg || ''; }
+function waProgress(pct) {
+  const p = document.getElementById('wa-progress'), f = document.getElementById('wa-progress-fill');
+  if (!p || !f) return;
+  if (pct == null) { p.classList.remove('show'); f.style.width = '0'; }
+  else { p.classList.add('show'); f.style.width = Math.max(0, Math.min(100, pct)) + '%'; }
+}
+function waBusy(b) {
+  ['wa-analyze', 'wa-variants', 'wa-captions', 'wa-safezones', 'wa-render'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = b;
+  });
+}
+
+// Poll an async job (analyze/safezones/export) to completion.
+function pollJobUntilDone(jobId) {
+  return new Promise((resolve, reject) => {
+    let attempts = 0; const max = 900; // ~15 min at 1s
+    const iv = setInterval(async () => {
+      attempts++;
+      try {
+        const r = await fetch(`/api/creator/job/${jobId}`);
+        if (!r.ok) return;
+        const job = await r.json();
+        waStatus(`${job.progressMessage || job.status} (${job.progress || 0}%)`);
+        waProgress(job.progress || 0);
+        if (job.status === 'complete') { clearInterval(iv); resolve(job); }
+        else if (job.status === 'failed') { clearInterval(iv); reject(new Error(job.error || 'job failed')); }
+        else if (attempts >= max) { clearInterval(iv); reject(new Error('job timeout')); }
+      } catch (e) { /* transient — keep polling */ }
+    }, 1000);
+  });
+}
+
+async function runAnalyze() {
+  if (!currentProject || !currentProject.filePath) { waStatus('No video file on this project.'); return; }
+  waBusy(true); waStatus('Queuing analysis…'); waProgress(0);
+  try {
+    const r = await fetch('/api/creator/analyze', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoPath: currentProject.filePath, entryId,
+        options: { fps: 5, motionThreshold: 0.15, audioThreshold: 0.7, minHighlightDuration: 1.0, maxHighlightDuration: 30.0 },
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.jobId) throw new Error(d.error || 'failed to queue');
+    await pollJobUntilDone(d.jobId);
+    waStatus('Analysis complete.'); waProgress(null);
+    await loadEntry();
+  } catch (e) { waStatus('Error: ' + e.message); waProgress(null); }
+  finally { waBusy(false); }
+}
+
+async function runSafeZones() {
+  if (!currentProject || !currentProject.filePath) { waStatus('No video file on this project.'); return; }
+  waBusy(true); waStatus('Queuing safe-zone detection…'); waProgress(0);
+  try {
+    const r = await fetch('/api/creator/safe-zones', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoPath: currentProject.filePath, entryId }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.jobId) throw new Error(d.error || 'failed to queue');
+    await pollJobUntilDone(d.jobId);
+    waStatus('Safe-zone detection complete.'); waProgress(null);
+    await loadEntry();
+  } catch (e) { waStatus('Error: ' + e.message); waProgress(null); }
+  finally { waBusy(false); }
+}
+
+async function runRenderShorts() {
+  const variants = (currentProject && Array.isArray(currentProject.variantsV10)) ? currentProject.variantsV10 : [];
+  if (variants.length === 0) { waStatus('Run Analyze Highlights first to generate variants to render.'); return; }
+  const top = variants.find(v => v.rank === 1) || variants[0];
+  if (!top || !Array.isArray(top.segments) || top.segments.length === 0) { waStatus('Top variant has no segments to render.'); return; }
+  waBusy(true); waStatus(`Rendering top variant (${top.label || top.id})…`); waProgress(0);
+  try {
+    const r = await fetch('/api/creator/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoPath: currentProject.filePath, entryId, renderKey: top.id, segments: top.segments, format: '9:16', fit: 'pad', burnCaptions: true }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.jobId) throw new Error(d.error || 'failed to queue');
+    await pollJobUntilDone(d.jobId);
+    waStatus('Render complete.'); waProgress(null);
+    await loadEntry();
+  } catch (e) { waStatus('Error: ' + e.message); waProgress(null); }
+  finally { waBusy(false); }
+}
+
+async function runRegenVariants() {
+  waBusy(true); waStatus('Regenerating variants from stored analysis…');
+  try {
+    const r = await fetch(`/api/creator-entries/${entryId}/regenerate-variants`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    waStatus('Variants regenerated.'); await loadEntry();
+  } catch (e) { waStatus('Error: ' + e.message); }
+  finally { waBusy(false); }
+}
+
+async function runRegenCaptions() {
+  waBusy(true); waStatus('Regenerating captions from stored analysis…');
+  try {
+    const r = await fetch(`/api/creator-entries/${entryId}/regenerate-captions`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    waStatus(`Captions regenerated (${(d.captions || []).length}).`); await loadEntry();
+  } catch (e) { waStatus('Error: ' + e.message); }
+  finally { waBusy(false); }
+}
+
+function loadStages(entry) {
+  const grid = document.getElementById('stage-grid'); if (!grid) return;
+  const stages = entry.stages || {};
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
+  const defs = [
+    ['Analysis', 'analyzed', !!(entry.scoreV10 || entry.analysis || stages.analyzed)],
+    ['Variants', 'variants', !!((entry.variantsV10 && entry.variantsV10.length) || stages.variants)],
+    ['Captions', 'captions', !!((entry.captions && entry.captions.length) || stages.captions)],
+    ['Safe Zones', 'safezones', !!(entry.safezones || stages.safezones)],
+    ['Renders', 'rendered', !!((entry.renderRecords && entry.renderRecords.length) || stages.rendered)],
+  ];
+  grid.innerHTML = defs.map(([name, key, done]) => `
+    <div class="stage-box ${done ? 'done' : ''}">
+      <div class="stage-name">${escapeHtml(name)}</div>
+      <div class="stage-state">${done ? '✓ Complete' : 'Not yet'}</div>
+      ${done && stages[key] ? `<div class="stage-time">${escapeHtml(fmt(stages[key]))}</div>` : ''}
+    </div>`).join('');
+}
+
+function loadRenderViewer(entry) {
+  const grid = document.getElementById('render-grid'); if (!grid) return;
+  const records = Array.isArray(entry.renderRecords) ? entry.renderRecords : [];
+  if (records.length === 0) {
+    grid.innerHTML = '<p class="no-data">No renders yet — use Render Shorts or a variant\'s Render &amp; Export.</p>';
+    return;
+  }
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
+  grid.innerHTML = records.slice().reverse().map(rec => {
+    const src = '/media/' + rec.path;
+    const dur = typeof rec.durationSec === 'number' ? Math.round(rec.durationSec) + 's' : '';
+    return `
+    <div class="render-card">
+      <video controls preload="metadata"><source src="${escapeHtml(src)}" type="video/mp4"></video>
+      <div class="render-meta">
+        <b>${escapeHtml(rec.variant || rec.renderKey || 'render')}</b>
+        ${dur ? escapeHtml(dur) + ' · ' : ''}${escapeHtml(fmt(rec.createdAt))}
+      </div>
+      <div class="render-actions">
+        <a href="${escapeHtml(src)}" download>Download</a>
+        <button onclick="reRender('${escapeHtml(rec.renderKey || '')}')">Re-render</button>
+        <button class="del" onclick="deleteRender('${escapeHtml(rec.id)}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function deleteRender(renderId) {
+  if (!renderId) return;
+  if (!confirm('Delete this render? This cannot be undone.')) return;
+  try {
+    const r = await fetch(`/api/creator-entries/${entryId}/render/${renderId}`, { method: 'DELETE' });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'failed'); }
+    await loadEntry();
+  } catch (e) { waStatus('Delete error: ' + e.message); }
+}
+
+function reRender(renderKey) {
+  // Re-render = re-run the export for the variant with this renderKey.
+  const variants = (currentProject && Array.isArray(currentProject.variantsV10)) ? currentProject.variantsV10 : [];
+  const v = variants.find(x => x.id === renderKey);
+  if (v) { exportVariant(v.id); waStatus('Re-rendering ' + (v.label || v.id) + '… (reload when the variant status shows queued/complete)'); }
+  else { runRenderShorts(); }
 }
 
 async function exportVariant(variantId) {
