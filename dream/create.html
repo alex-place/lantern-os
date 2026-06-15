@@ -764,6 +764,36 @@
       font-size: 1rem;
     }
 
+    /* ── Compact dashboard banner ── */
+    .dash-banner {
+      display: flex; align-items: center; gap: 16px; width: 100%;
+      background: linear-gradient(135deg, var(--surface), var(--surface2));
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 0 20px; height: 56px; margin-bottom: 20px; cursor: pointer;
+      color: var(--text); text-align: left; transition: all 0.2s; font-family: inherit;
+    }
+    .dash-banner:hover { border-color: var(--accent); }
+    .dash-banner-main { display: flex; align-items: baseline; gap: 14px; flex: 1; min-width: 0; }
+    .dash-banner-title { font-size: 1.05rem; font-weight: 700; }
+    .dash-banner-sub { font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dash-banner-cta { font-size: 0.85rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+    @media (max-width: 560px) { .dash-banner-sub { display: none; } }
+
+    .upload-zone.compact { padding: 28px 24px; margin-bottom: 8px; }
+
+    /* ── Status pills on project cards ── */
+    .status-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .status-pill.gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .status-pill.blue { background: rgba(124,106,247,.15); color: var(--accent); border: 1px solid var(--accent); }
+    .status-pill.green { background: rgba(76,175,130,.15); color: var(--green); border: 1px solid var(--green); }
+    .status-pill.red { background: rgba(224,85,85,.12); color: var(--danger); border: 1px solid var(--danger); }
+
+    /* ── Help modal ── */
+    .help-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+    .help-modal.show { display: flex; }
+    .help-modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; max-width: 480px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+    .help-modal-content ul { line-height: 1.9; color: var(--muted); padding-left: 20px; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       .hero {
@@ -814,198 +844,56 @@
 </nav>
 
 <div class="page">
-  <!-- Page Header -->
-  <div class="page-header">
-    <h1>Creator Dashboard</h1>
-    <p>Create, edit, analyze, and publish content from one place</p>
-  </div>
-
-  <!-- Hero Section -->
-  <div class="hero">
-    <div class="hero-content">
-      <h2>Welcome to Creator Tools</h2>
-      <p>Upload your content, analyze highlights, generate variants, and create captions with AI-powered tools.</p>
-      <div class="hero-actions">
-        <button class="btn-primary" onclick="document.querySelector('.upload-zone').scrollIntoView({ behavior: 'smooth' })">Upload Content</button>
-        <button class="btn-secondary" onclick="document.getElementById('recent-list').scrollIntoView({ behavior: 'smooth' })">View Projects</button>
-      </div>
+  <!-- Compact dashboard banner — click to expand help -->
+  <button class="dash-banner" id="dash-banner" onclick="openHelp()" title="What can I do here?">
+    <div class="dash-banner-main">
+      <span class="dash-banner-title">Creator Dashboard</span>
+      <span class="dash-banner-sub">Upload • Analyze • Edit • Export</span>
     </div>
-    <div class="hero-stats">
-      <div class="stat-card">
-        <div class="stat-value" id="total-projects">0</div>
-        <div class="stat-label">Total Projects</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="videos-processed">0</div>
-        <div class="stat-label">Videos Processed</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="highlights-generated">0</div>
-        <div class="stat-label">Highlights Generated</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="captions-generated">0</div>
-        <div class="stat-label">Captions Generated</div>
-      </div>
-    </div>
-  </div>
+    <span class="dash-banner-cta">Learn more</span>
+  </button>
 
   <!-- Status Messages -->
   <div id="status" class="status-message"></div>
 
-  <!-- Upload Form -->
-  <div class="form-card">
-    <div class="section-header">
-      <div>
-        <h2>Upload New Project</h2>
-        <p>Add a new video, image, or document to your library</p>
-      </div>
-    </div>
-
-    <form id="create-form">
-      <div class="form-grid">
-        <!-- Entry Type -->
-        <div class="form-group">
-          <label for="type">Project Type</label>
-          <select id="type" name="type" required>
-            <option value="video">Video</option>
-            <option value="note">Note</option>
-            <option value="project">Project</option>
-            <option value="highlight">Highlight</option>
-            <option value="dream">Dream</option>
-          </select>
-        </div>
-
-        <!-- Title -->
-        <div class="form-group">
-          <label for="title">Project Title</label>
-          <input type="text" id="title" name="title" placeholder="Give your project a name" required>
-        </div>
-
-        <!-- Project/Collection -->
-        <div class="form-group">
-          <label for="project">Collection / Series</label>
-          <input type="text" id="project" name="project" placeholder="Optional: Organize by series">
-        </div>
-
-        <!-- Description -->
-        <div class="form-group">
-          <label for="description">Description</label>
-          <textarea id="description" name="description" placeholder="What's this project about?"></textarea>
-        </div>
-
-        <!-- Tags -->
-        <div class="form-group">
-          <label for="tags">Tags (comma-separated)</label>
-          <input type="text" id="tags" name="tags" placeholder="e.g. gaming, creative, personal">
-        </div>
-
-        <!-- File Upload -->
-        <div class="form-group">
-          <label>Upload File</label>
-          <div id="upload-zone" class="upload-zone">
-            <span class="icon">📁</span>
-            <p><strong>Drag and drop your file here</strong></p>
-            <p style="font-size: 0.85rem; margin: 0 0 12px;">or</p>
-            <button type="button" class="file-input-button" onclick="document.getElementById('file-input').click()">Choose File</button>
-            <input type="file" id="file-input" name="file" accept="video/*,audio/*,image/*,.pdf,.doc,.docx">
-          </div>
-
-          <!-- File Preview -->
-          <div id="file-preview" class="file-preview">
-            <div class="file-preview-info">
-              <div>
-                <div class="file-preview-name" id="file-name"></div>
-                <div class="file-preview-size" id="file-size"></div>
-              </div>
-              <button type="button" class="file-preview-remove" onclick="clearFile()">Remove</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Form Actions -->
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" onclick="resetForm()">Clear Form</button>
-          <button type="submit" class="btn btn-primary" id="submit-btn">Save Project</button>
-        </div>
-      </div>
-    </form>
+  <!-- Upload dropzone — drop or choose, nothing else. Project is auto-named and opened. -->
+  <div id="upload-zone" class="upload-zone compact">
+    <span class="icon">⬆️</span>
+    <p><strong>Drop a video to start a project</strong></p>
+    <p style="font-size: 0.85rem; margin: 0 0 12px;">named automatically — rename it later inside the project</p>
+    <button type="button" class="file-input-button" onclick="document.getElementById('file-input').click()">Choose Video</button>
+    <input type="file" id="file-input" accept="video/*">
   </div>
 
-  <!-- Creator Suite Tools -->
-  <div style="margin-bottom: 48px;">
-    <div class="section-header" style="margin-bottom: 24px;">
-      <div>
-        <h2>Creator Tools</h2>
-        <p>Analyze uploads, generate variants, captions, and more</p>
-      </div>
-    </div>
-
-    <div class="tools-grid">
-      <div class="tool-card" id="highlight-tool">
-        <div class="tool-card-icon">🎬</div>
-        <h3 class="tool-card-title">Highlight Detection</h3>
-        <p class="tool-card-desc">Find the best moments automatically with motion, audio, and scene analysis.</p>
-        <div class="tool-card-status" id="highlight-status">Ready</div>
-        <button class="tool-card-btn" onclick="analyzeHighlights()" id="analyze-btn">Run Analysis</button>
-        <div id="highlights-panel" class="results-panel">
-          <h3>Highlight Analysis Results</h3>
-          <div id="highlights-content"></div>
-        </div>
-      </div>
-
-      <div class="tool-card disabled" id="variants-tool">
-        <div class="tool-card-icon">📊</div>
-        <h3 class="tool-card-title">Generate Variants</h3>
-        <p class="tool-card-desc">Create A/B/C retention variants optimized for different platforms.</p>
-        <div class="tool-card-status" id="variants-status">Waiting for analysis</div>
-        <button class="tool-card-btn" onclick="generateVariants()" id="variants-btn" disabled>Generate</button>
-        <div id="variants-panel" class="results-panel">
-          <h3>Retention Variants (A/B/C)</h3>
-          <div id="variants-content"></div>
-        </div>
-      </div>
-
-      <div class="tool-card disabled" id="captions-tool">
-        <div class="tool-card-icon">📝</div>
-        <h3 class="tool-card-title">Generate Captions</h3>
-        <p class="tool-card-desc">Automatically generate captions and subtitles from your video.</p>
-        <div class="tool-card-status" id="captions-status">Waiting for analysis</div>
-        <button class="tool-card-btn" onclick="generateCaptions()" id="captions-btn" disabled>Generate</button>
-        <div id="captions-panel" class="results-panel">
-          <h3>Generated Captions</h3>
-          <div id="captions-content"></div>
-        </div>
-      </div>
-
-      <div class="tool-card disabled" id="safezones-tool">
-        <div class="tool-card-icon">🎯</div>
-        <h3 class="tool-card-title">Safe Zones</h3>
-        <p class="tool-card-desc">Detect safe areas for text and graphics on your video.</p>
-        <div class="tool-card-status" id="safezones-status">Waiting for analysis</div>
-        <button class="tool-card-btn" onclick="detectSafeZones()" id="safezones-btn" disabled>Detect</button>
-        <div id="safezones-panel" class="results-panel">
-          <h3>Safe Zones Detected</h3>
-          <div id="safezones-content"></div>
-        </div>
-      </div>
-    </div>
+  <!-- Recent Projects -->
+  <div class="section-header" style="margin: 32px 0 16px;">
+    <div><h2 style="font-size: 1.2rem; margin: 0;">Recent Projects</h2></div>
+    <button class="btn btn-secondary" onclick="loadRecentEntries()" style="padding: 6px 14px; font-size: 0.85rem;">Refresh</button>
   </div>
 
-  <!-- Projects Library -->
-  <div>
-    <div class="section-header" style="margin-bottom: 24px;">
-      <div>
-        <h2>Projects</h2>
-        <p>Your uploaded content and analysis results</p>
-      </div>
+  <div id="recent-list" class="projects-grid">
+    <div class="empty-state">
+      <div class="icon">📚</div>
+      <p>No projects yet. Drop a video above to start.</p>
     </div>
+  </div>
+</div>
 
-    <div id="recent-list" class="projects-grid">
-      <div class="empty-state">
-        <div class="icon">📚</div>
-        <p>No projects yet. Upload your first project above.</p>
-      </div>
+<!-- Help Modal (expanded from the banner) -->
+<div id="helpModal" class="help-modal" onclick="if(event.target.id==='helpModal')closeHelp()">
+  <div class="help-modal-content">
+    <h2 style="margin-top: 0;">Creator Dashboard</h2>
+    <p style="color: var(--muted);">Drop a video and Lantern opens a project workspace where you can:</p>
+    <ul>
+      <li><strong>Analyze Highlights</strong> — find the best moments (motion, audio, scenes)</li>
+      <li><strong>Generate Variants</strong> — ranked short-form edits</li>
+      <li><strong>Generate Captions</strong> — burn-in captions</li>
+      <li><strong>Detect Safe Zones</strong> — facecam/HUD-aware 9:16 crop</li>
+      <li><strong>Render Shorts</strong> — export to 1080×1920, validated</li>
+    </ul>
+    <p style="color: var(--muted); font-size: 0.9rem;">Everything lives inside each project — reopen any project anytime and continue from any stage.</p>
+    <div style="text-align: right; margin-top: 16px;">
+      <button class="btn btn-primary" onclick="closeHelp()">Got it</button>
     </div>
   </div>
 </div>
@@ -1029,53 +917,7 @@
 <script>
 const uploadZone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
-const filePreview = document.getElementById('file-preview');
-const form = document.getElementById('create-form');
 const statusEl = document.getElementById('status');
-const submitBtn = document.getElementById('submit-btn');
-
-// Drag and drop
-uploadZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  uploadZone.classList.add('dragging');
-});
-
-uploadZone.addEventListener('dragleave', () => {
-  uploadZone.classList.remove('dragging');
-});
-
-uploadZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  uploadZone.classList.remove('dragging');
-  if (e.dataTransfer.files.length > 0) {
-    fileInput.files = e.dataTransfer.files;
-    updateFilePreview();
-  }
-});
-
-fileInput.addEventListener('change', updateFilePreview);
-
-function updateFilePreview() {
-  if (fileInput.files.length > 0) {
-    const file = fileInput.files[0];
-    document.getElementById('file-name').textContent = file.name;
-    document.getElementById('file-size').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
-    filePreview.classList.add('show');
-  } else {
-    filePreview.classList.remove('show');
-  }
-}
-
-function clearFile() {
-  fileInput.value = '';
-  filePreview.classList.remove('show');
-}
-
-function resetForm() {
-  form.reset();
-  clearFile();
-  statusEl.classList.remove('show', 'success', 'error', 'loading');
-}
 
 function showStatus(message, type) {
   statusEl.textContent = message;
@@ -1085,423 +927,144 @@ function showStatus(message, type) {
   }
 }
 
-// Form submission
-let currentEntry = null;
-let currentHighlightTimeline = null;
+// Help modal (expanded banner)
+function openHelp() { document.getElementById('helpModal').classList.add('show'); }
+function closeHelp() { document.getElementById('helpModal').classList.remove('show'); }
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+// Auto project name: warzone_clutch.mp4 -> "Warzone Clutch"; fallback to timestamp.
+function autoName(filename) {
+  const base = (filename || '').replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (base) return base.replace(/\b\w/g, (c) => c.toUpperCase());
+  const d = new Date(); const p = (n) => String(n).padStart(2, '0');
+  return `Video Project ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
-  const formData = new FormData();
-  const entryData = {
-    title: document.getElementById('title').value || `Video ${new Date().toISOString().split('T')[0]} ${new Date().toLocaleTimeString('en-US', { hour12: false }).split(':').slice(0, 2).join('-')}`,
-    type: document.getElementById('type').value,
-    project: document.getElementById('project').value,
-    description: document.getElementById('description').value,
-    tags: document.getElementById('tags').value
-  };
-
-  formData.append('entry', JSON.stringify(entryData));
-
-  if (fileInput.files.length > 0) {
-    formData.append('file', fileInput.files[0]);
-  }
-
-  submitBtn.disabled = true;
-  showStatus('Saving project...', 'loading');
-
-  try {
-    // Upload file via dreamer endpoint
-    const uploadResponse = await fetch('/api/dreamer/upload', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!uploadResponse.ok) {
-      const error = await uploadResponse.json();
-      showStatus(`✗ Error: ${error.error}`, 'error');
-      submitBtn.disabled = false;
-      return;
-    }
-
-    const uploadResult = await uploadResponse.json();
-    const filePath = uploadResult.file?.path;
-
-    // Create entry in new entry store
-    const entryCreateResponse = await fetch('/api/creator-entries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: entryData.title,
-        description: entryData.description,
-        project: entryData.project,
-        tags: Array.isArray(entryData.tags) ? entryData.tags : (entryData.tags || '').split(',').map(t => t.trim()).filter(Boolean),
-        type: entryData.type,
-        filePath: filePath
-      })
-    });
-
-    if (!entryCreateResponse.ok) {
-      const error = await entryCreateResponse.json();
-      showStatus(`✗ Error: ${error.error}`, 'error');
-      submitBtn.disabled = false;
-      return;
-    }
-
-    const entryResult = await entryCreateResponse.json();
-    currentEntry = entryResult.entry;
-
-    showStatus('✓ Project saved successfully', 'success');
-    resetForm();
-    loadRecentEntries();
-
-    // Enable analysis tools
-    document.getElementById('analyze-btn').disabled = false;
-    document.getElementById('highlight-tool').classList.remove('disabled');
-  } catch (err) {
-    showStatus(`✗ Error: ${err.message}`, 'error');
-  } finally {
-    submitBtn.disabled = false;
-  }
+// Drag & drop → upload immediately
+uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragging'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragging'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault(); uploadZone.classList.remove('dragging');
+  if (e.dataTransfer.files.length) uploadAndOpen(e.dataTransfer.files[0]);
 });
+fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadAndOpen(fileInput.files[0]); });
+
+// Upload → create auto-named project → open the project workspace (no naming step).
+let uploading = false;
+async function uploadAndOpen(file) {
+  if (!file || uploading) return;
+  uploading = true;
+  const title = autoName(file.name);
+  showStatus(`Uploading "${file.name}"…`, 'loading');
+  try {
+    const fd = new FormData();
+    fd.append('entry', JSON.stringify({ title, type: 'video' }));
+    fd.append('file', file);
+    const up = await fetch('/api/dreamer/upload', { method: 'POST', body: fd });
+    if (!up.ok) { const e = await up.json().catch(() => ({})); showStatus('✗ ' + (e.error || 'Upload failed'), 'error'); return; }
+    const upRes = await up.json();
+    const filePath = upRes.file?.path;
+    const cr = await fetch('/api/creator-entries', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, type: 'video', filePath })
+    });
+    if (!cr.ok) { const e = await cr.json().catch(() => ({})); showStatus('✗ ' + (e.error || 'Could not create project'), 'error'); return; }
+    const { entry } = await cr.json();
+    showStatus('✓ Project created — opening…', 'success');
+    // Land directly in the project workspace (Phase 7/8).
+    window.location.href = `/entry.html?id=${encodeURIComponent(entry.id)}`;
+  } catch (err) {
+    showStatus('✗ ' + err.message, 'error');
+  } finally {
+    uploading = false; fileInput.value = '';
+  }
+}
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Load recent entries
+function statusPill(status) {
+  if (status === 'analyzing') return '<span class="status-pill blue">Analyzing</span>';
+  if (status === 'ready') return '<span class="status-pill green">Ready</span>';
+  if (status === 'failed') return '<span class="status-pill red">Error</span>';
+  return '<span class="status-pill gray">Not Analyzed</span>';
+}
+
+function durStr(sec) {
+  if (!sec || !isFinite(sec)) return '';
+  sec = Math.round(sec);
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m ? `${m}m ${s}s` : `${s}s`;
+}
+
+// Load recent projects (project-first launcher: thumbnail + meta + status + quick actions)
 async function loadRecentEntries() {
   try {
     const response = await fetch('/api/creator-entries');
-    if (response.ok) {
-      const data = await response.json();
-      const list = document.getElementById('recent-list');
+    if (!response.ok) return;
+    const data = await response.json();
+    const list = document.getElementById('recent-list');
 
-      if (!data.entries || data.entries.length === 0) {
-        list.innerHTML = '<div class="empty-state"><div class="icon">📚</div><p>No projects yet. Upload your first project above.</p></div>';
-        return;
-      }
+    if (!data.entries || data.entries.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">📚</div><p>No projects yet. Drop a video above to start.</p></div>';
+      return;
+    }
 
-      // Update stats
-      updateStats(data.entries);
+    const sorted = [...data.entries].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-      // Sort by date, newest first
-      const sorted = [...data.entries].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    list.innerHTML = sorted.map(entry => {
+      const title = entry.title || autoName('');
+      const thumbnail = entry.thumbnail ? '/media/' + entry.thumbnail : '/placeholder.png';
+      const d = new Date(entry.createdAt);
+      const when = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+                   ' • ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dur = durStr(entry.scoreV10 && entry.scoreV10.viral && entry.scoreV10.viral.signals && entry.scoreV10.viral.signals.durationSec);
 
-      list.innerHTML = sorted.map(entry => {
-        const title = entry.title || `Video ${new Date(entry.createdAt).toLocaleDateString()}`;
-        const thumbnail = entry.thumbnail ? '/media/' + entry.thumbnail : '/placeholder.png';
-        const createdDate = new Date(entry.createdAt);
-        const formattedDate = createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
-                             ' • ' + createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-        let statusBadge = '📥';
-        if (entry.status === 'analyzing') statusBadge = '🟡';
-        else if (entry.status === 'ready') statusBadge = '🟢';
-        else if (entry.status === 'failed') statusBadge = '🔴';
-
-        return `
-          <div class="project-card">
-            <div class="project-thumbnail">
-              <img src="${thumbnail}" alt="${title}" onerror="this.src='/placeholder.png';">
-              <div class="status-badge">${statusBadge}</div>
+      return `
+        <div class="project-card">
+          <div class="project-thumbnail">
+            <img src="${esc(thumbnail)}" alt="${esc(title)}" onerror="this.src='/placeholder.png';">
+          </div>
+          <div class="project-info">
+            <h3 class="project-title">${esc(title)}</h3>
+            <div class="project-meta">
+              <span>${esc(when)}</span>
+              ${dur ? `<div class="project-meta-sep"></div><span>${esc(dur)}</span>` : ''}
             </div>
-            <div class="project-info">
-              <h3 class="project-title">${esc(title)}</h3>
-              <div class="project-meta">
-                <span>${esc(formattedDate)}</span>
-                ${entry.project ? `<div class="project-meta-sep"></div><span>${esc(entry.project)}</span>` : ''}
-              </div>
-              ${entry.description ? `<p class="project-desc">${esc(entry.description)}</p>` : ''}
-              <div class="project-actions">
-                <a href="/entry.html?id=${esc(entry.id)}">View</a>
-                <button class="delete-btn" data-id="${esc(entry.id)}" data-title="${esc(title)}" onclick="openDeleteModal(this.dataset.id, this.dataset.title)">Delete</button>
-              </div>
+            <div style="margin: 2px 0 6px;">${statusPill(entry.status)}</div>
+            <div class="project-actions">
+              <a href="/entry.html?id=${esc(entry.id)}">Open</a>
+              <a href="/entry.html?id=${esc(entry.id)}&autoanalyze=1">Analyze</a>
+              <button data-id="${esc(entry.id)}" data-title="${esc(title)}" onclick="renameProject(this.dataset.id, this.dataset.title)">Rename</button>
+              <button class="delete-btn" data-id="${esc(entry.id)}" data-title="${esc(title)}" onclick="openDeleteModal(this.dataset.id, this.dataset.title)">Delete</button>
             </div>
           </div>
-        `;
-      }).join('');
-    }
+        </div>
+      `;
+    }).join('');
   } catch (err) {
     console.error('Error loading entries:', err);
   }
 }
 
-function updateStats(entries) {
-  const totalProjects = entries.length;
-  const videosProcessed = entries.filter(e => e.type === 'video' && e.status === 'ready').length;
-  const highlightsGenerated = entries.filter(e => e.analysis).length;
-  const captionsGenerated = entries.filter(e => e.renders?.highlight).length;
-
-  document.getElementById('total-projects').textContent = totalProjects;
-  document.getElementById('videos-processed').textContent = videosProcessed;
-  document.getElementById('highlights-generated').textContent = highlightsGenerated;
-  document.getElementById('captions-generated').textContent = captionsGenerated;
-}
-
-// Creator Suite Functions
-async function analyzeHighlights() {
-  if (!currentEntry || !currentEntry.filePath) {
-    showStatus('✗ Please upload a video first', 'error');
-    return;
-  }
-
-  const analyzeBtn = document.getElementById('analyze-btn');
-  analyzeBtn.disabled = true;
-  showStatus('Queuing analysis job...', 'loading');
-
+// Quick rename from a card (full inline rename lives on the project page).
+async function renameProject(id, current) {
+  const next = prompt('Rename project:', current || '');
+  if (next === null) return;
+  const title = next.trim();
+  if (!title || title === current) return;
   try {
-    const response = await fetch('/api/creator/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        videoPath: currentEntry.filePath,
-        entryId: currentEntry.id,
-        options: {
-          fps: 5,
-          motionThreshold: 0.15,
-          audioThreshold: 0.7,
-          minHighlightDuration: 1.0,
-          maxHighlightDuration: 30.0
-        }
-      })
+    const r = await fetch(`/api/creator-entries/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title })
     });
-
-    if (response.ok) {
-      const result = await response.json();
-      pollJobProgress(result.jobId, 'highlights');
-    } else {
-      const error = await response.json();
-      showStatus(`✗ Failed to queue job: ${error.error}`, 'error');
-    }
-  } catch (err) {
-    showStatus(`✗ Error: ${err.message}`, 'error');
-  } finally {
-    analyzeBtn.disabled = false;
-  }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); showStatus('✗ ' + (e.error || 'Rename failed'), 'error'); return; }
+    showStatus('✓ Renamed', 'success');
+    loadRecentEntries();
+  } catch (e) { showStatus('✗ ' + e.message, 'error'); }
 }
 
-async function pollJobProgress(jobId, panelType) {
-  const maxAttempts = 300;
-  let attempts = 0;
-
-  const pollInterval = setInterval(async () => {
-    attempts++;
-
-    try {
-      const response = await fetch(`/api/creator/job/${jobId}`);
-      if (!response.ok) return;
-
-      const job = await response.json();
-      showStatus(`${job.progressMessage} (${job.progress}%)`, 'loading');
-
-      const panel = document.getElementById(`${panelType}-panel`);
-      const content = document.getElementById(`${panelType}-content`);
-
-      if (job.status === 'processing' || job.status === 'pending') {
-        let html = `<div style="margin-bottom: 12px;">
-          <div style="font-size: 0.85rem; margin-bottom: 6px;">
-            <strong>${job.progressMessage}</strong>
-          </div>
-          <div style="background: var(--surface2); height: 24px; border-radius: 4px; overflow: hidden;">
-            <div style="background: linear-gradient(90deg, var(--accent), var(--green)); height: 100%; width: ${job.progress}%; transition: width 0.3s; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 0.7rem; color: white; font-weight: 600;">${job.progress}%</span>
-            </div>
-          </div>
-        </div>`;
-        content.innerHTML = html;
-        panel.classList.add('show');
-      } else if (job.status === 'complete') {
-        clearInterval(pollInterval);
-        await displayJobResults(job, panelType);
-        showStatus(`✓ ${job.type} complete!`, 'success');
-      } else if (job.status === 'failed') {
-        clearInterval(pollInterval);
-        showStatus(`✗ Job failed: ${job.error}`, 'error');
-      }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(pollInterval);
-        showStatus('✗ Job timeout', 'error');
-      }
-    } catch (err) {
-      console.error('Poll error:', err);
-    }
-  }, 500);
-}
-
-async function displayJobResults(job, panelType) {
-  const panel = document.getElementById(`${panelType}-panel`);
-  const content = document.getElementById(`${panelType}-content`);
-
-  if (!job.result) {
-    content.innerHTML = '<div class="result-item">No results available</div>';
-    panel.classList.add('show');
-    return;
-  }
-
-  let html = '';
-
-  if (panelType === 'highlights' && job.result.timeline) {
-    const timeline = job.result.timeline;
-    currentHighlightTimeline = timeline;
-
-    if (currentEntry && currentEntry.id) {
-      try {
-        await fetch(`/api/creator-entries/${currentEntry.id}/analysis`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            duration: timeline.duration,
-            highlights: timeline.highlights,
-            topHighlights: timeline.topHighlights,
-            metadata: timeline.metadata
-          })
-        });
-      } catch (err) {
-        console.error('Error saving analysis:', err);
-      }
-    }
-
-    html = `<div class="result-stat">
-      <span class="stat-label">Duration:</span>
-      <span class="stat-value">${timeline.duration.toFixed(1)}s</span>
-    </div>`;
-    html += `<div class="result-stat">
-      <span class="stat-label">Highlights Found:</span>
-      <span class="stat-value">${timeline.highlights.length}</span>
-    </div>`;
-
-    if (timeline.topHighlights && timeline.topHighlights.length > 0) {
-      html += `<div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">`;
-      timeline.topHighlights.slice(0, 3).forEach((hl, idx) => {
-        html += `<div class="result-item">
-          <strong>#${idx + 1}</strong> ${hl.start.toFixed(1)}s - ${hl.end.toFixed(1)}s
-          <div style="font-size: 0.8rem; color: var(--accent); margin-top: 4px;">
-            Score: ${(hl.score * 100).toFixed(0)}% — ${hl.reason}
-          </div>
-        </div>`;
-      });
-      html += `</div>`;
-    }
-
-    // Enable variant/caption/safezone buttons
-    document.getElementById('variants-btn').disabled = false;
-    document.getElementById('variants-tool').classList.remove('disabled');
-    document.getElementById('variants-status').textContent = 'Ready';
-
-    document.getElementById('captions-btn').disabled = false;
-    document.getElementById('captions-tool').classList.remove('disabled');
-    document.getElementById('captions-status').textContent = 'Ready';
-
-    document.getElementById('safezones-btn').disabled = false;
-    document.getElementById('safezones-tool').classList.remove('disabled');
-    document.getElementById('safezones-status').textContent = 'Ready';
-  }
-
-  content.innerHTML = html;
-  panel.classList.add('show');
-}
-
-async function generateVariants() {
-  if (!currentHighlightTimeline) {
-    showStatus('✗ Please analyze highlights first', 'error');
-    return;
-  }
-
-  const variantsBtn = document.getElementById('variants-btn');
-  variantsBtn.disabled = true;
-  showStatus('Queuing variant generation...', 'loading');
-
-  try {
-    const response = await fetch('/api/creator/variants', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ highlightTimeline: currentHighlightTimeline })
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      pollJobProgress(result.jobId, 'variants');
-    } else {
-      const error = await response.json();
-      showStatus(`✗ Failed to queue: ${error.error}`, 'error');
-    }
-  } catch (err) {
-    showStatus(`✗ Error: ${err.message}`, 'error');
-  } finally {
-    variantsBtn.disabled = false;
-  }
-}
-
-async function generateCaptions() {
-  if (!currentHighlightTimeline) {
-    showStatus('✗ Please analyze highlights first', 'error');
-    return;
-  }
-
-  const captionsBtn = document.getElementById('captions-btn');
-  captionsBtn.disabled = true;
-  showStatus('Queuing caption generation...', 'loading');
-
-  try {
-    const response = await fetch('/api/creator/captions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        highlightTimeline: currentHighlightTimeline,
-        strategy: 'gaming',
-        format: 'all'
-      })
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      pollJobProgress(result.jobId, 'captions');
-    } else {
-      const error = await response.json();
-      showStatus(`✗ Failed to queue: ${error.error}`, 'error');
-    }
-  } catch (err) {
-    showStatus(`✗ Error: ${err.message}`, 'error');
-  } finally {
-    captionsBtn.disabled = false;
-  }
-}
-
-async function detectSafeZones() {
-  if (!currentEntry || !currentEntry.filePath) {
-    showStatus('✗ Please upload a video first', 'error');
-    return;
-  }
-
-  const safezonesBtn = document.getElementById('safezones-btn');
-  safezonesBtn.disabled = true;
-  showStatus('Queuing safe zone detection...', 'loading');
-
-  try {
-    const response = await fetch('/api/creator/safe-zones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        videoPath: currentEntry.filePath,
-        frameData: { width: 1920, height: 1080 }
-      })
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      pollJobProgress(result.jobId, 'safezones');
-    } else {
-      const error = await response.json();
-      showStatus(`✗ Failed to queue: ${error.error}`, 'error');
-    }
-  } catch (err) {
-    showStatus(`✗ Error: ${err.message}`, 'error');
-  } finally {
-    safezonesBtn.disabled = false;
-  }
-}
+// (Homepage Creator Tools removed — analysis/variants/captions/safe-zones now
+//  live inside each project workspace at /entry.html?id=…)
 
 // Initial load
 loadRecentEntries();

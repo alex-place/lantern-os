@@ -556,6 +556,34 @@
     .render-actions a:hover, .render-actions button:hover { border-color: var(--accent); color: var(--accent); }
     .render-actions .del:hover { border-color: var(--danger); color: var(--danger); }
 
+    /* Analysis failure banner + run history */
+    .analysis-error {
+      margin-top: 14px; padding: 14px 16px; border-radius: 10px;
+      background: rgba(224, 85, 85, 0.08); border: 1px solid var(--danger);
+      border-left: 3px solid var(--danger);
+    }
+    .analysis-error .ae-title { font-weight: 700; color: var(--danger); margin-bottom: 6px; }
+    .analysis-error .ae-row { font-size: 0.85rem; margin: 2px 0; }
+    .analysis-error .ae-row span { color: var(--muted); display: inline-block; min-width: 64px; }
+    .analysis-runs { margin-top: 14px; }
+    .analysis-runs h4 { margin: 0 0 8px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .run-row {
+      display: flex; align-items: center; gap: 10px; font-size: 0.82rem;
+      padding: 6px 0; border-top: 1px solid var(--border);
+    }
+    .run-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .run-dot.ok { background: var(--green); }
+    .run-dot.fail { background: var(--danger); }
+    .run-meta { color: var(--muted); margin-left: auto; }
+
+    /* Safe zones panel */
+    .research-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
+    .research-disclaimer { font-size: 0.72rem; color: var(--muted); margin: 10px 0 0; }
+    .sz-list { display: flex; flex-direction: column; gap: 8px; }
+    .sz-row { font-size: 0.88rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sz-dot { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+    .sz-cues { width: 100%; font-size: 0.74rem; color: var(--muted); padding-left: 18px; }
+
     .variant-export-btn {
       padding: 7px 14px;
       background: var(--accent);
@@ -587,6 +615,47 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ── TaskProgressPanel ───────────────────────────────────────────────── */
+    .tpp { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-top: 12px; display: none; }
+    .tpp.show { display: block; }
+    .tpp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .tpp-title { font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
+    .tpp-eta { font-size: 0.8rem; color: var(--muted); }
+    .tpp-heartbeat { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; animation: tpp-pulse 1.2s ease-in-out infinite; }
+    @keyframes tpp-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+    .tpp-bar-track { height: 5px; background: var(--surface2); border-radius: 3px; margin-bottom: 14px; }
+    .tpp-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 3px; width: 0%; transition: width 0.25s linear; }
+    .tpp-stages { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+    .tpp-stage { display: flex; align-items: center; gap: 9px; font-size: 0.83rem; }
+    .tpp-icon { width: 16px; text-align: center; font-size: 0.78rem; flex: none; }
+    .tpp-stage-name { }
+    .tpp-stage.tpp-running .tpp-stage-name { color: var(--accent); font-weight: 600; }
+    .tpp-stage.tpp-done .tpp-stage-name { color: var(--muted); }
+    .tpp-stage.tpp-pending .tpp-stage-name { color: var(--muted); opacity: 0.55; }
+    .tpp-stage.tpp-failed .tpp-stage-name { color: var(--danger); }
+    .tpp-live { font-size: 0.78rem; color: var(--muted); background: var(--surface2); border-radius: 7px; padding: 7px 11px; margin-bottom: 8px; display: none; line-height: 1.5; }
+    .tpp-live.show { display: block; }
+    .tpp-log-toggle { font-size: 0.75rem; color: var(--muted); cursor: pointer; user-select: none; }
+    .tpp-log-toggle:hover { color: var(--accent); }
+    .tpp-log { font-size: 0.72rem; font-family: monospace; color: var(--muted); max-height: 110px; overflow-y: auto; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; display: none; }
+    .tpp-log.show { display: block; }
+    .tpp-log-line { padding: 1px 0; }
+    .tpp-log-ts { color: var(--muted); opacity: 0.6; margin-right: 6px; }
+    /* completion */
+    .tpp-done { background: rgba(0,200,100,0.06); border: 1px solid var(--green); border-radius: 10px; padding: 14px 18px; margin-top: 12px; display: none; }
+    .tpp-done.show { display: block; }
+    .tpp-done-title { font-weight: 700; color: var(--green); margin-bottom: 10px; font-size: 0.95rem; }
+    .tpp-done-stats { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 10px; }
+    .tpp-done-stat { display: flex; flex-direction: column; gap: 2px; }
+    .tpp-done-stat-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .tpp-done-stat-val { font-weight: 700; font-size: 0.92rem; }
+    /* failure */
+    .tpp-fail { background: rgba(224,85,85,0.08); border: 1px solid var(--danger); border-radius: 10px; padding: 14px 18px; margin-top: 12px; display: none; }
+    .tpp-fail.show { display: block; }
+    .tpp-fail-title { font-weight: 700; color: var(--danger); margin-bottom: 6px; font-size: 0.95rem; }
+    .tpp-fail-row { font-size: 0.84rem; margin: 3px 0; }
+    .tpp-fail-row span { color: var(--muted); display: inline-block; min-width: 56px; }
   </style>
 </head>
 <body>
@@ -595,7 +664,7 @@
 
   <header>
     <div>
-      <h1 id="entry-title">Loading...</h1>
+      <h1 id="entry-title" title="Click to rename" style="cursor: text;" onclick="startTitleEdit()">Loading...</h1>
       <div class="entry-meta">
         <span id="entry-date"></span>
       </div>
@@ -646,10 +715,40 @@
         <button class="wa-btn" id="wa-render" onclick="runRenderShorts()">Render Shorts</button>
       </div>
       <div class="wa-status" id="wa-status"></div>
-      <div class="wa-progress" id="wa-progress"><div class="wa-progress-fill" id="wa-progress-fill"></div></div>
+
+      <!-- TaskProgressPanel — rich stage-by-stage progress with ETA, live stats, and log -->
+      <div class="tpp" id="tpp">
+        <div class="tpp-header">
+          <span class="tpp-title">
+            <span class="tpp-heartbeat" id="tpp-heartbeat"></span>
+            <span id="tpp-op-name">Processing</span>
+          </span>
+          <span class="tpp-eta" id="tpp-eta"></span>
+        </div>
+        <div class="tpp-bar-track"><div class="tpp-bar-fill" id="tpp-fill"></div></div>
+        <div class="tpp-stages" id="tpp-stages"></div>
+        <div class="tpp-live" id="tpp-live"></div>
+        <span class="tpp-log-toggle" id="tpp-log-toggle" onclick="tppToggleLog()" style="display:none">▶ Analysis Log</span>
+        <div class="tpp-log" id="tpp-log"></div>
+      </div>
+
+      <!-- Completion summary (shown when job finishes) -->
+      <div class="tpp-done" id="tpp-done">
+        <div class="tpp-done-title" id="tpp-done-title">✓ Complete</div>
+        <div class="tpp-done-stats" id="tpp-done-stats"></div>
+      </div>
+
+      <!-- Failure panel -->
+      <div class="tpp-fail" id="tpp-fail">
+        <div class="tpp-fail-title">⚠ Failed</div>
+        <div id="tpp-fail-body"></div>
+      </div>
 
       <!-- Per-stage status badges with timestamps -->
       <div class="stage-grid" id="stage-grid"></div>
+
+      <!-- Analysis error banner + run history (persisted; visible after refresh) -->
+      <div id="analysis-status"></div>
     </div>
 
     <div class="content-grid">
@@ -674,6 +773,15 @@
       <div class="section-sub">Rendered exports for this project. Persist across refresh and restart.</div>
       <div class="render-grid" id="render-grid">
         <p class="no-data">No renders yet — use Render Shorts or a variant's Render &amp; Export.</p>
+      </div>
+    </div>
+
+    <!-- Safe Zones (facecam/HUD heuristic detection + overlay) -->
+    <div style="margin-top: 32px;" id="safezones-section">
+      <h3 style="margin: 0 0 4px; font-size: 1rem;">Safe Zones</h3>
+      <div class="section-sub">Heuristic facecam/HUD detection (measured confidence — not face recognition). Renders use crop that avoids slicing these.</div>
+      <div id="safezones-panel">
+        <p class="no-data">No safe-zone detection yet — run "Detect Safe Zones".</p>
       </div>
     </div>
 
@@ -835,6 +943,7 @@ async function loadEntry() {
     // Update page title
     document.getElementById("entry-title").textContent = entry.title;
     document.getElementById("entry-date").textContent = formattedCreated;
+    document.title = (entry.title || "Entry") + " — Lantern OS";
 
     // Update overview tab
     document.getElementById("entry-created").textContent = formattedCreated;
@@ -871,6 +980,8 @@ async function loadEntry() {
     currentProject = entry;
     loadStages(entry);
     loadRenderViewer(entry);
+    loadAnalysisStatus(entry);
+    loadSafeZones(entry);
 
     // Load analysis
     if (analysis) {
@@ -894,6 +1005,14 @@ async function loadEntry() {
     } else {
       statusBadge.className = "badge badge-processing";
       statusBadge.textContent = "📥 Uploaded";
+    }
+
+    // Auto-analyze when arriving from the dashboard's "Analyze" quick action
+    // (Phase 8: Upload → project opens → analyze). Strip the param so a refresh
+    // doesn't re-trigger, and only fire if there's a video and we're not already running.
+    if (params.get("autoanalyze") === "1" && entry.filePath && entry.status !== "analyzing") {
+      history.replaceState({}, "", `/entry.html?id=${encodeURIComponent(entryId)}`);
+      if (typeof runAnalyze === "function") runAnalyze();
     }
   } catch (err) {
     console.error("Error loading entry:", err);
@@ -1126,6 +1245,7 @@ function loadVariants(entry) {
           <div class="variant-head">
             <span class="variant-label">${escapeHtml(v.label || v.strategy || v.id)}</span>
             <span class="variant-grade ${gradeClass(grade)}">${escapeHtml(grade)}</span>
+            ${v.rank === 1 ? '<span class="variant-grade g-Aplus" style="background:var(--accent);color:#fff;border-color:var(--accent);">★ Recommended Upload</span>' : ''}
           </div>
           <div class="variant-metrics">
             <div><span>Viral Score</span><b>${viral}</b></div>
@@ -1206,16 +1326,191 @@ function loadScoreV10(entry) {
 
 // ── Persistent Workspace: re-run actions on the STORED project ──────────────
 function waStatus(msg) { const e = document.getElementById('wa-status'); if (e) e.textContent = msg || ''; }
-function waProgress(pct) {
-  const p = document.getElementById('wa-progress'), f = document.getElementById('wa-progress-fill');
-  if (!p || !f) return;
-  if (pct == null) { p.classList.remove('show'); f.style.width = '0'; }
-  else { p.classList.add('show'); f.style.width = Math.max(0, Math.min(100, pct)) + '%'; }
-}
 function waBusy(b) {
   ['wa-analyze', 'wa-variants', 'wa-captions', 'wa-safezones', 'wa-render'].forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = b;
   });
+}
+
+// ── TaskProgressPanel (TPP) ──────────────────────────────────────────────────
+// Provides a rich, stage-aware progress display that smoothly interpolates and
+// shows ETA, live stats, a log panel, and completion/failure summaries.
+const TPP = (() => {
+  let _smoothPct = 0;     // currently displayed progress (interpolated)
+  let _targetPct = 0;     // latest reported progress from server
+  let _animId = null;     // setInterval for smooth interpolation
+  let _etaSec = null;     // ETA in seconds (from server or countdown)
+  let _etaInterval = null;
+  let _logOpen = false;
+  let _startedAt = null;  // job.startedAt ISO string
+
+  const $id = id => document.getElementById(id);
+
+  function _fmtEta(s) {
+    if (s == null || s < 0) return '';
+    if (s === 0) return 'almost done';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s remaining` : `${sec}s remaining`;
+  }
+
+  function _fmtDuration(startedAt) {
+    if (!startedAt) return '';
+    const secs = Math.round((Date.now() - new Date(startedAt).getTime()) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  function _stageIcon(status) {
+    if (status === 'done') return '<span style="color:var(--green)">✓</span>';
+    if (status === 'running') return '<span style="color:var(--accent)">⟳</span>';
+    if (status === 'failed') return '<span style="color:var(--danger)">✗</span>';
+    return '<span style="color:var(--muted);opacity:0.45">○</span>';
+  }
+
+  function _renderStages(stages) {
+    const el = $id('tpp-stages'); if (!el) return;
+    if (!Array.isArray(stages) || stages.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = stages.map(s => `
+      <div class="tpp-stage tpp-${s.status}">
+        <span class="tpp-icon">${_stageIcon(s.status)}</span>
+        <span class="tpp-stage-name">${escapeHtml(s.name)}</span>
+      </div>`).join('');
+  }
+
+  function _renderLive(liveStats) {
+    const el = $id('tpp-live'); if (!el) return;
+    const parts = [];
+    if (liveStats.analyzedSec != null && liveStats.totalSec != null && liveStats.totalSec > 0) {
+      const pct = Math.min(100, Math.round((liveStats.analyzedSec / liveStats.totalSec) * 100));
+      const fmt = s => { const m = Math.floor(s/60), sec = s%60; return m>0?`${m}:${String(sec).padStart(2,'0')}`:`${sec}s`; };
+      parts.push(`Scanned: ${fmt(liveStats.analyzedSec)} / ${fmt(liveStats.totalSec)} (${pct}%)`);
+    }
+    if (liveStats.highlightsFound != null) parts.push(`Highlights found: ${liveStats.highlightsFound}`);
+    if (liveStats.topScore != null) parts.push(`Top score: ${liveStats.topScore}`);
+    if (liveStats.regionsFound != null) parts.push(`Regions: ${liveStats.regionsFound}`);
+    if (parts.length === 0) { el.classList.remove('show'); return; }
+    el.textContent = parts.join('  ·  ');
+    el.classList.add('show');
+  }
+
+  function _renderLog(logs) {
+    const el = $id('tpp-log'); if (!el) return;
+    const toggle = $id('tpp-log-toggle');
+    if (!Array.isArray(logs) || logs.length === 0) {
+      if (toggle) toggle.style.display = 'none';
+      return;
+    }
+    if (toggle) toggle.style.display = '';
+    const lines = logs.slice(-60).map(l => {
+      const ts = l.ts ? new Date(l.ts).toLocaleTimeString('en-US', { hour12: false }) : '';
+      return `<div class="tpp-log-line"><span class="tpp-log-ts">[${escapeHtml(ts)}]</span>${escapeHtml(l.msg)}</div>`;
+    }).join('');
+    el.innerHTML = lines;
+    if (_logOpen) el.scrollTop = el.scrollHeight;
+  }
+
+  function _startSmooth() {
+    if (_animId) return;
+    _animId = setInterval(() => {
+      const diff = _targetPct - _smoothPct;
+      if (Math.abs(diff) < 0.15) { _smoothPct = _targetPct; }
+      else { _smoothPct += diff * 0.12; }
+      const fill = $id('tpp-fill');
+      if (fill) fill.style.width = Math.min(100, Math.max(0, _smoothPct)).toFixed(1) + '%';
+    }, 80);
+  }
+
+  function _startEtaCountdown() {
+    if (_etaInterval) clearInterval(_etaInterval);
+    _etaInterval = setInterval(() => {
+      if (_etaSec != null && _etaSec > 0) {
+        _etaSec--;
+        const el = $id('tpp-eta');
+        if (el) el.textContent = _fmtEta(_etaSec);
+      }
+    }, 1000);
+  }
+
+  function _stopAll() {
+    if (_animId) { clearInterval(_animId); _animId = null; }
+    if (_etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
+  }
+
+  return {
+    show(opName) {
+      _smoothPct = 0; _targetPct = 0; _etaSec = null; _logOpen = false;
+      const tpp = $id('tpp'); if (tpp) tpp.classList.add('show');
+      const op = $id('tpp-op-name'); if (op) op.textContent = opName || 'Processing';
+      const eta = $id('tpp-eta'); if (eta) eta.textContent = '';
+      const fill = $id('tpp-fill'); if (fill) fill.style.width = '0%';
+      const stages = $id('tpp-stages'); if (stages) stages.innerHTML = '';
+      const live = $id('tpp-live'); if (live) { live.textContent = ''; live.classList.remove('show'); }
+      const log = $id('tpp-log'); if (log) { log.innerHTML = ''; log.classList.remove('show'); }
+      const toggle = $id('tpp-log-toggle'); if (toggle) toggle.style.display = 'none';
+      [$id('tpp-done'), $id('tpp-fail')].forEach(el => el && el.classList.remove('show'));
+      _startSmooth();
+      _startEtaCountdown();
+    },
+
+    update(job) {
+      _targetPct = job.progress || 0;
+      _startedAt = _startedAt || job.startedAt;
+      if (job.etaSeconds != null) _etaSec = job.etaSeconds;
+      const eta = $id('tpp-eta');
+      if (eta) eta.textContent = _fmtEta(_etaSec);
+      _renderStages(job.stages);
+      _renderLive(job.liveStats || {});
+      _renderLog(job.logs);
+    },
+
+    complete(job, summary) {
+      _stopAll();
+      _targetPct = 100; _smoothPct = 100;
+      const fill = $id('tpp-fill'); if (fill) fill.style.width = '100%';
+      const tpp = $id('tpp'); if (tpp) tpp.classList.remove('show');
+
+      const el = $id('tpp-done'); if (!el) return;
+      const title = $id('tpp-done-title');
+      const stats = $id('tpp-done-stats');
+      if (title) title.textContent = `✓ ${summary.opName || 'Complete'}`;
+      if (stats) {
+        const dur = _fmtDuration(_startedAt);
+        const items = [dur && { label: 'Duration', val: dur }].concat(summary.stats || []).filter(Boolean);
+        stats.innerHTML = items.map(i => `<div class="tpp-done-stat"><span class="tpp-done-stat-label">${escapeHtml(i.label)}</span><b class="tpp-done-stat-val">${escapeHtml(String(i.val))}</b></div>`).join('');
+      }
+      el.classList.add('show');
+      _startedAt = null;
+    },
+
+    fail(job, stageName) {
+      _stopAll();
+      const tpp = $id('tpp'); if (tpp) tpp.classList.remove('show');
+      const el = $id('tpp-fail'); if (!el) return;
+      const body = $id('tpp-fail-body');
+      if (body) {
+        body.innerHTML = `
+          <div class="tpp-fail-row"><span>Stage:</span> ${escapeHtml(stageName || job.currentStageId || 'unknown')}</div>
+          <div class="tpp-fail-row"><span>Error:</span> ${escapeHtml(job.error || 'unknown error')}</div>`;
+      }
+      el.classList.add('show');
+      _startedAt = null;
+    },
+
+    hide() {
+      _stopAll();
+      [$id('tpp'), $id('tpp-done'), $id('tpp-fail')].forEach(el => el && el.classList.remove('show'));
+      _startedAt = null;
+    },
+  };
+})();
+
+function tppToggleLog() {
+  const el = document.getElementById('tpp-log');
+  const tog = document.getElementById('tpp-log-toggle');
+  if (!el) return;
+  const open = el.classList.toggle('show');
+  if (tog) tog.textContent = (open ? '▼' : '▶') + ' Analysis Log';
+  if (open) el.scrollTop = el.scrollHeight;
 }
 
 // Poll an async job (analyze/safezones/export) to completion.
@@ -1228,11 +1523,21 @@ function pollJobUntilDone(jobId) {
         const r = await fetch(`/api/creator/job/${jobId}`);
         if (!r.ok) return;
         const job = await r.json();
+        // Update status text and TaskProgressPanel
         waStatus(`${job.progressMessage || job.status} (${job.progress || 0}%)`);
-        waProgress(job.progress || 0);
-        if (job.status === 'complete') { clearInterval(iv); resolve(job); }
-        else if (job.status === 'failed') { clearInterval(iv); reject(new Error(job.error || 'job failed')); }
-        else if (attempts >= max) { clearInterval(iv); reject(new Error('job timeout')); }
+        TPP.update(job);
+        if (job.status === 'complete') {
+          clearInterval(iv);
+          resolve(job);
+        } else if (job.status === 'failed') {
+          clearInterval(iv);
+          const failedStage = Array.isArray(job.stages) ? (job.stages.find(s => s.status === 'failed') || null) : null;
+          TPP.fail(job, failedStage && failedStage.name);
+          reject(new Error(job.error || 'job failed'));
+        } else if (attempts >= max) {
+          clearInterval(iv);
+          reject(new Error('job timeout'));
+        }
       } catch (e) { /* transient — keep polling */ }
     }, 1000);
   });
@@ -1240,7 +1545,10 @@ function pollJobUntilDone(jobId) {
 
 async function runAnalyze() {
   if (!currentProject || !currentProject.filePath) { waStatus('No video file on this project.'); return; }
-  waBusy(true); waStatus('Queuing analysis…'); waProgress(0);
+  waBusy(true);
+  waStatus('');
+  TPP.hide();
+  TPP.show('Video Analysis');
   try {
     const r = await fetch('/api/creator/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1251,16 +1559,26 @@ async function runAnalyze() {
     });
     const d = await r.json();
     if (!r.ok || !d.jobId) throw new Error(d.error || 'failed to queue');
-    await pollJobUntilDone(d.jobId);
-    waStatus('Analysis complete.'); waProgress(null);
+    const job = await pollJobUntilDone(d.jobId);
+    const stats = [];
+    if (job.result && Array.isArray(job.result.variants)) stats.push({ label: 'Variants', val: job.result.variants.length });
+    if (job.liveStats && job.liveStats.highlightsFound != null) stats.push({ label: 'Highlights', val: job.liveStats.highlightsFound });
+    if (job.liveStats && job.liveStats.topScore != null) stats.push({ label: 'Top Score', val: job.liveStats.topScore + '%' });
+    TPP.complete(job, { opName: 'Analysis Complete', stats });
+    waStatus('');
     await loadEntry();
-  } catch (e) { waStatus('Error: ' + e.message); waProgress(null); }
+  } catch (e) {
+    if (!e.message.includes('job failed')) waStatus('Error: ' + e.message);
+  }
   finally { waBusy(false); }
 }
 
 async function runSafeZones() {
   if (!currentProject || !currentProject.filePath) { waStatus('No video file on this project.'); return; }
-  waBusy(true); waStatus('Queuing safe-zone detection…'); waProgress(0);
+  waBusy(true);
+  waStatus('');
+  TPP.hide();
+  TPP.show('Safe Zone Detection');
   try {
     const r = await fetch('/api/creator/safe-zones', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1268,10 +1586,16 @@ async function runSafeZones() {
     });
     const d = await r.json();
     if (!r.ok || !d.jobId) throw new Error(d.error || 'failed to queue');
-    await pollJobUntilDone(d.jobId);
-    waStatus('Safe-zone detection complete.'); waProgress(null);
+    const job = await pollJobUntilDone(d.jobId);
+    const stats = [];
+    if (job.liveStats && job.liveStats.regionsFound != null) stats.push({ label: 'Regions', val: job.liveStats.regionsFound });
+    if (job.liveStats && job.liveStats.framesSampled != null) stats.push({ label: 'Frames Sampled', val: job.liveStats.framesSampled });
+    TPP.complete(job, { opName: 'Detection Complete', stats });
+    waStatus('');
     await loadEntry();
-  } catch (e) { waStatus('Error: ' + e.message); waProgress(null); }
+  } catch (e) {
+    if (!e.message.includes('job failed')) waStatus('Error: ' + e.message);
+  }
   finally { waBusy(false); }
 }
 
@@ -1280,18 +1604,26 @@ async function runRenderShorts() {
   if (variants.length === 0) { waStatus('Run Analyze Highlights first to generate variants to render.'); return; }
   const top = variants.find(v => v.rank === 1) || variants[0];
   if (!top || !Array.isArray(top.segments) || top.segments.length === 0) { waStatus('Top variant has no segments to render.'); return; }
-  waBusy(true); waStatus(`Rendering top variant (${top.label || top.id})…`); waProgress(0);
+  waBusy(true);
+  waStatus('');
+  TPP.hide();
+  TPP.show(`Render: ${top.label || top.id}`);
   try {
     const r = await fetch('/api/creator/export', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoPath: currentProject.filePath, entryId, renderKey: top.id, segments: top.segments, format: '9:16', fit: 'pad', burnCaptions: true }),
+      body: JSON.stringify({ videoPath: currentProject.filePath, entryId, renderKey: top.id, segments: top.segments, format: '9:16', fit: 'crop', useSafeZones: true, burnCaptions: true }),
     });
     const d = await r.json();
     if (!r.ok || !d.jobId) throw new Error(d.error || 'failed to queue');
-    await pollJobUntilDone(d.jobId);
-    waStatus('Render complete.'); waProgress(null);
+    const job = await pollJobUntilDone(d.jobId);
+    const stats = [];
+    if (job.result && job.result.size) stats.push({ label: 'File Size', val: (job.result.size / (1024*1024)).toFixed(1) + ' MB' });
+    TPP.complete(job, { opName: 'Render Complete', stats });
+    waStatus('');
     await loadEntry();
-  } catch (e) { waStatus('Error: ' + e.message); waProgress(null); }
+  } catch (e) {
+    if (!e.message.includes('job failed')) waStatus('Error: ' + e.message);
+  }
   finally { waBusy(false); }
 }
 
@@ -1315,6 +1647,128 @@ async function runRegenCaptions() {
     waStatus(`Captions regenerated (${(d.captions || []).length}).`); await loadEntry();
   } catch (e) { waStatus('Error: ' + e.message); }
   finally { waBusy(false); }
+}
+
+// Inline title rename (Phase 3): click the title → input → save on Enter/blur.
+let titleEditing = false;
+function startTitleEdit() {
+  if (titleEditing) return;
+  titleEditing = true;
+  const h1 = document.getElementById('entry-title');
+  const cur = (currentProject && currentProject.title) || h1.textContent || '';
+  const input = document.createElement('input');
+  input.type = 'text'; input.value = cur; input.id = 'entry-title-input';
+  input.style.cssText = 'font-size:1.5rem;font-weight:600;background:var(--surface2);color:var(--text);border:1px solid var(--accent);border-radius:8px;padding:4px 10px;width:100%;max-width:520px;font-family:inherit;';
+  h1.replaceWith(input);
+  input.focus(); input.select();
+
+  const restoreH1 = (text) => {
+    const newH1 = document.createElement('h1');
+    newH1.id = 'entry-title'; newH1.title = 'Click to rename';
+    newH1.style.cursor = 'text'; newH1.setAttribute('onclick', 'startTitleEdit()');
+    newH1.textContent = text;
+    input.replaceWith(newH1);
+  };
+  const commit = async () => {
+    if (!titleEditing) return;
+    titleEditing = false;
+    const title = input.value.trim();
+    restoreH1(title || cur);
+    if (title && title !== cur) {
+      try {
+        await fetch(`/api/creator-entries/${entryId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title })
+        });
+        if (currentProject) currentProject.title = title;
+        document.title = title + ' — Lantern OS';
+      } catch (e) { console.error('rename failed', e); }
+    }
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    else if (e.key === 'Escape') { titleEditing = false; restoreH1(cur); }
+  });
+  input.addEventListener('blur', commit);
+}
+
+function loadSafeZones(entry) {
+  const panel = document.getElementById('safezones-panel'); if (!panel) return;
+  const sz = entry.safezones;
+  if (!sz) {
+    panel.innerHTML = '<p class="no-data">No safe-zone detection yet — run "Detect Safe Zones" above.</p>';
+    return;
+  }
+  if (sz.status !== 'ok') {
+    panel.innerHTML = `<p class="no-data">Detection unavailable: ${escapeHtml(sz.reason || 'could not analyze')}.</p>`;
+    return;
+  }
+  const regions = Array.isArray(sz.regions) ? sz.regions : [];
+  const face = regions.find(r => r.type === 'facecam');
+  const hud = regions.filter(r => r.type === 'hud');
+
+  const pct = (x) => Math.round((x || 0) * 100) + '%';
+  const rows = [];
+  if (face) {
+    const conf = pct(face.confidence);
+    const cueStr = face.cues ? `skin ${pct(face.cues.skin)} · motion ${pct(face.cues.temporal)} · border ${pct(face.cues.border)}` : '';
+    rows.push(`<div class="sz-row"><span class="sz-dot" style="background:red"></span><b>Facecam</b> · ${escapeHtml(face.corner || '')} · <b>${conf}</b> confidence ${face.needsDeclaration ? '<span class="status-pill gray" style="margin-left:6px;">low — confirm</span>' : ''}<div class="sz-cues">${escapeHtml(cueStr)}</div></div>`);
+  } else {
+    rows.push('<div class="sz-row"><span class="sz-dot" style="background:#555"></span><b>Facecam</b> · not detected (declare it if there is one)</div>');
+  }
+  rows.push(`<div class="sz-row"><span class="sz-dot" style="background:cyan"></span><b>HUD bands</b> · ${hud.length ? hud.length + ' detected' : 'none detected'}</div>`);
+
+  const overlay = sz.overlay ? `<img src="/media/${escapeHtml(sz.overlay)}" alt="safe-zone overlay" style="width:100%;max-width:360px;border-radius:10px;border:1px solid var(--border);margin-top:12px;">` : '';
+  const declareNote = (face && face.needsDeclaration) || !face
+    ? '<p class="research-disclaimer">Low confidence — this is a heuristic, not face recognition. If the box is wrong, declare the facecam position (coming next) and renders will preserve it deterministically.</p>'
+    : '';
+
+  panel.innerHTML = `
+    <div class="research-card">
+      <div class="sz-list">${rows.join('')}</div>
+      ${overlay}
+      ${declareNote}
+      <div style="margin-top:12px;"><button class="wa-btn" onclick="runSafeZones()">Re-run Detection</button></div>
+    </div>`;
+}
+
+function loadAnalysisStatus(entry) {
+  const el = document.getElementById('analysis-status'); if (!el) return;
+  const fmt = (iso) => { try { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
+  let html = '';
+
+  // Persisted failure: show the exact stage + reason (no more silent hang).
+  const err = entry.analysisError;
+  if (err) {
+    html += `
+      <div class="analysis-error">
+        <div class="ae-title">⚠ Analysis failed</div>
+        <div class="ae-row"><span>Stage:</span> ${escapeHtml(err.stage || 'unknown')}</div>
+        <div class="ae-row"><span>Reason:</span> ${escapeHtml(err.error || 'unknown error')}</div>
+        ${err.at ? `<div class="ae-row"><span>When:</span> ${escapeHtml(fmt(err.at))}</div>` : ''}
+      </div>`;
+  }
+
+  // Audit trail of analysis runs (most recent first).
+  const runs = Array.isArray(entry.analysisRuns) ? entry.analysisRuns : [];
+  if (runs.length) {
+    html += '<div class="analysis-runs"><h4>Analysis Runs</h4>';
+    runs.slice().reverse().forEach((r, i) => {
+      const ok = r.status === 'complete';
+      const detail = ok
+        ? `${typeof r.highlightCount === 'number' ? r.highlightCount + ' highlights' : 'complete'}${r.analysisCapped ? ' (capped)' : ''}`
+        : `failed${r.stage ? ' — ' + escapeHtml(r.stage) : ''}`;
+      html += `
+        <div class="run-row">
+          <span class="run-dot ${ok ? 'ok' : 'fail'}"></span>
+          <span>Run #${runs.length - i}</span>
+          <span>${escapeHtml(detail)}</span>
+          <span class="run-meta">${escapeHtml(fmt(r.finishedAt))}</span>
+        </div>`;
+    });
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
 }
 
 function loadStages(entry) {
@@ -1401,7 +1855,8 @@ async function exportVariant(variantId) {
         renderKey: v.id,
         segments: v.segments,
         format: '9:16',
-        fit: 'pad',
+        fit: 'crop',          // cover-fill the 9:16 frame (no black bars)
+        useSafeZones: true,    // shift the crop window to avoid slicing facecam/HUD
         burnCaptions: true,
       }),
     });
