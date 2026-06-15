@@ -790,6 +790,7 @@ async function act(dir,fromSwipe){
     if(card.favAsk==null){ blockTake('No live ask price — cannot trade'); return; }
     if(card.kind==='convergence'){
       if(card.favAsk>90){ blockTake(`Margin too thin (${100-(card.favAsk||0)}¢ profit) — need 10¢ min`); return; }
+      if(card.favAsk<80){ blockTake('Not converged enough — skip'); return; }
     } else {
       if(card.favAsk<4||card.favAsk>96){ blockTake(`Market converged (${card.favAsk}¢) — no edge`); return; }
       if((card.conviction||0)<40){ blockTake(`Edge too thin — ${card.conviction||0}% conviction`); return; }
