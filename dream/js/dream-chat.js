@@ -1149,8 +1149,16 @@
   function renderTagChips(category) {
     const container = document.getElementById(`chips-${category}`);
     container.innerHTML = logDreamTags[category].map(v =>
-      `<span class="tag-chip active" onclick="removeTagChip('${category}','${v}')">${escapeHtml(v)} ×</span>`
+      `<span class="tag-chip active" data-category="${escapeHtml(category)}" data-value="${escapeHtml(v)}">${escapeHtml(v)} ×</span>`
     ).join("");
+    // Event delegation for tag removal (XSS fix: use data attributes instead of inline onclick)
+    container.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tag-chip')) {
+        const cat = e.target.dataset.category;
+        const val = e.target.dataset.value;
+        removeTagChip(cat, val);
+      }
+    });
   }
 
   function clearLogDream() {

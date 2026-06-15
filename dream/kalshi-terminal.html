@@ -144,6 +144,7 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
   background:linear-gradient(135deg,#059669,#00d4aa);color:#fff;cursor:pointer;letter-spacing:.03em;transition:all .15s;min-width:110px;box-shadow:0 3px 14px rgba(0,180,130,.35)}
 .btn-take:hover{filter:brightness(1.08);transform:scale(1.04)}
 .peek .card-actions,.peek2 .card-actions{display:none}
+.keyboard-hint{font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:.05em;text-transform:uppercase;font-weight:500}
 /* theme toggle */
 .theme-toggle{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;color:var(--muted);font-size:13px;transition:border-color .2s}
 .theme-toggle:hover{border-color:var(--accent);color:var(--text)}
@@ -201,7 +202,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <h1 class="sr-only">Kalshi Terminal — Swipe Deck</h1>
 
 <nav class="site-nav">
-  <a class="nav-brand" href="/">
+  <a class="nav-brand" href="/trader-dashboard.html">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
     Lantern OS
   </a>
@@ -233,6 +234,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <div class="actions" role="region" aria-label="Card action buttons">
   <button class="btn-pass" id="bPass" aria-label="Pass on current position" onclick="act('pass')">✕ Pass</button>
   <button class="btn-take" id="bTake" aria-label="Take current position" onclick="act('take')">✓ Take it</button>
+  <div class="keyboard-hint">← Pass  Take →</div>
 </div>
 
 <div class="image-gallery" id="imageGallery" style="display:none" aria-label="Market chart and news images">
@@ -831,6 +833,7 @@ function showResult(res,card){
 document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight') act('take');
   else if(e.key==='ArrowLeft') act('pass');
+  else if(e.key==='Escape') closeImageModal();
 });
 
 
@@ -878,10 +881,6 @@ function toggleGallery(){
   imageGalleryOpen=!imageGalleryOpen;
   grid.style.display=imageGalleryOpen?'':'none';
 }
-
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') closeImageModal();
-});
 
 function init(){
   // Restore saved theme
