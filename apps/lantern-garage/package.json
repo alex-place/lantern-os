@@ -30,7 +30,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "exif-parser": "^0.1.12",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^2.4.5",
     "sharp": "^0.35.1",
     "tesseract.js": "^7.0.0"
   },
