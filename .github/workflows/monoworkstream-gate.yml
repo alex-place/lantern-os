@@ -1,7 +1,9 @@
 name: Monoworkstream Gate
-# Enforces per-agent workstream rule: only 1 open feature PR to master at a time.
-# Prevents conflicting merges and ensures serial review. Exempt: gh-pages (deploy), master (long-lived).
-# See AGENTS.md for complete monoworkstream rules and branch naming conventions.
+# Enforces the per-agent workstream rule: each agent prefix (claude/ gemini/ codex/
+# devin/ grok/ openai/) gets ONE concurrent open-PR lane; branches without a
+# recognised prefix share the "human" lane. Multiple lanes may be open at once.
+# Exempt: gh-pages (deploy), master (long-lived).
+# See AGENTS.md / CLAUDE.md for complete monoworkstream rules and branch naming.
 
 on:
   pull_request:
@@ -22,18 +24,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check open PR count (excluding exempt branches)
+      - name: Enforce per-agent lane (max 1 open PR per agent prefix)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Count open PRs that target master from non-exempt branches
-          # Exempt: gh-pages (deploy branch), master (long-lived)
-          open_count=$(gh pr list --state open --json headRefName,baseRefName \
-            --jq '[.[] | select(.baseRefName == "master" and .headRefName != "gh-pages")] | length')
-          echo "Open PRs targeting master: $open_count"
-          if [ "$open_count" -gt 1 ]; then
-            echo "::error::Monoworkstream violation: $open_count PRs open targeting master. Only 1 feature PR allowed at a time."
-            echo "Close or merge existing PRs before opening a new one."
+          # Group open PRs targeting master by agent lane and fail only if a single
+          # lane has more than one open PR. Exempt: gh-pages (deploy branch).
+          # Branches without a recognised agent prefix share the "human" lane.
+          offenders=$(gh pr list --state open --json number,title,headRefName,baseRefName --jq '
+            [ .[]
+              | select(.baseRefName == "master" and .headRefName != "gh-pages")
+              | .lane = (.headRefName | split("/")[0])
+              | .lane = (if (["claude","gemini","codex","devin","grok","openai"] | index(.lane)) then .lane else "human" end)
+            ]
+            | group_by(.lane)
+            | map(select(length > 1))
+            | map({lane: .[0].lane, prs: map("#\(.number) \(.title) [\(.headRefName)]")})
+          ')
+          echo "Open PRs grouped by lane:"
+          gh pr list --state open --json number,headRefName,baseRefName --jq '
+            [ .[] | select(.baseRefName == "master" and .headRefName != "gh-pages") ]
+            | group_by(.headRefName | split("/")[0])
+            | map("  \(.[0].headRefName | split("/")[0]): \(length) PR(s)")[]' || true
+          if [ "$offenders" != "[]" ] && [ -n "$offenders" ]; then
+            echo "::error::Monoworkstream violation — an agent lane has more than one open PR targeting master:"
+            echo "$offenders" | jq -r '.[] | "  lane \(.lane):", (.prs[] | "    \(.)")'
+            echo "Each agent prefix may keep only one open PR. Merge or close the others before opening a new one in the same lane."
             exit 1
           fi
-          echo "Monoworkstream gate passed ($open_count PR open)"
+          echo "Monoworkstream gate passed — at most one open PR per agent lane."

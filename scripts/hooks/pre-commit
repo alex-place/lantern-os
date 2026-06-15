@@ -112,10 +112,14 @@ for file in $(git diff --cached --name-only); do
   fi
 done
 
-# 5. Oversized commit (> 600 added lines = likely mass-generated boilerplate)
-added=$(git diff --cached --numstat | awk '{sum += $1} END {print sum+0}')
-if [ "$added" -gt 600 ]; then
-  echo "SLOP [size]: $added lines added in one commit — split into atomic changes."
+# 5. Oversized commit — count SOURCE lines only (docs / data / configs exempt).
+#    Convergence work is documentation- and experiment-output-heavy; gating on the
+#    total line count false-blocks legitimate research commits. Mirror the CI gate
+#    in .github/workflows/slop-check.yml (source-only, limit 1000) so local == CI.
+added=$(git diff --cached --numstat -- '*.js' '*.ts' '*.py' '*.sh' '*.mjs' '*.cjs' \
+  | awk '{sum += $1} END {print sum+0}')
+if [ "$added" -gt 1000 ]; then
+  echo "SLOP [size]: $added source lines added in one commit (limit 1000) — split into atomic changes."
   slop_fail=1
 fi
 
