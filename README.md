@@ -555,6 +555,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Update-InternalHou
 | [docs/PUBLIC-REPORT-EVIDENCE-BOUNDARY.md](docs/PUBLIC-REPORT-EVIDENCE-BOUNDARY.md) | Evidence and claim-labeling guidance for reports |
 | [docs/REPO-CONTRACT.md](docs/REPO-CONTRACT.md) | Repository scope and cleanup contract |
 | [docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) | Public deployment via Cloudflare Tunnel (HTTPS, no port forwarding) |
+| [docs/SIGMA0-COLLAPSE-CERTIFICATE.md](docs/SIGMA0-COLLAPSE-CERTIFICATE.md) | **Σ₀ Collapse Certificate** — Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments |
+| [docs/sigma0-collapse-certificate.tex](docs/sigma0-collapse-certificate.tex) | LaTeX source for the Σ₀ Collapse Certificate (typesetting / print) |
+| [docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md](docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md) | Companion essay — QM/GR mapping, explicitly framed as metaphor, not a physics result |
 
 ---
 
