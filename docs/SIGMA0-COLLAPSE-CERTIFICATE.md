@@ -300,66 +300,20 @@ rotation set by `Im λ`.
 
 ## 6. Demonstration on router data
 
-> **⚠ REPRODUCIBILITY FLAG — read first.** This section describes a pipeline
-> whose two driver scripts are **not present in the repository**. As of this
-> revision, `experiments/` contains only `cio_sde_demo.py`,
-> `crypto_tightband_observer.py`, `kalshi_cio_backtest.py`,
-> `kalshi_tightband_analysis.py`, and `train_cio_kalshi.py`. **Both**
-> `experiments/router_sigma0_encoder.py` **and**
-> `experiments/router_reservoir_G.py` **are absent** — confirmed across
-> `master`, `claude/sprint-1.5`, `claude/router-gate`,
-> `claude/sigma0-documentation`, and `origin/master` (tracked on zero branches;
-> no LFS pointer). **No numeric result below has a committed generating
-> artifact. Treat this entire section as a PLANNED / NOT-YET-COMMITTED design
-> sketch, not an established result.**
+> **⚠ DEPRECATED — Future Work.** This section has been moved to an appendix
+> as unimplemented future work. The intended demonstration required two driver
+> scripts (`experiments/router_sigma0_encoder.py` and
+> `experiments/router_reservoir_G.py`) which were never committed to the
+> repository. Without these scripts and a logged run artifact, the "parrot
+> attractor" claims cannot be reproduced and should not be cited as established
+> results.
 
-The intended demonstration would run the machinery above on the Lantern OS
-conversation log (`data/conversations/garage-conversations.jsonl`), encoding
-each turn as
+**Status:** The router-scale demonstration described in this section is **not
+implemented**. The required scripts are absent from all branches, and no numeric
+results have been produced from committed code. This section is retained as a
+design sketch for future work, not as an established result.
 
-$$x = [\text{novelty},\ \text{self\_repeat},\ \text{echo},\ \text{length}] \in [0,1]^4.$$
-
-Two scripts are *specified* (and need to be written / committed before any of
-this is reproducible):
-
-- **`experiments/router_sigma0_encoder.py`** (MISSING) — would fit a local
-  Jacobian per session, emit the spiral/canary/wall readouts, and build `π` and
-  `P_ij`.
-- **`experiments/router_reservoir_G.py`** (MISSING) — would train an echo-state
-  network into one global flow that runs autonomously, *becoming* `G`, feeding
-  its reconstructed fixed points back to the same Σ₀ certificate.
-
-**Claimed result — UNVERIFIED, cannot currently be reproduced.** The narrative
-result was that the log's dynamics collapse onto a **"parrot attractor"**
-(`novelty ≈ 1, echo ≈ 0.72`) — a flow whose only fixed point is "quote the
-prompt back," i.e. model collapse. **Because the generating scripts do not
-exist, these numbers have no produced artifact and must be regarded as
-hand-entered, not data-derived.** The previous claim that the result "appears
-directly in the data, not inserted by hand" is **withdrawn** — it cannot be
-substantiated as-is. Likewise, "cross-confirmed by both methods" is **withdrawn**:
-neither method is currently runnable. (The only `0.72` in committed repo data is
-an unrelated router-gate escalation *score* in `data/router-gate-decisions.jsonl`,
-where the echo feature is in fact ≈ 0.199 — so even the coincidence does not
-support the claim.)
-
-**Honest caveats (strengthened).**
-1. **The demonstration is not reproducible.** The two driver scripts are absent
-   from every branch; nothing in §6 should be cited as an established result
-   until they are committed with a logged run artifact.
-2. Even if the scripts existed, the source log is mostly synthetic test traffic,
-   so any numbers would be illustrative — the deliverable would be the pipeline,
-   not the values.
-3. A reservoir's autonomous rollout diverges unless projected back onto the
-   valid `[0,1]⁴` domain; that projection *is* `π`. This is a real modeling step,
-   but it is also an external bound imposed by hand (see §7), not an emergent
-   property.
-4. The certificate is unreliable at boundary fixed points where the hard clamp
-   is non-smooth — a log-barrier is the proper fix and is **not yet
-   implemented**.
-
-**To make §6 real:** commit `router_sigma0_encoder.py` and
-`router_reservoir_G.py` together with a checked-in run log, then replace the
-withdrawn claims above with the actual produced numbers.
+**See Appendix A** for the original design specification.
 
 ---
 
@@ -423,8 +377,64 @@ publication.*
 
 ---
 
+## Appendix A: Router Demonstration Design (Unimplemented)
+
+> **⚠ FUTURE WORK — NOT IMPLEMENTED.** This appendix contains the original design
+> specification for the router-scale demonstration. The required scripts
+> (`experiments/router_sigma0_encoder.py` and `experiments/router_reservoir_G.py`)
+> were never committed, and no numeric results have been produced from committed
+> code. This is retained as a design sketch for future implementation.
+
+### Original Design
+
+The intended demonstration would run the Σ₀ machinery on the Lantern OS
+conversation log (`data/conversations/garage-conversations.jsonl`), encoding
+each turn as
+
+$$x = [\text{novelty},\ \text{self\_repeat},\ \text{echo},\ \text{length}] \in [0,1]^4.$$
+
+Two scripts were specified (but never committed):
+
+- **`experiments/router_sigma0_encoder.py`** (MISSING) — would fit a local
+  Jacobian per session, emit the spiral/canary/wall readouts, and build `π` and
+  `P_ij`.
+- **`experiments/router_reservoir_G.py`** (MISSING) — would train an echo-state
+  network into one global flow that runs autonomously, *becoming* `G`, feeding
+  its reconstructed fixed points back to the same Σ₀ certificate.
+
+### Intended Result (Unverified)
+
+The narrative result was that the log's dynamics collapse onto a **"parrot
+attractor"** (`novelty ≈ 1, echo ≈ 0.72`) — a flow whose only fixed point is
+"quote the prompt back," i.e. model collapse. **Because the generating scripts
+do not exist, these numbers have no produced artifact and must be regarded as
+hand-entered, not data-derived.**
+
+### Honest Caveats
+
+1. **The demonstration is not reproducible.** The two driver scripts are absent
+   from every branch; nothing in this appendix should be cited as an established
+   result until they are committed with a logged run artifact.
+2. Even if the scripts existed, the source log is mostly synthetic test traffic,
+   so any numbers would be illustrative — the deliverable would be the pipeline,
+   not the values.
+3. A reservoir's autonomous rollout diverges unless projected back onto the
+   valid `[0,1]⁴` domain; that projection *is* `π`. This is a real modeling step,
+   but it is also an external bound imposed by hand, not an emergent property.
+4. The certificate is unreliable at boundary fixed points where the hard clamp
+   is non-smooth — a log-barrier is the proper fix and is **not yet
+   implemented**.
+
+### To Implement
+
+To make this demonstration real, commit `router_sigma0_encoder.py` and
+`router_reservoir_G.py` together with a checked-in run log, then replace the
+withdrawn claims above with the actual produced numbers.
+
+---
+
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
 `tests/test_cio_sde.py` (20 passing); framework `docs/sigma0-collapse-certificate.tex`.
-The §6 scripts `experiments/router_sigma0_encoder.py` and
-`experiments/router_reservoir_G.py` are **referenced but not present** — §6 is
-not reproducible until they are committed.*
+The router demonstration scripts `experiments/router_sigma0_encoder.py` and
+`experiments/router_reservoir_G.py` are **referenced but not present** — see
+Appendix A for the original design specification.*
