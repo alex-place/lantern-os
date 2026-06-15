@@ -43,7 +43,9 @@ from .collapse import (
     collapse_certificate,
     lyapunov_value,
     AntiCollapseOperator,
+    ReconstructionOperator,
 )
+from .surprise import SurpriseMonitor, kalman_predict
 
 __all__ = [
     "Dynamics",
@@ -65,4 +67,7 @@ __all__ = [
     "collapse_certificate",
     "lyapunov_value",
     "AntiCollapseOperator",
+    "ReconstructionOperator",
+    "SurpriseMonitor",
+    "kalman_predict",
 ]

@@ -16,10 +16,12 @@
 \theoremstyle{definition}
 \newtheorem{remark}{Remark}
 
-% --- callout box for verified claims / caveats ---
+% --- callout boxes ---
 \newtcolorbox{verifybox}{colback=green!4,colframe=green!45!black,boxrule=0.6pt,
   left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
 \newtcolorbox{caveatbox}{colback=yellow!8,colframe=orange!70!black,boxrule=0.6pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
+\newtcolorbox{brokenbox}{colback=red!5,colframe=red!60!black,boxrule=0.7pt,
   left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
 
 % --- shorthands ---
@@ -27,12 +29,13 @@
 \newcommand{\norm}[1]{\left\lVert#1\right\rVert}
 \newcommand{\Szero}{\Sigma_0}
 \newcommand{\PM}{P_{\!M}}
+\newcommand{\PN}{P_{\!N}}
 \DeclareMathOperator{\rank}{rank}
 \DeclareMathOperator*{\Real}{Re}
 
 \title{\textbf{$\Sigma_0$ --- The Collapse Certificate}\\[4pt]
-\large A computable stability certificate for convergence dynamics, and a
-demonstration of why an ungrounded self-improving system collapses}
+\large A computable stability certificate for convergence dynamics, and an honest
+account of why an ungrounded self-improving system tends to collapse or diverge}
 \author{Lantern OS \\ \texttt{src/cio\_sde/}}
 \date{\today}
 
@@ -40,22 +43,34 @@ demonstration of why an ungrounded self-improving system collapses}
 \maketitle
 
 \begin{abstract}
-We give a computable certificate for collapse in a dissipative nonlinear
-system: splitting the local Jacobian's symmetric part into active and
-near-null subspaces yields a Lyapunov function $V(x)=\tfrac12\norm{\PM x}^2$
-whose decay is guaranteed exactly when the active spectral abscissa is
-negative. We pair this with a semantic collapse operator $\Szero$ (projection
-onto the null manifold --- the ``42-state'') and an anti-collapse operator
-$\Sigma_0^{-1}$ (persistent excitation along null modes), and a critical-slowing
-``canary'' early-warning scalar. Running the construction on a real
-conversation log, two independent methods --- local Jacobian fitting and a
-reservoir reconstruction of the global flow --- converge on the same
-\emph{parrot attractor}, an in-data instance of model collapse. We read the
-result as a small, honest warning about recursively self-improving systems:
-absent external grounding, the dynamics admit only collapse or divergence.
-All theorems are verified against rollouts ($20/20$ tests passing); the data
-results are explicitly labelled illustrative.
+We give a computable certificate for contraction in a dissipative nonlinear
+system: splitting the local Jacobian's symmetric part into active and near-null
+subspaces yields a Lyapunov function $V(x)=\tfrac12\norm{\PM x}^2$ whose decay is
+guaranteed when the active spectral abscissa is negative \emph{and the active
+subspace is invariant under the full Jacobian} (e.g.\ $A$ normal). We are explicit
+about that hypothesis: the general non-normal case is not covered by the energy
+argument, and the authoritative test is the full spectrum $\max\Real\lambda(A)<0$.
+We pair the theorem with a semantic collapse operator $\Szero$ (a heuristic
+trigger plus projection onto the null manifold --- the ``42-state''), an
+anti-collapse operator $\Sigma_0^{-1}$ (empirically shown, not proven, to suppress
+collapse), and an early-warning signal. We read the construction as a small, honest
+warning about recursively self-improving systems: absent external grounding, the
+linearized dynamics admit only collapse or divergence. Theorem~1 is machine-checked
+($20/20$ tests passing) for the symmetric case. The other components are heuristics,
+labelled as such; one referenced demonstration is not currently reproducible (its
+scripts are absent from the repository); the AI-safety reading is the keeper and
+stands on its own.
 \end{abstract}
+
+\begin{caveatbox}
+\textbf{Per-section status.} \S1 theorem: \emph{proven under an explicit hypothesis,
+machine-checked for the symmetric case}. \S2 trigger: \emph{operational definition,
+not derived}. \S3 anti-collapse: \emph{heuristic, $N{=}1$ empirical}. \S4 canary:
+\emph{the eigenvalue readout is unimplemented; the correct signal (innovation
+surprise) is implemented in \texttt{surprise.py}}. \S5 graph: \emph{standard}.
+\S6 demonstration: \emph{not reproducible --- scripts absent}. \S7 AI-safety:
+\emph{the keeper}.
+\end{caveatbox}
 
 \tableofcontents
 \bigskip
@@ -67,204 +82,278 @@ We study a dissipative nonlinear system
 \dot{x} = f(x,u,\theta), \qquad x \in \R^{n},
 \end{equation}
 with internal state $x$ (for the router: a conversation's encoded state),
-control / persistent-excitation input $u$, and slowly-varying parameters
-$\theta$. Linearizing along a trajectory $x^\ast$ gives the local Jacobian
+control / persistent-excitation input $u$, and slowly-varying parameters $\theta$.
+Linearizing along a trajectory $x^\ast$ gives the local Jacobian
 \begin{equation}
 \dot{\delta x} = A\,\delta x, \qquad
 A = \left.\frac{\partial f}{\partial x}\right|_{x^\ast},
 \end{equation}
 and everything below reasons about the eigenstructure of $A$ and its symmetric
-part $A_s = \tfrac12(A + A^{\top})$.
+part $A_s = \tfrac12(A + A^{\top})$. The skew part $A_k=\tfrac12(A-A^\top)$ carries
+rotation and is \emph{not} seen by $A_s$; the gap between the two is exactly what
+makes the general case in \S2 harder than the symmetric one.
 
 % ====================================================================
 \section{The collapse-guarantee theorem}
 Split the state space using $A_s$ into the \emph{near-null} subspace
 $N = \operatorname{span}\{\, v_i : |\lambda_i(A_s)| < \varepsilon \,\}$ and its
-orthogonal complement, the \emph{active} subspace $M$ with projector $\PM$.
-Define the Lyapunov function on the active modes only,
+orthogonal complement, the \emph{active} subspace $M$ with projector $\PM$. Define
+the Lyapunov function on the active modes only,
 \begin{equation}
 V(x) = \tfrac12 \norm{\PM x}^2,
 \end{equation}
 and let the active spectral abscissa be
 $\alpha = \max\{\, \lambda_i(A_s) : v_i \in M \,\}$.
 
-\begin{theorem}[Collapse guarantee]
-If $\alpha < 0$, then
+\begin{theorem}[Contraction on the active subspace]
+Assume $\alpha < 0$ \textbf{and} the active subspace $M$ is $A$-invariant, i.e.
+$\PM A \PN = 0$ (equivalently: $A$ is normal, $A=A_s$, or $A$ commutes with $\PM$).
+Then
 \begin{equation}
 \dot V \le 2\alpha V
 \quad\Longrightarrow\quad
 \norm{\PM x(t)} \le \norm{\PM x(0)}\, e^{\alpha t}.
 \end{equation}
 The active modes decay exponentially at rate $|\alpha|$ and the trajectory
-contracts onto the invariant null manifold $N$: collapse is guaranteed.
-If $\alpha \ge 0$, some active mode is non-contracting and collapse is not
-guaranteed --- the system may wander or diverge.
+contracts onto the invariant null manifold $N$: under this hypothesis, collapse is
+guaranteed. If $\alpha \ge 0$, some active mode is non-contracting and collapse is
+not guaranteed.
 \end{theorem}
 
-\begin{proof}[Proof sketch]
-On $M$, $\dot V = (\PM x)^{\top} \PM \dot x
-= (\PM x)^{\top} A_s (\PM x) \le \lambda_{\max}(A_s|_M)\norm{\PM x}^2
-= 2\alpha V$. Gr\"onwall gives the exponential bound; the null component is
-invariant by construction of $N$.
+\begin{proof}
+Differentiating $V$ along the flow,
+\[
+\dot V = (\PM x)^{\top}\PM A\,x
+= (\PM x)^{\top} A_s (\PM x)
+\;+\; \underbrace{(\PM x)^{\top} A\,(\PN x)}_{\text{cross term}}.
+\]
+The first term is $\le 2\alpha V$ by the definition of $\alpha$. The cross term
+vanishes exactly when $M$ is $A$-invariant ($\PM A \PN = 0$), which holds
+automatically if $A$ is normal. Under that hypothesis $\dot V \le 2\alpha V$, and
+Gr\"onwall gives the exponential bound.
 \end{proof}
 
+\subsection{Why the hypothesis is required}
+For a general non-normal $A$ the skew part $A_k$ couples the active and null
+components, the cross term need not vanish, and the simple energy bound can fail.
+
+\begin{caveatbox}
+\textbf{Counterexample.} For $A=\begin{psmallmatrix}-1 & 3\\ -3 & 0\end{psmallmatrix}$
+the active abscissa is $\alpha=-1<0$, yet a direct scan finds
+$\max \dot V/V \approx +8.8\times10^{4} \gg 2\alpha=-2$, and integrating from
+$x_0=(0.3,1.0)$ makes $V$ \emph{grow} $0.045\to0.341$ --- a sign violation of
+$\dot V\le 2\alpha V$. Collapse still occurs here, but it is rescued by a different
+argument, not by the energy proof. The earlier ``exact, not approximate'' wording
+applies only to the symmetric case.
+\end{caveatbox}
+
+\subsection{The authoritative test: the full spectrum}
+$\alpha<0$ on the symmetric part is \emph{necessary but not sufficient} for strict
+contraction of the full system. The conservative, always-correct condition is
+\begin{equation}
+\max \Real\,\lambda(A) < 0 \quad\text{on the \emph{full} } A
+\ (\text{via \texttt{eig}, not \texttt{eigvalsh}}).
+\end{equation}
+A Bendixson bound gives $\Real\lambda(A)\le\lambda_{\max}(A_s)$, so $\alpha$ bounds
+the real parts but does not by itself certify them: a rotation such as
+$A=\begin{psmallmatrix}-1&0&0\\0&0&2\\0&-2&0\end{psmallmatrix}$ has $\alpha=-1$ yet
+eigenvalues $\{-1,\pm 2i\}$, a center that never collapses in its rotating plane.
+\textbf{Recommended:} report both $\alpha$ and $\max\Real\lambda(A)$.
+\texttt{collapse\_certificate()} currently computes only the former.
+
 \begin{verifybox}
-\textbf{Verification.} With $\alpha = -0.8$ the certificate predicts a
-contraction rate of $0.8$; a real rollout shows $V$ decaying
-$1.891 \to 0.004$ monotonically. The certificate is exact, not approximate.
+\textbf{Verification.} The shipped test uses $A=-0.8\,I$, which is \emph{symmetric}
+(the hypothesis holds exactly, cross term identically zero). The certificate
+predicts contraction rate $0.8$ and a rollout shows $V$ decaying monotonically.
+This confirms the theorem in precisely the special case where the proof is
+unconditionally valid; it does \emph{not} exercise the non-normal case.
+(\texttt{collapse\_certificate}, \texttt{lyapunov\_value}, \texttt{src/cio\_sde/collapse.py}.)
 \end{verifybox}
 
 % ====================================================================
 \section{The collapse trigger $\Sigma_0$}
 \label{sec:sigma0}
-$\Szero$ fires only in the genuinely underdetermined regime --- all four
-conditions together (a control singularity over a structureless field):
+\begin{caveatbox}
+\textbf{Status: operational definition --- not derived from Theorem~1.}
+\end{caveatbox}
+$\Szero$ fires when \emph{all four} conditions hold (a control singularity over a
+structureless field):
 \begin{center}
 \renewcommand{\arraystretch}{1.3}
 \begin{tabular}{@{}>{$}l<{$}l@{}}
 \toprule
-\textrm{Condition} & \textrm{Default threshold} \\
+\textrm{Condition} & \textrm{Meaning} \\
 \midrule
-\norm{\nabla_x L} < \varepsilon_g & \varepsilon_g = 0.01 \\
-\rank(J_f) < \rho\, n & \rho = 0.5 \\
-\Sigma \textrm{ anisotropy} < \varepsilon_{\sigma} & \varepsilon_{\sigma} = 0.05 \\
-\norm{\partial H/\partial u} < \varepsilon_c & \varepsilon_c = 0.01 \\
+\norm{\nabla_x L} < \varepsilon_g & no optimization signal remains \\
+\rank(J_f) < \rho\, n & drift Jacobian has lost directional structure \\
+\Sigma \textrm{ isotropically flat} & uncertainty has no preferred direction \\
+\norm{\partial H/\partial u} < \varepsilon_c & control cannot distinguish actions \\
 \bottomrule
 \end{tabular}
 \end{center}
-where anisotropy is the normalized eigenvalue spread of $\Sigma$'s symmetric part:
-\begin{equation}
-\text{aniso}(\Sigma) = \frac{\sigma_{\max} - \sigma_{\min}}{\sigma_{\text{mean}}}.
-\end{equation}
-When \emph{all four} conditions trigger, $\Szero$ projects the state onto the
-null eigenmodes of $A_s$ --- the ``42-state,'' a stable, structureless summary
-the system freezes onto:
+None of these four quantities is the spectral abscissa $\alpha$ that Theorem~1 uses.
+They are an operational definition of ``underdetermined'' --- a soft AND-gate
+$p=\min(p_\nabla,p_{\text{rank}},p_{\text{aniso}},p_{\text{ctrl}})$ over four
+independent signs of degeneracy. The link between ``the four conditions fire'' and
+``$\alpha<0$'' is a modeling assumption, not a proof. When triggered, $\Szero$
+projects the state onto the null eigenmodes of $A_s$,
 \begin{equation}
 x^\ast = P x, \qquad P = V_{\mathrm{null}} V_{\mathrm{null}}^{\top},
 \end{equation}
-or returns the semantic null $\perp_s$ if no invariant directions exist. The
-operator is implemented in \texttt{SemanticCollapseOperator.evaluate()}
-(line~120, \texttt{src/cio\_sde/collapse.py}).
+the ``42-state'' (a colloquial name, no formal meaning).
+
+\begin{caveatbox}
+\textbf{Caveat.} $x^\ast=Px$ is a true fixed point only when $A$ is normal. For
+non-normal $A$ the projection kills the symmetric part but the skew rotation leaves
+$\norm{A x^\ast}$ large, so $x^\ast$ is not an equilibrium of the real flow. In the
+implementation the apparent ``freeze'' is produced by the integrator overwriting
+$x_{\text{next}}=x^\ast$ and discarding the diffusion term --- a clamp, not an
+emergent attractor. (\texttt{SemanticCollapseOperator}.)
+\end{caveatbox}
 
 % ====================================================================
 \section{The anti-collapse operator $\Sigma_0^{-1}$}
+\begin{caveatbox}
+\textbf{Status: control-design heuristic. Empirically shown ($N{=}1$) to suppress
+collapse. No sufficiency theorem --- unlike Theorem~1.}
+\end{caveatbox}
 Where $\Szero$ projects \emph{onto} the null subspace, $\Sigma_0^{-1}$ injects
-energy \emph{along} it --- the persistent-excitation principle from adaptive
-control:
+energy \emph{along} it:
 \begin{equation}
 dx = f\,dt + dW + \Sigma_0^{-1}, \qquad
 \Sigma_0^{-1} = s\cdot p \cdot (V_{\mathrm{null}}\,\xi),
 \end{equation}
-with $\xi$ standard normal noise, $s$ the excitation strength (default $s=0.5$),
-and $p \in [0,1]$ the collapse proximity:
-\begin{equation}
-p = \min\bigl( p_\nabla, p_{\text{rank}}, p_{\text{aniso}}, p_{\text{ctrl}} \bigr),
-\end{equation}
-where each term is a soft indicator (zero when safe, one when at the threshold).
-The operator is a no-op when $p=0$ (costs nothing in healthy regimes), and
-gates full-strength excitation when $p \to 1$. It also re-anisotropizes the
-uncertainty covariance $\Sigma$ along the recovered null directions.
+with $\xi$ standard normal, $s$ the strength, $p\in[0,1]$ the collapse proximity.
+The implementation correctly injects noise in the null subspace and
+re-anisotropizes $\Sigma$. There is, however, \emph{no companion theorem} stating
+that $\Sigma_0^{-1}$ prevents collapse --- only a single forced-collapse
+demonstration. The classical persistent-excitation result (Anderson 1977) concerns
+estimator convergence; here there is no estimator, so the PE invocation is
+\emph{analogy only}.
 
 \begin{verifybox}
-\textbf{Verification (tests/test\_cio\_sde.py, line 221).} \texttt{test\_anti\_collapse\_suppresses\_collapse()}: on a forced collapse (zero drift, isotropic noise, near-origin state), $\Szero$ fires $40/40$ steps and state freezes; with $\Sigma_0^{-1}$ active ($s=0.5$), $\Szero$ never fires and state norm grows $\times 5$. With Σ₀⁻¹ dormant (line 235): in a structured regime, proximity $p=0$ and no excitation is added.
+\textbf{Evidence ($N{=}1$).} On one forced-collapse run, $\Szero$ fired every step
+and the state froze; with $\Sigma_0^{-1}$ active, $\Szero$ stopped firing and the
+state escaped. Encouraging directional evidence, not a guarantee. (The often-quoted
+``$40/40\to0/40$'' and ``$0.05\to12.9$'' figures are illustrative log values, not
+pinned by any test; the forced-collapse tests run $20$--$30$ steps.)
 \end{verifybox}
+
+\begin{remark}
+Latent defect (fixed): \texttt{AntiCollapseOperator.\_\_init\_\_} annotated
+\texttt{detector: Optional[...]} while \texttt{collapse.py} imported only
+\texttt{Dict}; the module loaded only because PEP~563 keeps annotations as strings.
+Corrected to \texttt{from typing import Dict, Optional}.
+\end{remark}
 
 % ====================================================================
 \section{The early-warning scalar (the ``canary'')}
+\begin{caveatbox}
+\textbf{Status: the eigenvalue readout below is NOT implemented in code. The right
+signal --- innovation surprise --- now is (\texttt{src/cio\_sde/surprise.py}).}
+\end{caveatbox}
 Near a bifurcation the dominant eigenvalue flattens (critical slowing down;
-\cite{wissel1984, scheffer2009}). Two readouts:
-\begin{align}
-p_{\mathrm{unbounded}}(x) &= \frac{1}{|\Real\,\lambda_{\max}(A_s)|}
-\;\xrightarrow[\text{boundary}]{}\; \infty, \\
-p_{\mathrm{gate}}(x) &= \operatorname{clip}\!\Big(1 -
-\tfrac{|\Real\,\lambda_{\max}|}{\varepsilon},\, 0,\, 1\Big) \in [0,1].
-\end{align}
-The unbounded form is the leading indicator (it diverges \emph{before}
-collapse); the gated form is the bounded control signal driving
-$\Sigma_0^{-1}$.
+\cite{wissel1984,scheffer2009}). Two \emph{proposed} readouts,
+$p_{\mathrm{unbounded}} = 1/|\Real\lambda_{\max}(A_s)|$ and
+$p_{\mathrm{gate}} = \operatorname{clip}(1-|\Real\lambda_{\max}|/\varepsilon,0,1)$,
+are written here but appear nowhere in \texttt{collapse.py}; the actual driver of
+$\Sigma_0^{-1}$ is the four-condition $\texttt{proximity()}$, not $p_{\mathrm{gate}}$.
+
+\begin{verifybox}
+\textbf{The right canary, implemented.} The correct early-warning is \emph{surprise
+relative to uncertainty}: the Kalman normalized innovation squared
+$\mathrm{NIS}=\nu^\top S^{-1}\nu$ with $\nu=y-C\hat x$, $S=C\Sigma C^\top + R$.
+$\mathrm{NIS}\approx m$ means model and reality agree; $\mathrm{NIS}\gg m$ means the
+model is overconfident and has drifted without knowing it. This is the standard
+innovation-consistency $\chi^2$ test \cite{barshalom2001}, implemented in
+\texttt{SurpriseMonitor}; \texttt{experiments/sigma0\_horse\_blinders.py} shows a
+low-coupling observer staying \emph{calm while wrong} before the surprise spikes.
+The dangerous state is the quiet before the spook, not the spook.
+\end{verifybox}
 
 % ====================================================================
 \section{Global structure: the attractor graph $G$}
-The system is multistable. Collect its attractors $\{A_1,\dots,A_k\}$ (fixed
-points, limit cycles, strange attractors), each with a basin
-$B_i = \{\, x_0 : \lim_{t\to\infty}\phi_t(x_0) \in A_i \,\}$. Coarse-graining to
-a graph $G=(V,E)$ --- nodes are attractors, edges noise/drift transitions ---
-gives an induced Markov process over basins,
+The system is multistable. Collect its attractors $\{A_1,\dots,A_k\}$, each with a
+basin $B_i = \{\, x_0 : \lim_{t\to\infty}\phi_t(x_0) \in A_i \,\}$. Coarse-graining
+to a graph $G=(V,E)$ gives an induced Markov process over basins,
 \begin{equation}
 P_{ij}(u) = \Pr\!\big(\pi(x_{t+1}) = A_j \mid \pi(x_t) = A_i,\, u_t\big),
 \end{equation}
-where the partition map $\pi:\R^n \to V$ sends a state to its basin. A boundary
-studded with \emph{saddles} (mixed-sign $\Real\lambda$) has stable manifolds:
-safe passages one can traverse without being captured by a deep attractor.
+with partition map $\pi:\R^n\to V$. This is the standard Markov-state-model
+construction; it is genuinely Markov only under timescale separation (fast
+intra-basin relaxation vs.\ slow inter-basin hops). A boundary studded with
+\emph{saddles} has stable manifolds --- ridges one can ride with control.
+\texttt{experiments/sigma0\_saddle\_ride.py} measures the cost: spin (the imaginary
+part $\Im\lambda$) is orthogonal to capture (the real part), and only structured
+control --- which knows the unstable direction and spends energy --- rides the
+ridge. \texttt{experiments/sigma0\_boundary\_qutrit.py} maps such a boundary from
+outside as pure negative space, verified against an analytic separatrix.
 
 % ====================================================================
-\section{Demonstration on real router data}
+\section{Demonstration on router data}
 \label{sec:demo}
-Two experiments run the construction on the actual Lantern OS conversation log,
-encoding each turn as a bounded vector
-\begin{equation}
-x = [\,\text{novelty},\ \text{self\_repeat},\ \text{echo},\ \text{length}\,]
-\in [0,1]^4 .
-\end{equation}
-\texttt{router\_sigma0\_encoder.py} fits a local Jacobian per session and emits
-the spiral/canary/wall readouts, $\pi$, and $P_{ij}$;
-\texttt{router\_reservoir\_G.py} trains an echo-state network on one global flow
-and runs it autonomously --- the reservoir \emph{becomes} $G$, its fixed points
-the reconstructed attractors, fed back to the same $\Szero$ certificate.
-
-\paragraph{Result (cross-confirmed).} This log's dynamics collapse onto a
-\emph{parrot attractor}, $\text{novelty}\approx 1,\ \text{echo}\approx 0.72$ ---
-a flow whose only fixed point is ``quote the prompt back.'' That is model
-collapse appearing directly in the data, not inserted by hand; two unrelated
-methods agreeing is the signal that it is real.
-
-\begin{caveatbox}
-\textbf{Honest caveats.} (1) The log is mostly synthetic test traffic, so the
-\emph{numbers} are illustrative --- the deliverable is the pipeline. (2) The
-reservoir's autonomous rollout diverges unless projected back onto the valid
-$[0,1]^4$ domain; that projection \emph{is} $\pi$, not a fudge. (3) The
-certificate is unreliable at boundary fixed points where the hard clamp is
-non-smooth --- a log-barrier is the proper fix and is not yet implemented.
-\end{caveatbox}
+\begin{brokenbox}
+\textbf{Reproducibility flag --- read first.} This section describes a pipeline
+whose two driver scripts, \texttt{experiments/router\_sigma0\_encoder.py} and
+\texttt{experiments/router\_reservoir\_G.py}, are \textbf{absent from the
+repository} (verified across all branches). No numeric result below has a committed
+generating artifact. Treat this section as a planned / not-yet-committed sketch, not
+an established result.
+\end{brokenbox}
+The intended demonstration encodes each conversation turn as
+$x=[\text{novelty},\text{self\_repeat},\text{echo},\text{length}]\in[0,1]^4$ and
+runs the construction two ways (local Jacobian fitting; reservoir reconstruction).
+The narrative result --- a \emph{parrot attractor}
+($\text{novelty}\approx1,\text{echo}\approx0.72$), i.e.\ model collapse in the data
+--- is \textbf{withdrawn} as unverified: because the generating scripts do not
+exist, those numbers have no produced artifact, and the claim that the result
+``appears directly in the data, not inserted by hand'' cannot be substantiated.
+\emph{To make \S6 real:} commit the two scripts with a logged run, then replace the
+withdrawn claims with the produced numbers.
 
 % ====================================================================
 \section{Why this is a warning against ASI}
-A system that ``comes out of its own eyes'' --- that optimizes against its own
-representations with no external anchor --- is the flow $\dot x = f(x)$ where
-$f$ only ever sees $x$. The certificate says such a system has two fates and no
-third without outside contact:
-\begin{enumerate}[label=(\arabic*)]
-\item \textbf{Collapse ($\Szero$):} it falls onto a degenerate,
-self-consistent, dead fixed point --- the 42-state. Mirrors agreeing with
-mirrors.
-\item \textbf{Divergence:} with no contraction it runs to infinity (the
-un-projected reservoir).
-\end{enumerate}
-The only stable middle --- the safe passages --- required an \emph{external
-bound} (the projection back onto the real domain). \textbf{Grounding is the
-safety mechanism.} Remove contact with something outside the mirrors and no
-certificate keeps the system off the wall. The reservoir's collapse onto the
-parrot attractor is a small, literal demonstration: a model trained only on its
-own reflections converges to reflecting.
+\begin{verifybox}
+\textbf{Status: the one downstream claim worth keeping --- as a machine-learning
+claim, on ML evidence, not as a consequence of the physics or of \S6.}
+\end{verifybox}
+A system that optimizes against its own representations with no external anchor is
+the flow $\dot x = f(x)$ where $f$ only ever sees $x$. The linearized certificate
+frames two degenerate fates absent outside contact: \textbf{collapse} onto a dead
+fixed point (the 42-state, mirrors agreeing with mirrors), or \textbf{divergence}.
+The only stable middle required an external bound. \textbf{Grounding is the safety
+mechanism.} This does not need the certificate's physics or the \S6 numbers: it is
+the documented phenomenon of \emph{model collapse} \cite{shumailov2024}, closely
+related to reward hacking \cite{amodei2016}. The ``parrot attractor'' is model
+collapse renamed. Two honest qualifications: the strict ``collapse or diverge, no
+third'' dichotomy is the \emph{linearized} framing (real training also admits limit
+cycles and partial-information equilibria --- better stated as ``tends to degenerate
+or destabilize absent grounding''); and the in-repo demonstration inherits \S6's
+missing-scripts problem, so the \emph{argument} rests on the published literature,
+not the demo.
 
 % ====================================================================
 \begin{thebibliography}{9}
 \bibitem{lyapunov1892} A.\,M. Lyapunov.
   \emph{The General Problem of the Stability of Motion}. 1892.
 \bibitem{poincare} H. Poincar\'e.
-  \emph{M\'emoire sur les courbes d\'efinies par une \'equation
-  diff\'erentielle}. 1880s.
+  \emph{M\'emoire sur les courbes d\'efinies par une \'equation diff\'erentielle}. 1880s.
+\bibitem{bendixson1901} I. Bendixson.
+  Sur les courbes d\'efinies par des \'equations diff\'erentielles. \emph{Acta Math.}, 1901.
 \bibitem{wissel1984} C. Wissel.
-  A universal law of the characteristic return time near thresholds.
-  \emph{Oecologia}, 1984.
+  A universal law of the characteristic return time near thresholds. \emph{Oecologia}, 1984.
 \bibitem{scheffer2009} M. Scheffer et al.
   Early-warning signals for critical transitions. \emph{Nature}, 2009.
 \bibitem{anderson1977} B.\,D.\,O. Anderson.
-  Exponential stability of linear equations arising in adaptive
-  identification. \emph{IEEE TAC}, 1977.
+  Exponential stability of linear equations arising in adaptive identification. \emph{IEEE TAC}, 1977.
+\bibitem{barshalom2001} Y. Bar-Shalom, X.-R. Li, T. Kirubarajan.
+  \emph{Estimation with Applications to Tracking and Navigation}. Wiley, 2001.
 \bibitem{pathak2018} J. Pathak et al.
-  Model-free prediction of large spatiotemporally chaotic systems from data.
-  \emph{PRL}, 2018.
+  Model-free prediction of large spatiotemporally chaotic systems from data. \emph{PRL}, 2018.
+\bibitem{shumailov2024} I. Shumailov et al.
+  AI models collapse when trained on recursively generated data. \emph{Nature}, 2024.
+\bibitem{amodei2016} D. Amodei et al.
+  Concrete Problems in AI Safety. \emph{arXiv:1606.06565}, 2016.
 \end{thebibliography}
 
 \begin{caveatbox}
@@ -273,21 +362,23 @@ unavailable when this was written and no URLs were fetched. Verify before formal
 publication.
 \end{caveatbox}
 
-\paragraph{Implementation and Testing.} All code is production-ready:
+\paragraph{Implementation and testing.}
 \begin{itemize}
-\item \texttt{src/cio\_sde/collapse.py} --- \texttt{SemanticCollapseOperator} (line 62), \texttt{CollapseCertificate} (line 147), \texttt{AntiCollapseOperator} (line 221).
-\item \texttt{tests/test\_cio\_sde.py} --- 20 automated tests, 100\% passing:
-  \begin{itemize}
-  \item SDE stability (no explosion, covariance PSD, replay invariance).
-  \item Collapse detection (dormant in structured regimes, fires when Jacobian is degenerate).
-  \item Lyapunov certificate (predicts exact contraction rate; verified by rollout).
-  \item Anti-collapse suppression (re-excites system, escapes the 42-state).
-  \end{itemize}
-\item \texttt{src/cio\_sde/__init__.py} exports \texttt{CIO\_SDE} neural SDE class with
-embedded $\Szero$ and $\Sigma_0^{-1}$ operators; integrates with continuous-time Kalman--Bucy filtering.
+\item \texttt{src/cio\_sde/collapse.py} --- \texttt{SemanticCollapseOperator},
+  \texttt{CollapseCertificate}/\texttt{collapse\_certificate}, \texttt{AntiCollapseOperator},
+  \texttt{ReconstructionOperator}.
+\item \texttt{src/cio\_sde/surprise.py} --- \texttt{SurpriseMonitor} and the Kalman
+  measurement update (the missing inference step).
+\item \texttt{tests/test\_cio\_sde.py} --- 20 automated tests, all passing (Theorem~1
+  exercised in the symmetric case only).
+\item Runnable, deterministic experiments present in the repo:
+  \texttt{sigma0\_reconstruction.py} (recoverability floor),
+  \texttt{sigma0\_horse\_blinders.py} (the surprise canary),
+  \texttt{sigma0\_saddle\_ride.py} (spin $\perp$ capture),
+  \texttt{sigma0\_boundary\_qutrit.py} (mapping a wall by negative space).
+\item \textbf{Absent:} \texttt{router\_sigma0\_encoder.py},
+  \texttt{router\_reservoir\_G.py} --- \S\ref{sec:demo} is not reproducible until
+  they are committed.
 \end{itemize}
-Data experiments: \texttt{experiments/router\_sigma0\_encoder.py},
-\texttt{experiments/router\_reservoir\_G.py}. (Note: these use synthetic router logs; the pipeline is
-live and verified, but data results are illustrative per the caveats in \S\ref{sec:demo}.)
 
 \end{document}

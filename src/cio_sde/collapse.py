@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
@@ -280,3 +280,63 @@ def _below(value: float, threshold: float) -> float:
     if threshold <= 0:
         return 0.0
     return max(0.0, min(1.0, 1.0 - value / threshold))
+
+
+# ── Σ₀ᴿ Reconstruction Operator ───────────────────────────────────────────────
+
+class ReconstructionOperator:
+    """
+    Σ₀ᴿ — reference-driven reconstruction: the "put the smoke back" operator.
+
+    Σ₀ collapse contracts the ACTIVE modes (|λ(A_s)| ≥ ε) to zero and freezes the
+    state onto the null manifold — the structure that lived in the active modes is
+    the "smoke" that disperses. `AntiCollapseOperator.excite` re-injects RANDOM
+    energy: it can un-freeze a collapsed state, but random ξ carries no information
+    about the original, so it lights *a* fire, not *the* fire.
+
+    ReconstructionOperator keeps a compact SEED of the pre-collapse active content
+    (the top-k mode coefficients — the "speck of dust") and regenerates from it.
+    The minimal seed size that hits a target fidelity is the state's effective
+    dimension: a hard floor. You cannot reconstruct information you did not keep —
+    the speck holds the world only as far as the world is compressible. This is
+    the encode side of the certificate: convergence as compression, with the
+    second law showing up as the floor of the rate–distortion curve.
+    """
+
+    def __init__(self, eig_eps: float = 1e-2) -> None:
+        self.eig_eps = eig_eps
+
+    @torch.no_grad()
+    def _active_basis(self, A: Tensor) -> Tensor:
+        """Eigenvectors of A_s for the structured (non-null) modes — (d, m)."""
+        Abar = A.mean(0) if A.dim() == 3 else A
+        A_s = 0.5 * (Abar + Abar.T)
+        evals, evecs = torch.linalg.eigh(A_s)
+        return evecs[:, evals.abs() >= self.eig_eps]
+
+    @torch.no_grad()
+    def collapse(self, x: Tensor, A: Tensor) -> Tensor:
+        """Burn: contract the active modes, keep only the null manifold (P_null x)."""
+        V = self._active_basis(A)
+        return x - (x @ V) @ V.T
+
+    @torch.no_grad()
+    def seed(self, x: Tensor, A: Tensor, k: int) -> Dict:
+        """Compress x to its top-k active-mode coefficients — the 'speck of dust'."""
+        V = self._active_basis(A)                          # (d, m)
+        coeffs = x @ V                                     # (..., m)
+        score = coeffs.abs().mean(0) if coeffs.dim() > 1 else coeffs.abs()
+        k = max(0, min(int(k), V.shape[1]))
+        idx = (torch.topk(score, k).indices if k > 0
+               else torch.empty(0, dtype=torch.long, device=x.device))
+        return {"idx": idx, "coeffs": coeffs.index_select(-1, idx),
+                "basis": V, "k": k, "active_dim": int(V.shape[1])}
+
+    @torch.no_grad()
+    def reconstruct(self, x_collapsed: Tensor, seed: Dict) -> Tensor:
+        """Regrow from the collapsed state + the retained seed."""
+        idx, coeffs, V = seed["idx"], seed["coeffs"], seed["basis"]
+        if idx.numel() == 0:
+            return x_collapsed
+        Vk = V.index_select(-1, idx)                       # (d, k)
+        return x_collapsed + coeffs @ Vk.T
