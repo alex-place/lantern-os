@@ -1,1 +1,9 @@
-{}
+{
+  "483": {
+    "number": 483,
+    "title": "fix: light mode UX and WCAG accessibility remediation",
+    "updatedAt": 1781499703000,
+    "firstSeenAt": 1781499745416,
+    "reviewedAt": null
+  }
+}

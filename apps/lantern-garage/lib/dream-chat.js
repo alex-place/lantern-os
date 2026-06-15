@@ -8,6 +8,7 @@ const { formatCSFContextForPrompt } = require("./csf-memory");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
+const { TokenAudit } = require("./token-audit");
 
 // Extract key topics from user message and generate 3 web search suggestion links
 function generateWebSuggestions(userMessage) {
@@ -803,7 +804,22 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           upstream.on("end", () => {
             try {
               const json = JSON.parse(data);
-              resolve(String(json.content?.[0]?.text || json.completion || "").trim());
+              const replyText = String(json.content?.[0]?.text || json.completion || "").trim();
+              // Log token usage to audit trail
+              if (json.usage) {
+                tokenAudit.logTokenUsage({
+                  provider: "anthropic",
+                  model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
+                  agent: agent.id,
+                  inputTokens: json.usage.input_tokens || 0,
+                  outputTokens: json.usage.output_tokens || 0,
+                  userMessage: text,
+                  responseLength: replyText.length,
+                  status: "success",
+                  duration: Date.now(),
+                });
+              }
+              resolve(replyText);
             } catch { resolve(""); }
           });
           upstream.on("error", reject);
@@ -891,7 +907,22 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           upstream.on("end", () => {
             try {
               const json = JSON.parse(data);
-              resolve(String(json.choices?.[0]?.message?.content || "").trim());
+              const replyText = String(json.choices?.[0]?.message?.content || "").trim();
+              // Log token usage to audit trail
+              if (json.usage) {
+                tokenAudit.logTokenUsage({
+                  provider: "openai",
+                  model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+                  agent: agent.id,
+                  inputTokens: json.usage.prompt_tokens || 0,
+                  outputTokens: json.usage.completion_tokens || 0,
+                  userMessage: text,
+                  responseLength: replyText.length,
+                  status: "success",
+                  duration: Date.now(),
+                });
+              }
+              resolve(replyText);
             } catch { resolve(""); }
           });
           upstream.on("error", reject);
@@ -924,6 +955,9 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   };
 }
 
+// ── Initialize Token Audit ───────────────────────────────────────────
+const tokenAudit = new TokenAudit();
+
 module.exports = {
   AGENT_PERSONAS,
   DREAM_DOORS,
@@ -931,4 +965,5 @@ module.exports = {
   parseBangCommand,
   handleConvergenceCommand,
   dreamChatReply,
+  tokenAudit,
 };

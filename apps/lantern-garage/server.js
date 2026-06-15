@@ -24,7 +24,7 @@ const { buildFlatRagHouse, writeFlatRagHouse } = require("./lib/rag-house");
 const { runPowerShell } = require("./lib/powershell");
 const { renderMarkdownDocument } = require("./lib/markdown-render");
 const { normalizeDreamerUser, dreamerNotebookPath, appendDreamerEntry, readDreamerNotebook, readRecentDreams } = require("./lib/dreamer-store");
-const { dreamChatReply, AGENT_PERSONAS, DREAM_DOORS, selectAgent } = require("./lib/dream-chat");
+const { dreamChatReply, AGENT_PERSONAS, DREAM_DOORS, selectAgent, tokenAudit } = require("./lib/dream-chat");
 const { unifiedAgentGreet, unifiedAgentHealth, unifiedAgentInspect } = require("./lib/unified-agent");
 const { handleStreamChat } = require("./lib/stream-chat");
 const { refreshAllPcsf } = require("./lib/pcsf-refresh");
@@ -68,7 +68,7 @@ const deps = {
   runPowerShell, renderMarkdownDocument,
   normalizeDreamerUser, dreamerNotebookPath, appendDreamerEntry,
   readDreamerNotebook, readRecentDreams,
-  dreamChatReply, AGENT_PERSONAS, DREAM_DOORS, selectAgent,
+  dreamChatReply, AGENT_PERSONAS, DREAM_DOORS, selectAgent, tokenAudit,
   unifiedAgentGreet, unifiedAgentHealth, unifiedAgentInspect,
   handleStreamChat,
   jobQueue, jobWorker, prWatcher,
@@ -102,6 +102,7 @@ const routes = [
   require("./routes/cubes"),
   require("./routes/csf"),
   require("./routes/training"),
+  require("./routes/token-audit"),
   require("./routes/trading"),
   require("./routes/agent-performance"),
   require("./routes/leaderboard"),
