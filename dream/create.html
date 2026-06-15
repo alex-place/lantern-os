@@ -545,12 +545,15 @@
       background: var(--surface2);
       overflow: hidden;
       position: relative;
+      border-radius: 10px;
+      margin-bottom: 12px;
     }
 
     .project-thumbnail img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      background: var(--surface2);
     }
 
     .project-thumbnail .status-badge {
@@ -558,6 +561,24 @@
       top: 12px;
       right: 12px;
       font-size: 1.5rem;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
+    .thumbnail-meta {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0) 60%);
+      color: var(--text);
+      padding: 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      z-index: 5;
     }
 
     .project-info {
@@ -607,7 +628,8 @@
       border-top: 1px solid var(--border);
     }
 
-    .project-actions a {
+    .project-actions a,
+    .project-actions button {
       flex: 1;
       display: block;
       text-align: center;
@@ -621,12 +643,109 @@
       font-weight: 600;
       transition: all 0.2s ease;
       cursor: pointer;
+      font-family: inherit;
     }
 
-    .project-actions a:hover {
+    .project-actions a:hover,
+    .project-actions button:hover {
       border-color: var(--accent);
       background: var(--accent-dim);
       color: var(--accent);
+    }
+
+    .project-actions button.delete-btn {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .project-actions button.delete-btn:hover {
+      border-color: var(--danger);
+      background: rgba(224, 85, 85, 0.1);
+      color: var(--danger);
+    }
+
+    .delete-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .delete-modal.show {
+      display: flex;
+    }
+
+    .delete-modal-content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 400px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .delete-modal-header {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    .delete-modal-message {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .delete-modal-project {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 24px;
+      word-break: break-word;
+    }
+
+    .delete-modal-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .delete-modal-actions button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .delete-modal-actions .cancel-btn {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .delete-modal-actions .cancel-btn:hover {
+      border-color: var(--accent);
+    }
+
+    .delete-modal-actions .confirm-btn {
+      background: var(--danger);
+      color: white;
+    }
+
+    .delete-modal-actions .confirm-btn:hover {
+      opacity: 0.9;
     }
 
     .empty-state {
@@ -891,6 +1010,21 @@
   </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="delete-modal">
+  <div class="delete-modal-content">
+    <div class="delete-modal-header">Delete Project?</div>
+    <div class="delete-modal-message">
+      This action cannot be undone. Are you sure you want to permanently delete this project?
+    </div>
+    <div class="delete-modal-project" id="deleteProjectName">—</div>
+    <div class="delete-modal-actions">
+      <button class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+      <button class="confirm-btn" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/theme-toggle.js"></script>
 <script>
 const uploadZone = document.getElementById('upload-zone');
@@ -1031,6 +1165,10 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // Load recent entries
 async function loadRecentEntries() {
   try {
@@ -1052,7 +1190,7 @@ async function loadRecentEntries() {
 
       list.innerHTML = sorted.map(entry => {
         const title = entry.title || `Video ${new Date(entry.createdAt).toLocaleDateString()}`;
-        const thumbnail = entry.thumbnail ? '/' + entry.thumbnail : '/placeholder.png';
+        const thumbnail = entry.thumbnail ? '/media/' + entry.thumbnail : '/placeholder.png';
         const createdDate = new Date(entry.createdAt);
         const formattedDate = createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
                              ' • ' + createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1069,14 +1207,15 @@ async function loadRecentEntries() {
               <div class="status-badge">${statusBadge}</div>
             </div>
             <div class="project-info">
-              <h3 class="project-title">${title}</h3>
+              <h3 class="project-title">${esc(title)}</h3>
               <div class="project-meta">
-                <span>${formattedDate}</span>
-                ${entry.project ? `<div class="project-meta-sep"></div><span>${entry.project}</span>` : ''}
+                <span>${esc(formattedDate)}</span>
+                ${entry.project ? `<div class="project-meta-sep"></div><span>${esc(entry.project)}</span>` : ''}
               </div>
-              ${entry.description ? `<p class="project-desc">${entry.description}</p>` : ''}
+              ${entry.description ? `<p class="project-desc">${esc(entry.description)}</p>` : ''}
               <div class="project-actions">
-                <a href="/entry.html?id=${entry.id}">View</a>
+                <a href="/entry.html?id=${esc(entry.id)}">View</a>
+                <button class="delete-btn" data-id="${esc(entry.id)}" data-title="${esc(title)}" onclick="openDeleteModal(this.dataset.id, this.dataset.title)">Delete</button>
               </div>
             </div>
           </div>
@@ -1117,6 +1256,7 @@ async function analyzeHighlights() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         videoPath: currentEntry.filePath,
+        entryId: currentEntry.id,
         options: {
           fps: 5,
           motionThreshold: 0.15,
@@ -1245,7 +1385,7 @@ async function displayJobResults(job, panelType) {
       html += `</div>`;
     }
 
-    // Enable variant/caption buttons
+    // Enable variant/caption/safezone buttons
     document.getElementById('variants-btn').disabled = false;
     document.getElementById('variants-tool').classList.remove('disabled');
     document.getElementById('variants-status').textContent = 'Ready';
@@ -1253,6 +1393,10 @@ async function displayJobResults(job, panelType) {
     document.getElementById('captions-btn').disabled = false;
     document.getElementById('captions-tool').classList.remove('disabled');
     document.getElementById('captions-status').textContent = 'Ready';
+
+    document.getElementById('safezones-btn').disabled = false;
+    document.getElementById('safezones-tool').classList.remove('disabled');
+    document.getElementById('safezones-status').textContent = 'Ready';
   }
 
   content.innerHTML = html;
@@ -1361,7 +1505,77 @@ async function detectSafeZones() {
 
 // Initial load
 loadRecentEntries();
-setInterval(loadRecentEntries, 30000);
+// REMOVED: setInterval(loadRecentEntries, 30000);
+// Reason: Polling every 30 seconds caused project title flickering
+// Solution: User can manually refresh or page reloads when project is created/deleted
+console.log("✅ Project list loaded. Manual refresh available via 'Refresh' button.");
+
+// Delete Modal Functions
+let deleteTargetId = null;
+
+function openDeleteModal(entryId, projectName) {
+  console.log("🗑️ openDeleteModal called", { entryId, projectName });
+  deleteTargetId = entryId;
+  document.getElementById('deleteProjectName').textContent = projectName;
+  document.getElementById('deleteModal').classList.add('show');
+  console.log("✅ Modal opened, deleteTargetId set to:", deleteTargetId);
+}
+
+function closeDeleteModal() {
+  console.log("🔐 Closing delete modal");
+  deleteTargetId = null;
+  document.getElementById('deleteModal').classList.remove('show');
+}
+
+async function confirmDelete() {
+  console.log("🗑️ confirmDelete called, deleteTargetId:", deleteTargetId);
+  if (!deleteTargetId) {
+    console.error("❌ confirmDelete: deleteTargetId is null or undefined");
+    return;
+  }
+
+  const modal = document.getElementById('deleteModal');
+  const confirmBtn = modal.querySelector('.confirm-btn');
+  const originalText = confirmBtn.textContent;
+
+  // Disable button and show loading state
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Deleting...';
+
+  try {
+    console.log("🌐 Making DELETE request to /api/creator-entries/" + deleteTargetId);
+    const response = await fetch(`/api/creator-entries/${deleteTargetId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    console.log("📊 Response status:", response.status, response.ok);
+
+    if (response.ok) {
+      console.log("✅ Delete successful, reloading entries");
+      showStatus('✓ Project deleted successfully', 'success');
+      closeDeleteModal();
+      await loadRecentEntries();
+    } else {
+      const error = await response.json();
+      console.error("❌ Delete failed:", error);
+      showStatus(`✗ Error: ${error.error}`, 'error');
+    }
+  } catch (err) {
+    console.error("❌ Delete error:", err);
+    showStatus(`✗ Error: ${err.message}`, 'error');
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = originalText;
+  }
+}
+
+// Close modal when clicking outside
+document.getElementById('deleteModal').addEventListener('click', (e) => {
+  if (e.target.id === 'deleteModal') {
+    closeDeleteModal();
+  }
+});
 </script>
 
 </body>

@@ -348,6 +348,189 @@
       cursor: not-allowed;
     }
 
+    .validation-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+
+    .validation-card.pass { border-left-color: var(--green); }
+    .validation-card.fail { border-left-color: var(--danger); }
+    .validation-card.skip { border-left-color: var(--muted); }
+
+    .validation-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .validation-verdict {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .validation-verdict.pass { color: var(--green); }
+    .validation-verdict.fail { color: var(--danger); }
+    .validation-verdict.skip { color: var(--muted); }
+
+    .validation-chip {
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 8px;
+    }
+
+    .validation-checks {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      font-size: 0.82rem;
+    }
+
+    .validation-checks span { color: var(--muted); }
+    .validation-checks .ck-ok::before { content: "✓ "; color: var(--green); }
+    .validation-checks .ck-bad::before { content: "✗ "; color: var(--danger); }
+    .validation-checks .ck-bad { color: var(--text); }
+
+    .validation-reasons {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--danger);
+      font-size: 0.82rem;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-bottom: 14px;
+    }
+
+    .variant-card {
+      display: flex;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+
+    .variant-card.rank-1 { border-color: var(--gold); }
+
+    .variant-rank {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--muted);
+      min-width: 38px;
+      text-align: center;
+    }
+    .variant-card.rank-1 .variant-rank { color: var(--gold); }
+
+    .variant-body { flex: 1; }
+
+    .variant-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .variant-label { font-weight: 600; font-size: 0.95rem; }
+
+    .variant-grade {
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 2px 9px;
+      border-radius: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    .variant-grade.g-Aplus, .variant-grade.g-A { color: var(--green); border-color: var(--green); }
+    .variant-grade.g-B { color: var(--gold); border-color: var(--gold); }
+    .variant-grade.g-C { color: var(--muted); }
+    .variant-grade.g-D { color: var(--danger); border-color: var(--danger); }
+
+    .variant-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 22px;
+      margin-bottom: 8px;
+    }
+    .variant-metrics > div { display: flex; flex-direction: column; }
+    .variant-metrics span { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .variant-metrics b { font-size: 1rem; }
+
+    .variant-note { font-size: 0.72rem; color: var(--muted); margin-bottom: 10px; }
+
+    .scorev10-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .scorev10-headline {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .scorev10-big {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .scorev10-grade {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-left: auto;
+      padding: 4px 12px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    .scorev10-grade.ga { color: var(--green); border-color: var(--green); }
+    .scorev10-grade.gb { color: var(--gold); border-color: var(--gold); }
+    .scorev10-grade.gc { color: var(--muted); }
+    .scorev10-grade.gd { color: var(--danger); border-color: var(--danger); }
+
+    .scorev10-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .scorev10-metric { display: flex; flex-direction: column; gap: 2px; }
+    .scorev10-metric-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .scorev10-metric-value { font-size: 1.05rem; font-weight: 700; }
+
+    .scorev10-disclaimer { font-size: 0.72rem; color: var(--muted); margin: 6px 0 0; }
+
+    .variant-export-btn {
+      padding: 7px 14px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .variant-export-btn:hover { opacity: 0.9; }
+    .variant-export-btn:disabled { opacity: 0.5; cursor: default; }
+    .variant-status { font-size: 0.8rem; color: var(--muted); margin-left: 10px; }
+
     @media (max-width: 768px) {
       .content-grid {
         grid-template-columns: 1fr;
@@ -429,11 +612,37 @@
       </div>
     </div>
 
+    <!-- Ranked Variants (V10 Short Selection Engine, Phase 5/9) -->
+    <div style="margin-top: 32px;" id="variants-section">
+      <h3 style="margin: 0 0 4px; font-size: 1rem;">Ranked Variants</h3>
+      <div class="section-sub">5 strategy edits, ranked by structural viral score. Predictions are structural estimates (not calibrated).</div>
+      <div id="variants-grid">
+        <p class="no-data">No variants yet — run analysis to generate them.</p>
+      </div>
+    </div>
+
+    <!-- V10 Overall Viral Score + Predictions -->
+    <div style="margin-top: 32px;" id="scorev10-section">
+      <h3 style="margin: 0 0 4px; font-size: 1rem;">V10 Score</h3>
+      <div class="section-sub">Structural estimates from your actual highlight timeline. Calibration activates after ≥100 labeled outcomes.</div>
+      <div id="scorev10-panel">
+        <p class="no-data">No analysis yet — run analysis to generate scores.</p>
+      </div>
+    </div>
+
     <!-- Output Artifacts (Phase 9) -->
     <div style="margin-top: 32px;">
       <h3 style="margin: 0 0 16px; font-size: 1rem;">Generated Outputs</h3>
       <div class="artifacts-grid" id="artifacts-grid">
         <p class="no-data">No artifacts yet</p>
+      </div>
+    </div>
+
+    <!-- Quality Check (ExportValidator, V10) -->
+    <div style="margin-top: 32px;" id="validation-section">
+      <h3 style="margin: 0 0 16px; font-size: 1rem;">Quality Check</h3>
+      <div id="validation-panel">
+        <p class="no-data">No quality checks yet</p>
       </div>
     </div>
 
@@ -583,6 +792,15 @@ async function loadEntry() {
     // Load artifacts (Phase 9)
     loadArtifacts(entry);
 
+    // Load quality-check results (ExportValidator, V10)
+    loadValidations(entry);
+
+    // Load ranked variants (V10 Short Selection Engine)
+    loadVariants(entry);
+
+    // Load V10 overall score + predictions panel
+    loadScoreV10(entry);
+
     // Load analysis
     if (analysis) {
       loadAnalysis(analysis);
@@ -730,7 +948,7 @@ function loadArtifacts(entry) {
       <div class="artifact-name">${artifact.name}</div>
       <div class="artifact-size" id="size-${artifact.path}">...</div>
       <div class="artifact-actions">
-        <a href="/${artifact.path}" class="download-btn" download>
+        <a href="/media/${artifact.path}" class="download-btn" download>
           ⬇️ Download
         </a>
       </div>
@@ -743,10 +961,219 @@ function loadArtifacts(entry) {
   });
 }
 
+// V10: Render ExportValidator results persisted on the entry (entry.validations)
+function loadValidations(entry) {
+  const panel = document.getElementById('validation-panel');
+  if (!panel) return;
+
+  const validations = entry.validations || {};
+  const types = Object.keys(validations);
+
+  if (types.length === 0) {
+    panel.innerHTML = '<p class="no-data">No quality checks yet — runs automatically when a render is saved.</p>';
+    return;
+  }
+
+  // Friendly labels for render keys
+  const label = {
+    highlight: 'Highlight Render',
+    variantA: 'Variant A', variantB: 'Variant B', variantC: 'Variant C',
+    variantD: 'Variant D', variantE: 'Variant E',
+  };
+
+  panel.innerHTML = types.map(type => {
+    const v = validations[type] || {};
+    const skipped = v.skipped === true;
+    const state = skipped ? 'skip' : (v.ok ? 'pass' : 'fail');
+    const verdict = skipped ? 'Validation skipped' : (v.ok ? 'Passed' : 'Blocked');
+
+    // fit mode is recorded on the encode info when present
+    const fit = (v.encode && v.encode.fit) || (v.fit) || null;
+    const probedAt = v.probedAt ? new Date(v.probedAt).toLocaleString() : null;
+
+    const checks = Array.isArray(v.checks) ? v.checks.map(c => {
+      const cls = c.ok ? 'ck-ok' : 'ck-bad';
+      const actual = c.actual !== undefined ? escapeHtml(String(c.actual)) : '';
+      return `<span class="${cls}">${escapeHtml(c.name)}${actual ? ': ' + actual : ''}</span>`;
+    }).join('') : '';
+
+    const reasons = Array.isArray(v.blockedReasons) && v.blockedReasons.length
+      ? `<ul class="validation-reasons">${v.blockedReasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>`
+      : '';
+
+    return `
+      <div class="validation-card ${state}">
+        <div class="validation-head">
+          <span class="validation-verdict ${state}">${verdict}</span>
+          <span class="validation-chip">${escapeHtml(label[type] || type)}</span>
+          ${fit ? `<span class="validation-chip">fit: ${escapeHtml(fit)}</span>` : ''}
+          ${probedAt ? `<span class="validation-chip">${escapeHtml(probedAt)}</span>` : ''}
+        </div>
+        ${checks ? `<div class="validation-checks">${checks}</div>` : ''}
+        ${reasons}
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// V10 Short Selection Engine — render the 5 ranked variants with real scores.
+let loadedEntryForVariants = null;
+let loadedVariants = {};
+
+function loadVariants(entry) {
+  loadedEntryForVariants = entry;
+  loadedVariants = {};
+  const grid = document.getElementById('variants-grid');
+  if (!grid) return;
+
+  const variants = Array.isArray(entry.variantsV10) ? entry.variantsV10 : [];
+  if (variants.length === 0) {
+    grid.innerHTML = '<p class="no-data">No variants yet — run analysis to generate them.</p>';
+    return;
+  }
+
+  const pct = (x) => (x === null || x === undefined) ? '—' : Math.round(x * 100) + '%';
+  const gradeClass = (g) => 'g-' + String(g).replace('+', 'plus');
+
+  grid.innerHTML = variants.map(v => {
+    loadedVariants[v.id] = v;
+    const viral = v.score && typeof v.score.viralScore === 'number' ? Math.round(v.score.viralScore * 100) : '—';
+    const completion = v.retention ? pct(v.retention.predictedCompletionRate) : '—';
+    const share = v.retention ? pct(v.retention.predictedShareRate) : '—';
+    const grade = v.editorGrade ? v.editorGrade.grade : '—';
+    const canExport = Array.isArray(v.segments) && v.segments.length > 0 && entry.filePath;
+    return `
+      <div class="variant-card rank-${v.rank}">
+        <div class="variant-rank">#${v.rank}</div>
+        <div class="variant-body">
+          <div class="variant-head">
+            <span class="variant-label">${escapeHtml(v.label || v.strategy || v.id)}</span>
+            <span class="variant-grade ${gradeClass(grade)}">${escapeHtml(grade)}</span>
+          </div>
+          <div class="variant-metrics">
+            <div><span>Viral Score</span><b>${viral}</b></div>
+            <div><span>Completion*</span><b>${completion}</b></div>
+            <div><span>Share*</span><b>${share}</b></div>
+            <div><span>Duration</span><b>${v.durationSec ? Math.round(v.durationSec) + 's' : '—'}</b></div>
+            <div><span>Segments</span><b>${Array.isArray(v.segments) ? v.segments.length : 0}</b></div>
+          </div>
+          <div class="variant-note">* structural estimate, not calibrated</div>
+          <button class="variant-export-btn" onclick="exportVariant('${v.id}')" ${canExport ? '' : 'disabled'}>
+            Render &amp; Export
+          </button>
+          <span class="variant-status" id="vstatus-${v.id}"></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function loadScoreV10(entry) {
+  const panel = document.getElementById('scorev10-panel');
+  if (!panel) return;
+
+  const s = entry.scoreV10;
+  if (!s) {
+    panel.innerHTML = '<p class="no-data">No analysis yet — run analysis to generate scores.</p>';
+    return;
+  }
+
+  const viral = s.viral || {};
+  const retention = s.retention || {};
+  const gaming = s.gaming || {};
+  const editorGrade = s.editorGrade || {};
+
+  const viralPct = typeof viral.viralScore === 'number' ? Math.round(viral.viralScore * 100) + '%' : '—';
+  const confidence = typeof viral.confidence === 'number' ? Math.round(viral.confidence * 100) + '%' : '—';
+  // Prefer display strings from the predictor; fall back to raw numbers
+  const completionRaw = (retention.display && retention.display.completion) ||
+    (typeof retention.predictedCompletionRate === 'number' ? Math.round(retention.predictedCompletionRate * 100) + '% (est)' : '—');
+  const shareRaw = (retention.display && retention.display.shareRate) ||
+    (typeof retention.predictedShareRate === 'number' ? Math.round(retention.predictedShareRate * 100) + '% (est)' : '—');
+  // Strip the "(structural estimate…)" suffix for the metric tile, keep it in the disclaimer
+  const completionDisplay = String(completionRaw).split(' (')[0];
+  const shareDisplay = String(shareRaw).split(' (')[0];
+
+  const grade = editorGrade.grade || '—';
+  const gradeClass = (grade === 'A+' || grade === 'A') ? 'ga' : grade === 'B' ? 'gb' : grade === 'C' ? 'gc' : grade === 'D' ? 'gd' : '';
+  const gamingTotal = typeof gaming.totalBonus === 'number' ? gaming.totalBonus : null;
+  const gamingDisplay = gamingTotal !== null ? (gamingTotal > 0 ? '+' + Math.round(gamingTotal * 100) + '%' : '0%') : '—';
+
+  panel.innerHTML = `
+    <div class="scorev10-card">
+      <div class="scorev10-headline">
+        <div>
+          <div class="scorev10-big">${escapeHtml(viralPct)}</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">Viral Score · ${escapeHtml(confidence)} confidence</div>
+        </div>
+        <span class="scorev10-grade ${gradeClass}">Grade: ${escapeHtml(grade)}</span>
+      </div>
+      <div class="scorev10-metrics">
+        <div class="scorev10-metric">
+          <span class="scorev10-metric-label">Completion</span>
+          <b class="scorev10-metric-value">${escapeHtml(completionDisplay)}</b>
+        </div>
+        <div class="scorev10-metric">
+          <span class="scorev10-metric-label">Share Rate</span>
+          <b class="scorev10-metric-value">${escapeHtml(shareDisplay)}</b>
+        </div>
+        <div class="scorev10-metric">
+          <span class="scorev10-metric-label">Gaming Bonus</span>
+          <b class="scorev10-metric-value">${escapeHtml(gamingDisplay)}</b>
+        </div>
+      </div>
+      <p class="scorev10-disclaimer">Structural estimates — not calibrated against real outcome data.</p>
+    </div>
+  `;
+}
+
+async function exportVariant(variantId) {
+  const v = loadedVariants[variantId];
+  const entry = loadedEntryForVariants;
+  if (!v || !entry || !entry.filePath) return;
+
+  const statusEl = document.getElementById(`vstatus-${variantId}`);
+  const btn = statusEl ? statusEl.previousElementSibling : null;
+  if (btn) btn.disabled = true;
+  if (statusEl) statusEl.textContent = 'Queuing…';
+
+  try {
+    const res = await fetch('/api/creator/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        videoPath: entry.filePath,
+        entryId: entry.id,
+        renderKey: v.id,
+        segments: v.segments,
+        format: '9:16',
+        fit: 'pad',
+        burnCaptions: true,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok && data.jobId) {
+      if (statusEl) statusEl.textContent = `Queued (job ${String(data.jobId).slice(0, 8)}…). Reload to see the export when ready.`;
+    } else {
+      if (statusEl) statusEl.textContent = 'Error: ' + (data.error || res.status);
+      if (btn) btn.disabled = false;
+    }
+  } catch (err) {
+    if (statusEl) statusEl.textContent = 'Error: ' + err.message;
+    if (btn) btn.disabled = false;
+  }
+}
+
 // Fetch file size for display
 async function fetchFileSize(path) {
   try {
-    const response = await fetch(`/${path}`, { method: 'HEAD' });
+    const response = await fetch(`/media/${path}`, { method: 'HEAD' });
     const size = response.headers.get('content-length');
     if (size) {
       const sizeEl = document.getElementById(`size-${path}`);
@@ -770,7 +1197,7 @@ function formatFileSize(bytes) {
 function loadVideoPlayers(entry) {
   // Original video
   if (entry.filePath) {
-    const videoPath = "/" + entry.filePath;
+    const videoPath = "/media/" + entry.filePath;
     document.getElementById("original-player").innerHTML = `
       <video controls preload="metadata" style="width: 100%; border-radius: 10px;">
         <source src="${videoPath}" type="video/mp4">
@@ -780,8 +1207,8 @@ function loadVideoPlayers(entry) {
   }
 
   // Highlight render
-  if (entry.renders.highlight) {
-    const videoPath = "/" + entry.renders.highlight;
+  if (entry.renders?.highlight) {
+    const videoPath = "/media/" + entry.renders.highlight;
     document.getElementById("highlight-player").innerHTML = `
       <video controls preload="metadata" style="width: 100%; border-radius: 10px;">
         <source src="${videoPath}" type="video/mp4">
@@ -793,8 +1220,8 @@ function loadVideoPlayers(entry) {
   // Variants
   const variants = ["variantA", "variantB", "variantC"];
   for (const variant of variants) {
-    if (entry.renders[variant]) {
-      const videoPath = "/" + entry.renders[variant];
+    if (entry.renders?.[variant]) {
+      const videoPath = "/media/" + entry.renders[variant];
       document.getElementById(`${variant}-player`).innerHTML = `
         <video controls preload="metadata" style="width: 100%; border-radius: 10px;">
           <source src="${videoPath}" type="video/mp4">
