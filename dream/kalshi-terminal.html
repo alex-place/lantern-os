@@ -341,7 +341,7 @@ async function syncDeck(){
   // 5. patch front in place (no full re-render — preserves swipe state)
   if(!dragging) patchFront(deck[idx]);
   const rem=deck.length-idx;
-  document.getElementById('progress').textContent=rem>0?`${rem} of ${deck.length} · soonest first`:'';
+  document.getElementById('progress').textContent=rem>0?`Card ${deck.length-rem+1} of ${deck.length} · soonest first`:'';
   maybePrefetch();
 }
 
@@ -392,7 +392,7 @@ async function maybePrefetch(){
     if(!toAdd.length) return;
     deck.push(...toAdd);
     const rem=deck.length-idx;
-    document.getElementById('progress').textContent=rem>0?`${rem} of ${deck.length} · soonest first`:'';
+    document.getElementById('progress').textContent=rem>0?`Card ${deck.length-rem+1} of ${deck.length} · soonest first`:'';
     if(!dragging&&idx<deck.length) render();
   } catch(_){}
   finally{ prefetching=false; }
@@ -639,7 +639,7 @@ function patchFront(card){
 function render(){
   const stage=document.getElementById('stage');
   const remaining=deck.length-idx;
-  document.getElementById('progress').textContent=remaining>0?`${remaining} of ${deck.length} · soonest first`:'';
+  document.getElementById('progress').textContent=remaining>0?`Card ${deck.length-remaining+1} of ${deck.length} · soonest first`:'';
   if(idx>=deck.length){ stage.innerHTML=''; document.getElementById('end').style.display='flex'; return; }
   document.getElementById('end').style.display='none';
   let html='';
@@ -790,7 +790,7 @@ async function act(dir,fromSwipe){
     if(card.favAsk==null){ blockTake('No live ask price — cannot trade'); return; }
     if(card.kind==='convergence'){
       if(card.favAsk>90){ blockTake(`Margin too thin (${100-(card.favAsk||0)}¢ profit) — need 10¢ min`); return; }
-      if(card.favAsk<80){ blockTake('Not converged enough — skip'); return; }
+      if(card.favAsk<80){ blockTake(`Not converged enough (${card.favAsk}¢) — need 80¢ min`); return; }
     } else {
       if(card.favAsk<4||card.favAsk>96){ blockTake(`Market converged (${card.favAsk}¢) — no edge`); return; }
       if((card.conviction||0)<40){ blockTake(`Edge too thin — ${card.conviction||0}% conviction`); return; }
@@ -826,7 +826,9 @@ function showResult(res,card){
     t.className='toast dry show';
     t.textContent=`DRY-RUN · take ${lbl} @ ${card.favAsk||'?'}¢\nplanned, not sent (${(res.wouldBlock||[]).join('; ')})`;
   } else if(res.mode==='live'){
-    t.className='toast live show'; t.textContent=`LIVE · took ${lbl} (status ${res.status})`;
+    const ok=res.status>=200&&res.status<300;
+    t.className=ok?'toast live show':'toast err show';
+    t.textContent=ok?`LIVE · took ${lbl} ✓`:`LIVE · FAILED ${lbl} (status ${res.status}) — check portfolio`;
   } else { t.className='toast err show'; t.textContent=JSON.stringify(res).slice(0,140); }
   clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3200);
 }
@@ -856,11 +858,15 @@ async function loadImages(){
 
 function renderImages(images){
   const grid=document.getElementById('imageGrid');
-  grid.innerHTML=images.slice(0,12).map(img=>`
-    <div class="image-item" onclick="openImageModal('${img.url||'/images/'+img.id}','${(img.filename||'image').replace(/'/g,"\\'")}')" title="${img.filename||'Image'}">
-      <img src="${img.url||'/images/'+img.id}" alt="${img.filename||'Market image'}" loading="lazy" onerror="this.parentElement.innerHTML='⚠'">
-    </div>
-  `).join('');
+  grid.innerHTML=images.slice(0,12).map(img=>{
+    const url=img.url||'/images/'+img.id;
+    const title=img.filename||'Image';
+    return `<div class="image-item" data-url="${encodeURIComponent(url)}" data-title="${encodeURIComponent(title)}" title="${title.replace(/"/g,'&quot;')}"><img src="${url.replace(/"/g,'%22')}" alt="${title.replace(/"/g,'&quot;')}" loading="lazy" onerror="this.parentElement.innerHTML='⚠'"></div>`;
+  }).join('');
+  grid.onclick=e=>{
+    const el=e.target.closest('[data-url]');
+    if(el) openImageModal(decodeURIComponent(el.dataset.url),decodeURIComponent(el.dataset.title));
+  };
 }
 
 function openImageModal(url,title){
