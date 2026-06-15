@@ -4,7 +4,16 @@
  * Embedded execution engine inside Dream Chat.
  * File-grounded, tool-driven, patch-based workflow.
  *
- * Flow: GROUND → PLAN → PATCH → VERIFY
+ * Flow: GROUND → PLAN → ( PATCH → APPLY → VERIFY )↺ → DONE
+ *
+ * Staff-level contract:
+ *   - "success" is returned ONLY when verification actually passes.
+ *   - On a failed verification the loop feeds the failure back to the model
+ *     and tries again, up to `maxAttempts`.
+ *   - If it cannot land green, the working tree is reverted to its pre-run
+ *     state (unless `keepOnFailure`), so it never leaves a broken repo.
+ *   - Capability/model selection is the caller's job (inject `llm`); this
+ *     runtime is model-agnostic so the performance leaderboard can route.
  */
 
 const fs = require("fs").promises;
@@ -13,8 +22,8 @@ const { exec } = require("child_process");
 const { promisify } = require("util");
 const execAsync = promisify(exec);
 
-const { searchRepoFiles, readFileContent, resolveRepoPath } = require("./repo-context");
-const { applyPatch, validatePatch } = require("./patch-engine");
+const { searchRepoFiles, readFileContent } = require("./repo-context");
+const { applyPatch, validatePatch, parsePatch } = require("./patch-engine");
 
 const KEYSTONE_SYSTEM_PROMPT = `You are Keystone Code Kernel inside Lantern OS.
 You are a repository-first coding agent modeled after Claude Code.
@@ -36,25 +45,165 @@ When you produce code changes, output them as unified diffs.
 When you need to create new files, clearly mark the filename and content.
 Always verify your work by running tests or checks when relevant.`;
 
+// Default safe pytest subset (mirrors CLAUDE.md) + JS suite.
+const PYTEST_SAFE =
+  "python -m pytest tests/ -q --tb=short " +
+  "--ignore=tests/test_anti_entropy_memory.py " +
+  "--ignore=tests/test_audit_chain.py " +
+  "--ignore=tests/test_discord_bot.py " +
+  "--ignore=tests/test_discord_voice_gate.py";
+const JS_SUITE = "npm test --prefix apps/lantern-garage";
+
+/**
+ * Run the verification gate against the set of changed files.
+ * Returns { ran, success, inconclusive, output, command }.
+ * `inconclusive` means no applicable test command was found — which is NOT
+ * a pass; the caller decides whether to allow unverified completion.
+ */
+async function defaultRunVerification(repo, changed, options = {}) {
+  const paths = (changed || []).map((c) => c.path || "");
+  const py =
+    paths.some((p) => /\.py$/.test(p)) || paths.some((p) => /(^|\/)tests?\//.test(p));
+  const js = paths.some((p) => /\.(c|m)?js$/.test(p));
+
+  let cmd = options.testCmd || null;
+  if (!cmd) {
+    if (py) cmd = PYTEST_SAFE;
+    else if (js) cmd = JS_SUITE;
+  }
+  if (!cmd) {
+    return {
+      ran: false,
+      success: false,
+      inconclusive: true,
+      output: "No applicable test command for the changed files.",
+      command: null,
+    };
+  }
+
+  try {
+    const r = await execAsync(cmd, {
+      cwd: repo,
+      timeout: options.testTimeoutMs || 120000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    return {
+      ran: true,
+      success: true,
+      inconclusive: false,
+      output: String(r.stdout || "").slice(-2000),
+      command: cmd,
+    };
+  } catch (e) {
+    const out = `${e.stdout || ""}\n${e.stderr || e.message || ""}`.slice(-2000);
+    return { ran: true, success: false, inconclusive: false, output: out, command: cmd };
+  }
+}
+
+/** Files a patch will touch (unified-diff targets + newfile blocks). */
+function targetsOf(patchText) {
+  const targets = new Set();
+  try {
+    for (const ch of parsePatch(patchText)) if (ch.file) targets.add(ch.file);
+  } catch (_) {
+    /* ignore parse errors — snapshot is best-effort */
+  }
+  if (typeof patchText === "string" && patchText.includes("newfile")) {
+    for (const block of patchText.split(/(?=^newfile\n)/m)) {
+      if (!block.trim().startsWith("newfile")) continue;
+      const fp = block.split("\n").find((l) => l && !l.startsWith("newfile"));
+      if (fp) targets.add(fp.trim());
+    }
+  }
+  return [...targets];
+}
+
+/** Capture pre-images of files a patch will touch (once each, before first apply). */
+async function snapshotTargets(patchText, repo, snapshots) {
+  for (const rel of targetsOf(patchText)) {
+    if (snapshots.has(rel)) continue;
+    const abs = path.join(repo, rel);
+    try {
+      const content = await fs.readFile(abs, "utf-8");
+      snapshots.set(rel, { existed: true, content });
+    } catch (_) {
+      snapshots.set(rel, { existed: false });
+    }
+  }
+}
+
+/** Restore the working tree to the captured pre-images (revert a failed run). */
+async function restoreSnapshots(snapshots, repo) {
+  for (const [rel, snap] of snapshots) {
+    const abs = path.join(repo, rel);
+    try {
+      if (snap.existed) await fs.writeFile(abs, snap.content, "utf-8");
+      else await fs.unlink(abs).catch(() => {});
+    } catch (_) {
+      /* best-effort restore */
+    }
+  }
+}
+
+/** Ask the model for a patch — initial pass, or a correction given a failure. */
+async function generatePatch(llm, ctx) {
+  const { planPrompt, plan, patchPrompt, prior, failure } = ctx;
+  const messages = [
+    { role: "user", content: planPrompt },
+    { role: "assistant", content: plan },
+    { role: "user", content: patchPrompt },
+  ];
+  if (prior && failure) {
+    messages.push({ role: "assistant", content: prior });
+    messages.push({
+      role: "user",
+      content:
+        `Your previous patch did not pass verification.\n\n` +
+        `${failure.type === "apply" ? "The patch FAILED TO APPLY" : "Tests FAILED"}` +
+        ` (command: ${failure.command || "n/a"}):\n---\n${
+          failure.output || failure.error || "(no output)"
+        }\n---\n\n` +
+        `Produce a CORRECTED unified diff (and/or newfile blocks) that fixes this. ` +
+        `Re-inspect the relevant files if needed. Output ONLY diffs/newfiles, no explanation.`,
+    });
+  }
+  const resp = await llm({
+    system: "Return ONLY unified diffs and file contents. No explanation or preamble.",
+    messages,
+  });
+  return resp.content || resp;
+}
+
 async function keystoneRun(issue, repo, llm, options = {}) {
-  const { verbose = false, maxFiles = 10 } = options;
+  const {
+    verbose = false,
+    maxFiles = 10,
+    maxAttempts = 3,
+    keepOnFailure = false,
+    allowUnverified = false,
+  } = options;
+  // Injectable tools — defaults are the real ones; tests override these.
+  const tools = {
+    searchRepoFiles,
+    readFileContent,
+    applyPatch,
+    validatePatch,
+    runVerification: defaultRunVerification,
+    ...(options.tools || {}),
+  };
   const results = [];
 
   try {
     // PHASE 1: GROUND — Search and read relevant files
     log(verbose, "🔍 PHASE 1: GROUNDING");
-    const searchResults = await searchRepoFiles(issue, maxFiles);
+    const searchResults = await tools.searchRepoFiles(issue, maxFiles);
     log(verbose, `Found ${searchResults.length} relevant files`);
 
     const files = [];
     for (const result of searchResults.slice(0, maxFiles)) {
       try {
-        const content = await readFileContent(result.path);
-        files.push({
-          path: result.path,
-          content,
-          relevance: result.score,
-        });
+        const content = await tools.readFileContent(result.path);
+        files.push({ path: result.path, content, relevance: result.score });
         log(verbose, `  ✓ ${result.path}`);
       } catch (e) {
         log(verbose, `  ✗ ${result.path} (read error)`);
@@ -62,11 +211,7 @@ async function keystoneRun(issue, repo, llm, options = {}) {
     }
 
     if (files.length === 0) {
-      return {
-        status: "failed",
-        error: "No relevant files found",
-        phase: "grounding",
-      };
+      return { status: "failed", error: "No relevant files found", phase: "grounding" };
     }
 
     results.push({
@@ -74,12 +219,11 @@ async function keystoneRun(issue, repo, llm, options = {}) {
       files: files.map((f) => ({ path: f.path, relevance: f.relevance })),
     });
 
-    // Build grounding context
     const groundingContext = files
       .map((f) => `\n=== ${f.path} ===\n${f.content.slice(0, 2000)}`)
       .join("\n");
 
-    // PHASE 2: PLAN — Ask LLM to understand the issue
+    // PHASE 2: PLAN
     log(verbose, "📋 PHASE 2: PLANNING");
     const planPrompt = `
 Issue: ${issue}
@@ -94,13 +238,10 @@ Output a clear, numbered plan. Be specific about line numbers and changes.`;
       system: KEYSTONE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: planPrompt }],
     });
-
     const plan = planResponse.content || planResponse;
     log(verbose, "Plan generated");
     results.push({ phase: "plan", plan });
 
-    // PHASE 3: PATCH — Ask LLM to generate diffs
-    log(verbose, "🔧 PHASE 3: PATCH GENERATION");
     const patchPrompt = `
 Based on your plan, generate the EXACT code changes needed.
 
@@ -119,111 +260,141 @@ content goes here
 
 Output ONLY the diffs and new files. No explanation.`;
 
-    const patchResponse = await llm({
-      system:
-        "Return ONLY unified diffs and file contents. No explanation or preamble.",
-      messages: [
-        { role: "user", content: planPrompt },
-        { role: "assistant", content: plan },
-        { role: "user", content: patchPrompt },
-      ],
-    });
+    // PHASES 3-5: PATCH → APPLY → VERIFY, with a relentless fix loop.
+    const snapshots = new Map();
+    let attempt = 0;
+    let feedback = null; // failure carried into the next attempt
+    let lastPatch = null;
+    let lastApply = null;
+    let lastVerify = null;
+    let lastError = null;
+    let lastPhase = "patch";
 
-    const patchText = patchResponse.content || patchResponse;
-    log(verbose, "Patch generated");
+    while (attempt < maxAttempts) {
+      attempt += 1;
+      log(verbose, `🔁 ATTEMPT ${attempt}/${maxAttempts}`);
 
-    // Validate patch structure
-    const patchValidation = await validatePatch(patchText);
-    if (!patchValidation.valid) {
-      log(verbose, `⚠ Patch validation: ${patchValidation.error}`);
-    }
-
-    results.push({
-      phase: "patch",
-      patch: patchText,
-      validation: patchValidation,
-    });
-
-    // PHASE 4: APPLY — Execute the patch
-    log(verbose, "✏️ PHASE 4: APPLYING PATCH");
-    const applyResult = await applyPatch(patchText, repo);
-
-    if (!applyResult.success) {
-      log(verbose, `❌ Patch failed: ${applyResult.error}`);
-      return {
-        status: "patch_failed",
-        error: applyResult.error,
-        phase: "apply",
+      // PATCH
+      const patchText = await generatePatch(llm, {
+        planPrompt,
         plan,
-        patch: patchText,
-      };
-    }
+        patchPrompt,
+        prior: lastPatch,
+        failure: feedback,
+      });
+      lastPatch = patchText;
+      const patchValidation = await tools.validatePatch(patchText);
+      if (!patchValidation.valid && patchValidation.type !== "newfile") {
+        lastError = `Invalid patch: ${patchValidation.error}`;
+        lastPhase = "patch";
+        feedback = { type: "apply", error: lastError };
+        results.push({ phase: "attempt", attempt, patchValid: false, error: lastError });
+        continue;
+      }
 
-    log(verbose, `✓ Applied ${applyResult.filesChanged} files`);
-    results.push({
-      phase: "apply",
-      filesChanged: applyResult.filesChanged,
-      changed: applyResult.changed,
-    });
+      // APPLY (snapshot pre-images first so a give-up can revert cleanly)
+      await snapshotTargets(patchText, repo, snapshots);
+      const applyResult = await tools.applyPatch(patchText, repo);
+      if (!applyResult.success) {
+        lastError = applyResult.error;
+        lastPhase = "apply";
+        feedback = { type: "apply", error: applyResult.error };
+        results.push({ phase: "attempt", attempt, applied: false, error: applyResult.error });
+        continue;
+      }
+      lastApply = applyResult;
 
-    // PHASE 5: VERIFY — Run tests if available
-    log(verbose, "✅ PHASE 5: VERIFICATION");
-    let verification = null;
-    try {
-      const testCmd =
-        applyResult.changed[0]?.path?.endsWith(".py") ||
-        applyResult.changed.some((f) => f.path?.includes("test"))
-          ? "python -m pytest tests/ -q --tb=short"
-          : "npm test --prefix apps/lantern-garage 2>&1 | head -50";
-
-      const verifyResult = await execAsync(testCmd, {
-        cwd: repo,
-        timeout: 30000,
-        maxBuffer: 1024 * 1024,
+      // VERIFY
+      const verify = await tools.runVerification(repo, applyResult.changed, options);
+      lastVerify = verify;
+      lastPhase = "verify";
+      results.push({
+        phase: "attempt",
+        attempt,
+        filesChanged: applyResult.filesChanged,
+        verify: { ran: verify.ran, success: verify.success, inconclusive: verify.inconclusive },
       });
 
-      verification = {
-        success: true,
-        output: verifyResult.stdout.slice(0, 1000),
-      };
-      log(verbose, "Tests passed");
-    } catch (e) {
-      verification = {
-        success: false,
-        output: String(e.message).slice(0, 500),
-      };
-      log(verbose, "Tests failed or unavailable");
+      if (verify.ran && verify.success) {
+        log(verbose, `✅ Verified green on attempt ${attempt}`);
+        return {
+          status: "success",
+          issue,
+          plan,
+          patch: lastPatch,
+          applied: applyResult.changed,
+          tests: { success: true, output: verify.output, command: verify.command },
+          attempts: attempt,
+          verified: true,
+          fullResults: results,
+        };
+      }
+
+      if (verify.inconclusive && allowUnverified) {
+        log(verbose, "⚠ No applicable tests — completing unverified (allowed).");
+        return {
+          status: "applied_unverified",
+          issue,
+          plan,
+          patch: lastPatch,
+          applied: applyResult.changed,
+          tests: { success: false, inconclusive: true, output: verify.output },
+          attempts: attempt,
+          verified: false,
+          fullResults: results,
+        };
+      }
+
+      // Not green — revert this attempt's changes before trying a fresh fix,
+      // so each attempt starts from the same clean baseline.
+      await restoreSnapshots(snapshots, repo);
+      lastError = verify.inconclusive
+        ? "No applicable tests found and unverified completion is not allowed."
+        : "Verification failed.";
+      feedback = { type: "verify", output: verify.output, command: verify.command };
+      log(verbose, `❌ Attempt ${attempt} not green — ${lastError}`);
     }
 
-    results.push({
-      phase: "verify",
-      tests: verification,
-    });
-
+    // Exhausted attempts without landing green.
+    let reverted = false;
+    if (!keepOnFailure) {
+      await restoreSnapshots(snapshots, repo);
+      reverted = true;
+    }
     return {
-      status: "success",
+      status: "verification_failed",
       issue,
       plan,
-      patch: patchText,
-      applied: applyResult.changed,
-      tests: verification,
+      patch: lastPatch,
+      applied: keepOnFailure && lastApply ? lastApply.changed : [],
+      tests: lastVerify
+        ? { success: false, inconclusive: !!lastVerify.inconclusive, output: lastVerify.output }
+        : null,
+      error: `${lastError || "Could not verify changes"} (after ${attempt} attempt${
+        attempt === 1 ? "" : "s"
+      }${reverted ? "; working tree reverted" : ""})`,
+      phase: lastPhase,
+      attempts: attempt,
+      verified: false,
+      reverted,
       fullResults: results,
     };
   } catch (err) {
-    return {
-      status: "error",
-      error: err.message,
-      phase: "unknown",
-      fullResults: results,
-    };
+    return { status: "error", error: err.message, phase: "unknown", fullResults: results };
   }
 }
 
 function log(verbose, message) {
-  if (verbose) console.log(`[Keystone] ${message}`);
+  // Diagnostics go to stderr so stdout / SSE token output stays clean.
+  if (verbose) process.stderr.write(`[Keystone] ${message}\n`);
 }
 
 module.exports = {
   keystoneRun,
   KEYSTONE_SYSTEM_PROMPT,
+  // exported for tests / reuse
+  defaultRunVerification,
+  targetsOf,
+  snapshotTargets,
+  restoreSnapshots,
 };
