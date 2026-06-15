@@ -8,7 +8,21 @@
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="css/dream-chat.css">
   <style>
-    .kc-page { max-width: 780px; margin: 0 auto; padding: 32px 24px 80px; }
+    /* This is a scrolling document page, not the fixed-height chat shell.
+       dream-chat.css locks html/body/.app to the viewport with overflow:hidden;
+       override that here so the Knowledge Center scrolls normally. */
+    html, body { height: auto; min-height: 100vh; overflow-x: hidden; overflow-y: auto; }
+    .app { display: block; height: auto; min-height: 0; overflow: visible; width: 100%; }
+    /* dream-chat.css hides scrollbars globally — restore a usable one for this page */
+    html { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    ::-webkit-scrollbar { display: block; width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    .kc-page { max-width: 920px; margin: 0 auto; padding: 28px 24px 96px; }
+    .kc-header { margin: 4px 0 28px; }
+    .kc-header h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+    .kc-header p { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
     .section { margin-bottom: 40px; }
     .section h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
     .link-grid {
@@ -49,6 +63,11 @@
 <div class="app">
   <div class="kc-page">
 
+    <div class="kc-header">
+      <h1>Knowledge Center</h1>
+      <p>Guides, live tools, research, and reference for Lantern OS.</p>
+    </div>
+
     <div class="section">
       <h2>Getting Started</h2>
       <div class="link-grid">
@@ -60,12 +79,95 @@
         <a class="link-card" href="/repo/QUICKSTART.md">
           <span class="icon">🚀</span>
           <h3>Quick Start</h3>
-          <p>Install, configure, and run Lantern OS locally.</p>
+          <p>Install, configure, and run Lantern OS locally (dual-boot 4177 + 4178).</p>
         </a>
         <a class="link-card" href="/repo/AGENTS.md">
           <span class="icon">🤖</span>
           <h3>Agents Guide</h3>
-          <p>How AI agents work in Lantern OS.</p>
+          <p>How AI agents and the per-agent monoworkstream lanes work.</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Explore</h2>
+      <div class="link-grid">
+        <a class="link-card" href="/dream-chat.html">
+          <span class="icon">📓</span>
+          <h3>Dream Journal</h3>
+          <p>Freeform RP chat journal with agent personas and provider fallback.</p>
+        </a>
+        <a class="link-card" href="/three-doors-game.html">
+          <span class="icon">🚪</span>
+          <h3>Three Doors</h3>
+          <p>The Kingdome — an infinitely replayable, symbolic door game.</p>
+        </a>
+        <a class="link-card" href="/flourishing">
+          <span class="icon">🌱</span>
+          <h3>Flourishing Dashboard</h3>
+          <p>Human Flourishing Frameworks — the real-time sensor-mesh dashboard.</p>
+        </a>
+        <a class="link-card" href="/kalshi-terminal.html">
+          <span class="icon">📈</span>
+          <h3>Kalshi Terminal</h3>
+          <p>Markets terminal — the Impossibility Deck and live event contracts.</p>
+        </a>
+        <a class="link-card" href="/crypto-dashboard.html">
+          <span class="icon">🪙</span>
+          <h3>Crypto Dashboard</h3>
+          <p>Real-time BTC / ETH / SOL / XRP / DOGE prices and market news.</p>
+        </a>
+        <a class="link-card" href="/orchestration.html">
+          <span class="icon">🧭</span>
+          <h3>Orchestration</h3>
+          <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Research &amp; Theory</h2>
+      <div class="link-grid">
+        <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
+          <span class="icon">📐</span>
+          <h3>Σ₀ Collapse Certificate</h3>
+          <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
+        </a>
+        <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
+          <span class="icon">📄</span>
+          <h3>LaTeX Source</h3>
+          <p>TeX source for the certificate — for typesetting and print.</p>
+        </a>
+        <a class="link-card" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
+          <span class="icon">🌌</span>
+          <h3>Quantum-Relativity Analysis</h3>
+          <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
+        </a>
+        <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
+          <span class="icon">🔄</span>
+          <h3>Tesseract Convergence Loop</h3>
+          <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Data &amp; Memory</h2>
+      <div class="link-grid">
+        <a class="link-card" href="/rag-house.html">
+          <span class="icon">🏠</span>
+          <h3>RAG House</h3>
+          <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
+        </a>
+        <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
+          <span class="icon">🗄️</span>
+          <h3>CSF Format</h3>
+          <p>Convergence-Fitted Searchable Format — the binary archive specification.</p>
+        </a>
+        <a class="link-card" href="/observer-mesh-cube.html">
+          <span class="icon">🧊</span>
+          <h3>Observer Mesh Cube</h3>
+          <p>The 3D status cube — beliefs and observers across the mesh.</p>
         </a>
       </div>
     </div>
@@ -78,26 +180,10 @@
           <h3>Changelog</h3>
           <p>Release notes and version history.</p>
         </a>
-        <a class="link-card" href="/repo/CHANGELOG.MD" target="_blank">
-          <span class="icon">📄</span>
-          <h3>Raw Changelog</h3>
-          <p>Markdown source for all releases.</p>
-        </a>
         <a class="link-card" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">
           <span class="icon">⚙️</span>
           <h3>GitHub</h3>
           <p>Source code, issues, and contributions.</p>
-        </a>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Data & Memory</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/rag-house.html">
-          <span class="icon">🏠</span>
-          <h3>RAG House</h3>
-          <p>Living map of Lantern OS architecture — Status Cube, Tesseract Loop, Convergence IO, CSF, agents, and all technical hub-and-spokes.</p>
         </a>
       </div>
     </div>
@@ -108,7 +194,17 @@
         <a class="link-card" href="/repo/SECURITY.md">
           <span class="icon">🔒</span>
           <h3>Security</h3>
-          <p>Policies and responsible disclosure.</p>
+          <p>Policies, vulnerability guidelines, and responsible disclosure.</p>
+        </a>
+        <a class="link-card" href="/repo/SKILLS.md">
+          <span class="icon">🛠️</span>
+          <h3>Skills</h3>
+          <p>Available capabilities, persona routing, and the provider chain.</p>
+        </a>
+        <a class="link-card" href="/repo/PROVIDERS.md">
+          <span class="icon">🔌</span>
+          <h3>Providers</h3>
+          <p>All AI providers, configuration, and the fallback chain.</p>
         </a>
         <a class="link-card" href="/repo/CONTRIBUTING.md">
           <span class="icon">🤝</span>
