@@ -519,3 +519,5 @@
   font-family: 'SF Mono','Monaco','Consolas',monospace;
   font-size: 0.85em;
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -269,13 +269,17 @@ function createAgentBubble(isError) {
   msg.className = 'message agent' + (isError ? ' error' : '');
   const bubble = document.createElement('div');
   bubble.className = 'message-content';
+  const thinking = document.createElement('span');
+  thinking.className = 'thinking-mandala';
+  thinking.innerHTML = '<img src="/mandala.svg" alt="" style="width:20px;height:20px;opacity:0.5;animation:spin 2s linear infinite;vertical-align:middle">';
+  bubble.appendChild(thinking);
   const cursor = document.createElement('span');
   cursor.className = 'stream-cursor';
   bubble.appendChild(cursor);
   msg.appendChild(bubble);
   container.appendChild(msg);
   container.scrollTop = container.scrollHeight;
-  return { msg, bubble, cursor };
+  return { msg, bubble, cursor, thinking };
 }
 
 // ── Main send ─────────────────────────────────────────────────────────────────
@@ -492,6 +496,7 @@ async function sendMessage() {
               bubble.insertBefore(rc, cursor);
             }
           } else if (evt.type === 'token' && evt.text) {
+            if (thinking.parentNode) thinking.remove();
             fullText += evt.text;
             cursor.remove();
             bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
