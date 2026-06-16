@@ -1126,7 +1126,8 @@
 .observer-panel-close:hover { color: var(--text); }
 .observer-panel-body {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: hidden;
+  overflow-x: hidden;
   padding: 14px 12px;
   display: flex;
   flex-direction: column;

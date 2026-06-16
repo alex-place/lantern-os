@@ -191,65 +191,6 @@
         <a href="https://console.x.ai" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
       </div>
 
-      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-
-      <div class="form-group">
-        <label class="form-label">Connectors</label>
-        <div class="connector-grid">
-          <div class="connector-card">
-            <span class="connector-card-icon">🔌</span>
-            <div class="connector-card-info">
-              <div class="connector-card-title">MCP Server</div>
-              <div class="connector-card-meta">OAuth 2.0 · Port 8772</div>
-            </div>
-            <span class="connector-card-status pending" id="mcp-status">Disconnected</span>
-            <button class="connector-btn primary" id="mcp-btn" onclick="connectMcp()">Connect</button>
-          </div>
-          <div class="connector-card">
-            <span class="connector-card-icon">🔍</span>
-            <div class="connector-card-info">
-              <div class="connector-card-title">Web Search</div>
-              <div class="connector-card-meta">DuckDuckGo · No key needed</div>
-            </div>
-            <span class="connector-card-status ok" id="search-status">Ready</span>
-            <button class="connector-btn" onclick="testWebSearch()">Test</button>
-          </div>
-        </div>
-      </div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-
-      <div class="form-group">
-        <label class="form-label">Display</label>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border)">
-          <span style="font-size:13px">Theme</span>
-          <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px">🌙</button>
-        </div>
-      </div>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-
-      <div class="form-group">
-        <label class="form-label">Context Modes</label>
-        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-          <label style="display:flex;gap:8px;align-items:center">
-            <input type="checkbox" id="ctx-search" checked onchange="updateContext()">
-            <span>Web Search (MCP)</span>
-          </label>
-          <label style="display:flex;gap:8px;align-items:center">
-            <input type="checkbox" id="ctx-memory" checked onchange="updateContext()">
-            <span>CSF Memory / Symbols</span>
-          </label>
-          <label style="display:flex;gap:8px;align-items:center">
-            <input type="checkbox" id="ctx-trading" onchange="updateContext()">
-            <span>Trading Context (IBKR)</span>
-          </label>
-          <label style="display:flex;gap:8px;align-items:center">
-            <input type="checkbox" id="ctx-perf" onchange="togglePerfMonitor()">
-            <span>Performance Monitor</span>
-          </label>
-        </div>
-      </div>
 
     </div>
   </div>
