@@ -140,10 +140,37 @@
     40% { transform: translateY(-6px); }
   }
 
-  .welcome-doors { text-align: center; padding: 40px 20px; }
+  .welcome-doors { text-align: center; padding: 0; display: flex; flex-direction: column; align-items: center; }
+  .welcome-doors-backdrop {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16/9;
+    background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.6) 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 60px;
+    overflow: hidden;
+    position: relative;
+  }
+  .welcome-doors-backdrop img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
+  .welcome-doors-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 40px 20px;
+  }
   .welcome-doors .big-door { font-size: 56px; margin-bottom: 16px; }
-  .welcome-doors h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-  .welcome-doors p { color: var(--muted); font-size: 14px; max-width: 320px; margin: 0 auto 20px; line-height: 1.5; }
+  .welcome-doors h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
+  .welcome-doors p { color: rgba(255,255,255,0.9); font-size: 14px; max-width: 320px; margin: 0 auto 20px; line-height: 1.5; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
   .start-btn {
     background: var(--accent);
     color: #fff;
@@ -192,10 +219,15 @@
   <!-- Chat area -->
   <div class="chat-container" id="chat">
     <div class="welcome-doors" id="welcome">
-      <div class="big-door">🏯</div>
-      <h2>Kingdome of Hearts</h2>
-      <p>A seven-stage dream journey through the Kingdome. Three doors each scene — no wrong choices. Lantern guides you. Each loop is different.</p>
-      <button class="start-btn" onclick="startGame()">Enter the Kingdome</button>
+      <div class="welcome-doors-backdrop">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/Caspar_David_Friedrich_-_Wanderer_above_the_sea_of_fog.jpg" alt="Wanderer Above the Sea of Fog — Caspar David Friedrich" style="opacity: 0.8;">
+      </div>
+      <div class="welcome-doors-content">
+        <div class="big-door">🏯</div>
+        <h2>Kingdome of Hearts</h2>
+        <p>A seven-stage dream journey through the Kingdome. Three doors each scene — no wrong choices. Lantern guides you. Each loop is different.</p>
+        <button class="start-btn" onclick="startGame()">Enter the Kingdome</button>
+      </div>
     </div>
   </div>
 
