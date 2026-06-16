@@ -506,6 +506,10 @@ async function sendMessage() {
             didError = true;
             if (evt.text) serverErrorText = evt.text;
             if (!fullText) bubble.style.color = 'var(--muted)';
+          } else if (evt.type === 'sigma0' && evt.corrected) {
+            // Response was revised by Σ₀ verify pass — show badge after stream completes
+            bubble.dataset.sigma0Corrected = '1';
+            bubble.dataset.sigma0Claims = evt.claims || 0;
           } else if (evt.type === 'done') {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel) routeLabel = evt.routeLabel;
@@ -525,6 +529,14 @@ async function sendMessage() {
   }
 
   bubble.innerHTML = renderMarkdown(fullText);
+
+  if (bubble.dataset.sigma0Corrected) {
+    const badge = document.createElement('span');
+    badge.title = `Σ₀ verified — ${bubble.dataset.sigma0Claims} claim(s) grounded`;
+    badge.style.cssText = 'font-size:10px;opacity:0.55;margin-left:6px;vertical-align:middle';
+    badge.textContent = '✓ Σ₀';
+    bubble.appendChild(badge);
+  }
 
   if (routeLabel) {
     const sig = document.createElement('div');
