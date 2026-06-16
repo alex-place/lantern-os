@@ -285,7 +285,7 @@ async function sendMessage() {
   if (!text || isSending) return;
 
   // Three-doors game lives on its own page now — Lantern guides there, not in chat
-  const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i);
+  const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts|explore)\b/i);
   if (kingdomeMatch) {
     input.value = '';
     window.location.href = '/three-doors-game.html';
