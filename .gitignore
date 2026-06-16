@@ -204,3 +204,10 @@ rag/
 merge-patches/
 patches/
 src/cio/target/
+
+# --- Runtime live-data / telemetry snapshots (PR #644 follow-up) ---
+# Continuously rewritten by running services; caused spurious merge
+# conflicts on every branch. Keep local, do not track.
+apps/data/crypto/prices.jsonl
+data/kalshi/cio-train-report.json
+data/kalshi/paper-positions.jsonl
