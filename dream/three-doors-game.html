@@ -152,7 +152,9 @@
     padding-bottom: 60px;
     overflow: hidden;
     position: relative;
+    animation: backdropFade 0.8s ease-out forwards;
   }
+  @keyframes backdropFade { from { opacity: 0; } to { opacity: 1; } }
   .welcome-doors-backdrop img {
     width: 100%;
     height: 100%;
@@ -167,10 +169,47 @@
     z-index: 1;
     text-align: center;
     padding: 40px 20px;
+    animation: contentSlideUp 0.6s ease-out 0.2s forwards;
+    opacity: 0;
   }
-  .welcome-doors .big-door { font-size: 56px; margin-bottom: 16px; }
-  .welcome-doors h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
-  .welcome-doors p { color: rgba(255,255,255,0.9); font-size: 14px; max-width: 320px; margin: 0 auto 20px; line-height: 1.5; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  @keyframes contentSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .welcome-doors .big-door { font-size: 56px; margin-bottom: 16px; animation: doorBounce 0.8s ease-out 0.4s forwards; opacity: 0; }
+  @keyframes doorBounce { 0% { opacity: 0; transform: scale(0.8); } 60% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
+  .welcome-doors h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.7); animation: fadeInDown 0.6s ease-out 0.5s forwards; opacity: 0; }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  .welcome-doors p { color: rgba(255,255,255,0.9); font-size: 14px; max-width: 320px; margin: 0 auto 20px; line-height: 1.5; text-shadow: 0 1px 4px rgba(0,0,0,0.5); animation: fadeInUp 0.6s ease-out 0.6s forwards; opacity: 0; }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Three-doors preview section */
+  .doors-preview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    max-width: 520px;
+    width: 100%;
+    margin: 28px auto 0;
+    padding: 0 20px;
+  }
+  @media (max-width: 580px) { .doors-preview { grid-template-columns: 1fr; gap: 12px; } }
+  .door-preview-chip {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+    color: rgba(255,255,255,0.9);
+    font-size: 12px;
+    line-height: 1.4;
+    cursor: default;
+    opacity: 0;
+    animation: doorPreviewFade 0.5s ease-out forwards;
+  }
+  .door-preview-chip:nth-child(1) { animation-delay: 0.7s; }
+  .door-preview-chip:nth-child(2) { animation-delay: 0.8s; }
+  .door-preview-chip:nth-child(3) { animation-delay: 0.9s; }
+  @keyframes doorPreviewFade { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .door-preview-chip strong { display: block; font-size: 18px; margin-bottom: 4px; }
+
   .start-btn {
     background: var(--accent);
     color: #fff;
@@ -180,33 +219,99 @@
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.3s ease;
     font-family: inherit;
+    animation: buttonGlow 0.6s ease-out 1.1s forwards;
+    opacity: 0;
+    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
   }
-  .start-btn:hover { background: var(--accent-hover); }
+  @keyframes buttonGlow {
+    from { opacity: 0; transform: translateY(10px); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.5); }
+    to { opacity: 1; transform: translateY(0); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+  }
+  .start-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+  }
+  .start-btn:active { transform: translateY(0); }
+
+  /* Learn more link */
+  .learn-more-link {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+    transition: all 0.2s ease;
+    animation: fadeIn 0.6s ease-out 1.2s forwards;
+    opacity: 0;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .learn-more-link:hover { color: rgba(255,255,255,0.9); border-bottom-color: rgba(255,255,255,0.6); }
+
+  /* Auto-load state: hide welcome screen */
+  body.game-started .welcome-doors { display: none; }
+
+  /* Loading state */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 20px;
+    color: var(--muted);
+  }
+  .loading-state .lantern-icon { font-size: 48px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* Mandala avatar pulse */
+  .mandala-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .mandala-avatar svg {
+    animation: mandala-pulse 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px var(--accent));
+  }
+  @keyframes mandala-pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+      filter: drop-shadow(0 0 8px var(--accent));
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 16px var(--accent));
+    }
+  }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- Site nav -->
+  <!-- Standard header (Lantern OS branded navigation) -->
   <nav class="site-nav">
-    <a class="nav-brand" href="/trader-dashboard.html">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
-      Lantern OS
+    <a class="nav-brand" href="/">
+      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle;margin-right:8px">
+      <span style="font-size:18px;font-weight:600">Lantern OS</span>
     </a>
     <div class="nav-links">
       <a href="/dream-chat.html">Journal</a>
       <a href="/three-doors-game.html" class="active">Kingdome</a>
-      <a href="/create.html">✏️ Create</a>
-      <a href="/knowledgecenter.html">Help</a>
+      <a href="/create.html">Create</a>
+      <a href="/explore.html">Explore</a>
     </div>
     <div class="nav-actions">
       <span id="status-line" style="font-size:11px;color:var(--muted);margin-right:6px"></span>
-      <button id="training-badge" onclick="showTrainingStatus()" title="LoRA training data collected" style="display:none;background:none;border:1px solid var(--border);border-radius:7px;padding:4px 8px;color:var(--accent);cursor:pointer;font-size:11px;font-family:inherit;gap:3px">📸 <span id="training-count">0</span></button>
       <button onclick="resetGame()" title="New game" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit">↺ New</button>
-      <button class="nav-btn" id="narrator-toggle" onclick="toggleNarrator()" title="Narrator on/off">🎙</button>
-      <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="background:none;border:none;cursor:pointer;font-size:16px">🌙</button>
     </div>
   </nav>
 
@@ -227,6 +332,12 @@
         <h2>Kingdome of Hearts</h2>
         <p>A seven-stage dream journey through the Kingdome. Three doors each scene — no wrong choices. Lantern guides you. Each loop is different.</p>
         <button class="start-btn" onclick="startGame()">Enter the Kingdome</button>
+        <div class="doors-preview">
+          <div class="door-preview-chip"><strong>🚪</strong> Red Door</div>
+          <div class="door-preview-chip"><strong>🚪</strong> Blue Door</div>
+          <div class="door-preview-chip"><strong>🚪</strong> Gold Door</div>
+        </div>
+        <a href="#" class="learn-more-link" onclick="event.preventDefault(); alert('Coming soon — learn more about the Kingdome mechanics')">Learn More →</a>
       </div>
     </div>
   </div>
@@ -264,5 +375,14 @@
 </footer>
 
 <script src="js/theme-toggle.js"></script>
+<script>
+  // Auto-load game on page load — all scripts are now loaded
+  window.addEventListener('load', () => {
+    document.body.classList.add('game-started');
+    if (typeof startGame === 'function') {
+      startGame();
+    }
+  });
+</script>
 </body>
 </html>
