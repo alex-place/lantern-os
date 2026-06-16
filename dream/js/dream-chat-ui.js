@@ -381,7 +381,7 @@ async function sendMessage() {
           const btn = document.createElement('button');
           btn.className = 'starter-chip';
           btn.textContent = a.label;
-          if (a.href) btn.onclick = () => { window.location.href = a.href; };
+          if (a.href) btn.onclick = () => { window.open(a.href, '_blank', 'noopener'); };
           else if (a.autonomous && a.issue) {
             btn.onclick = async () => {
               btn.disabled = true;
