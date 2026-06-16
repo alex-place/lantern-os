@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "work": "⚙️ Trabajo",
+    "trade": "📈 Trading",
+    "create": "✏️ Crear",
+    "settings": "Configuración"
+  },
+  "hero": {
+    "title": "Lantern OS",
+    "tagline": "Un sistema de razonamiento persistente y local-first. Privado, rápido y completamente tuyo.",
+    "subtext": "Convergence Core v1 · Ejecución Local · Sin Cuenta Requerida"
+  },
+  "section": {
+    "experiences": "Tres Experiencias Principales",
+    "settings": "Configuración & Preferencias"
+  },
+  "card": {
+    "work": {
+      "label": "Trabajo",
+      "title": "Dream Chat",
+      "description": "Chatea con una IA que recuerda tu diario y te ayuda a razonar tus ideas.",
+      "cta": "Abrir Trabajo",
+      "ariaLabel": "Dream Chat — Chatea con una IA que recuerda tu diario"
+    },
+    "trade": {
+      "label": "Trading",
+      "title": "Lantern Trader",
+      "description": "Centro de trading para mercados de predicción, análisis bursátil y noticias de mercado en vivo.",
+      "cta": "Abrir Trading",
+      "ariaLabel": "Lantern Trader — Centro de trading para mercados de predicción"
+    },
+    "create": {
+      "label": "Crear",
+      "title": "Creator Dashboard",
+      "description": "Sube y organiza tu trabajo creativo, almacenado localmente e indexado.",
+      "cta": "Abrir Crear",
+      "ariaLabel": "Creator Dashboard — Sube y organiza tu trabajo creativo"
+    }
+  },
+  "settings": {
+    "apiKeys": {
+      "icon": "🔑",
+      "title": "Claves API",
+      "description": "Configura proveedores de IA (Claude, OpenAI, Gemini) para respuestas en streaming. Opcionales — funciona sin conexión sin claves.",
+      "cta": "Configurar Claves",
+      "title_attr": "Configurar claves API para proveedores de IA"
+    },
+    "localData": {
+      "icon": "💾",
+      "title": "Datos Locales",
+      "description": "Todos los datos almacenados localmente en tu dispositivo. Sin sincronización en la nube, sin cuenta requerida. Exporta en cualquier momento.",
+      "cta": "Exportar Datos",
+      "title_attr": "Exportar y descargar tus datos"
+    },
+    "systemStatus": {
+      "icon": "⚡",
+      "title": "Estado del Sistema",
+      "description": "Monitorea el estado del kernel, consultas de memoria, registros de convergencia y estado de verificación en tiempo real.",
+      "cta": "Ver Estado",
+      "title_attr": "Ver información de salud y estado del sistema"
+    }
+  },
+  "status": {
+    "online": "Servidor en línea",
+    "offline": "Servidor sin conexión",
+    "unreachable": "Servidor inaccesible",
+    "connecting": "Conectando…",
+    "statusIndicator": "Indicador de estado del servidor",
+    "connectionStatus": "Estado de conexión del servidor",
+    "github": "GitHub"
+  },
+  "a11y": {
+    "skipContent": "Saltar al contenido principal",
+    "themeToggle": "Cambiar modo claro / oscuro",
+    "openInNewWindow": "(se abre en una nueva ventana)"
+  }
+}

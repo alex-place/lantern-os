@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "work": "⚙️ 仕事",
+    "trade": "📈 トレーディング",
+    "create": "✏️ 作成",
+    "settings": "設定"
+  },
+  "hero": {
+    "title": "Lantern OS",
+    "tagline": "プライベートで高速な、ローカルファーストな推論システム。完全にあなたのもの。",
+    "subtext": "Convergence Core v1 · ローカル実行 · アカウント不要"
+  },
+  "section": {
+    "experiences": "3つのコア体験",
+    "settings": "設定とカスタマイズ"
+  },
+  "card": {
+    "work": {
+      "label": "仕事",
+      "title": "Dream Chat",
+      "description": "あなたのジャーナルを記憶し、アイデアを整理するのを支援するAIとチャット。",
+      "cta": "仕事を開く",
+      "ariaLabel": "Dream Chat — あなたのジャーナルを記憶するAI"
+    },
+    "trade": {
+      "label": "トレーディング",
+      "title": "Lantern Trader",
+      "description": "予測市場、株式分析、ライブ市場ニュースのためのトレーディングハブ。",
+      "cta": "トレーディングを開く",
+      "ariaLabel": "Lantern Trader — 予測市場トレーディングハブ"
+    },
+    "create": {
+      "label": "作成",
+      "title": "Creator Dashboard",
+      "description": "クリエイティブワークをアップロードして整理。ローカル保存でインデックス化。",
+      "cta": "作成を開く",
+      "ariaLabel": "Creator Dashboard — クリエイティブワークをアップロード"
+    }
+  },
+  "settings": {
+    "apiKeys": {
+      "icon": "🔑",
+      "title": "APIキー",
+      "description": "AIプロバイダー（Claude、OpenAI、Gemini）を設定してストリーミング応答を有効化。すべてオプション—キーなしでオフライン動作。",
+      "cta": "キーを設定",
+      "title_attr": "AIプロバイダーのAPIキーを設定"
+    },
+    "localData": {
+      "icon": "💾",
+      "title": "ローカルデータ",
+      "description": "すべてのデータはデバイスに局所保存。クラウド同期なし、アカウント不要。いつでもエクスポート可能。",
+      "cta": "データをエクスポート",
+      "title_attr": "データをエクスポートしてダウンロード"
+    },
+    "systemStatus": {
+      "icon": "⚡",
+      "title": "システムステータス",
+      "description": "カーネル準備状況、メモリクエリ、収束レコード、検証ステータスをリアルタイム監視。",
+      "cta": "ステータスを表示",
+      "title_attr": "システムの状態と健康情報を表示"
+    }
+  },
+  "status": {
+    "online": "サーバーオンライン",
+    "offline": "サーバーオフライン",
+    "unreachable": "サーバーに接続できません",
+    "connecting": "接続中…",
+    "statusIndicator": "サーバーステータス",
+    "connectionStatus": "サーバー接続状態",
+    "github": "GitHub"
+  },
+  "a11y": {
+    "skipContent": "メインコンテンツへスキップ",
+    "themeToggle": "ライト/ダークモードを切り替え",
+    "openInNewWindow": "（新しいウィンドウで開く）"
+  }
+}

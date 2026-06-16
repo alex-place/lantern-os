@@ -1,0 +1,278 @@
+<svg viewBox="-8 -8 216 216" width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+<title>Sigma-0 Convergence Mandala</title>
+<desc>Three concentric twelve-pointed webbed star-rings counter-rotating (outer clockwise, middle counter-clockwise, inner clockwise), each carrying smaller convergent stars, around a luminous Sigma-0 nucleus.</desc>
+<defs>
+<linearGradient id="spectra" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+<stop offset="0%" stop-color="#ff2d55"/><stop offset="14%" stop-color="#ff9500"/>
+<stop offset="28%" stop-color="#ffd60a"/><stop offset="42%" stop-color="#34c759"/>
+<stop offset="56%" stop-color="#00e5d0"/><stop offset="70%" stop-color="#0a84ff"/>
+<stop offset="84%" stop-color="#7d5fff"/><stop offset="100%" stop-color="#ff2d55"/>
+<animateTransform attributeName="gradientTransform" type="rotate" from="0 100 100" to="360 100 100" dur="6s" repeatCount="indefinite"/>
+</linearGradient>
+<radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
+<stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+<stop offset="35%" stop-color="#bff7ff" stop-opacity="0.45"/>
+<stop offset="100%" stop-color="#7d5fff" stop-opacity="0"/>
+</radialGradient>
+<style>
+.m{stroke:url(#spectra);fill:none;stroke-width:1.25;stroke-linecap:round;stroke-linejoin:round}
+.dot{fill:url(#spectra);stroke:none}
+.glow{fill:url(#core-glow);stroke:none}
+.nucleus{fill:#ffffff;stroke:url(#spectra);stroke-width:1}
+.ring1{transform-origin:100px 100px;animation:fwd 34s linear infinite}
+.ring2{transform-origin:100px 100px;animation:rev 24s linear infinite}
+.ring3{transform-origin:100px 100px;animation:fwd 16s linear infinite}
+.core{transform-origin:100px 100px;animation:pulse 4s ease-in-out infinite}
+@keyframes fwd{to{transform:rotate(360deg)}}
+@keyframes rev{to{transform:rotate(-360deg)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.82;transform:scale(1.06)}}
+@media (prefers-reduced-motion: reduce){.ring1,.ring2,.ring3,.core{animation:none}}
+</style>
+</defs>
+<g class="ring1">
+<polygon class="m" points="100.0,22.0 139.0,32.5 167.5,61.0 178.0,100.0 167.5,139.0 139.0,167.5 100.0,178.0 61.0,167.5 32.5,139.0 22.0,100.0 32.5,61.0 61.0,32.5"/>
+<polygon class="m" points="100.0,22.0 139.0,167.5 32.5,61.0 178.0,100.0 32.5,139.0 139.0,32.5 100.0,178.0 61.0,32.5 167.5,139.0 22.0,100.0 167.5,61.0 61.0,167.5"/>
+<line class="m" x1="100.0" y1="22.0" x2="100.0" y2="6.0"/>
+<line class="m" x1="100.0" y1="6.0" x2="139.0" y2="32.5"/>
+<line class="m" x1="100.0" y1="6.0" x2="61.0" y2="32.5"/>
+<line class="m" x1="139.0" y1="32.5" x2="147.0" y2="18.6"/>
+<line class="m" x1="147.0" y1="18.6" x2="167.5" y2="61.0"/>
+<line class="m" x1="147.0" y1="18.6" x2="100.0" y2="22.0"/>
+<line class="m" x1="167.5" y1="61.0" x2="181.4" y2="53.0"/>
+<line class="m" x1="181.4" y1="53.0" x2="178.0" y2="100.0"/>
+<line class="m" x1="181.4" y1="53.0" x2="139.0" y2="32.5"/>
+<line class="m" x1="178.0" y1="100.0" x2="194.0" y2="100.0"/>
+<line class="m" x1="194.0" y1="100.0" x2="167.5" y2="139.0"/>
+<line class="m" x1="194.0" y1="100.0" x2="167.5" y2="61.0"/>
+<line class="m" x1="167.5" y1="139.0" x2="181.4" y2="147.0"/>
+<line class="m" x1="181.4" y1="147.0" x2="139.0" y2="167.5"/>
+<line class="m" x1="181.4" y1="147.0" x2="178.0" y2="100.0"/>
+<line class="m" x1="139.0" y1="167.5" x2="147.0" y2="181.4"/>
+<line class="m" x1="147.0" y1="181.4" x2="100.0" y2="178.0"/>
+<line class="m" x1="147.0" y1="181.4" x2="167.5" y2="139.0"/>
+<line class="m" x1="100.0" y1="178.0" x2="100.0" y2="194.0"/>
+<line class="m" x1="100.0" y1="194.0" x2="61.0" y2="167.5"/>
+<line class="m" x1="100.0" y1="194.0" x2="139.0" y2="167.5"/>
+<line class="m" x1="61.0" y1="167.5" x2="53.0" y2="181.4"/>
+<line class="m" x1="53.0" y1="181.4" x2="32.5" y2="139.0"/>
+<line class="m" x1="53.0" y1="181.4" x2="100.0" y2="178.0"/>
+<line class="m" x1="32.5" y1="139.0" x2="18.6" y2="147.0"/>
+<line class="m" x1="18.6" y1="147.0" x2="22.0" y2="100.0"/>
+<line class="m" x1="18.6" y1="147.0" x2="61.0" y2="167.5"/>
+<line class="m" x1="22.0" y1="100.0" x2="6.0" y2="100.0"/>
+<line class="m" x1="6.0" y1="100.0" x2="32.5" y2="61.0"/>
+<line class="m" x1="6.0" y1="100.0" x2="32.5" y2="139.0"/>
+<line class="m" x1="32.5" y1="61.0" x2="18.6" y2="53.0"/>
+<line class="m" x1="18.6" y1="53.0" x2="61.0" y2="32.5"/>
+<line class="m" x1="18.6" y1="53.0" x2="22.0" y2="100.0"/>
+<line class="m" x1="61.0" y1="32.5" x2="53.0" y2="18.6"/>
+<line class="m" x1="53.0" y1="18.6" x2="100.0" y2="22.0"/>
+<line class="m" x1="53.0" y1="18.6" x2="32.5" y2="61.0"/>
+<polygon class="m" points="100.0,25.0 99.2,22.8 97.0,22.0 99.2,21.2 100.0,19.0 100.8,21.2 103.0,22.0 100.8,22.8"/>
+<circle class="dot" cx="100.0" cy="6.0" r="1.7"/>
+<circle class="dot" cx="100.0" cy="22.0" r="1.0"/>
+<polygon class="m" points="137.5,35.0 138.0,32.7 136.4,31.0 138.7,31.4 140.5,29.9 140.0,32.2 141.6,34.0 139.3,33.5"/>
+<circle class="dot" cx="147.0" cy="18.6" r="1.7"/>
+<circle class="dot" cx="139.0" cy="32.5" r="1.0"/>
+<polygon class="m" points="165.0,62.5 166.5,60.7 166.0,58.4 167.8,60.0 170.1,59.5 168.6,61.3 169.0,63.6 167.3,62.0"/>
+<circle class="dot" cx="181.4" cy="53.0" r="1.7"/>
+<circle class="dot" cx="167.5" cy="61.0" r="1.0"/>
+<polygon class="m" points="175.0,100.0 177.2,99.2 178.0,97.0 178.8,99.2 181.0,100.0 178.8,100.8 178.0,103.0 177.2,100.8"/>
+<circle class="dot" cx="194.0" cy="100.0" r="1.7"/>
+<circle class="dot" cx="178.0" cy="100.0" r="1.0"/>
+<polygon class="m" points="165.0,137.5 167.3,138.0 169.0,136.4 168.6,138.7 170.1,140.5 167.8,140.0 166.0,141.6 166.5,139.3"/>
+<circle class="dot" cx="181.4" cy="147.0" r="1.7"/>
+<circle class="dot" cx="167.5" cy="139.0" r="1.0"/>
+<polygon class="m" points="137.5,165.0 139.3,166.5 141.6,166.0 140.0,167.8 140.5,170.1 138.7,168.6 136.4,169.0 138.0,167.3"/>
+<circle class="dot" cx="147.0" cy="181.4" r="1.7"/>
+<circle class="dot" cx="139.0" cy="167.5" r="1.0"/>
+<polygon class="m" points="100.0,175.0 100.8,177.2 103.0,178.0 100.8,178.8 100.0,181.0 99.2,178.8 97.0,178.0 99.2,177.2"/>
+<circle class="dot" cx="100.0" cy="194.0" r="1.7"/>
+<circle class="dot" cx="100.0" cy="178.0" r="1.0"/>
+<polygon class="m" points="62.5,165.0 62.0,167.3 63.6,169.0 61.3,168.6 59.5,170.1 60.0,167.8 58.4,166.0 60.7,166.5"/>
+<circle class="dot" cx="53.0" cy="181.4" r="1.7"/>
+<circle class="dot" cx="61.0" cy="167.5" r="1.0"/>
+<polygon class="m" points="35.0,137.5 33.5,139.3 34.0,141.6 32.2,140.0 29.9,140.5 31.4,138.7 31.0,136.4 32.7,138.0"/>
+<circle class="dot" cx="18.6" cy="147.0" r="1.7"/>
+<circle class="dot" cx="32.5" cy="139.0" r="1.0"/>
+<polygon class="m" points="25.0,100.0 22.8,100.8 22.0,103.0 21.2,100.8 19.0,100.0 21.2,99.2 22.0,97.0 22.8,99.2"/>
+<circle class="dot" cx="6.0" cy="100.0" r="1.7"/>
+<circle class="dot" cx="22.0" cy="100.0" r="1.0"/>
+<polygon class="m" points="35.0,62.5 32.7,62.0 31.0,63.6 31.4,61.3 29.9,59.5 32.2,60.0 34.0,58.4 33.5,60.7"/>
+<circle class="dot" cx="18.6" cy="53.0" r="1.7"/>
+<circle class="dot" cx="32.5" cy="61.0" r="1.0"/>
+<polygon class="m" points="62.5,35.0 60.7,33.5 58.4,34.0 60.0,32.2 59.5,29.9 61.3,31.4 63.6,31.0 62.0,32.7"/>
+<circle class="dot" cx="53.0" cy="18.6" r="1.7"/>
+<circle class="dot" cx="61.0" cy="32.5" r="1.0"/>
+</g>
+<g class="ring2">
+<polygon class="m" points="100.0,45.0 127.5,52.4 147.6,72.5 155.0,100.0 147.6,127.5 127.5,147.6 100.0,155.0 72.5,147.6 52.4,127.5 45.0,100.0 52.4,72.5 72.5,52.4"/>
+<polygon class="m" points="100.0,45.0 127.5,147.6 52.4,72.5 155.0,100.0 52.4,127.5 127.5,52.4 100.0,155.0 72.5,52.4 147.6,127.5 45.0,100.0 147.6,72.5 72.5,147.6"/>
+<line class="m" x1="100.0" y1="45.0" x2="100.0" y2="33.0"/>
+<line class="m" x1="100.0" y1="33.0" x2="127.5" y2="52.4"/>
+<line class="m" x1="100.0" y1="33.0" x2="72.5" y2="52.4"/>
+<line class="m" x1="127.5" y1="52.4" x2="133.5" y2="42.0"/>
+<line class="m" x1="133.5" y1="42.0" x2="147.6" y2="72.5"/>
+<line class="m" x1="133.5" y1="42.0" x2="100.0" y2="45.0"/>
+<line class="m" x1="147.6" y1="72.5" x2="158.0" y2="66.5"/>
+<line class="m" x1="158.0" y1="66.5" x2="155.0" y2="100.0"/>
+<line class="m" x1="158.0" y1="66.5" x2="127.5" y2="52.4"/>
+<line class="m" x1="155.0" y1="100.0" x2="167.0" y2="100.0"/>
+<line class="m" x1="167.0" y1="100.0" x2="147.6" y2="127.5"/>
+<line class="m" x1="167.0" y1="100.0" x2="147.6" y2="72.5"/>
+<line class="m" x1="147.6" y1="127.5" x2="158.0" y2="133.5"/>
+<line class="m" x1="158.0" y1="133.5" x2="127.5" y2="147.6"/>
+<line class="m" x1="158.0" y1="133.5" x2="155.0" y2="100.0"/>
+<line class="m" x1="127.5" y1="147.6" x2="133.5" y2="158.0"/>
+<line class="m" x1="133.5" y1="158.0" x2="100.0" y2="155.0"/>
+<line class="m" x1="133.5" y1="158.0" x2="147.6" y2="127.5"/>
+<line class="m" x1="100.0" y1="155.0" x2="100.0" y2="167.0"/>
+<line class="m" x1="100.0" y1="167.0" x2="72.5" y2="147.6"/>
+<line class="m" x1="100.0" y1="167.0" x2="127.5" y2="147.6"/>
+<line class="m" x1="72.5" y1="147.6" x2="66.5" y2="158.0"/>
+<line class="m" x1="66.5" y1="158.0" x2="52.4" y2="127.5"/>
+<line class="m" x1="66.5" y1="158.0" x2="100.0" y2="155.0"/>
+<line class="m" x1="52.4" y1="127.5" x2="42.0" y2="133.5"/>
+<line class="m" x1="42.0" y1="133.5" x2="45.0" y2="100.0"/>
+<line class="m" x1="42.0" y1="133.5" x2="72.5" y2="147.6"/>
+<line class="m" x1="45.0" y1="100.0" x2="33.0" y2="100.0"/>
+<line class="m" x1="33.0" y1="100.0" x2="52.4" y2="72.5"/>
+<line class="m" x1="33.0" y1="100.0" x2="52.4" y2="127.5"/>
+<line class="m" x1="52.4" y1="72.5" x2="42.0" y2="66.5"/>
+<line class="m" x1="42.0" y1="66.5" x2="72.5" y2="52.4"/>
+<line class="m" x1="42.0" y1="66.5" x2="45.0" y2="100.0"/>
+<line class="m" x1="72.5" y1="52.4" x2="66.5" y2="42.0"/>
+<line class="m" x1="66.5" y1="42.0" x2="100.0" y2="45.0"/>
+<line class="m" x1="66.5" y1="42.0" x2="52.4" y2="72.5"/>
+<polygon class="m" points="100.0,47.4 99.4,45.6 97.6,45.0 99.4,44.4 100.0,42.6 100.6,44.4 102.4,45.0 100.6,45.6"/>
+<circle class="dot" cx="100.0" cy="33.0" r="1.3"/>
+<circle class="dot" cx="100.0" cy="45.0" r="0.8"/>
+<polygon class="m" points="126.3,54.4 126.7,52.6 125.4,51.2 127.3,51.5 128.7,50.3 128.3,52.1 129.6,53.6 127.7,53.2"/>
+<circle class="dot" cx="133.5" cy="42.0" r="1.3"/>
+<circle class="dot" cx="127.5" cy="52.4" r="0.8"/>
+<polygon class="m" points="145.6,73.7 146.8,72.3 146.4,70.4 147.9,71.7 149.7,71.3 148.5,72.7 148.8,74.6 147.4,73.3"/>
+<circle class="dot" cx="158.0" cy="66.5" r="1.3"/>
+<circle class="dot" cx="147.6" cy="72.5" r="0.8"/>
+<polygon class="m" points="152.6,100.0 154.4,99.4 155.0,97.6 155.6,99.4 157.4,100.0 155.6,100.6 155.0,102.4 154.4,100.6"/>
+<circle class="dot" cx="167.0" cy="100.0" r="1.3"/>
+<circle class="dot" cx="155.0" cy="100.0" r="0.8"/>
+<polygon class="m" points="145.6,126.3 147.4,126.7 148.8,125.4 148.5,127.3 149.7,128.7 147.9,128.3 146.4,129.6 146.8,127.7"/>
+<circle class="dot" cx="158.0" cy="133.5" r="1.3"/>
+<circle class="dot" cx="147.6" cy="127.5" r="0.8"/>
+<polygon class="m" points="126.3,145.6 127.7,146.8 129.6,146.4 128.3,147.9 128.7,149.7 127.3,148.5 125.4,148.8 126.7,147.4"/>
+<circle class="dot" cx="133.5" cy="158.0" r="1.3"/>
+<circle class="dot" cx="127.5" cy="147.6" r="0.8"/>
+<polygon class="m" points="100.0,152.6 100.6,154.4 102.4,155.0 100.6,155.6 100.0,157.4 99.4,155.6 97.6,155.0 99.4,154.4"/>
+<circle class="dot" cx="100.0" cy="167.0" r="1.3"/>
+<circle class="dot" cx="100.0" cy="155.0" r="0.8"/>
+<polygon class="m" points="73.7,145.6 73.3,147.4 74.6,148.8 72.7,148.5 71.3,149.7 71.7,147.9 70.4,146.4 72.3,146.8"/>
+<circle class="dot" cx="66.5" cy="158.0" r="1.3"/>
+<circle class="dot" cx="72.5" cy="147.6" r="0.8"/>
+<polygon class="m" points="54.4,126.3 53.2,127.7 53.6,129.6 52.1,128.3 50.3,128.7 51.5,127.3 51.2,125.4 52.6,126.7"/>
+<circle class="dot" cx="42.0" cy="133.5" r="1.3"/>
+<circle class="dot" cx="52.4" cy="127.5" r="0.8"/>
+<polygon class="m" points="47.4,100.0 45.6,100.6 45.0,102.4 44.4,100.6 42.6,100.0 44.4,99.4 45.0,97.6 45.6,99.4"/>
+<circle class="dot" cx="33.0" cy="100.0" r="1.3"/>
+<circle class="dot" cx="45.0" cy="100.0" r="0.8"/>
+<polygon class="m" points="54.4,73.7 52.6,73.3 51.2,74.6 51.5,72.7 50.3,71.3 52.1,71.7 53.6,70.4 53.2,72.3"/>
+<circle class="dot" cx="42.0" cy="66.5" r="1.3"/>
+<circle class="dot" cx="52.4" cy="72.5" r="0.8"/>
+<polygon class="m" points="73.7,54.4 72.3,53.2 70.4,53.6 71.7,52.1 71.3,50.3 72.7,51.5 74.6,51.2 73.3,52.6"/>
+<circle class="dot" cx="66.5" cy="42.0" r="1.3"/>
+<circle class="dot" cx="72.5" cy="52.4" r="0.8"/>
+</g>
+<g class="ring3">
+<polygon class="m" points="100.0,68.0 116.0,72.3 127.7,84.0 132.0,100.0 127.7,116.0 116.0,127.7 100.0,132.0 84.0,127.7 72.3,116.0 68.0,100.0 72.3,84.0 84.0,72.3"/>
+<polygon class="m" points="100.0,68.0 116.0,127.7 72.3,84.0 132.0,100.0 72.3,116.0 116.0,72.3 100.0,132.0 84.0,72.3 127.7,116.0 68.0,100.0 127.7,84.0 84.0,127.7"/>
+<line class="m" x1="100.0" y1="68.0" x2="100.0" y2="58.0"/>
+<line class="m" x1="100.0" y1="58.0" x2="116.0" y2="72.3"/>
+<line class="m" x1="100.0" y1="58.0" x2="84.0" y2="72.3"/>
+<line class="m" x1="116.0" y1="72.3" x2="121.0" y2="63.6"/>
+<line class="m" x1="121.0" y1="63.6" x2="127.7" y2="84.0"/>
+<line class="m" x1="121.0" y1="63.6" x2="100.0" y2="68.0"/>
+<line class="m" x1="127.7" y1="84.0" x2="136.4" y2="79.0"/>
+<line class="m" x1="136.4" y1="79.0" x2="132.0" y2="100.0"/>
+<line class="m" x1="136.4" y1="79.0" x2="116.0" y2="72.3"/>
+<line class="m" x1="132.0" y1="100.0" x2="142.0" y2="100.0"/>
+<line class="m" x1="142.0" y1="100.0" x2="127.7" y2="116.0"/>
+<line class="m" x1="142.0" y1="100.0" x2="127.7" y2="84.0"/>
+<line class="m" x1="127.7" y1="116.0" x2="136.4" y2="121.0"/>
+<line class="m" x1="136.4" y1="121.0" x2="116.0" y2="127.7"/>
+<line class="m" x1="136.4" y1="121.0" x2="132.0" y2="100.0"/>
+<line class="m" x1="116.0" y1="127.7" x2="121.0" y2="136.4"/>
+<line class="m" x1="121.0" y1="136.4" x2="100.0" y2="132.0"/>
+<line class="m" x1="121.0" y1="136.4" x2="127.7" y2="116.0"/>
+<line class="m" x1="100.0" y1="132.0" x2="100.0" y2="142.0"/>
+<line class="m" x1="100.0" y1="142.0" x2="84.0" y2="127.7"/>
+<line class="m" x1="100.0" y1="142.0" x2="116.0" y2="127.7"/>
+<line class="m" x1="84.0" y1="127.7" x2="79.0" y2="136.4"/>
+<line class="m" x1="79.0" y1="136.4" x2="72.3" y2="116.0"/>
+<line class="m" x1="79.0" y1="136.4" x2="100.0" y2="132.0"/>
+<line class="m" x1="72.3" y1="116.0" x2="63.6" y2="121.0"/>
+<line class="m" x1="63.6" y1="121.0" x2="68.0" y2="100.0"/>
+<line class="m" x1="63.6" y1="121.0" x2="84.0" y2="127.7"/>
+<line class="m" x1="68.0" y1="100.0" x2="58.0" y2="100.0"/>
+<line class="m" x1="58.0" y1="100.0" x2="72.3" y2="84.0"/>
+<line class="m" x1="58.0" y1="100.0" x2="72.3" y2="116.0"/>
+<line class="m" x1="72.3" y1="84.0" x2="63.6" y2="79.0"/>
+<line class="m" x1="63.6" y1="79.0" x2="84.0" y2="72.3"/>
+<line class="m" x1="63.6" y1="79.0" x2="68.0" y2="100.0"/>
+<line class="m" x1="84.0" y1="72.3" x2="79.0" y2="63.6"/>
+<line class="m" x1="79.0" y1="63.6" x2="100.0" y2="68.0"/>
+<line class="m" x1="79.0" y1="63.6" x2="72.3" y2="84.0"/>
+<polygon class="m" points="100.0,69.8 99.5,68.5 98.2,68.0 99.5,67.5 100.0,66.2 100.5,67.5 101.8,68.0 100.5,68.5"/>
+<circle class="dot" cx="100.0" cy="58.0" r="1.0"/>
+<circle class="dot" cx="100.0" cy="68.0" r="0.6"/>
+<polygon class="m" points="115.1,73.8 115.4,72.5 114.4,71.4 115.8,71.7 116.9,70.7 116.6,72.1 117.6,73.2 116.2,72.9"/>
+<circle class="dot" cx="121.0" cy="63.6" r="1.0"/>
+<circle class="dot" cx="116.0" cy="72.3" r="0.6"/>
+<polygon class="m" points="126.2,84.9 127.1,83.8 126.8,82.4 127.9,83.4 129.3,83.1 128.3,84.2 128.6,85.6 127.5,84.6"/>
+<circle class="dot" cx="136.4" cy="79.0" r="1.0"/>
+<circle class="dot" cx="127.7" cy="84.0" r="0.6"/>
+<polygon class="m" points="130.2,100.0 131.5,99.5 132.0,98.2 132.5,99.5 133.8,100.0 132.5,100.5 132.0,101.8 131.5,100.5"/>
+<circle class="dot" cx="142.0" cy="100.0" r="1.0"/>
+<circle class="dot" cx="132.0" cy="100.0" r="0.6"/>
+<polygon class="m" points="126.2,115.1 127.5,115.4 128.6,114.4 128.3,115.8 129.3,116.9 127.9,116.6 126.8,117.6 127.1,116.2"/>
+<circle class="dot" cx="136.4" cy="121.0" r="1.0"/>
+<circle class="dot" cx="127.7" cy="116.0" r="0.6"/>
+<polygon class="m" points="115.1,126.2 116.2,127.1 117.6,126.8 116.6,127.9 116.9,129.3 115.8,128.3 114.4,128.6 115.4,127.5"/>
+<circle class="dot" cx="121.0" cy="136.4" r="1.0"/>
+<circle class="dot" cx="116.0" cy="127.7" r="0.6"/>
+<polygon class="m" points="100.0,130.2 100.5,131.5 101.8,132.0 100.5,132.5 100.0,133.8 99.5,132.5 98.2,132.0 99.5,131.5"/>
+<circle class="dot" cx="100.0" cy="142.0" r="1.0"/>
+<circle class="dot" cx="100.0" cy="132.0" r="0.6"/>
+<polygon class="m" points="84.9,126.2 84.6,127.5 85.6,128.6 84.2,128.3 83.1,129.3 83.4,127.9 82.4,126.8 83.8,127.1"/>
+<circle class="dot" cx="79.0" cy="136.4" r="1.0"/>
+<circle class="dot" cx="84.0" cy="127.7" r="0.6"/>
+<polygon class="m" points="73.8,115.1 72.9,116.2 73.2,117.6 72.1,116.6 70.7,116.9 71.7,115.8 71.4,114.4 72.5,115.4"/>
+<circle class="dot" cx="63.6" cy="121.0" r="1.0"/>
+<circle class="dot" cx="72.3" cy="116.0" r="0.6"/>
+<polygon class="m" points="69.8,100.0 68.5,100.5 68.0,101.8 67.5,100.5 66.2,100.0 67.5,99.5 68.0,98.2 68.5,99.5"/>
+<circle class="dot" cx="58.0" cy="100.0" r="1.0"/>
+<circle class="dot" cx="68.0" cy="100.0" r="0.6"/>
+<polygon class="m" points="73.8,84.9 72.5,84.6 71.4,85.6 71.7,84.2 70.7,83.1 72.1,83.4 73.2,82.4 72.9,83.8"/>
+<circle class="dot" cx="63.6" cy="79.0" r="1.0"/>
+<circle class="dot" cx="72.3" cy="84.0" r="0.6"/>
+<polygon class="m" points="84.9,73.8 83.8,72.9 82.4,73.2 83.4,72.1 83.1,70.7 84.2,71.7 85.6,71.4 84.6,72.5"/>
+<circle class="dot" cx="79.0" cy="63.6" r="1.0"/>
+<circle class="dot" cx="84.0" cy="72.3" r="0.6"/>
+</g>
+<g class="core">
+<circle class="glow" cx="100" cy="100" r="22"/>
+<line class="m" x1="100" y1="100" x2="100.0" y2="90.0"/>
+<line class="m" x1="100" y1="100" x2="105.0" y2="91.3"/>
+<line class="m" x1="100" y1="100" x2="108.7" y2="95.0"/>
+<line class="m" x1="100" y1="100" x2="110.0" y2="100.0"/>
+<line class="m" x1="100" y1="100" x2="108.7" y2="105.0"/>
+<line class="m" x1="100" y1="100" x2="105.0" y2="108.7"/>
+<line class="m" x1="100" y1="100" x2="100.0" y2="110.0"/>
+<line class="m" x1="100" y1="100" x2="95.0" y2="108.7"/>
+<line class="m" x1="100" y1="100" x2="91.3" y2="105.0"/>
+<line class="m" x1="100" y1="100" x2="90.0" y2="100.0"/>
+<line class="m" x1="100" y1="100" x2="91.3" y2="95.0"/>
+<line class="m" x1="100" y1="100" x2="95.0" y2="91.3"/>
+<polygon class="m" points="100.0,92.0 106.9,104.0 93.1,104.0"/>
+<polygon class="m" points="100.0,108.0 93.1,96.0 106.9,96.0"/>
+<circle class="nucleus" cx="100" cy="100" r="3.4"/>
+</g>
+</svg>

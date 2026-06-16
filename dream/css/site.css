@@ -4,6 +4,22 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Skip to content link (accessibility) ── */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--accent);
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  z-index: 100;
+  border-radius: 0 0 6px 0;
+}
+.skip-link:focus {
+  top: 0;
+}
+
 :root {
   --bg: #ffffff;
   --surface: #f8f9fa;
@@ -93,7 +109,19 @@ html, body {
 }
 .nav-links a:hover { color: var(--text); background: var(--surface2); }
 .nav-links a.active { color: var(--accent); font-weight: 600; }
-@media (max-width: 580px) { .nav-links { display: none; } }
+/* On narrow screens, keep the nav reachable: compact, horizontally scrollable
+   row instead of hiding it entirely (there is no hamburger menu). */
+@media (max-width: 580px) {
+  .nav-links {
+    gap: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-links a { padding: 6px 8px; font-size: 12.5px; }
+}
 .nav-actions {
   margin-left: auto;
   display: flex;
@@ -141,10 +169,22 @@ html, body {
 .footer-inner a:hover { color: var(--text); text-decoration: underline; }
 .footer-inner .sep { color: var(--border); }
 .footer-inner .ml { margin-left: auto; }
+.footer-meta { color: var(--muted); opacity: 0.75; }
 .footer-brand {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+/* Screen-reader-only text */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 @media (max-width: 640px) { .footer-inner .ml { margin-left: 0; width: 100%; } }
 
@@ -608,4 +648,13 @@ html, body {
   font-size: 0.65rem;
   padding: 1px 7px;
   margin-right: 4px;
+}
+
+/* ── Accessibility: respect reduced motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -427,6 +427,15 @@ async function sendMessage() {
     return;
   }
 
+  // !work / !edit — observable autonomous workspace (Sigma-0, issue #527)
+  const workMatch = text.match(/^!(?:work|edit)\s+([\s\S]+)/i);
+  if (workMatch) {
+    input.value = '';
+    addUserBubble(text);
+    runWorkspace(workMatch[1].trim()).catch(err => console.error('[workspace]', err));
+    return;
+  }
+
   isSending = true;
   document.getElementById('send-btn').disabled = true;
 
@@ -639,3 +648,210 @@ window.fetch = async function(...args) {
   }
   return response;
 };
+
+// ── Workspace — Sigma-0 observable autonomous coding (issue #527) ─────────────
+// Pillar 1 (A2): live step log + diff viewer
+// Pillar 2 (B1/B2/B3): approval gates before apply, commit, PR
+// Pillar 3 (C1/C2): receipt derived from what actually happened
+
+async function runWorkspace(request) {
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const uid = 'wks-' + Date.now();
+
+  if (!document.getElementById('wks-style')) {
+    const st = document.createElement('style');
+    st.id = 'wks-style';
+    st.textContent = `
+.wks{background:#12121e;border:1px solid rgba(124,58,237,.35);border-radius:10px;overflow:hidden;font-size:12px;margin-top:4px}
+.wks-hd{background:rgba(124,58,237,.12);padding:10px 14px;font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(124,58,237,.2)}
+.wks-step{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
+.wks-step-icon{font-size:14px;margin-top:1px;min-width:18px}
+.wks-step-info{flex:1;min-width:0}
+.wks-step-label{font-weight:500;display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.wks-step-body{color:rgba(205,214,244,.55);line-height:1.55;margin-top:3px}
+.wks-badge{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;letter-spacing:.04em}
+.wks-badge.run{background:rgba(245,166,35,.2);color:#f5a623}
+.wks-badge.ok{background:rgba(63,185,80,.2);color:#3fb950}
+.wks-badge.err{background:rgba(248,81,73,.2);color:#f85149}
+.wks-badge.wait{background:rgba(255,255,255,.06);color:rgba(205,214,244,.35)}
+.wks-badge.skip{background:rgba(255,255,255,.06);color:rgba(205,214,244,.35)}
+.wks-diff{background:#0d1117;padding:10px;border-radius:4px;font-family:monospace;font-size:10.5px;overflow:auto;max-height:240px;white-space:pre;margin:6px 0;line-height:1.4}
+.wks-diff .a{color:#3fb950}.wks-diff .d{color:#f85149}.wks-diff .h{color:#58a6ff}.wks-diff .m{color:#6e7681}
+.wks-actions{padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06)}
+.wks-btn{border:none;border-radius:5px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;transition:opacity .15s}
+.wks-btn:disabled{opacity:.35;cursor:default}
+.wks-btn.g{background:rgba(63,185,80,.75);color:#fff}.wks-btn.g:hover:not(:disabled){background:#3fb950}
+.wks-btn.x{background:rgba(248,81,73,.1);color:#f85149;border:1px solid rgba(248,81,73,.3)}.wks-btn.x:hover:not(:disabled){background:rgba(248,81,73,.2)}
+.wks-btn.s{background:rgba(255,255,255,.07);color:rgba(205,214,244,.8);border:1px solid rgba(255,255,255,.1)}.wks-btn.s:hover:not(:disabled){background:rgba(255,255,255,.12)}
+.wks-tag{background:rgba(124,58,237,.18);border-radius:3px;padding:1px 6px;font-size:10px;color:rgba(205,214,244,.7);display:inline-block;margin:1px 2px}
+.wks-tag.risk-high{background:rgba(248,81,73,.18);color:#f85149}
+.wks-tag.risk-low{background:rgba(63,185,80,.18);color:#3fb950}
+.wks-tag.risk-medium{background:rgba(245,166,35,.18);color:#f5a623}
+.wks-receipt{padding:10px 14px;font-size:11px;border-top:1px solid rgba(63,185,80,.2);background:rgba(63,185,80,.04);color:rgba(205,214,244,.65);line-height:1.7}
+.wks-test{background:#0d1117;border-radius:4px;padding:6px 8px;font-size:10.5px;font-family:monospace;margin-top:4px}`.trim();
+    document.head.appendChild(st);
+  }
+
+  const container = document.getElementById('messages');
+  const el = document.createElement('div');
+  el.className = 'message agent';
+  el.innerHTML = `<div class="message-content"><div class="wks">
+    <div class="wks-hd">⚙&thinsp;Workspace&ensp;<span style="opacity:.5;font-weight:400;font-size:11px">${esc(request.slice(0,80))}${request.length>80?'…':''}</span></div>
+    <div id="${uid}-steps"></div>
+    <div id="${uid}-actions" class="wks-actions" style="display:none"></div>
+    <div id="${uid}-receipt" class="wks-receipt" style="display:none"></div>
+  </div></div>`;
+  container.appendChild(el);
+
+  const stEl = () => document.getElementById(uid+'-steps');
+  const actEl = () => document.getElementById(uid+'-actions');
+  const rcEl  = document.getElementById(uid+'-receipt');
+  const scroll = () => { container.scrollTop = container.scrollHeight; };
+
+  const BADGE = { run:'running…', ok:'done', err:'failed', wait:'waiting', skip:'skipped' };
+
+  function addStep(icon, label, status, body) {
+    const row = document.createElement('div');
+    row.className = 'wks-step';
+    row.innerHTML = `<div class="wks-step-icon">${icon}</div>
+      <div class="wks-step-info">
+        <div class="wks-step-label">${esc(label)}&ensp;<span class="wks-badge ${status}">${BADGE[status]||status}</span></div>
+        <div class="wks-step-body">${body||''}</div>
+      </div>`;
+    stEl().appendChild(row);
+    scroll();
+    return row;
+  }
+
+  function upStep(row, status, body) {
+    const b = row.querySelector('.wks-badge');
+    b.className = 'wks-badge '+status;
+    b.textContent = BADGE[status]||status;
+    if (body !== undefined) row.querySelector('.wks-step-body').innerHTML = body;
+    scroll();
+  }
+
+  function setAct(html) {
+    const a = actEl(); a.style.display = html ? 'flex' : 'none'; a.innerHTML = html||''; scroll();
+  }
+
+  function gate(choices) {
+    return new Promise(resolve => {
+      choices.forEach(({id, val}) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          choices.forEach(({id:bid}) => { const b=document.getElementById(bid); if(b) b.disabled=true; });
+          resolve(val);
+        }, {once:true});
+      });
+    });
+  }
+
+  const receipt = { ts: new Date().toISOString(), request, plan:null, applied:false, tests:null, committed:false, pushed:false, prUrl:null, decisions:[] };
+
+  // ── Step 1: Plan (A1) ─────────────────────────────────────────────────
+  const planRow = addStep('📋','Plan','run','');
+  let plan;
+  try {
+    const r = await fetch('/api/self-edit/plan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request})});
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error||'plan_failed');
+    plan = d.plan;
+    receipt.plan = {summary:plan.summary, riskLevel:plan.riskLevel, files:plan.affectedFiles};
+    const rCls = 'risk-'+(plan.riskLevel||'medium');
+    const tags = [`<span class="wks-tag ${rCls}">⚠ ${esc(plan.riskLevel)}</span>`,
+      ...(plan.affectedFiles||[]).map(f=>`<span class="wks-tag">${esc(f)}</span>`)].join('');
+    const stepsHtml = (plan.steps||[]).map((s,i)=>`${i+1}. <b>${esc(s.action)}</b> ${esc(s.file||'')} — ${esc(s.description)}`).join('<br>');
+    upStep(planRow,'ok',`<div style="margin-bottom:4px">${esc(plan.summary)}</div><div style="margin:4px 0">${tags}</div>${stepsHtml?`<div style="margin-top:4px">${stepsHtml}</div>`:''}`);
+  } catch(e) { upStep(planRow,'err',esc(e.message)); return; }
+
+  // ── Step 2: Diff preview (A2) ─────────────────────────────────────────
+  const patchRow = addStep('📄','Diff preview','run','');
+  let diffText, changedFiles;
+  try {
+    const r = await fetch('/api/self-edit/patch', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan})});
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error||'patch_failed');
+    diffText = d.diffText; changedFiles = d.changedFiles||[];
+    try { receipt.diffHash = btoa(diffText).slice(0,10); } catch{}
+    const lines = diffText.split('\n');
+    const diffHtml = lines.slice(0,200).map(ln=>{
+      if (ln.startsWith('+++') || ln.startsWith('---')) return `<span class="m">${esc(ln)}</span>`;
+      if (ln.startsWith('+')) return `<span class="a">${esc(ln)}</span>`;
+      if (ln.startsWith('-')) return `<span class="d">${esc(ln)}</span>`;
+      if (ln.startsWith('@@')) return `<span class="h">${esc(ln)}</span>`;
+      return esc(ln);
+    }).join('\n');
+    const trunc = lines.length>200 ? `<div style="opacity:.4;font-size:10px;margin-top:3px">…truncated (showing 200 of ${lines.length} lines)</div>` : '';
+    upStep(patchRow,'ok',`<div style="margin-bottom:4px;opacity:.7">${changedFiles.map(esc).join(', ')||'(no files)'}</div><div class="wks-diff">${diffHtml}</div>${trunc}`);
+  } catch(e) { upStep(patchRow,'err',esc(e.message)); return; }
+
+  // ── Gate B1: diff approval ─────────────────────────────────────────────
+  setAct(`<button class="wks-btn g" id="${uid}-b1y">✓ Apply changes</button><button class="wks-btn x" id="${uid}-b1n">✗ Cancel</button>`);
+  const approved = await gate([{id:uid+'-b1y',val:true},{id:uid+'-b1n',val:false}]);
+  setAct(null);
+  receipt.decisions.push({gate:'B1',choice:approved?'approve':'cancel',ts:new Date().toISOString()});
+  if (!approved) { addStep('🚫','Cancelled','skip','No files changed.'); showWksReceipt(receipt,rcEl); return; }
+
+  // ── Step 3: Apply + test (B2) ─────────────────────────────────────────
+  const applyRow = addStep('⚡','Apply + test','run','');
+  let allOk = false;
+  try {
+    const r = await fetch('/api/self-edit/apply', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({diffText, testsToRun:plan.testsToRun||[]})});
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error||'apply_failed');
+    receipt.applied = true;
+    allOk = d.allTestsOk !== false;
+    const tests = d.tests||[];
+    receipt.tests = {passed:allOk, count:tests.length};
+    const applied = [...(d.applied?.changed||[]),(d.applied?.created||[])].flat();
+    const errs = d.applied?.errors||[];
+    const testsHtml = tests.length===0
+      ? '<div style="opacity:.4;margin-top:4px">No tests configured</div>'
+      : tests.map(t=>`<div class="wks-test"><span style="color:${t.ok?'#3fb950':'#f85149'}">${t.ok?'✓':'✗'} ${esc(t.cmd)}</span>${t.output?`<pre style="margin:3px 0 0;opacity:.6;font-size:10px;max-height:80px;overflow:auto">${esc(t.output.slice(0,400))}</pre>`:''}${t.error?`<pre style="margin:3px 0 0;color:#f85149;font-size:10px">${esc(String(t.error).slice(0,300))}</pre>`:''}</div>`).join('');
+    upStep(applyRow, allOk?'ok':'err', `<div style="margin-bottom:4px">${applied.map(esc).join(', ')||'applied'}</div>${errs.length?`<div style="color:#f85149;margin-bottom:4px">${errs.map(e=>esc(e.file+': '+e.error)).join('<br>')}</div>`:''}${testsHtml}`);
+  } catch(e) { upStep(applyRow,'err',esc(e.message)); showWksReceipt(receipt,rcEl); return; }
+
+  // Gate B2: block commit if tests failed
+  if (!allOk) { addStep('🧪','Tests failed — commit blocked','err','Fix failing tests before opening a PR. Working tree was modified.'); showWksReceipt(receipt,rcEl); return; }
+
+  // ── Gate B3: commit/PR confirmation ──────────────────────────────────
+  setAct(`<button class="wks-btn g" id="${uid}-b3y">🔗 Create draft PR</button><button class="wks-btn s" id="${uid}-b3n">◉ Stop here (no commit)</button>`);
+  const wantPr = await gate([{id:uid+'-b3y',val:true},{id:uid+'-b3n',val:false}]);
+  setAct(null);
+  receipt.decisions.push({gate:'B3',choice:wantPr?'create_pr':'stop',ts:new Date().toISOString()});
+  if (!wantPr) { addStep('✓','Applied — no PR','ok','Changes applied locally. No commit created.'); showWksReceipt(receipt,rcEl); return; }
+
+  // ── Step 4: PR (B3) ──────────────────────────────────────────────────
+  const prRow = addStep('🔗','Commit + PR','run','');
+  try {
+    const r = await fetch('/api/self-edit/pr', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      title: plan.summary||'auto: '+request.slice(0,60),
+      body: `Auto-generated via Workspace\n\n**Request:** ${request}\n\n**Plan:** ${plan.summary}`,
+      branch: plan.branchHint||'auto-change'
+    })});
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error||'pr_failed');
+    receipt.committed = true; receipt.pushed = d.pushed||false; receipt.prUrl = d.prUrl;
+    upStep(prRow,'ok',`Branch: <code style="opacity:.8">${esc(d.branch)}</code><br>${d.prUrl?`<a href="${esc(d.prUrl)}" target="_blank" style="color:#58a6ff">${esc(d.prUrl)}</a>`:'(no URL returned)'}${d.prError?`<br><span style="color:#f5a623;font-size:10px">${esc(d.prError)}</span>`:''}`);
+  } catch(e) { upStep(prRow,'err',esc(e.message)); }
+
+  showWksReceipt(receipt,rcEl);
+}
+
+// C1/C2: receipt derived only from what actually happened — no templated success
+function showWksReceipt(receipt, el) {
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ts = receipt.ts.slice(0,16).replace('T',' ');
+  const dec = receipt.decisions.map(d=>`<b>${d.gate}</b>:${d.choice}`).join(' · ')||'none';
+  const testStr = receipt.tests ? `${receipt.tests.passed?'✓':'✗'} tests (${receipt.tests.count})` : 'no tests';
+  const prStr = receipt.prUrl ? `<a href="${esc(receipt.prUrl)}" target="_blank" style="color:#58a6ff">PR open →</a>` : receipt.committed ? 'committed (no PR URL)' : '—';
+  el.style.display = 'block';
+  el.innerHTML = `<b style="color:#3fb950">Receipt</b> · ${ts}<br>${testStr} · committed:${receipt.committed?'✓':'✗'} · pushed:${receipt.pushed?'✓':'✗'} · ${prStr}<br>Gates: ${dec}`;
+  try {
+    const log = JSON.parse(sessionStorage.getItem('wks-receipts')||'[]');
+    log.push(receipt);
+    sessionStorage.setItem('wks-receipts', JSON.stringify(log.slice(-20)));
+  } catch {}
+}

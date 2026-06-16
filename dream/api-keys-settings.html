@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <title>API Keys — Lantern OS</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text);
+    }
+
+    .page-container {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .page-header {
+      padding: 40px 20px;
+      background: linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(59,130,246,0.05) 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-content {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .header-content h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .header-content p {
+      margin: 0;
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .page-main {
+      flex: 1;
+      padding: 40px 20px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .provider-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .provider-card:hover {
+      border-color: rgba(6,182,212,0.5);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .provider-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+
+    .provider-name {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .provider-icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-connected {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+
+    .status-disconnected {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .status-testing {
+      background: rgba(251, 146, 60, 0.15);
+      color: #fb923c;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .key-input-wrapper {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .key-input-wrapper label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .key-input-wrapper input {
+      width: 100%;
+      padding: 12px 40px 12px 14px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+
+    .key-input-wrapper input:focus {
+      outline: none;
+      border-color: rgba(6,182,212,0.6);
+      background: var(--bg-tertiary);
+    }
+
+    .toggle-visibility {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 16px;
+      padding: 4px 8px;
+      transition: color 0.2s;
+    }
+
+    .toggle-visibility:hover {
+      color: var(--text);
+    }
+
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 11px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-primary);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: var(--bg-secondary);
+      border-color: var(--accent);
+    }
+
+    .btn-primary {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.3);
+      color: #3b82f6;
+    }
+
+    .btn-primary:hover {
+      background: rgba(59, 130, 246, 0.25);
+      border-color: #3b82f6;
+    }
+
+    .btn-success {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+    }
+
+    .btn-success:hover {
+      background: rgba(34, 197, 94, 0.25);
+      border-color: #22c55e;
+    }
+
+    .info-box {
+      background: rgba(6,182,212,0.08);
+      border-left: 3px solid rgba(6,182,212,0.5);
+      border-radius: 6px;
+      padding: 16px;
+      margin-top: 40px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .info-box strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 600px) {
+      .provider-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header {
+        padding: 30px 16px;
+      }
+
+      .page-main {
+        padding: 24px 16px;
+      }
+
+      .header-content h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <nav class="site-nav">
+      <a class="nav-brand" href="/">
+        <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+        <span style="font-size:18px;font-weight:600">Lantern OS</span>
+      </a>
+      <div class="nav-links">
+        <a href="/dream-chat.html" style="font-size:16px;padding:12px 16px">⚙️ Work</a>
+        <a href="/trader-dashboard.html" style="font-size:16px;padding:12px 16px">📈 Trade</a>
+        <a href="/create.html" style="font-size:16px;padding:12px 16px">✏️ Create</a>
+      </div>
+      <div class="nav-actions">
+        <button class="nav-btn" id="theme-toggle" aria-label="Toggle light/dark mode" title="Light/Dark Mode">🌙</button>
+      </div>
+    </nav>
+
+    <div class="page-header">
+      <div class="header-content">
+        <h1>API Keys</h1>
+        <p>Connect your AI providers. Keys are stored locally in your browser and never sent to our servers.</p>
+      </div>
+    </div>
+
+    <div class="page-main">
+      <div class="provider-grid">
+        <!-- Claude -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-name">
+              <div class="provider-icon">🤖</div>
+              <div>Claude</div>
+            </div>
+            <span class="status-badge status-disconnected" id="status-claude">
+              <span class="status-dot"></span>
+              Disconnected
+            </span>
+          </div>
+
+          <div class="key-input-wrapper">
+            <label for="key-claude">API Key</label>
+            <input type="password" id="key-claude" placeholder="sk-ant-..." autocomplete="off">
+            <button class="toggle-visibility" onclick="toggleVisibility('key-claude')">👁️</button>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-primary" onclick="testKey('claude')">Test Connection</button>
+            <button class="btn btn-success" onclick="saveKey('claude')">Save</button>
+          </div>
+        </div>
+
+        <!-- Gemini -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-name">
+              <div class="provider-icon">🌐</div>
+              <div>Gemini</div>
+            </div>
+            <span class="status-badge status-disconnected" id="status-gemini">
+              <span class="status-dot"></span>
+              Disconnected
+            </span>
+          </div>
+
+          <div class="key-input-wrapper">
+            <label for="key-gemini">API Key</label>
+            <input type="password" id="key-gemini" placeholder="AIza..." autocomplete="off">
+            <button class="toggle-visibility" onclick="toggleVisibility('key-gemini')">👁️</button>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-primary" onclick="testKey('gemini')">Test Connection</button>
+            <button class="btn btn-success" onclick="saveKey('gemini')">Save</button>
+          </div>
+        </div>
+
+        <!-- ChatGPT -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-name">
+              <div class="provider-icon">💬</div>
+              <div>ChatGPT</div>
+            </div>
+            <span class="status-badge status-disconnected" id="status-openai">
+              <span class="status-dot"></span>
+              Disconnected
+            </span>
+          </div>
+
+          <div class="key-input-wrapper">
+            <label for="key-openai">API Key</label>
+            <input type="password" id="key-openai" placeholder="sk-..." autocomplete="off">
+            <button class="toggle-visibility" onclick="toggleVisibility('key-openai')">👁️</button>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-primary" onclick="testKey('openai')">Test Connection</button>
+            <button class="btn btn-success" onclick="saveKey('openai')">Save</button>
+          </div>
+        </div>
+
+        <!-- Grok -->
+        <div class="provider-card">
+          <div class="provider-header">
+            <div class="provider-name">
+              <div class="provider-icon">𝕏</div>
+              <div>Grok</div>
+            </div>
+            <span class="status-badge status-disconnected" id="status-grok">
+              <span class="status-dot"></span>
+              Disconnected
+            </span>
+          </div>
+
+          <div class="key-input-wrapper">
+            <label for="key-grok">API Key</label>
+            <input type="password" id="key-grok" placeholder="sk-..." autocomplete="off">
+            <button class="toggle-visibility" onclick="toggleVisibility('key-grok')">👁️</button>
+          </div>
+
+          <div class="button-group">
+            <button class="btn btn-primary" onclick="testKey('grok')">Test Connection</button>
+            <button class="btn btn-success" onclick="saveKey('grok')">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>🔒 Privacy First:</strong> Your API keys are stored only in your browser's local storage. They are never sent to Lantern's servers or any third party. You remain in complete control.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme toggle
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const theme = document.documentElement.getAttribute('data-theme');
+      const newTheme = theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      document.getElementById('theme-toggle').textContent = newTheme === 'dark' ? '🌙' : '☀️';
+    });
+
+    // Load theme preference
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.getElementById('theme-toggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+
+    // Toggle password visibility
+    function toggleVisibility(inputId) {
+      const input = document.getElementById(inputId);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    // Save API key
+    function saveKey(provider) {
+      const keyId = `key-${provider}`;
+      const input = document.getElementById(keyId);
+      const key = input.value.trim();
+
+      if (!key) {
+        alert('Please enter an API key');
+        return;
+      }
+
+      localStorage.setItem(`api_key_${provider}`, key);
+      const masked = '••••••••' + key.slice(-4);
+      input.placeholder = masked;
+      input.value = '';
+
+      updateStatus(provider, 'connected');
+      alert(`✓ ${provider} key saved locally`);
+    }
+
+    // Test API key
+    async function testKey(provider) {
+      const statusEl = document.getElementById(`status-${provider}`);
+      const originalText = statusEl.innerHTML;
+      statusEl.textContent = 'Testing...';
+      statusEl.className = 'status-badge status-testing';
+
+      try {
+        const response = await fetch(`/api/providers/test/${provider}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          updateStatus(provider, 'connected');
+          alert(`✓ ${provider} connection successful`);
+        } else {
+          updateStatus(provider, 'disconnected');
+          alert(`✗ Connection failed. Please check your API key.`);
+        }
+      } catch (error) {
+        updateStatus(provider, 'disconnected');
+        alert(`✗ Test failed: ${error.message}`);
+      }
+    }
+
+    // Update status badge
+    function updateStatus(provider, status) {
+      const statusEl = document.getElementById(`status-${provider}`);
+      if (status === 'connected') {
+        statusEl.innerHTML = '<span class="status-dot"></span>Connected';
+        statusEl.className = 'status-badge status-connected';
+      } else {
+        statusEl.innerHTML = '<span class="status-dot"></span>Disconnected';
+        statusEl.className = 'status-badge status-disconnected';
+      }
+    }
+
+    // Load initial key status
+    ['claude', 'gemini', 'openai', 'grok'].forEach(provider => {
+      const key = localStorage.getItem(`api_key_${provider}`);
+      if (key) {
+        updateStatus(provider, 'connected');
+        const masked = '••••••••' + key.slice(-4);
+        document.getElementById(`key-${provider}`).placeholder = masked;
+      } else {
+        updateStatus(provider, 'disconnected');
+      }
+    });
+  </script>
+</body>
+</html>

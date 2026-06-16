@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "work": "⚙️ Arbeit",
+    "trade": "📈 Handel",
+    "create": "✏️ Erstellen",
+    "settings": "Einstellungen"
+  },
+  "hero": {
+    "title": "Lantern OS",
+    "tagline": "Ein persistentes, lokal-first Reasoning-System. Privat, schnell und komplett dein Eigentum.",
+    "subtext": "Convergence Core v1 · Lokale Ausführung · Kein Konto erforderlich"
+  },
+  "section": {
+    "experiences": "Drei Kern-Erfahrungen",
+    "settings": "Einstellungen & Konfiguration"
+  },
+  "card": {
+    "work": {
+      "label": "Arbeit",
+      "title": "Dream Chat",
+      "description": "Chatten Sie mit einer KI, die Ihr Tagebuch kennt und Sie beim Durchdenken von Ideen unterstützt.",
+      "cta": "Arbeit öffnen",
+      "ariaLabel": "Dream Chat — Chatten Sie mit einer KI, die Ihr Tagebuch kennt"
+    },
+    "trade": {
+      "label": "Handel",
+      "title": "Lantern Trader",
+      "description": "Handels-Hub für Prognosemärkte, Börsenanalyse und Live-Marktnachrichten.",
+      "cta": "Handel öffnen",
+      "ariaLabel": "Lantern Trader — Handels-Hub für Prognosemärkte"
+    },
+    "create": {
+      "label": "Erstellen",
+      "title": "Creator Dashboard",
+      "description": "Laden Sie Ihre kreative Arbeit hoch und organisieren Sie diese lokal gespeichert und indexiert.",
+      "cta": "Erstellen öffnen",
+      "ariaLabel": "Creator Dashboard — Laden Sie Ihre kreative Arbeit hoch"
+    }
+  },
+  "settings": {
+    "apiKeys": {
+      "icon": "🔑",
+      "title": "API-Schlüssel",
+      "description": "Konfigurieren Sie KI-Anbieter (Claude, OpenAI, Gemini) für Streaming-Antworten. Optional — funktioniert offline ohne Schlüssel.",
+      "cta": "Schlüssel konfigurieren",
+      "title_attr": "API-Schlüssel für KI-Anbieter konfigurieren"
+    },
+    "localData": {
+      "icon": "💾",
+      "title": "Lokale Daten",
+      "description": "Alle Daten lokal auf Ihrem Gerät gespeichert. Keine Cloud-Synchronisierung, kein Konto erforderlich. Exportieren Sie jederzeit.",
+      "cta": "Daten exportieren",
+      "title_attr": "Daten exportieren und herunterladen"
+    },
+    "systemStatus": {
+      "icon": "⚡",
+      "title": "Systemstatus",
+      "description": "Überwachen Sie die Kernel-Bereitschaft, Speicherabfragen, Konvergenzdatensätze und Verifizierungsstatus in Echtzeit.",
+      "cta": "Status anzeigen",
+      "title_attr": "Systemstatus- und Gesundheitsinformationen anzeigen"
+    }
+  },
+  "status": {
+    "online": "Server online",
+    "offline": "Server offline",
+    "unreachable": "Server unerreichbar",
+    "connecting": "Verbindung wird hergestellt…",
+    "statusIndicator": "Server-Statusanzeige",
+    "connectionStatus": "Server-Verbindungsstatus",
+    "github": "GitHub"
+  },
+  "a11y": {
+    "skipContent": "Zum Hauptinhalt springen",
+    "themeToggle": "Hell-/Dunkelmodus umschalten",
+    "openInNewWindow": "(öffnet in neuem Fenster)"
+  }
+}

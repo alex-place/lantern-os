@@ -4,6 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#7c6af7">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid flash of wrong theme */
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <title>Creator Dashboard — Lantern OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
@@ -828,18 +841,19 @@
 
 <!-- Site nav -->
 <nav class="site-nav">
-  <a class="nav-brand" href="/trader-dashboard.html">
+  <a class="nav-brand" href="/">
     <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
     Lantern OS
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Journal</a>
-    <a href="/create.html">✏️ Create</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html" class="active">Create</a>
+    <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
   </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode">☀</button>
-    <a class="nav-cta" href="/create.html">Create</a>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
   </div>
 </nav>
 

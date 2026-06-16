@@ -5,34 +5,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
   <link rel="manifest" href="/manifest.json">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid flash of wrong theme */
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/css/site.css">
   <title>Lantern OS</title>
 </head>
 <body>
 
+<!-- ── Skip to content link ── -->
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
 <!-- ── Site nav ── -->
 <nav class="site-nav">
-  <a class="nav-brand" href="/trader-dashboard.html">
+  <a class="nav-brand" href="/">
     <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
     Lantern OS
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Journal</a>
-    <a href="/three-doors.html" data-prod-hidden>Kingdome</a>
-    <a href="/create.html">✏️ Create</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
   </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode">☀</button>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
     <a class="nav-cta" href="/dream-chat.html">Open Journal</a>
   </div>
 </nav>
 
 <div class="page">
 
+  <main id="main-content">
+
   <!-- ── Hero ── -->
   <div class="hero">
-    <svg id="hero-mandala" class="hero-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="-5 -5 210 210" style="width:88px;height:88px;display:block;margin:0 auto 18px"><defs><linearGradient id="hm-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="200" y2="200"><stop offset="0%" stop-color="#ff3366"/><stop offset="25%" stop-color="#ff9900"/><stop offset="50%" stop-color="#33ffaa"/><stop offset="75%" stop-color="#3366ff"/><stop offset="100%" stop-color="#ff3366"/><animateTransform attributeName="gradientTransform" type="rotate" from="0 100 100" to="360 100 100" dur="5s" repeatCount="indefinite"/></linearGradient><style>#hero-mandala .hm{stroke:url(#hm-grad);fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}#hero-mandala .hd{fill:url(#hm-grad);stroke:none}#hero-mandala .hi{transform-origin:100px 100px;animation:hm-fwd 20s linear infinite}#hero-mandala .hmi{transform-origin:100px 100px;animation:hm-rev 30s linear infinite}#hero-mandala .hoa{transform-origin:100px 100px;animation:hm-fwd 45s linear infinite}#hero-mandala .hob{transform-origin:100px 100px;animation:hm-rev 28s linear infinite}@keyframes hm-fwd{to{transform:rotate(360deg)}}@keyframes hm-rev{to{transform:rotate(-360deg)}}</style></defs><g class="hob"><polygon class="hm" points="170.0,100.0 160.6,65.0 135.0,39.4 100.0,30.0 65.0,39.4 39.4,65.0 30.0,100.0 39.4,135.0 65.0,160.6 100.0,170.0 135.0,160.6 160.6,135.0"/><line class="hm" x1="170.0" y1="100.0" x2="186.0" y2="100.0"/><line class="hm" x1="186.0" y1="100.0" x2="160.6" y2="135.0"/><line class="hm" x1="186.0" y1="100.0" x2="160.6" y2="65.0"/><circle class="hd" cx="186.0" cy="100.0" r="2.8"/><line class="hm" x1="160.6" y1="65.0" x2="174.5" y2="57.0"/><line class="hm" x1="174.5" y1="57.0" x2="170.0" y2="100.0"/><line class="hm" x1="174.5" y1="57.0" x2="135.0" y2="39.4"/><circle class="hd" cx="174.5" cy="57.0" r="2.8"/><line class="hm" x1="135.0" y1="39.4" x2="143.0" y2="25.5"/><line class="hm" x1="143.0" y1="25.5" x2="160.6" y2="65.0"/><line class="hm" x1="143.0" y1="25.5" x2="100.0" y2="30.0"/><circle class="hd" cx="143.0" cy="25.5" r="2.8"/><line class="hm" x1="100.0" y1="30.0" x2="100.0" y2="14.0"/><line class="hm" x1="100.0" y1="14.0" x2="135.0" y2="39.4"/><line class="hm" x1="100.0" y1="14.0" x2="65.0" y2="39.4"/><circle class="hd" cx="100.0" cy="14.0" r="2.8"/><line class="hm" x1="65.0" y1="39.4" x2="57.0" y2="25.5"/><line class="hm" x1="57.0" y1="25.5" x2="100.0" y2="30.0"/><line class="hm" x1="57.0" y1="25.5" x2="39.4" y2="65.0"/><circle class="hd" cx="57.0" cy="25.5" r="2.8"/><line class="hm" x1="39.4" y1="65.0" x2="25.5" y2="57.0"/><line class="hm" x1="25.5" y1="57.0" x2="65.0" y2="39.4"/><line class="hm" x1="25.5" y1="57.0" x2="30.0" y2="100.0"/><circle class="hd" cx="25.5" cy="57.0" r="2.8"/><line class="hm" x1="30.0" y1="100.0" x2="14.0" y2="100.0"/><line class="hm" x1="14.0" y1="100.0" x2="39.4" y2="65.0"/><line class="hm" x1="14.0" y1="100.0" x2="39.4" y2="135.0"/><circle class="hd" cx="14.0" cy="100.0" r="2.8"/><line class="hm" x1="39.4" y1="135.0" x2="25.5" y2="143.0"/><line class="hm" x1="25.5" y1="143.0" x2="30.0" y2="100.0"/><line class="hm" x1="25.5" y1="143.0" x2="65.0" y2="160.6"/><circle class="hd" cx="25.5" cy="143.0" r="2.8"/><line class="hm" x1="65.0" y1="160.6" x2="57.0" y2="174.5"/><line class="hm" x1="57.0" y1="174.5" x2="39.4" y2="135.0"/><line class="hm" x1="57.0" y1="174.5" x2="100.0" y2="170.0"/><circle class="hd" cx="57.0" cy="174.5" r="2.8"/><line class="hm" x1="100.0" y1="170.0" x2="100.0" y2="186.0"/><line class="hm" x1="100.0" y1="186.0" x2="65.0" y2="160.6"/><line class="hm" x1="100.0" y1="186.0" x2="135.0" y2="160.6"/><circle class="hd" cx="100.0" cy="186.0" r="2.8"/><line class="hm" x1="135.0" y1="160.6" x2="143.0" y2="174.5"/><line class="hm" x1="143.0" y1="174.5" x2="100.0" y2="170.0"/><line class="hm" x1="143.0" y1="174.5" x2="160.6" y2="135.0"/><circle class="hd" cx="143.0" cy="174.5" r="2.8"/><line class="hm" x1="160.6" y1="135.0" x2="174.5" y2="143.0"/><line class="hm" x1="174.5" y1="143.0" x2="135.0" y2="160.6"/><line class="hm" x1="174.5" y1="143.0" x2="170.0" y2="100.0"/><circle class="hd" cx="174.5" cy="143.0" r="2.8"/><circle class="hd" cx="170.0" cy="100.0" r="2.3"/><circle class="hd" cx="160.6" cy="65.0" r="2.3"/><circle class="hd" cx="135.0" cy="39.4" r="2.3"/><circle class="hd" cx="100.0" cy="30.0" r="2.3"/><circle class="hd" cx="65.0" cy="39.4" r="2.3"/><circle class="hd" cx="39.4" cy="65.0" r="2.3"/><circle class="hd" cx="30.0" cy="100.0" r="2.3"/><circle class="hd" cx="39.4" cy="135.0" r="2.3"/><circle class="hd" cx="65.0" cy="160.6" r="2.3"/><circle class="hd" cx="100.0" cy="170.0" r="2.3"/><circle class="hd" cx="135.0" cy="160.6" r="2.3"/><circle class="hd" cx="160.6" cy="135.0" r="2.3"/></g><g class="hoa"><polygon class="hm" points="154.0,100.0 146.8,73.0 127.0,53.2 100.0,46.0 73.0,53.2 53.2,73.0 46.0,100.0 53.2,127.0 73.0,146.8 100.0,154.0 127.0,146.8 146.8,127.0"/><line class="hm" x1="154.0" y1="100.0" x2="73.0" y2="53.2"/><line class="hm" x1="146.8" y1="73.0" x2="53.2" y2="73.0"/><line class="hm" x1="127.0" y1="53.2" x2="46.0" y2="100.0"/><line class="hm" x1="100.0" y1="46.0" x2="53.2" y2="127.0"/><line class="hm" x1="73.0" y1="53.2" x2="73.0" y2="146.8"/><line class="hm" x1="53.2" y1="73.0" x2="100.0" y2="154.0"/><line class="hm" x1="46.0" y1="100.0" x2="127.0" y2="146.8"/><line class="hm" x1="53.2" y1="127.0" x2="146.8" y2="127.0"/><line class="hm" x1="73.0" y1="146.8" x2="154.0" y2="100.0"/><line class="hm" x1="100.0" y1="154.0" x2="146.8" y2="73.0"/><line class="hm" x1="127.0" y1="146.8" x2="127.0" y2="53.2"/><line class="hm" x1="146.8" y1="127.0" x2="100.0" y2="46.0"/><circle class="hd" cx="154.0" cy="100.0" r="2.2"/><circle class="hd" cx="146.8" cy="73.0" r="2.2"/><circle class="hd" cx="127.0" cy="53.2" r="2.2"/><circle class="hd" cx="100.0" cy="46.0" r="2.2"/><circle class="hd" cx="73.0" cy="53.2" r="2.2"/><circle class="hd" cx="53.2" cy="73.0" r="2.2"/><circle class="hd" cx="46.0" cy="100.0" r="2.2"/><circle class="hd" cx="53.2" cy="127.0" r="2.2"/><circle class="hd" cx="73.0" cy="146.8" r="2.2"/><circle class="hd" cx="100.0" cy="154.0" r="2.2"/><circle class="hd" cx="127.0" cy="146.8" r="2.2"/><circle class="hd" cx="146.8" cy="127.0" r="2.2"/></g><g class="hmi"><polygon class="hm" points="138.0,100.0 132.9,81.0 119.0,67.1 100.0,62.0 81.0,67.1 67.1,81.0 62.0,100.0 67.1,119.0 81.0,132.9 100.0,138.0 119.0,132.9 132.9,119.0"/><line class="hm" x1="138.0" y1="100.0" x2="67.1" y2="81.0"/><line class="hm" x1="132.9" y1="81.0" x2="62.0" y2="100.0"/><line class="hm" x1="119.0" y1="67.1" x2="67.1" y2="119.0"/><line class="hm" x1="100.0" y1="62.0" x2="81.0" y2="132.9"/><line class="hm" x1="81.0" y1="67.1" x2="100.0" y2="138.0"/><line class="hm" x1="67.1" y1="81.0" x2="119.0" y2="132.9"/><line class="hm" x1="62.0" y1="100.0" x2="132.9" y2="119.0"/><line class="hm" x1="67.1" y1="119.0" x2="138.0" y2="100.0"/><line class="hm" x1="81.0" y1="132.9" x2="132.9" y2="81.0"/><line class="hm" x1="100.0" y1="138.0" x2="119.0" y2="67.1"/><line class="hm" x1="119.0" y1="132.9" x2="100.0" y2="62.0"/><line class="hm" x1="132.9" y1="119.0" x2="81.0" y2="67.1"/><circle class="hd" cx="138.0" cy="100.0" r="2.5"/><circle class="hd" cx="132.9" cy="81.0" r="2.5"/><circle class="hd" cx="119.0" cy="67.1" r="2.5"/><circle class="hd" cx="100.0" cy="62.0" r="2.5"/><circle class="hd" cx="81.0" cy="67.1" r="2.5"/><circle class="hd" cx="67.1" cy="81.0" r="2.5"/><circle class="hd" cx="62.0" cy="100.0" r="2.5"/><circle class="hd" cx="67.1" cy="119.0" r="2.5"/><circle class="hd" cx="81.0" cy="132.9" r="2.5"/><circle class="hd" cx="100.0" cy="138.0" r="2.5"/><circle class="hd" cx="119.0" cy="132.9" r="2.5"/><circle class="hd" cx="132.9" cy="119.0" r="2.5"/></g><g class="hi"><circle class="hd" cx="100" cy="100" r="3.5"/><line class="hm" x1="100" y1="100" x2="100.0" y2="89.0"/><line class="hm" x1="100" y1="100" x2="90.5" y2="105.5"/><line class="hm" x1="100" y1="100" x2="109.5" y2="105.5"/><polygon class="hm" points="100.0,89.0 90.5,105.5 109.5,105.5"/><line class="hm" x1="100.0" y1="89.0" x2="100.0" y2="78.0"/><line class="hm" x1="90.5" y1="105.5" x2="80.9" y2="111.0"/><line class="hm" x1="109.5" y1="105.5" x2="119.1" y2="111.0"/><polygon class="hm" points="100.0,78.0 80.9,111.0 119.1,111.0"/><polygon class="hm" points="100.0,122.0 119.1,89.0 80.9,89.0"/><circle class="hd" cx="100.0" cy="78.0" r="2.5"/><circle class="hd" cx="80.9" cy="111.0" r="2.5"/><circle class="hd" cx="119.1" cy="111.0" r="2.5"/><circle class="hd" cx="100.0" cy="122.0" r="2.5"/><circle class="hd" cx="119.1" cy="89.0" r="2.5"/><circle class="hd" cx="80.9" cy="89.0" r="2.5"/></g></svg>
+    <img src="mandala.svg" class="hero-icon" aria-hidden="true" width="88" height="88" alt="" style="display:block;margin:0 auto 18px">
     <h1>Lantern OS</h1>
     <p class="tagline" id="hero-tagline">Local-first personal OS. Private journal, interactive stories, and community dashboard — no account, no cloud required.</p>
     <div class="hero-cta-row">
@@ -41,122 +60,48 @@
     <p class="sub"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git"></span></p>
   </div>
 
-  <!-- ── Primary panel ── -->
-  <p class="section-label no-margin-top">Start here</p>
-  <div class="panels-primary">
+  <!-- ── Hero Features (3 primary experiences) ── -->
+  <p class="section-label no-margin-top">Core Experiences</p>
+  <div class="panels panels-margin-bottom">
     <a class="panel-full" href="/dream-chat.html">
       <span class="panel-full-icon">💬</span>
       <div class="panel-full-body">
-        <div class="tag">Journal</div>
-        <h2>Write & reflect</h2>
+        <div class="tag">Work</div>
+        <h2>Dream Chat</h2>
         <p id="panel-chat-desc">Record thoughts and reflections, chat with an AI, and discover patterns. Everything stays on your device.</p>
       </div>
       <span class="panel-full-arrow">Open Journal →</span>
     </a>
   </div>
 
-  <!-- ── Secondary panels ── -->
-  <p class="section-label">Explore</p>
   <div class="panels panels-margin-bottom">
-    <a class="panel" href="/three-doors.html" data-prod-hidden>
-      <span class="panel-icon">🏯</span>
-      <span class="panel-label">Dream Journey</span>
-      <h2>Kingdome of Hearts</h2>
-      <p>A seven-stage dream journey. Three doors each scene — no wrong choices. Lantern guides you. Each loop is different.</p>
-      <span class="panel-arrow">Enter the Kingdome →</span>
-    </a>
-    <a class="panel" href="/dream-journal/index.html" data-prod-hidden>
-      <span class="panel-icon">📓</span>
-      <span class="panel-label">Members Only</span>
-      <h2>Full Journal</h2>
-      <p id="panel-journal-desc">Deep archive and advanced synthesis for Patreon supporters.</p>
-      <span class="panel-arrow">View archive →</span>
-    </a>
-
     <a class="panel" href="/trader-dashboard.html">
       <span class="panel-icon">📈</span>
-      <span class="panel-label">Trading</span>
+      <span class="panel-label">Trade</span>
       <h2>Lantern Trader</h2>
       <p>Trading hub for stock trading, prediction markets, and market news — all in one place.</p>
       <span class="panel-arrow">Open Trader →</span>
     </a>
 
-    <a class="panel" href="/operations.html" data-prod-hidden>
-      <span class="panel-icon">⚙️</span>
-      <span class="panel-label">Ops</span>
-      <h2>Agent Operations</h2>
-      <p>Queue status, agent lanes, leaderboard, and provider health — unified ops hub for the Keystone orchestration system.</p>
-      <span class="panel-arrow">Open Ops →</span>
-    </a>
-
-    <a class="panel patreon" href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener" data-prod-hidden>
-      <span class="panel-icon">✦</span>
-      <span class="panel-label">Community</span>
-      <h2>Join the Guild</h2>
-      <p id="panel-patreon-desc">Support on Patreon, get full journal access, join the Synthesasia Discord.</p>
-      <span class="panel-arrow">Become a member →</span>
-    </a>
-
-    <a class="panel" href="/settings/providers.html" id="provider-panel" data-prod-hidden>
-      <span class="panel-icon">⚡</span>
-      <span class="panel-label">Settings</span>
-      <h2>AI Providers</h2>
-      <p id="provider-panel-desc">Configure Gemini, Claude, or OpenAI keys. All optional — works without any key.</p>
-      <span class="panel-arrow">Configure →</span>
-    </a>
-
-    <a class="panel" href="/knowledgecenter.html">
-      <span class="panel-icon">📚</span>
-      <span class="panel-label">Help</span>
-      <h2>Guides & Help</h2>
-      <p>How to get started, what's new, and answers to common questions.</p>
-      <span class="panel-arrow">Open guides →</span>
-    </a>
-  </div>
-
-  <!-- ── Creator Dashboard ── -->
-  <p class="section-label">Create</p>
-  <div class="panels panels-margin-bottom">
-    <a class="panel" href="/create.html" data-prod-hidden>
+    <a class="panel" href="/create.html">
       <span class="panel-icon">✏️</span>
-      <span class="panel-label">Creator</span>
+      <span class="panel-label">Create</span>
       <h2>Content Creator</h2>
       <p>Upload and share your dreams, moments, and creative work. Videos, notes, projects, and highlights — all stored locally.</p>
       <span class="panel-arrow">Start Creating →</span>
     </a>
   </div>
 
-  <!-- ── Feature strip ── -->
-  <p class="section-label" data-prod-hidden>What's included</p>
-  <div class="features" id="live-features" data-prod-hidden>
-    <div class="feature"><div class="icon">✍️</div><h3>Write freely</h3><p id="stat-capture">Dreams, reflections, symbols — stored as plain files on your computer.</p></div>
-    <div class="feature"><div class="icon">🧠</div><h3 id="stat-agents-label">AI companion</h3><p id="stat-agents">Chat with an AI that knows your journal. Works with Gemini, Claude, or OpenAI.</p></div>
-    <div class="feature"><div class="icon">🔍</div><h3>Find patterns</h3><p id="stat-readiness">Search and surface recurring symbols, themes, and emotions over time.</p></div>
-    <div class="feature"><div class="icon">💾</div><h3>Always yours</h3><p>Export everything anytime. No lock-in, no subscription, no cloud required.</p></div>
-    <div class="feature"><div class="icon">🔒</div><h3>Fully private</h3><p id="stat-providers">No tracking, no ads, no data sold. Runs entirely on your machine.</p></div>
-    <div class="feature"><div class="icon">🟢</div><h3>Always ready</h3><p id="stat-server">Server running locally. No internet needed to write or read your journal.</p></div>
-  </div>
-
-  <!-- ── Status table ── -->
-  <div class="benchmark" data-prod-hidden>
-    <div class="benchmark-header">
-      <h2>What's available right now</h2>
-      <p id="benchmark-subtitle">Live status from your Lantern instance.</p>
-    </div>
-    <table>
-      <thead><tr><th>Feature</th><th>Status</th><th>What It Does</th></tr></thead>
-      <tbody id="benchmark-body">
-        <tr><td>Write & Save Dreams</td><td><span class="pill live">Ready</span></td><td>Record your dreams, reflections, and ideas. Everything saved locally.</td></tr>
-        <tr><td>Lucid Dreaming Tracking</td><td><span class="pill live">Ready</span></td><td>Log lucid dreams, techniques you tried, and dream signs to watch for.</td></tr>
-        <tr><td>Pattern Recognition</td><td><span class="pill live">Ready</span></td><td>See what symbols, emotions, and themes appear most in your dreams.</td></tr>
-        <tr><td>Download Your Data</td><td><span class="pill live">Ready</span></td><td>Export everything as a backup file. Your data is always yours.</td></tr>
-        <tr><td>Dashboard</td><td><span class="pill live">Ready</span></td><td>Your spaces, community hub, and reference data at <code>/flourishing</code>.</td></tr>
-        <tr><td>Kingdome of Hearts</td><td><span class="pill live">Ready</span></td><td>Seven-stage dream journey, three doors per scene, infinite loops. Plays offline.</td></tr>
-        <tr><td>AI Chat</td><td><span class="pill optional" id="pill-ai-chat">Optional</span></td><td id="note-ai-chat">Chat with an AI. Requires you to add an API key.</td></tr>
-        <tr><td>Voice Recording</td><td><span class="pill held">Coming Later</span></td><td>Record dreams by voice instead of typing. Coming in a future update.</td></tr>
-        <tr><td>Dream Art Generation</td><td><span class="pill held">Coming Later</span></td><td>AI generates images from your dream descriptions. Planned for future.</td></tr>
-      </tbody>
-    </table>
+  <!-- ── Secondary navigation link ── -->
+  <p class="section-label">More</p>
+  <div class="panels panels-margin-bottom">
+    <a class="panel" href="/explore.html" style="grid-column: 1 / -1;">
+      <span class="panel-icon">🗺️</span>
+      <span class="panel-label">Navigation</span>
+      <h2>Explore & Discover</h2>
+      <p>Access additional features: Kingdome dream journeys, full archives, advanced tools, community, settings, and more.</p>
+      <span class="panel-arrow">Explore →</span>
+    </a>
   </div>
 
   <!-- Recent Journal Entries — real data from backend -->
@@ -168,26 +113,28 @@
     <div id="recent-entries-list" class="recent-entries-list-padding"></div>
   </div>
 
-  <div class="status-bar">
-    <div class="dot online" id="status-dot"></div>
-    <span id="status-label">connecting…</span>
-    <span class="status-bar-right" id="status-right">Lantern OS</span>
-  </div>
+  </main>
 
 </div>
 
 <!-- ── Site footer ── -->
 <footer class="site-footer">
   <div class="footer-inner">
-    <span class="footer-brand"><span class="mandala-icon spin-slow" aria-hidden="true"></span> Lantern OS</span>
+    <span class="footer-brand">
+      <span class="dot online" id="status-dot" title="Server status"></span>
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Lantern OS
+    </span>
     <span class="sep">·</span>
+    <a href="/">Home</a>
     <a href="/dream-chat.html">Journal</a>
-    <a href="/three-doors.html" data-prod-hidden>Kingdome</a>
-    <a href="/create.html">✏️ Create</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
-    <a href="/changelog.html">Changelog</a>
-    <a href="https://github.com/alex-place/lantern-os" target="_blank">GitHub</a>
-    <span class="sep ml">Open source · runs locally · no account needed</span>
+    <span class="sep">·</span>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span class="footer-meta ml">Open source · runs locally · no account needed</span>
+    <span class="visually-hidden" id="status-label">connecting…</span>
   </div>
 </footer>
 <script src="/js/theme-toggle.js"></script>

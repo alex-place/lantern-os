@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "work": "⚙️ Work",
+    "trade": "📈 Trade",
+    "create": "✏️ Create",
+    "settings": "Settings"
+  },
+  "hero": {
+    "title": "Lantern OS",
+    "tagline": "A persistent local-first reasoning system. Private, fast, and yours alone.",
+    "subtext": "Convergence Core v1 · Running Locally · No Account Required"
+  },
+  "section": {
+    "experiences": "Three Core Experiences",
+    "settings": "Settings & Configuration"
+  },
+  "card": {
+    "work": {
+      "label": "Work",
+      "title": "Dream Chat",
+      "description": "Chat with an AI that remembers your journal and helps you reason through ideas.",
+      "cta": "Open Work",
+      "ariaLabel": "Dream Chat — Chat with an AI that remembers your journal"
+    },
+    "trade": {
+      "label": "Trade",
+      "title": "Lantern Trader",
+      "description": "Trading hub for prediction markets, stock analysis, and live market news.",
+      "cta": "Open Trade",
+      "ariaLabel": "Lantern Trader — Trading hub for prediction markets and stock analysis"
+    },
+    "create": {
+      "label": "Create",
+      "title": "Creator Dashboard",
+      "description": "Upload and organize your creative work, stored locally and indexed.",
+      "cta": "Open Create",
+      "ariaLabel": "Creator Dashboard — Upload and organize your creative work"
+    }
+  },
+  "settings": {
+    "apiKeys": {
+      "icon": "🔑",
+      "title": "API Keys",
+      "description": "Configure AI providers (Claude, OpenAI, Gemini) for streaming responses. All optional — works offline without keys.",
+      "cta": "Configure Keys",
+      "title_attr": "Configure API keys for AI providers"
+    },
+    "localData": {
+      "icon": "💾",
+      "title": "Local Data",
+      "description": "All data stored locally on your device. No cloud sync, no account needed. Export anytime.",
+      "cta": "Export Data",
+      "title_attr": "Export and download your data"
+    },
+    "systemStatus": {
+      "icon": "⚡",
+      "title": "System Status",
+      "description": "Monitor kernel readiness, memory queries, convergence records, and verification status in real-time.",
+      "cta": "View Status",
+      "title_attr": "View system health and status information"
+    }
+  },
+  "status": {
+    "online": "Server online",
+    "offline": "Server offline",
+    "unreachable": "Server unreachable",
+    "connecting": "Connecting…",
+    "statusIndicator": "Server status indicator",
+    "connectionStatus": "Server connection status",
+    "github": "GitHub"
+  },
+  "a11y": {
+    "skipContent": "Skip to main content",
+    "themeToggle": "Toggle light / dark mode",
+    "openInNewWindow": "(opens in new window)"
+  }
+}
