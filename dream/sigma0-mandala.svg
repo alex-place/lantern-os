@@ -7,7 +7,6 @@
 <stop offset="28%" stop-color="#ffd60a"/><stop offset="42%" stop-color="#34c759"/>
 <stop offset="56%" stop-color="#00e5d0"/><stop offset="70%" stop-color="#0a84ff"/>
 <stop offset="84%" stop-color="#7d5fff"/><stop offset="100%" stop-color="#ff2d55"/>
-<animateTransform attributeName="gradientTransform" type="rotate" from="0 100 100" to="360 100 100" dur="6s" repeatCount="indefinite"/>
 </linearGradient>
 <radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
 <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
@@ -19,10 +18,10 @@
 .dot{fill:url(#spectra);stroke:none}
 .glow{fill:url(#core-glow);stroke:none}
 .nucleus{fill:#ffffff;stroke:url(#spectra);stroke-width:1}
-.ring1{transform-origin:100px 100px;animation:fwd 34s linear infinite}
-.ring2{transform-origin:100px 100px;animation:rev 24s linear infinite}
-.ring3{transform-origin:100px 100px;animation:fwd 16s linear infinite}
-.core{transform-origin:100px 100px;animation:pulse 4s ease-in-out infinite}
+.ring1{transform-origin:100px 100px;animation:fwd 110s linear infinite}
+.ring2{transform-origin:100px 100px;animation:rev 84s linear infinite}
+.ring3{transform-origin:100px 100px;animation:fwd 62s linear infinite}
+.core{transform-origin:100px 100px;animation:pulse 11s ease-in-out infinite}
 @keyframes fwd{to{transform:rotate(360deg)}}
 @keyframes rev{to{transform:rotate(-360deg)}}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.82;transform:scale(1.06)}}

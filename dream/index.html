@@ -19,6 +19,26 @@
     })();
   </script>
   <link rel="stylesheet" href="/css/site.css">
+  <style>
+    /* Large, slow Sigma-0 mandala as a background layer behind the hero */
+    .hero { position: relative; }
+    .hero-bg {
+      position: absolute;
+      top: 44%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(94vw, 620px);
+      height: auto;
+      opacity: 0.18;
+      z-index: 0;
+      pointer-events: none;
+      user-select: none;
+    }
+    .hero > h1,
+    .hero > .tagline,
+    .hero > .hero-cta-row,
+    .hero > .sub { position: relative; z-index: 1; }
+  </style>
   <title>Lantern OS</title>
 </head>
 <body>
@@ -51,7 +71,7 @@
 
   <!-- ── Hero ── -->
   <div class="hero">
-    <img src="mandala.svg" class="hero-icon" aria-hidden="true" width="88" height="88" alt="" style="display:block;margin:0 auto 18px">
+    <img src="/sigma0-mandala.svg" class="hero-bg" aria-hidden="true" alt="">
     <h1>Lantern OS</h1>
     <p class="tagline" id="hero-tagline">Local-first personal OS. Private journal, interactive stories, and community dashboard — no account, no cloud required.</p>
     <div class="hero-cta-row">
