@@ -1,489 +1,561 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
-  <title>API Keys — Lantern OS</title>
+  <link rel="manifest" href="/manifest.json">
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem('lantern-theme');
+        var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light');
+      } catch(e) { document.documentElement.setAttribute('data-theme','dark'); }
+    })();
+  </script>
   <link rel="stylesheet" href="/css/site.css">
+  <title>Settings — Lantern OS</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      background: var(--bg-primary);
-      color: var(--text);
-    }
-
-    .page-container {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
-    .page-header {
-      padding: 40px 20px;
-      background: linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(59,130,246,0.05) 100%);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header-content {
-      max-width: 900px;
+    .settings-shell {
+      max-width: 580px;
       margin: 0 auto;
+      padding: 28px 20px 80px;
     }
 
-    .header-content h1 {
-      margin: 0 0 8px 0;
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-
-    .header-content p {
-      margin: 0;
-      font-size: 15px;
-      color: var(--text-secondary);
-      line-height: 1.5;
-    }
-
-    .page-main {
-      flex: 1;
-      padding: 40px 20px;
-      max-width: 900px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .provider-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 24px;
-      margin-bottom: 40px;
-    }
-
-    .provider-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      transition: all 0.3s ease;
-    }
-
-    .provider-card:hover {
-      border-color: rgba(6,182,212,0.5);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .provider-header {
+    .settings-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 20px;
-      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .settings-header h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+    .settings-header .close-btn {
+      background: none; border: none; font-size: 1.1rem;
+      color: var(--muted); cursor: pointer; padding: 4px 8px;
+      border-radius: 6px; line-height: 1;
+    }
+    .settings-header .close-btn:hover { color: var(--text); background: var(--surface2); }
+
+    .section-label {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      margin: 24px 0 8px;
     }
 
-    .provider-name {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 18px;
-      font-weight: 600;
+    /* ── Provider dropdown ── */
+    .provider-select {
+      width: 100%; padding: 10px 36px 10px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text); font-size: 0.92rem;
+      cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
     }
+    .provider-select:focus { outline: none; border-color: var(--accent); }
 
-    .provider-icon {
-      font-size: 24px;
-      line-height: 1;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .status-connected {
-      background: rgba(34, 197, 94, 0.15);
-      color: #22c55e;
-    }
-
-    .status-disconnected {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-    }
-
-    .status-testing {
-      background: rgba(251, 146, 60, 0.15);
-      color: #fb923c;
-    }
-
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-
-    .key-input-wrapper {
-      position: relative;
-      margin-bottom: 16px;
-    }
-
-    .key-input-wrapper label {
-      display: block;
+    /* ── Key cards ── */
+    .key-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
       margin-bottom: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      overflow: hidden;
     }
 
-    .key-input-wrapper input {
-      width: 100%;
-      padding: 12px 40px 12px 14px;
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-family: 'Monaco', 'Courier New', monospace;
-      font-size: 13px;
-      color: var(--text);
-      transition: border-color 0.2s;
+    .key-card-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px 0;
     }
-
-    .key-input-wrapper input:focus {
-      outline: none;
-      border-color: rgba(6,182,212,0.6);
-      background: var(--bg-tertiary);
+    .key-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+    .key-name { font-size: 0.92rem; font-weight: 600; flex: 1; }
+    .key-badge {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+      padding: 2px 8px; border-radius: 20px;
     }
+    .key-badge.connected    { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .key-badge.disconnected { background: rgba(107,114,128,0.12); color: var(--muted); }
+    .key-badge.testing      { background: rgba(251,146,60,0.15); color: #fb923c; }
+    .key-badge.error        { background: rgba(239,68,68,0.15); color: #ef4444; }
 
-    .toggle-visibility {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-secondary);
-      font-size: 16px;
-      padding: 4px 8px;
-      transition: color 0.2s;
+    .key-card-body { padding: 10px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+
+    .key-input-row { display: flex; gap: 8px; align-items: center; }
+    .key-input-row input {
+      flex: 1; padding: 9px 12px;
+      background: var(--bg, var(--surface2, rgba(0,0,0,0.2)));
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: monospace; font-size: 0.83rem;
+      transition: border-color 0.15s; min-width: 0;
     }
-
-    .toggle-visibility:hover {
-      color: var(--text);
+    .key-input-row input:focus { outline: none; border-color: var(--accent); }
+    .key-input-row input::placeholder { color: var(--muted); opacity: 0.7; }
+    .eye-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; color: var(--muted); font-size: 0.88rem;
+      padding: 8px 10px; line-height: 1; flex-shrink: 0;
     }
-
-    .button-group {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
+    .eye-btn:hover { color: var(--text); border-color: var(--accent); }
+    .save-btn {
+      padding: 9px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; border: none; background: var(--accent); color: #fff;
+      flex-shrink: 0; transition: opacity 0.15s;
     }
+    .save-btn:hover { opacity: 0.85; }
 
-    .btn {
-      padding: 11px 16px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--bg-primary);
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
+    .key-actions-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .key-actions-row a { font-size: 0.75rem; color: var(--accent); text-decoration: none; margin-right: auto; }
+    .key-actions-row a:hover { text-decoration: underline; }
+    .btn-pill {
+      padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--border);
+      background: none; color: var(--muted);
+      transition: border-color 0.15s, color 0.15s;
     }
+    .btn-pill:hover { border-color: var(--accent); color: var(--text); }
+    .btn-pill.clear:hover { color: #ef4444; border-color: #ef4444; }
 
-    .btn:hover {
-      background: var(--bg-secondary);
-      border-color: var(--accent);
+    /* ── Connectors ── */
+    .connector-list { display: flex; flex-direction: column; gap: 1px; }
+    .connector-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 16px;
+      background: var(--surface); border: 1px solid var(--border);
     }
-
-    .btn-primary {
-      background: rgba(59, 130, 246, 0.15);
-      border-color: rgba(59, 130, 246, 0.3);
-      color: #3b82f6;
+    .connector-row:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+    .connector-row:last-child  { border-radius: 0 0 var(--radius) var(--radius); }
+    .connector-row + .connector-row { border-top: none; }
+    .connector-icon { font-size: 1.05rem; width: 24px; text-align: center; flex-shrink: 0; }
+    .connector-meta { flex: 1; min-width: 0; }
+    .connector-name { font-size: 0.88rem; font-weight: 600; }
+    .connector-sub  { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+    .connector-actions { display: flex; align-items: center; gap: 8px; }
+    .conn-badge {
+      font-size: 0.7rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 20px; white-space: nowrap;
     }
+    .conn-badge.ready        { background: rgba(34,197,94,0.15); color: #22c55e; }
+    .conn-badge.disconnected { background: rgba(107,114,128,0.12); color: var(--muted); }
 
-    .btn-primary:hover {
-      background: rgba(59, 130, 246, 0.25);
-      border-color: #3b82f6;
+    /* ── Context toggles ── */
+    .toggle-list { display: flex; flex-direction: column; gap: 1px; }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface); border: 1px solid var(--border);
     }
-
-    .btn-success {
-      background: rgba(34, 197, 94, 0.15);
-      border-color: rgba(34, 197, 94, 0.3);
-      color: #22c55e;
+    .toggle-row:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+    .toggle-row:last-child  { border-radius: 0 0 var(--radius) var(--radius); }
+    .toggle-row + .toggle-row { border-top: none; }
+    .toggle-label { font-size: 0.88rem; font-weight: 500; }
+    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 21px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: var(--border);
+      border-radius: 21px; cursor: pointer; transition: background 0.2s;
     }
-
-    .btn-success:hover {
-      background: rgba(34, 197, 94, 0.25);
-      border-color: #22c55e;
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 15px; height: 15px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: transform 0.2s;
     }
+    input:checked + .toggle-slider { background: var(--accent); }
+    input:checked + .toggle-slider::before { transform: translateX(17px); }
 
-    .info-box {
-      background: rgba(6,182,212,0.08);
-      border-left: 3px solid rgba(6,182,212,0.5);
-      border-radius: 6px;
-      padding: 16px;
-      margin-top: 40px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--text-secondary);
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 18px; font-size: 0.85rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      transition: transform 0.22s ease, opacity 0.22s;
+      opacity: 0; pointer-events: none; white-space: nowrap; z-index: 999;
     }
-
-    .info-box strong {
-      color: var(--text);
-    }
-
-    @media (max-width: 600px) {
-      .provider-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .page-header {
-        padding: 30px 16px;
-      }
-
-      .page-main {
-        padding: 24px 16px;
-      }
-
-      .header-content h1 {
-        font-size: 24px;
-      }
-    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   </style>
 </head>
 <body>
-  <div class="page-container">
-    <nav class="site-nav">
-      <a class="nav-brand" href="/">
-        <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-        <span style="font-size:18px;font-weight:600">Lantern OS</span>
-      </a>
-      <div class="nav-links">
-        <a href="/dream-chat.html" style="font-size:16px;padding:12px 16px">⚙️ Work</a>
-        <a href="/trader-dashboard.html" style="font-size:16px;padding:12px 16px">📈 Trade</a>
-        <a href="/create.html" style="font-size:16px;padding:12px 16px">✏️ Create</a>
-      </div>
-      <div class="nav-actions">
-        <button class="nav-btn" id="theme-toggle" aria-label="Toggle light/dark mode" title="Light/Dark Mode">🌙</button>
-      </div>
-    </nav>
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
+    Lantern OS
+  </a>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Journal</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" title="Toggle light/dark">☀</button>
+  </div>
+</nav>
 
-    <div class="page-header">
-      <div class="header-content">
-        <h1>API Keys</h1>
-        <p>Connect your AI providers. Keys are stored locally in your browser and never sent to our servers.</p>
-      </div>
+<div class="page">
+<div class="settings-shell">
+
+  <div class="settings-header">
+    <h1>Settings</h1>
+    <button class="close-btn" onclick="history.back()" title="Close">✕</button>
+  </div>
+
+  <!-- AI Provider -->
+  <div class="section-label">AI Provider</div>
+  <select class="provider-select" id="provider-select">
+    <option value="auto">Auto (pick best)</option>
+    <option value="anthropic">Claude</option>
+    <option value="gemini">Gemini</option>
+    <option value="openai">ChatGPT</option>
+    <option value="xai">Grok</option>
+    <option value="ollama">Ollama (local)</option>
+  </select>
+
+  <!-- API Keys -->
+  <div class="section-label">API Keys</div>
+
+  <!-- Claude -->
+  <div class="key-card">
+    <div class="key-card-head">
+      <div class="key-icon">✦</div>
+      <div class="key-name">Claude</div>
+      <span class="key-badge disconnected" id="status-anthropic">disconnected</span>
     </div>
-
-    <div class="page-main">
-      <div class="provider-grid">
-        <!-- Claude -->
-        <div class="provider-card">
-          <div class="provider-header">
-            <div class="provider-name">
-              <div class="provider-icon">🤖</div>
-              <div>Claude</div>
-            </div>
-            <span class="status-badge status-disconnected" id="status-claude">
-              <span class="status-dot"></span>
-              Disconnected
-            </span>
-          </div>
-
-          <div class="key-input-wrapper">
-            <label for="key-claude">API Key</label>
-            <input type="password" id="key-claude" placeholder="sk-ant-..." autocomplete="off">
-            <button class="toggle-visibility" onclick="toggleVisibility('key-claude')">👁️</button>
-          </div>
-
-          <div class="button-group">
-            <button class="btn btn-primary" onclick="testKey('claude')">Test Connection</button>
-            <button class="btn btn-success" onclick="saveKey('claude')">Save</button>
-          </div>
-        </div>
-
-        <!-- Gemini -->
-        <div class="provider-card">
-          <div class="provider-header">
-            <div class="provider-name">
-              <div class="provider-icon">🌐</div>
-              <div>Gemini</div>
-            </div>
-            <span class="status-badge status-disconnected" id="status-gemini">
-              <span class="status-dot"></span>
-              Disconnected
-            </span>
-          </div>
-
-          <div class="key-input-wrapper">
-            <label for="key-gemini">API Key</label>
-            <input type="password" id="key-gemini" placeholder="AIza..." autocomplete="off">
-            <button class="toggle-visibility" onclick="toggleVisibility('key-gemini')">👁️</button>
-          </div>
-
-          <div class="button-group">
-            <button class="btn btn-primary" onclick="testKey('gemini')">Test Connection</button>
-            <button class="btn btn-success" onclick="saveKey('gemini')">Save</button>
-          </div>
-        </div>
-
-        <!-- ChatGPT -->
-        <div class="provider-card">
-          <div class="provider-header">
-            <div class="provider-name">
-              <div class="provider-icon">💬</div>
-              <div>ChatGPT</div>
-            </div>
-            <span class="status-badge status-disconnected" id="status-openai">
-              <span class="status-dot"></span>
-              Disconnected
-            </span>
-          </div>
-
-          <div class="key-input-wrapper">
-            <label for="key-openai">API Key</label>
-            <input type="password" id="key-openai" placeholder="sk-..." autocomplete="off">
-            <button class="toggle-visibility" onclick="toggleVisibility('key-openai')">👁️</button>
-          </div>
-
-          <div class="button-group">
-            <button class="btn btn-primary" onclick="testKey('openai')">Test Connection</button>
-            <button class="btn btn-success" onclick="saveKey('openai')">Save</button>
-          </div>
-        </div>
-
-        <!-- Grok -->
-        <div class="provider-card">
-          <div class="provider-header">
-            <div class="provider-name">
-              <div class="provider-icon">𝕏</div>
-              <div>Grok</div>
-            </div>
-            <span class="status-badge status-disconnected" id="status-grok">
-              <span class="status-dot"></span>
-              Disconnected
-            </span>
-          </div>
-
-          <div class="key-input-wrapper">
-            <label for="key-grok">API Key</label>
-            <input type="password" id="key-grok" placeholder="sk-..." autocomplete="off">
-            <button class="toggle-visibility" onclick="toggleVisibility('key-grok')">👁️</button>
-          </div>
-
-          <div class="button-group">
-            <button class="btn btn-primary" onclick="testKey('grok')">Test Connection</button>
-            <button class="btn btn-success" onclick="saveKey('grok')">Save</button>
-          </div>
-        </div>
+    <div class="key-card-body">
+      <div class="key-input-row">
+        <input type="password" id="input-anthropic" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+        <button class="eye-btn" onclick="toggleEye('anthropic')" title="Show/hide">👁</button>
+        <button class="save-btn" onclick="saveKey('anthropic')">Save</button>
       </div>
-
-      <div class="info-box">
-        <strong>🔒 Privacy First:</strong> Your API keys are stored only in your browser's local storage. They are never sent to Lantern's servers or any third party. You remain in complete control.
+      <div class="key-actions-row">
+        <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Get key →</a>
+        <button class="btn-pill" onclick="testKey('anthropic')">Test</button>
+        <button class="btn-pill clear" onclick="clearKey('anthropic')">Clear</button>
       </div>
     </div>
   </div>
 
-  <script>
-    // Theme toggle
-    document.getElementById('theme-toggle').addEventListener('click', () => {
-      const theme = document.documentElement.getAttribute('data-theme');
-      const newTheme = theme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
-      document.getElementById('theme-toggle').textContent = newTheme === 'dark' ? '🌙' : '☀️';
+  <!-- Gemini -->
+  <div class="key-card">
+    <div class="key-card-head">
+      <div class="key-icon">🌐</div>
+      <div class="key-name">Gemini</div>
+      <span class="key-badge disconnected" id="status-gemini">disconnected</span>
+    </div>
+    <div class="key-card-body">
+      <div class="key-input-row">
+        <input type="password" id="input-gemini" placeholder="AIzaSy…" autocomplete="off" spellcheck="false">
+        <button class="eye-btn" onclick="toggleEye('gemini')" title="Show/hide">👁</button>
+        <button class="save-btn" onclick="saveKey('gemini')">Save</button>
+      </div>
+      <div class="key-actions-row">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get key →</a>
+        <button class="btn-pill" onclick="testKey('gemini')">Test</button>
+        <button class="btn-pill clear" onclick="clearKey('gemini')">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ChatGPT -->
+  <div class="key-card">
+    <div class="key-card-head">
+      <div class="key-icon">◈</div>
+      <div class="key-name">ChatGPT</div>
+      <span class="key-badge disconnected" id="status-openai">disconnected</span>
+    </div>
+    <div class="key-card-body">
+      <div class="key-input-row">
+        <input type="password" id="input-openai" placeholder="sk-…" autocomplete="off" spellcheck="false">
+        <button class="eye-btn" onclick="toggleEye('openai')" title="Show/hide">👁</button>
+        <button class="save-btn" onclick="saveKey('openai')">Save</button>
+      </div>
+      <div class="key-actions-row">
+        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get key →</a>
+        <button class="btn-pill" onclick="testKey('openai')">Test</button>
+        <button class="btn-pill clear" onclick="clearKey('openai')">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grok -->
+  <div class="key-card">
+    <div class="key-card-head">
+      <div class="key-icon">𝕏</div>
+      <div class="key-name">Grok</div>
+      <span class="key-badge disconnected" id="status-xai">disconnected</span>
+    </div>
+    <div class="key-card-body">
+      <div class="key-input-row">
+        <input type="password" id="input-xai" placeholder="xai-…" autocomplete="off" spellcheck="false">
+        <button class="eye-btn" onclick="toggleEye('xai')" title="Show/hide">👁</button>
+        <button class="save-btn" onclick="saveKey('xai')">Save</button>
+      </div>
+      <div class="key-actions-row">
+        <a href="https://console.x.ai/" target="_blank" rel="noopener">Get key →</a>
+        <button class="btn-pill" onclick="testKey('xai')">Test</button>
+        <button class="btn-pill clear" onclick="clearKey('xai')">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connectors -->
+  <div class="section-label">Connectors</div>
+  <div class="connector-list">
+    <div class="connector-row">
+      <div class="connector-icon">🔌</div>
+      <div class="connector-meta">
+        <div class="connector-name">MCP Server</div>
+        <div class="connector-sub" id="mcp-sub">OAuth 2.0 · Port 8772</div>
+      </div>
+      <div class="connector-actions">
+        <span class="conn-badge disconnected" id="mcp-badge">Disconnected</span>
+        <button class="btn-pill" onclick="testMcp()">Connect</button>
+      </div>
+    </div>
+    <div class="connector-row">
+      <div class="connector-icon">🔍</div>
+      <div class="connector-meta">
+        <div class="connector-name">Web Search</div>
+        <div class="connector-sub">DuckDuckGo · No key needed</div>
+      </div>
+      <div class="connector-actions">
+        <span class="conn-badge ready" id="search-badge">Ready</span>
+        <button class="btn-pill" onclick="testWebSearch()">Test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Modes -->
+  <div class="section-label">Context Modes</div>
+  <div class="toggle-list">
+    <div class="toggle-row">
+      <span class="toggle-label">Web Search (MCP)</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="ctx-web" onchange="saveCtx('web',this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">CSF Memory / Symbols</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="ctx-csf" onchange="saveCtx('csf',this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Trading Context (IBKR)</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="ctx-trading" onchange="saveCtx('trading',this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/theme-toggle.js"></script>
+<script>
+document.getElementById('theme-toggle').addEventListener('click', () => { if (window.toggleTheme) toggleTheme(); });
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let _tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ── localStorage key map (old names → new) ────────────────────────────────
+// Old page used api_key_claude / api_key_gemini / api_key_openai / api_key_grok
+// New page uses  lantern_key_anthropic / lantern_key_gemini / lantern_key_openai / lantern_key_xai
+const OLD_KEY_MAP = { anthropic:'api_key_claude', gemini:'api_key_gemini', openai:'api_key_openai', xai:'api_key_grok' };
+const NEW_KEY     = id => 'lantern_key_' + id;
+
+function getStoredKey(id) {
+  return localStorage.getItem(NEW_KEY(id)) || localStorage.getItem(OLD_KEY_MAP[id]) || null;
+}
+function setStoredKey(id, val) {
+  localStorage.setItem(NEW_KEY(id), val);
+  // Also remove legacy key to avoid confusion
+  localStorage.removeItem(OLD_KEY_MAP[id]);
+}
+function removeStoredKey(id) {
+  localStorage.removeItem(NEW_KEY(id));
+  localStorage.removeItem(OLD_KEY_MAP[id]);
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function setStatus(id, state, label) {
+  const el = document.getElementById('status-' + id);
+  if (!el) return;
+  el.className = 'key-badge ' + state;
+  el.textContent = label || state;
+}
+
+function setInputPlaceholder(id, key) {
+  const inp = document.getElementById('input-' + id);
+  if (!inp) return;
+  inp.placeholder = key ? '•••••••• (set — enter new key to replace)' : { anthropic:'sk-ant-…', gemini:'AIzaSy…', openai:'sk-…', xai:'xai-…' }[id] || '…';
+  if (key) inp.value = ''; // clear input so placeholder shows
+}
+
+function toggleEye(id) {
+  const inp = document.getElementById('input-' + id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ── Key CRUD ───────────────────────────────────────────────────────────────
+async function saveKey(id) {
+  const inp = document.getElementById('input-' + id);
+  const val = inp.value.trim();
+  if (!val) { toast('Paste your key first'); inp.focus(); return; }
+
+  setStatus(id, 'testing', 'saving…');
+  // Persist to server .env.local first (so autowork can use it)
+  try {
+    const r = await fetch('/api/providers/set-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: id, key: val }),
     });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'server error');
+  } catch(e) {
+    // Server save failed — fall back to localStorage only
+    console.warn('server key save failed, using localStorage only:', e.message);
+  }
 
-    // Load theme preference
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    document.getElementById('theme-toggle').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+  // Always save to localStorage as well
+  setStoredKey(id, val);
+  inp.value = '';
+  setInputPlaceholder(id, val);
+  setStatus(id, 'connected', 'connected');
+  toast('✓ ' + id + ' key saved');
+}
 
-    // Toggle password visibility
-    function toggleVisibility(inputId) {
-      const input = document.getElementById(inputId);
-      input.type = input.type === 'password' ? 'text' : 'password';
+async function clearKey(id) {
+  try {
+    await fetch('/api/providers/set-key', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: id }),
+    });
+  } catch(e) { /* best-effort */ }
+  removeStoredKey(id);
+  document.getElementById('input-' + id).value = '';
+  setInputPlaceholder(id, null);
+  setStatus(id, 'disconnected', 'disconnected');
+  toast(id + ' key cleared');
+}
+
+async function testKey(id) {
+  setStatus(id, 'testing', 'testing…');
+  // Send the current input value as key override if filled in
+  const inp = document.getElementById('input-' + id);
+  const keyOverride = inp.value.trim() || null;
+  try {
+    const r = await fetch('/api/providers/test/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(keyOverride ? { key: keyOverride } : {}),
+      signal: AbortSignal.timeout(12000),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) { setStatus(id, 'connected', 'connected'); toast('✓ ' + id + ' connected'); }
+    else {
+      setStatus(id, 'error', 'error');
+      toast('✗ ' + (d.error || d.message || 'check your key'));
     }
+  } catch(e) {
+    setStatus(id, 'error', 'error');
+    toast('✗ ' + e.message);
+  }
+}
 
-    // Save API key
-    function saveKey(provider) {
-      const keyId = `key-${provider}`;
-      const input = document.getElementById(keyId);
-      const key = input.value.trim();
+// ── Connectors ─────────────────────────────────────────────────────────────
+async function testMcp() {
+  document.getElementById('mcp-badge').textContent = 'Checking…';
+  try {
+    const r = await fetch('http://127.0.0.1:8772/health', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('mcp-badge').className = 'conn-badge ready';
+      document.getElementById('mcp-badge').textContent = 'Connected';
+      document.getElementById('mcp-sub').textContent = 'OAuth 2.0 · Port 8772 · online';
+      toast('✓ MCP server reachable');
+    } else throw new Error('HTTP ' + r.status);
+  } catch(e) {
+    document.getElementById('mcp-badge').className = 'conn-badge disconnected';
+    document.getElementById('mcp-badge').textContent = 'Disconnected';
+    toast('MCP offline — start: python src/mcp_server/server.py');
+  }
+}
 
-      if (!key) {
-        alert('Please enter an API key');
-        return;
-      }
+async function testWebSearch() {
+  const badge = document.getElementById('search-badge');
+  badge.textContent = 'Testing…';
+  try {
+    await fetch('/api/web-search?q=lantern', { signal: AbortSignal.timeout(5000) });
+    badge.className = 'conn-badge ready'; badge.textContent = 'Ready';
+    toast('✓ Web search OK');
+  } catch(e) {
+    badge.className = 'conn-badge disconnected'; badge.textContent = 'Error';
+    toast('Web search error: ' + e.message);
+  }
+}
 
-      localStorage.setItem(`api_key_${provider}`, key);
-      const masked = '••••••••' + key.slice(-4);
-      input.placeholder = masked;
-      input.value = '';
+// ── Context toggles ────────────────────────────────────────────────────────
+function saveCtx(k, v) {
+  localStorage.setItem('lantern_ctx_' + k, v ? '1' : '0');
+  toast((v ? '✓ ' : '— ') + { web:'Web Search', csf:'CSF Memory', trading:'Trading Context' }[k]);
+}
+['web','csf','trading'].forEach(k => {
+  const el = document.getElementById('ctx-' + k);
+  if (el) el.checked = localStorage.getItem('lantern_ctx_' + k) === '1';
+});
 
-      updateStatus(provider, 'connected');
-      alert(`✓ ${provider} key saved locally`);
-    }
+// ── Provider preference ────────────────────────────────────────────────────
+const provSel = document.getElementById('provider-select');
+provSel.value = localStorage.getItem('lantern-provider') || 'auto';
+provSel.addEventListener('change', () => {
+  localStorage.setItem('lantern-provider', provSel.value);
+  toast('Provider set: ' + provSel.options[provSel.selectedIndex].text);
+});
 
-    // Test API key
-    async function testKey(provider) {
-      const statusEl = document.getElementById(`status-${provider}`);
-      const originalText = statusEl.innerHTML;
-      statusEl.textContent = 'Testing...';
-      statusEl.className = 'status-badge status-testing';
+// ── Boot: load keys (localStorage first, then server .env overlay) ─────────
+const PROVIDERS = ['anthropic','gemini','openai','xai'];
 
-      try {
-        const response = await fetch(`/api/providers/test/${provider}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
+function initLocalKeys() {
+  PROVIDERS.forEach(id => {
+    const key = getStoredKey(id);
+    setInputPlaceholder(id, key);
+    if (key) setStatus(id, 'connected', 'connected');
+  });
+}
 
-        if (response.ok) {
-          updateStatus(provider, 'connected');
-          alert(`✓ ${provider} connection successful`);
-        } else {
-          updateStatus(provider, 'disconnected');
-          alert(`✗ Connection failed. Please check your API key.`);
-        }
-      } catch (error) {
-        updateStatus(provider, 'disconnected');
-        alert(`✗ Test failed: ${error.message}`);
-      }
-    }
-
-    // Update status badge
-    function updateStatus(provider, status) {
-      const statusEl = document.getElementById(`status-${provider}`);
-      if (status === 'connected') {
-        statusEl.innerHTML = '<span class="status-dot"></span>Connected';
-        statusEl.className = 'status-badge status-connected';
-      } else {
-        statusEl.innerHTML = '<span class="status-dot"></span>Disconnected';
-        statusEl.className = 'status-badge status-disconnected';
-      }
-    }
-
-    // Load initial key status
-    ['claude', 'gemini', 'openai', 'grok'].forEach(provider => {
-      const key = localStorage.getItem(`api_key_${provider}`);
-      if (key) {
-        updateStatus(provider, 'connected');
-        const masked = '••••••••' + key.slice(-4);
-        document.getElementById(`key-${provider}`).placeholder = masked;
-      } else {
-        updateStatus(provider, 'disconnected');
+async function overlayServerKeys() {
+  try {
+    const r = await fetch('/api/pcsf/routing', { cache:'no-store', signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return;
+    const data = await r.json();
+    const map = { anthropic:'anthropic', gemini:'gemini', openai:'openai', xai:'xai' };
+    (data.providers || []).forEach(p => {
+      const id = map[p.id];
+      if (!id || !p.hasKey) return;
+      setStatus(id, 'connected', 'connected');
+      // Only update placeholder if not already set in localStorage
+      const inp = document.getElementById('input-' + id);
+      if (inp && !getStoredKey(id) && inp.placeholder.indexOf('set') === -1) {
+        inp.placeholder = '•••••••• (set in .env)';
       }
     });
-  </script>
+  } catch(e) { /* server offline — localStorage still shown */ }
+}
+
+initLocalKeys();
+overlayServerKeys();
+</script>
 </body>
 </html>
