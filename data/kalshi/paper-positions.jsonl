@@ -396,3 +396,10 @@
 {"event": "open", "id": "paper_1781589724953_b83d", "ts": "2026-06-16T06:02:04.953428Z", "ticker": "KXBNB15M-26JUN160215-15", "title": "BNB price up in next 15 mins?", "side": "yes", "action": "buy", "count": 1, "limitCents": 66, "cio_edge": 0.3654, "source": "crypto_live_trader"}
 {"event": "open", "id": "paper_1781589769473_exlp", "ts": "2026-06-16T06:02:49.473147Z", "ticker": "KXSOL15M-26JUN160215-15", "title": "SOL price up in next 15 mins?", "side": "yes", "action": "buy", "count": 1, "limitCents": 74, "cio_edge": 0.2673, "source": "crypto_live_trader"}
 {"event": "open", "id": "paper_1781589780533_64xm", "ts": "2026-06-16T06:03:00.533297Z", "ticker": "KXETH15M-26JUN160215-15", "title": "ETH price up in next 15 mins?", "side": "yes", "action": "buy", "count": 1, "limitCents": 67, "cio_edge": 0.3558, "source": "crypto_live_trader"}
+{"event": "close", "id": "paper_1781590696595_lk0g", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:10.093845Z"}
+{"event": "close", "id": "paper_1781590742196_tzhx", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:10.509811Z"}
+{"event": "close", "id": "paper_1781590674517_7tv0", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:10.682084Z"}
+{"event": "close", "id": "paper_1781590708804_vb25", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:11.029605Z"}
+{"event": "close", "id": "paper_1781590673751_dibd", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:21.221857Z"}
+{"event": "close", "id": "paper_1781590708031_130o", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:21.582549Z"}
+{"event": "close", "id": "paper_1781590674775_qbiq", "exitTag": "RESOLVED", "exitPriceCents": 100, "pnlPct": 1.0, "correct": true, "closedAt": "2026-06-16T06:30:33.537865Z"}
