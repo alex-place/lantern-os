@@ -571,6 +571,17 @@
                 if (evt.cleanText && evt.cleanText !== fullText) {
                   bubble.textContent = evt.cleanText;
                 }
+                // Update Loop Depth observer panel (Ouro Σ₀ CDF exit)
+                try {
+                  const loopN = evt.loop_n ?? 1;
+                  const conf = evt.confidence ?? (evt.sigma0?.claims ? Math.min(1, 0.5 + evt.sigma0.claims * 0.08) : 0.5);
+                  const exitReason = evt.exit_reason ?? 'single_pass';
+                  const loopEl = document.getElementById('obs-loop-depth');
+                  const fillEl = document.getElementById('obs-loop-fill');
+                  if (loopEl) loopEl.textContent = `⟳ ${loopN} loop${loopN !== 1 ? 's' : ''} · ${Math.round(conf * 100)}% conf · ${exitReason}`;
+                  if (fillEl) fillEl.style.width = (conf * 100) + '%';
+                } catch (_) {}
+
                 // Parse [DOORS: A name | B name | C name] from full text if backend didn't extract
                 let suggestions = evt.suggestions;
                 if (!suggestions || suggestions.length === 0) {

@@ -156,6 +156,37 @@
       </div>
     </div>
 
+    <div class="section" id="research-papers">
+      <h2>Research Papers</h2>
+      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Foundational papers that shaped the Σ₀ loop reasoner, CDF exit gate, and continuous-latent reasoning. Open in-page or view on arXiv.</p>
+      <div class="link-grid">
+        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__ouro-looped-llm')">
+          <span class="icon">⟳</span>
+          <h3>Ouro — Looped LLMs</h3>
+          <p>arXiv 2510.25741 · Weight-shared looped transformer. 2.6B r4 matches 8B standard. CDF exit gate (τ=0.85). AIME24: 73%.</p>
+          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
+        </a>
+        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__coconut-latent-reasoning')">
+          <span class="icon">🧠</span>
+          <h3>Coconut — Latent Reasoning</h3>
+          <p>arXiv 2412.06769 · Continuous thought: hidden state fed back as next input. BFS-like latent search instead of greedy CoT.</p>
+          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
+        </a>
+        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__subliminal-learning')">
+          <span class="icon">🔬</span>
+          <h3>Subliminal Learning</h3>
+          <p>arXiv 2507.14805 · Models transmit behavioral traits via semantically unrelated distillation data (code, numbers). AI safety concern.</p>
+          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
+        </a>
+        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__gpt2')">
+          <span class="icon">📄</span>
+          <h3>GPT-2 (Radford et al. 2019)</h3>
+          <p>Language Models are Unsupervised Multitask Learners. Foundation paper — zero-shot task transfer from language model pretraining.</p>
+          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
+        </a>
+      </div>
+    </div>
+
     <div class="section">
       <h2>Research &amp; Theory</h2>
       <div class="link-grid">
@@ -339,6 +370,20 @@
   }).catch(()=>{ content.innerHTML = '<div class="lib-empty">Library unavailable — run: python scripts/build_library_thumbs.py</div>'; });
 
   search.addEventListener('input', () => render(search.value));
+
+  // Global: open a specific PDF by id (used by Research Papers link-cards)
+  window.openLibraryPdf = function(id){
+    const e = entries.find(x => x.id === id);
+    if(e){ openPdf(e); }
+    else {
+      // If library hasn't loaded yet, fetch then open
+      fetch('/api/library/list').then(r=>r.json()).then(d=>{
+        entries = d.entries || [];
+        const found = entries.find(x => x.id === id);
+        if(found) openPdf(found);
+      }).catch(()=>{});
+    }
+  };
 })();
 </script>
 </body>

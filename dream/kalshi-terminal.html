@@ -52,8 +52,8 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .stage{position:relative;width:min(440px,94vw);height:min(500px,62vh)}
 
 .card{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border);
-  border-radius:10px;padding:18px;display:flex;flex-direction:column;
-  box-shadow:var(--shadow);will-change:transform;touch-action:none;cursor:grab;user-select:none}
+  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;
+  box-shadow:var(--shadow);will-change:transform;touch-action:none;cursor:grab;user-select:none;overflow:hidden}
 .card.front{box-shadow:var(--shadow-hover);z-index:2;border-color:#3a4355}
 .card.peek{transform:scale(.94) translateY(18px);filter:brightness(.65);z-index:1;pointer-events:none}
 .card.peek2{transform:scale(.88) translateY(36px);filter:brightness(.45);z-index:0;pointer-events:none}
@@ -65,15 +65,19 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .card-klass.position{color:var(--accent)}.card-klass.exit{color:var(--danger)}.card-klass.engine,.card-klass.suggestion{color:var(--gold)}.card-klass.crypto{color:var(--green)}.card-klass.convergence{color:var(--green);font-size:11px}
 .countdown{font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px}
 .countdown.soon{color:var(--gold)}.countdown.now{color:var(--danger)}
+/* uniform real-time generation-age chip — same on every card kind */
+.gen-age{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;font-weight:600;
+  color:var(--green);letter-spacing:.04em;padding:1px 6px;border:1px solid var(--green);
+  border-radius:999px;background:rgba(0,212,170,.06);white-space:nowrap}
 
-.card-q{font-size:17px;font-weight:600;line-height:1.4;margin:8px 0 12px;color:var(--text);
+.card-q{font-size:16px;font-weight:600;line-height:1.35;margin:6px 0 8px;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 
 /* favorable hero */
-.fav{border-radius:8px;padding:12px 14px;margin:8px 0 12px;border:1px solid var(--border);background:var(--bg)}
+.fav{border-radius:8px;padding:9px 11px;margin:6px 0 8px;border:1px solid var(--border);background:var(--bg)}
 .fav.yes{border-color:var(--green);background:rgba(0,212,170,.04)}.fav.no{border-color:var(--danger);background:rgba(255,95,109,.04)}
 .fav-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.fav-act{font-size:21px;font-weight:800;margin:6px 0 4px;line-height:1.2;
+.fav-act{font-size:19px;font-weight:800;margin:4px 0 3px;line-height:1.2;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .fav.yes .fav-act{color:var(--green)}.fav.no .fav-act{color:var(--danger)}
 .fav-px{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace}
@@ -89,13 +93,13 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .ribbon.profit{background:rgba(52,211,153,.08);border-color:var(--green);color:var(--green)}
 
 /* market meta strip */
-.card-meta{display:flex;gap:12px;align-items:center;padding:8px 0 4px;font-size:11px;
+.card-meta{display:flex;gap:10px;align-items:center;padding:5px 0 3px;font-size:11px;
   color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace;border-top:1px solid var(--border);margin-top:auto}
 .card-meta span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card-meta .meta-badge{padding:1px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface);font-size:10px;font-weight:600;letter-spacing:.06em}
 
 /* card actions */
-.card-actions{display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.card-actions{display:flex;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .card-actions button{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);transition:all .15s}
 .card-actions .btn-pass,.card-actions .btn-skip{color:var(--muted);border-color:var(--border)}
 .card-actions .btn-pass:hover,.card-actions .btn-skip:hover{background:rgba(255,255,255,.05);color:var(--text)}
@@ -106,11 +110,11 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .card.peek .card-actions,.card.peek2 .card-actions{display:none}
 
 /* sides */
-.sides{display:flex;gap:8px;padding-top:8px}
-.side{flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 6px;text-align:center;background:var(--bg)}
+.sides{display:flex;gap:6px;padding-top:6px}
+.side{flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 6px;text-align:center;background:var(--bg)}
 .side .lbl{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-transform:uppercase;letter-spacing:.08em;font-family:'IBM Plex Mono',ui-monospace,monospace}
-.side .pct{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:19px;font-weight:600;margin-top:3px}
+.side .pct{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:17px;font-weight:600;margin-top:2px}
 .side.yes .pct{color:var(--green)}.side.no .pct{color:var(--danger)}
 
 /* stamps */
@@ -216,6 +220,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     <span class="nav-stat" id="cCreds" aria-label="Credentials status">—</span>
     <span id="cMode" aria-label="Trading mode"><span class="pill held">—</span></span>
     <span class="nav-stat" id="cFresh" aria-label="Data freshness"><span class="dot" id="sdot"></span>—</span>
+    <span class="nav-stat" id="cLive" aria-label="Live poller status" style="font-size:11px;color:var(--green)">⟳ —</span>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode" onclick="toggleTheme()">☀</button>
   </div>
 </nav>
@@ -257,9 +262,30 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <script>
 const API='/api/trading/kalshi';
-const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10;
+const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
 let lastSyncMs=0, lastDetCount=null;
+
+// ── real-time freshness ───────────────────────────────────────────────────────
+// Every card carries _genMs (server generatedAt, else receipt time). Only cards
+// generated within MAX_AGE_MS are shown; the rest are flushed continuously so the
+// deck is always live and never serves a stale design.
+function stampCards(cards, genAt){
+  const ms = genAt ? Date.parse(genAt) : NaN;
+  const base = isFinite(ms) ? ms : Date.now();
+  for(const c of (cards||[])) c._genMs = base;
+  return cards||[];
+}
+function cardAgeMs(card){ return card._genMs==null ? Infinity : Date.now()-card._genMs; }
+function isFresh(card){ return cardAgeMs(card) < MAX_AGE_MS; }
+// Drop non-fresh cards. Never yank a card mid-drag. Returns true if the visible
+// front card was removed (caller must re-render); pruning hidden cards needs none.
+function flushStale(){
+  for(let i=deck.length-1;i>idx;i--){ if(!isFresh(deck[i])) deck.splice(i,1); }
+  let frontChanged=false;
+  if(!dragging){ while(idx<deck.length && !isFresh(deck[idx])){ deck.splice(idx,1); frontChanged=true; } }
+  return frontChanged;
+}
 
 function toggleTheme(){
   const el=document.documentElement;
@@ -298,10 +324,28 @@ async function loadBalance(){
 }
 
 // ── syncDeck: initial load + live merge every SYNC_MS ────────────────────────
-// Show only positions marked for EXIT (sell/close) — no open holds
+// Show all open positions (exits first, then holds) + suggestion fill
 async function syncDeck(){
-  const d=await j('/positions-deck?exitsOnly=true');
+  const d=await j('/positions-deck');
+  // GLOBAL TRADING-PAUSE: server cleared all cards. Force-empty the deck (the
+  // in-place prune never removes the front card deck[idx]) and show why.
+  if(d.paused){
+    deck=[]; idx=0; liveMap={};
+    const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
+    const end=document.getElementById('end');
+    if(end){
+      end.style.display='flex';
+      end.innerHTML='<div style="color:var(--gold);font-weight:700">⏸ TRADING PAUSED</div>'
+        +'<div style="font-size:12px;color:var(--muted);max-width:320px">'
+        +(d.note||'All cards cleared until a strategy is proven net-profitable after fees.')+'</div>'
+        +'<button class="btn-ghost" onclick="syncDeck()">↻ Re-check</button>';
+    }
+    const prog=document.getElementById('progress'); if(prog) prog.textContent='';
+    markFresh(0);
+    return;
+  }
   if(!d.cards) return;
+  stampCards(d.cards, d.generatedAt);   // re-stamped each 5s sync → positions stay live
   // Drop positions that expired more than 5 minutes ago — they can't be acted on
   const fresh=d.cards.filter(c=>c.minsToClose==null||c.minsToClose>-5);
   liveMap={}; for(const x of fresh) liveMap[x.ticker]=x;
@@ -383,15 +427,20 @@ async function maybePrefetch(){
   prefetching=true;
   try {
     const pendingTickers=new Set(deck.slice(idx).map(c=>c.ticker));
-    const [det, ie, cry]=await Promise.all([
-      j('/decisive-deck?risk=0.5').then(d=>d.cards||[]).catch(()=>[]),
-      j('/impossibility-deck').then(d=>d.cards||[]),
-      j('/crypto-intraday').then(d=>d.cards||[]),
+    const [detR, ieR, cryR]=await Promise.all([
+      j('/decisive-deck?risk=0.5').catch(()=>({})),
+      j('/impossibility-deck').catch(()=>({})),
+      j('/crypto-intraday').catch(()=>({})),
     ]);
-    const detCards=det.filter(c=>!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
-    const ieDet=ie.filter(c=>c.stateLabel==='DETERMINED'&&!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
-    const ieConf=ie.filter(c=>c.stateLabel==='CONFIDENT'&&!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
-    const fill=cry.filter(c=>!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
+    const det=stampCards(detR.cards, detR.generatedAt);
+    const ie =stampCards(ieR.cards,  ieR.generatedAt);
+    const cry=stampCards(cryR.cards, cryR.generatedAt);
+    // only admit cards generated within the last minute
+    const ok=c=>!pendingTickers.has(c.ticker)&&isFresh(c)&&isSuggestionTradeable(c);
+    const detCards=det.filter(ok);
+    const ieDet=ie.filter(c=>c.stateLabel==='DETERMINED'&&ok(c));
+    const ieConf=ie.filter(c=>c.stateLabel==='CONFIDENT'&&ok(c));
+    const fill=cry.filter(ok);
     // Σ₀-ranked decisive cards first, then IE/crypto fill; de-dup by ticker; sort by Σ₀ score
     const seen=new Set(); const merged=[];
     for(const c of [...detCards,...ieDet,...ieConf,...fill]){ if(seen.has(c.ticker))continue; seen.add(c.ticker); merged.push(c); }
@@ -400,15 +449,22 @@ async function maybePrefetch(){
     if(!toAdd.length) return;
     deck.push(...toAdd);
     // Keep the not-yet-swiped portion Σ₀-ranked so the best risk-adjusted swipe
-    // leads (later-arriving decisive cards must not get stuck behind fill cards).
+    // leads — but NEVER reorder the card currently on screen (deck[idx]). Sorting
+    // from idx+1 keeps the visible front stable, which is what was causing the
+    // design to visibly switch/flicker on each prefetch cycle.
     if(!dragging){
-      const head=deck.slice(0,idx);
-      const tail=deck.slice(idx).sort((a,b)=>(b.sigma0?.score||0)-(a.sigma0?.score||0));
+      const head=deck.slice(0,idx+1);
+      const tail=deck.slice(idx+1).sort((a,b)=>(b.sigma0?.score||0)-(a.sigma0?.score||0));
       deck=head.concat(tail);
     }
     const rem=deck.length-idx;
     document.getElementById('progress').textContent=rem>0?`Card ${deck.length-rem+1} of ${deck.length} · soonest first`:'';
-    if(!dragging&&idx<deck.length) render();
+    // Only do a full render when there is no card on screen yet (came from the end
+    // screen / empty deck). Otherwise refresh the front in place — no stage rebuild,
+    // no flicker. Peek layers refresh on the next genuine card change (a swipe).
+    if(!dragging&&idx<deck.length){
+      if(!document.getElementById('front')) render(); else patchFront(deck[idx]);
+    }
   } catch(_){}
   finally{ prefetching=false; }
 }
@@ -425,14 +481,12 @@ function sigma0Badge(card){
   const conf=s.confidence!=null?Math.round(s.confidence*100)+'%':'—';
   const ev=s.ev_cents, reward=s.reward_cents;
   const evCol=ev>0?'var(--green)':'var(--danger)';
-  return `<div style="margin-top:8px;padding:7px 8px;border:1px solid #2c3446;border-radius:8px;background:#11151d;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;line-height:1.55">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--muted)">Σ₀ end-state → <b style="color:${endCol}">${end}</b></span>
+  return `<div style="margin-top:6px;padding:6px 8px;border:1px solid #2c3446;border-radius:7px;background:#11151d;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;line-height:1.5">
+    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;margin-bottom:3px">
+      <span style="color:var(--muted)">Σ₀ → <b style="color:${endCol}">${end}</b> &nbsp;win <b style="color:#e8edf5">${pWin}</b> &nbsp;loss <b style="color:var(--danger)">${loss}</b></span>
       <span style="color:${vCol};font-weight:700">${s.verdict||''}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;margin-top:3px;color:var(--muted)">
-      <span>win <b style="color:#e8edf5">${pWin}</b></span>
-      <span>loss <b style="color:var(--danger)">${loss}</b></span>
+    <div style="display:flex;gap:10px;color:var(--muted)">
       <span>Δ <b style="color:var(--green)">+${reward!=null?reward+'¢':'—'}</b></span>
       <span>EV <b style="color:${evCol}">${ev!=null?(ev>0?'+':'')+ev+'¢':'—'}</b></span>
       <span>conf <b style="color:#e8edf5">${conf}</b></span>
@@ -502,24 +556,26 @@ function fmtCountdown(card){
 
 function fmtStrategyFitness(fitness){
   if(!fitness) return '';
+  const cnt=fitness.count||0;
+  if(!cnt) return ''; // hide when no trade history yet
   const pnl=(fitness.pnl||0).toFixed(1);
   const dd=(fitness.drawdown||0).toFixed(1);
   const stab=(fitness.stability||0).toFixed(1);
-  const cnt=fitness.count||0;
-  return `<div style="margin-top:8px;padding:8px;border-radius:4px;background:var(--bg);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
-    <div style="margin-bottom:4px;font-weight:600">Strategy Fitness</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <span>PnL: <b>${pnl}%</b></span>
-      <span>Drawdown: <b>${dd}%</b></span>
-      <span>Stability: <b>${stab}</b></span>
-      <span style="margin-left:auto">${cnt} trades</span>
-    </div>
+  const pnlCol=fitness.pnl>0?'var(--green)':fitness.pnl<0?'var(--danger)':'var(--muted)';
+  return `<div style="margin-top:6px;padding:5px 8px;border-radius:4px;background:var(--bg);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;gap:10px;align-items:center">
+    <span style="font-weight:600;color:var(--muted)">Fitness</span>
+    <span>PnL <b style="color:${pnlCol}">${fitness.pnl>0?'+':''}${pnl}%</b></span>
+    <span>DD <b>${dd}%</b></span>
+    <span>Stab <b>${stab}</b></span>
+    <span style="margin-left:auto">${cnt} trades</span>
   </div>`;
 }
 
 function cardInner(card){
   const noPct=100-(card.yesPct||0);
   const cd=fmtCountdown(card);
+  const ageS=Math.floor(cardAgeMs(card)/1000);
+  const genAge=`<span class="gen-age">◉ ${ageS<2?'live':ageS+'s old'}</span>`;
   const fav=card.favSide;
   const isPosition=card.kind==='position';
   const isExit=card.kind==='exit';
@@ -549,7 +605,7 @@ function cardInner(card){
     return `
       <div class="stamp take">EXIT</div><div class="stamp pass">HOLD</div>
       ${ribbon}
-      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${regimeLabel}<span class="card-klass position">YOUR POSITION</span></div>
+      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${genAge}${regimeLabel}<span class="card-klass position">YOUR POSITION</span></div>
       <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
       <div class="fav ${favClass}">
         <div class="fav-tag">${card.qty||1} × ${fav.toUpperCase()} — Exit position</div>
@@ -590,7 +646,7 @@ function cardInner(card){
     const why3=parseSideWhy(card);
     return `
       <div class="stamp take">LOCK IN</div><div class="stamp pass">SKIP</div>
-      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${regimeLabel}<span class="card-klass convergence">PROFIT PLAY</span></div>
+      <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${genAge}${regimeLabel}<span class="card-klass convergence">PROFIT PLAY</span></div>
       <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
       <div class="fav yes">
         <div class="fav-tag">Buy ${fav.toUpperCase()} — lock in ${profit}¢ profit (${roi}% ROI)</div>
@@ -642,7 +698,7 @@ function cardInner(card){
   return `
     <div class="stamp take">${isSell?'EXIT':'TAKE'}</div><div class="stamp pass">PASS</div>
     ${ribbon}
-    <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${regimeLabel}${stateBadge}<span class="card-klass ${klLabel}">${klLabel.toUpperCase()}</span></div>
+    <div class="card-top"><span class="countdown ${cd.cls}">${cd.txt}</span>${genAge}${regimeLabel}${stateBadge}<span class="card-klass ${klLabel}">${klLabel.toUpperCase()}</span></div>
     <h3 class="card-q">${cleanTitle(card.title,card.ticker)}</h3>
     <div class="fav ${favClass}">
       <div class="fav-tag">${isSell?'Exit recommended':'Best entry now'}</div>
@@ -704,10 +760,21 @@ function render(){
 // tick countdown + freshness every second
 setInterval(()=>{
   updateFreshnessChip();
-  if(dragging||idx>=deck.length) return;
+  if(dragging) return;
+  // flush cards older than one minute; only re-render if the visible front went stale
+  const frontChanged=flushStale();
+  if(frontChanged){
+    if(idx>=deck.length){ document.getElementById('end').style.display='flex'; maybePrefetch(); }
+    else render();
+  }
+  if(deck.length-idx<PREFETCH_AT) maybePrefetch();
+  if(idx>=deck.length) return;
   const el=document.getElementById('front'); if(!el) return;
   const cd=fmtCountdown(deck[idx]); const c=el.querySelector('.countdown');
   if(c){ c.textContent=cd.txt; c.className='countdown '+cd.cls; }
+  // live-age indicator on the front card's generation (consistent across all kinds)
+  const ageEl=el.querySelector('.gen-age');
+  if(ageEl){ const a=Math.floor(cardAgeMs(deck[idx])/1000); ageEl.textContent=`◉ ${a<2?'live':a+'s old'}`; }
 },1000);
 
 // ── swipe with deadzone + minimum distance + velocity ────────────────────────
@@ -941,52 +1008,65 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Escape') closeImageModal();
 });
 
+// ── live-status heartbeat ─────────────────────────────────────────────────────
+async function pollLiveStatus(){
+  try {
+    const d = await fetch(API+'/live-status', {cache:'no-store', signal: AbortSignal.timeout(4000)});
+    if(!d.ok){ document.getElementById('cLive').textContent='⟳ —'; return; }
+    const s = await d.json();
+    const mkt = s.marketCount ?? '?';
+    const trained = s.selfTrainRounds ?? 0;
+    const alive = s.pollerStatus === 'running';
+    const chip = document.getElementById('cLive');
+    if(chip){
+      chip.textContent = `⟳ live · ${mkt} mkt · ✦${trained}`;
+      chip.style.color = alive ? 'var(--green)' : 'var(--gold)';
+    }
+  } catch(_){ /* silent */ }
+}
+
 // Polling interval references for visibility-based pausing
-let connInterval, balInterval, syncInterval, imgInterval;
+let connInterval, balInterval, syncInterval, imgInterval, liveInterval;
 
 function init(){
   // Restore saved theme
   try{const t=localStorage.getItem('kalshi-theme');if(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀':'🌙';}}catch(_){}
-  loadConnection(); loadBalance(); syncDeck(); loadImages();
-  
+  loadConnection(); loadBalance(); syncDeck(); loadImages(); pollLiveStatus();
+
   // Start polling with normal intervals
   connInterval=setInterval(loadConnection,20000);
   balInterval=setInterval(loadBalance,30000);
   syncInterval=setInterval(syncDeck,SYNC_MS);
   imgInterval=setInterval(loadImages,60000);
+  liveInterval=setInterval(pollLiveStatus,15000);
   
   // Pause/resume on visibility change to save API quota and battery
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
       // Clear all intervals when tab is hidden
-      clearInterval(connInterval);
-      clearInterval(balInterval);
-      clearInterval(syncInterval);
-      clearInterval(imgInterval);
-      
+      clearInterval(connInterval); clearInterval(balInterval);
+      clearInterval(syncInterval); clearInterval(imgInterval); clearInterval(liveInterval);
+
       // Set slow fallback intervals (30s for syncDeck, others 2x slower)
       connInterval=setInterval(loadConnection,40000);
       balInterval=setInterval(loadBalance,60000);
       syncInterval=setInterval(syncDeck,30000);
       imgInterval=setInterval(loadImages,120000);
+      liveInterval=setInterval(pollLiveStatus,60000);
     }else{
       // Clear slow intervals
-      clearInterval(connInterval);
-      clearInterval(balInterval);
-      clearInterval(syncInterval);
-      clearInterval(imgInterval);
-      
+      clearInterval(connInterval); clearInterval(balInterval);
+      clearInterval(syncInterval); clearInterval(imgInterval); clearInterval(liveInterval);
+
       // Restore normal intervals
       connInterval=setInterval(loadConnection,20000);
       balInterval=setInterval(loadBalance,30000);
       syncInterval=setInterval(syncDeck,SYNC_MS);
       imgInterval=setInterval(loadImages,60000);
-      
+      liveInterval=setInterval(pollLiveStatus,15000);
+
       // Immediate refresh on tab focus
-      loadConnection();
-      loadBalance();
-      syncDeck();
-      loadImages();
+      loadConnection(); loadBalance(); syncDeck(); loadImages(); pollLiveStatus();
     }
   });
 }
