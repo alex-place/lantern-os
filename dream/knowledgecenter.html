@@ -43,26 +43,53 @@
     .link-card h3 { font-size: 0.92rem; font-weight: 600; }
     .link-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
 
-    /* ── Library panel ── */
-    .lib-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
-    .lib-search { flex:1; min-width:180px; padding:9px 12px; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--text); font-size:0.85rem; }
-    .lib-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:16px; }
-    .lib-card { display:flex; flex-direction:column; gap:0; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s, transform .15s; text-align:left; padding:0; font:inherit; }
-    .lib-card:hover { border-color:var(--accent); transform:translateY(-2px); }
-    .lib-thumb { width:100%; aspect-ratio:3/4; object-fit:cover; object-position:top center; background:var(--surface2); display:block; }
-    .lib-meta { padding:10px 12px 12px; }
-    .lib-meta h3 { font-size:0.8rem; font-weight:600; line-height:1.25; margin:0 0 4px; color:var(--text); }
-    .lib-meta .lib-cat { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.03em; }
-    .lib-meta .lib-sub { font-size:0.68rem; color:var(--muted); margin-top:2px; }
-    .lib-group-title { font-size:0.85rem; font-weight:700; color:var(--muted); margin:22px 0 12px; text-transform:uppercase; letter-spacing:0.04em; }
-    .lib-modal { position:fixed; inset:0; background:rgba(0,0,0,0.78); display:none; align-items:center; justify-content:center; z-index:1000; padding:24px; }
-    .lib-modal.open { display:flex; }
-    .lib-modal-inner { background:var(--surface); border:1px solid var(--border); border-radius:14px; width:min(1000px,96vw); height:90vh; display:flex; flex-direction:column; overflow:hidden; }
-    .lib-modal-head { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); }
-    .lib-modal-head h3 { font-size:0.9rem; font-weight:600; flex:1; color:var(--text); margin:0; }
-    .lib-modal-head a, .lib-modal-head button { font-size:0.8rem; color:var(--accent); background:none; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer; text-decoration:none; }
-    .lib-modal iframe { flex:1; width:100%; border:0; background:#fff; }
-    .lib-empty { color:var(--muted); font-size:0.85rem; padding:18px; border:1px dashed var(--border); border-radius:10px; }
+    /* PDF gallery */
+    .pdf-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .pdf-search {
+      flex: 1; min-width: 180px; padding: 7px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.88rem;
+    }
+    .pdf-search:focus { outline: none; border-color: var(--accent); }
+    .pdf-count { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .pdf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .pdf-card {
+      position: relative;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: 12px 10px 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; text-decoration: none; color: var(--text);
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      overflow: hidden;
+    }
+    .pdf-card:hover { border-color: var(--accent); background: var(--surface2); transform: translateY(-2px); }
+    .pdf-card.hidden { display: none; }
+    .pdf-delete {
+      position: absolute; top: 6px; right: 6px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(239,68,68,0.85); color: #fff;
+      border: none; cursor: pointer; font-size: 13px; line-height: 22px; text-align: center;
+      opacity: 0; transition: opacity 0.15s;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2;
+    }
+    .pdf-card:hover .pdf-delete { opacity: 1; }
+    .pdf-delete:hover { background: rgb(220,38,38); }
+    .pdf-thumb-wrap {
+      width: 140px; height: 180px; display: flex; align-items: center; justify-content: center;
+      background: var(--surface2); border-radius: 6px; overflow: hidden; flex-shrink: 0;
+    }
+    .pdf-canvas { display: none; max-width: 140px; max-height: 180px; }
+    .pdf-placeholder { font-size: 48px; line-height: 1; }
+    .pdf-name {
+      font-size: 0.72rem; color: var(--muted); text-align: center;
+      word-break: break-word; line-height: 1.3; max-height: 3.9em; overflow: hidden;
+    }
+    .pdf-loading { text-align: center; color: var(--muted); padding: 40px 0; }
   </style>
 </head>
 <body>
@@ -87,159 +114,109 @@
 
     <div class="kc-header">
       <h1>Knowledge Center</h1>
-      <p>Complete documentation, research papers, live tools, and reference materials for Lantern OS — a local-first personal operating system built on the Σ₀ convergence loop.</p>
-    </div>
-
-    <div class="section" id="library">
-      <h2>📚 Resource Library</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Browse and read 30+ research papers, technical specifications, and reference PDFs in-page. Includes foundational AI research, architecture specs, game-theory papers, quantum teleportation studies, Σ₀ convergence theory, and cross-industry grounding knowledge.</p>
-      <div class="lib-toolbar">
-        <input id="lib-search" class="lib-search" type="search" placeholder="Filter by title or category…" aria-label="Filter library">
-      </div>
-      <div id="lib-content"><div class="lib-empty">Loading library…</div></div>
+      <p>Guides, live tools, research, and reference for Lantern OS.</p>
     </div>
 
     <div class="section">
-      <h2>🚀 Getting Started</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Begin here to understand, install, and run Lantern OS. Master the core concepts of the Σ₀ loop, agent architecture, and multi-provider AI routing.</p>
+      <h2>Getting Started</h2>
       <div class="link-grid">
         <a class="link-card" href="/repo/README.md">
           <span class="icon">📖</span>
           <h3>README</h3>
-          <p>Complete overview, core architecture, and system requirements.</p>
+          <p>Overview, architecture, and quick start.</p>
         </a>
         <a class="link-card" href="/repo/QUICKSTART.md">
-          <span class="icon">⚡</span>
-          <h3>Quick Start Guide</h3>
-          <p>Install and run locally in 5 minutes — dual-boot server (ports 4177 + 4178).</p>
+          <span class="icon">🚀</span>
+          <h3>Quick Start</h3>
+          <p>Install, configure, and run Lantern OS locally (dual-boot 4177 + 4178).</p>
         </a>
         <a class="link-card" href="/repo/AGENTS.md">
           <span class="icon">🤖</span>
-          <h3>Agents & Monoworkstream</h3>
-          <p>Per-agent PR lanes, convergence routing, and the Keystone technical coordinator.</p>
+          <h3>Agents Guide</h3>
+          <p>How AI agents and the per-agent monoworkstream lanes work.</p>
         </a>
       </div>
     </div>
 
     <div class="section">
-      <h2>🗺️ Explore Live Tools</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Interactive applications and real-time dashboards powered by the Σ₀ convergence loop. Everything works offline first, with optional cloud fallback.</p>
+      <h2>Explore</h2>
       <div class="link-grid">
         <a class="link-card" href="/dream-chat.html">
           <span class="icon">📓</span>
-          <h3>Dream Journal (Keystone)</h3>
-          <p>Freeform RP chat with 6 agent personas, multi-provider fallback, and persistent memory.</p>
+          <h3>Dream Journal</h3>
+          <p>Freeform RP chat journal with agent personas and provider fallback.</p>
         </a>
         <a class="link-card" href="/three-doors-game.html">
           <span class="icon">🚪</span>
-          <h3>The Kingdome</h3>
-          <p>Infinitely replayable symbolic door game with 7 stages, CSF-native persistence, and archetype-based gameplay.</p>
+          <h3>Three Doors</h3>
+          <p>The Kingdome — an infinitely replayable, symbolic door game.</p>
         </a>
-        <a class="link-card" href="/create.html">
-          <span class="icon">✏️</span>
-          <h3>Content Creator Suite</h3>
-          <p>Upload, organize, and curate creative work with LoRA fine-tuning integration.</p>
-        </a>
-        <a class="link-card" href="/trader-dashboard.html">
-          <span class="icon">📊</span>
-          <h3>Lantern Trader</h3>
-          <p>Real-time market data, prediction markets, and AI-powered trading analysis.</p>
+        <a class="link-card" href="/flourishing">
+          <span class="icon">🌱</span>
+          <h3>Flourishing Dashboard</h3>
+          <p>Human Flourishing Frameworks — the real-time sensor-mesh dashboard.</p>
         </a>
         <a class="link-card" href="/kalshi-terminal.html">
           <span class="icon">📈</span>
           <h3>Kalshi Terminal</h3>
-          <p>Event prediction markets with the Impossibility Deck and tight-band entry suggestions.</p>
+          <p>Markets terminal — the Impossibility Deck and live event contracts.</p>
+        </a>
+        <a class="link-card" href="/crypto-dashboard.html">
+          <span class="icon">🪙</span>
+          <h3>Crypto Dashboard</h3>
+          <p>Real-time BTC / ETH / SOL / XRP / DOGE prices and market news.</p>
         </a>
         <a class="link-card" href="/orchestration.html">
           <span class="icon">🧭</span>
-          <h3>Convergence Router</h3>
-          <p>Stateless provider routing — intent classification, gate logic, and multi-LLM fallback chains.</p>
+          <h3>Orchestration</h3>
+          <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
         </a>
       </div>
-    </div>
-
-    <div class="section" id="research-papers">
-      <h2>📖 Foundational Research Papers</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">30+ papers covering AI reasoning, latent-thought models, game theory, quantum computing, and cross-industry grounding. Core papers that shaped the Σ₀ convergence engine. Open in-page or read as PDF.</p>
-      <div class="link-grid">
-        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__ouro-looped-llm')">
-          <span class="icon">⟳</span>
-          <h3>Ouro — Looped LLMs</h3>
-          <p>arXiv 2510.25741 · Weight-shared looped transformer achieves 2.6B ≈ 8B performance. CDF exit gate framework (τ=0.85). AIME24: 73%.</p>
-          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
-        </a>
-        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__coconut-latent-reasoning')">
-          <span class="icon">🧠</span>
-          <h3>Coconut — Latent Reasoning</h3>
-          <p>arXiv 2412.06769 · Continuous thought: hidden state fed back as input token. BFS-like latent search outperforms greedy chain-of-thought.</p>
-          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
-        </a>
-        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__subliminal-learning')">
-          <span class="icon">🔒</span>
-          <h3>Subliminal Learning in LLMs</h3>
-          <p>arXiv 2507.14805 · Models absorb behavioral traits via unrelated distillation data. AI safety & alignment implications. Critical read.</p>
-          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
-        </a>
-        <a class="link-card" href="/knowledgecenter.html#library" onclick="event.preventDefault();openLibraryPdf('rp__gpt2')">
-          <span class="icon">🏛️</span>
-          <h3>GPT-2 (Radford et al. 2019)</h3>
-          <p>Language Models as Unsupervised Multitask Learners. Foundational work on zero-shot transfer and emergent capabilities in scale.</p>
-          <span style="font-size:0.7rem;color:var(--accent)">View PDF ↗</span>
-        </a>
-      </div>
-      <p style="color:var(--muted);font-size:0.8rem;margin:20px 0 0;">Browse the complete <strong>Resource Library</strong> above to explore all 30+ papers on AI, game theory, quantum physics, and more.</p>
     </div>
 
     <div class="section">
-      <h2>🔬 Research & Theory</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Core Σ₀ convergence loop theory, mathematical proofs, and the foundational reasoning engine that powers all Lantern OS features.</p>
+      <h2>Research &amp; Theory</h2>
       <div class="link-grid">
-        <a class="link-card" href="/repo/docs/CONVERGANCE-SIGMA0-BRIEFING.md">
-          <span class="icon">⭐</span>
-          <h3>Σ₀ Briefing (START HERE)</h3>
-          <p>Immutable North Star — the 6-stage convergence loop (Observe→Remember→Reason→Act→Verify→Converge) and architectural constraints.</p>
-        </a>
         <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
           <span class="icon">📐</span>
           <h3>Σ₀ Collapse Certificate</h3>
-          <p>Lyapunov-contraction theorem, Σ₀ trigger conditions, and four ground-truth-verified experiments proving convergence.</p>
+          <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
         </a>
-        <a class="link-card" href="/repo/docs/convergence-core-mapping.md">
-          <span class="icon">🗺️</span>
-          <h3>Convergence Core Mapping</h3>
-          <p>How existing Lantern code aligns with the 12 core architecture components and the Σ₀ loop.</p>
+        <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
+          <span class="icon">📄</span>
+          <h3>LaTeX Source</h3>
+          <p>TeX source for the certificate — for typesetting and print.</p>
+        </a>
+        <a class="link-card" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
+          <span class="icon">🌌</span>
+          <h3>Quantum-Relativity Analysis</h3>
+          <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
         </a>
         <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
           <span class="icon">🔄</span>
-          <h3>Tesseract Convergence Method</h3>
-          <p>Complete 20-step convergence process — 4D status cube, Bayesian belief updates, and cryptographic receipts.</p>
+          <h3>Tesseract Convergence Loop</h3>
+          <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
         </a>
       </div>
     </div>
 
     <div class="section">
-      <h2>💾 Architecture & Memory</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Core data structures, persistent memory systems, and the CSF archive format that power Lantern OS.</p>
+      <h2>Data &amp; Memory</h2>
       <div class="link-grid">
         <a class="link-card" href="/rag-house.html">
           <span class="icon">🏠</span>
           <h3>RAG House</h3>
-          <p>Interactive living map of the full architecture — Status Cube, Convergence IO, CSF, agents, and routing.</p>
+          <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
         </a>
-        <a class="link-card" href="/repo/docs/CSF-Whitepaper-v0.3.pdf">
-          <span class="icon">📋</span>
-          <h3>CSF Whitepaper</h3>
-          <p>Convergence-Fitted Searchable Format — binary archive spec for memory compression and persistence.</p>
+        <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
+          <span class="icon">🗄️</span>
+          <h3>CSF Format</h3>
+          <p>Convergence-Fitted Searchable Format — the binary archive specification.</p>
         </a>
-        <a class="link-card" href="/repo/docs/CONVERGENCE-CSF-ENGINE.pdf">
-          <span class="icon">⚙️</span>
-          <h3>CSF Engine Technical Spec</h3>
-          <p>Implementation details for the CSF serialization and deserialization engine.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/Convergence-Core-Research-Program-v1.1.pdf">
-          <span class="icon">📚</span>
-          <h3>Convergence Core Program</h3>
-          <p>Complete research program document v1.1 — all components, roadmap, and verification strategy.</p>
+        <a class="link-card" href="/observer-mesh-cube.html">
+          <span class="icon">🧊</span>
+          <h3>Observer Mesh Cube</h3>
+          <p>The 3D status cube — beliefs and observers across the mesh.</p>
         </a>
       </div>
     </div>
@@ -260,179 +237,45 @@
       </div>
     </div>
 
+    <div class="section" id="documents-section">
+      <h2>Documents</h2>
+      <div class="pdf-controls">
+        <input class="pdf-search" id="pdf-search" type="search" placeholder="Filter documents…" aria-label="Filter documents">
+        <span class="pdf-count" id="pdf-count"></span>
+      </div>
+      <div id="pdf-gallery"><p class="pdf-loading">Loading documents…</p></div>
+    </div>
+
     <div class="section">
-      <h2>📋 Reference & Guidelines</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Development guidelines, security policies, API reference, and community standards.</p>
+      <h2>Reference</h2>
       <div class="link-grid">
         <a class="link-card" href="/repo/SECURITY.md">
           <span class="icon">🔒</span>
-          <h3>Security Policy</h3>
-          <p>Vulnerability disclosure, responsible reporting, and security best practices.</p>
+          <h3>Security</h3>
+          <p>Policies, vulnerability guidelines, and responsible disclosure.</p>
+        </a>
+        <a class="link-card" href="/repo/SKILLS.md">
+          <span class="icon">🛠️</span>
+          <h3>Skills</h3>
+          <p>Available capabilities, persona routing, and the provider chain.</p>
         </a>
         <a class="link-card" href="/repo/PROVIDERS.md">
           <span class="icon">🔌</span>
-          <h3>AI Providers Guide</h3>
-          <p>All 10 supported providers, configuration, environment variables, and fallback chain.</p>
-        </a>
-        <a class="link-card" href="/repo/SKILLS.md">
-          <span class="icon">⚡</span>
-          <h3>Skills & Capabilities</h3>
-          <p>Available skills, persona routing, MCP tools, and the provider selection strategy.</p>
-        </a>
-        <a class="link-card" href="/repo/AGENTS.md">
-          <span class="icon">🎭</span>
-          <h3>Agent Personas</h3>
-          <p>Six agent personas (Lantern, Keystone, Blinkbug, Waterfall, Xenon, Founder) and routing logic.</p>
+          <h3>Providers</h3>
+          <p>All AI providers, configuration, and the fallback chain.</p>
         </a>
         <a class="link-card" href="/repo/CONTRIBUTING.md">
           <span class="icon">🤝</span>
-          <h3>Contributing Guide</h3>
-          <p>PR workflow, code review process, commit style, and the monoworkstream rule.</p>
+          <h3>Contributing</h3>
+          <p>Guidelines for pull requests and issues.</p>
         </a>
         <a class="link-card" href="/repo/CODE_OF_CONDUCT.md">
-          <span class="icon">🌟</span>
+          <span class="icon">💡</span>
           <h3>Code of Conduct</h3>
-          <p>Community standards, inclusive behavior, and conflict resolution.</p>
+          <p>Community standards and expectations.</p>
         </a>
       </div>
     </div>
-
-    <div class="section">
-      <h2>📑 Complete Documentation Index</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">150+ markdown guides covering every aspect of Lantern OS — from setup to theory to deployment. All documentation is version-controlled and maintained alongside the code.</p>
-
-      <div style="display: grid; gap: 20px;">
-        <!-- Core Guides -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">⭐ Core Guides</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/README.md"><span class="icon">📖</span><h3>README</h3><p>Complete project overview and architecture</p></a>
-            <a class="link-card" href="/repo/QUICKSTART.md"><span class="icon">⚡</span><h3>Quick Start</h3><p>Installation and first-run setup</p></a>
-            <a class="link-card" href="/repo/AGENTS.md"><span class="icon">🤖</span><h3>Agents Guide</h3><p>AI agent architecture and routing</p></a>
-            <a class="link-card" href="/repo/PROVIDERS.md"><span class="icon">🔌</span><h3>Providers</h3><p>10 AI providers and fallback chains</p></a>
-            <a class="link-card" href="/repo/SKILLS.md"><span class="icon">⚡</span><h3>Skills</h3><p>Capabilities and MCP tools</p></a>
-            <a class="link-card" href="/repo/SECURITY.md"><span class="icon">🔒</span><h3>Security</h3><p>Vulnerability policy and best practices</p></a>
-          </div>
-        </div>
-
-        <!-- Architecture & Theory -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">🏗️ Architecture & Theory</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/docs/CONVERGANCE-SIGMA0-BRIEFING.md"><span class="icon">⭐</span><h3>Σ₀ Briefing</h3><p>Convergence loop North Star</p></a>
-            <a class="link-card" href="/repo/docs/convergence-core-mapping.md"><span class="icon">🗺️</span><h3>Core Mapping</h3><p>12 components aligned with code</p></a>
-            <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md"><span class="icon">🔄</span><h3>Tesseract Method</h3><p>20-step convergence process</p></a>
-            <a class="link-card" href="/repo/docs/CONVERGENCE-LOOP.md"><span class="icon">♻️</span><h3>Loop Architecture</h3><p>Complete cycle specification</p></a>
-            <a class="link-card" href="/repo/docs/ARCHITECTURE.md"><span class="icon">🏢</span><h3>System Architecture</h3><p>High-level system design</p></a>
-            <a class="link-card" href="/repo/docs/CONVERGENCE-IO-v1.0.0.md"><span class="icon">🔗</span><h3>Convergence IO</h3><p>Interface and protocol spec</p></a>
-          </div>
-        </div>
-
-        <!-- Tools & Features -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">🛠️ Tools & Features</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/docs/DREAM-JOURNAL-USER-GUIDE.md"><span class="icon">📓</span><h3>Dream Journal Guide</h3><p>Chat interface and features</p></a>
-            <a class="link-card" href="/repo/docs/trading-api-reference.md"><span class="icon">📊</span><h3>Trading API</h3><p>60+ endpoints and integration</p></a>
-            <a class="link-card" href="/repo/docs/KALSHI-API-SPEC.md"><span class="icon">📈</span><h3>Kalshi Integration</h3><p>Markets terminal specification</p></a>
-            <a class="link-card" href="/repo/docs/THREE-DOORS-BACKLOG.md"><span class="icon">🚪</span><h3>Three Doors Game</h3><p>Game design and mechanics</p></a>
-            <a class="link-card" href="/repo/docs/creator-dashboard.md"><span class="icon">✏️</span><h3>Creator Suite</h3><p>Content creation platform</p></a>
-            <a class="link-card" href="/repo/docs/MONOWORKSTREAM.md"><span class="icon">🧵</span><h3>Monoworkstream</h3><p>Per-agent PR lane system</p></a>
-          </div>
-        </div>
-
-        <!-- Deployment & Operations -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">🚀 Deployment & Operations</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/docs/DEPLOYMENT-GUIDE.md"><span class="icon">📡</span><h3>Deployment Guide</h3><p>Production setup and CI/CD</p></a>
-            <a class="link-card" href="/repo/docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md"><span class="icon">☁️</span><h3>Cloudflare Tunnel</h3><p>Tunnel and reverse-proxy setup</p></a>
-            <a class="link-card" href="/repo/docs/DOCKER.md"><span class="icon">🐳</span><h3>Docker Guide</h3><p>Containerization and orchestration</p></a>
-            <a class="link-card" href="/repo/docs/GIT-AUTOMATION-SYSTEM-GUIDE.md"><span class="icon">🤖</span><h3>Git Automation</h3><p>Hooks and workflow automation</p></a>
-            <a class="link-card" href="/repo/docs/LANTERN-RUNTIME-CICD.md"><span class="icon">⚙️</span><h3>Runtime & CI/CD</h3><p>Build and deployment pipeline</p></a>
-            <a class="link-card" href="/repo/docs/SCRIPTS.md"><span class="icon">📜</span><h3>Scripts Reference</h3><p>Utility and maintenance scripts</p></a>
-          </div>
-        </div>
-
-        <!-- Memory & Data -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">💾 Memory & Data Systems</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md"><span class="icon">📋</span><h3>CSF Format Spec</h3><p>Binary archive format details</p></a>
-            <a class="link-card" href="/repo/docs/RESEARCH-CANON.md"><span class="icon">📚</span><h3>Research Canon</h3><p>Living reference of research</p></a>
-            <a class="link-card" href="/repo/docs/DATA-ARCHIVAL-AND-MIGRATION.md"><span class="icon">📦</span><h3>Data Archival</h3><p>Persistence and migration guide</p></a>
-            <a class="link-card" href="/repo/docs/CONVERGENCE-CICD-BATCH-LOOP.md"><span class="icon">🔁</span><h3>Batch Loop</h3><p>Convergence batch processing</p></a>
-            <a class="link-card" href="/repo/docs/git-convergance-loop.md"><span class="icon">🔀</span><h3>Git Convergence</h3><p>Git-based convergence workflow</p></a>
-            <a class="link-card" href="/repo/docs/MESH-HUB.md"><span class="icon">🕸️</span><h3>Mesh Hub</h3><p>Distributed mesh architecture</p></a>
-          </div>
-        </div>
-
-        <!-- Collaboration & Process -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">👥 Collaboration & Process</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/CONTRIBUTING.md"><span class="icon">🤝</span><h3>Contributing</h3><p>PR workflow and code review</p></a>
-            <a class="link-card" href="/repo/CODE_OF_CONDUCT.md"><span class="icon">🌟</span><h3>Code of Conduct</h3><p>Community standards</p></a>
-            <a class="link-card" href="/repo/docs/LINEAR-WORKFLOW.md"><span class="icon">✅</span><h3>Linear Workflow</h3><p>Issue tracking and task management</p></a>
-            <a class="link-card" href="/repo/docs/AGENT-ORCHESTRATION-OPERATOR-GUIDE.md"><span class="icon">🎭</span><h3>Agent Orchestration</h3><p>Multi-agent coordination</p></a>
-            <a class="link-card" href="/repo/docs/ACTIVE-FLEET-DEPLOYMENT.md"><span class="icon">🚁</span><h3>Fleet Deployment</h3><p>Multiple agent fleet management</p></a>
-            <a class="link-card" href="/repo/docs/WORK-QUEUE-SYSTEM.md"><span class="icon">📋</span><h3>Work Queue</h3><p>Task distribution system</p></a>
-          </div>
-        </div>
-
-        <!-- Advanced Topics -->
-        <div>
-          <h3 style="font-size:0.95rem; font-weight:700; margin-bottom:12px; color:var(--text)">🔬 Advanced Topics</h3>
-          <div class="link-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-            <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md"><span class="icon">📐</span><h3>Σ₀ Certificate</h3><p>Convergence proof and validation</p></a>
-            <a class="link-card" href="/repo/docs/SIGMA0-REAL-DATA-GROUNDING.md"><span class="icon">📊</span><h3>Real Data Grounding</h3><p>Evidence-based convergence</p></a>
-            <a class="link-card" href="/repo/docs/prediction-markets-as-grounding.md"><span class="icon">🎯</span><h3>Prediction Markets</h3><p>Forecast-driven grounding</p></a>
-            <a class="link-card" href="/repo/docs/SIGMA0-V10-SYSTEM.md"><span class="icon">🔟</span><h3>Σ₀ V10 System</h3><p>Latest implementation spec</p></a>
-            <a class="link-card" href="/repo/docs/SIGMA0-V10-THEORY-GROUNDING.md"><span class="icon">📚</span><h3>V10 Theory</h3><p>Mathematical foundations</p></a>
-            <a class="link-card" href="/repo/docs/INNOVATOR-EVIDENCE-METHOD.md"><span class="icon">💡</span><h3>Evidence Method</h3><p>Innovation verification framework</p></a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>💻 API & Development</h2>
-      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Technical API reference, trading endpoints, and developer resources for integrating with Lantern OS.</p>
-      <div class="link-grid">
-        <a class="link-card" href="/repo/docs/trading-api-reference.md">
-          <span class="icon">📊</span>
-          <h3>Trading API Reference</h3>
-          <p>60+ REST endpoints for Kalshi integration, order placement, market data, and trading history.</p>
-        </a>
-        <a class="link-card" href="/repo/src/mcp_server/README.md">
-          <span class="icon">🔗</span>
-          <h3>MCP Server Guide</h3>
-          <p>Model Context Protocol implementation — tools, resource queries, and prompting integration.</p>
-        </a>
-        <a class="link-card" href="/repo/CLAUDE.md">
-          <span class="icon">🤖</span>
-          <h3>Claude Integration Guide</h3>
-          <p>Hook system, monoworkstream rules, and agent-specific instructions for this repository.</p>
-        </a>
-        <a class="link-card" href="/repo/src/csf/README.md">
-          <span class="icon">📦</span>
-          <h3>CSF Archive Format</h3>
-          <p>Binary serialization format spec, compression ratios, and integration examples.</p>
-        </a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Library PDF viewer modal ── -->
-<div class="lib-modal" id="lib-modal" role="dialog" aria-modal="true" aria-label="PDF viewer">
-  <div class="lib-modal-inner">
-    <div class="lib-modal-head">
-      <h3 id="lib-modal-title">PDF</h3>
-      <a id="lib-modal-open" href="#" target="_blank" rel="noopener">Open in new tab ↗</a>
-      <button id="lib-modal-close" type="button" aria-label="Close viewer">✕ Close</button>
-    </div>
-    <iframe id="lib-modal-frame" title="PDF document viewer"></iframe>
   </div>
 </div>
 
@@ -440,93 +283,153 @@
 <footer class="site-footer">
   <div class="footer-inner">
     <span><strong>Lantern OS</strong> · <a href="/trader-dashboard.html">Home</a> · <a href="/dream-chat.html">Journal</a> · <a href="/three-doors-game.html">Explore</a></span>
-    <span style="margin-left: auto;"><a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a></span>
+    <span style="margin-left: auto;"><a href="/knowledgecenter.html">Help</a></span>
   </div>
 </footer>
 
 <script src="/js/theme-toggle.js"></script>
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
-(function(){
-  const content = document.getElementById('lib-content');
-  const search  = document.getElementById('lib-search');
-  const modal   = document.getElementById('lib-modal');
-  const frame   = document.getElementById('lib-modal-frame');
-  const mTitle  = document.getElementById('lib-modal-title');
-  const mOpen   = document.getElementById('lib-modal-open');
-  let entries = [];
+(function () {
+  if (typeof pdfjsLib === 'undefined') return;
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
-  function esc(s){ return (s||'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+  let allCards = [];
 
-  function openPdf(e){
-    mTitle.textContent = e.title;
-    mOpen.href = e.pdfUrl;
-    frame.src = e.pdfUrl;
-    modal.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-  function closePdf(){
-    modal.classList.remove('open');
-    frame.src = 'about:blank';
-    document.body.style.overflow = '';
-  }
-  document.getElementById('lib-modal-close').addEventListener('click', closePdf);
-  modal.addEventListener('click', ev => { if (ev.target === modal) closePdf(); });
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePdf(); });
-
-  function card(e){
-    const c = document.createElement('button');
-    c.className = 'lib-card'; c.type = 'button';
-    const sizeMB = e.sizeKB ? (e.sizeKB/1024).toFixed(1)+' MB' : '';
-    const pages  = e.pages ? e.pages+' pp' : '';
-    const sub = [pages, sizeMB].filter(Boolean).join(' · ');
-    c.innerHTML =
-      (e.thumbUrl ? '<img class="lib-thumb" loading="lazy" alt="" src="'+esc(e.thumbUrl)+'">' : '<div class="lib-thumb"></div>') +
-      '<div class="lib-meta"><div class="lib-cat">'+esc(e.category)+'</div>'+
-      '<h3>'+esc(e.title)+'</h3><div class="lib-sub">'+esc(sub)+'</div></div>';
-    c.addEventListener('click', () => openPdf(e));
-    return c;
-  }
-
-  function render(filter){
-    const f = (filter||'').toLowerCase().trim();
-    const list = entries.filter(e => !f || (e.title+' '+e.category+' '+e.collection).toLowerCase().includes(f));
-    content.innerHTML = '';
-    if (!list.length){ content.innerHTML = '<div class="lib-empty">No documents match.</div>'; return; }
-    const groups = {};
-    list.forEach(e => { (groups[e.collection] = groups[e.collection] || []).push(e); });
-    Object.keys(groups).forEach(g => {
-      const h = document.createElement('div'); h.className = 'lib-group-title';
-      h.textContent = g + ' (' + groups[g].length + ')';
-      content.appendChild(h);
-      const grid = document.createElement('div'); grid.className = 'lib-grid';
-      groups[g].forEach(e => grid.appendChild(card(e)));
-      content.appendChild(grid);
-    });
-  }
-
-  fetch('/api/library/list').then(r=>r.json()).then(d=>{
-    entries = d.entries || [];
-    render('');
-    if (location.hash === '#library') document.getElementById('library').scrollIntoView();
-  }).catch(()=>{ content.innerHTML = '<div class="lib-empty">Library unavailable — run: python scripts/build_library_thumbs.py</div>'; });
-
-  search.addEventListener('input', () => render(search.value));
-
-  // Global: open a specific PDF by id (used by Research Papers link-cards)
-  window.openLibraryPdf = function(id){
-    const e = entries.find(x => x.id === id);
-    if(e){ openPdf(e); }
-    else {
-      // If library hasn't loaded yet, fetch then open
-      fetch('/api/library/list').then(r=>r.json()).then(d=>{
-        entries = d.entries || [];
-        const found = entries.find(x => x.id === id);
-        if(found) openPdf(found);
-      }).catch(()=>{});
+  async function renderThumb(card) {
+    const wrap = card.querySelector('.pdf-thumb-wrap');
+    const canvas = card.querySelector('.pdf-canvas');
+    const placeholder = card.querySelector('.pdf-placeholder');
+    const url = card.dataset.pdfUrl;
+    try {
+      const loadingTask = pdfjsLib.getDocument(url);
+      const pdf = await loadingTask.promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = 140 / viewport.width;
+      const sv = page.getViewport({ scale });
+      canvas.width = sv.width;
+      canvas.height = sv.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: sv }).promise;
+      placeholder.style.display = 'none';
+      canvas.style.display = 'block';
+    } catch {
+      placeholder.textContent = '📄';
     }
-  };
+  }
+
+  function applyFilter(query) {
+    const q = query.toLowerCase().trim();
+    let visible = 0;
+    for (const card of allCards) {
+      const match = !q || card.dataset.name.includes(q) || card.dataset.folder.includes(q);
+      card.classList.toggle('hidden', !match);
+      if (match) visible++;
+    }
+    const countEl = document.getElementById('pdf-count');
+    if (countEl) countEl.textContent = `${visible} of ${allCards.length}`;
+  }
+
+  async function init() {
+    const gallery = document.getElementById('pdf-gallery');
+    if (!gallery) return;
+
+    let data;
+    try {
+      const resp = await fetch('/api/pdfs');
+      data = await resp.json();
+    } catch {
+      gallery.innerHTML = '<p class="pdf-loading">Failed to load documents.</p>';
+      return;
+    }
+
+    const { pdfs } = data;
+    if (!pdfs || !pdfs.length) {
+      gallery.innerHTML = '<p class="pdf-loading">No documents found.</p>';
+      return;
+    }
+
+    const countEl = document.getElementById('pdf-count');
+    if (countEl) countEl.textContent = `${pdfs.length} documents`;
+
+    const grid = document.createElement('div');
+    grid.className = 'pdf-grid';
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          renderThumb(entry.target);
+          observer.unobserve(entry.target);
+        }
+      }
+    }, { rootMargin: '300px' });
+
+    for (const pdf of pdfs) {
+      const card = document.createElement('a');
+      card.className = 'pdf-card';
+      card.href = pdf.repoPath;
+      card.target = '_blank';
+      card.rel = 'noopener';
+      card.dataset.pdfUrl = pdf.repoPath;
+      card.dataset.filename = pdf.filename;
+      card.dataset.name = pdf.name.toLowerCase();
+      card.dataset.folder = (pdf.folder || '').toLowerCase();
+      card.innerHTML =
+        '<button class="pdf-delete" title="Delete document" aria-label="Delete">✕</button>' +
+        '<div class="pdf-thumb-wrap">' +
+          '<span class="pdf-placeholder">⏳</span>' +
+          '<canvas class="pdf-canvas"></canvas>' +
+        '</div>' +
+        '<span class="pdf-name">' + pdf.name.replace(/</g, '&lt;') + '</span>';
+
+      card.querySelector('.pdf-delete').addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const name = pdf.filename;
+        if (!confirm('Delete "' + pdf.name + '"?\n\nThis permanently removes the file from the research pool.')) return;
+        try {
+          const r = await fetch('/api/pdfs?filename=' + encodeURIComponent(name), { method: 'DELETE' });
+          const data = await r.json();
+          if (data.deleted > 0) {
+            card.style.transition = 'opacity 0.2s';
+            card.style.opacity = '0';
+            setTimeout(() => {
+              card.remove();
+              allCards = allCards.filter(c => c !== card);
+              const countEl = document.getElementById('pdf-count');
+              if (countEl) {
+                const vis = allCards.filter(c => !c.classList.contains('hidden')).length;
+                countEl.textContent = vis + ' of ' + allCards.length;
+              }
+            }, 200);
+          } else {
+            alert('Delete failed: ' + (data.errors && data.errors[0] && data.errors[0].error || 'unknown error'));
+          }
+        } catch {
+          alert('Delete failed — server error.');
+        }
+      });
+
+      grid.appendChild(card);
+      allCards.push(card);
+      observer.observe(card);
+    }
+
+    gallery.innerHTML = '';
+    gallery.appendChild(grid);
+
+    const searchEl = document.getElementById('pdf-search');
+    if (searchEl) {
+      searchEl.addEventListener('input', () => applyFilter(searchEl.value));
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
 </body>
