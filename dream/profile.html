@@ -176,6 +176,27 @@
     <div class="loading">Loading profile…</div>
   </div>
 
+  <!-- Edit profile modal -->
+  <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.8); z-index:1000; display:flex; align-items:center; justify-content:center;">
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:16px; padding:32px; max-width:500px; width:90%;">
+      <h2 style="margin-top:0; margin-bottom:24px;">Edit Profile</h2>
+      <form id="edit-form" onsubmit="saveProfile(event)" style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <label style="display:block; font-size:12px; color:var(--accent); margin-bottom:4px; text-transform:uppercase; font-weight:600;">Name</label>
+          <input type="text" id="edit-name" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:rgba(255,255,255,.04); color:var(--text); font-size:14px;">
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; color:var(--accent); margin-bottom:4px; text-transform:uppercase; font-weight:600;">Bio</label>
+          <textarea id="edit-bio" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:rgba(255,255,255,.04); color:var(--text); font-size:14px; min-height:80px;"></textarea>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <button type="submit" class="btn-logout" style="flex:1; background:rgba(20,184,166,.2); color:var(--accent); border-color:var(--accent);">Save Changes</button>
+          <button type="button" onclick="closeEditModal()" class="btn-back" style="flex:1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </main>
 
 <!-- ── Site footer ── -->
@@ -193,81 +214,152 @@
 
 <script src="/js/theme-toggle.js"></script>
 <script>
+  let currentProfile = null;
+
   async function loadProfile() {
     try {
-      const res = await fetch('/api/auth/session', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch session');
+      // First check auth session
+      const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
+      if (!sessionRes.ok) throw new Error('Not authenticated');
 
-      const session = await res.json();
-
-      const content = document.getElementById('profile-content');
-
+      const session = await sessionRes.json();
       if (!session.authenticated) {
-        content.innerHTML = `
-          <div class="error-message">
-            Not authenticated. Redirecting to login…
-          </div>
-        `;
-        setTimeout(() => {
-          location.href = '/auth.html';
-        }, 1500);
+        redirectToLogin();
         return;
       }
 
-      const user = session.user || {};
-      const role = session.role || 'guest';
+      // Load full profile from backend
+      const res = await fetch('/api/profiles/me', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch profile');
 
-      const roleClass = role === 'founder' ? 'founder' : role === 'admin' ? 'admin' : '';
+      const profile = await res.json();
+      currentProfile = profile;
 
-      content.innerHTML = `
-        <div class="profile-card">
+      renderProfile(profile);
+    } catch (err) {
+      console.error('Profile load error:', err);
+      redirectToLogin();
+    }
+  }
+
+  function renderProfile(profile) {
+    const content = document.getElementById('profile-content');
+    const role = profile.role || 'guest';
+    const roleClass = role === 'founder' ? 'founder' : role === 'admin' ? 'admin' : '';
+
+    content.innerHTML = `
+      <div class="profile-card">
+        <div class="profile-field">
+          <span class="profile-field-label">Name</span>
+          <span class="profile-field-value">${escapeHtml(profile.name || 'Not set')}</span>
+        </div>
+        <div class="profile-field">
+          <span class="profile-field-label">Email</span>
+          <span class="profile-field-value">${escapeHtml(profile.email || 'Not provided')}</span>
+        </div>
+        ${profile.bio ? `
           <div class="profile-field">
-            <span class="profile-field-label">Name</span>
-            <span class="profile-field-value">${escapeHtml(user.name || 'Unknown')}</span>
+            <span class="profile-field-label">Bio</span>
+            <span class="profile-field-value">${escapeHtml(profile.bio)}</span>
           </div>
-          <div class="profile-field">
-            <span class="profile-field-label">Email</span>
-            <span class="profile-field-value">${escapeHtml(user.email || 'Not provided')}</span>
-          </div>
+        ` : ''}
+        <div class="profile-field">
+          <span class="profile-field-label">User ID</span>
+          <span class="profile-field-value"><code style="font-family:monospace; font-size:12px;">${escapeHtml(profile.id)}</code></span>
+        </div>
+        ${profile.patreonId ? `
           <div class="profile-field">
             <span class="profile-field-label">Patreon ID</span>
-            <span class="profile-field-value">${escapeHtml(user.id || 'Unknown')}</span>
+            <span class="profile-field-value">${escapeHtml(profile.patreonId)}</span>
           </div>
           <div class="profile-field">
             <span class="profile-field-label">Tier</span>
-            <span class="profile-field-value">${escapeHtml(user.tier || 'None')}</span>
+            <span class="profile-field-value">${escapeHtml(profile.tier || 'None')}</span>
           </div>
-          <div class="profile-field">
-            <span class="profile-field-label">Role</span>
-            <span class="profile-field-value">
-              <span class="role-badge ${roleClass}">${escapeHtml(role)}</span>
-            </span>
-          </div>
+        ` : ''}
+        <div class="profile-field">
+          <span class="profile-field-label">Role</span>
+          <span class="profile-field-value">
+            <span class="role-badge ${roleClass}">${escapeHtml(role)}</span>
+            ${profile.metadata?.source ? `<span style="font-size:11px; color:var(--muted); margin-left:8px;">(${escapeHtml(profile.metadata.source)})</span>` : ''}
+          </span>
         </div>
+        <div class="profile-field">
+          <span class="profile-field-label">Joined</span>
+          <span class="profile-field-value">${formatDate(profile.metadata?.createdAt)}</span>
+        </div>
+      </div>
 
-        <div class="profile-actions">
-          <button class="btn-logout" onclick="logout()">🚪 Logout</button>
-          <a class="btn-back" href="/">← Back to Home</a>
-        </div>
-      `;
+      <div class="profile-actions">
+        <button class="btn-logout" onclick="openEditModal()" style="background:rgba(106,190,255,.15); color:#6abeff; border-color:rgba(106,190,255,.3);">✏️ Edit Profile</button>
+        <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+        <a class="btn-back" href="/">← Back to Home</a>
+      </div>
+    `;
+  }
+
+  function openEditModal() {
+    document.getElementById('edit-name').value = currentProfile.name || '';
+    document.getElementById('edit-bio').value = currentProfile.bio || '';
+    document.getElementById('edit-modal').style.display = 'flex';
+  }
+
+  function closeEditModal() {
+    document.getElementById('edit-modal').style.display = 'none';
+  }
+
+  async function saveProfile(e) {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/profiles/me', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('edit-name').value,
+          bio: document.getElementById('edit-bio').value,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to save profile');
+
+      currentProfile = await res.json();
+      closeEditModal();
+      renderProfile(currentProfile);
     } catch (err) {
-      console.error('Profile load error:', err);
-      const content = document.getElementById('profile-content');
-      content.innerHTML = `
-        <div class="error-message">
-          Error loading profile: ${escapeHtml(err.message)}
-        </div>
-        <div class="profile-actions">
-          <a class="btn-back" href="/">← Back to Home</a>
-        </div>
-      `;
+      alert('Error saving profile: ' + err.message);
     }
   }
 
   function escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text || '';
     return div.innerHTML;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return 'Unknown';
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  function redirectToLogin() {
+    const content = document.getElementById('profile-content');
+    content.innerHTML = `
+      <div class="error-message">
+        Not authenticated. Redirecting to login…
+      </div>
+    `;
+    setTimeout(() => {
+      location.href = '/auth.html';
+    }, 1500);
   }
 
   async function logout() {
@@ -288,6 +380,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', loadProfile);
+  document.addEventListener('click', (e) => {
+    const modal = document.getElementById('edit-modal');
+    if (e.target === modal) closeEditModal();
+  });
 </script>
 <script src="/js/update-checker.js" defer></script>
 </body>
