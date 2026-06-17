@@ -131,9 +131,7 @@
         <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a>
       </div>
       <div class="nav-actions">
-
-        <button class="patreon-pill" id="patreon-auth-btn" data-role="guest" aria-label="Log in with Patreon" onclick="loginWithPatreon()" title="Log in with Patreon">🔐 Patreon</button>
-        <button class="patreon-pill" id="patreon-logout-btn" hidden aria-label="Log out" onclick="logoutPatreon()" title="Log out">↩ Logout</button>
+        <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
         <button class="nav-btn" id="voice-btn" aria-label="Toggle voice mode" aria-pressed="false" onclick="
           if (!window.voiceMode) window.voiceMode = false;
           window.voiceMode = !window.voiceMode;
