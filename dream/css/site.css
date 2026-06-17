@@ -145,17 +145,28 @@ html, body {
 }
 .nav-cta:hover { background: var(--accent-hover); }
 
+/* ── Patreon support link in nav ── */
+.nav-support {
+  font-size: 13px; color: #ff6b6b; font-weight: 600;
+  text-decoration: none; transition: color 0.15s;
+  padding: 6px 10px;
+}
+.nav-support:hover { color: #ff8787; }
+
 /* ── Footer ── */
 .site-footer {
   border-top: 1px solid var(--border);
-  padding: 24px 20px;
-  margin-top: 48px;
+  padding: 16px 20px;
+  margin-top: auto;
+  background: var(--surface);
+  flex-shrink: 0;
 }
 .footer-inner {
-  max-width: 880px;
+  max-width: 1200px;
   margin: 0 auto;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
   font-size: 0.82rem;

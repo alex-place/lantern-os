@@ -1,0 +1,251 @@
+/* ── Shared Global Header/Footer Styles ──────────────────────────────── */
+
+:root {
+  --header-bg: var(--surface, #0f0f0f);
+  --header-border: var(--border, #1a1a1a);
+  --header-text: var(--text, #e0e0e0);
+  --header-accent: var(--accent, #3b82f6);
+}
+
+/* ── Global Navigation (Header) ── */
+.global-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  padding: 0 20px;
+  backdrop-filter: blur(10px);
+  background-color: rgba(15, 15, 15, 0.95);
+}
+
+.global-nav-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  gap: 24px;
+}
+
+.global-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--header-text);
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.global-nav-brand img {
+  width: 24px;
+  height: 24px;
+}
+
+.global-nav-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.global-nav-link {
+  text-decoration: none;
+  color: var(--header-text);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.global-nav-link:hover {
+  color: var(--header-accent);
+}
+
+.global-nav-link.active {
+  color: var(--header-accent);
+  border-bottom: 2px solid var(--header-accent);
+  padding-bottom: 2px;
+}
+
+.global-nav-support {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.global-nav-support:hover {
+  color: #ff8787;
+}
+
+.global-nav-sep {
+  color: var(--header-border);
+  margin: 0 4px;
+}
+
+.global-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.global-nav-theme {
+  background: none;
+  border: 1px solid var(--header-border);
+  color: var(--header-text);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.global-nav-theme:hover {
+  background: var(--header-border);
+  border-color: var(--header-accent);
+}
+
+/* ── Global Footer ── */
+.global-footer {
+  margin-top: auto;
+  padding: 12px 20px;
+  background: var(--header-bg);
+  border-top: 1px solid var(--header-border);
+  text-align: center;
+  font-size: 12px;
+  color: var(--header-text);
+}
+
+.global-footer-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.global-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.global-footer a {
+  color: var(--header-accent);
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.global-footer a:hover {
+  opacity: 0.8;
+}
+
+.global-footer-sep {
+  color: var(--header-border);
+}
+
+/* ── Responsive Design ── */
+@media (max-width: 768px) {
+  .global-nav-inner {
+    height: auto;
+    padding: 8px 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .global-nav-center {
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .global-nav-link {
+    font-size: 12px;
+  }
+
+  .global-nav-sep {
+    display: none;
+  }
+
+  .global-nav-support {
+    display: none;
+  }
+
+  .global-footer-inner {
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .global-footer-sep {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .global-nav {
+    padding: 0 12px;
+  }
+
+  .global-nav-inner {
+    gap: 8px;
+  }
+
+  .global-nav-brand {
+    font-size: 14px;
+  }
+
+  .global-nav-brand img {
+    width: 20px;
+    height: 20px;
+  }
+
+  .global-nav-center {
+    display: none;
+  }
+
+  .global-footer {
+    padding: 8px 12px;
+  }
+
+  .global-footer-brand {
+    font-size: 11px;
+  }
+}
+
+/* ── Dark/Light Theme Support ── */
+[data-theme="light"] {
+  --header-bg: #f5f5f5;
+  --header-border: #e0e0e0;
+  --header-text: #333;
+  --header-accent: #2563eb;
+}
+
+[data-theme="light"] .global-nav {
+  background-color: rgba(245, 245, 245, 0.95);
+}
+
+[data-theme="light"] .global-nav-link {
+  color: #333;
+}
+
+[data-theme="light"] .global-nav-link:hover,
+[data-theme="light"] .global-nav-link.active {
+  color: #2563eb;
+}
+
+[data-theme="light"] .global-footer a {
+  color: #2563eb;
+}
