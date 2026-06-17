@@ -130,6 +130,7 @@
       </div>
       <div class="nav-actions">
         <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
+        <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
         <button class="nav-btn" id="voice-btn" aria-label="Toggle voice mode" aria-pressed="false" onclick="
           if (!window.voiceMode) window.voiceMode = false;
           window.voiceMode = !window.voiceMode;
@@ -425,6 +426,23 @@
     applyPatreonSession({ authenticated: false, role: "guest" });
   }
 
+  async function logoutUser() {
+    try {
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        location.href = '/auth.html';
+      } else {
+        alert('Logout failed');
+      }
+    } catch (err) {
+      console.error('Logout error:', err);
+      alert('Logout error: ' + err.message);
+    }
+  }
+
   // Wrap sendMessage so locked visitors cannot bypass the disabled input in DevTools.
   const originalSendMessage = window.sendMessage;
   window.sendMessage = function gatedSendMessage(...args) {
@@ -438,7 +456,25 @@
     }
   };
 
-  document.addEventListener("DOMContentLoaded", refreshPatreonSession);
+  async function updateAuthUI() {
+    try {
+      const res = await fetch('/api/auth/session', { credentials: 'include' });
+      if (res.ok) {
+        const session = await res.json();
+        const logoutBtn = document.getElementById('logout-btn');
+        if (session.authenticated && logoutBtn) {
+          logoutBtn.style.display = 'block';
+        }
+      }
+    } catch (err) {
+      console.error('Auth check error:', err);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    refreshPatreonSession();
+    updateAuthUI();
+  });
 </script>
 
 <script src="js/dream-chat.js?v=20260615-a2"></script>

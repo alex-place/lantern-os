@@ -85,6 +85,7 @@
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
+    <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
     <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
   </div>
 </nav>
@@ -150,12 +151,47 @@
 </footer>
 <script src="/js/theme-toggle.js"></script>
 <script>
+async function logoutUser() {
+  try {
+    const res = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (res.ok) {
+      location.href = '/auth.html';
+    } else {
+      alert('Logout failed');
+    }
+  } catch (err) {
+    console.error('Logout error:', err);
+    alert('Logout error: ' + err.message);
+  }
+}
+
+async function updateAuthUI() {
+  try {
+    const res = await fetch('/api/auth/session', { credentials: 'include' });
+    if (res.ok) {
+      const session = await res.json();
+      const logoutBtn = document.getElementById('logout-btn');
+      if (session.authenticated && logoutBtn) {
+        logoutBtn.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    console.error('Auth check error:', err);
+  }
+}
+
 /* Theme toggle event listener */
 document.addEventListener('DOMContentLoaded', () => {
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle && window.toggleTheme) {
     themeToggle.addEventListener('click', toggleTheme);
   }
+
+  // Check auth status and show logout button
+  updateAuthUI();
 });
 
 /* Real-time honest state loader */
