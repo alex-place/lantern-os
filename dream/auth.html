@@ -161,6 +161,47 @@
       opacity: 0.6;
       pointer-events: none;
     }
+    .auth-divider {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin: 20px 0 16px;
+      position: relative;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 42%;
+      height: 1px;
+      background: var(--border);
+    }
+    .auth-divider::before { left: 0; }
+    .auth-divider::after  { right: 0; }
+    .guest-section { margin-bottom: 4px; }
+    .guest-label {
+      font-size: 12px; color: var(--muted);
+      text-align: center; margin: 0 0 12px;
+    }
+    .guest-links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .guest-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(255,255,255,.03);
+      text-decoration: none;
+      transition: border-color .15s, background .15s;
+    }
+    .guest-link:hover { border-color: var(--accent); background: rgba(6,182,212,.06); }
+    .guest-link-icon { font-size: 20px; flex-shrink: 0; }
+    .guest-link-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .guest-link-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -204,6 +245,28 @@
       <a class="btn-patreon-secondary" href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer">
         View Tiers & Support
       </a>
+    </div>
+
+    <div class="auth-divider">or</div>
+
+    <div class="guest-section">
+      <p class="guest-label">Continue without an account</p>
+      <div class="guest-links">
+        <a href="/explore.html" class="guest-link">
+          <span class="guest-link-icon">🗺️</span>
+          <div>
+            <div class="guest-link-name">Explore</div>
+            <div class="guest-link-desc">Kingdome, Three Doors &amp; more</div>
+          </div>
+        </a>
+        <a href="/knowledgecenter.html" class="guest-link">
+          <span class="guest-link-icon">📚</span>
+          <div>
+            <div class="guest-link-name">Help</div>
+            <div class="guest-link-desc">Docs, guides &amp; resources</div>
+          </div>
+        </a>
+      </div>
     </div>
 
     <div class="auth-status" id="auth-status">
