@@ -37,6 +37,16 @@
     }
     .card:hover { border-color: var(--accent); background: var(--surface2); transform: translateY(-2px); }
     .card .icon { font-size: 22px; }
+    .card .avatar {
+      width: 56px; height: 56px; object-fit: cover; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface2);
+    }
+    .card .badge {
+      display: inline-block; align-self: flex-start; font-size: 0.66rem;
+      font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 999px;
+      background: var(--accent); color: #fff;
+    }
     .card h3 { font-size: 0.92rem; font-weight: 600; margin: 0; }
     .card .meta { font-size: 0.78rem; color: var(--muted); }
     .card .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
@@ -352,14 +362,25 @@
     const personasEl = $("agent-personas");
     const personas = agents?.agents || [];
     if (personas.length) {
-      personasEl.innerHTML = personas.map(a => `
+      personasEl.innerHTML = personas.map(a => {
+        const fallbackIcon = a.symbol ? a.symbol.split(",")[0].trim() : "🤖";
+        // Avatar image when present; if it 404s, swap back to the emoji/text icon.
+        const visual = a.avatar
+          ? `<img class="avatar" src="${a.avatar}" alt="${a.name}"
+                 onerror="this.outerHTML='<div class=\\'icon\\'>${fallbackIcon}</div>'">`
+          : `<div class="icon">${fallbackIcon}</div>`;
+        const badge = a.role === "coder"
+          ? `<span class="badge">🔑 Coder · Σ₀</span>`
+          : "";
+        return `
         <div class="card">
-          <div class="icon">${a.symbol ? a.symbol.split(",")[0].trim() : "🤖"}</div>
+          ${visual}
+          ${badge}
           <h3>${a.name}</h3>
           <div class="meta">${a.id}</div>
           <div class="meta">${a.symbol || ""}</div>
-        </div>
-      `).join("");
+        </div>`;
+      }).join("");
     } else {
       personasEl.innerHTML = `<div class="card"><span class="error">No personas registered</span></div>`;
     }

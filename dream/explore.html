@@ -84,6 +84,41 @@
     .explore-info-box p:last-of-type {
       margin-bottom: 0;
     }
+
+    /* ── Watch: YouTube embed + video carousel ── */
+    .video-embed {
+      position: relative; width: 100%; aspect-ratio: 16 / 9;
+      border-radius: var(--radius); overflow: hidden;
+      background: #000; border: 1px solid var(--border); margin-bottom: 18px;
+    }
+    .video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .video-carousel {
+      display: flex; gap: 12px; overflow-x: auto;
+      padding: 6px 2px 10px; scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .video-thumb {
+      flex: 0 0 auto; width: 170px; cursor: pointer; padding: 0; text-align: left;
+      border-radius: 10px; overflow: hidden; background: var(--surface);
+      border: 1px solid var(--border); color: inherit; font: inherit;
+      scroll-snap-align: center;
+      transition: transform .15s, border-color .15s, box-shadow .15s;
+    }
+    .video-thumb:hover { transform: translateY(-2px); }
+    .video-thumb.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+    .video-thumb img { width: 100%; height: 96px; object-fit: cover; display: block; background: #000; }
+    .video-thumb .vt-title {
+      padding: 7px 9px; font-size: .78rem; line-height: 1.3;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .video-thumb .vt-badge {
+      display: inline-block; font-size: .58rem; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+    }
+    .video-thumb.placeholder {
+      display: flex; align-items: center; justify-content: center;
+      height: 130px; border-style: dashed; color: var(--muted); font-size: .8rem;
+    }
   </style>
 </head>
 <body>
@@ -118,6 +153,22 @@
   </div>
 
   <main id="main-content">
+
+    <!-- ── Watch (canon: made by Gage) ── -->
+    <div class="explore-section">
+      <p class="explore-section-title">🎬 Watch — Made by Gage</p>
+      <div class="explore-info-box" style="max-width:920px">
+        <div class="video-embed">
+          <iframe id="ytPlayer"
+            src="https://www.youtube-nocookie.com/embed/_bjDjkQsTs0?rel=0"
+            title="Made by Gage — canon"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen></iframe>
+        </div>
+        <div class="video-carousel" id="videoCarousel" role="list" aria-label="Video carousel — Gage's canon piece centered"></div>
+      </div>
+    </div>
 
     <!-- ── Dreams & Stories ── -->
     <div class="explore-section">
@@ -159,6 +210,28 @@
           <h2>Work Dashboard</h2>
           <p>Track autonomous tasks, streaming work sessions, and convergence records. See what's queued, in progress, and verified complete.</p>
           <span class="panel-arrow">Open Dashboard →</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── Knowledge & Reference ── -->
+    <div class="explore-section">
+      <p class="explore-section-title">📚 Knowledge & Reference</p>
+      <div class="explore-panels">
+        <a class="panel" href="/knowledgecenter.html#library">
+          <span class="panel-icon">📚</span>
+          <span class="panel-label">Library</span>
+          <h2>Reference Library</h2>
+          <p>Browse and read reference PDFs in-page — a cross-industry grounding knowledge base (aviation, maritime, medicine, energy, and more) plus the Comet-Leap master documents. Thumbnails, search, and an in-page viewer.</p>
+          <span class="panel-arrow">Open Library →</span>
+        </a>
+
+        <a class="panel" href="/knowledgecenter.html">
+          <span class="panel-icon">📖</span>
+          <span class="panel-label">Docs</span>
+          <h2>Knowledge Center</h2>
+          <p>Guides, live tools, research, and reference for Lantern OS — getting started, theory, data &amp; memory, and project docs all in one place.</p>
+          <span class="panel-arrow">Open Knowledge Center →</span>
         </a>
       </div>
     </div>
@@ -276,6 +349,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
   checkStatus();
   setInterval(checkStatus, 30000);
+})();
+</script>
+
+<script>
+/* Watch panel — YouTube embed + carousel. Gage's canon video is centered.
+   To add more canon videos, replace a { placeholder:true } slot below with a
+   real { id:'<youtubeId>', title:'<title>' }. The center stays Gage's piece. */
+(function () {
+  const VIDEOS = [
+    { placeholder: true },
+    { placeholder: true },
+    { id: '_bjDjkQsTs0', title: 'Made by Gage', featured: true },
+    { placeholder: true },
+    { placeholder: true },
+  ];
+  const player = document.getElementById('ytPlayer');
+  const car = document.getElementById('videoCarousel');
+  if (!player || !car) return;
+
+  const embed = (id, autoplay) =>
+    'https://www.youtube-nocookie.com/embed/' + id + '?rel=0' + (autoplay ? '&autoplay=1' : '');
+
+  VIDEOS.forEach(v => {
+    const t = document.createElement('button');
+    t.type = 'button';
+    t.setAttribute('role', 'listitem');
+    if (v.placeholder) {
+      t.className = 'video-thumb placeholder';
+      t.textContent = '+ Add canon video';
+      t.setAttribute('aria-label', 'Empty slot — add a canon video');
+    } else {
+      t.className = 'video-thumb' + (v.featured ? ' active' : '');
+      t.setAttribute('aria-label', 'Play ' + v.title);
+      t.innerHTML =
+        '<img loading="lazy" src="https://img.youtube.com/vi/' + v.id + '/hqdefault.jpg" alt="">' +
+        '<div class="vt-title">' + (v.featured ? '<span class="vt-badge">★ Canon</span> ' : '') + v.title + '</div>';
+      t.addEventListener('click', () => {
+        player.src = embed(v.id, true);
+        car.querySelectorAll('.video-thumb').forEach(e => e.classList.remove('active'));
+        t.classList.add('active');
+      });
+    }
+    car.appendChild(t);
+  });
+
+  // Center the featured (Gage) thumb within the carousel — scroll the strip, not the page.
+  const active = car.querySelector('.video-thumb.active');
+  if (active) car.scrollLeft = Math.max(0, active.offsetLeft - (car.clientWidth - active.offsetWidth) / 2);
 })();
 </script>
 </body>

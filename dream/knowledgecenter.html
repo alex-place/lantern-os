@@ -42,6 +42,27 @@
     .link-card .icon { font-size: 22px; }
     .link-card h3 { font-size: 0.92rem; font-weight: 600; }
     .link-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
+    /* ── Library panel ── */
+    .lib-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+    .lib-search { flex:1; min-width:180px; padding:9px 12px; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--text); font-size:0.85rem; }
+    .lib-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:16px; }
+    .lib-card { display:flex; flex-direction:column; gap:0; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s, transform .15s; text-align:left; padding:0; font:inherit; }
+    .lib-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+    .lib-thumb { width:100%; aspect-ratio:3/4; object-fit:cover; object-position:top center; background:var(--surface2); display:block; }
+    .lib-meta { padding:10px 12px 12px; }
+    .lib-meta h3 { font-size:0.8rem; font-weight:600; line-height:1.25; margin:0 0 4px; color:var(--text); }
+    .lib-meta .lib-cat { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.03em; }
+    .lib-meta .lib-sub { font-size:0.68rem; color:var(--muted); margin-top:2px; }
+    .lib-group-title { font-size:0.85rem; font-weight:700; color:var(--muted); margin:22px 0 12px; text-transform:uppercase; letter-spacing:0.04em; }
+    .lib-modal { position:fixed; inset:0; background:rgba(0,0,0,0.78); display:none; align-items:center; justify-content:center; z-index:1000; padding:24px; }
+    .lib-modal.open { display:flex; }
+    .lib-modal-inner { background:var(--surface); border:1px solid var(--border); border-radius:14px; width:min(1000px,96vw); height:90vh; display:flex; flex-direction:column; overflow:hidden; }
+    .lib-modal-head { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); }
+    .lib-modal-head h3 { font-size:0.9rem; font-weight:600; flex:1; color:var(--text); margin:0; }
+    .lib-modal-head a, .lib-modal-head button { font-size:0.8rem; color:var(--accent); background:none; border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer; text-decoration:none; }
+    .lib-modal iframe { flex:1; width:100%; border:0; background:#fff; }
+    .lib-empty { color:var(--muted); font-size:0.85rem; padding:18px; border:1px dashed var(--border); border-radius:10px; }
   </style>
 </head>
 <body>
@@ -67,6 +88,15 @@
     <div class="kc-header">
       <h1>Knowledge Center</h1>
       <p>Guides, live tools, research, and reference for Lantern OS.</p>
+    </div>
+
+    <div class="section" id="library">
+      <h2>📚 Library</h2>
+      <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Browse and read reference PDFs in-page — the cross-industry grounding knowledge base and the Comet-Leap master documents.</p>
+      <div class="lib-toolbar">
+        <input id="lib-search" class="lib-search" type="search" placeholder="Filter by title or category…" aria-label="Filter library">
+      </div>
+      <div id="lib-content"><div class="lib-empty">Loading library…</div></div>
     </div>
 
     <div class="section">
@@ -222,6 +252,18 @@
   </div>
 </div>
 
+<!-- ── Library PDF viewer modal ── -->
+<div class="lib-modal" id="lib-modal" role="dialog" aria-modal="true" aria-label="PDF viewer">
+  <div class="lib-modal-inner">
+    <div class="lib-modal-head">
+      <h3 id="lib-modal-title">PDF</h3>
+      <a id="lib-modal-open" href="#" target="_blank" rel="noopener">Open in new tab ↗</a>
+      <button id="lib-modal-close" type="button" aria-label="Close viewer">✕ Close</button>
+    </div>
+    <iframe id="lib-modal-frame" title="PDF document viewer"></iframe>
+  </div>
+</div>
+
 <!-- ── Footer ── -->
 <footer class="site-footer">
   <div class="footer-inner">
@@ -231,5 +273,73 @@
 </footer>
 
 <script src="/js/theme-toggle.js"></script>
+<script>
+(function(){
+  const content = document.getElementById('lib-content');
+  const search  = document.getElementById('lib-search');
+  const modal   = document.getElementById('lib-modal');
+  const frame   = document.getElementById('lib-modal-frame');
+  const mTitle  = document.getElementById('lib-modal-title');
+  const mOpen   = document.getElementById('lib-modal-open');
+  let entries = [];
+
+  function esc(s){ return (s||'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+  function openPdf(e){
+    mTitle.textContent = e.title;
+    mOpen.href = e.pdfUrl;
+    frame.src = e.pdfUrl;
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closePdf(){
+    modal.classList.remove('open');
+    frame.src = 'about:blank';
+    document.body.style.overflow = '';
+  }
+  document.getElementById('lib-modal-close').addEventListener('click', closePdf);
+  modal.addEventListener('click', ev => { if (ev.target === modal) closePdf(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePdf(); });
+
+  function card(e){
+    const c = document.createElement('button');
+    c.className = 'lib-card'; c.type = 'button';
+    const sizeMB = e.sizeKB ? (e.sizeKB/1024).toFixed(1)+' MB' : '';
+    const pages  = e.pages ? e.pages+' pp' : '';
+    const sub = [pages, sizeMB].filter(Boolean).join(' · ');
+    c.innerHTML =
+      (e.thumbUrl ? '<img class="lib-thumb" loading="lazy" alt="" src="'+esc(e.thumbUrl)+'">' : '<div class="lib-thumb"></div>') +
+      '<div class="lib-meta"><div class="lib-cat">'+esc(e.category)+'</div>'+
+      '<h3>'+esc(e.title)+'</h3><div class="lib-sub">'+esc(sub)+'</div></div>';
+    c.addEventListener('click', () => openPdf(e));
+    return c;
+  }
+
+  function render(filter){
+    const f = (filter||'').toLowerCase().trim();
+    const list = entries.filter(e => !f || (e.title+' '+e.category+' '+e.collection).toLowerCase().includes(f));
+    content.innerHTML = '';
+    if (!list.length){ content.innerHTML = '<div class="lib-empty">No documents match.</div>'; return; }
+    const groups = {};
+    list.forEach(e => { (groups[e.collection] = groups[e.collection] || []).push(e); });
+    Object.keys(groups).forEach(g => {
+      const h = document.createElement('div'); h.className = 'lib-group-title';
+      h.textContent = g + ' (' + groups[g].length + ')';
+      content.appendChild(h);
+      const grid = document.createElement('div'); grid.className = 'lib-grid';
+      groups[g].forEach(e => grid.appendChild(card(e)));
+      content.appendChild(grid);
+    });
+  }
+
+  fetch('/api/library/list').then(r=>r.json()).then(d=>{
+    entries = d.entries || [];
+    render('');
+    if (location.hash === '#library') document.getElementById('library').scrollIntoView();
+  }).catch(()=>{ content.innerHTML = '<div class="lib-empty">Library unavailable — run: python scripts/build_library_thumbs.py</div>'; });
+
+  search.addEventListener('input', () => render(search.value));
+})();
+</script>
 </body>
 </html>

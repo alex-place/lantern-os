@@ -310,7 +310,9 @@ async function syncDeck(){
   if(deck.length===0){
     deck=fresh; idx=0;
     document.getElementById('end').style.display='none';
-    render(); return;
+    // No open positions → load the Σ₀ decisive deck instead of dead-ending empty
+    if(deck.length===0){ await maybePrefetch(); } else { render(); }
+    return;
   }
 
   const wasAtEnd=idx>=deck.length;
@@ -381,21 +383,61 @@ async function maybePrefetch(){
   prefetching=true;
   try {
     const pendingTickers=new Set(deck.slice(idx).map(c=>c.ticker));
-    const [ie, cry]=await Promise.all([
+    const [det, ie, cry]=await Promise.all([
+      j('/decisive-deck?risk=0.5').then(d=>d.cards||[]).catch(()=>[]),
       j('/impossibility-deck').then(d=>d.cards||[]),
       j('/crypto-intraday').then(d=>d.cards||[]),
     ]);
+    const detCards=det.filter(c=>!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
     const ieDet=ie.filter(c=>c.stateLabel==='DETERMINED'&&!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
     const ieConf=ie.filter(c=>c.stateLabel==='CONFIDENT'&&!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
     const fill=cry.filter(c=>!pendingTickers.has(c.ticker)&&isSuggestionTradeable(c));
-    const toAdd=[...ieDet,...ieConf,...fill].slice(0,DECK_TARGET-remaining);
+    // Σ₀-ranked decisive cards first, then IE/crypto fill; de-dup by ticker; sort by Σ₀ score
+    const seen=new Set(); const merged=[];
+    for(const c of [...detCards,...ieDet,...ieConf,...fill]){ if(seen.has(c.ticker))continue; seen.add(c.ticker); merged.push(c); }
+    merged.sort((a,b)=>(b.sigma0?.score||0)-(a.sigma0?.score||0));
+    const toAdd=merged.slice(0,DECK_TARGET-remaining);
     if(!toAdd.length) return;
     deck.push(...toAdd);
+    // Keep the not-yet-swiped portion Σ₀-ranked so the best risk-adjusted swipe
+    // leads (later-arriving decisive cards must not get stuck behind fill cards).
+    if(!dragging){
+      const head=deck.slice(0,idx);
+      const tail=deck.slice(idx).sort((a,b)=>(b.sigma0?.score||0)-(a.sigma0?.score||0));
+      deck=head.concat(tail);
+    }
     const rem=deck.length-idx;
     document.getElementById('progress').textContent=rem>0?`Card ${deck.length-rem+1} of ${deck.length} · soonest first`:'';
     if(!dragging&&idx<deck.length) render();
   } catch(_){}
   finally{ prefetching=false; }
+}
+
+// Σ₀ end-state badge — predicted attractor, win/loss odds, capturable delta, EV,
+// contraction confidence. Renders only on cards the Σ₀ engine scored.
+function sigma0Badge(card){
+  const s=card.sigma0; if(!s||s.score==null) return '';
+  const end=s.end_state||'—';
+  const endCol=end==='YES'?'var(--green)':end==='NO'?'var(--danger)':'var(--muted)';
+  const vCol=s.verdict==='STRONG'?'var(--green)':s.verdict==='SKIP_NEG_EV'?'var(--danger)':'var(--gold)';
+  const pWin=s.p_win!=null?Math.round(s.p_win*100)+'%':'—';
+  const loss=s.loss_odds!=null?Math.round(s.loss_odds*100)+'%':'—';
+  const conf=s.confidence!=null?Math.round(s.confidence*100)+'%':'—';
+  const ev=s.ev_cents, reward=s.reward_cents;
+  const evCol=ev>0?'var(--green)':'var(--danger)';
+  return `<div style="margin-top:8px;padding:7px 8px;border:1px solid #2c3446;border-radius:8px;background:#11151d;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;line-height:1.55">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="color:var(--muted)">Σ₀ end-state → <b style="color:${endCol}">${end}</b></span>
+      <span style="color:${vCol};font-weight:700">${s.verdict||''}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:3px;color:var(--muted)">
+      <span>win <b style="color:#e8edf5">${pWin}</b></span>
+      <span>loss <b style="color:var(--danger)">${loss}</b></span>
+      <span>Δ <b style="color:var(--green)">+${reward!=null?reward+'¢':'—'}</b></span>
+      <span>EV <b style="color:${evCol}">${ev!=null?(ev>0?'+':'')+ev+'¢':'—'}</b></span>
+      <span>conf <b style="color:#e8edf5">${conf}</b></span>
+    </div>
+  </div>`;
 }
 
 function cleanTitle(title,ticker){
@@ -559,6 +601,7 @@ function cardInner(card){
           <div class="conv-num" style="color:var(--green)">${card.favAsk}% probability</div>
         </div>
         <div class="reason">${card.reason||''}</div>
+        ${sigma0Badge(card)}
         ${strategyReason}
         ${fitnessDisplay}
       </div>
@@ -610,6 +653,7 @@ function cardInner(card){
         <div class="conv-num">${card.conviction}% ${convLabel}</div>
       </div>
       <div class="reason">${card.reason||''}</div>
+      ${sigma0Badge(card)}
       ${strategyReason}
       ${fitnessDisplay}
       ${traceHtml}

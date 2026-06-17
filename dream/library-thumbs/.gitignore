@@ -1,0 +1,4 @@
+# Library thumbnails + index are build artifacts — regenerate with:
+#   python scripts/build_library_thumbs.py
+*.png
+index.json
