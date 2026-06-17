@@ -154,19 +154,19 @@
 
   <main id="main-content">
 
-    <!-- ── Watch (canon: made by Gage) ── -->
+    <!-- ── Watch (lanternYT — all channel videos, Gage's canon piece centered) ── -->
     <div class="explore-section">
-      <p class="explore-section-title">🎬 Watch — Made by Gage</p>
+      <p class="explore-section-title">🎬 Watch — <a href="https://www.youtube.com/@lantern1975" target="_blank" rel="noopener noreferrer" style="color:inherit">lanternYT ↗</a></p>
       <div class="explore-info-box" style="max-width:920px">
         <div class="video-embed">
           <iframe id="ytPlayer"
             src="https://www.youtube-nocookie.com/embed/_bjDjkQsTs0?rel=0"
-            title="Made by Gage — canon"
+            title="lanternYT video"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerpolicy="strict-origin-when-cross-origin"
             allowfullscreen></iframe>
         </div>
-        <div class="video-carousel" id="videoCarousel" role="list" aria-label="Video carousel — Gage's canon piece centered"></div>
+        <div class="video-carousel" id="videoCarousel" role="list" aria-label="lanternYT videos — canon piece centered"></div>
       </div>
     </div>
 
@@ -353,17 +353,18 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
-/* Watch panel — YouTube embed + carousel. Gage's canon video is centered.
-   To add more canon videos, replace a { placeholder:true } slot below with a
-   real { id:'<youtubeId>', title:'<title>' }. The center stays Gage's piece. */
+/* Watch panel — every video from the lanternYT channel, fetched live from
+   /api/youtube/lantern-videos (scraped + cached server-side). Gage's canon piece
+   is centered & featured. Falls back to the known videos if the API is down. */
 (function () {
-  const VIDEOS = [
-    { placeholder: true },
-    { placeholder: true },
-    { id: '_bjDjkQsTs0', title: 'Made by Gage', featured: true },
-    { placeholder: true },
-    { placeholder: true },
-  ];
+  const FEATURED_ID = '_bjDjkQsTs0';
+  const FALLBACK = {
+    featured: FEATURED_ID,
+    videos: [
+      { id: '20t9zSUXhhw', title: 'learning Mario [lantern gaming]' },
+      { id: '_bjDjkQsTs0', title: 'playing doom 1 half playthrough [lantern gaming]', featured: true },
+    ],
+  };
   const player = document.getElementById('ytPlayer');
   const car = document.getElementById('videoCarousel');
   if (!player || !car) return;
@@ -371,32 +372,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const embed = (id, autoplay) =>
     'https://www.youtube-nocookie.com/embed/' + id + '?rel=0' + (autoplay ? '&autoplay=1' : '');
 
-  VIDEOS.forEach(v => {
-    const t = document.createElement('button');
-    t.type = 'button';
-    t.setAttribute('role', 'listitem');
-    if (v.placeholder) {
-      t.className = 'video-thumb placeholder';
-      t.textContent = '+ Add canon video';
-      t.setAttribute('aria-label', 'Empty slot — add a canon video');
-    } else {
-      t.className = 'video-thumb' + (v.featured ? ' active' : '');
-      t.setAttribute('aria-label', 'Play ' + v.title);
+  function render(data) {
+    const featured = data.featured || FEATURED_ID;
+    const videos = (data.videos && data.videos.length) ? data.videos : FALLBACK.videos;
+    car.innerHTML = '';
+    videos.forEach(v => {
+      const isFeat = v.featured || v.id === featured;
+      const t = document.createElement('button');
+      t.type = 'button';
+      t.setAttribute('role', 'listitem');
+      t.className = 'video-thumb' + (isFeat ? ' active' : '');
+      t.setAttribute('aria-label', 'Play ' + (v.title || v.id));
       t.innerHTML =
         '<img loading="lazy" src="https://img.youtube.com/vi/' + v.id + '/hqdefault.jpg" alt="">' +
-        '<div class="vt-title">' + (v.featured ? '<span class="vt-badge">★ Canon</span> ' : '') + v.title + '</div>';
+        '<div class="vt-title">' + (isFeat ? '<span class="vt-badge">★ Canon</span> ' : '') +
+        (v.title || v.id) + '</div>';
       t.addEventListener('click', () => {
         player.src = embed(v.id, true);
         car.querySelectorAll('.video-thumb').forEach(e => e.classList.remove('active'));
         t.classList.add('active');
       });
-    }
-    car.appendChild(t);
-  });
+      car.appendChild(t);
+    });
+    // load the featured video into the player and center its thumb
+    const featVid = videos.find(v => v.featured || v.id === featured) || videos[0];
+    if (featVid) player.src = embed(featVid.id, false);
+    const active = car.querySelector('.video-thumb.active') || car.querySelector('.video-thumb');
+    if (active) car.scrollLeft = Math.max(0, active.offsetLeft - (car.clientWidth - active.offsetWidth) / 2);
+  }
 
-  // Center the featured (Gage) thumb within the carousel — scroll the strip, not the page.
-  const active = car.querySelector('.video-thumb.active');
-  if (active) car.scrollLeft = Math.max(0, active.offsetLeft - (car.clientWidth - active.offsetWidth) / 2);
+  fetch('/api/youtube/lantern-videos', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(render)
+    .catch(() => render(FALLBACK));
 })();
 </script>
 </body>
