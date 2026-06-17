@@ -29,38 +29,32 @@
     .page {
       max-width: 1120px;
       margin: 0 auto;
-      padding: 32px 24px 80px;
+      padding: 20px 24px 80px;
     }
 
-    /* ── Header / Page Title ── */
+    /* ── Header / Page Title (Compact) ── */
     .page-header {
-      margin-bottom: 48px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
     }
 
     .page-header h1 {
-      font-size: 2.2rem;
+      font-size: 1.4rem;
       font-weight: 700;
-      margin: 0 0 8px;
+      margin: 0 0 4px;
       letter-spacing: -0.5px;
     }
 
     .page-header p {
-      font-size: 1.05rem;
+      font-size: 0.9rem;
       color: var(--muted);
       margin: 0;
     }
 
-    /* ── Hero Section ── */
+    /* ── Hero Section (Hidden) ── */
     .hero {
-      background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 48px;
-      margin-bottom: 48px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 48px;
-      align-items: center;
+      display: none;
     }
 
     .hero-content h2 {
@@ -144,7 +138,7 @@
 
     /* ── Section Headers ── */
     .section-header {
-      margin-bottom: 24px;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -152,13 +146,13 @@
     }
 
     .section-header h2 {
-      font-size: 1.3rem;
+      font-size: 1.1rem;
       font-weight: 700;
       margin: 0;
     }
 
     .section-header p {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       color: var(--muted);
       margin: 0;
     }
@@ -169,7 +163,7 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 32px;
-      margin-bottom: 48px;
+      margin-bottom: 32px;
     }
 
     .form-grid {
@@ -397,12 +391,9 @@
       color: var(--accent);
     }
 
-    /* ── Tools Grid ── */
+    /* ── Tools Grid (Hidden - tools in project view only) ── */
     .tools-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-      margin-bottom: 48px;
+      display: none;
     }
 
     .tool-card {
