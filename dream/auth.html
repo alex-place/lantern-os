@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <title>Lantern OS — Sign In</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(6,182,212,.08) 0%, rgba(167,139,250,.06) 100%), var(--bg);
+    }
+    .auth-screen {
+      width: 100%;
+      max-width: 500px;
+      padding: 40px 20px;
+    }
+    .auth-hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .auth-hero img {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.9;
+    }
+    .auth-hero h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 12px;
+      color: var(--text);
+    }
+    .auth-hero p {
+      font-size: 16px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+    .auth-gate {
+      margin: 40px auto 0;
+      max-width: 460px;
+      padding: 32px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(6,182,212,.12), transparent 40%),
+        radial-gradient(circle at bottom right, rgba(167,139,250,.10), transparent 35%),
+        rgba(10,15,25,.88);
+      box-shadow: 0 24px 80px rgba(0,0,0,.32);
+    }
+    .auth-gate-kicker {
+      color: var(--accent);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .auth-gate h2 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .auth-gate p {
+      margin: 0 0 24px;
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+    .role-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,.04);
+      text-align: center;
+    }
+    .role-card strong {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .role-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .auth-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .btn-patreon-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 20px;
+      background: #ff424d;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    .btn-patreon-primary:hover {
+      background: #ff5a63;
+      transform: translateY(-1px);
+    }
+    .btn-patreon-secondary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 20px;
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .btn-patreon-secondary:hover {
+      background: rgba(255,255,255,.08);
+      border-color: var(--accent);
+    }
+    .auth-status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.03);
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div class="auth-screen">
+  <div class="auth-hero">
+    <img src="/mandala.svg" alt="" aria-hidden="true">
+    <h1>Lantern OS</h1>
+    <p>Local-first personal operating system</p>
+  </div>
+
+  <div class="auth-gate" id="auth-gate">
+    <div class="auth-gate-kicker">Access Control</div>
+    <h2>Sign In with Patreon</h2>
+    <p id="auth-message">
+      Unlock Keystone Desk and exclusive features based on your tier.
+    </p>
+
+    <div class="role-grid">
+      <div class="role-card">
+        <strong>Guest</strong>
+        <span>Explore & learn</span>
+      </div>
+      <div class="role-card">
+        <strong>Supporter</strong>
+        <span>Chat access</span>
+      </div>
+      <div class="role-card">
+        <strong>Founder</strong>
+        <span>Advanced tools</span>
+      </div>
+      <div class="role-card">
+        <strong>Admin</strong>
+        <span>Full access</span>
+      </div>
+    </div>
+
+    <div class="auth-actions">
+      <button class="btn-patreon-primary" id="auth-btn" onclick="loginWithPatreon()">
+        ♥ Continue with Patreon
+      </button>
+      <a class="btn-patreon-secondary" href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer">
+        View Tiers & Support
+      </a>
+    </div>
+
+    <div class="auth-status" id="auth-status">
+      Checking session…
+    </div>
+  </div>
+</div>
+
+<script>
+  const LANTERN_ROLES = {
+    guest:     { label: "Guest",     canAccess: true },
+    supporter: { label: "Supporter", canAccess: true },
+    founder:   { label: "Founder",   canAccess: true },
+    admin:     { label: "Admin",     canAccess: true }
+  };
+
+  function loginWithPatreon() {
+    const returnTo = "/";
+    location.href = `/api/auth/patreon/start?returnTo=${encodeURIComponent(returnTo)}`;
+  }
+
+  async function checkSession() {
+    try {
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      if (!res.ok) throw new Error("No session");
+
+      const session = await res.json();
+
+      if (session.authenticated) {
+        const role = session.role || "guest";
+        const plan = LANTERN_ROLES[role];
+
+        if (plan && plan.canAccess) {
+          // Auto-redirect to home if already authenticated
+          location.href = "/";
+          return;
+        }
+      }
+    } catch (err) {
+      // Not authenticated, show login
+    }
+
+    updateStatus("Ready to sign in");
+  }
+
+  function updateStatus(message) {
+    const el = document.getElementById("auth-status");
+    if (el) el.textContent = message;
+  }
+
+  // Check session on page load
+  document.addEventListener("DOMContentLoaded", checkSession);
+</script>
+</body>
+</html>
