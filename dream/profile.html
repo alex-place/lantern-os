@@ -7,199 +7,192 @@
   <title>Profile — Lantern OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    .profile-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      max-width: 600px;
-      width: 100%;
+    html, body { height: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; }
+    main { flex: 1; padding: 48px 20px 64px; }
+
+    .profile-wrap {
+      max-width: 720px;
       margin: 0 auto;
-      padding: 40px 20px;
-    }
-    .profile-header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    .profile-header h1 {
-      font-size: 32px;
-      font-weight: 700;
-      margin: 0 0 12px;
-      color: var(--text);
-    }
-    .profile-header p {
-      color: var(--muted);
-      font-size: 15px;
-      margin: 0;
-    }
-    .profile-card {
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px;
-      background:
-        radial-gradient(circle at top left, rgba(6,182,212,.12), transparent 40%),
-        radial-gradient(circle at bottom right, rgba(167,139,250,.10), transparent 35%),
-        rgba(10,15,25,.88);
-      box-shadow: 0 24px 80px rgba(0,0,0,.32);
-      margin-bottom: 24px;
-    }
-    .profile-field {
-      margin-bottom: 24px;
-    }
-    .profile-field:last-child {
-      margin-bottom: 0;
-    }
-    .profile-field-label {
-      display: block;
-      font-size: 12px;
-      font-family: 'IBM Plex Mono', monospace;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-    .profile-field-value {
-      display: block;
-      font-size: 16px;
-      color: var(--text);
-      word-break: break-word;
-    }
-    .role-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      text-transform: capitalize;
-      background: rgba(6,182,212,.2);
-      color: var(--accent);
-    }
-    .role-badge.founder {
-      background: rgba(251,146,60,.2);
-      color: #fb923c;
-    }
-    .role-badge.admin {
-      background: rgba(239,68,68,.2);
-      color: #ef4444;
-    }
-    .profile-actions {
       display: flex;
       flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Hero card ── */
+    .hero-card {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 36px;
+      background:
+        radial-gradient(circle at top left, rgba(6,182,212,.13), transparent 45%),
+        radial-gradient(circle at bottom right, rgba(167,139,250,.10), transparent 40%),
+        var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+    @media (max-width: 540px) {
+      .hero-card { flex-direction: column; text-align: center; padding: 28px 20px; }
+    }
+
+    .avatar {
+      flex-shrink: 0;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #06b6d4, #7c3aed);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 700; color: #fff;
+      letter-spacing: -.5px;
+      border: 3px solid var(--border);
+    }
+
+    .hero-info { flex: 1; min-width: 0; }
+    .hero-name {
+      font-size: 24px; font-weight: 700;
+      color: var(--text); margin: 0 0 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .hero-email { font-size: 14px; color: var(--muted); margin: 0 0 14px; }
+
+    .tier-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      border: 1px solid;
+    }
+    .tier-badge.guest    { background: rgba(156,163,175,.15); color: #9ca3af; border-color: rgba(156,163,175,.3); }
+    .tier-badge.supporter{ background: rgba(6,182,212,.15);   color: #06b6d4; border-color: rgba(6,182,212,.35); }
+    .tier-badge.founder  { background: rgba(251,146,60,.15);  color: #fb923c; border-color: rgba(251,146,60,.35); }
+    .tier-badge.admin    { background: rgba(167,139,250,.15); color: #a78bfa; border-color: rgba(167,139,250,.35); }
+
+    .hero-actions {
+      display: flex; gap: 10px; margin-top: 18px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 540px) { .hero-actions { justify-content: center; } }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); text-decoration: none;
+      transition: border-color .15s, background .15s, color .15s;
+      background: var(--surface2); color: var(--text);
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger { background: rgba(239,68,68,.1); color: #ef4444; border-color: rgba(239,68,68,.3); }
+    .btn-danger:hover { background: rgba(239,68,68,.2); border-color: #ef4444; color: #ef4444; }
+    .btn-primary { background: rgba(6,182,212,.15); color: var(--accent); border-color: rgba(6,182,212,.4); }
+    .btn-primary:hover { background: rgba(6,182,212,.25); border-color: var(--accent); }
+
+    /* ── Info grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
-    .btn-logout {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
+    @media (max-width: 540px) { .info-grid { grid-template-columns: 1fr; } }
+
+    .info-cell {
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 12px 20px;
-      background: rgba(239,68,68,.1);
-      color: #ef4444;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
+      padding: 16px 20px;
+      background: var(--surface);
     }
-    .btn-logout:hover {
-      background: rgba(239,68,68,.2);
-      border-color: #ef4444;
+    .info-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--accent); font-family: 'IBM Plex Mono', monospace;
+      margin-bottom: 6px;
     }
-    .btn-back {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
+    .info-value {
+      font-size: 14px; color: var(--text); word-break: break-word;
+    }
+    .info-value code {
+      font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted);
+    }
+
+    /* ── Access grid ── */
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 12px;
+    }
+    .access-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .access-card {
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 12px 20px;
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      padding: 14px 16px;
+      background: var(--surface);
+      display: flex; align-items: center; gap: 10px;
       text-decoration: none;
+      transition: border-color .15s, background .15s;
     }
-    .btn-back:hover {
-      background: rgba(255,255,255,.08);
-      border-color: var(--accent);
+    .access-card:hover { border-color: var(--accent); background: var(--surface2); }
+    .access-card.locked {
+      opacity: .45; cursor: default; pointer-events: none;
     }
-    .error-message {
-      border: 1px solid rgba(239,68,68,.3);
-      border-radius: 12px;
-      padding: 16px;
-      background: rgba(239,68,68,.05);
-      color: #ef4444;
-      margin-bottom: 24px;
-      text-align: center;
-      font-size: 14px;
+    .access-icon { font-size: 20px; flex-shrink: 0; }
+    .access-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .access-req   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Edit modal ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.6); z-index: 100;
+      align-items: center; justify-content: center;
     }
-    .loading {
-      text-align: center;
-      color: var(--muted);
-      padding: 40px 20px;
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px; max-width: 440px; width: 90%;
     }
+    .modal h2 { margin: 0 0 24px; font-size: 18px; }
+    .form-row { margin-bottom: 16px; }
+    .form-row label {
+      display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 6px;
+    }
+    .form-row input, .form-row textarea {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--surface2); color: var(--text); font-size: 14px;
+      font-family: inherit;
+    }
+    .form-row textarea { min-height: 80px; resize: vertical; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions .btn { flex: 1; justify-content: center; }
+
+    .loading { text-align: center; color: var(--muted); padding: 80px 20px; font-size: 14px; }
   </style>
 </head>
 <body>
 
-<!-- ── Site nav ── -->
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
     <span style="font-size:18px;font-weight:600">Lantern OS</span>
   </a>
-  <div class="nav-links"></div>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Journal</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+  </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
+    <a href="/profile.html" class="nav-btn active" title="Your profile" aria-label="View your profile">👤</a>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
   </div>
 </nav>
 
-<main class="profile-container" id="main-content">
-
-  <div class="profile-header">
-    <h1>Your Profile</h1>
-    <p>Patreon member account information</p>
-  </div>
-
-  <div id="profile-content">
+<main>
+  <div class="profile-wrap" id="profile-wrap">
     <div class="loading">Loading profile…</div>
   </div>
-
-  <!-- Edit profile modal -->
-  <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.8); z-index:1000; display:flex; align-items:center; justify-content:center;">
-    <div style="background:var(--bg); border:1px solid var(--border); border-radius:16px; padding:32px; max-width:500px; width:90%;">
-      <h2 style="margin-top:0; margin-bottom:24px;">Edit Profile</h2>
-      <form id="edit-form" onsubmit="saveProfile(event)" style="display:flex; flex-direction:column; gap:16px;">
-        <div>
-          <label style="display:block; font-size:12px; color:var(--accent); margin-bottom:4px; text-transform:uppercase; font-weight:600;">Name</label>
-          <input type="text" id="edit-name" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:rgba(255,255,255,.04); color:var(--text); font-size:14px;">
-        </div>
-        <div>
-          <label style="display:block; font-size:12px; color:var(--accent); margin-bottom:4px; text-transform:uppercase; font-weight:600;">Bio</label>
-          <textarea id="edit-bio" style="width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:rgba(255,255,255,.04); color:var(--text); font-size:14px; min-height:80px;"></textarea>
-        </div>
-        <div style="display:flex; gap:12px;">
-          <button type="submit" class="btn-logout" style="flex:1; background:rgba(20,184,166,.2); color:var(--accent); border-color:var(--accent);">Save Changes</button>
-          <button type="button" onclick="closeEditModal()" class="btn-back" style="flex:1;">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
 </main>
 
-<!-- ── Site footer ── -->
 <footer class="site-footer">
   <div class="footer-inner">
     <span class="footer-brand">
@@ -212,179 +205,189 @@
   </div>
 </footer>
 
+<!-- Edit modal -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <h2>Edit Profile</h2>
+    <form id="edit-form" onsubmit="saveProfile(event)">
+      <div class="form-row">
+        <label>Display Name</label>
+        <input type="text" id="edit-name" maxlength="80" autocomplete="name">
+      </div>
+      <div class="form-row">
+        <label>Bio</label>
+        <textarea id="edit-bio" maxlength="400" placeholder="A short intro…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn" onclick="closeEdit()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="/js/theme-toggle.js"></script>
 <script>
-  let currentProfile = null;
+const ROLE_LEVEL = { guest: 0, supporter: 1, founder: 2, admin: 3 };
 
-  async function loadProfile() {
-    try {
-      // First check auth session
-      const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
-      if (!sessionRes.ok) throw new Error('Not authenticated');
+const TIER_LABELS = {
+  guest:     { label: 'Free',              emoji: '🔓' },
+  supporter: { label: 'Wanderer — $5/mo',  emoji: '🌀' },
+  founder:   { label: 'Deep Dreamer — $20/mo', emoji: '✦' },
+  admin:     { label: 'Synthesasia Guild — $200/mo', emoji: '⬡' },
+};
 
-      const session = await sessionRes.json();
-      if (!session.authenticated) {
-        redirectToLogin();
-        return;
-      }
+const FEATURES = [
+  { emoji: '📖', label: 'Journal',     href: '/dream-chat.html',       req: 'guest' },
+  { emoji: '📈', label: 'Trader',      href: '/trader-dashboard.html', req: 'admin' },
+  { emoji: '✏️', label: 'Create',      href: '/create.html',           req: 'founder' },
+  { emoji: '🗺️', label: 'Explore',     href: '/explore.html',          req: 'guest' },
+  { emoji: '📚', label: 'Knowledge',   href: '/knowledgecenter.html',  req: 'guest' },
+  { emoji: '📊', label: 'Crypto',      href: '/crypto-dashboard.html', req: 'guest' },
+];
 
-      // Load full profile from backend
-      const res = await fetch('/api/profiles/me', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch profile');
+let currentProfile = null;
 
-      const profile = await res.json();
-      currentProfile = profile;
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
 
-      renderProfile(profile);
-    } catch (err) {
-      console.error('Profile load error:', err);
-      redirectToLogin();
-    }
-  }
+function escapeHtml(s) {
+  const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+}
 
-  function renderProfile(profile) {
-    const content = document.getElementById('profile-content');
-    const role = profile.role || 'guest';
-    const roleClass = role === 'founder' ? 'founder' : role === 'admin' ? 'admin' : '';
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' }); }
+  catch { return iso; }
+}
 
-    content.innerHTML = `
-      <div class="profile-card">
-        <div class="profile-field">
-          <span class="profile-field-label">Name</span>
-          <span class="profile-field-value">${escapeHtml(profile.name || 'Not set')}</span>
-        </div>
-        <div class="profile-field">
-          <span class="profile-field-label">Email</span>
-          <span class="profile-field-value">${escapeHtml(profile.email || 'Not provided')}</span>
-        </div>
-        ${profile.bio ? `
-          <div class="profile-field">
-            <span class="profile-field-label">Bio</span>
-            <span class="profile-field-value">${escapeHtml(profile.bio)}</span>
-          </div>
-        ` : ''}
-        <div class="profile-field">
-          <span class="profile-field-label">User ID</span>
-          <span class="profile-field-value"><code style="font-family:monospace; font-size:12px;">${escapeHtml(profile.id)}</code></span>
-        </div>
-        ${profile.patreonId ? `
-          <div class="profile-field">
-            <span class="profile-field-label">Patreon ID</span>
-            <span class="profile-field-value">${escapeHtml(profile.patreonId)}</span>
-          </div>
-          <div class="profile-field">
-            <span class="profile-field-label">Tier</span>
-            <span class="profile-field-value">${escapeHtml(profile.tier || 'None')}</span>
-          </div>
-        ` : ''}
-        <div class="profile-field">
-          <span class="profile-field-label">Role</span>
-          <span class="profile-field-value">
-            <span class="role-badge ${roleClass}">${escapeHtml(role)}</span>
-            ${profile.metadata?.source ? `<span style="font-size:11px; color:var(--muted); margin-left:8px;">(${escapeHtml(profile.metadata.source)})</span>` : ''}
-          </span>
-        </div>
-        <div class="profile-field">
-          <span class="profile-field-label">Joined</span>
-          <span class="profile-field-value">${formatDate(profile.metadata?.createdAt)}</span>
+function hasAccess(userRole, reqRole) {
+  return (ROLE_LEVEL[userRole] || 0) >= (ROLE_LEVEL[reqRole] || 0);
+}
+
+function renderProfile(profile) {
+  const wrap = document.getElementById('profile-wrap');
+  const role = profile.role || 'guest';
+  const tier = TIER_LABELS[role] || TIER_LABELS.guest;
+
+  const featureCards = FEATURES.map(f => {
+    const ok = hasAccess(role, f.req);
+    const reqLabel = f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '';
+    return ok
+      ? `<a class="access-card" href="${f.href}">
+           <span class="access-icon">${f.emoji}</span>
+           <div><div class="access-label">${f.label}</div></div>
+         </a>`
+      : `<div class="access-card locked" title="${escapeHtml(reqLabel)}">
+           <span class="access-icon">${f.emoji}</span>
+           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(reqLabel)}</div></div>
+         </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="hero-card">
+      <div class="avatar">${escapeHtml(initials(profile.name))}</div>
+      <div class="hero-info">
+        <h1 class="hero-name">${escapeHtml(profile.name || 'Member')}</h1>
+        <p class="hero-email">${escapeHtml(profile.email || '')}</p>
+        <span class="tier-badge ${escapeHtml(role)}">${tier.emoji} ${escapeHtml(tier.label)}</span>
+        <div class="hero-actions">
+          <button class="btn btn-primary" onclick="openEdit()">✏️ Edit</button>
+          <button class="btn btn-danger" onclick="logout()">🚪 Sign out</button>
+          <a class="btn" href="/">← Home</a>
         </div>
       </div>
+    </div>
 
-      <div class="profile-actions">
-        <button class="btn-logout" onclick="openEditModal()" style="background:rgba(106,190,255,.15); color:#6abeff; border-color:rgba(106,190,255,.3);">✏️ Edit Profile</button>
-        <button class="btn-logout" onclick="logout()">🚪 Logout</button>
-        <a class="btn-back" href="/">← Back to Home</a>
+    <div class="info-grid">
+      ${profile.bio ? `
+        <div class="info-cell" style="grid-column:1/-1">
+          <div class="info-label">Bio</div>
+          <div class="info-value">${escapeHtml(profile.bio)}</div>
+        </div>` : ''}
+      <div class="info-cell">
+        <div class="info-label">Member since</div>
+        <div class="info-value">${fmtDate(profile.metadata?.createdAt)}</div>
       </div>
-    `;
-  }
-
-  function openEditModal() {
-    document.getElementById('edit-name').value = currentProfile.name || '';
-    document.getElementById('edit-bio').value = currentProfile.bio || '';
-    document.getElementById('edit-modal').style.display = 'flex';
-  }
-
-  function closeEditModal() {
-    document.getElementById('edit-modal').style.display = 'none';
-  }
-
-  async function saveProfile(e) {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/profiles/me', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: document.getElementById('edit-name').value,
-          bio: document.getElementById('edit-bio').value,
-        }),
-      });
-
-      if (!res.ok) throw new Error('Failed to save profile');
-
-      currentProfile = await res.json();
-      closeEditModal();
-      renderProfile(currentProfile);
-    } catch (err) {
-      alert('Error saving profile: ' + err.message);
-    }
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
-  }
-
-  function formatDate(iso) {
-    if (!iso) return 'Unknown';
-    try {
-      return new Date(iso).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
-      return iso;
-    }
-  }
-
-  function redirectToLogin() {
-    const content = document.getElementById('profile-content');
-    content.innerHTML = `
-      <div class="error-message">
-        Not authenticated. Redirecting to login…
+      <div class="info-cell">
+        <div class="info-label">Patreon ID</div>
+        <div class="info-value"><code>${escapeHtml(profile.patreonId || profile.id || '—')}</code></div>
       </div>
-    `;
-    setTimeout(() => {
-      location.href = '/auth.html';
-    }, 1500);
-  }
+    </div>
 
-  async function logout() {
-    try {
-      const res = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        location.href = '/auth.html';
-      } else {
-        alert('Logout failed');
-      }
-    } catch (err) {
-      console.error('Logout error:', err);
-      alert('Logout error: ' + err.message);
-    }
-  }
+    <div>
+      <div class="section-title">Feature Access</div>
+      <div class="access-grid">${featureCards}</div>
+    </div>
+  `;
+}
 
-  document.addEventListener('DOMContentLoaded', loadProfile);
-  document.addEventListener('click', (e) => {
-    const modal = document.getElementById('edit-modal');
-    if (e.target === modal) closeEditModal();
+function openEdit() {
+  document.getElementById('edit-name').value = currentProfile?.name || '';
+  document.getElementById('edit-bio').value  = currentProfile?.bio  || '';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+  const btn = e.submitter || e.target.querySelector('[type=submit]');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/profiles/me', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: document.getElementById('edit-name').value.trim(),
+        bio:  document.getElementById('edit-bio').value.trim(),
+      }),
+    });
+    if (!res.ok) throw new Error('Save failed');
+    currentProfile = await res.json();
+    closeEdit();
+    renderProfile(currentProfile);
+  } catch (err) {
+    alert('Could not save: ' + err.message);
+  } finally {
+    btn.textContent = 'Save'; btn.disabled = false;
+  }
+}
+
+async function logout() {
+  const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  if (res.ok) location.href = '/auth.html';
+  else alert('Logout failed');
+}
+
+async function init() {
+  try {
+    const sr = await fetch('/api/auth/session', { credentials: 'include' });
+    const session = sr.ok ? await sr.json() : null;
+    if (!session?.authenticated) { location.href = '/auth.html?returnTo=/profile.html'; return; }
+
+    const pr = await fetch('/api/profiles/me', { credentials: 'include' });
+    const profile = pr.ok ? await pr.json() : { ...session.user, role: session.role };
+    currentProfile = profile;
+    renderProfile(profile);
+  } catch (err) {
+    console.error(err);
+    location.href = '/auth.html';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle && window.toggleTheme) toggle.addEventListener('click', toggleTheme);
+  document.getElementById('edit-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeEdit();
   });
+  init();
+});
 </script>
-<script src="/js/update-checker.js" defer></script>
 </body>
 </html>
