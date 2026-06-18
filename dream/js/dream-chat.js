@@ -424,6 +424,7 @@
     }
     if (emptyState) emptyState.style.display = "none";
     appendUserBubble(text);
+    inputEl.dataset.lastMsg = text;
     inputEl.value = "";
     analytics.messagesSent++;
     analytics.lastAgent = directModeEnabled ? "Direct" : detectAgent(text);
@@ -519,6 +520,7 @@
         let buf = "";
 
         let streamFinished = false;
+        let hadDoneEvent = false;
         let routeInfo = null;
         let receiptInfo = null;
         function processLines(lines) {
@@ -627,6 +629,7 @@
                 appendErrorNotice(row, evt.text);
               }
               if (evt.type === "done" && !streamFinished) {
+                hadDoneEvent = true;
                 streamFinished = true;
                 const displayText = evt.cleanText || fullText;
                 if (evt.cleanText && evt.cleanText !== fullText) {
@@ -663,6 +666,14 @@
               if (buf.trim()) processLines([buf]);
               if (!streamFinished) {
                 if (!hasTokens) bubble.textContent = "No response received.";
+                // Stream closed without a done event — response likely truncated
+                if (!hadDoneEvent && hasTokens) {
+                  const retryBadge = document.createElement("div");
+                  retryBadge.style.cssText = "margin-top:6px;font-size:11px;opacity:0.7;cursor:pointer;color:var(--accent)";
+                  retryBadge.textContent = "⟳ Response truncated — tap to retry";
+                  retryBadge.onclick = () => { inputEl.value = inputEl.dataset.lastMsg || ""; sendMessage(); };
+                  bubble.appendChild(retryBadge);
+                }
                 finishStream(row, bubble, cursor, fullText, "done", undefined, undefined, undefined, undefined, undefined);
               }
               return;

@@ -416,6 +416,11 @@ async function sendMessage() {
               } catch (e) {
                 btn.textContent = '✗ Error';
                 btn.style.color = '#f87171';
+                const errRow = document.createElement('div');
+                errRow.className = 'msg-row agent';
+                errRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px;color:#f87171">✗ Auto-work error: ${e.message}</div>`;
+                messages.appendChild(errRow);
+                if (typeof scrollToBottom === 'function') scrollToBottom();
               }
             };
           }
