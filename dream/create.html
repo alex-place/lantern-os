@@ -785,6 +785,48 @@
 
     .upload-zone.compact { padding: 28px 24px; margin-bottom: 8px; }
 
+    /* ── Inline upload progress (matches workspace .wa-progress bars) ── */
+    .upload-progress { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0; }
+    .uprow {
+      background: var(--surface, #14141c);
+      border: 1px solid var(--border, rgba(255,255,255,.08));
+      border-radius: 12px;
+      padding: 12px 14px;
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .uprow.fade { opacity: 0; transform: translateY(-4px); }
+    .uprow-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .uprow-name {
+      font-size: 0.9rem; color: var(--text, #e8e8ea);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    }
+    .uprow-pct {
+      font-size: 0.8rem; color: var(--muted, #9aa0aa);
+      font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 0 auto;
+    }
+    .uprow.done .uprow-pct { color: var(--green, #22c55e); font-weight: 600; }
+    .uprow.error .uprow-pct { color: var(--danger, #e05555); font-weight: 600; }
+    .uprow-track {
+      height: 8px; margin-top: 8px;
+      background: var(--surface2, rgba(255,255,255,.06));
+      border-radius: 5px; overflow: hidden;
+    }
+    .uprow-fill {
+      height: 100%; width: 0;
+      background: linear-gradient(90deg, var(--accent, #06b6d4), var(--green, #22c55e));
+      border-radius: 5px;
+      transition: width .3s ease;
+    }
+    .uprow.error .uprow-fill { background: var(--danger, #e05555); }
+    .uprow.processing .uprow-fill {
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,.16) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.16) 75%, transparent 75%, transparent),
+        linear-gradient(90deg, var(--accent, #06b6d4), var(--green, #22c55e));
+      background-size: 28px 28px, 100% 100%;
+      animation: uprow-stripes 0.8s linear infinite;
+    }
+    @keyframes uprow-stripes { from { background-position: 0 0, 0 0; } to { background-position: 28px 0, 0 0; } }
+
     /* ── Status pills on project cards ── */
     .status-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
     .status-pill.gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
@@ -869,8 +911,11 @@
     <p><strong>Drop a video to start a project</strong></p>
     <p style="font-size: 0.85rem; margin: 0 0 12px;">named automatically — rename it later inside the project</p>
     <button type="button" class="file-input-button" onclick="document.getElementById('file-input').click()">Choose Video</button>
-    <input type="file" id="file-input" accept="video/*">
+    <input type="file" id="file-input" accept="video/*" multiple>
   </div>
+
+  <!-- Live upload progress (one row per file) -->
+  <div id="upload-progress" class="upload-progress" aria-live="polite"></div>
 
   <!-- Recent Projects -->
   <div class="section-header" style="margin: 32px 0 16px;">
@@ -946,44 +991,102 @@ function autoName(filename) {
   return `Video Project ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// Drag & drop → upload immediately
+// Drag & drop → upload (multiple files supported, each with live progress)
 uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragging'); });
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragging'));
 uploadZone.addEventListener('drop', (e) => {
   e.preventDefault(); uploadZone.classList.remove('dragging');
-  if (e.dataTransfer.files.length) uploadAndOpen(e.dataTransfer.files[0]);
+  handleFiles(e.dataTransfer.files);
 });
-fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadAndOpen(fileInput.files[0]); });
+fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
 
-// Upload → create auto-named project → open the project workspace (no naming step).
-let uploading = false;
-async function uploadAndOpen(file) {
-  if (!file || uploading) return;
-  uploading = true;
+const uploadList = document.getElementById('upload-progress');
+
+function handleFiles(fileList) {
+  const files = [...fileList].filter(f => f.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|m4v)$/i.test(f.name));
+  if (!files.length) { showStatus('Please choose a video file.', 'error'); return; }
+  // A single upload keeps the existing "open the project workspace" flow;
+  // multiple uploads stay on the dashboard so each can finish independently.
+  const openOnDone = files.length === 1;
+  files.forEach(f => startUpload(f, openOnDone));
+}
+
+// One progress row per upload. Width is set directly and smoothed by the CSS
+// `transition: width .3s` on .uprow-fill — the same mechanism as the workspace
+// .wa-progress bars. Staged so it never snaps 0→100: bytes 8→70%, then 70→90
+// (striped "Analyzing…"), then 100% on completion.
+function startUpload(file, openOnDone) {
   const title = autoName(file.name);
-  showStatus(`Uploading "${file.name}"…`, 'loading');
-  try {
-    const fd = new FormData();
-    fd.append('entry', JSON.stringify({ title, type: 'video' }));
-    fd.append('file', file);
-    const up = await fetch('/api/dreamer/upload', { method: 'POST', body: fd });
-    if (!up.ok) { const e = await up.json().catch(() => ({})); showStatus('✗ ' + (e.error || 'Upload failed'), 'error'); return; }
-    const upRes = await up.json();
-    const filePath = upRes.file?.path;
-    const cr = await fetch('/api/creator-entries', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, type: 'video', filePath })
-    });
-    if (!cr.ok) { const e = await cr.json().catch(() => ({})); showStatus('✗ ' + (e.error || 'Could not create project'), 'error'); return; }
-    const { entry } = await cr.json();
-    showStatus('✓ Project created — opening…', 'success');
-    // Land directly in the project workspace (Phase 7/8).
-    window.location.href = `/entry.html?id=${encodeURIComponent(entry.id)}`;
-  } catch (err) {
-    showStatus('✗ ' + err.message, 'error');
-  } finally {
-    uploading = false; fileInput.value = '';
+  const row = document.createElement('div');
+  row.className = 'uprow uploading';
+  row.innerHTML =
+    '<div class="uprow-head">' +
+      '<span class="uprow-name">' + esc(file.name) + '</span>' +
+      '<span class="uprow-pct">0%</span>' +
+    '</div>' +
+    '<div class="uprow-track"><div class="uprow-fill"></div></div>';
+  uploadList.appendChild(row);
+  const fill = row.querySelector('.uprow-fill');
+  const pctEl = row.querySelector('.uprow-pct');
+  let phase = 'uploading';
+  function setProgress(pct) {
+    fill.style.width = Math.max(0, Math.min(100, pct)).toFixed(1) + '%';
+    if (phase === 'uploading') pctEl.textContent = Math.round(pct) + '%';
   }
+  // Force a frame at 0 before the first real value so the .3s transition runs.
+  setProgress(0); void fill.offsetWidth; setProgress(8);
+
+  // Phase 1 (8–70%): real byte upload via XHR (exposes upload progress events).
+  const fd = new FormData();
+  fd.append('entry', JSON.stringify({ title, type: 'video' }));
+  fd.append('file', file);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/dreamer/upload');
+  xhr.upload.addEventListener('progress', (e) => {
+    if (e.lengthComputable) setProgress(8 + (e.loaded / e.total) * 62);
+  });
+  xhr.addEventListener('load', async () => {
+    if (xhr.status < 200 || xhr.status >= 300) return failRow(row, pctEl, 'Upload failed');
+    let upRes; try { upRes = JSON.parse(xhr.responseText); } catch { return failRow(row, pctEl, 'Bad server response'); }
+    const filePath = upRes.file && upRes.file.path;
+    // Phase 2 (70→90%): project creation — no byte events, show striped "Analyzing…".
+    phase = 'processing';
+    row.classList.replace('uploading', 'processing');
+    pctEl.textContent = 'Analyzing…';
+    setProgress(90);
+    try {
+      const cr = await fetch('/api/creator-entries', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, type: 'video', filePath })
+      });
+      if (!cr.ok) { const e = await cr.json().catch(() => ({})); return failRow(row, pctEl, e.error || 'Could not create project'); }
+      const { entry } = await cr.json();
+      // Phase 3 (100%): done.
+      phase = 'done';
+      row.classList.replace('processing', 'done');
+      setProgress(100);
+      pctEl.textContent = '✓ Uploaded';
+      loadRecentEntries();
+      if (openOnDone && entry && entry.id) {
+        setTimeout(() => { window.location.href = '/entry.html?id=' + encodeURIComponent(entry.id); }, 750);
+      } else {
+        setTimeout(() => fadeRow(row), 1500);
+      }
+    } catch (err) { failRow(row, pctEl, err.message); }
+  });
+  xhr.addEventListener('error', () => failRow(row, pctEl, 'Network error'));
+  xhr.send(fd);
+}
+
+function failRow(row, pctEl, msg) {
+  row.classList.remove('uploading', 'processing'); row.classList.add('error');
+  pctEl.textContent = '✗ ' + msg;
+  setTimeout(() => fadeRow(row), 4000);
+}
+
+function fadeRow(row) {
+  row.classList.add('fade');
+  setTimeout(() => row.remove(), 500);
 }
 
 function esc(s) {
