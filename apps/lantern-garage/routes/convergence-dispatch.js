@@ -104,7 +104,7 @@ module.exports = async (req, res, url, deps) => {
         }
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddAll, gitCommit, gitPush, openDraftPr } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr } = require("../lib/self-edit-engine");
         const { execFile } = require("child_process");
         const path = require("path");
         const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -178,29 +178,48 @@ module.exports = async (req, res, url, deps) => {
         
         // Step 2: Generate patch
         const { diffText, files } = await generatePatch(REPO_ROOT, plan);
-        
-        // Step 3: Apply patch
-        applyPatch(REPO_ROOT, diffText);
-        
-        // Step 4: Run tests
-        const testResults = runTests(REPO_ROOT, []);
-        const allTestsOk = testResults.every((r) => r.ok);
-        
-        if (!allTestsOk) {
-          // Rollback on test failure
+
+        // Step 3: Apply patch — capture stats so we can verify it actually changed code
+        const applyStats = applyPatch(REPO_ROOT, diffText);
+        const changedFiles = [...(applyStats.changed || []), ...(applyStats.created || [])];
+
+        // Anti-fraud gate: the patch MUST produce real, clean code changes.
+        // Without this, a hallucinated/failed patch leaves the working tree
+        // unchanged, then `git add -A` would commit unrelated runtime data churn
+        // (prices.jsonl etc.) as the "fix" — closing the issue with no real work.
+        if (changedFiles.length === 0 || (applyStats.errors && applyStats.errors.length > 0)) {
           execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT });
-          sendJson(res, { 
-            ok: false, 
-            error: "tests_failed", 
+          sendJson(res, {
+            ok: false,
+            error: "patch_did_not_apply",
+            applyStats,
+            message: "Generated patch produced no usable code changes (hunks failed or empty). Aborted — nothing committed.",
+          }, 422);
+          return;
+        }
+
+        // Step 4: Run tests from the plan. Empty test set = UNVERIFIED, not "passed".
+        const plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        const testResults = runTests(REPO_ROOT, plannedTests);
+        const testsRan = plannedTests.length;
+        const allTestsOk = testResults.every((r) => r.ok);
+        const testsVerified = testsRan > 0 && allTestsOk;
+
+        if (testsRan > 0 && !allTestsOk) {
+          // Rollback on test failure — stage nothing
+          execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT });
+          sendJson(res, {
+            ok: false,
+            error: "tests_failed",
             testResults,
             message: "Tests failed after applying changes. Changes rolled back."
           }, 500);
           return;
         }
-        
-        // Step 5: Commit
-        gitAddAll(REPO_ROOT);
-        const commitTitle = `fix: ${issueDetails.title} (fixes #${issueNumber})`;
+
+        // Step 5: Commit — stage ONLY the files the patch changed (never git add -A)
+        gitAddFiles(REPO_ROOT, changedFiles);
+        const commitTitle = `${testsVerified ? "" : "[unverified] "}fix: ${issueDetails.title} (fixes #${issueNumber})`;
         gitCommit(REPO_ROOT, commitTitle);
 
         // Capture the commit SHA for the response/UI
@@ -212,8 +231,12 @@ module.exports = async (req, res, url, deps) => {
         // Step 6: Push
         gitPush(REPO_ROOT, branchName);
 
-        // Step 7: Open PR
-        const prBody = `Fixes #${issueNumber}\n\n${issueDetails.body}`;
+        // Step 7: Open PR — flag unverified when no tests actually ran
+        const prBody = `Fixes #${issueNumber}\n\n${issueDetails.body}\n\n---\n` +
+          (testsVerified
+            ? `✅ ${testsRan} test(s) passed.`
+            : `⚠️ No automated tests ran for this change — **requires human review before merge**.`) +
+          `\n\nFiles changed: ${changedFiles.join(", ")}`;
         const prUrl = openDraftPr(REPO_ROOT, branchName, commitTitle, prBody);
 
         sendJson(res, {
@@ -223,6 +246,10 @@ module.exports = async (req, res, url, deps) => {
           branch: branchName,
           commitSha,
           prUrl,
+          changedFiles,
+          testsRan,
+          testsVerified,
+          verified: testsVerified,
           steps: ["fetched_issue", "generated_plan", "applied_patch", "ran_tests", "committed", "pushed", "opened_pr"],
           testResults
         });
@@ -259,7 +286,7 @@ module.exports = async (req, res, url, deps) => {
       const GH_REPO = "alex-place/lantern-os";
       const {
         generatePlan, generatePatch, applyPatch, runTests,
-        gitAddAll, gitCommit, gitPush, openDraftPr,
+        gitAddFiles, gitCommit, gitPush, openDraftPr,
         gitCurrentBranch, gitCreateBranch,
       } = require("../lib/self-edit-engine");
 
@@ -371,21 +398,28 @@ module.exports = async (req, res, url, deps) => {
           step("research", "web_search", { skipped: true, reason: e.message });
         }
 
-        // Find relevant files in codebase (grep for keywords + file patterns)
+        // Find relevant files in codebase. Use `git grep` via execFileSync (no shell)
+        // — cross-platform (the old `grep -r ... 2>/dev/null | head` silently failed
+        // on Windows/cmd.exe, returning 0 files so the LLM patched blind → hallucinations).
         const fs = require("fs");
-        const { execSync } = require("child_process");
+        const { execFileSync } = require("child_process");
         const scopeFiles = [];
-        try {
-          const grepOutput = execSync(
-            `grep -r "${keywords[0] || 'fix'}" --include="*.js" --include="*.json" --include="*.md" ${REPO_ROOT} 2>/dev/null | head -20`,
-            { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 }
-          ).split("\n").filter(Boolean);
-          grepOutput.forEach((line) => {
-            const filePath = line.split(":")[0];
-            if (filePath && !scopeFiles.includes(filePath)) scopeFiles.push(filePath);
-          });
-        } catch (e) {
-          // grep may fail if no matches, that's ok
+        for (const kw of keywords.slice(0, 5)) {
+          if (scopeFiles.length >= 20) break;
+          if (!kw || kw.length < 4) continue;
+          try {
+            const out = execFileSync(
+              "git",
+              ["grep", "-l", "-i", "-e", kw, "--", "*.js", "*.json", "*.md", "*.py", "*.html"],
+              { cwd: REPO_ROOT, encoding: "utf-8", timeout: 8000, maxBuffer: 10 * 1024 * 1024, windowsHide: true }
+            ).split("\n").filter(Boolean);
+            for (const filePath of out) {
+              if (filePath && !scopeFiles.includes(filePath)) scopeFiles.push(filePath);
+              if (scopeFiles.length >= 20) break;
+            }
+          } catch (e) {
+            // git grep exits non-zero when a keyword has no matches — that's fine.
+          }
         }
 
         const researchContext = {
@@ -431,8 +465,24 @@ module.exports = async (req, res, url, deps) => {
         // ── 5. apply ─────────────────────────────────────────────────────
         step("apply", "start");
         const stats = applyPatch(REPO_ROOT, diffText);
+        const changedFiles = [...(stats.changed || []), ...(stats.created || [])];
+
+        // Anti-fraud gate: refuse to proceed if the patch changed nothing or had
+        // hunk errors. Otherwise a hallucinated/failed patch would let unrelated
+        // data-file churn be committed as the "fix" (the data-file fraud pattern).
+        if (changedFiles.length === 0 || (stats.errors && stats.errors.length > 0)) {
+          await new Promise((resolve) =>
+            execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT, timeout: 10000, windowsHide: true }, () => resolve()));
+          receipt.applied = false;
+          receipt.stoppedAt = "patch_did_not_apply";
+          step("apply", "error", { stats, error: "patch_did_not_apply" });
+          send("done", { ok: false, ...receipt, message: "Generated patch produced no usable code changes (hunks failed or empty). Aborted — nothing committed." });
+          res.end();
+          return;
+        }
         receipt.applied = true;
-        step("apply", "done", { stats });
+        receipt.changedFiles = changedFiles;
+        step("apply", "done", { stats, changedFiles });
 
         // ── 6. tests (verification gate for commit/push) ─────────────────
         const tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
@@ -466,11 +516,12 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
         step("commit", "start");
-        gitAddAll(REPO_ROOT);
-        const commitTitle = `fix: ${issueDetails.title} (fixes #${issueNumber})`;
+        gitAddFiles(REPO_ROOT, changedFiles); // stage ONLY patched files — never git add -A
+        const verified = tests.length > 0 && testsPassed;
+        const commitTitle = `${verified ? "" : "[unverified] "}fix: ${issueDetails.title} (fixes #${issueNumber})`;
         gitCommit(REPO_ROOT, commitTitle);
         receipt.committed = true;
-        step("commit", "done", { title: commitTitle });
+        step("commit", "done", { title: commitTitle, changedFiles, verified });
 
         // ── 8. push + PR (opt-in) ────────────────────────────────────────
         if (!autoPush) {

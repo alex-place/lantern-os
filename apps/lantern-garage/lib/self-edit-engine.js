@@ -240,6 +240,19 @@ function gitAddAll(repoRoot) {
   execSync("git add -A", { cwd: repoRoot, encoding: "utf8", timeout: 5000 });
 }
 
+// Stage ONLY the given files. Critical anti-fraud measure: autowork must never
+// `git add -A` (that sweeps unrelated runtime data churn — prices.jsonl etc. —
+// into the commit, letting a no-op patch masquerade as a real fix). Paths are
+// validated inside repoRoot and staged individually via execFileSync (no shell).
+function gitAddFiles(repoRoot, files) {
+  const list = (files || []).filter((f) => f && isPathSafe(repoRoot, f));
+  if (list.length === 0) throw new Error("no_files_to_stage");
+  for (const f of list) {
+    execFileSync("git", ["add", "--", f], { cwd: repoRoot, encoding: "utf8", timeout: 5000 });
+  }
+  return list;
+}
+
 // GitHub repo slug for API calls. Override with GH_REPO env if the remote moves.
 const GH_REPO = process.env.GH_REPO || "alex-place/lantern-os";
 
@@ -646,6 +659,7 @@ module.exports = {
   gitPush,
   gitDiffStat,
   gitAddAll,
+  gitAddFiles,
   gitCurrentBranch,
   openDraftPr,
   runTests,
