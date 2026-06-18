@@ -440,6 +440,63 @@ async function sendMessage() {
     return;
   }
 
+  // Auto-route work/status queries to convergence agent (no LLM cost, instant)
+  const WORK_INTENT = /\b(what (work|issues?|tasks?|bugs?|tickets?|pr[s']?|pull requests?)|what (needs?|needs to be) (done|fixed|closed|worked on)|what'?s? (open|pending|left|next|the status|blocking)|show (me )?(open |the )?issues?|status (of|update)|list (issues?|tasks?|open)|open issues?|any issues?|what should i (work on|fix|do)|top issues?|priority (issues?|tasks?))\b/i;
+  if (WORK_INTENT.test(text) && !text.startsWith('!')) {
+    input.value = '';
+    input.style.height = 'auto';
+    const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    addUserBubble(text);
+    const messages = document.getElementById('messages');
+    const sysRow = document.createElement('div');
+    sysRow.className = 'msg-row agent';
+    sysRow.innerHTML = '<div class="msg-label">Convergence</div><div class="bubble" style="font-size:13px">Routing locally…</div>';
+    messages.appendChild(sysRow);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    try {
+      const r = await fetch(`${base}/api/convergence/agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const d = await r.json();
+      const bubble = sysRow.querySelector('.bubble');
+      const badge = d.grounded ? '⚡ Instant answer · from live repo data' : '⚡ Instant answer · no AI cost';
+      const meta = `<div style="font-size:11px;opacity:0.55;margin-top:8px">${badge}</div>`;
+      bubble.innerHTML = `<div style="white-space:pre-wrap;line-height:1.5">${esc(d.answer || '(no answer)')}</div>` + meta;
+      const acts = Array.isArray(d.actions) ? d.actions : [];
+      if (acts.length) {
+        const wrap = document.createElement('div');
+        wrap.className = 'starter-chips';
+        wrap.style.marginTop = '10px';
+        acts.forEach(a => {
+          const btn = document.createElement('button');
+          btn.className = 'starter-chip';
+          btn.textContent = a.label;
+          if (a.href) btn.onclick = () => window.open(a.href, '_blank', 'noopener');
+          else if (a.autonomous && a.issue) {
+            btn.onclick = async () => {
+              btn.disabled = true; btn.textContent = 'Working…';
+              try {
+                const wr = await fetch(`${base}/api/convergence/autonomous-work`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ issue: a.issue }) });
+                const wres = await wr.json();
+                if (wres.ok) { btn.textContent = '✓ Done'; btn.style.color = '#4ade80'; }
+                else { btn.textContent = '✗ Failed'; btn.style.color = '#f87171'; }
+              } catch { btn.textContent = '✗ Error'; btn.style.color = '#f87171'; }
+            };
+          } else if (a.command) btn.onclick = () => fillAndSend(a.command);
+          wrap.appendChild(btn);
+        });
+        bubble.appendChild(wrap);
+      }
+    } catch (e) {
+      sysRow.querySelector('.bubble').textContent = `Convergence failed: ${e.message}`;
+    }
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    return;
+  }
+
   isSending = true;
   document.getElementById('send-btn').disabled = true;
 
@@ -489,7 +546,7 @@ async function sendMessage() {
         try {
           const evt = JSON.parse(line.slice(6));
           if (evt.type === 'route') {
-            if (!document.querySelector('.route-card')) {
+            if (!bubble.querySelector('.route-card')) {
               const rc = document.createElement('div');
               rc.className = 'route-card';
               rc.textContent = evt.label || `${evt.agentName} · ${evt.surface}`;
