@@ -112,7 +112,15 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
         try {
           currentBranch = execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf8" }).trim();
         } catch {}
-        const pull = execSync(`git pull origin ${currentBranch}`, { cwd: repoRoot, encoding: "utf8", timeout: 30000 });
+        // Stash local data-file changes so pull doesn't fail on dirty working tree
+        try { execSync("git stash --include-untracked -m autoupdate", { cwd: repoRoot, encoding: "utf8" }); } catch {}
+        let pull;
+        try {
+          pull = execSync(`git pull origin ${currentBranch}`, { cwd: repoRoot, encoding: "utf8", timeout: 30000 });
+        } finally {
+          // Always restore stashed data files after pull
+          try { execSync("git stash pop", { cwd: repoRoot, encoding: "utf8" }); } catch {}
+        }
         steps.push({ step: "git_pull", ok: true, output: pull.trim(), branch: currentBranch });
       } catch (e) {
         steps.push({ step: "git_pull", ok: false, output: e.stdout?.trim() || e.message });
@@ -176,9 +184,13 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
               // Watchdog failed, final fallback
             }
             // Final fallback: detached spawn (old behavior)
+            // Use server-dev.js when running on dev port 4178, otherwise server.js
+            const serverScript = (process.env.LANTERN_GARAGE_PORT === "4178")
+              ? "apps/lantern-garage/server-dev.js"
+              : "apps/lantern-garage/server.js";
             const restartScript = process.platform === "win32"
-              ? `Start-Sleep -Seconds 2; Start-Process node -ArgumentList "apps/lantern-garage/server.js" -WindowStyle Hidden`
-              : `sleep 2 && node apps/lantern-garage/server.js`;
+              ? `Start-Sleep -Seconds 2; Start-Process node -ArgumentList "${serverScript}" -WindowStyle Hidden`
+              : `sleep 2 && node ${serverScript}`;
             const shell = process.platform === "win32" ? "powershell.exe" : "sh";
             const args = process.platform === "win32" ? ["-Command", restartScript] : ["-c", restartScript];
             spawn(shell, args, { detached: true, stdio: "ignore", cwd: repoRoot });
