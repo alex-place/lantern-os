@@ -841,7 +841,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
         req2.write(payload);
         req2.end();
       });
-      if (reply) {
+      if (reply && reply.length >= 20) {
         recordProviderSuccessRouter("anthropic"); // Log to provider-router
         return { reply, agent: agent.name, suggestions, online: true, source: "claude", webSuggestions };
       }
@@ -893,7 +893,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           req2.write(payload);
           req2.end();
         });
-        if (reply) {
+        if (reply && reply.length >= 20) {
           return { reply, agent: agent.name, suggestions, online: true, source: `gemini:${geminiModel}`, webSuggestions };
         }
       } catch (err) { console.error(`Gemini (${geminiModel}) error:`, err.message); }
@@ -952,7 +952,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
         req2.write(payload);
         req2.end();
       });
-      if (reply) {
+      if (reply && reply.length >= 20) {
         recordProviderSuccessRouter("openai"); // Log to provider-router
         return { reply, agent: agent.name, suggestions, online: true, source: "openai", webSuggestions };
       }
@@ -1000,7 +1000,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
         req2.write(payload);
         req2.end();
       });
-      if (reply) {
+      if (reply && reply.length >= 20) {
         recordProviderSuccessRouter("xai");
         return { reply, agent: agent.name, suggestions, online: true, source: "grok", webSuggestions };
       }
