@@ -1,0 +1,180 @@
+{
+  "manifest_version": "1.0.0",
+  "sprint_name": "CSF v1.6 Sprint Consolidation",
+  "status": "Active",
+  "description": "Consolidated work items for CSF v1.6, focusing on Kingdome convergence, LoRA integration, and production hardening. Archived previous 1.5 and pre-1.5 issues.",
+  "tracks": [
+    {
+      "id": "kingdome",
+      "name": "Kingdome Convergence Engine",
+      "description": "Core work on the Tesseract convergence engine, sparse matrix modeling, and architecture.",
+      "priority": "High"
+    },
+    {
+      "id": "lora",
+      "name": "LoRA Live Integration",
+      "description": "Integrating LoRA models for dynamic persona, context, and mock replacement strategies.",
+      "priority": "Medium"
+    },
+    {
+      "id": "production",
+      "name": "Production Hardening",
+      "description": "Security audits, performance tuning, stability testing, and token audit logging.",
+      "priority": "Medium"
+    }
+  ],
+  "work_items": [
+    {
+      "id": "#596",
+      "title": "Kingdome: Formalize Sparse Ternary Matrix Schema",
+      "description": "Define the canonical schema for the 3^12 sparse ternary matrix within the CSF archive.",
+      "status": "Active",
+      "priority": "P0",
+      "track": "kingdome",
+      "assigned_to": "Kingdome Engine Designer"
+    },
+    {
+      "id": "#597",
+      "title": "Kingdome: Implement Wavefront Query Optimization",
+      "description": "Optimize `Wavefront::search` to leverage bloom filters and segment tables more effectively for large archives.",
+      "status": "Active",
+      "priority": "P1",
+      "track": "kingdome",
+      "assigned_to": "Kingdome Engine Designer"
+    },
+    {
+      "id": "#598",
+      "title": "Kingdome: Develop Dollhouse Checkin-Aware Merge Strategy",
+      "description": "Implement coverage-weighted merge logic, respecting `last_checkin` and `coverage_score` metadata.",
+      "status": "Active",
+      "priority": "P1",
+      "track": "kingdome",
+      "assigned_to": "Kingdome Engine Designer"
+    },
+    {
+      "id": "#599",
+      "title": "LoRA: Design LoRA API Integration Layer",
+      "description": "Create a robust API for dynamically loading and switching LoRA models based on context or persona.",
+      "status": "Active",
+      "priority": "P0",
+      "track": "lora",
+      "assigned_to": "LoRA Integration Lead"
+    },
+    {
+      "id": "#600",
+      "title": "LoRA: Implement LoRA Mock Replacement Strategy",
+      "description": "Develop a system to seamlessly replace mock LLM responses with live LoRA model outputs during development.",
+      "status": "Active",
+      "priority": "P1",
+      "track": "lora",
+      "assigned_to": "LoRA Integration Lead"
+    },
+    {
+      "id": "#601",
+      "title": "LoRA: Integrate LoRA Model Training Workflow",
+      "description": "Establish a workflow for fine-tuning and deploying new LoRA models based on agent interactions.",
+      "status": "Active",
+      "priority": "P2",
+      "track": "lora",
+      "assigned_to": "LoRA Integration Lead"
+    },
+    {
+      "id": "#602",
+      "title": "Production: Implement Token Audit Logging",
+      "description": "Add comprehensive logging for all token usage (`convergence-audit.jsonl`) across providers and agents.",
+      "status": "Active",
+      "priority": "P0",
+      "track": "production",
+      "assigned_to": "Production Hardening Lead"
+    },
+    {
+      "id": "#603",
+      "title": "Production: Conduct Security Audit of Convergence Layer",
+      "description": "Perform a security review of the CSF Rust crate and its integration points, focusing on data integrity and access control.",
+      "status": "Active",
+      "priority": "P1",
+      "track": "production",
+      "assigned_to": "Production Hardening Lead"
+    },
+    {
+      "id": "#604",
+      "title": "Production: Optimize CSF Archive for Low-Power Devices",
+      "description": "Benchmark and optimize CSF compression/decompression for embedded and low-power edge devices.",
+      "status": "Active",
+      "priority": "P2",
+      "track": "production",
+      "assigned_to": "Production Hardening Lead"
+    },
+    {
+      "id": "#605",
+      "title": "Kingdome: CLI `csf merge` Command Implementation",
+      "description": "Complete the `csf merge` command to perform real dollhouse checkin-aware convergence.",
+      "status": "Active",
+      "priority": "P1",
+      "track": "kingdome",
+      "assigned_to": "Kingdome Engine Designer"
+    },
+    {
+      "id": "#606",
+      "title": "LoRA: Update `dream_chat` Agent for LoRA Context Switching",
+      "description": "Modify the `dream_chat` agent to dynamically select and apply LoRA models based on conversation context.",
+      "status": "Active",
+      "priority": "P1",
+      "track": "lora",
+      "assigned_to": "LoRA Integration Lead"
+    },
+    {
+      "id": "#607",
+      "title": "Production: Enhance `tesseract_listener` for Audit Log Monitoring",
+      "description": "Extend `tesseract_listener` to monitor and report on `convergence-audit.jsonl` activity.",
+      "status": "Active",
+      "priority": "P2",
+      "track": "production",
+      "assigned_to": "Production Hardening Lead"
+    },
+    {
+      "id": "#608",
+      "title": "Kingdome: Implement `csf checkin` for Manifest Export",
+      "description": "Develop the `csf checkin` command to validate integrity hashes and export `manifest.json`.",
+      "status": "Active",
+      "priority": "P2",
+      "track": "kingdome",
+      "assigned_to": "Kingdome Engine Designer"
+    },
+    {
+      "id": "#609",
+      "title": "Production: Establish Performance Benchmarking for 1.6",
+      "description": "Set up new `cargo bench` targets for 1.6 features and integrate into CI.",
+      "status": "Active",
+      "priority": "P2",
+      "track": "production",
+      "assigned_to": "Production Hardening Lead"
+    }
+  ],
+  "archived_items": [
+    {
+      "id": "#451-#463",
+      "description": "Completed CSF v1.5 release issues (Wavefront API, Segment Table, Bounded Load, Selective Decode).",
+      "status": "Archived - Completed 1.5",
+      "date_archived": "2026-06-12"
+    },
+    {
+      "id": "#406-#413",
+      "description": "Phase A/B/C duplicates (pre-1.5) - consolidated into 1.6 work items.",
+      "status": "Archived - Duplicates",
+      "date_archived": "2026-06-12"
+    },
+    {
+      "id": "#414-#423",
+      "description": "Phase A/B/C duplicates (pre-1.5) - consolidated into 1.6 work items.",
+      "status": "Archived - Duplicates",
+      "date_archived": "2026-06-12"
+    },
+    {
+      "id": "#424-#446",
+      "description": "Stale pre-1.5 issues - no longer relevant for 1.6 sprint.",
+      "status": "Archived - Stale",
+      "date_archived": "2026-06-12"
+    }
+  ]
+}
