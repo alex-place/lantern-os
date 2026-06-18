@@ -39,6 +39,10 @@
     }
     /* Hero with the large, slow Sigma-0 mandala as a background layer */
     .hero { position: relative; text-align: center; padding: 0; }
+    @keyframes hero-spin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
     .hero-bg {
       position: absolute;
       top: 50%; left: 50%;
@@ -49,6 +53,7 @@
       z-index: 0;
       pointer-events: none;
       user-select: none;
+      animation: hero-spin 60s linear infinite;
     }
     .hero > h1, .hero > .tagline, .hero > .hero-cta-row, .hero > .sub { position: relative; z-index: 1; }
     .hero h1 { margin-bottom: 12px; }
@@ -107,22 +112,22 @@
   <div class="home-tiles">
     <a class="panel" href="/trader-dashboard.html">
       <span class="panel-icon">📈</span>
-      <span class="panel-label">Trade</span>
       <h2>Lantern Trader</h2>
+      <span class="panel-label">Trade</span>
       <p>Stocks, prediction markets, and market news.</p>
       <span class="panel-arrow">Open Trader →</span>
     </a>
     <a class="panel" href="/create.html">
       <span class="panel-icon">✏️</span>
-      <span class="panel-label">Create</span>
       <h2>Lantern Create</h2>
+      <span class="panel-label">Create</span>
       <p>Upload and organize your creative work.</p>
       <span class="panel-arrow">Start Creating →</span>
     </a>
     <a class="panel" href="/explore.html">
       <span class="panel-icon">🗺️</span>
-      <span class="panel-label">Explore</span>
-      <h2>Explore Lantern</h2>
+      <h2>Convergance</h2>
+      <span class="panel-label">Explore Convergance</span>
       <p>Kingdome, archives, settings, and more.</p>
       <span class="panel-arrow">Explore →</span>
     </a>
