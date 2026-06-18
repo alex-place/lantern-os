@@ -37,6 +37,73 @@
   body[data-patreon-role="supporter"] .admin-only,
   body[data-patreon-role="founder"] .admin-only { display:none !important; }
   body[data-patreon-role="admin"] .admin-only { display:initial; }
+
+  /* ── Journal attachment ("+") → Knowledge Center ── */
+  .input-container { position: relative; }
+  .attach-btn {
+    background: none;
+    border: none;
+    color: var(--muted, #9aa0aa);
+    font-size: 22px;
+    line-height: 1;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background .15s, color .15s;
+  }
+  .attach-btn:hover { background: var(--surface2, rgba(255,255,255,.06)); color: var(--text, #e5e7eb); }
+  .attach-btn[aria-expanded="true"] { color: var(--accent, #06b6d4); }
+  .attach-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 8px;
+    width: 280px;
+    background: var(--surface, #16161e);
+    border: 1px solid var(--border, rgba(255,255,255,.12));
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.35);
+    display: none;
+    z-index: 50;
+  }
+  .attach-menu.open { display: block; }
+  .attach-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--text, #e5e7eb);
+    text-align: left;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .attach-item:hover:not(:disabled) { background: var(--surface2, rgba(255,255,255,.06)); }
+  .attach-item:disabled { color: var(--muted, #9aa0aa); opacity: .55; cursor: default; }
+  .attach-item .attach-ico { font-size: 17px; width: 22px; text-align: center; }
+  .attach-soon {
+    margin-left: auto;
+    font-size: 10px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--muted, #9aa0aa);
+    border: 1px solid var(--border, rgba(255,255,255,.14));
+    border-radius: 999px;
+    padding: 1px 7px;
+  }
+  .attach-help {
+    margin: 6px 8px 4px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--muted, #9aa0aa);
+  }
 </style>
 
 </head>
@@ -98,11 +165,29 @@
 
     <!-- Input area -->
     <div class="input-container">
+      <!-- Attachment menu — imports flow into the Knowledge Center -->
+      <div id="attach-menu" class="attach-menu" role="menu" aria-label="Add attachment">
+        <button type="button" class="attach-item" role="menuitem" onclick="lanternAttach.pickPdf()">
+          <span class="attach-ico">📄</span> Upload PDF
+        </button>
+        <button type="button" class="attach-item" disabled aria-disabled="true">
+          <span class="attach-ico">🖼️</span> Upload Image <span class="attach-soon">soon</span>
+        </button>
+        <button type="button" class="attach-item" disabled aria-disabled="true">
+          <span class="attach-ico">📁</span> Upload File <span class="attach-soon">soon</span>
+        </button>
+        <button type="button" class="attach-item" disabled aria-disabled="true">
+          <span class="attach-ico">✎</span> Paste Research <span class="attach-soon">soon</span>
+        </button>
+        <p class="attach-help">Imported files are added to your Knowledge Center and become searchable throughout Lantern.</p>
+      </div>
       <div class="input-wrapper">
+        <button id="attach-btn" class="attach-btn" type="button" aria-label="Add attachment" aria-haspopup="true" aria-expanded="false" onclick="lanternAttach.toggle()" title="Add to Knowledge Center">+</button>
         <button id="voice-input-btn" aria-label="Start voice input" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
+      <input type="file" id="attach-pdf-input" accept=".pdf" multiple style="display:none">
     </div>
 
   </div><!-- /.app-main -->
@@ -392,5 +477,69 @@
 <script src="/js/dream-chat-ui.js?v=20260615-a2"></script>
 <script src="js/convergance-sync.js"></script>
 <script src="/js/auth-gate.js" defer></script>
+<script>
+/* ── Journal attachments → Knowledge Center ──
+   Reuses the existing PDF ingest endpoint (/api/pdfs/upload). The uploaded
+   file lands in data/ingest and appears in the Knowledge Center; a confirmation
+   is shown inline in the conversation. No new ingestion pipeline. */
+(function () {
+  const base = (typeof serverBase !== 'undefined' && serverBase) ? serverBase : window.location.origin;
+  const menu = document.getElementById('attach-menu');
+  const btn = document.getElementById('attach-btn');
+  const fileInput = document.getElementById('attach-pdf-input');
+  if (!menu || !btn || !fileInput) return;
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  function closeMenu() { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
+  function openMenu() { menu.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+
+  function sysBubble(html) {
+    const messages = document.getElementById('messages');
+    if (typeof hideEmptyState === 'function') hideEmptyState();
+    const row = document.createElement('div');
+    row.className = 'msg-row agent';
+    row.innerHTML = '<div class="msg-label">Knowledge Center</div><div class="bubble" style="font-size:13px">' + html + '</div>';
+    messages.appendChild(row);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    else messages.scrollTop = messages.scrollHeight;
+    return row;
+  }
+
+  async function uploadPdfs(files) {
+    const pdfs = [...files].filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (!pdfs.length) { sysBubble('Please choose a PDF file.'); return; }
+    const label = pdfs.length === 1 ? esc(pdfs[0].name) : pdfs.length + ' PDFs';
+    const bubble = sysBubble('Uploading <b>' + label + '</b>…').querySelector('.bubble');
+    const fd = new FormData();
+    pdfs.forEach(f => fd.append('file', f));
+    try {
+      const res = await fetch(base + '/api/pdfs/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.ok && data.saved && data.saved.length) {
+        const saved = data.saved.map(esc).join(', ');
+        const failed = (data.errors || []).length
+          ? '<br><span style="opacity:.7">Skipped: ' + data.errors.map(e => esc(e.filename)).join(', ') + '</span>' : '';
+        bubble.innerHTML = '✓ Uploaded <b>' + saved + '</b><br>Added to your Knowledge Center — '
+          + '<a href="/knowledgecenter.html" style="color:var(--accent)">view &amp; search</a>' + failed;
+      } else {
+        bubble.innerHTML = '✗ Upload failed: ' + esc((data && data.error) || 'unknown error');
+      }
+    } catch (e) {
+      bubble.innerHTML = '✗ Upload error: ' + esc(e.message);
+    }
+    fileInput.value = '';
+  }
+
+  window.lanternAttach = {
+    toggle() { menu.classList.contains('open') ? closeMenu() : openMenu(); },
+    pickPdf() { closeMenu(); fileInput.click(); },
+  };
+
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadPdfs(fileInput.files); });
+  document.addEventListener('click', (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+})();
+</script>
 </body>
 </html>
