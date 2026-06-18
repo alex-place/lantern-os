@@ -282,6 +282,144 @@ function createAgentBubble(isError) {
   return { msg, bubble, cursor, thinking };
 }
 
+// ── Autowork live-step panel (issue #527 / autonomous-work/stream) ─────────────
+// Consumes the SSE stream and renders each phase as it happens, so the user can
+// watch plan → patch → tests → commit → push → PR in real time.
+const AUTOWORK_PHASES = [
+  ['fetch_issue', 'Fetch issue'],
+  ['branch',      'Create branch'],
+  ['research',    'Research (codebase + web)'],
+  ['plan',        'Generate plan'],
+  ['patch',       'Generate patch'],
+  ['apply',       'Apply changes'],
+  ['tests',       'Run tests'],
+  ['commit',      'Commit'],
+  ['push',        'Push'],
+  ['pr',          'Open PR'],
+  ['convergence', 'Convergence record'],
+  ['record',      'Log record'],
+];
+
+async function runAutowork(issue, btn, base) {
+  base = base || ((typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+  hideEmptyState();
+  const messages = document.getElementById('messages');
+
+  // Build the panel
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const stepRowsHtml = AUTOWORK_PHASES.map(([k, label]) =>
+    `<div class="aw-step" data-phase="${k}" style="display:flex;align-items:center;gap:8px;padding:3px 0;opacity:0.4">
+       <span class="aw-icon" style="width:16px;text-align:center">○</span>
+       <span class="aw-label" style="font-size:12.5px">${label}</span>
+       <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
+     </div>`).join('');
+  row.innerHTML =
+    `<div class="msg-label">Keystone · Autowork #${esc(issue)}</div>
+     <div class="bubble" style="font-size:13px">
+       <div class="aw-steps">${stepRowsHtml}</div>
+       <div class="aw-diff" style="display:none;margin-top:8px"></div>
+       <div class="aw-final" style="margin-top:8px;font-weight:600"></div>
+     </div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+
+  const setStep = (phase, status, extra) => {
+    const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
+    if (!el) return;
+    el.style.opacity = '1';
+    const icon = el.querySelector('.aw-icon');
+    const ex = el.querySelector('.aw-extra');
+    if (status === 'start')        { icon.textContent = '◐'; icon.style.color = 'var(--accent)'; }
+    else if (status === 'done')    { icon.textContent = '✓'; icon.style.color = '#4ade80'; }
+    else if (status === 'error')   { icon.textContent = '✗'; icon.style.color = '#f87171'; }
+    else if (status === 'skipped') { icon.textContent = '⊘'; icon.style.color = '#facc15'; }
+    if (extra) ex.textContent = extra;
+  };
+
+  try {
+    const resp = await fetch(`${base}/api/convergence/autonomous-work/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issue, commit: true, push: true }),
+    });
+    if (!resp.ok || !resp.body) throw new Error(`stream_unavailable_${resp.status}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let finalDone = null;
+
+    const handleEvent = (evName, data) => {
+      let d = {};
+      try { d = JSON.parse(data); } catch { return; }
+      if (evName === 'step') {
+        let extra = '';
+        if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
+        else if (d.phase === 'research' && d.status === 'done') extra = `${d.filesFound || 0} files · ${d.webSourcesFound || 0} web`;
+        else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
+        setStep(d.phase, d.status, extra);
+      } else if (evName === 'diff') {
+        const diffEl = row.querySelector('.aw-diff');
+        const files = (d.files || []).join(', ');
+        diffEl.style.display = 'block';
+        diffEl.innerHTML =
+          `<details><summary style="cursor:pointer;opacity:0.8">📄 Diff — ${esc(files) || 'changes'}</summary>
+             <pre style="white-space:pre-wrap;max-height:240px;overflow:auto;background:var(--bg,#0a0a0a);border:1px solid var(--border,#222);border-radius:6px;padding:8px;font-size:11px;margin-top:6px">${esc(d.diffText || '')}</pre>
+           </details>`;
+      } else if (evName === 'error') {
+        const fin = row.querySelector('.aw-final');
+        fin.style.color = '#f87171';
+        fin.textContent = `✗ ${d.error || 'error'}`;
+      } else if (evName === 'done') {
+        finalDone = d;
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+    };
+
+    // SSE parse loop
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const chunks = buf.split('\n\n');
+      buf = chunks.pop();
+      for (const chunk of chunks) {
+        const evMatch = chunk.match(/^event:\s*(.+)$/m);
+        const dataMatch = chunk.match(/^data:\s*([\s\S]+)$/m);
+        if (evMatch && dataMatch) handleEvent(evMatch[1].trim(), dataMatch[1].trim());
+      }
+    }
+
+    // Render final state
+    const fin = row.querySelector('.aw-final');
+    if (finalDone && finalDone.ok) {
+      btn.textContent = '✓ Done';
+      btn.style.color = '#4ade80';
+      fin.style.color = '#4ade80';
+      fin.innerHTML = finalDone.prUrl
+        ? `✓ Auto-worked #${esc(issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
+        : `✓ ${esc(finalDone.message || 'Done')}`;
+    } else {
+      btn.textContent = '✗ Failed';
+      btn.style.color = '#f87171';
+      if (!fin.textContent) {
+        fin.style.color = '#f87171';
+        fin.textContent = `✗ ${esc((finalDone && finalDone.message) || 'Auto-work failed')}`;
+      }
+    }
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+  } catch (e) {
+    btn.textContent = '✗ Error';
+    btn.style.color = '#f87171';
+    const fin = row.querySelector('.aw-final');
+    fin.style.color = '#f87171';
+    fin.textContent = `✗ Auto-work error: ${e.message}`;
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+  }
+}
+
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('input');
@@ -387,41 +525,10 @@ async function sendMessage() {
           btn.textContent = a.label;
           if (a.href) btn.onclick = () => { window.open(a.href, '_blank', 'noopener'); };
           else if (a.autonomous && a.issue) {
-            btn.onclick = async () => {
+            btn.onclick = () => {
               btn.disabled = true;
               btn.textContent = 'Working…';
-              try {
-                const workResp = await fetch(`${base}/api/convergence/autonomous-work`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ issue: a.issue }),
-                });
-                const workResult = await workResp.json();
-                if (workResult.ok) {
-                  btn.textContent = '✓ Done';
-                  btn.style.color = '#4ade80';
-                  const resultRow = document.createElement('div');
-                  resultRow.className = 'msg-row agent';
-                  resultRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">✓ Auto-worked #${workResult.issue}<br><a href="${workResult.prUrl}" target="_blank" style="color:var(--accent)">View PR</a></div>`;
-                  messages.appendChild(resultRow);
-                } else {
-                  btn.textContent = '✗ Failed';
-                  btn.style.color = '#f87171';
-                  const errorRow = document.createElement('div');
-                  errorRow.className = 'msg-row agent';
-                  errorRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px;color:#f87171">✗ Auto-work failed: ${workResult.error}</div>`;
-                  messages.appendChild(errorRow);
-                }
-                if (typeof scrollToBottom === 'function') scrollToBottom();
-              } catch (e) {
-                btn.textContent = '✗ Error';
-                btn.style.color = '#f87171';
-                const errRow = document.createElement('div');
-                errRow.className = 'msg-row agent';
-                errRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px;color:#f87171">✗ Auto-work error: ${e.message}</div>`;
-                messages.appendChild(errRow);
-                if (typeof scrollToBottom === 'function') scrollToBottom();
-              }
+              runAutowork(a.issue, btn, base).catch(e => console.error('[autowork]', e));
             };
           }
           else if (a.command) btn.onclick = () => fillAndSend(a.command);
@@ -436,12 +543,15 @@ async function sendMessage() {
     return;
   }
 
-  // !work / !edit — observable autonomous workspace (Sigma-0, issue #527)
-  const workMatch = text.match(/^!(?:work|edit)\s+([\s\S]+)/i);
+  // !work / !edit <issue#> — observable autonomous workspace (Sigma-0, issue #527)
+  const workMatch = text.match(/^!(?:work|edit)\s+#?(\d+)/i);
   if (workMatch) {
     input.value = '';
     addUserBubble(text);
-    runWorkspace(workMatch[1].trim()).catch(err => console.error('[workspace]', err));
+    const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+    // Dummy button so runAutowork can report status without a chip
+    const dummyBtn = { textContent: '', style: {} };
+    runAutowork(parseInt(workMatch[1], 10), dummyBtn, base).catch(err => console.error('[autowork]', err));
     return;
   }
 
