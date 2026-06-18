@@ -562,6 +562,17 @@ TOOLS_REGISTRY = {
     "web_search": _tool_web_search,
 }
 
+# ── GitHub tools (gh-CLI backed) — mirrors the high-value core of GitHub's MCP ──
+# Act-stage tooling. Write tools honor GITHUB_WRITE_ENABLED (default on).
+try:
+    import github_tools
+    _gh_added = github_tools.register(TOOLS_REGISTRY)
+    _GITHUB_INT_PARAMS = github_tools.INT_PARAMS
+    logger.info("GitHub tools registered (%d): write_enabled=%s", len(_gh_added), github_tools.WRITE_ENABLED)
+except Exception as _gh_exc:  # pragma: no cover - optional module
+    _GITHUB_INT_PARAMS = set()
+    logger.warning("GitHub tools not loaded: %s", _gh_exc)
+
 
 def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
     """Handle a single JSON-RPC request."""
@@ -598,7 +609,7 @@ def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
                 "required": [],
             }
             for param_name, param in sig.parameters.items():
-                if param_name in ("limit",):
+                if param_name in ("limit",) or param_name in _GITHUB_INT_PARAMS:
                     parameters["properties"][param_name] = {
                         "type": "integer",
                         "default": param.default if param.default is not inspect.Parameter.empty else 10,

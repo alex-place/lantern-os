@@ -600,6 +600,13 @@ async function handleStreamChat(req, url, res) {
 
   sse.writeStreamHeaders(res);
 
+  // Realtime context — declared here because KEYSTONE_DEBUG_PROMPT / ROUTER_PROMPT
+  // below interpolate it. It used to be declared ~140 lines further down, so the
+  // prompt template hit a temporal-dead-zone ReferenceError on EVERY request,
+  // throwing right after the 200 header and hanging the socket (no token, no done).
+  const _now = new Date();
+  const _realtimeCtx = `Current date/time: ${_now.toISOString()} (${_now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ${_now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })})`;
+
   const allRecent = readRecentDreams(12);
   // Adaptive Focus Memory: high-lucidity / high-tag entries stay Full,
   // older low-signal entries become Placeholder summaries
@@ -736,9 +743,6 @@ async function handleStreamChat(req, url, res) {
       : surfaceMode === "three-doors"
         ? `${agent.name || "Lantern"} · Three Doors`
         : (ROUTE_LABEL_MAP[converganceIntent] || "Keystone · router");
-
-  const _now = new Date();
-  const _realtimeCtx = `Current date/time: ${_now.toISOString()} (${_now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}, ${_now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZoneName: "short" })})`;
 
   // Plain Keystone desk prompt — no persona voice, no doors. Dream Chat is Keystone-only.
   const ROUTER_PROMPT = `You are Keystone, the engineering desk agent for Lantern OS. Answer directly, technically, and concisely — no roleplay, no dream personas, no door suggestions. IMPORTANT: Your very first token must be substantive content — never output only your name, "Keystone,", "Keystone, engineering desk.", or any greeting. Go straight to the answer. If the user asks for roleplay, Lantern, or the Three Doors game, tell them to open the Explore tab (/three-doors-game.html).\n\n${_realtimeCtx}\n\nContext:\n${dreamContext}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}`;

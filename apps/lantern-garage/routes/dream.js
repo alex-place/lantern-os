@@ -335,7 +335,28 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
 
   if ((url.pathname === "/api/dream/stream" && req.method === "GET") ||
       (url.pathname === "/api/dream/chat/stream" && req.method === "POST")) {
-    await handleStreamChat(req, url, res);
+    try {
+      await handleStreamChat(req, url, res);
+    } catch (err) {
+      // Honest fallback: never leave an SSE socket hanging on an internal throw.
+      console.error("[dream/stream] handler error (non-fatal to client):", err && err.stack ? err.stack : err);
+      if (!res.writableEnded) {
+        try {
+          if (!res.headersSent) {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+              "Access-Control-Allow-Origin": "*",
+              "X-Accel-Buffering": "no",
+            });
+          }
+          res.write(`data: ${JSON.stringify({ type: "error", text: "The streaming engine hit an internal error." })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "done", source: "offline", online: false, error: String(err && err.message || err) })}\n\n`);
+          res.end();
+        } catch { /* socket already gone */ }
+      }
+    }
     return true;
   }
 
