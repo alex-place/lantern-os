@@ -1,0 +1,39 @@
+{
+  "_comment": "Safe Zone V2.5 priors. All rects are normalized [x,y,width,height] in the FINAL 9:16 output frame (e.g. 1080x1920), x/y = top-left. The Shorts-UI zones are fixed platform overlays captions/content must avoid; caption candidate zones are tried in order by the confidence loop; facecam_band is where the facecam-top layout places the cam.",
+  "version": "2.5",
+  "targetAspect": 0.5625,
+
+  "shortsUI": {
+    "_comment": "YouTube Shorts native overlays — hard exclusion zones for captions.",
+    "top_status":       { "x": 0.0,  "y": 0.0,  "width": 1.0,  "height": 0.06, "label": "status/clock/title" },
+    "right_action_rail":{ "x": 0.84, "y": 0.42, "width": 0.16, "height": 0.50, "label": "like/comment/share/remix/channel" },
+    "bottom_metadata":  { "x": 0.0,  "y": 0.86, "width": 1.0,  "height": 0.14, "label": "handle/caption/progress" }
+  },
+
+  "captionCandidateZones": [
+    { "id": "mid_lower",  "x": 0.08, "y": 0.66, "width": 0.70, "height": 0.14, "_note": "above bottom metadata, left of action rail — default readable band" },
+    { "id": "mid_center", "x": 0.08, "y": 0.50, "width": 0.70, "height": 0.14 },
+    { "id": "mid_upper",  "x": 0.08, "y": 0.36, "width": 0.70, "height": 0.14 },
+    { "id": "upper_safe", "x": 0.08, "y": 0.24, "width": 0.70, "height": 0.12, "_note": "below the facecam band; for fullscreen-gameplay scenes" }
+  ],
+
+  "facecamBand": { "x": 0.0, "y": 0.0, "width": 1.0, "height": 0.22, "_note": "facecam-top layout target (top ~22%)" },
+
+  "confidence": {
+    "threshold": 0.85,
+    "weights": {
+      "faceSeparation": 0.25,
+      "gameplaySeparation": 0.25,
+      "uiSeparation": 0.20,
+      "motionStability": 0.15,
+      "ocrClearance": 0.15
+    }
+  },
+
+  "temporal": {
+    "_comment": "EMA smoothing of the chosen safe-zone rect across frames/scenes. alpha is the weight of the NEW observation; lower = smoother. Re-seed (no smoothing) on a scene cut or when the facecam/crop changes.",
+    "emaAlpha": 0.35,
+    "maxMovementPerSecond": 0.06,
+    "reseedOn": ["scene_cut", "facecam_move", "crop_change"]
+  }
+}
