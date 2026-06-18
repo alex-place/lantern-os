@@ -921,47 +921,39 @@ def _build_openapi_spec(base_url: str) -> Dict[str, Any]:
 
     for name, fn in TOOLS_REGISTRY.items():
         sig = inspect.signature(fn)
-        properties: Dict[str, Any] = {}
-        required: List[str] = []
+        parameters: List[Dict[str, Any]] = []
         for param_name, param in sig.parameters.items():
             has_default = param.default is not inspect.Parameter.empty
             ann = param.annotation
-            if ann in (int,) or param_name in ("limit", "max_results"):
-                prop_type = "integer"
-            elif ann in (float,) or param_name in ("max_age_seconds",):
-                prop_type = "number"
-            elif ann in (bool,) or param_name in ("restart",):
-                prop_type = "boolean"
+            if ann is int or param_name in ("limit", "max_results"):
+                param_type = "integer"
+            elif ann is float or param_name in ("max_age_seconds",):
+                param_type = "number"
+            elif ann is bool or param_name in ("restart",):
+                param_type = "boolean"
             else:
-                prop_type = "string"
-            prop: Dict[str, Any] = {"type": prop_type}
-            if has_default:
-                prop["default"] = param.default
-            if fn.__doc__:
-                prop["description"] = ""
-            properties[param_name] = prop
-            if not has_default:
-                required.append(param_name)
+                param_type = "string"
 
-        request_body: Dict[str, Any] = {
-            "required": bool(required),
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "type": "object",
-                        "properties": properties,
-                        **({"required": required} if required else {}),
-                    }
-                }
-            },
-        }
+            p: Dict[str, Any] = {
+                "name": param_name,
+                "in": "query",
+                "required": not has_default,
+                "schema": {"type": param_type},
+            }
+            if has_default and param.default is not None:
+                p["schema"]["default"] = param.default
+            parameters.append(p)
+
+        doc = (fn.__doc__ or "").strip()
+        summary = doc.split("\n")[0][:120] if doc else name
 
         paths[f"/tools/{name}"] = {
-            "post": {
+            "get": {
                 "operationId": name,
-                "summary": (fn.__doc__ or name).strip().split("\n")[0][:120],
-                "description": (fn.__doc__ or "").strip(),
-                "requestBody": request_body if properties else {"required": False, "content": {"application/json": {"schema": {"type": "object"}}}},
+                "summary": summary,
+                "description": doc,
+                "deprecated": False,
+                **({"parameters": parameters} if parameters else {}),
                 "responses": {
                     "200": {
                         "description": "Tool result",
@@ -970,16 +962,6 @@ def _build_openapi_spec(base_url: str) -> Dict[str, Any]:
                 },
             }
         }
-
-    security_schemes: Dict[str, Any] = {}
-    security: List[Any] = []
-    if _MCP_API_KEY:
-        security_schemes["ApiKeyAuth"] = {
-            "type": "apiKey",
-            "in": "header",
-            "name": "X-API-Key",
-        }
-        security = [{"ApiKeyAuth": []}]
 
     spec: Dict[str, Any] = {
         "openapi": "3.1.0",
@@ -990,10 +972,14 @@ def _build_openapi_spec(base_url: str) -> Dict[str, Any]:
         },
         "servers": [{"url": base_url}],
         "paths": paths,
+        "components": {"schemas": {}},
     }
-    if security_schemes:
-        spec["components"] = {"securitySchemes": security_schemes}
-        spec["security"] = security
+
+    if _MCP_API_KEY:
+        spec["components"]["securitySchemes"] = {
+            "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"}
+        }
+        spec["security"] = [{"ApiKeyAuth": []}]
 
     return spec
 
@@ -1005,20 +991,36 @@ async def openapi_spec(request: Request):
     return JSONResponse(_build_openapi_spec(base))
 
 
-@app.post("/tools/{tool_name}")
+@app.get("/tools/{tool_name}")
 async def tool_call_rest(tool_name: str, request: Request):
-    """Direct REST endpoint for each tool. ChatGPT Actions calls land here."""
+    """Direct REST endpoint for each tool. ChatGPT Actions GET calls land here."""
     if not _check_mcp_auth(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     fn = TOOLS_REGISTRY.get(tool_name)
     if not fn:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+    # Coerce query params to the expected types using the function signature
+    import inspect
+    sig = inspect.signature(fn)
+    kwargs: Dict[str, Any] = {}
+    for param_name, param in sig.parameters.items():
+        raw = request.query_params.get(param_name)
+        if raw is None:
+            continue
+        ann = param.annotation
+        try:
+            if ann is int or param_name in ("limit", "max_results"):
+                kwargs[param_name] = int(raw)
+            elif ann is float or param_name in ("max_age_seconds",):
+                kwargs[param_name] = float(raw)
+            elif ann is bool or param_name in ("restart",):
+                kwargs[param_name] = raw.lower() in ("1", "true", "yes")
+            else:
+                kwargs[param_name] = raw
+        except (ValueError, TypeError):
+            kwargs[param_name] = raw
     try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    try:
-        result = fn(**body)
+        result = fn(**kwargs)
         return JSONResponse(result)
     except TypeError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
