@@ -48,6 +48,7 @@ function createEntry(repoRoot, entryData) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     filePath: entryData.filePath || null, // Path to original uploaded file
+    facecamGuidance: entryData.facecamGuidance || null, // optional creator hint for facecam layout
     thumbnail: null, // Path to thumbnail
     analysis: null,
     renders: {

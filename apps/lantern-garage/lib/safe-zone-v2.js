@@ -153,11 +153,117 @@ function borderEdgeScore(frame, b, cornerName) {
   return Math.max(vMean, hMean); // a box needs at least one strong straight inner edge
 }
 
+// Pearson correlation of two equal-length series. Used to measure whether a
+// corner's motion tracks the gameplay (high corr = part of the game) or moves
+// on its own (low/negative corr = a separate overlaid video, i.e. a facecam).
+function pearson(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return 0;
+  let sa = 0, sb = 0;
+  for (let i = 0; i < n; i++) { sa += a[i]; sb += b[i]; }
+  const ma = sa / n, mb = sb / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { const xa = a[i] - ma, xb = b[i] - mb; num += xa * xb; da += xa * xa; db += xb * xb; }
+  const den = Math.sqrt(da * db);
+  return den > 1e-9 ? num / den : 0;
+}
+
+// Locate a facecam OVERLAY rectangle. A facecam is a separate video composited
+// on top of the gameplay, so its real signature is a "seam" — a sharp, straight
+// brightness discontinuity along the box's inner edges, where the webcam meets
+// the game — plus interior motion of its own and a look that stands out from the
+// scene. We search corner-anchored boxes of plausible facecam sizes and keep the
+// one with the strongest seam. This finds the ACTUAL box (often a small bright
+// rectangle), instead of scoring a fixed quarter-frame block and being fooled by
+// whichever corner happens to have skin-toned or busy gameplay pixels.
+// Map an optional creator hint to a facecam-search constraint. Accepts free-ish
+// text like "Top Right", "Bottom Left", "Full Height Left", "Vertical Facecam
+// Right Side", "No Facecam", "Webcam moves around".
+function parseGuidance(g) {
+  if (!g) return null;
+  const s = String(g).toLowerCase();
+  if (s.includes("no facecam") || s.trim() === "none") return { none: true };
+  const c = {};
+  if (s.includes("left")) c.side = "left";
+  else if (s.includes("right")) c.side = "right";
+  if (s.includes("top")) c.vertical = "top";
+  else if (s.includes("bottom")) c.vertical = "bottom";
+  if (s.includes("full height") || s.includes("vertical")) c.fullHeight = true;
+  if (s.includes("move") || s.includes("around")) c.moves = true;
+  return Object.keys(c).length ? c : null;
+}
+
+function bestFacecamRect(meanBright, activity, globalBright, guidance) {
+  const mean = (grid, r0, r1, c0, c1) => {
+    let s = 0, k = 0;
+    for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) { s += grid[r][c]; k++; }
+    return k ? s / k : 0;
+  };
+  // Scene activity scale → motion normalizes per-video (no magic constant).
+  let gAct = 0, gN = 0;
+  for (let r = 0; r < GRID_ROWS; r++) for (let c = 0; c < GRID_COLS; c++) { gAct += activity[r][c]; gN++; }
+  gAct = gN ? gAct / gN : 1;
+
+  // Seam (mean abs brightness step) across a vertical or horizontal grid edge.
+  const colSeam = (cIn, cOut, r0, r1) => {
+    if (cOut < 0 || cOut >= GRID_COLS) return 0;
+    let s = 0, k = 0; for (let r = r0; r < r1; r++) { s += Math.abs(meanBright[r][cIn] - meanBright[r][cOut]); k++; } return k ? s / k : 0;
+  };
+  const rowSeam = (rIn, rOut, c0, c1) => {
+    if (rOut < 0 || rOut >= GRID_ROWS) return 0;
+    let s = 0, k = 0; for (let c = c0; c < c1; c++) { s += Math.abs(meanBright[rIn][c] - meanBright[rOut][c]); k++; } return k ? s / k : 0;
+  };
+
+  // The box is anchored to a left/right frame edge (facecams hug a side) but its
+  // vertical extent FLOATS — we search every [r0,r1) band and let the top and
+  // bottom seams bound it, so the box hugs the real cam instead of stretching to
+  // the frame corner.
+  // Creator guidance narrows the search: a side hint restricts left/right, a
+  // top/bottom hint restricts the vertical half, full-height/vertical raises the
+  // height cap so a tall side-cam isn't truncated.
+  const sides = guidance && guidance.side ? [guidance.side] : ["left", "right"];
+  const maxH = guidance && guidance.fullHeight ? GRID_ROWS : 6;
+  let best = null;
+  for (const side of sides) {
+    const left = side === "left";
+    for (const w of [2, 3, 4]) {
+      const c0 = left ? 0 : GRID_COLS - w, c1 = c0 + w;
+      const innerCol = left ? c1 - 1 : c0, outerCol = left ? c1 : c0 - 1;
+      for (let r0 = 0; r0 <= GRID_ROWS - 2; r0++) {
+        for (let r1 = r0 + 2; r1 <= GRID_ROWS; r1++) {
+          if (r1 - r0 > maxH) continue; // a facecam is rarely taller than ~75% (unless guided full-height)
+          if (guidance && guidance.vertical) {
+            const inTop = (r0 + r1) / 2 < GRID_ROWS / 2;
+            if ((guidance.vertical === "top") !== inTop) continue;
+          }
+          const vSeam = colSeam(innerCol, outerCol, r0, r1);      // toward centre
+          const topSeam = rowSeam(r0, r0 - 1, c0, c1);            // above the box
+          const botSeam = rowSeam(r1 - 1, r1, c0, c1);            // below the box
+          // A well-bounded box is distinct on its inner vertical edge AND on top
+          // AND bottom. Bias toward the weakest bound so a box that bleeds into
+          // matching pixels (e.g. stretches down into more darkness) scores lower.
+          const vBound = Math.min(topSeam, botSeam);
+          const seam = Math.min(vSeam, vBound) * 0.6 + (vSeam + topSeam + botSeam) / 3 * 0.4;
+          const interiorAct = mean(activity, r0, r1, c0, c1);
+          const interiorBright = mean(meanBright, r0, r1, c0, c1);
+          const nSeam = Math.min(1, seam / 22);
+          const nAct = Math.min(1, interiorAct / (gAct * 1.4 + 1));
+          const nDist = Math.min(1, Math.abs(interiorBright - globalBright) / (globalBright + 20));
+          const score = 0.58 * nSeam + 0.24 * nAct + 0.18 * nDist;
+          const corner = (r0 + r1) / 2 < GRID_ROWS / 2 ? `top_${side}` : `bottom_${side}`;
+          if (!best || score > best.score) best = { corner, r0, r1, c0, c1, score, cues: { seam: round3(nSeam), activity: round3(nAct), distinct: round3(nDist) } };
+        }
+      }
+    }
+  }
+  return best;
+}
+
 // ---------------------------------------------------------------------------
 // Region detection
 // ---------------------------------------------------------------------------
 
-function detectRegions(frames) {
+function detectRegions(frames, opts = {}) {
   const n = frames.length;
   const brightnesses = frames.map(cellBrightness);
 
@@ -178,77 +284,39 @@ function detectRegions(frames) {
       for (let c = 0; c < GRID_COLS; c++) activity[r][c] /= transitions;
   }
 
-  // Corner blocks (≈ a quarter of the frame in each corner).
-  const cr = Math.max(1, Math.round(GRID_ROWS * 0.35));
-  const cc = Math.max(1, Math.round(GRID_COLS * 0.30));
-  const corners = {
-    top_left: { r0: 0, r1: cr, c0: 0, c1: cc, x: 0, y: 0 },
-    top_right: { r0: 0, r1: cr, c0: GRID_COLS - cc, c1: GRID_COLS, x: 1 - cc / GRID_COLS, y: 0 },
-    bottom_left: { r0: GRID_ROWS - cr, r1: GRID_ROWS, c0: 0, c1: cc, x: 0, y: 1 - cr / GRID_ROWS },
-    bottom_right: { r0: GRID_ROWS - cr, r1: GRID_ROWS, c0: GRID_COLS - cc, c1: GRID_COLS, x: 1 - cc / GRID_COLS, y: 1 - cr / GRID_ROWS },
-  };
-
-  // Global per-transition motion to compare corners against the whole scene.
-  const globalPerTransition = new Float64Array(Math.max(0, n - 1));
-  for (let f = 1; f < n; f++) {
-    let sum = 0, cells = 0;
+  // Mean brightness per cell across all frames, and the scene average — used by
+  // the seam/distinctness search below.
+  const meanBright = Array.from({ length: GRID_ROWS }, () => new Float64Array(GRID_COLS));
+  for (let f = 0; f < n; f++)
     for (let r = 0; r < GRID_ROWS; r++)
-      for (let c = 0; c < GRID_COLS; c++) { sum += Math.abs(brightnesses[f][r][c] - brightnesses[f - 1][r][c]); cells++; }
-    globalPerTransition[f - 1] = cells ? sum / cells : 0;
-  }
+      for (let c = 0; c < GRID_COLS; c++) meanBright[r][c] += brightnesses[f][r][c] / n;
+  let gbSum = 0, gbN = 0;
+  for (let r = 0; r < GRID_ROWS; r++) for (let c = 0; c < GRID_COLS; c++) { gbSum += meanBright[r][c]; gbN++; }
+  const globalBright = gbN ? gbSum / gbN : 0;
 
-  // Representative raw frames for the per-pixel cues (skin/border).
-  const repIdx = [...new Set([0, Math.floor(n / 2), n - 1])].filter((i) => i >= 0 && i < n);
-  const repFrames = repIdx.map((i) => frames[i]);
-
-  // For each corner, blend three honest cues into a measured facecam confidence:
-  //   temporal — fraction of transitions where the corner is clearly more active
-  //              than the scene (a sustained distinct overlay)
-  //   skin     — mean skin-tone fraction (a webcam usually frames a person)
-  //   border   — gradient along the block's inner edges (an overlay box frame)
+  // Find the actual overlaid facecam rectangle by its seam (see bestFacecamRect).
+  // An optional creator guidance hint narrows or disables the search.
   const regions = [];
-  let bestCorner = null;
-  for (const [name, b] of Object.entries(corners)) {
-    let fires = 0;
-    for (let f = 1; f < n; f++) {
-      let sum = 0, cells = 0;
-      for (let r = b.r0; r < b.r1; r++)
-        for (let c = b.c0; c < b.c1; c++) { sum += Math.abs(brightnesses[f][r][c] - brightnesses[f - 1][r][c]); cells++; }
-      const local = cells ? sum / cells : 0;
-      const global = globalPerTransition[f - 1] || 0;
-      if (local > 3 && local > 1.3 * (global + 0.001)) fires++;
-    }
-    const temporal = transitions ? fires / transitions : 0;
-    const p = cornerPixels(b);
-    const skinRaw = repFrames.reduce((s, fr) => s + skinFraction(fr, p), 0) / (repFrames.length || 1);
-    const borderRaw = borderEdgeScore(repFrames[Math.floor(repFrames.length / 2)] || frames[0], b, name);
-
-    // Normalize cues to 0..1 (uncalibrated but bounded).
-    const skin = Math.min(1, skinRaw / 0.20);     // ~20% skin in the box saturates
-    const border = Math.min(1, borderRaw / 60);   // strong straight inner edge
-    // Skin is the most facecam-SPECIFIC cue (a HUD/minimap/kill-feed is not
-    // skin-coloured), so it dominates; temporal + border are supporting.
-    const confidence = 0.55 * skin + 0.25 * temporal + 0.20 * border;
-
-    const cand = { name, b, confidence, framesSeen: fires, cues: { temporal: round3(temporal), skin: round3(skin), border: round3(border) } };
-    if (!bestCorner || confidence > bestCorner.confidence) bestCorner = cand;
-  }
-
-  // Honest tiers: >=0.4 emit a facecam region; 0.2..0.4 emit a low-confidence
-  // candidate flagged needsDeclaration (UI should ask the user to confirm/place
-  // the facecam); <0.2 emit nothing. We never report a bare detected:true.
-  if (bestCorner && bestCorner.confidence >= 0.2) {
-    const b = bestCorner.b;
-    const lowConf = bestCorner.confidence < 0.4;
+  const guidance = parseGuidance(opts.facecamGuidance);
+  const fc = (guidance && guidance.none) ? null : bestFacecamRect(meanBright, activity, globalBright, guidance);
+  // Honest tiers: >=0.45 → confident facecam region; 0.25..0.45 → low-confidence
+  // candidate flagged needsDeclaration so the UI can ask the user to confirm or
+  // place it; <0.25 → emit nothing. We never report a bare detected:true.
+  if (fc && fc.score >= 0.25) {
     regions.push({
       type: "facecam",
       candidate: true,
-      corner: bestCorner.name,
-      bounds: { x: round3(b.x), y: round3(b.y), width: round3((b.c1 - b.c0) / GRID_COLS), height: round3((b.r1 - b.r0) / GRID_ROWS) },
-      confidence: round3(bestCorner.confidence),
-      cues: bestCorner.cues,
-      framesSeen: bestCorner.framesSeen,
-      needsDeclaration: lowConf,
+      corner: fc.corner,
+      bounds: {
+        x: round3(fc.c0 / GRID_COLS),
+        y: round3(fc.r0 / GRID_ROWS),
+        width: round3((fc.c1 - fc.c0) / GRID_COLS),
+        height: round3((fc.r1 - fc.r0) / GRID_ROWS),
+      },
+      confidence: round3(fc.score),
+      cues: fc.cues,
+      guided: !!guidance, // narrowed by a creator guidance hint
+      needsDeclaration: fc.score < 0.45 && !guidance, // a guided detection is trusted
       priority: 1,
     });
   }
@@ -361,7 +429,7 @@ async function analyzeForCrop(videoPath, opts = {}) {
   if (!ok || frames.length < 2) {
     return { status: "unavailable", reason: "could not sample frames (ffmpeg missing or unreadable video)" };
   }
-  const { regions, framesSampled, transitions } = detectRegions(frames);
+  const { regions, framesSampled, transitions } = detectRegions(frames, opts);
   const srcW = opts.srcWidth || SAMPLE_W;
   const srcH = opts.srcHeight || SAMPLE_H;
   const cropPlan = planCrop(regions, srcW, srcH, opts.targetAspect || TARGET_ASPECT_9_16);

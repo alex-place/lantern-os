@@ -914,6 +914,23 @@
     <input type="file" id="file-input" accept="video/*" multiple>
   </div>
 
+  <!-- Optional facecam guidance — helps detection on unusual layouts -->
+  <div id="facecam-guidance-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 2px 0; font-size:0.85rem;">
+    <label for="facecam-guidance" style="font-weight:600; color:var(--text);">Facecam Guidance <span style="font-weight:400; color:var(--muted);">(optional)</span></label>
+    <select id="facecam-guidance" style="background:var(--surface2,#1a1a1a); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:0.85rem; font-family:inherit;">
+      <option value="">Auto-detect</option>
+      <option>Top Left</option>
+      <option>Top Right</option>
+      <option>Bottom Left</option>
+      <option>Bottom Right</option>
+      <option>Full Height Left</option>
+      <option>Vertical Facecam Right Side</option>
+      <option>Webcam moves around</option>
+      <option>No Facecam</option>
+    </select>
+    <span style="flex-basis:100%; font-size:0.78rem; color:var(--muted); margin-top:2px;">Tell Lantern where your facecam usually appears if detection struggles.</span>
+  </div>
+
   <!-- Live upload progress (one row per file) -->
   <div id="upload-progress" class="upload-progress" aria-live="polite"></div>
 
@@ -1055,9 +1072,10 @@ function startUpload(file, openOnDone) {
     pctEl.textContent = 'Analyzing…';
     setProgress(90);
     try {
+      const facecamGuidance = (document.getElementById('facecam-guidance') || {}).value || undefined;
       const cr = await fetch('/api/creator-entries', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, type: 'video', filePath })
+        body: JSON.stringify({ title, type: 'video', filePath, facecamGuidance })
       });
       if (!cr.ok) { const e = await cr.json().catch(() => ({})); return failRow(row, pctEl, e.error || 'Could not create project'); }
       const { entry } = await cr.json();

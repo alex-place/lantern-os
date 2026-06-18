@@ -95,8 +95,43 @@ function isValidRect(rect) {
  *   (e.g. a SafeZoneDetectorV2 plan that avoids the facecam) before scaling,
  *   instead of a naive center crop.
  */
-function buildVideoFilter(fit, w, h, fps, cropRect) {
+// facecam-top sub-graph: take one video stream (inLabel), lift the detected
+// facecam overlay into a top band, stack the gameplay beneath it, and emit
+// outLabel — the standard gaming-short layout. `facecam` and `gameplayRect` are
+// normalized source rects (the facecam from SafeZoneDetectorV2; the gameplay
+// window defaults to the full frame). Reused by both the single-clip and the
+// segment-concat renderers. `tail` is an optional trailing filter (e.g. fps).
+function facecamTopChain(inLabel, outLabel, w, h, facecam, gameplayRect, topFrac, tail) {
+  const frac = Math.min(0.35, Math.max(0.12, Number(topFrac) || 0.22));
+  const topH = Math.round((h * frac) / 2) * 2; // even height for yuv420p
+  const botH = h - topH;
+  const f = facecam;
+  const g = isValidRect(gameplayRect) ? gameplayRect : { x: 0, y: 0, width: 1, height: 1 };
+  const id = (outLabel.match(/[a-z0-9]+/i) || ["x"])[0]; // unique pad suffix
+  const t = tail ? `,${tail}` : "";
+  return (
+    `${inLabel}split=2[fcs_${id}][gps_${id}];` +
+    `[fcs_${id}]crop=in_w*${f.width}:in_h*${f.height}:in_w*${f.x}:in_h*${f.y},` +
+      `scale=${w}:${topH}:force_original_aspect_ratio=increase,crop=${w}:${topH}[fct_${id}];` +
+    `[gps_${id}]crop=in_w*${g.width}:in_h*${g.height}:in_w*${g.x}:in_h*${g.y},` +
+      `scale=${w}:${botH}:force_original_aspect_ratio=increase,crop=${w}:${botH}[gpt_${id}];` +
+    `[fct_${id}][gpt_${id}]vstack=inputs=2${t}${outLabel}`
+  );
+}
+
+function buildVideoFilter(fit, w, h, fps, cropRect, facecam, gameplayRect, topFrac) {
   const fpsEnd = `fps=${fps},format=yuv420p,setsar=1`;
+
+  // facecam-top: the detected facecam overlay is lifted to a top band and the
+  // gameplay is stacked beneath it. Requires a facecam rect; otherwise the caller
+  // should fall back to another fit.
+  if (fit === "facecam-top" && isValidRect(facecam)) {
+    return {
+      filterComplex: facecamTopChain("[0:v]", "[vout]", w, h, facecam, gameplayRect, topFrac, fpsEnd),
+      mapV: "[vout]",
+    };
+  }
+
   if (fit === "crop") {
     if (cropRect && isValidRect(cropRect)) {
       const { x, y, width, height } = cropRect;
@@ -149,7 +184,8 @@ async function reencodeToShortForm(inputPath, outputPath, options = {}) {
   const start = Number.isFinite(Number(options.start)) ? Number(options.start) : null;
 
   const { vf, filterComplex, mapV } = buildVideoFilter(
-    cfg.fit, cfg.width, cfg.height, cfg.fps, options.cropRect || null
+    cfg.fit, cfg.width, cfg.height, cfg.fps, options.cropRect || null,
+    options.facecam || null, options.gameplayRect || null, options.facecamTopFrac
   );
 
   // Assemble ffmpeg args.
@@ -284,14 +320,26 @@ async function renderSegments(inputPath, outputPath, segments, options = {}) {
   }
   if (clean.length === 0) throw new Error("no valid segments after clamping");
 
-  // Per-segment frame filter (reuse pad/crop; blur falls back to pad for concat).
-  const { vf } = buildVideoFilter(cfg.fit === "blur" ? "pad" : cfg.fit, cfg.width, cfg.height, cfg.fps, options.cropRect || null);
+  // Per-segment frame filter. facecam-top builds a per-segment stack sub-graph;
+  // blur falls back to pad for concat; pad/crop reuse the simple vf.
+  const useFacecamTop = cfg.fit === "facecam-top" && isValidRect(options.facecam || null);
+  const fctTail = `fps=${cfg.fps},format=yuv420p,setsar=1`;
+  const { vf } = useFacecamTop
+    ? { vf: null }
+    : buildVideoFilter(cfg.fit === "blur" ? "pad" : cfg.fit, cfg.width, cfg.height, cfg.fps, options.cropRect || null);
   const hasAudio = meta.hasAudio;
 
   const chains = [];
   const concatInputs = [];
   clean.forEach((s, i) => {
-    chains.push(`[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS,${vf}[v${i}]`);
+    if (useFacecamTop) {
+      chains.push(
+        `[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS[seg${i}];` +
+        facecamTopChain(`[seg${i}]`, `[v${i}]`, cfg.width, cfg.height, options.facecam, options.gameplayRect || null, options.facecamTopFrac, fctTail)
+      );
+    } else {
+      chains.push(`[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS,${vf}[v${i}]`);
+    }
     if (hasAudio) {
       chains.push(`[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS,aresample=async=1[a${i}]`);
       concatInputs.push(`[v${i}][a${i}]`);

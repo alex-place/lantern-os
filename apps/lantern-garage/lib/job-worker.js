@@ -502,8 +502,12 @@ async function processExportJob(job, repoRoot, ctx) {
   // low-confidence, leave cropRect unset → naive center crop.
   let cropRect = null;
   let cropPlan = null;
+  let facecamRect = null;
   const useSafeZones = job.input.useSafeZones === true || ci.isEnabled("safeZoneV2");
-  if (job.input.fit === "crop" && useSafeZones) {
+  const wantsFacecamTop = job.input.fit === "facecam-top";
+  // Run detection for crop-mode safe zones, and ALWAYS for facecam-top (which
+  // needs the facecam box to lift it to the top band).
+  if ((job.input.fit === "crop" && useSafeZones) || wantsFacecamTop) {
     ctx.stage("safezones");
     ctx.progress(20, "Detecting safe zones (facecam/HUD)");
     ctx.log("Sampling frames for safe-zone detection");
@@ -515,13 +519,25 @@ async function processExportJob(job, repoRoot, ctx) {
         cropPlan = { status: "unavailable", note: "fell back to center crop", reason: "source dimensions unknown (probe failed)" };
         ctx.log("Safe-zone detection unavailable — falling back to center crop");
       } else {
+        let _fcg = job.input.facecamGuidance || null;
+        if (!_fcg && job.input.entryId) { try { _fcg = require("./entry-store").getEntry(repoRoot, job.input.entryId)?.facecamGuidance || null; } catch {} }
+        if (_fcg) ctx.log(`Applying facecam guidance: ${_fcg}`);
         const plan = await analyzeForCrop(fullPath, {
           srcWidth: meta.width,
           srcHeight: meta.height,
+          facecamGuidance: _fcg,
         });
-        if (plan.status === "ok" && plan.cropPlan && plan.cropPlan.mode === "horizontal") {
-          cropRect = plan.cropPlan.cropRect;
-          cropPlan = { ...plan.cropPlan, regions: plan.regions, framesSampled: plan.framesSampled };
+        if (plan.status === "ok") {
+          if (plan.cropPlan && plan.cropPlan.mode === "horizontal") {
+            cropRect = plan.cropPlan.cropRect;
+          }
+          cropPlan = { ...(plan.cropPlan || {}), regions: plan.regions, framesSampled: plan.framesSampled };
+          // A confident facecam drives the facecam-top layout (locked to the top).
+          const fc = (plan.regions || []).find((r) => r.type === "facecam" && !r.needsDeclaration);
+          if (fc) {
+            facecamRect = fc.bounds;
+            ctx.log(`Facecam detected (${fc.corner}, conf ${fc.confidence}) — locking to top band`);
+          }
           ctx.log(`Safe zones detected — ${(plan.regions || []).length} region(s)`);
         } else {
           cropPlan = { status: plan.status, note: "fell back to center crop", reason: plan.reason };
@@ -533,6 +549,18 @@ async function processExportJob(job, repoRoot, ctx) {
       cropPlan = { status: "error", note: "fell back to center crop", reason: e.message };
       ctx.log(`Safe-zone error (non-fatal): ${e.message}`);
     }
+  }
+
+  // Lock a detected facecam to the top: an explicit facecam-top request OR any
+  // crop-mode export that found a confident facecam upgrades to the split layout.
+  // facecam-top without a facecam falls back to a safe fit (never a broken split).
+  let effectiveFit = job.input.fit;
+  if (facecamRect && (wantsFacecamTop || job.input.fit === "crop")) {
+    effectiveFit = "facecam-top";
+    ctx.log("Facecam locked to top band (facecam-top layout)");
+  } else if (wantsFacecamTop && !facecamRect) {
+    effectiveFit = cropRect ? "crop" : "pad";
+    ctx.log(`No confident facecam — facecam-top falls back to ${effectiveFit}`);
   }
 
   // A variant export supplies a segment cut-list -> trim+concat render.
@@ -554,7 +582,8 @@ async function processExportJob(job, repoRoot, ctx) {
     ctx.log(`Rendering ${segments.length} highlight segments`);
     encodeInfo = await renderSegments(fullPath, exportFile, segments, {
       width: job.input.width, height: job.input.height, fps: job.input.fps,
-      fit: job.input.fit, cropRect, maxDuration: job.input.maxDuration,
+      fit: effectiveFit, cropRect, facecam: facecamRect, gameplayRect: cropRect,
+      maxDuration: job.input.maxDuration,
     });
   } else {
     ctx.progress(30, "Re-encoding to short-form (1080x1920)");
@@ -563,11 +592,13 @@ async function processExportJob(job, repoRoot, ctx) {
       width: job.input.width,
       height: job.input.height,
       fps: job.input.fps,
-      fit: job.input.fit, // pad (default) | crop | blur
+      fit: effectiveFit, // pad | crop | blur | facecam-top
       start: job.input.start,
       duration: job.input.duration,
       maxDuration: job.input.maxDuration,
       cropRect, // null → center crop; set → safe-zone-aware crop
+      facecam: facecamRect, // facecam-top: lift this box to the top band
+      gameplayRect: cropRect, // facecam-top: gameplay window (avoids the facecam)
     });
   }
   if (cropPlan) encodeInfo.cropPlan = cropPlan;
@@ -737,7 +768,10 @@ async function processSafeZonesJob(job, repoRoot, ctx) {
     result = { status: "unavailable", reason: "source dimensions unknown (probe failed)" };
     ctx.log("Detection unavailable — source dimensions unknown");
   } else {
-    const plan = await analyzeForCrop(fullPath, { srcWidth: meta.width, srcHeight: meta.height });
+    let _fcg = job.input.facecamGuidance || null;
+    if (!_fcg && job.input.entryId) { try { _fcg = require("./entry-store").getEntry(repoRoot, job.input.entryId)?.facecamGuidance || null; } catch {} }
+    if (_fcg) ctx.log(`Applying facecam guidance: ${_fcg}`);
+    const plan = await analyzeForCrop(fullPath, { srcWidth: meta.width, srcHeight: meta.height, facecamGuidance: _fcg });
     result = plan; // { status, regions, cropPlan, framesSampled, ... } — honest "unavailable" when detection fails
     const regionCount = Array.isArray(plan.regions) ? plan.regions.length : 0;
     ctx.log(`Detection complete — ${regionCount} region(s) found (${plan.framesSampled || 0} frames sampled)`);

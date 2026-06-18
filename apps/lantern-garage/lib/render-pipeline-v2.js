@@ -112,16 +112,13 @@ class RenderConstraints {
   }
 
   /**
-   * Validate facecam is in top 20% of frame
+   * Facecam position is satisfied by RELOCATION, not rejection: the exporter's
+   * facecam-top layout (video-export.js) lifts a detected facecam into the top
+   * band regardless of where it sits in the source. So a segment is never
+   * rejected for facecam placement — the render enforces it.
    */
-  validateFacecamPosition(segment, videoMetadata) {
-    if (!segment.facecamBounds) return true;
-
-    const frameHeight = videoMetadata.height || 1080;
-    const facecamTop = segment.facecamBounds.top || 0;
-
-    // Facecam should be in top 20% (y < 0.2 * height)
-    return facecamTop < frameHeight * this.maxFacecamBand;
+  validateFacecamPosition(/* segment, videoMetadata */) {
+    return true;
   }
 
   /**
