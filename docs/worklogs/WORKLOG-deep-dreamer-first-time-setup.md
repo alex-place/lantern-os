@@ -201,3 +201,26 @@ npm run dev --prefix apps/lantern-garage
 
 **Bottom line:** the happy path (subscribe → chat → create) works; the *access-control* part of
 the request ("no access to trade", linked roles) is aspirational and needs the worklist above.
+
+---
+
+## 7. Addendum — canonical-code reconciliation (2026-06-18)
+
+§§1–6 above were drafted from the **OneDrive working copy**, which is stale relative to the
+canonical repo (`C:\dev\lantern-os`). Verifying against canonical code corrected several findings:
+
+- **§4.1 (env vars):** Canonical `.env.example` *already* had a Patreon OAuth section. The real
+  problem was **misleading config** (documented `PATREON_TIER_*` vars the code never reads — tier→role
+  is hardcoded in `patreon-auth.js`) plus a **missing local-dev redirect URI**. ✅ Fixed (PR #699).
+- **§4.3 (role gating "never wired"):** **Incorrect for canonical.** `routes/pages.js` *does* gate
+  pages server-side: `create.html`→`founder` (so Deep Dreamer reaches the Creator Suite),
+  `trader-dashboard.html`/`kalshi-terminal.html`→`admin`. Issue #696 was largely already done.
+- **§4.2 (trade access):** **Partially correct.** trader-dashboard/kalshi-terminal were admin-gated,
+  but `trading.html`/`trading-news.html` were only auth-gated, and **all `/api/trading/*` endpoints
+  were ungated**. ✅ Fixed (PR #699) via a per-user `trade` entitlement: `entitlements.trade`
+  defaults `false`, an `/api/trading/*` guard, page gating by entitlement, and nav hiding. A
+  Deep Dreamer (`founder`) now has **no trade access** unless explicitly granted — without needing
+  the server-wide `LANTERN_DISABLE_TRADING=1` blunt instrument.
+
+**Still open (separate follow-ups):** #697 (Patreon↔Discord identity link) and #698 (`founder`
+role rename) — larger/riskier, intentionally not bundled into PR #699.
