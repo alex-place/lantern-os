@@ -6,8 +6,19 @@
  */
 (function () {
   const PUBLIC = ['/auth.html', '/auth', '/explore.html', '/knowledgecenter.html'];
+  // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
+  const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/trader-dashboard.html', '/kalshi-terminal.html'];
   const pathname = window.location.pathname;
   const isPublic = PUBLIC.includes(pathname);
+
+  // Hide nav links to trade-only pages for accounts without trade access, so a
+  // non-entitled user (e.g. Deep Dreamer) never sees a link that would 403.
+  function hideTradeNav() {
+    document.querySelectorAll('a[href]').forEach((a) => {
+      const href = (a.getAttribute('href') || '').split('?')[0];
+      if (TRADE_PAGES.includes(href)) a.style.display = 'none';
+    });
+  }
 
   function updateNav(session) {
     // Profile button
@@ -61,8 +72,13 @@
     .then(session => {
       updateNav(session);
       wireLogout();
+      const canTrade = !!(session && session.entitlements && session.entitlements.trade);
+      if (!canTrade) hideTradeNav();
       if (!isPublic && (!session || !session.authenticated)) {
         location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
+      } else if (TRADE_PAGES.includes(pathname) && session && session.authenticated && !canTrade) {
+        // Direct navigation to a trade page without entitlement → bounce home.
+        location.href = '/';
       }
     })
     .catch(() => {
