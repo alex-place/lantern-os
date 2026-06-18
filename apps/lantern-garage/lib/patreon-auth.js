@@ -6,7 +6,7 @@
 
 const crypto = require("crypto");
 const querystring = require("querystring");
-const { getOrCreateFromPatreon } = require("./user-profiles");
+const { getOrCreateFromPatreon, getProfile } = require("./user-profiles");
 
 // Use native fetch (Node 18+) or require a polyfill
 const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
@@ -236,9 +236,14 @@ function mapPatreonTierToRole(tierIds) {
  */
 function getSessionInfo(req) {
   if (req.session && req.session.authenticated) {
+    const role = req.session.patreon.role;
+    const profile = getProfile(req.session.patreon.id);
+    // Admins hold all entitlements implicitly; otherwise read the profile flag.
+    const trade = role === "admin" || !!(profile && profile.entitlements && profile.entitlements.trade === true);
     return {
       authenticated: true,
-      role: req.session.patreon.role,
+      role,
+      entitlements: { trade },
       user: {
         id: req.session.patreon.id,
         name: req.session.patreon.name,
@@ -255,7 +260,7 @@ function getSessionInfo(req) {
     process.env.LANTERN_LOCAL_ADMIN === "1" &&
     (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1");
   if (devPort === 4178 || loopbackAdmin) {
-    return { authenticated: true, role: "admin", user: { id: "dev", name: "Dev", email: "", tier: "dev" } };
+    return { authenticated: true, role: "admin", entitlements: { trade: true }, user: { id: "dev", name: "Dev", email: "", tier: "dev" } };
   }
   return { authenticated: false, role: "guest" };
 }

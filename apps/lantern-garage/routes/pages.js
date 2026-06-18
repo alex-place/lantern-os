@@ -5,7 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { requireAuth, requireRole } = require("../lib/auth-middleware");
+const { requireAuth, requireRole, requireEntitlement } = require("../lib/auth-middleware");
 
 // Public pages — no auth required
 const PUBLIC_PAGES = {
@@ -17,14 +17,19 @@ const PUBLIC_PAGES = {
   "/knowledgecenter.html":"knowledgecenter.html",
 };
 
-// Protected pages — { file, role } where role is minimum required
+// Protected pages — { file, role } where role is minimum required, OR
+// { file, entitlement } where a per-feature entitlement is required (admins pass
+// implicitly). Trade pages use the "trade" entitlement so a paid tier such as
+// Deep Dreamer (founder) does NOT get trading access unless explicitly granted.
 const PROTECTED_PAGES = {
   "/dream-chat.html":     { file: "dream-chat.html",        role: "guest" },
   "/profile.html":        { file: "profile.html",           role: "guest" },
   "/crypto-dashboard.html":{ file: "crypto-dashboard.html", role: "guest" },
   "/create.html":         { file: "create.html",            role: "founder" },
-  "/trader-dashboard.html":{ file: "trader-dashboard.html", role: "admin" },
-  "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   role: "admin" },
+  "/trading.html":        { file: "trading.html",           entitlement: "trade" },
+  "/trading-news.html":   { file: "trading-news.html",      entitlement: "trade" },
+  "/trader-dashboard.html":{ file: "trader-dashboard.html", entitlement: "trade" },
+  "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
 };
 
 module.exports = async function pagesRoute(req, res, url, deps) {
@@ -47,7 +52,11 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   const page = PROTECTED_PAGES[pathname];
   if (page) {
     if (!requireAuth(req, res)) return true;
-    if (!requireRole(req, res, page.role)) return true;
+    if (page.entitlement) {
+      if (!requireEntitlement(req, res, page.entitlement)) return true;
+    } else if (!requireRole(req, res, page.role)) {
+      return true;
+    }
 
     const filePath = path.join(deps.publicRoot, page.file);
     if (fs.existsSync(filePath)) {

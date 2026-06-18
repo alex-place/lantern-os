@@ -109,6 +109,52 @@ function protectStaticPage(requiredRole = "supporter") {
 }
 
 /**
+ * Check whether the current request has a per-feature entitlement (e.g. "trade").
+ * Rules:
+ *   - Local bypass (dev port 4178 / LANTERN_LOCAL_ADMIN on loopback) → granted.
+ *   - role "admin" → granted (admins hold all entitlements implicitly).
+ *   - otherwise → only if the user's profile has entitlements[key] === true.
+ * Returns a boolean and never writes to the response.
+ */
+function hasEntitlement(req, key) {
+  if (isLocalBypass(req)) return true;
+
+  const session = req.session?.patreon;
+  if (!session?.id) return false;
+  if (session.role === "admin") return true;
+
+  const profile = getProfile(session.id);
+  return !!(profile && profile.entitlements && profile.entitlements[key] === true);
+}
+
+/**
+ * Require a per-feature entitlement. Returns true if allowed; otherwise sends a
+ * 403 (or 302 to login when unauthenticated) and returns false.
+ */
+function requireEntitlement(req, res, key) {
+  if (isLocalBypass(req)) return true;
+
+  const session = req.session?.patreon;
+  if (!session?.id) {
+    res.writeHead(302, { Location: "/auth.html" });
+    res.end();
+    return false;
+  }
+
+  if (hasEntitlement(req, key)) return true;
+
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(
+    JSON.stringify({
+      error: "Feature not enabled for this account",
+      entitlement: key,
+      role: session.role,
+    })
+  );
+  return false;
+}
+
+/**
  * Attach user profile to request for downstream handlers.
  */
 function attachProfile(req) {
@@ -122,6 +168,8 @@ function attachProfile(req) {
 module.exports = {
   requireAuth,
   requireRole,
+  hasEntitlement,
+  requireEntitlement,
   protectStaticPage,
   attachProfile,
 };

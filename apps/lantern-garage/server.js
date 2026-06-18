@@ -81,7 +81,20 @@ const deps = {
   "__dirname": __dirname,
 };
 
+// Authoritative gate for the trading API. Page-level gating (routes/pages.js)
+// stops the HTML from loading, but the data endpoints must be guarded too so a
+// non-entitled account (e.g. Deep Dreamer/founder without trade access) cannot
+// reach /api/trading/* directly. Runs before routes/trading. Admins and the
+// local bypass pass through (see auth-middleware.requireEntitlement).
+const { requireEntitlement } = require("./lib/auth-middleware");
+function tradeApiGuard(req, res, url) {
+  if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
+  if (requireEntitlement(req, res, "trade")) return false;     // allowed → fall through
+  return true;                                                  // blocked → 403/302 already sent
+}
+
 const routes = [
+  tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)

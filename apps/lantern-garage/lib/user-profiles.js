@@ -33,6 +33,10 @@ function createProfile(userId, data = {}) {
     email: data.email || "",
     role: data.role || "guest", // guest, supporter, founder, admin, or custom
     tier: data.tier || null,
+    // Per-feature entitlements, independent of the role ladder. Trading is
+    // OPT-IN: a paid tier (e.g. Deep Dreamer/founder) does NOT get trade access
+    // unless explicitly granted. `admin` is allowed implicitly (see auth-middleware).
+    entitlements: { trade: false, ...(data.entitlements || {}) },
     patreonId: data.patreonId || null,
     avatar: data.avatar || null, // URL or base64 avatar
     bio: data.bio || "",
@@ -108,6 +112,17 @@ function setUserRole(userId, newRole) {
   }
 
   return updateProfile(userId, { role: newRole });
+}
+
+/**
+ * Set a per-feature entitlement (admin-only operation), e.g. trade access.
+ * Merges into the profile's existing entitlements rather than replacing them.
+ */
+function setEntitlement(userId, key, value) {
+  const profile = getProfile(userId);
+  if (!profile) return null;
+  const entitlements = { ...(profile.entitlements || {}), [key]: !!value };
+  return updateProfile(userId, { entitlements });
 }
 
 /**
@@ -289,6 +304,7 @@ module.exports = {
   getProfile,
   updateProfile,
   setUserRole,
+  setEntitlement,
   listProfiles,
   deleteProfile,
   getOrCreateFromPatreon,
