@@ -1,7 +1,7 @@
 # Simple Windsurf Developer Launcher
 # Open the Windsurf Developer interface directly
 
-$windsurfPath = "d:\tmp\lantern-os\surfaces\windsurf-dev\index.html"
+$windsurfPath = Join-Path (Split-Path $PSScriptRoot -Parent) "surfaces\windsurf-dev\index.html"
 
 if (Test-Path $windsurfPath) {
     Write-Host "Opening Windsurf Developer..." -ForegroundColor Cyan

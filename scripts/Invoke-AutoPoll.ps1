@@ -1,5 +1,5 @@
 param(
-    [string]$ConfigPath = "D:\tmp\lantern-os\data\automation\poll-config.json",
+    [string]$ConfigPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "data\automation\poll-config.json"),
     [switch]$RunOnce
 )
 
@@ -31,7 +31,7 @@ function Get-PollConfiguration {
             @{
                 name = "lantern-os-repo"
                 type = "git"
-                path = "D:\tmp\lantern-os"
+                path = (Split-Path $PSScriptRoot -Parent)
                 intervalMinutes = 5
                 enabled = $true
             }
@@ -54,14 +54,14 @@ function Get-PollConfiguration {
             @{
                 name = "convergence-loop"
                 type = "script"
-                path = "D:\tmp\lantern-os\scripts\Invoke-LanternConvergenceLoop.ps1"
+                path = (Join-Path (Split-Path $PSScriptRoot -Parent) "scripts\Invoke-LanternConvergenceLoop.ps1")
                 triggerOnChanges = $true
                 enabled = $true
             }
             @{
                 name = "hff-convergence"
                 type = "script"
-                path = "D:\tmp\lantern-os\scripts\Invoke-HFFConvergence.ps1"
+                path = (Join-Path (Split-Path $PSScriptRoot -Parent) "scripts\Invoke-HFFConvergence.ps1")
                 triggerOnChanges = $true
                 enabled = $true
             }
@@ -173,7 +173,7 @@ foreach ($source in $config.sources) {
 }
 
 # Store poll results
-$resultsPath = "D:\tmp\lantern-os\data\automation\poll-results.json"
+$resultsPath = (Join-Path (Split-Path $PSScriptRoot -Parent) "data\automation\poll-results.json")
 $results = @{
     timestamp = Get-Date -Format "o"
     sources = $pollResults

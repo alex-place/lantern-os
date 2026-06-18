@@ -1,5 +1,5 @@
 param(
-    [string]$RepoPath = "D:\tmp\lantern-os",
+    [string]$RepoPath = (Split-Path $PSScriptRoot -Parent),
     [string]$Branch = "master",
     [int]$PollIntervalMinutes = 5,
     [switch]$Continuous

@@ -22,7 +22,12 @@ try:
 except:
     FFMPEG = "ffmpeg"
 
-SOURCE = r"D:\Gaming Clips\ewww double rangerrr.mp4"
+# Source video: pass as the first CLI arg or set LANTERN_SHORTS_SOURCE.
+SOURCE = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("LANTERN_SHORTS_SOURCE", "")
+if not SOURCE:
+    print("ERROR: no source video. Pass a path as the first argument, "
+          "or set LANTERN_SHORTS_SOURCE=<path-to-video>.")
+    sys.exit(1)
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")
 FINAL_OUTPUT = os.path.join(OUTPUT_DIR, "lantern_v6_short.mp4")
 SEGMENTS_JSON = os.path.join(OUTPUT_DIR, "lantern_v6_segments.json")

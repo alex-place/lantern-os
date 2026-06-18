@@ -1,6 +1,6 @@
 param(
     [string]$HffRepoPath = "C:\tmp\human-flourishing-frameworks-scan",
-    [string]$LanternRepoPath = "D:\tmp\lantern-os",
+    [string]$LanternRepoPath = (Split-Path $PSScriptRoot -Parent),
     [switch]$DryRun,
     [switch]$ForceConvergence
 )
@@ -248,7 +248,7 @@ if ($changes.hasChanges -or $ForceConvergence) {
             
             # Trigger convergence loop
             Write-Log "Triggering Lantern convergence loop"
-            & "D:\tmp\lantern-os\scripts\Invoke-LanternConvergenceLoop.ps1"
+            & (Join-Path (Split-Path $PSScriptRoot -Parent) "scripts\Invoke-LanternConvergenceLoop.ps1")
         }
     } else {
         Write-Log "[DRY RUN] Would sync HFF repository and promote artifacts"
