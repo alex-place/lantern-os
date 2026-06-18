@@ -886,6 +886,24 @@
   </div>
 </div>
 
+<!-- Research PDF Upload -->
+<div class="dash-section" style="margin-top: 40px;">
+  <div class="section-header" style="margin-bottom: 16px;">
+    <div>
+      <h2 style="font-size: 1.2rem; margin: 0;">Research Library</h2>
+      <p style="font-size: 0.85rem; color: var(--muted); margin: 4px 0 0;">PDFs added here appear in the <a href="/knowledgecenter.html" style="color:var(--accent)">Knowledge Center</a> and are indexed for search.</p>
+    </div>
+  </div>
+  <div id="pdf-upload-zone" class="upload-zone compact" style="border-style: dashed;">
+    <span class="icon">📄</span>
+    <p><strong>Drop PDFs to add to the research library</strong></p>
+    <p style="font-size: 0.85rem; margin: 0 0 12px;">Multiple files supported · max 100 MB each</p>
+    <button type="button" class="file-input-button" onclick="document.getElementById('pdf-file-input').click()">Choose PDFs</button>
+    <input type="file" id="pdf-file-input" accept=".pdf" multiple>
+  </div>
+  <div id="pdf-upload-status" style="font-size:13px; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-top:10px; min-height:18px;"></div>
+</div>
+
 <!-- Help Modal (expanded from the banner) -->
 <div id="helpModal" class="help-modal" onclick="if(event.target.id==='helpModal')closeHelp()">
   <div class="help-modal-content">
@@ -1148,6 +1166,37 @@ document.getElementById('deleteModal').addEventListener('click', (e) => {
 });
 </script>
 
+<script>
+(function () {
+  const zone = document.getElementById('pdf-upload-zone');
+  const input = document.getElementById('pdf-file-input');
+  const status = document.getElementById('pdf-upload-status');
+
+  async function uploadPdfs(files) {
+    const pdfs = [...files].filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (!pdfs.length) { status.textContent = 'No PDF files selected.'; return; }
+    status.textContent = `Uploading ${pdfs.length} file${pdfs.length > 1 ? 's' : ''}…`;
+    const fd = new FormData();
+    pdfs.forEach(f => fd.append('file', f));
+    try {
+      const res = await fetch('/api/pdfs/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.ok) {
+        const names = data.saved.join(', ');
+        status.textContent = `Saved: ${names || '(none)'}` + (data.errors.length ? ` · ${data.errors.map(e => e.filename).join(', ')} failed` : '');
+      } else {
+        status.textContent = 'Upload failed: ' + (data.error || 'unknown');
+      }
+    } catch (e) { status.textContent = 'Error: ' + e.message; }
+    input.value = '';
+  }
+
+  input.addEventListener('change', () => uploadPdfs(input.files));
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragging'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragging'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragging'); uploadPdfs(e.dataTransfer.files); });
+})();
+</script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
