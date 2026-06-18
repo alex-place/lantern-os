@@ -1,7 +1,7 @@
 const path = require("path");
 const { appendJsonlQueued, readJsonl } = require("./file-queue");
 
-const repoRoot = path.resolve(__dirname, "..", "..");
+const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const conversationLogPath = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
 const operatorNotesPath = path.join(repoRoot, "data", "operator-notes", "notes.jsonl");
 const maxConversationTextLength = 4000;

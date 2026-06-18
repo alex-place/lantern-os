@@ -12,10 +12,12 @@ const { getProfile } = require("./user-profiles");
  * Sends appropriate redirect (to /auth.html if not logged in).
  */
 function requireAuth(req, res) {
+  // Dev bypass: port 4178 skips auth gate
+  if (req.socket?.localPort === 4178) return true;
+
   const session = req.session?.patreon;
 
   if (!session?.id) {
-    // Not authenticated - redirect to login
     res.writeHead(302, { Location: "/auth.html" });
     res.end();
     return false;
@@ -30,10 +32,12 @@ function requireAuth(req, res) {
  * Sends 403 Forbidden if insufficient role.
  */
 function requireRole(req, res, requiredRole = "supporter") {
+  // Dev bypass: port 4178 gets admin access
+  if (req.socket?.localPort === 4178) return true;
+
   const session = req.session?.patreon;
 
   if (!session?.id) {
-    // Not authenticated - redirect to login
     res.writeHead(302, { Location: "/auth.html" });
     res.end();
     return false;

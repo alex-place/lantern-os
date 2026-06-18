@@ -1,23 +1,14 @@
 tunnel: lantern-os
-credentials-file: ~/.cloudflare/lantern-os.json
+credentials-file: C:\Users\alexp\.cloudflared\16689f09-f5f6-4ba9-92a4-68460117997e.json
 
 ingress:
   # Dream Journal UI + API
   - hostname: lantern-os.net
     service: http://127.0.0.1:4177
-    tlsSkip: false
 
-  # MCP Server (no-auth, public access)
+  # MCP Server
   - hostname: mcp.lantern-os.net
-    path: ^(?!/oauth).*
     service: http://127.0.0.1:8771
-    tlsSkip: false
-
-  # MCP OAuth2 Server (OAuth2 protected)
-  - hostname: mcp.lantern-os.net
-    path: /oauth.*
-    service: http://127.0.0.1:8772
-    tlsSkip: false
 
   # Fallback
   - service: http_status:404
