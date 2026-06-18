@@ -1001,7 +1001,7 @@ def _build_openapi_spec(base_url: str) -> Dict[str, Any]:
 @app.get("/openapi.json")
 async def openapi_spec(request: Request):
     """OpenAPI 3.1.0 spec — import this URL into ChatGPT Actions."""
-    base = str(request.base_url).rstrip("/")
+    base = _MCP_BASE_URL
     return JSONResponse(_build_openapi_spec(base))
 
 
