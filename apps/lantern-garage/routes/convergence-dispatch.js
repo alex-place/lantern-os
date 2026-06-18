@@ -285,7 +285,7 @@ module.exports = async (req, res, url, deps) => {
       const REPO_ROOT = path.resolve(__dirname, "../../..");
       const GH_REPO = "alex-place/lantern-os";
       const {
-        generatePlan, generatePatch, applyPatch, runTests,
+        generatePlan, generateEdits, applyEdits, runTests,
         gitAddFiles, gitCommit, gitPush, openDraftPr,
         gitCurrentBranch, gitCreateBranch,
       } = require("../lib/self-edit-engine");
@@ -448,28 +448,30 @@ module.exports = async (req, res, url, deps) => {
           }
         });
 
-        // ── 4. patch (diff emitted BEFORE it is applied — observation) ────
+        // ── 4. patch — SEARCH/REPLACE edits (reliable) emitted before applying ──
         step("patch", "start");
-        const { diffText, files } = await generatePatch(REPO_ROOT, plan);
-        const affected = files.map((f) => (f.newFile || f.oldFile || "").replace(/^[ab]\//, ""));
-        send("diff", { diffText, files: affected });
+        const { edits } = await generateEdits(REPO_ROOT, plan);
+        const affected = [...new Set(edits.map((e) => e.file))];
+        const diffPreview = edits.map((e) =>
+          `FILE: ${e.file}\n--- search\n${e.search}\n+++ replace\n${e.replace}`).join("\n\n");
+        send("diff", { diffText: diffPreview, files: affected, editCount: edits.length });
 
         if (dryRun) {
           receipt.stoppedAt = "dry_run";
           step("apply", "skipped", { reason: "dry_run" });
-          send("done", { ok: true, ...receipt, message: "Dry run — diff shown, nothing applied." });
+          send("done", { ok: true, ...receipt, message: "Dry run — edits shown, nothing applied." });
           res.end();
           return;
         }
 
         // ── 5. apply ─────────────────────────────────────────────────────
         step("apply", "start");
-        const stats = applyPatch(REPO_ROOT, diffText);
+        const stats = applyEdits(REPO_ROOT, edits);
         const changedFiles = [...(stats.changed || []), ...(stats.created || [])];
 
-        // Anti-fraud gate: refuse to proceed if the patch changed nothing or had
-        // hunk errors. Otherwise a hallucinated/failed patch would let unrelated
-        // data-file churn be committed as the "fix" (the data-file fraud pattern).
+        // Anti-fraud gate: refuse to proceed if nothing changed or any edit failed.
+        // Otherwise a hallucinated/failed edit would let unrelated data-file churn
+        // be committed as the "fix" (the data-file fraud pattern).
         if (changedFiles.length === 0 || (stats.errors && stats.errors.length > 0)) {
           await new Promise((resolve) =>
             execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT, timeout: 10000, windowsHide: true }, () => resolve()));

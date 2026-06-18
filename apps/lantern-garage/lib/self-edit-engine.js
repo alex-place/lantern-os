@@ -691,6 +691,107 @@ async function generatePatch(repoRoot, plan) {
   return { diffText, files };
 }
 
+// ── Search/replace edits (reliable LLM edit format) ───────────────────────
+// LLMs are bad at unified-diff line arithmetic, so diffs rarely apply. Aider/
+// Cursor use SEARCH/REPLACE blocks instead: the model quotes the exact existing
+// text and its replacement, and we locate-and-swap. Far more reliable, and we
+// can fuzzy-match on trimmed lines if the exact text drifts by whitespace.
+
+const EDIT_SYSTEM_PROMPT = `You are a precise code editor. Implement the plan using SEARCH/REPLACE blocks.
+
+For EACH change output a block in EXACTLY this format:
+
+FILE: relative/path/to/file
+<<<<<<< SEARCH
+(exact existing lines to find — copy them verbatim from the file shown)
+=======
+(the replacement lines)
+>>>>>>> REPLACE
+
+Rules:
+- SEARCH text must match the current file content EXACTLY (whitespace included).
+- Keep SEARCH blocks small and unique — just enough lines to locate the spot.
+- To create a NEW file, leave the SEARCH section empty and put the full content in REPLACE.
+- Output ONLY blocks. No prose, no markdown fences.`;
+
+function parseEditBlocks(raw) {
+  const edits = [];
+  const re = /FILE:\s*(.+?)\r?\n<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n?=======\r?\n([\s\S]*?)\r?\n?>>>>>>> REPLACE/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    edits.push({ file: m[1].trim().replace(/^[ab]\//, ""), search: m[2], replace: m[3] });
+  }
+  return edits;
+}
+
+async function generateEdits(repoRoot, plan) {
+  let fileContext = "";
+  for (const fp of plan.affectedFiles || []) {
+    if (!isPathSafe(repoRoot, fp)) continue;
+    const full = path.join(repoRoot, fp);
+    if (fs.existsSync(full)) {
+      const content = fs.readFileSync(full, "utf8").slice(0, 8000);
+      fileContext += `\n===== FILE: ${fp} =====\n${content}\n`;
+    } else {
+      fileContext += `\n===== FILE: ${fp} (does not exist — create it) =====\n`;
+    }
+  }
+  const userPrompt = `Plan: ${plan.summary}\n\nSteps:\n${plan.steps.map((s, i) => `${i + 1}. [${s.action}] ${s.file}: ${s.description}`).join("\n")}\n\nCurrent files:\n${fileContext}\n\nOutput the SEARCH/REPLACE blocks.`;
+  const raw = await callLlm(EDIT_SYSTEM_PROMPT, userPrompt, "auto");
+  const edits = parseEditBlocks(raw);
+  return { edits, raw };
+}
+
+// Apply SEARCH/REPLACE edits. Exact match first, then whitespace-trimmed line
+// match as a fallback. Returns the same {changed, created, errors} contract as
+// applyPatch so the anti-fraud gate works unchanged.
+function applyEdits(repoRoot, edits) {
+  const stats = { changed: [], created: [], errors: [], applier: "search-replace" };
+  for (const e of edits) {
+    if (!isPathSafe(repoRoot, e.file)) { stats.errors.push({ file: e.file, error: "unsafe_path" }); continue; }
+    const full = path.join(repoRoot, e.file);
+    const exists = fs.existsSync(full);
+    try {
+      // New file: empty SEARCH → write REPLACE as the whole content.
+      if (!exists || e.search.trim() === "") {
+        const dir = path.dirname(full);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(full, e.replace.replace(/\r\n/g, "\n"), "utf8");
+        (exists ? stats.changed : stats.created).push(e.file);
+        continue;
+      }
+      const content = fs.readFileSync(full, "utf8");
+      let updated = null;
+      if (content.includes(e.search)) {
+        updated = content.replace(e.search, e.replace);
+      } else {
+        // Whitespace-tolerant: match on trimmed lines.
+        const cl = content.split("\n");
+        const sl = e.search.replace(/\r\n/g, "\n").split("\n");
+        const sTrim = sl.map((l) => l.trim());
+        for (let i = 0; i + sl.length <= cl.length; i++) {
+          let hit = true;
+          for (let j = 0; j < sl.length; j++) { if (cl[i + j].trim() !== sTrim[j]) { hit = false; break; } }
+          if (hit) {
+            cl.splice(i, sl.length, ...e.replace.replace(/\r\n/g, "\n").split("\n"));
+            updated = cl.join("\n");
+            break;
+          }
+        }
+      }
+      if (updated === null) { stats.errors.push({ file: e.file, error: "search_not_found" }); continue; }
+      fs.writeFileSync(full, updated, "utf8");
+      stats.changed.push(e.file);
+    } catch (err) {
+      stats.errors.push({ file: e.file, error: err.message });
+    }
+  }
+  // de-dup
+  stats.changed = [...new Set(stats.changed)];
+  stats.created = [...new Set(stats.created)];
+  return stats;
+}
+
 // ── Module exports ────────────────────────────────────────────────────────
 
 module.exports = {
@@ -710,6 +811,9 @@ module.exports = {
   runTests,
   generatePlan,
   generatePatch,
+  generateEdits,
+  applyEdits,
+  parseEditBlocks,
   callLlm,
   isAllowedTest,
   requireSafePaths,
