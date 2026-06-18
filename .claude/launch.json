@@ -2,98 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dream-journal",
+      "name": "lantern-garage",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--prefix", "apps/lantern-garage"],
+      "port": 4177
+    },
+    {
+      "name": "lantern-dev",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["apps/lantern-garage/server.js"],
-      "port": 4177,
-      "autoPort": false
-    },
-    {
-      "name": "three-doors-worktree",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [".claude/worktrees/frosty-northcutt-79abbf/apps/lantern-garage/server.js"],
-      "port": 4180,
-      "env": {
-        "LANTERN_GARAGE_PORT": "4180"
-      }
-    },
-    {
-      "name": "dream-journal-dev",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["apps/lantern-garage/server.js"],
-      "port": 4178,
-      "autoPort": false,
-      "env": {
-        "LANTERN_GARAGE_PORT": "4178",
-        "ROUTER_GATE": "1"
-      }
-    },
-    {
-      "name": "lantern-api",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "flask", "run", "--port=5000"],
-      "port": 5000,
-      "env": {
-        "FLASK_APP": "apps/lantern-api/app.py",
-        "FLASK_ENV": "development",
-        "LANTERN_MODE": "development"
-      },
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "lantern-dashboard",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["apps/lantern-dashboard/server.py"],
-      "port": 4177,
-      "env": {
-        "LANTERN_MODE": "development",
-        "FLASK_ENV": "development"
-      },
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "lantern-browser-stt",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["apps/lantern-browser/server.py"],
-      "port": 8765,
-      "env": {
-        "LANTERN_MODE": "development",
-        "VOSK_MODEL_PATH": "${workspaceFolder}/apps/lantern-browser/models"
-      },
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "lantern-orchestrator",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["apps/orchestrator/server.py"],
-      "port": 8000,
-      "env": {
-        "LANTERN_MODE": "development",
-        "ORCHESTRATOR_MODE": "local"
-      },
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "lantern-rag-server",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["apps/rag-server/server.py"],
-      "port": 8767,
-      "env": {
-        "LANTERN_MODE": "development",
-        "RAG_MODE": "local"
-      },
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "lantern-desktop",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["apps/lantern-desktop/lantern_desktop.py"],
-      "port": 9000,
-      "env": {
-        "LANTERN_MODE": "desktop",
-        "LANTERN_API_URL": "http://localhost:5000"
-      },
-      "cwd": "${workspaceFolder}"
+      "runtimeArgs": ["apps/lantern-garage/server-dev.js"],
+      "port": 4178
     }
   ]
 }

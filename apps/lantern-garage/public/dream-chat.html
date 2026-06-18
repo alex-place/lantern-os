@@ -33,75 +33,6 @@
     border-color:rgba(20,184,166,.6);
     background:rgba(20,184,166,.12);
   }
-  .patreon-gate {
-    margin:16px auto 0;
-    max-width:860px;
-    padding:18px;
-    border:1px solid var(--border, rgba(255,255,255,.14));
-    border-radius:20px;
-    background:
-      radial-gradient(circle at top left, rgba(6,182,212,.18), transparent 34%),
-      radial-gradient(circle at bottom right, rgba(167,139,250,.14), transparent 30%),
-      rgba(10,15,25,.82);
-    box-shadow:0 18px 60px rgba(0,0,0,.28);
-  }
-  .patreon-gate.hidden { display:none; }
-  .patreon-gate-kicker {
-    color:var(--accent, #06b6d4);
-    font-family:'IBM Plex Mono', monospace;
-    font-size:12px;
-    letter-spacing:.08em;
-    text-transform:uppercase;
-    margin-bottom:8px;
-  }
-  .patreon-gate h2 {
-    margin:0 0 8px;
-    font-size:24px;
-    color:var(--text, #f8fafc);
-  }
-  .patreon-gate p {
-    margin:0 0 14px;
-    color:var(--muted, #94a3b8);
-    line-height:1.5;
-  }
-  .patreon-actions {
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    align-items:center;
-    margin-top:14px;
-  }
-  .patreon-primary,
-  .patreon-secondary {
-    border:1px solid var(--border, rgba(255,255,255,.14));
-    border-radius:12px;
-    padding:10px 14px;
-    cursor:pointer;
-    font-weight:650;
-  }
-  .patreon-primary {
-    border-color:#ff424d;
-    background:#ff424d;
-    color:white;
-  }
-  .patreon-secondary {
-    background:rgba(255,255,255,.05);
-    color:var(--text, #e5e7eb);
-  }
-  .role-grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
-    gap:10px;
-    margin-top:14px;
-  }
-  .role-card {
-    border:1px solid var(--border, rgba(255,255,255,.14));
-    border-radius:14px;
-    padding:12px;
-    background:rgba(255,255,255,.04);
-  }
-  .role-card strong { display:block; color:var(--text,#fff); margin-bottom:4px; }
-  .role-card span { color:var(--muted,#94a3b8); font-size:12px; }
   body[data-patreon-role="guest"] .patron-only { display:none !important; }
   body[data-patreon-role="supporter"] .admin-only,
   body[data-patreon-role="founder"] .admin-only { display:none !important; }
@@ -145,27 +76,6 @@
       </div>
     </nav>
 
-
-    <!-- Patreon login / role gate -->
-    <section class="patreon-gate" id="patreon-gate" aria-labelledby="patreon-gate-title">
-      <div class="patreon-gate-kicker">Lantern OS access</div>
-      <h2 id="patreon-gate-title">Unlock Keystone Desk with Patreon</h2>
-      <p id="patreon-gate-copy">
-        Sign in with Patreon so Lantern can apply the right role, usage limits, and feature access.
-        Guests can browse the public pages; patrons unlock chat usage and higher tiers unlock deeper tools.
-      </p>
-      <div class="role-grid" aria-label="Available access roles">
-        <div class="role-card"><strong>Guest</strong><span>Public explore/help pages, limited preview.</span></div>
-        <div class="role-card"><strong>Supporter</strong><span>Keystone chat and daily patron usage.</span></div>
-        <div class="role-card"><strong>Founder</strong><span>Higher limits, memory tools, experiments.</span></div>
-        <div class="role-card"><strong>Admin</strong><span>Full local/dev controls.</span></div>
-      </div>
-      <div class="patreon-actions">
-        <button class="patreon-primary" onclick="loginWithPatreon()">Continue with Patreon</button>
-        <a class="patreon-secondary" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">View tiers</a>
-        <span id="patreon-session-status" style="font-size:12px;color:var(--muted)">Checking session…</span>
-      </div>
-    </section>
 
 
     <!-- Chat area -->

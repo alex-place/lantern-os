@@ -184,6 +184,33 @@
   }
   loadAgents();
 
+  // ── Load conversation history (REMEMBER stage — issue #647) ───────────────
+  async function loadConversationHistory() {
+    try {
+      const r = await fetch(`${serverBase}/api/conversations?limit=20`, { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) return;
+      const data = await r.json();
+      const entries = (data.conversations || []).filter(e => e.role === "operator" || e.role === "lantern");
+      if (entries.length === 0) return;
+
+      if (emptyState) emptyState.style.display = "none";
+
+      const fragment = document.createDocumentFragment();
+      for (const entry of entries) {
+        const isUser = entry.role === "operator";
+        conversationHistory.push({ role: isUser ? "user" : "assistant", text: entry.text });
+        const row = document.createElement("div");
+        row.className = `msg-row ${isUser ? "user" : "agent"}`;
+        const time = entry.recordedAt ? new Date(entry.recordedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Lantern"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
+        fragment.appendChild(row);
+      }
+      messagesEl.appendChild(fragment);
+      scrollToBottom();
+    } catch { /* non-critical — fresh session is fine */ }
+  }
+  loadConversationHistory();
+
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();

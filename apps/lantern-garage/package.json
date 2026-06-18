@@ -7,6 +7,7 @@
     "setup": "node ../../scripts/ensure-rust.js || true",
     "prestart": "npm run setup",
     "start": "node server.js",
+    "start:dev": "node server-dev.js",
     "start:local": "node server.js",
     "start:sd": "python ../../src/sd_image_server.py",
     "check": "node --check server.js",

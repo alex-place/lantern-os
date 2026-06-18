@@ -247,6 +247,11 @@ function getSessionInfo(req) {
       },
     };
   }
+  // Dev bypass: port 4178 skips auth gate (admin session, local only)
+  const devPort = req.socket && req.socket.localPort;
+  if (devPort === 4178) {
+    return { authenticated: true, role: "admin", user: { id: "dev", name: "Dev", email: "", tier: "dev" } };
+  }
   return { authenticated: false, role: "guest" };
 }
 
