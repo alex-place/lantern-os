@@ -305,7 +305,9 @@
   function fmtDate(iso) {
     if (!iso) return '';
     try {
-      return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      // Date-only strings (YYYY-MM-DD) must be parsed as local time to avoid UTC-shift
+      const d = iso.length === 10 ? new Date(iso + 'T00:00:00') : new Date(iso);
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     } catch { return ''; }
   }
 
@@ -395,10 +397,12 @@
       card.dataset.name = pdf.name.toLowerCase();
       card.dataset.folder = (pdf.folder || '').toLowerCase();
       const metaParts = [];
-      if (pdf.modifiedAt) metaParts.push(fmtDate(pdf.modifiedAt));
+      const dateVal = pdf.publishedAt || pdf.modifiedAt;
+      if (dateVal) metaParts.push(fmtDate(dateVal));
       if (pdf.size) metaParts.push(fmtSize(pdf.size));
+      const metaTitle = pdf.publishedAt ? 'Published: ' + pdf.publishedAt : 'Modified: ' + (pdf.modifiedAt || '');
       const metaHtml = metaParts.length
-        ? '<span class="pdf-meta" title="Modified: ' + (pdf.modifiedAt || '') + '">' + metaParts.join(' · ') + '</span>'
+        ? '<span class="pdf-meta" title="' + metaTitle + '">' + metaParts.join(' · ') + '</span>'
         : '';
 
       card.innerHTML =
@@ -407,7 +411,7 @@
           '<span class="pdf-placeholder">⏳</span>' +
           '<canvas class="pdf-canvas"></canvas>' +
         '</div>' +
-        '<span class="pdf-name">' + pdf.name.replace(/</g, '&lt;') + '</span>' +
+        '<span class="pdf-name">' + (pdf.pdfTitle || pdf.name).replace(/</g, '&lt;') + '</span>' +
         metaHtml;
 
       card.querySelector('.pdf-delete').addEventListener('click', async (e) => {
