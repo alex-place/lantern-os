@@ -123,6 +123,49 @@
     </div>
 
     <div class="section">
+      <h2>Grounding &amp; Σ₀ updates</h2>
+      <p style="opacity:.8;margin:-2px 0 12px">
+        These docs <strong>are the live grounding corpus</strong>: the assistant retrieves
+        the nearest section before answering (deterministic/near routing, $0 before the LLM).
+        Recent Σ₀ additions —
+        <a href="/repo/docs/LANTERN-SIGMA0-CODER.md">lantern-sigma0-coder</a>,
+        <a href="/repo/docs/OURO-LOOPLM.md">Ouro / LoopLM (Q-exit)</a>,
+        <a href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">CSF-Pack v0.8</a>.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="kb-q" type="text" placeholder="Ask the knowledge base… e.g. what is Ouro looped reasoning"
+          style="flex:1;min-width:240px;padding:10px 12px;border-radius:8px;border:1px solid var(--border,#2a2a2a);background:var(--bg,#0e0e0e);color:inherit;font:inherit"
+          onkeydown="if(event.key==='Enter')kbAsk()">
+        <button onclick="kbAsk()" class="link-card" style="padding:10px 16px;cursor:pointer">Search grounding</button>
+      </div>
+      <div id="kb-result" style="margin-top:10px"></div>
+    </div>
+    <script>
+      async function kbAsk() {
+        const q = document.getElementById('kb-q').value.trim();
+        const out = document.getElementById('kb-result');
+        if (!q) return;
+        out.innerHTML = '<span style="opacity:.6">searching grounding corpus…</span>';
+        try {
+          const r = await fetch('/api/knowledge/query?q=' + encodeURIComponent(q));
+          const d = await r.json();
+          if (d && d.hit) {
+            const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+            out.innerHTML =
+              '<div class="link-card" style="display:block;cursor:default">' +
+              '<div style="font-size:.8em;opacity:.7">tier: <b>' + d.tier + '</b> · score ' + (d.score ?? '—') +
+              ' · <a href="/repo/' + esc((d.source||'').split('#')[0]) + '">' + esc(d.source) + '</a></div>' +
+              '<pre style="white-space:pre-wrap;margin:8px 0 0;font:inherit">' + esc((d.text||'').slice(0,900)) + '</pre></div>';
+          } else {
+            out.innerHTML = '<span style="opacity:.6">No strong grounding match — the assistant would answer with the full LLM.</span>';
+          }
+        } catch (e) {
+          out.innerHTML = '<span style="opacity:.6">Grounding API unavailable: ' + e.message + '</span>';
+        }
+      }
+    </script>
+
+    <div class="section">
       <h2>Getting Started</h2>
       <div class="link-grid">
         <a class="link-card" href="/repo/README.md">
