@@ -40,6 +40,11 @@ jobs:
         continue-on-error: true
 
       - name: Validate HFF Repository
+        # Advisory only: this runs lantern's convergence loop against EXTERNAL
+        # repos (human-flourishing-frameworks, etc.) that do not carry lantern's
+        # required surfaces, so a HIGH there must not fail lantern-os CI. The
+        # repo checkouts above are already continue-on-error for the same reason.
+        continue-on-error: true
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"

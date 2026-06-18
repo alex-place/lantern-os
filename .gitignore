@@ -166,6 +166,7 @@ data/provenance/
 
 # Auto-generated convergence evidence files
 manifests/evidence/convergence-*.json
+manifests/validation/
 convergence-output.json
 data/pcsf/convergance-receipts.jsonl
 
