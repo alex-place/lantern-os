@@ -482,7 +482,15 @@ async function sendMessage() {
                 const wr = await fetch(`${base}/api/convergence/autonomous-work`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ issue: a.issue }) });
                 const wres = await wr.json();
                 if (wres.ok) { btn.textContent = '✓ Done'; btn.style.color = '#4ade80'; }
-                else { btn.textContent = '✗ Failed'; btn.style.color = '#f87171'; }
+                else {
+                  btn.textContent = '✗ Failed';
+                  btn.style.color = '#f87171';
+                  const errRow = document.createElement('div');
+                  errRow.className = 'msg-row agent';
+                  errRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px;color:#f87171">✗ Auto-work failed: ${wres.error || 'unknown error'}</div>`;
+                  document.getElementById('messages').appendChild(errRow);
+                  if (typeof scrollToBottom === 'function') scrollToBottom();
+                }
               } catch { btn.textContent = '✗ Error'; btn.style.color = '#f87171'; }
             };
           } else if (a.command) btn.onclick = () => fillAndSend(a.command);
@@ -513,6 +521,7 @@ async function sendMessage() {
   let serverErrorText = '';
   let didError = false;
   let routeLabel = '';
+  let receivedDone = false;
 
   try {
     const provider = document.getElementById('provider-select')?.value || '';
@@ -570,6 +579,7 @@ async function sendMessage() {
           } else if (evt.type === 'done') {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel) routeLabel = evt.routeLabel;
+            receivedDone = true;
           }
         } catch { /* skip malformed line */ }
       }
@@ -577,6 +587,15 @@ async function sendMessage() {
   } catch (e) { didError = true; }
 
   cursor.remove();
+
+  // Truncation detection: stream ended without a done event and text looks cut off
+  if (fullText && !receivedDone) {
+    const truncBadge = document.createElement('span');
+    truncBadge.title = 'Stream ended without completing — response may be truncated';
+    truncBadge.style.cssText = 'font-size:10px;opacity:0.5;margin-left:6px;vertical-align:middle;cursor:help';
+    truncBadge.textContent = '⚠ truncated';
+    bubble.appendChild(truncBadge);
+  }
 
   if (!fullText) {
     fullText = serverErrorText || FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];

@@ -33,8 +33,18 @@
     if (RP_OPT_IN_RE.test(msg)) return "dream_chat";
     if (CODING_TRIGGERS.some(t => lower.includes(t))) return "coding_change";
     if (/\b(debug|error|broken|crash|not working|not responding)\b/i.test(lower)) return "technical_debug";
+    if (/\b(buy|sell|trade|trading|position|portfolio|market|ticker|stock|kalshi|prediction market|should i (buy|sell|hold))\b/i.test(lower)) return "trading";
+    if (/\b(remember (this|that)|save (this|that)|log (this|that)|add to (my )?(journal|memory|notes?))\b/i.test(lower)) return "memory";
+    if (/\b(show me a? ?(video|clip|youtube)|play a? ?video|find a? ?video)\b/i.test(lower)) return "media";
     return "general";
   }
+
+  // Map intent → subtle UI label shown below input on auto-detect
+  const INTENT_LABELS = {
+    trading: "📈 Trading context",
+    memory: "💾 Saving to journal",
+    media: "🎬 Media search",
+  };
 
   // Agent is contextual — Lantern is default, others triggered by name in message
   function detectAgent(msg) {
@@ -419,7 +429,30 @@
     analytics.lastAgent = directModeEnabled ? "Direct" : detectAgent(text);
     analytics.record("send", text.slice(0, 40));
     analytics._msgStart = Date.now();
-    streamAgentResponse(text);
+
+    // Auto-detect intent and show context chip if non-default
+    const autoIntent = detectRouteIntent(text);
+    const intentLabel = INTENT_LABELS[autoIntent];
+    if (intentLabel) {
+      const chip = document.createElement("div");
+      chip.className = "msg-row agent intent-chip";
+      chip.innerHTML = `<div class="bubble" style="font-size:12px;opacity:0.7;padding:4px 10px;">${intentLabel} · auto-detected</div>`;
+      messagesEl.appendChild(chip);
+      scrollToBottom();
+    }
+
+    // "remember this" — auto-save to journal without full stream round-trip
+    if (autoIntent === "memory") {
+      const prevUser = conversationHistory.slice(-3).filter(e => e.role === "user").map(e => e.text).join(" / ");
+      const saveText = prevUser || text;
+      fetch(`${serverBase}/api/dream/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "note", text: saveText, tags: ["memory", "auto-saved"], source: "dream-chat" }),
+      }).catch(() => {});
+    }
+
+    streamAgentResponse(text, autoIntent);
   }
 
   function appendUserBubble(text) {
@@ -432,7 +465,7 @@
   }
 
   // ── Stream agent response ───────────────────────────────────────────────────
-  async function streamAgentResponse(message) {
+  async function streamAgentResponse(message, clientIntent) {
     stopSpeaking();
     isStreaming = true;
     sendBtn.disabled = true;
@@ -473,6 +506,7 @@
         provider: provider || undefined,
         history: historyToSend,
         mcp: directModeEnabled,
+        routeIntent: clientIntent || undefined,
       }),
     })
       .then((res) => {
