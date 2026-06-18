@@ -11,14 +11,14 @@ const { requireAuth, requireRole } = require("../lib/auth-middleware");
 const PUBLIC_PAGES = {
   "/auth.html":           "auth.html",
   "/auth":                "auth.html",
+  "/":                    "index.html",
+  "/index.html":          "index.html",
   "/explore.html":        "explore.html",
   "/knowledgecenter.html":"knowledgecenter.html",
 };
 
 // Protected pages — { file, role } where role is minimum required
 const PROTECTED_PAGES = {
-  "/":                    { file: "index.html",             role: "guest" },
-  "/index.html":          { file: "index.html",             role: "guest" },
   "/dream-chat.html":     { file: "dream-chat.html",        role: "guest" },
   "/profile.html":        { file: "profile.html",           role: "guest" },
   "/crypto-dashboard.html":{ file: "crypto-dashboard.html", role: "guest" },
