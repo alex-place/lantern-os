@@ -157,43 +157,88 @@ function applyHunk(lines, hunk) {
   return result;
 }
 
-function applyPatch(repoRoot, diffText) {
-  const files = validateDiff(diffText, repoRoot);
-  const stats = { changed: [], created: [], errors: [] };
-
+// Targets of a parsed diff, as repo-relative paths, tagged created vs changed.
+function diffTargets(files) {
+  const out = [];
   for (const f of files) {
     let target = f.newFile && f.newFile !== "/dev/null" ? f.newFile : f.oldFile;
     if (!target || target === "/dev/null") continue;
-    // Strip standard git diff a/ and b/ prefixes
+    target = target.replace(/^(a|b)\//, "");
+    out.push({ target, created: f.oldFile === "/dev/null" });
+  }
+  return out;
+}
+
+// Strict, dependency-free applier (exact context match). Used as a fallback.
+function applyPatchStrict(repoRoot, files) {
+  const stats = { changed: [], created: [], errors: [] };
+  for (const f of files) {
+    let target = f.newFile && f.newFile !== "/dev/null" ? f.newFile : f.oldFile;
+    if (!target || target === "/dev/null") continue;
     target = target.replace(/^(a|b)\//, "");
     const fullPath = path.join(repoRoot, target);
     let lines = [];
-    if (fs.existsSync(fullPath)) {
-      lines = fs.readFileSync(fullPath, "utf8").split(/\r?\n/);
-    } else {
-      // new file
-    }
-
+    if (fs.existsSync(fullPath)) lines = fs.readFileSync(fullPath, "utf8").split(/\r?\n/);
     try {
       let working = lines;
-      // Apply hunks in reverse order to preserve line numbers
-      for (let hi = f.hunks.length - 1; hi >= 0; hi--) {
-        working = applyHunk(working, f.hunks[hi]);
-      }
+      for (let hi = f.hunks.length - 1; hi >= 0; hi--) working = applyHunk(working, f.hunks[hi]);
       const dir = path.dirname(fullPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(fullPath, working.join("\n"), "utf8");
-      if (lines.length === 0 && f.hunks.length > 0) {
-        stats.created.push(target);
-      } else {
-        stats.changed.push(target);
-      }
+      if (lines.length === 0 && f.hunks.length > 0) stats.created.push(target);
+      else stats.changed.push(target);
     } catch (err) {
       stats.errors.push({ file: target, error: err.message });
     }
   }
-
   return stats;
+}
+
+// Apply a unified diff. LLM-generated diffs almost always have line-number drift
+// and minor context fuzz, which a strict exact-match applier rejects (→ the patch
+// never lands → autowork can't actually complete issues). We use git's robust
+// applier first (with recount/fuzz/3way), and fall back to the strict applier
+// only if git is unavailable. validateDiff still gates format + path safety, and
+// the caller's anti-fraud gate still rejects empty/errored results.
+function applyPatch(repoRoot, diffText) {
+  const files = validateDiff(diffText, repoRoot);
+  const targets = diffTargets(files);
+  const os = require("os");
+  const tmp = path.join(os.tmpdir(), `autowork-${process.pid}-${Date.now()}.diff`);
+  fs.writeFileSync(tmp, diffText.endsWith("\n") ? diffText : diffText + "\n", "utf8");
+
+  // Most-faithful strategy first, then progressively more tolerant.
+  const strategies = [
+    ["--recount", "--whitespace=nowarn"],
+    ["--recount", "-C1", "--whitespace=fix"],
+    ["--3way", "--recount", "--whitespace=nowarn"],
+  ];
+  let applied = false, lastErr = "";
+  for (const flags of strategies) {
+    try {
+      execFileSync("git", ["apply", "--check", ...flags, tmp], { cwd: repoRoot, encoding: "utf8", timeout: 15000 });
+    } catch (e) { lastErr = String(e.stderr || e.message || "").slice(0, 500); continue; }
+    try {
+      execFileSync("git", ["apply", ...flags, tmp], { cwd: repoRoot, encoding: "utf8", timeout: 15000 });
+      applied = true; break;
+    } catch (e) { lastErr = String(e.stderr || e.message || "").slice(0, 500); continue; }
+  }
+  try { fs.unlinkSync(tmp); } catch (_e) { /* best effort */ }
+
+  if (applied) {
+    return {
+      changed: targets.filter((t) => !t.created).map((t) => t.target),
+      created: targets.filter((t) => t.created).map((t) => t.target),
+      errors: [],
+      applier: "git",
+    };
+  }
+
+  // git apply rejected the diff — fall back to the strict applier (exact match).
+  const strict = applyPatchStrict(repoRoot, files);
+  strict.applier = "strict";
+  if (strict.errors.length > 0 && lastErr) strict.gitApplyError = lastErr;
+  return strict;
 }
 
 // ── Git operations ──────────────────────────────────────────────────────
