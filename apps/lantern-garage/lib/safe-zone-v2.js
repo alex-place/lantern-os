@@ -176,7 +176,24 @@ function pearson(a, b) {
 // one with the strongest seam. This finds the ACTUAL box (often a small bright
 // rectangle), instead of scoring a fixed quarter-frame block and being fooled by
 // whichever corner happens to have skin-toned or busy gameplay pixels.
-function bestFacecamRect(meanBright, activity, globalBright) {
+// Map an optional creator hint to a facecam-search constraint. Accepts free-ish
+// text like "Top Right", "Bottom Left", "Full Height Left", "Vertical Facecam
+// Right Side", "No Facecam", "Webcam moves around".
+function parseGuidance(g) {
+  if (!g) return null;
+  const s = String(g).toLowerCase();
+  if (s.includes("no facecam") || s.trim() === "none") return { none: true };
+  const c = {};
+  if (s.includes("left")) c.side = "left";
+  else if (s.includes("right")) c.side = "right";
+  if (s.includes("top")) c.vertical = "top";
+  else if (s.includes("bottom")) c.vertical = "bottom";
+  if (s.includes("full height") || s.includes("vertical")) c.fullHeight = true;
+  if (s.includes("move") || s.includes("around")) c.moves = true;
+  return Object.keys(c).length ? c : null;
+}
+
+function bestFacecamRect(meanBright, activity, globalBright, guidance) {
   const mean = (grid, r0, r1, c0, c1) => {
     let s = 0, k = 0;
     for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) { s += grid[r][c]; k++; }
@@ -201,15 +218,24 @@ function bestFacecamRect(meanBright, activity, globalBright) {
   // vertical extent FLOATS — we search every [r0,r1) band and let the top and
   // bottom seams bound it, so the box hugs the real cam instead of stretching to
   // the frame corner.
+  // Creator guidance narrows the search: a side hint restricts left/right, a
+  // top/bottom hint restricts the vertical half, full-height/vertical raises the
+  // height cap so a tall side-cam isn't truncated.
+  const sides = guidance && guidance.side ? [guidance.side] : ["left", "right"];
+  const maxH = guidance && guidance.fullHeight ? GRID_ROWS : 6;
   let best = null;
-  for (const side of ["left", "right"]) {
+  for (const side of sides) {
     const left = side === "left";
     for (const w of [2, 3, 4]) {
       const c0 = left ? 0 : GRID_COLS - w, c1 = c0 + w;
       const innerCol = left ? c1 - 1 : c0, outerCol = left ? c1 : c0 - 1;
       for (let r0 = 0; r0 <= GRID_ROWS - 2; r0++) {
         for (let r1 = r0 + 2; r1 <= GRID_ROWS; r1++) {
-          if (r1 - r0 > 6) continue; // a facecam is rarely taller than ~75%
+          if (r1 - r0 > maxH) continue; // a facecam is rarely taller than ~75% (unless guided full-height)
+          if (guidance && guidance.vertical) {
+            const inTop = (r0 + r1) / 2 < GRID_ROWS / 2;
+            if ((guidance.vertical === "top") !== inTop) continue;
+          }
           const vSeam = colSeam(innerCol, outerCol, r0, r1);      // toward centre
           const topSeam = rowSeam(r0, r0 - 1, c0, c1);            // above the box
           const botSeam = rowSeam(r1 - 1, r1, c0, c1);            // below the box
@@ -237,7 +263,7 @@ function bestFacecamRect(meanBright, activity, globalBright) {
 // Region detection
 // ---------------------------------------------------------------------------
 
-function detectRegions(frames) {
+function detectRegions(frames, opts = {}) {
   const n = frames.length;
   const brightnesses = frames.map(cellBrightness);
 
@@ -269,8 +295,10 @@ function detectRegions(frames) {
   const globalBright = gbN ? gbSum / gbN : 0;
 
   // Find the actual overlaid facecam rectangle by its seam (see bestFacecamRect).
+  // An optional creator guidance hint narrows or disables the search.
   const regions = [];
-  const fc = bestFacecamRect(meanBright, activity, globalBright);
+  const guidance = parseGuidance(opts.facecamGuidance);
+  const fc = (guidance && guidance.none) ? null : bestFacecamRect(meanBright, activity, globalBright, guidance);
   // Honest tiers: >=0.45 → confident facecam region; 0.25..0.45 → low-confidence
   // candidate flagged needsDeclaration so the UI can ask the user to confirm or
   // place it; <0.25 → emit nothing. We never report a bare detected:true.
@@ -287,7 +315,8 @@ function detectRegions(frames) {
       },
       confidence: round3(fc.score),
       cues: fc.cues,
-      needsDeclaration: fc.score < 0.45,
+      guided: !!guidance, // narrowed by a creator guidance hint
+      needsDeclaration: fc.score < 0.45 && !guidance, // a guided detection is trusted
       priority: 1,
     });
   }
@@ -400,7 +429,7 @@ async function analyzeForCrop(videoPath, opts = {}) {
   if (!ok || frames.length < 2) {
     return { status: "unavailable", reason: "could not sample frames (ffmpeg missing or unreadable video)" };
   }
-  const { regions, framesSampled, transitions } = detectRegions(frames);
+  const { regions, framesSampled, transitions } = detectRegions(frames, opts);
   const srcW = opts.srcWidth || SAMPLE_W;
   const srcH = opts.srcHeight || SAMPLE_H;
   const cropPlan = planCrop(regions, srcW, srcH, opts.targetAspect || TARGET_ASPECT_9_16);
