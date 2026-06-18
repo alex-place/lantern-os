@@ -5,12 +5,7 @@ const trainer = new ConverganceMergeTrainer();
 module.exports = async function autoMergeRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
 
-  console.log('[auto-merge] Checking route:', url.pathname);
-  if (!url.pathname.startsWith('/api/merge/')) {
-    console.log('[auto-merge] Not a merge route, skipping');
-    return false;
-  }
-  console.log('[auto-merge] Found merge route!');
+  if (!url.pathname.startsWith('/api/merge/')) return false;
 
   // GET /api/merge/status
   if (req.method === 'GET' && url.pathname === '/api/merge/status') {
@@ -28,58 +23,54 @@ module.exports = async function autoMergeRoutes(req, res, url, deps) {
 
   // POST /api/merge/analyze — Analyze PR readiness
   if (req.method === 'POST' && url.pathname === '/api/merge/analyze') {
-    return collectRequestBody(req, async (body) => {
-      try {
-        const prData = JSON.parse(body);
-        const decision = trainer.resolver.analyzeMergeReadiness(prData);
-        sendJson(res, decision, 200);
-      } catch (e) {
-        sendJson(res, { error: e.message }, 400);
-      }
-    });
+    try {
+      const body = await collectRequestBody(req);
+      const prData = JSON.parse(body);
+      const decision = trainer.resolver.analyzeMergeReadiness(prData);
+      sendJson(res, decision, 200);
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
+    }
+    return true;
   }
 
   // POST /api/merge/record — Record merge outcome
   if (req.method === 'POST' && url.pathname === '/api/merge/record') {
-    return collectRequestBody(req, async (body) => {
-      try {
-        const { prData, outcome } = JSON.parse(body);
-        trainer.resolver.recordMergeDecision(prData, prData.decision || {}, outcome);
-        sendJson(
-          res,
-          { status: 'recorded', outcome, metrics: trainer.resolver.patterns.successMetrics },
-          200
-        );
-      } catch (e) {
-        sendJson(res, { error: e.message }, 400);
-      }
-    });
+    try {
+      const body = await collectRequestBody(req);
+      const { prData, outcome } = JSON.parse(body);
+      trainer.resolver.recordMergeDecision(prData, prData.decision || {}, outcome);
+      sendJson(res, { status: 'recorded', outcome, metrics: trainer.resolver.patterns.successMetrics }, 200);
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
+    }
+    return true;
   }
 
   // POST /api/merge/apply-improvements — Apply Keystone recommendations
   if (req.method === 'POST' && url.pathname === '/api/merge/apply-improvements') {
-    return collectRequestBody(req, async (body) => {
-      try {
-        const { approved } = JSON.parse(body);
-        const result = trainer.applyRecommendations(approved || []);
-        sendJson(res, result, 200);
-      } catch (e) {
-        sendJson(res, { error: e.message }, 400);
-      }
-    });
+    try {
+      const body = await collectRequestBody(req);
+      const { approved } = JSON.parse(body);
+      const result = trainer.applyRecommendations(approved || []);
+      sendJson(res, result, 200);
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
+    }
+    return true;
   }
 
   // POST /api/merge/keystone-response — Process Keystone training response
   if (req.method === 'POST' && url.pathname === '/api/merge/keystone-response') {
-    return collectRequestBody(req, async (body) => {
-      try {
-        const keystoneAnalysis = JSON.parse(body);
-        const result = trainer.processKeystoneResponse(keystoneAnalysis);
-        sendJson(res, result, 200);
-      } catch (e) {
-        sendJson(res, { error: e.message }, 400);
-      }
-    });
+    try {
+      const body = await collectRequestBody(req);
+      const keystoneAnalysis = JSON.parse(body);
+      const result = trainer.processKeystoneResponse(keystoneAnalysis);
+      sendJson(res, result, 200);
+    } catch (e) {
+      sendJson(res, { error: e.message }, 400);
+    }
+    return true;
   }
 
   // GET /api/merge/analysis — Get full analysis
