@@ -94,22 +94,7 @@
       opacity: 0.7; margin-top: -4px; line-height: 1.4;
     }
     .pdf-loading { text-align: center; color: var(--muted); padding: 40px 0; }
-    .tesseract-bar {
-      display: flex; align-items: center; gap: 8px; margin-left: auto;
-      flex-shrink: 0;
-    }
-    .tesseract-status {
-      font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace;
-      white-space: nowrap;
-    }
-    .tesseract-btn {
-      font-size: 11px; padding: 4px 10px; border-radius: 6px;
-      border: 1px solid var(--border); background: var(--surface2);
-      color: var(--muted); cursor: pointer; font-family: 'IBM Plex Mono', monospace;
-      transition: border-color .15s, color .15s;
-    }
-    .tesseract-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .tesseract-btn:disabled { opacity: .4; cursor: default; }
+
   </style>
 </head>
 <body>
@@ -262,11 +247,6 @@
       <div class="pdf-controls">
         <input class="pdf-search" id="pdf-search" type="search" placeholder="Filter documents…" aria-label="Filter documents">
         <span class="pdf-count" id="pdf-count"></span>
-        <div class="tesseract-bar" id="tesseract-bar">
-          <span class="tesseract-status" id="tesseract-status">⬡ Tesseract —</span>
-          <button class="tesseract-btn" id="tesseract-pack-btn" onclick="tesseractAction('pack')" title="Compress all PDFs into one CSF tesseract">Pack</button>
-          <button class="tesseract-btn" id="tesseract-unpack-btn" onclick="tesseractAction('unpack')" title="Read manifest from tesseract">Unpack</button>
-        </div>
       </div>
       <div id="pdf-gallery"><p class="pdf-loading">Loading documents…</p></div>
     </div>
@@ -478,73 +458,6 @@
     init();
   }
 })();
-</script>
-<script>
-// ── Tesseract CIO wiring ──────────────────────────────────────────────────
-async function tesseractLoadStatus() {
-  try {
-    const r = await fetch('/api/csf/tesseract/status');
-    const d = await r.json();
-    const el = document.getElementById('tesseract-status');
-    if (!el) return;
-    if (d.exists && d.manifest) {
-      const m = d.manifest;
-      const kb = d.csfSize ? (d.csfSize / 1024).toFixed(0) + ' KB' : '';
-      const date = m.packedAt ? new Date(m.packedAt).toLocaleDateString() : '';
-      el.textContent = `⬡ ${m.count} docs · ${kb} · ${date}`;
-      el.title = `Packed: ${m.packedAt}\nText: ${(m.totalTextChars||0).toLocaleString()} chars\nPath: ${m.csfPath}`;
-    } else {
-      el.textContent = '⬡ No tesseract yet';
-    }
-  } catch { /* silent */ }
-}
-
-async function tesseractAction(action) {
-  const packBtn  = document.getElementById('tesseract-pack-btn');
-  const unpackBtn= document.getElementById('tesseract-unpack-btn');
-  const status   = document.getElementById('tesseract-status');
-  if (!packBtn) return;
-
-  // Step 1: ask CIO router for the endpoint (deterministic route)
-  const routeRes = await fetch('/api/convergence/route-task', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ taskType: action === 'pack' ? 'pack_research_tesseract' : 'unpack_research_tesseract' }),
-  });
-  const route = await routeRes.json();
-  if (!route.endpoint) {
-    alert('CIO route failed: ' + JSON.stringify(route));
-    return;
-  }
-
-  // Step 2: execute the routed endpoint
-  packBtn.disabled = true; unpackBtn.disabled = true;
-  status.textContent = action === 'pack' ? '⬡ Packing…' : '⬡ Reading…';
-
-  try {
-    const res = await fetch(route.endpoint, { method: 'POST' });
-    const data = await res.json();
-    if (data.ok && data.manifest) {
-      const m = data.manifest;
-      const kb = data.manifest.csfPath
-        ? '' // size comes from status endpoint
-        : '';
-      status.textContent = `⬡ ${m.count} docs packed`;
-      console.log('[tesseract]', action, data.log);
-      await tesseractLoadStatus();
-    } else {
-      status.textContent = '⬡ Error — check console';
-      console.error('[tesseract]', data);
-    }
-  } catch (err) {
-    status.textContent = '⬡ Failed';
-    console.error('[tesseract]', err);
-  } finally {
-    packBtn.disabled = false; unpackBtn.disabled = false;
-  }
-}
-
-document.addEventListener('DOMContentLoaded', tesseractLoadStatus);
 </script>
 </body>
 </html>
