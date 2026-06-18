@@ -4,11 +4,11 @@ description: CSF v0.8.1 Tesseract Convergence Plan
 
 # CSF v0.8.1 — Tesseract Convergence Plan
 
-**Date:** 2026-06-05
-**Status:** Draft — awaiting PR
+**Date:** 2026-06-12
+**Status:** Active — 1.6 Sprint
 **Scope:** `src/csf_rust/` + convergence layer integration
 **Owner:** Alex
-**Target merge:** 2026-06-12
+**Target merge:** Weeks 1-12 (3-month convergence)
 
 | PR | Feature | Predicted Impact | Acceptance Benchmark |
 |----|---------|-----------------|---------------------|
@@ -124,6 +124,28 @@ _The existing `src/csf_cache_manager.py` and tests must be able to call the Rust
 ## 4. Predicted Benchmarks (v0.8.1 Targets vs Competitors)
 
 **Methodology:** Predictions are derived from v0.7 Python measurements + Rust zero-cost abstraction theory + symbolic-layer overhead models. All numbers are **pre-release estimates** to be validated by `cargo bench` in CI. If reality diverges by > 20%, the plan will be revised.
+
+---
+
+## 5. Release Archive & Sprint Consolidation
+
+### 5.1. CSF v1.5 Release Closure (Archived)
+
+The CSF v1.5 release is now complete and archived. Key commits include:
+-   `e0a1cee`: Finalized Wavefront API and selective segment decode.
+-   `8e48174`: Implemented bounded wavefront load and LRU eviction.
+-   `1804b7b`: Integrated segment table into archive footer.
+
+These features are now stable and form the baseline for the Tesseract Convergence Layer.
+
+### 5.2. CSF v1.6 Sprint Intake (Active)
+
+The v1.6 sprint is now active, focusing on consolidation and integration. Key intake phases include:
+-   **Kingdome Design Review (P0):** Formalizing the convergence engine architecture.
+-   **LoRA API Integration:** Live integration of LoRA models for dynamic persona and context.
+-   **Token Audit Logging:** Implementing comprehensive token usage tracking for cost and compliance.
+
+This sprint aims to converge the core Tesseract components with live agent workflows. be revised.
 
 ### 4.1 Structured Data Compression (Lantern OS Workloads)
 
