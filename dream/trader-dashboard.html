@@ -40,6 +40,117 @@
       line-height: 1.6;
     }
 
+    .positions-panel {
+      background: var(--surface, #111);
+      border: 1px solid var(--border, #222);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 0 auto 32px;
+      max-width: 860px;
+    }
+    .position-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border, #1e1e1e);
+      font-size: 0.88rem;
+    }
+    .position-card:last-child { border-bottom: none; }
+    .position-ticker {
+      font-weight: 700;
+      min-width: 80px;
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.82rem;
+    }
+    .position-pnl {
+      font-weight: 600;
+      min-width: 60px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.82rem;
+    }
+    .position-pnl.positive { color: #4ade80; }
+    .position-pnl.negative { color: #f87171; }
+    .position-signal {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .position-signal.stop { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid #f87171; }
+    .position-signal.take { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid #4ade80; }
+    .position-signal.hold { background: rgba(250,204,21,0.1); color: #facc15; border: 1px solid #facc15; }
+    .position-close-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .position-close-btn:hover { border-color: #f87171; color: #f87171; }
+
+    .live-panel {
+      background: var(--surface, #111);
+      border: 1px solid var(--border, #222);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 0 auto 32px;
+      max-width: 860px;
+    }
+    .live-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted, #888);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+    }
+    .live-pulse {
+      color: var(--accent, #06b6d4);
+      animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+    .live-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    .live-stat-card {
+      background: var(--bg, #0a0a0a);
+      border: 1px solid var(--border, #1e1e1e);
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .live-stat-label {
+      font-size: 0.75rem;
+      color: var(--muted, #666);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+    .live-stat-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text, #eee);
+    }
+    .live-stat-val.ok { color: #4ade80; }
+    .live-stat-val.warn { color: #facc15; }
+    .live-stat-val.fail { color: #f87171; }
+
     .system-readiness {
       display: flex;
       align-items: center;
@@ -242,6 +353,41 @@
     </a>
   </div>
 
+  <!-- ── Live Data Panel (#612) ── -->
+  <div class="live-panel" id="live-panel">
+    <div class="live-panel-header">
+      <span>⚡ Live Trading Data</span>
+      <span class="live-pulse" id="live-pulse" title="Auto-refreshes every 6s">●</span>
+    </div>
+    <div class="live-stats-grid">
+      <div class="live-stat-card">
+        <div class="live-stat-label">Collector</div>
+        <div class="live-stat-val" id="stat-collector">—</div>
+      </div>
+      <div class="live-stat-card">
+        <div class="live-stat-label">Open Positions</div>
+        <div class="live-stat-val" id="stat-positions">—</div>
+      </div>
+      <div class="live-stat-card">
+        <div class="live-stat-label">Win Rate</div>
+        <div class="live-stat-val" id="stat-winrate">—</div>
+      </div>
+      <div class="live-stat-card">
+        <div class="live-stat-label">Markets Tracked</div>
+        <div class="live-stat-val" id="stat-markets">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Open Positions Panel (#617) ── -->
+  <div class="positions-panel" id="positions-panel">
+    <div class="live-panel-header">
+      <span>📋 Open Positions</span>
+      <a href="/kalshi-terminal.html" style="font-size:0.78rem;color:var(--accent);text-decoration:none;font-weight:500;letter-spacing:0">Full Terminal ↗</a>
+    </div>
+    <div id="positions-list"><p style="color:var(--muted);font-size:0.85rem;margin:0">Loading…</p></div>
+  </div>
+
   <!-- System Status -->
   <div class="health-panel">
     <h3>System Status</h3>
@@ -358,6 +504,137 @@ document.addEventListener('DOMContentLoaded', () => {
 
   checkHealth();
   setInterval(checkHealth, 10000);
+})();
+
+/* Live trading data panel — 6s polling (#612) */
+(function() {
+  const $ = id => document.getElementById(id);
+
+  async function fetchJson(path) {
+    try {
+      const r = await fetch(path, { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  }
+
+  function setVal(id, val, cls) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = val;
+    el.className = 'live-stat-val' + (cls ? ' ' + cls : '');
+  }
+
+  async function refreshLive() {
+    const [collector, positions, winrate] = await Promise.all([
+      fetchJson('/api/trading/kalshi/collector-status'),
+      fetchJson('/api/trading/kalshi/paper-positions'),
+      fetchJson('/api/trading/kalshi/winrate-stats'),
+    ]);
+
+    if (collector) {
+      const running = collector.running || collector.status === 'running';
+      const markets = collector.marketCount || collector.market_count || 0;
+      setVal('stat-collector', running ? '▶ Running' : '■ Stopped', running ? 'ok' : 'warn');
+      setVal('stat-markets', markets ? String(markets) : '—');
+    } else {
+      setVal('stat-collector', 'Offline', 'fail');
+      setVal('stat-markets', '—');
+    }
+
+    if (positions) {
+      const arr = Array.isArray(positions) ? positions : (positions.positions || []);
+      const open = arr.filter(p => p.status === 'open' || !p.status).length;
+      setVal('stat-positions', String(open));
+    } else {
+      setVal('stat-positions', '—');
+    }
+
+    if (winrate) {
+      const wr = winrate.winRate ?? winrate.win_rate ?? winrate.overall_win_rate;
+      setVal('stat-winrate', wr != null ? (Math.round(wr * 100) + '%') : '—', wr >= 0.5 ? 'ok' : wr != null ? 'warn' : '');
+    } else {
+      setVal('stat-winrate', '—');
+    }
+  }
+
+  refreshLive();
+  setInterval(refreshLive, 6000);
+})();
+
+/* Open positions panel — 6s polling (#617) */
+(function() {
+  const list = document.getElementById('positions-list');
+
+  async function fetchJson(path) {
+    try {
+      const r = await fetch(path, { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  }
+
+  function signalClass(pos) {
+    const sig = (pos.signal || pos.exit_signal || '').toLowerCase();
+    if (sig.includes('stop')) return 'stop';
+    if (sig.includes('take') || sig.includes('profit')) return 'take';
+    return 'hold';
+  }
+  function signalLabel(pos) {
+    const sig = (pos.signal || pos.exit_signal || '').toUpperCase();
+    return sig || 'HOLD';
+  }
+
+  async function closePosition(ticker, side) {
+    if (!confirm(`Close ${ticker} ${side || ''}?`)) return;
+    try {
+      await fetch('/api/trading/kalshi/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, side: side === 'yes' ? 'no' : 'yes', action: 'close' }),
+      });
+      setTimeout(refreshPositions, 800);
+    } catch (e) { alert('Close failed: ' + e.message); }
+  }
+
+  async function refreshPositions() {
+    const data = await fetchJson('/api/trading/kalshi/paper-positions');
+    if (!data) { list.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;margin:0">Positions unavailable</p>'; return; }
+    const positions = Array.isArray(data) ? data : (data.positions || []);
+    const open = positions.filter(p => p.status === 'open' || !p.status);
+    if (open.length === 0) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;margin:0">No open positions</p>';
+      return;
+    }
+    list.innerHTML = '';
+    open.slice(0, 8).forEach(pos => {
+      const pnl = pos.pnl ?? pos.unrealized_pnl ?? 0;
+      const pnlSign = pnl >= 0 ? '+' : '';
+      const card = document.createElement('div');
+      card.className = 'position-card';
+      const sc = signalClass(pos);
+      card.innerHTML = `
+        <span class="position-ticker">${pos.ticker || pos.market_ticker || '—'}</span>
+        <span class="position-pnl ${pnl >= 0 ? 'positive' : 'negative'}">${pnlSign}$${Math.abs(pnl).toFixed(2)}</span>
+        <span class="position-signal ${sc}">${signalLabel(pos)}</span>
+        <button class="position-close-btn" title="Close position">✕ Close</button>
+      `;
+      card.querySelector('.position-close-btn').onclick = () => closePosition(pos.ticker || pos.market_ticker, pos.side);
+      list.appendChild(card);
+    });
+    if (open.length > 8) {
+      const more = document.createElement('p');
+      more.style.cssText = 'font-size:0.8rem;color:var(--muted);margin:8px 0 0;text-align:center';
+      more.textContent = `+${open.length - 8} more — `;
+      const link = document.createElement('a');
+      link.href = '/kalshi-terminal.html';
+      link.textContent = 'open full terminal';
+      link.style.color = 'var(--accent)';
+      more.appendChild(link);
+      list.appendChild(more);
+    }
+  }
+
+  refreshPositions();
+  setInterval(refreshPositions, 6000);
 })();
 </script>
 <script src="/js/auth-gate.js" defer></script>

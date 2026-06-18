@@ -695,12 +695,72 @@
       });
   }
 
+  // ── Rich media rendering (#649) ──────────────────────────────────────────
+  // Post-process bubble text: YouTube iframes, image tags, clickable URLs.
+  // Called once streaming is done so we never corrupt in-progress text nodes.
+  function renderRichMedia(bubble, text) {
+    if (!text) return;
+    const YT_RE = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
+    const IMG_MD_RE = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
+    const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
+
+    // Collect YouTube video IDs from raw text before escaping
+    const ytIds = [];
+    let ytMatch;
+    while ((ytMatch = YT_RE.exec(text)) !== null) ytIds.push(ytMatch[1]);
+
+    // Track image URLs to skip them in URL linkification
+    const imgUrls = new Set();
+    let t = text.replace(IMG_MD_RE, (_, alt, url) => { imgUrls.add(url); return `\x00IMG\x00${url}\x00${alt}\x00`; });
+
+    // Linkify bare URLs (skip image URLs)
+    t = t.replace(URL_RE, (url) => imgUrls.has(url) ? url : `\x00LINK\x00${url}\x00`);
+
+    // Build HTML from segments
+    const parts = t.split('\x00');
+    let html = '';
+    let i = 0;
+    while (i < parts.length) {
+      const seg = parts[i];
+      if (seg === 'IMG') {
+        const url = parts[i + 1], alt = parts[i + 2];
+        html += `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt || '')}" style="max-width:100%;border-radius:6px;margin-top:6px;" loading="lazy">`;
+        i += 3;
+      } else if (seg === 'LINK') {
+        const url = parts[i + 1];
+        html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${escapeHtml(url)}</a>`;
+        i += 2;
+      } else {
+        html += escapeHtml(seg).replace(/\n/g, '<br>');
+        i++;
+      }
+    }
+
+    bubble.innerHTML = html;
+
+    // Append YouTube iframes
+    ytIds.forEach(vid => {
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube-nocookie.com/embed/${vid}`;
+      iframe.width = '100%';
+      iframe.height = '220';
+      iframe.style.cssText = 'border:0;border-radius:6px;margin-top:8px;display:block;max-width:480px;';
+      iframe.allow = 'encrypted-media; picture-in-picture';
+      iframe.allowFullscreen = true;
+      iframe.loading = 'lazy';
+      bubble.appendChild(iframe);
+    });
+  }
+
   function finishStream(row, bubble, cursor, text, source, error, suggestions, imagePrompt, webSuggestions, actions, routeLabel) {
     cursor.remove();
     if (!text && !error) {
       bubble.textContent = bubble.textContent || "…";
     }
     if (text) conversationHistory.push({ role: "assistant", text });
+
+    // Render rich media (YouTube embeds, clickable links, images)
+    if (text) renderRichMedia(bubble, text);
 
     // Analytics
     const latency = analytics._msgStart ? Date.now() - analytics._msgStart : null;
