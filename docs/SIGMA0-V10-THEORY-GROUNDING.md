@@ -417,8 +417,8 @@ A system that optimizes against its own representations with no external anchor 
 | Σ₀ Trigger | `collapseRisk` calculation | feature-extractor-v10.js:123 | IMPLEMENTED |
 | Σ₀⁻¹ Operator | Multi-peak re-promotion | sigma0-v10-scoring.js:182 | IMPLEMENTED |
 | `proximity()` function | Implicit in multi-peak check | sigma0-v10-scoring.js:182 | PARTIAL |
-| `p_gate` / `p_unbounded` | Not computed at runtime | — | UNIMPLEMENTED |
-| `SurpriseMonitor` / NIS canary | Class exists, not wired | — | PROPOSED |
+| `p_gate` / `p_unbounded` | Retired — superseded by NIS canary (#659) | — | RETIRED |
+| `SurpriseMonitor` / NIS canary | Wired into `forward_step` Kalman predict/update (#657) | cio_sde/engine.py, cio_sde/surprise.py | IMPLEMENTED |
 | Attractor graph G | Failure modes defined (§5 above) | — | DOCUMENTED |
 | Certification `α < 0` test | Not computed at runtime | — | FUTURE |
 

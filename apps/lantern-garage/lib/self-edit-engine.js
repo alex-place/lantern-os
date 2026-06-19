@@ -548,6 +548,10 @@ function callGemini(system, user, maxTokens = 4096) {
 function callOllama(messages) {
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
   const model = process.env.OLLAMA_MODEL || "qwen2.5-coder";
+  // Cold model load on the first /api/chat can take well over 30s for a 3B/7B
+  // model, which would abort before any token. Match the chat-path default
+  // (dream-chat.js / stream-chat.js use 120s) and honour OLLAMA_TIMEOUT_MS. (#690)
+  const ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000;
   const httpLib = ollamaBase.startsWith("https") ? require("https") : require("http");
   const payload = JSON.stringify({ model, messages, stream: false });
   return new Promise((resolve, reject) => {
@@ -568,7 +572,7 @@ function callOllama(messages) {
       });
     });
     req.on("error", reject);
-    req.setTimeout(30000, () => { req.destroy(); reject(new Error("ollama_timeout")); });
+    req.setTimeout(ollamaTimeout, () => { req.destroy(); reject(new Error("ollama_timeout")); });
     req.write(payload);
     req.end();
   });

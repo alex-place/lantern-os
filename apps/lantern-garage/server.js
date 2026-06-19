@@ -382,11 +382,26 @@ if (enableCloudflare) {
     console.log("[Cloudflare Tunnel] Install with: choco install cloudflare-warp");
   });
   cloudflaredProcess.on("exit", (code) => {
-    console.log(`[Cloudflare Tunnel] exited with code ${code}`);
+    if (code && code !== 0) {
+      // Non-zero exit: public access is down but the local server keeps running.
+      // The most common cause is a stale/unauthorized tunnel credential
+      // ("Unauthorized: Tunnel not found", see #672) — surface the fix instead of
+      // a bare exit code so it is self-explanatory.
+      console.warn(
+        `[Cloudflare Tunnel] exited with code ${code} — public access (https://lantern-os.net) ` +
+        `unavailable; the server continues locally on this port.\n` +
+        `[Cloudflare Tunnel] If you see "Unauthorized: Tunnel not found", the credential is ` +
+        `stale/revoked — recreate the tunnel:\n` +
+        `[Cloudflare Tunnel]   cloudflared tunnel login && cloudflared tunnel create lantern-os\n` +
+        `[Cloudflare Tunnel] then point ~/.cloudflared/config.yml at the new tunnel id.`
+      );
+    } else {
+      console.log(`[Cloudflare Tunnel] exited cleanly (code ${code}).`);
+    }
   });
   console.log(`[Cloudflare Tunnel] Starting (reading from ~/.cloudflared/config.yml)...`);
 } else {
-  console.log("[Cloudflare Tunnel] Disabled (set LANTERN_CLOUDFLARE_TUNNEL=true to enable)");
+  console.log("[Cloudflare Tunnel] Disabled via LANTERN_CLOUDFLARE_TUNNEL=false (it is enabled by default; unset the var to re-enable).");
 }
 
 // Graceful shutdown

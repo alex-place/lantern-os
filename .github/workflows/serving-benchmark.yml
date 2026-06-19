@@ -1,0 +1,58 @@
+name: Serving Benchmark
+
+# Phase 2 of the serving-optimization rollout (#730 / PR #723): run the serving
+# benchmark on a daily cron and grow the leaderboard at data/benchmarks/leaderboard.jsonl.
+# The actual --run step needs a provider API key configured as an Actions secret; when
+# none is present the job still summarizes the existing leaderboard so the workflow is
+# always green and the artifact is always published. Multi-day metric validation (the
+# rest of #730) accrues from these scheduled runs.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "provider:model to benchmark (e.g. anthropic:claude-haiku-4-5-20251001)"
+        required: false
+        default: ""
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  benchmark:
+    runs-on: windows-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run benchmark (only when a provider key is configured)
+        if: ${{ env.ANTHROPIC_API_KEY != '' }}
+        shell: pwsh
+        run: |
+          $target = "${{ github.event.inputs.target }}"
+          if (-not $target) { $target = "anthropic:claude-haiku-4-5-20251001" }
+          Write-Host "[benchmark] Running $target on the golden set..."
+          python src/serving_benchmark.py --run $target
+
+      - name: Summarize leaderboard
+        run: python src/serving_benchmark.py --summarize
+
+      - name: Upload leaderboard
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: serving-leaderboard
+          path: data/benchmarks/leaderboard.jsonl
+          if-no-files-found: ignore
