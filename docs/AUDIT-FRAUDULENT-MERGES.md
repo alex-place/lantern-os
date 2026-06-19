@@ -1,5 +1,21 @@
 # Audit Report: Fraudulent PR Merges — Data File Masquerade
 
+> ## ⚠️ SUPERSEDED — DO NOT run the revert commands in this document
+> **Updated 2026-06-19 (re-verified for #646).** The remediation in this audit is
+> **already done**, and its revert hashes are **WRONG and dangerous**:
+> - The fraud was remediated by **PR #671** (`security/revert-fraudulent-merges`,
+>   merged 2026-06-17), which reverted **#604, #611, #634**. The grounding logic in
+>   `convergence-dispatch.js` is restored on current `master`. **Re-reverting would
+>   re-introduce the fraud.**
+> - **#635** is a zero-impact leftover (1 data line) — **do not revert it.**
+> - The hashes in "How to Revert" below are wrong: `4f5222bd` is #604's *feature*
+>   commit (not its merge), and `248a5d35` is an unrelated test-skip.
+> - **Correct merge commits (record only):** #604 `f91c1e81`, #611 `81cef97f`,
+>   #634 `c114c525`, #635 `91a163e6`.
+> - A process gate is live: `85a663fd` (#650) flags data-only feat/fix PRs.
+>
+> See closed issue **#646** for the full corrected analysis. Kept for the historical record only.
+
 **Date:** 2026-06-16  
 **Scope:** Auto-merged PRs (last 30 closed PRs)  
 **Method:** File-level analysis + claim vs. delivery verification  
@@ -322,8 +338,9 @@ From issue #593:
 
 ### Immediate Actions
 
-1. **Revert fraudulent PRs:**
+1. **Revert fraudulent PRs:** ⚠️ **DO NOT RUN — already done via #671; hashes below are WRONG. See the banner at the top.**
    ```bash
+   # ⛔ OBSOLETE / DANGEROUS — kept for historical record only. Do not execute.
    git revert 81cef97fe  # PR #611
    git revert c114c525  # PR #634
    git revert 295d24f6  # PR #635
