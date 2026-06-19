@@ -237,8 +237,17 @@ def _load_fleet_status() -> Dict[str, Any]:
 
 _STARTED_AT = datetime.now(timezone.utc).isoformat()
 
-# ── In-memory state (replace with Redis/DB in production) ──
-_task_queue: List[Dict[str, Any]] = []
+# ── Task queue — in-memory, made durable by an in-house JSONL ledger ──
+# (Superfleet Phase 1) Local-first event sourcing; no external broker. The queue
+# is rebuilt by replaying data/queue/task-ledger.jsonl on startup.
+import queue_ledger
+_LEDGER_PATH = REPO_ROOT / "data" / "queue" / "task-ledger.jsonl"
+_task_queue: List[Dict[str, Any]] = queue_ledger.replay(_LEDGER_PATH)
+
+
+def _ledger(event: str, **payload: Any) -> None:
+    """Record one queue lifecycle event to the durable ledger (best-effort)."""
+    queue_ledger.append_event(_LEDGER_PATH, event, **payload)
 
 # Skills registry — only skills with real deployed Python modules.
 # super_jarvis_fleet is NOT a skill — it is the agent fleet. See data/status/super-jarvis-fleet.json.
@@ -335,6 +344,7 @@ def _tool_task_intake(description: str, priority: str = "medium") -> Dict[str, A
     # Sort by priority
     priority_order = {"high": 0, "medium": 1, "low": 2}
     _task_queue.sort(key=lambda t: priority_order.get(t["priority"], 1))
+    _ledger("enqueued", task=task)
     return {
         "task_id": task_id,
         "status": "submitted",
@@ -364,6 +374,7 @@ def _tool_task_cancel(task_id: str) -> Dict[str, Any]:
     task = matches[0]
     task["status"] = "cancelled"
     task["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+    _ledger("status", task_id=task["id"], status="cancelled", cancelled_at=task["cancelled_at"])
     return {"ok": True, "task_id": task["id"], "status": "cancelled", "queue_depth": len(_task_queue)}
 
 
@@ -377,6 +388,7 @@ def _tool_task_delete(task_id: str) -> Dict[str, Any]:
                 "candidates": [t["id"] for t in matches], "queue_depth": len(_task_queue)}
     removed_id = matches[0]["id"]
     _task_queue[:] = [t for t in _task_queue if t.get("id") != removed_id]
+    _ledger("deleted", task_id=removed_id)
     return {"ok": True, "task_id": removed_id, "removed": 1, "queue_depth": len(_task_queue)}
 
 
@@ -387,6 +399,7 @@ def _tool_queue_clear(status: str = "") -> Dict[str, Any]:
         _task_queue[:] = [t for t in _task_queue if t.get("status") != status]
     else:
         _task_queue.clear()
+    _ledger("cleared", filter=status or "all")
     return {"ok": True, "removed": before - len(_task_queue), "queue_depth": len(_task_queue), "filter": status or "all"}
 
 
@@ -419,6 +432,7 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
     # ── Act: mark in-flight; active_slots now reflects this task ──
     task["status"] = "active"
     task["started_at"] = datetime.now(timezone.utc).isoformat()
+    _ledger("status", task_id=task["id"], status="active", started_at=task["started_at"])
     started = time.time()
 
     garage = os.getenv("GARAGE_BASE_URL", "http://127.0.0.1:4177").rstrip("/")
@@ -485,6 +499,9 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
     task["confidence"] = confidence
     if err:
         task["error"] = err
+    _ledger("status", task_id=task["id"], status=task["status"],
+            completed_at=task["completed_at"], confidence=confidence,
+            result=task["result"], error=err)
 
     return {
         "ok": success,
