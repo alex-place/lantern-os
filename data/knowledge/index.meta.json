@@ -1,5 +1,5 @@
 {
-  "built_at": 1781820801.837854,
+  "built_at": 1781842092.9390094,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -17,6 +17,6 @@
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md"
   ],
-  "sections": 315,
-  "sha256": "671ff3f03e4596817a4769e51719ee9c24d67434cca9a620982cedfbb3c0893a"
+  "sections": 316,
+  "sha256": "cf162788014582863d2eada948a58edb85767adfb10164a683c80e3227f0d73c"
 }
