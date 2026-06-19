@@ -41,8 +41,39 @@
       border-color: var(--accent); background: var(--surface2); transform: translateY(-2px);
     }
     .link-card .icon { font-size: 22px; }
-    .link-card h3 { font-size: 0.92rem; font-weight: 600; }
+    .link-card h3 { font-size: 0.92rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
     .link-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
+    /* Plain-English jargon glosses (#748): a small "?" affordance on jargon cards
+       that reveals a one-line normie definition on hover (the badge), keyboard
+       focus of the card, or tap (see the small handler near </body>). */
+    .gloss {
+      position: relative; flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px;
+      font-size: 10px; font-weight: 700; line-height: 1;
+      color: var(--muted); border: 1px solid var(--border); border-radius: 50%;
+      cursor: help; user-select: none; transition: color .15s, border-color .15s;
+    }
+    .link-card:hover .gloss { color: var(--accent); border-color: var(--accent); }
+    .gloss-bubble {
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      width: max-content; max-width: 230px;
+      padding: 8px 10px; border-radius: 8px;
+      background: var(--surface2, #14161c); color: var(--text);
+      border: 1px solid var(--border);
+      font-size: 0.72rem; font-weight: 400; line-height: 1.45; text-align: left;
+      white-space: normal; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      opacity: 0; pointer-events: none; z-index: 60;
+      transform: translateX(-50%) translateY(4px);
+      transition: opacity .15s, transform .15s;
+    }
+    .gloss:hover .gloss-bubble,
+    .link-card:focus-visible .gloss-bubble,
+    .gloss.gloss-open .gloss-bubble {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+    @media (max-width: 520px) { .gloss-bubble { max-width: 180px; } }
 
     /* PDF gallery */
     .pdf-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
@@ -193,22 +224,22 @@
       <div class="link-grid">
         <a class="link-card" href="/dream-chat.html">
           <span class="icon">📓</span>
-          <h3>Dream Journal</h3>
+          <h3>Dream Journal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A free-form chat journal. "RP" = roleplay, "personas" = different AI characters, and "provider fallback" = it switches to another AI model if one is unavailable.</span></span></h3>
           <p>Freeform RP chat journal with agent personas and provider fallback.</p>
         </a>
         <a class="link-card" href="/three-doors-game.html">
           <span class="icon">🚪</span>
-          <h3>Three Doors</h3>
+          <h3>Three Doors <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A symbolic choose-your-path game ("The Kingdome") — pick a door, see where it leads, and replay endlessly.</span></span></h3>
           <p>The Kingdome — an infinitely replayable, symbolic door game.</p>
         </a>
         <a class="link-card" href="/flourishing">
           <span class="icon">🌱</span>
-          <h3>Flourishing Dashboard</h3>
+          <h3>Flourishing Dashboard <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A live dashboard that tracks well-being signals (a "sensor mesh" of inputs) against established human-flourishing frameworks.</span></span></h3>
           <p>Human Flourishing Frameworks — the real-time sensor-mesh dashboard.</p>
         </a>
         <a class="link-card" href="/kalshi-terminal.html">
           <span class="icon">📈</span>
-          <h3>Kalshi Terminal</h3>
+          <h3>Kalshi Terminal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A trading screen for Kalshi — a regulated market where you bet on real-world events (elections, weather). The "Impossibility Deck" is its swipe-to-decide card UI.</span></span></h3>
           <p>Markets terminal — the Impossibility Deck and live event contracts.</p>
         </a>
         <a class="link-card" href="/crypto-dashboard.html">
@@ -218,7 +249,7 @@
         </a>
         <a class="link-card" href="/orchestration.html">
           <span class="icon">🧭</span>
-          <h3>Orchestration</h3>
+          <h3>Orchestration <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">How a message gets handled: it figures out what you're asking ("intent"), checks the answer is grounded in real data ("convergence gate"), and switches AI models if one fails.</span></span></h3>
           <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
         </a>
       </div>
@@ -229,7 +260,7 @@
       <div class="link-grid">
         <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
           <span class="icon">📐</span>
-          <h3>Σ₀ Collapse Certificate</h3>
+          <h3>Σ₀ Collapse Certificate <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Σ₀ ("sigma-zero") is the project's core stability math. This document proves the reasoning loop stays grounded instead of spiralling into confident nonsense.</span></span></h3>
           <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
         </a>
         <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
@@ -244,17 +275,17 @@
         </a>
         <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
           <span class="icon">🔄</span>
-          <h3>Tesseract Convergence Loop</h3>
+          <h3>Tesseract Convergence Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The step-by-step method the system reasons with — tracking how confident it is ("Bayesian beliefs") in a 4-D status "cube" and keeping receipts for every claim.</span></span></h3>
           <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
         </a>
         <a class="link-card" href="/repo/docs/LANTERN-SIGMA0-CODER.md">
           <span class="icon">🤖</span>
-          <h3>lantern-sigma0-coder</h3>
+          <h3>lantern-sigma0-coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A coding AI that runs locally on your own machine (via Ollama), fine-tuned ("LoRA") on past Claude sessions — no cloud required.</span></span></h3>
           <p>The local Σ₀ coding agent — a LoRA fine-tuned on past Claude sessions, served via Ollama, leaderboard-routed, and continually retrained.</p>
         </a>
         <a class="link-card" href="/repo/docs/OURO-LOOPLM.md">
           <span class="icon">🔁</span>
-          <h3>Ouro / LoopLM</h3>
+          <h3>Ouro / LoopLM <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A reasoning technique where the model loops internally to "think" longer on harder questions before answering, instead of replying in one pass.</span></span></h3>
           <p>Looped latent reasoning (arXiv 2510.25741) — adaptive depth + Q-exit CDF, implemented over our local model (loop-reasoner.js) and grounded in the KB.</p>
         </a>
         <a class="link-card" href="/repo/docs/SIGMA0-OURO-CODER.md">
@@ -275,17 +306,17 @@
       <div class="link-grid">
         <a class="link-card" href="/rag-house.html">
           <span class="icon">🏠</span>
-          <h3>RAG House</h3>
+          <h3>RAG House <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">RAG = Retrieval-Augmented Generation: the AI looks things up before answering. The "house" is a living map of how all the pieces fit together.</span></span></h3>
           <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
         </a>
         <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
           <span class="icon">🗄️</span>
-          <h3>CSF Format</h3>
+          <h3>CSF Format <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">CSF ("Convergence-Fitted Searchable Format") is the project's own file format for packing and searching its memory and archives — like a smarter, searchable zip.</span></span></h3>
           <p>Convergence-Fitted Searchable Format — consolidated spec. Now includes <strong>CSF-Pack v0.8</strong>: pack/unpack arbitrary files with SHA-256 integrity, path-safety, and zip-class compression (benchmarked).</p>
         </a>
         <a class="link-card" href="/observer-mesh-cube.html">
           <span class="icon">🧊</span>
-          <h3>Observer Mesh Cube</h3>
+          <h3>Observer Mesh Cube <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A 3-D visualization of what the system currently believes and which components ("observers") are watching each part.</span></span></h3>
           <p>The 3D status cube — beliefs and observers across the mesh.</p>
         </a>
       </div>
@@ -526,6 +557,25 @@
   } else {
     init();
   }
+})();
+
+// Jargon gloss tap support (#748): the "?" sits inside the card's <a>, so on touch
+// we intercept the tap to reveal the definition instead of following the link.
+// Hover + keyboard-focus are handled in pure CSS.
+(function () {
+  function closeAll() {
+    document.querySelectorAll('.gloss.gloss-open').forEach((o) => o.classList.remove('gloss-open'));
+  }
+  document.querySelectorAll('.gloss').forEach((g) => {
+    g.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();           // don't navigate the card link, don't reach the doc handler
+      const wasOpen = g.classList.contains('gloss-open');
+      closeAll();
+      if (!wasOpen) g.classList.add('gloss-open');
+    });
+  });
+  document.addEventListener('click', closeAll);   // tap elsewhere closes any open gloss
 })();
 </script>
 <script src="/js/narrator.js" defer></script>

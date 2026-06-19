@@ -28,6 +28,7 @@
   }
   .patreon-pill[data-role="guest"] { opacity:.9; }
   .patreon-pill[data-role="supporter"],
+  .patreon-pill[data-role="deep_dreamer"],
   .patreon-pill[data-role="founder"],
   .patreon-pill[data-role="admin"] {
     border-color:rgba(20,184,166,.6);
@@ -35,6 +36,7 @@
   }
   body[data-patreon-role="guest"] .patron-only { display:none !important; }
   body[data-patreon-role="supporter"] .admin-only,
+  body[data-patreon-role="deep_dreamer"] .admin-only,
   body[data-patreon-role="founder"] .admin-only { display:none !important; }
   body[data-patreon-role="admin"] .admin-only { display:initial; }
 
@@ -332,10 +334,11 @@
    * IMPORTANT: real limits must also be enforced server-side in your chat API.
    */
   const LANTERN_ROLES = {
-    guest:     { label: "Guest",     canChat: false, dailyMessages: 0,   modelAccess: ["public"] },
-    supporter: { label: "Supporter", canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
-    founder:   { label: "Founder",   canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
-    admin:     { label: "Admin",     canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
+    guest:        { label: "Guest",        canChat: true,  dailyMessages: 10,  modelAccess: ["public"] }, // #739: limited guest chat (no account)
+    supporter:    { label: "Supporter",    canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
+    deep_dreamer: { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
+    founder:      { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
+    admin:        { label: "Admin",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
   };
 
   let lanternSession = { authenticated: false, role: "guest" };
@@ -394,7 +397,7 @@
           || value === "auto"
           || value === "ollama"
           || plan.modelAccess.includes(value)
-          || (value === "keystone-ft" && ["founder", "admin"].includes(role));
+          || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
         option.disabled = !allowed;
       });
     }
@@ -438,18 +441,24 @@
     }
   }
 
-  // Wrap sendMessage so locked visitors cannot bypass the disabled input in DevTools.
-  const originalSendMessage = window.sendMessage;
-  window.sendMessage = function gatedSendMessage(...args) {
-    const role = normalizeRole(lanternSession.role);
-    if (!LANTERN_ROLES[role].canChat) {
-      loginWithPatreon();
-      return;
-    }
-    if (typeof originalSendMessage === "function") {
-      return originalSendMessage.apply(this, args);
-    }
-  };
+  // Gate sendMessage so visitors without chat access cannot send (defense-in-depth;
+  // real limits are also enforced server-side). Installed on `load` so it wraps the
+  // FINAL sendMessage: dream-chat-ui.js defines window.sendMessage and
+  // convergance-sync.js wraps it — both AFTER this inline script runs. The previous
+  // version captured window.sendMessage here (still undefined) and was then
+  // overwritten by those later scripts, leaving chat completely ungated.
+  window.addEventListener("load", () => {
+    const realSendMessage = window.sendMessage;
+    if (typeof realSendMessage !== "function") return;
+    window.sendMessage = function gatedSendMessage(...args) {
+      const role = normalizeRole(lanternSession.role);
+      if (!LANTERN_ROLES[role].canChat) {
+        loginWithPatreon();
+        return;
+      }
+      return realSendMessage.apply(this, args);
+    };
+  });
 
   async function updateAuthUI() {
     try {
@@ -474,7 +483,7 @@
 
 <script src="js/dream-chat.js?v=20260615-a2"></script>
 <script src="/js/theme-toggle.js"></script>
-<script src="/js/dream-chat-ui.js?v=20260615-a2"></script>
+<script src="/js/dream-chat-ui.js?v=20260619-b1"></script>
 <script src="js/convergance-sync.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>

@@ -284,15 +284,27 @@
 
 <script>
   const LANTERN_ROLES = {
-    guest:     { label: "Guest",     canAccess: true },
-    supporter: { label: "Supporter", canAccess: true },
-    founder:   { label: "Founder",   canAccess: true },
-    admin:     { label: "Admin",     canAccess: true }
+    guest:        { label: "Guest",        canAccess: true },
+    supporter:    { label: "Supporter",    canAccess: true },
+    deep_dreamer: { label: "Deep Dreamer", canAccess: true },
+    founder:      { label: "Deep Dreamer", canAccess: true }, // legacy alias (#698)
+    admin:        { label: "Admin",        canAccess: true }
   };
 
+  // Honor the page the guest was trying to reach — auth-gate.js redirects with
+  // ?returnTo=/dream-chat.html, so after sign-in they land on the chat they came
+  // for instead of always bouncing to the home page. Only same-origin absolute
+  // paths are allowed (no "//host" protocol-relative open redirects).
+  function safeReturnTo() {
+    try {
+      const rt = new URLSearchParams(location.search).get("returnTo");
+      if (rt && rt.startsWith("/") && !rt.startsWith("//")) return rt;
+    } catch (_) {}
+    return "/";
+  }
+
   function loginWithPatreon() {
-    const returnTo = "/";
-    location.href = `/api/auth/patreon/start?returnTo=${encodeURIComponent(returnTo)}`;
+    location.href = `/api/auth/patreon/start?returnTo=${encodeURIComponent(safeReturnTo())}`;
   }
 
   async function checkSession() {
@@ -307,8 +319,8 @@
         const plan = LANTERN_ROLES[role];
 
         if (plan && plan.canAccess) {
-          // Auto-redirect to home if already authenticated
-          location.href = "/";
+          // Already authenticated — go where they were headed (returnTo), else home.
+          location.href = safeReturnTo();
           return;
         }
       }
