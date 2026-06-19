@@ -7,6 +7,7 @@
   <title>Knowledge Center — Lantern OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="css/dream-chat.css">
+  <link rel="stylesheet" href="/css/narrator.css">
   <style>
     /* This is a scrolling document page, not the fixed-height chat shell.
        dream-chat.css locks html/body/.app to the viewport with overflow:hidden;
@@ -115,7 +116,7 @@
   </div>
 </nav>
 <div class="app">
-  <div class="kc-page">
+  <div class="kc-page" data-narrate>
 
     <div class="kc-header">
       <h1>Knowledge Center</h1>
@@ -527,5 +528,6 @@
   }
 })();
 </script>
+<script src="/js/narrator.js" defer></script>
 </body>
 </html>
