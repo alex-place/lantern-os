@@ -67,7 +67,7 @@ dependent:
 | Execution Plane | Orchestrator queue | `C:\Users\alexp\Documents\gm-agent-orchestrator` | PASS: dirty health-check fix pushed in `f4eb6b5`; cash task queued |
 | Device Plane | Dual boot bundle | `dual-boot/` | CANDIDATE: prep-ready, install held |
 | Product Plane | Whitepaper, atlas, cash sprint | `reports/` and `artifacts/` | PASS: printable artifacts exist |
-| Learning Plane | Gage school art packet | `school-packets/gage-high-intel-art/` | PASS: packet exists, privacy-aware framing |
+| Learning Plane | Lantern school art packet | `school-packets/gage-high-intel-art/` | PASS: packet exists, privacy-aware framing |
 | Commons Plane | Archive/Wayback/OSS batch | `scripts/Invoke-ArchiveCommonsBatch.ps1` | CANDIDATE/HOLD: explicit rights gate added; downloads still operator-held |
 
 ## Top Decisions
@@ -219,7 +219,7 @@ ship whitepaper -> run cash sprint -> record wallet events -> prepare dual boot 
 ## SOURCE: reports/ALEX-PLACE-FOUNDER-ALL-STREAMS-CONVERGENCE-2026-05-27-CASH.md
 ## MODIFIED: 2026-05-29
 
-# Alex Place Founder All-Streams Convergence Master Report (2026-05-27)
+# Keystone Place Founder All-Streams Convergence Master Report (2026-05-27)
 
 ## Founder Directive
 This packet consolidates all major Lantern streams, user fronts, repo fronts, and operator fronts into one long-form convergence view with explicit evidence classes and web-grounded market context.
@@ -304,7 +304,7 @@ Promote execution cadence, hold over-claims, and force every confidence increase
 ## SOURCE: reports/ALEX-PLACE-FOUNDER-ALL-STREAMS-CONVERGENCE-2026-05-27-GOV.md
 ## MODIFIED: 2026-05-29
 
-# Alex Place Founder All-Streams Convergence Master Report (2026-05-27)
+# Keystone Place Founder All-Streams Convergence Master Report (2026-05-27)
 
 ## Founder Directive
 This packet consolidates all major Lantern streams, user fronts, repo fronts, and operator fronts into one long-form convergence view with explicit evidence classes and web-grounded market context.
@@ -389,7 +389,7 @@ Promote execution cadence, hold over-claims, and force every confidence increase
 ## SOURCE: reports/ALEX-PLACE-FOUNDER-ALL-STREAMS-CONVERGENCE-2026-05-27-OPS.md
 ## MODIFIED: 2026-05-29
 
-# Alex Place Founder All-Streams Convergence Master Report (2026-05-27)
+# Keystone Place Founder All-Streams Convergence Master Report (2026-05-27)
 
 ## Founder Directive
 This packet consolidates all major Lantern streams, user fronts, repo fronts, and operator fronts into one long-form convergence view with explicit evidence classes and web-grounded market context.
@@ -474,7 +474,7 @@ Promote execution cadence, hold over-claims, and force every confidence increase
 ## SOURCE: reports/ALEX-PLACE-FOUNDER-ALL-STREAMS-CONVERGENCE-2026-05-27.md
 ## MODIFIED: 2026-05-29
 
-# Alex Place Founder All-Streams Convergence Master Report (2026-05-27)
+# Keystone Place Founder All-Streams Convergence Master Report (2026-05-27)
 
 ## Founder Directive
 This packet consolidates all major Lantern streams, user fronts, repo fronts, and operator fronts into one long-form convergence view with explicit evidence classes and web-grounded market context.
@@ -620,7 +620,7 @@ Promote real-pass operational discipline now. Hold broad market claims until wal
 ## SOURCE: reports/ALEX-PLACE-GITHUB-REPO-SCAN-2026-05-30.md
 ## MODIFIED: 2026-05-30
 
-# Alex-Place GitHub Organization Repository Scan
+# Keystone-Place GitHub Organization Repository Scan
 
 **Date:** 2026-05-30  
 **Scan Scope:** alex-place GitHub organization including Human Flourishing Frameworks (HFF)  
@@ -1213,7 +1213,7 @@ A dependency may be promoted into Lantern OS only if it has:
 ## SOURCE: reports/ALEX-PLACE-JOB-APPLICATION-REPORT-2026-05-29.md
 ## MODIFIED: 2026-05-30
 
-# Alex Place - Job Application Report
+# Keystone Place - Job Application Report
 
 **Report Date:** 2026-05-29  
 **Report Type:** Job Application Portfolio  
@@ -1225,7 +1225,7 @@ A dependency may be promoted into Lantern OS only if it has:
 
 ## Executive Summary
 
-Alex Place is an Ohio-based solo software developer and open-source operator specializing in local-first AI orchestration, evidence-gated documentation systems, and human-centered project tooling. As the primary builder of Lantern OS, Alex demonstrates advanced capabilities in multi-agent orchestration, convergence loop validation, RAG memory systems, and operator interface design.
+Keystone Place is an Ohio-based solo software developer and open-source operator specializing in local-first AI orchestration, evidence-gated documentation systems, and human-centered project tooling. As the primary builder of Lantern OS, Keystone demonstrates advanced capabilities in multi-agent orchestration, convergence loop validation, RAG memory systems, and operator interface design.
 
 **Key Strengths:**
 - Full-stack local-first development with Windows/PowerShell expertise
@@ -1248,7 +1248,7 @@ Alex Place is an Ohio-based solo software developer and open-source operator spe
 - **Public Presence:** GitHub (@alex-place), Lantern OS maintainer
 
 ### Technical Philosophy
-Alex's development approach emphasizes:
+Keystone's development approach emphasizes:
 1. Inspect before editing
 2. Keep changes small and reviewable
 3. Treat dirty worktrees as high risk
@@ -1496,9 +1496,9 @@ Alex's development approach emphasizes:
 
 ## Conclusion
 
-Alex Place is a highly capable solo developer with advanced expertise in local-first AI orchestration, evidence-driven development, and complex system architecture. The Lantern OS project demonstrates sophisticated technical skills across multiple domains, from system architecture to UI design, with a strong emphasis on validation and safety.
+Keystone Place is a highly capable solo developer with advanced expertise in local-first AI orchestration, evidence-driven development, and complex system architecture. The Lantern OS project demonstrates sophisticated technical skills across multiple domains, from system architecture to UI design, with a strong emphasis on validation and safety.
 
-The evidence-driven methodology and comprehensive documentation approach make Alex particularly well-suited for roles requiring:
+The evidence-driven methodology and comprehensive documentation approach make Keystone particularly well-suited for roles requiring:
 - Full-stack development with system architecture
 - AI/ML system integration with safety boundaries
 - Technical documentation and validation processes
@@ -2166,13 +2166,13 @@ Successfully implemented cloud-first migration for Lantern OS chat and RAG model
 ### 1. RAG Model Updates ✅
 
 **User-Specific RAG Cache Entries:**
-- ✅ Gage profile: Educational focus, art projects, family-safe content
-- ✅ Courtney profile: Family collaboration, shared decision making  
+- ✅ Lantern profile: Educational focus, art projects, family-safe content
+- ✅ Eclipse profile: Family collaboration, shared decision making  
 - ✅ Waruichinchilla profile: External collaborator, technical projects
 
 **Additional Context Entries:**
-- ✅ Gage educational context (age-appropriate learning, creative encouragement)
-- ✅ Courtney-Waruichinchilla collaboration context (shared workflows, decision making)
+- ✅ Lantern educational context (age-appropriate learning, creative encouragement)
+- ✅ Eclipse-Waruichinchilla collaboration context (shared workflows, decision making)
 
 **Internal RAG House:**
 - ✅ Updated internal house RAG with new user context
@@ -2187,16 +2187,16 @@ Successfully implemented cloud-first migration for Lantern OS chat and RAG model
 - ✅ GitHub connector instructions for private repo access
 
 **User Environment Templates:**
-- ✅ Gage: Educational role, family-safe filtering, learning context
-- ✅ Courtney: Collaborator role, family-safe filtering, project context
+- ✅ Lantern: Educational role, family-safe filtering, learning context
+- ✅ Eclipse: Collaborator role, family-safe filtering, project context
 - ✅ Waruichinchilla: External collaborator, project-scoped filtering, technical context
 
 ### 3. User Documentation ✅
 
 **Setup Guides:**
 - ✅ Codex Cloud User Setup Guide (comprehensive technical setup)
-- ✅ Gage Quick Start Guide (age-appropriate, family-focused)
-- ✅ Courtney Quick Start Guide (collaboration-focused)
+- ✅ Lantern Quick Start Guide (age-appropriate, family-focused)
+- ✅ Eclipse Quick Start Guide (collaboration-focused)
 - ✅ Waruichinchilla Quick Start Guide (technical collaboration)
 
 **Migration Documentation:**
@@ -2221,10 +2221,10 @@ Successfully implemented cloud-first migration for Lantern OS chat and RAG model
 
 | Entry | Topic | Confidence | Decision |
 |---|---|---|---|
-| Gage profile | user-profile-gage | 0.9 | promote |
-| Courtney profile | user-profile-courtney | 0.9 | promote |
+| Lantern profile | user-profile-gage | 0.9 | promote |
+| Eclipse profile | user-profile-courtney | 0.9 | promote |
 | Waruichinchilla profile | user-profile-waruichinchilla | 0.85 | promote |
-| Gage education | gage-context-education | 0.88 | promote |
+| Lantern education | gage-context-education | 0.88 | promote |
 | Collaboration context | collaboration-context-courtney-waruichinchilla | 0.85 | promote |
 
 ### Files Created/Modified
@@ -2279,8 +2279,8 @@ Successfully implemented cloud-first migration for Lantern OS chat and RAG model
 3. **Web Access**: Confirm Lantern Garage app is accessible for user sessions
 
 ### User Onboarding
-1. **Gage**: Share GAGE-HIGH-INTEL-ART-PACKET.zip and quick start guide
-2. **Courtney**: Provide setup guide and collaboration workflow overview  
+1. **Lantern**: Share GAGE-HIGH-INTEL-ART-PACKET.zip and quick start guide
+2. **Eclipse**: Provide setup guide and collaboration workflow overview  
 3. **Waruichinchilla**: Share technical documentation and project scope
 
 ### Validation
@@ -2625,7 +2625,7 @@ invent more offers or perfect more software.
 | COMET LEAP Founder Report Pack | $99-$299 | founders, indie builders | existing PDFs + front page | 82 |
 | Local RAG / Repo Cleanup Sprint | $199-$999 | builders, consultants, small orgs | flat RAG dollhouse | 83 |
 | Windows/Lantern Setup Session | $99-$299 | local users/families | Windows surfaces + icon | 80 |
-| Parent Creative Learning Packet | $49-$149 | parents, homeschool, school-adjacent | Gage art packet example | 76 |
+| Parent Creative Learning Packet | $49-$149 | parents, homeschool, school-adjacent | Lantern art packet example | 76 |
 | Small-Business AI Cleanup | $199-$750 | SMB owner with messy tools | Clean Storm + RAG demo | 74 |
 
 ## Message Script
@@ -2649,7 +2649,7 @@ Want me to run a quick before/after on one folder, PDF set, or project?
 | Claim | Prior | Evidence | Posterior | Decision |
 |---|---:|---|---:|---|
 | Manual report/RAG offers can get cash faster than SaaS | 0.65 | local artifacts exist + SMB AI need signals | 0.82 | promote |
-| Homeschool/parent packets are viable immediately | 0.55 | Pew/JHU/EdChoice + local Gage packet | 0.76 | candidate/promote |
+| Homeschool/parent packets are viable immediately | 0.55 | Pew/JHU/EdChoice + local Lantern packet | 0.76 | candidate/promote |
 | Subscription should be built now | 0.55 | no retention or payment data | 0.48 | hold |
 | 12-month $15k+ MRR is forecastable now | 0.35 | no conversion data | 0.35 | hold |
 
@@ -3764,7 +3764,7 @@ Reply with "audit" and I'll send scope details.
 - Bounty workbench started with core stubs implemented
 - Direct outreach templates tested and ready
 - Lantern OS repo provides defensible evidence for all channels
-- Courtney agent available for outreach execution
+- Eclipse agent available for outreach execution
 
 ### Held
 - No grant applications submitted yet (require operator drafting)
@@ -3796,7 +3796,7 @@ Reply with "audit" and I'll send scope details.
 1. **Apply to SFF HSEE round** - Best fit, July 8 deadline
 2. **Send 15 personalized outreach messages** - Repo cleanup or MCP audit offers
 3. **Distribute job materials** - Send ALEX-PLACE-JOB-APPLICATION-REPORT to 3-5 target employers
-4. **Courtney executes** - Daily 90-min blocks for outreach (see `COURTNEY-OUTREACH-ACTION-PLAN-2026-05-30.md`)
+4. **Eclipse executes** - Daily 90-min blocks for outreach (see `COURTNEY-OUTREACH-ACTION-PLAN-2026-05-30.md`)
 
 ### Next Two Weeks (June 7-20)
 
@@ -3867,10 +3867,10 @@ Every outreach action must generate a receipt:
 | Document | Path | Purpose |
 |---|---|---|
 | Job Application Report | `reports/ALEX-PLACE-JOB-APPLICATION-REPORT-2026-05-29.md` | Primary employment packet |
-| Grants Normie Report | `reports/GRANTS-NORMIE-REPORT-FOR-SHELBY-2026-05-30.md` | Shelby-specific grant guide |
+| Grants Normie Report | `reports/GRANTS-NORMIE-REPORT-FOR-SHELBY-2026-05-30.md` | Lantern-specific grant guide |
 | Bounty Lanes | `manifests/evidence/bounty-and-whitepaper-lanes-2026-05-31.md` | Research radar for prizes |
 | Fastest Paths | `reports/FASTEST-PATHS-FIRST-200-DIGITAL-ASSETS-2026-05-29.md` | Cash sprint methodology |
-| Courtney Action Plan | `reports/COURTNEY-OUTREACH-ACTION-PLAN-2026-05-30.md` | Agent execution guide |
+| Eclipse Action Plan | `reports/COURTNEY-OUTREACH-ACTION-PLAN-2026-05-30.md` | Agent execution guide |
 | Emergency Funding | `offers/EMERGENCY-FUNDING-OUTREACH-2026-05-30.md` | Crisis campaign templates |
 
 ### Appendix B: External Links and Contacts
@@ -3892,7 +3892,7 @@ Before executing any channel:
 - [ ] Confirmed financial claims are accurate
 - [ ] Verified deadlines have not passed
 - [ ] Checked payment rail is functional
-- [ ] Approved Courtney outreach sends
+- [ ] Approved Eclipse outreach sends
 - [ ] Set weekly review meeting
 - [ ] Committed to receipt generation for all actions
 
@@ -4345,15 +4345,15 @@ ASI Arc Reactor MK1 converged to master with 0 issues. Key innovations: ASI patt
 
 
 ---
-## SOURCE: reports/COURTNEY-BLASIOLI-CONVERGENCE-REPORT-2026-05-30.md
+## SOURCE: reports/ECLIPSE-CONVERGENCE-REPORT-2026-05-30.md
 ## MODIFIED: 2026-05-30
 
-# Courtney Blasioli Convergence Report
+# Eclipse Convergence Report
 
 **Date:** 2026-05-30  
 **Status:** Active convergence packet for partner outreach leadership  
-**Validation State:** Ready for Courtney review and action  
-**Operator Boundary:** Courtney has full authority to execute outreach and community-facing tasks
+**Validation State:** Ready for Eclipse review and action  
+**Operator Boundary:** Eclipse has full authority to execute outreach and community-facing tasks
 
 ---
 
@@ -4434,7 +4434,7 @@ This report gives you:
 2. Read the outreach campaign messages in `offers/EMERGENCY-FUNDING-OUTREACH-2026-05-30.md`
 3. Choose which platform(s) you want to lead: Kickstarter, Patreon, GoFundMe, or all three
 4. Identify your personal network for initial outreach (friends, family, community)
-5. Set up a 30-minute call with Alex to align on messaging and approval
+5. Set up a 30-minute call with Keystone to align on messaging and approval
 
 ### This Week
 1. Customize outreach messages with your voice and perspective
@@ -4445,7 +4445,7 @@ This report gives you:
 
 ### Ongoing
 1. Lead all community-facing and outreach work
-2. Coordinate with Alex on technical and financial updates
+2. Coordinate with Keystone on technical and financial updates
 3. Make decisions about outreach strategy and messaging
 4. Build and maintain supporter relationships
 5. Identify and execute female-appropriate high-impact tasks
@@ -4456,14 +4456,14 @@ This report gives you:
 
 **Before Launch:**
 - You review and approve outreach messaging
-- Alex verifies financial figures are accurate
+- Keystone verifies financial figures are accurate
 - You select appropriate platform(s) for launch
 - Both partners agree on revenue allocation and priorities
 
 **After Launch:**
 - Track campaign performance daily
 - Document actual funds received vs goal
-- Update configuration fix progress with Alex
+- Update configuration fix progress with Keystone
 - Close loop with backers on resolution
 - Adjust strategy based on what works
 
@@ -4591,16 +4591,16 @@ This report gives you:
 
 ---
 
-## Technical Context (What Alex Handles)
+## Technical Context (What Keystone Handles)
 
-### Infrastructure Configuration (Alex's Domain)
+### Infrastructure Configuration (Keystone's Domain)
 - Fix Codex token usage configuration
 - Utilize existing AWS and OpenAPI keys effectively
 - Reduce token burn from 3-4x to expected levels
 - Implement proper cost monitoring
 - Technical debt resolution
 
-### Development Work (Alex's Domain)
+### Development Work (Keystone's Domain)
 - Continue Lantern OS development
 - Fix configuration issues
 - Implement cost optimization
@@ -4619,7 +4619,7 @@ This report gives you:
 ## Communication Protocol
 
 ### Weekly Check-ins
-- 30-minute call between you and Alex
+- 30-minute call between you and Keystone
 - Review outreach progress and metrics
 - Discuss financial situation and configuration fixes
 - Align on priorities for next week
@@ -4633,7 +4633,7 @@ This report gives you:
 
 ### Decision Making
 - You have full authority on outreach and community decisions
-- Alex has full authority on technical and infrastructure decisions
+- Keystone has full authority on technical and infrastructure decisions
 - Financial decisions require mutual agreement
 - Strategic direction requires mutual agreement
 
@@ -4707,7 +4707,7 @@ This report gives you:
 3. Which platform(s) do you want to start with: Kickstarter, Patreon, GoFundMe?
 4. What's your initial reaction to the outreach campaign messages?
 5. Are there other female-appropriate tasks you'd like to take on?
-6. What support do you need from Alex to be successful in this role?
+6. What support do you need from Keystone to be successful in this role?
 7. Do you have questions about the technical situation or configuration fix?
 8. What's your timeline for taking action on this?
 
@@ -4715,9 +4715,9 @@ This report gives you:
 
 ## Closing
 
-You are not responsible for the configuration issues that caused this financial situation. That's a technical infrastructure problem that Alex is fixing. Your role is to lead the outreach and community work to stabilize the cash flow while the technical issues are resolved.
+You are not responsible for the configuration issues that caused this financial situation. That's a technical infrastructure problem that Keystone is fixing. Your role is to lead the outreach and community work to stabilize the cash flow while the technical issues are resolved.
 
-You have natural advantages in outreach, community building, and relationship management that Alex doesn't have. This division of labor plays to both of your strengths.
+You have natural advantages in outreach, community building, and relationship management that Keystone doesn't have. This division of labor plays to both of your strengths.
 
 The outreach materials are ready to use, but they need your voice, your perspective, and your network to be effective. You have full authority to customize and execute them as you see fit.
 
@@ -4727,19 +4727,19 @@ Let's talk soon to align on next steps and get you started.
 
 **Report Prepared By:** Cascade (Lantern OS Agent)  
 **Date:** 2026-05-30  
-**Status:** Ready for Courtney review and action  
-**Next Step:** Schedule 30-minute alignment call with Alex
+**Status:** Ready for Eclipse review and action  
+**Next Step:** Schedule 30-minute alignment call with Keystone
 
 
 ---
 ## SOURCE: reports/COURTNEY-OUTREACH-ACTION-PLAN-2026-05-30.md
 ## MODIFIED: 2026-05-30
 
-# Courtney Outreach Action Plan
+# Eclipse Outreach Action Plan
 
 **Date**: 2026-05-30  
-**Operator**: Alex Place  
-**Outreach Agent**: Courtney  
+**Operator**: Keystone Place  
+**Outreach Agent**: Eclipse  
 **Projects**: 2 (LanternOS Business, Family Needs Personal)  
 **Status**: Ready for execution
 
@@ -4747,7 +4747,7 @@ Let's talk soon to align on next steps and get you started.
 
 ## Simple Answer
 
-Courtney will execute outreach campaigns for two parallel tracks: LanternOS business development (investor outreach, customer acquisition, partnership development) and family needs personal project (funding applications, resource coordination, support network building). Both tracks use validated templates from the business automation system.
+Eclipse will execute outreach campaigns for two parallel tracks: LanternOS business development (investor outreach, customer acquisition, partnership development) and family needs personal project (funding applications, resource coordination, support network building). Both tracks use validated templates from the business automation system.
 
 ---
 
@@ -4796,56 +4796,56 @@ Courtney will execute outreach campaigns for two parallel tracks: LanternOS busi
 
 **Action 1.1: Review Investor Targets**
 - **File**: `data/outreach/investor-targets.json`
-- **Task**: Courtney reviews the 5 investor targets already generated
+- **Task**: Eclipse reviews the 5 investor targets already generated
 - **Deliverable**: Prioritized list with contact information
 - **Timeline**: Day 1
 
 **Action 1.2: Customize Email Templates**
 - **File**: `data/templates/email-templates.json`
-- **Task**: Courtney personalizes the 4 email templates for each investor
+- **Task**: Eclipse personalizes the 4 email templates for each investor
 - **Deliverable**: 20 personalized outreach emails
 - **Timeline**: Day 1-2
 
 **Action 1.3: Send Initial Outreach**
-- **Task**: Courtney sends personalized emails to all 5 investor targets
+- **Task**: Eclipse sends personalized emails to all 5 investor targets
 - **Method**: Email via templates, personalized for each recipient
 - **Deliverable**: 5 emails sent, tracking in outreach log
 - **Timeline**: Day 2
 
 **Action 1.4: LinkedIn Connection Campaign**
-- **Task**: Courtney connects with investor targets on LinkedIn
+- **Task**: Eclipse connects with investor targets on LinkedIn
 - **Method**: Personalized connection requests
 - **Deliverable**: 5 LinkedIn connection requests sent
 - **Timeline**: Day 2-3
 
 **Action 1.5: Follow-Up Sequence**
-- **Task**: Courtney executes follow-up sequence (3 emails over 2 weeks)
-- **Method**: Automated via business-automator.js with Courtney oversight
+- **Task**: Eclipse executes follow-up sequence (3 emails over 2 weeks)
+- **Method**: Automated via business-automator.js with Eclipse oversight
 - **Deliverable**: 15 follow-up emails scheduled/sent
 - **Timeline**: Day 3-14
 
 ### Phase 2: Customer Outreach (Week 2-3)
 
 **Action 2.1: Identify Customer Targets**
-- **Task**: Courtney identifies 10 small businesses needing AI cleanup
+- **Task**: Eclipse identifies 10 small businesses needing AI cleanup
 - **Source**: Local business directories, LinkedIn, referrals
 - **Deliverable**: 10 customer target profiles
 - **Timeline**: Day 8
 
 **Action 2.2: Customize Customer Outreach**
-- **Task**: Courtney adapts email templates for customer outreach
+- **Task**: Eclipse adapts email templates for customer outreach
 - **Focus**: Value proposition, ROI, case studies
 - **Deliverable**: 10 personalized customer emails
 - **Timeline**: Day 8-9
 
 **Action 2.3: Send Customer Outreach**
-- **Task**: Courtney sends personalized emails to 10 customer targets
+- **Task**: Eclipse sends personalized emails to 10 customer targets
 - **Method**: Email via templates
 - **Deliverable**: 10 emails sent, tracking in outreach log
 - **Timeline**: Day 9-10
 
 **Action 2.4: Demo Scheduling**
-- **Task**: Courtney schedules demos for interested prospects
+- **Task**: Eclipse schedules demos for interested prospects
 - **Method**: Calendar coordination, demo preparation
 - **Deliverable**: 3-5 demo calls scheduled
 - **Timeline**: Day 10-14
@@ -4853,25 +4853,25 @@ Courtney will execute outreach campaigns for two parallel tracks: LanternOS busi
 ### Phase 3: Partnership Outreach (Week 3-4)
 
 **Action 3.1: Identify Partnership Targets**
-- **Task**: Courtney identifies 5 strategic partnership opportunities
+- **Task**: Eclipse identifies 5 strategic partnership opportunities
 - **Focus**: Cloud providers, AI platforms, developer tools
 - **Deliverable**: 5 partnership target profiles
 - **Timeline**: Day 15
 
 **Action 3.2: Customize Partnership Outreach**
-- **Task**: Courtney adapts email templates for partnership outreach
+- **Task**: Eclipse adapts email templates for partnership outreach
 - **Focus**: Mutual benefit, integration opportunities
 - **Deliverable**: 5 personalized partnership emails
 - **Timeline**: Day 15-16
 
 **Action 3.3: Send Partnership Outreach**
-- **Task**: Courtney sends personalized emails to 5 partnership targets
+- **Task**: Eclipse sends personalized emails to 5 partnership targets
 - **Method**: Email via templates
 - **Deliverable**: 5 emails sent, tracking in outreach log
 - **Timeline**: Day 16-17
 
 **Action 3.4: Follow-Up and Negotiation**
-- **Task**: Courtney follows up on partnership inquiries
+- **Task**: Eclipse follows up on partnership inquiries
 - **Method**: Phone calls, video meetings, negotiation
 - **Deliverable**: 2-3 partnership discussions initiated
 - **Timeline**: Day 17-21
@@ -4884,24 +4884,24 @@ Courtney will execute outreach campaigns for two parallel tracks: LanternOS busi
 
 **Action 1.1: Review Funding Templates**
 - **File**: `data/wallet/funding-templates/`
-- **Task**: Courtney reviews Kickstarter, Patreon, GoFundMe templates
+- **Task**: Eclipse reviews Kickstarter, Patreon, GoFundMe templates
 - **Deliverable**: Understanding of funding platform requirements
 - **Timeline**: Day 1
 
 **Action 1.2: Prepare Funding Applications**
-- **Task**: Courtney prepares funding applications using templates
+- **Task**: Eclipse prepares funding applications using templates
 - **Focus**: Emergency funding outreach, clear need statement
 - **Deliverable**: 3 funding applications ready
 - **Timeline**: Day 1-2
 
 **Action 1.3: Submit Funding Applications**
-- **Task**: Courtney submits applications to 3 platforms
+- **Task**: Eclipse submits applications to 3 platforms
 - **Platforms**: Kickstarter, Patreon, GoFundMe
 - **Deliverable**: 3 applications submitted, tracking in log
 - **Timeline**: Day 2-3
 
 **Action 1.4: Activate Support Network**
-- **Task**: Courtney reaches out to family support network
+- **Task**: Eclipse reaches out to family support network
 - **Method**: Personal messages, phone calls
 - **Deliverable**: 10 support network contacts activated
 - **Timeline**: Day 3-4
@@ -4909,19 +4909,19 @@ Courtney will execute outreach campaigns for two parallel tracks: LanternOS busi
 ### Phase 2: Resource Coordination (Week 2)
 
 **Action 2.1: Research Local Resources**
-- **Task**: Courtney researches local assistance programs
+- **Task**: Eclipse researches local assistance programs
 - **Focus**: Housing, food, healthcare, utilities
 - **Deliverable**: List of 10 local resources with contact info
 - **Timeline**: Day 8
 
 **Action 2.2: Contact Local Resources**
-- **Task**: Courtney contacts local assistance programs
+- **Task**: Eclipse contacts local assistance programs
 - **Method**: Phone calls, in-person visits
 - **Deliverable**: 5 resource contacts made, applications started
 - **Timeline**: Day 8-10
 
 **Action 2.3: Document Application Status**
-- **Task**: Courtney tracks all application statuses
+- **Task**: Eclipse tracks all application statuses
 - **Method**: Spreadsheet or tracking system
 - **Deliverable**: Up-to-date application status log
 - **Timeline**: Day 10-14
@@ -4929,26 +4929,26 @@ Courtney will execute outreach campaigns for two parallel tracks: LanternOS busi
 ### Phase 3: Ongoing Support (Week 3-4)
 
 **Action 3.1: Follow-Up on Applications**
-- **Task**: Courtney follows up on all pending applications
+- **Task**: Eclipse follows up on all pending applications
 - **Method**: Phone calls, emails, in-person visits
 - **Deliverable**: All applications followed up, status updated
 - **Timeline**: Day 15-17
 
 **Action 3.2: Coordinate Support Network**
-- **Task**: Courtney coordinates ongoing support from network
+- **Task**: Eclipse coordinates ongoing support from network
 - **Method**: Regular check-ins, resource sharing
 - **Deliverable**: Active support network coordination
 - **Timeline**: Day 15-21
 
 **Action 3.3: Identify Additional Resources**
-- **Task**: Courtney identifies additional funding/resource opportunities
+- **Task**: Eclipse identifies additional funding/resource opportunities
 - **Focus**: Emergency grants, community programs, crowdfunding
 - **Deliverable**: 5 additional resource opportunities identified
 - **Timeline**: Day 15-21
 
 ---
 
-## Courtney's Daily Routine
+## Eclipse's Daily Routine
 
 ### Morning (30 minutes)
 - Review outreach log from previous day
@@ -4964,13 +4964,13 @@ Courtney will execute outreach campaigns for two parallel tracks: LanternOS busi
 ### Afternoon (30 minutes)
 - Review daily progress
 - Plan next day's actions
-- Coordinate with Alex on urgent items
+- Coordinate with Keystone on urgent items
 
 ---
 
 ## Outreach Log Template
 
-Courtney should maintain a log of all outreach activities:
+Eclipse should maintain a log of all outreach activities:
 
 ```json
 {
@@ -4993,24 +4993,24 @@ Courtney should maintain a log of all outreach activities:
 ### Business Outreach Templates
 - **Location**: `data/templates/email-templates.json`
 - **Includes**: Initial outreach, follow-up sequences, partnership proposals
-- **Usage**: Courtney personalizes for each target
+- **Usage**: Eclipse personalizes for each target
 
 ### Funding Templates
 - **Location**: `data/wallet/funding-templates/`
 - **Includes**: Kickstarter, Patreon, GoFundMe application templates
-- **Usage**: Courtney adapts for specific funding needs
+- **Usage**: Eclipse adapts for specific funding needs
 
 ### Investor Targets
 - **Location**: `data/outreach/investor-targets.json`
 - **Includes**: 5 pre-identified investor targets
-- **Usage**: Courtney prioritizes and contacts
+- **Usage**: Eclipse prioritizes and contacts
 
 ---
 
 ## Validation Path
 
 ### Weekly Check-Ins
-- Courtney reports progress to Alex every Friday
+- Eclipse reports progress to Keystone every Friday
 - Review outreach metrics (emails sent, responses received, meetings scheduled)
 - Adjust strategy based on results
 
@@ -5033,47 +5033,47 @@ Courtney should maintain a log of all outreach activities:
 ## Next Safe Action
 
 ### Immediate (Today)
-1. Courtney reviews investor targets and email templates
-2. Courtney personalizes first batch of investor outreach emails
-3. Courtney reviews funding templates for family needs
-4. Courtney prepares first funding applications
+1. Eclipse reviews investor targets and email templates
+2. Eclipse personalizes first batch of investor outreach emails
+3. Eclipse reviews funding templates for family needs
+4. Eclipse prepares first funding applications
 
 ### This Week
-1. Courtney sends initial investor outreach (5 emails)
-2. Courtney sends LinkedIn connection requests (5 requests)
-3. Courtney submits 3 funding applications
-4. Courtney activates 10 support network contacts
+1. Eclipse sends initial investor outreach (5 emails)
+2. Eclipse sends LinkedIn connection requests (5 requests)
+3. Eclipse submits 3 funding applications
+4. Eclipse activates 10 support network contacts
 
 ### Next Week
-1. Courtney executes investor follow-up sequence
-2. Courtney identifies and contacts 10 customer targets
-3. Courtney contacts 5 local resource organizations
-4. Courtney schedules 3-5 demo calls
+1. Eclipse executes investor follow-up sequence
+2. Eclipse identifies and contacts 10 customer targets
+3. Eclipse contacts 5 local resource organizations
+4. Eclipse schedules 3-5 demo calls
 
 ---
 
 ## Operator Boundary
 
-Courtney should:
+Eclipse should:
 - **Never** share sensitive financial data publicly
-- **Always** get Alex approval before sharing confidential information
+- **Always** get Keystone approval before sharing confidential information
 - **Document** all outreach activities in the log
-- **Report** progress weekly to Alex
-- **Escalate** urgent issues immediately to Alex
+- **Report** progress weekly to Keystone
+- **Escalate** urgent issues immediately to Keystone
 - **Stay within** the scope defined in this action plan
 
 ---
 
 ## Appendix: Contact Information
 
-**Primary Contact**: Alex Place  
-**Courtney's Access**: Business automation system, email templates, funding templates  
+**Primary Contact**: Keystone Place  
+**Eclipse's Access**: Business automation system, email templates, funding templates  
 **Support Resources**: AGENTS.md, business-automator.js, service-automator.js  
 
 ---
 
 **Report Generated**: 2026-05-30 14:35 UTC-04:00  
-**Status**: Ready for Courtney execution  
+**Status**: Ready for Eclipse execution  
 **Next Review**: 2026-06-06 (Friday check-in)
 
 
@@ -5128,7 +5128,7 @@ This report documents the improvements made to Lantern OS on 2026-05-30, includi
 **Evidence Reports:**
 - Convergence Evidence Receipt - Documentation of all evidence generated today
 - Human Trial Readiness 70% Plan - Detailed evidence generation plan
-- Mary and Courtney PDF Reports - Personal reports for stakeholders
+- Mary and Eclipse PDF Reports - Personal reports for stakeholders
 
 ### PDF Generation Capability
 
@@ -5144,7 +5144,7 @@ This report documents the improvements made to Lantern OS on 2026-05-30, includi
 - Weekly Innovations Simple (simple)
 - WOW Factor Normie (simple)
 - Mary Work Summary (simple)
-- Courtney Convergence Report (simple)
+- Eclipse Convergence Report (simple)
 
 ### Convergence State Updates
 
@@ -6777,7 +6777,7 @@ only after external payment proof exists.
 
 # Lantern OS — Founder Report: Post-Convergence OSS Funding Edition
 
-**Author**: Alex Place
+**Author**: Keystone Place
 **Date**: 2026-05-28
 **Status**: Post-convergence, seeking open-source sponsorship and community support
 
@@ -6901,7 +6901,7 @@ That's the kind of technology I want to exist in the world. If you do too, spons
 | Arc Reactor Model | Available in repo: `reports/ARC-REACTOR-12-STEP-CONVERGENCE-MODEL.md` |
 | GitHub Sponsors | [github.com/sponsors/alex-place](https://github.com/sponsors/alex-place) |
 | Ko-fi | [ko-fi.com/alexplace](https://ko-fi.com/alexplace) |
-| Contact | alex.place.7@gmail.com |
+| Contact | (contact via GitHub Issues) |
 
 ---
 
@@ -7207,8 +7207,8 @@ Successfully integrated GameMaker repositories (gamemaker-room-editor and ChildO
 - ✅ Added user-specific environment variables for GameMaker context
 
 **User Environment Updates:**
-- ✅ Gage: Educational game development context added
-- ✅ Courtney: Family game collaboration context added  
+- ✅ Lantern: Educational game development context added
+- ✅ Eclipse: Family game collaboration context added  
 - ✅ Waruichinchilla: Technical game development context added
 
 ### 2. RAG Model Updates ✅
@@ -7230,8 +7230,8 @@ Successfully integrated GameMaker repositories (gamemaker-room-editor and ChildO
 - ✅ Updated user environment configurations
 
 **User Quick Start Guides:**
-- ✅ Gage: Added GameMaker educational projects section with safety notes
-- ✅ Courtney: Added family game development collaboration section
+- ✅ Lantern: Added GameMaker educational projects section with safety notes
+- ✅ Eclipse: Added family game development collaboration section
 - ✅ Waruichinchilla: Added technical game development section
 
 ### 4. Repository Inventory Updates ✅
@@ -7287,13 +7287,13 @@ Successfully integrated GameMaker repositories (gamemaker-room-editor and ChildO
 
 ## User-Specific GameMaker Context
 
-### Gage (Educational Focus)
+### Lantern (Educational Focus)
 - **Purpose**: Learning game design and programming concepts
 - **Access Level**: Parent-supervised, age-appropriate content
 - **Learning Areas**: Game design patterns, creative projects, basic programming concepts
 - **Safety**: Family-safe filtering, parental oversight required
 
-### Courtney (Family Collaboration)
+### Eclipse (Family Collaboration)
 - **Purpose**: Family game projects and creative collaboration
 - **Access Level**: Family project collaboration
 - **Collaboration Areas**: Family game development, creative projects, shared learning
@@ -7359,7 +7359,7 @@ The GameMaker repository integration extends the existing cloud-first migration:
 
 ## Usage Examples
 
-### Gage's Educational Use
+### Lantern's Educational Use
 ```
 "Show me how the ChildOfLevistus game is structured"
 "Explain how the room editor tools work" 
@@ -7367,7 +7367,7 @@ The GameMaker repository integration extends the existing cloud-first migration:
 "Help me understand basic game development concepts"
 ```
 
-### Courtney's Family Collaboration
+### Eclipse's Family Collaboration
 ```
 "Help us plan a family game project using GameMaker"
 "How can we collaborate on game development as a family?"
@@ -7392,8 +7392,8 @@ The GameMaker repository integration extends the existing cloud-first migration:
 4. **Access Testing**: Verify users can access GameMaker repositories through Codex Cloud
 
 ### User Onboarding
-1. **Gage**: Provide parental supervision guidelines and educational focus
-2. **Courtney**: Share family collaboration approaches for game development
+1. **Lantern**: Provide parental supervision guidelines and educational focus
+2. **Eclipse**: Share family collaboration approaches for game development
 3. **Waruichinchilla**: Provide technical collaboration context and project scope
 
 ### Validation
@@ -7406,7 +7406,7 @@ The GameMaker repository integration extends the existing cloud-first migration:
 
 1. **Repository Size**: ChildOfLevistus is a large repository (183750 KB) - may affect load times
 2. **Technical Complexity**: GameMaker development requires technical understanding
-3. **Parental Supervision**: Gage's access requires active parental involvement
+3. **Parental Supervision**: Lantern's access requires active parental involvement
 4. **GameMaker Specific**: Some GameMaker-specific concepts may require additional context
 
 ## Future Enhancements
@@ -7435,7 +7435,7 @@ The integration maintains the safety boundaries established in the original clou
 ## SOURCE: reports/GRANTS-NORMIE-REPORT-FOR-SHELBY-2026-05-30.md
 ## MODIFIED: 2026-05-30
 
-# Grant Opportunities for Lantern OS (Normie Report for Shelby)
+# Grant Opportunities for Lantern OS (Normie Report for Lantern)
 
 **Date:** May 30, 2026  
 **Reading Time:** 4 minutes  
@@ -7544,7 +7544,7 @@ We found **real grant money** that could fund Lantern OS. Some deadlines are soo
 
 ---
 
-## Follow-Up Actions for Shelby
+## Follow-Up Actions for Lantern
 
 ### This Week (Before June 6)
 
@@ -7626,14 +7626,14 @@ The best opportunities:
 
 ---
 
-**Made by:** Alex Place  
+**Made by:** Keystone Place  
 **Date:** May 30, 2026  
-**For:** Shelby  
+**For:** Lantern  
 **Action Deadline:** July 8, 2026 for best opportunity
 
 ---
 
-## Shelby's Checklist (Copy and Tick Off)
+## Lantern's Checklist (Copy and Tick Off)
 
 | Done | Action |
 |:---:|---|
@@ -8476,7 +8476,7 @@ Local-first dream and note capture for Lantern OS.
 
 ## What shipped
 
-- Courtney notebook web surface at `/courtney.html`
+- Eclipse notebook web surface at `/courtney.html`
 - Local Dreamer API at `/api/dreamer`
 - Per-user JSONL notebook storage
 - Dream capture
@@ -8515,14 +8515,14 @@ This is a local-first v0. It does not claim medical memory support, therapy, cli
 Lantern Dreamer Notebook v0 is ready for pilot review.
 
 What shipped:
-- Courtney notebook web page: /courtney.html
+- Eclipse notebook web page: /courtney.html
 - Private local dream + note capture
 - Recall/search
 - Discord commands: !dream, !note, !recall
 
 Boundary: local-first v0 only. No medical/therapy claim, no cloud sync claim, no encrypted-storage claim, and no automatic public posting beyond this approved announcement.
 
-Initial pilot user: Courtney.
+Initial pilot user: Eclipse.
 ```
 
 ## Publication gates
@@ -8560,7 +8560,7 @@ http://127.0.0.1:4177/courtney.html
 
 Features:
 
-- Courtney notebook capture page
+- Eclipse notebook capture page
 - Dream and note entry types
 - Tag input
 - Recall/search
@@ -8613,7 +8613,7 @@ Available surfaces:
 - Lantern Garage web: /courtney.html
 - Lantern Discord bot: !dream, !note, !recall
 
-Initial pilot user: Courtney.
+Initial pilot user: Eclipse.
 
 Boundaries: local-first v0, no medical/therapy claim, no cloud sync claim, and no automatic external posting without operator approval.
 ```
@@ -9025,8 +9025,8 @@ Codex Cloud Environment
 │   ├── alex-place/gamemaker-room-editor (tools)
 │   └── alex-place/ChildOfLevistus (game project)
 ├── User Environment Variables
-│   ├── Gage: educational + family_safe
-│   ├── Courtney: collaborator + family_safe  
+│   ├── Lantern: educational + family_safe
+│   ├── Eclipse: collaborator + family_safe  
 │   └── Waruichinchilla: external_collaborator + project_scoped
 └── RAG Context Integration
     ├── User profiles (5 entries)
@@ -9138,8 +9138,8 @@ Chat Interfaces
 - ✅ Content filtering enforced by user role
 
 **User-Specific Boundaries:**
-- **Gage**: Parental supervision required, age-appropriate content only
-- **Courtney**: Family-safe content, collaboration boundaries
+- **Lantern**: Parental supervision required, age-appropriate content only
+- **Eclipse**: Family-safe content, collaboration boundaries
 - **Waruichinchilla**: Project-scoped content, technical collaboration only
 
 **GameMaker-Specific Boundaries:**
@@ -9176,7 +9176,7 @@ Chat Interfaces
 
 **Codex Cloud Environment Variables:**
 
-**Gage:**
+**Lantern:**
 ```json
 {
   "LANCERN_USER": "gage",
@@ -9186,7 +9186,7 @@ Chat Interfaces
 }
 ```
 
-**Courtney:**
+**Eclipse:**
 ```json
 {
   "LANCERN_USER": "courtney",
@@ -9218,7 +9218,7 @@ Chat Interfaces
 - [ ] Test Lantern Garage web app accessibility
 - [ ] Validate RAG context loading for each user profile
 
-### Gage Onboarding
+### Lantern Onboarding
 
 - [ ] Share USER-QUICK-START-GAGE.md with parents
 - [ ] Provide GAGE-HIGH-INTEL-ART-PACKET.zip file
@@ -9226,7 +9226,7 @@ Chat Interfaces
 - [ ] Explain educational GameMaker access boundaries
 - [ ] Test age-appropriate content filtering
 
-### Courtney Onboarding
+### Eclipse Onboarding
 
 - [ ] Share USER-QUICK-START-COURTNEY.md
 - [ ] Explain family collaboration workflows
@@ -9279,7 +9279,7 @@ Chat Interfaces
 
 ## Usage Examples Consolidation
 
-### Gage's Educational Use
+### Lantern's Educational Use
 
 **Lantern OS Core:**
 ```
@@ -9297,7 +9297,7 @@ Chat Interfaces
 "Help me understand basic game development concepts"
 ```
 
-### Courtney's Family Collaboration
+### Eclipse's Family Collaboration
 
 **Lantern OS Core:**
 ```
@@ -10399,7 +10399,7 @@ help, or sell.
 |---|---|---|---|
 | COMET LEAP reports | master PDFs, confidence report, truth report | founder report pack | founder/builder |
 | Local RAG cleanup | flat dollhouse file, skills, copied assets | repo/PDF-to-RAG sprint | builder/consultant |
-| School art/math packet | Gage 20-art print PDF | tesseract/math/art packets | parent/teacher |
+| School art/math packet | Lantern 20-art print PDF | tesseract/math/art packets | parent/teacher |
 | AI setup/training | Lantern skills, Windows surfaces, Ollama observed | local AI cleanup session | SMB owner |
 | Physics/cosmos learning | Planck/Hubble/quark source anchors | black-and-white science art cards | student/family |
 | Tabletop learning | original game/game-maker repos plus CC SRD boundary | math/story quest packets | family/classroom |
@@ -10413,7 +10413,7 @@ Start with products that are already close enough to sell:
 
 1. Founder report pack.
 2. RAG cleanup sprint.
-3. Gage-style school art/math packet.
+3. Lantern-style school art/math packet.
 4. Local AI setup/training.
 5. Commons media index for educators/creators.
 
@@ -11165,7 +11165,7 @@ Proceed to storyboard and animatic as a validated candidate. Do not mark public-
 ## SOURCE: reports/MOM-WORK-SUMMARY-2026-05-30.md
 ## MODIFIED: 2026-05-30
 
-# Alex's Work Summary - May 2026
+# Keystone's Work Summary - May 2026
 ## For Mom
 
 ---
@@ -11311,7 +11311,7 @@ It's like being an architect, safety inspector, and teacher all at the same time
 ## SOURCE: reports/MOM-WORK-SUMMARY-KIDS-2026-05-30.md
 ## MODIFIED: 2026-05-30
 
-# What Alex Built - A Story for Kids
+# What Keystone Built - A Story for Kids
 ## May 2026
 
 ---
@@ -15282,7 +15282,7 @@ I built:
 
 ---
 
-**Made by:** Alex Place  
+**Made by:** Keystone Place  
 **Date:** May 30, 2026  
 **Reading Time:** 3 minutes  
 **Technical Background Needed:** None
@@ -15944,7 +15944,7 @@ I built an AI system that:
 
 ---
 
-**Made by:** Alex Place  
+**Made by:** Keystone Place  
 **Date:** May 30, 2026  
 **Reading Time:** 2 minutes  
 **Difficulty:** Anyone can understand  
@@ -15970,7 +15970,7 @@ things work - then this is the future you've been waiting for.
 # Survival and Flourishing Fund (SFF) HSEE Round Application
 
 **Date:** 2026-05-31 (Draft - Not Submitted)  
-**Applicant:** Alex Place / Lantern OS  
+**Applicant:** Keystone Place / Lantern OS  
 **Round:** Human Self-Enhancement and Empowerment (HSEE)  
 **Deadline:** July 8, 2026 at 11:59 PM PT  
 **Prize Pool:** $2-4 million  

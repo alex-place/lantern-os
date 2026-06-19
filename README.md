@@ -558,4 +558,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor guidelines.
 - **Live Demo:** https://lantern-os.net
 - **MCP Server:** https://mcp.lantern-os.net
 - **Issues:** [github.com/alex-place/lantern-os/issues](https://github.com/alex-place/lantern-os/issues)
-- **Email:** alex.place.7@gmail.com
+- **Contact:** open a GitHub issue

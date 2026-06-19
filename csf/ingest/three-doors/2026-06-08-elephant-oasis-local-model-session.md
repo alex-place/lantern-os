@@ -12,9 +12,9 @@ This session was played against the local lantern-csf-dream Ollama model to vali
 ## Identity & Symbolic Self
 
 [2026-06-08] - Player is the Doorwalker. Known by the fox. Green-chooser continuity intact.
-[2026-06-08] - Shelby present: black horns, fae/angel energy.
-[2026-06-08] - Courtney present: purple/hot-pink spacey bubble energy.
-[2026-06-08] - Alex present as the one who lit the first lantern.
+[2026-06-08] - Lantern present: black horns, fae/angel energy.
+[2026-06-08] - Eclipse present: purple/hot-pink spacey bubble energy.
+[2026-06-08] - Keystone present as the one who lit the first lantern.
 [2026-06-08] - The raven with silver eyes carried over from Raven Room thread — perches at water's edge.
 
 ## Dreams & Memories

@@ -355,7 +355,7 @@
       "pdfTitle": "",
       "sha256": "b2479662f532f152",
       "textLength": 775,
-      "textSnippet": "\u00a0\nPage 1 of 1\nCredit Note\nCredit Note\nE6205C63-0009-CN-01\nInvoice\nE6205C63-0009\nDate of issue May 30, 2026\nOpenAI OpCo, LLC\n1455 3rd Street\nSan Francisco, California 94158\nUnited States\nar@openai.com\nBill to\nCourtney Blasioli\n9500 Collett Rd\nlot 35\nWaynesville, Ohio 45068\nUnited States\nalex.place.7@gmail.com\n$4.12 refunded on May 30, 2026\nprorated refund: requested_by_customer\nDescription\nQty\nUnit price\nAmount\n1 seat \u00d7 ChatGPT Plus Subscription (at $20.00 / month)\nMay 5\u2013Jun 5, 2026\n$4.12\nSubtotal\n$4.12\nAdjustment total\n$4.12\nRefund issued - Visa - 5735\n$4.12\nTotal credit\n$4.12\n\u00a0\nRefund instruc"
+      "textSnippet": "[REDACTED — payment/billing PII removed from research pool]"
     },
     {
       "filename": "Developing-High-Frequency-Trading-Systems-Learn-how-to-implement-high-frequency-trading-from-scratch-with-C++or-Java-basics.pdf",
@@ -901,7 +901,7 @@
       "pdfTitle": "",
       "sha256": "3f0ed6d8d97bd12c",
       "textLength": 942,
-      "textSnippet": "\u00a0\nPage 1 of 1\nRefund\nInvoice number\nE6205C63-0009\nReceipt number 3177-5986\nDate issued\nMay 30, 2026\nOpenAI OpCo, LLC\n1455 3rd Street\nSan Francisco, California 94158\nUnited States\nar@openai.com\nBill to\nCourtney Blasioli\n9500 Collett Rd\nlot 35\nWaynesville, Ohio 45068\nUnited States\nalex.place.7@gmail.com\n$4.12 refunded on May 30, 2026\nDescription\nQty\nUnit price\nAmount\nChatGPT Plus Subscription (per seat)\nMay 5\u2013Jun 5, 2026\n1\n$20.00\n$20.00\nSubtotal\n$20.00\nTotal\n$20.00\nAmount paid\n$20.00\n(E6205C63-0009-CN-01) 1 seat \u00d7 ChatGPT Plus Subscription (at $20.00 / month)\n-$4.12\nCredited subtotal\n-$4.12\nCred"
+      "textSnippet": "[REDACTED — payment/billing PII removed from research pool]"
     },
     {
       "filename": "smartsheet-ai-whitepaper-march-2026.pdf",

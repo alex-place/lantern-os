@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-14  
 **Status:** ACCEPTED  
-**Decision Makers:** Alex Place  
+**Decision Makers:** Keystone Place  
 **Stakeholders:** Keystone agent, debug tools, Convergence IO engine
 
 ---
