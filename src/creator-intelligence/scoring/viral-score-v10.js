@@ -14,6 +14,7 @@
 "use strict";
 
 const PRIORS = require("../research/viral_patterns.json");
+const { effectivePriors } = require("./editing-priors-adapter");
 
 function clamp01(x) {
   if (!Number.isFinite(x)) return 0;
@@ -171,7 +172,10 @@ function viralScoreV10(analysis = {}) {
     captionPotential: scoreCaptionPotential(s),
   };
 
-  const w = PRIORS.weights;
+  // Weights adapt to open-video research once >25 samples exist (else baseline).
+  // Signal THRESHOLDS stay at baseline (units differ) — see the adapter.
+  const eff = effectivePriors(PRIORS);
+  const w = eff.weights;
   let viralScore = 0;
   let confWeighted = 0;
   let confWeightTotal = 0;
@@ -194,7 +198,11 @@ function viralScoreV10(analysis = {}) {
     componentScores,
     basis: "structural_heuristic",
     calibrated: false,
-    weightsSource: "research/viral_patterns.json",
+    priorInformed: eff._priorInformed,
+    priorSamples: eff._samples,
+    weightsSource: eff._priorInformed
+      ? "research/viral_patterns.json + editing_priors.json (open-video, >25 samples)"
+      : "research/viral_patterns.json",
     signals: s,
     computedAt: new Date().toISOString(),
   };

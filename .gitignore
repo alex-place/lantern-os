@@ -136,6 +136,8 @@ archive/**/worktrees/**
 # Exceptions: legitimately-named Creator V10 source + docs + Σ₀ spectral modules
 !docs/creator-v10/**
 !apps/lantern-garage/lib/safe-zone-v2.js
+!apps/lantern-garage/lib/safe-zone-v3.js
+!apps/lantern-garage/lib/facecam-v3.js
 !apps/lantern-garage/lib/caption-engine-v3.js
 !apps/lantern-garage/lib/variant-engine-v2.js
 !apps/lantern-garage/lib/spectral-analyzer.js
@@ -244,3 +246,12 @@ models/*/adapters/
 
 # per-user CSF profile archives (user data — privacy)
 data/profiles/*.csf
+
+# Open-video research: per-machine extracted features (never videos)
+research/open_video/features/*.jsonl
+
+# Open-video research: generated SQLite corpus (regenerate with --corpus)
+research/corpus.db
+
+# Facecam V3 debug overlay (generated)
+facecam-debug.png

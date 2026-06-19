@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "=== Windsurf Developer GitHub Pages Deployment ===" -ForegroundColor Cyan
 
 # Navigate to repository
-Set-Location "d:\tmp\lantern-os"
+Set-Location (Split-Path $PSScriptRoot -Parent)
 
 Write-Host "Current directory: $(Get-Location)" -ForegroundColor Green
 Write-Host ""

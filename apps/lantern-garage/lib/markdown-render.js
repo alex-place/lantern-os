@@ -102,6 +102,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} — Lantern OS</title>
   <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/narrator.css">
   <style>
     .md-page { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
     .md-page h1 { font-size: 2rem; font-weight: 800; margin: 0 0 12px; line-height: 1.15; }
@@ -137,7 +138,9 @@ function renderMarkdownDocument(markdown, sourcePath) {
 
 <div class="md-page">
   <div class="md-source">${escapeHtml(sourcePath)}</div>
+  <article data-narrate>
   ${body.join("\n")}
+  </article>
 </div>
 
 <footer class="site-footer">
@@ -148,6 +151,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
 </footer>
 
 <script src="/js/theme-toggle.js"></script>
+<script src="/js/narrator.js" defer></script>
 </body>
 </html>`;
 }

@@ -15,8 +15,9 @@ const PUBLIC_PAGES = {
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",
   "/knowledgecenter.html":"knowledgecenter.html",
-  // Public so first-time visitors reach the chat without a Patreon account (#739).
-  // Guests get a limited read-only experience; per-role limits/models still apply.
+  // Primary interface: the chat must be reachable without a Patreon login so the
+  // "no account needed" promise holds (#739). dream-chat.html handles the guest
+  // session client-side (defaults to { authenticated:false, role:"guest" }).
   "/dream-chat.html":     "dream-chat.html",
 };
 

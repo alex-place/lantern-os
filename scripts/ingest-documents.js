@@ -177,8 +177,10 @@ async function ingestDocuments(sourceDir, repoRoot = null) {
   return stats;
 }
 
-// CLI entry point
-const sourceDir = process.argv[2] || 'D:\\tmp\\imagesandreports';
+// CLI entry point. Source dir: pass as arg 2, or set LANTERN_INGEST_DIR;
+// defaults to a repo-relative folder (no hardcoded drive).
+const sourceDir = process.argv[2] || process.env.LANTERN_INGEST_DIR
+  || path.join(__dirname, '..', 'data', 'imagesandreports');
 ingestDocuments(sourceDir).catch(err => {
   console.error(`Fatal error: ${err.message}`);
   process.exit(1);

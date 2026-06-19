@@ -1,0 +1,12 @@
+{
+  "_comment": "Learned highlight priors from open-license video. Regenerate: node scripts/open-video-research.js --highlight-priors",
+  "samples": 35,
+  "updatedAt": "2026-06-19T02:39:20.870Z",
+  "best_motion_range": [
+    0.04,
+    0.162
+  ],
+  "best_cut_frequency": 4.967,
+  "best_audio_peak_rate": 0,
+  "median_cut_gap_sec": 0.2
+}

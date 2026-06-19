@@ -8,8 +8,15 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.lib.colors import black, grey, white, HexColor
 
-INPUT = r'D:\tmp\lantern-os\docs\CSF-FORMAT-SPECIFICATION.md'
-OUTPUT = r'D:\tmp\lantern-os\docs\CSF-FORMAT-SPECIFICATION.pdf'
+import os
+
+# Read the spec from the repo; write the generated PDF to the user's Documents
+# (override the docs target with LANTERN_DOCS_DIR).
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DOCS_DIR = os.environ.get("LANTERN_DOCS_DIR", os.path.join(os.path.expanduser("~"), "Documents", "Lantern"))
+os.makedirs(DOCS_DIR, exist_ok=True)
+INPUT = os.path.join(REPO_ROOT, 'docs', 'CSF-FORMAT-SPECIFICATION.md')
+OUTPUT = os.path.join(DOCS_DIR, 'CSF-FORMAT-SPECIFICATION.pdf')
 
 with open(INPUT, 'r', encoding='utf-8') as f:
     lines = f.readlines()

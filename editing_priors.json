@@ -1,0 +1,12 @@
+{
+  "_comment": "Editing priors learned from open-license / public-domain video (OBSERVABLE signals only). Regenerate after collecting features: `node scripts/open-video-research.js --aggregate`. Until samples > 0 every value is null and the editor uses its built-in defaults — these are NOT measured findings, just an empty store with the schema.",
+  "samples": 0,
+  "updatedAt": null,
+  "opening_hook_strength": null,
+  "avg_cut_rate": null,
+  "motion_target": null,
+  "motion_variance": null,
+  "avg_audio_peaks": null,
+  "facecam": null,
+  "facecam_distribution": {}
+}

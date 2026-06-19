@@ -1,7 +1,7 @@
 # Kingdome of Hearts — Three Doors Lore Expansion
 
 **CSF Ingest Date:** 2026-06-09
-**Source:** Founder direct session + Shelby Elephant Door anchor memory + Three Doors runtime canon
+**Source:** Founder direct session + Lantern Elephant Door anchor memory + Three Doors runtime canon
 **Status:** Design contract with partial implementation
 
 ---
@@ -14,7 +14,7 @@
 
 The **Kingdome of Hearts** is a new narrative hub in the Three Doors game. It transforms the existing linear scene progression into a **hub-and-spoke architecture** where the Garden at the Beginning acts as a central nexus, with seven thematic doors radiating outward.
 
-The founder (Alex) envisions themselves as **the King** — not as power over others, but as the one who holds the gate and asks the question.
+The founder (Keystone) envisions themselves as **the King** — not as power over others, but as the one who holds the gate and asks the question.
 
 ---
 
@@ -141,7 +141,7 @@ A Doorwalker who returns to the Garden and answers truly wins the game. Converge
 - `skills/three-doors-game/SKILL.md` — core game rules, tone, continuity, CSF export format
 - `csf/ingest/three-doors/2026-06-04-lantern-consolidate.md` — original game contract
 - `csf/ingest/three-doors/2026-06-05-three-doors-game.md` — Doorwalker identity, fox companion, Moss Door origin
-- `csf/ingest/2026-06-06-elephant-door-memories.md` — Shelby's Elephant Door anchor memory
+- `csf/ingest/2026-06-06-elephant-door-memories.md` — Lantern's Elephant Door anchor memory
 - `csf/ingest/2026-06-08-fuzzy-testing-three-doors-bugfixes.md` — game engine validation
 
 ### Art & Image Assets

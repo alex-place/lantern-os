@@ -131,12 +131,19 @@ function fallbackHighlights(analysis) {
 
 function generateVariantsV10(analysis = {}, opts = {}) {
   let highlights = Array.isArray(analysis.highlights) ? analysis.highlights : [];
-  // HARD GUARANTEE: never build empty variants. If there are no highlights,
-  // degrade gracefully to fallback windows so every variant carries segments.
+  // HARD GUARANTEE: never build empty (or single-segment) variants. We aim for
+  // at least 2 segments so a Short always has structure; if real highlights are
+  // short, top up with explicitly-tagged fallback windows (never fabricating
+  // quality — they score 0.5 and carry the "fallback" tag). Best-effort: a clip
+  // too short to yield a 2nd window stays as-is.
   let usedFallback = false;
-  if (highlights.length === 0) {
-    highlights = fallbackHighlights(analysis);
-    usedFallback = highlights.length > 0;
+  const realCount = highlights.length;
+  if (highlights.length < 2) {
+    for (const f of fallbackHighlights(analysis)) {
+      if (highlights.length >= 2) break;
+      if (!highlights.some((h) => Math.abs((h.start || 0) - f.start) < 1)) highlights.push(f);
+    }
+    usedFallback = highlights.length > realCount;
   }
   const targetSec = Math.min(MAX_TARGET_SEC, opts.targetSec || DEFAULT_TARGET_SEC);
 

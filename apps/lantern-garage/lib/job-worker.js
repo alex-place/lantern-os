@@ -8,7 +8,9 @@ const { analyzeVideoForHighlights } = require("./highlight-engine");
 const { generateCaptions } = require("./caption-engine");
 const { detectSafeZones } = require("./safe-zone-detector");
 const { reencodeToShortForm, renderSegments, probeSource, burnCaptionsToVideo } = require("./video-export");
-const { analyzeForCrop } = require("./safe-zone-v2");
+// Facecam V3-aware crop analysis: same plan as safe-zone-v2 but with the facecam
+// region upgraded by the thorough multi-window detector (falls back to v2 on error).
+const { analyzeForCropV3: analyzeForCrop } = require("./safe-zone-v3");
 const ci = require("../../../src/creator-intelligence");
 
 // Stage manifests — defines named stages and their progress weight for each job type.
@@ -519,9 +521,13 @@ async function processExportJob(job, repoRoot, ctx) {
         cropPlan = { status: "unavailable", note: "fell back to center crop", reason: "source dimensions unknown (probe failed)" };
         ctx.log("Safe-zone detection unavailable — falling back to center crop");
       } else {
+        let _fcg = job.input.facecamGuidance || null;
+        if (!_fcg && job.input.entryId) { try { _fcg = require("./entry-store").getEntry(repoRoot, job.input.entryId)?.facecamGuidance || null; } catch {} }
+        if (_fcg) ctx.log(`Applying facecam guidance: ${_fcg}`);
         const plan = await analyzeForCrop(fullPath, {
           srcWidth: meta.width,
           srcHeight: meta.height,
+          facecamGuidance: _fcg,
         });
         if (plan.status === "ok") {
           if (plan.cropPlan && plan.cropPlan.mode === "horizontal") {
@@ -764,7 +770,10 @@ async function processSafeZonesJob(job, repoRoot, ctx) {
     result = { status: "unavailable", reason: "source dimensions unknown (probe failed)" };
     ctx.log("Detection unavailable — source dimensions unknown");
   } else {
-    const plan = await analyzeForCrop(fullPath, { srcWidth: meta.width, srcHeight: meta.height });
+    let _fcg = job.input.facecamGuidance || null;
+    if (!_fcg && job.input.entryId) { try { _fcg = require("./entry-store").getEntry(repoRoot, job.input.entryId)?.facecamGuidance || null; } catch {} }
+    if (_fcg) ctx.log(`Applying facecam guidance: ${_fcg}`);
+    const plan = await analyzeForCrop(fullPath, { srcWidth: meta.width, srcHeight: meta.height, facecamGuidance: _fcg });
     result = plan; // { status, regions, cropPlan, framesSampled, ... } — honest "unavailable" when detection fails
     const regionCount = Array.isArray(plan.regions) ? plan.regions.length : 0;
     ctx.log(`Detection complete — ${regionCount} region(s) found (${plan.framesSampled || 0} frames sampled)`);

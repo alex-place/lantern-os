@@ -23,7 +23,7 @@ Examples of unacceptable behavior:
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to alex.place.7@gmail.com. All reports will be reviewed and investigated promptly. The project team is obligated to maintain confidentiality.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported via a GitHub issue. All reports will be reviewed and investigated promptly. The project team is obligated to maintain confidentiality.
 
 ## Attribution
 

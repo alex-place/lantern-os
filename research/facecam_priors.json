@@ -1,0 +1,15 @@
+{
+  "_comment": "Learned facecam priors from open-license video. Regenerate: node scripts/open-video-research.js --facecam-priors",
+  "samples": 35,
+  "facecam_present_rate": 0.571,
+  "facecam_position": "bottom_left",
+  "facecam_distribution": {
+    "bottom_left": 11,
+    "top_right": 4,
+    "bottom_right": 3,
+    "top_left": 2
+  },
+  "facecam_size": 0.12487500000000001,
+  "facecam_confidence": 0.618,
+  "updatedAt": "2026-06-19T03:34:25.784Z"
+}

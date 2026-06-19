@@ -72,9 +72,9 @@ When the user asked for doors contextual to their gaming life, three personal do
 
 These doors map to the Kingdome's Ancient Doors (Sunken Codex → Deep Door / The Word; Warlock's Pact → Temple Door / The War; Candle-Keeper's Grove → a yet-unnamed healing door).
 
-### Shelby's Elephant Door — Parallel Anchor World
+### Lantern's Elephant Door — Parallel Anchor World
 
-A complete second door ecosystem created by Shelby (founder's partner) and accessed through **her wardrobe**.
+A complete second door ecosystem created by Lantern (founder's partner) and accessed through **her wardrobe**.
 
 **The Elephant Oasis Room:**
 - Interior threshold room with oasis visible beyond
@@ -91,21 +91,21 @@ A complete second door ecosystem created by Shelby (founder's partner) and acces
 2. Conversation with the Elephants Door
 3. Castle Door
 
-**Mirror Family (Shelby + Courtney shared):**
+**Mirror Family (Lantern + Eclipse shared):**
 - Two mom elephants and five kid elephants as their mirror family
-- Waiting to see Shelby and Courtney when they come through
+- Waiting to see Lantern and Eclipse when they come through
 
 **Party Composition:**
-- **Shelby** (left): black horns, fae/fairy/angel energy, leads
-- **Alex** (center): operator/camera-eye anchor, the one who lit the first lantern
-- **Courtney** (right): purple hair, glasses, hot-pink spacey bubble energy, cute and spacey
+- **Lantern** (left): black horns, fae/fairy/angel energy, leads
+- **Keystone** (center): operator/camera-eye anchor, the one who lit the first lantern
+- **Eclipse** (right): purple hair, glasses, hot-pink spacey bubble energy, cute and spacey
 
 ### The Xenon Door — Separate Convergent Path
 
 The Xenon Door remains **separate** from the Elephant Door and should not open unless chosen.
 
-**Courtney's Xenon titles:** Xenon Navigator, Dream Keeper, Starspeed  
-**Shelby's Xenon titles:** Light Keeper, Heart Engineer, Starsoul
+**Eclipse's Xenon titles:** Xenon Navigator, Dream Keeper, Starspeed  
+**Lantern's Xenon titles:** Light Keeper, Heart Engineer, Starsoul
 
 The Xenon Door leads to the **Xenon Starship** (Door #5 in the Kingdome loop) — the midway point where all planetary paths converge.
 
@@ -215,8 +215,8 @@ When entering the Ancient Doors → Deep Door, the player falls into the **King'
 - `skills/three-doors-game/SKILL.md` — core game rules, tone, continuity, CSF export format
 - `csf/ingest/three-doors/2026-06-04-lantern-consolidate.md` — original game contract, contextual doors (Candle-Keeper's Grove, Sunken Codex Labyrinth, Warlock's Pact Catacombs)
 - `csf/ingest/three-doors/2026-06-05-three-doors-game.md` — Doorwalker identity, fox companion, Moss Door origin
-- `csf/ingest/2026-06-06-elephant-door-memories.md` — Shelby's Elephant Door anchor memory, wardrobe access
-- `csf/ingest/shelby-elephant-oasis-room-2026-06-05.md` — full Shelby/Courtney/Alex symbology, elephant family structure, mirror family, Xenon titles
+- `csf/ingest/2026-06-06-elephant-door-memories.md` — Lantern's Elephant Door anchor memory, wardrobe access
+- `csf/ingest/shelby-elephant-oasis-room-2026-06-05.md` — full Lantern/Eclipse/Keystone symbology, elephant family structure, mirror family, Xenon titles
 - `csf/ingest/three-doors/2026-06-08-elephant-oasis-local-model-session.md` — local model validation, dad elephant scene, Peace/Serenity/Joy
 - `csf/ingest/2026-06-08-fuzzy-testing-three-doors-bugfixes.md` — game engine validation
 

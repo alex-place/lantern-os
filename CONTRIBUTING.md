@@ -68,7 +68,7 @@ Run: `python -m pytest tests/ -q --tb=short`
 
 - General questions: Open a GitHub Discussion
 - Security issues: See SECURITY.md
-- Email: alex.place.7@gmail.com
+- Contact: open a GitHub issue
 
 ---
 

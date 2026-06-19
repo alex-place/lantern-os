@@ -92,6 +92,7 @@ module.exports = async function creatorEntriesRoutes(req, res, url, deps) {
         tags: body.tags,
         type: body.type || "video",
         filePath: body.filePath,
+        facecamGuidance: body.facecamGuidance, // optional creator hint
       });
 
       // Generate thumbnail in background (non-blocking)

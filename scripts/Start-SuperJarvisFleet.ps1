@@ -71,7 +71,7 @@ $fleetStatus = [pscustomobject]@{
             role = $_.role
             state = $state
             step = $_.step
-            worktree = "D:\tmp\lantern-os"
+            worktree = (Split-Path $PSScriptRoot -Parent)
             branch = "master"
         }
     })
