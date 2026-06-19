@@ -1,0 +1,307 @@
+{
+  "issue": 658,
+  "description": "Sigma0^-1 anti-collapse prevention rate measured over an alpha x non-normality x noise grid, with a fixed underdetermined (3-dim null) Jacobian structure",
+  "config": {
+    "dim": 4,
+    "batch": 8,
+    "steps": 30,
+    "dt": 0.05,
+    "trials_per_cell": 20,
+    "excite_strength": 0.5,
+    "init_scale": 0.01,
+    "null_dim": 3,
+    "base_seed": 20260619,
+    "alphas": [
+      -0.5,
+      -0.2,
+      -0.05
+    ],
+    "non_normalities": [
+      0.0,
+      0.5,
+      1.0
+    ],
+    "noises": [
+      0.01,
+      0.05,
+      0.2
+    ]
+  },
+  "headline_conditional_prevention_rate": 1.0,
+  "conditional_note": "prevention rate over trials that ACTUALLY collapse without Sigma0^-1; cells that never collapse are excluded (cannot demonstrate prevention)",
+  "collapse_prone_trials_total": 180,
+  "collapse_prone_cells": 9,
+  "total_cells": 27,
+  "cells": [
+    {
+      "alpha": -0.5,
+      "non_normality": 0.0,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 0.0,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 0.0,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 0.5,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 0.5,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 0.5,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 1.0,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 1.0,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.5,
+      "non_normality": 1.0,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 0.0,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 0.0,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 0.0,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 0.5,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 0.5,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 0.5,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 1.0,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 1.0,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.2,
+      "non_normality": 1.0,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 0.0,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 0.0,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 0.0,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 1.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 20,
+      "prevented_among_prone": 20
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 0.5,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 0.5,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 0.5,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 1.0,
+      "noise": 0.01,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 1.0,
+      "noise": 0.05,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    },
+    {
+      "alpha": -0.05,
+      "non_normality": 1.0,
+      "noise": 0.2,
+      "n_trials": 20,
+      "collapse_rate_without_anti": 0.0,
+      "prevention_rate_with_anti": 1.0,
+      "collapse_prone_trials": 0,
+      "prevented_among_prone": 0
+    }
+  ]
+}

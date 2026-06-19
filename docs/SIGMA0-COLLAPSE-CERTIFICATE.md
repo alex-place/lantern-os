@@ -43,10 +43,11 @@ status cannot silently drift.
 - [#508] — `.md`/`.tex` status-box reconcile pass.
 
 **Open (the deterministic next gaps — what this pass re-tracks):**
-- [#658] — **§3 sufficiency.** Σ₀⁻¹ is HEURISTIC with N=1 evidence; no theorem says it *prevents* collapse. Upgrade via proof under explicit hypotheses, or a regime sweep to MEASURED-over-distribution. *(In progress: `experiments/sigma0_regime_sweep.py` measures the prevention rate over an α × non-normality × noise grid.)*
+- [#658] — **§3 sufficiency (downgraded).** Σ₀⁻¹ was N=1 HEURISTIC; the regime sweep below upgrades it to MEASURED-over-distribution (option b). A closed-form *sufficiency theorem* (option a) remains the only residual.
 - [#660] — **housekeeping.** Reconcile the persistent-excitation attribution across `.md`/`.tex`, and verify all web citations before formal publication.
 
 **Resolved (landed 2026-06-19):**
+- [#658] — **§3 evidence upgraded N=1 → MEASURED.** `experiments/sigma0_regime_sweep.py` runs a forced-collapse rollout with/without Σ₀⁻¹ over an α × non-normality × noise grid with a fixed underdetermined (3-dim null) Jacobian. Over **180 trials that genuinely collapse without protection**, Σ₀⁻¹ suppressed collapse AND re-excited the state in **100%** (`data/sigma0_regime_sweep_report.json`). Honest caveat: in this construction the non-normal off-diagonal lifts the Jacobian's effective rank, so the collapse-prone cells are the diagonal ones (non_normality=0); the measured distribution spans α∈{−0.5,−0.2,−0.05} × noise∈{0.01,0.05,0.2}. The §3 label moves from N=1 HEURISTIC to MEASURED; a sufficiency theorem is still future work.
 - [#657] — **§4 residual CLOSED.** The engine no longer self-observes; `forward_step` runs a Kalman predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration stays consistent (NIS≈m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS — the canary fires under collapse. `test_surprise_monitor_integration` flipped `xfail` → hard pass (30 passed). *This was the last open technical gap in the Σ₀ machinery.*
 - [#659] — **§4 decision CLOSED (RETIRED).** `p_gate`/`p_unbounded` formally retired, superseded by the `surprise.py` NIS canary; never implemented in `collapse.py` and will not be.
 
