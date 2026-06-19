@@ -1,8 +1,8 @@
-// ── Three Doors Lantern Conversation ───────────────────────────────────────────
-// Freeform conversation with Lantern — the guide answers mid-scene
+// ── Three Doors Keystone Conversation ───────────────────────────────────────────
+// Freeform conversation with Keystone — the guide answers mid-scene
 // Depends on three-doors-data.js for SCENES
 
-// ── Freeform conversation with Lantern — the guide answers mid-scene ──
+// ── Freeform conversation with Keystone — the guide answers mid-scene ──
 const lanternHistory = [];
 let lanternBusy = false;
 
@@ -13,7 +13,7 @@ async function askLantern(text) {
   appendUserMsg(esc(text));
   appendTyping();
 
-  // First history entry anchors Lantern in the current scene
+  // First history entry anchors Keystone in the current scene
   const sceneText = (SCENES[gameState?.scene_key]?.text || gameState?.text || "")
     .replace(/\*\*/g, "").replace(/\*/g, "").slice(0, 300);
   const sceneCtx = {
@@ -79,7 +79,7 @@ async function askLantern(text) {
     const chat = document.getElementById("chat");
     const el = document.createElement("div");
     el.className = "message agent";
-    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content"><em>Lantern's flame flickers — it can't find words right now. Try again, or choose a door.</em></div>`;
+    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content"><em>Keystone's flame flickers — it can't find words right now. Try again, or choose a door.</em></div>`;
     chat.appendChild(el);
     chat.scrollTop = chat.scrollHeight;
   } else {

@@ -185,7 +185,7 @@ async function testWebSearch() {
     const r = await fetch('http://127.0.0.1:8772/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'Lantern OS', max_results: 3 } } }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'Keystone OS', max_results: 3 } } }),
     });
     const data = await r.json();
     if (data.result && data.result.success) {
@@ -426,7 +426,7 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text || isSending) return;
 
-  // Three-doors game lives on its own page now — Lantern guides there, not in chat
+  // Three-doors game lives on its own page now — Keystone guides there, not in chat
   const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts|explore)\b/i);
   if (kingdomeMatch) {
     input.value = '';

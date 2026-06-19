@@ -8,7 +8,7 @@ function initializeSharedHeader() {
       <div class="global-nav-inner">
         <a class="global-nav-brand" href="/">
           <img src="/mandala.svg" alt="" aria-hidden="true">
-          <span>Lantern OS</span>
+          <span>Keystone OS</span>
         </a>
 
         <div class="global-nav-center">
@@ -37,7 +37,7 @@ function initializeSharedHeader() {
         <span class="global-footer-brand">
           <span class="dot online" id="status-dot" title="Server status" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:8px;vertical-align:middle"></span>
           <span class="mandala-icon" aria-hidden="true" style="display:inline-block;margin-right:4px">⬡</span>
-          Lantern OS
+          Keystone OS
         </span>
         <span class="global-footer-sep">·</span>
         <a href="/">Home</a>

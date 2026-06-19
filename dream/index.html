@@ -66,7 +66,7 @@
     /* Fallback: allow scroll only on very short viewports */
     @media (max-height: 560px) { body { overflow: auto; } .home-main { justify-content: flex-start; } }
   </style>
-  <title>Lantern OS</title>
+  <title>Keystone OS</title>
 </head>
 <body>
 
@@ -77,7 +77,7 @@
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-    <span style="font-size:18px;font-weight:600">Lantern OS</span>
+    <span style="font-size:18px;font-weight:600">Keystone OS</span>
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Journal</a>
@@ -86,7 +86,7 @@
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
     <span class="sep" style="margin: 0 4px;">·</span>
-    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a>
+    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -100,8 +100,8 @@
   <!-- ── Hero ── -->
   <div class="hero">
     <img src="/sigma0-mandala.svg" class="hero-bg" aria-hidden="true" alt="">
-    <h1>Chat with Keystone. Trade with Eclipse. Create with Lantern.</h1>
-    <p class="tagline" id="hero-tagline">Lantern OS is a desktop cockpit for Windows and Linux — a context-aware command center that organizes work, tracks market signals, powers creator tools, and routes your next best action.</p>
+    <h1>Chat with Keystone. Trade with Eclipse. Create with Keystone.</h1>
+    <p class="tagline" id="hero-tagline">Keystone OS is a desktop cockpit for Windows and Linux — a context-aware command center that organizes work, tracks market signals, powers creator tools, and routes your next best action.</p>
     <div class="hero-cta-row">
       <a class="btn-primary" href="/dream-chat.html">✦ Keystone Chat</a>
     </div>
@@ -112,14 +112,14 @@
   <div class="home-tiles">
     <a class="panel" href="/trader-dashboard.html">
       <span class="panel-icon">📈</span>
-      <h2>Lantern Trader</h2>
+      <h2>Keystone Trader</h2>
       <span class="panel-label">Trade</span>
       <p>Stocks, prediction markets, and market news.</p>
       <span class="panel-arrow">Open Trader →</span>
     </a>
     <a class="panel" href="/create.html">
       <span class="panel-icon">✏️</span>
-      <h2>Lantern Create</h2>
+      <h2>Keystone Create</h2>
       <span class="panel-label">Create</span>
       <p>Upload and organize your creative work.</p>
       <span class="panel-arrow">Start Creating →</span>
@@ -140,7 +140,7 @@
   <div class="footer-inner">
     <span class="footer-brand">
       <span class="dot online" id="status-dot" title="Server status"></span>
-      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Lantern OS
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
     </span>
     <span class="sep">·</span>
     <a href="/">Home</a>
@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('hero-edition').textContent = 'Orion Edition · ' + branch;
     $('hero-git').textContent = shortCommit + (commitDate ? ' · ' + commitDate : '');
-    $('status-right').textContent = 'Lantern OS · ' + branch + ' · ' + v;
+    $('status-right').textContent = 'Keystone OS · ' + branch + ' · ' + v;
 
     // Version badges
     document.querySelectorAll('[data-version-badge]').forEach(el => {
@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }).join('<br>');
       $('nodes-list').innerHTML = nodeHTML;
     } else {
-      $('nodes-status').textContent = 'No nodes registered yet. Machines running Lantern OS will appear here.';
+      $('nodes-status').textContent = 'No nodes registered yet. Machines running Keystone OS will appear here.';
       $('nodes-list').innerHTML = '';
     }
 

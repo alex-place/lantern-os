@@ -176,7 +176,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     </div>
     <div class="message-content">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:4px">
-        Lantern ${sourceBadge}
+        Keystone ${sourceBadge}
       </div>
       ${breadcrumb}
       <div class="scene-image">
@@ -186,7 +186,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
         <div class="sd-badge">SD prompt — hover to copy</div>
       </div>
       <div id="${descId}" style="font-size:14px;line-height:1.6;margin-bottom:10px">${md(displayText)}</div>
-      ${foxPresent ? `<div class="fox-line">🏮 Lantern, your guide, is with you.</div>` : ""}
+      ${foxPresent ? `<div class="fox-line">🏮 Keystone, your guide, is with you.</div>` : ""}
       ${doorHTML}
     </div>`;
 
@@ -336,7 +336,7 @@ async function refreshSceneText(sceneKey, textEl) {
   const archetype = scene.archetype || "mystical";
   const history = (gameState?.history || []).filter(h => h.startsWith("Chose ")).slice(-3).join(", ") || "just arrived";
   const loopNote = loopCount > 0 ? ` Loop ${loopCount + 1} — the space feels rewritten, familiar but altered.` : "";
-  const prompt = `You are Lantern, the dreaming guide. Describe the scene "${sceneKey}" (archetype: ${archetype}) in 3 evocative sentences. The dreamer arrived via: ${history}.${loopNote} Be symbolic and sensory — never the same twice. End on a threshold feeling. Scene core: ${scene.text.replace(/\*\*/g,"").replace(/\*/g,"").slice(0,200)}`;
+  const prompt = `You are Keystone, the dreaming guide. Describe the scene "${sceneKey}" (archetype: ${archetype}) in 3 evocative sentences. The dreamer arrived via: ${history}.${loopNote} Be symbolic and sensory — never the same twice. End on a threshold feeling. Scene core: ${scene.text.replace(/\*\*/g,"").replace(/\*/g,"").slice(0,200)}`;
   const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), 20000);
   try {

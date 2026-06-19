@@ -46,7 +46,7 @@
     media: "🎬 Media search",
   };
 
-  // Agent is contextual — Lantern is default, others triggered by name in message
+  // Agent is contextual — Keystone is default, others triggered by name in message
   function detectAgent(msg) {
     const lower = (msg || "").toLowerCase();
     if (lower.includes("keystone") || lower.includes("debug")) return "keystone";
@@ -156,7 +156,7 @@
     .then(v => {
       if (v?.version) {
         const el = document.getElementById("app-version");
-        if (el) el.textContent = `Lantern OS v${v.version} · private · local`;
+        if (el) el.textContent = `Keystone OS v${v.version} · private · local`;
       }
     })
     .catch(() => {});
@@ -212,7 +212,7 @@
         const row = document.createElement("div");
         row.className = `msg-row ${isUser ? "user" : "agent"}`;
         const time = entry.recordedAt ? new Date(entry.recordedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Lantern"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
+        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Keystone"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
         fragment.appendChild(row);
       }
       messagesEl.appendChild(fragment);
@@ -472,7 +472,7 @@
     sendBtn.disabled = true;
     setThinking(true);
 
-    const agentName = directModeEnabled ? "Model" : (agents.find((a) => a.id === detectAgent(message))?.name || "Lantern");
+    const agentName = directModeEnabled ? "Model" : (agents.find((a) => a.id === detectAgent(message))?.name || "Keystone");
     const msgTime = new Date();
     const row = document.createElement("div");
     row.className = "msg-row agent";
@@ -775,11 +775,20 @@
       const turn = conversationHistory.filter(m => m.role === "assistant").length;
       const latStr = latency ? `${(latency / 1000).toFixed(1)}s` : null;
       const isErr = source === "failed" || source === "unavailable" || source === "error" || !!error;
-      // Route signature — who/what the user is talking to
+      // Route signature — who/what the user is talking to.
+      // A degraded route (cloud unreachable → weak local model, issue #740) is
+      // flagged in amber so the user knows the answer came from the fallback and
+      // can weigh it accordingly, instead of trusting an off-tone local reply.
       if (routeLabel) {
+        const isDegraded = /degraded/i.test(routeLabel);
         const sig = document.createElement("div");
-        sig.className = "msg-route-sig";
+        sig.className = isDegraded ? "msg-route-sig degraded" : "msg-route-sig";
         sig.setAttribute("aria-label", `Active route: ${routeLabel}`);
+        if (isDegraded) {
+          sig.setAttribute("role", "status");
+          sig.style.color = "#f59e0b";
+          sig.style.fontWeight = "600";
+        }
         sig.textContent = routeLabel;
         row.appendChild(sig);
       }
@@ -873,7 +882,7 @@
       logBtn.onclick = async () => {
         logBtn.disabled = true;
         logBtn.textContent = "Saving…";
-        const fullConv = conversationHistory.map(h => `${h.role === "user" ? "You" : "Lantern"}: ${h.text}`).join("\n");
+        const fullConv = conversationHistory.map(h => `${h.role === "user" ? "You" : "Keystone"}: ${h.text}`).join("\n");
         try {
           const r = await fetch(`${serverBase}/api/dream/create`, {
             method: "POST",
