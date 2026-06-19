@@ -438,18 +438,24 @@
     }
   }
 
-  // Wrap sendMessage so locked visitors cannot bypass the disabled input in DevTools.
-  const originalSendMessage = window.sendMessage;
-  window.sendMessage = function gatedSendMessage(...args) {
-    const role = normalizeRole(lanternSession.role);
-    if (!LANTERN_ROLES[role].canChat) {
-      loginWithPatreon();
-      return;
-    }
-    if (typeof originalSendMessage === "function") {
-      return originalSendMessage.apply(this, args);
-    }
-  };
+  // Gate sendMessage so visitors without chat access cannot send (defense-in-depth;
+  // real limits are also enforced server-side). Installed on `load` so it wraps the
+  // FINAL sendMessage: dream-chat-ui.js defines window.sendMessage and
+  // convergance-sync.js wraps it — both AFTER this inline script runs. The previous
+  // version captured window.sendMessage here (still undefined) and was then
+  // overwritten by those later scripts, leaving chat completely ungated.
+  window.addEventListener("load", () => {
+    const realSendMessage = window.sendMessage;
+    if (typeof realSendMessage !== "function") return;
+    window.sendMessage = function gatedSendMessage(...args) {
+      const role = normalizeRole(lanternSession.role);
+      if (!LANTERN_ROLES[role].canChat) {
+        loginWithPatreon();
+        return;
+      }
+      return realSendMessage.apply(this, args);
+    };
+  });
 
   async function updateAuthUI() {
     try {

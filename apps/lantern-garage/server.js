@@ -3,6 +3,36 @@ const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
 
+// ── Dependency preflight ───────────────────────────────────────────────────
+// When `git pull` adds a dependency to package.json but `npm install` hasn't run
+// yet, startup otherwise dies with a raw "Cannot find module 'x'" stack trace
+// (e.g. busboy via routes/pdfs.js). Surface an actionable message instead.
+(function preflightDependencies() {
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
+  } catch {
+    return; // no/unreadable manifest → nothing to check
+  }
+  const missing = [];
+  for (const dep of Object.keys(pkg.dependencies || {})) {
+    try {
+      require.resolve(dep);
+    } catch (e) {
+      // Only a genuinely absent package is MODULE_NOT_FOUND. Other resolve errors
+      // (e.g. ERR_PACKAGE_PATH_NOT_EXPORTED) mean the package IS installed.
+      if (e && e.code === "MODULE_NOT_FOUND") missing.push(dep);
+    }
+  }
+  if (missing.length) {
+    console.error(
+      `\n[startup] Missing ${missing.length} dependenc${missing.length === 1 ? "y" : "ies"}: ${missing.join(", ")}` +
+      `\n[startup] Run:  npm install --prefix apps/lantern-garage\n`
+    );
+    process.exit(1);
+  }
+})();
+
 // Load .env.local then .env from repo root (two levels up from apps/lantern-garage/)
 // .env.local ALWAYS overrides system env — .env only sets if not already present
 const candidateEnvFiles = [
