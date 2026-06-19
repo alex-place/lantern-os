@@ -440,7 +440,8 @@
 .msg-route-sig {
   font-size: 0.68rem;
   color: var(--accent, #e2c97e);
-  opacity: 0.7;
+  opacity: 1;
+  font-weight: 500;
   padding: 2px 8px;
   align-self: flex-start;
   letter-spacing: 0.04em;

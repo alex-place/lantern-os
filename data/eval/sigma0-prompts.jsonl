@@ -1,0 +1,10 @@
+{"id": 1, "prompt": "What is 2+2? Answer with the number only.", "expected": "4"}
+{"id": 2, "prompt": "What is the capital of France? One word.", "expected": "Paris"}
+{"id": 3, "prompt": "Name the largest planet in our solar system. One word.", "expected": "Jupiter"}
+{"id": 4, "prompt": "The opposite of 'hot' is ___. One word.", "expected": "cold"}
+{"id": 5, "prompt": "A train travels 60 miles in 1 hour. How far in 2 hours? Number + unit.", "expected": "120 miles"}
+{"id": 6, "prompt": "List three primary colors.", "expected": "red, blue, yellow"}
+{"id": 7, "prompt": "What does CPU stand for?", "expected": "Central Processing Unit"}
+{"id": 8, "prompt": "Translate 'hello' to Spanish. One word.", "expected": "hola"}
+{"id": 9, "prompt": "Is 17 a prime number? Answer yes or no.", "expected": "yes"}
+{"id": 10, "prompt": "What color is the sky on a clear day? One word.", "expected": "blue"}

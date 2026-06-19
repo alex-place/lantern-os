@@ -244,3 +244,6 @@ models/*/adapters/
 
 # per-user CSF profile archives (user data — privacy)
 data/profiles/*.csf
+
+# Open-video research: per-machine extracted features (never videos)
+research/open_video/features/*.jsonl

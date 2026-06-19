@@ -2,12 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "lantern-garage",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start", "--prefix", "apps/lantern-garage"],
-      "port": 4177
-    },
-    {
       "name": "lantern-dev",
       "runtimeExecutable": "node",
       "runtimeArgs": ["apps/lantern-garage/server-dev.js"],

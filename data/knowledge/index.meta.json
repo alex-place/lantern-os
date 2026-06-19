@@ -1,5 +1,5 @@
 {
-  "built_at": 1781820801.837854,
+  "built_at": 1781843457.3200023,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -7,6 +7,7 @@
     "QUICKSTART.md",
     "docs/LANTERN-SIGMA0-CODER.md",
     "docs/OURO-LOOPLM.md",
+    "docs/SIGMA0-OURO-CODER.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
     "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
@@ -17,6 +18,6 @@
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md"
   ],
-  "sections": 315,
-  "sha256": "671ff3f03e4596817a4769e51719ee9c24d67434cca9a620982cedfbb3c0893a"
+  "sections": 329,
+  "sha256": "7cc11c7c7de456c85d8e3e4cb4b4530c3a6531ba283a052de1b7d5b9d97e3a4f"
 }

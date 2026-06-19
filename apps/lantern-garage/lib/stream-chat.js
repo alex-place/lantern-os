@@ -801,11 +801,25 @@ async function handleStreamChat(req, url, res) {
       convergenceId: routeDecision.convergence_id || null,
       requiresConvergence: routeDecision.requires_convergence || false,
     };
+    // ── Degraded-local indicator (issue #740) ───────────────────────────────
+    // In Auto mode (no explicit provider) the cloud chain (Gemini→Claude→OpenAI→
+    // Grok) can silently fall through to the local Ollama model — which ignores
+    // ROUTER_PROMPT and produces off-tone filler ("calm while wrong"). When that
+    // happens, flag it so the UI shows "degraded — local model" instead of
+    // passing the weak answer off as the normal route. Explicit ollama/local
+    // requests are intentional and not flagged.
+    const isLocalSource = source === "ollama" || source === "offline";
+    const degradedLocal = isLocalSource && !requestedProvider && !isRpMode;
+    let finalRouteLabel = routeLabel;
+    if (degradedLocal) {
+      signature.degraded = true;
+      finalRouteLabel = `${routeLabel} · ⚠ degraded — local model (cloud unreachable)`;
+    }
     // Σ₀ verify: fire-and-forget — logs claims to convergence/records.jsonl
     if (SIGMA0_VERIFY && fullReply && message) {
       verifyResponse(fullReply, message).catch(() => {});
     }
-    return sse.sendDone(res, source, { ...extra, ...signature, routeLabel });
+    return sse.sendDone(res, source, { ...extra, ...signature, routeLabel: finalRouteLabel });
   };
 
   // Emit route event with actual routing decision from server

@@ -15,6 +15,10 @@ const PUBLIC_PAGES = {
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",
   "/knowledgecenter.html":"knowledgecenter.html",
+  // Primary interface: the chat must be reachable without a Patreon login so the
+  // "no account needed" promise holds. dream-chat.html handles the guest session
+  // client-side (defaults to { authenticated:false, role:"guest" }).
+  "/dream-chat.html":     "dream-chat.html",
 };
 
 // Protected pages — { file, role } where role is minimum required, OR
@@ -22,7 +26,6 @@ const PUBLIC_PAGES = {
 // implicitly). Trade pages use the "trade" entitlement so a paid tier such as
 // Deep Dreamer (founder) does NOT get trading access unless explicitly granted.
 const PROTECTED_PAGES = {
-  "/dream-chat.html":     { file: "dream-chat.html",        role: "guest" },
   "/profile.html":        { file: "profile.html",           role: "guest" },
   "/crypto-dashboard.html":{ file: "crypto-dashboard.html", role: "guest" },
   "/create.html":         { file: "create.html",            role: "founder" },

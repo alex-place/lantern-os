@@ -66,6 +66,7 @@ try:
     from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
     from fastapi.middleware.cors import CORSMiddleware
     from starlette.background import BackgroundTask
+    from starlette.concurrency import run_in_threadpool
     import uvicorn
     FASTAPI_AVAILABLE = True
 except ImportError as e:
@@ -221,17 +222,32 @@ def _load_fleet_status() -> Dict[str, Any]:
     except Exception as exc:
         logger.warning("Could not read fleet status file: %s", exc)
 
+    # active_slots is now LIVE evidence: tasks currently in-flight through the Kernel
+    # loop (queue status=active), not a static file value. 0 means nothing is running
+    # right now; it rises while task_run is executing a task, then falls back to 0.
     return {
         "designed_ring_slots": designed_slots,
-        "active_slots": active_slots,
+        "active_slots": _active_task_count(),
         "sleeping_slots": sleeping_slots,
-        "claim_boundary": claim_boundary,
+        "claim_boundary": (
+            "active_slots = tasks currently in-flight through the Kernel loop "
+            "(queue status=active); designed_ring_slots is a design contract"
+        ),
     }
 
 _STARTED_AT = datetime.now(timezone.utc).isoformat()
 
-# ── In-memory state (replace with Redis/DB in production) ──
-_task_queue: List[Dict[str, Any]] = []
+# ── Task queue — in-memory, made durable by an in-house JSONL ledger ──
+# (Superfleet Phase 1) Local-first event sourcing; no external broker. The queue
+# is rebuilt by replaying data/queue/task-ledger.jsonl on startup.
+import queue_ledger
+_LEDGER_PATH = REPO_ROOT / "data" / "queue" / "task-ledger.jsonl"
+_task_queue: List[Dict[str, Any]] = queue_ledger.replay(_LEDGER_PATH)
+
+
+def _ledger(event: str, **payload: Any) -> None:
+    """Record one queue lifecycle event to the durable ledger (best-effort)."""
+    queue_ledger.append_event(_LEDGER_PATH, event, **payload)
 
 # Skills registry — only skills with real deployed Python modules.
 # super_jarvis_fleet is NOT a skill — it is the agent fleet. See data/status/super-jarvis-fleet.json.
@@ -288,6 +304,24 @@ async def _send_to_session(session_id: str, message: Dict[str, Any]):
 
 # ── Tool Implementations ──
 
+def _active_task_count() -> int:
+    """Honest in-flight count: queued tasks currently being run through the Kernel loop.
+    This is what active_slots reports — 0 means nothing is running right now."""
+    return sum(1 for t in _task_queue if t.get("status") == "active")
+
+
+def _append_jsonl(path: Path, obj: Dict[str, Any]) -> bool:
+    """Append one record to an append-only JSONL log (Memory / Converge stage)."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(obj, default=str) + "\n")
+        return True
+    except Exception as exc:
+        logger.warning("append_jsonl failed for %s: %s", path, exc)
+        return False
+
+
 def _tool_queue_status(limit: int = 10) -> Dict[str, Any]:
     tasks = _task_queue[:limit]
     return {
@@ -310,6 +344,7 @@ def _tool_task_intake(description: str, priority: str = "medium") -> Dict[str, A
     # Sort by priority
     priority_order = {"high": 0, "medium": 1, "low": 2}
     _task_queue.sort(key=lambda t: priority_order.get(t["priority"], 1))
+    _ledger("enqueued", task=task)
     return {
         "task_id": task_id,
         "status": "submitted",
@@ -339,6 +374,7 @@ def _tool_task_cancel(task_id: str) -> Dict[str, Any]:
     task = matches[0]
     task["status"] = "cancelled"
     task["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+    _ledger("status", task_id=task["id"], status="cancelled", cancelled_at=task["cancelled_at"])
     return {"ok": True, "task_id": task["id"], "status": "cancelled", "queue_depth": len(_task_queue)}
 
 
@@ -352,6 +388,7 @@ def _tool_task_delete(task_id: str) -> Dict[str, Any]:
                 "candidates": [t["id"] for t in matches], "queue_depth": len(_task_queue)}
     removed_id = matches[0]["id"]
     _task_queue[:] = [t for t in _task_queue if t.get("id") != removed_id]
+    _ledger("deleted", task_id=removed_id)
     return {"ok": True, "task_id": removed_id, "removed": 1, "queue_depth": len(_task_queue)}
 
 
@@ -362,7 +399,125 @@ def _tool_queue_clear(status: str = "") -> Dict[str, Any]:
         _task_queue[:] = [t for t in _task_queue if t.get("status") != status]
     else:
         _task_queue.clear()
+    _ledger("cleared", filter=status or "all")
     return {"ok": True, "removed": before - len(_task_queue), "queue_depth": len(_task_queue), "filter": status or "all"}
+
+
+def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
+    """Pick up a queued task and run it through the Convergence Loop (Kernel) — the honest
+    consumer for the queue. Claims the named task (full id or unique prefix) or the top
+    pending task, marks it active (so active_slots reflects real in-flight work), routes it
+    to the local Σ₀ reasoning path (Reason/Act), writes an append-only Convergence Record +
+    PCSF receipt (Verify/Converge), then marks it done. Per the LANTERN-DREAM rule, results
+    are PROPOSALS: confidence is capped at 0.3 until Σ₀-verified."""
+    import urllib.request
+
+    # ── Observe: select the task ──
+    if task_id:
+        matches = [t for t in _task_queue if t.get("id") == task_id or t.get("id", "").startswith(task_id)]
+        if not matches:
+            return {"ok": False, "error": "task_not_found", "task_id": task_id}
+        if len(matches) > 1:
+            return {"ok": False, "error": "ambiguous_prefix", "candidates": [t["id"] for t in matches]}
+        task = matches[0]
+    else:
+        pending = [t for t in _task_queue if t.get("status") == "pending"]
+        if not pending:
+            return {"ok": False, "error": "no_pending_tasks", "queue_depth": len(_task_queue)}
+        task = pending[0]  # queue is priority-sorted by task_intake
+
+    if task.get("status") == "active":
+        return {"ok": False, "error": "already_active", "task_id": task["id"]}
+
+    # ── Act: mark in-flight; active_slots now reflects this task ──
+    task["status"] = "active"
+    task["started_at"] = datetime.now(timezone.utc).isoformat()
+    _ledger("status", task_id=task["id"], status="active", started_at=task["started_at"])
+    started = time.time()
+
+    garage = os.getenv("GARAGE_BASE_URL", "http://127.0.0.1:4177").rstrip("/")
+    goal = str(task.get("description", ""))
+    prompt = (
+        "You are the Lantern Kernel executing a queued task. Produce a concrete, grounded "
+        "result or plan with explicit next steps. Be honest about uncertainty.\n\n"
+        f"Task: {goal}"
+    )
+
+    # ── Reason/Act: route to the local convergence/Σ₀ path via the garage server ──
+    reply, provider, online, err = "", "unknown", False, None
+    try:
+        body = json.dumps({"message": prompt}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{garage}/api/dream/chat", data=body,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=int(os.getenv("TASK_RUN_TIMEOUT_SEC", "300"))) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        reply = str(data.get("reply", "") or "")
+        provider = data.get("source") or "unknown"
+        online = bool(data.get("online"))
+    except Exception as exc:
+        err = str(exc)
+
+    latency_ms = int((time.time() - started) * 1000)
+    success = bool(reply) and err is None
+    # LANTERN-DREAM: unverified result is a proposal — confidence capped at 0.3.
+    confidence = 0.3 if success else 0.0
+    is_local = provider in ("ollama", "local")
+
+    # ── Verify/Converge: append-only Convergence Record + PCSF receipt ──
+    _append_jsonl(REPO_ROOT / "data" / "convergence" / "records.jsonl", {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "surface": "mcp-task-run",
+        "hypothesis": goal[:280],
+        "evidence_ids": [],
+        "result": reply[:2000],
+        "confidence": confidence,
+        "reasoner": provider,
+        "verified": False,
+        "task_id": task["id"],
+    })
+    _append_jsonl(REPO_ROOT / "data" / "pcsf" / "convergance-receipts.jsonl", {
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "profile": "kernel",
+        "intent": "task_run",
+        "capacityClass": "local_model" if is_local else ("live" if online else "offline"),
+        "provider": provider,
+        "metered": not is_local,
+        "privacyBoundary": "internal" if is_local else "external",
+        "claimBoundary": "proposal",
+        "latencyMs": latency_ms,
+        "success": success,
+        "error": err,
+        "task_id": task["id"],
+    })
+
+    # ── Converge: finalize task state ──
+    task["status"] = "done" if success else "failed"
+    task["completed_at"] = datetime.now(timezone.utc).isoformat()
+    task["result"] = reply[:2000]
+    task["confidence"] = confidence
+    if err:
+        task["error"] = err
+    _ledger("status", task_id=task["id"], status=task["status"],
+            completed_at=task["completed_at"], confidence=confidence,
+            result=task["result"], error=err)
+
+    return {
+        "ok": success,
+        "task_id": task["id"],
+        "status": task["status"],
+        "provider": provider,
+        "confidence": confidence,
+        "latency_ms": latency_ms,
+        "result_preview": reply[:500],
+        "error": err,
+        "convergence_record": "data/convergence/records.jsonl",
+        "pcsf_receipt": "data/pcsf/convergance-receipts.jsonl",
+        "note": "Proposal only — confidence capped at 0.3 until Σ₀-verified (LANTERN-DREAM rule).",
+        "active_slots": _active_task_count(),
+        "queue_depth": len(_task_queue),
+    }
 
 
 def _tool_boot_check() -> Dict[str, Any]:
@@ -588,6 +743,7 @@ TOOLS_REGISTRY = {
     "task_intake": _tool_task_intake,
     "task_cancel": _tool_task_cancel,
     "task_delete": _tool_task_delete,
+    "task_run": _tool_task_run,
     "queue_clear": _tool_queue_clear,
     "dispatch_work": _tool_dispatch_work,
     "boot_check": _tool_boot_check,
@@ -950,10 +1106,13 @@ async def mcp_streamable_http(request: Request):
 
     wants_stream = "text/event-stream" in request.headers.get("Accept", "")
 
+    # Offload to a threadpool: tools may block (subprocess gh calls, long task_run
+    # HTTP calls). Running them inline would freeze the async event loop and stall
+    # every other request — including health checks and the connector — for minutes.
     if isinstance(body, list):
-        payload = [_handle_jsonrpc(r) for r in body]
+        payload = [await run_in_threadpool(_handle_jsonrpc, r) for r in body]
     else:
-        payload = _handle_jsonrpc(body)
+        payload = await run_in_threadpool(_handle_jsonrpc, body)
 
     if wants_stream:
         async def _stream():
@@ -1171,12 +1330,12 @@ async def messages_endpoint(request: Request):
 
     if isinstance(body, list):
         # Batch request
-        results = [_handle_jsonrpc(req) for req in body]
+        results = [await run_in_threadpool(_handle_jsonrpc, req) for req in body]
         for resp in results:
             await _send_to_session(session_id, resp)
         return JSONResponse({"status": "batch processed"})
     else:
-        result = _handle_jsonrpc(body)
+        result = await run_in_threadpool(_handle_jsonrpc, body)
         await _send_to_session(session_id, result)
         return JSONResponse(result)
 
