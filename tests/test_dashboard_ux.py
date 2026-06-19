@@ -21,8 +21,7 @@ def read(path: str) -> str:
 def test_landing_page_is_clean_sales_page() -> None:
     html = read("apps/lantern-garage/public/index.html")
     # Title and branding
-    assert "Journal" in html
-    assert "Lantern OS" in html
+    assert "Keystone OS" in html
     # CTA panels
     assert "dream-chat.html" in html
     assert "patreon.com" in html

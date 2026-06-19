@@ -5,7 +5,7 @@ import pytest
 def test_outreach_program_page_exists_and_keeps_boundaries():
     text = Path('apps/lantern-garage/public/outreach.html').read_text(encoding='utf-8')
     required = [
-        'Lantern OS Outreach Program',
+        'Keystone OS Outreach Program',
         '2-1-1',
         '1-800-827-5722',
         '513-369-6900',
