@@ -1,6 +1,18 @@
 const https = require("https");
 const http = require("http");
 const path = require("path");
+
+// On Windows, Node's bundled CA store sometimes can't verify cloud-provider certs
+// ("unable to verify the first certificate"). Without this, every cloud request
+// throws, the auto cascade swallows the error, and the chat silently degrades to the
+// weak local Ollama model — the "calm while wrong" failure in #740. Mirror the
+// self-edit-engine / routes/providers workaround, but scope it to Windows (or an
+// explicit opt-in) so TLS verification is not disabled on other platforms. Set
+// LANTERN_INSECURE_TLS=0 to force-disable, =1 to force-enable anywhere.
+const INSECURE_TLS = process.env.LANTERN_INSECURE_TLS === "1" ||
+  (process.platform === "win32" && process.env.LANTERN_INSECURE_TLS !== "0");
+const llmAgent = INSECURE_TLS ? new https.Agent({ rejectUnauthorized: false }) : undefined;
+
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse } = require("./dream-chat");
 const { modelFor } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
@@ -962,6 +974,7 @@ async function handleStreamChat(req, url, res) {
       const result = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("verify_timeout")), VERIFY_TIMEOUT_MS);
         const req = https.request({
+          agent: llmAgent,
           hostname: "api.anthropic.com",
           path: "/v1/messages",
           method: "POST",
@@ -1397,6 +1410,7 @@ async function handleStreamChat(req, url, res) {
       const payload = JSON.stringify(geminiPayloadBase);
       await new Promise((resolve, reject) => {
         const req2 = https.request({
+          agent: llmAgent,
           hostname: "generativelanguage.googleapis.com",
           path: `/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
           method: "POST",
@@ -1503,6 +1517,7 @@ async function handleStreamChat(req, url, res) {
       });
       await new Promise((resolve, reject) => {
         const req2 = https.request({
+          agent: llmAgent,
           hostname: "api.anthropic.com",
           path: "/v1/messages",
           method: "POST",
@@ -1595,6 +1610,7 @@ async function handleStreamChat(req, url, res) {
 
       await new Promise((resolve, reject) => {
         const req2 = https.request({
+          agent: llmAgent,
           hostname: "api.openai.com",
           path: "/v1/chat/completions",
           method: "POST",
@@ -1672,6 +1688,7 @@ async function handleStreamChat(req, url, res) {
       });
       await new Promise((resolve, reject) => {
         const req2 = require("https").request({
+          agent: llmAgent,
           hostname: "api.x.ai", path: "/v1/chat/completions", method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}`, "Content-Length": Buffer.byteLength(payload) },
         }, (upstream) => {

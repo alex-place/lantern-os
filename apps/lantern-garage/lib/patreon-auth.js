@@ -15,7 +15,7 @@ const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
 // Campaign: Dream Journal By Lantern OS (ID: 16143763)
 const TIER_TO_ROLE = {
   "28764312": "supporter",     // Wanderer ($5)
-  "28740619": "founder",       // Deep Dreamer ($20)
+  "28740619": "deep_dreamer",  // Deep Dreamer ($20) — renamed from "founder" (#698: avoid collision with the Discord top tier)
   "28764307": "admin",         // Synthesasia Guild ($200)
 };
 
@@ -339,7 +339,9 @@ function handleLogout(req, res) {
  * Middleware: require specific role.
  */
 function requirePatreonRole(requiredRole) {
-  const roleHierarchy = { guest: 0, supporter: 1, founder: 2, admin: 3 };
+  // deep_dreamer is the $20 web tier; `founder` kept as a legacy alias so sessions
+  // persisted before the #698 rename still resolve to level 2.
+  const roleHierarchy = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
   return (req, res, next) => {

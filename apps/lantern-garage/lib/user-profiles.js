@@ -12,6 +12,10 @@ const crypto = require("crypto");
 const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
 const PROFILES_INDEX = path.join(PROFILES_DIR, "index.jsonl");
 const PROFILES_CSF = path.join(PROFILES_DIR, "profiles.csf");
+// Append-only Patreon-id <-> Discord-id link store (#697). Latest record wins,
+// mirroring the index.jsonl convention. Lets the Discord bot resolve a web role
+// from a Discord snowflake (and vice-versa) without a shared DB.
+const ACCOUNT_LINKS = path.join(PROFILES_DIR, "account-links.jsonl");
 
 // Ensure directories exist
 function ensureDirectories() {
@@ -38,6 +42,7 @@ function createProfile(userId, data = {}) {
     // unless explicitly granted. `admin` is allowed implicitly (see auth-middleware).
     entitlements: { trade: false, ...(data.entitlements || {}) },
     patreonId: data.patreonId || null,
+    discordId: data.discordId || null, // linked Discord snowflake (#697), if any
     avatar: data.avatar || null, // URL or base64 avatar
     bio: data.bio || "",
     settings: data.settings || {},
@@ -106,7 +111,9 @@ function updateProfile(userId, updates) {
  * Set user role (admin-only operation).
  */
 function setUserRole(userId, newRole) {
-  const validRoles = ["guest", "supporter", "founder", "admin"];
+  // deep_dreamer is the $20 web tier (renamed from "founder", #698); "founder"
+  // stays accepted as a legacy alias so older callers/profiles don't break.
+  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "admin"];
   if (!validRoles.includes(newRole)) {
     throw new Error(`Invalid role: ${newRole}`);
   }
@@ -299,6 +306,58 @@ function loadProfileFromIndex(userId) {
   return latest;
 }
 
+// ── Patreon <-> Discord account linking (#697) ──
+
+/**
+ * Link a Patreon (web) identity to a Discord snowflake.
+ * Appends to the account-links store and stamps discordId onto the profile so a
+ * subscriber configured once on the web is resolvable from Discord (and vice-versa).
+ * Returns the link record, or null if no profile exists for patreonId.
+ */
+function linkDiscordAccount(patreonId, discordId) {
+  ensureDirectories();
+  if (!patreonId || !discordId) {
+    throw new Error("linkDiscordAccount requires both patreonId and discordId");
+  }
+  const profile = loadProfileFromIndex(patreonId);
+  if (!profile) return null; // must have a web profile to link to
+  const link = {
+    patreonId: String(patreonId),
+    discordId: String(discordId),
+    linkedAt: new Date().toISOString(),
+  };
+  fs.appendFileSync(ACCOUNT_LINKS, JSON.stringify(link) + "\n");
+  // Carry the id on the profile too, so a single profile read exposes the link.
+  updateProfile(patreonId, { discordId: String(discordId) });
+  return link;
+}
+
+/**
+ * Return the newest link record for a Discord id (latest-wins), or null.
+ */
+function getLinkByDiscordId(discordId) {
+  ensureDirectories();
+  if (!fs.existsSync(ACCOUNT_LINKS)) return null;
+  const lines = fs.readFileSync(ACCOUNT_LINKS, "utf-8").split("\n").filter(Boolean);
+  let latest = null;
+  for (const line of lines) {
+    try {
+      const rec = JSON.parse(line);
+      if (String(rec.discordId) === String(discordId)) latest = rec;
+    } catch (e) { /* skip invalid lines */ }
+  }
+  return latest;
+}
+
+/**
+ * Resolve a Discord snowflake to its linked web profile (with role/tier), or null.
+ */
+function getProfileByDiscordId(discordId) {
+  const link = getLinkByDiscordId(discordId);
+  if (!link) return null;
+  return getProfile(link.patreonId);
+}
+
 module.exports = {
   createProfile,
   getProfile,
@@ -308,6 +367,9 @@ module.exports = {
   listProfiles,
   deleteProfile,
   getOrCreateFromPatreon,
+  linkDiscordAccount,
+  getLinkByDiscordId,
+  getProfileByDiscordId,
   exportToCSF,
   importFromCSF,
 };

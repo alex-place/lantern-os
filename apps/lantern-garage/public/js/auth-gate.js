@@ -5,7 +5,10 @@
  * - Updates nav to show profile/logout (authed) or sign-in button (guest)
  */
 (function () {
-  const PUBLIC = ['/auth.html', '/auth', '/explore.html', '/knowledgecenter.html'];
+  // dream-chat.html is public so first-time visitors can reach the chat without an
+  // account, honoring the "no account needed" promise (#739). Guests get a limited
+  // read-only experience; premium models/limits are still enforced by role.
+  const PUBLIC = ['/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/trader-dashboard.html', '/kalshi-terminal.html'];
   const pathname = window.location.pathname;

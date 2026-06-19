@@ -59,7 +59,8 @@ function requireRole(req, res, requiredRole = "supporter") {
     return false;
   }
 
-  const roleHierarchy = { guest: 0, supporter: 1, founder: 2, admin: 3 };
+  // deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
+  const roleHierarchy = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
   const userLevel = roleHierarchy[session.role] || 0;
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 

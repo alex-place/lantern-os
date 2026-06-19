@@ -637,9 +637,11 @@ async function sendMessage() {
   let didError = false;
   let routeLabel = '';
   let receivedDone = false;
+  let doneProvider = '';
+  const requestedProvider = document.getElementById('provider-select')?.value || '';
 
   try {
-    const provider = document.getElementById('provider-select')?.value || '';
+    const provider = requestedProvider;
     const resp = await fetch('/api/dream/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -694,6 +696,7 @@ async function sendMessage() {
           } else if (evt.type === 'done') {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel) routeLabel = evt.routeLabel;
+            doneProvider = evt.source || evt.provider || '';
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -735,6 +738,19 @@ async function sendMessage() {
     sig.setAttribute('aria-label', `Active route: ${routeLabel}`);
     sig.textContent = routeLabel;
     msg.appendChild(sig);
+  }
+
+  // Degraded-mode notice (#740): the answer came from the local model as a silent
+  // fallback because the cloud providers failed — not because the user chose local.
+  // A small local model often ignores the system prompt and answers off-tone, so
+  // surface it honestly. `provider` is what the user requested ('' = auto).
+  if (!didError && doneProvider === 'ollama' && requestedProvider !== 'ollama') {
+    const warn = document.createElement('div');
+    warn.className = 'msg-route-sig degraded';
+    warn.setAttribute('role', 'note');
+    warn.style.cssText = 'font-size:11px;color:#f5a623;margin-top:2px;';
+    warn.textContent = '⚠ Offline — answered by the local model (cloud providers unavailable). Quality may be lower.';
+    msg.appendChild(warn);
   }
 
   if (!didError) history.push({ role: 'assistant', text: fullText });

@@ -38,22 +38,22 @@ function req(session) {
 }
 
 // 1. New profile defaults trade=false (opt-in).
-const founder = profiles.createProfile("user-founder", { role: "founder" });
+const founder = profiles.createProfile("user-founder", { role: "deep_dreamer" });
 assert.strictEqual(founder.entitlements.trade, false);
 ok("new profile defaults entitlements.trade = false");
 
 // 2. Founder without entitlement is denied.
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "founder" } }), "trade"), false);
+assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "deep_dreamer" } }), "trade"), false);
 ok("founder without grant → hasEntitlement(trade) false");
 
 // 3. Granting trade flips it.
 profiles.setEntitlement("user-founder", "trade", true);
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "founder" } }), "trade"), true);
+assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "deep_dreamer" } }), "trade"), true);
 ok("setEntitlement(trade,true) → hasEntitlement true");
 
 // 4. setEntitlement does not clobber other entitlements.
 profiles.setEntitlement("user-founder", "beta", true);
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "founder" } }), "trade"), true);
+assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "deep_dreamer" } }), "trade"), true);
 ok("setEntitlement preserves existing entitlements");
 
 // 5. admin role passes implicitly even without a profile flag.
@@ -68,9 +68,9 @@ assert.strictEqual(res.statusCode, 302);
 ok("requireEntitlement unauthenticated → 302, returns false");
 
 // 7. requireEntitlement: authed but not entitled → 403, blocked.
-profiles.createProfile("user-plain", { role: "founder" });
+profiles.createProfile("user-plain", { role: "deep_dreamer" });
 res = fakeRes();
-assert.strictEqual(requireEntitlement(req({ patreon: { id: "user-plain", role: "founder" } }), res, "trade"), false);
+assert.strictEqual(requireEntitlement(req({ patreon: { id: "user-plain", role: "deep_dreamer" } }), res, "trade"), false);
 assert.strictEqual(res.statusCode, 403);
 assert.ok(res.body.includes("trade"));
 ok("requireEntitlement authed-not-entitled → 403, returns false");
