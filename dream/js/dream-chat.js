@@ -9,6 +9,19 @@
   let directModeEnabled = false;
   let keystoneMcpEnabled = false; // legacy compat
   let originalAgents = [];
+
+  // ── Chat session id ───────────────────────────────────────────────────────
+  // Scopes history to this conversation so reloads don't replay the global log.
+  // "New chat" rotates this id, giving a clean slate without deleting old data.
+  const CHAT_SESSION_KEY = "lantern_chat_session";
+  function freshSessionId() {
+    try {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch { /* insecure context — fall through */ }
+    return "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
+  let chatSessionId = localStorage.getItem(CHAT_SESSION_KEY) || freshSessionId();
+  localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
   // ── ROUTE INTENT DETECTION ────────────────────────────────────────────────
   // Returns a route intent string used to select the backend agent/surface.
   // RP is opt-in only — general chat, code work, and GitHub work use the router.
@@ -197,7 +210,7 @@
   // ── Load conversation history (REMEMBER stage — issue #647) ───────────────
   async function loadConversationHistory() {
     try {
-      const r = await fetch(`${serverBase}/api/conversations?limit=20`, { signal: AbortSignal.timeout(3000) });
+      const r = await fetch(`${serverBase}/api/conversations?limit=20&sessionId=${encodeURIComponent(chatSessionId)}`, { signal: AbortSignal.timeout(3000) });
       if (!r.ok) return;
       const data = await r.json();
       const entries = (data.conversations || []).filter(e => e.role === "operator" || e.role === "lantern");
@@ -220,6 +233,21 @@
     } catch { /* non-critical — fresh session is fine */ }
   }
   loadConversationHistory();
+
+  // ── New chat: clear the visible history and start a fresh session ─────────
+  // Non-destructive — rotates the session id so prior turns are archived, not shown.
+  function newChat() {
+    chatSessionId = freshSessionId();
+    localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
+    conversationHistory.length = 0;
+    messagesEl.querySelectorAll(".msg-row").forEach((n) => n.remove());
+    if (emptyState) emptyState.style.display = "";
+    inputEl.value = "";
+    try { inputEl.focus(); } catch { /* no-op */ }
+  }
+  window.newChat = newChat;
+  const newChatBtn = document.getElementById("new-chat-btn");
+  if (newChatBtn) newChatBtn.addEventListener("click", newChat);
 
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -508,6 +536,7 @@
         history: historyToSend,
         mcp: directModeEnabled,
         routeIntent: clientIntent || undefined,
+        sessionId: chatSessionId,
       }),
     })
       .then((res) => {
