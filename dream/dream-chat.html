@@ -132,16 +132,7 @@
         <button class="nav-btn" id="new-chat-btn" title="New chat" aria-label="Start a new chat (clears the visible history)">✎</button>
         <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
         <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
-        <button class="nav-btn" id="voice-btn" aria-label="Toggle voice mode" aria-pressed="false" onclick="
-          if (!window.voiceMode) window.voiceMode = false;
-          window.voiceMode = !window.voiceMode;
-          this.setAttribute('aria-pressed', window.voiceMode);
-          this.style.opacity = window.voiceMode ? '1' : '0.5';
-          this.style.background = window.voiceMode ? 'rgba(161,139,250,0.2)' : '';
-          this.style.borderColor = window.voiceMode ? '#a78bfa' : '';
-          const voiceInputBtn = document.getElementById('voice-input-btn');
-          if (voiceInputBtn) voiceInputBtn.style.display = window.voiceMode ? 'block' : 'none';
-        " title="Voice Mode">🎙️</button>
+        <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
         <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
       </div>
     </nav>
@@ -186,7 +177,7 @@
       </div>
       <div class="input-wrapper">
         <button id="attach-btn" class="attach-btn" type="button" aria-label="Add attachment" aria-haspopup="true" aria-expanded="false" onclick="lanternAttach.toggle()" title="Add to Knowledge Center">+</button>
-        <button id="voice-input-btn" aria-label="Start voice input" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
+        <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text)">🎙️</button>
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
@@ -224,6 +215,11 @@
         <div class="obs-section-title">Loop Depth (Σ₀)</div>
         <div class="obs-value" id="obs-loop-depth" style="font-family:'IBM Plex Mono',monospace;font-size:11px">⟳ — loops · — conf</div>
         <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-fill" style="width:0%;background:var(--accent)"></div></div>
+      </div>
+      <div>
+        <div class="obs-section-title">Loop Records (Σ₀)</div>
+        <div class="obs-value" id="obs-loop-records" title="ConvergenceRecords emitted by chat replies (Reason→Act)">—</div>
+        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-records-fill" style="width:0%"></div></div>
       </div>
       <div>
         <div class="obs-section-title">Dilation Ratio</div>

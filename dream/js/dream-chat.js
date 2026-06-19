@@ -207,6 +207,32 @@
   }
   loadAgents();
 
+  // ── Convergence loop status (CONVERGE stage) — live sidebar panel ──────────
+  // Reads /api/convergence/status (records.jsonl + patterns) and lights up the
+  // "Convergence" observability slot so the loop the chat feeds is visible.
+  function refreshConvergence() {
+    fetch(`${serverBase}/api/convergence/status`, { signal: AbortSignal.timeout(3000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => {
+        if (!s) return;
+        // Dedicated "Loop Records" row — do NOT reuse #obs-convergence (that slot
+        // is the dream-delta convergence score, owned by dream-chat-ui.js).
+        const el = document.getElementById("obs-loop-records");
+        const fill = document.getElementById("obs-loop-records-fill");
+        if (el) {
+          el.textContent = s.total
+            ? `${s.total} rec · ${Math.round((s.avgConfidence || 0) * 100)}% conf · ${s.topReasoner || "—"}`
+            : "no records yet";
+          el.title = s.total
+            ? `${s.total} convergence records · ${Math.round((s.groundedPct || 0) * 100)}% grounded · ${s.verified || 0} verified · ${s.patternsCount || 0} patterns`
+            : "Reason→Act emits a ConvergenceRecord per reply";
+        }
+        if (fill) fill.style.width = Math.round((s.avgConfidence || 0) * 100) + "%";
+      })
+      .catch(() => {});
+  }
+  refreshConvergence();
+
   // ── Load conversation history (REMEMBER stage — issue #647) ───────────────
   async function loadConversationHistory() {
     try {
@@ -635,8 +661,8 @@
               if (evt.type === "token" && evt.text) {
                 if (!hasTokens) { hasTokens = true; setThinking(false); }
                 fullText += evt.text;
-                streamTtsBuf += evt.text;
-                streamTtsFlush(false);
+                // Narration (top 🔊 toggle) — only speak replies when enabled.
+                if (window.narrateReplies) { streamTtsBuf += evt.text; streamTtsFlush(false); }
                 analytics.tokensReceived++;
                 cursor.remove();
                 // Strip [DOORS:...] tag during streaming; chips rendered on done
@@ -674,6 +700,8 @@
                   if (loopEl) loopEl.textContent = `⟳ ${loopN} loop${loopN !== 1 ? 's' : ''} · ${Math.round(conf * 100)}% conf · ${exitReason}`;
                   if (fillEl) fillEl.style.width = (conf * 100) + '%';
                 } catch (_) {}
+                // CONVERGE: this reply just emitted a record — refresh the loop panel.
+                try { refreshConvergence(); } catch (_) {}
 
                 // Parse [DOORS: A name | B name | C name] from full text if backend didn't extract
                 let suggestions = evt.suggestions;
@@ -1162,7 +1190,7 @@
     setThinking(false);
     scrollToBottom();
     // TTS — flush remainder and wrap bubble for word highlighting
-    if (text && source !== "failed" && source !== "error") streamTtsFinish(text, bubble);
+    if (window.narrateReplies && text && source !== "failed" && source !== "error") streamTtsFinish(text, bubble);
   }
 
   function appendErrorNotice(row, msg) {
@@ -1520,7 +1548,9 @@
   // ════════════════════════════════════════════════════════════════
   //  Voice — STT (Web Speech API) + TTS
   // ════════════════════════════════════════════════════════════════
-  const voiceBtn = document.getElementById("voice-btn");
+  // STT "listening" feedback shows on the composer mic (#voice-input-btn).
+  // The top #voice-btn is now the narration toggle (speaks replies) — a separate control.
+  const voiceBtn = document.getElementById("voice-input-btn");
   let recognition = null;
   let isListening = false;
 
@@ -1549,15 +1579,19 @@
     recognition.onend = () => {
       isListening = false;
       voiceBtn.classList.remove("listening");
-      inputEl.placeholder = "Tell me a dream…";
-      const toSend = accumulated.trim();
+      inputEl.placeholder = "Write something, ask a question…";
+      // Dictation: drop the transcript into the composer for review (no auto-send).
+      const dictated = accumulated.trim();
       accumulated = "";
-      if (toSend) { inputEl.value = toSend; sendMessage(); }
+      if (dictated) { inputEl.value = dictated; inputEl.dispatchEvent(new Event("input")); try { inputEl.focus(); } catch (e) {} }
     };
     recognition.onerror = () => {
       isListening = false; voiceBtn.classList.remove("listening");
       inputEl.placeholder = "Tell me a dream…";
     };
+    // Share this single recognition instance with the composer's voice button
+    // (dream-chat-ui.js startVoiceInput() reads window.recognition).
+    window.recognition = recognition;
   }
 
   function toggleVoice() {
@@ -1572,6 +1606,8 @@
       try { recognition.start(); } catch(e) { isListening = false; voiceBtn.classList.remove("listening"); inputEl.placeholder = "Tell me a dream…"; }
     }
   }
+  // Expose the working toggle so the nav mic button can start/stop listening in one click.
+  window.toggleVoice = toggleVoice;
 
   let ttsAudio = null;
 
