@@ -549,8 +549,12 @@ async function handleStreamChat(req, url, res) {
   } else {
     compacted = compactHistory(history);
   }
-  const historyContext = compacted.length > 0
-    ? `\nPrior conversation turns:\n${compacted.map(h => `${h.role === "assistant" ? "Keystone" : "Dreamer"}: ${h.text}`).join("\n")}`
+  // Narrate only real turns here — drop synthetic alternation scaffolding (the
+  // assistant "ack" the budgeter injects) so the debug prompt doesn't replay it
+  // back to the model as a genuine prior statement.
+  const narratableTurns = compacted.filter((h) => !h._synthetic);
+  const historyContext = narratableTurns.length > 0
+    ? `\nPrior conversation turns:\n${narratableTurns.map(h => `${h.role === "assistant" ? "Keystone" : "Dreamer"}: ${h.text}`).join("\n")}`
     : "";
 
   // Co-occurrence pairs: symbols that appear together in the same entry strengthen the edge
@@ -973,7 +977,12 @@ async function handleStreamChat(req, url, res) {
     role,
     text: String(text == null ? "" : text).slice(0, maxConversationTextLength),
     sessionId,
-  }).catch(() => {});
+  }).catch((err) => {
+    // Best-effort like the rest of the codebase, but a dropped write silently
+    // erodes the session context the REMEMBER stage rebuilds next turn — so at
+    // least surface it in the server log instead of swallowing it entirely.
+    console.error("[logTurn] failed to persist turn (session context may be incomplete):", err.message);
+  });
 
   await logTurn("operator", message);
 
@@ -1705,11 +1714,9 @@ async function handleStreamChat(req, url, res) {
       const payload = JSON.stringify({
         model: ollamaModel,
         stream: true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...history.map(h => ({ role: h.role, content: h.text })),
-          { role: "user", content: message },
-        ],
+        // Use the budgeted, role-normalized context like every other provider
+        // path (was raw `history`, which bypassed #772's assembly).
+        messages: buildProviderMessages(systemPrompt, compacted, message),
       });
       const ollamaUrl = new URL(ollamaBase);
       const ollamaOpts = {

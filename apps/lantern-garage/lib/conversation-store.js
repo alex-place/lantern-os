@@ -15,6 +15,7 @@ function normalizeConversationEntry(input) {
   const allowedRoles = new Set(["operator", "lantern", "system", "note"]);
   const text = String(input.text || "").trim();
   const surface = String(input.surface || "garage").trim().slice(0, 80) || "garage";
+  const sessionId = input.sessionId ? String(input.sessionId).trim().slice(0, 64) : null;
 
   if (!allowedRoles.has(role)) {
     throw new Error("invalid_conversation_role");
@@ -28,6 +29,7 @@ function normalizeConversationEntry(input) {
     surface,
     role,
     text: text.slice(0, maxConversationTextLength),
+    sessionId,
   };
 }
 
@@ -35,9 +37,14 @@ async function appendConversationEntry(entry) {
   await appendJsonlQueued(conversationLogPath, entry);
 }
 
-function readConversationLog(limit = 50) {
-  return readJsonl(path.relative(repoRoot, conversationLogPath), limit)
+function readConversationLog(limit = 50, sessionId = null) {
+  // When scoped to a session, read a bounded larger window then filter,
+  // so the last `limit` *session* turns survive interleaving from other sessions.
+  const window = sessionId ? 2000 : limit;
+  const all = readJsonl(path.relative(repoRoot, conversationLogPath), window)
     .filter((entry) => !entry.parseError);
+  if (!sessionId) return all;
+  return all.filter((entry) => entry.sessionId === sessionId).slice(-limit);
 }
 
 function normalizeRagCacheItem(input) {
