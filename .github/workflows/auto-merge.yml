@@ -1,0 +1,74 @@
+name: Auto-merge
+
+# Opt-in, stack-safe auto-merger. The repo has no branch protection, so this
+# workflow enforces "all checks green + mergeable" itself before merging.
+#
+# How to use: add the `auto-merge` label to a PR. The workflow merges labeled,
+# non-draft PRs that target the default branch, in ASCENDING PR-number order
+# (so a stack lands bottom-up), one per run. It STOPS at the first labeled PR
+# that is conflicting, has a failing check, or still has checks running — so a
+# stuck PR never lets a later one jump the queue. The */10 schedule advances the
+# train; `workflow_dispatch` kicks it immediately.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+  pull_request_target:
+    types: [labeled, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge the lowest-numbered green auto-merge PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          BASE="${BASE:-master}"
+          mapfile -t PRS < <(gh pr list --repo "$REPO" --state open --label auto-merge \
+            --base "$BASE" --json number,isDraft \
+            --jq 'map(select(.isDraft==false)) | sort_by(.number) | .[].number')
+          if [ "${#PRS[@]}" -eq 0 ]; then echo "No auto-merge PRs queued."; exit 0; fi
+          echo "Queue (ascending): ${PRS[*]}"
+          for n in "${PRS[@]}"; do
+            echo "::group::Evaluate PR #$n"
+            mergeable=$(gh pr view "$n" --repo "$REPO" --json mergeable --jq .mergeable)
+            mstate=$(gh pr view "$n" --repo "$REPO" --json mergeStateStatus --jq .mergeStateStatus)
+            echo "mergeable=$mergeable mergeState=$mstate"
+
+            if [ "$mergeable" = "CONFLICTING" ]; then
+              gh pr comment "$n" --repo "$REPO" \
+                --body "🤖 auto-merge: blocked — merge conflict with \`$BASE\`. Resolve and I'll continue." || true
+              echo "Conflict on #$n — stopping to preserve stack order."
+              echo "::endgroup::"; exit 0
+            fi
+
+            states=$(gh pr checks "$n" --repo "$REPO" --json state --jq '.[].state' 2>/dev/null || true)
+            if printf '%s\n' "$states" | grep -qiE 'FAILURE|ERROR|CANCELLED|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE'; then
+              echo "Failing checks on #$n — stopping (won't skip ahead in the stack)."
+              echo "::endgroup::"; exit 0
+            fi
+            if printf '%s\n' "$states" | grep -qiE 'PENDING|QUEUED|IN_PROGRESS|EXPECTED|WAITING'; then
+              echo "Checks still running on #$n — waiting."
+              echo "::endgroup::"; exit 0
+            fi
+
+            echo "All green + mergeable — merging #$n (squash)."
+            gh pr merge "$n" --repo "$REPO" --squash --delete-branch
+            echo "Merged #$n. The schedule will pick up the next one."
+            echo "::endgroup::"; exit 0
+          done
