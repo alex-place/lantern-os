@@ -12,11 +12,17 @@ First patch (this file):
   - worker_tick        : claim + run up to N pending tasks once (proves queue pickup)
   - lantern_command    : bang-command router (!convergance, !autonomous-work, !pr-status …)
 
+Follow-up patch (issue automation — the first *write* tools here):
+  - github_work_issue        : investigate | patch (bot branch + push) | pr (open, never merge)
+  - github_fix_failed_checks : inspect failed checks → stacked fix PR (default) or bot-branch push
+
 Durable receipts → data/convergence/{pr,issue}-work-records.jsonl.
 
-Safety gates (env, enforced by the *write* tools added in the follow-up patch):
+Safety gates (env, ENFORCED by the write tools below — hard-refuse on violation):
   GITHUB_WRITE_ENABLED=1  GITHUB_ALLOWED_REPOS=alex-place/lantern-os
   MCP_ALLOW_MERGE=0  MCP_DEFAULT_BASE_BRANCH=master  MCP_BOT_BRANCH_PREFIX=mcp/
+Hard rules: never write the base branch; never merge; only write allow-listed repos
+and branches under an allowed prefix; refuse all writes when WRITE_ENABLED is False.
 """
 
 import os
@@ -251,19 +257,374 @@ def worker_tick(limit: int = 1) -> Dict[str, Any]:
     }
 
 
+# ── Write-tool safety helpers (shared by github_work_issue / fix_failed_checks) ─
+def _write_enabled() -> bool:
+    """Re-read github_tools.WRITE_ENABLED live so tests can toggle it."""
+    return bool(getattr(github_tools, "WRITE_ENABLED", False))
+
+
+def _bot_branch(kind: str, number: int) -> str:
+    """Deterministic bot branch name under MCP_BOT_BRANCH_PREFIX (always allowed)."""
+    return f"{BOT_PREFIX}{kind}-{number}"
+
+
+def _refuse(reason: str, **extra: Any) -> Dict[str, Any]:
+    """Hard refusal as an error dict (never raises, never writes)."""
+    out = {"ok": False, "refused": True, "error": reason}
+    out.update(extra)
+    return out
+
+
+def _coerce_files(file_changes: Any) -> List[Dict[str, str]]:
+    """Normalize file_changes (JSON string or list) → [{path, content}, ...]."""
+    if not file_changes:
+        return []
+    parsed = json.loads(file_changes) if isinstance(file_changes, str) else file_changes
+    if not isinstance(parsed, list):
+        raise ValueError("file_changes must be a JSON array of {path, content}")
+    out: List[Dict[str, str]] = []
+    for f in parsed:
+        if not isinstance(f, dict) or "path" not in f or "content" not in f:
+            raise ValueError("each file change needs {path, content}")
+        out.append({"path": str(f["path"]), "content": str(f["content"])})
+    return out
+
+
+# ── Tool: github_work_issue ───────────────────────────────────────────────────
+def github_work_issue(owner: str = "", repo: str = "", issue_number: int = 0,
+                      mode: str = "investigate", create_pr: bool = False,
+                      file_changes: Any = None, fix_plan: str = "") -> Dict[str, Any]:
+    """Work a GitHub issue under hard safety gates.
+
+    mode=investigate : read the issue + record a fix_plan. NO writes.
+    mode=patch       : investigate + create a bot branch (MCP_BOT_BRANCH_PREFIX)
+                       + push proposed file_changes. NO PR, NO merge.
+    mode=pr          : patch + open a PR into MCP_DEFAULT_BASE_BRANCH. NEVER merges.
+
+    Safety (hard refuse → error dict): repo not allow-listed; writes disabled
+    (github_tools.WRITE_ENABLED False); any attempt to write the base branch.
+    Every action is appended to data/convergence/issue-work-records.jsonl.
+    """
+    if not owner or not repo:
+        d_owner, d_repo = _default_repo()
+        owner, repo = owner or d_owner, repo or d_repo
+    try:
+        issue_number = int(issue_number)
+    except (TypeError, ValueError):
+        return _refuse("issue_number must be an integer", issue_number=issue_number)
+    mode = (mode or "investigate").lower().strip()
+    if mode not in ("investigate", "patch", "pr"):
+        return _refuse(f"unknown mode '{mode}' (use investigate|patch|pr)", mode=mode)
+    # create_pr=True is shorthand for mode=pr.
+    if create_pr and mode == "patch":
+        mode = "pr"
+
+    # ── Gate 1: repo allow-list (applies to every mode) ──
+    if not repo_allowed(owner, repo):
+        rec = {"timestamp": _now(), "surface": "github_work_issue", "issue": issue_number,
+               "pr": None, "branch": None, "actions_taken": [], "mode": mode,
+               "verified": False, "confidence": 0.3, "result": "refused: repo not allow-listed"}
+        _record("issue", rec)
+        return _refuse(f"repo {owner}/{repo} is not allow-listed (GITHUB_ALLOWED_REPOS)",
+                       owner=owner, repo=repo, mode=mode)
+
+    actions: List[str] = []
+    # ── Observe: read the issue (read-only, all modes) ──
+    info = github_tools.github_get_issue(owner, repo, str(issue_number))
+    if isinstance(info, dict) and info.get("error"):
+        return _refuse(f"could not read issue #{issue_number}: {info['error']}",
+                       owner=owner, repo=repo, mode=mode)
+    actions.append("investigate")
+    plan = fix_plan or _issue_fix_plan(info)
+    result: Dict[str, Any] = {
+        "ok": True, "mode": mode, "owner": owner, "repo": repo, "issue": issue_number,
+        "title": info.get("title"), "state": info.get("state"),
+        "labels": info.get("labels", []), "body_excerpt": (info.get("body") or "")[:400],
+        "fix_plan": plan, "branch": None, "pull_number": None, "confidence": 0.3,
+    }
+
+    if mode == "investigate":
+        result["note"] = "investigate only — no writes"
+        _record("issue", _issue_receipt(issue_number, None, None, actions, plan,
+                                        "investigation only (no writes)"))
+        return result
+
+    # ── patch / pr require writes ──
+    if not _write_enabled():
+        _record("issue", _issue_receipt(issue_number, None, None, actions, plan,
+                                        "refused: writes disabled (GITHUB_WRITE_ENABLED=0)"))
+        return _refuse("writes disabled (github_tools.WRITE_ENABLED is False)",
+                       owner=owner, repo=repo, mode=mode, fix_plan=plan)
+
+    branch = _bot_branch("issue", issue_number)
+    # ── Gate 2: never write the base branch; only allowed bot/prefixed branches ──
+    if branch == DEFAULT_BASE or not branch_allowed(branch):
+        _record("issue", _issue_receipt(issue_number, None, branch, actions, plan,
+                                        "refused: target branch not writable"))
+        return _refuse(f"refusing to write branch '{branch}' (base branch or disallowed prefix)",
+                       owner=owner, repo=repo, mode=mode, branch=branch)
+
+    try:
+        files = _coerce_files(file_changes)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _refuse(f"invalid file_changes: {exc}", owner=owner, repo=repo, mode=mode)
+    if not files:
+        return _refuse("patch/pr mode requires file_changes ([{path, content}, ...])",
+                       owner=owner, repo=repo, mode=mode, fix_plan=plan)
+
+    # ── Act: create the bot branch off the base, then push the files ──
+    br = github_tools.github_create_branch(owner, repo, branch, from_branch=DEFAULT_BASE)
+    if isinstance(br, dict) and br.get("error") and "already exists" not in str(br.get("error", "")).lower():
+        _record("issue", _issue_receipt(issue_number, None, branch, actions, plan,
+                                        f"branch create failed: {br['error']}"))
+        return _refuse(f"could not create branch '{branch}': {br['error']}",
+                       owner=owner, repo=repo, mode=mode, branch=branch)
+    actions.append(f"create_branch:{branch}")
+    result["branch"] = branch
+
+    commit_msg = f"fix(#{issue_number}): {(info.get('title') or 'automated patch')[:60]}\n\n{plan[:300]}"
+    if len(files) == 1:
+        pushed = github_tools.github_create_or_update_file(
+            owner, repo, files[0]["path"], files[0]["content"], commit_msg, branch=branch)
+    else:
+        pushed = github_tools.github_push_files(owner, repo, branch, commit_msg, json.dumps(files))
+    if isinstance(pushed, dict) and pushed.get("error"):
+        _record("issue", _issue_receipt(issue_number, None, branch, actions, plan,
+                                        f"push failed: {pushed['error']}"))
+        return _refuse(f"could not push files: {pushed['error']}",
+                       owner=owner, repo=repo, mode=mode, branch=branch)
+    actions.append("push_files:" + ",".join(f["path"] for f in files))
+    result["pushed_files"] = [f["path"] for f in files]
+
+    if mode == "patch":
+        result["note"] = "patched bot branch — no PR opened (mode=patch)"
+        _record("issue", _issue_receipt(issue_number, None, branch, actions, plan,
+                                        "pushed to bot branch (no PR)"))
+        return result
+
+    # ── mode == pr: open a PR into the base branch (NEVER merge) ──
+    pr_title = f"fix(#{issue_number}): {(info.get('title') or 'automated patch')[:80]}"
+    pr_body = (f"Automated patch for #{issue_number} via MCP github_work_issue.\n\n"
+               f"**Fix plan**\n{plan}\n\nCloses #{issue_number}")
+    pr = github_tools.github_create_pull_request(owner, repo, pr_title, branch, DEFAULT_BASE, body=pr_body)
+    if isinstance(pr, dict) and pr.get("error"):
+        _record("issue", _issue_receipt(issue_number, None, branch, actions, plan,
+                                        f"PR create failed: {pr['error']}"))
+        return _refuse(f"could not open PR: {pr['error']}",
+                       owner=owner, repo=repo, mode=mode, branch=branch)
+    actions.append(f"create_pull_request:#{pr.get('number')}")
+    result["pull_number"] = pr.get("number")
+    result["pr_url"] = pr.get("html_url")
+    result["note"] = "PR opened into base branch — NOT merged"
+    _record("issue", _issue_receipt(issue_number, pr.get("number"), branch, actions, plan,
+                                    f"PR #{pr.get('number')} opened (not merged)"))
+    return result
+
+
+def _issue_fix_plan(info: Dict[str, Any]) -> str:
+    title = info.get("title") or "issue"
+    body = (info.get("body") or "").strip()
+    first = body.splitlines()[0] if body else ""
+    return f"Investigate '{title}'. {first}".strip()
+
+
+def _issue_receipt(issue: int, pr: Any, branch: Any, actions: List[str],
+                   plan: str, result: str) -> Dict[str, Any]:
+    return {"timestamp": _now(), "surface": "github_work_issue",
+            "issue": issue, "pr": pr, "branch": branch,
+            "actions_taken": list(actions), "fix_plan": plan,
+            "evidence": [], "confidence": 0.3, "verified": False, "result": result}
+
+
+# ── Tool: github_fix_failed_checks ────────────────────────────────────────────
+def github_fix_failed_checks(owner: str = "", repo: str = "", pull_number: int = 0,
+                             create_pr: bool = True, file_changes: Any = None,
+                             fix_plan: str = "") -> Dict[str, Any]:
+    """Inspect a PR's failed checks and propose/apply a fix under safety gates.
+
+    Reuses github_pr_status + github_get_job_logs to build a fix_plan.
+    create_pr=True (DEFAULT, SAFER): create a STACKED bot fix branch and open a
+    NEW PR — never touches the original branch. Only when create_pr=False AND the
+    original branch is clearly bot-owned (starts with MCP_BOT_BRANCH_PREFIX) do we
+    push directly to it.
+
+    Safety (hard refuse): repo not allow-listed; writes disabled; any attempt to
+    write the base branch; never merges. Receipts → pr-work-records.jsonl.
+    """
+    if not owner or not repo:
+        d_owner, d_repo = _default_repo()
+        owner, repo = owner or d_owner, repo or d_repo
+    try:
+        pull_number = int(pull_number)
+    except (TypeError, ValueError):
+        return _refuse("pull_number must be an integer", pull_number=pull_number)
+
+    # ── Gate 1: repo allow-list ──
+    if not repo_allowed(owner, repo):
+        _record("pr", _pr_receipt(pull_number, None, [], "", "refused: repo not allow-listed"))
+        return _refuse(f"repo {owner}/{repo} is not allow-listed (GITHUB_ALLOWED_REPOS)",
+                       owner=owner, repo=repo)
+
+    # ── Observe: PR status + failing checks ──
+    status = github_pr_status(owner, repo, pull_number)
+    if not status.get("ok"):
+        return _refuse(f"could not read PR #{pull_number}: {status.get('error')}",
+                       owner=owner, repo=repo)
+    failing = status.get("blockers") or []
+    orig_branch = status.get("branch") or ""
+    logs_tail = _failed_job_logs(owner, repo, pull_number)
+    plan = fix_plan or _checks_fix_plan(failing, logs_tail)
+    actions: List[str] = ["inspect_checks"]
+    result: Dict[str, Any] = {
+        "ok": True, "owner": owner, "repo": repo, "pull_number": pull_number,
+        "original_branch": orig_branch, "failing_checks": failing,
+        "fix_plan": plan, "logs_excerpt": logs_tail[-1200:] if logs_tail else "",
+        "branch": None, "new_pull_number": None, "confidence": 0.3,
+    }
+
+    # No file changes supplied → plan-only (status + plan), no writes.
+    try:
+        files = _coerce_files(file_changes)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return _refuse(f"invalid file_changes: {exc}", owner=owner, repo=repo)
+    if not files:
+        result["note"] = "status + fix_plan only (no file_changes supplied → no writes)"
+        _record("pr", _pr_receipt(pull_number, None, actions, plan, "plan only (no writes)"))
+        return result
+
+    # ── writes required from here ──
+    if not _write_enabled():
+        _record("pr", _pr_receipt(pull_number, None, actions, plan,
+                                  "refused: writes disabled (GITHUB_WRITE_ENABLED=0)"))
+        return _refuse("writes disabled (github_tools.WRITE_ENABLED is False)",
+                       owner=owner, repo=repo, fix_plan=plan)
+
+    bot_owned = bool(orig_branch) and orig_branch.startswith(BOT_PREFIX)
+    # Decide the target branch:
+    #   create_pr=True (default, safer) → always a fresh STACKED bot branch + new PR.
+    #   create_pr=False → direct push ONLY if the original branch is bot-owned.
+    if not create_pr and bot_owned:
+        target_branch, open_new_pr = orig_branch, False
+    else:
+        target_branch, open_new_pr = _bot_branch("fixpr", pull_number), True
+
+    # ── Gate 2/3: never the base branch; allowed prefix only ──
+    if target_branch == DEFAULT_BASE or not branch_allowed(target_branch):
+        _record("pr", _pr_receipt(pull_number, target_branch, actions, plan,
+                                  "refused: target branch not writable"))
+        return _refuse(f"refusing to write branch '{target_branch}' (base branch or disallowed prefix)",
+                       owner=owner, repo=repo, branch=target_branch)
+    result["branch"] = target_branch
+    result["stacked"] = open_new_pr
+
+    # ── Act: for a stacked fix, create the branch off the original PR branch ──
+    if open_new_pr:
+        from_branch = orig_branch if (orig_branch and branch_allowed(orig_branch)) else DEFAULT_BASE
+        br = github_tools.github_create_branch(owner, repo, target_branch, from_branch=from_branch)
+        if isinstance(br, dict) and br.get("error") and "already exists" not in str(br.get("error", "")).lower():
+            _record("pr", _pr_receipt(pull_number, target_branch, actions, plan,
+                                      f"branch create failed: {br['error']}"))
+            return _refuse(f"could not create fix branch '{target_branch}': {br['error']}",
+                           owner=owner, repo=repo, branch=target_branch)
+        actions.append(f"create_branch:{target_branch}")
+
+    commit_msg = f"fix(checks): PR #{pull_number}\n\n{plan[:300]}"
+    if len(files) == 1:
+        pushed = github_tools.github_create_or_update_file(
+            owner, repo, files[0]["path"], files[0]["content"], commit_msg, branch=target_branch)
+    else:
+        pushed = github_tools.github_push_files(owner, repo, target_branch, commit_msg, json.dumps(files))
+    if isinstance(pushed, dict) and pushed.get("error"):
+        _record("pr", _pr_receipt(pull_number, target_branch, actions, plan,
+                                  f"push failed: {pushed['error']}"))
+        return _refuse(f"could not push fix: {pushed['error']}",
+                       owner=owner, repo=repo, branch=target_branch)
+    actions.append("push_files:" + ",".join(f["path"] for f in files))
+    result["pushed_files"] = [f["path"] for f in files]
+
+    if not open_new_pr:
+        result["note"] = f"pushed fix directly to bot-owned branch '{target_branch}' (no new PR; never merged)"
+        _record("pr", _pr_receipt(pull_number, target_branch, actions, plan,
+                                  "pushed to bot-owned PR branch (no new PR)"))
+        return result
+
+    # ── open a NEW PR for the stacked fix (NEVER merge) ──
+    base = orig_branch if (orig_branch and branch_allowed(orig_branch)) else DEFAULT_BASE
+    pr_title = f"fix(checks): repair failing checks on PR #{pull_number}"
+    pr_body = (f"Stacked fix for the failing checks on #{pull_number}.\n\n"
+               f"**Failing**: {', '.join(failing) or 'unknown'}\n\n**Plan**\n{plan}")
+    pr = github_tools.github_create_pull_request(owner, repo, pr_title, target_branch, base, body=pr_body)
+    if isinstance(pr, dict) and pr.get("error"):
+        _record("pr", _pr_receipt(pull_number, target_branch, actions, plan,
+                                  f"PR create failed: {pr['error']}"))
+        return _refuse(f"could not open stacked PR: {pr['error']}",
+                       owner=owner, repo=repo, branch=target_branch)
+    actions.append(f"create_pull_request:#{pr.get('number')}")
+    result["new_pull_number"] = pr.get("number")
+    result["pr_url"] = pr.get("html_url")
+    result["note"] = f"opened stacked fix PR #{pr.get('number')} into '{base}' — NOT merged"
+    _record("pr", _pr_receipt(pull_number, target_branch, actions, plan,
+                              f"stacked fix PR #{pr.get('number')} opened (not merged)"))
+    return result
+
+
+def _failed_job_logs(owner: str, repo: str, pull_number: int) -> str:
+    """Best-effort tail of failed-job logs for the PR head ref (read-only)."""
+    try:
+        d = _gh_json(["pr", "view", str(pull_number), "--repo", f"{owner}/{repo}",
+                      "--json", "statusCheckRollup"])
+    except Exception:
+        return ""
+    tails: List[str] = []
+    for c in (d.get("statusCheckRollup") or []):
+        if not _check_failed(c):
+            continue
+        job_id = _job_id_from_check(c)
+        if not job_id:
+            continue
+        logs = github_tools.github_get_job_logs(owner, repo, str(job_id))
+        if isinstance(logs, dict) and logs.get("logs_tail"):
+            tails.append(f"[{_check_name(c)}]\n{logs['logs_tail'][-800:]}")
+        if len(tails) >= 3:
+            break
+    return "\n\n".join(tails)
+
+
+def _job_id_from_check(c: Dict[str, Any]) -> str:
+    """Extract an Actions job id from a check-rollup entry, if present."""
+    for key in ("databaseId", "id"):
+        if c.get(key):
+            return str(c[key])
+    url = c.get("detailsUrl") or c.get("targetUrl") or ""
+    if "/job/" in url:
+        return url.rsplit("/job/", 1)[-1].split("?")[0]
+    return ""
+
+
+def _checks_fix_plan(failing: List[str], logs_tail: str) -> str:
+    if not failing:
+        return "No failing checks detected; verify the PR is actually red before patching."
+    plan = "Repair failing checks: " + ", ".join(failing) + "."
+    if logs_tail:
+        plan += " Logs point at the tail output above."
+    return plan
+
+
+def _pr_receipt(pull_number: int, branch: Any, actions: List[str],
+                plan: str, result: str) -> Dict[str, Any]:
+    return {"timestamp": _now(), "surface": "github_fix_failed_checks",
+            "issue": None, "pr": pull_number, "branch": branch,
+            "actions_taken": list(actions), "fix_plan": plan,
+            "evidence": [], "confidence": 0.3, "verified": False, "result": result}
+
+
 # ── Tool: lantern_command (bang-command router) ──────────────────────────────
 def _investigate_issue(owner: str, repo: str, issue_number: int) -> Dict[str, Any]:
-    """Minimal PR1 investigate for !autonomous-work: read the issue + record a
-    receipt. (patch/pr modes land in the follow-up github_work_issue tool.)"""
-    info = github_tools.github_get_issue(owner, repo, str(issue_number))
-    _record("issue", {
-        "timestamp": _now(), "surface": "mcp-lantern-command",
-        "issue": issue_number, "pr": None, "branch": None,
-        "actions_taken": ["investigate"], "evidence": [], "confidence": 0.3,
-        "verified": False, "result": "investigation only (patch/pr modes in follow-up patch)",
-    })
-    return {"title": info.get("title"), "state": info.get("state"),
-            "labels": info.get("labels", []), "body_excerpt": (info.get("body") or "")[:400]}
+    """!autonomous-work investigate — delegate to github_work_issue (read-only)."""
+    res = github_work_issue(owner, repo, issue_number, mode="investigate")
+    return {"title": res.get("title"), "state": res.get("state"),
+            "labels": res.get("labels", []), "fix_plan": res.get("fix_plan"),
+            "body_excerpt": res.get("body_excerpt", "")}
 
 
 def lantern_command(command: str = "") -> Dict[str, Any]:
@@ -298,10 +659,13 @@ def lantern_command(command: str = "") -> Dict[str, Any]:
                 "result": github_pr_status(owner, repo, int(arg))}
     if name == "!fix-pr":
         if not arg.isdigit():
-            return {"ok": False, "command": name, "error": "usage: !fix-pr <pull_number>"}
+            return {"ok": False, "command": name, "error": "usage: !fix-pr <pull_number> [--push]"}
+        # Default to the safer stacked-PR gate (create_pr=True). '--push' opts into
+        # a direct push, which github_fix_failed_checks still only honors for
+        # bot-owned branches. No file_changes here → status + plan (no writes).
+        create_pr = "--push" not in parts[1:]
         return {"ok": True, "command": name, "routed_to": "github_fix_failed_checks",
-                "note": "auto-fix lands in the follow-up patch; here is the status + plan",
-                "result": github_pr_status(owner, repo, int(arg))}
+                "result": github_fix_failed_checks(owner, repo, int(arg), create_pr=create_pr)}
     if name == "!queue-run":
         return {"ok": True, "command": name, "routed_to": "worker_tick",
                 "result": worker_tick(int(arg) if arg.isdigit() else 1)}
@@ -315,6 +679,8 @@ CONVERGENCE_TOOLS = {
     "convergence_run": convergence_run,
     "github_triage_prs": github_triage_prs,
     "github_pr_status": github_pr_status,
+    "github_work_issue": github_work_issue,
+    "github_fix_failed_checks": github_fix_failed_checks,
     "worker_tick": worker_tick,
     "lantern_command": lantern_command,
 }
