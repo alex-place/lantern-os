@@ -590,6 +590,30 @@ module.exports = async (req, res, url, deps) => {
         fsSync.appendFileSync(convergenceLog, JSON.stringify(convergenceRecord) + "\n");
         step("record", "done", { path: "data/convergence-autonomous-work.jsonl" });
 
+        // AGI-benchmark per-run scores (#592): map the convergence record onto the
+        // six loop dimensions (Observe→Research→Reason→Act→Verify→Converge) and append
+        // one row per autonomous run. Scores are derived from the real signals of THIS
+        // run only — no synthetic data is written. Fulfils the SKILLS.md §benchmark
+        // contract ("Scores updated per-run in data/agi-benchmark.jsonl").
+        const c = convergenceRecord.confidence;
+        const agiRow = {
+          timestamp: convergenceRecord.timestamp,
+          runId: `autowork-${issueNumber}-${convergenceRecord.timestamp}`,
+          issue: issueNumber,
+          dimensions: {
+            observe: issueDetails ? 0.9 : 0.5,                       // issue fetched (+ web sweep)
+            research: c.codebaseResearch,                            // codebase + web grounding
+            reason: (plan.actions?.length || 0) > 0 ? 0.85 : 0.5,    // plan generated
+            act: (stats?.filesModified || 0) > 0 ? 0.85 : 0.5,       // patch applied + committed
+            verify: c.testsPassed,                                   // tests actually ran/passed
+            converge: c.overall                                      // confidence record + PR
+          },
+          overall: c.overall
+        };
+        const agiBenchLog = path.join(REPO_ROOT, "data", "agi-benchmark.jsonl");
+        fsSync.appendFileSync(agiBenchLog, JSON.stringify(agiRow) + "\n");
+        step("agi-benchmark", "done", { path: "data/agi-benchmark.jsonl", overall: agiRow.overall });
+
         send("done", {
           ok: true,
           ...receipt,

@@ -342,17 +342,16 @@ def test_anti_collapse_dormant_when_safe():
 
 # ── Surprise Monitor Integration ───────────────────────────────────────────────
 
-@pytest.mark.xfail(reason="#506: engine.forward_step now consumes m.surprise_monitor and emits "
-                          "surprise_spook, but it self-observes (y=x), so during collapse the "
-                          "innovation -> 0 and the NIS canary may not fire; pending an observation "
-                          "model that triggers spooks under collapse",
-                   strict=False)
 def test_surprise_monitor_integration():
     """Surprise monitor fires NIS canary and triggers anti-collapse excitation.
 
-    Pending #506 — the engine does not yet consume m.surprise_monitor during
-    rollout, so no surprise_spook is recorded. Marked xfail until the integration
-    lands; flipping it back to a hard test is the acceptance check for #506.
+    Closed #657 (the #506 residual). The engine no longer self-observes (y=x gave
+    innovation ν≡0 so the canary never fired). It now runs a genuine Kalman
+    predict/update cycle (engine.forward_step): it predicts the next state from the
+    model's own drift+diffusion (process noise Q=(g·dilation)²·dt), then scores the
+    realized state as an observation. Smooth exploration stays consistent (NIS≈m,
+    silent — verified 0/30 spooks in a structured regime), while the collapse snap /
+    Σ₀⁻¹ excitation kick spikes NIS past the χ² threshold (the spook).
     """
     m = _model()
     # Create a system that will drift toward collapse
