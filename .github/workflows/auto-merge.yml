@@ -1,18 +1,20 @@
 name: Auto-merge
 
-# Opt-in, stack-safe auto-merger. The repo has no branch protection, so this
+# Opt-in, best-fit zipper merger. The repo has no branch protection, so this
 # workflow enforces "all checks green + mergeable" itself before merging.
 #
-# How to use: add the `auto-merge` label to a PR. The workflow merges labeled,
-# non-draft PRs that target the default branch, in ASCENDING PR-number order
-# (so a stack lands bottom-up), one per run. It STOPS at the first labeled PR
-# that is conflicting, has a failing check, or still has checks running — so a
-# stuck PR never lets a later one jump the queue. The */10 schedule advances the
-# train; `workflow_dispatch` kicks it immediately.
+# How to use: add the `auto-merge` label to PRs. The workflow walks labeled,
+# non-draft PRs targeting the default branch in ASCENDING number order and merges
+# the lowest-numbered one that is fully ready (mergeable + all checks green),
+# one per run. It does NOT freeze on a stuck PR: if a PR is conflicting or has a
+# failing check it is SKIPPED (with a comment) so later ready PRs can still land
+# ("best fit / as it comes in"). A PR that is merely BEHIND the base gets its
+# branch updated (re-running its checks) rather than merged stale. The */6
+# schedule advances the zipper; `workflow_dispatch` kicks it immediately.
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/6 * * * *'
   workflow_dispatch: {}
   pull_request_target:
     types: [labeled, synchronize, reopened, ready_for_review]
@@ -28,22 +30,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  merge:
+  zipper:
     runs-on: ubuntu-latest
     steps:
-      - name: Merge the lowest-numbered green auto-merge PR
+      - name: Zipper-merge ready auto-merge PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           BASE: ${{ github.event.repository.default_branch }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           BASE="${BASE:-master}"
           mapfile -t PRS < <(gh pr list --repo "$REPO" --state open --label auto-merge \
             --base "$BASE" --json number,isDraft \
             --jq 'map(select(.isDraft==false)) | sort_by(.number) | .[].number')
           if [ "${#PRS[@]}" -eq 0 ]; then echo "No auto-merge PRs queued."; exit 0; fi
-          echo "Queue (ascending): ${PRS[*]}"
+          echo "Zipper queue (ascending): ${PRS[*]}"
+
           for n in "${PRS[@]}"; do
             echo "::group::Evaluate PR #$n"
             mergeable=$(gh pr view "$n" --repo "$REPO" --json mergeable --jq .mergeable)
@@ -52,23 +55,32 @@ jobs:
 
             if [ "$mergeable" = "CONFLICTING" ]; then
               gh pr comment "$n" --repo "$REPO" \
-                --body "🤖 auto-merge: blocked — merge conflict with \`$BASE\`. Resolve and I'll continue." || true
-              echo "Conflict on #$n — stopping to preserve stack order."
-              echo "::endgroup::"; exit 0
+                --body "🤖 auto-merge: skipped — merge conflict with \`$BASE\`. Resolve and I'll pick it back up." >/dev/null 2>&1 || true
+              echo "Conflict — skip #$n, try next."; echo "::endgroup::"; continue
+            fi
+
+            # Behind the base → refresh the branch so checks re-run against current $BASE,
+            # then move on (it'll be ready on a later pass).
+            if [ "$mstate" = "BEHIND" ]; then
+              echo "Behind $BASE — updating branch of #$n to re-trigger checks."
+              gh pr update-branch "$n" --repo "$REPO" >/dev/null 2>&1 || echo "update-branch failed (maintainer edits may be off)"
+              echo "::endgroup::"; continue
             fi
 
             states=$(gh pr checks "$n" --repo "$REPO" --json state --jq '.[].state' 2>/dev/null || true)
             if printf '%s\n' "$states" | grep -qiE 'FAILURE|ERROR|CANCELLED|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE'; then
-              echo "Failing checks on #$n — stopping (won't skip ahead in the stack)."
-              echo "::endgroup::"; exit 0
+              echo "Failing checks — skip #$n, try next."; echo "::endgroup::"; continue
             fi
             if printf '%s\n' "$states" | grep -qiE 'PENDING|QUEUED|IN_PROGRESS|EXPECTED|WAITING'; then
-              echo "Checks still running on #$n — waiting."
-              echo "::endgroup::"; exit 0
+              echo "Checks still running — skip #$n this pass."; echo "::endgroup::"; continue
             fi
 
-            echo "All green + mergeable — merging #$n (squash)."
-            gh pr merge "$n" --repo "$REPO" --squash --delete-branch
-            echo "Merged #$n. The schedule will pick up the next one."
-            echo "::endgroup::"; exit 0
+            echo "Ready — merging #$n (squash)."
+            if gh pr merge "$n" --repo "$REPO" --squash --delete-branch; then
+              echo "Merged #$n. Schedule will advance the zipper."
+              echo "::endgroup::"; exit 0
+            else
+              echo "Merge call failed for #$n — skip, try next."; echo "::endgroup::"; continue
+            fi
           done
+          echo "No PR was ready to merge this pass."
