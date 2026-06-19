@@ -769,6 +769,21 @@ except Exception as _gh_exc:  # pragma: no cover - optional module
     _GITHUB_INT_PARAMS = set()
     logger.warning("GitHub tools not loaded: %s", _gh_exc)
 
+# ── Convergence / workflow tools — the !convergance + PR-work backbone ──
+# convergence_run, github_triage_prs, github_pr_status, worker_tick, lantern_command.
+# Wired with the live queue + task_run so worker_tick proves pickup.
+try:
+    import convergence_tools
+    _cv_added = convergence_tools.register(TOOLS_REGISTRY, {
+        "task_queue": _task_queue,
+        "run_task": _tool_task_run,
+        "append_jsonl": _append_jsonl,
+        "repo_root": REPO_ROOT,
+    })
+    logger.info("Convergence/workflow tools registered (%d): %s", len(_cv_added), _cv_added)
+except Exception as _cv_exc:  # pragma: no cover - optional module
+    logger.warning("Convergence tools not loaded: %s", _cv_exc)
+
 
 def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
     """Handle a single JSON-RPC request."""
