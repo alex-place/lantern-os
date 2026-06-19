@@ -12,7 +12,7 @@ function initializeSharedHeader() {
         </a>
 
         <div class="global-nav-center">
-          <a href="/dream-chat.html" class="global-nav-link">Journal</a>
+          <a href="/dream-chat.html" class="global-nav-link">Chat</a>
           <a href="/trader-dashboard.html" class="global-nav-link">Trader</a>
           <a href="/create.html" class="global-nav-link">Create</a>
           <a href="/explore.html" class="global-nav-link">Explore</a>
@@ -42,7 +42,7 @@ function initializeSharedHeader() {
         <span class="global-footer-sep">·</span>
         <a href="/">Home</a>
         <span class="global-footer-sep">·</span>
-        <a href="/dream-chat.html">Journal</a>
+        <a href="/dream-chat.html">Chat</a>
         <span class="global-footer-sep">·</span>
         <a href="/trader-dashboard.html">Trader</a>
         <span class="global-footer-sep">·</span>
