@@ -1,0 +1,2571 @@
+{
+  "summary": "Generate a diverse execution-verifiable Python coding corpus to retrain the Σ₀ Ouro Coder (#781)",
+  "agentCount": 12,
+  "logs": [
+    "generated 192 candidate tasks across 12 categories"
+  ],
+  "result": {
+    "count": 192,
+    "tasks": [
+      {
+        "fn": "swap_case",
+        "instruction": "Write a Python function `fn(s)` that returns a copy of the string `s` with every uppercase letter converted to lowercase and every lowercase letter converted to uppercase. Non-letter characters are left unchanged. Output only the function code.",
+        "code": "def fn(s):\n    result = []\n    for ch in s:\n        if ch.isupper():\n            result.append(ch.lower())\n        elif ch.islower():\n            result.append(ch.upper())\n        else:\n            result.append(ch)\n    return ''.join(result)",
+        "asserts": [
+          "assert fn('Hello World') == 'hELLO wORLD'",
+          "assert fn('') == ''",
+          "assert fn('abc123') == 'ABC123'",
+          "assert fn('ABC') == 'abc'",
+          "assert fn('Python3.8!') == 'pYTHON3.8!'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "count_substring",
+        "instruction": "Write a Python function `fn(text, sub)` that returns the number of non-overlapping occurrences of the substring `sub` within `text`. If `sub` is an empty string, return 0. Output only the function code.",
+        "code": "def fn(text, sub):\n    if sub == '':\n        return 0\n    return text.count(sub)",
+        "asserts": [
+          "assert fn('banana', 'a') == 3",
+          "assert fn('aaaa', 'aa') == 2",
+          "assert fn('hello', 'z') == 0",
+          "assert fn('abc', '') == 0",
+          "assert fn('', 'a') == 0",
+          "assert fn('mississippi', 'iss') == 2"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "truncate_with_ellipsis",
+        "instruction": "Write a Python function `fn(s, n)` that returns the string `s` unchanged if its length is less than or equal to `n`. Otherwise, return the first `n` characters of `s` followed by '...'. Assume `n` is a non-negative integer. Output only the function code.",
+        "code": "def fn(s, n):\n    if len(s) <= n:\n        return s\n    return s[:n] + '...'",
+        "asserts": [
+          "assert fn('hello', 10) == 'hello'",
+          "assert fn('hello world', 5) == 'hello...'",
+          "assert fn('abc', 3) == 'abc'",
+          "assert fn('abcd', 0) == '...'",
+          "assert fn('', 5) == ''",
+          "assert fn('abcdef', 4) == 'abcd...'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "initials",
+        "instruction": "Write a Python function `fn(name)` that returns the uppercase initials of each whitespace-separated word in `name`, joined with no separator. For example 'john ronald tolkien' becomes 'JRT'. If the input is empty or only whitespace, return an empty string. Output only the function code.",
+        "code": "def fn(name):\n    return ''.join(word[0].upper() for word in name.split())",
+        "asserts": [
+          "assert fn('john ronald tolkien') == 'JRT'",
+          "assert fn('alice') == 'A'",
+          "assert fn('') == ''",
+          "assert fn('   ') == ''",
+          "assert fn('mary jane watson') == 'MJW'",
+          "assert fn('  spaced  out  ') == 'SO'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "repeat_string",
+        "instruction": "Write a Python function `fn(s, n)` that returns the string `s` concatenated with itself `n` times. If `n` is zero or negative, return an empty string. Output only the function code.",
+        "code": "def fn(s, n):\n    if n <= 0:\n        return ''\n    return s * n",
+        "asserts": [
+          "assert fn('ab', 3) == 'ababab'",
+          "assert fn('x', 0) == ''",
+          "assert fn('hi', 1) == 'hi'",
+          "assert fn('a', -2) == ''",
+          "assert fn('', 5) == ''",
+          "assert fn('xy', 2) == 'xyxy'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "remove_punctuation",
+        "instruction": "Write a Python function `fn(s)` that returns the string `s` with all ASCII punctuation characters removed, keeping letters, digits, and whitespace. Output only the function code.",
+        "code": "import string\n\ndef fn(s):\n    punct = set(string.punctuation)\n    return ''.join(ch for ch in s if ch not in punct)",
+        "asserts": [
+          "assert fn('Hello, World!') == 'Hello World'",
+          "assert fn('a.b,c;d') == 'abcd'",
+          "assert fn('') == ''",
+          "assert fn('no punctuation here') == 'no punctuation here'",
+          "assert fn('1+1=2') == '112'",
+          "assert fn('!!!') == ''"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "capitalize_words",
+        "instruction": "Write a Python function `fn(s)` that capitalizes the first letter of each whitespace-separated word and lowercases the rest of each word, preserving single spaces between words. Leading/trailing whitespace and repeated spaces are collapsed to single spaces. Output only the function code.",
+        "code": "def fn(s):\n    return ' '.join(word.capitalize() for word in s.split())",
+        "asserts": [
+          "assert fn('hello world') == 'Hello World'",
+          "assert fn('HELLO WORLD') == 'Hello World'",
+          "assert fn('  mixed CASE words ') == 'Mixed Case Words'",
+          "assert fn('') == ''",
+          "assert fn('a') == 'A'",
+          "assert fn('the quick brown fox') == 'The Quick Brown Fox'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "is_rotation",
+        "instruction": "Write a Python function `fn(a, b)` that returns True if string `b` is a rotation of string `a` (i.e. `b` can be obtained by moving some number of leading characters of `a` to the end), and False otherwise. Two empty strings are considered rotations of each other. Output only the function code.",
+        "code": "def fn(a, b):\n    if len(a) != len(b):\n        return False\n    if a == '' and b == '':\n        return True\n    return b in (a + a)",
+        "asserts": [
+          "assert fn('waterbottle', 'erbottlewat') is True",
+          "assert fn('hello', 'llohe') is True",
+          "assert fn('hello', 'helol') is False",
+          "assert fn('', '') is True",
+          "assert fn('abc', 'ab') is False",
+          "assert fn('aaa', 'aaa') is True"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "longest_word",
+        "instruction": "Write a Python function `fn(sentence)` that returns the longest whitespace-separated word in `sentence`. If there is a tie, return the word that appears first. If the sentence is empty or only whitespace, return an empty string. Output only the function code.",
+        "code": "def fn(sentence):\n    words = sentence.split()\n    if not words:\n        return ''\n    longest = words[0]\n    for word in words[1:]:\n        if len(word) > len(longest):\n            longest = word\n    return longest",
+        "asserts": [
+          "assert fn('the quick brown fox') == 'quick'",
+          "assert fn('a bb ccc') == 'ccc'",
+          "assert fn('cat dog pig') == 'cat'",
+          "assert fn('') == ''",
+          "assert fn('   ') == ''",
+          "assert fn('one') == 'one'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "snake_to_camel",
+        "instruction": "Write a Python function `fn(s)` that converts a snake_case string to camelCase. The first word stays lowercase and each subsequent word's first letter is uppercased, with underscores removed. Assume input contains only lowercase letters, digits, and underscores. Output only the function code.",
+        "code": "def fn(s):\n    parts = s.split('_')\n    if not parts:\n        return ''\n    head = parts[0]\n    tail = ''.join(p[:1].upper() + p[1:] for p in parts[1:])\n    return head + tail",
+        "asserts": [
+          "assert fn('hello_world') == 'helloWorld'",
+          "assert fn('my_variable_name') == 'myVariableName'",
+          "assert fn('single') == 'single'",
+          "assert fn('') == ''",
+          "assert fn('a_b_c') == 'aBC'",
+          "assert fn('snake_case_2_camel') == 'snakeCase2Camel'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "mask_string",
+        "instruction": "Write a Python function `fn(s, visible)` that returns `s` with all but the last `visible` characters replaced by '*'. If `visible` is greater than or equal to the length of `s`, return `s` unchanged. If `visible` is zero or negative, mask the entire string. Output only the function code.",
+        "code": "def fn(s, visible):\n    if visible <= 0:\n        return '*' * len(s)\n    if visible >= len(s):\n        return s\n    return '*' * (len(s) - visible) + s[-visible:]",
+        "asserts": [
+          "assert fn('1234567890', 4) == '******7890'",
+          "assert fn('abcd', 4) == 'abcd'",
+          "assert fn('abcd', 10) == 'abcd'",
+          "assert fn('secret', 0) == '******'",
+          "assert fn('', 3) == ''",
+          "assert fn('hello', 2) == '***lo'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "compress_runs",
+        "instruction": "Write a Python function `fn(s)` that performs basic run-length compression: each maximal run of a repeated character is replaced by the character followed by the run length. For example 'aaabb' becomes 'a3b2'. An empty string returns an empty string. Output only the function code.",
+        "code": "def fn(s):\n    if not s:\n        return ''\n    result = []\n    prev = s[0]\n    count = 1\n    for ch in s[1:]:\n        if ch == prev:\n            count += 1\n        else:\n            result.append(prev + str(count))\n            prev = ch\n            count = 1\n    result.append(prev + str(count))\n    return ''.join(result)",
+        "asserts": [
+          "assert fn('aaabb') == 'a3b2'",
+          "assert fn('abc') == 'a1b1c1'",
+          "assert fn('') == ''",
+          "assert fn('a') == 'a1'",
+          "assert fn('aaaa') == 'a4'",
+          "assert fn('aabaa') == 'a2b1a2'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "replace_vowels",
+        "instruction": "Write a Python function `fn(s, ch)` that replaces every vowel (a, e, i, o, u, both lowercase and uppercase) in `s` with the single character `ch`, leaving all other characters unchanged. Output only the function code.",
+        "code": "def fn(s, ch):\n    vowels = set('aeiouAEIOU')\n    return ''.join(ch if c in vowels else c for c in s)",
+        "asserts": [
+          "assert fn('hello', '*') == 'h*ll*'",
+          "assert fn('AEIOU', '-') == '-----'",
+          "assert fn('xyz', '*') == 'xyz'",
+          "assert fn('', '*') == ''",
+          "assert fn('Programming', '0') == 'Pr0gr0mm0ng'",
+          "assert fn('bcd', '#') == 'bcd'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "format_phone",
+        "instruction": "Write a Python function `fn(digits)` that takes a string of exactly 10 digit characters and returns it formatted as '(XXX) XXX-XXXX'. If the input does not consist of exactly 10 digits, return the input string unchanged. Output only the function code.",
+        "code": "def fn(digits):\n    if len(digits) != 10 or not digits.isdigit():\n        return digits\n    return '(' + digits[:3] + ') ' + digits[3:6] + '-' + digits[6:]",
+        "asserts": [
+          "assert fn('1234567890') == '(123) 456-7890'",
+          "assert fn('0000000000') == '(000) 000-0000'",
+          "assert fn('123') == '123'",
+          "assert fn('abcdefghij') == 'abcdefghij'",
+          "assert fn('') == ''",
+          "assert fn('12345678901') == '12345678901'"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "count_words_starting_with",
+        "instruction": "Write a Python function `fn(text, letter)` that returns the number of whitespace-separated words in `text` that start with the given `letter`, comparing case-insensitively. Assume `letter` is a single character. Output only the function code.",
+        "code": "def fn(text, letter):\n    target = letter.lower()\n    count = 0\n    for word in text.split():\n        if word[0].lower() == target:\n            count += 1\n    return count",
+        "asserts": [
+          "assert fn('apple banana avocado', 'a') == 2",
+          "assert fn('Apple Apricot ant', 'A') == 3",
+          "assert fn('one two three', 'z') == 0",
+          "assert fn('', 'a') == 0",
+          "assert fn('Cat car Cup', 'c') == 3",
+          "assert fn('hello world', 'h') == 1"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "center_pad",
+        "instruction": "Write a Python function `fn(s, width)` that centers the string `s` within a field of the given `width` using spaces as padding. If `width` is less than or equal to the length of `s`, return `s` unchanged. When padding cannot be split evenly, the extra space goes on the right. Output only the function code.",
+        "code": "def fn(s, width):\n    if width <= len(s):\n        return s\n    total = width - len(s)\n    left = total // 2\n    right = total - left\n    return ' ' * left + s + ' ' * right",
+        "asserts": [
+          "assert fn('hi', 6) == '  hi  '",
+          "assert fn('hi', 5) == ' hi  '",
+          "assert fn('abc', 3) == 'abc'",
+          "assert fn('abc', 2) == 'abc'",
+          "assert fn('', 4) == '    '",
+          "assert fn('x', 4) == ' x  '"
+        ],
+        "category": "string manipulation (slicing, casing, splitting, joining, replacing, formatting)"
+      },
+      {
+        "fn": "rotate_left",
+        "instruction": "Write a function `rotate_left(lst, n)` that returns a new list with the elements of `lst` rotated to the left by `n` positions. Rotating left by 1 moves the first element to the end. `n` may be larger than the list length (wrap around using modulo) and the original list must not be mutated. An empty list returns an empty list. Output only the function code.",
+        "code": "def rotate_left(lst, n):\n    if not lst:\n        return []\n    n = n % len(lst)\n    return lst[n:] + lst[:n]",
+        "asserts": [
+          "assert rotate_left([1, 2, 3, 4, 5], 2) == [3, 4, 5, 1, 2]",
+          "assert rotate_left([1, 2, 3], 0) == [1, 2, 3]",
+          "assert rotate_left([1, 2, 3], 4) == [2, 3, 1]",
+          "assert rotate_left([], 3) == []",
+          "assert rotate_left([7], 5) == [7]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "partition_by_parity",
+        "instruction": "Write a function `partition_by_parity(nums)` that splits a list of integers into two lists and returns them as a tuple `(evens, odds)`, where `evens` contains all even numbers and `odds` contains all odd numbers, each preserving their original relative order. An empty input returns `([], [])`. Output only the function code.",
+        "code": "def partition_by_parity(nums):\n    evens = [x for x in nums if x % 2 == 0]\n    odds = [x for x in nums if x % 2 != 0]\n    return (evens, odds)",
+        "asserts": [
+          "assert partition_by_parity([1, 2, 3, 4, 5]) == ([2, 4], [1, 3, 5])",
+          "assert partition_by_parity([]) == ([], [])",
+          "assert partition_by_parity([2, 4, 6]) == ([2, 4, 6], [])",
+          "assert partition_by_parity([1, 3, 5]) == ([], [1, 3, 5])",
+          "assert partition_by_parity([0]) == ([0], [])"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "dedupe_preserve_order",
+        "instruction": "Write a function `dedupe_preserve_order(items)` that removes duplicate elements from a list while keeping only the first occurrence of each element, preserving the original order. The input contains only hashable elements. An empty list returns an empty list. Output only the function code.",
+        "code": "def dedupe_preserve_order(items):\n    seen = set()\n    result = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            result.append(x)\n    return result",
+        "asserts": [
+          "assert dedupe_preserve_order([1, 2, 2, 3, 1, 4]) == [1, 2, 3, 4]",
+          "assert dedupe_preserve_order([]) == []",
+          "assert dedupe_preserve_order([5, 5, 5]) == [5]",
+          "assert dedupe_preserve_order(['a', 'b', 'a', 'c']) == ['a', 'b', 'c']",
+          "assert dedupe_preserve_order([1]) == [1]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "zip_longest_fill",
+        "instruction": "Write a function `zip_longest_fill(a, b, fill=None)` that zips two lists into a list of pairs (tuples). When the lists have different lengths, continue until the longer list is exhausted, using `fill` for the missing values from the shorter list. If both lists are empty, return an empty list. Output only the function code.",
+        "code": "def zip_longest_fill(a, b, fill=None):\n    n = max(len(a), len(b))\n    result = []\n    for i in range(n):\n        x = a[i] if i < len(a) else fill\n        y = b[i] if i < len(b) else fill\n        result.append((x, y))\n    return result",
+        "asserts": [
+          "assert zip_longest_fill([1, 2], [3, 4]) == [(1, 3), (2, 4)]",
+          "assert zip_longest_fill([1, 2, 3], [4]) == [(1, 4), (2, None), (3, None)]",
+          "assert zip_longest_fill([], []) == []",
+          "assert zip_longest_fill([1], [2, 3], 0) == [(1, 2), (0, 3)]",
+          "assert zip_longest_fill([], [1, 2], -1) == [(-1, 1), (-1, 2)]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "split_at",
+        "instruction": "Write a function `split_at(lst, index)` that splits a list into two parts at the given index and returns them as a tuple `(left, right)`, where `left` holds the elements before `index` and `right` holds the rest. An `index` past the end puts everything in `left`; a negative `index` is treated as 0 (everything in `right`). Do not mutate the input. Output only the function code.",
+        "code": "def split_at(lst, index):\n    if index < 0:\n        index = 0\n    return (lst[:index], lst[index:])",
+        "asserts": [
+          "assert split_at([1, 2, 3, 4], 2) == ([1, 2], [3, 4])",
+          "assert split_at([1, 2, 3], 0) == ([], [1, 2, 3])",
+          "assert split_at([1, 2, 3], 5) == ([1, 2, 3], [])",
+          "assert split_at([], 2) == ([], [])",
+          "assert split_at([1, 2, 3], -1) == ([], [1, 2, 3])"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "interleave",
+        "instruction": "Write a function `interleave(a, b)` that merges two lists by alternating their elements: the first element of `a`, then the first of `b`, then the second of `a`, and so on. When one list is longer, append its remaining elements at the end. Two empty lists return an empty list. Output only the function code.",
+        "code": "def interleave(a, b):\n    result = []\n    n = min(len(a), len(b))\n    for i in range(n):\n        result.append(a[i])\n        result.append(b[i])\n    result.extend(a[n:])\n    result.extend(b[n:])\n    return result",
+        "asserts": [
+          "assert interleave([1, 2, 3], [4, 5, 6]) == [1, 4, 2, 5, 3, 6]",
+          "assert interleave([1, 2], [3, 4, 5, 6]) == [1, 3, 2, 4, 5, 6]",
+          "assert interleave([], []) == []",
+          "assert interleave([1], []) == [1]",
+          "assert interleave([1, 2, 3], [9]) == [1, 9, 2, 3]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "count_consecutive",
+        "instruction": "Write a function `count_consecutive(items)` that performs run-length encoding: it returns a list of `(value, count)` tuples describing consecutive runs of equal elements in order. For example `[1, 1, 2]` becomes `[(1, 2), (2, 1)]`. An empty list returns an empty list. Output only the function code.",
+        "code": "def count_consecutive(items):\n    result = []\n    for x in items:\n        if result and result[-1][0] == x:\n            result[-1] = (x, result[-1][1] + 1)\n        else:\n            result.append((x, 1))\n    return result",
+        "asserts": [
+          "assert count_consecutive([1, 1, 2, 3, 3, 3]) == [(1, 2), (2, 1), (3, 3)]",
+          "assert count_consecutive([]) == []",
+          "assert count_consecutive([5]) == [(5, 1)]",
+          "assert count_consecutive(['a', 'a', 'a']) == [('a', 3)]",
+          "assert count_consecutive([1, 2, 1]) == [(1, 1), (2, 1), (1, 1)]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "take_every_nth",
+        "instruction": "Write a function `take_every_nth(lst, n)` that returns a new list containing every nth element of `lst`, starting with the first element (index 0). For `n` of 1 it returns a copy of the whole list. If `n` is zero or negative, return an empty list. Output only the function code.",
+        "code": "def take_every_nth(lst, n):\n    if n <= 0:\n        return []\n    return lst[::n]",
+        "asserts": [
+          "assert take_every_nth([1, 2, 3, 4, 5, 6], 2) == [1, 3, 5]",
+          "assert take_every_nth([1, 2, 3, 4], 1) == [1, 2, 3, 4]",
+          "assert take_every_nth([], 3) == []",
+          "assert take_every_nth([1, 2, 3], 0) == []",
+          "assert take_every_nth([10, 20, 30, 40, 50], 3) == [10, 40]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "pairwise",
+        "instruction": "Write a function `pairwise(lst)` that returns a list of consecutive overlapping pairs (tuples) from `lst`. For input `[1, 2, 3]` it returns `[(1, 2), (2, 3)]`. A list with fewer than two elements returns an empty list. Output only the function code.",
+        "code": "def pairwise(lst):\n    return [(lst[i], lst[i + 1]) for i in range(len(lst) - 1)]",
+        "asserts": [
+          "assert pairwise([1, 2, 3, 4]) == [(1, 2), (2, 3), (3, 4)]",
+          "assert pairwise([1, 2]) == [(1, 2)]",
+          "assert pairwise([5]) == []",
+          "assert pairwise([]) == []",
+          "assert pairwise(['a', 'b', 'c']) == [('a', 'b'), ('b', 'c')]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "filter_greater_than",
+        "instruction": "Write a function `filter_greater_than(nums, threshold)` that returns a new list containing only the numbers from `nums` that are strictly greater than `threshold`, preserving their original order. Values equal to the threshold are excluded. An empty input returns an empty list. Output only the function code.",
+        "code": "def filter_greater_than(nums, threshold):\n    return [x for x in nums if x > threshold]",
+        "asserts": [
+          "assert filter_greater_than([1, 5, 3, 8, 2], 3) == [5, 8]",
+          "assert filter_greater_than([], 10) == []",
+          "assert filter_greater_than([1, 2, 3], 5) == []",
+          "assert filter_greater_than([4, 4, 4], 4) == []",
+          "assert filter_greater_than([-1, 0, 1], -1) == [0, 1]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "group_into_buckets",
+        "instruction": "Write a function `group_into_buckets(nums)` that classifies each integer in `nums` by sign and returns a dictionary with keys `'positive'`, `'negative'`, and `'zero'`, each mapping to a list of the matching numbers in their original order. All three keys must always be present even when their lists are empty. Output only the function code.",
+        "code": "def group_into_buckets(nums):\n    buckets = {'positive': [], 'negative': [], 'zero': []}\n    for x in nums:\n        if x > 0:\n            buckets['positive'].append(x)\n        elif x < 0:\n            buckets['negative'].append(x)\n        else:\n            buckets['zero'].append(x)\n    return buckets",
+        "asserts": [
+          "assert group_into_buckets([1, -2, 0, 3, -4]) == {'positive': [1, 3], 'negative': [-2, -4], 'zero': [0]}",
+          "assert group_into_buckets([]) == {'positive': [], 'negative': [], 'zero': []}",
+          "assert group_into_buckets([0, 0]) == {'positive': [], 'negative': [], 'zero': [0, 0]}",
+          "assert group_into_buckets([5]) == {'positive': [5], 'negative': [], 'zero': []}",
+          "assert group_into_buckets([-1, -2, -3]) == {'positive': [], 'negative': [-1, -2, -3], 'zero': []}"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "scale_list",
+        "instruction": "Write a function `scale_list(nums, factor)` that returns a new list where every element of `nums` is multiplied by `factor`, preserving order. An empty input returns an empty list. Output only the function code.",
+        "code": "def scale_list(nums, factor):\n    return [x * factor for x in nums]",
+        "asserts": [
+          "assert scale_list([1, 2, 3], 2) == [2, 4, 6]",
+          "assert scale_list([], 5) == []",
+          "assert scale_list([1, 2, 3], 0) == [0, 0, 0]",
+          "assert scale_list([-1, 2], 3) == [-3, 6]",
+          "assert scale_list([10], -1) == [-10]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "drop_while_negative",
+        "instruction": "Write a function `drop_while_negative(nums)` that removes elements from the front of the list as long as they are strictly negative, and returns the remaining list starting from the first non-negative element. Once a non-negative element is reached, the rest is kept unchanged (including any later negatives). An empty list returns an empty list. Output only the function code.",
+        "code": "def drop_while_negative(nums):\n    i = 0\n    while i < len(nums) and nums[i] < 0:\n        i += 1\n    return nums[i:]",
+        "asserts": [
+          "assert drop_while_negative([-1, -2, 3, -4, 5]) == [3, -4, 5]",
+          "assert drop_while_negative([-1, -2, -3]) == []",
+          "assert drop_while_negative([1, 2, 3]) == [1, 2, 3]",
+          "assert drop_while_negative([]) == []",
+          "assert drop_while_negative([0, -1]) == [0, -1]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "index_of_all",
+        "instruction": "Write a function `index_of_all(lst, target)` that returns a list of all indices at which `target` appears in `lst`, in ascending order. If the target is not present, return an empty list. Output only the function code.",
+        "code": "def index_of_all(lst, target):\n    return [i for i, x in enumerate(lst) if x == target]",
+        "asserts": [
+          "assert index_of_all([1, 2, 1, 3, 1], 1) == [0, 2, 4]",
+          "assert index_of_all([1, 2, 3], 5) == []",
+          "assert index_of_all([], 1) == []",
+          "assert index_of_all(['a', 'b', 'a'], 'a') == [0, 2]",
+          "assert index_of_all([7], 7) == [0]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "flatten_one_level",
+        "instruction": "Write a function `flatten_one_level(nested)` that takes a list of lists and returns a single flat list containing all the inner elements in order, flattening exactly one level. Empty inner lists contribute nothing. An empty outer list returns an empty list. Output only the function code.",
+        "code": "def flatten_one_level(nested):\n    result = []\n    for sub in nested:\n        for x in sub:\n            result.append(x)\n    return result",
+        "asserts": [
+          "assert flatten_one_level([[1, 2], [3, 4]]) == [1, 2, 3, 4]",
+          "assert flatten_one_level([]) == []",
+          "assert flatten_one_level([[1], [], [2, 3]]) == [1, 2, 3]",
+          "assert flatten_one_level([[1, 2]]) == [1, 2]",
+          "assert flatten_one_level([[], []]) == []"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "running_max",
+        "instruction": "Write a function `running_max(nums)` that returns a new list of the same length where each position holds the maximum of all elements seen so far (from the start up to and including that position). An empty input returns an empty list. Output only the function code.",
+        "code": "def running_max(nums):\n    result = []\n    current = None\n    for x in nums:\n        if current is None or x > current:\n            current = x\n        result.append(current)\n    return result",
+        "asserts": [
+          "assert running_max([1, 3, 2, 5, 4]) == [1, 3, 3, 5, 5]",
+          "assert running_max([]) == []",
+          "assert running_max([5]) == [5]",
+          "assert running_max([3, 2, 1]) == [3, 3, 3]",
+          "assert running_max([-2, -5, -1]) == [-2, -2, -1]"
+        ],
+        "category": "list operations (transform, filter, partition, rotate, dedup, zip-like)"
+      },
+      {
+        "fn": "invert_dict",
+        "instruction": "Write a function `invert_dict(d)` that returns a new dictionary swapping each key with its value (values become keys, keys become values). If two keys share the same value, later entries overwrite earlier ones. Output only the function code.",
+        "code": "def invert_dict(d):\n    return {v: k for k, v in d.items()}",
+        "asserts": [
+          "assert invert_dict({\"a\": 1, \"b\": 2}) == {1: \"a\", 2: \"b\"}",
+          "assert invert_dict({}) == {}",
+          "assert invert_dict({\"x\": \"y\"}) == {\"y\": \"x\"}",
+          "assert invert_dict({1: 10}) == {10: 1}",
+          "assert invert_dict({\"a\": 1, \"b\": 1}) == {1: \"b\"}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "count_items",
+        "instruction": "Write a function `count_items(items)` that takes a list and returns a dictionary mapping each distinct element to the number of times it appears in the list. Output only the function code.",
+        "code": "def count_items(items):\n    counts = {}\n    for x in items:\n        counts[x] = counts.get(x, 0) + 1\n    return counts",
+        "asserts": [
+          "assert count_items([1, 1, 2, 3, 3, 3]) == {1: 2, 2: 1, 3: 3}",
+          "assert count_items([]) == {}",
+          "assert count_items([\"a\"]) == {\"a\": 1}",
+          "assert count_items([\"x\", \"y\", \"x\"]) == {\"x\": 2, \"y\": 1}",
+          "assert count_items([0, 0, 0]) == {0: 3}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "group_by_parity",
+        "instruction": "Write a function `group_by_parity(nums)` that takes a list of integers and returns a dictionary with keys \"even\" and \"odd\", each mapping to a list of the numbers with that parity, preserving original order. Output only the function code.",
+        "code": "def group_by_parity(nums):\n    result = {\"even\": [], \"odd\": []}\n    for n in nums:\n        if n % 2 == 0:\n            result[\"even\"].append(n)\n        else:\n            result[\"odd\"].append(n)\n    return result",
+        "asserts": [
+          "assert group_by_parity([1, 2, 3, 4]) == {\"even\": [2, 4], \"odd\": [1, 3]}",
+          "assert group_by_parity([]) == {\"even\": [], \"odd\": []}",
+          "assert group_by_parity([2, 4, 6]) == {\"even\": [2, 4, 6], \"odd\": []}",
+          "assert group_by_parity([1, 3, 5]) == {\"even\": [], \"odd\": [1, 3, 5]}",
+          "assert group_by_parity([0]) == {\"even\": [0], \"odd\": []}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "lookup_with_default",
+        "instruction": "Write a function `lookup_with_default(d, key, default)` that returns the value mapped to `key` in dictionary `d`, or `default` if the key is not present. Output only the function code.",
+        "code": "def lookup_with_default(d, key, default):\n    return d.get(key, default)",
+        "asserts": [
+          "assert lookup_with_default({\"a\": 1}, \"a\", 0) == 1",
+          "assert lookup_with_default({\"a\": 1}, \"b\", 0) == 0",
+          "assert lookup_with_default({}, \"x\", -1) == -1",
+          "assert lookup_with_default({\"k\": None}, \"k\", 5) is None",
+          "assert lookup_with_default({\"a\": 1, \"b\": 2}, \"b\", 99) == 2"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "merge_sum_values",
+        "instruction": "Write a function `merge_sum_values(d1, d2)` that merges two dictionaries with numeric values into a new dictionary. For keys present in both, the result holds the sum of the two values; keys in only one dictionary keep their value. Output only the function code.",
+        "code": "def merge_sum_values(d1, d2):\n    result = dict(d1)\n    for k, v in d2.items():\n        result[k] = result.get(k, 0) + v\n    return result",
+        "asserts": [
+          "assert merge_sum_values({\"a\": 1, \"b\": 2}, {\"b\": 3, \"c\": 4}) == {\"a\": 1, \"b\": 5, \"c\": 4}",
+          "assert merge_sum_values({}, {}) == {}",
+          "assert merge_sum_values({\"x\": 1}, {}) == {\"x\": 1}",
+          "assert merge_sum_values({}, {\"y\": 2}) == {\"y\": 2}",
+          "assert merge_sum_values({\"a\": 5}, {\"a\": 5}) == {\"a\": 10}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "build_index_map",
+        "instruction": "Write a function `build_index_map(items)` that takes a list and returns a dictionary mapping each element to its index in the list. If an element appears more than once, the result holds its last index. Output only the function code.",
+        "code": "def build_index_map(items):\n    return {item: i for i, item in enumerate(items)}",
+        "asserts": [
+          "assert build_index_map([\"a\", \"b\", \"c\"]) == {\"a\": 0, \"b\": 1, \"c\": 2}",
+          "assert build_index_map([]) == {}",
+          "assert build_index_map([\"x\"]) == {\"x\": 0}",
+          "assert build_index_map([\"a\", \"b\", \"a\"]) == {\"a\": 2, \"b\": 1}",
+          "assert build_index_map([10, 20]) == {10: 0, 20: 1}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "filter_by_value",
+        "instruction": "Write a function `filter_by_value(d, threshold)` that returns a new dictionary containing only the key-value pairs from `d` whose value is greater than or equal to `threshold`. Output only the function code.",
+        "code": "def filter_by_value(d, threshold):\n    return {k: v for k, v in d.items() if v >= threshold}",
+        "asserts": [
+          "assert filter_by_value({\"a\": 1, \"b\": 5, \"c\": 3}, 3) == {\"b\": 5, \"c\": 3}",
+          "assert filter_by_value({}, 0) == {}",
+          "assert filter_by_value({\"x\": 10}, 5) == {\"x\": 10}",
+          "assert filter_by_value({\"x\": 1}, 5) == {}",
+          "assert filter_by_value({\"a\": 0, \"b\": 0}, 0) == {\"a\": 0, \"b\": 0}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "group_by_length",
+        "instruction": "Write a function `group_by_length(words)` that takes a list of strings and returns a dictionary mapping each string length to a list of the words having that length, preserving original order. Output only the function code.",
+        "code": "def group_by_length(words):\n    result = {}\n    for w in words:\n        result.setdefault(len(w), []).append(w)\n    return result",
+        "asserts": [
+          "assert group_by_length([\"a\", \"bb\", \"cc\", \"ddd\"]) == {1: [\"a\"], 2: [\"bb\", \"cc\"], 3: [\"ddd\"]}",
+          "assert group_by_length([]) == {}",
+          "assert group_by_length([\"hi\"]) == {2: [\"hi\"]}",
+          "assert group_by_length([\"\", \"a\"]) == {0: [\"\"], 1: [\"a\"]}",
+          "assert group_by_length([\"ab\", \"cd\"]) == {2: [\"ab\", \"cd\"]}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "dict_from_pairs",
+        "instruction": "Write a function `dict_from_pairs(pairs)` that takes a list of (key, value) tuples and builds a dictionary from them. If a key appears more than once, the last value wins. Output only the function code.",
+        "code": "def dict_from_pairs(pairs):\n    result = {}\n    for k, v in pairs:\n        result[k] = v\n    return result",
+        "asserts": [
+          "assert dict_from_pairs([(\"a\", 1), (\"b\", 2)]) == {\"a\": 1, \"b\": 2}",
+          "assert dict_from_pairs([]) == {}",
+          "assert dict_from_pairs([(\"x\", 1), (\"x\", 2)]) == {\"x\": 2}",
+          "assert dict_from_pairs([(1, \"one\")]) == {1: \"one\"}",
+          "assert dict_from_pairs([(\"a\", 1), (\"b\", 2), (\"a\", 3)]) == {\"a\": 3, \"b\": 2}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "max_value_key",
+        "instruction": "Write a function `max_value_key(d)` that returns the key whose value is the largest in the dictionary `d`. If there is a tie, return the key that was encountered first. Return None if the dictionary is empty. Output only the function code.",
+        "code": "def max_value_key(d):\n    if not d:\n        return None\n    best = None\n    best_val = None\n    for k, v in d.items():\n        if best_val is None or v > best_val:\n            best_val = v\n            best = k\n    return best",
+        "asserts": [
+          "assert max_value_key({\"a\": 1, \"b\": 5, \"c\": 3}) == \"b\"",
+          "assert max_value_key({}) is None",
+          "assert max_value_key({\"x\": 10}) == \"x\"",
+          "assert max_value_key({\"a\": 2, \"b\": 2}) == \"a\"",
+          "assert max_value_key({\"a\": -5, \"b\": -1}) == \"b\""
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "invert_multimap",
+        "instruction": "Write a function `invert_multimap(d)` that inverts a dictionary so each distinct value maps to a list of the keys that had that value, in the order the keys were encountered. Output only the function code.",
+        "code": "def invert_multimap(d):\n    result = {}\n    for k, v in d.items():\n        result.setdefault(v, []).append(k)\n    return result",
+        "asserts": [
+          "assert invert_multimap({\"a\": 1, \"b\": 1, \"c\": 2}) == {1: [\"a\", \"b\"], 2: [\"c\"]}",
+          "assert invert_multimap({}) == {}",
+          "assert invert_multimap({\"x\": 5}) == {5: [\"x\"]}",
+          "assert invert_multimap({\"a\": 1, \"b\": 2}) == {1: [\"a\"], 2: [\"b\"]}",
+          "assert invert_multimap({\"p\": 0, \"q\": 0, \"r\": 0}) == {0: [\"p\", \"q\", \"r\"]}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "sum_values",
+        "instruction": "Write a function `sum_values(d)` that returns the sum of all the numeric values in the dictionary `d`. An empty dictionary should return 0. Output only the function code.",
+        "code": "def sum_values(d):\n    total = 0\n    for v in d.values():\n        total += v\n    return total",
+        "asserts": [
+          "assert sum_values({\"a\": 1, \"b\": 2, \"c\": 3}) == 6",
+          "assert sum_values({}) == 0",
+          "assert sum_values({\"x\": 10}) == 10",
+          "assert sum_values({\"a\": -5, \"b\": 5}) == 0",
+          "assert sum_values({\"a\": 0}) == 0"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "count_chars",
+        "instruction": "Write a function `count_chars(text)` that takes a string and returns a dictionary mapping each character to the number of times it appears in the string. Output only the function code.",
+        "code": "def count_chars(text):\n    counts = {}\n    for ch in text:\n        counts[ch] = counts.get(ch, 0) + 1\n    return counts",
+        "asserts": [
+          "assert count_chars(\"aabbc\") == {\"a\": 2, \"b\": 2, \"c\": 1}",
+          "assert count_chars(\"\") == {}",
+          "assert count_chars(\"x\") == {\"x\": 1}",
+          "assert count_chars(\"aaa\") == {\"a\": 3}",
+          "assert count_chars(\"ab\") == {\"a\": 1, \"b\": 1}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "select_keys",
+        "instruction": "Write a function `select_keys(d, keys)` that returns a new dictionary containing only the entries of `d` whose key is in the list `keys`. Keys in the list that are absent from `d` are ignored. Output only the function code.",
+        "code": "def select_keys(d, keys):\n    return {k: d[k] for k in keys if k in d}",
+        "asserts": [
+          "assert select_keys({\"a\": 1, \"b\": 2, \"c\": 3}, [\"a\", \"c\"]) == {\"a\": 1, \"c\": 3}",
+          "assert select_keys({\"a\": 1}, []) == {}",
+          "assert select_keys({}, [\"x\"]) == {}",
+          "assert select_keys({\"a\": 1, \"b\": 2}, [\"a\", \"z\"]) == {\"a\": 1}",
+          "assert select_keys({\"a\": 1}, [\"a\", \"a\"]) == {\"a\": 1}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "merge_prefer_first",
+        "instruction": "Write a function `merge_prefer_first(d1, d2)` that merges two dictionaries into a new one. For keys present in both, the value from `d1` is kept. Neither input dictionary should be modified. Output only the function code.",
+        "code": "def merge_prefer_first(d1, d2):\n    result = dict(d2)\n    result.update(d1)\n    return result",
+        "asserts": [
+          "assert merge_prefer_first({\"a\": 1}, {\"a\": 2, \"b\": 3}) == {\"a\": 1, \"b\": 3}",
+          "assert merge_prefer_first({}, {}) == {}",
+          "assert merge_prefer_first({\"x\": 1}, {}) == {\"x\": 1}",
+          "assert merge_prefer_first({}, {\"y\": 2}) == {\"y\": 2}",
+          "assert merge_prefer_first({\"a\": 1, \"b\": 2}, {\"b\": 9, \"c\": 3}) == {\"a\": 1, \"b\": 2, \"c\": 3}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "average_by_group",
+        "instruction": "Write a function `average_by_group(pairs)` that takes a list of (label, value) tuples and returns a dictionary mapping each label to the average (as a float) of all values recorded for that label. Output only the function code.",
+        "code": "def average_by_group(pairs):\n    sums = {}\n    counts = {}\n    for label, value in pairs:\n        sums[label] = sums.get(label, 0) + value\n        counts[label] = counts.get(label, 0) + 1\n    return {label: sums[label] / counts[label] for label in sums}",
+        "asserts": [
+          "assert average_by_group([(\"a\", 2), (\"a\", 4), (\"b\", 10)]) == {\"a\": 3.0, \"b\": 10.0}",
+          "assert average_by_group([]) == {}",
+          "assert average_by_group([(\"x\", 5)]) == {\"x\": 5.0}",
+          "assert average_by_group([(\"g\", 1), (\"g\", 2), (\"g\", 3)]) == {\"g\": 2.0}",
+          "assert average_by_group([(\"a\", 0), (\"a\", 0)]) == {\"a\": 0.0}"
+        ],
+        "category": "dictionary operations (build, invert, merge, group-by, count, lookup-with-default)"
+      },
+      {
+        "fn": "divisor_count",
+        "instruction": "Write a Python function `divisor_count(n)` that returns the number of positive divisors of the integer `n`. Use the absolute value of `n`, and return 0 when `n` is 0. Output only the function code.",
+        "code": "def divisor_count(n):\n    n = abs(n)\n    if n == 0:\n        return 0\n    count = 0\n    i = 1\n    while i * i <= n:\n        if n % i == 0:\n            count += 2\n            if i * i == n:\n                count -= 1\n        i += 1\n    return count",
+        "asserts": [
+          "assert divisor_count(1) == 1",
+          "assert divisor_count(6) == 4",
+          "assert divisor_count(28) == 6",
+          "assert divisor_count(0) == 0",
+          "assert divisor_count(-12) == 6",
+          "assert divisor_count(49) == 3"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "sum_proper_divisors",
+        "instruction": "Write a Python function `sum_proper_divisors(n)` that returns the sum of all proper divisors of `n` (positive divisors excluding `n` itself). Return 0 for `n` less than or equal to 1. Output only the function code.",
+        "code": "def sum_proper_divisors(n):\n    if n <= 1:\n        return 0\n    total = 1\n    i = 2\n    while i * i <= n:\n        if n % i == 0:\n            total += i\n            other = n // i\n            if other != i:\n                total += other\n        i += 1\n    return total",
+        "asserts": [
+          "assert sum_proper_divisors(1) == 0",
+          "assert sum_proper_divisors(6) == 6",
+          "assert sum_proper_divisors(12) == 16",
+          "assert sum_proper_divisors(0) == 0",
+          "assert sum_proper_divisors(28) == 28",
+          "assert sum_proper_divisors(7) == 1"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "digital_root",
+        "instruction": "Write a Python function `digital_root(n)` that repeatedly sums the digits of the absolute value of `n` until a single digit remains, and returns that digit. Output only the function code.",
+        "code": "def digital_root(n):\n    n = abs(n)\n    while n >= 10:\n        s = 0\n        while n > 0:\n            s += n % 10\n            n //= 10\n        n = s\n    return n",
+        "asserts": [
+          "assert digital_root(0) == 0",
+          "assert digital_root(9) == 9",
+          "assert digital_root(38) == 2",
+          "assert digital_root(12345) == 6",
+          "assert digital_root(-99) == 9",
+          "assert digital_root(10) == 1"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "to_base",
+        "instruction": "Write a Python function `to_base(n, base)` that converts integer `n` into its string representation in the given `base` (2 through 36), using lowercase letters for digit values above 9. Return \"0\" for zero and prefix negative numbers with a minus sign. Output only the function code.",
+        "code": "def to_base(n, base):\n    if n == 0:\n        return \"0\"\n    digits = \"0123456789abcdefghijklmnopqrstuvwxyz\"\n    neg = n < 0\n    n = abs(n)\n    out = []\n    while n > 0:\n        out.append(digits[n % base])\n        n //= base\n    if neg:\n        out.append(\"-\")\n    return \"\".join(reversed(out))",
+        "asserts": [
+          "assert to_base(0, 2) == \"0\"",
+          "assert to_base(5, 2) == \"101\"",
+          "assert to_base(255, 16) == \"ff\"",
+          "assert to_base(-10, 2) == \"-1010\"",
+          "assert to_base(8, 8) == \"10\"",
+          "assert to_base(100, 10) == \"100\""
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "from_base",
+        "instruction": "Write a Python function `from_base(s, base)` that parses the string `s` as an integer written in the given `base` (2 through 36) and returns its value as a base-10 integer. Accept lowercase or uppercase letters for digits above 9, ignore surrounding whitespace, and support a leading minus sign. Output only the function code.",
+        "code": "def from_base(s, base):\n    digits = \"0123456789abcdefghijklmnopqrstuvwxyz\"\n    s = s.strip().lower()\n    neg = s.startswith(\"-\")\n    if neg:\n        s = s[1:]\n    val = 0\n    for ch in s:\n        val = val * base + digits.index(ch)\n    return -val if neg else val",
+        "asserts": [
+          "assert from_base(\"0\", 2) == 0",
+          "assert from_base(\"101\", 2) == 5",
+          "assert from_base(\"ff\", 16) == 255",
+          "assert from_base(\"-1010\", 2) == -10",
+          "assert from_base(\"10\", 8) == 8",
+          "assert from_base(\"777\", 10) == 777"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "prime_factors",
+        "instruction": "Write a Python function `prime_factors(n)` that returns a list of the prime factors of the absolute value of `n`, in non-decreasing order and with repetition (so the product of the list equals `n`). Return an empty list for 0 and 1. Output only the function code.",
+        "code": "def prime_factors(n):\n    n = abs(n)\n    factors = []\n    d = 2\n    while d * d <= n:\n        while n % d == 0:\n            factors.append(d)\n            n //= d\n        d += 1\n    if n > 1:\n        factors.append(n)\n    return factors",
+        "asserts": [
+          "assert prime_factors(1) == []",
+          "assert prime_factors(12) == [2, 2, 3]",
+          "assert prime_factors(17) == [17]",
+          "assert prime_factors(60) == [2, 2, 3, 5]",
+          "assert prime_factors(0) == []",
+          "assert prime_factors(2) == [2]"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "lcm",
+        "instruction": "Write a Python function `lcm(a, b)` that returns the least common multiple of two integers `a` and `b` as a non-negative integer. Return 0 if either argument is 0. You may use the `math` module. Output only the function code.",
+        "code": "import math\n\ndef lcm(a, b):\n    if a == 0 or b == 0:\n        return 0\n    return abs(a * b) // math.gcd(a, b)",
+        "asserts": [
+          "assert lcm(4, 6) == 12",
+          "assert lcm(3, 5) == 15",
+          "assert lcm(0, 5) == 0",
+          "assert lcm(7, 7) == 7",
+          "assert lcm(-4, 6) == 12",
+          "assert lcm(1, 99) == 99"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "mod_pow",
+        "instruction": "Write a Python function `mod_pow(base, exp, mod)` that computes `(base ** exp) % mod` efficiently using fast modular exponentiation, where `exp` is a non-negative integer. Return 0 when `mod` is 1. Output only the function code.",
+        "code": "def mod_pow(base, exp, mod):\n    if mod == 1:\n        return 0\n    result = 1\n    base %= mod\n    while exp > 0:\n        if exp & 1:\n            result = (result * base) % mod\n        base = (base * base) % mod\n        exp >>= 1\n    return result",
+        "asserts": [
+          "assert mod_pow(2, 10, 1000) == 24",
+          "assert mod_pow(3, 0, 7) == 1",
+          "assert mod_pow(2, 5, 1) == 0",
+          "assert mod_pow(5, 3, 13) == 8",
+          "assert mod_pow(7, 2, 100) == 49",
+          "assert mod_pow(10, 5, 6) == 4"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "count_digits",
+        "instruction": "Write a Python function `count_digits(n)` that returns the number of decimal digits in the absolute value of the integer `n`. The number 0 has one digit, and a leading minus sign does not count. Output only the function code.",
+        "code": "def count_digits(n):\n    n = abs(n)\n    if n == 0:\n        return 1\n    count = 0\n    while n > 0:\n        count += 1\n        n //= 10\n    return count",
+        "asserts": [
+          "assert count_digits(0) == 1",
+          "assert count_digits(5) == 1",
+          "assert count_digits(100) == 3",
+          "assert count_digits(-4567) == 4",
+          "assert count_digits(9) == 1",
+          "assert count_digits(1000000) == 7"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "is_perfect_number",
+        "instruction": "Write a Python function `is_perfect_number(n)` that returns True if `n` is a perfect number (a positive integer equal to the sum of its proper divisors) and False otherwise. Output only the function code.",
+        "code": "def is_perfect_number(n):\n    if n <= 1:\n        return False\n    total = 1\n    i = 2\n    while i * i <= n:\n        if n % i == 0:\n            total += i\n            other = n // i\n            if other != i:\n                total += other\n        i += 1\n    return total == n",
+        "asserts": [
+          "assert is_perfect_number(6) is True",
+          "assert is_perfect_number(28) is True",
+          "assert is_perfect_number(12) is False",
+          "assert is_perfect_number(1) is False",
+          "assert is_perfect_number(496) is True",
+          "assert is_perfect_number(0) is False"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "collatz_steps",
+        "instruction": "Write a Python function `collatz_steps(n)` that returns the number of steps to reach 1 from the positive integer `n` using the Collatz process: if even divide by 2, if odd multiply by 3 and add 1. Reaching 1 from 1 takes 0 steps. Output only the function code.",
+        "code": "def collatz_steps(n):\n    steps = 0\n    while n != 1:\n        if n % 2 == 0:\n            n //= 2\n        else:\n            n = 3 * n + 1\n        steps += 1\n    return steps",
+        "asserts": [
+          "assert collatz_steps(1) == 0",
+          "assert collatz_steps(2) == 1",
+          "assert collatz_steps(6) == 8",
+          "assert collatz_steps(7) == 16",
+          "assert collatz_steps(16) == 4",
+          "assert collatz_steps(27) == 111"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "nth_triangular",
+        "instruction": "Write a Python function `nth_triangular(n)` that returns the n-th triangular number (the sum of the integers from 1 to n). Return 0 for any `n` less than or equal to 0. Output only the function code.",
+        "code": "def nth_triangular(n):\n    if n <= 0:\n        return 0\n    return n * (n + 1) // 2",
+        "asserts": [
+          "assert nth_triangular(1) == 1",
+          "assert nth_triangular(0) == 0",
+          "assert nth_triangular(5) == 15",
+          "assert nth_triangular(10) == 55",
+          "assert nth_triangular(-3) == 0",
+          "assert nth_triangular(100) == 5050"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "is_armstrong",
+        "instruction": "Write a Python function `is_armstrong(n)` that returns True if the non-negative integer `n` is an Armstrong number (equal to the sum of each of its digits raised to the power of the number of digits) and False otherwise. Return False for negative input. Output only the function code.",
+        "code": "def is_armstrong(n):\n    if n < 0:\n        return False\n    s = str(n)\n    power = len(s)\n    total = sum(int(ch) ** power for ch in s)\n    return total == n",
+        "asserts": [
+          "assert is_armstrong(0) is True",
+          "assert is_armstrong(5) is True",
+          "assert is_armstrong(153) is True",
+          "assert is_armstrong(154) is False",
+          "assert is_armstrong(9474) is True",
+          "assert is_armstrong(10) is False"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "digit_product",
+        "instruction": "Write a Python function `digit_product(n)` that returns the product of the decimal digits of the absolute value of `n`. Return 0 when `n` is 0. Output only the function code.",
+        "code": "def digit_product(n):\n    n = abs(n)\n    if n == 0:\n        return 0\n    product = 1\n    while n > 0:\n        product *= n % 10\n        n //= 10\n    return product",
+        "asserts": [
+          "assert digit_product(0) == 0",
+          "assert digit_product(5) == 5",
+          "assert digit_product(123) == 6",
+          "assert digit_product(-456) == 120",
+          "assert digit_product(909) == 0",
+          "assert digit_product(111) == 1"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "count_set_bits",
+        "instruction": "Write a Python function `count_set_bits(n)` that returns the number of 1 bits in the binary representation of the absolute value of the integer `n`. Output only the function code.",
+        "code": "def count_set_bits(n):\n    n = abs(n)\n    count = 0\n    while n > 0:\n        count += n & 1\n        n >>= 1\n    return count",
+        "asserts": [
+          "assert count_set_bits(0) == 0",
+          "assert count_set_bits(1) == 1",
+          "assert count_set_bits(7) == 3",
+          "assert count_set_bits(8) == 1",
+          "assert count_set_bits(255) == 8",
+          "assert count_set_bits(-5) == 2"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "count_primes_below",
+        "instruction": "Write a Python function `count_primes_below(n)` that returns how many prime numbers are strictly less than `n`, using a sieve. Return 0 when `n` is less than 3. Output only the function code.",
+        "code": "def count_primes_below(n):\n    if n < 3:\n        return 0\n    sieve = [True] * n\n    sieve[0] = sieve[1] = False\n    i = 2\n    while i * i < n:\n        if sieve[i]:\n            for j in range(i * i, n, i):\n                sieve[j] = False\n        i += 1\n    return sum(sieve)",
+        "asserts": [
+          "assert count_primes_below(0) == 0",
+          "assert count_primes_below(2) == 0",
+          "assert count_primes_below(3) == 1",
+          "assert count_primes_below(10) == 4",
+          "assert count_primes_below(20) == 8",
+          "assert count_primes_below(100) == 25"
+        ],
+        "category": "number theory and integer math (divisors, digits, bases, modular, sequences)"
+      },
+      {
+        "fn": "sum_nested",
+        "instruction": "Write a function `fn(data)` that recursively sums all integers in a nested list of arbitrary depth. Elements are either integers or lists of integers/lists. An empty list sums to 0. Output only the function code.",
+        "code": "def fn(data):\n    total = 0\n    for item in data:\n        if isinstance(item, list):\n            total += fn(item)\n        else:\n            total += item\n    return total",
+        "asserts": [
+          "assert fn([1, 2, 3]) == 6",
+          "assert fn([1, [2, 3], [4, [5]]]) == 15",
+          "assert fn([]) == 0",
+          "assert fn([[], [[]]]) == 0",
+          "assert fn([[[[7]]]]) == 7"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "nesting_depth",
+        "instruction": "Write a function `fn(data)` that returns the maximum nesting depth of a list. A non-list value has depth 0, a flat list has depth 1, and each additional level of nesting adds 1. An empty list has depth 1. Output only the function code.",
+        "code": "def fn(data):\n    if not isinstance(data, list):\n        return 0\n    if not data:\n        return 1\n    return 1 + max(fn(item) for item in data)",
+        "asserts": [
+          "assert fn(5) == 0",
+          "assert fn([1, 2, 3]) == 1",
+          "assert fn([]) == 1",
+          "assert fn([1, [2, [3]]]) == 3",
+          "assert fn([[1], [[2]], 3]) == 3"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "power_of",
+        "instruction": "Write a function `fn(base, exp)` that computes base raised to a non-negative integer exponent using recursion, without using the ** operator or pow(). Any base to the power 0 is 1. Output only the function code.",
+        "code": "def fn(base, exp):\n    if exp == 0:\n        return 1\n    return base * fn(base, exp - 1)",
+        "asserts": [
+          "assert fn(2, 10) == 1024",
+          "assert fn(5, 0) == 1",
+          "assert fn(3, 1) == 3",
+          "assert fn(7, 2) == 49",
+          "assert fn(0, 5) == 0",
+          "assert fn(-2, 3) == -8"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "count_leaves",
+        "instruction": "Write a function `fn(tree)` that counts the leaf values in a nested list, where a leaf is any non-list element. An empty list contributes 0 leaves. Output only the function code.",
+        "code": "def fn(tree):\n    if not isinstance(tree, list):\n        return 1\n    count = 0\n    for item in tree:\n        count += fn(item)\n    return count",
+        "asserts": [
+          "assert fn([1, 2, 3]) == 3",
+          "assert fn([1, [2, 3], 4]) == 4",
+          "assert fn([]) == 0",
+          "assert fn([[], []]) == 0",
+          "assert fn([1, [2, [3, 4]], 5]) == 5"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "gcd_recursive",
+        "instruction": "Write a function `fn(a, b)` that computes the greatest common divisor of two non-negative integers using the recursive Euclidean algorithm. The gcd of any number and 0 is that number. Output only the function code.",
+        "code": "def fn(a, b):\n    if b == 0:\n        return a\n    return fn(b, a % b)",
+        "asserts": [
+          "assert fn(12, 8) == 4",
+          "assert fn(48, 18) == 6",
+          "assert fn(7, 0) == 7",
+          "assert fn(0, 9) == 9",
+          "assert fn(17, 13) == 1",
+          "assert fn(100, 25) == 25"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "sum_to_n",
+        "instruction": "Write a function `fn(n)` that returns the sum of all integers from 1 to n inclusive using recursion. For n less than or equal to 0, return 0. Output only the function code.",
+        "code": "def fn(n):\n    if n <= 0:\n        return 0\n    return n + fn(n - 1)",
+        "asserts": [
+          "assert fn(5) == 15",
+          "assert fn(1) == 1",
+          "assert fn(0) == 0",
+          "assert fn(-3) == 0",
+          "assert fn(100) == 5050"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "list_length",
+        "instruction": "Write a function `fn(items)` that returns the number of elements in a list using recursion, without calling len(). An empty list has length 0. Output only the function code.",
+        "code": "def fn(items):\n    if not items:\n        return 0\n    return 1 + fn(items[1:])",
+        "asserts": [
+          "assert fn([10, 20, 30]) == 3",
+          "assert fn([]) == 0",
+          "assert fn([5]) == 1",
+          "assert fn(['a', 'b', 'c', 'd']) == 4",
+          "assert fn([None, None]) == 2"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "reverse_list",
+        "instruction": "Write a function `fn(items)` that returns a new list with the elements in reverse order using recursion, without using slicing tricks like items[::-1] or the reversed() builtin. An empty list returns an empty list. Output only the function code.",
+        "code": "def fn(items):\n    if not items:\n        return []\n    return fn(items[1:]) + [items[0]]",
+        "asserts": [
+          "assert fn([1, 2, 3]) == [3, 2, 1]",
+          "assert fn([]) == []",
+          "assert fn([42]) == [42]",
+          "assert fn(['a', 'b']) == ['b', 'a']",
+          "assert fn([1, 2, 3, 4, 5]) == [5, 4, 3, 2, 1]"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "merge_sort",
+        "instruction": "Write a function `fn(items)` that sorts a list of numbers in ascending order using the recursive merge sort divide-and-conquer algorithm. An empty list and a single-element list are already sorted. Output only the function code.",
+        "code": "def fn(items):\n    if len(items) <= 1:\n        return list(items)\n    mid = len(items) // 2\n    left = fn(items[:mid])\n    right = fn(items[mid:])\n    merged = []\n    i = j = 0\n    while i < len(left) and j < len(right):\n        if left[i] <= right[j]:\n            merged.append(left[i])\n            i += 1\n        else:\n            merged.append(right[j])\n            j += 1\n    merged.extend(left[i:])\n    merged.extend(right[j:])\n    return merged",
+        "asserts": [
+          "assert fn([3, 1, 2]) == [1, 2, 3]",
+          "assert fn([]) == []",
+          "assert fn([5]) == [5]",
+          "assert fn([5, 4, 3, 2, 1]) == [1, 2, 3, 4, 5]",
+          "assert fn([2, 2, 1, 3, 1]) == [1, 1, 2, 2, 3]"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "flatten_deep",
+        "instruction": "Write a function `fn(data)` that recursively flattens a nested list of arbitrary depth into a single flat list, preserving left-to-right order. An empty list flattens to an empty list. Output only the function code.",
+        "code": "def fn(data):\n    result = []\n    for item in data:\n        if isinstance(item, list):\n            result.extend(fn(item))\n        else:\n            result.append(item)\n    return result",
+        "asserts": [
+          "assert fn([1, [2, 3], 4]) == [1, 2, 3, 4]",
+          "assert fn([]) == []",
+          "assert fn([[1, [2, [3]]], 4]) == [1, 2, 3, 4]",
+          "assert fn([[], [1], []]) == [1]",
+          "assert fn([1, 2, 3]) == [1, 2, 3]"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "count_digits",
+        "instruction": "Write a function `fn(n)` that counts the number of decimal digits in a non-negative integer using recursion. The number 0 has 1 digit. Output only the function code.",
+        "code": "def fn(n):\n    if n < 10:\n        return 1\n    return 1 + fn(n // 10)",
+        "asserts": [
+          "assert fn(0) == 1",
+          "assert fn(7) == 1",
+          "assert fn(42) == 2",
+          "assert fn(1000) == 4",
+          "assert fn(999999) == 6"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "ackermann",
+        "instruction": "Write a function `fn(m, n)` that computes the Ackermann function for non-negative integers m and n using its standard recursive definition: if m is 0 return n+1; if n is 0 return fn(m-1, 1); otherwise return fn(m-1, fn(m, n-1)). Output only the function code.",
+        "code": "def fn(m, n):\n    if m == 0:\n        return n + 1\n    if n == 0:\n        return fn(m - 1, 1)\n    return fn(m - 1, fn(m, n - 1))",
+        "asserts": [
+          "assert fn(0, 0) == 1",
+          "assert fn(1, 1) == 3",
+          "assert fn(2, 2) == 7",
+          "assert fn(3, 3) == 61",
+          "assert fn(0, 5) == 6"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "sum_digits_recursive",
+        "instruction": "Write a function `fn(n)` that returns the sum of the decimal digits of a non-negative integer using recursion. The digit sum of 0 is 0. Output only the function code.",
+        "code": "def fn(n):\n    if n == 0:\n        return 0\n    return n % 10 + fn(n // 10)",
+        "asserts": [
+          "assert fn(0) == 0",
+          "assert fn(5) == 5",
+          "assert fn(123) == 6",
+          "assert fn(9999) == 36",
+          "assert fn(1001) == 2"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "max_nested",
+        "instruction": "Write a function `fn(data)` that returns the maximum integer found anywhere in a nested list of integers (arbitrary depth). The input is guaranteed to contain at least one integer somewhere. Output only the function code.",
+        "code": "def fn(data):\n    best = None\n    for item in data:\n        if isinstance(item, list):\n            sub = fn(item)\n            if sub is not None and (best is None or sub > best):\n                best = sub\n        else:\n            if best is None or item > best:\n                best = item\n    return best",
+        "asserts": [
+          "assert fn([1, 2, 3]) == 3",
+          "assert fn([1, [9, 2], 3]) == 9",
+          "assert fn([[[-5]]]) == -5",
+          "assert fn([[1, [2, [8]]], 4]) == 8",
+          "assert fn([7]) == 7"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "decimal_to_binary",
+        "instruction": "Write a function `fn(n)` that converts a non-negative integer to its binary representation as a string using recursion, without using bin() or format(). The number 0 returns the string '0'. Output only the function code.",
+        "code": "def fn(n):\n    if n == 0:\n        return '0'\n    if n == 1:\n        return '1'\n    return fn(n // 2) + str(n % 2)",
+        "asserts": [
+          "assert fn(0) == '0'",
+          "assert fn(1) == '1'",
+          "assert fn(2) == '10'",
+          "assert fn(5) == '101'",
+          "assert fn(10) == '1010'",
+          "assert fn(255) == '11111111'"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "count_paths",
+        "instruction": "Write a function `fn(rows, cols)` that counts the number of distinct paths from the top-left to the bottom-right corner of a grid with the given number of rows and columns, moving only right or down, using recursion. A grid with a single row or single column has exactly 1 path. Output only the function code.",
+        "code": "def fn(rows, cols):\n    if rows == 1 or cols == 1:\n        return 1\n    return fn(rows - 1, cols) + fn(rows, cols - 1)",
+        "asserts": [
+          "assert fn(1, 1) == 1",
+          "assert fn(2, 2) == 2",
+          "assert fn(3, 3) == 6",
+          "assert fn(1, 5) == 1",
+          "assert fn(3, 7) == 28",
+          "assert fn(4, 4) == 20"
+        ],
+        "category": "recursion (factorial-like, tree/nesting, divide-and-conquer, accumulation)"
+      },
+      {
+        "fn": "sort_by_length",
+        "instruction": "Write a Python function `fn(words)` that takes a list of strings and returns a new list sorted by string length in ascending order. Strings of equal length must keep their original relative order (stable sort). Output only the function code.",
+        "code": "def fn(words):\n    return sorted(words, key=len)",
+        "asserts": [
+          "assert fn(['ccc', 'a', 'bb']) == ['a', 'bb', 'ccc']",
+          "assert fn([]) == []",
+          "assert fn(['x']) == ['x']",
+          "assert fn(['ab', 'cd', 'e']) == ['e', 'ab', 'cd']",
+          "assert fn(['hi', 'by', 'no']) == ['hi', 'by', 'no']"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "binary_search_first",
+        "instruction": "Write a Python function `fn(arr, target)` that performs binary search on a sorted (ascending) list of integers and returns the index of the FIRST occurrence of target. If target is not present, return -1. Output only the function code.",
+        "code": "def fn(arr, target):\n    lo, hi = 0, len(arr) - 1\n    result = -1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if arr[mid] == target:\n            result = mid\n            hi = mid - 1\n        elif arr[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return result",
+        "asserts": [
+          "assert fn([1, 2, 2, 2, 3], 2) == 1",
+          "assert fn([1, 2, 3, 4], 4) == 3",
+          "assert fn([1, 2, 3], 5) == -1",
+          "assert fn([], 1) == -1",
+          "assert fn([7], 7) == 0",
+          "assert fn([5, 5, 5], 5) == 0"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "selection_sort",
+        "instruction": "Write a Python function `fn(nums)` that sorts a list of numbers in ascending order using the selection sort algorithm and returns a new sorted list. Do not mutate the input list. Output only the function code.",
+        "code": "def fn(nums):\n    arr = list(nums)\n    n = len(arr)\n    for i in range(n):\n        min_idx = i\n        for j in range(i + 1, n):\n            if arr[j] < arr[min_idx]:\n                min_idx = j\n        arr[i], arr[min_idx] = arr[min_idx], arr[i]\n    return arr",
+        "asserts": [
+          "assert fn([3, 1, 2]) == [1, 2, 3]",
+          "assert fn([]) == []",
+          "assert fn([5]) == [5]",
+          "assert fn([4, 4, 1, 4]) == [1, 4, 4, 4]",
+          "assert fn([-2, 0, -5, 3]) == [-5, -2, 0, 3]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "find_insertion_index",
+        "instruction": "Write a Python function `fn(arr, value)` that takes a sorted (ascending) list and a value, and returns the leftmost index at which the value could be inserted to keep the list sorted. Output only the function code.",
+        "code": "def fn(arr, value):\n    lo, hi = 0, len(arr)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] < value:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo",
+        "asserts": [
+          "assert fn([1, 3, 5, 7], 4) == 2",
+          "assert fn([1, 3, 5], 0) == 0",
+          "assert fn([1, 3, 5], 9) == 3",
+          "assert fn([], 5) == 0",
+          "assert fn([2, 2, 2], 2) == 0",
+          "assert fn([1, 2, 4, 4, 5], 4) == 2"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "sort_descending",
+        "instruction": "Write a Python function `fn(nums)` that returns a new list containing the numbers sorted in descending (largest to smallest) order. Output only the function code.",
+        "code": "def fn(nums):\n    return sorted(nums, reverse=True)",
+        "asserts": [
+          "assert fn([1, 3, 2]) == [3, 2, 1]",
+          "assert fn([]) == []",
+          "assert fn([5]) == [5]",
+          "assert fn([-1, -3, -2]) == [-1, -2, -3]",
+          "assert fn([4, 4, 1]) == [4, 4, 1]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "kth_smallest",
+        "instruction": "Write a Python function `fn(nums, k)` that returns the k-th smallest element (1-indexed) from a list of numbers. Assume k is valid (1 <= k <= len(nums)). Duplicates count as separate positions. Output only the function code.",
+        "code": "def fn(nums, k):\n    return sorted(nums)[k - 1]",
+        "asserts": [
+          "assert fn([3, 1, 2], 1) == 1",
+          "assert fn([3, 1, 2], 3) == 3",
+          "assert fn([5, 5, 5], 2) == 5",
+          "assert fn([10], 1) == 10",
+          "assert fn([4, 2, 7, 1, 9], 4) == 7"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "sort_by_frequency",
+        "instruction": "Write a Python function `fn(items)` that returns a list of the unique items sorted by descending frequency of occurrence in the input list. Items with the same frequency must appear in the order they first appeared in the input. Output only the function code.",
+        "code": "def fn(items):\n    counts = {}\n    order = []\n    for x in items:\n        if x not in counts:\n            counts[x] = 0\n            order.append(x)\n        counts[x] += 1\n    return sorted(order, key=lambda x: -counts[x])",
+        "asserts": [
+          "assert fn([1, 1, 2, 3, 3, 3]) == [3, 1, 2]",
+          "assert fn([]) == []",
+          "assert fn(['a']) == ['a']",
+          "assert fn([4, 5, 4, 6, 5, 4]) == [4, 5, 6]",
+          "assert fn([7, 8, 8, 7]) == [7, 8]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "linear_search_all",
+        "instruction": "Write a Python function `fn(arr, target)` that returns a list of all indices at which target appears in the list arr, in ascending index order. If target does not appear, return an empty list. Output only the function code.",
+        "code": "def fn(arr, target):\n    return [i for i, x in enumerate(arr) if x == target]",
+        "asserts": [
+          "assert fn([1, 2, 1, 3, 1], 1) == [0, 2, 4]",
+          "assert fn([1, 2, 3], 5) == []",
+          "assert fn([], 1) == []",
+          "assert fn(['a', 'b', 'a'], 'a') == [0, 2]",
+          "assert fn([9], 9) == [0]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "sort_tuples_by_second",
+        "instruction": "Write a Python function `fn(pairs)` that takes a list of (key, value) tuples and returns a new list sorted by the second element of each tuple in ascending order. Ties keep their original relative order. Output only the function code.",
+        "code": "def fn(pairs):\n    return sorted(pairs, key=lambda p: p[1])",
+        "asserts": [
+          "assert fn([('a', 3), ('b', 1), ('c', 2)]) == [('b', 1), ('c', 2), ('a', 3)]",
+          "assert fn([]) == []",
+          "assert fn([('x', 5)]) == [('x', 5)]",
+          "assert fn([('a', 1), ('b', 1)]) == [('a', 1), ('b', 1)]",
+          "assert fn([('p', 2), ('q', -1)]) == [('q', -1), ('p', 2)]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "search_rotated_min",
+        "instruction": "Write a Python function `fn(arr)` that finds and returns the minimum value in a rotated sorted list of distinct integers using binary search. The list was originally sorted ascending then rotated some number of positions. Assume the list is non-empty. Output only the function code.",
+        "code": "def fn(arr):\n    lo, hi = 0, len(arr) - 1\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] > arr[hi]:\n            lo = mid + 1\n        else:\n            hi = mid\n    return arr[lo]",
+        "asserts": [
+          "assert fn([3, 4, 5, 1, 2]) == 1",
+          "assert fn([1, 2, 3, 4]) == 1",
+          "assert fn([2, 1]) == 1",
+          "assert fn([5]) == 5",
+          "assert fn([4, 5, 6, 7, 0, 1, 2]) == 0"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "merge_sorted",
+        "instruction": "Write a Python function `fn(a, b)` that merges two ascending-sorted lists into a single ascending-sorted list and returns it. The result must contain all elements from both lists (including duplicates). Output only the function code.",
+        "code": "def fn(a, b):\n    result = []\n    i = j = 0\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            result.append(a[i])\n            i += 1\n        else:\n            result.append(b[j])\n            j += 1\n    result.extend(a[i:])\n    result.extend(b[j:])\n    return result",
+        "asserts": [
+          "assert fn([1, 3, 5], [2, 4, 6]) == [1, 2, 3, 4, 5, 6]",
+          "assert fn([], [1, 2]) == [1, 2]",
+          "assert fn([1, 2], []) == [1, 2]",
+          "assert fn([], []) == []",
+          "assert fn([1, 1], [1]) == [1, 1, 1]",
+          "assert fn([5], [1]) == [1, 5]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "sort_strings_case_insensitive",
+        "instruction": "Write a Python function `fn(words)` that returns a new list of strings sorted alphabetically in a case-insensitive manner (treating uppercase and lowercase as equal). When two strings compare equal ignoring case, keep their original relative order. Output only the function code.",
+        "code": "def fn(words):\n    return sorted(words, key=str.lower)",
+        "asserts": [
+          "assert fn(['banana', 'Apple', 'cherry']) == ['Apple', 'banana', 'cherry']",
+          "assert fn([]) == []",
+          "assert fn(['Zebra']) == ['Zebra']",
+          "assert fn(['b', 'B', 'a']) == ['a', 'b', 'B']",
+          "assert fn(['Dog', 'cat', 'Ant']) == ['Ant', 'cat', 'Dog']"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "find_peak_index",
+        "instruction": "Write a Python function `fn(arr)` that finds a peak element in a list and returns its index. A peak is an element strictly greater than its neighbors; elements outside the array are considered negative infinity. Use binary search; if multiple peaks exist, any valid peak index is acceptable, but for a strictly given input return the deterministic result of the algorithm below. Assume the list is non-empty. Output only the function code.",
+        "code": "def fn(arr):\n    lo, hi = 0, len(arr) - 1\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] < arr[mid + 1]:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo",
+        "asserts": [
+          "assert fn([1, 2, 3, 1]) == 2",
+          "assert fn([1]) == 0",
+          "assert fn([3, 2, 1]) == 0",
+          "assert fn([1, 2, 3, 4]) == 3",
+          "assert fn([1, 3, 2, 4, 1]) == 1"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "top_n_largest",
+        "instruction": "Write a Python function `fn(nums, n)` that returns a list of the n largest numbers from the input list, sorted in descending order. If n is greater than or equal to the list length, return all numbers sorted descending. If n is 0 or the list is empty, return an empty list. Output only the function code.",
+        "code": "def fn(nums, n):\n    if n <= 0:\n        return []\n    return sorted(nums, reverse=True)[:n]",
+        "asserts": [
+          "assert fn([3, 1, 4, 1, 5, 9, 2], 3) == [9, 5, 4]",
+          "assert fn([1, 2], 5) == [2, 1]",
+          "assert fn([], 3) == []",
+          "assert fn([5, 3, 8], 0) == []",
+          "assert fn([7, 7, 7], 2) == [7, 7]",
+          "assert fn([4], 1) == [4]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "count_less_equal",
+        "instruction": "Write a Python function `fn(arr, value)` that takes a sorted (ascending) list and returns the count of elements that are less than or equal to the given value, using binary search. Output only the function code.",
+        "code": "def fn(arr, value):\n    lo, hi = 0, len(arr)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] <= value:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo",
+        "asserts": [
+          "assert fn([1, 2, 3, 4, 5], 3) == 3",
+          "assert fn([1, 2, 3], 0) == 0",
+          "assert fn([1, 2, 3], 9) == 3",
+          "assert fn([], 4) == 0",
+          "assert fn([2, 2, 2, 2], 2) == 4",
+          "assert fn([1, 5, 9], 4) == 1"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "sort_by_abs",
+        "instruction": "Write a Python function `fn(nums)` that returns a new list of numbers sorted by their absolute value in ascending order. Numbers with equal absolute value keep their original relative order. Output only the function code.",
+        "code": "def fn(nums):\n    return sorted(nums, key=abs)",
+        "asserts": [
+          "assert fn([-3, 1, -2]) == [1, -2, -3]",
+          "assert fn([]) == []",
+          "assert fn([0]) == [0]",
+          "assert fn([5, -5, 3]) == [3, 5, -5]",
+          "assert fn([-1, 1, -1]) == [-1, 1, -1]"
+        ],
+        "category": "sorting and searching (custom sorts, binary/linear search variants, selection)"
+      },
+      {
+        "fn": "set_intersection",
+        "instruction": "Write a function `fn(a, b)` that takes two lists and returns a sorted list of the distinct elements common to both. Output only the function code.",
+        "code": "def fn(a, b):\n    return sorted(set(a) & set(b))",
+        "asserts": [
+          "assert fn([1,2,3],[2,3,4]) == [2,3]",
+          "assert fn([],[1,2]) == []",
+          "assert fn([1,1,2],[2,2,3]) == [2]",
+          "assert fn([5],[5]) == [5]",
+          "assert fn([1,2],[3,4]) == []"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "set_union",
+        "instruction": "Write a function `fn(a, b)` that takes two lists and returns a sorted list of all distinct elements appearing in either list. Output only the function code.",
+        "code": "def fn(a, b):\n    return sorted(set(a) | set(b))",
+        "asserts": [
+          "assert fn([1,2],[2,3]) == [1,2,3]",
+          "assert fn([],[]) == []",
+          "assert fn([1,1,1],[]) == [1]",
+          "assert fn([3,2],[1]) == [1,2,3]",
+          "assert fn([],[5,5]) == [5]"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "set_difference",
+        "instruction": "Write a function `fn(a, b)` that returns a sorted list of the distinct elements present in list `a` but not in list `b`. Output only the function code.",
+        "code": "def fn(a, b):\n    return sorted(set(a) - set(b))",
+        "asserts": [
+          "assert fn([1,2,3],[2]) == [1,3]",
+          "assert fn([1,2],[1,2]) == []",
+          "assert fn([],[1]) == []",
+          "assert fn([5,6,7],[]) == [5,6,7]",
+          "assert fn([1,1,2],[1]) == [2]"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "symmetric_difference",
+        "instruction": "Write a function `fn(a, b)` that returns a sorted list of the distinct elements that are in exactly one of the two input lists (not in both). Output only the function code.",
+        "code": "def fn(a, b):\n    return sorted(set(a) ^ set(b))",
+        "asserts": [
+          "assert fn([1,2,3],[2,3,4]) == [1,4]",
+          "assert fn([],[]) == []",
+          "assert fn([1,2],[1,2]) == []",
+          "assert fn([1],[2]) == [1,2]",
+          "assert fn([1,1,2],[2,3]) == [1,3]"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "is_subset",
+        "instruction": "Write a function `fn(a, b)` that returns True if every distinct element of list `a` also appears in list `b`, and False otherwise. Output only the function code.",
+        "code": "def fn(a, b):\n    return set(a) <= set(b)",
+        "asserts": [
+          "assert fn([1,2],[1,2,3]) is True",
+          "assert fn([],[1]) is True",
+          "assert fn([1,4],[1,2,3]) is False",
+          "assert fn([1,1,2],[1,2]) is True",
+          "assert fn([],[]) is True"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "is_superset",
+        "instruction": "Write a function `fn(a, b)` that returns True if list `a` contains every distinct element of list `b`, and False otherwise. Output only the function code.",
+        "code": "def fn(a, b):\n    return set(a) >= set(b)",
+        "asserts": [
+          "assert fn([1,2,3],[1,2]) is True",
+          "assert fn([1],[]) is True",
+          "assert fn([1,2],[1,2,3]) is False",
+          "assert fn([],[]) is True",
+          "assert fn([5,5,6],[6]) is True"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "is_disjoint",
+        "instruction": "Write a function `fn(a, b)` that returns True if the two lists share no common elements, and False otherwise. Output only the function code.",
+        "code": "def fn(a, b):\n    return set(a).isdisjoint(set(b))",
+        "asserts": [
+          "assert fn([1,2],[3,4]) is True",
+          "assert fn([1,2],[2,3]) is False",
+          "assert fn([],[1]) is True",
+          "assert fn([],[]) is True",
+          "assert fn([5],[5]) is False"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "unique_count",
+        "instruction": "Write a function `fn(items)` that returns the number of distinct values in the given list. Output only the function code.",
+        "code": "def fn(items):\n    return len(set(items))",
+        "asserts": [
+          "assert fn([1,1,2,3,3,3]) == 3",
+          "assert fn([]) == 0",
+          "assert fn([7]) == 1",
+          "assert fn(['a','a','a']) == 1",
+          "assert fn([1,2,3,4]) == 4"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "sets_equal",
+        "instruction": "Write a function `fn(a, b)` that returns True if the two lists contain exactly the same set of distinct elements (ignoring order and duplicates), and False otherwise. Output only the function code.",
+        "code": "def fn(a, b):\n    return set(a) == set(b)",
+        "asserts": [
+          "assert fn([1,2,3],[3,2,1]) is True",
+          "assert fn([1,1,2],[2,1]) is True",
+          "assert fn([1,2],[1,2,3]) is False",
+          "assert fn([],[]) is True",
+          "assert fn([1],[2]) is False"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "common_elements_count",
+        "instruction": "Write a function `fn(a, b)` that returns how many distinct elements appear in both lists. Output only the function code.",
+        "code": "def fn(a, b):\n    return len(set(a) & set(b))",
+        "asserts": [
+          "assert fn([1,2,3],[2,3,4]) == 2",
+          "assert fn([],[1]) == 0",
+          "assert fn([1,1,1],[1]) == 1",
+          "assert fn([1,2],[3,4]) == 0",
+          "assert fn([5,6,7],[7,6,5]) == 3"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "unique_to_first",
+        "instruction": "Write a function `fn(a, b)` that returns a sorted list of the distinct elements found only in list `a` and not in list `b`. Output only the function code.",
+        "code": "def fn(a, b):\n    return sorted(set(a) - set(b))",
+        "asserts": [
+          "assert fn([1,2,3,4],[3,4,5]) == [1,2]",
+          "assert fn([1,2],[1,2,3]) == []",
+          "assert fn([],[1,2]) == []",
+          "assert fn([9,9,8],[8]) == [9]",
+          "assert fn([1,2,3],[]) == [1,2,3]"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "has_duplicates",
+        "instruction": "Write a function `fn(items)` that returns True if the list contains any repeated value, and False otherwise. Output only the function code.",
+        "code": "def fn(items):\n    return len(set(items)) != len(items)",
+        "asserts": [
+          "assert fn([1,2,3]) is False",
+          "assert fn([1,1,2]) is True",
+          "assert fn([]) is False",
+          "assert fn([5]) is False",
+          "assert fn(['a','b','a']) is True"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "jaccard_similarity",
+        "instruction": "Write a function `fn(a, b)` that returns the Jaccard similarity of two lists: the size of the intersection of their distinct elements divided by the size of their union. Return 0.0 when both lists are empty. Output only the function code.",
+        "code": "def fn(a, b):\n    sa, sb = set(a), set(b)\n    union = sa | sb\n    if not union:\n        return 0.0\n    return len(sa & sb) / len(union)",
+        "asserts": [
+          "assert round(fn([1,2,3],[2,3,4]), 4) == 0.5",
+          "assert round(fn([1,2,3],[1,2,3]), 4) == 1.0",
+          "assert round(fn([1,2],[3,4]), 4) == 0.0",
+          "assert round(fn([],[]), 4) == 0.0",
+          "assert round(fn([1,2,3,4],[3,4]), 4) == 0.5"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "dedupe_preserve_order",
+        "instruction": "Write a function `fn(items)` that removes duplicate values from the list while keeping the first occurrence of each in its original order, returning a new list. Output only the function code.",
+        "code": "def fn(items):\n    seen = set()\n    out = []\n    for x in items:\n        if x not in seen:\n            seen.add(x)\n            out.append(x)\n    return out",
+        "asserts": [
+          "assert fn([3,1,2,1,3]) == [3,1,2]",
+          "assert fn([]) == []",
+          "assert fn([5,5,5]) == [5]",
+          "assert fn([1,2,3]) == [1,2,3]",
+          "assert fn(['a','b','a','c']) == ['a','b','c']"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "union_all",
+        "instruction": "Write a function `fn(lists)` that takes a list of lists and returns a sorted list of all distinct elements appearing across every inner list. Output only the function code.",
+        "code": "def fn(lists):\n    result = set()\n    for lst in lists:\n        result |= set(lst)\n    return sorted(result)",
+        "asserts": [
+          "assert fn([[1,2],[2,3],[3,4]]) == [1,2,3,4]",
+          "assert fn([]) == []",
+          "assert fn([[]]) == []",
+          "assert fn([[1,1],[1]]) == [1]",
+          "assert fn([[5],[6],[7]]) == [5,6,7]"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "count_unique_chars",
+        "instruction": "Write a function `fn(text)` that returns the number of distinct characters in the given string. Output only the function code.",
+        "code": "def fn(text):\n    return len(set(text))",
+        "asserts": [
+          "assert fn('hello') == 4",
+          "assert fn('') == 0",
+          "assert fn('aaa') == 1",
+          "assert fn('abc') == 3",
+          "assert fn('mississippi') == 4"
+        ],
+        "category": "set operations (intersection, union, difference, subset checks, unique counts)"
+      },
+      {
+        "fn": "is_valid_triangle",
+        "instruction": "Write a function `is_valid_triangle(a, b, c)` that returns True if three positive side lengths can form a valid triangle (each side length must be positive, and the sum of any two sides must be strictly greater than the third), otherwise returns False. Output only the function code.",
+        "code": "def is_valid_triangle(a, b, c):\n    if a <= 0 or b <= 0 or c <= 0:\n        return False\n    return a + b > c and a + c > b and b + c > a",
+        "asserts": [
+          "assert is_valid_triangle(3, 4, 5) is True",
+          "assert is_valid_triangle(1, 1, 2) is False",
+          "assert is_valid_triangle(0, 4, 5) is False",
+          "assert is_valid_triangle(5, 5, 5) is True",
+          "assert is_valid_triangle(-1, 2, 3) is False",
+          "assert is_valid_triangle(10, 1, 1) is False"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "classify_number",
+        "instruction": "Write a function `classify_number(n)` that classifies an integer. Return \"zero\" if n is 0. Otherwise return a two-word string combining sign and parity: \"positive\" or \"negative\", a space, then \"even\" or \"odd\" (e.g. \"positive even\", \"negative odd\"). Output only the function code.",
+        "code": "def classify_number(n):\n    if n == 0:\n        return \"zero\"\n    sign = \"positive\" if n > 0 else \"negative\"\n    parity = \"even\" if n % 2 == 0 else \"odd\"\n    return sign + \" \" + parity",
+        "asserts": [
+          "assert classify_number(0) == \"zero\"",
+          "assert classify_number(4) == \"positive even\"",
+          "assert classify_number(7) == \"positive odd\"",
+          "assert classify_number(-2) == \"negative even\"",
+          "assert classify_number(-3) == \"negative odd\""
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "in_range",
+        "instruction": "Write a function `in_range(value, low, high)` that returns True if value lies within the inclusive range [low, high], otherwise returns False. Output only the function code.",
+        "code": "def in_range(value, low, high):\n    return low <= value <= high",
+        "asserts": [
+          "assert in_range(5, 1, 10) is True",
+          "assert in_range(1, 1, 10) is True",
+          "assert in_range(10, 1, 10) is True",
+          "assert in_range(0, 1, 10) is False",
+          "assert in_range(11, 1, 10) is False",
+          "assert in_range(-5, -10, -1) is True"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "letter_grade",
+        "instruction": "Write a function `letter_grade(score)` that converts a numeric score to a letter grade using standard cutoffs: 90 or above is \"A\", 80-89 is \"B\", 70-79 is \"C\", 60-69 is \"D\", and anything below 60 is \"F\". Output only the function code.",
+        "code": "def letter_grade(score):\n    if score >= 90:\n        return \"A\"\n    elif score >= 80:\n        return \"B\"\n    elif score >= 70:\n        return \"C\"\n    elif score >= 60:\n        return \"D\"\n    return \"F\"",
+        "asserts": [
+          "assert letter_grade(95) == \"A\"",
+          "assert letter_grade(90) == \"A\"",
+          "assert letter_grade(85) == \"B\"",
+          "assert letter_grade(60) == \"D\"",
+          "assert letter_grade(59) == \"F\"",
+          "assert letter_grade(0) == \"F\""
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "is_valid_password",
+        "instruction": "Write a function `is_valid_password(s)` that returns True if the string is a valid password and False otherwise. A valid password must be at least 8 characters long and contain at least one uppercase letter, at least one lowercase letter, and at least one digit. Output only the function code.",
+        "code": "def is_valid_password(s):\n    if len(s) < 8:\n        return False\n    has_upper = any(c.isupper() for c in s)\n    has_lower = any(c.islower() for c in s)\n    has_digit = any(c.isdigit() for c in s)\n    return has_upper and has_lower and has_digit",
+        "asserts": [
+          "assert is_valid_password(\"Abcdef12\") is True",
+          "assert is_valid_password(\"abcdef12\") is False",
+          "assert is_valid_password(\"ABCDEF12\") is False",
+          "assert is_valid_password(\"Abcdefgh\") is False",
+          "assert is_valid_password(\"Ab1\") is False",
+          "assert is_valid_password(\"\") is False"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "sign",
+        "instruction": "Write a function `sign(n)` that returns 1 if n is positive, -1 if n is negative, and 0 if n is exactly zero. Output only the function code.",
+        "code": "def sign(n):\n    if n > 0:\n        return 1\n    elif n < 0:\n        return -1\n    return 0",
+        "asserts": [
+          "assert sign(5) == 1",
+          "assert sign(-3) == -1",
+          "assert sign(0) == 0",
+          "assert sign(0.5) == 1",
+          "assert sign(-0.001) == -1"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "can_vote",
+        "instruction": "Write a function `can_vote(age, is_citizen)` that returns True only if the person is at least 18 years old AND is a citizen (is_citizen is a boolean). Otherwise return False. Output only the function code.",
+        "code": "def can_vote(age, is_citizen):\n    return age >= 18 and is_citizen",
+        "asserts": [
+          "assert can_vote(18, True) is True",
+          "assert can_vote(17, True) is False",
+          "assert can_vote(25, False) is False",
+          "assert can_vote(18, False) is False",
+          "assert can_vote(100, True) is True"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "fizzbuzz_value",
+        "instruction": "Write a function `fizzbuzz_value(n)` that returns \"FizzBuzz\" if n is divisible by both 3 and 5, \"Fizz\" if divisible by 3 only, \"Buzz\" if divisible by 5 only, and otherwise the number itself as a string. Output only the function code.",
+        "code": "def fizzbuzz_value(n):\n    if n % 15 == 0:\n        return \"FizzBuzz\"\n    elif n % 3 == 0:\n        return \"Fizz\"\n    elif n % 5 == 0:\n        return \"Buzz\"\n    return str(n)",
+        "asserts": [
+          "assert fizzbuzz_value(15) == \"FizzBuzz\"",
+          "assert fizzbuzz_value(3) == \"Fizz\"",
+          "assert fizzbuzz_value(5) == \"Buzz\"",
+          "assert fizzbuzz_value(7) == \"7\"",
+          "assert fizzbuzz_value(30) == \"FizzBuzz\"",
+          "assert fizzbuzz_value(0) == \"FizzBuzz\""
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "is_valid_username",
+        "instruction": "Write a function `is_valid_username(s)` that returns True if the string is a valid username and False otherwise. Rules: length must be between 3 and 16 characters inclusive, the first character must be a letter, and every character must be alphanumeric or an underscore. Output only the function code.",
+        "code": "def is_valid_username(s):\n    if not (3 <= len(s) <= 16):\n        return False\n    if not s[0].isalpha():\n        return False\n    return all(c.isalnum() or c == \"_\" for c in s)",
+        "asserts": [
+          "assert is_valid_username(\"alex_99\") is True",
+          "assert is_valid_username(\"ab\") is False",
+          "assert is_valid_username(\"1abc\") is False",
+          "assert is_valid_username(\"user name\") is False",
+          "assert is_valid_username(\"Valid_Name\") is True",
+          "assert is_valid_username(\"a\" * 17) is False"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "year_type",
+        "instruction": "Write a function `year_type(year)` that returns \"leap\" if the given year is a leap year and \"common\" otherwise. A leap year is divisible by 4, except century years which must also be divisible by 400. Output only the function code.",
+        "code": "def year_type(year):\n    leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)\n    return \"leap\" if leap else \"common\"",
+        "asserts": [
+          "assert year_type(2000) == \"leap\"",
+          "assert year_type(1900) == \"common\"",
+          "assert year_type(2024) == \"leap\"",
+          "assert year_type(2023) == \"common\"",
+          "assert year_type(2100) == \"common\""
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "bmi_category",
+        "instruction": "Write a function `bmi_category(weight_kg, height_m)` that computes BMI as weight divided by height squared, then returns a category string: \"underweight\" if BMI < 18.5, \"normal\" if BMI < 25, \"overweight\" if BMI < 30, otherwise \"obese\". Output only the function code.",
+        "code": "def bmi_category(weight_kg, height_m):\n    bmi = weight_kg / (height_m ** 2)\n    if bmi < 18.5:\n        return \"underweight\"\n    elif bmi < 25:\n        return \"normal\"\n    elif bmi < 30:\n        return \"overweight\"\n    return \"obese\"",
+        "asserts": [
+          "assert bmi_category(50, 1.75) == \"underweight\"",
+          "assert bmi_category(70, 1.75) == \"normal\"",
+          "assert bmi_category(80, 1.75) == \"overweight\"",
+          "assert bmi_category(100, 1.75) == \"obese\"",
+          "assert bmi_category(60, 1.6) == \"normal\""
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "overlaps",
+        "instruction": "Write a function `overlaps(a_start, a_end, b_start, b_end)` that returns True if two closed intervals [a_start, a_end] and [b_start, b_end] overlap (including touching at an endpoint), otherwise returns False. Assume each interval's start is less than or equal to its end. Output only the function code.",
+        "code": "def overlaps(a_start, a_end, b_start, b_end):\n    return a_start <= b_end and b_start <= a_end",
+        "asserts": [
+          "assert overlaps(1, 5, 4, 8) is True",
+          "assert overlaps(1, 3, 5, 7) is False",
+          "assert overlaps(1, 5, 5, 9) is True",
+          "assert overlaps(0, 10, 3, 4) is True",
+          "assert overlaps(5, 6, 1, 2) is False"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "is_valid_hex_color",
+        "instruction": "Write a function `is_valid_hex_color(s)` that returns True if the string is a valid hex color code and False otherwise. A valid code starts with '#' followed by exactly 3 or exactly 6 hexadecimal digits (0-9, a-f, A-F). Output only the function code.",
+        "code": "def is_valid_hex_color(s):\n    if not s.startswith(\"#\"):\n        return False\n    body = s[1:]\n    if len(body) != 3 and len(body) != 6:\n        return False\n    return all(c in \"0123456789abcdefABCDEF\" for c in body)",
+        "asserts": [
+          "assert is_valid_hex_color(\"#fff\") is True",
+          "assert is_valid_hex_color(\"#FFFFFF\") is True",
+          "assert is_valid_hex_color(\"#12ab9F\") is True",
+          "assert is_valid_hex_color(\"fff\") is False",
+          "assert is_valid_hex_color(\"#ggg\") is False",
+          "assert is_valid_hex_color(\"#ff\") is False"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "triangle_type",
+        "instruction": "Write a function `triangle_type(a, b, c)` that classifies a triangle by its side lengths: return \"equilateral\" if all three sides are equal, \"isosceles\" if exactly two sides are equal, and \"scalene\" if all sides differ. Output only the function code.",
+        "code": "def triangle_type(a, b, c):\n    if a == b == c:\n        return \"equilateral\"\n    elif a == b or b == c or a == c:\n        return \"isosceles\"\n    return \"scalene\"",
+        "asserts": [
+          "assert triangle_type(3, 3, 3) == \"equilateral\"",
+          "assert triangle_type(3, 3, 5) == \"isosceles\"",
+          "assert triangle_type(3, 4, 5) == \"scalene\"",
+          "assert triangle_type(5, 3, 5) == \"isosceles\"",
+          "assert triangle_type(7, 7, 7) == \"equilateral\""
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "all_positive",
+        "instruction": "Write a function `all_positive(nums)` that returns True if every number in the list is strictly greater than zero. An empty list should return True (vacuously). Output only the function code.",
+        "code": "def all_positive(nums):\n    if not nums:\n        return True\n    return all(n > 0 for n in nums)",
+        "asserts": [
+          "assert all_positive([1, 2, 3]) is True",
+          "assert all_positive([1, -2, 3]) is False",
+          "assert all_positive([]) is True",
+          "assert all_positive([0, 1]) is False",
+          "assert all_positive([5]) is True"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "shipping_cost",
+        "instruction": "Write a function `shipping_cost(weight, is_express)` that computes a shipping cost. The base cost is 5.0 for weight up to and including 1, plus 2.0 for each unit (or fraction) of weight above 1 (i.e. base = 5.0 + (weight - 1) * 2.0 when weight > 1). If is_express is True, multiply the cost by 1.5. Return the result rounded to 2 decimal places. Output only the function code.",
+        "code": "def shipping_cost(weight, is_express):\n    base = 5.0 if weight <= 1 else 5.0 + (weight - 1) * 2.0\n    if is_express:\n        base *= 1.5\n    return round(base, 2)",
+        "asserts": [
+          "assert shipping_cost(1, False) == 5.0",
+          "assert shipping_cost(3, False) == 9.0",
+          "assert shipping_cost(1, True) == 7.5",
+          "assert shipping_cost(3, True) == 13.5",
+          "assert shipping_cost(0.5, False) == 5.0"
+        ],
+        "category": "conditionals and boolean logic (validation, classification, range checks)"
+      },
+      {
+        "fn": "squares",
+        "instruction": "Write a function `squares` that takes a list of integers and returns a new list containing the square of each integer, in the same order. Use a list comprehension. Output only the function code.",
+        "code": "def squares(nums):\n    return [n * n for n in nums]",
+        "asserts": [
+          "assert squares([1, 2, 3]) == [1, 4, 9]",
+          "assert squares([]) == []",
+          "assert squares([0]) == [0]",
+          "assert squares([-2, -3]) == [4, 9]",
+          "assert squares([5]) == [25]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "keep_evens",
+        "instruction": "Write a function `keep_evens` that takes a list of integers and returns a new list containing only the even numbers, preserving their original order. Use filtering via a comprehension. Output only the function code.",
+        "code": "def keep_evens(nums):\n    return [n for n in nums if n % 2 == 0]",
+        "asserts": [
+          "assert keep_evens([1, 2, 3, 4, 5, 6]) == [2, 4, 6]",
+          "assert keep_evens([1, 3, 5]) == []",
+          "assert keep_evens([]) == []",
+          "assert keep_evens([0, 2, 4]) == [0, 2, 4]",
+          "assert keep_evens([-2, -1, 0, 1]) == [-2, 0]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "uppercase_all",
+        "instruction": "Write a function `uppercase_all` that takes a list of strings and returns a new list where each string is converted to uppercase. Use a comprehension. Output only the function code.",
+        "code": "def uppercase_all(words):\n    return [w.upper() for w in words]",
+        "asserts": [
+          "assert uppercase_all(['hello', 'world']) == ['HELLO', 'WORLD']",
+          "assert uppercase_all([]) == []",
+          "assert uppercase_all(['Mixed', 'CASE']) == ['MIXED', 'CASE']",
+          "assert uppercase_all(['a']) == ['A']",
+          "assert uppercase_all(['123', 'x']) == ['123', 'X']"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "word_lengths",
+        "instruction": "Write a function `word_lengths` that takes a list of words and returns a list of the lengths of each word, in the same order. Use a comprehension. Output only the function code.",
+        "code": "def word_lengths(words):\n    return [len(w) for w in words]",
+        "asserts": [
+          "assert word_lengths(['cat', 'apple', 'a']) == [3, 5, 1]",
+          "assert word_lengths([]) == []",
+          "assert word_lengths(['']) == [0]",
+          "assert word_lengths(['hello']) == [5]",
+          "assert word_lengths(['ab', 'abc', 'abcd']) == [2, 3, 4]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "product_of_list",
+        "instruction": "Write a function `product_of_list` that returns the product of all numbers in a list. The product of an empty list is 1. Compute it functionally by multiplying elements together (no imports). Output only the function code.",
+        "code": "def product_of_list(nums):\n    result = 1\n    for n in nums:\n        result *= n\n    return result",
+        "asserts": [
+          "assert product_of_list([1, 2, 3, 4]) == 24",
+          "assert product_of_list([]) == 1",
+          "assert product_of_list([5]) == 5",
+          "assert product_of_list([0, 9, 9]) == 0",
+          "assert product_of_list([-2, 3]) == -6"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "pair_with_index",
+        "instruction": "Write a function `pair_with_index` that takes a list and returns a list of (index, element) tuples, where index starts at 0. Use enumerate inside a comprehension. Output only the function code.",
+        "code": "def pair_with_index(items):\n    return [(i, x) for i, x in enumerate(items)]",
+        "asserts": [
+          "assert pair_with_index(['a', 'b', 'c']) == [(0, 'a'), (1, 'b'), (2, 'c')]",
+          "assert pair_with_index([]) == []",
+          "assert pair_with_index([10]) == [(0, 10)]",
+          "assert pair_with_index([True, False]) == [(0, True), (1, False)]",
+          "assert pair_with_index([1, 1]) == [(0, 1), (1, 1)]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "filter_long_words",
+        "instruction": "Write a function `filter_long_words` that takes a list of words and an integer `n`, and returns the words whose length is strictly greater than `n`, preserving order. Use a comprehension with a condition. Output only the function code.",
+        "code": "def filter_long_words(words, n):\n    return [w for w in words if len(w) > n]",
+        "asserts": [
+          "assert filter_long_words(['hi', 'hello', 'hey'], 3) == ['hello']",
+          "assert filter_long_words([], 2) == []",
+          "assert filter_long_words(['a', 'bb', 'ccc'], 0) == ['a', 'bb', 'ccc']",
+          "assert filter_long_words(['one', 'two'], 5) == []",
+          "assert filter_long_words(['apple', 'pie'], 3) == ['apple']"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "double_each",
+        "instruction": "Write a function `double_each` that takes a list of numbers and returns a new list with each number multiplied by 2. Use a comprehension. Output only the function code.",
+        "code": "def double_each(nums):\n    return [n * 2 for n in nums]",
+        "asserts": [
+          "assert double_each([1, 2, 3]) == [2, 4, 6]",
+          "assert double_each([]) == []",
+          "assert double_each([0]) == [0]",
+          "assert double_each([-1, -2]) == [-2, -4]",
+          "assert double_each([1.5]) == [3.0]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "sum_of_squares",
+        "instruction": "Write a function `sum_of_squares` that returns the sum of the squares of all integers in a list. Use a generator expression inside sum(). Output only the function code.",
+        "code": "def sum_of_squares(nums):\n    return sum(n * n for n in nums)",
+        "asserts": [
+          "assert sum_of_squares([1, 2, 3]) == 14",
+          "assert sum_of_squares([]) == 0",
+          "assert sum_of_squares([4]) == 16",
+          "assert sum_of_squares([-1, -2]) == 5",
+          "assert sum_of_squares([0, 0]) == 0"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "first_letters",
+        "instruction": "Write a function `first_letters` that takes a list of non-empty words and returns a string made of the first character of each word, in order. Use a comprehension joined into a string. Output only the function code.",
+        "code": "def first_letters(words):\n    return ''.join(w[0] for w in words)",
+        "asserts": [
+          "assert first_letters(['hello', 'world']) == 'hw'",
+          "assert first_letters([]) == ''",
+          "assert first_letters(['apple']) == 'a'",
+          "assert first_letters(['Cat', 'Dog', 'Eel']) == 'CDE'",
+          "assert first_letters(['x', 'y', 'z']) == 'xyz'"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "indices_of",
+        "instruction": "Write a function `indices_of` that takes a list and a target value, and returns a list of all indices at which the target appears, in increasing order. Use enumerate inside a comprehension. Output only the function code.",
+        "code": "def indices_of(items, target):\n    return [i for i, x in enumerate(items) if x == target]",
+        "asserts": [
+          "assert indices_of([1, 2, 1, 3, 1], 1) == [0, 2, 4]",
+          "assert indices_of([], 5) == []",
+          "assert indices_of(['a', 'b', 'c'], 'z') == []",
+          "assert indices_of([7], 7) == [0]",
+          "assert indices_of([0, 0, 0], 0) == [0, 1, 2]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "flatten_pairs",
+        "instruction": "Write a function `flatten_pairs` that takes a list of two-element tuples and returns a single flat list containing all elements in order (first element of each tuple, then second). Use a nested comprehension. Output only the function code.",
+        "code": "def flatten_pairs(pairs):\n    return [x for pair in pairs for x in pair]",
+        "asserts": [
+          "assert flatten_pairs([(1, 2), (3, 4)]) == [1, 2, 3, 4]",
+          "assert flatten_pairs([]) == []",
+          "assert flatten_pairs([('a', 'b')]) == ['a', 'b']",
+          "assert flatten_pairs([(0, 0), (1, 1), (2, 2)]) == [0, 0, 1, 1, 2, 2]",
+          "assert flatten_pairs([(9, 8)]) == [9, 8]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "count_positive",
+        "instruction": "Write a function `count_positive` that returns how many numbers in a list are strictly greater than zero. Use a generator expression with sum(). Output only the function code.",
+        "code": "def count_positive(nums):\n    return sum(1 for n in nums if n > 0)",
+        "asserts": [
+          "assert count_positive([1, -2, 3, 0, 5]) == 3",
+          "assert count_positive([]) == 0",
+          "assert count_positive([-1, -2, -3]) == 0",
+          "assert count_positive([0, 0, 0]) == 0",
+          "assert count_positive([4]) == 1"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "letter_to_index_map",
+        "instruction": "Write a function `letter_to_index_map` that takes a list of unique characters and returns a dictionary mapping each character to its index in the list. Use a dictionary comprehension with enumerate. Output only the function code.",
+        "code": "def letter_to_index_map(chars):\n    return {c: i for i, c in enumerate(chars)}",
+        "asserts": [
+          "assert letter_to_index_map(['a', 'b', 'c']) == {'a': 0, 'b': 1, 'c': 2}",
+          "assert letter_to_index_map([]) == {}",
+          "assert letter_to_index_map(['x']) == {'x': 0}",
+          "assert letter_to_index_map(['z', 'y']) == {'z': 0, 'y': 1}",
+          "assert letter_to_index_map(['1', '2', '3']) == {'1': 0, '2': 1, '3': 2}"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "scale_values",
+        "instruction": "Write a function `scale_values` that takes a dictionary mapping keys to numbers and a multiplier, and returns a new dictionary with the same keys but each value multiplied by the multiplier. Use a dictionary comprehension. Output only the function code.",
+        "code": "def scale_values(d, factor):\n    return {k: v * factor for k, v in d.items()}",
+        "asserts": [
+          "assert scale_values({'a': 1, 'b': 2}, 3) == {'a': 3, 'b': 6}",
+          "assert scale_values({}, 5) == {}",
+          "assert scale_values({'x': 10}, 0) == {'x': 0}",
+          "assert scale_values({'p': 2, 'q': 4}, 1) == {'p': 2, 'q': 4}",
+          "assert scale_values({'n': -2}, 2) == {'n': -4}"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "running_max",
+        "instruction": "Write a function `running_max` that takes a list of numbers and returns a list of the same length where each element is the maximum of all elements seen so far (inclusive). For an empty input, return an empty list. Output only the function code.",
+        "code": "def running_max(nums):\n    result = []\n    current = None\n    for n in nums:\n        if current is None or n > current:\n            current = n\n        result.append(current)\n    return result",
+        "asserts": [
+          "assert running_max([1, 3, 2, 5, 4]) == [1, 3, 3, 5, 5]",
+          "assert running_max([]) == []",
+          "assert running_max([7]) == [7]",
+          "assert running_max([5, 4, 3]) == [5, 5, 5]",
+          "assert running_max([-2, -5, -1]) == [-2, -2, -1]"
+        ],
+        "category": "comprehensions and functional style (map/filter/reduce-style without imports)"
+      },
+      {
+        "fn": "safe_divide",
+        "instruction": "Write a function `safe_divide(a, b)` that returns the result of dividing `a` by `b`. If `b` is zero, return None instead of raising an error. Output only the function code.",
+        "code": "def safe_divide(a, b):\n    if b == 0:\n        return None\n    return a / b",
+        "asserts": [
+          "assert safe_divide(10, 2) == 5.0",
+          "assert safe_divide(7, 0) is None",
+          "assert safe_divide(0, 5) == 0.0",
+          "assert safe_divide(-6, 3) == -2.0",
+          "assert round(safe_divide(1, 3), 4) == 0.3333"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "first_or_default",
+        "instruction": "Write a function `first_or_default(items, default=None)` that returns the first element of the list `items`, or `default` if the list is empty. Output only the function code.",
+        "code": "def first_or_default(items, default=None):\n    if not items:\n        return default\n    return items[0]",
+        "asserts": [
+          "assert first_or_default([1, 2, 3]) == 1",
+          "assert first_or_default([]) is None",
+          "assert first_or_default([], 0) == 0",
+          "assert first_or_default(['a']) == 'a'",
+          "assert first_or_default([], 'x') == 'x'"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "safe_int",
+        "instruction": "Write a function `safe_int(value, default=0)` that attempts to convert `value` to an integer. If conversion fails (raises ValueError or TypeError), return `default`. Output only the function code.",
+        "code": "def safe_int(value, default=0):\n    try:\n        return int(value)\n    except (ValueError, TypeError):\n        return default",
+        "asserts": [
+          "assert safe_int('42') == 42",
+          "assert safe_int('abc') == 0",
+          "assert safe_int(None) == 0",
+          "assert safe_int('7', -1) == 7",
+          "assert safe_int('bad', -1) == -1",
+          "assert safe_int(3.9) == 3"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "get_in_range",
+        "instruction": "Write a function `get_in_range(n, low, high)` that returns True if `n` is within the inclusive range [low, high], and False otherwise. Output only the function code.",
+        "code": "def get_in_range(n, low, high):\n    return low <= n <= high",
+        "asserts": [
+          "assert get_in_range(5, 1, 10) is True",
+          "assert get_in_range(1, 1, 10) is True",
+          "assert get_in_range(10, 1, 10) is True",
+          "assert get_in_range(0, 1, 10) is False",
+          "assert get_in_range(11, 1, 10) is False",
+          "assert get_in_range(-5, -10, 0) is True"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "safe_get",
+        "instruction": "Write a function `safe_get(d, key, default=None)` that returns the value for `key` in dictionary `d`, or `default` if the key is missing or `d` is not a dict. Output only the function code.",
+        "code": "def safe_get(d, key, default=None):\n    if not isinstance(d, dict):\n        return default\n    return d.get(key, default)",
+        "asserts": [
+          "assert safe_get({'a': 1}, 'a') == 1",
+          "assert safe_get({'a': 1}, 'b') is None",
+          "assert safe_get({'a': 1}, 'b', 0) == 0",
+          "assert safe_get(None, 'a', 'x') == 'x'",
+          "assert safe_get([], 'a', 'x') == 'x'",
+          "assert safe_get({}, 'k', 5) == 5"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "normalize_index",
+        "instruction": "Write a function `normalize_index(i, length)` that converts a possibly-negative index `i` into a non-negative index for a sequence of the given `length`. If the resulting index is out of bounds (including when length is 0), return None. Output only the function code.",
+        "code": "def normalize_index(i, length):\n    if i < 0:\n        i = length + i\n    if 0 <= i < length:\n        return i\n    return None",
+        "asserts": [
+          "assert normalize_index(2, 5) == 2",
+          "assert normalize_index(-1, 5) == 4",
+          "assert normalize_index(-5, 5) == 0",
+          "assert normalize_index(5, 5) is None",
+          "assert normalize_index(0, 0) is None",
+          "assert normalize_index(-6, 5) is None"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "default_if_empty",
+        "instruction": "Write a function `default_if_empty(s, default='N/A')` that returns the string `s` with surrounding whitespace stripped, or `default` if `s` is None or becomes empty after stripping. Output only the function code.",
+        "code": "def default_if_empty(s, default='N/A'):\n    if s is None:\n        return default\n    stripped = s.strip()\n    if stripped == '':\n        return default\n    return stripped",
+        "asserts": [
+          "assert default_if_empty('hello') == 'hello'",
+          "assert default_if_empty('  hi  ') == 'hi'",
+          "assert default_if_empty('') == 'N/A'",
+          "assert default_if_empty('   ') == 'N/A'",
+          "assert default_if_empty(None) == 'N/A'",
+          "assert default_if_empty('', 'none') == 'none'"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "safe_last",
+        "instruction": "Write a function `safe_last(items)` that returns the last element of the sequence `items`, or None if it is empty or not indexable. Output only the function code.",
+        "code": "def safe_last(items):\n    try:\n        if len(items) == 0:\n            return None\n        return items[-1]\n    except TypeError:\n        return None",
+        "asserts": [
+          "assert safe_last([1, 2, 3]) == 3",
+          "assert safe_last([]) is None",
+          "assert safe_last('abc') == 'c'",
+          "assert safe_last('') is None",
+          "assert safe_last(None) is None",
+          "assert safe_last((9,)) == 9"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "ensure_list",
+        "instruction": "Write a function `ensure_list(value)` that wraps `value` in a list if it is not already a list. If `value` is None, return an empty list. Output only the function code.",
+        "code": "def ensure_list(value):\n    if value is None:\n        return []\n    if isinstance(value, list):\n        return value\n    return [value]",
+        "asserts": [
+          "assert ensure_list(5) == [5]",
+          "assert ensure_list([1, 2]) == [1, 2]",
+          "assert ensure_list(None) == []",
+          "assert ensure_list('a') == ['a']",
+          "assert ensure_list([]) == []",
+          "assert ensure_list((1, 2)) == [(1, 2)]"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "percent_of",
+        "instruction": "Write a function `percent_of(part, whole)` that returns what percentage `part` is of `whole`, rounded to 2 decimal places. If `whole` is zero, return 0.0. Output only the function code.",
+        "code": "def percent_of(part, whole):\n    if whole == 0:\n        return 0.0\n    return round((part / whole) * 100, 2)",
+        "asserts": [
+          "assert percent_of(1, 4) == 25.0",
+          "assert percent_of(0, 10) == 0.0",
+          "assert percent_of(5, 0) == 0.0",
+          "assert percent_of(1, 3) == 33.33",
+          "assert percent_of(3, 3) == 100.0",
+          "assert percent_of(2, 8) == 25.0"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "safe_strip_prefix",
+        "instruction": "Write a function `safe_strip_prefix(s, prefix)` that removes `prefix` from the start of string `s` if present, otherwise returns `s` unchanged. An empty prefix leaves `s` unchanged. Output only the function code.",
+        "code": "def safe_strip_prefix(s, prefix):\n    if prefix and s.startswith(prefix):\n        return s[len(prefix):]\n    return s",
+        "asserts": [
+          "assert safe_strip_prefix('hello_world', 'hello_') == 'world'",
+          "assert safe_strip_prefix('abc', 'xyz') == 'abc'",
+          "assert safe_strip_prefix('abc', '') == 'abc'",
+          "assert safe_strip_prefix('', 'a') == ''",
+          "assert safe_strip_prefix('foobar', 'foobar') == ''",
+          "assert safe_strip_prefix('test', 't') == 'est'"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "validate_age",
+        "instruction": "Write a function `validate_age(age)` that returns True only if `age` is an integer between 0 and 150 inclusive. Booleans must not be accepted as valid ages. Return False for any other input. Output only the function code.",
+        "code": "def validate_age(age):\n    if isinstance(age, bool):\n        return False\n    if not isinstance(age, int):\n        return False\n    return 0 <= age <= 150",
+        "asserts": [
+          "assert validate_age(25) is True",
+          "assert validate_age(0) is True",
+          "assert validate_age(150) is True",
+          "assert validate_age(151) is False",
+          "assert validate_age(-1) is False",
+          "assert validate_age(True) is False",
+          "assert validate_age('30') is False"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "safe_avg",
+        "instruction": "Write a function `safe_avg(nums)` that returns the arithmetic mean of the list `nums`, rounded to 4 decimal places. If the list is empty or None, return 0.0. Output only the function code.",
+        "code": "def safe_avg(nums):\n    if not nums:\n        return 0.0\n    return round(sum(nums) / len(nums), 4)",
+        "asserts": [
+          "assert safe_avg([2, 4, 6]) == 4.0",
+          "assert safe_avg([]) == 0.0",
+          "assert safe_avg(None) == 0.0",
+          "assert safe_avg([5]) == 5.0",
+          "assert safe_avg([1, 2]) == 1.5",
+          "assert safe_avg([1, 1, 1]) == 1.0"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "truncate_text",
+        "instruction": "Write a function `truncate_text(text, limit)` that returns `text` unchanged if its length is at most `limit`, otherwise returns the first `limit` characters followed by '...'. If `limit` is negative, treat it as 0. Output only the function code.",
+        "code": "def truncate_text(text, limit):\n    if limit < 0:\n        limit = 0\n    if len(text) <= limit:\n        return text\n    return text[:limit] + '...'",
+        "asserts": [
+          "assert truncate_text('hello', 10) == 'hello'",
+          "assert truncate_text('hello world', 5) == 'hello...'",
+          "assert truncate_text('hello', 5) == 'hello'",
+          "assert truncate_text('abc', 0) == '...'",
+          "assert truncate_text('abc', -3) == '...'",
+          "assert truncate_text('', 4) == ''"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "coerce_bool",
+        "instruction": "Write a function `coerce_bool(value)` that converts a string to a boolean: 'true', 'yes', '1', 'on' (case-insensitive, ignoring surrounding whitespace) map to True; everything else maps to False. Non-string input returns False. Output only the function code.",
+        "code": "def coerce_bool(value):\n    if not isinstance(value, str):\n        return False\n    return value.strip().lower() in ('true', 'yes', '1', 'on')",
+        "asserts": [
+          "assert coerce_bool('true') is True",
+          "assert coerce_bool(' YES ') is True",
+          "assert coerce_bool('1') is True",
+          "assert coerce_bool('off') is False",
+          "assert coerce_bool('') is False",
+          "assert coerce_bool(1) is False",
+          "assert coerce_bool(None) is False"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "nth_or_none",
+        "instruction": "Write a function `nth_or_none(items, n)` that returns the element at index `n` of the list `items`, supporting negative indices, or None if the index is out of range. Output only the function code.",
+        "code": "def nth_or_none(items, n):\n    if -len(items) <= n < len(items):\n        return items[n]\n    return None",
+        "asserts": [
+          "assert nth_or_none([10, 20, 30], 1) == 20",
+          "assert nth_or_none([10, 20, 30], -1) == 30",
+          "assert nth_or_none([10, 20, 30], 3) is None",
+          "assert nth_or_none([], 0) is None",
+          "assert nth_or_none([5], 0) == 5",
+          "assert nth_or_none([1, 2], -3) is None"
+        ],
+        "category": "edge cases and input validation (empty inputs, bounds, type-ish guards returning defaults)"
+      },
+      {
+        "fn": "running_max",
+        "instruction": "Write a Python function `running_max(nums)` that takes a list of numbers and returns a new list where each element is the maximum of all elements seen so far (a running maximum). For an empty list, return an empty list. Output only the function code.",
+        "code": "def running_max(nums):\n    result = []\n    current = None\n    for n in nums:\n        if current is None or n > current:\n            current = n\n        result.append(current)\n    return result",
+        "asserts": [
+          "assert running_max([1, 3, 2, 5, 4]) == [1, 3, 3, 5, 5]",
+          "assert running_max([]) == []",
+          "assert running_max([7]) == [7]",
+          "assert running_max([5, 4, 3, 2, 1]) == [5, 5, 5, 5, 5]",
+          "assert running_max([-3, -1, -2, 0]) == [-3, -1, -1, 0]"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "count_above_mean",
+        "instruction": "Write a Python function `count_above_mean(nums)` that returns the count of numbers in the list that are strictly greater than the arithmetic mean of the list. For an empty list, return 0. Output only the function code.",
+        "code": "def count_above_mean(nums):\n    if not nums:\n        return 0\n    mean = sum(nums) / len(nums)\n    return sum(1 for n in nums if n > mean)",
+        "asserts": [
+          "assert count_above_mean([1, 2, 3, 4, 5]) == 2",
+          "assert count_above_mean([]) == 0",
+          "assert count_above_mean([5]) == 0",
+          "assert count_above_mean([2, 2, 2, 2]) == 0",
+          "assert count_above_mean([1, 10]) == 1"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "most_frequent",
+        "instruction": "Write a Python function `most_frequent(items)` that returns the element that appears most often in the list. If there is a tie, return the element that reaches its maximum count first (earliest to appear). For an empty list, return None. Output only the function code.",
+        "code": "def most_frequent(items):\n    if not items:\n        return None\n    counts = {}\n    best = None\n    best_count = 0\n    for x in items:\n        counts[x] = counts.get(x, 0) + 1\n        if counts[x] > best_count:\n            best_count = counts[x]\n            best = x\n    return best",
+        "asserts": [
+          "assert most_frequent([1, 2, 2, 3, 3, 3]) == 3",
+          "assert most_frequent([]) is None",
+          "assert most_frequent(['a']) == 'a'",
+          "assert most_frequent([1, 1, 2, 2]) == 1",
+          "assert most_frequent(['x', 'y', 'x', 'y', 'x']) == 'x'"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "cumulative_sum",
+        "instruction": "Write a Python function `cumulative_sum(nums)` that returns a list of the running (cumulative) sums of the input list. The i-th element of the output is the sum of input elements from index 0 through i. For an empty list, return an empty list. Output only the function code.",
+        "code": "def cumulative_sum(nums):\n    result = []\n    total = 0\n    for n in nums:\n        total += n\n        result.append(total)\n    return result",
+        "asserts": [
+          "assert cumulative_sum([1, 2, 3, 4]) == [1, 3, 6, 10]",
+          "assert cumulative_sum([]) == []",
+          "assert cumulative_sum([5]) == [5]",
+          "assert cumulative_sum([-1, 1, -1, 1]) == [-1, 0, -1, 0]",
+          "assert cumulative_sum([0, 0, 0]) == [0, 0, 0]"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "value_frequencies",
+        "instruction": "Write a Python function `value_frequencies(items)` that returns a dictionary mapping each distinct element in the list to the number of times it appears. For an empty list, return an empty dictionary. Output only the function code.",
+        "code": "def value_frequencies(items):\n    freq = {}\n    for x in items:\n        freq[x] = freq.get(x, 0) + 1\n    return freq",
+        "asserts": [
+          "assert value_frequencies([1, 1, 2, 3, 3, 3]) == {1: 2, 2: 1, 3: 3}",
+          "assert value_frequencies([]) == {}",
+          "assert value_frequencies(['a']) == {'a': 1}",
+          "assert value_frequencies(['x', 'y', 'x']) == {'x': 2, 'y': 1}",
+          "assert value_frequencies([0, 0, 0, 0]) == {0: 4}"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "min_max_range",
+        "instruction": "Write a Python function `min_max_range(nums)` that returns the difference between the largest and smallest values in the list (the range). For a single-element list, return 0. For an empty list, return None. Output only the function code.",
+        "code": "def min_max_range(nums):\n    if not nums:\n        return None\n    lo = hi = nums[0]\n    for n in nums:\n        if n < lo:\n            lo = n\n        if n > hi:\n            hi = n\n    return hi - lo",
+        "asserts": [
+          "assert min_max_range([1, 5, 3, 9, 2]) == 8",
+          "assert min_max_range([]) is None",
+          "assert min_max_range([4]) == 0",
+          "assert min_max_range([-3, -1, -7]) == 6",
+          "assert min_max_range([2, 2, 2]) == 0"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "count_consecutive_pairs",
+        "instruction": "Write a Python function `count_consecutive_pairs(items)` that returns how many times an element is immediately followed by an equal element (i.e., the number of adjacent equal pairs). For a list of length 0 or 1, return 0. Output only the function code.",
+        "code": "def count_consecutive_pairs(items):\n    count = 0\n    for i in range(1, len(items)):\n        if items[i] == items[i - 1]:\n            count += 1\n    return count",
+        "asserts": [
+          "assert count_consecutive_pairs([1, 1, 2, 2, 2, 3]) == 3",
+          "assert count_consecutive_pairs([]) == 0",
+          "assert count_consecutive_pairs([5]) == 0",
+          "assert count_consecutive_pairs([1, 2, 3, 4]) == 0",
+          "assert count_consecutive_pairs(['a', 'a', 'a']) == 2"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "weighted_mean",
+        "instruction": "Write a Python function `weighted_mean(values, weights)` that computes the weighted arithmetic mean: the sum of each value times its weight, divided by the sum of the weights. Assume the two lists have the same length. If the sum of weights is 0, return None. Output only the function code.",
+        "code": "def weighted_mean(values, weights):\n    total_w = sum(weights)\n    if total_w == 0:\n        return None\n    total = sum(v * w for v, w in zip(values, weights))\n    return total / total_w",
+        "asserts": [
+          "assert weighted_mean([1, 2, 3], [1, 1, 1]) == 2.0",
+          "assert weighted_mean([10, 20], [1, 3]) == 17.5",
+          "assert weighted_mean([5], [2]) == 5.0",
+          "assert weighted_mean([1, 2], [0, 0]) is None",
+          "assert round(weighted_mean([4, 8, 12], [1, 2, 3]), 4) == 9.3333"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "count_distinct",
+        "instruction": "Write a Python function `count_distinct(items)` that returns the number of distinct (unique) elements in the list. For an empty list, return 0. Output only the function code.",
+        "code": "def count_distinct(items):\n    seen = set()\n    for x in items:\n        seen.add(x)\n    return len(seen)",
+        "asserts": [
+          "assert count_distinct([1, 2, 2, 3, 3, 3]) == 3",
+          "assert count_distinct([]) == 0",
+          "assert count_distinct([7, 7, 7]) == 1",
+          "assert count_distinct(['a', 'b', 'c']) == 3",
+          "assert count_distinct([1, 2, 3, 1, 2, 3]) == 3"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "longest_run",
+        "instruction": "Write a Python function `longest_run(items)` that returns the length of the longest run of consecutive equal elements in the list. For an empty list, return 0. Output only the function code.",
+        "code": "def longest_run(items):\n    if not items:\n        return 0\n    longest = 1\n    current = 1\n    for i in range(1, len(items)):\n        if items[i] == items[i - 1]:\n            current += 1\n            if current > longest:\n                longest = current\n        else:\n            current = 1\n    return longest",
+        "asserts": [
+          "assert longest_run([1, 1, 2, 2, 2, 1]) == 3",
+          "assert longest_run([]) == 0",
+          "assert longest_run([5]) == 1",
+          "assert longest_run([1, 2, 3, 4]) == 1",
+          "assert longest_run(['a', 'a', 'a', 'a']) == 4"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "tally_signs",
+        "instruction": "Write a Python function `tally_signs(nums)` that returns a dictionary with keys 'positive', 'negative', and 'zero', counting how many numbers in the list fall into each category. For an empty list, all counts are 0. Output only the function code.",
+        "code": "def tally_signs(nums):\n    result = {'positive': 0, 'negative': 0, 'zero': 0}\n    for n in nums:\n        if n > 0:\n            result['positive'] += 1\n        elif n < 0:\n            result['negative'] += 1\n        else:\n            result['zero'] += 1\n    return result",
+        "asserts": [
+          "assert tally_signs([1, -2, 0, 3, -4, 0]) == {'positive': 2, 'negative': 2, 'zero': 2}",
+          "assert tally_signs([]) == {'positive': 0, 'negative': 0, 'zero': 0}",
+          "assert tally_signs([0]) == {'positive': 0, 'negative': 0, 'zero': 1}",
+          "assert tally_signs([5, 5, 5]) == {'positive': 3, 'negative': 0, 'zero': 0}",
+          "assert tally_signs([-1, -1]) == {'positive': 0, 'negative': 2, 'zero': 0}"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "mean_of_evens",
+        "instruction": "Write a Python function `mean_of_evens(nums)` that returns the arithmetic mean of only the even integers in the list. If there are no even numbers, return None. Output only the function code.",
+        "code": "def mean_of_evens(nums):\n    evens = [n for n in nums if n % 2 == 0]\n    if not evens:\n        return None\n    return sum(evens) / len(evens)",
+        "asserts": [
+          "assert mean_of_evens([1, 2, 3, 4]) == 3.0",
+          "assert mean_of_evens([1, 3, 5]) is None",
+          "assert mean_of_evens([]) is None",
+          "assert mean_of_evens([2, 4, 6]) == 4.0",
+          "assert mean_of_evens([0, 10]) == 5.0"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "index_of_min",
+        "instruction": "Write a Python function `index_of_min(nums)` that returns the index of the smallest element in the list. If the minimum value occurs more than once, return the index of its first occurrence. For an empty list, return -1. Output only the function code.",
+        "code": "def index_of_min(nums):\n    if not nums:\n        return -1\n    best_idx = 0\n    for i in range(1, len(nums)):\n        if nums[i] < nums[best_idx]:\n            best_idx = i\n    return best_idx",
+        "asserts": [
+          "assert index_of_min([3, 1, 4, 1, 5]) == 1",
+          "assert index_of_min([]) == -1",
+          "assert index_of_min([7]) == 0",
+          "assert index_of_min([5, 4, 3, 2, 1]) == 4",
+          "assert index_of_min([-2, -2, -2]) == 0"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "char_count_in_words",
+        "instruction": "Write a Python function `char_count_in_words(words)` that takes a list of strings and returns the total number of characters across all of them (sum of their lengths). For an empty list, return 0. Output only the function code.",
+        "code": "def char_count_in_words(words):\n    total = 0\n    for w in words:\n        total += len(w)\n    return total",
+        "asserts": [
+          "assert char_count_in_words(['ab', 'cde', 'f']) == 6",
+          "assert char_count_in_words([]) == 0",
+          "assert char_count_in_words(['']) == 0",
+          "assert char_count_in_words(['hello']) == 5",
+          "assert char_count_in_words(['a', 'b', 'c']) == 3"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "count_in_range",
+        "instruction": "Write a Python function `count_in_range(nums, low, high)` that returns how many numbers in the list fall within the inclusive range [low, high]. For an empty list, return 0. Output only the function code.",
+        "code": "def count_in_range(nums, low, high):\n    count = 0\n    for n in nums:\n        if low <= n <= high:\n            count += 1\n    return count",
+        "asserts": [
+          "assert count_in_range([1, 2, 3, 4, 5], 2, 4) == 3",
+          "assert count_in_range([], 0, 10) == 0",
+          "assert count_in_range([1, 2, 3], 5, 10) == 0",
+          "assert count_in_range([5, 5, 5], 5, 5) == 3",
+          "assert count_in_range([-3, 0, 3, 6], -1, 4) == 2"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "variance",
+        "instruction": "Write a Python function `variance(nums)` that computes the population variance of the list: the mean of the squared differences from the overall mean. For an empty list, return None. Output only the function code.",
+        "code": "def variance(nums):\n    if not nums:\n        return None\n    mean = sum(nums) / len(nums)\n    return sum((n - mean) ** 2 for n in nums) / len(nums)",
+        "asserts": [
+          "assert variance([1, 2, 3, 4, 5]) == 2.0",
+          "assert variance([]) is None",
+          "assert variance([5]) == 0.0",
+          "assert variance([2, 2, 2, 2]) == 0.0",
+          "assert round(variance([1, 2, 3, 4]), 4) == 1.25"
+        ],
+        "category": "counting and accumulation (running stats, frequency, min/max/mean without imports where natural)"
+      },
+      {
+        "fn": "transpose",
+        "instruction": "Write a function `transpose(matrix)` that takes a rectangular matrix represented as a list of equal-length lists and returns its transpose (rows become columns). For an empty matrix, return an empty list. Output only the function code.",
+        "code": "def transpose(matrix):\n    if not matrix:\n        return []\n    return [list(row) for row in zip(*matrix)]",
+        "asserts": [
+          "assert transpose([[1, 2, 3], [4, 5, 6]]) == [[1, 4], [2, 5], [3, 6]]",
+          "assert transpose([[1, 2], [3, 4]]) == [[1, 3], [2, 4]]",
+          "assert transpose([[7]]) == [[7]]",
+          "assert transpose([]) == []",
+          "assert transpose([[1, 2, 3]]) == [[1], [2], [3]]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "flatten_deep",
+        "instruction": "Write a function `flatten_deep(nested)` that fully flattens an arbitrarily nested list of integers into a single flat list, preserving left-to-right order. Strings and other non-list items are treated as scalars. Output only the function code.",
+        "code": "def flatten_deep(nested):\n    result = []\n    for item in nested:\n        if isinstance(item, list):\n            result.extend(flatten_deep(item))\n        else:\n            result.append(item)\n    return result",
+        "asserts": [
+          "assert flatten_deep([1, [2, [3, [4]]], 5]) == [1, 2, 3, 4, 5]",
+          "assert flatten_deep([]) == []",
+          "assert flatten_deep([[], [[]], []]) == []",
+          "assert flatten_deep([1, 2, 3]) == [1, 2, 3]",
+          "assert flatten_deep([[1], [2, 3], [[4, 5]]]) == [1, 2, 3, 4, 5]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "main_diagonal",
+        "instruction": "Write a function `main_diagonal(matrix)` that returns a list of the elements on the main diagonal of a square matrix (the elements at positions [0][0], [1][1], ...). For an empty matrix, return an empty list. Output only the function code.",
+        "code": "def main_diagonal(matrix):\n    return [matrix[i][i] for i in range(len(matrix))]",
+        "asserts": [
+          "assert main_diagonal([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == [1, 5, 9]",
+          "assert main_diagonal([[1, 2], [3, 4]]) == [1, 4]",
+          "assert main_diagonal([[42]]) == [42]",
+          "assert main_diagonal([]) == []",
+          "assert main_diagonal([[0, 1, 2], [3, 0, 5], [6, 7, 0]]) == [0, 0, 0]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "row_sums",
+        "instruction": "Write a function `row_sums(matrix)` that takes a list of lists of numbers and returns a list containing the sum of each row. An empty row sums to 0; an empty matrix returns an empty list. Output only the function code.",
+        "code": "def row_sums(matrix):\n    return [sum(row) for row in matrix]",
+        "asserts": [
+          "assert row_sums([[1, 2, 3], [4, 5, 6]]) == [6, 15]",
+          "assert row_sums([[10], [20], [30]]) == [10, 20, 30]",
+          "assert row_sums([[]]) == [0]",
+          "assert row_sums([]) == []",
+          "assert row_sums([[-1, 1], [0, 0]]) == [0, 0]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "column_sums",
+        "instruction": "Write a function `column_sums(matrix)` that takes a rectangular matrix (list of equal-length rows) and returns a list containing the sum of each column. For an empty matrix, return an empty list. Output only the function code.",
+        "code": "def column_sums(matrix):\n    if not matrix:\n        return []\n    return [sum(col) for col in zip(*matrix)]",
+        "asserts": [
+          "assert column_sums([[1, 2, 3], [4, 5, 6]]) == [5, 7, 9]",
+          "assert column_sums([[1, 2], [3, 4], [5, 6]]) == [9, 12]",
+          "assert column_sums([[7]]) == [7]",
+          "assert column_sums([]) == []",
+          "assert column_sums([[1, 1], [1, 1], [1, 1]]) == [3, 3]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "matrix_max",
+        "instruction": "Write a function `matrix_max(matrix)` that returns the maximum value found across all cells of a non-empty matrix (list of non-empty lists). Output only the function code.",
+        "code": "def matrix_max(matrix):\n    best = matrix[0][0]\n    for row in matrix:\n        for value in row:\n            if value > best:\n                best = value\n    return best",
+        "asserts": [
+          "assert matrix_max([[1, 2, 3], [4, 9, 6]]) == 9",
+          "assert matrix_max([[5]]) == 5",
+          "assert matrix_max([[-3, -1], [-7, -2]]) == -1",
+          "assert matrix_max([[0, 0], [0, 0]]) == 0",
+          "assert matrix_max([[10, 2], [3, 4], [8, 1]]) == 10"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "identity_matrix",
+        "instruction": "Write a function `identity_matrix(n)` that returns the n x n identity matrix as a list of lists, with 1 on the main diagonal and 0 elsewhere. For n == 0, return an empty list. Output only the function code.",
+        "code": "def identity_matrix(n):\n    return [[1 if i == j else 0 for j in range(n)] for i in range(n)]",
+        "asserts": [
+          "assert identity_matrix(3) == [[1, 0, 0], [0, 1, 0], [0, 0, 1]]",
+          "assert identity_matrix(1) == [[1]]",
+          "assert identity_matrix(0) == []",
+          "assert identity_matrix(2) == [[1, 0], [0, 1]]",
+          "assert identity_matrix(4) == [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "flatten_one_level",
+        "instruction": "Write a function `flatten_one_level(list_of_lists)` that concatenates a list of lists into a single list, flattening exactly one level (inner lists are not recursed into). Output only the function code.",
+        "code": "def flatten_one_level(list_of_lists):\n    result = []\n    for sub in list_of_lists:\n        result.extend(sub)\n    return result",
+        "asserts": [
+          "assert flatten_one_level([[1, 2], [3, 4], [5]]) == [1, 2, 3, 4, 5]",
+          "assert flatten_one_level([[1, [2]], [3]]) == [1, [2], 3]",
+          "assert flatten_one_level([]) == []",
+          "assert flatten_one_level([[], [], []]) == []",
+          "assert flatten_one_level([['a'], ['b', 'c']]) == ['a', 'b', 'c']"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "matrix_shape",
+        "instruction": "Write a function `matrix_shape(matrix)` that returns a tuple (rows, cols) giving the number of rows and the number of columns of a matrix. The column count is taken from the first row. For an empty matrix, return (0, 0). Output only the function code.",
+        "code": "def matrix_shape(matrix):\n    rows = len(matrix)\n    cols = len(matrix[0]) if rows > 0 else 0\n    return (rows, cols)",
+        "asserts": [
+          "assert matrix_shape([[1, 2, 3], [4, 5, 6]]) == (2, 3)",
+          "assert matrix_shape([[1], [2], [3]]) == (3, 1)",
+          "assert matrix_shape([]) == (0, 0)",
+          "assert matrix_shape([[]]) == (1, 0)",
+          "assert matrix_shape([[9]]) == (1, 1)"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "anti_diagonal",
+        "instruction": "Write a function `anti_diagonal(matrix)` that returns a list of the elements on the anti-diagonal of a square matrix, traversed from the top-right corner to the bottom-left corner (positions [0][n-1], [1][n-2], ...). For an empty matrix, return an empty list. Output only the function code.",
+        "code": "def anti_diagonal(matrix):\n    n = len(matrix)\n    return [matrix[i][n - 1 - i] for i in range(n)]",
+        "asserts": [
+          "assert anti_diagonal([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == [3, 5, 7]",
+          "assert anti_diagonal([[1, 2], [3, 4]]) == [2, 3]",
+          "assert anti_diagonal([[5]]) == [5]",
+          "assert anti_diagonal([]) == []",
+          "assert anti_diagonal([[1, 0, 0], [0, 2, 0], [0, 0, 3]]) == [0, 2, 0]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "scalar_multiply",
+        "instruction": "Write a function `scalar_multiply(matrix, k)` that returns a new matrix where every element of the input matrix is multiplied by the scalar k. The input matrix is not modified. For an empty matrix, return an empty list. Output only the function code.",
+        "code": "def scalar_multiply(matrix, k):\n    return [[value * k for value in row] for row in matrix]",
+        "asserts": [
+          "assert scalar_multiply([[1, 2], [3, 4]], 2) == [[2, 4], [6, 8]]",
+          "assert scalar_multiply([[1, 2, 3]], 0) == [[0, 0, 0]]",
+          "assert scalar_multiply([], 5) == []",
+          "assert scalar_multiply([[5]], -1) == [[-5]]",
+          "assert scalar_multiply([[2], [4]], 3) == [[6], [12]]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "matrix_add",
+        "instruction": "Write a function `matrix_add(a, b)` that adds two matrices of identical dimensions element-wise and returns the resulting matrix. For two empty matrices, return an empty list. Output only the function code.",
+        "code": "def matrix_add(a, b):\n    return [[a[i][j] + b[i][j] for j in range(len(a[i]))] for i in range(len(a))]",
+        "asserts": [
+          "assert matrix_add([[1, 2], [3, 4]], [[5, 6], [7, 8]]) == [[6, 8], [10, 12]]",
+          "assert matrix_add([[0]], [[0]]) == [[0]]",
+          "assert matrix_add([], []) == []",
+          "assert matrix_add([[1, 1, 1]], [[-1, -1, -1]]) == [[0, 0, 0]]",
+          "assert matrix_add([[1], [2]], [[3], [4]]) == [[4], [6]]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "count_nested",
+        "instruction": "Write a function `count_nested(nested)` that returns the total number of scalar (non-list) leaf elements in an arbitrarily nested list. Empty lists contribute nothing to the count. Output only the function code.",
+        "code": "def count_nested(nested):\n    total = 0\n    for item in nested:\n        if isinstance(item, list):\n            total += count_nested(item)\n        else:\n            total += 1\n    return total",
+        "asserts": [
+          "assert count_nested([1, [2, 3], [[4], 5]]) == 5",
+          "assert count_nested([]) == 0",
+          "assert count_nested([[], [[]], []]) == 0",
+          "assert count_nested([1, 2, 3]) == 3",
+          "assert count_nested([[1, [2, [3, [4]]]]]) == 4"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "max_depth",
+        "instruction": "Write a function `max_depth(nested)` that returns the maximum nesting depth of a list. A flat list (or empty list) has depth 1, a list containing a list has depth 2, and so on. Output only the function code.",
+        "code": "def max_depth(nested):\n    best = 1\n    for item in nested:\n        if isinstance(item, list):\n            best = max(best, 1 + max_depth(item))\n    return best",
+        "asserts": [
+          "assert max_depth([1, 2, 3]) == 1",
+          "assert max_depth([]) == 1",
+          "assert max_depth([1, [2, 3]]) == 2",
+          "assert max_depth([1, [2, [3, [4]]]]) == 4",
+          "assert max_depth([[1], [[2]], 3]) == 3"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "rotate_90_clockwise",
+        "instruction": "Write a function `rotate_90_clockwise(matrix)` that rotates a rectangular matrix 90 degrees clockwise and returns the new matrix. The top row of the input becomes the rightmost column of the output. For an empty matrix, return an empty list. Output only the function code.",
+        "code": "def rotate_90_clockwise(matrix):\n    if not matrix:\n        return []\n    return [list(row) for row in zip(*matrix[::-1])]",
+        "asserts": [
+          "assert rotate_90_clockwise([[1, 2], [3, 4]]) == [[3, 1], [4, 2]]",
+          "assert rotate_90_clockwise([[1, 2, 3], [4, 5, 6]]) == [[4, 1], [5, 2], [6, 3]]",
+          "assert rotate_90_clockwise([[7]]) == [[7]]",
+          "assert rotate_90_clockwise([]) == []",
+          "assert rotate_90_clockwise([[1], [2], [3]]) == [[3, 2, 1]]"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      },
+      {
+        "fn": "diagonal_sum",
+        "instruction": "Write a function `diagonal_sum(matrix)` that returns the sum of both diagonals of a square matrix, counting the center element only once when the matrix has odd dimensions. For an empty matrix, return 0. Output only the function code.",
+        "code": "def diagonal_sum(matrix):\n    n = len(matrix)\n    total = 0\n    for i in range(n):\n        total += matrix[i][i]\n        if i != n - 1 - i:\n            total += matrix[i][n - 1 - i]\n    return total",
+        "asserts": [
+          "assert diagonal_sum([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == 25",
+          "assert diagonal_sum([[1, 2], [3, 4]]) == 10",
+          "assert diagonal_sum([[5]]) == 5",
+          "assert diagonal_sum([]) == 0",
+          "assert diagonal_sum([[1, 0, 1], [0, 1, 0], [1, 0, 1]]) == 5"
+        ],
+        "category": "nested and 2D structures (matrices, list-of-lists, transpose, flatten-deep, diagonal)"
+      }
+    ]
+  }
+}
