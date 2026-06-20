@@ -13,6 +13,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
+import pytest  # noqa: E402
+
+# sigma0.decode_canary imports torch at module load; CI does not install it.
+# Skip the module rather than error collection where torch is unavailable.
+pytest.importorskip("torch")
 from sigma0.decode_canary import DecodeCanary  # noqa: E402
 
 
