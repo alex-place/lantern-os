@@ -23,6 +23,78 @@
     });
   }
 
+  // ── Admin feature-flags + per-page nav visibility ────────────────────────
+  // The admin control surface (admin-flags.html) writes to data/admin/
+  // feature-flags.json; these public endpoints expose it. This is the canonical
+  // wiring — it runs on every page (auth-gate.js is included site-wide) and
+  // matches links by href, so it covers each page's inline .site-nav, not just
+  // one header component. Server-side enforcement lives in routes/pages.js.
+  function hrefPath(href) {
+    try { return new URL(href, location.origin).pathname; }
+    catch (e) { return (href || '').split('?')[0]; }
+  }
+
+  // Apply { path: { hidden, disabled } } overrides to every nav link.
+  function applyNavVisibility(navigation) {
+    if (!navigation) return;
+    document.querySelectorAll('nav a[href]').forEach((a) => {
+      const cfg = navigation[hrefPath(a.getAttribute('href'))];
+      if (!cfg) return;
+      if (cfg.hidden) { a.style.display = 'none'; return; }
+      if (cfg.disabled) {
+        a.setAttribute('aria-disabled', 'true');
+        a.removeAttribute('href');
+        a.style.setProperty('pointer-events', 'none', 'important');
+        a.style.setProperty('opacity', '0.4', 'important');
+        a.style.setProperty('cursor', 'not-allowed', 'important');
+        a.title = 'Temporarily disabled by an administrator';
+      }
+    });
+  }
+
+  // Expose flags + gate [data-flag]/[data-flag-off] elements anywhere on the page.
+  function applyFlags(flags) {
+    if (!flags) return;
+    window.LanternFlags = { map: flags, enabled: (k) => !!flags[k] };
+    document.querySelectorAll('[data-flag]').forEach((el) => {
+      if (!flags[el.getAttribute('data-flag')]) el.style.display = 'none';
+    });
+    document.querySelectorAll('[data-flag-off]').forEach((el) => {
+      if (flags[el.getAttribute('data-flag-off')]) el.style.display = 'none';
+    });
+    document.dispatchEvent(new CustomEvent('lantern-flags-ready', { detail: { flags } }));
+  }
+
+  // Admins get an Admin link into the page's primary nav (and any opt-in
+  // [data-admin-only] elements revealed). Reuses the session we already fetched
+  // — no second /api/auth/session round-trip.
+  function injectAdminLink(session) {
+    if (!session || session.role !== 'admin') return;
+    document.querySelectorAll('[data-admin-only]').forEach((el) => { el.style.display = ''; });
+    const links = document.querySelector('.nav-links') || document.querySelector('nav');
+    if (links && !links.querySelector('a[href="/admin-flags.html"]')) {
+      const a = document.createElement('a');
+      a.href = '/admin-flags.html';
+      a.textContent = 'Admin';
+      a.className = 'nav-admin-link';
+      const anchor = links.querySelector('.sep') || links.querySelector('.nav-support');
+      if (anchor) links.insertBefore(a, anchor); else links.appendChild(a);
+    }
+  }
+
+  // Best-effort: a fetch failure leaves the nav fully visible (fail-open for UX;
+  // the server still gates disabled pages and protected routes).
+  function applyAdminControls(session) {
+    Promise.all([
+      fetch('/api/nav-config', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/flags', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([nav, fl]) => {
+      applyNavVisibility(nav && nav.navigation);
+      applyFlags(fl && fl.flags);
+      injectAdminLink(session);
+    }).catch(() => {});
+  }
+
   function updateNav(session) {
     // Profile button
     const profileBtn = document.getElementById('profile-btn');
@@ -75,6 +147,7 @@
     .then(session => {
       updateNav(session);
       wireLogout();
+      applyAdminControls(session);
       const canTrade = !!(session && session.entitlements && session.entitlements.trade);
       if (!canTrade) hideTradeNav();
       if (!isPublic && (!session || !session.authenticated)) {
@@ -85,6 +158,8 @@
       }
     })
     .catch(() => {
+      // Session lookup failed — still apply public nav-config/flags (no admin link).
+      applyAdminControls(null);
       if (!isPublic) {
         location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
       }
