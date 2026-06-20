@@ -890,7 +890,6 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
   // PRIORITY 2: Anthropic Claude (if explicitly requested or Ollama unavailable)
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  console.log("[dream-chat] DEBUG: anthropicKey exists:", !!anthropicKey, "rp:", rp, "condition:", (anthropicKey && (!rp || rp === "claude" || rp === "anthropic")) || (!rp && !ollamaModel));
   if ((anthropicKey && (!rp || rp === "claude" || rp === "anthropic")) || (!rp && !ollamaModel)) {
     try {
       // Anthropic intentionally left unmodified (no frequency_penalty; matches PR #723).

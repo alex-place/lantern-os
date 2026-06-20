@@ -71,6 +71,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.11] - 2026-06-20
+
+### Changed
+- Removed a leftover `DEBUG` `console.log` in `dream-chat.js` that printed Anthropic-key existence and provider-routing internals to the server log on every reply. Minor log-hygiene / info-leak cleanup; also clears the recurring SLOP "debug statement" flag on `dream-chat.js` commits.
+
 ## [1.4.10] - 2026-06-20
 
 ### Fixed
