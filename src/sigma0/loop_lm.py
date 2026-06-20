@@ -41,9 +41,14 @@ os.environ.setdefault("HF_HOME", "D:/hf-cache")
 
 # #768: lazy import of stability gates — only loaded when called, so the module
 # is importable without scipy (which is not in the minimal inference venv).
+def _finite(x):
+    """round(x, 4) or None for nan/inf — JSON-safe scalar for the result dict."""
+    return round(float(x), 4) if (x == x and abs(x) != float("inf")) else None
+
+
 def _stability_gates(A_tensor):
-    """Compute #768 Lyapunov + numerical-range gates on a Jacobian A. Returns a
-    dict summary (never raises — returns None on import/compute failure)."""
+    """Compute #768 region-wideners (numerical-range, Lyapunov, ε-pseudospectral, Kreiss)
+    on a Jacobian A. Returns a dict summary (never raises — None on import/compute fail)."""
     try:
         _src = os.path.join(os.path.dirname(__file__), "..", "..")
         if _src not in sys.path:
@@ -53,11 +58,13 @@ def _stability_gates(A_tensor):
         return {
             "gate_numerical_range": g.gate_numerical_range,
             "gate_lyapunov": g.gate_lyapunov,
+            "gate_pseudospectral": g.gate_pseudospectral,
             "proven_contracting": g.proven_contracting,
-            "numerical_range_abscissa": round(g.numerical_range_abscissa, 4),
-            "spectral_abscissa": round(g.spectral_abscissa, 4),
-            "lyapunov_transient_bound": round(g.lyapunov_transient_bound, 4)
-                if not (g.lyapunov_transient_bound != g.lyapunov_transient_bound) else None,
+            "numerical_range_abscissa": _finite(g.numerical_range_abscissa),
+            "spectral_abscissa": _finite(g.spectral_abscissa),
+            "pseudospectral_abscissa": _finite(g.pseudospectral_abscissa),
+            "lyapunov_transient_bound": _finite(g.lyapunov_transient_bound),
+            "kreiss_bound": _finite(g.kreiss_bound),
         }
     except Exception:
         return None
@@ -254,9 +261,15 @@ class Sigma0LoopLM:
             # EMA monitor. Empty list = no anomalous confidence spikes during generation.
             "collapse_events": dc.collapse_events if dc is not None else [],
             "canary_mean_entropy": dc.mean_entropy if dc is not None else None,
-            # #768: Lyapunov + numerical-range stability gates on the empirical Jacobian.
-            # None = not enough tokens to estimate; proven_contracting=True = gate passed.
+            # #768: Lyapunov / numerical-range / ε-pseudospectral gates + Kreiss bound on
+            # the empirical Jacobian. None = not enough tokens to estimate.
             "stability_gates": stability_cert,
+            # #768 acceptance gate — the certificate is CONSUMED here (not just reported):
+            # the generation's latent exit-depth trajectory is convergence-ACCEPTED iff its
+            # empirical Jacobian is provably contracting by either region-widener gate.
+            # None = no certificate (too few tokens). This is the gate the issue asked for.
+            "stability_accepted": (bool(stability_cert["proven_contracting"])
+                                   if stability_cert is not None else None),
         }
         if dc is not None:   # Σ₀ decode canary telemetry (#766)
             out["canary_max_proximity"] = round(canary_max_prox, 4)

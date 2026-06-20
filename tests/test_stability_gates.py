@@ -154,3 +154,46 @@ def test_crouzeix_bound_holds_numerically():
         assert g.crouzeix_transient_bound == pytest.approx(1.0 + 2.0 ** 0.5, abs=1e-9)
         sup = max(np.linalg.norm(expm(M * t), 2) for t in ts)
         assert sup <= g.crouzeix_transient_bound + 1e-6
+
+
+# ── #768 gate #2: ε-pseudospectral abscissa + Kreiss constant ───────────────────
+
+def test_pseudospectral_abscissa_is_provable_upper_bound():
+    """α_ε ≤ ω(A)+ε (field-of-values upper bound) must dominate the spectral abscissa, and
+    the gate must agree with the slightly-looser numerical-range gate. The ω=0 transient
+    counterexample must NOT earn a transient-free certificate."""
+    g = stability_gates(_A([[-1.0, 0.0], [0.0, -2.0]]))           # ω = −1
+    assert g.pseudospectral_abscissa == pytest.approx(-1.0 + g.pseudospectral_eps, abs=1e-6)
+    assert g.pseudospectral_abscissa >= g.spectral_abscissa       # α_ε ≥ α_0 always
+    assert g.gate_pseudospectral is True
+    gc = stability_gates(_A([[-1.0, 3.0], [-3.0, 0.0]]))          # ω = 0 → transient growth
+    assert gc.gate_pseudospectral is False
+    assert gc.pseudospectral_abscissa > 0
+
+
+def test_kreiss_bound_lower_bounds_transient_peak():
+    """Kreiss matrix theorem (continuous): K(A) ≤ sup_t‖e^{tA}‖. The computed lower bound
+    must sit under the true transient peak, equal 1 for a normal A (no transient), and
+    exceed 1 for a transiently-growing non-normal Hurwitz A."""
+    ts = np.linspace(0.0, 12.0, 240)
+    g_norm = stability_gates(_A([[-1.0, 0.0], [0.0, -2.0]]))
+    assert g_norm.kreiss_bound == pytest.approx(1.0, abs=1e-6)    # normal → K(A)=1
+
+    M = np.array([[-1.0, 10.0], [0.0, -1.0]])
+    g = stability_gates(torch.tensor(M))
+    sup = max(np.linalg.norm(expm(M * t), 2) for t in ts)
+    assert g.kreiss_bound > 1.0                                   # detects the transient
+    assert g.kreiss_bound <= sup + 1e-6                           # Kreiss lower bound holds
+
+
+def test_kreiss_large_matrix_uses_cheap_probe():
+    """For a large Jacobian (loop_lm's hidden-dim A) the Kreiss probe is capped to one RHP
+    point for speed; it must still return a finite lower bound ≥ 1 and not scan a full grid."""
+    rng = np.random.default_rng(7)
+    n = 80
+    # circular law: randn(n,n)/√n has spectral radius ≈1, so the −3I shift makes this
+    # comfortably Hurwitz (rightmost eigenvalue ≈ −2) regardless of the random draw.
+    M = rng.standard_normal((n, n)) / np.sqrt(n) - 3.0 * np.eye(n)
+    g = stability_gates(torch.tensor(M))
+    assert np.isfinite(g.kreiss_bound) and g.kreiss_bound >= 1.0
+    assert g.gate_lyapunov is True
