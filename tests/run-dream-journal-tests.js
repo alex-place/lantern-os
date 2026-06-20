@@ -20,6 +20,7 @@ const allCommands = {
   validate: [node, ["apps/lantern-garage/validate.js"]],
   ui: [node, [playwrightCli, "test", "tests/test_dream_journal_ui.spec.js"]],
   "ui:headed": [node, [playwrightCli, "test", "tests/test_dream_journal_ui.spec.js", "--headed"]],
+  "dream-chat-ui": [node, [playwrightCli, "test", "tests/test_dream_chat_ux.spec.js"]],
 };
 
 function selectedCommands() {
@@ -27,7 +28,7 @@ function selectedCommands() {
   const names = requested.length ? requested : ["api", "chat", "multiturn", "keystone", "cache", "ui"];
   for (const name of names) {
     if (!allCommands[name]) {
-      throw new Error(`Unknown test target "${name}". Use api, chat, multiturn, keystone, validate, ui, or ui:headed.`);
+      throw new Error(`Unknown test target "${name}". Use api, chat, multiturn, keystone, cache, validate, ui, ui:headed, or dream-chat-ui.`);
     }
   }
   return names;
