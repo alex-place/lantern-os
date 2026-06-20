@@ -71,6 +71,17 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.7] - 2026-06-20
+
+### Fixed
+- **Dream-chat sessions now persist from the live send path.** `dream-chat-ui.js` (the `sendMessage()` that actually runs) omitted `sessionId` from the `POST /api/dream/chat/stream` body, so turns logged untagged and never formed a saved session — the Chats drawer (#773) stayed on "No saved sessions yet" even after chatting. It now sends `sessionId` from `localStorage['lantern_chat_session']` (the id `dream-chat.js` owns), matching the server's `parsed.sessionId` read in `stream-chat.js`. Verified end-to-end in the dev preview: a fresh chat now creates a titled, resumable session.
+
+### Accessibility
+- Added accessible names to icon-only chat controls that lacked them: the Observer panel close button (`aria-label="Close observer panel"`) and the JS-generated session "resume" buttons (`aria-label="Resume chat: <title>"`, replacing an accessible name built from title + timestamp/turn-count noise).
+- Bumped `dream-chat.js` / `dream-chat-ui.js` cache-busters so returning browsers fetch the above fixes.
+
+---
+
 ## [1.4.6] - 2026-06-20
 
 ### Fixed

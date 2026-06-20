@@ -333,6 +333,9 @@
       const open = document.createElement("button");
       open.className = "session-open";
       open.title = "Resume this session";
+      // Explicit accessible name so screen readers announce the action + which
+      // chat, instead of the concatenated title + timestamp/turn-count metadata.
+      open.setAttribute("aria-label", `Resume chat: ${s.title || "(untitled session)"}${isCurrent ? " (current)" : ""}`);
       const title = document.createElement("span");
       title.className = "session-title";
       title.textContent = s.title || "(untitled session)";
