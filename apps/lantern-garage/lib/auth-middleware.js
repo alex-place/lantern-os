@@ -6,16 +6,39 @@
 
 const { getProfile } = require("./user-profiles");
 
+// Headers that only ever appear on traffic relayed through a reverse proxy or
+// tunnel (Cloudflare in front of lantern-os.net, nginx, Railway, etc.). A
+// genuine same-machine request from the owner's browser to 127.0.0.1 carries
+// none of these.
+const PROXY_HEADERS = [
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-real-ip",
+  "forwarded",
+  "cf-connecting-ip",
+  "cf-ray",
+  "true-client-ip",
+];
+
 /**
  * Local-only access bypass (grants admin).
- * Two triggers, both safe for production:
+ * Two triggers, both intended for the owner's own machine only:
  *   1. Dev server on port 4178 (existing behavior).
  *   2. LANTERN_LOCAL_ADMIN=1 AND the request arrives on a loopback address.
- * Cloud deploys bind 0.0.0.0 and never set LANTERN_LOCAL_ADMIN, so remote
- * traffic stays fully gated. Lets the owner reach founder/admin pages
- * (e.g. /create.html) on the local stable server (4177) without Patreon login.
+ *
+ * SECURITY: the loopback socket address is NOT proof of a local owner when the
+ * server sits behind a reverse proxy or tunnel. lantern-os.net is fronted by
+ * Cloudflare, so every visitor reaches Node from a loopback/proxy socket — the
+ * old check handed admin (read + write of feature flags and nav) to the entire
+ * internet. We therefore deny the bypass outright whenever the request carries
+ * any proxy/forwarding header; only a direct, un-proxied local hit qualifies.
  */
 function isLocalBypass(req) {
+  const headers = req.headers || {};
+  for (const h of PROXY_HEADERS) {
+    if (headers[h]) return false; // came through a proxy/tunnel → never "local"
+  }
   if (req.socket?.localPort === 4178) return true;
   if (process.env.LANTERN_LOCAL_ADMIN !== "1") return false;
   const ip = req.socket?.remoteAddress || "";
