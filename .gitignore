@@ -295,3 +295,6 @@ apps/data/csf-query-metrics.jsonl
 data/convergence/chat-responses.jsonl
 data/cubes/*/deltas/*.jsonl
 data/proposals.jsonl
+
+# Junction to the dedicated dev-server worktree (C:/dev/lantern-os-dev); see docs/DEV-SERVER-WORKTREE.md
+.dev-worktree/

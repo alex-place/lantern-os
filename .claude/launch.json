@@ -3,8 +3,10 @@
   "configurations": [
     {
       "name": "lantern-dev",
+      "comment": "Runs from the dedicated dev-server worktree via the .dev-worktree junction (-> C:/dev/lantern-os-dev), so the automation's resets/branch-switches on the MAIN checkout don't yank code/env out from under the running dev server. Update its code with: git -C C:/dev/lantern-os-dev fetch && git -C C:/dev/lantern-os-dev reset --hard origin/master, then restart.",
       "runtimeExecutable": "node",
       "runtimeArgs": ["apps/lantern-garage/server-dev.js"],
+      "cwd": ".dev-worktree",
       "port": 4178
     },
     {
