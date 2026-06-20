@@ -117,7 +117,15 @@ module.exports = async function keystoneRoutes(req, res, url, deps) {
   if (url.pathname === "/api/keystone/status" && req.method === "GET") {
     try {
       const git_status = execSync("git status --short", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
-      const branch = execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
+      // `git branch --show-current` is empty on a detached HEAD (CI checks out PRs detached),
+      // which left `branch` blank. Fall back to the CI head-ref env vars, then the short SHA,
+      // so the field is always a meaningful non-empty label.
+      let branch = execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
+      if (!branch) {
+        branch = (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || "").trim()
+          || execSync("git rev-parse --short HEAD", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim()
+          || "detached";
+      }
       const log = execSync("git log --oneline -5", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
       const test_count = "Run: npm test or node tests/test_dream_journal_api.js + test_dream_journal_chat.js + test_dream_chat_multiturns.js + test_dream_journal_keystone.js";
 
