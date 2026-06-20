@@ -100,6 +100,18 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.5] - 2026-06-20
+
+### Fixed
+- **#810** `_prompt_from_messages` in `scripts/ouro_serve.py` now uses `### Instruction / ### Response` format matching the QLoRA training template byte-exactly. `apply_chat_template` added special tokens that misaligned with training and cost ~11pts accuracy (served 0.23 vs raw 0.34 on HumanEval).
+- **#811** `_SERVED_MODELS` gate in `scripts/ouro_serve.py` returns 404 for non-coder model names (dream, pcsf, convergance) so the Lantern provider chain falls back to cloud for persona surfaces instead of silently answering with the 1.4B coder.
+- **#672** `_tunnelFailed` flag in `apps/lantern-garage/server.js` prevents the 3s optimistic `setTimeout` from overwriting `status:error` after a Cloudflare spawn failure.
+
+### Added
+- Creator intake suite (local-unique): `GET/POST /api/creators`, `creator-intake.html` 10-section brand identity form, `data/creators/courtney-blasioli.json` profile.
+
+---
+
 ## [1.4.2] - 2026-06-18
 **Build:** 1.4.2+2026-06-18.041643
 **Commit:** 89a00dc8

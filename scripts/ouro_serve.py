@@ -34,6 +34,13 @@ MODEL_ID = os.environ.get("OURO_MODEL", "ByteDance/Ouro-1.4B-Thinking")
 ADAPTER = os.environ.get("OURO_ADAPTER", "")
 PORT = int(os.environ.get("OURO_PORT", "11434"))
 MODEL_NAME = "ouro:latest"  # what the Ollama API advertises
+# #811: only answer model names that belong to the Ouro/coding stack. Dream, pcsf,
+# convergance, and other persona models should 404 so the server's provider chain
+# falls back to cloud (Anthropic/OpenAI). Extend via OURO_MODEL_ALIASES env (comma-sep).
+_SERVED_MODELS = {
+    "ouro:latest", "ouro-1.4b", "lantern-sigma0-coder", "lantern-sigma0-coder-v2",
+    "lantern-sigma0-coder-loop",
+}.union(set(filter(None, os.environ.get("OURO_MODEL_ALIASES", "").split(","))))
 # Serving mode. Product DEFAULT = fast cached generate (Ouro's UniversalTransformerCache).
 # The native Σ₀ adaptive Q-exit loop is a no-cache research/"deep" mode — opt in with
 # OURO_NATIVE=1. It is far slower (~1 s/token) so it is NOT the chat default.
@@ -96,10 +103,19 @@ print(f"[ouro] ready on :{PORT} as '{MODEL_NAME}' (native={NATIVE})", flush=True
 
 
 def _prompt_from_messages(messages):
-    try:
-        return _tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    except Exception:
-        return "\n".join(f"{m.get('role')}: {m.get('content','')}" for m in messages) + "\nassistant:"
+    # #810: use the QLoRA training template byte-exactly — apply_chat_template adds
+    # special tokens that misalign with the "### Instruction / ### Response" training
+    # format and cost ~11pts accuracy (served 0.23 vs raw 0.34 on HumanEval).
+    parts = []
+    for m in messages:
+        role, content = m.get("role", ""), m.get("content", "")
+        if role == "system":
+            parts.append(content)
+        elif role == "user":
+            parts.append(f"### Instruction:\n{content}")
+        elif role == "assistant":
+            parts.append(f"### Response:\n{content}")
+    return ("\n\n".join(parts) if parts else "") + "\n\n### Response:\n"
 
 
 def _persist_loop_meta(out: dict) -> None:
@@ -185,6 +201,11 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(ln) or b"{}")
         except Exception:
             return self._json({"error": "bad json"}, 400)
+        # #811: gate on model name — only answer coding/ouro models; 404 for dream/pcsf/
+        # convergance so the Lantern provider chain falls back to cloud for those surfaces.
+        req_model = (body.get("model") or "").lower().strip()
+        if req_model and req_model not in _SERVED_MODELS:
+            return self._json({"error": f"model not found: {body.get('model')}"}, 404)
         is_chat = self.path.startswith("/api/chat")
         prompt = _prompt_from_messages(body.get("messages", [])) if is_chat else body.get("prompt", "")
         stream = body.get("stream", True)
