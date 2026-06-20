@@ -180,6 +180,9 @@ const sessionMiddleware = session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
+  // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
+  // `secure` session cookie is actually set (otherwise login never persists).
+  proxy: true,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

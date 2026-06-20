@@ -72,11 +72,29 @@ function readCookie(req, name) {
 }
 
 /**
+ * Resolve the OAuth redirect_uri from the request that served /start, so the
+ * callback always returns to the SAME origin the flow began on. Behind Railway's
+ * proxy, `x-forwarded-proto` + `host` give the public URL (e.g. lantern-os.net).
+ * Falls back to the static env var only when no host header is present.
+ * (Fixes cross-origin "State mismatch": flow started on lantern-os.net but the
+ * env-configured redirect_uri pointed at 127.0.0.1.)
+ */
+function resolveRedirectUri(req) {
+  const host = req.headers && req.headers.host;
+  if (host) {
+    const proto = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim()
+      || (req.socket && req.socket.encrypted ? "https" : "http");
+    return `${proto}://${host}/api/auth/patreon/callback`;
+  }
+  return process.env.PATREON_REDIRECT_URI || null;
+}
+
+/**
  * Start OAuth flow: redirect to Patreon login.
  */
 function handlePatreonStart(req, res, returnTo) {
   const clientId = process.env.PATREON_CLIENT_ID;
-  const redirectUri = process.env.PATREON_REDIRECT_URI;
+  const redirectUri = resolveRedirectUri(req);
 
   if (!clientId || !redirectUri) {
     res.writeHead(500, { "Content-Type": "application/json" });
@@ -90,6 +108,7 @@ function handlePatreonStart(req, res, returnTo) {
   req.session.pkce_verifier = verifier;
   req.session.oauth_state = state;
   req.session.return_to = returnTo || "/";
+  req.session.redirect_uri = redirectUri;
 
   const params = querystring.stringify({
     response_type: "code",
@@ -103,10 +122,11 @@ function handlePatreonStart(req, res, returnTo) {
 
   // Belt-and-suspenders: also carry state/verifier in a signed short-TTL cookie
   // so the callback can recover them if the session was lost (issue #689).
-  const oauthToken = signOauth({ state, verifier, return_to: returnTo || "/", exp: Date.now() + 10 * 60 * 1000 });
+  const oauthToken = signOauth({ state, verifier, return_to: returnTo || "/", redirect_uri: redirectUri, exp: Date.now() + 10 * 60 * 1000 });
+  const secure = redirectUri.startsWith("https://") ? "; Secure" : "";
   res.writeHead(302, {
     Location: `https://www.patreon.com/oauth2/authorize?${params}`,
-    "Set-Cookie": `${OAUTH_COOKIE}=${encodeURIComponent(oauthToken)}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax`,
+    "Set-Cookie": `${OAUTH_COOKIE}=${encodeURIComponent(oauthToken)}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax${secure}`,
   });
   res.end();
 }
@@ -133,6 +153,9 @@ async function handlePatreonCallback(req, res, query, deps) {
   const oauthCk = verifyOauth(readCookie(req, OAUTH_COOKIE));
   const expectedState = req.session.oauth_state || (oauthCk && oauthCk.state) || null;
   const verifier = req.session.pkce_verifier || (oauthCk && oauthCk.verifier) || null;
+  // Reuse the EXACT redirect_uri used at /start (Patreon requires an exact match
+  // at token exchange). Fall back to deriving it from this request's host.
+  const redirectUri = req.session.redirect_uri || (oauthCk && oauthCk.redirect_uri) || resolveRedirectUri(req);
   console.log("[AUTH] Cookie oauth recovery:", oauthCk ? "present" : "none");
 
   // Verify state (constant-time-ish): require a non-empty expected state that matches
@@ -143,7 +166,7 @@ async function handlePatreonCallback(req, res, query, deps) {
 
   try {
     // Exchange code for token (server-side, never expose client secret to browser)
-    const token = await exchangePatreonCode(code, verifier);
+    const token = await exchangePatreonCode(code, verifier, redirectUri);
 
     // Fetch user identity and membership data
     const user = await getPatreonUserWithMemberships(token);
@@ -196,10 +219,10 @@ async function handlePatreonCallback(req, res, query, deps) {
 /**
  * Exchange authorization code for access token (server-side).
  */
-async function exchangePatreonCode(code, verifier) {
+async function exchangePatreonCode(code, verifier, redirectUriArg) {
   const clientId = process.env.PATREON_CLIENT_ID;
   const clientSecret = process.env.PATREON_CLIENT_SECRET;
-  const redirectUri = process.env.PATREON_REDIRECT_URI;
+  const redirectUri = redirectUriArg || process.env.PATREON_REDIRECT_URI;
 
   console.log("[AUTH] Token exchange - code:", code.slice(0, 10) + "...");
   console.log("[AUTH] Token exchange - redirectUri:", redirectUri);
