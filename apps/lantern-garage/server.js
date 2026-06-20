@@ -167,11 +167,12 @@ const routes = [
   require("./routes/research"), // open-video learning flywheel status
 
   require("./routes/pdfs"), // PDF document listing for Knowledge Center
-  require("./routes/surfaces"),
   require("./routes/features"),
+  require("./routes/admin-flags"),     // Admin feature flags + per-page nav visibility
   require("./routes/personal-cube"),
   require("./routes/pr-review"),
   require("./routes/auto-merge"),
+  require("./routes/surfaces"),        // static file catch-all — MUST stay last (returns true for any path)
 ];
 
 // ── Session middleware (Patreon OAuth) ──
