@@ -298,3 +298,8 @@ data/proposals.jsonl
 
 # Junction to the dedicated dev-server worktree (C:/dev/lantern-os-dev); see docs/DEV-SERVER-WORKTREE.md
 .dev-worktree/
+
+# Runtime state rewritten by the running server every tick (perpetually dirties
+# server worktrees and blocks autowork branch switches — see #781 autowork failure).
+apps/data/agent-performance.jsonl
+data/pcsf/settings.pcsf.json
