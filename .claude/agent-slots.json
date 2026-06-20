@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "description": "Agent Slot Configuration for Lantern OS Foundry — Gemini-first daily routing",
+  "version": "1.2.0",
+  "description": "Agent Slot Configuration for Lantern OS Foundry — Gemini-first daily routing + Σ₀ local convergence coder",
   "slots": [
     {
       "id": "gemini-2.5-pro-slot",
@@ -121,6 +121,20 @@
       "responsibilities": ["deep_engineering_work", "complex_debugging", "performance_optimization", "system_design", "integration"],
       "syncInterval": 300,
       "healthCheck": { "interval": 60, "timeout": 10 }
+    },
+    {
+      "id": "sigma0-coder-slot",
+      "agent": "sigma0",
+      "provider": "ollama",
+      "model": "lantern-sigma0-coder-v2",
+      "status": "ready",
+      "capabilities": { "maxTokens": 32768, "batchSize": 4, "parallelTasks": 2, "supportedTools": ["code_execution", "git", "analysis", "testing"] },
+      "quotaTracking": { "enabled": false, "windowSize": 86400, "maxTokensPerWindow": 0, "fallbackAgent": "gemini-2.5-flash-slot" },
+      "responsibilities": ["sigma0_coding", "convergence_coding", "code_generation", "bug_fixes", "refactoring", "test_writing"],
+      "syncInterval": 300,
+      "healthCheck": { "interval": 60, "timeout": 10 },
+      "local": true,
+      "note": "Σ₀ Ouro convergence coder — the project's own convergence-fitted local coding model (Ollama). No quota; falls back to Gemini if the local runtime is unhealthy."
     }
   ],
   "batchSync": {
@@ -143,11 +157,12 @@
       "gemini-1.5-flash-8b-slot",
       "claude-slot-1",
       "codex-slot-1",
-      "devin-slot-1"
+      "devin-slot-1",
+      "sigma0-coder-slot"
     ],
     "weights": {
       "gemini-2.5-pro-slot": 0.20,
-      "gemini-2.5-flash-slot": 0.20,
+      "gemini-2.5-flash-slot": 0.15,
       "gemini-2.0-flash-slot": 0.15,
       "gemini-2.0-flash-lite-slot": 0.10,
       "gemini-1.5-pro-slot": 0.10,
@@ -155,7 +170,8 @@
       "gemini-1.5-flash-8b-slot": 0.05,
       "claude-slot-1": 0.05,
       "codex-slot-1": 0.03,
-      "devin-slot-1": 0.02
+      "devin-slot-1": 0.02,
+      "sigma0-coder-slot": 0.05
     },
     "affinityRules": {
       "strategic_decisions": "gemini-2.5-pro-slot",
@@ -169,7 +185,9 @@
       "lightweight_tasks": "gemini-2.0-flash-lite-slot",
       "micro_tasks": "gemini-1.5-flash-8b-slot",
       "deep_reasoning": "claude-slot-1",
-      "deep_engineering_work": "devin-slot-1"
+      "deep_engineering_work": "devin-slot-1",
+      "sigma0_coding": "sigma0-coder-slot",
+      "convergence_coding": "sigma0-coder-slot"
     }
   },
   "monitoring": {
