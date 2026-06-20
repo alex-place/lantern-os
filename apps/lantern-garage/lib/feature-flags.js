@@ -49,7 +49,7 @@ function ensureDir() {
 }
 
 function emptyConfig() {
-  return { version: 1, flags: {}, navigation: {}, updatedAt: null };
+  return { version: 1, flags: Object.create(null), navigation: {}, updatedAt: null };
 }
 
 /** Load the config document (cached). Never throws — falls back to empty. */
@@ -60,7 +60,7 @@ function loadConfig() {
       const parsed = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
       _cache = {
         version: parsed.version || 1,
-        flags: parsed.flags && typeof parsed.flags === "object" ? parsed.flags : {},
+        flags: nullProtoFlags(parsed.flags),
         navigation: parsed.navigation && typeof parsed.navigation === "object" ? parsed.navigation : {},
         updatedAt: parsed.updatedAt || null,
       };
@@ -194,12 +194,36 @@ function setNavEntry(pagePath, { hidden, disabled } = {}, actor = "admin") {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Flag keys are lowercase, alnum + dot/underscore/hyphen. */
+/**
+ * JS reserved property names. Even after normalization these must never become
+ * flag keys: `cfg.flags["__proto__"] = {…}` invokes the prototype setter and
+ * stores nothing (the endpoint then reports a misleading success), and a raw
+ * `flags["constructor"]` read off a normal object would resolve to Object's
+ * constructor. We reject them so setFlag's empty-key guard returns a clean 400.
+ */
+const RESERVED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Copy stored flags into a prototype-less map. Belt-and-suspenders against
+ * prototype surprises: with no Object.prototype in the chain, a stray reserved
+ * key (or a direct flags[key] read in isFlagEnabled) can never resolve to an
+ * inherited member.
+ */
+function nullProtoFlags(src) {
+  const out = Object.create(null);
+  if (src && typeof src === "object") {
+    for (const k of Object.keys(src)) out[k] = src[k];
+  }
+  return out;
+}
+
+/** Flag keys are lowercase, alnum + dot/underscore/hyphen. Reserved names rejected. */
 function normalizeKey(key) {
-  return String(key || "")
+  const k = String(key || "")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9._-]/g, "");
+  return RESERVED_KEYS.has(k) ? "" : k;
 }
 
 /** Test/maintenance hook: drop the in-memory cache so the next read re-loads. */

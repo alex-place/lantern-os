@@ -34,12 +34,15 @@ MODEL_ID = os.environ.get("OURO_MODEL", "ByteDance/Ouro-1.4B-Thinking")
 ADAPTER = os.environ.get("OURO_ADAPTER", "")
 PORT = int(os.environ.get("OURO_PORT", "11434"))
 MODEL_NAME = "ouro:latest"  # what the Ollama API advertises
-# #811: only answer model names that belong to the Ouro/coding stack. Dream, pcsf,
-# convergance, and other persona models should 404 so the server's provider chain
-# falls back to cloud (Anthropic/OpenAI). Extend via OURO_MODEL_ALIASES env (comma-sep).
+# #811: gate on model name — only answer models Ouro can serve. Legacy persona names
+# (lantern-csf-dream, lantern-convergance, lantern-pcsf) are listed as aliases so
+# existing .env files or requests using the old Ollama model names still hit Ouro
+# rather than falling through to cloud. Extend further via OURO_MODEL_ALIASES (comma-sep).
 _SERVED_MODELS = {
-    "ouro:latest", "ouro-1.4b", "lantern-sigma0-coder", "lantern-sigma0-coder-v2",
-    "lantern-sigma0-coder-loop",
+    "ouro:latest", "ouro-1.4b",
+    "lantern-sigma0-coder", "lantern-sigma0-coder-v2", "lantern-sigma0-coder-loop",
+    # legacy persona names (Ollama sunset — all surfaces now served by Ouro)
+    "lantern-csf-dream", "lantern-convergance", "lantern-pcsf",
 }.union(set(filter(None, os.environ.get("OURO_MODEL_ALIASES", "").split(","))))
 # Serving mode. Product DEFAULT = fast cached generate (Ouro's UniversalTransformerCache).
 # The native Σ₀ adaptive Q-exit loop is a no-cache research/"deep" mode — opt in with

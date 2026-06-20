@@ -75,6 +75,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ### Fixed
 - **Autowork "Work" button now streams the live step panel from the natural-language path too.** Typing "what should I work on?" (the `WORK_INTENT` route in `apps/lantern-garage/public/js/dream-chat-ui.js`) wired its Auto-work button to the old non-streaming `/api/convergence/autonomous-work` endpoint — an opaque "Working… → ✓ Done" with no visible progress — while the `!ask` chips used the observable `/autonomous-work/stream` panel (plan → patch → tests → commit → push → PR). Both paths now call `runAutowork()`, so a user gets the same honest, step-by-step view regardless of whether they typed or clicked. Σ₀: no hidden agency (#527). Verified live in the dev preview against the current worktree-isolated pipeline.
+- `feature-flags.js` `normalizeKey()` now rejects the JS reserved keys `__proto__`, `constructor`, and `prototype` (returns `""`), so `setFlag()`'s empty-key guard turns `PUT /api/admin/flags` with a reserved key into a clean `400` instead of reporting `{ok:true}` while silently storing nothing (the old `cfg.flags["__proto__"] = {…}` hit the prototype setter and dropped the value). The flags map is now `Object.create(null)` as defense-in-depth so a raw `flags[key]` read in `isFlagEnabled()` can't resolve to an inherited member. Admin-gated, low-severity correctness/hardening. Added `tests/test_feature_flags_reserved_keys.js`.
 
 ---
 
@@ -104,6 +105,16 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 ### Fixed
 - `validate-version-changelog.py` now resolves `CHANGELOG.MD` case-insensitively and reads files as UTF-8, so the pre-commit/pre-push validators no longer crash on Windows (cp1252) against the emoji/em-dash changelog.
 - `auto-version.js` inserts new entries below the title/`[Unreleased]` block instead of at the very top, so the header no longer gets re-buried.
+
+---
+
+## [1.4.6] - 2026-06-20
+
+### Fixed
+- **#811** Wire all Lantern surfaces to Ouro after Ollama sunset:
+  - `dream-chat.js`: default `ollamaModel` changed from `"lantern-csf-dream"` → `"ouro:latest"` (both the convergence synthesis path and the main chat path)
+  - `model-registry.js`: `convergance.ollamaModel` default changed to `"ouro:latest"`; `CONVERGENCE_MODEL` env override still works
+  - `ouro_serve.py`: `_SERVED_MODELS` expanded to include legacy persona model names (`lantern-csf-dream`, `lantern-convergance`, `lantern-pcsf`) as aliases so old `.env` files still route to Ouro
 
 ---
 

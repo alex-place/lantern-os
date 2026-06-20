@@ -10,6 +10,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# Least-privilege default token: checks out this + external public repos (read).
+permissions:
+  contents: read
+
 jobs:
   validate-hff:
     runs-on: windows-latest

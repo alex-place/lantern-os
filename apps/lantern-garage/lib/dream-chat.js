@@ -421,7 +421,7 @@ Respond with a single, profound observation (2-3 sentences). Focus on:
 Be honest. If there's not enough data, say so.`;
 
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
-  const ollamaModel = process.env.OLLAMA_MODEL || "lantern-csf-dream";
+  const ollamaModel = process.env.OLLAMA_MODEL || "ouro:latest";
 
   try {
     const payload = JSON.stringify({
@@ -803,7 +803,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
   // PRIORITY 1: Ollama (Local-first — no API keys, full privacy, control)
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
-  const ollamaModel = process.env.OLLAMA_MODEL || "lantern-csf-dream";
+  const ollamaModel = process.env.OLLAMA_MODEL || "ouro:latest";
   if (!rp || rp === "ollama" || rp === "local" || rp === "sigma0") {
     const isCoding = rp === "sigma0" || _isCodingRequest(text);
     const sigma0Persona = _getPersonas().find(p => p.id === "keystone-sigma0") || _DEFAULT_PERSONAS.find(p => p.id === "keystone-sigma0");
