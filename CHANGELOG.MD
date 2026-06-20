@@ -71,6 +71,20 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.4] - 2026-06-20
+
+### Fixed
+- **Autowork now runs each issue in an isolated git worktree** instead of in-place in the live serving checkout. The server continuously writes runtime JSONL into its own working tree, so the old in-place flow tripped its own `git_tree_dirty` guard ("refusing to switch branches … would be clobbered") before it could branch — autowork could never start. Both `/api/convergence/autonomous-work` and `/api/convergence/autonomous-work/stream` now create a dedicated worktree under `.claude/worktrees/` (off `master`, branch `auto/issue-<n>-<slug>`) and run every branch/apply/test/commit/push there; the worktree is torn down in a `finally` (branch kept). This also isolates concurrent issue runs from one another. (`apps/lantern-garage/routes/convergence-dispatch.js`, new `apps/lantern-garage/lib/autowork-worktree.js`)
+
+### Changed
+- `src/worktree-manager.js`: `createWorktree` / `removeWorktree` / `listWorktrees` now accept an explicit `repoRoot` (default unchanged), so a caller running inside one checkout can branch from the checkout it actually targets. Backward-compatible — existing 3-arg callers are unaffected.
+- `self-edit-engine.runTests(repoRoot, cmds, opts)` accepts `opts.env`, used to point `NODE_PATH` at the main checkout's `node_modules` when tests run inside a fresh worktree.
+
+### Added
+- `tests/test_autowork_worktree_isolation.js` — hermetic proof that a run gets its own worktree off `master`, the main working tree is never dirtied, a worktree commit does not leak to the main tree, and `cleanup()` removes the dir while keeping the branch.
+
+---
+
 ## [1.4.3] - 2026-06-20
 
 ### Changed

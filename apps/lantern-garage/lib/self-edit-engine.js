@@ -462,15 +462,18 @@ function isAllowedTest(cmd) {
   return ALLOWED_TESTS.some((re) => re.test(cmd));
 }
 
-function runTests(repoRoot, testCommands) {
+// opts.env overrides the child environment — used to point NODE_PATH at the main
+// checkout's node_modules when tests run inside an isolated worktree that has none.
+function runTests(repoRoot, testCommands, opts = {}) {
   const results = [];
+  const env = opts.env || process.env;
   for (const cmd of testCommands) {
     if (!isAllowedTest(cmd)) {
       results.push({ cmd, ok: false, error: "test_not_allowlisted", output: "" });
       continue;
     }
     try {
-      const out = execSync(cmd, { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024 });
+      const out = execSync(cmd, { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024, env });
       results.push({ cmd, ok: true, output: out.slice(0, MAX_OUTPUT), truncated: out.length > MAX_OUTPUT });
     } catch (err) {
       results.push({
