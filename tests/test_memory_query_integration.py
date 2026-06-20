@@ -34,6 +34,7 @@ class TestMemoryQueryIntegration:
             source="dream-chat",
             content={"intent": "user greeting", "text": "Hello Lantern"},
             confidence=0.95,
+            verification_status="verified",
             log_type="conversations",
         )
 
@@ -41,6 +42,7 @@ class TestMemoryQueryIntegration:
             source="router",
             content={"route": "convergence-dispatch", "cache_hit": True},
             confidence=0.85,
+            verification_status="verified",
             log_type="convergence",
         )
 
@@ -48,6 +50,7 @@ class TestMemoryQueryIntegration:
             source="kalshi-suggest",
             content={"suggestion": "tight-band entry", "market": "btc"},
             confidence=0.75,
+            verification_status="verified",
             log_type="trading",
         )
 
@@ -55,6 +58,7 @@ class TestMemoryQueryIntegration:
             source="dream-chat",
             content={"intent": "system query", "text": "What trades executed today?"},
             confidence=0.90,
+            verification_status="verified",
             log_type="conversations",
         )
 
