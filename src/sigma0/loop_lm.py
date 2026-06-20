@@ -164,16 +164,10 @@ class Sigma0LoopLM:
         eos = self.tok.eos_token_id
         bb = self._backbone()
         lm_head = self.model.lm_head if hasattr(self.model, "lm_head") else bb.lm_head
-        # G10 collapse canary (#793): track per-token softmax entropy EMA.
-        # Greedy argmax → collapse attractor manifests as entropy suddenly DROPPING
-        # (model becomes very confident = near-zero entropy). A two-sided alarm flags
-        # the token index so callers can detect/react. Seeded at first token.
-        _canary_ema = None      # running entropy EMA
-        _canary_alpha = 0.15    # EMA smoothing
-        _canary_thresh = 2.5    # z-score threshold for spook
-        _canary_var = None      # running variance EMA (for z-score)
-        _collapse_events = []   # list of (token_idx, entropy, z_score) at alarm points
-        # Σ₀ DecodeCanary (#766/#800): independent proximity/spook collapse detector.
+        # Σ₀ DecodeCanary (#766/#800/#793): the single collapse monitor. Per token it folds
+        # self-repeat / n-gram echo / argmax-margin into sigma0_proximity AND tracks the
+        # softmax-entropy EMA (#793's over-confidence signal), surfaced as unified canary_*
+        # telemetry — no second parallel canary in this loop.
         dc = None
         if canary:
             try:
@@ -206,28 +200,18 @@ class Sigma0LoopLM:
                     for tid in set(ids[0, -len(depths):].tolist()):
                         v = logits[tid]
                         logits[tid] = v / rep_cur if v > 0 else v * rep_cur
-                # G10 (#793): feed decoded logits into the entropy canary (before argmax so softmax is unaffected)
-                probs = torch.softmax(logits.float(), dim=-1)
-                entropy = float(-(probs * (probs + 1e-10).log()).sum().item())
-                if _canary_ema is None:
-                    _canary_ema = entropy
-                    _canary_var = 0.0
-                else:
-                    diff = entropy - _canary_ema
-                    _canary_var = (1 - _canary_alpha) * (_canary_var + _canary_alpha * diff ** 2)
-                    _canary_ema = _canary_alpha * entropy + (1 - _canary_alpha) * _canary_ema
-                    std = max(_canary_var ** 0.5, 1e-6)
-                    z = (entropy - _canary_ema) / std
-                    if abs(z) >= _canary_thresh:
-                        _collapse_events.append({"token": _tok_idx, "entropy": round(entropy, 3),
-                                                 "z": round(float(z), 2)})
                 nxt = int(torch.argmax(logits))
                 if dc is not None:
-                    # argmax margin (top1−top2 prob): low margin = uncertain/degenerate decode
-                    probs = torch.softmax(logits, dim=-1)
+                    # Feed both decode-health signals to the one canary: argmax margin
+                    # (top1−top2 prob; low = uncertain/degenerate) and full softmax entropy
+                    # (#793; a sudden drop = over-confident collapse). softmax computed once
+                    # here, after argmax selection, so it never perturbs the chosen token.
+                    probs = torch.softmax(logits.float(), dim=-1)
                     top2 = torch.topk(probs, 2).values
                     margin = float((top2[0] - top2[1]).item())
-                    obs = dc.observe(nxt, margin=margin, exit_depth=step, max_steps=self.max_steps)
+                    entropy = float(-(probs * (probs + 1e-10).log()).sum().item())
+                    obs = dc.observe(nxt, margin=margin, exit_depth=step, max_steps=self.max_steps,
+                                     entropy=entropy, token_idx=_tok_idx)
                     canary_max_prox = max(canary_max_prox, obs["proximity"])
                     canary_spooks += int(obs["spook"])
                     if obs["signal"] != "none":
@@ -266,10 +250,10 @@ class Sigma0LoopLM:
             "exit_reason": "adaptive_qexit" if mode == "qexit" else "convergence_exit",
             "mode": mode,
             "q": q,
-            # G10 (canary): collapse events detected by the per-token entropy EMA monitor.
-            # Empty list = no anomalous confidence spikes observed during generation.
-            "collapse_events": _collapse_events,
-            "canary_mean_entropy": round(_canary_ema, 3) if _canary_ema is not None else None,
+            # G10 (#793, now owned by the DecodeCanary): collapse events from the entropy
+            # EMA monitor. Empty list = no anomalous confidence spikes during generation.
+            "collapse_events": dc.collapse_events if dc is not None else [],
+            "canary_mean_entropy": dc.mean_entropy if dc is not None else None,
             # #768: Lyapunov + numerical-range stability gates on the empirical Jacobian.
             # None = not enough tokens to estimate; proven_contracting=True = gate passed.
             "stability_gates": stability_cert,
