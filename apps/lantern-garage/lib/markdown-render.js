@@ -145,53 +145,44 @@ function renderMarkdownDocument(markdown, sourcePath) {
   <title>${escapeHtml(title)} — Keystone OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/narrator.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap">
   <style>
-    /* Anthropic brand "reading paper": Lora body + Poppins headings on a warm
-       off-white card, comfortable measure & line-height for long technical docs. */
-    :root {
-      --b-dark: #141413; --b-light: #faf9f5; --b-midgray: #b0aea5;
-      --b-lightgray: #e8e6dc; --b-orange: #d97757; --b-blue: #6a9bcc; --b-green: #788c5d;
-      --b-ink: #2b2a27; --b-paper2: #f3f1ea;
-    }
-    body { background: #1c1b19; }
+    /* Doc reading view — built entirely on the site theme variables (css/site.css)
+       so it follows the global light/dark toggle. No fixed palette, no web fonts:
+       a clean centered card that inherits the site's "Segoe UI" sans. */
     .md-page {
-      max-width: 760px; margin: 28px auto 96px; padding: 56px 64px 72px;
-      background: var(--b-light); color: var(--b-ink);
-      border-radius: 14px; box-shadow: 0 12px 44px rgba(0,0,0,0.38);
-      font-family: 'Lora', Georgia, 'Times New Roman', serif;
-      font-size: 1.08rem; line-height: 1.78;
+      max-width: 820px; margin: 32px auto 96px; padding: 44px 56px 64px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 16px;
+      font-size: 1.05rem; line-height: 1.75;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
     }
-    .md-page p, .md-page li { line-height: 1.78; margin: 0 0 1.05em; color: var(--b-ink); }
+    .md-page p, .md-page li { margin: 0 0 1.05em; }
     .md-page li { margin-bottom: 0.5em; }
-    .md-page li::marker { color: var(--b-orange); }
+    .md-page li::marker { color: var(--accent); }
     .md-page h1, .md-page h2, .md-page h3, .md-page h4, .md-page h5, .md-page h6 {
-      font-family: 'Poppins', Arial, Helvetica, sans-serif; color: var(--b-dark); line-height: 1.22;
+      color: var(--text); line-height: 1.25; font-weight: 700;
     }
-    .md-page h1 { font-size: 2.2rem; font-weight: 800; margin: 0 0 .5em; letter-spacing: -0.015em; }
-    .md-page h2 { font-size: 1.55rem; font-weight: 700; margin: 1.9em 0 .55em; padding-top: .7em; border-top: 1px solid var(--b-lightgray); }
-    .md-page h3 { font-size: 1.22rem; font-weight: 600; margin: 1.6em 0 .4em; color: #3a3937; }
-    .md-page h4 { font-size: 0.95rem; font-weight: 600; margin: 1.4em 0 .3em; text-transform: uppercase; letter-spacing: .05em; color: var(--b-midgray); }
-    .md-page a { color: var(--b-orange); font-weight: 600; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
-    .md-page a:hover { color: #bf5c3d; }
-    .md-page strong { color: var(--b-dark); font-weight: 700; }
-    .md-page code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--b-lightgray); color: #7a4a33; padding: 1.5px 6px; border-radius: 5px; font-size: 0.85em; }
-    .md-page pre { background: #23221f; color: #f3f1ea; overflow: auto; padding: 18px 20px; border-radius: 10px; margin: 1.4em 0; line-height: 1.55; }
-    .md-page pre code { background: none; color: inherit; padding: 0; font-size: 0.85rem; }
-    .md-page table { width: 100%; border-collapse: collapse; margin: 1.6em 0; font-family: 'Poppins', Arial, sans-serif; font-size: 0.9rem; border: 1px solid var(--b-lightgray); border-radius: 10px; overflow: hidden; }
-    .md-page th, .md-page td { border-bottom: 1px solid var(--b-lightgray); padding: 11px 14px; text-align: left; vertical-align: top; line-height: 1.5; }
-    .md-page thead th { background: var(--b-dark); color: var(--b-light); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; }
-    .md-page tbody tr:nth-child(even) { background: var(--b-paper2); }
-    .md-page blockquote { margin: 1.5em 0; padding: 6px 22px; background: var(--b-paper2); border-left: 4px solid var(--b-orange); border-radius: 0 10px 10px 0; color: #3a3937; }
+    .md-page h1 { font-size: 2rem; font-weight: 800; margin: 0 0 .5em; letter-spacing: -0.02em; }
+    .md-page h2 { font-size: 1.5rem; margin: 1.85em 0 .55em; padding-top: .7em; border-top: 1px solid var(--border); }
+    .md-page h3 { font-size: 1.2rem; font-weight: 600; margin: 1.55em 0 .4em; }
+    .md-page h4 { font-size: 0.9rem; font-weight: 700; margin: 1.4em 0 .3em; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    .md-page a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+    .md-page a:hover { color: var(--accent-hover); }
+    .md-page strong { color: var(--text); font-weight: 700; }
+    .md-page code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--surface2); color: var(--accent); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px; font-size: 0.85em; }
+    .md-page pre { background: var(--surface2); color: var(--text); border: 1px solid var(--border); overflow: auto; padding: 16px 18px; border-radius: 10px; margin: 1.4em 0; line-height: 1.55; }
+    .md-page pre code { background: none; border: none; color: inherit; padding: 0; font-size: 0.85rem; }
+    .md-page table { width: 100%; border-collapse: collapse; margin: 1.6em 0; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .md-page th, .md-page td { border-bottom: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; line-height: 1.5; }
+    .md-page thead th { background: var(--surface2); color: var(--text); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; }
+    .md-page tbody tr:nth-child(even) { background: var(--surface2); }
+    .md-page blockquote { margin: 1.5em 0; padding: 6px 22px; background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; color: var(--text); }
     .md-page blockquote h2 { margin-top: .6em; border-top: none; padding-top: 0; font-size: 1.2rem; }
     .md-page blockquote h3 { margin-top: .5em; }
     .md-page blockquote > :first-child { margin-top: .4em; }
-    .md-page hr { border: none; border-top: 1px solid var(--b-lightgray); margin: 2.4em 0; }
-    .md-source { color: var(--b-midgray); font-size: 0.8rem; margin-bottom: 28px; font-family: 'Poppins', Arial, sans-serif; letter-spacing: .02em; }
-    @media (max-width: 820px) { .md-page { padding: 32px 22px 56px; margin: 0; border-radius: 0; font-size: 1.04rem; } }
+    .md-page hr { border: none; border-top: 1px solid var(--border); margin: 2.4em 0; }
+    .md-source { color: var(--muted); font-size: 0.8rem; margin-bottom: 26px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .01em; }
+    @media (max-width: 820px) { .md-page { padding: 28px 20px 48px; margin: 0; border-radius: 0; border-left: none; border-right: none; font-size: 1.02rem; } }
   </style>
 </head>
 <body>
