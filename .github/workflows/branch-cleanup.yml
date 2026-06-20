@@ -17,6 +17,11 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# Deleting merged/stale branches (action-delete-branch + `git push --delete`)
+# requires write access to refs; the default token is read-only.
+permissions:
+  contents: write
+
 jobs:
   delete-merged-branches:
     runs-on: ubuntu-latest
