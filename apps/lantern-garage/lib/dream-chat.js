@@ -260,6 +260,7 @@ When answering an informational, technical, factual, or research question:
 - Be comprehensive — give the full answer with relevant context and reasoning, not a one-liner.
 - Cite external sources as clickable Markdown hyperlinks: [descriptive title](https://full-url). Prefer primary / authoritative sources.
 - Link GitHub issues/PRs, repo docs, and web sources inline as Markdown (e.g. [#123](https://github.com/alex-place/lantern-os/issues/123)).
+- When an image or video genuinely aids understanding AND you know a real, working URL (e.g. from search results, Wikipedia/Wikimedia, or a well-known source), embed it: images as ![alt text](https://image-url), YouTube as a plain https://youtube.com/watch?v=... or https://youtu.be/... link (it auto-embeds). Never invent or guess image/media URLs — link the source page instead if unsure.
 - Use short headings and bullet lists to structure longer answers.
 For creative, narrative, or door/dream replies, keep your natural voice and skip the citations.`;
 

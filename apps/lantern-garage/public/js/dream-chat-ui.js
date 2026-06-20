@@ -208,13 +208,23 @@ function renderMarkdown(text) {
   h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
   h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
 
-  // Markdown links [label](url) → new-tab anchors. Stash as placeholders first so the
-  // GitHub-pill and bare-URL linkifiers below never touch the URL inside them.
+  // Stash rich media + links as placeholders BEFORE the URL linkifiers run, so those
+  // never touch a URL that's already inside an image / iframe / anchor.
   const _stash = [];
-  h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) => {
-    const i = _stash.push(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`) - 1;
-    return `\x00L${i}\x00`;
-  });
+  const _put = (html) => `\x00L${_stash.push(html) - 1}\x00`;
+
+  // Images ![alt](url) → <img>. Broken / hallucinated URLs hide themselves (onerror).
+  // Must run before the link rule so ![..](..) isn't read as a text link.
+  h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
+    _put(`<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
+
+  // YouTube links → privacy-friendly inline embed.
+  h = h.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})[^\s<>"')\x00]*/g, (_, vid) =>
+    _put(`<iframe src="https://www.youtube-nocookie.com/embed/${vid}" width="100%" height="220" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`));
+
+  // Markdown links [label](url) → new-tab anchors.
+  h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) =>
+    _put(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
 
   h = h.replace(
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)/g,
