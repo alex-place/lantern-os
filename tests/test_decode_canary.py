@@ -71,6 +71,37 @@ def test_knobs_respond_to_proximity():
     assert calm["rep_penalty"] == 1.3 and calm["q"] == 0.5, "zero proximity must be a no-op"
 
 
+def test_entropy_signal_surfaced_and_tracked():
+    """Feeding softmax entropy (the folded #793 signal) surfaces it + tracks a running EMA."""
+    dc = DecodeCanary()
+    out = dc.observe(3, entropy=2.5)
+    assert out["entropy"] == 2.5, "fed entropy not surfaced in observation"
+    assert dc.mean_entropy == 2.5, "first entropy must seed the EMA"
+    dc.observe(4, entropy=2.0)
+    assert dc.mean_entropy is not None and 2.0 < dc.mean_entropy < 2.5, \
+        f"EMA did not track toward newer entropy: {dc.mean_entropy}"
+
+
+def test_no_entropy_keeps_signal_inert():
+    """Without an entropy arg the #793 signal stays inert: no events, null telemetry."""
+    dc = DecodeCanary()
+    for tid in range(10):
+        out = dc.observe(tid)
+    assert out["entropy"] is None and out["entropy_z"] is None
+    assert dc.collapse_events == [] and dc.mean_entropy is None
+
+
+def test_entropy_drop_records_collapse_event():
+    """A sharp entropy drop after a steady run trips the two-sided z-alarm (over-confidence)."""
+    dc = DecodeCanary(ent_z_thresh=2.0)
+    for i in range(12):
+        dc.observe(i, entropy=3.0)               # steady high-entropy baseline
+    dc.observe(99, entropy=0.05, token_idx=12)   # sudden confidence spike → entropy collapse
+    assert dc.collapse_events, "entropy collapse did not append a collapse_event"
+    ev = dc.collapse_events[-1]
+    assert ev["token"] == 12 and ev["z"] < 0, f"collapse event mis-recorded: {ev}"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
