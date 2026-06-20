@@ -172,6 +172,7 @@ const routes = [
   require("./routes/personal-cube"),
   require("./routes/pr-review"),
   require("./routes/auto-merge"),
+  require("./routes/creators"),        // creator profiles + intake form
   require("./routes/surfaces"),        // static file catch-all — MUST stay last (returns true for any path)
 ];
 
