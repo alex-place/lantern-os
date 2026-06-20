@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#7c6af7">
+  <title>Calibration — Creator Dashboard</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/creator-theme.css">
+  <style>
+    .page { padding: 24px 24px 80px; max-width: 920px; margin: 0 auto; }
+    .page-header { margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 0.92rem; margin: 0 0 24px; line-height: 1.5; }
+    .card { margin-bottom: 20px; padding: 20px; }
+    .card h2 { font-size: 1.05rem; margin: 0 0 4px; }
+    .card .hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; line-height: 1.5; }
+
+    .tier { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 700;
+            font-size: 0.8rem; letter-spacing: 0.02em; }
+    .tier-insufficient { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .tier-directional { background: rgba(212,160,23,0.15); color: var(--gold); border: 1px solid var(--gold); }
+    .tier-calibrated { background: rgba(60,180,100,0.15); color: var(--green); border: 1px solid var(--green); }
+
+    .progress-track { height: 10px; background: var(--surface2); border-radius: 999px; overflow: hidden; margin: 14px 0 6px; }
+    .progress-bar-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+    .progress-label { font-size: 0.82rem; color: var(--muted); }
+
+    .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 14px; }
+    .stat { }
+    .stat .num { font-size: 1.5rem; font-weight: 700; }
+    .stat .lbl { font-size: 0.78rem; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .r-pos { color: var(--green); } .r-neg { color: var(--danger); }
+
+    .confirm-item { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+                    margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+    .confirm-item .meta { flex: 1; font-size: 0.85rem; line-height: 1.4; }
+    .confirm-item .meta .arrow { color: var(--muted); }
+    .confirm-item .conf { color: var(--muted); font-size: 0.78rem; }
+
+    .notice { padding: 14px 16px; border-radius: var(--radius-sm); font-size: 0.88rem; line-height: 1.5; }
+    .notice-warn { background: rgba(212,160,23,0.1); border: 1px solid var(--gold); color: var(--text); }
+    .notice-info { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+    .muted { color: var(--muted); }
+    .file-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    #commit-btn[disabled] { opacity: .5; cursor: not-allowed; }
+    .rec-item { padding: 10px 12px; border-left: 3px solid var(--green); background: var(--surface2);
+                border-radius: var(--radius-xs); margin-bottom: 8px; font-size: 0.9rem; }
+    .rec-item .src { color: var(--muted); font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <a class="back-link" href="/create.html">← Creator Dashboard</a>
+  <div class="page-header"><h1>Calibration</h1></div>
+  <p class="subtitle">
+    Calibration turns your structural scores into <strong>verified</strong> ones by comparing them
+    against your <strong>own</strong> posted-video analytics. Nothing here is claimed until enough
+    real outcomes exist — your data stays local and is never committed.
+  </p>
+
+  <div id="disabled-banner"></div>
+
+  <!-- Readiness / tier -->
+  <div class="card" id="status-card">
+    <h2>Readiness</h2>
+    <p class="hint">Calibration unlocks once you have enough of your own shorts with both measured features and real outcomes.</p>
+    <div id="tier-wrap"><span class="muted">Loading…</span></div>
+    <div class="progress-track" id="progress-track" hidden><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="progress-label" id="progress-label"></div>
+    <div class="stat-row" id="stat-row"></div>
+  </div>
+
+  <!-- Upload -->
+  <div class="card">
+    <h2>Import analytics</h2>
+    <p class="hint">Export from YouTube Studio → Analytics → Advanced mode → Export → CSV, then drop the "Table data" file here. Exact title matches link automatically; weaker matches wait for your confirmation.</p>
+    <div class="file-row">
+      <input type="file" id="csv-input" accept=".csv,text/csv">
+      <button class="button" id="commit-btn" disabled onclick="commitImport()">Commit import</button>
+    </div>
+    <div id="preview" style="margin-top:16px;"></div>
+  </div>
+
+  <!-- Calibrated recommendations (separate from structural estimates) -->
+  <div class="card">
+    <h2>Calibrated insights</h2>
+    <p class="hint">These come only from your real outcomes — kept separate from the per-project <em>structural estimates</em>, which are always available but are heuristic, not calibrated.</p>
+    <div id="recs"><span class="muted">Loading…</span></div>
+  </div>
+
+  <!-- Correlations -->
+  <div class="card">
+    <h2>Feature ↔ outcome correlations</h2>
+    <p class="hint">Which of our measured signals actually track your real performance. Each row shows Pearson r and the sample size n behind it.</p>
+    <div id="correlations"><span class="muted">Loading…</span></div>
+  </div>
+</div>
+
+<script>
+const state = { csvText: null, manualLinks: {} };
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let body = null; try { body = await r.json(); } catch {}
+  return { ok: r.ok, code: r.status, body };
+}
+
+function tierFor(have) {
+  if (have >= 100) return { key: "calibrated", label: "CALIBRATED" };
+  if (have >= 30) return { key: "directional", label: "DIRECTIONAL" };
+  return { key: "insufficient", label: "INSUFFICIENT DATA" };
+}
+
+async function loadStatus() {
+  const { code, body } = await api("/api/creator/calibration/status");
+  if (code === 403) {
+    document.getElementById("disabled-banner").innerHTML =
+      '<div class="notice notice-warn" style="margin-bottom:20px;">Calibration is disabled. Start the server with ' +
+      '<code>LANTERN_CI_CALIBRATION=1</code> to enable it.</div>';
+    document.querySelectorAll(".card").forEach((c) => { c.style.opacity = .5; c.style.pointerEvents = "none"; });
+    return false;
+  }
+  const have = (body.readiness && body.readiness.have) || 0;
+  const need = (body.readiness && body.readiness.need) || 100;
+  const tier = tierFor(have);
+  document.getElementById("tier-wrap").innerHTML =
+    '<span class="tier tier-' + tier.key + '">' + tier.label + '</span>';
+  const track = document.getElementById("progress-track");
+  track.hidden = false;
+  document.getElementById("progress-fill").style.width = Math.min(100, (have / need) * 100) + "%";
+  document.getElementById("progress-label").textContent =
+    have + " / " + need + " usable outcomes toward calibration";
+  document.getElementById("stat-row").innerHTML =
+    '<div class="stat"><div class="num">' + have + '</div><div class="lbl">usable (feature + outcome)</div></div>' +
+    '<div class="stat"><div class="num">' + (body.labeledOutcomes || 0) + '</div><div class="lbl">total labeled rows</div></div>';
+  return true;
+}
+
+document.getElementById("csv-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { state.csvText = reader.result; state.manualLinks = {}; previewImport(); };
+  reader.readAsText(file);
+});
+
+async function previewImport() {
+  if (!state.csvText) return;
+  const { body } = await api("/api/creator/calibration/import", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csvText: state.csvText, dryRun: true }),
+  });
+  renderPreview(body);
+}
+
+function renderPreview(r) {
+  const el = document.getElementById("preview");
+  if (!r || r.status === "error") {
+    el.innerHTML = '<div class="notice notice-warn">' + esc(r ? r.reason : "import failed") + '</div>';
+    document.getElementById("commit-btn").disabled = true;
+    return;
+  }
+  let html = '<div class="notice notice-info" style="margin-bottom:12px;">Parsed <strong>' + r.parsed.rows +
+    '</strong> video rows · metrics: ' + esc((r.parsed.recognizedMetrics || []).join(", ")) +
+    ' · <strong>' + r.autoLinked + '</strong> auto-linked' +
+    (r.parsed.skipped ? ' · ' + r.parsed.skipped + ' skipped' : '') + '.</div>';
+
+  const nc = r.needsConfirmation || [];
+  if (nc.length) {
+    html += '<h3 style="font-size:.92rem;margin:14px 0 8px;">Confirm these matches (' + nc.length + ')</h3>';
+    nc.forEach((p) => {
+      const checked = state.manualLinks[p.videoRef] ? "checked" : "";
+      html += '<div class="confirm-item">' +
+        '<input type="checkbox" ' + checked + ' onchange="toggleLink(' + esc(JSON.stringify(p.videoRef)) +
+          ',' + esc(JSON.stringify(p.candidateEntryId)) + ', this.checked)">' +
+        '<div class="meta"><strong>' + esc(p.title || p.videoRef) + '</strong> ' +
+          '<span class="arrow">→</span> ' + esc(p.candidateTitle || "(no candidate)") +
+          '<div class="conf">confidence ' + (p.confidence != null ? p.confidence : "?") + '</div></div>' +
+        '</div>';
+    });
+  }
+  const um = r.unmatched || [];
+  if (um.length) {
+    html += '<p class="muted" style="font-size:.84rem;margin-top:10px;">' + um.length +
+      ' row(s) could not be matched to a local project and will be skipped.</p>';
+  }
+  el.innerHTML = html;
+  document.getElementById("commit-btn").disabled = false;
+}
+
+function toggleLink(videoRef, entryId, on) {
+  if (on && entryId) state.manualLinks[videoRef] = entryId;
+  else delete state.manualLinks[videoRef];
+}
+
+async function commitImport() {
+  if (!state.csvText) return;
+  document.getElementById("commit-btn").disabled = true;
+  const manualLinks = Object.entries(state.manualLinks).map(([videoRef, entryId]) => ({ videoRef, entryId }));
+  const { body } = await api("/api/creator/calibration/import", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ csvText: state.csvText, manualLinks }),
+  });
+  const el = document.getElementById("preview");
+  if (!body || body.status === "error") {
+    el.innerHTML = '<div class="notice notice-warn">' + esc(body ? body.reason : "import failed") + '</div>';
+  } else {
+    const ing = body.ingested || {};
+    el.innerHTML = '<div class="notice notice-info">Imported <strong>' + (ing.written || 0) +
+      '</strong> new outcome(s) (' + (ing.usable || 0) + ' usable' +
+      (ing.duplicates ? ', ' + ing.duplicates + ' duplicates skipped' : '') + ').</div>';
+  }
+  await Promise.all([loadStatus(), loadCorrelations(), loadRecommendations()]);
+}
+
+async function loadCorrelations() {
+  const { body } = await api("/api/creator/calibration/correlations");
+  const el = document.getElementById("correlations");
+  if (!body || body.status !== "ok") {
+    const have = body && body.have != null ? body.have : 0;
+    const need = body && body.need != null ? body.need : 30;
+    el.innerHTML = '<div class="notice notice-info">Not enough data yet (' + have + ' / ' + need +
+      '). Correlations appear once you have ' + need + '+ usable outcomes.</div>';
+    return;
+  }
+  const note = body.calibrated ? '' :
+    '<div class="notice notice-warn" style="margin-bottom:12px;">' + esc(body.note) + '</div>';
+  let rows = (body.correlations || []).slice(0, 25).map((c) =>
+    '<tr><td>' + esc(c.feature) + '</td><td>' + esc(c.metric) + '</td>' +
+    '<td class="num ' + (c.r >= 0 ? "r-pos" : "r-neg") + '">' + c.r + '</td>' +
+    '<td class="num">' + c.n + '</td></tr>').join("");
+  el.innerHTML = note + '<table><thead><tr><th>Feature</th><th>Outcome</th>' +
+    '<th class="num">r</th><th class="num">n</th></tr></thead><tbody>' +
+    (rows || '<tr><td colspan="4" class="muted">No correlations met the sample-size floor.</td></tr>') +
+    '</tbody></table><p class="muted" style="font-size:.8rem;margin-top:8px;">Sample size: ' +
+    body.sampleSize + ' usable outcomes.</p>';
+}
+
+async function loadRecommendations() {
+  const { body } = await api("/api/creator/calibration/recommendations");
+  const el = document.getElementById("recs");
+  if (!body || body.status !== "ok") {
+    const have = body && body.have != null ? body.have : 0;
+    const need = body && body.need != null ? body.need : 100;
+    el.innerHTML = '<div class="notice notice-info">Calibrated recommendations unlock at <strong>' + need +
+      '</strong> usable outcomes (' + have + ' so far). Until then, use the <em>structural estimates</em> shown in each project — they are heuristic, not calibrated.</div>';
+    return;
+  }
+  if (!body.recommendations.length) {
+    el.innerHTML = '<div class="notice notice-info">Calibrated, but no signal cleared the correlation strength threshold yet.</div>';
+    return;
+  }
+  el.innerHTML = body.recommendations.map((rec) =>
+    '<div class="rec-item">' + esc(rec.text) +
+    '<div class="src">r=' + rec.r + ' · n=' + rec.n + '</div></div>').join("");
+}
+
+(async function init() {
+  const enabled = await loadStatus();
+  if (enabled) { loadCorrelations(); loadRecommendations(); }
+})();
+</script>
+</body>
+</html>
