@@ -874,19 +874,29 @@
     if (!text) return;
     const YT_RE = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
     const IMG_MD_RE = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
-    const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
+    const URL_RE = /https?:\/\/[^\s<>"')\]\x00]+/g; // exclude \x00 so it can't eat into a sentinel
 
     // Collect YouTube video IDs from raw text before escaping
     const ytIds = [];
     let ytMatch;
     while ((ytMatch = YT_RE.exec(text)) !== null) ytIds.push(ytMatch[1]);
 
-    // Track image URLs to skip them in URL linkification
-    const imgUrls = new Set();
-    let t = text.replace(IMG_MD_RE, (_, alt, url) => { imgUrls.add(url); return `\x00IMG\x00${url}\x00${alt}\x00`; });
+    // Markdown links [label](url) and bare URLs both become anchors that open in a
+    // NEW TAB (target=_blank + rel=noopener). Handled-URL set prevents double-linking.
+    const MD_LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+    const handledUrls = new Set();
+    let t = text.replace(IMG_MD_RE, (_, alt, url) => { handledUrls.add(url); return `\x00IMG\x00${url}\x00${alt}\x00`; });
+    // Markdown links before bare-URL linkify, so the inner URL isn't linkified twice.
+    t = t.replace(MD_LINK_RE, (_, label, url) => { handledUrls.add(url); return `\x00MDLINK\x00${url}\x00${label}\x00`; });
+    // Linkify remaining bare URLs (skip image + markdown-link URLs).
+    t = t.replace(URL_RE, (url) => handledUrls.has(url) ? url : `\x00LINK\x00${url}\x00`);
 
-    // Linkify bare URLs (skip image URLs)
-    t = t.replace(URL_RE, (url) => imgUrls.has(url) ? url : `\x00LINK\x00${url}\x00`);
+    // Light inline markdown for comprehensive answers: **bold** and `code`. Applied
+    // to plain text segments only (anchors/images are emitted separately).
+    const inlineMd = (s) => escapeHtml(s)
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`\n]+)`/g, '<code style="background:rgba(127,127,127,0.15);padding:1px 4px;border-radius:3px">$1</code>')
+      .replace(/\n/g, '<br>');
 
     // Build HTML from segments
     const parts = t.split('\x00');
@@ -898,12 +908,16 @@
         const url = parts[i + 1], alt = parts[i + 2];
         html += `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt || '')}" style="max-width:100%;border-radius:6px;margin-top:6px;" loading="lazy">`;
         i += 3;
+      } else if (seg === 'MDLINK') {
+        const url = parts[i + 1], label = parts[i + 2];
+        html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${escapeHtml(label)}</a>`;
+        i += 3;
       } else if (seg === 'LINK') {
         const url = parts[i + 1];
         html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${escapeHtml(url)}</a>`;
         i += 2;
       } else {
-        html += escapeHtml(seg).replace(/\n/g, '<br>');
+        html += inlineMd(seg);
         i++;
       }
     }
