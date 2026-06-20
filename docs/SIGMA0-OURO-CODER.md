@@ -1,5 +1,38 @@
 # Σ₀ Ouro Coder — the looped local coding agent
 
+> ## 📖 In plain English (start here)
+>
+> **What this is:** a coding assistant that runs entirely **on your own computer** — no
+> cloud, no internet needed. Its "brain" is a small AI model called **Ouro**.
+>
+> **The trick — it thinks in loops.** Most AI models get smarter by being *bigger*. Ouro
+> gets smarter by going *around again*: it reuses the same small set of layers several
+> times on one problem — like re-reading a hard sentence until it clicks. That's why it's
+> named "Ouro," after the *ouroboros*, the snake that eats its own tail. A loop.
+>
+> **It decides how hard to think.** Easy question? It loops a couple of times and answers
+> fast. Hard question? It keeps looping to think it through. A built-in "good enough yet?"
+> check (the *Q-exit gate*) decides when to stop — so a tiny model can punch above its size
+> on the hard parts without being slow on the easy ones.
+>
+> **It learned this project.** It was fine-tuned on this repo's own past coding sessions,
+> so it already knows the house style and conventions.
+>
+> **Two speeds:** a **Fast** mode (the default — quick, reuses cached work) and a **Deep**
+> "think-harder" mode you switch on for tough problems (slower, ~1 second per word).
+>
+> **Where it fits:** it's just one swappable "brain" plugged into the bigger Lantern loop —
+> *Observe → Remember → Reason → Act → Verify → Converge*. Unplug it, drop in a different
+> model, and the rest of the system doesn't change.
+>
+> **Honest about limits:** it's small (1.4 billion parameters), it's a real but modest
+> fine-tune (not a production-grade model), and its Deep mode is genuinely slow. A capable
+> local helper — not a frontier model.
+>
+> *🎙️ Want it read aloud? Press the **Listen** bar at the bottom of this page.*
+>
+> The rest of this page is the precise, technical version. ↓
+
 The **Σ₀ Ouro Coder** is the Σ₀ coding agent running on **Ouro** (the *Ouroboros* looped
 language model, [arXiv:2510.25741](https://arxiv.org/abs/2510.25741)) instead of a plain
 transformer. It is the same Convergence-Core coder path — `Reason → Act` for code — but its

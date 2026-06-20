@@ -13,6 +13,7 @@ const scoreEngine = require("./scoring/score-engine");
 const { validateExport, DEFAULTS: EXPORT_DEFAULTS } = require("./scoring/export-validator");
 const reverseEngineer = require("./analysis/reverse-engineer");
 const learningStore = require("./training/learning-store");
+const calibration = require("./calibration");
 const recommend = require("./recommendations/recommend");
 const { scoreVideoV10 } = require("./scoring/score-v10");
 const { generateVariantsV10 } = require("./scoring/variant-engine-v10");
@@ -65,6 +66,34 @@ module.exports = {
 
   // Continuous learning (first-party data — always allowed)
   training: learningStore,
+
+  // Analytics calibration (first-party data). Ingest/readiness/correlations are
+  // honest by construction; gated by the `calibration` flag so it never runs
+  // unprompted. Reads short-circuit to insufficient_data when the flag is off.
+  calibration: {
+    enabled: (env) => flags.isEnabled("calibration", env),
+    importCsvFile: (csvPath, opts, env) =>
+      flags.isEnabled("calibration", env)
+        ? calibration.importCsvFile(csvPath, opts)
+        : disabledResult("calibration_flag_off"),
+    importCsvText: (text, opts, env) =>
+      flags.isEnabled("calibration", env)
+        ? calibration.importCsvText(text, opts)
+        : disabledResult("calibration_flag_off"),
+    proposeLinks: (rows, entries, opts) => calibration.proposeLinks(rows, entries, opts),
+    parseAnalyticsCsv: (text) => calibration.parseAnalyticsCsv(text),
+    readiness: (env) =>
+      flags.isEnabled("calibration", env) ? calibration.readiness() : disabledResult("calibration_flag_off"),
+    correlations: (opts, env) =>
+      flags.isEnabled("calibration", env) ? calibration.correlations(opts) : disabledResult("calibration_flag_off"),
+    recommendations: (opts, env) =>
+      flags.isEnabled("calibration", env) ? calibration.calibratedRecommendations(opts) : disabledResult("calibration_flag_off"),
+    weights: (opts, env) =>
+      flags.isEnabled("calibration", env) ? calibration.proposeCalibratedWeights(opts) : disabledResult("calibration_flag_off"),
+    count: () => calibration.count(),
+    thresholds: () => calibration.thresholds,
+    loadEntries: () => calibration.loadEntries(),
+  },
 
   // Recommendations (per-video always real; population path honest)
   recommendations: {

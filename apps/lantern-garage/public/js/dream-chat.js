@@ -9,6 +9,19 @@
   let directModeEnabled = false;
   let keystoneMcpEnabled = false; // legacy compat
   let originalAgents = [];
+
+  // ── Chat session id ───────────────────────────────────────────────────────
+  // Scopes history to this conversation so reloads don't replay the global log.
+  // "New chat" rotates this id, giving a clean slate without deleting old data.
+  const CHAT_SESSION_KEY = "lantern_chat_session";
+  function freshSessionId() {
+    try {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch { /* insecure context — fall through */ }
+    return "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
+  let chatSessionId = localStorage.getItem(CHAT_SESSION_KEY) || freshSessionId();
+  localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
   // ── ROUTE INTENT DETECTION ────────────────────────────────────────────────
   // Returns a route intent string used to select the backend agent/surface.
   // RP is opt-in only — general chat, code work, and GitHub work use the router.
@@ -46,7 +59,7 @@
     media: "🎬 Media search",
   };
 
-  // Agent is contextual — Lantern is default, others triggered by name in message
+  // Agent is contextual — Keystone is default, others triggered by name in message
   function detectAgent(msg) {
     const lower = (msg || "").toLowerCase();
     if (lower.includes("keystone") || lower.includes("debug")) return "keystone";
@@ -156,7 +169,7 @@
     .then(v => {
       if (v?.version) {
         const el = document.getElementById("app-version");
-        if (el) el.textContent = `Lantern OS v${v.version} · private · local`;
+        if (el) el.textContent = `Keystone OS v${v.version} · private · local`;
       }
     })
     .catch(() => {});
@@ -194,10 +207,36 @@
   }
   loadAgents();
 
+  // ── Convergence loop status (CONVERGE stage) — live sidebar panel ──────────
+  // Reads /api/convergence/status (records.jsonl + patterns) and lights up the
+  // "Convergence" observability slot so the loop the chat feeds is visible.
+  function refreshConvergence() {
+    fetch(`${serverBase}/api/convergence/status`, { signal: AbortSignal.timeout(3000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => {
+        if (!s) return;
+        // Dedicated "Loop Records" row — do NOT reuse #obs-convergence (that slot
+        // is the dream-delta convergence score, owned by dream-chat-ui.js).
+        const el = document.getElementById("obs-loop-records");
+        const fill = document.getElementById("obs-loop-records-fill");
+        if (el) {
+          el.textContent = s.total
+            ? `${s.total} rec · ${Math.round((s.avgConfidence || 0) * 100)}% conf · ${s.topReasoner || "—"}`
+            : "no records yet";
+          el.title = s.total
+            ? `${s.total} convergence records · ${Math.round((s.groundedPct || 0) * 100)}% grounded · ${s.verified || 0} verified · ${s.patternsCount || 0} patterns`
+            : "Reason→Act emits a ConvergenceRecord per reply";
+        }
+        if (fill) fill.style.width = Math.round((s.avgConfidence || 0) * 100) + "%";
+      })
+      .catch(() => {});
+  }
+  refreshConvergence();
+
   // ── Load conversation history (REMEMBER stage — issue #647) ───────────────
   async function loadConversationHistory() {
     try {
-      const r = await fetch(`${serverBase}/api/conversations?limit=20`, { signal: AbortSignal.timeout(3000) });
+      const r = await fetch(`${serverBase}/api/conversations?limit=20&sessionId=${encodeURIComponent(chatSessionId)}`, { signal: AbortSignal.timeout(3000) });
       if (!r.ok) return;
       const data = await r.json();
       const entries = (data.conversations || []).filter(e => e.role === "operator" || e.role === "lantern");
@@ -212,7 +251,7 @@
         const row = document.createElement("div");
         row.className = `msg-row ${isUser ? "user" : "agent"}`;
         const time = entry.recordedAt ? new Date(entry.recordedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Lantern"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
+        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Keystone"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
         fragment.appendChild(row);
       }
       messagesEl.appendChild(fragment);
@@ -220,6 +259,136 @@
     } catch { /* non-critical — fresh session is fine */ }
   }
   loadConversationHistory();
+
+  // ── New chat: clear the visible history and start a fresh session ─────────
+  // Non-destructive — rotates the session id so prior turns are archived, not shown.
+  function newChat() {
+    chatSessionId = freshSessionId();
+    localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
+    conversationHistory.length = 0;
+    messagesEl.querySelectorAll(".msg-row").forEach((n) => n.remove());
+    if (emptyState) emptyState.style.display = "";
+    inputEl.value = "";
+    try { inputEl.focus(); } catch { /* no-op */ }
+  }
+  window.newChat = newChat;
+  const newChatBtn = document.getElementById("new-chat-btn");
+  if (newChatBtn) newChatBtn.addEventListener("click", newChat);
+
+  // ── #773 Multi-session UX: list, resume/switch, gated clear ───────────────
+  function resetChatView() {
+    conversationHistory.length = 0;
+    messagesEl.querySelectorAll(".msg-row").forEach((n) => n.remove());
+    if (emptyState) emptyState.style.display = "";
+  }
+
+  // Resume an existing session: adopt its id, then reload its turns into view.
+  async function switchSession(id) {
+    if (!id) return;
+    if (id !== chatSessionId) {
+      chatSessionId = id;
+      localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
+      resetChatView();
+      await loadConversationHistory();
+    }
+    closeSessions();
+  }
+  window.switchSession = switchSession;
+
+  let sessionsOperator = false;
+  async function loadSessions() {
+    const listEl = document.getElementById("sessions-list");
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="sessions-empty">Loading…</div>';
+    try {
+      const r = await fetch(`${serverBase}/api/conversations/sessions`, { signal: AbortSignal.timeout(4000) });
+      const data = r.ok ? await r.json() : { sessions: [] };
+      sessionsOperator = !!data.operator;
+      renderSessions(data.sessions || []);
+    } catch {
+      listEl.innerHTML = '<div class="sessions-empty">Could not load sessions.</div>';
+    }
+  }
+
+  function renderSessions(sessions) {
+    const listEl = document.getElementById("sessions-list");
+    if (!listEl) return;
+    const clearAllBtn = document.getElementById("clear-all-btn");
+    if (clearAllBtn) clearAllBtn.style.display = sessionsOperator ? "" : "none";
+    if (!sessions.length) {
+      listEl.innerHTML = '<div class="sessions-empty">No saved sessions yet. Start chatting to create one.</div>';
+      return;
+    }
+    listEl.innerHTML = "";
+    for (const s of sessions) {
+      const isCurrent = s.sessionId === chatSessionId;
+      const when = s.lastActivity
+        ? new Date(s.lastActivity).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        : "";
+      const row = document.createElement("div");
+      row.className = "session-item" + (isCurrent ? " active" : "");
+      const open = document.createElement("button");
+      open.className = "session-open";
+      open.title = "Resume this session";
+      const title = document.createElement("span");
+      title.className = "session-title";
+      title.textContent = s.title || "(untitled session)";
+      const meta = document.createElement("span");
+      meta.className = "session-meta";
+      meta.textContent = `${when}${s.turnCount ? " · " + s.turnCount + " turns" : ""}${isCurrent ? " · current" : ""}`;
+      open.appendChild(title);
+      open.appendChild(meta);
+      open.addEventListener("click", () => switchSession(s.sessionId));
+      const del = document.createElement("button");
+      del.className = "session-del";
+      del.title = "Delete this session";
+      del.setAttribute("aria-label", "Delete session");
+      del.textContent = "✕";
+      del.addEventListener("click", (e) => { e.stopPropagation(); clearSession(s.sessionId); });
+      row.appendChild(open);
+      row.appendChild(del);
+      listEl.appendChild(row);
+    }
+  }
+
+  // Per-session clear is self-service (server archives then removes that session's turns).
+  async function clearSession(id) {
+    if (!id) return;
+    if (!confirm("Delete this chat session? Its turns are archived first, then removed.")) return;
+    try {
+      await fetch(`${serverBase}/api/conversations?sessionId=${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch { /* best-effort */ }
+    if (id === chatSessionId) newChat();
+    loadSessions();
+  }
+
+  // Clearing ALL history is operator-gated server-side (loopback / OPERATOR_TOKEN).
+  async function clearAllHistory() {
+    if (!confirm("Clear ALL chat history across every session? This archives, then wipes the whole log.")) return;
+    try {
+      const r = await fetch(`${serverBase}/api/conversations`, { method: "DELETE" });
+      if (r.status === 403) { alert("Clearing all history requires operator access (run Keystone locally)."); return; }
+    } catch { /* best-effort */ }
+    newChat();
+    loadSessions();
+  }
+  window.clearAllHistory = clearAllHistory;
+
+  function openSessions() {
+    const ov = document.getElementById("sessions-overlay");
+    if (ov) ov.classList.add("open");
+    loadSessions();
+  }
+  function closeSessions() {
+    const ov = document.getElementById("sessions-overlay");
+    if (ov) ov.classList.remove("open");
+  }
+  window.openSessions = openSessions;
+  window.closeSessions = closeSessions;
+  const sessionsBtn = document.getElementById("sessions-btn");
+  if (sessionsBtn) sessionsBtn.addEventListener("click", openSessions);
+  const drawerNewChat = document.getElementById("drawer-new-chat");
+  if (drawerNewChat) drawerNewChat.addEventListener("click", () => { newChat(); loadSessions(); });
 
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -472,7 +641,7 @@
     sendBtn.disabled = true;
     setThinking(true);
 
-    const agentName = directModeEnabled ? "Model" : (agents.find((a) => a.id === detectAgent(message))?.name || "Lantern");
+    const agentName = directModeEnabled ? "Model" : (agents.find((a) => a.id === detectAgent(message))?.name || "Keystone");
     const msgTime = new Date();
     const row = document.createElement("div");
     row.className = "msg-row agent";
@@ -508,6 +677,7 @@
         history: historyToSend,
         mcp: directModeEnabled,
         routeIntent: clientIntent || undefined,
+        sessionId: chatSessionId,
       }),
     })
       .then((res) => {
@@ -606,8 +776,8 @@
               if (evt.type === "token" && evt.text) {
                 if (!hasTokens) { hasTokens = true; setThinking(false); }
                 fullText += evt.text;
-                streamTtsBuf += evt.text;
-                streamTtsFlush(false);
+                // Narration (top 🔊 toggle) — only speak replies when enabled.
+                if (window.narrateReplies) { streamTtsBuf += evt.text; streamTtsFlush(false); }
                 analytics.tokensReceived++;
                 cursor.remove();
                 // Strip [DOORS:...] tag during streaming; chips rendered on done
@@ -645,6 +815,8 @@
                   if (loopEl) loopEl.textContent = `⟳ ${loopN} loop${loopN !== 1 ? 's' : ''} · ${Math.round(conf * 100)}% conf · ${exitReason}`;
                   if (fillEl) fillEl.style.width = (conf * 100) + '%';
                 } catch (_) {}
+                // CONVERGE: this reply just emitted a record — refresh the loop panel.
+                try { refreshConvergence(); } catch (_) {}
 
                 // Parse [DOORS: A name | B name | C name] from full text if backend didn't extract
                 let suggestions = evt.suggestions;
@@ -702,19 +874,29 @@
     if (!text) return;
     const YT_RE = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
     const IMG_MD_RE = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g;
-    const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
+    const URL_RE = /https?:\/\/[^\s<>"')\]\x00]+/g; // exclude \x00 so it can't eat into a sentinel
 
     // Collect YouTube video IDs from raw text before escaping
     const ytIds = [];
     let ytMatch;
     while ((ytMatch = YT_RE.exec(text)) !== null) ytIds.push(ytMatch[1]);
 
-    // Track image URLs to skip them in URL linkification
-    const imgUrls = new Set();
-    let t = text.replace(IMG_MD_RE, (_, alt, url) => { imgUrls.add(url); return `\x00IMG\x00${url}\x00${alt}\x00`; });
+    // Markdown links [label](url) and bare URLs both become anchors that open in a
+    // NEW TAB (target=_blank + rel=noopener). Handled-URL set prevents double-linking.
+    const MD_LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
+    const handledUrls = new Set();
+    let t = text.replace(IMG_MD_RE, (_, alt, url) => { handledUrls.add(url); return `\x00IMG\x00${url}\x00${alt}\x00`; });
+    // Markdown links before bare-URL linkify, so the inner URL isn't linkified twice.
+    t = t.replace(MD_LINK_RE, (_, label, url) => { handledUrls.add(url); return `\x00MDLINK\x00${url}\x00${label}\x00`; });
+    // Linkify remaining bare URLs (skip image + markdown-link URLs).
+    t = t.replace(URL_RE, (url) => handledUrls.has(url) ? url : `\x00LINK\x00${url}\x00`);
 
-    // Linkify bare URLs (skip image URLs)
-    t = t.replace(URL_RE, (url) => imgUrls.has(url) ? url : `\x00LINK\x00${url}\x00`);
+    // Light inline markdown for comprehensive answers: **bold** and `code`. Applied
+    // to plain text segments only (anchors/images are emitted separately).
+    const inlineMd = (s) => escapeHtml(s)
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`\n]+)`/g, '<code style="background:rgba(127,127,127,0.15);padding:1px 4px;border-radius:3px">$1</code>')
+      .replace(/\n/g, '<br>');
 
     // Build HTML from segments
     const parts = t.split('\x00');
@@ -726,12 +908,16 @@
         const url = parts[i + 1], alt = parts[i + 2];
         html += `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt || '')}" style="max-width:100%;border-radius:6px;margin-top:6px;" loading="lazy">`;
         i += 3;
+      } else if (seg === 'MDLINK') {
+        const url = parts[i + 1], label = parts[i + 2];
+        html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${escapeHtml(label)}</a>`;
+        i += 3;
       } else if (seg === 'LINK') {
         const url = parts[i + 1];
         html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${escapeHtml(url)}</a>`;
         i += 2;
       } else {
-        html += escapeHtml(seg).replace(/\n/g, '<br>');
+        html += inlineMd(seg);
         i++;
       }
     }
@@ -775,11 +961,20 @@
       const turn = conversationHistory.filter(m => m.role === "assistant").length;
       const latStr = latency ? `${(latency / 1000).toFixed(1)}s` : null;
       const isErr = source === "failed" || source === "unavailable" || source === "error" || !!error;
-      // Route signature — who/what the user is talking to
+      // Route signature — who/what the user is talking to.
+      // A degraded route (cloud unreachable → weak local model, issue #740) is
+      // flagged in amber so the user knows the answer came from the fallback and
+      // can weigh it accordingly, instead of trusting an off-tone local reply.
       if (routeLabel) {
+        const isDegraded = /degraded/i.test(routeLabel);
         const sig = document.createElement("div");
-        sig.className = "msg-route-sig";
+        sig.className = isDegraded ? "msg-route-sig degraded" : "msg-route-sig";
         sig.setAttribute("aria-label", `Active route: ${routeLabel}`);
+        if (isDegraded) {
+          sig.setAttribute("role", "status");
+          sig.style.color = "#f59e0b";
+          sig.style.fontWeight = "600";
+        }
         sig.textContent = routeLabel;
         row.appendChild(sig);
       }
@@ -873,7 +1068,7 @@
       logBtn.onclick = async () => {
         logBtn.disabled = true;
         logBtn.textContent = "Saving…";
-        const fullConv = conversationHistory.map(h => `${h.role === "user" ? "You" : "Lantern"}: ${h.text}`).join("\n");
+        const fullConv = conversationHistory.map(h => `${h.role === "user" ? "You" : "Keystone"}: ${h.text}`).join("\n");
         try {
           const r = await fetch(`${serverBase}/api/dream/create`, {
             method: "POST",
@@ -1124,7 +1319,7 @@
     setThinking(false);
     scrollToBottom();
     // TTS — flush remainder and wrap bubble for word highlighting
-    if (text && source !== "failed" && source !== "error") streamTtsFinish(text, bubble);
+    if (window.narrateReplies && text && source !== "failed" && source !== "error") streamTtsFinish(text, bubble);
   }
 
   function appendErrorNotice(row, msg) {
@@ -1482,7 +1677,9 @@
   // ════════════════════════════════════════════════════════════════
   //  Voice — STT (Web Speech API) + TTS
   // ════════════════════════════════════════════════════════════════
-  const voiceBtn = document.getElementById("voice-btn");
+  // STT "listening" feedback shows on the composer mic (#voice-input-btn).
+  // The top #voice-btn is now the narration toggle (speaks replies) — a separate control.
+  const voiceBtn = document.getElementById("voice-input-btn");
   let recognition = null;
   let isListening = false;
 
@@ -1511,15 +1708,19 @@
     recognition.onend = () => {
       isListening = false;
       voiceBtn.classList.remove("listening");
-      inputEl.placeholder = "Tell me a dream…";
-      const toSend = accumulated.trim();
+      inputEl.placeholder = "Write something, ask a question…";
+      // Dictation: drop the transcript into the composer for review (no auto-send).
+      const dictated = accumulated.trim();
       accumulated = "";
-      if (toSend) { inputEl.value = toSend; sendMessage(); }
+      if (dictated) { inputEl.value = dictated; inputEl.dispatchEvent(new Event("input")); try { inputEl.focus(); } catch (e) {} }
     };
     recognition.onerror = () => {
       isListening = false; voiceBtn.classList.remove("listening");
       inputEl.placeholder = "Tell me a dream…";
     };
+    // Share this single recognition instance with the composer's voice button
+    // (dream-chat-ui.js startVoiceInput() reads window.recognition).
+    window.recognition = recognition;
   }
 
   function toggleVoice() {
@@ -1534,6 +1735,8 @@
       try { recognition.start(); } catch(e) { isListening = false; voiceBtn.classList.remove("listening"); inputEl.placeholder = "Tell me a dream…"; }
     }
   }
+  // Expose the working toggle so the nav mic button can start/stop listening in one click.
+  window.toggleVoice = toggleVoice;
 
   let ttsAudio = null;
 

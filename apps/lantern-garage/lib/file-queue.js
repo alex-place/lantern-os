@@ -25,6 +25,43 @@ async function appendJsonlQueued(filePath, record) {
   });
 }
 
+async function rotateJsonlIfNeeded(filePath, { maxBytes = 5 * 1024 * 1024, keepArchives = 5 } = {}) {
+  // Bound append-only growth (#771). Runs INSIDE the per-path write queue so a rename can
+  // never interleave with an in-flight append. Past maxBytes the current file is renamed to
+  // a timestamped archive (`<base>.<ISO>`); the next append recreates a fresh file. Old
+  // archives beyond keepArchives are pruned (oldest first).
+  return enqueueFileWrite(filePath, async () => {
+    let size;
+    try {
+      size = (await fs.promises.stat(filePath)).size;
+    } catch {
+      return { rotated: null, pruned: 0 };          // nothing to rotate yet
+    }
+    if (size < maxBytes) {
+      return { rotated: null, pruned: 0 };
+    }
+    const dir = path.dirname(filePath);
+    const base = path.basename(filePath);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    let archive = path.join(dir, `${base}.${stamp}`);
+    for (let n = 1; fs.existsSync(archive); n += 1) {  // avoid clobber within the same ms
+      archive = path.join(dir, `${base}.${stamp}.${n}`);
+    }
+    await fs.promises.rename(filePath, archive);
+    let pruned = 0;
+    const archives = (await fs.promises.readdir(dir))
+      .filter((name) => name.startsWith(`${base}.`) && name !== base)
+      .sort();                                        // ISO stamp prefix → chronological
+    for (let i = 0; i < archives.length - keepArchives; i += 1) {
+      try {
+        await fs.promises.unlink(path.join(dir, archives[i]));
+        pruned += 1;
+      } catch { /* best-effort prune */ }
+    }
+    return { rotated: path.basename(archive), pruned };
+  });
+}
+
 async function writeTextQueued(filePath, text) {
   return enqueueFileWrite(filePath, async () => {
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
@@ -65,6 +102,7 @@ function readJsonl(relativePath, limit = 20) {
 module.exports = {
   enqueueFileWrite,
   appendJsonlQueued,
+  rotateJsonlIfNeeded,
   writeTextQueued,
   readText,
   readJson,

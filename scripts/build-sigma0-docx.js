@@ -117,10 +117,10 @@ const doc = new Document({
       note("Verification: on a forced collapse, Σ₀ fired 40/40 steps and the state froze; with Σ₀⁻¹ active, Σ₀ fired 0/40 and the state escaped 0.05 → 12.9."),
 
       H1("4.  The early-warning scalar (the “canary”)"),
-      P("Near a bifurcation the dominant eigenvalue flattens (critical slowing down — Wissel 1984; Scheffer et al., Nature 2009). Two readouts:"),
+      P("Near a bifurcation the dominant eigenvalue flattens (critical slowing down — Wissel 1984; Scheffer et al., Nature 2009). Two eigenvalue readouts were originally proposed:"),
       eq("p_unbounded(x) = 1 / |Re λ_max(A_s)|   →∞  at the boundary"),
       eq("p_gate(x) = clip( 1 − |Re λ_max| / ε , 0, 1 )  ∈ [0,1]"),
-      P("The unbounded form is the leading indicator (diverges before collapse); the gated form is the bounded control signal that drives Σ₀⁻¹."),
+      P("These were RETIRED (#659): they were never implemented, and the eigenvalue readout is the wrong early-warning. The live canary is the Kalman normalized innovation squared (NIS = νᵀS⁻¹ν, ν = y − Cx̂, S = CΣCᵀ + R) computed by SurpriseMonitor and wired into the rollout's predict/update cycle (#657). NIS ≈ m means model and reality agree; NIS ≫ m means the model is overconfident and has drifted — the spook. The actual driver of Σ₀⁻¹ is proximity(), not p_gate."),
 
       H1("5.  Global structure: the attractor graph G"),
       P("The system is multistable. Collect its attractors {A₁…A_k} (fixed points, limit cycles, strange attractors), each with a basin B_i = { x₀ : lim φ_t(x₀) ∈ A_i }. Coarse-grain to a graph G = (V, E): nodes are attractors, edges are noise/drift transitions, giving an induced Markov process over basins:"),

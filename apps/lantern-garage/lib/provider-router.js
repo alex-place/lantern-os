@@ -52,6 +52,27 @@ const _providerState = {};
 let _lastHealthCheck = 0;
 
 /**
+ * Does this provider have an API key available in the environment?
+ * (ollama/local is always "available".)
+ */
+function providerHasKey(provider) {
+  const env = process.env;
+  switch (String(provider || "").toLowerCase()) {
+    case "anthropic": return !!env.ANTHROPIC_API_KEY;
+    case "openai": return !!env.OPENAI_API_KEY;
+    case "gemini": return !!(env.GEMINI_API_KEY || env.GOOGLE_API_KEY);
+    case "xai": case "grok": return !!env.XAI_API_KEY;
+    case "mistral": return !!env.MISTRAL_API_KEY;
+    case "cohere": return !!env.COHERE_API_KEY;
+    case "deepseek": return !!env.DEEPSEEK_API_KEY;
+    case "perplexity": return !!env.PERPLEXITY_API_KEY;
+    case "openrouter": return !!env.OPENROUTER_API_KEY;
+    case "ollama": case "local": return true;
+    default: return false;
+  }
+}
+
+/**
  * Select which provider + model to use for a request
  * @param {string} message - User message
  * @param {string} taskType - "coding"|"reasoning"|"creative"|"default"
@@ -74,6 +95,42 @@ async function selectProvider(message, taskType = "default", requestedProvider =
 
   // Use task type to select chain
   const chain = PROVIDER_CHAINS[taskType] || PROVIDER_CHAINS.default;
+
+  // LEADERBOARD_ROUTING: rank cloud(with key) + local together by compositeScore
+  // and pick the best on merit (Auto mode only). Default off → legacy chain order.
+  if (process.env.LEADERBOARD_ROUTING === "1" && !requestedProvider) {
+    try {
+      const { rankCandidates } = require("./model-leaderboard");
+      const { CLOUD_PROVIDERS } = require("./leaderboard-routing");
+      const candidates = [];
+      for (const step of chain) {
+        if (!isProviderHealthy(step.provider)) continue;
+        if (step.provider === "ollama") {
+          // local candidate scored by its MODEL name (how local outcomes record)
+          candidates.push({ provider: "ollama", model: step.models[0], key: step.models[0] });
+        } else if (providerHasKey(step.provider)) {
+          // cloud candidate scored by PROVIDER name
+          candidates.push({ provider: step.provider, model: step.models[0], key: step.provider });
+        }
+      }
+      if (!candidates.some((c) => c.provider === "ollama")) {
+        candidates.push({ provider: "ollama", model: "lantern-csf-dream", key: "lantern-csf-dream" });
+      }
+      const rankedCands = await rankCandidates(candidates, taskType, { cloudSet: CLOUD_PROVIDERS });
+      const best = rankedCands[0];
+      if (best) {
+        return {
+          provider: best.provider,
+          model: best.model,
+          chain: [],
+          reason: `leaderboard:${best.score.toFixed(2)}${best.scored ? "" : ":coldstart"}`,
+        };
+      }
+    } catch (e) {
+      console.error("[provider-router] leaderboard routing error (non-fatal):", e.message);
+      // fall through to legacy chain selection
+    }
+  }
 
   // Find first healthy provider in chain
   for (const step of chain) {

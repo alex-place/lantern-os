@@ -39,6 +39,32 @@ function requireSafePaths(repoRoot, filePaths) {
   }
 }
 
+// Resolve an LLM-supplied path to its real repo location. Returns it unchanged if it
+// already exists; otherwise, when the repo has exactly one tracked file with that
+// basename (or one whose path uniquely ends with it), returns that real path. Fixes
+// plans that reference a bare basename (`ouro_serve.py`) when the file lives under a
+// directory (`scripts/ouro_serve.py`) — which otherwise makes the patch generator
+// feed `<new file>` and emit a duplicate at the wrong path (#777). Ambiguous (>1
+// match) paths are left as-is so we never silently retarget the wrong file.
+function resolveRepoPath(repoRoot, p) {
+  if (!p || typeof p !== "string") return p;
+  const rel = p.replace(/^[ab]\//, "").replace(/\\/g, "/");
+  if (fs.existsSync(path.join(repoRoot, rel))) return rel;
+  const base = path.posix.basename(rel);
+  if (!base) return rel;
+  let candidates = [];
+  try {
+    const out = execFileSync("git", ["ls-files", `*/${base}`, base], {
+      cwd: repoRoot, encoding: "utf8", timeout: 10000, windowsHide: true,
+    });
+    candidates = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  } catch (_e) { /* no git or no match */ }
+  if (!candidates.length) return rel;
+  const suffix = candidates.filter((c) => c === rel || c.endsWith("/" + rel));
+  const resolved = suffix.length === 1 ? suffix[0] : (candidates.length === 1 ? candidates[0] : null);
+  return resolved && isPathSafe(repoRoot, resolved) ? resolved : rel;
+}
+
 // ── Branch safety ───────────────────────────────────────────────────────
 
 function sanitizeBranchName(raw) {
@@ -194,6 +220,51 @@ function applyPatchStrict(repoRoot, files) {
   return stats;
 }
 
+// Repair dropped-prefix paths in an LLM diff. The model frequently emits a bare
+// basename (`a/ouro_serve.py`) when the real file lives under a directory
+// (`scripts/ouro_serve.py`). git apply and the strict applier both key on the
+// literal path, so the patch lands nowhere → the anti-fraud gate aborts ("no usable
+// code changes"). When a CHANGED target doesn't exist but the repo holds exactly one
+// tracked file with that basename (or one whose path uniquely ends with the target),
+// rewrite the diff's header lines to the real path. New files (oldFile=/dev/null) are
+// left as authored; ambiguous (>1 candidate) matches are left untouched.
+function resolveDiffPaths(repoRoot, diffText, files) {
+  const rewrites = [];
+  const seen = new Set();
+  for (const f of files) {
+    if (f.oldFile === "/dev/null") continue; // intentional new file
+    let target = (f.newFile && f.newFile !== "/dev/null" ? f.newFile : f.oldFile) || "";
+    target = target.replace(/^(a|b)\//, "").replace(/\\/g, "/");
+    if (!target || seen.has(target)) continue;
+    seen.add(target);
+    if (fs.existsSync(path.join(repoRoot, target))) continue; // already correct
+    const base = path.posix.basename(target);
+    if (!base) continue;
+    let candidates = [];
+    try {
+      const out = execFileSync("git", ["ls-files", `*/${base}`, base], {
+        cwd: repoRoot, encoding: "utf8", timeout: 10000, windowsHide: true,
+      });
+      candidates = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    } catch (_e) { /* no git or no match */ }
+    if (!candidates.length) continue;
+    const suffix = candidates.filter((c) => c === target || c.endsWith("/" + target));
+    const resolved = suffix.length === 1 ? suffix[0] : (candidates.length === 1 ? candidates[0] : null);
+    if (resolved && resolved !== target && isPathSafe(repoRoot, resolved)) {
+      rewrites.push({ from: target, to: resolved });
+    }
+  }
+  if (!rewrites.length) return { diffText, rewrites };
+  const lines = diffText.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (!(lines[i].startsWith("--- ") || lines[i].startsWith("+++ ") || lines[i].startsWith("diff --git "))) continue;
+    for (const { from, to } of rewrites) {
+      lines[i] = lines[i].split(`a/${from}`).join(`a/${to}`).split(`b/${from}`).join(`b/${to}`);
+    }
+  }
+  return { diffText: lines.join("\n"), rewrites };
+}
+
 // Apply a unified diff. LLM-generated diffs almost always have line-number drift
 // and minor context fuzz, which a strict exact-match applier rejects (→ the patch
 // never lands → autowork can't actually complete issues). We use git's robust
@@ -201,7 +272,15 @@ function applyPatchStrict(repoRoot, files) {
 // only if git is unavailable. validateDiff still gates format + path safety, and
 // the caller's anti-fraud gate still rejects empty/errored results.
 function applyPatch(repoRoot, diffText) {
-  const files = validateDiff(diffText, repoRoot);
+  let files = validateDiff(diffText, repoRoot);
+  // Repair dropped-prefix paths (e.g. ouro_serve.py -> scripts/ouro_serve.py) so the
+  // patch lands on the real file instead of failing the apply and aborting the run.
+  const pathFix = resolveDiffPaths(repoRoot, diffText, files);
+  const pathRewrites = pathFix.rewrites;
+  if (pathRewrites.length) {
+    diffText = pathFix.diffText;
+    files = validateDiff(diffText, repoRoot);
+  }
   const targets = diffTargets(files);
   const os = require("os");
   const tmp = path.join(os.tmpdir(), `autowork-${process.pid}-${Date.now()}.diff`);
@@ -231,12 +310,14 @@ function applyPatch(repoRoot, diffText) {
       created: targets.filter((t) => t.created).map((t) => t.target),
       errors: [],
       applier: "git",
+      pathRewrites,
     };
   }
 
   // git apply rejected the diff — fall back to the strict applier (exact match).
   const strict = applyPatchStrict(repoRoot, files);
   strict.applier = "strict";
+  strict.pathRewrites = pathRewrites;
   if (strict.errors.length > 0 && lastErr) strict.gitApplyError = lastErr;
   return strict;
 }
@@ -247,8 +328,26 @@ function gitCurrentBranch(repoRoot) {
   return execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
 }
 
+// Guard against clobbering in-progress work. This automation operates on the
+// primary working tree (REPO_ROOT), so a branch switch here would silently
+// discard any uncommitted edits a human (or another process) has staged or
+// modified — and a stray staged file would also leak into the next commit.
+// Refuse the switch when the tree is dirty rather than destroy that work.
+function gitEnsureClean(repoRoot) {
+  const dirty = execSync("git status --porcelain", { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
+  if (dirty) {
+    const n = dirty.split("\n").length;
+    throw new Error(
+      `git_tree_dirty: refusing to switch branches in ${repoRoot} — ${n} uncommitted ` +
+      `change(s) would be clobbered. Commit, stash, or run this automation in a ` +
+      `dedicated git worktree.`
+    );
+  }
+}
+
 function gitCreateBranch(repoRoot, branchName) {
   const safe = sanitizeBranchName(branchName);
+  gitEnsureClean(repoRoot);
   execSync(`git checkout -b ${safe}`, { cwd: repoRoot, encoding: "utf8", timeout: 10000 });
   return safe;
 }
@@ -548,6 +647,10 @@ function callGemini(system, user, maxTokens = 4096) {
 function callOllama(messages) {
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
   const model = process.env.OLLAMA_MODEL || "qwen2.5-coder";
+  // Cold model load on the first /api/chat can take well over 30s for a 3B/7B
+  // model, which would abort before any token. Match the chat-path default
+  // (dream-chat.js / stream-chat.js use 120s) and honour OLLAMA_TIMEOUT_MS. (#690)
+  const ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000;
   const httpLib = ollamaBase.startsWith("https") ? require("https") : require("http");
   const payload = JSON.stringify({ model, messages, stream: false });
   return new Promise((resolve, reject) => {
@@ -568,7 +671,7 @@ function callOllama(messages) {
       });
     });
     req.on("error", reject);
-    req.setTimeout(30000, () => { req.destroy(); reject(new Error("ollama_timeout")); });
+    req.setTimeout(ollamaTimeout, () => { req.destroy(); reject(new Error("ollama_timeout")); });
     req.write(payload);
     req.end();
   });
@@ -649,6 +752,10 @@ async function generatePlan(repoRoot, userRequest, scopeFiles, history) {
   plan.riskLevel = ["low", "medium", "high"].includes(plan.riskLevel) ? plan.riskLevel : "medium";
   plan.branchHint = sanitizeBranchName(plan.branchHint || "auto-change").replace(/^auto\//, "");
 
+  // Resolve bare-basename paths to real repo locations so the patch generator edits
+  // the existing file instead of duplicating it at the wrong path (#777).
+  plan.affectedFiles = plan.affectedFiles.map((fp) => resolveRepoPath(repoRoot, fp));
+  for (const s of plan.steps) { if (s && typeof s.file === "string") s.file = resolveRepoPath(repoRoot, s.file); }
   // Ensure all affected files are safe
   requireSafePaths(repoRoot, plan.affectedFiles);
   // Filter tests to allowlisted only
@@ -670,20 +777,38 @@ Rules:
 - If creating a new file, use \`--- /dev/null\` and \`+++ b/path\` with a single hunk starting at line 0.
 `;
 
-async function generatePatch(repoRoot, plan) {
+async function generatePatch(repoRoot, plan, opts = {}) {
   let fileContext = "";
+  // Include (nearly) the FULL file, not a 6KB slice. A truncated file makes the
+  // model invent context for anything past the cut — the #1 cause of "hunk context
+  // mismatch" apply failures (e.g. a leaderboard write near the end of a long file).
+  const PER_FILE_CAP = 24000;
   for (const fp of plan.affectedFiles || []) {
     if (!isPathSafe(repoRoot, fp)) continue;
     const full = path.join(repoRoot, fp);
     if (fs.existsSync(full)) {
-      const content = fs.readFileSync(full, "utf8").slice(0, 6000);
+      const raw = fs.readFileSync(full, "utf8");
+      const content = raw.length > PER_FILE_CAP ? raw.slice(0, PER_FILE_CAP) + "\n…(truncated)…\n" : raw;
       fileContext += `\n--- ${fp} ---\n${content}\n`;
     } else {
       fileContext += `\n--- ${fp} ---\n<new file>\n`;
     }
   }
 
-  const userPrompt = `Plan summary: ${plan.summary}\n\nSteps:\n${plan.steps.map((s, i) => `${i + 1}. [${s.action}] ${s.file}: ${s.description}`).join("\n")}\n\n${fileContext}\n\nGenerate the unified diff.`;
+  let userPrompt = `Plan summary: ${plan.summary}\n\nSteps:\n${plan.steps.map((s, i) => `${i + 1}. [${s.action}] ${s.file}: ${s.description}`).join("\n")}\n\n${fileContext}\n\nGenerate the unified diff.`;
+
+  // Feedback retry: when a prior diff failed to apply, show the model its own diff
+  // and the exact apply errors, and insist it copy context EXACTLY from the file
+  // bodies above (which are ground truth). This is what lets autowork self-correct
+  // hunk-count / hallucinated-context failures instead of aborting on attempt 1.
+  if (opts.feedback && opts.feedback.errors) {
+    userPrompt +=
+      `\n\n--- YOUR PREVIOUS DIFF FAILED TO APPLY ---\nErrors:\n${opts.feedback.errors}\n\n` +
+      (opts.feedback.priorDiff ? `Previous diff:\n${opts.feedback.priorDiff}\n\n` : "") +
+      `The file contents shown above are the GROUND TRUTH. Reproduce context lines ` +
+      `byte-for-byte (exact whitespace, exact text), use correct @@ line numbers/counts, ` +
+      `and do not invent lines that aren't in the file. Output ONLY the corrected unified diff.`;
+  }
 
   const raw = await callLlm(PATCH_SYSTEM_PROMPT, userPrompt, "auto");
   const diffText = raw.replace(/^```diff\n?/, "").replace(/^```\n?/, "").replace(/\n?```$/, "").trim();
@@ -700,6 +825,7 @@ module.exports = {
   validateDiff,
   applyPatch,
   gitCreateBranch,
+  gitEnsureClean,
   gitCommit,
   gitPush,
   gitDiffStat,
@@ -713,4 +839,5 @@ module.exports = {
   callLlm,
   isAllowedTest,
   requireSafePaths,
+  resolveRepoPath,
 };

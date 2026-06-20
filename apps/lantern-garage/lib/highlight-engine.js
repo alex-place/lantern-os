@@ -142,6 +142,16 @@ async function analyzeVideoForHighlights(videoPath, options = {}, onProgress = (
     options.weights
   );
 
+  // A1 — MEASURED shot-boundary metrics. The real scene cuts detected above are
+  // aggregated into an honest cut-rate so the scorer no longer has to proxy
+  // "cuts" with the highlight count. Provenance is recorded; this is measured
+  // from the user's own clip (own_render), not a population claim.
+  timeline.metadata.shotBoundaries = computeShotMetrics(
+    sceneChanges,
+    metadata.duration,
+    sceneThreshold
+  );
+
   // Instrumentation — real counts from this analysis, surfaced so the pipeline
   // can never fail silently (stored on the project as analysis.debug downstream).
   timeline.metadata.debug = {
@@ -164,6 +174,69 @@ async function analyzeVideoForHighlights(videoPath, options = {}, onProgress = (
 
   timeline.sort();
   return timeline;
+}
+
+// ============================================================================
+// SHOT-BOUNDARY METRICS (A1)
+// ============================================================================
+
+/**
+ * Aggregate detected scene-change boundaries into MEASURED shot metrics.
+ * Pure function (no ffmpeg) so it is unit-testable. Boundaries partition the
+ * clip into shots; we report the real cut rate and shot-length distribution.
+ *
+ * HONESTY: every number traces to real detected boundaries. With no boundaries
+ * the clip is one continuous shot (cutsPerMin 0), which is reported as such —
+ * never faked. `measured:false` only when duration is unusable.
+ *
+ * @param {Array<{timestamp:number}>} sceneChanges  detected boundaries
+ * @param {number} durationSec
+ * @param {number} threshold  the detection threshold used (for provenance)
+ * @returns {{count, cutsPerMin, avgShotLengthSec, shotLengthCV, durationSec,
+ *            source, threshold, measured}}
+ */
+function computeShotMetrics(sceneChanges, durationSec, threshold = 0.3) {
+  const dur = Number(durationSec);
+  const base = {
+    count: 0,
+    cutsPerMin: null,
+    avgShotLengthSec: null,
+    shotLengthCV: null,
+    durationSec: Number.isFinite(dur) ? Number(dur.toFixed(2)) : null,
+    source: "ffmpeg_scene_hsv",
+    threshold,
+    measured: false,
+  };
+  if (!Number.isFinite(dur) || dur <= 0) return base;
+
+  // Unique, in-range boundary timestamps, sorted.
+  const bounds = Array.from(
+    new Set(
+      (Array.isArray(sceneChanges) ? sceneChanges : [])
+        .map((s) => Number(s && s.timestamp))
+        .filter((t) => Number.isFinite(t) && t > 0 && t < dur)
+    )
+  ).sort((a, b) => a - b);
+
+  // Shot lengths = gaps between [0, ...bounds, duration].
+  const edges = [0, ...bounds, dur];
+  const lengths = [];
+  for (let i = 1; i < edges.length; i++) lengths.push(edges[i] - edges[i - 1]);
+
+  const mean = lengths.reduce((s, v) => s + v, 0) / lengths.length;
+  const variance = lengths.reduce((s, v) => s + (v - mean) ** 2, 0) / lengths.length;
+  const std = Math.sqrt(variance);
+
+  return {
+    count: bounds.length,
+    cutsPerMin: Number(((bounds.length / dur) * 60).toFixed(3)),
+    avgShotLengthSec: Number(mean.toFixed(3)),
+    shotLengthCV: mean > 0 ? Number((std / mean).toFixed(3)) : 0,
+    durationSec: Number(dur.toFixed(2)),
+    source: "ffmpeg_scene_hsv",
+    threshold,
+    measured: true,
+  };
 }
 
 // ============================================================================
@@ -557,6 +630,7 @@ module.exports = {
   detectMotion,
   detectAudioSpikes,
   detectSceneChanges,
+  computeShotMetrics,
   scoreHighlight,
   mergeDetections,
   getVideoMetadata,

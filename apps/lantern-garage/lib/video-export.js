@@ -106,13 +106,20 @@ function facecamTopChain(inLabel, outLabel, w, h, facecam, gameplayRect, topFrac
   const topH = Math.round((h * frac) / 2) * 2; // even height for yuv420p
   const botH = h - topH;
   const f = facecam;
+  // RULE 1 — gameplay centre is sacred. The gameplay band is a CENTRE crop of the
+  // full frame (force_original_aspect_ratio=increase + centre crop below), so the
+  // gameplay subject never leaves centre. We do NOT shift the window off-centre to
+  // dodge the facecam; a corner cam is naturally cropped out by the centre crop.
   const g = isValidRect(gameplayRect) ? gameplayRect : { x: 0, y: 0, width: 1, height: 1 };
   const id = (outLabel.match(/[a-z0-9]+/i) || ["x"])[0]; // unique pad suffix
   const t = tail ? `,${tail}` : "";
   return (
     `${inLabel}split=2[fcs_${id}][gps_${id}];` +
+    // Facecam: scale to FIT the band and PAD-centre it (no cropping) so the whole
+    // cam is perfectly centred horizontally and vertically — wherever it sat.
     `[fcs_${id}]crop=in_w*${f.width}:in_h*${f.height}:in_w*${f.x}:in_h*${f.y},` +
-      `scale=${w}:${topH}:force_original_aspect_ratio=increase,crop=${w}:${topH}[fct_${id}];` +
+      `scale=${w}:${topH}:force_original_aspect_ratio=decrease,` +
+      `pad=${w}:${topH}:(ow-iw)/2:(oh-ih)/2:color=black[fct_${id}];` +
     `[gps_${id}]crop=in_w*${g.width}:in_h*${g.height}:in_w*${g.x}:in_h*${g.y},` +
       `scale=${w}:${botH}:force_original_aspect_ratio=increase,crop=${w}:${botH}[gpt_${id}];` +
     `[fct_${id}][gpt_${id}]vstack=inputs=2${t}${outLabel}`

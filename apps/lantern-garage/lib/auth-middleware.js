@@ -59,7 +59,8 @@ function requireRole(req, res, requiredRole = "supporter") {
     return false;
   }
 
-  const roleHierarchy = { guest: 0, supporter: 1, founder: 2, admin: 3 };
+  // deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
+  const roleHierarchy = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
   const userLevel = roleHierarchy[session.role] || 0;
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
@@ -155,6 +156,17 @@ function requireEntitlement(req, res, key) {
 }
 
 /**
+ * Non-writing check: does this request belong to an admin?
+ * True for the local bypass (dev port 4178 / LANTERN_LOCAL_ADMIN on loopback)
+ * or a session whose role is "admin". Never touches the response — use this
+ * when you need to branch on admin status without sending a 403.
+ */
+function isAdmin(req) {
+  if (isLocalBypass(req)) return true;
+  return req.session?.patreon?.role === "admin";
+}
+
+/**
  * Attach user profile to request for downstream handlers.
  */
 function attachProfile(req) {
@@ -170,6 +182,7 @@ module.exports = {
   requireRole,
   hasEntitlement,
   requireEntitlement,
+  isAdmin,
   protectStaticPage,
   attachProfile,
 };

@@ -18,8 +18,10 @@ class TestMcpServerEndpoints:
         try:
             from src.mcp_server import server
             assert server is not None
-        except ImportError:
-            pytest.skip("MCP server not available in test environment")
+        except (ImportError, SystemExit):
+            # server.py calls sys.exit(1) (SystemExit) when fastapi/uvicorn
+            # are absent, which is the expected state in the lean CI env.
+            pytest.skip("MCP server deps (fastapi/uvicorn) not available in test environment")
 
     def test_mcp_tools_are_registered(self):
         """Verify all core tools are properly registered."""

@@ -1,7 +1,9 @@
 name: Code Review Gate
-# Prevents data-file fraud: flags PRs where >80% of changes are data files
-# rather than actual code. feat:/fix: PRs must have meaningful code changes.
-# See issue #650.
+# Prevents data-file fraud: flags PRs where the changes are overwhelmingly data
+# files rather than actual code. feat:/fix: PRs must have meaningful code changes.
+# Weighs both file counts AND added source LINES (numstat) so a single cosmetic
+# code line can no longer launder a large data-only diff past the gate.
+# See issues #650 and #646.
 
 on:
   pull_request:
@@ -32,52 +34,79 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Count changed files by category
-          FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          set -uo pipefail
 
-          TOTAL=$(echo "$FILES" | grep -c . || echo 0)
+          # Data-file regex: anything under data/ or apps/data/, plus data extensions anywhere.
+          DATA_RE='^(data|apps/data)/|\.(jsonl|ndjson|csv|tsv|sqlite|parquet)$'
+          # Code-file regex: real source extensions (json is intentionally NOT code).
+          CODE_RE='\.(js|mjs|cjs|jsx|ts|tsx|py|html|css|scss|yml|yaml|sh|ps1|rs|go|java|rb|c|cpp|h|hpp)$'
+
+          # Helper: count non-empty lines without tripping grep's exit-1-on-no-match.
+          count() { printf '%s\n' "$1" | grep -cE "$2" 2>/dev/null || true; }
+
+          # --- file-level view ---
+          FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          TOTAL=$(printf '%s\n' "$FILES" | grep -c . 2>/dev/null || true); TOTAL=${TOTAL:-0}
           if [ "$TOTAL" -eq 0 ]; then
             echo "No changed files detected — skipping ratio check."
             exit 0
           fi
-
-          # Data files: .jsonl, .json (in data/), .csv, .tsv, .sqlite
-          DATA=$(echo "$FILES" | grep -cE '\.(jsonl|csv|tsv|sqlite)$|^data/.*\.json$|^apps/data/' 2>/dev/null || echo 0)
-
-          # Code files: .js, .py, .ts, .tsx, .html, .css, .yml, .yaml, .sh, .rs
-          CODE=$(echo "$FILES" | grep -cE '\.(js|py|ts|tsx|html|css|yml|yaml|sh|rs|go|java|rb)$' 2>/dev/null || echo 0)
-
-          echo "Total files changed: $TOTAL"
-          echo "Data files: $DATA"
-          echo "Code files: $CODE"
-
-          # Calculate data ratio (integer arithmetic: DATA*100/TOTAL)
+          DATA=$(count "$FILES" "$DATA_RE"); DATA=${DATA:-0}
+          CODE=$(printf '%s\n' "$FILES" | grep -E "$CODE_RE" 2>/dev/null | grep -vE '^(data|apps/data)/' | grep -c . 2>/dev/null || true); CODE=${CODE:-0}
           DATA_PCT=$(( DATA * 100 / TOTAL ))
-          echo "Data file ratio: ${DATA_PCT}%"
+
+          # --- line-level view (added lines via numstat; binary files report '-') ---
+          NUMSTAT=$(git diff --numstat "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || git diff --numstat HEAD~1 HEAD)
+          DATA_ADDED=0; CODE_ADDED=0
+          while IFS=$'\t' read -r added removed path; do
+            [ -z "${path:-}" ] && continue
+            [ "$added" = "-" ] && continue   # binary
+            if printf '%s' "$path" | grep -qE "$DATA_RE"; then
+              DATA_ADDED=$(( DATA_ADDED + added ))
+            elif printf '%s' "$path" | grep -qE "$CODE_RE"; then
+              CODE_ADDED=$(( CODE_ADDED + added ))
+            fi
+          done <<< "$NUMSTAT"
+
+          echo "Files: total=$TOTAL data=$DATA code=$CODE (data ${DATA_PCT}%)"
+          echo "Added lines: data=$DATA_ADDED code=$CODE_ADDED"
 
           # Determine if this is a feature/fix PR
           IS_FEAT_FIX=false
-          if echo "$PR_TITLE" | grep -qiE '^(feat|fix|feature)\b'; then
+          if printf '%s' "$PR_TITLE" | grep -qiE '^(feat|fix|feature)\b'; then
             IS_FEAT_FIX=true
           fi
-
           echo "Is feat/fix PR: $IS_FEAT_FIX"
 
-          # Gate: feat/fix PRs must be >50% code files OR have at least 2 code files
           FAIL=false
           REASON=""
-
-          if [ "$IS_FEAT_FIX" = "true" ] && [ "$DATA_PCT" -gt 80 ] && [ "$CODE" -lt 2 ]; then
-            FAIL=true
-            REASON="feat/fix PR has ${DATA_PCT}% data files and only ${CODE} code file(s). Expected meaningful code changes."
+          if [ "$IS_FEAT_FIX" = "true" ]; then
+            # Signal 1 (original): mostly data files and <2 code files.
+            if [ "$DATA_PCT" -gt 80 ] && [ "$CODE" -lt 2 ]; then
+              FAIL=true
+              REASON="feat/fix PR has ${DATA_PCT}% data files and only ${CODE} code file(s)."
+            fi
+            # Signal 2 (new, line-based): negligible code added while data dominates.
+            # Closes the "1 cosmetic code line + a 2nd code file" bypass.
+            if [ "$CODE_ADDED" -lt 10 ] && [ "$DATA_ADDED" -gt 50 ] && [ "$DATA_ADDED" -gt $(( CODE_ADDED * 3 )) ]; then
+              FAIL=true
+              REASON="feat/fix PR added ${DATA_ADDED} data line(s) but only ${CODE_ADDED} code line(s) — looks like a data-only change wearing a feat/fix title."
+            fi
           fi
+
+          # Non-failing advisory: PR title names a source file that isn't in the diff.
+          for tok in $(printf '%s' "$PR_TITLE" | grep -oE '[A-Za-z0-9_.-]+\.(js|py|ts|tsx|rs|go)' || true); do
+            if ! printf '%s\n' "$FILES" | grep -qF "$tok"; then
+              echo "::warning::PR title mentions '$tok' but that file is not in the diff."
+            fi
+          done
 
           if [ "$FAIL" = "true" ]; then
             echo ""
             echo "❌ Code Review Gate FAILED: $REASON"
             echo ""
-            echo "This PR appears to be primarily data files with a feat/fix title."
-            echo "Ensure the PR title accurately reflects the changes, or add code files."
+            echo "This PR appears to be primarily data with a feat/fix title."
+            echo "Ensure the PR title accurately reflects the changes, or add real code."
             echo ""
             echo "Files changed:"
             echo "$FILES"
@@ -85,4 +114,4 @@ jobs:
           fi
 
           echo ""
-          echo "✅ Code Review Gate passed (data ${DATA_PCT}%, code files: ${CODE})"
+          echo "✅ Code Review Gate passed (data ${DATA_PCT}% of files, +${CODE_ADDED} code lines)"

@@ -42,7 +42,11 @@ const PROVIDER_CONFIG = {
     envKey: "ANTHROPIC_API_KEY",
     baseUrl: "api.anthropic.com",
     path: () => "/v1/messages",
-    defaultModel: "claude-haiku-4-5-20251001",
+    // Sonnet 4.6 (not Haiku) is the swarm/convergence anchor: parallel/consensus/
+    // council all pick this per-provider default, and Anthropic is the synthesizer
+    // (index 2) for reasoning-job councils — strong reasoning at near-Haiku latency.
+    // modelChain order is preserved: pickModel() returns [1] (sonnet) for coding jobs.
+    defaultModel: "claude-sonnet-4-6",
     modelChain: ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-7"],
     strengths: ["chat", "coding", "creative", "reasoning"],
     costTier: "medium",
@@ -133,7 +137,7 @@ const PROVIDER_CONFIG = {
 
 // ── Job → best provider mapping (primary + 2 alternates) ──
 const JOB_ASSIGNMENTS = {
-  chat:      ["gemini", "anthropic", "openai"],
+  chat:      ["gemini", "openai", "anthropic"], // anthropic last = council synthesizer (Sonnet)
   coding:    ["anthropic", "openai", "mistral"],
   reasoning: ["openai", "deepseek", "anthropic"],
   vision:    ["gemini", "xai", "openai"],

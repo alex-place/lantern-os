@@ -50,13 +50,17 @@ guaranteed when the active spectral abscissa is negative \emph{and the active
 subspace is invariant under the full Jacobian} (e.g.\ $A$ normal). We are explicit
 about that hypothesis: the general non-normal case is not covered by the energy
 argument, and the authoritative test is the full spectrum $\max\Real\lambda(A)<0$.
+For the non-normal regime we add two sufficient, provable contraction gates (a
+numerical-range gate and a Lyapunov/similarity-metric gate, \S\ref{sec:gates768})
+that strictly widen the certified region.
 We pair the theorem with a semantic collapse operator $\Szero$ (a heuristic
 trigger plus projection onto the null manifold --- the ``42-state''), an
 anti-collapse operator $\Sigma_0^{-1}$ (empirically shown, not proven, to suppress
 collapse), and an early-warning signal. We read the construction as a small, honest
 warning about recursively self-improving systems: absent external grounding, the
 linearized dynamics admit only collapse or divergence. Theorem~1 is machine-checked
-($28$ passing, $1$ xfail pending \#506) for the symmetric case. The other components are heuristics,
+($31$ passing, \#506 resolved) for the symmetric case, with $9$ further tests for the
+non-normal gates (\texttt{test\_stability\_gates.py}). The other components are heuristics,
 labelled as such; one referenced demonstration is not currently reproducible (its
 scripts are absent from the repository); the AI-safety reading is the keeper and
 stands on its own.
@@ -134,6 +138,7 @@ Gr\"onwall gives the exponential bound.
 \end{proof}
 
 \subsection{Why the hypothesis is required}
+\label{sec:hypothesis}
 For a general non-normal $A$ the skew part $A_k$ couples the active and null
 components, the cross term need not vanish, and the simple energy bound can fail.
 
@@ -158,8 +163,10 @@ A Bendixson bound gives $\Real\lambda(A)\le\lambda_{\max}(A_s)$, so $\alpha$ bou
 the real parts but does not by itself certify them: a rotation such as
 $A=\begin{psmallmatrix}-1&0&0\\0&0&2\\0&-2&0\end{psmallmatrix}$ has $\alpha=-1$ yet
 eigenvalues $\{-1,\pm 2i\}$, a center that never collapses in its rotating plane.
-\textbf{Recommended:} report both $\alpha$ and $\max\Real\lambda(A)$.
-\texttt{collapse\_certificate()} currently computes only the former.
+\textbf{Recommended:} report both $\alpha$ and $\max\Real\lambda(A)$. As of \#505,
+\texttt{collapse\_certificate()} reports both (the conservative small-gain $\alpha$ and
+the exact $\max\Real\lambda(A)$); \S\ref{sec:gates768} adds two provable gates that
+widen the certified non-normal region.
 
 \begin{verifybox}
 \textbf{Verification.} The shipped test uses $A=-0.8\,I$, which is \emph{symmetric}
@@ -168,6 +175,42 @@ predicts contraction rate $0.8$ and a rollout shows $V$ decaying monotonically.
 This confirms the theorem in precisely the special case where the proof is
 unconditionally valid; it does \emph{not} exercise the non-normal case.
 (\texttt{collapse\_certificate}, \texttt{lyapunov\_value}, \texttt{src/cio\_sde/collapse.py}.)
+\end{verifybox}
+
+\subsection{Provable region-wideners for non-normal $A$ (\#768)}
+\label{sec:gates768}
+The small-gain bound over-rejects strongly non-normal $A$, and $\max\Real\lambda(A)<0$
+alone is necessary-not-sufficient (transient growth). \texttt{stability\_gates()} adds
+two \emph{sufficient, provable} contraction certificates, each strictly wider than
+small-gain (margin $m\ge0$):
+\begin{enumerate}
+\item \textbf{Numerical-range gate (monotone).}
+  $\omega(A)=\lambda_{\max}(A_s)<-m \implies \norm{e^{tA}}_2\le e^{\omega t}$ --- a
+  strict, no-transient contraction (matrix measure $\mu_2$; Lohmiller--Slotine 1998).
+  $\omega(A)$ is the rightmost point of the numerical range $W(A)$; since
+  $\operatorname{spec}(A)\subset W(A)$, this gate \emph{implies} the Lyapunov gate.
+\item \textbf{Lyapunov gate (asymptotic, optimal metric).} For margin $m\ge0$,
+  $\exists P\succ0:\ (A+mI)^\top P+P(A+mI)\prec0 \iff \max\Real\lambda(A)<-m$ (classical
+  Lyapunov theorem; $=\inf_T\mu_2(TAT^{-1})<-m$). Certified by solving
+  $(A+mI)^\top P+P(A+mI)=-I$ and checking $P\succ0$ (with a relative ill-conditioning
+  guard, so the boundary is never certified independent of solver warnings). It
+  \emph{accepts the \S\ref{sec:hypothesis}~counterexample}
+  $A=\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$ (Hurwitz at $-\tfrac12$) that the
+  energy proof and the small-gain bound reject; $\sqrt{\kappa(P_0)}$ (the margin-0 solve)
+  bounds the Euclidean transient $\sup_t\norm{e^{tA}}$.
+\end{enumerate}
+\textbf{Honest scope.} Sufficient, not necessary; they certify the \emph{full}
+Jacobian's contraction, not collapse-onto-manifold (the active/null alignment gap is
+separate). The \emph{proven} transient constant is Crouzeix--Palencia (2017):
+$\norm{e^{tA}}\le 1+\sqrt2$ when $W(A)\subset$~LHP ($\omega\le0$); the sharper constant
+$2$ is Crouzeix's still-open conjecture.
+\begin{verifybox}
+\textbf{Verification.} \texttt{tests/test\_stability\_gates.py} (9 tests): the
+$\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$ case (small-gain rejects, Lyapunov
+accepts, numerical-range flags the transient), a 400-matrix red-team finding \emph{no}
+false-positive certificate, and matrix-exponential checks that the monotone ($e^{\omega t}$),
+Lyapunov ($\sqrt{\kappa(P)}$), and Crouzeix--Palencia ($1+\sqrt2$) bounds each hold.
+(\texttt{stability\_gates}, \texttt{StabilityGates}, \texttt{src/cio\_sde/collapse.py}.)
 \end{verifybox}
 
 % ====================================================================
@@ -369,11 +412,14 @@ arXiv:2406.07515).
 \begin{itemize}
 \item \texttt{src/cio\_sde/collapse.py} --- \texttt{SemanticCollapseOperator},
   \texttt{CollapseCertificate}/\texttt{collapse\_certificate}, \texttt{AntiCollapseOperator},
-  \texttt{ReconstructionOperator}.
+  \texttt{ReconstructionOperator}, \texttt{stability\_gates}/\texttt{StabilityGates} (\#768).
 \item \texttt{src/cio\_sde/surprise.py} --- \texttt{SurpriseMonitor} and the Kalman
   measurement update (the missing inference step).
-\item \texttt{tests/test\_cio\_sde.py} --- 28 passing, 1 xfail (surprise$\leftrightarrow\Sigma_0$
-  integration pending \#506); Theorem~1 exercised in the symmetric case only.
+\item \texttt{tests/test\_cio\_sde.py} --- 31 passing (\#506 resolved); Theorem~1
+  exercised in the symmetric case only.
+\item \texttt{tests/test\_stability\_gates.py} --- 9 passing: the \#768 numerical-range
+  $+$ Lyapunov gates, a 400-matrix red-team (no false-positive certificate), and
+  matrix-exponential checks of the proven transient bounds.
 \item Runnable, deterministic experiments present in the repo:
   \texttt{sigma0\_reconstruction.py} (recoverability floor),
   \texttt{sigma0\_horse\_blinders.py} (the surprise canary),

@@ -6,7 +6,7 @@ Instructions
 [2026-06-06] - Public docs should separate implemented math, prototype math, conceptual theory, and lore/metaphor.
 
 Identity & Symbolic Self
-[2026-06-06] - Alex is positioning Lantern OS as a founder-grade system with a large invention backlog and public/private disclosure boundaries.
+[2026-06-06] - Keystone is positioning Lantern OS as a founder-grade system with a large invention backlog and public/private disclosure boundaries.
 [2026-06-06] - Synthesasia is an invented symbolic-emotive language whose core unit is a triad of three symbols or three-symbol groupings.
 [2026-06-06] - The Lantern tesseract should be treated as a symbolic architecture for sparse state navigation and observer-focused rendering, not as a literal physics claim.
 

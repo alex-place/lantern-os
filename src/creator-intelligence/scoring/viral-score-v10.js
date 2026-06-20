@@ -14,6 +14,7 @@
 "use strict";
 
 const PRIORS = require("../research/viral_patterns.json");
+const { effectivePriors } = require("./editing-priors-adapter");
 
 function clamp01(x) {
   if (!Number.isFinite(x)) return 0;
@@ -42,7 +43,17 @@ function deriveSignals(analysis) {
     ? Math.min(...highlights.map((h) => h.start))
     : null;
 
-  const cutsPerMin = durationMin > 0 ? highlights.length / durationMin : 0;
+  // A1: prefer the MEASURED shot-boundary cut rate (real scene cuts) when the
+  // analysis carries it; fall back to the highlight-count proxy otherwise. The
+  // flag makes the provenance auditable downstream (and in calibration).
+  const shot = analysis.metadata && analysis.metadata.shotBoundaries;
+  const cutsPerMinMeasured = !!(shot && shot.measured && typeof shot.cutsPerMin === "number");
+  const cutsPerMin = cutsPerMinMeasured
+    ? shot.cutsPerMin
+    : (durationMin > 0 ? highlights.length / durationMin : 0);
+  const avgShotLengthSec = cutsPerMinMeasured && typeof shot.avgShotLengthSec === "number"
+    ? shot.avgShotLengthSec
+    : null;
   const coverage = clamp01(
     highlights.reduce((s, h) => s + (h.duration || Math.max(0, (h.end || 0) - (h.start || 0))), 0) / durationSec
   );
@@ -77,12 +88,27 @@ function deriveSignals(analysis) {
 
   const strongBeats = highlights.filter((h) => (h.score || 0) >= 0.5).length;
 
+  // A3: measured speech features when the analysis carries a transcript-derived
+  // block (timeline.metadata.speech). Numeric ones feed calibration; categorical
+  // ones (hookStyle, ctaPosition) are exposed as honest diagnostics. Absent =>
+  // nulls/flags, never inferred from audio energy.
+  const sp = analysis.metadata && analysis.metadata.speech;
+  const speechMeasured = !!(sp && sp.measured);
+  const wordsPerSec = speechMeasured && typeof sp.wordsPerSec === "number" ? sp.wordsPerSec : null;
+  const speechCoverage = speechMeasured && typeof sp.speechCoverage === "number" ? sp.speechCoverage : null;
+  const deadAirMaxSec = speechMeasured && typeof sp.deadAirMaxSec === "number" ? sp.deadAirMaxSec : null;
+  const hookStyle = speechMeasured ? sp.hookStyle : null;
+  const ctaPresent = speechMeasured ? sp.ctaPresent : null;
+  const ctaPosition = speechMeasured ? sp.ctaPosition : null;
+
   return {
     durationSec, durationMin, highlightsCount: highlights.length,
     hasAudioSignal: audioHl.length > 0,
-    timeToFirstEventSec, cutsPerMin, coverage,
+    timeToFirstEventSec, cutsPerMin, cutsPerMinMeasured, avgShotLengthSec, coverage,
     gapCV, audioActivityPerMin, audioPeak, multiSignalSpikesPerMin,
     endPayoff, lateSurprise, excessMotion, strongBeats,
+    speechMeasured, wordsPerSec, speechCoverage, deadAirMaxSec,
+    hookStyle, ctaPresent, ctaPosition,
   };
 }
 
@@ -171,7 +197,10 @@ function viralScoreV10(analysis = {}) {
     captionPotential: scoreCaptionPotential(s),
   };
 
-  const w = PRIORS.weights;
+  // Weights adapt to open-video research once >25 samples exist (else baseline).
+  // Signal THRESHOLDS stay at baseline (units differ) — see the adapter.
+  const eff = effectivePriors(PRIORS);
+  const w = eff.weights;
   let viralScore = 0;
   let confWeighted = 0;
   let confWeightTotal = 0;
@@ -194,7 +223,11 @@ function viralScoreV10(analysis = {}) {
     componentScores,
     basis: "structural_heuristic",
     calibrated: false,
-    weightsSource: "research/viral_patterns.json",
+    priorInformed: eff._priorInformed,
+    priorSamples: eff._samples,
+    weightsSource: eff._priorInformed
+      ? "research/viral_patterns.json + editing_priors.json (open-video, >25 samples)"
+      : "research/viral_patterns.json",
     signals: s,
     computedAt: new Date().toISOString(),
   };

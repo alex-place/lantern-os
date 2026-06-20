@@ -1,10 +1,15 @@
 const path = require("path");
-const { appendJsonlQueued, readJsonl } = require("./file-queue");
+const { appendJsonlQueued, readJsonl, rotateJsonlIfNeeded } = require("./file-queue");
+const { redactPII } = require("./redact");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const conversationLogPath = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
 const operatorNotesPath = path.join(repoRoot, "data", "operator-notes", "notes.jsonl");
 const maxConversationTextLength = 4000;
+// #771 — bound the append-only conversation log. Rotate to timestamped archives past the
+// size cap and keep only the most recent N. Tunable via env.
+const conversationLogMaxBytes = Math.max(64 * 1024, Number(process.env.CONV_LOG_MAX_BYTES) || 5 * 1024 * 1024);
+const conversationLogKeepArchives = Math.max(0, Number(process.env.CONV_LOG_KEEP_ARCHIVES) || 5);
 
 function normalizeConversationEntry(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -15,6 +20,7 @@ function normalizeConversationEntry(input) {
   const allowedRoles = new Set(["operator", "lantern", "system", "note"]);
   const text = String(input.text || "").trim();
   const surface = String(input.surface || "garage").trim().slice(0, 80) || "garage";
+  const sessionId = input.sessionId ? String(input.sessionId).trim().slice(0, 64) : null;
 
   if (!allowedRoles.has(role)) {
     throw new Error("invalid_conversation_role");
@@ -27,17 +33,37 @@ function normalizeConversationEntry(input) {
     recordedAt: new Date().toISOString(),
     surface,
     role,
-    text: text.slice(0, maxConversationTextLength),
+    // #770: redact high-confidence PII / secrets at rest so a log leak exposes far less.
+    text: redactPII(text.slice(0, maxConversationTextLength)),
+    sessionId,
   };
 }
 
 async function appendConversationEntry(entry) {
   await appendJsonlQueued(conversationLogPath, entry);
+  // #771: keep the file bounded — rotate + prune once it exceeds the cap (serialized
+  // behind the append in the same per-path write queue).
+  return rotateJsonlIfNeeded(conversationLogPath, {
+    maxBytes: conversationLogMaxBytes,
+    keepArchives: conversationLogKeepArchives,
+  });
 }
 
-function readConversationLog(limit = 50) {
-  return readJsonl(path.relative(repoRoot, conversationLogPath), limit)
+function rotateConversationLogIfNeeded() {
+  return rotateJsonlIfNeeded(conversationLogPath, {
+    maxBytes: conversationLogMaxBytes,
+    keepArchives: conversationLogKeepArchives,
+  });
+}
+
+function readConversationLog(limit = 50, sessionId = null) {
+  // When scoped to a session, read a bounded larger window then filter,
+  // so the last `limit` *session* turns survive interleaving from other sessions.
+  const window = sessionId ? 2000 : limit;
+  const all = readJsonl(path.relative(repoRoot, conversationLogPath), window)
     .filter((entry) => !entry.parseError);
+  if (!sessionId) return all;
+  return all.filter((entry) => entry.sessionId === sessionId).slice(-limit);
 }
 
 function normalizeRagCacheItem(input) {
@@ -94,6 +120,7 @@ function readOperatorQueue() {
 module.exports = {
   normalizeConversationEntry,
   appendConversationEntry,
+  rotateConversationLogIfNeeded,
   readConversationLog,
   normalizeRagCacheItem,
   appendExternalRagItem,

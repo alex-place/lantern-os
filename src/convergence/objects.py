@@ -26,8 +26,12 @@ class TaskStatus(str, Enum):
     ABANDONED = "abandoned"
 
 
-class ToolResult(Enum):
-    """Tool execution outcome."""
+class ToolOutcome(Enum):
+    """Tool execution outcome (tri-state).
+
+    Distinct from the ``ToolResult`` dataclass below, which carries the
+    full structured payload of a ``Tool.call()``.
+    """
     SUCCESS = "success"
     FAILURE = "failure"
     ERROR = "error"

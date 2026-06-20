@@ -179,5 +179,5 @@ Before submitting a PR with UI changes:
 
 ## Questions?
 
-Email: alex.place.7@gmail.com
+Contact: open a GitHub issue
 Open an issue: https://github.com/alex-place/lantern-os/issues

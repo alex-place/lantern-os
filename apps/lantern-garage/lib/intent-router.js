@@ -49,7 +49,7 @@ const CAPABILITY_REGISTRY = [
   },
   {
     id: "lantern",
-    name: "Lantern",
+    name: "Keystone",
     intents: ["dream_analysis"],
     triggers: [
       /\b(dream|reflect|reflection|journal|memory|remember|thought)\b/i,
@@ -147,7 +147,7 @@ function classifyIntent(message) {
   scores.sort((a, b) => b.confidence - a.confidence || b.matchCount - a.matchCount);
   const topMatch = scores[0];
   if (!topMatch || topMatch.confidence === 0) {
-    return fallbackRoute("No explicit intent triggers matched; defaulting to Lantern reflection");
+    return fallbackRoute("No explicit intent triggers matched; defaulting to Keystone reflection");
   }
 
   return {

@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from convergence_io.dilation import (
     dilation, DilationField, SwapConvergenceGuard, D_MIN, D_MAX, D_DEFAULT,
+    grounding_policy, GroundingPolicy,
 )
 
 
@@ -140,3 +141,56 @@ def test_guard_reset():
     assert g.is_oscillating("x", "y", current_tick=3)
     g.reset("x", "y")
     assert not g.is_oscillating("x", "y", current_tick=3)
+
+
+# ── G12: collapse-proximity sign-fix + livelock guard (#764) ───────────────────
+
+def test_collapse_proximity_deflates_not_inflates():
+    """Near collapse, dilation must DEFLATE toward D_MIN, not pin at D_MAX."""
+    # high uncertainty, low confidence = the regime that pins D high...
+    d_far = dilation(uncertainty=1.0, cost_pressure=0.0, confidence=0.0, collapse_proximity=0.0)
+    d_near = dilation(uncertainty=1.0, cost_pressure=0.0, confidence=0.0, collapse_proximity=1.0)
+    assert d_far > d_near                       # proximity collapses the dilation
+    assert d_near == pytest.approx(D_MIN, abs=1e-9)  # proximity=1 ⇒ D_MIN (go look / act)
+
+
+def test_collapse_proximity_zero_is_backward_compatible():
+    base = dilation(0.7, 0.1, 0.3)
+    assert dilation(0.7, 0.1, 0.3, collapse_proximity=0.0) == pytest.approx(base)
+
+
+def test_collapse_proximity_monotone():
+    vals = [dilation(0.9, 0.0, 0.1, collapse_proximity=p) for p in (0.0, 0.25, 0.5, 0.75, 1.0)]
+    assert all(vals[i] >= vals[i + 1] for i in range(len(vals) - 1))  # monotone down
+
+
+def test_field_livelock_guard_forces_dmin():
+    """A node pinned near D_MAX longer than max_dwell_ticks is forced to D_MIN."""
+    f = DilationField(max_dwell_ticks=3, dwell_threshold=1.5)
+    d = D_DEFAULT
+    for _ in range(3):                          # within budget: stays in the slow region
+        d = f.update_node("stuck", uncertainty=1.0, cost_pressure=0.0, confidence=0.0)
+    assert d == pytest.approx(2.0, abs=1e-9)    # elevated (formula's practical ceiling ~2.0)
+    d = f.update_node("stuck", uncertainty=1.0, cost_pressure=0.0, confidence=0.0)  # exceeds dwell
+    assert d == pytest.approx(D_MIN, abs=1e-9)  # livelock broken → forced to D_MIN
+
+
+# ── grounding_policy: the within→without bridge (#764, #731) ───────────────────
+
+def test_grounding_policy_low_dilation_is_cheap():
+    pol = grounding_policy(0.4, base_max_results=5, base_min_sources=2)
+    assert pol.fetch_external is False and pol.deep_mode is False and pol.max_results == 5
+
+
+def test_grounding_policy_high_dilation_grounds_harder():
+    lo = grounding_policy(1.0, base_max_results=5, base_min_sources=2)
+    hi = grounding_policy(4.0, base_max_results=5, base_min_sources=2)
+    assert hi.max_results > lo.max_results       # wider web breadth
+    assert hi.min_sources >= lo.min_sources      # higher corroboration floor
+    assert hi.deep_mode is True and lo.deep_mode is False
+    assert hi.fetch_external is True
+
+
+def test_grounding_policy_monotone_in_dilation():
+    mrs = [grounding_policy(d).max_results for d in (D_MIN, 0.5, 1.0, 2.0, 3.0, D_MAX)]
+    assert all(mrs[i] <= mrs[i + 1] for i in range(len(mrs) - 1))

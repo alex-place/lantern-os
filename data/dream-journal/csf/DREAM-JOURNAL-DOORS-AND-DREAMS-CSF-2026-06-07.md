@@ -67,7 +67,7 @@ Core elements:
 - White, lavender, gold, and pale pink palette
 - Text: Dream Journal Orion by Lantern OS
 - Tagline: Every dream is a door. Every memory is a home.
-- Created by Alex Place
+- Created by Keystone Place
 
 ## Use
 
@@ -115,11 +115,11 @@ The Dream Journal door/icon system contains the following canonical doors:
 
 ---
 
-# CSF: Gage XP Door
+# CSF: Lantern XP Door
 
 ## Identity
 
-The Gage XP Door is a chaotic Windows XP dream portal and childlike invention myth.
+The Lantern XP Door is a chaotic Windows XP dream portal and childlike invention myth.
 
 Core visual language:
 
@@ -575,8 +575,8 @@ This distinction should be preserved.
 
 Generated or referenced visual directions include:
 
-1. Gage XP Door chaotic portal poster.
-2. Dream Journal white-brand Gage door poster.
+1. Lantern XP Door chaotic portal poster.
+2. Dream Journal white-brand Lantern door poster.
 3. Xenon Door purple cosmic feminine poster.
 4. Kingdome of Hearts king/gate poster.
 5. Founder Door attempts.

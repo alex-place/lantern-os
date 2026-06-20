@@ -9,6 +9,7 @@ const {
   listProfiles,
   setUserRole,
   deleteProfile,
+  linkDiscordAccount,
   exportToCSF,
   importFromCSF,
 } = require("../lib/user-profiles");
@@ -66,6 +67,38 @@ module.exports = async function profileRoutes(req, res, url, deps) {
       }
     });
 
+    return true;
+  }
+
+  // POST /api/profiles/me/link-discord — Link the current web user to a Discord id (#697)
+  if (method === "POST" && path === "/api/profiles/me/link-discord") {
+    const userId = req.session?.patreon?.id;
+    if (!userId) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Not authenticated" }));
+    }
+
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { discordId } = JSON.parse(body || "{}");
+        if (!discordId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "discordId is required" }));
+        }
+        const link = linkDiscordAccount(userId, String(discordId));
+        if (!link) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "No profile to link" }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, link }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
     return true;
   }
 

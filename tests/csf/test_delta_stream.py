@@ -88,5 +88,52 @@ class TestStreamEfficiency(unittest.TestCase):
         self.assertLess(len(data), 1024)
 
 
+class TestStreamTruncationDetection(unittest.TestCase):
+    """Truncated / short streams must raise, not silently swallow records."""
+
+    def test_truncated_confirmation_extent_raises(self):
+        # encode_confirmation = header + position + extent byte.
+        # Dropping the trailing extent byte must raise rather than default to 0.
+        data = encode_confirmation(0, (0,) * 12, extent=0xFF)
+        reader = DeltaStreamReader(data[:-1])
+        with self.assertRaises(ValueError):
+            reader.read_all()
+
+    def test_truncated_delta_payload_raises(self):
+        writer = DeltaStreamWriter()
+        writer.delta(4, DeltaType.LIGHT_CHANGED, (0,) * 12, b"\x01\x02\x03")
+        data = writer.to_bytes()
+        reader = DeltaStreamReader(data[:-2])  # drop 2 of 3 declared payload bytes
+        with self.assertRaises(ValueError):
+            reader.read_all()
+
+    def test_truncated_position_raises(self):
+        writer = DeltaStreamWriter()
+        writer.delta(4, DeltaType.LIGHT_CHANGED, (2,) * 12, b"\x09")
+        data = writer.to_bytes()
+        # Keep only the header byte; the position field is now incomplete.
+        reader = DeltaStreamReader(data[:1])
+        with self.assertRaises(ValueError):
+            reader.read_all()
+
+    def test_expected_count_mismatch_raises(self):
+        writer = DeltaStreamWriter()
+        writer.confirm(0, (0,) * 12)
+        writer.confirm(0, (1,) * 12)
+        data = writer.to_bytes()
+        reader = DeltaStreamReader(data)
+        with self.assertRaises(ValueError):
+            reader.read_all(expected=3)
+
+    def test_expected_count_match_ok(self):
+        writer = DeltaStreamWriter()
+        writer.confirm(0, (0,) * 12)
+        writer.delta(4, DeltaType.LIGHT_CHANGED, (0,) * 12, b"\x01")
+        data = writer.to_bytes()
+        reader = DeltaStreamReader(data)
+        records = reader.read_all(expected=2)
+        self.assertEqual(len(records), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

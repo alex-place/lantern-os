@@ -17,7 +17,7 @@
     const banner = document.createElement("div");
     banner.id = "lantern-update-banner";
     banner.innerHTML = `
-      <span class="lantern-update-text">Lantern OS update available on <code>master</code></span>
+      <span class="lantern-update-text">Keystone OS update available on <code>master</code></span>
       <button class="lantern-update-btn" id="lantern-update-action" title="Update now">Update & Restart</button>
       <button class="lantern-update-dismiss" id="lantern-update-dismiss" title="Dismiss">&times;</button>
     `;

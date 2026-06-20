@@ -1,20 +1,35 @@
 const https = require("https");
 const http = require("http");
 const path = require("path");
+
+// On Windows, Node's bundled CA store sometimes can't verify cloud-provider certs
+// ("unable to verify the first certificate"). Without this, every cloud request
+// throws, the auto cascade swallows the error, and the chat silently degrades to the
+// weak local Ollama model — the "calm while wrong" failure in #740. Mirror the
+// self-edit-engine / routes/providers workaround, but scope it to Windows (or an
+// explicit opt-in) so TLS verification is not disabled on other platforms. Set
+// LANTERN_INSECURE_TLS=0 to force-disable, =1 to force-enable anywhere.
+const INSECURE_TLS = process.env.LANTERN_INSECURE_TLS === "1" ||
+  (process.platform === "win32" && process.env.LANTERN_INSECURE_TLS !== "0");
+const llmAgent = INSECURE_TLS ? new https.Agent({ rejectUnauthorized: false }) : undefined;
+
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse } = require("./dream-chat");
 const { modelFor } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
+const { emitConvergenceRecord } = require("./convergence-records");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
+const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
 const { generateDoorSceneImage } = require("./image-generation");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
+const { chatDilation, groundingPolicy } = require("./grounding-policy");
 const { generatePlan, generatePatch } = require("./self-edit-engine");
 const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
@@ -26,6 +41,20 @@ const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 const repoRoot = path.resolve(__dirname, "../../../");
 
 const maxConversationTextLength = 4000;
+
+// Per-request grounding (web search + live GitHub project context) is best-effort
+// enrichment that runs BEFORE the model is called. If the network or the `gh` CLI
+// is slow/hung, an unbounded await there stalls the ENTIRE chat reply (no tokens,
+// no error) - observed in degraded environments. Bound each grounding call so it
+// can never hang the response: on timeout, resolve to a fallback and proceed; the
+// underlying call finishes (and self-times-out) in the background.
+const GROUNDING_TIMEOUT_MS = parseInt(process.env.GROUNDING_TIMEOUT_MS, 10) || 4000;
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    Promise.resolve(promise).catch(() => fallback),
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
 
 // Fallback doors when AI omits the marker or provider fails
 const FALLBACK_DOORS = ["Tell me more about that", "What happened next?", "How are you feeling about it?"];
@@ -78,7 +107,7 @@ function compactHistory(history) {
     }
     // Low fidelity: first N words only
     const words = text.trim().split(/\s+/).filter(Boolean).slice(0, LOW_FIDELITY_WORD_LIMIT).join(" ");
-    const roleLabel = role === "assistant" ? "Lantern" : "Dreamer";
+    const roleLabel = role === "assistant" ? "Keystone" : "Dreamer";
     const summary = words.length > 0 ? `[${roleLabel}: ${words}…]` : `[${roleLabel}]`;
     logTruncationMetric(text.length, summary.length, "low_fidelity");
     return { role, text: summary };
@@ -282,6 +311,11 @@ async function handleStreamChat(req, url, res) {
   // Surface mode: dream-chat (default) or three-doors.
   // The game page declares itself via body.surface; bang commands can also flip it below.
   let surfaceMode = parsed.surface === "three-doors" ? "three-doors" : "dream-chat";
+
+  // Session scoping: stamp every recorded turn with the caller's session so history
+  // reads back per-conversation instead of one global flat log (issue: session mgmt).
+  const sessionId = parsed.sessionId || null;
+  const logConversation = (entry) => appendConversationEntry({ ...entry, sessionId });
 
   // Handle bang commands
   const cmd = parseBangCommand(message);
@@ -519,14 +553,65 @@ async function handleStreamChat(req, url, res) {
     }
 
     if (cmd.name === "converge" || cmd.name === "convergance") {
-      // Route the task to Keystone via the normal LLM chain (same as !three-doors fallthrough).
-      // Keystone's system prompt handles dev/GitHub tasks directly.
-      const taskContent = (cmd.args || "").trim() || message.replace(/^!\S+\s*/, "").trim();
-      message = taskContent
-        ? `[Convergence task] ${taskContent}`
-        : message.replace(/^!\S+\s*/, "").trim() || message;
+      // Σ₀ convergence (real, not a length vote): run a multi-provider COUNCIL —
+      // creative + critic + a Sonnet synthesizer — then EMIT a Convergence Record so
+      // the Verify→Converge stage is grounded and auditable in records.jsonl.
+      const question = (cmd.args || "").trim() || message.replace(/^!\S+\s*/, "").trim();
+      if (question) {
+        sse.writeStreamHeaders(res);
+        sse.sendRoute(res, { label: "Convergence · Σ₀ council", agentName: "Keystone", surface: surfaceMode });
+        // Use the shared SSE helpers so the frontend (which reads {type:"token",text:…})
+        // actually renders these. The old raw {token} format was silently dropped.
+        const sendToken = (token) => sse.sendToken(res, token);
+        const sendDone = (source, meta) => sse.sendDone(res, source, meta); // ends the response
+        sendToken("Σ₀ converging across providers…\n\n");
+        const convSystem = "You are a Σ₀ convergence engine. Weigh the perspectives, then give the single most accurate, well-grounded answer — comprehensive, with sources as Markdown links [title](url) when you can. End with exactly one final line: CONFIDENCE: <a number 0-1 for how well-supported the answer is>.";
+        try {
+          const result = await swarmOrchestrate({ job: "chat", mode: "council", systemPrompt: convSystem, message: question, history });
+          let conf = 0.6;
+          const cm = String(result.text).match(/CONFIDENCE:\s*([0-9]*\.?[0-9]+)/i);
+          if (cm) conf = Math.max(0, Math.min(1, parseFloat(cm[1])));
+          const answer = String(result.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(result.text);
+          const members = (result.council && result.council.members) || [];
+          let recordId = null;
+          try {
+            const rec = await emitConvergenceRecord({
+              hypothesis: question.slice(0, 300),
+              result: answer.slice(0, 2000),
+              confidence: conf,
+              evidence_ids: members.map((m) => m.provider),
+              reasoner: "convergance-council",
+              verified: true,
+              verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+            });
+            recordId = rec && rec.id;
+          } catch (_e) { /* record emit is best-effort */ }
+          for (const w of answer.split(" ")) sendToken(w + " ");
+          sendDone("keystone", {
+            agent: "Keystone",
+            provider: result.provider,
+            online: true,
+            routeLabel: "Convergence · Σ₀ council",
+            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), recordId },
+          });
+          return;
+        } catch (err) {
+          // Council unavailable (e.g. no provider keys) — fall back to a single provider
+          // so the user still gets an answer. Headers are already SSE, so do NOT fall through.
+          try {
+            const fb = await swarmOrchestrate({ job: "chat", mode: "single", systemPrompt: convSystem, message: question, history });
+            const ans = String(fb.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(fb.text);
+            for (const w of ans.split(" ")) sendToken(w + " ");
+            sendDone("keystone", { agent: "Keystone", provider: fb.provider, online: true, routeLabel: "Convergence · single (council unavailable)" });
+          } catch (e2) {
+            sendToken(`Convergence unavailable: ${err.message}\n`);
+            sendDone("failed", { error: err.message });
+          }
+          return;
+        }
+      }
+      // Empty !convergance — fall through to normal Keystone chat.
       requestedAgent = requestedAgent || "keystone";
-      // fall through to normal SSE chat routing below
     }
 
     if (cmd.name === "self-edit" || cmd.name === "selfedit" || cmd.name === "code") {
@@ -620,8 +705,8 @@ async function handleStreamChat(req, url, res) {
   });
 
   // Dream Chat is Keystone-only: the desk agent is always Keystone.
-  // Personas (Lantern et al.) live in the Three Doors game surface, where the
-  // game may request a specific guide via body.agent (defaults to Lantern).
+  // Personas (Keystone et al.) live in the Three Doors game surface, where the
+  // game may request a specific guide via body.agent (defaults to Keystone).
   const agent = surfaceMode === "three-doors"
     ? (AGENT_PERSONAS.find((a) => a.id === (requestedAgent || "lantern"))
         || AGENT_PERSONAS.find((a) => a.id === "lantern")
@@ -633,7 +718,7 @@ async function handleStreamChat(req, url, res) {
   // about app dev, repo state, and convergence. Direct API access from the UX.
   const isKeystoneDebug = agent.id === "keystone" && (mcpFlag || message.startsWith("[Convergence task]"));
 
-  // Name reported in done events — Keystone at the desk, the persona (Lantern) in the game
+  // Name reported in done events — Keystone at the desk, the persona (Keystone) in the game
   const doneAgentName = agent.name || "Keystone";
 
   let dreamContext = recentDreams.length > 0
@@ -653,9 +738,27 @@ async function handleStreamChat(req, url, res) {
 
   // Compact history once; providers reuse this via buildProviderMessages.
   // historyContext is kept for Keystone debug prompt only — not injected into dream system prompt.
-  const compacted = compactHistory(history);
+  //
+  // #772 REMEMBER stage: assemble a token-budgeted context — a rolling summary of
+  // older turns plus recent verbatim turns within the active model's window — from
+  // the FULL session log instead of the client's fixed last-6 slice. Drop-in for
+  // compactHistory(history) (same { role, text }[] shape). Best-effort: any failure
+  // degrades to the pre-#772 fixed-slice behaviour so a chat reply never breaks.
+  let compacted;
+  try {
+    const budgeted = assembleSessionContext({
+      sessionId: parsed.sessionId,
+      clientHistory: history,
+      currentMessage: message,
+      requestedProvider,
+      surfaceMode,
+    });
+    compacted = Array.isArray(budgeted && budgeted.compacted) ? budgeted.compacted : compactHistory(history);
+  } catch {
+    compacted = compactHistory(history);
+  }
   const historyContext = compacted.length > 0
-    ? `\nPrior conversation turns:\n${compacted.map(h => `${h.role === "assistant" ? "Lantern" : "Dreamer"}: ${h.text}`).join("\n")}`
+    ? `\nPrior conversation turns:\n${compacted.map(h => `${h.role === "assistant" ? "Keystone" : "Dreamer"}: ${h.text}`).join("\n")}`
     : "";
 
   // Co-occurrence pairs: symbols that appear together in the same entry strengthen the edge
@@ -680,15 +783,20 @@ async function handleStreamChat(req, url, res) {
   const DOORS_INSTRUCTION = `\n\nAt the end of every response, imagine exactly 3 forward-facing doors — canaries the dreamer is sending ahead into their waking and dreaming life. Each door should be a brief, future-tense, equally weighted sensory or experiential path grounded in the last door mentioned and the dreamer's personal symbol mesh. All 3 should carry equal weight — no door is more important. They represent what the dreamer wants to see, hear, feel, taste, touch, or live. Write them as a single hidden line:\n[DOORS: door one | door two | door three]\nRules: future tense, first person, short (under 8 words), no questions, no commands, equally weighted, rooted in the conversation and symbol mesh.${meshHint}`;
 
   // Keystone debug prompt — raw dev access, no persona, no doors
-  const KEYSTONE_DEBUG_PROMPT = `You are Keystone, a direct debug interface for Lantern OS development. You have access to the full repo context below. Respond as a senior engineer — concise, honest, actionable. No dream persona, no doors, no metaphors.\n\n${_realtimeCtx}\n\nRepo state:\n- Server: apps/lantern-garage/server.js (modular routes under routes/)\n- Streaming: lib/stream-chat.js (Gemini→Claude→OpenAI→Grok→Ollama chain)\n- Dream journal: ${allRecent.length} entries in data/dream_journal/\n- Providers configured: ${['GEMINI_API_KEY','ANTHROPIC_API_KEY','OPENAI_API_KEY','XAI_API_KEY'].filter(k => process.env[k]).join(', ') || 'none'}\n- Symbol mesh: ${symbolMesh.slice(0, 5).join(', ') || 'empty'}\n- Co-occurrence: ${topPairs || 'none'}\n${historyContext}\n\nYou can EXECUTE commands. When you output a single-line bash code block, the UI renders a ▶ Run button.\nONLY use these exact commands (anything else is blocked):\n\nTESTS: \`npm test\` or \`node tests/test_dream_journal_api.js\` or \`node tests/test_dream_journal_chat.js\` or \`node tests/test_dream_chat_multiturns.js\` or \`node tests/test_dream_journal_keystone.js\`\nGIT: \`git status\` \`git diff --stat\` \`git log --oneline -N\` \`git add FILE\` \`git commit -m "MSG"\` \`git push origin master\` \`git branch\`\nPR: \`gh pr create --repo alex-place/lantern-os --head cdblasioli-gif:master --base master --title "TITLE" --body "BODY"\`\nORCH: \`python src/convergence_io_engine.py health\` or \`loop\` or \`inspect\`\nREAD: \`cat FILE\` \`head -N FILE\`\n\nWhen asked to do something, output the EXACT command in a bash code block. The user clicks ▶ to run it. Do NOT suggest commands outside this list.\n\nAnswer directly. Reference file paths. Check data/pcsf/ for state. Check manifests/dream-journal-v1-agent-slots.json and csf/ingest/*.md for work queue.`;
+  const KEYSTONE_DEBUG_PROMPT = `You are Keystone, a direct debug interface for Keystone OS development. You have access to the full repo context below. Respond as a senior engineer — concise, honest, actionable. No dream persona, no doors, no metaphors.\n\n${_realtimeCtx}\n\nRepo state:\n- Server: apps/lantern-garage/server.js (modular routes under routes/)\n- Streaming: lib/stream-chat.js (Gemini→Claude→OpenAI→Grok→Ollama chain)\n- Dream journal: ${allRecent.length} entries in data/dream_journal/\n- Providers configured: ${['GEMINI_API_KEY','ANTHROPIC_API_KEY','OPENAI_API_KEY','XAI_API_KEY'].filter(k => process.env[k]).join(', ') || 'none'}\n- Symbol mesh: ${symbolMesh.slice(0, 5).join(', ') || 'empty'}\n- Co-occurrence: ${topPairs || 'none'}\n${historyContext}\n\nYou can EXECUTE commands. When you output a single-line bash code block, the UI renders a ▶ Run button.\nONLY use these exact commands (anything else is blocked):\n\nTESTS: \`npm test\` or \`node tests/test_dream_journal_api.js\` or \`node tests/test_dream_journal_chat.js\` or \`node tests/test_dream_chat_multiturns.js\` or \`node tests/test_dream_journal_keystone.js\`\nGIT: \`git status\` \`git diff --stat\` \`git log --oneline -N\` \`git add FILE\` \`git commit -m "MSG"\` \`git push origin master\` \`git branch\`\nPR: \`gh pr create --repo alex-place/lantern-os --head cdblasioli-gif:master --base master --title "TITLE" --body "BODY"\`\nORCH: \`python src/convergence_io_engine.py health\` or \`loop\` or \`inspect\`\nREAD: \`cat FILE\` \`head -N FILE\`\n\nWhen asked to do something, output the EXACT command in a bash code block. The user clicks ▶ to run it. Do NOT suggest commands outside this list.\n\nAnswer directly. Reference file paths. Check data/pcsf/ for state. Check manifests/dream-journal-v1-agent-slots.json and csf/ingest/*.md for work queue.`;
 
-  // ── Web Search Grounding ───────────────────────────────────────────
+  // ── Web Search Grounding (dilation-gated; within→without bridge) ─────
+  // Chat-level time-dilation drives how hard to reach external reality: an
+  // uncertain/analytical/fresh-fact query dilates → wider grounding; a normal one
+  // stays at the base. (convergence_io.dilation ↔ grounding-policy.js)
   let groundingContext = "";
-  if (!isKeystoneDebug && needsGrounding(message)) {
+  const groundingD = chatDilation(message);
+  const gpol = groundingPolicy(groundingD);
+  if (!isKeystoneDebug && (needsGrounding(message) || groundingD >= 1.5)) {
     const searchQuery = extractSearchQuery(message);
     if (searchQuery) {
       try {
-        const searchResult = await webSearchMcp(searchQuery, 5);
+        const searchResult = await withTimeout(webSearchMcp(searchQuery, gpol.maxResults), GROUNDING_TIMEOUT_MS, { success: false });
         if (searchResult.success && searchResult.results) {
           groundingContext = formatGroundingContext(searchResult.results, searchQuery);
         }
@@ -704,9 +812,23 @@ async function handleStreamChat(req, url, res) {
   let kbAnswer = null;
   if (!isKeystoneDebug && surfaceMode !== "three-doors" && message && process.env.KB_ROUTER !== "0") {
     try {
-      kbAnswer = require("./knowledge-router").answer(message);
+      const kr = require("./knowledge-router");
+      kbAnswer = kr.answer(message);
+      // New-user orientation anchor. The most natural identity questions —
+      // "what is this", "what is this app?", "what can you do" — are mostly
+      // stop-words or get diluted below the TF-IDF threshold, so they MISS the KB
+      // and fall through to whatever weak fallback model is up (e.g. local Ollama
+      // when the cloud providers are unreachable), which improvises dream-journal
+      // filler. Anchor those to the canonical product section so the Tier-0
+      // short-circuit answers them deterministically. The lookahead keeps
+      // "what is this FUNCTION/file/error…" out (those are real technical asks).
+      const isOrientation = /\b(?:what(?:'s| is| are)?\s+this(?=[\s?!.]*$|\s+(?:app|thing|site|place|tool|project))|what(?:'s| is)?\s+lantern\s*os|what\s+can\s+you\s+do|who\s+are\s+you|how\s+do\s+i\s+(?:get\s+)?start)/i.test(String(message).trim());
+      if (isOrientation && (!kbAnswer || !kbAnswer.hit || (kbAnswer.tier !== "deterministic" && (kbAnswer.score || 0) < 0.3))) {
+        const canonical = kr.answer("what is lantern os");
+        if (canonical && canonical.hit) kbAnswer = canonical;
+      }
       if (kbAnswer && kbAnswer.hit) {
-        const kbBlock = `Knowledge Center (Lantern OS docs) — grounding from ${kbAnswer.source}:\n${kbAnswer.text}`;
+        const kbBlock = `Knowledge Center (Keystone OS docs) — grounding from ${kbAnswer.source}:\n${kbAnswer.text}`;
         groundingContext = groundingContext ? `${groundingContext}\n\n${kbBlock}` : kbBlock;
       }
     } catch (e) {
@@ -721,7 +843,7 @@ async function handleStreamChat(req, url, res) {
   if (!isKeystoneDebug && surfaceMode !== "three-doors" && message && process.env.KEYSTONE_MCP !== "0") {
     try {
       const { gatherProjectContext } = require("./keystone-context");
-      const proj = await gatherProjectContext({ maxItems: 8 });
+      const proj = await withTimeout(gatherProjectContext({ maxItems: 8 }), GROUNDING_TIMEOUT_MS, null);
       if (proj) groundingContext = groundingContext ? `${groundingContext}\n\n${proj}` : proj;
     } catch (e) {
       console.error("[keystone-context] failed (non-fatal):", e.message);
@@ -771,11 +893,15 @@ async function handleStreamChat(req, url, res) {
     : requestedProvider === "keystone-ft"
       ? "Keystone FT · memory route"
       : surfaceMode === "three-doors"
-        ? `${agent.name || "Lantern"} · Three Doors`
+        ? `${agent.name || "Keystone"} · Three Doors`
         : (ROUTE_LABEL_MAP[converganceIntent] || "Keystone · router");
 
   // Plain Keystone desk prompt — no persona voice, no doors. Dream Chat is Keystone-only.
-  const ROUTER_PROMPT = `You are Keystone, the engineering desk agent for Lantern OS. Answer directly, technically, and concisely — no roleplay, no dream personas, no door suggestions. IMPORTANT: Your very first token must be substantive content — never output only your name, "Keystone,", "Keystone, engineering desk.", or any greeting. Go straight to the answer. If the user asks for roleplay, Lantern, or the Three Doors game, tell them to open the Explore tab (/three-doors-game.html).\n\n${_realtimeCtx}\n\nContext:\n${dreamContext}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}`;
+  // The product-fact line gives even a weak fallback model (e.g. local Ollama, when the
+  // cloud providers are unavailable) a correct, concrete answer to "what is this?" so new
+  // users get an orientation instead of improvised dream-journal filler. The journal block
+  // is explicitly labelled background so the model does not narrate it as if it were the app.
+  const ROUTER_PROMPT = `You are Keystone, the engineering desk agent for Keystone OS — a local-first, private journaling and reasoning app (journal, chat, and trading tools) that runs on the user's own machine with no account required. Answer directly and technically — no roleplay, no dream personas, no door suggestions. Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?", "what can you do?", or anything about the app itself, give a plain one- or two-sentence description of Keystone OS; do NOT describe the journal entries below as if they were the app, and do NOT use mystical or "dream" language. IMPORTANT: Your very first token must be substantive content — never output only your name, "Keystone,", "Keystone, engineering desk.", or any greeting. Go straight to the answer. If the user asks for roleplay, Keystone, or the Three Doors game, tell them to open the Explore tab (/three-doors-game.html).\n\n${_realtimeCtx}\n\nBackground (the user's recent journal entries — do not treat as the subject unless they ask about their journal):\n${dreamContext}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}`;
 
   const systemPrompt = isKeystoneDebug
     ? KEYSTONE_DEBUG_PROMPT
@@ -958,6 +1084,7 @@ async function handleStreamChat(req, url, res) {
       const result = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("verify_timeout")), VERIFY_TIMEOUT_MS);
         const req = https.request({
+          agent: llmAgent,
           hostname: "api.anthropic.com",
           path: "/v1/messages",
           method: "POST",
@@ -1023,7 +1150,7 @@ async function handleStreamChat(req, url, res) {
     sendDone("offline", { agent: doneAgentName, online: false, error: reason || "no_provider_configured", suggestions: FALLBACK_DOORS });
   };
 
-  await appendConversationEntry({
+  await logConversation({
     recordedAt: new Date().toISOString(),
     surface: "dream-chat-stream",
     role: "operator",
@@ -1052,7 +1179,7 @@ async function handleStreamChat(req, url, res) {
       timeoutMs: Number(process.env.CONVERGENCE_ROUTE_TIMEOUT_MS || 20000),
     });
     if (convResult.reply && !convResult.error) {
-      await appendConversationEntry({
+      await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
         role: "lantern",
@@ -1198,7 +1325,7 @@ async function handleStreamChat(req, url, res) {
       && (kbAnswer.tier === "deterministic" || kbAnswer.score >= KB_ANSWER_MIN)) {
     const ans = `${kbAnswer.text}\n\n— from the Knowledge Center: ${kbAnswer.source}`;
     sendToken(ans);
-    await appendConversationEntry({
+    await logConversation({
       recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
       role: "lantern", text: ans.slice(0, maxConversationTextLength),
     }).catch(() => {});
@@ -1232,13 +1359,20 @@ async function handleStreamChat(req, url, res) {
           resp.on("end", () => { try { resolve(JSON.parse(d).message?.content || ""); } catch (e) { reject(e); } });
         });
         rq.on("error", reject);
-        rq.setTimeout(120000, () => { rq.destroy(); reject(new Error("ollama_timeout")); });
+        // FAST (interactive default) fails over quickly when the local model
+        // stalls; DEEP native loop (OURO_NATIVE=1) keeps the long ceiling. This
+        // is the loop-reasoner path (called up to maxLoops times), so a flat 120s
+        // here could stall a single streamed reply for minutes on a dead model.
+        // OLLAMA_TIMEOUT_MS overrides both.
+        const _ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10)
+          || (/^(1|true|yes)$/i.test(process.env.OURO_NATIVE || "") ? 120000 : 15000);
+        rq.setTimeout(_ollamaTimeout, () => { rq.destroy(); reject(new Error("ollama_timeout")); });
         rq.write(body); rq.end();
       });
       const lr = await loopedReason({ prompt: message, systemPrompt, callLLM, maxLoops: 4 });
       if (lr && lr.reply) {
         const { cleanText, suggestions } = doorsOrFallback(lr.reply, true);
-        await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
+        await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
           role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
         sendToken(cleanText);
         try { recordProviderSuccess("ollama"); recordModelOutcome(loopModel, intent, true, 0); } catch (_e) {}
@@ -1297,7 +1431,7 @@ async function handleStreamChat(req, url, res) {
         if (fullReply) {
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
           const imageEntryId = triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh });
-          await appendConversationEntry({
+          await logConversation({
             recordedAt: new Date().toISOString(),
             surface: "dream-chat-stream",
             role: "lantern",
@@ -1342,7 +1476,7 @@ async function handleStreamChat(req, url, res) {
       if (sseErr) throw sseErr;
       if (fullReply) {
         const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-        await appendConversationEntry({
+        await logConversation({
           recordedAt: new Date().toISOString(),
           surface: "dream-chat-stream",
           role: "lantern",
@@ -1393,6 +1527,7 @@ async function handleStreamChat(req, url, res) {
       const payload = JSON.stringify(geminiPayloadBase);
       await new Promise((resolve, reject) => {
         const req2 = https.request({
+          agent: llmAgent,
           hostname: "generativelanguage.googleapis.com",
           path: `/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
           method: "POST",
@@ -1446,7 +1581,7 @@ async function handleStreamChat(req, url, res) {
           geminiSigma0 = { corrected: vr.corrected, claims: vr.records.length };
         } catch { /* non-fatal */ }
       }
-      await appendConversationEntry({
+      await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
         role: "lantern",
@@ -1499,6 +1634,7 @@ async function handleStreamChat(req, url, res) {
       });
       await new Promise((resolve, reject) => {
         const req2 = https.request({
+          agent: llmAgent,
           hostname: "api.anthropic.com",
           path: "/v1/messages",
           method: "POST",
@@ -1552,7 +1688,7 @@ async function handleStreamChat(req, url, res) {
           anthropicSigma0 = { corrected: vr.corrected, claims: vr.records.length };
         } catch { /* non-fatal */ }
       }
-      await appendConversationEntry({
+      await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
         role: "lantern",
@@ -1591,6 +1727,7 @@ async function handleStreamChat(req, url, res) {
 
       await new Promise((resolve, reject) => {
         const req2 = https.request({
+          agent: llmAgent,
           hostname: "api.openai.com",
           path: "/v1/chat/completions",
           method: "POST",
@@ -1630,7 +1767,7 @@ async function handleStreamChat(req, url, res) {
         req2.end();
       });
       const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-      await appendConversationEntry({
+      await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
         role: "lantern",
@@ -1668,6 +1805,7 @@ async function handleStreamChat(req, url, res) {
       });
       await new Promise((resolve, reject) => {
         const req2 = require("https").request({
+          agent: llmAgent,
           hostname: "api.x.ai", path: "/v1/chat/completions", method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}`, "Content-Length": Buffer.byteLength(payload) },
         }, (upstream) => {
@@ -1690,7 +1828,7 @@ async function handleStreamChat(req, url, res) {
         req2.write(payload); req2.end();
       });
       const { cleanText: xaiClean, suggestions: xaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-      await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength) }).catch(() => {});
+      await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength) }).catch(() => {});
       recordProviderSuccess("xai");
       const grokModelName = xaiModel; // receipt MUST reflect the model actually sent
       await recordConvergenceSignature("grok", grokModelName, xaiClean, true);
@@ -1730,7 +1868,7 @@ async function handleStreamChat(req, url, res) {
         if (sseErr) throw sseErr;
         if (fullReply) {
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-          await appendConversationEntry({
+          await logConversation({
             recordedAt: new Date().toISOString(),
             surface: "dream-chat-stream",
             role: "lantern",
@@ -1804,7 +1942,7 @@ async function handleStreamChat(req, url, res) {
       });
       if (ollamaOk) {
         const { cleanText: ollamaClean, suggestions: ollamaDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-        await appendConversationEntry({
+        await logConversation({
           recordedAt: new Date().toISOString(),
           surface: "dream-chat-stream",
           role: "lantern",

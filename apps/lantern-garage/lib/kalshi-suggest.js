@@ -261,6 +261,7 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
 
     const denom = (m.yes_ask || 0) + (m.no_ask || 0);
     const yesPct = denom > 0 ? Math.round((m.yes_ask / denom) * 100) : (m.yes_ask || 0);
+    const favLabel = f.side === "yes" ? (m.yes_sub_title || "YES") : (m.no_sub_title || "NO");
     entries.push({
       kind: "entry", action: "buy",
       ticker: m.ticker,
@@ -269,13 +270,28 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
       noLabel: m.no_sub_title || "NO",
       yesCents: m.yes_ask, noCents: m.no_ask, yesPct,
       favSide: f.side,                                   // 'yes' | 'no'
-      favLabel: f.side === "yes" ? (m.yes_sub_title || "YES") : (m.no_sub_title || "NO"),
+      favLabel,
       favAsk: f.sideAsk,
       conviction: f.conviction,
       reason: f.reason,
       minsToClose: Number.isFinite(f.minsToClose) ? Math.round(f.minsToClose) : null,
       close: m.close_time || "",
     });
+
+    // Reason → Act: emit one ConvergenceRecord per tradeable entry suggestion.
+    // This reasoner has a RESOLVABLE outcome — the trade settles win/lose — so the
+    // record gives the convergence loop something real to grade later (Verify).
+    // Mirrors routes/dream.js: guarded so a failed record never breaks a suggestion.
+    try {
+      const { emitConvergenceRecord } = require("./convergence-records");
+      await emitConvergenceRecord({
+        hypothesis: `buy ${f.side.toUpperCase()} (${favLabel}) @ ${f.sideAsk}¢ — ${m.title || m.ticker} [${m.ticker}]`,
+        evidence_ids: [m.ticker],
+        result: `entry ${f.side} ${favLabel} @ ${f.sideAsk}¢ · ${f.reason}`,
+        confidence: Math.max(0, Math.min(1, f.conviction / 100)), // conviction is 0..100
+        reasoner: "kalshi-suggest",
+      });
+    } catch { /* convergence record non-critical */ }
   }
 
   // entries: time-sensitive — soonest-closing first, then conviction

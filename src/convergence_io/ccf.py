@@ -101,10 +101,15 @@ class CapabilityGate:
     Enforces tier limits, temporal validity, and tracks honesty.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, honesty_floor: float = 0.5, pcsf_registry: Optional[Any] = None) -> None:
         self._claims: Dict[str, CapabilityClaim] = {}
         self._honesty = HonestyTracker()
         self._lock = threading.RLock()
+        # P6: minimum historical honesty score to allow an action.
+        self._honesty_floor = honesty_floor
+        # P8/PCSF: optional ProviderRegistry; when supplied, a claim whose provider is
+        # not currently routable (circuit-open / quota-hit / no-key) is denied.
+        self._pcsf = pcsf_registry
         # CCF tier enforcement: action → required tier
         self._tier_requirements: Dict[str, str] = {
             "art_generation_unlimited": "synthesasia_guild",
@@ -128,6 +133,19 @@ class CapabilityGate:
             return GateResult(allowed=False, reason=f"claim for {agent_id} expired at {claim.expires_at}")
         if not claim.verified_at:
             return GateResult(allowed=False, reason=f"claim for {agent_id} not verified")
+        # P8/PCSF: the provider backing this claim must currently be routable.
+        if self._pcsf is not None and claim.provider_id:
+            pcs = self._pcsf.get(claim.provider_id)
+            if pcs is not None and not pcs.is_routable():
+                return GateResult(allowed=False,
+                                  reason=f"provider '{claim.provider_id}' not routable (PCSF state {pcs.state.value})",
+                                  honesty_score=self._honesty.score(agent_id))
+        # P6: deny if this agent's historical honesty has fallen below the floor.
+        score = self._honesty.score(agent_id)
+        if score < self._honesty_floor:
+            return GateResult(allowed=False,
+                              reason=f"honesty {score} < floor {self._honesty_floor}",
+                              honesty_score=score)
         # Tier enforcement
         if tier and claim.tier:
             tier_order = {"wanderer": 0, "deep_dreamer": 1, "synthesasia_guild": 2}

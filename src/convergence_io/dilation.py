@@ -39,29 +39,78 @@ def dilation(
     uncertainty: float,
     cost_pressure: float,
     confidence: float,
+    collapse_proximity: float = 0.0,
 ) -> float:
     """
     Compute scalar dilation for a single node.
 
     Args:
-        uncertainty:   0.0 (certain) → 1.0 (completely unknown)
-        cost_pressure: 0.0 (no pressure) → 1.0 (must minimize cost)
-        confidence:    0.0 (no confidence) → 1.0 (fully confident)
+        uncertainty:        0.0 (certain) → 1.0 (completely unknown)
+        cost_pressure:      0.0 (no pressure) → 1.0 (must minimize cost)
+        confidence:         0.0 (no confidence) → 1.0 (fully confident)
+        collapse_proximity: 0.0 (far from a 42-state) → 1.0 (frozen / confidently-wrong)
 
     Returns:
         float in [D_MIN, D_MAX]
 
     Formula:
         raw = (1 + uncertainty) / (1 + confidence) / (1 + cost_pressure)
-        Uncertainty inflates dilation.
-        Confidence and cost_pressure deflate it.
+        Uncertainty inflates dilation; confidence and cost_pressure deflate it.
+
+    G12 SIGN-FIX (#764). Naively, uncertainty inflates D — but near a Σ₀ collapse
+    uncertainty is high AND confidence is low, so D would pin at D_MAX exactly when
+    the system most needs to act / re-ground: a "maximally-dilated, never-resolving"
+    livelock (temporal observer-collapse). So `collapse_proximity` deflates D toward
+    D_MIN: proximity=1 ⇒ D_MIN regardless of uncertainty. Dilate to *think* when
+    productively uncertain; collapse dilation to *go look* (act / re-ground) when
+    frozen or confidently wrong.
     """
     uncertainty = max(0.0, min(1.0, uncertainty))
     cost_pressure = max(0.0, min(1.0, cost_pressure))
     confidence = max(0.0, min(1.0, confidence))
+    p = max(0.0, min(1.0, collapse_proximity))
 
     raw = (1.0 + uncertainty) / ((1.0 + confidence) * (1.0 + cost_pressure))
-    return max(D_MIN, min(D_MAX, raw))
+    d = max(D_MIN, min(D_MAX, raw))
+    d = (1.0 - p) * d + p * D_MIN          # near collapse → deflate toward D_MIN
+    return max(D_MIN, min(D_MAX, d))
+
+
+@dataclass
+class GroundingPolicy:
+    """How much EXTERNAL grounding to buy at a given dilation — the within→without
+    bridge. Higher dilation (productive uncertainty) ⇒ reach out harder; near the
+    fast/confident floor ⇒ cheap / cached."""
+    fetch_external: bool
+    max_results: int
+    min_sources: int
+    deep_mode: bool
+
+
+def grounding_policy(D: float, base_max_results: int = 5,
+                     base_min_sources: int = 2) -> GroundingPolicy:
+    """Map a dilation value D to an external-grounding budget (route-by-difficulty).
+
+    D ≤ 1 (confident / fast): minimal fetch, base corroboration, no deep loop.
+    D > 1 (uncertain / slow): scale web breadth with D, raise the corroboration floor
+    and escalate to DEEP mode once D is high. Realizes "dilation affects grounding
+    from without"; pairs with the G12-corrected `dilation()` so a *frozen* node (low D)
+    does not over-fetch and a *productively uncertain* node (high D) grounds harder.
+    """
+    D = max(D_MIN, min(D_MAX, D))
+    if D <= 1.0:
+        return GroundingPolicy(
+            fetch_external=D > 0.5,
+            max_results=base_max_results,
+            min_sources=base_min_sources,
+            deep_mode=False,
+        )
+    return GroundingPolicy(
+        fetch_external=True,
+        max_results=int(round(base_max_results * D)),
+        min_sources=base_min_sources + (1 if D >= 3.0 else 0),
+        deep_mode=D >= 3.0,
+    )
 
 
 @dataclass
@@ -78,8 +127,14 @@ class DilationField:
     Updated each tick by the execution loop based on observed runtime signals.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_dwell_ticks: int = 8, dwell_threshold: float = 1.5) -> None:
         self._states: Dict[str, NodeDilationState] = {}
+        self._dwell: Dict[str, int] = {}            # consecutive ticks stuck in the slow region
+        self._max_dwell_ticks = max_dwell_ticks      # G12 livelock guard
+        # NOTE: dilation()'s practical ceiling is ~2.0 (numerator ≤2, denominator ≥1),
+        # so the D_MAX=5 clamp rarely binds; "stuck slow" is keyed on this elevated
+        # threshold, not D_MAX.
+        self._dwell_threshold = dwell_threshold
         self._lock = threading.Lock()
 
     def update_node(
@@ -88,10 +143,23 @@ class DilationField:
         uncertainty: float = 0.5,
         cost_pressure: float = 0.0,
         confidence: float = 0.5,
+        collapse_proximity: float = 0.0,
     ) -> float:
-        """Recompute and store dilation for node_id. Returns new value."""
-        d = dilation(uncertainty, cost_pressure, confidence)
+        """Recompute and store dilation for node_id. Returns new value.
+
+        G12 livelock guard: a node pinned near D_MAX for more than max_dwell_ticks
+        consecutive ticks is forced to D_MIN — break the no-progress deliberation loop
+        and act / re-ground. (Belt-and-suspenders to `collapse_proximity` deflation.)
+        """
+        d = dilation(uncertainty, cost_pressure, confidence, collapse_proximity)
         with self._lock:
+            if d >= self._dwell_threshold:
+                self._dwell[node_id] = self._dwell.get(node_id, 0) + 1
+            else:
+                self._dwell[node_id] = 0
+            if self._dwell.get(node_id, 0) > self._max_dwell_ticks:
+                d = D_MIN
+                self._dwell[node_id] = 0
             self._states[node_id] = NodeDilationState(
                 uncertainty=uncertainty,
                 cost_pressure=cost_pressure,

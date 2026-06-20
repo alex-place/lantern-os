@@ -1,0 +1,89 @@
+{
+  "_comment": "Curated, verified open-license video for the Sigma0 research flywheel. Blender films (CC-BY) + open-SOURCE game gameplay (SuperTux/0 A.D./Minetest/Xonotic/OpenArena/Tux Racer — CC/GPL on Wikimedia Commons). Fetched bounded (<=480p / first 120s, <=150MB) then DELETED — only features are kept. The nightly also searches live on top of this. NOTE: genuinely-open *gaming* footage is open-source-game gameplay, not viral-TikTok-style edits (those are copyrighted).",
+  "videos": [
+    {
+      "url": "https://archive.org/details/BigBuckBunny_124",
+      "title": "Big Buck Bunny",
+      "license": "CC-BY 3.0",
+      "creator": "Blender Foundation",
+      "source": "allowlist/blender"
+    },
+    {
+      "url": "https://archive.org/details/Sintel",
+      "title": "Sintel",
+      "license": "CC-BY 3.0",
+      "creator": "Blender Foundation",
+      "source": "allowlist/blender"
+    },
+    {
+      "url": "https://archive.org/details/ElephantsDream",
+      "title": "Elephants Dream",
+      "license": "CC-BY 2.5",
+      "creator": "Blender Foundation",
+      "source": "allowlist/blender"
+    },
+    {
+      "url": "https://archive.org/details/caminandes-3-llamigos",
+      "title": "Caminandes 3: Llamigos",
+      "license": "CC-BY 4.0",
+      "creator": "Blender Foundation",
+      "source": "allowlist/blender"
+    },
+    {
+      "url": "https://archive.org/details/agent-327-operation-barbershop",
+      "title": "Agent 327: Operation Barbershop",
+      "license": "CC-BY 4.0",
+      "creator": "Blender Foundation",
+      "source": "allowlist/blender"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/b/b3/SuperTux_level_1_pacifist_run.webm",
+      "title": "SuperTux level 1 pacifist run",
+      "license": "GPL",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/5d/0_A.D._-_Gameplay_Preview_-_Winter_2007.ogv",
+      "title": "0 A.D. - Gameplay Preview - Winter 2007",
+      "license": "CC BY-SA 3.0",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/06/Devtest_Minetest_5.6.1_Lava_block_2023.01.04_-_20.29.08.02.webm",
+      "title": "Devtest Minetest 5.6.1 Lava block 2023.01.04 - 20.29.08.02",
+      "license": "CC BY-SA 3.0",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/3/32/NodeCore_Screenshot.webm",
+      "title": "NodeCore Screenshot",
+      "license": "CC BY 3.0",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/b/b9/Xonotic_0-8-2_gameplay.webm",
+      "title": "Xonotic 0-8-2 gameplay",
+      "license": "GPLv3",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/6/60/OpenArena_0.8.8_gameplay.webm",
+      "title": "OpenArena 0.8.8 gameplay",
+      "license": "GPLv3",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    },
+    {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/d/de/Tux_Racer_gameplay_%28Ingo%27s_Speedway%29.webm",
+      "title": "Tux Racer gameplay (Ingo's Speedway)",
+      "license": "GPL",
+      "creator": null,
+      "source": "allowlist/opensource-game"
+    }
+  ]
+}

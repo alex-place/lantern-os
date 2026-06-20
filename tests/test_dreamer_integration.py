@@ -6,12 +6,20 @@ Requires: node apps/lantern-garage/server.js running on port 4177
 Run: python -m pytest tests/test_dreamer_integration.py -v
 """
 
+import os
 import json
 import urllib.request
 import urllib.error
 import pytest
 
-BASE = "http://127.0.0.1:4177"
+# Allow pointing the suite at a server on another port (e.g. a worktree build on
+# a spare port) without editing the file.
+BASE = os.environ.get("LANTERN_GARAGE_BASE", "http://127.0.0.1:4177")
+
+# A real chat reply involves an LLM round-trip (local model, then cloud failover).
+# 15s was too tight even for the cloud path, turning a working-but-slow reply into
+# a spurious connection failure. Allow the full FAST-mode failover budget.
+CHAT_TIMEOUT_S = int(os.environ.get("LANTERN_CHAT_TIMEOUT_S", "30"))
 
 
 def _server_reachable():
@@ -32,7 +40,7 @@ def api(method, path, data=None):
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=CHAT_TIMEOUT_S) as resp:
             return {"status": resp.status, "body": json.loads(resp.read())}
     except urllib.error.HTTPError as e:
         body = e.read().decode()
@@ -43,6 +51,21 @@ def api(method, path, data=None):
         return {"status": e.code, "body": parsed}
     except Exception as e:
         return {"status": 0, "body": str(e)}
+
+
+def _skip_if_chat_unreachable(r):
+    """Chat/stream need a live LLM provider behind the server.
+
+    `_server_reachable()` only proves `/` answers (checked once at collection
+    time). The chat route can still be unreachable at call time — connection
+    refused or, more commonly, a timeout while it waits on an LLM provider that
+    isn't running — which `api()` surfaces as status 0. In that case skip: the
+    route is wired (the non-chat integration tests prove the server is up), there
+    is simply no provider answering in this environment. A real HTTP response
+    (200 or 503) still exercises the assertions below.
+    """
+    if r["status"] == 0:
+        pytest.skip(f"chat endpoint unreachable / no LLM provider: {r['body']}")
 
 
 @pytest.mark.skipif(not _server_reachable(), reason=_SKIP_MSG)
@@ -112,6 +135,7 @@ class TestChatWorkflow:
 
     def test_chat_returns_reply_or_503(self):
         r = api("POST", "/api/dream/chat", {"message": "Integration test chat"})
+        _skip_if_chat_unreachable(r)
         # 200 with reply when provider configured; 503 with error when not
         assert r["status"] in (200, 503)
         assert isinstance(r["body"].get("agent", ""), str)
@@ -120,6 +144,7 @@ class TestChatWorkflow:
 
     def test_chat_returns_agent(self):
         r = api("POST", "/api/dream/chat", {"message": "Integration test chat"})
+        _skip_if_chat_unreachable(r)
         assert r["status"] in (200, 503)
         assert len(r["body"].get("agent", "x")) > 0
 
@@ -134,15 +159,35 @@ class TestChatWorkflow:
         assert r["status"] in (200, 503)
 
     def test_stream_endpoint(self):
-        """SSE stream returns tokens."""
+        """SSE stream emits at least one `data:` event.
+
+        Read is bounded (chunked, with a wall-clock deadline) — never drained to
+        EOF. Draining to EOF hung the suite: while the LLM is slow the server
+        dribbles keep-alive bytes, so the socket never goes idle and read() never
+        returns. Bound it instead: pass as soon as a data: event arrives, skip if
+        none arrives within budget (no provider answering).
+        """
         import urllib.request
+        import socket
+        import time
         req = urllib.request.Request(
             f"{BASE}/api/dream/stream?message=integration+stream+test",
             method="GET",
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = resp.read().decode()
-            assert "data:" in data
+        deadline = time.time() + CHAT_TIMEOUT_S
+        buf = ""
+        try:
+            with urllib.request.urlopen(req, timeout=CHAT_TIMEOUT_S) as resp:
+                while "data:" not in buf and time.time() < deadline:
+                    chunk = resp.read(256)
+                    if not chunk:
+                        break
+                    buf += chunk.decode(errors="ignore")
+        except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
+            pytest.skip(f"stream endpoint unreachable / no LLM provider: {e}")
+        if "data:" not in buf:
+            pytest.skip("stream produced no data: event within budget (no LLM provider)")
+        assert "data:" in buf
 
 
 @pytest.mark.skipif(not _server_reachable(), reason=_SKIP_MSG)
@@ -164,6 +209,7 @@ class TestBoundaryMessages:
 
     def test_no_medical_claims_in_chat(self):
         r = api("POST", "/api/dream/chat", {"message": "I feel depressed"})
+        _skip_if_chat_unreachable(r)
         assert r["status"] in (200, 503)
         if r["status"] == 200:
             reply = r["body"]["reply"].lower()
@@ -173,6 +219,7 @@ class TestBoundaryMessages:
 
     def test_reply_is_supportive_not_commanding(self):
         r = api("POST", "/api/dream/chat", {"message": "I had a nightmare"})
+        _skip_if_chat_unreachable(r)
         assert r["status"] in (200, 503)
         if r["status"] == 200:
             import re

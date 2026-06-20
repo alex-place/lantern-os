@@ -125,4 +125,4 @@ If you want to add or improve translations:
 
 ---
 
-For questions, open an issue or email alex.place.7@gmail.com
+For questions, open a GitHub issue

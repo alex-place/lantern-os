@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#7c6af7">
-  <title>Entry Details — Lantern OS</title>
+  <title>Entry Details — Keystone OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
     :root {
@@ -943,7 +943,7 @@ async function loadEntry() {
     // Update page title
     document.getElementById("entry-title").textContent = entry.title;
     document.getElementById("entry-date").textContent = formattedCreated;
-    document.title = (entry.title || "Entry") + " — Lantern OS";
+    document.title = (entry.title || "Entry") + " — Keystone OS";
 
     // Update overview tab
     document.getElementById("entry-created").textContent = formattedCreated;
@@ -1249,6 +1249,7 @@ function loadVariants(entry) {
           </div>
           <div class="variant-metrics">
             <div><span>Viral Score</span><b>${viral}</b></div>
+            ${typeof v.introStrength === 'number' ? `<div><span>Hook*</span><b>${Math.round(v.introStrength * 100)}</b></div>` : ''}
             <div><span>Completion*</span><b>${completion}</b></div>
             <div><span>Share*</span><b>${share}</b></div>
             <div><span>Duration</span><b>${v.durationSec ? Math.round(v.durationSec) + 's' : '—'}</b></div>
@@ -1296,6 +1297,18 @@ function loadScoreV10(entry) {
   const gamingTotal = typeof gaming.totalBonus === 'number' ? gaming.totalBonus : null;
   const gamingDisplay = gamingTotal !== null ? (gamingTotal > 0 ? '+' + Math.round(gamingTotal * 100) + '%' : '0%') : '—';
 
+  // MEASURED signals (A1 real shot-boundary cut rate, A3 speech) — shown only when
+  // actually measured from this clip, never inferred. Distinct from the structural
+  // estimates above.
+  const sig = viral.signals || {};
+  const measuredBits = [];
+  if (sig.cutsPerMinMeasured && typeof sig.cutsPerMin === 'number') measuredBits.push(sig.cutsPerMin.toFixed(1) + ' cuts/min');
+  if (sig.speechMeasured) {
+    if (sig.hookStyle && sig.hookStyle !== 'unknown') measuredBits.push('hook: ' + sig.hookStyle);
+    if (typeof sig.wordsPerSec === 'number') measuredBits.push(sig.wordsPerSec.toFixed(1) + ' words/s');
+    if (sig.ctaPresent) measuredBits.push('CTA' + (sig.ctaPosition ? ' (' + sig.ctaPosition + ')' : ''));
+  }
+
   panel.innerHTML = `
     <div class="scorev10-card">
       <div class="scorev10-headline">
@@ -1320,6 +1333,7 @@ function loadScoreV10(entry) {
         </div>
       </div>
       <p class="scorev10-disclaimer">Structural estimates — not calibrated against real outcome data.</p>
+      ${measuredBits.length ? `<p class="scorev10-disclaimer" style="color:var(--text);">Measured: ${escapeHtml(measuredBits.join(' · '))}</p>` : ''}
     </div>
   `;
 }
@@ -1680,7 +1694,7 @@ function startTitleEdit() {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title })
         });
         if (currentProject) currentProject.title = title;
-        document.title = title + ' — Lantern OS';
+        document.title = title + ' — Keystone OS';
       } catch (e) { console.error('rename failed', e); }
     }
   };

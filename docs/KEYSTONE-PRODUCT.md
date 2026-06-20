@@ -1,9 +1,64 @@
-# Keystone Chat — sustainable LLM product plan
+# Keystone Chat — product definition & operating contract
 
-**Thesis:** model *performance is the product*. So performance must be **measured on
-every change**, the **fast path must be the default**, and the model must stay
-**interchangeable** (per the Convergence North Star — the Core never assumes a
-specific LLM). This doc is the operating contract for that.
+> **One line:** Keystone chat is the member's **operator console for Lantern OS** — the
+> one place a member talks to the system, directs its tools, and watches the convergence
+> loop turn a question into verified, cited work.
+
+## Who it's for (stakeholders)
+
+Lantern OS **members** (subscribers). A member already holds three things: **the repo,
+the tools, and the chat.** The repo is a one-time clone; the tools are a one-time setup.
+**The chat is the only thing they experience recurringly** — so the chat is what justifies
+the recurring subscription, and **member return rate** is the metric that matters most.
+
+A member who already has the repo + tools is not paying for another general chatbot
+(Claude/ChatGPT are cheaper). They are paying for **leverage over their own copy of the
+system.** That is the product.
+
+## What the chat must do
+
+1. **Be grounded in their actual state** — answers cite the real repo, open issues,
+   persistent memory, web results, and live tool output. The **External Reality Rule** is
+   the trust contract: every claim carries `[claim, evidence, confidence, source]`. When
+   Keystone says "the benchmark passes," it is true with a receipt.
+2. **Operate the tools, not just describe them** — "research X", "run the benchmark",
+   "status of the Kalshi collector", "intake this task" route to the real tools
+   (convergence router, MCP tools, the research loop) and report results, not prose about
+   results.
+3. **Be fast enough to feel live** — sub-2s **FAST** default; **DEEP**/Σ₀ opt-in for the
+   hard minority. A laggy console does not get reopened.
+4. **Remember the member** — continuity across sessions so the chat compounds over a
+   subscription instead of resetting.
+5. **Show the loop working** — make Observe→Remember→Reason→Act→Verify→Converge visible,
+   so the member sees a reasoning system grounding itself, not a wrapper.
+
+## What it is explicitly NOT
+
+- Not the dream-journal / mystic voice. Keystone is the **technical coordinator** face,
+  grounded in GitHub issues — no dream-door suggestions injected.
+- Not a stateless Q&A box.
+- Not a surface that ever asserts system status it did not verify.
+
+## North star — architecture vs product
+
+- **Architecture north star** ([CONVERGANCE-SIGMA0-BRIEFING](CONVERGANCE-SIGMA0-BRIEFING.md)):
+  the single loop + user sovereignty (member owns memory, codebase, model). The *how*.
+- **Product north star:** member value — *grounded, tool-wired, fast, continuous chat.*
+  The *what/why*. When the two conflict (chat latency vs the 70–85 s native loop),
+  **product wins via serving modes** (FAST default) — the call already made 2026-06-18.
+
+The **Σ₀ coding agent** is the sibling surface with its own north star — *ship changes the
+developer merges with confidence (correct, verified, proof-backed)*; see
+[LANTERN-SIGMA0-CODER](LANTERN-SIGMA0-CODER.md). Both are the same loop with different
+Verify surfaces: chat verifies by **grounding/citations**, the coder by **tests**.
+
+---
+
+**Performance is the product, too.** The member value above depends on the chat staying
+fast and correct — so model *performance is measured on every change*, the *fast path is
+the default*, and the model stays *interchangeable* (per the Convergence North Star — the
+Core never assumes a specific LLM). The rest of this doc is the serving contract that keeps
+that true.
 
 ## Serving architecture (decided 2026-06-18)
 

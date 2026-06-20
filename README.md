@@ -34,7 +34,7 @@
 
 It combines a web app, local memory systems, MCP tooling, multi-provider routing, and a structured convergence loop so work moves from raw context → validated artifacts → archived evidence with clear receipts and ground-truth verification.
 
-**Current state:** Σ₀ (Sigma-Zero) verification framework deployed (2026-06-14) | 1.6 UI Dashboard Sprint completed (2026-06-16)
+**Current state:** Σ₀ (Sigma-Zero) verification framework live (2026-06-14) · 1.6 dashboards shipped (2026-06-16) · Keystone serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`, 2026-06-18) · native Σ₀ LoopLM + standing benchmark landed (#756). The product surface is **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of Lantern OS.
 
 ---
 
@@ -79,6 +79,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 ### Who Should Use This
 
+- **Lantern OS members** (subscribers) — you get the repo, the tools, and **Keystone chat**, the operator console for your own copy of the system. See **[Keystone Chat product definition](docs/KEYSTONE-PRODUCT.md)**.
 - **Solo developers** working on complex projects that need evidence-backed decision-making
 - **AI researchers** exploring convergence dynamics, autonomous routing, and persistent memory systems
 - **Organizations** needing local-first agent workflows with operator control and audit trails
@@ -90,6 +91,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 | Area | Status | Notes |
 |------|--------|-------|
+| **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** | ✅ Live | Member operator console — grounded technical chat, **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`), tool-wired, leaderboard-measured |
 | **Dream Journal** | ✅ Live | Freeform chat, local storage, JSONL export, PWA mode |
 | **1.6 Trader Dashboard** | ✅ Live (2026-06-16) | Real-time market data, position management, convergence metrics |
 | **1.6 Creator Dashboard** | ✅ Live (2026-06-16) | Dream journal publishing, markdown editor, template system |
@@ -456,9 +458,15 @@ npm run dev --prefix apps/lantern-garage
 - **[docs/DREAM-JOURNAL-API-ENDPOINTS.md](docs/DREAM-JOURNAL-API-ENDPOINTS.md)** — Full API reference
 - **[AUTONOMOUS-REPAIR-GUIDE.md](AUTONOMOUS-REPAIR-GUIDE.md)** — Health monitoring, auto-repair, deployment control
 
+### For Product & Members
+
+- **[docs/KEYSTONE-PRODUCT.md](docs/KEYSTONE-PRODUCT.md)** — Keystone chat product definition (operator console for members) + serving contract (fast default / deep opt-in)
+- **[docs/LANTERN-SIGMA0-CODER.md](docs/LANTERN-SIGMA0-CODER.md)** — the Σ₀ coding agent (sibling surface): ship changes a developer merges with confidence
+
 ### For Architects
 
 - **[docs/CONVERGANCE-SIGMA0-BRIEFING.md](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** — **START HERE** — Σ₀ framework, immutable North Star
+- **[docs/ANTI-COLLAPSE-HARDENING.md](docs/ANTI-COLLAPSE-HARDENING.md)** — CSF-native defense-in-depth: how the loop resists collapse (proven vs heuristic), the hardening plan, red-team gaps (epic #764)
 - **[docs/RESEARCH-CANON.md](docs/RESEARCH-CANON.md)** — Living references for Convergence 12 components
 - **[docs/convergence-core-mapping.md](docs/convergence-core-mapping.md)** — How code aligns with architecture
 - **[docs/TESSERACT-CONVERGENCE-LOOP.md](docs/TESSERACT-CONVERGENCE-LOOP.md)** — 20-step convergence with 4D status cube
@@ -558,4 +566,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor guidelines.
 - **Live Demo:** https://lantern-os.net
 - **MCP Server:** https://mcp.lantern-os.net
 - **Issues:** [github.com/alex-place/lantern-os/issues](https://github.com/alex-place/lantern-os/issues)
-- **Email:** alex.place.7@gmail.com
+- **Contact:** open a GitHub issue

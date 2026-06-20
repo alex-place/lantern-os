@@ -2,6 +2,8 @@
 
 Maps existing codebase to the four core objects and six-stage loop. Identifies what aligns, what diverges, and what needs refactoring.
 
+> **⏱ Real-time status (updated 2026-06-19).** This document reads as a *future migration plan* ("Action: create a Memory class…"). Re-grounded against the tree on 2026-06-19, **most of it has already landed** — the four objects, the six-stage orchestrator ([`src/convergence/kernel.py`](../src/convergence/kernel.py)), the verify/closure ([`verify.py`](../src/convergence/verify.py)), and pattern extraction all exist in Python. The honest open gap is **wiring, not building**: the live serving path doesn't yet drive the Kernel end-to-end. **Landed since this doc was written:** token-budgeted Memory context (#772, `66ad7024`) and the **first end-to-end loop slice closing** (Kalshi: Reason→Verify→Converge, `8608e5e7`). Treat the "Action:" items below as the *original* plan — cross-check current open work against [`docs/research/2026-06-19-convergence-core-agent-spine.md`](research/2026-06-19-convergence-core-agent-spine.md) (file-by-file grounding) and [`docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md`](KEYSTONE-PROGRESS-REPORT-2026-06-19.md) (executive status).
+
 ---
 
 ## Four Core Objects
@@ -342,7 +344,7 @@ high_confidence_records = memory.query(
 | Kalshi trading | Standalone tight-band algorithm | Not linked to broader reasoning | Treat as Tool; suggest becomes ConvergenceRecord |
 | Discord bot | Separate message ingestion | Divergent input path | Route discord messages through same Observe → Memory pipeline |
 | 3-Doors game | Standalone game with own state | Not part of loop | Move to Tool (game_step callable) |
-| CSF format | Custom archive; CADD spec in GDrive | Implementation detail leak | Keep; expose via Memory abstraction |
+| CSF format | Storage face of the 3¹² lattice (`src/csf/v07/`); same object as the Tesseract | No longer a leak — one Convergence-Core object | Keep; expose via Memory abstraction. See [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) |
 
 ---
 

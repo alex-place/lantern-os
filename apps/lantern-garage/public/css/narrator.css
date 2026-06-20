@@ -1,0 +1,144 @@
+/* narrator.css — floating "read aloud" control bar + on-screen caption.
+   Uses site.css custom properties; falls back gracefully if absent. */
+
+.narrator-bar {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface, #1a1f2b);
+  border: 1px solid var(--border, #2c3440);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  color: var(--text, #e6e9ef);
+  font: 500 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  max-width: calc(100vw - 24px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.narrator-bar.is-playing {
+  border-color: var(--accent, #6ea8fe);
+  box-shadow: 0 8px 30px rgba(110, 168, 254, 0.25);
+}
+
+.narrator-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border, #2c3440);
+  background: var(--surface2, #232a36);
+  color: var(--text, #e6e9ef);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.narrator-btn:hover {
+  background: var(--accent, #6ea8fe);
+  border-color: var(--accent, #6ea8fe);
+  color: #0c0f15;
+}
+
+.narrator-btn:active {
+  transform: scale(0.94);
+}
+
+.narrator-play {
+  background: var(--accent, #6ea8fe);
+  border-color: var(--accent, #6ea8fe);
+  color: #0c0f15;
+}
+
+.narrator-label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.narrator-progress {
+  min-width: 34px;
+  text-align: center;
+  color: var(--muted, #9aa4b2);
+  font-variant-numeric: tabular-nums;
+}
+
+.narrator-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.narrator-rate-input {
+  width: 84px;
+  accent-color: var(--accent, #6ea8fe);
+  cursor: pointer;
+}
+
+.narrator-rate-val {
+  color: var(--muted, #9aa4b2);
+  min-width: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+.narrator-voice {
+  max-width: 160px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: var(--surface2, #232a36);
+  color: var(--text, #e6e9ef);
+  border: 1px solid var(--border, #2c3440);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* On-screen "subtitle" of the sentence currently being read. */
+.narrator-caption {
+  position: fixed;
+  bottom: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8999;
+  max-width: min(760px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface, #1a1f2b) 92%, transparent);
+  border: 1px solid var(--border, #2c3440);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  color: var(--text, #e6e9ef);
+  font: 500 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.narrator-caption[hidden] {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .narrator-voice {
+    max-width: 110px;
+  }
+  .narrator-label {
+    display: none;
+  }
+  .narrator-caption {
+    font-size: 15px;
+    bottom: 92px;
+  }
+}
+
+@media print {
+  .narrator-bar,
+  .narrator-caption {
+    display: none !important;
+  }
+}

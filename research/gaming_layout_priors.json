@@ -1,0 +1,27 @@
+{
+  "_comment": "Gaming short-form layout DESIGN DEFAULTS for the Σ₀ editor. These are directional parameters from widely-known PUBLIC short-form conventions (facecam in a top band, gameplay centred, captions in the lower third). They are NOT statistics scraped from specific copyrighted creators' clips (Kai Cenat / CaseOh / Jynxzi / Speed / etc.) — Lantern does not download or analyze copyrighted content. Recalibrate against first-party outcomes when those exist.",
+  "calibrated": false,
+  "basis": "design_default",
+  "facecam_top_height": 0.23,
+  "gameplay_center_height": 0.72,
+  "caption_y": 0.78,
+  "safe_margin": 0.06,
+  "facecam_min_confidence": 0.85,
+  "safe_gameplay_zone": { "x": 0.15, "y": 0.35, "width": 0.70, "height": 0.50 },
+  "caption_avoid_zones": ["crosshair_center", "minimap_corner", "inventory_bottom"],
+  "composition": {
+    "_note": "Composition formula (public short-form conventions, NOT scraped from specific creators). Priority is absolute: gameplay is the immovable centre; the facecam is secondary and orbits the gameplay; captions are tertiary and orbit BOTH. Implemented by caption-placement.bestCaptionPlacement().",
+    "priority": ["gameplay_center", "facecam", "captions"],
+    "facecam_orbit": {
+      "top": "captions_lower",
+      "bottom": "captions_upper",
+      "left": "captions_opposite_or_upper",
+      "right": "captions_opposite_or_upper",
+      "none": "captions_lower_third"
+    },
+    "action_center_protect": [0.40, 0.60],
+    "central_caption_column": [0.10, 0.90],
+    "caption_band_height": 0.13,
+    "platform_caption_y": { "youtube": 0.73, "tiktok": 0.67, "instagram": 0.69 }
+  }
+}

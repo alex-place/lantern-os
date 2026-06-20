@@ -41,38 +41,60 @@ class ProviderCapacityState:
     last_error_msg: str = ""
     quota_remaining: Optional[int] = None
     circuit_recovery_at: Optional[float] = None
+    quota_recovery_at: Optional[float] = None         # QUOTA_HIT recovery timer (mirrors circuit)
+    recovery_backoff_level: int = 0                    # exponential half-open backoff counter
     env_key: Optional[str] = None
     last_checked: Optional[float] = None  # P7 — health timestamp
 
     def is_routable(self) -> bool:
         if self.state in (ProviderState.AVAILABLE, ProviderState.DEGRADED):
             return True
+        # Half-open: once the recovery timer elapses, let a single probe through. Its
+        # outcome (record_success / record_error) decides whether to close or re-open
+        # with a longer backoff window.
         if self.state == ProviderState.CIRCUIT_OPEN and self.circuit_recovery_at:
             return time.time() >= self.circuit_recovery_at
+        if self.state == ProviderState.QUOTA_HIT and self.quota_recovery_at:
+            return time.time() >= self.quota_recovery_at
         return False
 
-    def record_success(self, latency_ms: float) -> None:
+    def record_success(self, latency_ms: float, ema_alpha: float = 0.2) -> None:
         self.success_count += 1
         self.last_success_at = time.time()
-        self.latency_p50_ms = (self.latency_p50_ms + latency_ms) / 2
+        # True EMA on the DECLARED field. (Was `self.latency_p50_ms`, never declared —
+        # the RHS read raised AttributeError on every provider's first success, silently
+        # routing healthy providers to fallbacks. #765.)
+        if self.latency_ema_ms <= 0.0:
+            self.latency_ema_ms = latency_ms                       # first sample seeds the EMA
+        else:
+            self.latency_ema_ms = ema_alpha * latency_ms + (1.0 - ema_alpha) * self.latency_ema_ms
         self.latency_p99_ms = max(self.latency_p99_ms, latency_ms)
         self.error_count = 0
+        self.recovery_backoff_level = 0                            # successful probe → reset backoff
+        self.circuit_recovery_at = None
+        self.quota_recovery_at = None
         self.state = ProviderState.AVAILABLE
 
-    def record_error(self, msg: str, failure_threshold: int = 3, recovery_secs: float = 30.0) -> None:
+    def record_error(self, msg: str, failure_threshold: int = 3, recovery_secs: float = 30.0,
+                     max_recovery_secs: float = 600.0) -> None:
         self.error_count += 1
         self.last_error_at = time.time()
         self.last_error_msg = msg
         if self.error_count >= failure_threshold:
+            # Exponential backoff: each successive trip (including a failed half-open
+            # probe) waits longer, capped. A successful probe resets the level above.
+            window = min(recovery_secs * (2 ** self.recovery_backoff_level), max_recovery_secs)
             self.state = ProviderState.CIRCUIT_OPEN
-            self.circuit_recovery_at = time.time() + recovery_secs
+            self.circuit_recovery_at = time.time() + window
+            self.recovery_backoff_level += 1
         else:
             self.state = ProviderState.DEGRADED
 
-    def record_quota_hit(self) -> None:
+    def record_quota_hit(self, recovery_secs: float = 60.0) -> None:
         self.state = ProviderState.QUOTA_HIT
         self.last_error_at = time.time()
         self.last_error_msg = "quota exhausted"
+        self.quota_recovery_at = time.time() + recovery_secs      # half-open probe after timer
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -84,6 +106,9 @@ class ProviderCapacityState:
             "success_count": self.success_count,
             "quota_remaining": self.quota_remaining,
             "is_routable": self.is_routable(),
+            "recovery_backoff_level": self.recovery_backoff_level,
+            "circuit_recovery_at": self.circuit_recovery_at,
+            "quota_recovery_at": self.quota_recovery_at,
             "last_checked": datetime.fromtimestamp(self.last_checked, tz=timezone.utc).isoformat() if self.last_checked else None,
         }
 

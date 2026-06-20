@@ -28,6 +28,9 @@ MAGIC = b"CSF\x00"
 VERSION_MAJOR = 0
 VERSION_MINOR = 3
 
+# Footer: the low 16 hex chars of sha256(everything-before-footer), ASCII-encoded.
+FOOTER_LEN = 16
+
 
 @dataclass
 class CSFMetadata:
@@ -138,8 +141,8 @@ class CSFWriter:
         body.extend(struct.pack(">I", len(delta_bytes)))
         body.extend(delta_bytes)
 
-        # Footer
-        checksum = hashlib.sha256(body).hexdigest()[:16]
+        # Footer: integrity checksum over the entire body written so far.
+        checksum = hashlib.sha256(body).hexdigest()[:FOOTER_LEN]
         body.extend(checksum.encode())
 
         path.write_bytes(bytes(body))
@@ -166,6 +169,19 @@ class CSFReader:
         self.records: List[Record] = []
         self._parse()
 
+    @staticmethod
+    def _verify_integrity(d: bytes) -> None:
+        """Recompute the SHA-256 footer over the body and compare it to the
+        stored footer. Raises ValueError on truncation or any byte mismatch."""
+        if len(d) < FOOTER_LEN:
+            raise ValueError(
+                "CSF file too small / truncated (missing integrity footer)")
+        body, footer = d[:-FOOTER_LEN], d[-FOOTER_LEN:]
+        expected = hashlib.sha256(body).hexdigest()[:FOOTER_LEN].encode()
+        if footer != expected:
+            raise ValueError(
+                "CSF integrity check failed (footer checksum mismatch)")
+
     def _parse(self):
         d = self._data
         o = 0
@@ -174,6 +190,11 @@ class CSFReader:
         if magic != MAGIC:
             raise ValueError(f"not a CSF file (magic={magic!r})")
         o += 4
+
+        # Integrity FIRST — the writer appends a SHA-256 footer over everything
+        # before it. Recompute and compare before parsing, so corruption or
+        # truncation fails with a clean error instead of silently-wrong records.
+        self._verify_integrity(d)
 
         major, minor = struct.unpack_from(">BB", d, o)
         o += 2

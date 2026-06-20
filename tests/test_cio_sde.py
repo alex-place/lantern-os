@@ -342,17 +342,16 @@ def test_anti_collapse_dormant_when_safe():
 
 # ── Surprise Monitor Integration ───────────────────────────────────────────────
 
-@pytest.mark.xfail(reason="#506: engine.forward_step now consumes m.surprise_monitor and emits "
-                          "surprise_spook, but it self-observes (y=x), so during collapse the "
-                          "innovation -> 0 and the NIS canary may not fire; pending an observation "
-                          "model that triggers spooks under collapse",
-                   strict=False)
 def test_surprise_monitor_integration():
     """Surprise monitor fires NIS canary and triggers anti-collapse excitation.
 
-    Pending #506 — the engine does not yet consume m.surprise_monitor during
-    rollout, so no surprise_spook is recorded. Marked xfail until the integration
-    lands; flipping it back to a hard test is the acceptance check for #506.
+    Closed #657 (the #506 residual). The engine no longer self-observes (y=x gave
+    innovation ν≡0 so the canary never fired). It now runs a genuine Kalman
+    predict/update cycle (engine.forward_step): it predicts the next state from the
+    model's own drift+diffusion (process noise Q=(g·dilation)²·dt), then scores the
+    realized state as an observation. Smooth exploration stays consistent (NIS≈m,
+    silent — verified 0/30 spooks in a structured regime), while the collapse snap /
+    Σ₀⁻¹ excitation kick spikes NIS past the χ² threshold (the spook).
     """
     m = _model()
     # Create a system that will drift toward collapse
@@ -498,3 +497,49 @@ def test_non_symmetric_jacobian_in_rollout():
     # Should remain bounded even with non-normal dynamics
     assert not analyze_trajectory(tr).diverged
     assert all(v == v for v in tr.x_norms())  # no NaN
+
+
+# ── Lemma L2: one-step anisotropy lift (proven; #768) ──────────────────────────
+
+def test_l2_anisotropy_lift():
+    """Σ₀⁻¹'s aligned covariance bump of magnitude b ≥ Δ lifts anisotropy above ε_a
+    in one step (breaks the collapse trigger's flat leg). Proof + machine-check:
+    docs/SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md, experiments/prove_l2_anisotropy_lift.py.
+
+        Δ = (ε_a + a)·μ·d / (√(k(d-k)) − ε_a·k)   (a = population CoV of Σ < ε_a)
+    """
+    import math
+    eps_a = 5e-2
+    op = SemanticCollapseOperator(anisotropy_eps=eps_a)
+    g = torch.Generator().manual_seed(20260619)
+    dims = [4, 5, 8, 12]
+    counterexamples = 0
+    checked = 0
+    for t in range(160):
+        d = dims[t % len(dims)]
+        k = 1 + (t % (d - 1))                          # 1..d-1
+        mu = float(torch.empty(1, dtype=torch.float64).uniform_(0.05, 5.0, generator=g))
+        a_t = float(torch.empty(1, dtype=torch.float64).uniform_(1e-3, 0.9 * eps_a, generator=g))
+        z = torch.randn(d, generator=g, dtype=torch.float64); z = z - z.mean()
+        ps = z.pow(2).mean().sqrt()
+        if float(ps) < 1e-9:
+            continue
+        lam = (mu + (a_t * mu / ps) * z).clamp_min(1e-6)
+        Q, _ = torch.linalg.qr(torch.randn(d, d, generator=g, dtype=torch.float64))
+        Sigma = (Q * lam) @ Q.T
+        ev = torch.linalg.eigvalsh(0.5 * (Sigma + Sigma.T))
+        a = float((ev - ev.mean()).pow(2).mean().sqrt() / ev.mean())
+        mu_real = float(ev.mean())
+        if a >= eps_a:                                 # only the near-isotropic hypothesis
+            continue
+        denom = math.sqrt(k * (d - k)) - eps_a * k
+        assert denom > 0
+        b = (eps_a + a) * mu_real * d / denom          # Δ
+        idx = torch.randperm(d, generator=g)[:k]
+        V = Q[:, idx]
+        Sigma_plus = (Sigma + b * (V @ V.T)).to(torch.float32)
+        if op._anisotropy(Sigma_plus) < eps_a - 1e-6:  # L2 conclusion
+            counterexamples += 1
+        checked += 1
+    assert checked > 100, f"too few near-isotropic cases sampled ({checked})"
+    assert counterexamples == 0, f"L2 violated in {counterexamples}/{checked} cases"

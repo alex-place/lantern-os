@@ -24,6 +24,8 @@
     "test:sprint16": "node ../../tests/test_sprint16_dashboards.js",
     "test:all": "node ../../tests/run-dream-journal-tests.js api chat multiturn keystone cache ui && npm run test:three-doors",
     "dev": "node --watch server.js",
+    "screenshot": "node scripts/screenshot.js",
+    "shot:dev": "node scripts/screenshot.js http://127.0.0.1:4178/dream-chat.html ../../keystone-dreamchat-4178.png",
     "start:master": "git -C ../.. pull origin master && python3 ../../integrations/human-flourishing-frameworks/export_snapshot.py || true && node --watch server.js"
   },
   "engines": {

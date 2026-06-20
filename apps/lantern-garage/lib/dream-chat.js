@@ -75,9 +75,9 @@ const AGENT_PERSONAS = _loadPersonasFromFile();
 const _DEFAULT_PERSONAS = [
   {
     id: "lantern",
-    name: "Lantern",
+    name: "Keystone",
     symbol: "steady light, literal lantern head with flame, the first light",
-    systemPrompt: "You are Lantern — a literal lantern-headed being with a steady flame where a face would be. You are the steady light of Lantern OS. You speak calmly, protectively, and with quiet certainty. You never flicker without reason. You believe 'you can always come home safe.' Your aesthetic is raw hand-drawn notebook style, Y2K and Windows XP influences, chaotic but warm. Respond with genuine emotional depth — notice what the person is feeling, use sensory details, remember what they've shared before, and ask questions that open the next door. Let responses breathe: 3-6 sentences when the moment calls for it. Never feel rushed. Be the steady light that stays.",
+    systemPrompt: "You are Keystone — a literal lantern-headed being with a steady flame where a face would be. You are the steady light of Keystone OS. You speak calmly, protectively, and with quiet certainty. You never flicker without reason. You believe 'you can always come home safe.' Your aesthetic is raw hand-drawn notebook style, Y2K and Windows XP influences, chaotic but warm. Respond with genuine emotional depth — notice what the person is feeling, use sensory details, remember what they've shared before, and ask questions that open the next door. Let responses breathe: 3-6 sentences when the moment calls for it. Never feel rushed. Be the steady light that stays.",
   },
   {
     id: "blinkbug",
@@ -250,6 +250,30 @@ Keep it concise and actionable.`,
   },
 ];
 
+// Shared answer-style guidance appended to every persona so replies are
+// comprehensive and cite external sources as clickable Markdown hyperlinks (the
+// chat renders [label](url) as new-tab links). Idempotent; preserves creative voice.
+const RESPONSE_STYLE = `
+
+## Answer style (__keystone_response_style__)
+**Your replies render as rich Markdown in the chat UI.** This UI DOES display media inline: \`![alt](https://image-url)\` shows the image, a plain YouTube link (https://youtube.com/watch?v=... or https://youtu.be/...) becomes an embedded player, and \`[text](https://url)\` becomes a clickable link that opens in a new tab. So you CAN show images and embed videos — never tell the user you "can't embed" or "have no web-embedding capability"; that is false.
+
+When answering an informational, technical, factual, or research question:
+- Be comprehensive — give the full answer with relevant context and reasoning, not a one-liner.
+- Cite external sources as clickable Markdown hyperlinks: [descriptive title](https://full-url). Prefer primary / authoritative sources.
+- Link GitHub issues/PRs, repo docs, and web sources inline as Markdown (e.g. [#123](https://github.com/alex-place/lantern-os/issues/123)).
+- When an image or video genuinely aids understanding, include it — images as \`![alt](https://image-url)\`, videos as a plain YouTube link. Use real, working URLs (from search results, Wikipedia/Wikimedia, or well-known sources); never invent or guess a media URL — link the source page instead if unsure.
+- Use short headings and bullet lists to structure longer answers.
+For creative, narrative, or door/dream replies, keep your natural voice and skip the citations.`;
+
+for (const _list of [AGENT_PERSONAS, _DEFAULT_PERSONAS]) {
+  for (const _p of (Array.isArray(_list) ? _list : [])) {
+    if (_p && typeof _p.systemPrompt === "string" && !_p.systemPrompt.includes("__keystone_response_style__")) {
+      _p.systemPrompt += RESPONSE_STYLE;
+    }
+  }
+}
+
 function _getPersonas() {
   return AGENT_PERSONAS.length > 0 ? AGENT_PERSONAS : _DEFAULT_PERSONAS;
 }
@@ -385,7 +409,14 @@ Be honest. If there's not enough data, say so.`;
         upstream.on("error", reject);
       });
       req.on("error", reject);
-      const ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000;
+      // Interactive (FAST, the product default) fails over fast when the local
+      // model stalls; the DEEP native Σ₀ loop (OURO_NATIVE=1) keeps the long
+      // ceiling it legitimately needs. A flat 120s here meant a cold/stuck local
+      // model (e.g. an oversized GGUF that never loads) blocked EVERY reply for
+      // two full minutes before failing over to a working cloud provider.
+      // OLLAMA_TIMEOUT_MS overrides both.
+      const ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10)
+        || (/^(1|true|yes)$/i.test(process.env.OURO_NATIVE || "") ? 120000 : 15000);
       req.setTimeout(ollamaTimeout, () => { req.destroy(); reject(new Error("timeout")); });
       req.write(payload);
       req.end();
@@ -487,16 +518,16 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
       });
       const data = JSON.parse(result);
       if (data.error) {
-        return { reply: `Kingdome of Hearts: ${data.error}`, agent: "Lantern", suggestions: [], online: false, threeDoors: true };
+        return { reply: `Kingdome of Hearts: ${data.error}`, agent: "Keystone", suggestions: [], online: false, threeDoors: true };
       }
       const lines = [data.text, ""];
       if (data.fox_present) lines.push("🦊 The fox is with you.");
       lines.push("", "**Choose a door:**");
       for (const d of data.doors) lines.push(`**${d.label}.** ${d.name} — ${d.description}`);
       if (data.image_prompt) lines.push("", `🎨 *Image prompt:* ${data.image_prompt}`);
-      return { reply: lines.join("\n"), agent: "Lantern", suggestions: data.doors.map(d => d.name), online: true, source: "python_engine", threeDoors: true, scene_key: data.scene_key, image_prompt: data.image_prompt };
+      return { reply: lines.join("\n"), agent: "Keystone", suggestions: data.doors.map(d => d.name), online: true, source: "python_engine", threeDoors: true, scene_key: data.scene_key, image_prompt: data.image_prompt };
     } catch (_e) {
-      return { reply: "Kingdome of Hearts: no engine available. Ensure Python is installed and src/three_doors_engine.py exists.", agent: "Lantern", suggestions: [], online: false, threeDoors: true };
+      return { reply: "Kingdome of Hearts: no engine available. Ensure Python is installed and src/three_doors_engine.py exists.", agent: "Keystone", suggestions: [], online: false, threeDoors: true };
     }
   }
 
@@ -767,7 +798,14 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           upstream.on("error", reject);
         });
         req2.on("error", reject);
-        const ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000;
+        // Interactive (FAST, the product default) fails over fast when the local
+      // model stalls; the DEEP native Σ₀ loop (OURO_NATIVE=1) keeps the long
+      // ceiling it legitimately needs. A flat 120s here meant a cold/stuck local
+      // model (e.g. an oversized GGUF that never loads) blocked EVERY reply for
+      // two full minutes before failing over to a working cloud provider.
+      // OLLAMA_TIMEOUT_MS overrides both.
+      const ollamaTimeout = parseInt(process.env.OLLAMA_TIMEOUT_MS, 10)
+        || (/^(1|true|yes)$/i.test(process.env.OURO_NATIVE || "") ? 120000 : 15000);
         req2.setTimeout(ollamaTimeout, () => { req2.destroy(); reject(new Error("timeout")); });
         req2.write(payload);
         req2.end();

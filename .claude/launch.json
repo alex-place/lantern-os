@@ -3,9 +3,25 @@
   "configurations": [
     {
       "name": "lantern-dev",
+      "comment": "Runs from the .dev-worktree junction (-> C:/dev/lantern-os-dev), isolated from the automation churn on the main checkout. See docs/DEV-SERVER-WORKTREE.md.",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["apps/lantern-garage/server-dev.js"],
+      "runtimeArgs": [
+        "apps/lantern-garage/server-dev.js"
+      ],
+      "cwd": ".dev-worktree",
       "port": 4178
+    },
+    {
+      "name": "lantern-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/lantern-garage/server.js"
+      ],
+      "port": 4177,
+      "autoPort": true,
+      "env": {
+        "LEADERBOARD_ROUTING": "1"
+      }
     }
   ]
 }

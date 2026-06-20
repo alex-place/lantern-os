@@ -3,6 +3,36 @@ const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
 
+// ── Dependency preflight ───────────────────────────────────────────────────
+// When `git pull` adds a dependency to package.json but `npm install` hasn't run
+// yet, startup otherwise dies with a raw "Cannot find module 'x'" stack trace
+// (e.g. busboy via routes/pdfs.js). Surface an actionable message instead.
+(function preflightDependencies() {
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
+  } catch {
+    return; // no/unreadable manifest → nothing to check
+  }
+  const missing = [];
+  for (const dep of Object.keys(pkg.dependencies || {})) {
+    try {
+      require.resolve(dep);
+    } catch (e) {
+      // Only a genuinely absent package is MODULE_NOT_FOUND. Other resolve errors
+      // (e.g. ERR_PACKAGE_PATH_NOT_EXPORTED) mean the package IS installed.
+      if (e && e.code === "MODULE_NOT_FOUND") missing.push(dep);
+    }
+  }
+  if (missing.length) {
+    console.error(
+      `\n[startup] Missing ${missing.length} dependenc${missing.length === 1 ? "y" : "ies"}: ${missing.join(", ")}` +
+      `\n[startup] Run:  npm install --prefix apps/lantern-garage\n`
+    );
+    process.exit(1);
+  }
+})();
+
 // Load .env.local then .env from repo root (two levels up from apps/lantern-garage/)
 // .env.local ALWAYS overrides system env — .env only sets if not already present
 const candidateEnvFiles = [
@@ -133,12 +163,16 @@ const routes = [
   require("./routes/self-edit"),
   require("./routes/creator"),
   require("./routes/creator-entries"),
+  require("./routes/creator-calibration"),
+  require("./routes/research"), // open-video learning flywheel status
+
   require("./routes/pdfs"), // PDF document listing for Knowledge Center
-  require("./routes/surfaces"),
   require("./routes/features"),
+  require("./routes/admin-flags"),     // Admin feature flags + per-page nav visibility
   require("./routes/personal-cube"),
   require("./routes/pr-review"),
   require("./routes/auto-merge"),
+  require("./routes/surfaces"),        // static file catch-all — MUST stay last (returns true for any path)
 ];
 
 // ── Session middleware (Patreon OAuth) ──
@@ -148,6 +182,9 @@ const sessionMiddleware = session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
+  // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
+  // `secure` session cookie is actually set (otherwise login never persists).
+  proxy: true,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -352,11 +389,26 @@ if (enableCloudflare) {
     console.log("[Cloudflare Tunnel] Install with: choco install cloudflare-warp");
   });
   cloudflaredProcess.on("exit", (code) => {
-    console.log(`[Cloudflare Tunnel] exited with code ${code}`);
+    if (code && code !== 0) {
+      // Non-zero exit: public access is down but the local server keeps running.
+      // The most common cause is a stale/unauthorized tunnel credential
+      // ("Unauthorized: Tunnel not found", see #672) — surface the fix instead of
+      // a bare exit code so it is self-explanatory.
+      console.warn(
+        `[Cloudflare Tunnel] exited with code ${code} — public access (https://lantern-os.net) ` +
+        `unavailable; the server continues locally on this port.\n` +
+        `[Cloudflare Tunnel] If you see "Unauthorized: Tunnel not found", the credential is ` +
+        `stale/revoked — recreate the tunnel:\n` +
+        `[Cloudflare Tunnel]   cloudflared tunnel login && cloudflared tunnel create lantern-os\n` +
+        `[Cloudflare Tunnel] then point ~/.cloudflared/config.yml at the new tunnel id.`
+      );
+    } else {
+      console.log(`[Cloudflare Tunnel] exited cleanly (code ${code}).`);
+    }
   });
   console.log(`[Cloudflare Tunnel] Starting (reading from ~/.cloudflared/config.yml)...`);
 } else {
-  console.log("[Cloudflare Tunnel] Disabled (set LANTERN_CLOUDFLARE_TUNNEL=true to enable)");
+  console.log("[Cloudflare Tunnel] Disabled via LANTERN_CLOUDFLARE_TUNNEL=false (it is enabled by default; unset the var to re-enable).");
 }
 
 // Graceful shutdown

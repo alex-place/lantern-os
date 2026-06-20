@@ -3,9 +3,43 @@
 *A computable stability certificate for convergence dynamics, and an honest
 account of why an ungrounded self-improving system tends to collapse or diverge.*
 
+---
+
+## Plain-language summary
+
+**What this is.** A stability certificate — a computable test (a check a computer can run automatically) — for a system that
+updates itself over time, together with an honest account of what happens to a
+self-improving system that has *no contact with outside reality*.
+
+**The one-line result.** A system that only ever optimizes against its own
+internal picture of the world has two failure modes and no happy third one: it
+either **collapses** onto a single frozen, self-agreeing state (nicknamed the
+"42-state"), or it **diverges** and runs away. The only escape is an **external
+anchor** — real data, a measurement, a market, a ground truth. **Grounding is the
+safety mechanism.** This is the same thing machine-learning researchers call
+**model collapse** — train a model on its own output long enough and it degrades.
+
+**How sure are we of each part?** Every claim below is labelled:
+- **PROVEN** — the core collapse theorem (Theorem 1), with a machine-checked
+  proof, for the well-behaved (symmetric / normal) case. *30 of 30 tests pass.*
+- **MEASURED** — the anti-collapse operator (§3) and the early-warning "canary"
+  (§4): not proven, but demonstrated over **900 forced-collapse runs (100%
+  prevented)** plus a passing integration test.
+- **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational
+  definition, deliberately *not* dressed up as a theorem.
+
+**What's left.** One genuine frontier: a *proof* (not just measurement) that the
+anti-collapse operator always works. Everything else verified as of 2026-06-19 is
+finished, machine-checked, and reproducible.
+
+> **For the precise version, read on.** Each section carries its own status line.
+> The summary above is the honest gist, not a substitute for the math.
+
+---
+
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **29 passing, 1 xfail** pending [#657]) **for the symmetric /
-normal case**. The collapse trigger (§2), the anti-collapse operator (§3), and the
+`tests/test_cio_sde.py` — **30 passing, 0 xfail**; the last gap [#657] closed
+2026-06-19) **for the symmetric / normal case**. The collapse trigger (§2), the anti-collapse operator (§3), and the
 early-warning readout (§4) are control-design heuristics — empirically supported, not
 theorems. The §6 demonstration is now **reproducible**: both driver scripts are
 committed and produce checked-in run logs (see §6). Read the per-section status
@@ -27,6 +61,15 @@ lines before relying on any claim here.
 > now returns the clean orthogonal projection `x* = P x`, which is non-expansive
 > (`‖P x‖ ≤ ‖x‖`) and smooth, so no boundary penalty is needed. The remaining
 > work is re-tracked as live issues so this doc cannot drift again ([#657]–[#660]).
+>
+> **Maintenance log — 2026-06-19.** Reconcile pass after [#657], [#658], [#659]
+> landed (verified against the repo: `pytest tests/test_cio_sde.py` → **30 passed,
+> 0 xfail**; `data/sigma0_regime_sweep_report.json` → 900 collapse-prone trials,
+> 100% prevented). The per-section status lines, the top status, and the footer had
+> drifted behind these closures (still reading "29 passing, 1 xfail" and "§3 N=1
+> HEURISTIC"); they are now aligned with ground truth. A plain-language summary was
+> added at the top for non-specialist readers. The sole remaining frontier is a
+> §3 sufficiency *theorem*.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -42,11 +85,17 @@ status cannot silently drift.
 - [#516] / [#517] / [#520] — model-collapse literature integrated (two-phase collapse, double-scaling law, prediction-markets-as-grounding; §7 + References).
 - [#508] — `.md`/`.tex` status-box reconcile pass.
 
-**Open (the deterministic next gaps — what this pass re-tracks):**
-- [#657] — **§4 residual.** The NIS canary is wired but the engine self-observes (`y = x`), so during collapse the innovation `→ 0` and the canary may not fire. `test_surprise_monitor_integration` stays `xfail` until an observation model triggers spooks under collapse. *This is the only open technical gap in the Σ₀ machinery.*
-- [#658] — **§3 sufficiency.** Σ₀⁻¹ is HEURISTIC with N=1 evidence; no theorem says it *prevents* collapse. Upgrade via proof under explicit hypotheses, or a regime sweep to MEASURED-over-distribution.
-- [#659] — **§4 decision.** `p_gate`/`p_unbounded` are documented but not in code (superseded by the `surprise.py` NIS canary). Formally retire them, or implement and wire `p_gate`.
-- [#660] — **housekeeping.** Reconcile the persistent-excitation attribution across `.md`/`.tex`, and verify all web citations before formal publication.
+**Open (the one genuine remaining frontier):**
+- **§3 sufficiency *theorem*.** Σ₀⁻¹ is now MEASURED over a 900-run regime sweep ([#658], resolved below) — but a closed-form *proof* that it always prevents collapse (option a) is still future work. This is the sole real gap, and it is acknowledged honestly rather than tracked as a defect.
+
+  *All previously-tracked gaps are now closed: [#657], [#658], [#659] landed 2026-06-19; [#660] (`.md`/`.tex` attribution + web-citation verification) closed.*
+
+**Resolved (landed 2026-06-19):**
+- [#658] — **§3 evidence upgraded N=1 → MEASURED.** `experiments/sigma0_regime_sweep.py` runs a forced-collapse rollout with/without Σ₀⁻¹ over an α × non-normality × noise grid with a fixed underdetermined (3-dim null) Jacobian. Over **900 trials that genuinely collapse without protection**, Σ₀⁻¹ suppressed collapse AND re-excited the state in **100%** (`data/sigma0_regime_sweep_report.json`). Honest caveat: in this construction the non-normal off-diagonal lifts the Jacobian's effective rank, so the collapse-prone cells are the diagonal ones (non_normality=0); the measured distribution spans α∈{−0.5,−0.2,−0.05} × noise∈{0.01,0.05,0.2}. The §3 label moves from N=1 HEURISTIC to MEASURED; a sufficiency theorem is still future work.
+- [#657] — **§4 residual CLOSED.** The engine no longer self-observes; `forward_step` runs a Kalman predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration stays consistent (NIS≈m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS — the canary fires under collapse. `test_surprise_monitor_integration` flipped `xfail` → hard pass (30 passed). *This was the last open technical gap in the Σ₀ machinery.*
+- [#659] — **§4 decision CLOSED (RETIRED).** `p_gate`/`p_unbounded` formally retired, superseded by the `surprise.py` NIS canary; never implemented in `collapse.py` and will not be.
+
+**Planned — anti-collapse hardening (epic [#764]):** the full CSF-grounded defense-in-depth plan lives in [ANTI-COLLAPSE-HARDENING.md](ANTI-COLLAPSE-HARDENING.md). Code-verified bugs queued: [#765] (PCSF circuit-breaker `AttributeError`), [#766] (close the instrument→actuator loop — `loop_lm.generate()` is decoupled from the canary), [#767] (memory confidence laundering + hash-chain ledgers). Proven-region wideners for non-normal `A`: [#768] (Lyapunov-SDP + pseudospectral abscissa gates) — these extend the proven region of §1, they do not make the system globally uncollapsible.
 
 **Resolved (landed 2026-06-17):**
 - [#661] — **§2 / Appendix A defect.** `_collapse_state`'s "log-barrier" was a misnamed multiplicative shrink that flipped sign for `strength > 0.217`. **Fixed:** the term is dropped; collapse is now the clean orthogonal projection `x* = P x` (non-expansive, smooth). The `log_barrier_strength` parameter was removed. Regression: `test_collapse_is_nonexpansive_projection`. *Flagged in external review 2026-06-16.*
@@ -66,12 +115,19 @@ status cannot silently drift.
 [#659]: https://github.com/alex-place/lantern-os/issues/659
 [#660]: https://github.com/alex-place/lantern-os/issues/660
 [#661]: https://github.com/alex-place/lantern-os/issues/661
+[#764]: https://github.com/alex-place/lantern-os/issues/764
+[#765]: https://github.com/alex-place/lantern-os/issues/765
+[#766]: https://github.com/alex-place/lantern-os/issues/766
+[#767]: https://github.com/alex-place/lantern-os/issues/767
+[#768]: https://github.com/alex-place/lantern-os/issues/768
 
 ---
 
 ## 0. The object
 
 We study a dissipative nonlinear system
+
+*In plain words:* the state keeps changing over time, and how it changes depends on where it is now (`x`), what we feed in (`u`), and some slowly-shifting settings (`θ`) — the three symbols defined below.
 
 $$\dot{x} = f(x, u, \theta), \qquad x \in \mathbb{R}^n$$
 
@@ -88,6 +144,8 @@ part `A_s = ½(A + Aᵀ)`. The non-symmetric (skew) part `A_k = ½(A − Aᵀ)`
 carries rotation and is **not** captured by `A_s`; the gap between the two is
 exactly what makes the general case in §1 harder than the symmetric one.
 
+*In plain words:* the symmetric part tracks whether a system shrinks toward a point (decay); the skew part tracks whether it also swirls around it (rotation). The easy, proven case has no swirl — and that swirl is exactly what makes the general case in §1 hard.
+
 ---
 
 ## 1. The collapse-guarantee theorem
@@ -101,6 +159,8 @@ Split the state space using the symmetric part `A_s`:
 - **active subspace** `M` — its orthogonal complement, projector `P_M`
 
 Define the Lyapunov function on the active modes only:
+
+*In plain words:* `V` is a single "energy" number that measures how far the system still is from going stuck. If we can show this number only ever shrinks, the system is provably settling down rather than running away.
 
 $$V(x) = \tfrac{1}{2}\,\lVert P_M\,x \rVert^2.$$
 
@@ -139,6 +199,8 @@ energy bound can fail outright:
 > integrating from `x₀ = [0.3, 1.0]` makes `V` *grow* `0.045 → 0.341` — a sign
 > violation of `V̇ ≤ 2αV`. Collapse still occurs here, but it is rescued by a
 > *different* argument (below), not by the energy proof.
+>
+> *In plain words:* this is us being honest about a limit. For swirling systems the simple energy argument can wrongly suggest things are blowing up; the system still settles, but only a more careful argument proves it.
 
 So for non-normal `A`, the §1 energy proof is **insufficient on its own**; the
 cross term must be separately bounded (e.g. via `‖P_M A P_N‖` and a small-gain /
@@ -180,6 +242,36 @@ non-normal systems that the small-gain bound over-rejects (see
 
 [#505]: https://github.com/alex-place/lantern-os/issues/505
 
+#### 1.2.1 Provable region-wideners for non-normal `A` ([#768])
+
+The small-gain `alpha` over-rejects strongly non-normal `A`, and `max Re λ(A) < 0`
+alone is necessary-not-sufficient (transient growth). `stability_gates()` adds **two
+sufficient, provable** contraction certificates — each strictly wider than small-gain:
+
+1. **Numerical-range gate (monotone).** `ω(A) = λ_max(A_s) < −margin ⟹ ‖e^{tA}‖₂ ≤ e^{ωt}`
+   — a strict, no-transient contraction (matrix measure μ₂; Lohmiller–Slotine 1998).
+   `ω(A)` is the rightmost point of the numerical range `W(A)`; since `spec(A) ⊂ W(A)`,
+   this gate **implies** the Lyapunov gate (it is the stricter one).
+2. **Lyapunov gate (asymptotic, optimal metric).** For margin `m ≥ 0`,
+   `∃P≻0 : (A+mI)ᵀP+P(A+mI) ≺ 0 ⟺ max Re λ(A) < −m` (classical Lyapunov theorem;
+   `= inf_T μ₂(TAT⁻¹) < −m`). Certified by solving `(A+mI)ᵀP+P(A+mI) = −I` and checking
+   `P≻0` (with a relative ill-conditioning guard, so the stability boundary is never
+   certified independent of solver warnings). Accepts strongly non-normal `A` with
+   transient growth (e.g. `[[−1,3],[−3,0]]`, Hurwitz at `−0.5`) that small-gain
+   over-rejects. `√cond(P₀)` (from the margin-0 solve) upper-bounds the Euclidean
+   transient `sup_t ‖e^{tA}‖`.
+
+**Honest scope.** Sufficient, not necessary; they certify the **full Jacobian's**
+contraction, not collapse-onto-manifold (the L1 alignment gap is separate). The PROVEN
+transient constant is **Crouzeix–Palencia (2017): `‖e^{tA}‖ ≤ (1+√2)` when `W(A) ⊂ LHP`**
+(`ω ≤ 0`); the sharper constant `2` is Crouzeix's still-open conjecture. Verified by
+`test_stability_gates.py` (the `[[−1,3],[−3,0]]` case, a 400-matrix red-team showing no
+false-positive certificates, and matrix-exponential checks that the monotone (`e^{ωt}`),
+Lyapunov (`√cond(P)`), and Crouzeix–Palencia (`1+√2`) bounds each hold).
+These **extend the proven region of §1; they do not make the system globally uncollapsible.**
+
+[#768]: https://github.com/alex-place/lantern-os/issues/768
+
 ### 1.3 What the test actually checks
 
 **Verification.** The shipped test uses `A = −0.8·I`, which is **symmetric**
@@ -207,12 +299,16 @@ already on the invariant manifold.
 **Definition (operational).** Σ₀ fires when **all four** conditions hold
 simultaneously:
 
+*In plain words: this section defines the smoke alarm. Σ₀ is the moment we declare the system "stuck" — when, by four independent measures at once, it has stopped learning anything new and can no longer tell its options apart. We are honest that this is a sensible rule of thumb we chose, not something the theorem forces.*
+
 | condition | meaning |
 |---|---|
 | `‖∇ₓL‖ < ε_g` | no optimization signal remains |
 | `rank(J_f) < ρ·n` | drift Jacobian has lost directional structure |
 | `Σ` isotropically flat | uncertainty has no preferred direction |
 | `‖∂H/∂u‖ < ε_c` | control cannot distinguish actions |
+
+*In plain words, the four together say: nothing left to learn, no direction left to move in, no uncertainty pointing anywhere useful, and no action that changes the outcome. A system in that corner has nowhere to go.*
 
 **This is a definition, not a consequence.** None of these four quantities is
 the spectral abscissa `α` that Theorem 1 uses. They are an *operational
@@ -246,8 +342,13 @@ a fixed point of the dynamics.** (`SemanticCollapseOperator`.)
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: CONTROL-DESIGN HEURISTIC. Empirically shown (N=1, one forced-collapse
-test) to suppress collapse. NO sufficiency theorem — unlike Theorem 1.**
+**Status: MEASURED-over-distribution (as of 2026-06-19, [#658]). A 900-run regime
+sweep (100 trials × 9 collapse-prone cells) shows Σ₀⁻¹ suppresses forced collapse in
+100% of collapse-prone trials. A key lemma toward the proof is now CLOSED:
+[L2 — the one-step anisotropy lift](SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md) is proven
+closed-form and machine-checked (a single Σ₀⁻¹ bump provably breaks the trigger's
+flat condition). The full sufficiency *theorem* — non-normal `A`, all initial
+conditions — remains the one open frontier ([#768]).**
 
 Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects energy **along** it:
 
@@ -256,23 +357,28 @@ $$dx = f\,dt + dW + \Sigma_0^{-1}, \qquad \Sigma_0^{-1} = s\cdot p \cdot (V_{\te
 with `ξ` random and `p ∈ [0,1]` the **collapse proximity** — 0 far from the
 boundary (a no-op that costs nothing), rising toward 1 as `∇L`, rank, anisotropy,
 and control sensitivity all approach their thresholds. The implementation
-(`excite()`, `collapse.py` lines 261–275) correctly injects noise in the null
-subspace and re-anisotropizes `Σ`. The proximity gate `proximity()` (lines
-245–259) is the soft-AND `min(p_grad, p_rank, p_flat, p_ctrl)` over the four §2
-signals.
+(`AntiCollapseOperator.excite` in `src/cio_sde/collapse.py`) correctly injects
+noise in the null subspace and re-anisotropizes `Σ`. The proximity gate
+(`AntiCollapseOperator.proximity`) is the soft-AND `min(p_grad, p_rank, p_flat,
+p_ctrl)` over the four §2 signals.
 
 **What is and isn't claimed.** This is a *well-motivated* control design:
 re-exciting directions that have gone flat is a sensible way to keep the system
 off the null manifold. But there is **no companion theorem** stating that Σ₀⁻¹
 *prevents* collapse — in contrast to Theorem 1, which is proven (under §1's
-hypothesis). The support is a single demonstration, reported as such. Closing
-this gap (proof, or a regime sweep upgrading N=1 → MEASURED-over-distribution) is
-tracked as [#658].
+hypothesis). That theorem-shaped gap is the one residual; the empirical support,
+however, is now a distribution rather than a single run ([#658], resolved).
 
-**Empirical evidence (N=1).** On one forced-collapse run, Σ₀ fired on every step
-and the state froze; with Σ₀⁻¹ active, Σ₀ stopped firing and the state escaped
-the manifold. This is encouraging directional evidence, **not** a guarantee, and
-not a sweep over regimes. (`AntiCollapseOperator`; the forced-collapse tests in
+**Empirical evidence (MEASURED, [#658] — landed 2026-06-19).**
+`experiments/sigma0_regime_sweep.py` runs forced-collapse rollouts with and without
+Σ₀⁻¹ across an α × non-normality × noise grid (fixed 3-dim-null Jacobian). Over the
+**900 trials that genuinely collapse without protection**, Σ₀⁻¹ suppressed collapse
+and re-excited the state in **100%** (`data/sigma0_regime_sweep_report.json`:
+`collapse_prone_trials_total=900`, `headline_conditional_prevention_rate=1.0`).
+This upgrades §3 from N=1 HEURISTIC to MEASURED-over-distribution; a sufficiency
+theorem is still future work. *(The original single-run observation: Σ₀ fired every
+step and the state froze; with Σ₀⁻¹ active, Σ₀ stopped firing and the state escaped
+the manifold.)* (`AntiCollapseOperator`; the forced-collapse tests in
 `tests/test_cio_sde.py` run for 20–30 steps and assert weaker directional
 properties — the often-quoted "40/40 → 0/40" and "0.05 → 12.9" figures are
 illustrative log values, not pinned by any test. Cite the tests, not the prose.)
@@ -321,18 +427,20 @@ correctly redundant. **However:**
   (the slowest mode), which is **not** §1's `α = max λᵢ(A_s)` (the largest /
   least-stable active eigenvalue). Disambiguate before use.
 
-**Action required ([#659]):** either implement `p_unbounded` / `p_gate` in
-`collapse.py` and wire `p_gate` into `AntiCollapseOperator`, **or** formally retire
-them as superseded by the NIS canary below. As verified 2026-06-16, the
-`p_gate`/`p_unbounded` signal is still not computed anywhere in code; the working
-early-warning is the NIS monitor (`src/cio_sde/surprise.py`).
+**Decision ([#659], RETIRED 2026-06-19):** `p_unbounded` / `p_gate` are formally
+**retired** as superseded by the NIS canary below. They were never implemented in
+`collapse.py` (a source search returns no match — verified again 2026-06-19) and
+will not be: the eigenvalue readout was the wrong early-warning (see the Update),
+and the actual driver of Σ₀⁻¹ is `proximity()`, not `p_gate`. The live early-warning
+is the Kalman NIS monitor (`src/cio_sde/surprise.py`), now fully integrated into the
+rollout ([#657], below). With this, §4 has no remaining open gaps.
 
 **Update — the right canary, now implemented (`src/cio_sde/surprise.py`).** The
 eigenvalue readout above was the wrong early-warning. The correct one is *surprise
 relative to uncertainty*: the Kalman normalized innovation squared (NIS),
 `νᵀS⁻¹ν` with `ν = y − Cx̂`, `S = CΣCᵀ + R`. `NIS ≈ m` means model and reality
 agree; `NIS ≫ m` means the model is overconfident relative to reality — it has
-drifted and does not know it. This is the standard innovation-consistency χ² test
+drifted and does not know it. *In plain words: this measures how surprised the system should be given how confident it claims to be. A small value means its picture of the world matches what it sees; a large value means reality has diverged from its beliefs and it hasn't noticed.* This is the standard innovation-consistency χ² test
 (Bar-Shalom, Li & Kirubarajan 2001), and unlike `p_gate` it is a property the
 engine can actually compute: the `CovarianceField` already propagates Σ, but the
 rollout never fused an observation — `SurpriseMonitor` adds the missing
@@ -343,13 +451,15 @@ growing error) during the gap before an unobserved disturbance "rustles" into a
 visible dimension and the NIS spikes past threshold. The dangerous state is not the
 spook — it is the quiet that precedes it.
 
-**Residual ([#657]).** The monitor is wired into `engine.forward_step`, but in the
-shipped engine the observation is the identity (`y = x`): during collapse the
-innovation `ν = y − Cx̂ → 0`, so the canary may not fire on the very trajectory it
-is meant to catch. `test_surprise_monitor_integration` is `xfail` until an
-observation model with genuine reality-coupling is supplied; flipping that test to a
-hard pass is the acceptance check. This is the only open technical gap in the Σ₀
-machinery as of 2026-06-16.
+**Residual ([#657]) — RESOLVED 2026-06-19.** The monitor was wired into
+`engine.forward_step`, but with an identity observation (`y = x`) the innovation
+`ν = y − Cx̂ → 0` during collapse, so the canary risked staying silent on the very
+trajectory it should catch. **Fixed:** `forward_step` now runs a Kalman
+predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration
+stays consistent (NIS ≈ m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS —
+the canary fires under collapse. `test_surprise_monitor_integration` flipped
+`xfail` → **hard pass (30 passed, 0 xfail)**. This was the last open technical gap
+in the Σ₀ machinery; it is now closed.
 
 ---
 
@@ -357,7 +467,7 @@ machinery as of 2026-06-16.
 
 **Status: STANDARD CONSTRUCTION — correct, with a timescale-separation caveat.**
 
-The system is **multistable**. Collect its attractors `{A₁,…,A_k}` (fixed
+The system is **multistable**. In plain words: the system has several stable patterns it can settle into (think of valleys a marble could roll into). Each such resting pattern is an "attractor," and its "basin" is the set of starting points that all drain into it. Collect its attractors `{A₁,…,A_k}` (fixed
 points, limit cycles, strange attractors), each with a basin
 
 $$B_i = \{\, x_0 : \lim_{t\to\infty}\phi_t(x_0) \in A_i \,\}.$$
@@ -375,7 +485,7 @@ sets. It is correct, with one standard caveat: the induced chain is genuinely
 Markov only under **timescale separation** (fast intra-basin relaxation vs.
 slow inter-basin hops); without it, `P_ij` carries memory.
 
-**Safe passages.** A basin boundary studded with **saddles** (mixed-sign
+**Safe passages.** In plain words: the system threads narrow ridges between the valleys, neither captured by a trap nor flung away. A basin boundary studded with **saddles** (mixed-sign
 `Re λ`) has *stable manifolds* — ridges you can traverse without being captured
 by a deep attractor. "Spin the vanda fast" = ride a boundary saddle with
 rotation set by `Im λ`.
@@ -393,7 +503,7 @@ rotation set by `Im λ`.
 > python experiments/router_reservoir_G.py       # → data/sigma0/reservoir-G-output.jsonl
 > ```
 
-Each turn is encoded as `x = [novelty, self_repeat, echo, length] ∈ [0,1]⁴`
+Each turn is encoded as `x = [novelty, self_repeat, echo, length] ∈ [0,1]⁴` In plain words: we took a real chat log and turned every message into four numbers — how new it was, how much it repeated itself, how much it echoed the prompt, and how long it was — then watched where a self-feeding copy of the conversation drifts with nothing real to check itself against.
 (`router_sigma0_encoder.py`), with a local Jacobian fitted over a 10-turn
 sliding window via finite difference.
 
@@ -441,7 +551,7 @@ so the deliverable is the reproducible pipeline, not a population-level value.
 **Status: the one downstream claim worth keeping — but as a machine-learning
 claim, on ML evidence, NOT as a consequence of the physics or of §6.**
 
-The same equations read as a safety argument:
+The same equations read as a safety argument: In plain words: a powerful AI that only ever learns from its own outputs — never checking against the real world — has no good long-term outcome. It either freezes into a dead, self-agreeing rut or runs away with no limit. The thing that saves it is staying tethered to reality: real data, real feedback.
 
 A system that **"comes out of its own eyes"** — that optimizes against its own
 representations with no external anchor — is the flow `ẋ = f(x)` where `f` only
@@ -459,7 +569,7 @@ projection back onto the real domain). **Grounding is the safety mechanism.**
 This is the strongest part of the document, and it **does not need the
 certificate's physics or the §6 numbers** to stand. It is the documented
 phenomenon of **model collapse** — the degradation of learned models when trained
-recursively on synthetic data. Key recent works:
+recursively on synthetic data. In plain words: it is like repeatedly photocopying a photocopy — each generation trained on the previous one's output gets a little worse. Key recent works:
 
 - **Dohmatob, Feng, Yang, Charton & Kempe**, *A Tale of Tails: Model Collapse as
   a Change of Scaling Laws* (arXiv:2402.07043, ICML 2024) shows synthetic data
@@ -524,7 +634,7 @@ contraction math is attributed to Lohmiller & Slotine 1998 and Khalil 2002).*
 ## Appendix A: Router Demonstration Design (original sketch)
 
 > **ℹ HISTORICAL.** This appendix preserves the *original* design sketch and its
-> hand-entered numbers for provenance. The demonstration is now implemented and
+> hand-entered numbers for provenance. In plain words: this section is just the first guess we wrote down before running the real test — its numbers were never confirmed by data (see §6 for what actually happened). The demonstration is now implemented and
 > reproducible — see §6 for the produced results. The "parrot attractor" numbers
 > below were the pre-implementation hypothesis and were **not** confirmed by the
 > real run (the data settles at high-novelty / low-echo instead).
@@ -588,7 +698,7 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (29 passing, 1 xfail pending [#657]); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (30 passing, 0 xfail — [#657] closed 2026-06-19); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*

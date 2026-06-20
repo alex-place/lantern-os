@@ -8,6 +8,11 @@ documentation (whitepaper, backend notes, CADD, code docstrings) and supersedes
 the dead `CSF-FORMAT-SPECIFICATION.md` reference that `header.py` and the
 Knowledge Center pointed at.
 
+> **Lattice view (singularity).** The symbolic v0.7 engine (`src/csf/v07/`) is the
+> **storage face** of the `3**12` balanced-ternary Convergence Lattice — the same object the
+> Converged Tesseract moves across. See [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md)
+> for the consolidation; §6 below is the short bridge.
+
 ---
 
 ## 1. Version lineage
@@ -189,3 +194,25 @@ Symbolic compression research: `quantum_dust`, `base3_positions`,
 - `csf/ingest/` — CSF *ingest* docs are the memory/task queue, **not** format specs
 
 This spec is the authoritative format reference; the above remain for history.
+
+---
+
+## 6. The 3¹² lattice (storage face of the singularity)
+
+The v0.7 symbolic engine is not a standalone compressor — it is the **storage face** of a
+single `3**12 = 531,441`-cell **balanced-ternary lattice** that the project also reasons over
+geometrically (the "Tesseract"). The two are one object; the full argument and grounding live
+in [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md). Bridge facts:
+
+| Spec concept | Lattice role | Code |
+|---|---|---|
+| `NUM_DIMENSIONS = 12`, `TOTAL_POSITIONS = 3 ** 12` | 12 ternary axes (one per Convergence-12 component) | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py) |
+| `QutritState` (amp 0-7, phase 0-7) + `QutritDelta` (2 B) | a lattice cell + its signed change | [`qutrit_delta.py`](../src/csf/v07/qutrit_delta.py) |
+| `QuantumDustField` baseline + active deltas + dust | a stored point; most cells implicit ("dust") | [`quantum_dust.py`](../src/csf/v07/quantum_dust.py) |
+| observer-collapsed wavefront | the **motion face** (Tesseract) reads the same field | [`converged_tesseract.py`](../src/converged_tesseract.py) |
+
+**Why base-3, not base-2:** ternary is the most economical integer radix (optimum is `e`,
+nearest integer 3), and balanced ternary `{-1,0,+1}` gives symmetric arithmetic — the same
+substrate as BitNet b1.58's ternary weights ([arXiv:2402.17764](https://arxiv.org/abs/2402.17764)).
+The "no change is free" dust optimisation is the storage-side twin of BitNet's ~66 % zero-weight
+sparsity. Citations and falsifiable experiments: see the singularity doc §5–6.

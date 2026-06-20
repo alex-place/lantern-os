@@ -56,6 +56,15 @@ data/pcsf/*.json
 apps/data/conversations/garage-conversations.jsonl
 data/metrics/three-doors-events.jsonl
 
+# Research Convergence Loop runtime output (memories, records, reports, queue)
+data/research/*.jsonl
+data/research/reports/
+
+# ─── Creator Intelligence calibration (private first-party analytics) ────────
+# The operator's own YouTube/TikTok analytics + the labeled outcome set built
+# from them. Local-only by design — never commit personal performance data.
+data/creator-intelligence/outcomes/
+
 # ─── Document ingest (generated, large, local-only) ──────────────────────────
 data/csf-ingest/deltas.jsonl
 data/csf-ingest/dedup-log.jsonl
@@ -136,6 +145,8 @@ archive/**/worktrees/**
 # Exceptions: legitimately-named Creator V10 source + docs + Σ₀ spectral modules
 !docs/creator-v10/**
 !apps/lantern-garage/lib/safe-zone-v2.js
+!apps/lantern-garage/lib/safe-zone-v3.js
+!apps/lantern-garage/lib/facecam-v3.js
 !apps/lantern-garage/lib/caption-engine-v3.js
 !apps/lantern-garage/lib/variant-engine-v2.js
 !apps/lantern-garage/lib/spectral-analyzer.js
@@ -245,5 +256,45 @@ models/*/adapters/
 # per-user CSF profile archives (user data — privacy)
 data/profiles/*.csf
 
+# Gaming layout suite — user-supplied clips + debug frames (never committed)
+tests/gaming-layout-suite/*.mp4
+tests/gaming-layout-suite/*.mkv
+tests/gaming-layout-suite/*.webm
+debug/
+
 # Open-video research: per-machine extracted features (never videos)
 research/open_video/features/*.jsonl
+
+# Creator Intelligence loop — per-machine checkpoint/metadata/calibration (never commit)
+research/ci_loop/
+
+# Open-video research: generated SQLite corpus (regenerate with --corpus)
+research/corpus.db
+
+# Facecam V3 debug overlay (generated)
+facecam-debug.png
+
+# ─── Runtime / collector churn (local only) ───────────────────────────────────
+# These are written continuously by running servers/collectors, so tracking them
+# left the working tree permanently dirty and blocked branch-switch automation
+# ("git_tree_dirty: refusing to switch branches"). Same policy as the other
+# runtime data above (data/csf/, data/pcsf/, data/training/ …).
+data/csf_cache/
+data/*.out
+apps/data/crypto/prices.jsonl
+data/kalshi/paper-positions.jsonl
+data/kalshi/cio-train-report.json
+data/agent_hook_audit.jsonl
+
+# ─── Runtime churn logs (#767/#777) ──────────────────────────────────────────
+# Append-only runtime logs/metrics, not curated data. They are rewritten on every
+# chat / cube / csf op, so when tracked they chronically dirty the tree and the
+# branch-switch guard refuses to switch ("git_tree_dirty … would be clobbered").
+# Local-only; untracked via `git rm --cached` in the same commit that ignores them.
+apps/data/csf-query-metrics.jsonl
+data/convergence/chat-responses.jsonl
+data/cubes/*/deltas/*.jsonl
+data/proposals.jsonl
+
+# Junction to the dedicated dev-server worktree (C:/dev/lantern-os-dev); see docs/DEV-SERVER-WORKTREE.md
+.dev-worktree/

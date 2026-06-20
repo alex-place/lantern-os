@@ -1,9 +1,0 @@
-2026-06-10 20:43:14 WARNING  lantern.mcp.oauth MCP_OAUTH_JWT_SECRET not set. Using random secret. Set it for persistent tokens across restarts.
-2026-06-10 20:43:14 INFO     lantern.mcp.oauth Random secret (save this): uF6gDMGcW_T8hee4-qQtEUoY2kscTyhxo3VpKfqNJPU
-2026-06-10 20:43:14 INFO     lantern.mcp.oauth Lantern OS MCP OAuth Server starting on http://127.0.0.1:8772
-2026-06-10 20:43:14 INFO     lantern.mcp.oauth Tools available: ['queue_status', 'task_intake', 'dispatch_work', 'boot_check', 'list_skills', 'get_status', 'web_search', 'render_report_pdf']
-2026-06-10 20:43:14 INFO     lantern.mcp.oauth OAuth discovery: http://127.0.0.1:8772/.well-known/oauth-authorization-server
-INFO:     Started server process [20160]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8772 (Press CTRL+C to quit)

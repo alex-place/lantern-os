@@ -1,12 +1,16 @@
 {
-  "built_at": 1781843457.3200023,
+  "built_at": 1781923094.314502,
   "docs": [
     "README.md",
     "CLAUDE.md",
     "AGENTS.md",
     "QUICKSTART.md",
+    "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
     "docs/LANTERN-SIGMA0-CODER.md",
     "docs/OURO-LOOPLM.md",
+    "docs/research/2026-06-19-kernel-model-frontier.md",
+    "docs/research/2026-06-19-convergence-tesseract-spiral.md",
+    "docs/research/2026-06-19-convergence-core-agent-spine.md",
     "docs/SIGMA0-OURO-CODER.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
@@ -18,6 +22,6 @@
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md"
   ],
-  "sections": 329,
-  "sha256": "7cc11c7c7de456c85d8e3e4cb4b4530c3a6531ba283a052de1b7d5b9d97e3a4f"
+  "sections": 371,
+  "sha256": "c43c4b3bae05d580c2a09f531768cd8c6ce47abb34d89edf7c5af3026866feca"
 }

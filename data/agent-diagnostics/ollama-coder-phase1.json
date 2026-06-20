@@ -1,0 +1,78 @@
+{
+  "issue": 629,
+  "phase": 1,
+  "title": "Diagnose Ollama coding-agent failure — RP artifacts and verification gaps",
+  "generated": "2026-06-19",
+  "method": "code-analysis + live runtime probe (read-only; no edits to dream-chat.js this phase)",
+  "source": "static analysis of apps/lantern-garage/lib/dream-chat.js + apps/lantern-garage/routes/dream.js, plus live curl probes of the local Ollama daemon",
+
+  "model_status": {
+    "state": "running",
+    "summary": "Ollama daemon is up at 127.0.0.1:11434 and the configured coder model responds correctly. This contradicts the issue's premise that the model 'stopped working' — as of this probe the model is live; the real defects are prompt-framing and verification, not availability.",
+    "configured_model": "lantern-sigma0-coder-v2 (set via OLLAMA_MODEL in .env; a 3.1B qwen2 Q4_K_M GGUF, the trained coder model from epic #690)",
+    "live_probe": "GET /api/tags lists only 'lantern-sigma0-coder-v2:latest'. POST /api/chat to that model returned a clean 'ok' (load_duration ~0.14s, total ~0.34s warm).",
+    "default_fallback_risk": "The hard-coded default when OLLAMA_MODEL is unset is 'lantern-csf-dream' (dream-chat.js:356,731), which is NOT installed (absent from /api/tags). Any deployment that does not set OLLAMA_MODEL would hit model-not-found and silently fall through to cloud. .env currently sets OLLAMA_MODEL correctly, so the live path works.",
+    "evidence": [
+      "ollamaModel default = 'lantern-csf-dream' — dream-chat.js:356,731",
+      "ollamaBase default = http://127.0.0.1:11434 — dream-chat.js:355,730",
+      "live: /api/tags returns only lantern-sigma0-coder-v2:latest (no lantern-csf-dream)",
+      "live: /api/chat to lantern-sigma0-coder-v2 returned message.content='ok', done_reason='stop'",
+      ".env sets OLLAMA_MODEL=lantern-sigma0-coder-v2 and OLLAMA_TIMEOUT_MS=180000"
+    ]
+  },
+
+  "prompt_issues": [
+    {
+      "id": "rp-framed-userprompt",
+      "severity": "high",
+      "description": "Every Ollama (and cloud) request wraps the user's text in dream/persona roleplay framing: the userPrompt is built as 'Dreamer says: \"...\" ... Respond as your persona. Keep it brief (2-4 sentences). ... Never diagnose or command.' This RP framing is applied uniformly, even for code/verification tasks, biasing the model toward short in-character prose instead of grounded code output.",
+      "evidence": ["dream-chat.js:651 (userPrompt template: 'Dreamer says' + 'Respond as your persona. Keep it brief (2-4 sentences).' + 'Never diagnose or command.')"]
+    },
+    {
+      "id": "rp-artifacts-inline-personas",
+      "severity": "medium",
+      "description": "The inline _DEFAULT_PERSONAS fallback carries heavy roleplay artifacts (e.g. a literal lantern-headed being; a CRT-television caterpillar / glitch-poetry persona) that, when used, push storytelling over verification. Live personas load from apps/data/contexts/personas.json (cleaner/professional), but the fallback path remains RP-laden.",
+      "evidence": ["dream-chat.js:80,86 (inline persona RP artifacts)", "apps/data/contexts/personas.json:10-15 (live 'keystone' persona is generic technical, with no explicit code-output contract)"]
+    },
+    {
+      "id": "keystone-code-contract-only-in-unused-fallback",
+      "severity": "medium",
+      "description": "The [APPLY_CODE]-style coder contract for the Keystone persona exists only in the inline fallback (not used when personas.json loads), so the live coder persona has no explicit code-output / grounding contract.",
+      "evidence": ["dream-chat.js:92-153 (inline keystone [APPLY_CODE] prompt, unused when personas.json present)"]
+    }
+  ],
+
+  "verification_gaps": [
+    {
+      "id": "ollama-return-no-verification",
+      "severity": "high",
+      "description": "The Ollama branch returns its reply directly with no verification/grounding pass and no confidence field; the only Σ₀ verify pass (verifyResponse) runs downstream in routes/dream.js and is gated off for local-only runs.",
+      "evidence": ["dream-chat.js:778 (Ollama success return: { reply, agent, suggestions, online, source:'ollama', webSuggestions } — no 'confidence')"]
+    },
+    {
+      "id": "doors-parser-token-never-requested",
+      "severity": "low",
+      "description": "The Ollama response is scanned for a '[DOORS: ...]' token, but the userPrompt never instructs the model to emit one, so the door-suggestion extraction is effectively dead for Ollama and falls back to generic suggestions.",
+      "evidence": ["dream-chat.js:760 (content.match(/\\[DOORS:\\s*([^\\]]+)\\]/i)) with no corresponding instruction in the userPrompt at dream-chat.js:651"]
+    },
+    {
+      "id": "verify-pass-gated-off-for-local",
+      "severity": "high",
+      "description": "verifyResponse (Σ₀ grounding + low-confidence revision) only runs when SIGMA0_VERIFY=true AND ANTHROPIC_API_KEY is present, and executes downstream of the Ollama call. A local Ollama-only run therefore receives zero verification and zero confidence scoring — the 'calm while wrong' failure mode (cf. #740).",
+      "evidence": ["dream-chat.js:1031 (if SIGMA0_VERIFY !== 'true' return unverified)", "dream-chat.js:1034 (if no ANTHROPIC_API_KEY return unverified)", "routes/dream.js:270-274 (verifyResponse invoked downstream)"]
+    }
+  ],
+
+  "confidence_score_missing": true,
+
+  "recommendation": {
+    "verdict": "retune (prompt + verification wiring) — NOT rebuild/replace; the model itself is live and correct",
+    "actions": [
+      "Bypass the RP 'Dreamer says / Respond as your persona' framing for coder and verification tasks — branch the userPrompt so code/keystone requests get a grounded code-output contract instead of in-character brevity (dream-chat.js:651).",
+      "Extend the verify/confidence pass to the local Ollama path so local-only runs still get a [claim, evidence, confidence] record — either make a lightweight self-check that does not require ANTHROPIC_API_KEY, or attach a confidence field to the Ollama return (dream-chat.js:778, 1030-1034).",
+      "Either install a 'lantern-csf-dream' model or keep OLLAMA_MODEL pinned in every deployment so the unset-default does not silently fail to cloud (dream-chat.js:356,731).",
+      "Wire OLLAMA_TIMEOUT_MS into the autowork callOllama path (currently hard-coded 30s) — tracked separately in #690."
+    ],
+    "blocked_on": "none for the diagnostic itself; the retune actions are follow-on code changes (Phase 2)."
+  }
+}

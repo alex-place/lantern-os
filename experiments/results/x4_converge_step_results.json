@@ -1,0 +1,114 @@
+{
+  "experiment": "X4_converge_step_instrument",
+  "instrument_under_test": "converge_step_ref (brief-specified contraction semantics)",
+  "params": {
+    "eps": 0.05,
+    "max_steps": 12,
+    "dim": 16
+  },
+  "torch": {
+    "version": "2.10.0+cpu",
+    "cuda": false
+  },
+  "trajectories": {
+    "contraction": {
+      "ground_truth": "h_t = h_star + 0.5**t*(h0-h_star); converges to h_star",
+      "deltas": [
+        0.49986268943568335,
+        0.4747808140700913,
+        0.3892561377342688,
+        0.24915404373060585,
+        0.13380418278294173,
+        0.06768847030879922,
+        0.033811758812259625
+      ],
+      "exit_reason": "fixed_point",
+      "exit_step_1indexed": 8,
+      "rel_at_exit": 0.033811758812259625,
+      "expected_reason": "fixed_point",
+      "checks": {
+        "reason_is_fixed_point": true,
+        "deltas_strictly_decreasing": true
+      },
+      "verdict": "PASS"
+    },
+    "orbit": {
+      "ground_truth": "constant-norm rotation by fixed angle 0.7 rad/step in a 2-plane",
+      "deltas": [
+        0.13423145552437268,
+        0.13423145552437268,
+        0.13423145552437266,
+        0.1342314555243727,
+        0.1342314555243727,
+        0.13423145552437254,
+        0.13423145552437274,
+        0.13423145552437274,
+        0.13423145552437274,
+        0.1342314555243727,
+        0.13423145552437254
+      ],
+      "exit_reason": "max_depth",
+      "exit_step_1indexed": 12,
+      "rel_at_exit": 0.13423145552437254,
+      "expected_reason": "max_depth",
+      "checks": {
+        "reason_is_max_depth": true,
+        "all_rel_above_eps": true,
+        "rel_roughly_constant": true,
+        "no_false_fixed_point": true
+      },
+      "verdict": "PASS"
+    },
+    "divergence": {
+      "ground_truth": "h_t = 1.3**t * h0; magnitudes blow up",
+      "deltas": [
+        0.30000000000000004,
+        0.3000000000000001,
+        0.29999999999999993,
+        0.3000000000000002,
+        0.3,
+        0.30000000000000004,
+        0.3000000000000002,
+        0.3,
+        0.3,
+        0.3000000000000001,
+        0.2999999999999999
+      ],
+      "exit_reason": "max_depth",
+      "exit_step_1indexed": 12,
+      "rel_at_exit": 0.2999999999999999,
+      "expected_reason": "max_depth",
+      "checks": {
+        "reason_is_max_depth": true,
+        "deltas_non_decreasing": true,
+        "all_rel_above_eps": true,
+        "no_false_fixed_point": true
+      },
+      "verdict": "PASS"
+    }
+  },
+  "repo_instrument_probe": {
+    "has_converge_step_in_repo": false,
+    "has_qexit_step_in_repo": true,
+    "qexit_demo_rising_gates": {
+      "gate_logits": [
+        -3.0,
+        -1.0,
+        0.5,
+        2.0
+      ],
+      "q": 0.5,
+      "exit_step": 3,
+      "confidence_cdf": 0.7370854023419187,
+      "reason": "threshold_met"
+    },
+    "note": "Repo's qexit_step measures a CDF over learned exit-gate LOGITS, not hidden-state relative-delta contraction. The brief's converge_step (hidden_per_step, eps) contract is NOT present in loop_lm.py; converge_step_ref in THIS file is a faithful local implementation of the brief's contraction semantics, and is what the PASS/FAIL above test."
+  },
+  "real_ouro_bonus": {
+    "attempted": true,
+    "succeeded": false,
+    "blocker": "ImportError: huggingface-hub>=0.34.0,<1.0 is required for a normal functioning of this module, but found huggingface-hub==1.18.0.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main"
+  },
+  "all_synthetic_pass": true,
+  "verdict": "supported"
+}

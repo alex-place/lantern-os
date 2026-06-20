@@ -520,6 +520,91 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
     }
 
 
+# ── Superfleet Phase 3: sandboxed EXECUTOR (opt-in; default path stays proposal) ──
+import executor as _executor
+
+
+def _tool_execute_task(task_id: str = "", dry_run: str = "") -> Dict[str, Any]:
+    """SUPERFLEET PHASE 3 — sandboxed EXECUTOR. Upgrades a claimed task from a
+    PROPOSAL into an executed change: claim a queued task → carve a git-worktree
+    SANDBOX off the base branch → run the local Σ₀/convergence coder → run bounded
+    in-house verification (py_compile / node --check) → on success commit + push a
+    NEW fix branch (never auto-merged) → emit a Convergence Record + PCSF receipt;
+    on failure record the failure pattern. The worktree is always auto-cleaned.
+
+    OPT-IN + BOUNDED: refuses unless SUPERFLEET_EXECUTOR=1 (the default queue
+    consumer remains task_run, the proposal generator). Push is a second opt-in
+    (SUPERFLEET_EXECUTOR_PUSH=1); otherwise it commits to the branch only. Pass
+    dry_run=1 to prove the whole flow without committing/pushing or mutating the
+    real repo (sandbox created + removed only)."""
+    is_dry = str(dry_run).strip() in ("1", "true", "yes", "on")
+
+    if not is_dry and not _executor.executor_enabled():
+        return {
+            "ok": False,
+            "error": "executor_disabled",
+            "note": (
+                f"Execute path is opt-in. Set {_executor.ENV_FLAG}=1 to enable, "
+                "or use task_run for the default proposal path. Pass dry_run=1 to "
+                "exercise the flow safely without the flag."
+            ),
+        }
+
+    # ── Observe: claim the task (named full id / unique prefix, or top pending) ──
+    if task_id:
+        matches = [t for t in _task_queue if t.get("id") == task_id or t.get("id", "").startswith(task_id)]
+        if not matches:
+            return {"ok": False, "error": "task_not_found", "task_id": task_id}
+        if len(matches) > 1:
+            return {"ok": False, "error": "ambiguous_prefix", "candidates": [t["id"] for t in matches]}
+        task = matches[0]
+    else:
+        pending = [t for t in _task_queue if t.get("status") == "pending"]
+        if not pending:
+            return {"ok": False, "error": "no_pending_tasks", "queue_depth": len(_task_queue)}
+        task = pending[0]
+
+    if task.get("status") == "active":
+        return {"ok": False, "error": "already_active", "task_id": task["id"]}
+
+    # ── Act: mark in-flight so active_slots reflects this executor run ──
+    task["status"] = "active"
+    task["started_at"] = datetime.now(timezone.utc).isoformat()
+    _ledger("status", task_id=task["id"], status="active", started_at=task["started_at"])
+
+    # Reuse the server's evidence sinks so the executor logs land in the same
+    # Convergence Record / PCSF receipt streams as task_run.
+    res = _executor.execute_task(
+        task,
+        REPO_ROOT,
+        append_record=lambda o: _append_jsonl(REPO_ROOT / "data" / "convergence" / "records.jsonl", o),
+        append_receipt=lambda o: _append_jsonl(REPO_ROOT / "data" / "pcsf" / "convergance-receipts.jsonl", o),
+        record_failure=lambda o: _append_jsonl(REPO_ROOT / "data" / "convergence" / "failure-patterns.jsonl", o),
+        dry_run=is_dry,
+    )
+
+    # ── Converge: finalize queue state (dry-runs do NOT consume the task) ──
+    if is_dry:
+        task["status"] = "pending"
+        task.pop("started_at", None)
+        _ledger("status", task_id=task["id"], status="pending", requeued_from="dry_run")
+    else:
+        task["status"] = "done" if res.get("ok") else "failed"
+        task["completed_at"] = datetime.now(timezone.utc).isoformat()
+        task["confidence"] = res.get("confidence", 0.0)
+        if res.get("fix_branch"):
+            task["fix_branch"] = res["fix_branch"]
+        if res.get("error"):
+            task["error"] = res["error"]
+        _ledger("status", task_id=task["id"], status=task["status"],
+                completed_at=task["completed_at"], confidence=task.get("confidence", 0.0),
+                fix_branch=res.get("fix_branch"), error=res.get("error"))
+
+    res["active_slots"] = _active_task_count()
+    res["queue_depth"] = len(_task_queue)
+    return res
+
+
 def _tool_boot_check() -> Dict[str, Any]:
     """Check orchestrator boot status. Reports honest slot counts from fleet status file."""
     return _build_boot_status()
@@ -692,29 +777,38 @@ def _tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
             html = resp.read().decode("utf-8", errors="replace")
 
         results = []
+        # DuckDuckGo-lite markup: <a ... href="URL" class='result-link'>TITLE</a>
+        # and <td class='result-snippet'>SNIPPET</td> (single quotes, varying order).
         link_pattern = re.compile(
-            r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+            r"""<a\b[^>]*\bhref=["']([^"']+)["'][^>]*\bclass=["']result-link["'][^>]*>(.*?)</a>""",
             re.IGNORECASE | re.DOTALL,
         )
         snippet_pattern = re.compile(
-            r'<td[^>]+class="result__snippet"[^>]*>(.*?)</td>',
+            r"""<td[^>]*\bclass=["']result-snippet["'][^>]*>(.*?)</td>""",
             re.IGNORECASE | re.DOTALL,
         )
 
         links = link_pattern.findall(html)
         snippets = snippet_pattern.findall(html)
 
+        def _normalize(href: str) -> str:
+            if "uddg=" in href:
+                m = re.search(r"uddg=([^&]+)", href)
+                if m:
+                    return urllib.parse.unquote(m.group(1))
+            if href.startswith("//"):
+                return "https:" + href
+            if href.startswith("/"):
+                return "https://duckduckgo.com" + href
+            return href
+
         for i, (href, title_raw) in enumerate(links[:max_results]):
             title = re.sub(r"<[^>]+>", "", title_raw).strip()
-            if href.startswith("//"):
-                href = "https:" + href
-            elif href.startswith("/"):
-                href = "https://duckduckgo.com" + href
             snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip() if i < len(snippets) else ""
             results.append({
                 "rank": i + 1,
                 "title": title,
-                "url": href,
+                "url": _normalize(href),
                 "snippet": snippet,
             })
 
@@ -736,6 +830,66 @@ def _tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
         }
 
 
+# ── Research Convergence Loop ──
+# Drives the six-stage Convergence Kernel for open research questions:
+# web-search evidence (Observe), persist as memory (Remember), extract claims
+# (Reason), corroborate across independent sources — External Reality Rule (Verify),
+# emit a cited report (Converge). Continuous via a durable JSONL task queue.
+
+_research_program = None
+
+
+def _get_research_program():
+    global _research_program
+    if _research_program is None:
+        from convergence.research import ResearchProgram
+        _research_program = ResearchProgram()
+    return _research_program
+
+
+def _tool_research_run(question: str, max_results: int = 5) -> Dict[str, Any]:
+    """Run the research convergence loop for one question: web-search the evidence,
+    persist it as memory, extract claims, verify each by cross-source corroboration
+    (External Reality Rule), and return a cited report carrying, for every claim,
+    [claim, evidence, confidence, source]."""
+    try:
+        from convergence.research import ResearchLoop
+        report = ResearchLoop().run(question, max_results=int(max_results))
+        return {"success": True, **report.to_dict()}
+    except Exception as exc:
+        logger.exception("research_run failed")
+        return {"success": False, "question": question, "error": str(exc)}
+
+
+def _tool_research_intake(question: str, priority: str = "medium") -> Dict[str, Any]:
+    """Queue a research question for the continuous research program (durable JSONL
+    queue that survives restarts). Drain it with research_run_next."""
+    try:
+        return {"success": True, **_get_research_program().enqueue(question, priority)}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+def _tool_research_run_next(max_results: int = 5) -> Dict[str, Any]:
+    """Run the highest-priority pending research task from the queue through the
+    convergence loop. Returns the cited report, or a queue_empty note."""
+    try:
+        out = _get_research_program().run_next(max_results=int(max_results))
+        if out is None:
+            return {"success": True, "status": "queue_empty"}
+        return {"success": True, "report": out}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+def _tool_research_status() -> Dict[str, Any]:
+    """Show the research program queue depth and per-status task breakdown."""
+    try:
+        return {"success": True, **_get_research_program().status()}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
 # ── JSON-RPC Dispatch ──
 
 TOOLS_REGISTRY = {
@@ -744,6 +898,7 @@ TOOLS_REGISTRY = {
     "task_cancel": _tool_task_cancel,
     "task_delete": _tool_task_delete,
     "task_run": _tool_task_run,
+    "execute_task": _tool_execute_task,
     "queue_clear": _tool_queue_clear,
     "dispatch_work": _tool_dispatch_work,
     "boot_check": _tool_boot_check,
@@ -756,6 +911,10 @@ TOOLS_REGISTRY = {
     "mesh_prune": _tool_mesh_prune,
     "update_lantern_os": _tool_update_lantern_os,
     "web_search": _tool_web_search,
+    "research_run": _tool_research_run,
+    "research_intake": _tool_research_intake,
+    "research_run_next": _tool_research_run_next,
+    "research_status": _tool_research_status,
 }
 
 # ── GitHub tools (gh-CLI backed) — mirrors the high-value core of GitHub's MCP ──
@@ -768,6 +927,33 @@ try:
 except Exception as _gh_exc:  # pragma: no cover - optional module
     _GITHUB_INT_PARAMS = set()
     logger.warning("GitHub tools not loaded: %s", _gh_exc)
+
+# ── Local deterministic repo-fix runner — the local execution layer ──
+# Worktree-sandboxed, scope+secret-gated, allowlisted tests, receipt-backed. The LLM
+# proposes; this layer validates and executes. Never writes/pushes a protected branch.
+try:
+    import local_runner
+    _lr_added = local_runner.register(TOOLS_REGISTRY)
+    _LOCAL_INT_PARAMS = local_runner.INT_PARAMS
+    logger.info("Local runner tools registered (%d): repo=%s", len(_lr_added), local_runner.REPO_ROOT)
+except Exception as _lr_exc:  # pragma: no cover - optional module
+    _LOCAL_INT_PARAMS = set()
+    logger.warning("Local runner not loaded: %s", _lr_exc)
+
+# ── Convergence / workflow tools — the !convergance + PR-work backbone ──
+# convergence_run, github_triage_prs, github_pr_status, worker_tick, lantern_command.
+# Wired with the live queue + task_run so worker_tick proves pickup.
+try:
+    import convergence_tools
+    _cv_added = convergence_tools.register(TOOLS_REGISTRY, {
+        "task_queue": _task_queue,
+        "run_task": _tool_task_run,
+        "append_jsonl": _append_jsonl,
+        "repo_root": REPO_ROOT,
+    })
+    logger.info("Convergence/workflow tools registered (%d): %s", len(_cv_added), _cv_added)
+except Exception as _cv_exc:  # pragma: no cover - optional module
+    logger.warning("Convergence tools not loaded: %s", _cv_exc)
 
 
 def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
@@ -805,12 +991,12 @@ def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
                 "required": [],
             }
             for param_name, param in sig.parameters.items():
-                if param_name in ("limit",) or param_name in _GITHUB_INT_PARAMS:
+                if param_name in ("limit", "max_results") or param_name in _GITHUB_INT_PARAMS or param_name in _LOCAL_INT_PARAMS:
                     parameters["properties"][param_name] = {
                         "type": "integer",
-                        "default": param.default if param.default is not inspect.Parameter.empty else 10,
+                        "default": param.default if param.default is not inspect.Parameter.empty else (5 if param_name == "max_results" else 10),
                     }
-                elif param_name in ("description", "agent", "task", "priority"):
+                elif param_name in ("description", "agent", "task", "priority", "question"):
                     parameters["properties"][param_name] = {
                         "type": "string",
                         "default": param.default if param.default is not inspect.Parameter.empty else "",

@@ -108,11 +108,11 @@ By providing a persistent self-story, Narrative Identity dramatically reduces th
 
 Systems that optimize only against their own representations (with no external grounding) face a fundamental constraint: they can only collapse or diverge. There is no stable middle ground.
 
-The Σ₀ Collapse Certificate is a computable stability certificate for dissipative nonlinear systems. It provides exact predictions about when a self-improving system will freeze into a degenerate fixed point (collapse) versus spinning into incoherence (divergence).
+The Σ₀ Collapse Certificate is a computable stability certificate for dissipative nonlinear systems. It gives a *sufficient* condition — **proven for the normal/symmetric regime** (or when the active subspace is A-invariant) — for when a system contracts onto a degenerate fixed point. Outside that regime it reports a conservative small-gain bound plus the full-spectrum `max Re λ(A)` screen, **not** an exact prediction. See [docs/ANTI-COLLAPSE-HARDENING.md](../../docs/ANTI-COLLAPSE-HARDENING.md) for the proven-vs-heuristic boundary and the defense-in-depth hardening plan (epic #764).
 
 ### The Collapse Guarantee Theorem
 
-A system with drift Jacobian A collapses if and only if the active spectral abscissa α (the largest eigenvalue of the symmetric part, excluding near-null modes) is negative:
+For **normal/symmetric A** (or an A-invariant active subspace), if the active spectral abscissa α (the largest eigenvalue of the symmetric part, excluding near-null modes) is negative, active-mode energy contracts exponentially. This is **sufficient, not iff** — for non-normal A the cross term `P_M A P_N` breaks the simple bound (certificate §1.2):
 
 ```
 If α < 0:  ‖P_M x(t)‖ ≤ ‖P_M x(0)‖ · e^(α t)
@@ -140,8 +140,10 @@ Proximity ∈ [0,1] is zero when safe (cost is zero), rises to 1 as the system a
 
 ### Verified Implementation
 
-- `src/cio_sde/collapse.py` — SemanticCollapseOperator, CollapseCertificate, AntiCollapseOperator
-- `tests/test_cio_sde.py` — 20 automated tests, 100% passing (stability, collapse detection, certificate accuracy, anti-collapse rescue)
+- `src/cio_sde/collapse.py` — SemanticCollapseOperator, CollapseCertificate (conservative `α = α_sym + ‖A−Aₛ‖₂` bound + full-spectrum `max Re λ(A)` screen), AntiCollapseOperator
+- `src/cio_sde/surprise.py` — Kalman NIS canary (early-warning; #657). Heuristic predictor — it trusts its observation input (see hardening gaps G1/G10).
+- `tests/test_cio_sde.py` — **30 automated tests, 0 xfail, 100% passing**.
+- **Hardening (epic #764):** [docs/ANTI-COLLAPSE-HARDENING.md](../../docs/ANTI-COLLAPSE-HARDENING.md) — 19 adopted measures + 14 red-team gaps; provable region-wideners for non-normal A (Lyapunov-SDP + pseudospectral, #768); 3 code-verified bugs queued (#765/#766/#767).
 
 ### Safety Implications
 
@@ -171,9 +173,39 @@ These mathematical frameworks are not isolated — they form an integrated cogni
 
 ---
 
-## Related Documentation
+## 9. The 3¹² Convergence Lattice (CSF × Tesseract)
 
-- `docs/sigma0-collapse-certificate.tex` — Complete technical paper: Σ₀ collapse certificate, Lyapunov theorem, anti-collapse operator, and ASI warning. 20/20 tests verified.
+The system's state space is a **balanced-ternary lattice**: `3 ** 12 = 531,441` cells, one
+ternary axis per Convergence-12 component. It is **one object seen from two faces** — the CSF
+format is the *storage* face (where the system is) and the Converged Tesseract is the *motion*
+face (where it is going). Use this when reasoning about memory layout, state compression, or
+where a convergence trajectory sits.
+
+- **Why base 3.** Ternary is the most economical integer radix (radix economy is minimised at
+  `e ≈ 2.718`, nearest integer 3); balanced ternary `{-1,0,+1}` gives symmetric arithmetic.
+  Same substrate as BitNet b1.58's ternary weights ([arXiv:2402.17764](https://arxiv.org/abs/2402.17764)).
+- **Sparsity.** Most cells are implicit "dust" (`quantum_dust.py`) — the storage twin of
+  BitNet's ~66 % zero-weight sparsity. "No change is free."
+- **Convergence.** A reasoning trajectory spirals toward a fixed point `h* ≈ f(h*)` via
+  contraction `‖Δh‖/‖h‖ < ε` (`loop_lm.converge_step`); STARS-style Jacobian Spectral Radius
+  Regularisation ([arXiv:2605.26733](https://arxiv.org/html/2605.26733)) is the literature's
+  route to guaranteeing the contraction. This is the same fixed-point story as §7's Σ₀
+  collapse certificate, restricted to the lattice.
+- **Status-Cube = `3**3` projection.** belief × observer × state is three of the twelve axes.
+
+**Implemented substrate:** `src/csf/v07/qutrit_delta.py` (`NUM_DIMENSIONS=12`), `quantum_dust.py`,
+`src/converged_tesseract.py`. **Full design + grounding + falsifiable experiments:**
+`docs/TESSERACT-CSF-SINGULARITY.md`.
+
+---
+
+## Related Documentation
+- `docs/TESSERACT-CSF-SINGULARITY.md` — the 3¹² lattice (CSF ≡ Tesseract) design reference
+- `docs/research/2026-06-19-convergence-tesseract-spiral.md` — the spiral geometry paper
+
+- `docs/SIGMA0-COLLAPSE-CERTIFICATE.md` — the authoritative certificate (proven-vs-heuristic boundary, changelog #657/#658/#661).
+- `docs/ANTI-COLLAPSE-HARDENING.md` — CSF-native defense-in-depth hardening plan (epic #764).
+- `docs/sigma0-collapse-certificate.tex` — technical paper: Σ₀ collapse certificate, Lyapunov theorem, anti-collapse operator, ASI warning. 30/30 tests verified.
 - `docs/SIGMA0-COLLAPSE-PLAIN-ENGLISH.docx` — Plain-English guide for non-technical readers.
 
 ## Related Skills

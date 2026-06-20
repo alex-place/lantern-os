@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    (function () {
+      try {
+        var s = localStorage.getItem('lantern-theme');
+        var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Admin · Feature Flags — Keystone OS</title>
+  <style>
+    .admin-shell { max-width: 760px; margin: 0 auto; padding: 28px 20px 96px; }
+    .admin-head { margin-bottom: 8px; }
+    .admin-head h1 { font-size: 1.4rem; font-weight: 700; margin: 0; }
+    .admin-head p { color: var(--muted); margin: 6px 0 0; font-size: 0.92rem; }
+
+    .section-label {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted); margin: 32px 0 10px;
+    }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
+    }
+    .row { display: flex; align-items: center; gap: 14px; }
+    .row .grow { flex: 1; min-width: 0; }
+    .row .title { font-weight: 600; font-size: 0.95rem; }
+    .row .sub { color: var(--muted); font-size: 0.82rem; margin-top: 2px; word-break: break-word; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; }
+
+    .toggles { display: flex; gap: 18px; align-items: center; flex-shrink: 0; }
+    .toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+    .toggle span { font-size: 0.8rem; color: var(--muted); }
+
+    /* Switch */
+    .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; cursor: pointer; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 999px; transition: 0.15s;
+    }
+    .slider::before {
+      content: ""; position: absolute; height: 16px; width: 16px; left: 2px; top: 2px;
+      background: var(--muted); border-radius: 50%; transition: 0.15s;
+    }
+    .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(16px); background: #fff; }
+    .switch input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+
+    .btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      padding: 9px 14px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn.ghost:hover { color: var(--text); border-color: var(--accent); }
+    .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--border); padding: 6px 10px; font-size: 0.8rem; }
+    .btn.danger:hover { border-color: var(--danger); }
+
+    .add-form { display: grid; gap: 10px; }
+    .add-form input, .add-form textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 9px 11px; color: var(--text); font-size: 0.9rem;
+      font-family: inherit;
+    }
+    .add-form input:focus, .add-form textarea:focus { outline: none; border-color: var(--accent); }
+    .add-form .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 520px) { .add-form .grid2 { grid-template-columns: 1fr; } }
+
+    .empty { color: var(--muted); font-size: 0.88rem; padding: 6px 2px; }
+    #toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 16px; border-radius: 10px; font-size: 0.88rem; opacity: 0;
+      transition: 0.2s; pointer-events: none; z-index: 50;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .gate-msg { text-align: center; color: var(--muted); padding: 60px 20px; }
+    .gate-msg a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-head">
+      <h1>Feature Flags &amp; Navigation</h1>
+      <p>Admin-only controls. Toggle feature flags and choose which pages appear in the global navigation.</p>
+    </div>
+
+    <div id="gate" class="gate-msg" style="display:none">
+      <p>This page is restricted to administrators.</p>
+      <p><a href="/auth.html">Sign in</a> with an admin account, or open it from the local stable/dev server.</p>
+    </div>
+
+    <div id="content" style="display:none">
+      <div class="section-label">Navigation visibility</div>
+      <p class="empty" style="margin:-4px 0 10px">
+        <strong>Hidden</strong> removes the link from the nav (page still reachable by URL).
+        <strong>Disabled</strong> greys the link and blocks the page for non-admins.
+      </p>
+      <div id="nav-list"></div>
+
+      <div class="section-label">Feature flags</div>
+      <div id="flag-list"></div>
+
+      <div class="section-label">Add a feature flag</div>
+      <div class="card">
+        <form class="add-form" id="add-flag-form">
+          <div class="grid2">
+            <input id="f-key" placeholder="key (e.g. new_dashboard)" autocomplete="off" required>
+            <input id="f-label" placeholder="Label (optional)" autocomplete="off">
+          </div>
+          <textarea id="f-desc" rows="2" placeholder="Description (optional)"></textarea>
+          <div class="row" style="justify-content:flex-end;gap:10px">
+            <label class="toggle"><span>Enabled</span>
+              <span class="switch"><input type="checkbox" id="f-enabled"><span class="slider"></span></span>
+            </label>
+            <button class="btn" type="submit">Add flag</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="/js/shared-header.js"></script>
+  <script>
+    const $ = (s) => document.querySelector(s);
+    let toastTimer = null;
+    function toast(msg) {
+      const t = $('#toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+    }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+
+    async function api(method, path, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' }, cache: 'no-store' };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const r = await fetch(path, opts);
+      let data = {};
+      try { data = await r.json(); } catch (e) {}
+      return { ok: r.ok, status: r.status, data };
+    }
+
+    function switchEl(checked, onChange, disabled) {
+      const wrap = document.createElement('span');
+      wrap.className = 'switch';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!checked;
+      if (disabled) input.disabled = true;
+      input.addEventListener('change', () => onChange(input.checked, input));
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      wrap.appendChild(input); wrap.appendChild(slider);
+      return wrap;
+    }
+
+    function renderNav(navigation) {
+      const list = $('#nav-list');
+      list.innerHTML = '';
+      navigation.forEach((page) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const grow = document.createElement('div');
+        grow.className = 'grow';
+        grow.innerHTML = `<div class="title">${esc(page.label)}</div>
+          <div class="sub mono">${esc(page.path)}</div>`;
+
+        const toggles = document.createElement('div');
+        toggles.className = 'toggles';
+
+        const hiddenLabel = document.createElement('label');
+        hiddenLabel.className = 'toggle';
+        hiddenLabel.appendChild(Object.assign(document.createElement('span'), { textContent: 'Hidden' }));
+        hiddenLabel.appendChild(switchEl(page.hidden, async (val) => {
+          const res = await api('PUT', '/api/admin/nav', { path: page.path, hidden: val });
+          if (res.ok) { page.hidden = val; toast('Saved'); } else { toast(res.data.error || 'Error'); }
+        }));
+
+        const disabledLabel = document.createElement('label');
+        disabledLabel.className = 'toggle';
+        disabledLabel.appendChild(Object.assign(document.createElement('span'), { textContent: 'Disabled' }));
+        disabledLabel.appendChild(switchEl(page.disabled, async (val) => {
+          const res = await api('PUT', '/api/admin/nav', { path: page.path, disabled: val });
+          if (res.ok) { page.disabled = val; toast('Saved'); } else { toast(res.data.error || 'Error'); }
+        }));
+
+        toggles.appendChild(hiddenLabel);
+        toggles.appendChild(disabledLabel);
+        row.appendChild(grow);
+        row.appendChild(toggles);
+        card.appendChild(row);
+        list.appendChild(card);
+      });
+    }
+
+    function renderFlags(flags) {
+      const list = $('#flag-list');
+      list.innerHTML = '';
+      if (!flags.length) {
+        list.innerHTML = '<div class="empty">No feature flags yet. Add one below.</div>';
+        return;
+      }
+      flags.forEach((flag) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const grow = document.createElement('div');
+        grow.className = 'grow';
+        grow.innerHTML = `<div class="title">${esc(flag.label || flag.key)}</div>
+          <div class="sub"><span class="mono">${esc(flag.key)}</span>${flag.description ? ' — ' + esc(flag.description) : ''}</div>`;
+
+        const toggles = document.createElement('div');
+        toggles.className = 'toggles';
+
+        toggles.appendChild(switchEl(flag.enabled, async (val) => {
+          const res = await api('PUT', '/api/admin/flags', { key: flag.key, enabled: val });
+          if (res.ok) { flag.enabled = val; toast('Saved'); } else { toast(res.data.error || 'Error'); }
+        }));
+
+        const del = document.createElement('button');
+        del.className = 'btn danger';
+        del.textContent = 'Delete';
+        del.addEventListener('click', async () => {
+          const res = await api('DELETE', '/api/admin/flags/' + encodeURIComponent(flag.key));
+          if (res.ok) { card.remove(); toast('Deleted'); load(); } else { toast(res.data.error || 'Error'); }
+        });
+
+        toggles.appendChild(del);
+        row.appendChild(grow);
+        row.appendChild(toggles);
+        card.appendChild(row);
+        list.appendChild(card);
+      });
+    }
+
+    async function load() {
+      const res = await api('GET', '/api/admin/config');
+      if (res.status === 403) {
+        $('#gate').style.display = '';
+        $('#content').style.display = 'none';
+        return;
+      }
+      if (!res.ok) { toast(res.data.error || 'Failed to load'); return; }
+      $('#gate').style.display = 'none';
+      $('#content').style.display = '';
+      renderNav(res.data.navigation || []);
+      renderFlags(res.data.flags || []);
+    }
+
+    $('#add-flag-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = $('#f-key').value.trim();
+      if (!key) return;
+      const res = await api('PUT', '/api/admin/flags', {
+        key,
+        label: $('#f-label').value.trim(),
+        description: $('#f-desc').value.trim(),
+        enabled: $('#f-enabled').checked,
+      });
+      if (res.ok) {
+        $('#f-key').value = ''; $('#f-label').value = ''; $('#f-desc').value = ''; $('#f-enabled').checked = false;
+        toast('Flag added');
+        load();
+      } else {
+        toast(res.data.error || 'Error');
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

@@ -307,7 +307,7 @@ function renderFlatHouse(house) {
   $("flatSources").textContent = String(sources.length || 0);
   $("flatRecords").textContent = String(house.ragRecordCount || 0);
   $("archiveMode").textContent = "manifest only; no repo deletion";
-  $("windowsHost").textContent = house.windowsSurface?.host || "Windows host, Lantern OS app";
+  $("windowsHost").textContent = house.windowsSurface?.host || "Windows host, Keystone OS app";
   $("bootMutation").textContent = house.windowsSurface?.defaultBootMutation || "blocked";
 
   const list = $("flatSourceList");
@@ -493,7 +493,7 @@ async function storeConversation(event) {
   waitingBubble.className = "chat-bubble pending";
   waitingBubble.setAttribute("aria-busy", "true");
   waitingBubble.classList.add("chat-message-text");
-  waitingBubble.textContent = "Waiting for Lantern response—queued for MCP/local reply.";
+  waitingBubble.textContent = "Waiting for Keystone response—queued for MCP/local reply.";
 
   updateBubble(waitingBubble, true);
 
@@ -667,7 +667,7 @@ async function tryMcpChatReply(messages, context) {
     context,
     queued: true,
     status: "waiting_for_mcp_response",
-    message: "Waiting for Lantern response—queued for MCP/local reply.",
+    message: "Waiting for Keystone response—queued for MCP/local reply.",
   };
   return reply;
 }

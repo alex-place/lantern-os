@@ -46,3 +46,6 @@ apscheduler>=3.10.0
 
 # Testing
 pytest==9.0.3
+
+# Facecam V3 face detection (optional — detector falls back to a heuristic if absent)
+opencv-python>=4.8

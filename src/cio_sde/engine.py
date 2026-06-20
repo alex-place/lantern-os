@@ -262,6 +262,20 @@ class CIO_SDE(nn.Module):
         self.collapse_op = None      # optional Σ₀ Semantic Collapse Operator
         self.anti_collapse_op = None # optional Σ₀⁻¹ Anti-Collapse Operator
         self.surprise_monitor = None # optional SurpriseMonitor for NIS-based collapse detection
+        # One-step prediction (x̂_{t|t-1}, P_{t|t-1}) for the surprise observation model
+        # (#657). Instead of self-observing (y=x gave innovation ν≡0), the engine runs a
+        # genuine Kalman predict/update cycle: it predicts the NEXT state from the model's
+        # own drift+diffusion, then scores the realized state as an observation. The
+        # prediction covariance P is seeded with the model's diffusion process noise Q, so
+        # smooth exploration yields NIS≈m (consistent — quiet), and only an ANOMALOUS jump
+        # (the collapse snap onto the attractor, or a Σ₀⁻¹ excitation kick) makes
+        # NIS = νᵀS⁻¹ν spike past the χ² threshold — the spook. None until first seeded.
+        self._surprise_pred_mean = None
+        self._surprise_pred_cov = None
+        # Observation (sensor) noise R for the NIS canary, and a covariance floor so S
+        # stays well-conditioned when the diffusion process noise is tiny.
+        self.surprise_obs_noise = 0.01
+        self.surprise_cov_floor = 1e-3
         self.register_buffer("x_target", torch.zeros(dim))
 
     # L(x, u) = ‖x − x*‖² + ρ‖u‖²  (latency+compute+risk rolled into a quadratic)
@@ -312,18 +326,44 @@ class CIO_SDE(nn.Module):
         sigma0_proximity = 0.0
         surprise_boost = 0.0
         
-        # Check surprise monitor for NIS-based collapse detection
+        # Surprise monitor — NIS-based collapse detection (#506/#657).
+        # The engine no longer self-observes (y=x gave innovation ν≡0, so the canary
+        # never fired). It carries a belief mean x̂ propagated noise-free through the
+        # model's own linearized dynamics F = I + A·dt; the TRUE state x is the
+        # observation. The innovation ν = x − C x̂ is the drift+noise the deterministic
+        # forecast could not anticipate. As Σ contracts toward collapse, S = CΣCᵀ + R
+        # shrinks toward R and NIS = νᵀ S⁻¹ ν spikes — the spook (Bar-Shalom, Li &
+        # Kirubarajan 2001, the NIS χ² consistency test).
         if self.surprise_monitor is not None:
-            # For surprise integration, we need observation y, C, R
-            # Default to identity observation if not provided
-            C = torch.eye(x.shape[-1], device=x.device).unsqueeze(0).expand(x.shape[0], -1, -1)
-            R = torch.eye(x.shape[-1], device=x.device).unsqueeze(0).expand(x.shape[0], -1, -1) * 0.1
-            y = x  # self-observation for now
-            surprise_result = self.surprise_monitor.evaluate(x, sigma, y, C, R)
-            info["surprise_spook"] = bool(surprise_result["spook"].any())
-            if info["surprise_spook"] and self.surprise_monitor.anti_collapse_trigger:
-                # Boost anti-collapse proximity when surprise fires
-                surprise_boost = 1.0
+            bsz, dd = x.shape
+            eye = torch.eye(dd, device=x.device, dtype=x.dtype).unsqueeze(0)
+            C = eye.expand(bsz, -1, -1)
+            R = eye.expand(bsz, -1, -1) * self.surprise_obs_noise
+            if self._surprise_pred_mean is not None and self._surprise_pred_mean.shape == x.shape:
+                # Score the prediction made LAST step against the realized state x.
+                surprise_result = self.surprise_monitor.evaluate(
+                    self._surprise_pred_mean, self._surprise_pred_cov, x, C, R)
+                info["surprise_spook"] = bool(surprise_result["spook"].any())
+                info["surprise_nis"] = float(surprise_result["nis"].mean().item())
+                if info["surprise_spook"] and self.surprise_monitor.anti_collapse_trigger:
+                    # Spook → boost anti-collapse proximity to 1.0 (detect → excite).
+                    surprise_boost = 1.0
+                # Measurement update: fuse x to get the posterior belief.
+                x_post, P_post = self.surprise_monitor.update(
+                    self._surprise_pred_mean, self._surprise_pred_cov, x, C, R)
+            else:
+                x_post = x.detach()                              # seed belief at first state
+                P_post = eye.expand(bsz, -1, -1).clone() * self.surprise_obs_noise
+            # Predict the NEXT state for next step's comparison, using the model's OWN
+            # drift (mean) and diffusion (process-noise covariance). Q = expected one-step
+            # increment variance (g·dilation)²·dt — so a state evolving as the model expects
+            # produces a consistent innovation (NIS≈m), and only a deviation surprises.
+            F = eye + A * dt
+            proc_var = (g.detach() * dilation) ** 2 * dt + self.surprise_cov_floor   # (B, d)
+            Q = torch.diag_embed(proc_var)
+            self._surprise_pred_mean = (x_post + f.detach() * dt)
+            P_next = F @ P_post @ F.transpose(-1, -2) + Q
+            self._surprise_pred_cov = 0.5 * (P_next + P_next.transpose(-1, -2)).detach()
         
         if self.anti_collapse_op is not None:
             sigma0_proximity = self.anti_collapse_op.proximity(self, x, u, sigma, A)

@@ -185,7 +185,7 @@ async function testWebSearch() {
     const r = await fetch('http://127.0.0.1:8772/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'Lantern OS', max_results: 3 } } }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'Keystone OS', max_results: 3 } } }),
     });
     const data = await r.json();
     if (data.result && data.result.success) {
@@ -207,6 +207,25 @@ function renderMarkdown(text) {
   h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
   h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
   h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+
+  // Stash rich media + links as placeholders BEFORE the URL linkifiers run, so those
+  // never touch a URL that's already inside an image / iframe / anchor.
+  const _stash = [];
+  const _put = (html) => `\x00L${_stash.push(html) - 1}\x00`;
+
+  // Images ![alt](url) → <img>. Broken / hallucinated URLs hide themselves (onerror).
+  // Must run before the link rule so ![..](..) isn't read as a text link.
+  h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
+    _put(`<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
+
+  // YouTube links → privacy-friendly inline embed.
+  h = h.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})[^\s<>"')\x00]*/g, (_, vid) =>
+    _put(`<iframe src="https://www.youtube-nocookie.com/embed/${vid}" width="100%" height="220" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`));
+
+  // Markdown links [label](url) → new-tab anchors.
+  h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) =>
+    _put(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
+
   h = h.replace(
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)/g,
     '<a href="https://github.com/$1/$2/pull/$3" target="_blank" rel="noopener" class="pr-pill">🔗 PR #$3 — $1/$2 →</a>'
@@ -215,6 +234,17 @@ function renderMarkdown(text) {
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/(\d+)/g,
     '<a href="https://github.com/$1/$2/issues/$3" target="_blank" rel="noopener" class="issue-pill">⚑ Issue #$3 — $1/$2 →</a>'
   );
+  // Remaining bare URLs → new-tab anchors (lookbehind skips URLs already inside an href;
+  // trailing sentence punctuation is kept outside the link).
+  h = h.replace(/(?<!["\/=])(https?:\/\/[^\s<>"')\x00]+)/g, (m, url) => {
+    const trail = (url.match(/[.,;:!?]+$/) || [''])[0];
+    const clean = trail ? url.slice(0, -trail.length) : url;
+    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${clean}</a>${trail}`;
+  });
+
+  // Restore the stashed markdown-link anchors.
+  h = h.replace(/\x00L(\d+)\x00/g, (_, i) => _stash[+i]);
+
   h = h.replace(/\n/g, '<br>');
   return h;
 }
@@ -426,7 +456,7 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text || isSending) return;
 
-  // Three-doors game lives on its own page now — Lantern guides there, not in chat
+  // Three-doors game lives on its own page now — Keystone guides there, not in chat
   const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts|explore)\b/i);
   if (kingdomeMatch) {
     input.value = '';
@@ -637,9 +667,11 @@ async function sendMessage() {
   let didError = false;
   let routeLabel = '';
   let receivedDone = false;
+  let doneProvider = '';
+  const requestedProvider = document.getElementById('provider-select')?.value || '';
 
   try {
-    const provider = document.getElementById('provider-select')?.value || '';
+    const provider = requestedProvider;
     const resp = await fetch('/api/dream/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -694,6 +726,7 @@ async function sendMessage() {
           } else if (evt.type === 'done') {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel) routeLabel = evt.routeLabel;
+            doneProvider = evt.source || evt.provider || '';
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -735,6 +768,19 @@ async function sendMessage() {
     sig.setAttribute('aria-label', `Active route: ${routeLabel}`);
     sig.textContent = routeLabel;
     msg.appendChild(sig);
+  }
+
+  // Degraded-mode notice (#740): the answer came from the local model as a silent
+  // fallback because the cloud providers failed — not because the user chose local.
+  // A small local model often ignores the system prompt and answers off-tone, so
+  // surface it honestly. `provider` is what the user requested ('' = auto).
+  if (!didError && doneProvider === 'ollama' && requestedProvider !== 'ollama') {
+    const warn = document.createElement('div');
+    warn.className = 'msg-route-sig degraded';
+    warn.setAttribute('role', 'note');
+    warn.style.cssText = 'font-size:11px;color:#f5a623;margin-top:2px;';
+    warn.textContent = '⚠ Offline — answered by the local model (cloud providers unavailable). Quality may be lower.';
+    msg.appendChild(warn);
   }
 
   if (!didError) history.push({ role: 'assistant', text: fullText });

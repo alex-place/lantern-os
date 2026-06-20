@@ -90,27 +90,46 @@ def encode_delta(level: int, delta_type: DeltaType,
 
 def decode_record(data: bytes, offset: int,
                   codec: Optional[Base3Codec] = None) -> Tuple[Record, int]:
-    """Decode one record from the stream. Returns (record, new_offset)."""
+    """Decode one record from the stream. Returns (record, new_offset).
+
+    Raises ValueError if the buffer is truncated mid-record rather than
+    silently substituting defaults, so truncation is detected, not swallowed.
+    """
+    if offset >= len(data):
+        raise ValueError("truncated delta stream: missing record header")
     header = data[offset]
     offset += 1
     is_conf, level, dtype = _parse_header(header)
 
-    if codec is not None:
-        position, offset = codec.decode(data, offset)
-    else:
-        from .base3 import decode_absolute
-        position, offset = decode_absolute(data, offset)
+    try:
+        if codec is not None:
+            position, offset = codec.decode(data, offset)
+        else:
+            from .base3 import decode_absolute
+            position, offset = decode_absolute(data, offset)
+    except IndexError:
+        raise ValueError("truncated delta stream: incomplete position field")
 
     if is_conf:
-        extent = data[offset] if offset < len(data) else 0
+        if offset >= len(data):
+            raise ValueError(
+                "truncated delta stream: confirmation record missing extent byte")
+        extent = data[offset]
         offset += 1
         return Record(True, level, position=position,
                       payload=bytes([extent])), offset
     else:
+        if offset >= len(data):
+            raise ValueError(
+                "truncated delta stream: delta record missing payload length")
         payload_len = data[offset]
         offset += 1
-        payload = data[offset:offset + payload_len]
-        offset += payload_len
+        end = offset + payload_len
+        if end > len(data):
+            raise ValueError(
+                "truncated delta stream: delta payload shorter than declared length")
+        payload = data[offset:end]
+        offset = end
         return Record(False, level, DeltaType(dtype),
                       position=position, payload=payload), offset
 
@@ -152,11 +171,22 @@ class DeltaStreamReader:
             self._data, self._offset, self._codec)
         return rec
 
-    def read_all(self) -> List[Record]:
+    def read_all(self, expected: Optional[int] = None) -> List[Record]:
+        """Decode every record in the buffer.
+
+        A record truncated mid-stream raises (via ``decode_record``) instead of
+        being silently dropped. If ``expected`` is given, the final record count
+        must match it exactly or a ValueError is raised — catching the case
+        where the buffer ends cleanly on a record boundary but is short records.
+        """
         records = []
         while True:
             rec = self.read()
             if rec is None:
                 break
             records.append(rec)
+        if expected is not None and len(records) != expected:
+            raise ValueError(
+                f"delta stream record count mismatch: "
+                f"decoded {len(records)}, expected {expected}")
         return records

@@ -1,0 +1,30 @@
+{
+  "_comment": "Datasets the Σ₀ flywheel MAY ingest for editing priors. Each is LICENSE-GATED: ingest is refused unless redistributable===true AND the license is on the permissive allowlist (CC-BY / CC-BY-SA / CC0 / public-domain / GPL / MIT / Apache). Anything NonCommercial (NC), NoDerivatives (ND), proprietary, or with an unclear/unknown license is refused — feature extraction is a derivative use, so ND/unknown is unsafe. Ingest = download → analyze → extract priors → DELETE the source video; only features are kept. ALWAYS verify the real license text at the source before flipping redistributable to true.",
+  "datasets": [
+    {
+      "name": "gamingvideoset",
+      "title": "GamingVideoSET — gaming video quality dataset",
+      "license": "unclear (related work uses CC BY-NC-ND 4.0)",
+      "license_url": "",
+      "redistributable": false,
+      "source": { "type": "manual", "url": "https://kingston.box.com/v/GamingVideoSET" },
+      "notes": "24 raw 1080p/30fps gaming clips + 576 encoded MP4s, built for video-QUALITY (QoE/codec) research. Gated OFF: (1) the license is not clearly stated and related datasets are CC BY-NC-ND — NoDerivatives makes feature extraction unsafe; (2) the download is a Box folder, not automatable; (3) even if licensed it is raw gameplay with no facecam, so it would only inform motion/cut/pacing priors. Confirm the real license before enabling."
+    },
+    {
+      "name": "blender-open-movies",
+      "title": "Blender Foundation open movies",
+      "license": "CC-BY 3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "redistributable": true,
+      "source": {
+        "type": "urls",
+        "urls": [
+          "https://archive.org/details/BigBuckBunny_124",
+          "https://archive.org/details/Sintel",
+          "https://archive.org/details/ElephantsDream"
+        ]
+      },
+      "notes": "CC-BY animated shorts (not gaming) — a clean, redistributable example that PASSES the gate. Real cuts/motion/pacing for editing priors; fetched via the flywheel downloader (yt-dlp) then deleted."
+    }
+  ]
+}

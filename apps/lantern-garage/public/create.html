@@ -17,7 +17,7 @@
       }
     })();
   </script>
-  <title>Creator Dashboard — Lantern OS</title>
+  <title>Creator Dashboard — Keystone OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
     :root {
@@ -876,16 +876,17 @@
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    Lantern OS
+    Keystone OS
   </a>
   <div class="nav-links">
-    <a href="/dream-chat.html">Journal</a>
+    <a href="/dream-chat.html">Chat</a>
     <a href="/trader-dashboard.html">Trader</a>
     <a href="/create.html" class="active">Create</a>
+    <a href="/calibration.html">Calibration</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
         <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a>
+        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
   </div>
   <div class="nav-actions">
     <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
@@ -928,11 +929,23 @@
       <option>Webcam moves around</option>
       <option>No Facecam</option>
     </select>
-    <span style="flex-basis:100%; font-size:0.78rem; color:var(--muted); margin-top:2px;">Tell Lantern where your facecam usually appears if detection struggles.</span>
+    <span style="flex-basis:100%; font-size:0.78rem; color:var(--muted); margin-top:2px;">Tell Keystone where your facecam usually appears if detection struggles.</span>
   </div>
 
   <!-- Live upload progress (one row per file) -->
   <div id="upload-progress" class="upload-progress" aria-live="polite"></div>
+
+  <!-- Σ₀ Research Flywheel status -->
+  <div id="research-status" class="form-card" style="margin: 24px 0; padding: 20px;">
+    <div class="section-header" style="margin-bottom: 12px;">
+      <div>
+        <h2 style="font-size: 1.1rem; margin: 0;">🔬 Σ₀ Research Flywheel</h2>
+        <p style="font-size: 0.82rem; color: var(--muted); margin: 4px 0 0;">The editor learns editing priors from open-license video. Run <code>npm run research-nightly</code> to collect.</p>
+      </div>
+      <button class="btn btn-secondary" onclick="loadResearchStatus()" style="padding: 6px 14px; font-size: 0.85rem;">Refresh</button>
+    </div>
+    <div id="research-body" style="font-size: 0.9rem; color: var(--muted);">Loading…</div>
+  </div>
 
   <!-- Recent Projects -->
   <div class="section-header" style="margin: 32px 0 16px;">
@@ -952,7 +965,7 @@
 <div id="helpModal" class="help-modal" onclick="if(event.target.id==='helpModal')closeHelp()">
   <div class="help-modal-content">
     <h2 style="margin-top: 0;">Creator Dashboard</h2>
-    <p style="color: var(--muted);">Drop a video and Lantern opens a project workspace where you can:</p>
+    <p style="color: var(--muted);">Drop a video and Keystone opens a project workspace where you can:</p>
     <ul>
       <li><strong>Analyze Highlights</strong> — find the best moments (motion, audio, scenes)</li>
       <li><strong>Generate Variants</strong> — ranked short-form edits</li>
@@ -1194,8 +1207,44 @@ async function renameProject(id, current) {
 // (Homepage Creator Tools removed — analysis/variants/captions/safe-zones now
 //  live inside each project workspace at /entry.html?id=…)
 
+// ── Σ₀ Research Flywheel status ──────────────────────────────────────────
+async function loadResearchStatus() {
+  const body = document.getElementById('research-body');
+  if (!body) return;
+  try {
+    const r = await fetch('/api/research/status');
+    const s = await r.json();
+    if (!s.ok) throw new Error(s.error || 'unavailable');
+    const w = s.weights.effective || {};
+    const pct = Math.round((s.adaptation.readiness || 0) * 100);
+    const statusLabel = { idle: 'Idle — no corpus yet', collecting: 'Collecting', adapting: 'Adapting weights' }[s.adaptation.status] || s.adaptation.status;
+    const wb = (k) => w[k] != null ? (w[k]).toFixed(3) : '—';
+    const last = s.lastNightly ? `${s.lastNightly.analyzed ?? '?'} analyzed · ${new Date(s.lastNightly.at).toLocaleString()}` : 'never';
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:14px;">
+        <div><div style="font-size:1.6rem;font-weight:700;color:var(--text);">${s.corpus.samples}</div><div style="font-size:0.78rem;">videos analyzed</div></div>
+        <div><div style="font-size:1.6rem;font-weight:700;color:var(--text);">${statusLabel}</div><div style="font-size:0.78rem;">status</div></div>
+        <div><div style="font-size:1.6rem;font-weight:700;color:${s.adaptation.priorInformed ? 'var(--accent)' : 'var(--text)'};">${pct}%</div><div style="font-size:0.78rem;">to adaptation (${s.adaptation.minSamples}+)</div></div>
+      </div>
+      <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:14px;"><div style="height:100%;width:${pct}%;background:var(--accent);"></div></div>
+      <div style="font-size:0.82rem;">
+        <strong>Current Σ₀ weights</strong> <span style="color:var(--muted);">(${s.weights.source})</span><br>
+        hook ${wb('hook')} · surprise ${wb('surprise')} · pacing ${wb('pacing')} · emotion ${wb('emotion')} · retention ${wb('retention')}<br>
+        <span style="color:var(--muted);">learned priors:</span> hook ${s.priors.opening_hook_strength ?? '—'} · cut/s ${s.priors.avg_cut_rate ?? '—'} · motion ${s.priors.motion_target ?? '—'} · facecam ${s.priors.facecam ?? '—'}<br>
+        ${s.hookPriors ? `<span style="color:var(--muted);">hook priors (n=${s.hookPriors.samples}):</span> opening-motion ${s.hookPriors.opening_motion ?? '—'} · cuts/3s ${s.hookPriors.scene_cuts_first3s ?? '—'} · ramp ${s.hookPriors.motion_ramp ?? '—'}<br>` : ''}
+        ${s.highlightPriors ? `<span style="color:var(--muted);">highlight priors (n=${s.highlightPriors.samples}):</span> motion-range ${JSON.stringify(s.highlightPriors.best_motion_range)} · cut-freq ${s.highlightPriors.best_cut_frequency ?? '—'} · cut-gap ${s.highlightPriors.median_cut_gap_sec ?? '—'}s<br>` : ''}
+        ${s.facecamPriors ? `<span style="color:var(--muted);">facecam priors:</span> ${s.facecamPriors.facecam_position ?? '—'} · present ${Math.round((s.facecamPriors.facecam_present_rate||0)*100)}% · size ${s.facecamPriors.facecam_size ?? '—'}<br>` : ''}
+        <span style="color:var(--muted);">last nightly:</span> ${last}
+        ${s.adaptation.priorInformed ? '' : `<br><span style="color:var(--muted);">${s.adaptation.samplesNeeded} more open-license clips until weights adapt.</span>`}
+      </div>`;
+  } catch (e) {
+    body.innerHTML = `<span style="color:var(--muted);">Research status unavailable: ${e.message}</span>`;
+  }
+}
+
 // Initial load
 loadRecentEntries();
+loadResearchStatus();
 // REMOVED: setInterval(loadRecentEntries, 30000);
 // Reason: Polling every 30 seconds caused project title flickering
 // Solution: User can manually refresh or page reloads when project is created/deleted

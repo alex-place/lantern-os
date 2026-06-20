@@ -58,15 +58,59 @@
     .hero > h1, .hero > .tagline, .hero > .hero-cta-row, .hero > .sub { position: relative; z-index: 1; }
     .hero h1 { margin-bottom: 12px; }
     .hero .tagline { margin-bottom: 22px; }
-    /* Compact secondary experiences */
-    .home-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    /* ── Secondary experiences — redesigned tiles ── */
+    .home-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     @media (max-width: 680px) { .home-tiles { grid-template-columns: 1fr; } }
-    .home-tiles .panel { padding: 18px 18px 16px; }
+    .home-tiles .panel {
+      --tile: var(--accent);
+      position: relative;
+      overflow: hidden;
+      gap: 7px;
+      padding: 20px 18px 18px;
+      transition: border-color .2s, background .2s, transform .15s, box-shadow .2s;
+    }
+    /* per-tile accent identity */
+    .home-tiles .tile-trader  { --tile: #10b981; }   /* emerald — markets   */
+    .home-tiles .tile-create  { --tile: #a78bfa; }   /* violet  — studio    */
+    .home-tiles .tile-explore { --tile: #06b6d4; }   /* cyan    — convergence */
+    /* top accent bar that wipes in on hover */
+    .home-tiles .panel::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--tile);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform .28s ease;
+    }
+    .home-tiles .panel:hover { border-color: var(--tile); }
+    .home-tiles .panel:hover::before { transform: scaleX(1); }
+    /* icon in a tinted rounded chip */
+    .home-tiles .panel-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 46px; height: 46px; margin-bottom: 2px;
+      border-radius: 13px; font-size: 23px; line-height: 1;
+      background: color-mix(in srgb, var(--tile) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tile) 32%, transparent);
+      transition: transform .2s ease, background .2s, border-color .2s;
+    }
+    .home-tiles .panel:hover .panel-icon {
+      transform: translateY(-1px) scale(1.05) rotate(-4deg);
+      background: color-mix(in srgb, var(--tile) 26%, transparent);
+    }
+    /* eyebrow label now sits above the title, tinted to the tile */
+    .home-tiles .panel-label { color: var(--tile); font-size: 0.62rem; }
+    .home-tiles .panel h2 { font-size: 1.18rem; margin: 1px 0 0; }
+    .home-tiles .panel p { font-size: 0.82rem; }
+    .home-tiles .panel-arrow {
+      color: var(--tile);
+      display: inline-flex; align-items: center;
+      transition: transform .2s ease;
+    }
+    .home-tiles .panel:hover .panel-arrow { transform: translateX(5px); }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* Fallback: allow scroll only on very short viewports */
     @media (max-height: 560px) { body { overflow: auto; } .home-main { justify-content: flex-start; } }
   </style>
-  <title>Lantern OS</title>
+  <title>Keystone OS</title>
 </head>
 <body>
 
@@ -77,16 +121,16 @@
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-    <span style="font-size:18px;font-weight:600">Lantern OS</span>
+    <span style="font-size:18px;font-weight:600">Keystone OS</span>
   </a>
   <div class="nav-links">
-    <a href="/dream-chat.html">Journal</a>
+    <a href="/dream-chat.html">Chat</a>
     <a href="/trader-dashboard.html">Trader</a>
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
     <span class="sep" style="margin: 0 4px;">·</span>
-    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a>
+    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -100,8 +144,8 @@
   <!-- ── Hero ── -->
   <div class="hero">
     <img src="/sigma0-mandala.svg" class="hero-bg" aria-hidden="true" alt="">
-    <h1>Chat with Keystone. Trade with Eclipse. Create with Lantern.</h1>
-    <p class="tagline" id="hero-tagline">Lantern OS is a desktop cockpit for Windows and Linux — a context-aware command center that organizes work, tracks market signals, powers creator tools, and routes your next best action.</p>
+    <h1>Observe. Remember. Reason. Act. Verify. Converge.</h1>
+    <p class="tagline" id="hero-tagline">Keystone OS is a local-first convergence engine — a persistent reasoning and coding system that runs entirely on your machine and improves from accumulated evidence, never locked to a single model. Chat, trade, and create on the same grounded core.</p>
     <div class="hero-cta-row">
       <a class="btn-primary" href="/dream-chat.html">✦ Keystone Chat</a>
     </div>
@@ -110,26 +154,26 @@
 
   <!-- ── Secondary experiences ── -->
   <div class="home-tiles">
-    <a class="panel" href="/trader-dashboard.html">
-      <span class="panel-icon">📈</span>
-      <h2>Lantern Trader</h2>
-      <span class="panel-label">Trade</span>
-      <p>Stocks, prediction markets, and market news.</p>
+    <a class="panel tile-trader" href="/trader-dashboard.html">
+      <span class="panel-icon" aria-hidden="true">📈</span>
+      <span class="panel-label">Markets</span>
+      <h2>Trader</h2>
+      <p>Stocks, prediction markets, and live market news.</p>
       <span class="panel-arrow">Open Trader →</span>
     </a>
-    <a class="panel" href="/create.html">
-      <span class="panel-icon">✏️</span>
-      <h2>Lantern Create</h2>
-      <span class="panel-label">Create</span>
-      <p>Upload and organize your creative work.</p>
-      <span class="panel-arrow">Start Creating →</span>
+    <a class="panel tile-create" href="/create.html">
+      <span class="panel-icon" aria-hidden="true">✏️</span>
+      <span class="panel-label">Studio</span>
+      <h2>Create</h2>
+      <p>Upload, organize, and shape your creative work.</p>
+      <span class="panel-arrow">Open Create →</span>
     </a>
-    <a class="panel" href="/explore.html">
-      <span class="panel-icon">🗺️</span>
-      <h2>Convergance</h2>
-      <span class="panel-label">Explore Convergance</span>
-      <p>Kingdome, archives, settings, and more.</p>
-      <span class="panel-arrow">Explore →</span>
+    <a class="panel tile-explore" href="/explore.html">
+      <span class="panel-icon" aria-hidden="true">🧭</span>
+      <span class="panel-label">Convergence</span>
+      <h2>Explore</h2>
+      <p>Kingdome of Hearts, agents, archives, and settings.</p>
+      <span class="panel-arrow">Open Explore →</span>
     </a>
   </div>
 
@@ -140,11 +184,11 @@
   <div class="footer-inner">
     <span class="footer-brand">
       <span class="dot online" id="status-dot" title="Server status"></span>
-      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Lantern OS
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
     </span>
     <span class="sep">·</span>
     <a href="/">Home</a>
-    <a href="/dream-chat.html">Journal</a>
+    <a href="/dream-chat.html">Chat</a>
     <a href="/trader-dashboard.html">Trader</a>
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
@@ -237,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('hero-edition').textContent = 'Orion Edition · ' + branch;
     $('hero-git').textContent = shortCommit + (commitDate ? ' · ' + commitDate : '');
-    $('status-right').textContent = 'Lantern OS · ' + branch + ' · ' + v;
+    $('status-right').textContent = 'Keystone OS · ' + branch + ' · ' + v;
 
     // Version badges
     document.querySelectorAll('[data-version-badge]').forEach(el => {
@@ -285,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }).join('<br>');
       $('nodes-list').innerHTML = nodeHTML;
     } else {
-      $('nodes-status').textContent = 'No nodes registered yet. Machines running Lantern OS will appear here.';
+      $('nodes-status').textContent = 'No nodes registered yet. Machines running Keystone OS will appear here.';
       $('nodes-list').innerHTML = '';
     }
 

@@ -1,5 +1,5 @@
 /**
- * Unified Lantern OS Header Component
+ * Unified Keystone OS Header Component
  * Provides consistent light/dark mode toggle + navigation across all pages
  *
  * Usage: Add to your HTML <head>:
@@ -16,7 +16,7 @@ function initializeHeader() {
     <nav class="site-nav">
       <a class="nav-brand" href="/trader-dashboard.html">
         <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-        <span style="font-size:18px;font-weight:600">Lantern OS</span>
+        <span style="font-size:18px;font-weight:600">Keystone OS</span>
       </a>
       <div class="nav-links">
         <a href="/dream-chat.html" class="nav-link ${currentPage === 'dream-chat.html' ? 'active' : ''}" style="font-size:16px;padding:12px 16px">⚙️ Work</a>

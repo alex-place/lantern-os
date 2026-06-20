@@ -1,0 +1,93 @@
+{
+  "experiment": "X3 \u2014 dust sparsity vs BitNet b1.58 zero-weight sparsity",
+  "bitnet_reference": 0.66,
+  "bitnet_source": "arXiv:2402.17764 (BitNet b1.58, ~2/3 ternary weights are 0)",
+  "uniform_random_expected_zero_fraction": 0.125,
+  "metric_definitions": {
+    "address_sparsity": "fraction of 3^12 address space unoccupied (== dust_percentage/100); ~1.0 by construction; NOT comparable to BitNet (no sparse address space).",
+    "value_zero_fraction": "over stored cells (baseline + active), fraction of (cell,dim) amplitude entries == 0; the BitNet-fair analog of zero-weight fraction."
+  },
+  "fields": [
+    {
+      "population_method": "realistic: reuse of sigma0_tesseract_cube_grounding.measure_dust \u2014 observe() 130 positions (stride x7919) with identical single-dim delta (dim0 amp+3, phase+1) from all-zero default; field.converge() drives cluster promotion into baseline; then re-observe baseline positions (dim1 amp+1) so baseline+active coexist. Sparse single-dimension activations from a zero default => most amplitude slots remain 0.",
+      "total_positions": 531441,
+      "baseline_positions": 128,
+      "active_positions": 130,
+      "stored_cells": 130,
+      "address_sparsity": 0.999514527,
+      "dust_percentage": 99.951453,
+      "amplitude_entries_total": 1560,
+      "amplitude_entries_zero": 1302,
+      "value_zero_fraction": 0.834615,
+      "cells_fully_zero": 0,
+      "bitnet_reference": 0.66,
+      "delta_vs_bitnet": 0.174615
+    },
+    {
+      "population_method": "synthetic_sparse: 200 baseline cells; each activates k in {1,2,3} random dims with amplitude in {1..7}, remaining dims at the zero default. converge() is a no-op (no active deltas). Models 'mostly-off' symbolic cells.",
+      "total_positions": 531441,
+      "baseline_positions": 200,
+      "active_positions": 0,
+      "stored_cells": 200,
+      "address_sparsity": 0.999623665,
+      "dust_percentage": 99.962366,
+      "amplitude_entries_total": 2400,
+      "amplitude_entries_zero": 1977,
+      "value_zero_fraction": 0.82375,
+      "cells_fully_zero": 0,
+      "bitnet_reference": 0.66,
+      "delta_vs_bitnet": 0.16375
+    },
+    {
+      "population_method": "synthetic_uniform (control): 200 baseline cells; every dim amplitude ~ Uniform{0..7}. Expected zero fraction ~1/8=0.125. Demonstrates a field with no structural sparsity.",
+      "total_positions": 531441,
+      "baseline_positions": 200,
+      "active_positions": 0,
+      "stored_cells": 200,
+      "address_sparsity": 0.999623665,
+      "dust_percentage": 99.962366,
+      "amplitude_entries_total": 2400,
+      "amplitude_entries_zero": 329,
+      "value_zero_fraction": 0.137083,
+      "cells_fully_zero": 0,
+      "bitnet_reference": 0.66,
+      "delta_vs_bitnet": -0.522917
+    },
+    {
+      "population_method": "synthetic_tuned_66 (demonstration): 300 baseline cells; per dim, P(amp==0)=0.66 else amp~Uniform{1..7}. Constructed to land near BitNet's 0.66 to show the number is a population choice, not a shared law.",
+      "total_positions": 531441,
+      "baseline_positions": 300,
+      "active_positions": 0,
+      "stored_cells": 300,
+      "address_sparsity": 0.999435497,
+      "dust_percentage": 99.94355,
+      "amplitude_entries_total": 3600,
+      "amplitude_entries_zero": 2385,
+      "value_zero_fraction": 0.6625,
+      "cells_fully_zero": 4,
+      "bitnet_reference": 0.66,
+      "delta_vs_bitnet": 0.0025
+    }
+  ],
+  "verdict": {
+    "verdict": "refined",
+    "address_metric_is_category_error": true,
+    "value_zero_fraction_by_method": {
+      "realistic": 0.834615,
+      "synthetic_sparse": 0.82375,
+      "synthetic_uniform (control)": 0.137083,
+      "synthetic_tuned_66 (demonstration)": 0.6625
+    },
+    "value_zero_fraction_spread": 0.697532,
+    "reasoning": [
+      "ADDRESS sparsity is ~0.999435 for every field (range fully in [0.999,1.0]); it is ~1 by construction and has no BitNet counterpart, so comparing it to 0.66 is a category error.",
+      "Realistic value_zero_fraction = 0.8346 (delta vs 0.66 = +0.1746): sparse single-dim activations from the all-zero default leave ~11/12 amplitude slots at zero, FAR above BitNet's 2/3.",
+      "Across populations value_zero_fraction spans 0.698 (uniform control ~0.125 vs tuned ~0.66 vs realistic/sparse >0.66): the zero rate is a STRUCTURAL / data-dependent artifact, while BitNet's 66% is LEARNED by training. Same number is reachable, but not the same phenomenon."
+    ]
+  },
+  "caveats": [
+    "No real Ouro model was used. Populations are committed-code (realistic) and synthetic. The 'realistic' field reuses the committed populator from experiments/sigma0_tesseract_cube_grounding.py::measure_dust.",
+    "docs/TESSERACT-CSF-SINGULARITY.md was not present in the repo at run time; the section 3.3 claim is tested as stated in the experiment brief.",
+    "BitNet's 0.66 is a LEARNED zero mass; the dust field's zero rate is structural/data-dependent. Matching the number does not make it the same mechanism."
+  ]
+}

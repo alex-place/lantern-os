@@ -13,6 +13,11 @@ This module implements the **Q-exit policy** (per-token cumulative-CDF early exi
 and **surfaces the realized latent loop depth** — the genuine adaptive inference
 the paper describes, which the stock checkpoint leaves on the table.
 
+It also adds a **convergence-exit** mode (mode="converge"): instead of halting on
+the gate's confidence CDF, iterate the weight-tied block until the last-token hidden
+state contracts to a fixed point, ‖hₜ − hₜ₋₁‖/‖hₜ₋₁‖ < ε. See
+docs/research/2026-06-19-convergence-tesseract-spiral.md.
+
 Paper §3 (our native impl below):
   λ_t  = σ(gate_t)                     instantaneous exit prob at step t
   S_t  = Π_{j≤t}(1 - λ_j)              survival
@@ -54,7 +59,9 @@ class Sigma0LoopLM:
         if tok.pad_token is None:
             tok.pad_token = tok.eos_token
         model = AutoModelForCausalLM.from_pretrained(
-            base, trust_remote_code=True, dtype=getattr(torch, dtype), device_map="auto")
+            base, trust_remote_code=True, dtype=getattr(torch, dtype), device_map="auto",
+            low_cpu_mem_usage=True)  # avoid the double state-dict materialization that
+            # triggers 'OSError 1455: paging file too small' on RAM-starved boxes (#781)
         if adapter:
             from peft import PeftModel
             model = PeftModel.from_pretrained(model, adapter)
@@ -85,9 +92,39 @@ class Sigma0LoopLM:
                 return t, min(1.0, cdf), "threshold_met"
         return n, min(1.0, cdf), "max_depth"
 
+    # ── convergence exit: stop when the latent loop reaches a fixed point ─────
+    # Upgrade of Q-exit. Where Q-exit STOPS (confidence CDF ≥ q), this CONVERGES:
+    # iterate the weight-tied block until the last-token hidden state contracts,
+    # ‖h_t − h_{t-1}‖ / ‖h_{t-1}‖ < eps  →  h* ≈ f(h*) (a fixed point of the loop).
+    # See docs/research/2026-06-19-convergence-tesseract-spiral.md (§3, upgrade 1).
+    @staticmethod
+    def converge_step(hidden_per_step, eps: float, max_steps: int):
+        """hidden_per_step: list of last-token hidden vectors (1-D tensors), one per UT step.
+        Returns (exit_step_1indexed, rel_delta_at_exit, reason, deltas).
+        `deltas` is the full contraction trajectory ‖Δh‖/‖h‖ for experiment E2."""
+        deltas = []
+        n = len(hidden_per_step)
+        for t in range(1, n):
+            prev, cur = hidden_per_step[t - 1], hidden_per_step[t]
+            denom = float(prev.norm()) or 1e-9
+            rel = float((cur - prev).norm()) / denom
+            deltas.append(rel)
+            if rel < eps:
+                return t + 1, rel, "fixed_point", deltas   # 1-indexed exit depth
+        return n, (deltas[-1] if deltas else 0.0), "max_depth", deltas
+
     # ── generation with per-token adaptive depth ─────────────────────────────
     def generate(self, prompt: str, q: float = 0.5, max_new_tokens: int = 200, messages=None,
-                 rep_penalty: float = 1.3):
+                 rep_penalty: float = 1.3, mode: str = "qexit", eps: float = 0.05,
+                 canary: bool = True, adapt: bool = False):
+        """mode='qexit' (baseline, exit on confidence) or 'converge' (exit on
+        latent fixed point). 'converge' also returns the mean contraction delta
+        so the spiral hypothesis (E2) is falsifiable from real trajectories.
+
+        canary=True wires the decode stream into the Σ₀ SurpriseMonitor (#766): per-token
+        self-repeat/echo/argmax-margin feed sigma0_proximity, surfaced as `canary_*` in the
+        result — observe-only, it does NOT change the tokens. adapt=True additionally GATES
+        rep_penalty/q on that proximity (suppress repeats + exit sooner as collapse nears)."""
         torch, *_ = _lazy()
         if messages is not None:
             ids = self.tok.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
@@ -95,38 +132,79 @@ class Sigma0LoopLM:
             ids = self.tok(prompt, return_tensors="pt").input_ids
         ids = ids.to(self._backbone().device if hasattr(self._backbone(), "device") else "cuda")
         depths = []
+        exit_deltas = []   # contraction trajectory per token (converge mode)
         eos = self.tok.eos_token_id
         bb = self._backbone()
         lm_head = self.model.lm_head if hasattr(self.model, "lm_head") else bb.lm_head
+        dc = None
+        if canary:
+            try:
+                from sigma0.decode_canary import DecodeCanary
+                dc = DecodeCanary()
+            except Exception:
+                dc = None  # canary is best-effort; never break generation
+        q_cur, rep_cur = q, rep_penalty
+        canary_max_prox, canary_spooks, canary_signal = 0.0, 0, "none"
         with torch.no_grad():
             for _ in range(max_new_tokens):
                 # OuroModel.forward returns (outputs, hidden_states_list, gate_list)
                 _out, hidden_states_list, gate_list = bb.model(input_ids=ids, use_cache=False)
-                # last-token gate per step → Q-exit
-                gate_steps = [g[0, -1, 0].item() for g in gate_list]
-                step, conf, reason = self.qexit_step(gate_steps, q, self.max_steps)
+                if mode == "converge":
+                    # contraction over the latent trajectory of the last token
+                    h_per_step = [h[0, -1, :] for h in hidden_states_list]
+                    step, rel, reason, deltas = self.converge_step(h_per_step, eps, self.max_steps)
+                    if deltas:
+                        exit_deltas.append(sum(deltas) / len(deltas))
+                else:
+                    # last-token gate per step → Q-exit
+                    gate_steps = [g[0, -1, 0].item() for g in gate_list]
+                    step, conf, reason = self.qexit_step(gate_steps, q_cur, self.max_steps)
                 depths.append(step)
                 hidden = hidden_states_list[step - 1][:, -1:, :]   # hidden at exit depth, last token
                 logits = lm_head(hidden)[0, -1]
-                if rep_penalty and rep_penalty != 1.0 and depths:
+                if rep_cur and rep_cur != 1.0 and depths:
                     # CTRL-style repetition penalty over tokens already generated this turn
                     for tid in set(ids[0, -len(depths):].tolist()):
                         v = logits[tid]
-                        logits[tid] = v / rep_penalty if v > 0 else v * rep_penalty
+                        logits[tid] = v / rep_cur if v > 0 else v * rep_cur
                 nxt = int(torch.argmax(logits))
+                if dc is not None:
+                    # argmax margin (top1−top2 prob): low margin = uncertain/degenerate decode
+                    probs = torch.softmax(logits, dim=-1)
+                    top2 = torch.topk(probs, 2).values
+                    margin = float((top2[0] - top2[1]).item())
+                    obs = dc.observe(nxt, margin=margin, exit_depth=step, max_steps=self.max_steps)
+                    canary_max_prox = max(canary_max_prox, obs["proximity"])
+                    canary_spooks += int(obs["spook"])
+                    if obs["signal"] != "none":
+                        canary_signal = obs["signal"]
+                    if adapt:  # actuator: gate knobs on Σ₀ proximity (opt-in; changes tokens)
+                        k = dc.knobs(q, rep_penalty)
+                        q_cur, rep_cur = k["q"], k["rep_penalty"]
                 ids = torch.cat([ids, torch.tensor([[nxt]], device=ids.device)], dim=1)
                 if nxt == eos:
                     break
         text = self.tok.decode(ids[0, -len(depths):], skip_special_tokens=True)
         mean_depth = sum(depths) / len(depths) if depths else 0
-        return {
+        out = {
             "text": text,
             "tokens": len(depths),
             "mean_depth": round(mean_depth, 2),
             "max_steps": self.max_steps,
-            "exit_reason": "adaptive_qexit",
+            "exit_reason": "adaptive_qexit" if mode == "qexit" else "convergence_exit",
+            "mode": mode,
             "q": q,
         }
+        if dc is not None:   # Σ₀ decode canary telemetry (#766)
+            out["canary_max_proximity"] = round(canary_max_prox, 4)
+            out["canary_spooks"] = canary_spooks
+            out["canary_signal"] = canary_signal
+            out["adapt"] = adapt
+        if mode == "converge":
+            # mean contraction delta across tokens: < eps ⇒ loop genuinely converges (E2)
+            out["eps"] = eps
+            out["mean_contraction"] = round(sum(exit_deltas) / len(exit_deltas), 4) if exit_deltas else None
+        return out
 
 
 if __name__ == "__main__":

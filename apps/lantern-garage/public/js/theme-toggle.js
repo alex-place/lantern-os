@@ -1,4 +1,4 @@
-// Shared theme toggle logic for all Lantern OS pages
+// Shared theme toggle logic for all Keystone OS pages
 (function() {
   const stored = localStorage.getItem('lantern-theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

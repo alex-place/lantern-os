@@ -1,0 +1,9 @@
+{
+  "_comment": "Learned hook priors (opening 3s) from open-license video. Regenerate: node scripts/open-video-research.js --hook-priors",
+  "samples": 35,
+  "updatedAt": "2026-06-19T02:39:20.567Z",
+  "opening_motion": 0.105,
+  "scene_cuts_first3s": 14,
+  "audio_spikes_first3s": 0,
+  "motion_ramp": -0.018
+}

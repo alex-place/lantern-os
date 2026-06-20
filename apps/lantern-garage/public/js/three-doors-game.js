@@ -538,7 +538,7 @@ async function apiDoors(action, choice) {
 
 async function apiNarrate(sceneKey, sceneText) {
   // Local-only narration: provider "local" routes to Ollama (lantern-csf-dream);
-  // no cloud provider is contacted. Lantern is the voice of the game.
+  // no cloud provider is contacted. Keystone is the voice of the game.
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15000);
   try {
@@ -685,7 +685,7 @@ function submitCustomDoor() {
     chooseDoor("CUSTOM", val);
     return;
   }
-  // Anything conversational — talk to Lantern, in persona, inside the scene
+  // Anything conversational — talk to Keystone, in persona, inside the scene
   input.value = "";
   askLantern(val);
 }

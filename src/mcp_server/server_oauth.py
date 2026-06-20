@@ -191,34 +191,41 @@ def _tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
             html = resp.read().decode("utf-8", errors="replace")
 
         results = []
-        # DuckDuckGo lite result pattern: <a class="result__a" href="...">title</a>
-        # followed by <td class="result__snippet">snippet</td>
+        # DuckDuckGo-lite result pattern: <a ... href="URL" class='result-link'>title</a>
+        # followed by <td class='result-snippet'>snippet</td> (single quotes, varying order).
         link_pattern = re.compile(
-            r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+            r"""<a\b[^>]*\bhref=["']([^"']+)["'][^>]*\bclass=["']result-link["'][^>]*>(.*?)</a>""",
             re.IGNORECASE | re.DOTALL,
         )
         snippet_pattern = re.compile(
-            r'<td[^>]+class="result__snippet"[^>]*>(.*?)</td>',
+            r"""<td[^>]*\bclass=["']result-snippet["'][^>]*>(.*?)</td>""",
             re.IGNORECASE | re.DOTALL,
         )
 
         links = link_pattern.findall(html)
         snippets = snippet_pattern.findall(html)
 
+        def _normalize(href: str) -> str:
+            # Resolve DuckDuckGo redirect wrappers (/l/?uddg=...) to the real target.
+            if "uddg=" in href:
+                m = re.search(r"uddg=([^&]+)", href)
+                if m:
+                    return urllib.parse.unquote(m.group(1))
+            if href.startswith("//"):
+                return "https:" + href
+            if href.startswith("/"):
+                return "https://duckduckgo.com" + href
+            return href
+
         for i, (href, title_raw) in enumerate(links[:max_results]):
             # Clean title: strip tags
             title = re.sub(r"<[^>]+>", "", title_raw).strip()
-            # Resolve relative URLs
-            if href.startswith("//"):
-                href = "https:" + href
-            elif href.startswith("/"):
-                href = "https://duckduckgo.com" + href
             # Get snippet if available
             snippet = re.sub(r"<[^>]+>", "", snippets[i]).strip() if i < len(snippets) else ""
             results.append({
                 "rank": i + 1,
                 "title": title,
-                "url": href,
+                "url": _normalize(href),
                 "snippet": snippet,
             })
 

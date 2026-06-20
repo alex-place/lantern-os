@@ -33,6 +33,17 @@ module.exports = async (req, res, url, deps) => {
     return true;
   }
 
+  // GET /api/convergence/status — live loop state (Converge stage) for the chat UX
+  if (pathname === "/api/convergence/status" && req.method === "GET") {
+    try {
+      const { convergenceStatus } = require("../lib/convergence-status");
+      sendJson(res, convergenceStatus(), 200);
+    } catch (e) {
+      sendJson(res, { total: 0, avgConfidence: 0, groundedPct: 0, verified: 0, reasoners: [], topReasoner: null, patternsCount: 0, error: e.message }, 200);
+    }
+    return true;
+  }
+
   // POST /api/convergence/route-intent — Route a message intent
   if (pathname === "/api/convergence/route-intent" && req.method === "POST") {
     let body = "";
@@ -156,6 +167,23 @@ module.exports = async (req, res, url, deps) => {
             }
           );
         });
+
+        // Guard: never switch branches over an uncommitted working tree. The
+        // patch is applied *after* this point, so anything dirty here is
+        // unrelated in-flight work that a checkout would silently discard.
+        const dirtyTree = await new Promise((resolve) => {
+          execFile("git", ["status", "--porcelain"], { cwd: REPO_ROOT, timeout: 5000, windowsHide: true },
+            (err, stdout) => resolve(err ? "" : String(stdout).trim()));
+        });
+        if (dirtyTree) {
+          sendJson(res, {
+            ok: false,
+            error: "git_tree_dirty",
+            issue: issueNumber,
+            message: "Working tree has uncommitted changes; refusing to switch branches. Commit or stash first.",
+          }, 409);
+          return;
+        }
 
         // Always use a fresh issue-specific branch — never reuse current branch
         const branchName = `auto/issue-${issueNumber}`;
@@ -287,7 +315,7 @@ module.exports = async (req, res, url, deps) => {
       const {
         generatePlan, generatePatch, applyPatch, runTests,
         gitAddFiles, gitCommit, gitPush, openDraftPr,
-        gitCurrentBranch, gitCreateBranch,
+        gitCurrentBranch, gitCreateBranch, gitEnsureClean,
       } = require("../lib/self-edit-engine");
 
       // honest running record of what actually happened
@@ -348,8 +376,10 @@ module.exports = async (req, res, url, deps) => {
           try {
             branchName = gitCreateBranch(REPO_ROOT, `issue-${issueNumber}`);
           } catch (e) {
-            // Branch already exists — check it out
+            // Branch already exists — check it out, but never clobber an
+            // uncommitted working tree (gitEnsureClean throws if dirty).
             const { execSync } = require("child_process");
+            gitEnsureClean(REPO_ROOT);
             execSync(`git checkout ${targetBranch}`, { cwd: REPO_ROOT, timeout: 5000, env: { ...process.env, SKIP_MONOWORKSTREAM: "1" } });
           }
         }
@@ -448,35 +478,56 @@ module.exports = async (req, res, url, deps) => {
           }
         });
 
-        // ── 4. patch (diff emitted BEFORE it is applied — observation) ────
-        step("patch", "start");
-        const { diffText, files } = await generatePatch(REPO_ROOT, plan);
-        const affected = files.map((f) => (f.newFile || f.oldFile || "").replace(/^[ab]\//, ""));
-        send("diff", { diffText, files: affected });
+        // ── 4-5. patch → apply, with a feedback retry loop ────────────────
+        // LLM diffs routinely miss exact hunk context/counts. Instead of aborting
+        // on the first apply failure, feed the apply errors back to the model and
+        // let it self-correct (up to MAX_PATCH_ATTEMPTS). Each failed attempt is
+        // rolled back so the tree stays clean between tries.
+        const MAX_PATCH_ATTEMPTS = 3;
+        let diffText = "", stats = null, changedFiles = [], feedback = null, applied = false;
+        for (let attempt = 1; attempt <= MAX_PATCH_ATTEMPTS; attempt++) {
+          step("patch", attempt === 1 ? "start" : "retry", { attempt, of: MAX_PATCH_ATTEMPTS });
+          const gen = await generatePatch(REPO_ROOT, plan, feedback ? { feedback } : {});
+          diffText = gen.diffText;
+          const affected = (gen.files || []).map((f) => (f.newFile || f.oldFile || "").replace(/^[ab]\//, ""));
+          send("diff", { diffText, files: affected, attempt });
 
-        if (dryRun) {
-          receipt.stoppedAt = "dry_run";
-          step("apply", "skipped", { reason: "dry_run" });
-          send("done", { ok: true, ...receipt, message: "Dry run — diff shown, nothing applied." });
-          res.end();
-          return;
-        }
+          if (dryRun) {
+            receipt.stoppedAt = "dry_run";
+            step("apply", "skipped", { reason: "dry_run" });
+            send("done", { ok: true, ...receipt, message: "Dry run — diff shown, nothing applied." });
+            res.end();
+            return;
+          }
 
-        // ── 5. apply ─────────────────────────────────────────────────────
-        step("apply", "start");
-        const stats = applyPatch(REPO_ROOT, diffText);
-        const changedFiles = [...(stats.changed || []), ...(stats.created || [])];
+          step("apply", "start", { attempt });
+          stats = applyPatch(REPO_ROOT, diffText);
+          changedFiles = [...(stats.changed || []), ...(stats.created || [])];
 
-        // Anti-fraud gate: refuse to proceed if the patch changed nothing or had
-        // hunk errors. Otherwise a hallucinated/failed patch would let unrelated
-        // data-file churn be committed as the "fix" (the data-file fraud pattern).
-        if (changedFiles.length === 0 || (stats.errors && stats.errors.length > 0)) {
+          // Anti-fraud gate: a usable patch changes ≥1 file with zero hunk errors.
+          // Otherwise a hallucinated/failed patch could let unrelated data-file churn
+          // be committed as the "fix" (the data-file fraud pattern).
+          if (changedFiles.length > 0 && !(stats.errors && stats.errors.length > 0)) {
+            applied = true;
+            break;
+          }
+
+          // Failed — roll the tree back clean and carry the errors into the next try.
           await new Promise((resolve) =>
             execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT, timeout: 10000, windowsHide: true }, () => resolve()));
+          feedback = {
+            priorDiff: diffText,
+            errors: (stats.errors && stats.errors.length)
+              ? stats.errors.map((e) => `${e.file}: ${e.error}`).join("\n")
+              : "the diff changed no files (paths/hunks did not match the repo)",
+          };
+          step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error", { stats, attempt });
+        }
+
+        if (!applied) {
           receipt.applied = false;
           receipt.stoppedAt = "patch_did_not_apply";
-          step("apply", "error", { stats, error: "patch_did_not_apply" });
-          send("done", { ok: false, ...receipt, message: "Generated patch produced no usable code changes (hunks failed or empty). Aborted — nothing committed." });
+          send("done", { ok: false, ...receipt, message: `Generated patch produced no usable code changes after ${MAX_PATCH_ATTEMPTS} attempts (hunks failed or empty). Aborted — nothing committed.` });
           res.end();
           return;
         }
@@ -589,6 +640,30 @@ module.exports = async (req, res, url, deps) => {
         const fsSync = require("fs");
         fsSync.appendFileSync(convergenceLog, JSON.stringify(convergenceRecord) + "\n");
         step("record", "done", { path: "data/convergence-autonomous-work.jsonl" });
+
+        // AGI-benchmark per-run scores (#592): map the convergence record onto the
+        // six loop dimensions (Observe→Research→Reason→Act→Verify→Converge) and append
+        // one row per autonomous run. Scores are derived from the real signals of THIS
+        // run only — no synthetic data is written. Fulfils the SKILLS.md §benchmark
+        // contract ("Scores updated per-run in data/agi-benchmark.jsonl").
+        const c = convergenceRecord.confidence;
+        const agiRow = {
+          timestamp: convergenceRecord.timestamp,
+          runId: `autowork-${issueNumber}-${convergenceRecord.timestamp}`,
+          issue: issueNumber,
+          dimensions: {
+            observe: issueDetails ? 0.9 : 0.5,                       // issue fetched (+ web sweep)
+            research: c.codebaseResearch,                            // codebase + web grounding
+            reason: (plan.actions?.length || 0) > 0 ? 0.85 : 0.5,    // plan generated
+            act: (stats?.filesModified || 0) > 0 ? 0.85 : 0.5,       // patch applied + committed
+            verify: c.testsPassed,                                   // tests actually ran/passed
+            converge: c.overall                                      // confidence record + PR
+          },
+          overall: c.overall
+        };
+        const agiBenchLog = path.join(REPO_ROOT, "data", "agi-benchmark.jsonl");
+        fsSync.appendFileSync(agiBenchLog, JSON.stringify(agiRow) + "\n");
+        step("agi-benchmark", "done", { path: "data/agi-benchmark.jsonl", overall: agiRow.overall });
 
         send("done", {
           ok: true,

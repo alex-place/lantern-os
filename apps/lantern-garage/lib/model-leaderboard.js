@@ -52,22 +52,48 @@ async function orderChainByLeaderboard(staticChain, taskType) {
 }
 
 /**
- * Record a local-model outcome so the leaderboard learns which model is best.
- * Wraps recordAgentCallFromConvergenceReceipt with a minimal synthetic receipt.
+ * Record a model/provider outcome so the leaderboard learns which is best.
+ * agentId = the model OR provider name (so local models and cloud providers
+ * rank in the same table). costUsd defaults to 0 (local = $0, boosts score);
+ * cloud passes a real cost so the ranking is cost-aware.
  */
-function recordModelOutcome(model, taskType, success, latencyMs) {
+function recordModelOutcome(model, taskType, success, latencyMs, costUsd = 0) {
   try {
     return recordAgentCallFromConvergenceReceipt(
-      { source: "ollama-chat", model },
-      model,                      // agentId = the model name (so it ranks per model)
+      { source: "chat", model },
+      model,                      // agentId = the model/provider name
       taskType || "default",
       !!success,                  // validationPassed
       latencyMs || 0,
-      0,                          // local model = $0 cost (boosts compositeScore)
+      costUsd || 0,
     );
   } catch (e) {
     return Promise.resolve();
   }
 }
 
-module.exports = { orderChainByLeaderboard, recordModelOutcome, preferredLocalModel };
+/**
+ * Rank a global candidate set (local models + cloud providers) by leaderboard
+ * compositeScore for this task. Each candidate is {provider, model, key?} — key
+ * is the leaderboard agentId to score by (defaults to model, then provider).
+ * Unscored candidates get a cold-start prior (cloud slightly above local so it
+ * is explored, generating the comparison data; real scores then take over).
+ * Returns the candidates sorted best-first with {score, scored} annotated.
+ */
+async function rankCandidates(candidates, taskType, opts = {}) {
+  const { coldCloud = 0.6, coldLocal = 0.5, cloudSet = null } = opts;
+  let ranked = [];
+  try { ranked = await getTopAgentsForTask(taskType, 30, 1); } catch { /* no signal */ }
+  const score = {};
+  for (const r of ranked) score[r.agentId] = r.compositeScore;
+  const isCloud = (p) => (cloudSet ? cloudSet.has(String(p).toLowerCase()) : false);
+  return (Array.isArray(candidates) ? candidates : [])
+    .map((c, i) => {
+      const key = c.key || c.model || c.provider;
+      const has = score[key] != null;
+      return { ...c, key, score: has ? score[key] : (isCloud(c.provider) ? coldCloud : coldLocal), scored: has, _i: i };
+    })
+    .sort((a, b) => (b.score - a.score) || (a._i - b._i));
+}
+
+module.exports = { orderChainByLeaderboard, recordModelOutcome, preferredLocalModel, rankCandidates };

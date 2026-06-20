@@ -227,7 +227,7 @@ async function run() {
   // ── GET / (HTML dashboard) ──────────────────────────────────────────────
   console.log("\nGET / (dashboard)");
 
-  await test("landing page returns 200 HTML with Lantern OS heading", async () => {
+  await test("landing page returns 200 HTML with Keystone OS heading", async () => {
     const r = await new Promise((resolve, reject) => {
       const req = http.request({ hostname: HOST, port: PORT, path: "/", method: "GET" }, (res) => {
         let data = "";
@@ -238,7 +238,7 @@ async function run() {
       req.end();
     });
     assert.strictEqual(r.status, 200);
-    assert.ok(r.body.includes("Lantern OS"), "Page should include Lantern OS heading");
+    assert.ok(r.body.includes("Keystone OS"), "Page should include Keystone OS heading");
     assert.ok(r.body.includes("dream-chat.html"), "Landing page should link to dream chat");
   });
 

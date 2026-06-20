@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/dream-chat.css">
   <link rel="stylesheet" href="/css/dream-chat-ui.css">
-  <title>Dream Chat — Lantern OS</title>
+  <title>Dream Chat — Keystone OS</title>
 
 <style>
   /* Patreon auth gate */
@@ -28,6 +28,7 @@
   }
   .patreon-pill[data-role="guest"] { opacity:.9; }
   .patreon-pill[data-role="supporter"],
+  .patreon-pill[data-role="deep_dreamer"],
   .patreon-pill[data-role="founder"],
   .patreon-pill[data-role="admin"] {
     border-color:rgba(20,184,166,.6);
@@ -35,6 +36,7 @@
   }
   body[data-patreon-role="guest"] .patron-only { display:none !important; }
   body[data-patreon-role="supporter"] .admin-only,
+  body[data-patreon-role="deep_dreamer"] .admin-only,
   body[data-patreon-role="founder"] .admin-only { display:none !important; }
   body[data-patreon-role="admin"] .admin-only { display:initial; }
 
@@ -115,33 +117,67 @@
     <nav class="site-nav">
       <a class="nav-brand" href="/">
         <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-        <span style="font-size:18px;font-weight:600">Lantern OS</span>
+        <span style="font-size:18px;font-weight:600">Keystone OS</span>
       </a>
       <div class="nav-links">
-        <a href="/dream-chat.html" class="active">Journal</a>
+        <a href="/dream-chat.html" class="active">Chat</a>
         <a href="/trader-dashboard.html">Trader</a>
         <a href="/create.html">Create</a>
         <a href="/explore.html">Explore</a>
         <a href="/knowledgecenter.html">Help</a>
         <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a>
+        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
       </div>
       <div class="nav-actions">
+        <button class="nav-btn" id="new-chat-btn" title="New chat" aria-label="Start a new chat (clears the visible history)">✎</button>
+        <button class="nav-btn" id="sessions-btn" title="Chats" aria-label="Open chat sessions">🗂</button>
         <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
         <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
-        <button class="nav-btn" id="voice-btn" aria-label="Toggle voice mode" aria-pressed="false" onclick="
-          if (!window.voiceMode) window.voiceMode = false;
-          window.voiceMode = !window.voiceMode;
-          this.setAttribute('aria-pressed', window.voiceMode);
-          this.style.opacity = window.voiceMode ? '1' : '0.5';
-          this.style.background = window.voiceMode ? 'rgba(161,139,250,0.2)' : '';
-          this.style.borderColor = window.voiceMode ? '#a78bfa' : '';
-          const voiceInputBtn = document.getElementById('voice-input-btn');
-          if (voiceInputBtn) voiceInputBtn.style.display = window.voiceMode ? 'block' : 'none';
-        " title="Voice Mode">🎙️</button>
+        <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
         <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
       </div>
     </nav>
+
+    <!-- #773 Sessions drawer: list, resume/switch, gated clear -->
+    <style>
+      .sessions-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:1200;}
+      .sessions-overlay.open{display:block;}
+      .sessions-drawer{position:absolute;top:0;left:0;height:100%;width:330px;max-width:86vw;
+        background:var(--bg);color:var(--text);border-right:1px solid var(--border);
+        box-shadow:2px 0 24px rgba(0,0,0,.25);display:flex;flex-direction:column;padding:16px;box-sizing:border-box;}
+      .sessions-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+      .sessions-head h2{font-size:18px;margin:0;font-weight:600;}
+      .sessions-close{background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;}
+      .drawer-new-chat{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;
+        background:var(--surface);color:var(--text);cursor:pointer;margin-bottom:12px;font-size:14px;text-align:left;}
+      .drawer-new-chat:hover{border-color:var(--accent);}
+      .sessions-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin:0 -4px;padding:0 4px;}
+      .sessions-empty{opacity:.6;font-size:13px;padding:14px 4px;}
+      .session-item{display:flex;align-items:stretch;gap:2px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);}
+      .session-item.active{border-color:var(--accent);}
+      .session-open{flex:1;min-width:0;text-align:left;background:transparent;border:none;color:var(--text);
+        cursor:pointer;padding:8px 10px;display:flex;flex-direction:column;gap:3px;}
+      .session-title{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .session-meta{font-size:11px;color:var(--muted);}
+      .session-del{background:transparent;border:none;color:var(--muted);cursor:pointer;opacity:.5;padding:0 12px;font-size:12px;}
+      .session-del:hover{opacity:1;color:#e25555;}
+      .sessions-foot{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+      .clear-all-btn{width:100%;padding:8px;border:1px solid #e25555;color:#e25555;background:transparent;border-radius:8px;cursor:pointer;font-size:13px;}
+      .clear-all-btn:hover{background:rgba(226,85,85,.1);}
+    </style>
+    <div class="sessions-overlay" id="sessions-overlay" onclick="if(event.target===event.currentTarget) closeSessions()">
+      <aside class="sessions-drawer" role="dialog" aria-modal="true" aria-label="Chat sessions">
+        <div class="sessions-head">
+          <h2>Chats</h2>
+          <button class="sessions-close" aria-label="Close sessions" onclick="closeSessions()">×</button>
+        </div>
+        <button class="drawer-new-chat" id="drawer-new-chat">✎ New chat</button>
+        <div class="sessions-list" id="sessions-list"></div>
+        <div class="sessions-foot">
+          <button class="clear-all-btn" id="clear-all-btn" onclick="clearAllHistory()" style="display:none;">Clear all history (operator)</button>
+        </div>
+      </aside>
+    </div>
 
 
 
@@ -179,11 +215,11 @@
         <button type="button" class="attach-item" disabled aria-disabled="true">
           <span class="attach-ico">✎</span> Paste Research <span class="attach-soon">soon</span>
         </button>
-        <p class="attach-help">Imported files are added to your Knowledge Center and become searchable throughout Lantern.</p>
+        <p class="attach-help">Imported files are added to your Knowledge Center and become searchable throughout Keystone.</p>
       </div>
       <div class="input-wrapper">
         <button id="attach-btn" class="attach-btn" type="button" aria-label="Add attachment" aria-haspopup="true" aria-expanded="false" onclick="lanternAttach.toggle()" title="Add to Knowledge Center">+</button>
-        <button id="voice-input-btn" aria-label="Start voice input" onclick="startVoiceInput()" title="Speak" style="display:none;background:none;border:none;font-size:24px;padding:8px 12px;cursor:pointer;opacity:0.5">🎙️</button>
+        <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text)">🎙️</button>
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
@@ -221,6 +257,11 @@
         <div class="obs-section-title">Loop Depth (Σ₀)</div>
         <div class="obs-value" id="obs-loop-depth" style="font-family:'IBM Plex Mono',monospace;font-size:11px">⟳ — loops · — conf</div>
         <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-fill" style="width:0%;background:var(--accent)"></div></div>
+      </div>
+      <div>
+        <div class="obs-section-title">Loop Records (Σ₀)</div>
+        <div class="obs-value" id="obs-loop-records" title="ConvergenceRecords emitted by chat replies (Reason→Act)">—</div>
+        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-records-fill" style="width:0%"></div></div>
       </div>
       <div>
         <div class="obs-section-title">Dilation Ratio</div>
@@ -332,10 +373,11 @@
    * IMPORTANT: real limits must also be enforced server-side in your chat API.
    */
   const LANTERN_ROLES = {
-    guest:     { label: "Guest",     canChat: false, dailyMessages: 0,   modelAccess: ["public"] },
-    supporter: { label: "Supporter", canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
-    founder:   { label: "Founder",   canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
-    admin:     { label: "Admin",     canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
+    guest:        { label: "Guest",        canChat: true,  dailyMessages: 10,  modelAccess: ["public"] }, // #739: limited guest chat (no account)
+    supporter:    { label: "Supporter",    canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
+    deep_dreamer: { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
+    founder:      { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
+    admin:        { label: "Admin",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
   };
 
   let lanternSession = { authenticated: false, role: "guest" };
@@ -394,7 +436,7 @@
           || value === "auto"
           || value === "ollama"
           || plan.modelAccess.includes(value)
-          || (value === "keystone-ft" && ["founder", "admin"].includes(role));
+          || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
         option.disabled = !allowed;
       });
     }
@@ -438,18 +480,24 @@
     }
   }
 
-  // Wrap sendMessage so locked visitors cannot bypass the disabled input in DevTools.
-  const originalSendMessage = window.sendMessage;
-  window.sendMessage = function gatedSendMessage(...args) {
-    const role = normalizeRole(lanternSession.role);
-    if (!LANTERN_ROLES[role].canChat) {
-      loginWithPatreon();
-      return;
-    }
-    if (typeof originalSendMessage === "function") {
-      return originalSendMessage.apply(this, args);
-    }
-  };
+  // Gate sendMessage so visitors without chat access cannot send (defense-in-depth;
+  // real limits are also enforced server-side). Installed on `load` so it wraps the
+  // FINAL sendMessage: dream-chat-ui.js defines window.sendMessage and
+  // convergance-sync.js wraps it — both AFTER this inline script runs. The previous
+  // version captured window.sendMessage here (still undefined) and was then
+  // overwritten by those later scripts, leaving chat completely ungated.
+  window.addEventListener("load", () => {
+    const realSendMessage = window.sendMessage;
+    if (typeof realSendMessage !== "function") return;
+    window.sendMessage = function gatedSendMessage(...args) {
+      const role = normalizeRole(lanternSession.role);
+      if (!LANTERN_ROLES[role].canChat) {
+        loginWithPatreon();
+        return;
+      }
+      return realSendMessage.apply(this, args);
+    };
+  });
 
   async function updateAuthUI() {
     try {
@@ -474,7 +522,7 @@
 
 <script src="js/dream-chat.js?v=20260615-a2"></script>
 <script src="/js/theme-toggle.js"></script>
-<script src="/js/dream-chat-ui.js?v=20260615-a2"></script>
+<script src="/js/dream-chat-ui.js?v=20260620-c2"></script>
 <script src="js/convergance-sync.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from csf.csf_file import CSFReader, CSFWriter, SymbolicDictionary
+from csf.csf_file import MAGIC, CSFReader, CSFWriter, SymbolicDictionary
 from csf.delta_stream import DeltaType
 
 
@@ -89,6 +89,78 @@ class TestCSFFileRoundtrip(unittest.TestCase):
 
             # File should be well under 20KB for 1050 records
             self.assertLess(meta.total_bytes, 20_000)
+        finally:
+            path.unlink(missing_ok=True)
+
+
+class TestCSFFileIntegrity(unittest.TestCase):
+    """Footer checksum must detect tampering and truncation on load."""
+
+    def _write_sample(self, path: Path):
+        writer = CSFWriter()
+        writer.set_baseline({0: 100, 42: 200, 531440: 50})
+        writer.dictionary.encode_name("TestSymbol")
+        writer.add_confirmation(0, (0,) * 12, extent=0xFF)
+        writer.add_delta(4, DeltaType.LIGHT_CHANGED,
+                         (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), b"\x05")
+        writer.write(path)
+
+    def test_clean_file_loads(self):
+        with tempfile.NamedTemporaryFile(suffix=".csf", delete=False) as f:
+            path = Path(f.name)
+        try:
+            self._write_sample(path)
+            # Sanity: an untouched file verifies and parses.
+            reader = CSFReader(path)
+            self.assertEqual(reader.metadata.delta_count, 2)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_body_tamper_detected(self):
+        with tempfile.NamedTemporaryFile(suffix=".csf", delete=False) as f:
+            path = Path(f.name)
+        try:
+            self._write_sample(path)
+            b = bytearray(path.read_bytes())
+            b[len(b) // 2] ^= 0xFF  # flip a body byte (not the magic, not the footer)
+            path.write_bytes(bytes(b))
+            with self.assertRaises(ValueError):
+                CSFReader(path)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_footer_tamper_detected(self):
+        with tempfile.NamedTemporaryFile(suffix=".csf", delete=False) as f:
+            path = Path(f.name)
+        try:
+            self._write_sample(path)
+            b = bytearray(path.read_bytes())
+            b[-1] ^= 0xFF  # corrupt the stored footer itself
+            path.write_bytes(bytes(b))
+            with self.assertRaises(ValueError):
+                CSFReader(path)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_truncation_detected(self):
+        with tempfile.NamedTemporaryFile(suffix=".csf", delete=False) as f:
+            path = Path(f.name)
+        try:
+            self._write_sample(path)
+            b = path.read_bytes()
+            path.write_bytes(b[:-8])  # lop off part of the footer
+            with self.assertRaises(ValueError):
+                CSFReader(path)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_tiny_file_rejected(self):
+        with tempfile.NamedTemporaryFile(suffix=".csf", delete=False) as f:
+            path = Path(f.name)
+        try:
+            path.write_bytes(MAGIC + b"\x00\x03")  # too small to hold a footer
+            with self.assertRaises(ValueError):
+                CSFReader(path)
         finally:
             path.unlink(missing_ok=True)
 

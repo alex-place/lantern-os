@@ -82,7 +82,19 @@ Curated references organized by component. Not a bookmark dump. Living document 
   - Binary compression + versioning
   - Replace bookmark usage with CADD
 
-**Status:** Append-only JSONL working; Graph layer needed
+### Lattice substrate — ternary storage (the 3¹² singularity, storage face)
+- **BitNet b1.58 — *The Era of 1-bit LLMs*** ([arXiv:2402.17764](https://arxiv.org/abs/2402.17764))
+  - Ternary weights `{-1,0,+1}`, ~66% zeros, matmul→add; grounds CSF's qutrit engine
+  - The dust-sparsity in `quantum_dust.py` is the storage twin of BitNet's zero-sparsity
+  - Status: external grounding for [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md)
+- **Sparse-BitNet** ([arXiv:2603.05168](https://arxiv.org/pdf/2603.05168)) · **T-SAR** ([arXiv:2511.13676](https://arxiv.org/pdf/2511.13676))
+  - 1.58-bit models are naturally sparsity-friendly; CPU-only ternary inference
+- **Radix economy** ([Wikipedia](https://en.wikipedia.org/wiki/Radix_economy) · [Quanta](https://www.quantamagazine.org/how-base-3-computing-beats-binary-20240809/))
+  - Base 3 is the most economical integer radix (optimum `e`); the principled reason the lattice is ternary
+- **Hyperdimensional computing / VSA** ([arXiv:2111.06077](https://arxiv.org/abs/2111.06077))
+  - Ternary `{-1,0,1}` sparse high-dimensional codes; reference for the 12-axis vector-symbolic substrate
+
+**Status:** Append-only JSONL working; Graph layer needed; ternary lattice substrate implemented (`src/csf/v07/`)
 
 ---
 
@@ -292,6 +304,17 @@ Pattern Extraction (Memory.compile)
 Memory.append(type=Pattern, confidence=X)
 ```
 
+### Convergence dynamics — latent motion to a fixed point (the 3¹² singularity, motion face)
+- **Geiping et al. — *Scaling up Test-Time Compute with Latent Reasoning: A Recurrent Depth Approach*** ([arXiv:2502.05171](https://arxiv.org/pdf/2502.05171))
+  - Iterates a recurrent block to arbitrary depth; reports emergent **orbit trajectories,
+    directional drift, per-token convergence rates** — the empirical basis for the spiral
+- **STARS — *Stabilizing Recurrent Dynamics …*** ([arXiv:2605.26733](https://arxiv.org/html/2605.26733))
+  - Constrains latent states to **asymptotically stable fixed points** via Jacobian Spectral
+    Radius Regularisation; closes the spiral paper's open **non-normal-operator** gap
+- **SpiralFormer** ([arXiv:2602.11698](https://arxiv.org/pdf/2602.11698)) · **A Survey on Latent Reasoning** ([arXiv:2507.06203](https://arxiv.org/pdf/2507.06203))
+- **Ouro LoopLM** ([arXiv:2510.25741](https://arxiv.org/abs/2510.25741)) — weight-tied recurrence + Q-exit; substrate the spiral extends
+- Lattice consolidation: [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) · [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
+
 ### Key Insight
 Never retrain. Accumulate.
 
@@ -342,6 +365,6 @@ Never retrain. Accumulate.
 4. **Remove entries when superseded by implementation or better alternative**
 5. **This is not a bookmarks list. It is the architecture research trail.**
 
-**Last Updated:** 2026-06-15  
+**Last Updated:** 2026-06-19 (3¹² lattice substrate + convergence-dynamics anchors — Comet Leap P2)  
 **Maintained By:** Lantern OS team  
 **Immutability:** Read-only; update via PR + issue comment only

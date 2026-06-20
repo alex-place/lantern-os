@@ -24,6 +24,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     mcpFlag: false,
     routeIntent: "",
     surface: "",
+    sessionId: null,
   };
 
   if (req.method === "GET") {
@@ -33,6 +34,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.requestedProvider = String(url.searchParams.get("provider") || "").trim().toLowerCase();
     parsed.routeIntent = String(url.searchParams.get("routeIntent") || "").trim();
     parsed.surface = String(url.searchParams.get("surface") || "").trim().toLowerCase();
+    parsed.sessionId = String(url.searchParams.get("sessionId") || "").trim().slice(0, 64) || null;
     return parsed;
   }
 
@@ -49,6 +51,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.history = sanitizeHistory(body.history);
     parsed.routeIntent = String(body.routeIntent || "").trim();
     parsed.surface = String(body.surface || "").trim().toLowerCase();
+    parsed.sessionId = String(body.sessionId || "").trim().slice(0, 64) || null;
   } catch {
     // Keep safe defaults for malformed JSON or body read failures.
   }

@@ -61,6 +61,26 @@ def get_serving_mode() -> ServingMode:
     return FAST_MODE
 
 
+def serving_mode_for(dilation: Optional[float] = None) -> ServingMode:
+    """Pick the serving mode for a given time-dilation — the within→without bridge.
+
+    `OURO_NATIVE=1` still hard-forces DEEP. Otherwise escalate FAST→DEEP only when the
+    dilation is high enough that `grounding_policy(D).deep_mode` is set (route by
+    difficulty: a productively-uncertain turn earns the slow Σ₀ loop; a routine one
+    stays on the sub-2s cached path). `dilation=None` ⇒ the env-based default.
+    """
+    base = get_serving_mode()
+    if base.name == "deep" or dilation is None:
+        return base
+    try:
+        from convergence_io.dilation import grounding_policy
+        if grounding_policy(float(dilation)).deep_mode:
+            return DEEP_MODE
+    except Exception:
+        pass
+    return base
+
+
 def get_decode_params(mode: ServingMode) -> dict:
     """Get decode parameters appropriate to the serving mode."""
     if not mode.decode_antirepetition:
