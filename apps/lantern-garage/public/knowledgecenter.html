@@ -43,6 +43,13 @@
     .link-card .icon { font-size: 22px; }
     .link-card h3 { font-size: 0.92rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
     .link-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+    /* Last-modified label on Research & Theory cards — pushed to the card foot so
+       dates line up across a row. Source is each linked doc's git commit date. */
+    .link-card .card-meta {
+      margin-top: auto; padding-top: 6px;
+      font-size: 0.68rem; color: var(--muted); opacity: 0.72;
+      letter-spacing: 0.01em; font-variant-numeric: tabular-nums;
+    }
 
     /* Plain-English jargon glosses (#748): a small "?" affordance on jargon cards
        that reveals a one-line normie definition on hover (the badge), keyboard
@@ -266,66 +273,73 @@
 
     <div class="section">
       <h2>Research &amp; Theory</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
+      <p style="opacity:.8;margin:-8px 0 14px;font-size:.82rem">Sorted by last updated — newest first. Each date is the document's last git commit.</p>
+      <div class="link-grid" id="research-grid">
+        <a class="link-card" data-modified="2026-06-20T13:58:33-04:00" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
           <span class="icon">📐</span>
           <h3>Σ₀ Collapse Certificate <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Σ₀ ("sigma-zero") is the project's core stability math. This document proves the reasoning loop stays grounded instead of spiralling into confident nonsense.</span></span></h3>
           <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
+          <span class="card-meta">Updated Jun 20, 2026</span>
         </a>
-        <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
-          <span class="icon">📄</span>
-          <h3>LaTeX Source</h3>
-          <p>TeX source for the certificate — for typesetting and print.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
-          <span class="icon">🌌</span>
-          <h3>Quantum-Relativity Analysis</h3>
-          <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent,#5b8cff)">
+        <a class="link-card" data-modified="2026-06-19T22:38:35-04:00" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent,#5b8cff)">
           <span class="icon">📊</span>
           <h3>Progress Report — Shareholder Edition <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An honest, evidence-tagged status of where Keystone — the bounded, self-improving agent — stands: what shipped, the real numbers, and the next milestones.</span></span></h3>
           <p>2026-06-19 — what shipped (token-budgeted memory #772, the loop's first closing slice), the real metrics (34% golden-set baseline), the honest ceiling, and the roadmap. Every claim evidence-tagged.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
         </a>
-        <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
-          <span class="icon">🔄</span>
-          <h3>Tesseract Convergence Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The step-by-step method the system reasons with — tracking how confident it is ("Bayesian beliefs") in a 4-D status "cube" and keeping receipts for every claim.</span></span></h3>
-          <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/LANTERN-SIGMA0-CODER.md">
-          <span class="icon">🤖</span>
-          <h3>lantern-sigma0-coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A coding AI that runs locally on your own machine (via Ollama), fine-tuned ("LoRA") on past Claude sessions — no cloud required.</span></span></h3>
-          <p>The local Σ₀ coding agent — a LoRA fine-tuned on past Claude sessions, served via Ollama, leaderboard-routed, and continually retrained.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/OURO-LOOPLM.md">
-          <span class="icon">🔁</span>
-          <h3>Ouro / LoopLM <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A reasoning technique where the model loops internally to "think" longer on harder questions before answering, instead of replying in one pass.</span></span></h3>
-          <p>Looped latent reasoning (arXiv 2510.25741) — adaptive depth + Q-exit CDF, implemented over our local model (loop-reasoner.js) and grounded in the KB.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
-          <span class="icon">🧭</span>
-          <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Lantern runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
-          <p>Ouro LoopLM (current kernel) vs the 2026 dense small-model frontier (Qwen3-4B, Phi-4-mini, Gemma 3n E2B) — primary-source-verified, scored on Lantern's own metrics, with a benchmark plan instead of a pick.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
-          <span class="icon">🌀</span>
-          <h3>Convergence-exit spiral <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Instead of stopping when the model is "confident enough" (Q-exit), keep looping until its internal state stops moving — a true fixed point. Falsifiable, with a shipped prototype.</span></span></h3>
-          <p>Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract over the Status-Cube. External Reality Rule: every claim tagged implemented / proven-conditional / hypothesis, with 4 falsifiable experiments.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
+        <a class="link-card" data-modified="2026-06-19T22:30:40-04:00" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
           <span class="icon">🧩</span>
           <h3>Convergence Core spine <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The design for turning Lantern's already-built parts (memory, task, tool, record + the Σ₀ safety system) into one closed agent loop — and the single feedback wire that's still missing.</span></span></h3>
           <p>The four core objects, the six-stage loop, and the write-back closure already exist in code (kernel.py, verify.py); the gap is that none of it runs end-to-end in the serving path. Verified file-by-file, with the honest "durable agent, not AGI" ceiling.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
         </a>
-        <a class="link-card" href="/repo/docs/SIGMA0-OURO-CODER.md">
+        <a class="link-card" data-modified="2026-06-19T10:37:47-04:00" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
+          <span class="icon">📄</span>
+          <h3>LaTeX Source</h3>
+          <p>TeX source for the certificate — for typesetting and print.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
+        </a>
+        <a class="link-card" data-modified="2026-06-19T08:06:08-04:00" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
+          <span class="icon">🌀</span>
+          <h3>Convergence-exit spiral <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Instead of stopping when the model is "confident enough" (Q-exit), keep looping until its internal state stops moving — a true fixed point. Falsifiable, with a shipped prototype.</span></span></h3>
+          <p>Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract over the Status-Cube. External Reality Rule: every claim tagged implemented / proven-conditional / hypothesis, with 4 falsifiable experiments.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
+        </a>
+        <a class="link-card" data-modified="2026-06-19T04:09:37-04:00" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
+          <span class="icon">🧭</span>
+          <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Lantern runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
+          <p>Ouro LoopLM (current kernel) vs the 2026 dense small-model frontier (Qwen3-4B, Phi-4-mini, Gemma 3n E2B) — primary-source-verified, scored on Lantern's own metrics, with a benchmark plan instead of a pick.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
+        </a>
+        <a class="link-card" data-modified="2026-06-19T02:02:56-04:00" href="/repo/docs/SIGMA0-OURO-CODER.md">
           <span class="icon">🌀</span>
           <h3>Σ₀ Ouro Coder</h3>
           <p>The Σ₀ coding agent on the Ouro looped LLM — Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth, served as a drop-in Ollama model the coder/agent path uses transparently.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
         </a>
-        <a class="link-card" href="/repo/docs/KEYSTONE-MCP.md">
+        <a class="link-card" data-modified="2026-06-19T00:09:01-04:00" href="/repo/docs/OURO-LOOPLM.md">
+          <span class="icon">🔁</span>
+          <h3>Ouro / LoopLM <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A reasoning technique where the model loops internally to "think" longer on harder questions before answering, instead of replying in one pass.</span></span></h3>
+          <p>Looped latent reasoning (arXiv 2510.25741) — adaptive depth + Q-exit CDF, implemented over our local model (loop-reasoner.js) and grounded in the KB.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
+        </a>
+        <a class="link-card" data-modified="2026-06-18T18:13:22-04:00" href="/repo/docs/KEYSTONE-MCP.md">
           <span class="icon">🔌</span>
           <h3>Keystone ↔ MCP</h3>
           <p>Keystone chat is linked to live project tools/details (GitHub issues+PRs, MCP tools) — any provider, incl. Grok, answers grounded in the real repo.</p>
+          <span class="card-meta">Updated Jun 18, 2026</span>
+        </a>
+        <a class="link-card" data-modified="2026-06-18T15:36:29-04:00" href="/repo/docs/LANTERN-SIGMA0-CODER.md">
+          <span class="icon">🤖</span>
+          <h3>lantern-sigma0-coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A coding AI that runs locally on your own machine (via Ollama), fine-tuned ("LoRA") on past Claude sessions — no cloud required.</span></span></h3>
+          <p>The local Σ₀ coding agent — a LoRA fine-tuned on past Claude sessions, served via Ollama, leaderboard-routed, and continually retrained.</p>
+          <span class="card-meta">Updated Jun 18, 2026</span>
+        </a>
+        <a class="link-card" data-modified="2026-06-14T20:26:12-04:00" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
+          <span class="icon">🌌</span>
+          <h3>Quantum-Relativity Analysis</h3>
+          <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
+          <span class="card-meta">Updated Jun 14, 2026</span>
         </a>
       </div>
     </div>
@@ -605,6 +619,18 @@
     });
   });
   document.addEventListener('click', closeAll);   // tap elsewhere closes any open gloss
+})();
+
+// Research & Theory: keep cards newest-first by last-modified. The source order
+// is already sorted; this enforces it and stays correct if cards are added or
+// edited. Sort keys come from each card's data-modified (the linked doc's git
+// commit date); ISO timestamps sort correctly as plain strings.
+(function () {
+  const grid = document.getElementById('research-grid');
+  if (!grid) return;
+  Array.from(grid.querySelectorAll('.link-card'))
+    .sort((a, b) => (b.dataset.modified || '').localeCompare(a.dataset.modified || ''))
+    .forEach((card) => grid.appendChild(card));
 })();
 </script>
 <script src="/js/narrator.js" defer></script>
