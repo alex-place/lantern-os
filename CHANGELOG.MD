@@ -71,6 +71,18 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.6] - 2026-06-20
+
+### Added
+- **Execution-grounded coding benchmark** (`scripts/eval_coding_ouro.py`, #776) — grades a model on real coding tasks by EXECUTING the generated code against assertions in a subprocess sandbox (timeout-isolated, same trust model as `eval_humaneval_ouro.py`), not by substring matching. Generalizes the 3-hardcoded-task `validate_ouro_coding.py` to any golden file, runs the same dual backends as `eval_keystone.py` (http Ollama API / in-process `Sigma0LoopLM`), and adds a **verbosity metric** (bytes/words per correct solution) so "concise AND correct" is measurable. Persists per-task detail to `data/eval/runs/` and a schema-reconciled `benchmark:"coding-exec"` row to `data/eval/leaderboard.jsonl`. Includes `--self-test` for an offline (no-model) harness check.
+- `data/eval/mbpp-basic.jsonl` — MBPP-style basic-Python golden subset (18 original exec-and-assert tasks), the missing MBPP file noted in #776.
+- `tests/test_eval_coding_harness.py` — 16 offline unit tests for the scoring logic (extract/exec/timeout/verbosity/leaderboard-row) plus reference-solution checks that each MBPP task is satisfiable. Runnable without a GPU.
+
+### Notes
+- This closes the GPU-independent scaffolding of #776 (epic #774). What remains needs the RTX 3070: actually running the benchmark to persist real `coding-exec` pass@1 rows, and the HumanEval `--limit 20` nightly.
+
+---
+
 ## [1.4.4] - 2026-06-20
 
 ### Fixed
