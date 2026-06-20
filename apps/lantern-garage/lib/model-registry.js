@@ -25,8 +25,10 @@ module.exports = {
       surfaces: ["provider-routing", "privacy", "receipts"],
     },
     convergance: {
+      // #811: Ollama sunset — convergance surface now served by ouro:latest on :11434.
+      // Override with CONVERGENCE_MODEL if a dedicated model is later promoted.
       profileId: "lantern-convergance",
-      ollamaModel: process.env.CONVERGENCE_MODEL || "lantern-convergance",
+      ollamaModel: process.env.CONVERGENCE_MODEL || "ouro:latest",
       surfaces: ["eval", "promotion", "receipts", "task-loop"],
     },
     coder: {

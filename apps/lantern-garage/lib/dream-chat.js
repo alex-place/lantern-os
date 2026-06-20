@@ -9,6 +9,7 @@ const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery
 const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
 const { TokenAudit } = require("./token-audit");
+const serving = require("./serving-modes");
 
 // Extract key topics from user message and generate 3 web search suggestion links
 function generateWebSuggestions(userMessage) {
@@ -421,13 +422,15 @@ Respond with a single, profound observation (2-3 sentences). Focus on:
 Be honest. If there's not enough data, say so.`;
 
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
-  const ollamaModel = process.env.OLLAMA_MODEL || "lantern-csf-dream";
+  const ollamaModel = process.env.OLLAMA_MODEL || "ouro:latest";
 
   try {
     const payload = JSON.stringify({
       model: ollamaModel,
       stream: false,
       messages: [{ role: "user", content: convergencePrompt }],
+      // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
+      options: serving.applyOllamaDecodeParams({}),
     });
 
     const ollamaUrl = new URL(ollamaBase);
@@ -803,7 +806,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
   // PRIORITY 1: Ollama (Local-first — no API keys, full privacy, control)
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
-  const ollamaModel = process.env.OLLAMA_MODEL || "lantern-csf-dream";
+  const ollamaModel = process.env.OLLAMA_MODEL || "ouro:latest";
   if (!rp || rp === "ollama" || rp === "local" || rp === "sigma0") {
     const isCoding = rp === "sigma0" || _isCodingRequest(text);
     const sigma0Persona = _getPersonas().find(p => p.id === "keystone-sigma0") || _DEFAULT_PERSONAS.find(p => p.id === "keystone-sigma0");
@@ -819,6 +822,8 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           { role: "system", content: ollamaSystemPrompt },
           { role: "user", content: ollamaUserPrompt },
         ],
+        // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
+        options: serving.applyOllamaDecodeParams({}),
       });
       const ollamaUrl = new URL(ollamaBase);
       const reply = await new Promise((resolve, reject) => {
@@ -888,6 +893,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   console.log("[dream-chat] DEBUG: anthropicKey exists:", !!anthropicKey, "rp:", rp, "condition:", (anthropicKey && (!rp || rp === "claude" || rp === "anthropic")) || (!rp && !ollamaModel));
   if ((anthropicKey && (!rp || rp === "claude" || rp === "anthropic")) || (!rp && !ollamaModel)) {
     try {
+      // Anthropic intentionally left unmodified (no frequency_penalty; matches PR #723).
       const payload = JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
         max_tokens: 512,
@@ -1003,13 +1009,14 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey && (!rp || rp === "openai" || rp === "gpt")) {
     try {
-      const payload = JSON.stringify({
+      // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
+      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
         model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
         messages: [
           { role: "system", content: agent.systemPrompt },
           { role: "user", content: userPrompt },
         ],
-      });
+      }));
       const reply = await new Promise((resolve, reject) => {
         const req2 = https.request({
           hostname: "api.openai.com",

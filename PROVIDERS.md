@@ -266,6 +266,56 @@ curl -X POST http://127.0.0.1:4177/api/dream/chat/stream \
 
 ---
 
+## Serving Defaults & Decode Parameters (#730)
+
+Lantern serves in one of two modes (`src/serving_modes.py`). **FAST** is the
+product default; **DEEP** is opt-in via `OURO_NATIVE=1`. Each provider streamer in
+`src/unified_agent_connector.py` injects the mode-appropriate anti-repetition
+decode params on every call.
+
+### Decode parameters by provider
+
+| Provider(s) | FAST params | DEEP params |
+|-------------|-------------|-------------|
+| OpenAI / Groq / Deepseek / Gemini | `top_p=0.95, frequency_penalty=0.5` | `top_p=0.98, frequency_penalty=0.2` |
+| Anthropic | *(no `frequency_penalty` — unsupported by API)* | *(unchanged)* |
+| Local (Ollama-style API) | `top_p=0.95, repeat_penalty=1.1, repeat_last_n=64` | `top_p=0.98, repeat_penalty=1.05, repeat_last_n=128` |
+
+`temperature` defaults to 0.7. Verified by `tests/test_serving_modes.py`.
+
+### Benchmark, validation & honest metrics
+
+`src/serving_benchmark.py` runs a 10-prompt golden set and records latency,
+repetition_ratio, cost and throughput to `data/benchmarks/leaderboard.jsonl`.
+
+**Honesty contract:** the connector silently returns a canned offline persona stub
+when a provider is unreachable. The benchmark **pins the requested model** onto the
+provider config, streams with `fallback=False`, and **rejects** any `source: offline`
+or empty response — recording it as an error, never as data. A leaderboard row
+therefore always belongs to the model it names.
+
+**Validation contract (#730):**
+
+| Mode | Latency | Repetition (target / floor) | Success |
+|------|---------|------------------------------|---------|
+| FAST | <= 2 s (hard) | 0.85 / 0.80 | >= 0.90 |
+| DEEP | 70-85 s (native Σ₀ only; warn elsewhere) | 0.80 / 0.75 | >= 0.90 |
+
+Repetition is WARN below target but ERROR only below the floor (token-loop
+territory). Run / validate / monitor:
+
+```bash
+python src/serving_benchmark.py --providers anthropic:claude-haiku-4-5-20251001 --mode fast
+python src/serving_benchmark.py --validate    # exit 1 on regression
+python src/serving_benchmark.py --report      # -> data/benchmarks/REPORT.md
+```
+
+Daily automation: `.github/workflows/serving-benchmark.yml` benchmarks every
+provider whose API key is a repo secret, then validates as a gate. Full design:
+[docs/SERVING-ARCHITECTURE-2026.md](docs/SERVING-ARCHITECTURE-2026.md).
+
+---
+
 ## Security Notes
 
 ⚠️ **API Keys:**

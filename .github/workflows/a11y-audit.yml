@@ -14,6 +14,12 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# Default to read-only; the report job opts into pull-requests:write for its
+# PR comment. Without this, the default token is read-only and the comment
+# step fails with "403 Resource not accessible by integration".
+permissions:
+  contents: read
+
 jobs:
   site-audit:
     name: Site Audit (Sitemap & Page Validation)
@@ -70,6 +76,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [site-audit, a11y-tests]
     if: always()
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -117,7 +126,7 @@ jobs:
               '- Page completeness check\n\n' +
               '[View sitemap](apps/lantern-garage/public/sitemap.xml)';
 
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,

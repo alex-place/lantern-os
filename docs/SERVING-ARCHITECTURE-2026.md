@@ -97,18 +97,17 @@ decode_params = get_decode_params(mode)
 
 ---
 
-## Performance Baseline
+## Performance Baseline (measured, not estimated)
 
-Running on golden set (10 diverse prompts):
+The baseline accrues from **real** benchmark runs in
+`data/benchmarks/leaderboard.jsonl` — appended by the daily workflow and by
+`python src/serving_benchmark.py --providers <provider:model> --mode fast`.
 
-| Provider | Model | Mode | Latency | Repetition | Tokens | Cost |
-|----------|-------|------|---------|-----------|--------|------|
-| ollama | qwen2.5-coder | FAST | 450ms | 0.92 | 85 | $0.00 |
-| ollama | qwen2.5-coder | DEEP | 75s | 0.89 | 320 | $0.00 |
-| groq | llama-3.1-70b | FAST | 280ms | 0.94 | 110 | ~$0.00 |
-| openai | gpt-4o-mini | FAST | 820ms | 0.96 | 92 | $0.003 |
-
-(See `data/benchmarks/leaderboard.jsonl` for full historical data.)
+> ⚠️ A previous version of this section hard-coded estimated numbers (e.g.
+> "450ms / 0.92") that were never measured. They were removed per the External
+> Reality Rule: the leaderboard and `data/benchmarks/REPORT.md` are the single
+> source of truth, and the benchmark records only real provider responses (an
+> unreachable provider is logged as an error, never as fabricated data).
 
 ---
 
@@ -117,20 +116,51 @@ Running on golden set (10 diverse prompts):
 ### Standing Benchmark
 
 ```bash
-# Run benchmark on a single provider:model pair
-python src/serving_benchmark.py --run ollama:qwen2.5-coder
+# Run one provider:model pair (FAST mode, the product default)
+python src/serving_benchmark.py --run anthropic:claude-haiku-4-5-20251001 --mode fast
 
-# Summarize all runs
-python src/serving_benchmark.py --summarize
+# Run several at once; DEEP mode sets OURO_NATIVE for the run
+python src/serving_benchmark.py --providers "anthropic:claude-haiku-4-5-20251001,openai:gpt-4.1-mini" --mode fast
+
+# Validate the latest run per config against the FAST/DEEP contract (exit 1 on regression)
+python src/serving_benchmark.py --validate
+
+# Refresh the Markdown monitoring report
+python src/serving_benchmark.py --report   # → data/benchmarks/REPORT.md
 ```
 
-**Golden set:**
-- 10 diverse prompts (reasoning, creative, code, domain)
-- Metrics: latency, tokens, repetition_ratio, cost
+**Golden set:** 10 diverse prompts (reasoning, creative, code, domain).
+**Metrics:** latency, tokens, repetition_ratio (+ per-task pass), cost, throughput.
+**Leaderboard:** `data/benchmarks/leaderboard.jsonl` · **Report:** `data/benchmarks/REPORT.md`.
 
-**Leaderboard location:** `data/benchmarks/leaderboard.jsonl`
+#### Honesty contract
 
-Every production deploy appends a new benchmark run. Over time, this becomes a measurable performance history.
+The connector silently falls back to a canned **offline persona stub** when a
+provider is unreachable. The benchmark therefore pins the requested model onto the
+provider config, streams with `fallback=False`, and **rejects** any run whose
+metadata reports `source: offline` or whose output is empty — recording it as an
+**error**, never as provider data. (The CLI model used to be ignored; it is now the
+model actually queried, so a leaderboard row always belongs to the model it names.)
+
+#### Validation contract (#730)
+
+| Mode | Latency | Repetition (target / floor) | Success rate |
+|------|---------|------------------------------|--------------|
+| FAST | ≤ 2 s (**error**) | 0.85 / **0.80** | ≥ 0.90 (**error**) |
+| DEEP | 70-85 s band (**warn**\*) | 0.80 / **0.75** | ≥ 0.90 (**error**) |
+
+Repetition is **WARN** below target but **ERROR** only below the floor — a real
+`✅✅✅` token-loop scores ~0.1-0.3, far under the floor, while honest short replies
+hover near the target. A per-task check also fails if any single golden-set task
+collapses below repetition 0.5.
+\* The DEEP latency band only binds the native Σ₀ runtime; it is informational for
+cached providers.
+
+**Daily automation:** `.github/workflows/serving-benchmark.yml` runs the logic
+tests, benchmarks every cloud provider whose API key is a repo secret, regenerates
+the report, commits the leaderboard, then runs `--validate` as a gate. Providers
+without a key are skipped — never fabricated. Over time the leaderboard becomes a
+measurable performance history; each run appends one row.
 
 ---
 
@@ -142,11 +172,13 @@ Every production deploy appends a new benchmark run. Over time, this becomes a m
 - [x] Create standing benchmark
 - [x] Default to FAST (product-ready)
 
-### Phase 2: Validation (Weeks of 2026-06-25)
-- [ ] Run benchmark on all providers daily
-- [ ] Measure reply quality (human + automated)
-- [ ] Validate no regression in reasoning tasks
-- [ ] Document FAST mode expectations (limits, constraints)
+### Phase 2: Validation (#730)
+- [x] Harden benchmark for honest metrics (model pinning, offline-stub rejection)
+- [x] Add `--validate` FAST/DEEP threshold gate (two-tier repetition)
+- [x] Daily benchmark automation (CI workflow, validates as a gate)
+- [x] Reasoning/coding regression check (per-task repetition floor)
+- [x] Document FAST/DEEP expectations + per-provider decode params (PROVIDERS.md)
+- [ ] Accrue ≥7 daily runs (automated; accrues once provider secrets are set)
 
 ### Phase 3: Optimization (Weeks of 2026-07-02)
 - [ ] Tune decode params per provider

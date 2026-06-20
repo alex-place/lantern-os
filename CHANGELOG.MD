@@ -71,7 +71,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.4.6] - 2026-06-20
+## [1.4.9] - 2026-06-20
 
 ### Added
 - **Execution-grounded coding benchmark** (`scripts/eval_coding_ouro.py`, #776) — grades a model on real coding tasks by EXECUTING the generated code against assertions in a subprocess sandbox (timeout-isolated, same trust model as `eval_humaneval_ouro.py`), not by substring matching. Generalizes the 3-hardcoded-task `validate_ouro_coding.py` to any golden file, runs the same dual backends as `eval_keystone.py` (http Ollama API / in-process `Sigma0LoopLM`), and adds a **verbosity metric** (bytes/words per correct solution) so "concise AND correct" is measurable. Persists per-task detail to `data/eval/runs/` and a schema-reconciled `benchmark:"coding-exec"` row to `data/eval/leaderboard.jsonl`. Includes `--self-test` for an offline (no-model) harness check.
@@ -80,6 +80,27 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ### Notes
 - This closes the GPU-independent scaffolding of #776 (epic #774). What remains needs the RTX 3070: actually running the benchmark to persist real `coding-exec` pass@1 rows, and the HumanEval `--limit 20` nightly.
+
+## [1.4.8] - 2026-06-20
+
+### Fixed
+- **Dream-chat sessions now persist from the live send path.** `dream-chat-ui.js` (the `sendMessage()` that actually runs) omitted `sessionId` from the `POST /api/dream/chat/stream` body, so turns logged untagged and never formed a saved session — the Chats drawer (#773) stayed on "No saved sessions yet" even after chatting. It now sends `sessionId` from `localStorage['lantern_chat_session']` (the id `dream-chat.js` owns), matching the server's `parsed.sessionId` read in `stream-chat.js`. Verified end-to-end in the dev preview: a fresh chat now creates a titled, resumable session.
+
+### Accessibility
+- Added accessible names to icon-only chat controls that lacked them: the Observer panel close button (`aria-label="Close observer panel"`) and the JS-generated session "resume" buttons (`aria-label="Resume chat: <title>"`, replacing an accessible name built from title + timestamp/turn-count noise).
+- Bumped `dream-chat.js` / `dream-chat-ui.js` cache-busters so returning browsers fetch the above fixes.
+
+---
+
+## [1.4.7] - 2026-06-20
+
+### Fixed
+- **Autowork "Work" button now streams the live step panel from the natural-language path too.** Typing "what should I work on?" (the `WORK_INTENT` route in `apps/lantern-garage/public/js/dream-chat-ui.js`) wired its Auto-work button to the old non-streaming `/api/convergence/autonomous-work` endpoint — an opaque "Working… → ✓ Done" with no visible progress — while the `!ask` chips used the observable `/autonomous-work/stream` panel (plan → patch → tests → commit → push → PR). Both paths now call `runAutowork()`, so a user gets the same honest, step-by-step view regardless of whether they typed or clicked. Σ₀: no hidden agency (#527). Verified live in the dev preview against the current worktree-isolated pipeline.
+
+## [1.4.6] - 2026-06-20
+
+### Fixed
+- `feature-flags.js` `normalizeKey()` now rejects the JS reserved keys `__proto__`, `constructor`, and `prototype` (returns `""`), so `setFlag()`'s empty-key guard turns `PUT /api/admin/flags` with a reserved key into a clean `400` instead of reporting `{ok:true}` while silently storing nothing (the old `cfg.flags["__proto__"] = {…}` hit the prototype setter and dropped the value). The flags map is now `Object.create(null)` as defense-in-depth so a raw `flags[key]` read in `isFlagEnabled()` can't resolve to an inherited member. Admin-gated, low-severity correctness/hardening. Added `tests/test_feature_flags_reserved_keys.js`.
 
 ---
 
@@ -109,6 +130,16 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 ### Fixed
 - `validate-version-changelog.py` now resolves `CHANGELOG.MD` case-insensitively and reads files as UTF-8, so the pre-commit/pre-push validators no longer crash on Windows (cp1252) against the emoji/em-dash changelog.
 - `auto-version.js` inserts new entries below the title/`[Unreleased]` block instead of at the very top, so the header no longer gets re-buried.
+
+---
+
+## [1.4.6] - 2026-06-20
+
+### Fixed
+- **#811** Wire all Lantern surfaces to Ouro after Ollama sunset:
+  - `dream-chat.js`: default `ollamaModel` changed from `"lantern-csf-dream"` → `"ouro:latest"` (both the convergence synthesis path and the main chat path)
+  - `model-registry.js`: `convergance.ollamaModel` default changed to `"ouro:latest"`; `CONVERGENCE_MODEL` env override still works
+  - `ouro_serve.py`: `_SERVED_MODELS` expanded to include legacy persona model names (`lantern-csf-dream`, `lantern-convergance`, `lantern-pcsf`) as aliases so old `.env` files still route to Ouro
 
 ---
 
