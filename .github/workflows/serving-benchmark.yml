@@ -1,58 +1,146 @@
 name: Serving Benchmark
 
-# Phase 2 of the serving-optimization rollout (#730 / PR #723): run the serving
-# benchmark on a daily cron and grow the leaderboard at data/benchmarks/leaderboard.jsonl.
-# The actual --run step needs a provider API key configured as an Actions secret; when
-# none is present the job still summarizes the existing leaderboard so the workflow is
-# always green and the artifact is always published. Multi-day metric validation (the
-# rest of #730) accrues from these scheduled runs.
+# Phase 2 / issue #730 — daily serving-optimization validation.
+#
+# Supersedes the earlier summarize-only workflow with:
+#   1. unit       — always-green logic gate for the benchmark + validation code.
+#   2. benchmark  — runs the golden set against every cloud provider whose API
+#                   key is present as a secret, appends honest results to the
+#                   leaderboard, regenerates the report, commits, then validates.
+#                   Providers without a key are skipped (never fabricated).
+#
+# The benchmark never records an unreachable provider's offline-stub fallback as
+# data (it pins the model and streams with fallback=False), so the leaderboard
+# only ever grows with real measurements.
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: "17 7 * * *"   # daily 07:17 UTC
   workflow_dispatch:
     inputs:
-      target:
-        description: "provider:model to benchmark (e.g. anthropic:claude-haiku-4-5-20251001)"
+      providers:
+        description: "Override provider:model specs, comma-separated (e.g. anthropic:claude-haiku-4-5-20251001,openai:gpt-4.1-mini)"
         required: false
         default: ""
+      mode:
+        description: "Serving mode"
+        required: false
+        default: "fast"
+        type: choice
+        options: [fast, deep]
+
+permissions:
+  contents: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  PYTHON_VERSION: "3.12"
+
+concurrency:
+  group: serving-benchmark
+  cancel-in-progress: false
 
 jobs:
-  benchmark:
-    runs-on: windows-latest
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+  unit:
+    name: Benchmark logic tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
-
-      - name: Run benchmark (only when a provider key is configured)
-        if: ${{ env.ANTHROPIC_API_KEY != '' }}
-        shell: pwsh
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install deps
         run: |
-          $target = "${{ github.event.inputs.target }}"
-          if (-not $target) { $target = "anthropic:claude-haiku-4-5-20251001" }
-          Write-Host "[benchmark] Running $target on the golden set..."
-          python src/serving_benchmark.py --run $target
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-timeout requests python-dotenv pydantic
+      - name: Run benchmark + serving-mode tests
+        run: |
+          python -m pytest tests/test_serving_benchmark.py tests/test_serving_modes.py \
+            -q --tb=short --timeout=60
 
-      - name: Summarize leaderboard
-        run: python src/serving_benchmark.py --summarize
+  benchmark:
+    name: Daily golden-set benchmark
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests python-dotenv pydantic
 
-      - name: Upload leaderboard
-        uses: actions/upload-artifact@v7
+      - name: Select providers with available credentials
+        id: select
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OVERRIDE: ${{ github.event.inputs.providers }}
+        run: |
+          if [ -n "$OVERRIDE" ]; then
+            SPECS="$OVERRIDE"
+          else
+            SPECS=""
+            [ -n "$ANTHROPIC_API_KEY" ] && SPECS="$SPECS,anthropic:claude-haiku-4-5-20251001"
+            [ -n "$OPENAI_API_KEY" ]   && SPECS="$SPECS,openai:gpt-4.1-mini"
+            [ -n "$GROQ_API_KEY" ]     && SPECS="$SPECS,groq:llama-3.1-70b-versatile"
+            [ -n "$GEMINI_API_KEY" ]   && SPECS="$SPECS,gemini:gemini-2.5-flash"
+            [ -n "$DEEPSEEK_API_KEY" ] && SPECS="$SPECS,deepseek:deepseek-chat"
+            SPECS="${SPECS#,}"
+          fi
+          echo "specs=$SPECS" >> "$GITHUB_OUTPUT"
+          if [ -z "$SPECS" ]; then
+            echo "::notice::No provider credentials configured; skipping live runs. Set OPENAI_API_KEY / ANTHROPIC_API_KEY / GROQ_API_KEY as repo secrets to grow the leaderboard."
+          else
+            echo "Will benchmark: $SPECS"
+          fi
+
+      - name: Run benchmark
+        if: steps.select.outputs.specs != ''
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODE: ${{ github.event.inputs.mode || 'fast' }}
+        run: |
+          python src/serving_benchmark.py --providers "${{ steps.select.outputs.specs }}" --mode "$MODE"
+
+      - name: Regenerate leaderboard report
+        run: python src/serving_benchmark.py --report
+
+      - name: Commit leaderboard + report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/benchmarks/leaderboard.jsonl data/benchmarks/REPORT.md
+          if git diff --staged --quiet; then
+            echo "No leaderboard changes to commit."
+          else
+            git commit -m "chore(serving): daily benchmark leaderboard update [skip ci]"
+            git push origin HEAD:${{ github.ref_name }} || echo "::warning::Push blocked (branch protection?); results uploaded as artifact instead."
+          fi
+
+      - name: Upload leaderboard artifact
         if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: serving-leaderboard
-          path: data/benchmarks/leaderboard.jsonl
+          path: |
+            data/benchmarks/leaderboard.jsonl
+            data/benchmarks/REPORT.md
+          retention-days: 90
           if-no-files-found: ignore
+
+      - name: Validate serving contract (gate)
+        if: steps.select.outputs.specs != ''
+        run: python src/serving_benchmark.py --validate

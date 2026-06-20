@@ -34,6 +34,7 @@ const { generatePlan, generatePatch } = require("./self-edit-engine");
 const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
 const { classifyIntent } = require("./intent-router");
+const serving = require("./serving-modes");
 const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
@@ -1395,6 +1396,8 @@ async function handleStreamChat(req, url, res) {
           model: ollamaModel,
           stream: true,
           messages: buildProviderMessages(systemPrompt, compacted, message),
+          // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
+          options: serving.applyOllamaDecodeParams({}),
         });
         const ollamaUrl = new URL(ollamaBase);
         await new Promise((resolve, reject) => {
@@ -1719,11 +1722,12 @@ async function handleStreamChat(req, url, res) {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey && message && (!requestedProvider || requestedProvider === "openai" || requestedProvider === "gpt")) {
     try {
-      const payload = JSON.stringify({
+      // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
+      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
         model: modelFor("openai"),
         stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
-      });
+      }));
 
       await new Promise((resolve, reject) => {
         const req2 = https.request({
@@ -1799,10 +1803,11 @@ async function handleStreamChat(req, url, res) {
   if (xaiKey && message && (!requestedProvider || requestedProvider === "grok" || requestedProvider === "xai")) {
     try {
       const xaiModel = modelFor("xai");
-      const payload = JSON.stringify({
+      // xAI/Grok is OpenAI-compatible → FAST-mode decode params (issue #729).
+      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
         model: xaiModel, stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
-      });
+      }));
       await new Promise((resolve, reject) => {
         const req2 = require("https").request({
           agent: llmAgent,
@@ -1897,6 +1902,8 @@ async function handleStreamChat(req, url, res) {
           ...history.map(h => ({ role: h.role, content: h.text })),
           { role: "user", content: message },
         ],
+        // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
+        options: serving.applyOllamaDecodeParams({}),
       });
       const ollamaUrl = new URL(ollamaBase);
       const ollamaOpts = {

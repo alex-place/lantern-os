@@ -621,22 +621,13 @@ async function sendMessage() {
           btn.textContent = a.label;
           if (a.href) btn.onclick = () => window.open(a.href, '_blank', 'noopener');
           else if (a.autonomous && a.issue) {
-            btn.onclick = async () => {
+            // Use the same observable streaming path as the !ask chips, so a
+            // user who *types* "what should I work on?" gets the live step
+            // panel (plan → patch → tests → commit → push → PR) instead of an
+            // opaque "Working… ✓ Done" button. Σ₀: no hidden agency (#527).
+            btn.onclick = () => {
               btn.disabled = true; btn.textContent = 'Working…';
-              try {
-                const wr = await fetch(`${base}/api/convergence/autonomous-work`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ issue: a.issue }) });
-                const wres = await wr.json();
-                if (wres.ok) { btn.textContent = '✓ Done'; btn.style.color = '#4ade80'; }
-                else {
-                  btn.textContent = '✗ Failed';
-                  btn.style.color = '#f87171';
-                  const errRow = document.createElement('div');
-                  errRow.className = 'msg-row agent';
-                  errRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px;color:#f87171">✗ Auto-work failed: ${wres.error || 'unknown error'}</div>`;
-                  document.getElementById('messages').appendChild(errRow);
-                  if (typeof scrollToBottom === 'function') scrollToBottom();
-                }
-              } catch { btn.textContent = '✗ Error'; btn.style.color = '#f87171'; }
+              runAutowork(a.issue, btn, base).catch(e => console.error('[autowork]', e));
             };
           } else if (a.command) btn.onclick = () => fillAndSend(a.command);
           wrap.appendChild(btn);

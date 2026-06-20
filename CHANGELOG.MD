@@ -71,7 +71,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.4.7] - 2026-06-20
+## [1.4.8] - 2026-06-20
 
 ### Fixed
 - **Dream-chat sessions now persist from the live send path.** `dream-chat-ui.js` (the `sendMessage()` that actually runs) omitted `sessionId` from the `POST /api/dream/chat/stream` body, so turns logged untagged and never formed a saved session — the Chats drawer (#773) stayed on "No saved sessions yet" even after chatting. It now sends `sessionId` from `localStorage['lantern_chat_session']` (the id `dream-chat.js` owns), matching the server's `parsed.sessionId` read in `stream-chat.js`. Verified end-to-end in the dev preview: a fresh chat now creates a titled, resumable session.
@@ -81,6 +81,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 - Bumped `dream-chat.js` / `dream-chat-ui.js` cache-busters so returning browsers fetch the above fixes.
 
 ---
+
+## [1.4.7] - 2026-06-20
+
+### Fixed
+- **Autowork "Work" button now streams the live step panel from the natural-language path too.** Typing "what should I work on?" (the `WORK_INTENT` route in `apps/lantern-garage/public/js/dream-chat-ui.js`) wired its Auto-work button to the old non-streaming `/api/convergence/autonomous-work` endpoint — an opaque "Working… → ✓ Done" with no visible progress — while the `!ask` chips used the observable `/autonomous-work/stream` panel (plan → patch → tests → commit → push → PR). Both paths now call `runAutowork()`, so a user gets the same honest, step-by-step view regardless of whether they typed or clicked. Σ₀: no hidden agency (#527). Verified live in the dev preview against the current worktree-isolated pipeline.
 
 ## [1.4.6] - 2026-06-20
 
