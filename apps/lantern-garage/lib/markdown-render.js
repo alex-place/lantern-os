@@ -197,18 +197,21 @@ function renderMarkdownDocument(markdown, sourcePath) {
 <body>
 <nav class="site-nav">
   <a class="nav-brand" href="/">
-    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
-    Keystone OS
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">Keystone OS</span>
   </a>
   <div class="nav-links">
-    <a href="/">Home</a>
     <a href="/dream-chat.html">Chat</a>
-    <a href="/three-doors-game.html">Explore</a>
-    <a href="/flourishing">Dashboard</a>
-    <a href="/knowledgecenter.html">Help</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html" class="active">Help</a>
+    <span class="sep" style="margin: 0 4px;">·</span>
+    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
   </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☀</button>
+    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
   </div>
 </nav>
 
@@ -221,8 +224,16 @@ function renderMarkdownDocument(markdown, sourcePath) {
 
 <footer class="site-footer">
   <div class="footer-inner">
-    <span><strong>Keystone OS</strong> · <a href="/">Home</a> · <a href="/dream-chat.html">Chat</a> · <a href="/three-doors-game.html">Explore</a></span>
-    <span style="margin-left: auto;"><a href="/knowledgecenter.html">Help</a></span>
+    <span class="footer-brand">
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
+    </span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
   </div>
 </footer>
 
