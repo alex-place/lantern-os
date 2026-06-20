@@ -266,7 +266,10 @@
     chatSessionId = freshSessionId();
     localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
     conversationHistory.length = 0;
-    messagesEl.querySelectorAll(".msg-row").forEach((n) => n.remove());
+    // Clear both row shapes: command replies use `.msg-row`, normal streamed
+    // replies (dream-chat-ui.js) use `.message`. Clearing only one left the
+    // conversation half-visible after "New chat".
+    messagesEl.querySelectorAll(".msg-row, .message").forEach((n) => n.remove());
     if (emptyState) emptyState.style.display = "";
     inputEl.value = "";
     try { inputEl.focus(); } catch { /* no-op */ }
@@ -278,7 +281,7 @@
   // ── #773 Multi-session UX: list, resume/switch, gated clear ───────────────
   function resetChatView() {
     conversationHistory.length = 0;
-    messagesEl.querySelectorAll(".msg-row").forEach((n) => n.remove());
+    messagesEl.querySelectorAll(".msg-row, .message").forEach((n) => n.remove());
     if (emptyState) emptyState.style.display = "";
   }
 

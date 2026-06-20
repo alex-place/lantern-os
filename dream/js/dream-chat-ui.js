@@ -659,7 +659,7 @@ async function sendMessage() {
   history.push({ role: 'user', text });
   writeCubeDelta('chat_message', [], 'conversation:' + Date.now());
 
-  const { msg, bubble, cursor } = createAgentBubble(false);
+  const { msg, bubble, cursor, thinking } = createAgentBubble(false);
   const container = document.getElementById('messages');
 
   let fullText = '';
@@ -736,14 +736,10 @@ async function sendMessage() {
 
   cursor.remove();
 
-  // Truncation detection: stream ended without a done event and text looks cut off
-  if (fullText && !receivedDone) {
-    const truncBadge = document.createElement('span');
-    truncBadge.title = 'Stream ended without completing — response may be truncated';
-    truncBadge.style.cssText = 'font-size:10px;opacity:0.5;margin-left:6px;vertical-align:middle;cursor:help';
-    truncBadge.textContent = '⚠ truncated';
-    bubble.appendChild(truncBadge);
-  }
+  // Truncation detection: stream ended without a done event and text looks cut off.
+  // The badge is attached AFTER the final innerHTML render below — otherwise that
+  // render wipes it out and the warning never shows.
+  const looksTruncated = !!(fullText && !receivedDone);
 
   if (!fullText) {
     fullText = serverErrorText || FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
@@ -753,6 +749,14 @@ async function sendMessage() {
   }
 
   bubble.innerHTML = renderMarkdown(fullText);
+
+  if (looksTruncated) {
+    const truncBadge = document.createElement('span');
+    truncBadge.title = 'Stream ended without completing — response may be truncated';
+    truncBadge.style.cssText = 'font-size:10px;opacity:0.5;margin-left:6px;vertical-align:middle;cursor:help';
+    truncBadge.textContent = '⚠ truncated';
+    bubble.appendChild(truncBadge);
+  }
 
   if (bubble.dataset.sigma0Corrected) {
     const badge = document.createElement('span');
