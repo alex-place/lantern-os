@@ -280,6 +280,11 @@ class StabilityGates:
     gate_lyapunov: bool               # ∃P≻0 ⟺ max Re λ(A) < −margin (accepts non-normal)
     lyapunov_transient_bound: float   # √cond(P): bound on sup_t‖e^{tA}‖ (nan if not Hurwitz)
     crouzeix_transient_bound: float   # 1+√2 when W(A) ⊂ LHP (ω ≤ 0), else nan
+    # #768 gate #2 — ε-pseudospectral abscissa + Kreiss constant (transient-growth bounds).
+    pseudospectral_abscissa: float    # provable upper bound: α_ε(A) ≤ ω(A)+ε (field-of-values)
+    gate_pseudospectral: bool         # α_ε(A) < −margin → no ε-transient escapes the LHP
+    kreiss_bound: float               # K(A) lower bound (continuous Kreiss const) ≤ sup_t‖e^{tA}‖
+    pseudospectral_eps: float         # the ε used for the pseudospectral abscissa/gate
     margin: float
 
     @property
@@ -291,12 +296,13 @@ class StabilityGates:
         ly = "PASS" if self.gate_lyapunov else "fail"
         return (f"gates[#768]: numerical-range(ω={self.numerical_range_abscissa:+.4f})={nr} "
                 f"lyapunov(maxReλ={self.spectral_abscissa:+.4f})={ly} "
-                f"transient≤{self.lyapunov_transient_bound:.3g} → "
+                f"transient≤{self.lyapunov_transient_bound:.3g} "
+                f"α_ε≤{self.pseudospectral_abscissa:+.4f} K(A)≥{self.kreiss_bound:.3g} → "
                 f"{'PROVEN contracting' if self.proven_contracting else 'not certified'}")
 
 
 @torch.no_grad()
-def stability_gates(A: Tensor, margin: float = 0.0) -> StabilityGates:
+def stability_gates(A: Tensor, margin: float = 0.0, pseudo_eps: float = 1e-2) -> StabilityGates:
     """#768 Tier-A provable region-wideners for a (possibly non-normal) Jacobian A.
 
     Two SUFFICIENT contraction certificates, each strictly wider than the conservative
@@ -314,6 +320,15 @@ def stability_gates(A: Tensor, margin: float = 0.0) -> StabilityGates:
        by solving the Lyapunov equation and checking P≻0. Accepts strongly non-normal A
        with transient growth (e.g. [[−1,3],[−3,0]]) that small-gain over-rejects.
        √cond(P) upper-bounds the Euclidean transient amplification sup_t ‖e^{tA}‖.
+
+    Two transient-growth quantities round out the certificate (#768 gate #2):
+      • pseudospectral abscissa — PROVABLE upper bound α_ε(A) ≤ ω(A)+ε via the field-of-
+        values resolvent inequality ‖(zI−A)⁻¹‖₂ ≤ 1/dist(z, W(A)). gate_pseudospectral
+        certifies α_ε(A) < −margin: no ε-sized perturbation pushes a mode into the RHP, a
+        transient-aware strengthening of the monotone gate (reduces to ω(A) < −ε−margin).
+      • Kreiss constant — K(A)=sup_{Re z>0} Re(z)·‖(zI−A)⁻¹‖₂, LOWER-bounded by sampling the
+        RHP. Kreiss matrix theorem (continuous): K(A) ≤ sup_t‖e^{tA}‖ ≤ e·n·K(A), so it is a
+        rigorous lower bound on the transient peak (complements √cond(P) / Crouzeix uppers).
 
     HONEST SCOPE: sufficient, not necessary; certify the FULL Jacobian's contraction
     (not collapse-onto-manifold). Crouzeix–Palencia (2017) gives the PROVEN transient
@@ -358,6 +373,38 @@ def stability_gates(A: Tensor, margin: float = 0.0) -> StabilityGates:
         pass
 
     crouzeix = (1.0 + 2.0 ** 0.5) if omega <= 0.0 else float("nan")
+
+    # #768 gate #2 — ε-pseudospectral abscissa: PROVABLE upper bound α_ε(A) ≤ ω(A)+ε
+    # (every z in the ε-pseudospectrum has dist(z, W(A)) ≤ ε, so Re(z) ≤ ω(A)+ε). The gate
+    # certifies α_ε(A) < −margin, i.e. no ε-sized perturbation reaches the RHP.
+    pseudospectral_abscissa = omega + pseudo_eps
+    gate_pseudospectral = pseudospectral_abscissa < -margin
+
+    # Kreiss constant LOWER bound: K(A)=sup_{Re z>0} Re(z)·‖(zI−A)⁻¹‖₂ ≥ any sampled value.
+    # ‖(zI−A)⁻¹‖₂ = 1/σ_min(zI−A). The resolvent SVD is O(n³); cap the sample budget for
+    # large Jacobians (loop_lm's hidden-dim A) — a single RHP probe still gives a valid
+    # lower bound. K(A) ≥ 1 always; >1 signals genuine non-normal transient growth.
+    kreiss = 1.0
+    try:
+        eigs = np.linalg.eigvals(M)
+        if n <= 64:
+            y_span = float(np.max(np.abs(eigs.imag))) + 1.0
+            scale = abs(spectral_abscissa) + 1.0
+            xs = np.array([1e-3, 1e-2, 0.05, 0.1, 0.25, 0.5, 1.0]) * scale
+            ys = np.linspace(-1.5 * y_span, 1.5 * y_span, 41)
+        else:
+            # one probe just inside the RHP, level with the rightmost eigenvalue
+            xs = np.array([abs(spectral_abscissa) + 1e-2])
+            ys = np.array([float(eigs.imag[int(np.argmax(eigs.real))])])
+        eye_c = np.eye(n)
+        for x in xs:
+            for y in ys:
+                smin = float(np.linalg.svd((x + 1j * y) * eye_c - M, compute_uv=False).min())
+                if smin > 1e-15:
+                    kreiss = max(kreiss, float(x) / smin)
+    except Exception:
+        kreiss = float("nan")
+
     return StabilityGates(
         numerical_range_abscissa=omega,
         spectral_abscissa=spectral_abscissa,
@@ -365,6 +412,10 @@ def stability_gates(A: Tensor, margin: float = 0.0) -> StabilityGates:
         gate_lyapunov=gate_lyap,
         lyapunov_transient_bound=transient,
         crouzeix_transient_bound=crouzeix,
+        pseudospectral_abscissa=pseudospectral_abscissa,
+        gate_pseudospectral=gate_pseudospectral,
+        kreiss_bound=kreiss,
+        pseudospectral_eps=pseudo_eps,
         margin=margin,
     )
 

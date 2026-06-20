@@ -260,14 +260,28 @@ sufficient, provable** contraction certificates — each strictly wider than sma
    transient growth (e.g. `[[−1,3],[−3,0]]`, Hurwitz at `−0.5`) that small-gain
    over-rejects. `√cond(P₀)` (from the margin-0 solve) upper-bounds the Euclidean
    transient `sup_t ‖e^{tA}‖`.
+3. **ε-pseudospectral abscissa + Kreiss constant (transient-aware).** The field-of-values
+   resolvent bound `‖(zI−A)⁻¹‖₂ ≤ 1/dist(z, W(A))` gives a **provable** upper bound on the
+   ε-pseudospectral abscissa, `α_ε(A) ≤ ω(A) + ε`; `gate_pseudospectral` certifies
+   `α_ε(A) < −margin` — no `ε`-sized perturbation reaches the RHP, a transient-aware
+   strengthening of gate 1 (it reduces to `ω(A) < −ε−margin`). The Kreiss constant
+   `K(A) = sup_{Re z>0} Re(z)·‖(zI−A)⁻¹‖₂`, lower-bounded by sampling the right half-plane,
+   gives a rigorous **lower** bound on the transient peak (continuous Kreiss matrix theorem:
+   `K(A) ≤ sup_t‖e^{tA}‖ ≤ e·n·K(A)`), complementing the `√cond(P)` / `1+√2` upper bounds.
+
+**Acceptance gate.** `loop_lm.generate()` now **consumes** the certificate (it was previously
+computed but unused): it surfaces `stability_accepted = proven_contracting` on the empirical
+exit-depth Jacobian, so a generation's latent trajectory carries an explicit
+convergence-accept/reject verdict (`None` when too few tokens to certify).
 
 **Honest scope.** Sufficient, not necessary; they certify the **full Jacobian's**
 contraction, not collapse-onto-manifold (the L1 alignment gap is separate). The PROVEN
 transient constant is **Crouzeix–Palencia (2017): `‖e^{tA}‖ ≤ (1+√2)` when `W(A) ⊂ LHP`**
 (`ω ≤ 0`); the sharper constant `2` is Crouzeix's still-open conjecture. Verified by
 `test_stability_gates.py` (the `[[−1,3],[−3,0]]` case, a 400-matrix red-team showing no
-false-positive certificates, and matrix-exponential checks that the monotone (`e^{ωt}`),
-Lyapunov (`√cond(P)`), and Crouzeix–Palencia (`1+√2`) bounds each hold).
+false-positive certificates, the `α_ε ≤ ω+ε` upper bound and `K(A) ≤ sup_t‖e^{tA}‖` lower
+bound, and matrix-exponential checks that the monotone (`e^{ωt}`), Lyapunov (`√cond(P)`),
+and Crouzeix–Palencia (`1+√2`) bounds each hold).
 These **extend the proven region of §1; they do not make the system globally uncollapsible.**
 
 [#768]: https://github.com/alex-place/lantern-os/issues/768
