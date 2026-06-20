@@ -1,3 +1,64 @@
+import time
+from pathlib import Path
+
+
+def _append_leaderboard_entry(entry_dict):
+    """Append a metrics entry to the leaderboard JSONL file."""
+    leaderboard_path = Path("data/eval/leaderboard.jsonl")
+    leaderboard_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(leaderboard_path, "a") as f:
+        f.write(json.dumps(entry_dict) + "\n")
+
+
+def _generate(prompt, **kwargs):
+    """Generate response and persist DEEP-mode metrics to leaderboard."""
+    # Call the loop generator and capture full dict
+    full_result = _loop.generate(prompt, **kwargs)
+    
+    # Extract text for response
+    text_output = full_result.get('text', '')
+    
+    # Extract metrics from result
+    ts = int(time.time())
+    mode = full_result.get('mode', 'default')
+    mean_depth = full_result.get('mean_depth')
+    exit_reason = full_result.get('exit_reason')
+    tokens = full_result.get('tokens', 0)
+    q = full_result.get('q')
+    mean_contraction = full_result.get('mean_contraction')
+    
+    # Persist metrics to leaderboard if in DEEP mode
+    if mode == 'converge' or mean_depth is not None:
+        entry = {
+            'ts': str(ts),
+            'mode': mode,
+            'mean_depth': mean_depth,
+            'exit_reason': exit_reason,
+            'tokens': tokens,
+            'q': q,
+            'mean_contraction': mean_contraction
+        }
+        _append_leaderboard_entry(entry)
+    
+    # Prepare response with metrics header
+    response = {
+        'text': text_output,
+        'mode': mode,
+        'mean_depth': mean_depth,
+        'exit_reason': exit_reason,
+        'tokens': tokens,
+        'q': q,
+        'mean_contraction': mean_contraction
+    }
+    
+    # Set response header for client-side visualization
+    if mean_depth is not None:
+        response['headers'] = {
+            'x-ouro-depth': str(mean_depth)
+        }
+    
+    return response
 import os
 import time
 from datetime import datetime
@@ -86,4 +147,5 @@ class OuroServe:
             'tokens': 100,
             'q': prompt,
         }
+import json
 import json
