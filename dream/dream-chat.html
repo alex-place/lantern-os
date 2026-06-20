@@ -130,12 +130,54 @@
       </div>
       <div class="nav-actions">
         <button class="nav-btn" id="new-chat-btn" title="New chat" aria-label="Start a new chat (clears the visible history)">✎</button>
+        <button class="nav-btn" id="sessions-btn" title="Chats" aria-label="Open chat sessions">🗂</button>
         <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
         <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
         <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
         <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
       </div>
     </nav>
+
+    <!-- #773 Sessions drawer: list, resume/switch, gated clear -->
+    <style>
+      .sessions-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:1200;}
+      .sessions-overlay.open{display:block;}
+      .sessions-drawer{position:absolute;top:0;left:0;height:100%;width:330px;max-width:86vw;
+        background:var(--bg);color:var(--text);border-right:1px solid var(--border);
+        box-shadow:2px 0 24px rgba(0,0,0,.25);display:flex;flex-direction:column;padding:16px;box-sizing:border-box;}
+      .sessions-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+      .sessions-head h2{font-size:18px;margin:0;font-weight:600;}
+      .sessions-close{background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;}
+      .drawer-new-chat{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;
+        background:var(--surface);color:var(--text);cursor:pointer;margin-bottom:12px;font-size:14px;text-align:left;}
+      .drawer-new-chat:hover{border-color:var(--accent);}
+      .sessions-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin:0 -4px;padding:0 4px;}
+      .sessions-empty{opacity:.6;font-size:13px;padding:14px 4px;}
+      .session-item{display:flex;align-items:stretch;gap:2px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);}
+      .session-item.active{border-color:var(--accent);}
+      .session-open{flex:1;min-width:0;text-align:left;background:transparent;border:none;color:var(--text);
+        cursor:pointer;padding:8px 10px;display:flex;flex-direction:column;gap:3px;}
+      .session-title{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .session-meta{font-size:11px;color:var(--muted);}
+      .session-del{background:transparent;border:none;color:var(--muted);cursor:pointer;opacity:.5;padding:0 12px;font-size:12px;}
+      .session-del:hover{opacity:1;color:#e25555;}
+      .sessions-foot{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+      .clear-all-btn{width:100%;padding:8px;border:1px solid #e25555;color:#e25555;background:transparent;border-radius:8px;cursor:pointer;font-size:13px;}
+      .clear-all-btn:hover{background:rgba(226,85,85,.1);}
+    </style>
+    <div class="sessions-overlay" id="sessions-overlay" onclick="if(event.target===event.currentTarget) closeSessions()">
+      <aside class="sessions-drawer" role="dialog" aria-modal="true" aria-label="Chat sessions">
+        <div class="sessions-head">
+          <h2>Chats</h2>
+          <button class="sessions-close" aria-label="Close sessions" onclick="closeSessions()">×</button>
+        </div>
+        <button class="drawer-new-chat" id="drawer-new-chat">✎ New chat</button>
+        <div class="sessions-list" id="sessions-list"></div>
+        <div class="sessions-foot">
+          <button class="clear-all-btn" id="clear-all-btn" onclick="clearAllHistory()" style="display:none;">Clear all history (operator)</button>
+        </div>
+      </aside>
+    </div>
 
 
 

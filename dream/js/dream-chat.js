@@ -275,6 +275,121 @@
   const newChatBtn = document.getElementById("new-chat-btn");
   if (newChatBtn) newChatBtn.addEventListener("click", newChat);
 
+  // ── #773 Multi-session UX: list, resume/switch, gated clear ───────────────
+  function resetChatView() {
+    conversationHistory.length = 0;
+    messagesEl.querySelectorAll(".msg-row").forEach((n) => n.remove());
+    if (emptyState) emptyState.style.display = "";
+  }
+
+  // Resume an existing session: adopt its id, then reload its turns into view.
+  async function switchSession(id) {
+    if (!id) return;
+    if (id !== chatSessionId) {
+      chatSessionId = id;
+      localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
+      resetChatView();
+      await loadConversationHistory();
+    }
+    closeSessions();
+  }
+  window.switchSession = switchSession;
+
+  let sessionsOperator = false;
+  async function loadSessions() {
+    const listEl = document.getElementById("sessions-list");
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="sessions-empty">Loading…</div>';
+    try {
+      const r = await fetch(`${serverBase}/api/conversations/sessions`, { signal: AbortSignal.timeout(4000) });
+      const data = r.ok ? await r.json() : { sessions: [] };
+      sessionsOperator = !!data.operator;
+      renderSessions(data.sessions || []);
+    } catch {
+      listEl.innerHTML = '<div class="sessions-empty">Could not load sessions.</div>';
+    }
+  }
+
+  function renderSessions(sessions) {
+    const listEl = document.getElementById("sessions-list");
+    if (!listEl) return;
+    const clearAllBtn = document.getElementById("clear-all-btn");
+    if (clearAllBtn) clearAllBtn.style.display = sessionsOperator ? "" : "none";
+    if (!sessions.length) {
+      listEl.innerHTML = '<div class="sessions-empty">No saved sessions yet. Start chatting to create one.</div>';
+      return;
+    }
+    listEl.innerHTML = "";
+    for (const s of sessions) {
+      const isCurrent = s.sessionId === chatSessionId;
+      const when = s.lastActivity
+        ? new Date(s.lastActivity).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        : "";
+      const row = document.createElement("div");
+      row.className = "session-item" + (isCurrent ? " active" : "");
+      const open = document.createElement("button");
+      open.className = "session-open";
+      open.title = "Resume this session";
+      const title = document.createElement("span");
+      title.className = "session-title";
+      title.textContent = s.title || "(untitled session)";
+      const meta = document.createElement("span");
+      meta.className = "session-meta";
+      meta.textContent = `${when}${s.turnCount ? " · " + s.turnCount + " turns" : ""}${isCurrent ? " · current" : ""}`;
+      open.appendChild(title);
+      open.appendChild(meta);
+      open.addEventListener("click", () => switchSession(s.sessionId));
+      const del = document.createElement("button");
+      del.className = "session-del";
+      del.title = "Delete this session";
+      del.setAttribute("aria-label", "Delete session");
+      del.textContent = "✕";
+      del.addEventListener("click", (e) => { e.stopPropagation(); clearSession(s.sessionId); });
+      row.appendChild(open);
+      row.appendChild(del);
+      listEl.appendChild(row);
+    }
+  }
+
+  // Per-session clear is self-service (server archives then removes that session's turns).
+  async function clearSession(id) {
+    if (!id) return;
+    if (!confirm("Delete this chat session? Its turns are archived first, then removed.")) return;
+    try {
+      await fetch(`${serverBase}/api/conversations?sessionId=${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch { /* best-effort */ }
+    if (id === chatSessionId) newChat();
+    loadSessions();
+  }
+
+  // Clearing ALL history is operator-gated server-side (loopback / OPERATOR_TOKEN).
+  async function clearAllHistory() {
+    if (!confirm("Clear ALL chat history across every session? This archives, then wipes the whole log.")) return;
+    try {
+      const r = await fetch(`${serverBase}/api/conversations`, { method: "DELETE" });
+      if (r.status === 403) { alert("Clearing all history requires operator access (run Keystone locally)."); return; }
+    } catch { /* best-effort */ }
+    newChat();
+    loadSessions();
+  }
+  window.clearAllHistory = clearAllHistory;
+
+  function openSessions() {
+    const ov = document.getElementById("sessions-overlay");
+    if (ov) ov.classList.add("open");
+    loadSessions();
+  }
+  function closeSessions() {
+    const ov = document.getElementById("sessions-overlay");
+    if (ov) ov.classList.remove("open");
+  }
+  window.openSessions = openSessions;
+  window.closeSessions = closeSessions;
+  const sessionsBtn = document.getElementById("sessions-btn");
+  if (sessionsBtn) sessionsBtn.addEventListener("click", openSessions);
+  const drawerNewChat = document.getElementById("drawer-new-chat");
+  if (drawerNewChat) drawerNewChat.addEventListener("click", () => { newChat(); loadSessions(); });
+
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
