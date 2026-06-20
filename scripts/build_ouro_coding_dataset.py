@@ -25,12 +25,17 @@ seed can be concatenated with training-data.jsonl before `train-qlora-ouro.py`.
     python scripts/build_ouro_coding_dataset.py --merge    # + training-data.augmented.jsonl
 """
 import argparse
+import hashlib
 import json
 import os
+import subprocess
+import sys
+import tempfile
 import textwrap
 
 OUT_DIR = "models/lantern-sigma0-coder"
 SEED_PATH = os.path.join(OUT_DIR, "coding-seed.jsonl")
+EXTRA_PATH = os.path.join(OUT_DIR, "coding-extra.jsonl")
 EXISTING_PATH = os.path.join(OUT_DIR, "training-data.jsonl")
 AUGMENTED_PATH = os.path.join(OUT_DIR, "training-data.augmented.jsonl")
 
@@ -301,11 +306,109 @@ def verify(task):
     return True, "ok"
 
 
+def verify_candidate_sandboxed(code, asserts, timeout=8):
+    """Verify an agent-generated coding task by EXECUTION in an isolated subprocess.
+
+    Why a subprocess (vs the in-process verify() used for the trusted hardcoded seed):
+    these candidates are model-authored, so a buggy one could infinite-loop or blow up.
+    The subprocess gives a hard timeout and isolates state. Contract: the program
+    `code + each assert` must exit 0. This is the Σ₀ ground-truth gate — a model's claim
+    that its code works does NOT count; only a green subprocess does (#781).
+    """
+    if not asserts:
+        return False, "no asserts"
+    for a in asserts:
+        if not a.strip().startswith("assert"):
+            return False, f"not an assert: {a[:50]}"
+    try:
+        compile(code, "<extra>", "exec")
+    except SyntaxError as e:
+        return False, f"syntax: {e}"
+    program = code.rstrip() + "\n\n" + "\n".join(asserts) + "\n"
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
+        f.write(program)
+        path = f.name
+    try:
+        r = subprocess.run([sys.executable, path], capture_output=True, timeout=timeout, text=True)
+        if r.returncode == 0:
+            return True, "ok"
+        last = (r.stderr.strip().splitlines() or ["?"])[-1][:120]
+        return False, last
+    except subprocess.TimeoutExpired:
+        return False, f"timeout(>{timeout}s)"
+    except Exception as e:  # noqa: BLE001
+        return False, f"runner: {e}"
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+# narrow blocklist: candidates are constrained to pure stdlib functions; reject any that
+# reach for I/O / nondeterminism / process control before we even execute them.
+_FORBIDDEN_TOKENS = ("import os", "import sys", "import socket", "import subprocess",
+                     "open(", "input(", "eval(", "exec(", "__import__", "random.", "import random",
+                     "time.", "import time", "datetime", "requests", "urllib", "shutil")
+
+
+def load_extra_candidates(path, seed_fns):
+    """Read a JSONL of model-generated {fn, instruction, code, asserts} candidates,
+    execution-verify each, dedup (by fn name vs seed + by code hash), and return
+    (verified_rows, dropped). verified_rows use the same {instruction, input, output} schema."""
+    rows, dropped, seen_fns, seen_hashes = [], [], set(seed_fns), set()
+    with open(path, encoding="utf-8") as f:
+        for ln, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                t = json.loads(line)
+            except json.JSONDecodeError as e:
+                dropped.append((f"line{ln}", f"json: {e}"))
+                continue
+            fn = (t.get("fn") or "").strip()
+            code = (t.get("code") or "").strip()
+            instr = (t.get("instruction") or "").strip()
+            asserts = t.get("asserts") or []
+            if not (fn and code and instr):
+                dropped.append((fn or f"line{ln}", "missing fn/code/instruction"))
+                continue
+            if f"def {fn}" not in code:
+                dropped.append((fn, "code does not define fn"))
+                continue
+            if fn in seen_fns:
+                dropped.append((fn, "duplicate fn name"))
+                continue
+            low = code.lower()
+            bad = next((tok for tok in _FORBIDDEN_TOKENS if tok in low), None)
+            if bad:
+                dropped.append((fn, f"forbidden token: {bad!r}"))
+                continue
+            h = hashlib.sha1(code.encode("utf-8")).hexdigest()
+            if h in seen_hashes:
+                dropped.append((fn, "duplicate code body"))
+                continue
+            ok, detail = verify_candidate_sandboxed(code, asserts)
+            if not ok:
+                dropped.append((fn, detail))
+                continue
+            seen_fns.add(fn)
+            seen_hashes.add(h)
+            if not instr.endswith("Output only the function code."):
+                instr = instr.rstrip(". ") + ". Output only the function code."
+            rows.append({"instruction": instr, "input": "", "output": code})
+    return rows, dropped
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=SEED_PATH)
     ap.add_argument("--merge", action="store_true",
-                    help=f"also write {AUGMENTED_PATH} = existing training-data.jsonl + the verified seed")
+                    help=f"also write {AUGMENTED_PATH} = existing training-data.jsonl + the verified seed (+extras)")
+    ap.add_argument("--extra-candidates", default=None,
+                    help="JSONL of model-generated {fn,instruction,code,asserts}; each is "
+                         "execution-verified in a subprocess and deduped before inclusion")
     a = ap.parse_args()
 
     rows, dropped = [], []
@@ -326,11 +429,28 @@ def main():
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    print(f"verified {len(rows)}/{len(TASKS)} coding examples -> {a.out}")
+    print(f"verified {len(rows)}/{len(TASKS)} curated coding examples -> {a.out}")
     for fn, why in dropped:
         print(f"  DROPPED {fn}: {why}")
     if dropped:
-        raise SystemExit(f"ERROR: {len(dropped)} example(s) failed verification; none broken should ship")
+        # the curated seed is hand-authored: ANY failure is a real regression, abort.
+        raise SystemExit(f"ERROR: {len(dropped)} curated example(s) failed verification; none broken should ship")
+
+    # Optional: fold in model-generated extras. Unlike the curated seed, drops here are
+    # EXPECTED (the model writes some broken/duplicate tasks) and are informational, not fatal.
+    extra_rows = []
+    if a.extra_candidates:
+        extra_rows, extra_dropped = load_extra_candidates(a.extra_candidates, names)
+        with open(EXTRA_PATH, "w", encoding="utf-8") as f:
+            for r in extra_rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        kept = len(extra_rows)
+        total = kept + len(extra_dropped)
+        print(f"extras: verified {kept}/{total} model-generated examples -> {EXTRA_PATH}")
+        from collections import Counter
+        reasons = Counter(why.split(":")[0].split("(")[0] for _, why in extra_dropped)
+        for reason, c in reasons.most_common():
+            print(f"  dropped x{c}: {reason}")
 
     if a.merge:
         existing = []
@@ -343,9 +463,10 @@ def main():
         with open(AUGMENTED_PATH, "w", encoding="utf-8") as f:
             for line in existing:
                 f.write(line + "\n")
-            for r in rows:
+            for r in rows + extra_rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        print(f"merged {len(existing)} existing + {len(rows)} coding rows -> {AUGMENTED_PATH}")
+        print(f"merged {len(existing)} existing + {len(rows)} curated + {len(extra_rows)} extra "
+              f"coding rows -> {AUGMENTED_PATH} ({len(existing) + len(rows) + len(extra_rows)} total)")
 
 
 if __name__ == "__main__":

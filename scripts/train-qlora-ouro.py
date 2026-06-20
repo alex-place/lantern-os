@@ -38,12 +38,20 @@ def main():
     if not torch.cuda.is_available():
         print("ERROR: CUDA required."); return 1
 
+    # bf16 over fp16 on Ampere+ : fp16 QLoRA on this reasoning-LM overflows gradients
+    # (observed grad_norm=nan on a smoke run), which max_grad_norm clipping then
+    # propagates into the LoRA weights -> a NaN/garbage adapter. bf16 has fp32's
+    # exponent range, so no overflow. Fall back to fp16 only if bf16 is unsupported.
+    use_bf16 = torch.cuda.is_bf16_supported()
+    compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    print(f"precision: {'bf16' if use_bf16 else 'fp16'}")
+
     tok = AutoTokenizer.from_pretrained(a.base, trust_remote_code=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
     bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
-                             bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True)
+                             bnb_4bit_compute_dtype=compute_dtype, bnb_4bit_use_double_quant=True)
     model = AutoModelForCausalLM.from_pretrained(
         a.base, quantization_config=bnb, device_map="auto", trust_remote_code=True)
     model.config.use_cache = False
@@ -83,7 +91,8 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tok, mlm=False),
         args=TrainingArguments(
             output_dir=a.out, num_train_epochs=a.epochs, per_device_train_batch_size=1,
-            gradient_accumulation_steps=8, learning_rate=a.lr, fp16=True,
+            gradient_accumulation_steps=8, learning_rate=a.lr,
+            bf16=use_bf16, fp16=not use_bf16, max_grad_norm=1.0, warmup_ratio=0.03,
             logging_steps=5, save_strategy="epoch", optim="paged_adamw_8bit",
             gradient_checkpointing=True, report_to="none"))
     trainer.train()

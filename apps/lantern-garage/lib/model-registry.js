@@ -39,6 +39,19 @@ module.exports = {
       surfaces: ["autowork", "coding", "code-execution", "task-loop"],
       continualTraining: true,
     },
+    coderLoop: {
+      // Σ₀ Ouro DEEP coder (OURO_NATIVE=1 / deep serving mode): Ouro-1.4B + the Σ₀
+      // LoRA adapter, served via the native Q-exit loop (src/sigma0/loop_lm.py),
+      // NOT Ollama. Retrained on the execution-verified coding corpus (#781). The
+      // adapter path is the promotion target every harness/loop reads by default;
+      // override with OURO_ADAPTER.
+      profileId: "lantern-sigma0-coder-loop",
+      baseModel: "ByteDance/Ouro-1.4B",
+      adapterPath: process.env.OURO_ADAPTER || "D:/lantern-train/ouro-sigma0-adapters/final",
+      trainingData: "models/lantern-sigma0-coder/training-data.augmented.jsonl",
+      surfaces: ["deep-reasoning", "coding", "task-loop"],
+      continualTraining: true,
+    },
   },
   image: {
     dream: {
