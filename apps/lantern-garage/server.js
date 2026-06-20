@@ -163,6 +163,7 @@ const routes = [
   require("./routes/self-edit"),
   require("./routes/creator"),
   require("./routes/creator-entries"),
+  require("./routes/creator-calibration"),
   require("./routes/research"), // open-video learning flywheel status
 
   require("./routes/pdfs"), // PDF document listing for Knowledge Center

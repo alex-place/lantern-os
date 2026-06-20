@@ -60,6 +60,11 @@ data/metrics/three-doors-events.jsonl
 data/research/*.jsonl
 data/research/reports/
 
+# ─── Creator Intelligence calibration (private first-party analytics) ────────
+# The operator's own YouTube/TikTok analytics + the labeled outcome set built
+# from them. Local-only by design — never commit personal performance data.
+data/creator-intelligence/outcomes/
+
 # ─── Document ingest (generated, large, local-only) ──────────────────────────
 data/csf-ingest/deltas.jsonl
 data/csf-ingest/dedup-log.jsonl

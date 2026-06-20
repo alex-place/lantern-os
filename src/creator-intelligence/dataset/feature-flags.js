@@ -13,6 +13,10 @@ const FLAG_DEFS = {
   // Export validation is pure ffprobe measurement and safe to run — on by default.
   exportValidator: { env: "LANTERN_CI_EXPORT_VALIDATOR", default: true },
   researchReport: { env: "LANTERN_CI_RESEARCH_REPORT", default: false },
+  // Analytics calibration: imports the operator's OWN first-party analytics and
+  // joins them to measured features. Read/ingest of first-party data is always
+  // legitimate; gated off by default so it never runs unprompted.
+  calibration: { env: "LANTERN_CI_CALIBRATION", default: false },
 };
 
 function envTruthy(value) {

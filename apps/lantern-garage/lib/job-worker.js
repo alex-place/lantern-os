@@ -257,6 +257,17 @@ async function processAnalyzeJob(job, repoRoot, ctx) {
     }
   }
 
+  // A3 (optional, default OFF): transcribe speech → measured hook/CTA/caption
+  // features on timeline.metadata.speech. Flag-gated (LANTERN_CI_SPEECH=1) and
+  // fully non-fatal — when Whisper is absent or disabled this is a no-op and the
+  // timeline is byte-identical. Runs before toJSON() so V10 scoring can use it.
+  try {
+    const { maybeAttachSpeech } = require("./speech-features");
+    const sp = await maybeAttachSpeech(timeline, fullPath, Number(timeline.duration) || 0,
+      { outDir: path.join(repoRoot, "data", "creator", "transcripts") });
+    if (sp) ctx.log(`Speech features: hook=${sp.hookStyle}, ${sp.wordsPerSec} words/s, CTA=${sp.ctaPresent}`);
+  } catch (e) { ctx.log(`Speech features skipped: ${e.message}`); }
+
   ctx.stage("ranking");
   ctx.progress(70, "Scoring highlights");
   ctx.log("Scoring highlights");
