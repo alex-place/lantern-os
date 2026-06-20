@@ -201,13 +201,16 @@ Respond with JSON:
     const yesProb = market.yes_ask / (market.yes_ask + market.no_ask);
     const minsToClose = (new Date(market.close_time).getTime() - Date.now()) / 60000;
     const spread = Math.abs((market.yes_ask || 0) - (market.no_ask || 0));
+    // Kalshi returns liquidity_dollars as a string; `?.toFixed` only guards null, so a
+    // string value threw "toFixed is not a function" and zeroed out the whole loop. Coerce.
+    const liq = parseFloat(market.liquidity_dollars);
 
     return `Market: ${market.title}
 Ticker: ${market.ticker}
 YES Probability: ${(yesProb * 100).toFixed(0)}%
 Spread: ${spread}¢
 Time to Close: ${Math.round(minsToClose)} minutes
-Liquidity: $${market.liquidity_dollars?.toFixed(0) || "unknown"}
+Liquidity: $${Number.isFinite(liq) ? liq.toFixed(0) : "unknown"}
 
 Question: Will this market converge to a determined state (>80% or <20% probability) before settlement?`;
   }

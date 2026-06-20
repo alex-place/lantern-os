@@ -71,6 +71,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.10] - 2026-06-20
+
+### Fixed
+- **`ConvergenceLora` no longer crashes on string `liquidity_dollars`.** `formatMarketForLLM()` used `market.liquidity_dollars?.toFixed(0)`, but Kalshi returns that field as a string — optional chaining guards null, not a string type, so `.toFixed` threw "is not a function" on every market. The loop swallowed it per-market, so ConvergenceLora silently produced "0 training examples / 0 convergence predictions". Now `parseFloat`-coerced (matching `kalshi-suggest.js`), with a `Number.isFinite` "unknown" fallback. Added `tests/test_kalshi_convergence_lora.js` (string / numeric / missing / non-numeric cases).
+
 ## [1.4.9] - 2026-06-20
 
 ### Added
