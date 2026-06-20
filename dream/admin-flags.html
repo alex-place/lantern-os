@@ -131,7 +131,23 @@
 
   <div id="toast"></div>
 
-  <script src="/js/shared-header.js"></script>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/">
+      <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
+      Keystone OS
+    </a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/operations.html">Ops Hub</a>
+      <a href="/agent-status.html">System</a>
+      <a href="/admin-flags.html" class="active">Admin</a>
+    </div>
+    <div class="nav-actions">
+      <button id="theme-toggle" class="nav-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    </div>
+  </nav>
+  <script src="/js/auth-gate.js" defer></script>
+
   <script>
     const $ = (s) => document.querySelector(s);
     let toastTimer = null;
