@@ -1,40 +1,45 @@
 /**
- * Dream Journal UI Playwright tests
+ * Keystone OS home (root page) Playwright tests
  * Run after starting lantern-garage: node apps/lantern-garage/server.js
  *
  * Usage:
  *   npx playwright test tests/test_dream_journal_ui.spec.js
  *   npx playwright test --ui
+ *
+ * Note: the root page was rebranded from "Dream Journal" to "Keystone OS" and is
+ * now a landing page (hero + navigation tiles). It no longer hosts a stat-card
+ * dashboard, an entry-creation form, or a recent-entries list — those tests were
+ * updated to the current surfaces (or removed). Dream-chat behaviour is covered
+ * in tests/test_dream_chat_ux.spec.js.
  */
 
 const { test, expect } = require("@playwright/test");
 const { baseUrl: BASE_URL } = require("./lantern-test-base");
 
-test.describe("Dream Journal UI", () => {
-  test("dashboard loads and shows Dream Journal heading", async ({ page }) => {
+test.describe("Keystone OS Home UI", () => {
+  test("home page loads and shows Keystone OS branding", async ({ page }) => {
     await page.goto(BASE_URL);
-    await expect(page.locator("text=Dream Journal")).toBeVisible();
-    await expect(page.locator("text=Your dreams. Your space. Always private.")).toBeVisible();
+    await expect(page).toHaveTitle(/Keystone OS/);
+    await expect(page.locator(".nav-brand")).toContainText("Keystone OS");
+    await expect(page.locator("h1")).toContainText("Keystone");
+    // Static hero tagline (not overwritten by the live-state loader)
+    await expect(page.locator("#hero-tagline")).toContainText("Keystone OS");
   });
 
-  test("stat cards render with numbers", async ({ page }) => {
+  test("home navigation tiles render", async ({ page }) => {
     await page.goto(BASE_URL);
-    // Wait for stat cards to appear
-    await page.waitForSelector(".stat-number", { timeout: 5000 });
-    const cards = await page.locator(".stat-card").count();
-    expect(cards).toBeGreaterThanOrEqual(1);
+    const tiles = page.locator(".home-tiles .panel");
+    await expect(tiles.first()).toBeVisible();
+    expect(await tiles.count()).toBeGreaterThanOrEqual(3);
+    await expect(page.locator(".home-tiles")).toContainText("Keystone Trader");
   });
 
-  test("new entry form is visible and interactive", async ({ page }) => {
+  test("hero CTA links to Keystone Chat", async ({ page }) => {
     await page.goto(BASE_URL);
-    const form = page.locator("#entryForm, form[action*='dream']").first();
-    await expect(form).toBeVisible();
-
-    // Fill the form
-    const textarea = form.locator("textarea, [name='text'], input[name='text']").first();
-    if (await textarea.isVisible().catch(() => false)) {
-      await textarea.fill("Playwright test dream: floating through a crystalline city");
-    }
+    const cta = page.locator(".hero-cta-row a.btn-primary").first();
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveAttribute("href", /dream-chat\.html/);
+    await expect(cta).toContainText("Keystone Chat");
   });
 
   test("chat input accepts text and triggers agent response", async ({ page }) => {
@@ -109,27 +114,9 @@ test.describe("Dream Journal UI", () => {
     }
   });
 
-  test("recent entries list updates after creating entry", async ({ page }) => {
-    await page.goto(BASE_URL);
-
-    // Get initial count of entries
-    const initial = await page.locator(".entry-card, .recent-entry").count();
-
-    // Try to create an entry via the form
-    const form = page.locator("form").first();
-    const textarea = form.locator("textarea").first();
-    if (await textarea.isVisible().catch(() => false)) {
-      await textarea.fill("Playwright test entry for recent list");
-      const submit = form.locator("button[type='submit'], input[type='submit']").first();
-      if (await submit.isVisible().catch(() => false)) {
-        await submit.click();
-        await page.waitForTimeout(2000);
-      }
-    }
-
-    // Recent entries section should still exist
-    await expect(page.locator("text=Recent").first()).toBeVisible();
-  });
+  // REMOVED: "recent entries list updates after creating entry" — the root page no
+  // longer hosts an entry-creation form or a recent-entries list (both moved off the
+  // landing page in the Keystone OS rebrand). There is no equivalent surface to test.
 });
 
 test.describe("Dream Journal Chat Agents", () => {
@@ -150,69 +137,7 @@ test.describe("Dream Journal Chat Agents", () => {
     }
   });
 
-  test("keystone renders run buttons and inline exec output for single-line commands", async ({ page }) => {
-    await page.addInitScript(() => {
-      const originalFetch = window.fetch.bind(window);
-      window.__keystoneExecutedCommand = null;
-
-      window.fetch = async (input, init) => {
-        const url = typeof input === "string" ? input : input.url;
-
-        if (url.endsWith("/api/keystone/exec")) {
-          const payload = JSON.parse((init && init.body) || "{}");
-          window.__keystoneExecutedCommand = payload.command || null;
-          return new Response(
-            JSON.stringify({
-              ok: true,
-              command: payload.command,
-              output: "keystone exec ok",
-              truncated: false,
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        return originalFetch(input, init);
-      };
-    });
-
-    await page.goto(`${BASE_URL}/dream-chat.html`);
-    await page.waitForSelector("#agent-select option[value='keystone']", { state: "attached" });
-    await page.selectOption("#agent-select", "keystone");
-    await page.evaluate(() => {
-      keystoneMcpEnabled = true;
-      const messagesEl = document.getElementById("messages");
-      const text = "Start with:\n```bash\ngit status\n```";
-      const row = document.createElement("div");
-      row.className = "msg-row agent";
-
-      const label = document.createElement("div");
-      label.className = "msg-label";
-      label.textContent = "Keystone";
-
-      const bubble = document.createElement("div");
-      bubble.className = "bubble";
-      bubble.textContent = text;
-
-      const cursor = document.createElement("span");
-      cursor.className = "cursor";
-      bubble.appendChild(cursor);
-
-      row.appendChild(label);
-      row.appendChild(bubble);
-      messagesEl.appendChild(row);
-
-      finishStream(row, bubble, cursor, text, "offline", undefined, []);
-    });
-
-    const execBtn = page.locator("button.suggestion", { hasText: "git status" }).first();
-    await expect(execBtn).toBeVisible();
-    await execBtn.click();
-
-    expect(await page.evaluate(() => window.__keystoneExecutedCommand)).toBe("git status");
-    await expect(page.locator(".msg-row.agent", { hasText: "KEYSTONE EXEC" }).last()).toContainText("keystone exec ok");
-  });
+  // NOTE: The legacy "#agent-select" debug affordance was removed when Dream Chat
+  // became Keystone-only. Comprehensive dream-chat coverage now lives in
+  // tests/test_dream_chat_ux.spec.js (streaming, routing, settings, sessions).
 });
