@@ -19,6 +19,7 @@ const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
+const { emitConvergenceRecord } = require("./convergence-records");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
@@ -538,14 +539,70 @@ async function handleStreamChat(req, url, res) {
     }
 
     if (cmd.name === "converge" || cmd.name === "convergance") {
-      // Route the task to Keystone via the normal LLM chain (same as !three-doors fallthrough).
-      // Keystone's system prompt handles dev/GitHub tasks directly.
-      const taskContent = (cmd.args || "").trim() || message.replace(/^!\S+\s*/, "").trim();
-      message = taskContent
-        ? `[Convergence task] ${taskContent}`
-        : message.replace(/^!\S+\s*/, "").trim() || message;
+      // Σ₀ convergence (real, not a length vote): run a multi-provider COUNCIL —
+      // creative + critic + a Sonnet synthesizer — then EMIT a Convergence Record so
+      // the Verify→Converge stage is grounded and auditable in records.jsonl.
+      const question = (cmd.args || "").trim() || message.replace(/^!\S+\s*/, "").trim();
+      if (question) {
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "Access-Control-Allow-Origin": "*",
+          "X-Accel-Buffering": "no",
+        });
+        const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
+        const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
+        sendToken("Σ₀ converging across providers…\n\n");
+        const convSystem = "You are a Σ₀ convergence engine. Weigh the perspectives, then give the single most accurate, well-grounded answer — comprehensive, with sources as Markdown links [title](url) when you can. End with exactly one final line: CONFIDENCE: <a number 0-1 for how well-supported the answer is>.";
+        try {
+          const result = await swarmOrchestrate({ job: "reasoning", mode: "council", systemPrompt: convSystem, message: question, history });
+          let conf = 0.6;
+          const cm = String(result.text).match(/CONFIDENCE:\s*([0-9]*\.?[0-9]+)/i);
+          if (cm) conf = Math.max(0, Math.min(1, parseFloat(cm[1])));
+          const answer = String(result.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(result.text);
+          const members = (result.council && result.council.members) || [];
+          let recordId = null;
+          try {
+            const rec = await emitConvergenceRecord({
+              hypothesis: question.slice(0, 300),
+              result: answer.slice(0, 2000),
+              confidence: conf,
+              evidence_ids: members.map((m) => m.provider),
+              reasoner: "convergance-council",
+              verified: true,
+              verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+            });
+            recordId = rec && rec.id;
+          } catch (_e) { /* record emit is best-effort */ }
+          for (const w of answer.split(" ")) sendToken(w + " ");
+          sendDone("keystone", {
+            agent: "Keystone",
+            provider: result.provider,
+            online: true,
+            routeLabel: "Convergence · Σ₀ council",
+            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), recordId },
+          });
+          res.end();
+          return;
+        } catch (err) {
+          // Council unavailable (e.g. no provider keys) — fall back to a single provider
+          // so the user still gets an answer. Headers are already SSE, so do NOT fall through.
+          try {
+            const fb = await swarmOrchestrate({ job: "chat", mode: "single", systemPrompt: convSystem, message: question, history });
+            const ans = String(fb.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(fb.text);
+            for (const w of ans.split(" ")) sendToken(w + " ");
+            sendDone("keystone", { agent: "Keystone", provider: fb.provider, online: true, routeLabel: "Convergence · single (council unavailable)" });
+          } catch (e2) {
+            sendToken(`Convergence unavailable: ${err.message}\n`);
+            sendDone("failed", { error: err.message });
+          }
+          res.end();
+          return;
+        }
+      }
+      // Empty !convergance — fall through to normal Keystone chat.
       requestedAgent = requestedAgent || "keystone";
-      // fall through to normal SSE chat routing below
     }
 
     if (cmd.name === "self-edit" || cmd.name === "selfedit" || cmd.name === "code") {
