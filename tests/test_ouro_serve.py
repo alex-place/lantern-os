@@ -19,6 +19,7 @@ class TestOuroServe:
         Test that leaderboard.jsonl receives mean_depth and mean_contraction 
         records after DEEP-mode request.
         """
+        pytest.importorskip("torch")  # ouro_serve imports torch; skip when absent (#777 CI)
         from ouro_serve import OuroServe
         
         # Create OuroServe instance with temp leaderboard path
@@ -60,6 +61,7 @@ class TestOuroServe:
         Test that x-ouro-depth response header is present and matches 
         mean_depth from leaderboard record.
         """
+        pytest.importorskip("torch")  # ouro_serve imports torch; skip when absent (#777 CI)
         from ouro_serve import OuroServe
         
         # Create OuroServe instance with temp leaderboard path
