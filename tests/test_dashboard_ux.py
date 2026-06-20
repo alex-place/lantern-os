@@ -111,8 +111,10 @@ def test_dream_chat_fails_fast_without_provider() -> None:
 
 def test_pcsf_files_exist() -> None:
     pcsf_dir = ROOT / "data" / "pcsf"
-    required = ["narrator.pcsf.json", "agent.pcsf.json",
-                "model.pcsf.json", "settings.pcsf.json"]
+    # settings.pcsf.json is runtime-refreshed by pcsf-refresh.js and was intentionally
+    # untracked + gitignored (#781, 25238afb) so server churn no longer dirties the tree —
+    # it is NOT a committed source file. Require only the stable, tracked PCSF configs.
+    required = ["narrator.pcsf.json", "agent.pcsf.json", "model.pcsf.json"]
     for f in required:
         assert (pcsf_dir / f).exists(), f"Missing PCSF file: {f}"
 
