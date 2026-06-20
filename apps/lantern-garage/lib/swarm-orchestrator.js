@@ -137,7 +137,7 @@ const PROVIDER_CONFIG = {
 
 // ── Job → best provider mapping (primary + 2 alternates) ──
 const JOB_ASSIGNMENTS = {
-  chat:      ["gemini", "anthropic", "openai"],
+  chat:      ["gemini", "openai", "anthropic"], // anthropic last = council synthesizer (Sonnet)
   coding:    ["anthropic", "openai", "mistral"],
   reasoning: ["openai", "deepseek", "anthropic"],
   vision:    ["gemini", "xai", "openai"],

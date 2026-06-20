@@ -556,7 +556,7 @@ async function handleStreamChat(req, url, res) {
         sendToken("Σ₀ converging across providers…\n\n");
         const convSystem = "You are a Σ₀ convergence engine. Weigh the perspectives, then give the single most accurate, well-grounded answer — comprehensive, with sources as Markdown links [title](url) when you can. End with exactly one final line: CONFIDENCE: <a number 0-1 for how well-supported the answer is>.";
         try {
-          const result = await swarmOrchestrate({ job: "reasoning", mode: "council", systemPrompt: convSystem, message: question, history });
+          const result = await swarmOrchestrate({ job: "chat", mode: "council", systemPrompt: convSystem, message: question, history });
           let conf = 0.6;
           const cm = String(result.text).match(/CONFIDENCE:\s*([0-9]*\.?[0-9]+)/i);
           if (cm) conf = Math.max(0, Math.min(1, parseFloat(cm[1])));
