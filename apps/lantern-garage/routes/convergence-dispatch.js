@@ -116,10 +116,14 @@ module.exports = async (req, res, url, deps) => {
 
         // Import self-edit functions
         const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr } = require("../lib/self-edit-engine");
+        const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
         const REPO_ROOT = path.resolve(__dirname, "../../..");
         const GH_REPO = "alex-place/lantern-os";
+        // Code-mutating git ops run in `workRoot` (an isolated worktree), not the
+        // live serving checkout (REPO_ROOT). Torn down in `finally`.
+        let workRoot = REPO_ROOT, cleanupWorktree = null;
 
         // Fetch issue details
         const issueDetails = await new Promise((resolve) => {
@@ -155,60 +159,34 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
 
-        // Check current branch and switch from master if needed
-        const currentBranch = await new Promise((resolve) => {
-          execFile(
-            "git",
-            ["branch", "--show-current"],
-            { cwd: REPO_ROOT, timeout: 5000, windowsHide: true },
-            (err, stdout) => {
-              if (err) return resolve("master");
-              resolve(stdout.trim());
-            }
-          );
-        });
-
-        // Guard: never switch branches over an uncommitted working tree. The
-        // patch is applied *after* this point, so anything dirty here is
-        // unrelated in-flight work that a checkout would silently discard.
-        const dirtyTree = await new Promise((resolve) => {
-          execFile("git", ["status", "--porcelain"], { cwd: REPO_ROOT, timeout: 5000, windowsHide: true },
-            (err, stdout) => resolve(err ? "" : String(stdout).trim()));
-        });
-        if (dirtyTree) {
+        // Run in an isolated worktree off master so branch/apply/commit/push
+        // never touch the live serving checkout — which the server keeps dirty
+        // with runtime JSONL, the churn that tripped the old in-place dirty-tree
+        // guard and blocked every run. Also isolates concurrent runs.
+        let branchName;
+        try {
+          const wt = createIssueWorktree(REPO_ROOT, issueNumber, issueDetails.title);
+          workRoot = wt.workRoot;
+          branchName = wt.branch;
+          cleanupWorktree = wt.cleanup;
+        } catch (e) {
           sendJson(res, {
             ok: false,
-            error: "git_tree_dirty",
+            error: "worktree_create_failed",
             issue: issueNumber,
-            message: "Working tree has uncommitted changes; refusing to switch branches. Commit or stash first.",
+            message: `Could not create an isolated worktree: ${e.message}`,
           }, 409);
           return;
         }
 
-        // Always use a fresh issue-specific branch — never reuse current branch
-        const branchName = `auto/issue-${issueNumber}`;
-        if (currentBranch !== branchName) {
-          // Try checkout existing branch first, then create new one
-          await new Promise((resolve) => {
-            execFile("git", ["checkout", branchName], { cwd: REPO_ROOT, timeout: 5000, windowsHide: true },
-              (err) => {
-                if (!err) return resolve(true);
-                execFile("git", ["checkout", "-b", branchName, "master"], { cwd: REPO_ROOT, timeout: 5000, windowsHide: true, env: { ...process.env, SKIP_MONOWORKSTREAM: "1" } },
-                  (err2) => resolve(!err2)
-                );
-              }
-            );
-          });
-        }
-
         // Step 1: Generate plan
-        const plan = await generatePlan(REPO_ROOT, issueDetails.title + "\n\n" + issueDetails.body, [], []);
-        
+        const plan = await generatePlan(workRoot, issueDetails.title + "\n\n" + issueDetails.body, [], []);
+
         // Step 2: Generate patch
-        const { diffText, files } = await generatePatch(REPO_ROOT, plan);
+        const { diffText, files } = await generatePatch(workRoot, plan);
 
         // Step 3: Apply patch — capture stats so we can verify it actually changed code
-        const applyStats = applyPatch(REPO_ROOT, diffText);
+        const applyStats = applyPatch(workRoot, diffText);
         const changedFiles = [...(applyStats.changed || []), ...(applyStats.created || [])];
 
         // Anti-fraud gate: the patch MUST produce real, clean code changes.
@@ -216,7 +194,7 @@ module.exports = async (req, res, url, deps) => {
         // unchanged, then `git add -A` would commit unrelated runtime data churn
         // (prices.jsonl etc.) as the "fix" — closing the issue with no real work.
         if (changedFiles.length === 0 || (applyStats.errors && applyStats.errors.length > 0)) {
-          execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT });
+          execFile("git", ["checkout", "--", "."], { cwd: workRoot });
           sendJson(res, {
             ok: false,
             error: "patch_did_not_apply",
@@ -228,14 +206,14 @@ module.exports = async (req, res, url, deps) => {
 
         // Step 4: Run tests from the plan. Empty test set = UNVERIFIED, not "passed".
         const plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
-        const testResults = runTests(REPO_ROOT, plannedTests);
+        const testResults = runTests(workRoot, plannedTests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsRan = plannedTests.length;
         const allTestsOk = testResults.every((r) => r.ok);
         const testsVerified = testsRan > 0 && allTestsOk;
 
         if (testsRan > 0 && !allTestsOk) {
           // Rollback on test failure — stage nothing
-          execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT });
+          execFile("git", ["checkout", "--", "."], { cwd: workRoot });
           sendJson(res, {
             ok: false,
             error: "tests_failed",
@@ -246,18 +224,18 @@ module.exports = async (req, res, url, deps) => {
         }
 
         // Step 5: Commit — stage ONLY the files the patch changed (never git add -A)
-        gitAddFiles(REPO_ROOT, changedFiles);
+        gitAddFiles(workRoot, changedFiles);
         const commitTitle = `${testsVerified ? "" : "[unverified] "}fix: ${issueDetails.title} (fixes #${issueNumber})`;
-        gitCommit(REPO_ROOT, commitTitle);
+        gitCommit(workRoot, commitTitle);
 
         // Capture the commit SHA for the response/UI
         const commitSha = await new Promise((resolve) => {
-          execFile("git", ["rev-parse", "HEAD"], { cwd: REPO_ROOT, timeout: 5000, windowsHide: true },
+          execFile("git", ["rev-parse", "HEAD"], { cwd: workRoot, timeout: 5000, windowsHide: true },
             (err, stdout) => resolve(err ? null : stdout.trim()));
         });
 
         // Step 6: Push
-        gitPush(REPO_ROOT, branchName);
+        gitPush(workRoot, branchName);
 
         // Step 7: Open PR — flag unverified when no tests actually ran
         const prBody = `Fixes #${issueNumber}\n\n${issueDetails.body}\n\n---\n` +
@@ -265,7 +243,7 @@ module.exports = async (req, res, url, deps) => {
             ? `✅ ${testsRan} test(s) passed.`
             : `⚠️ No automated tests ran for this change — **requires human review before merge**.`) +
           `\n\nFiles changed: ${changedFiles.join(", ")}`;
-        const prUrl = openDraftPr(REPO_ROOT, branchName, commitTitle, prBody);
+        const prUrl = openDraftPr(workRoot, branchName, commitTitle, prBody);
 
         sendJson(res, {
           ok: true,
@@ -283,6 +261,9 @@ module.exports = async (req, res, url, deps) => {
         });
       } catch (err) {
         sendJson(res, { ok: false, error: err.message, stack: err.stack }, 500);
+      } finally {
+        // Always tear down the worktree — the branch (and any push) survives.
+        if (cleanupWorktree) { try { cleanupWorktree(); } catch (_e) { /* best effort */ } }
       }
     });
     return true;
@@ -315,8 +296,14 @@ module.exports = async (req, res, url, deps) => {
       const {
         generatePlan, generatePatch, applyPatch, runTests,
         gitAddFiles, gitCommit, gitPush, openDraftPr,
-        gitCurrentBranch, gitCreateBranch, gitEnsureClean,
       } = require("../lib/self-edit-engine");
+      const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
+
+      // Code-mutating git ops run in `workRoot` (a dedicated worktree, set by the
+      // branch step), never in the live serving checkout (REPO_ROOT). REPO_ROOT is
+      // still used for the gh issue fetch and the persistent convergence/AGI logs.
+      // The worktree is torn down in `finally`.
+      let workRoot = REPO_ROOT, cleanupWorktree = null;
 
       // honest running record of what actually happened
       const receipt = {
@@ -367,24 +354,27 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
 
-        // ── 2. branch (always issue-specific, never reuse current) ──────────
+        // ── 2. branch — isolated worktree off master ───────────────────────
+        // Each run gets its own git worktree under .claude/worktrees/ so the
+        // branch/apply/commit/push never touch the live serving checkout (which
+        // the server keeps dirty with runtime JSONL — that churn is what tripped
+        // the old in-place `git_tree_dirty` guard and blocked every run). It also
+        // isolates concurrent issue runs from one another.
         step("branch", "start");
-        const targetBranch = `auto/issue-${issueNumber}`;
-        const curBranch = gitCurrentBranch(REPO_ROOT);
-        let branchName = targetBranch;
-        if (curBranch !== targetBranch) {
-          try {
-            branchName = gitCreateBranch(REPO_ROOT, `issue-${issueNumber}`);
-          } catch (e) {
-            // Branch already exists — check it out, but never clobber an
-            // uncommitted working tree (gitEnsureClean throws if dirty).
-            const { execSync } = require("child_process");
-            gitEnsureClean(REPO_ROOT);
-            execSync(`git checkout ${targetBranch}`, { cwd: REPO_ROOT, timeout: 5000, env: { ...process.env, SKIP_MONOWORKSTREAM: "1" } });
-          }
+        let branchName;
+        try {
+          const wt = createIssueWorktree(REPO_ROOT, issueNumber, issueDetails.title);
+          workRoot = wt.workRoot;
+          branchName = wt.branch;
+          cleanupWorktree = wt.cleanup;
+        } catch (e) {
+          step("branch", "error", { error: `worktree_create_failed: ${e.message}` });
+          send("done", { ok: false, ...receipt, stoppedAt: "branch", message: `Could not create an isolated worktree: ${e.message}` });
+          res.end();
+          return;
         }
         receipt.branch = branchName;
-        step("branch", "done", { branch: branchName });
+        step("branch", "done", { branch: branchName, worktree: workRoot });
 
         // ── 3. research (Σ₀: ground in codebase + external reality + web) ──
         step("research", "start", { issue: issueNumber });
@@ -441,7 +431,7 @@ module.exports = async (req, res, url, deps) => {
             const out = execFileSync(
               "git",
               ["grep", "-l", "-i", "-e", kw, "--", "*.js", "*.json", "*.md", "*.py", "*.html"],
-              { cwd: REPO_ROOT, encoding: "utf-8", timeout: 8000, maxBuffer: 10 * 1024 * 1024, windowsHide: true }
+              { cwd: workRoot, encoding: "utf-8", timeout: 8000, maxBuffer: 10 * 1024 * 1024, windowsHide: true }
             ).split("\n").filter(Boolean);
             for (const filePath of out) {
               if (filePath && !scopeFiles.includes(filePath)) scopeFiles.push(filePath);
@@ -468,7 +458,7 @@ module.exports = async (req, res, url, deps) => {
         // ── 4. plan (with research context as Σ₀ evidence) ───────────────
         step("plan", "start");
         const plan = await generatePlan(
-          REPO_ROOT, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
+          workRoot, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
         step("plan", "done", {
           plan,
           confidence: {
@@ -487,7 +477,7 @@ module.exports = async (req, res, url, deps) => {
         let diffText = "", stats = null, changedFiles = [], feedback = null, applied = false;
         for (let attempt = 1; attempt <= MAX_PATCH_ATTEMPTS; attempt++) {
           step("patch", attempt === 1 ? "start" : "retry", { attempt, of: MAX_PATCH_ATTEMPTS });
-          const gen = await generatePatch(REPO_ROOT, plan, feedback ? { feedback } : {});
+          const gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
           diffText = gen.diffText;
           const affected = (gen.files || []).map((f) => (f.newFile || f.oldFile || "").replace(/^[ab]\//, ""));
           send("diff", { diffText, files: affected, attempt });
@@ -501,7 +491,7 @@ module.exports = async (req, res, url, deps) => {
           }
 
           step("apply", "start", { attempt });
-          stats = applyPatch(REPO_ROOT, diffText);
+          stats = applyPatch(workRoot, diffText);
           changedFiles = [...(stats.changed || []), ...(stats.created || [])];
 
           // Anti-fraud gate: a usable patch changes ≥1 file with zero hunk errors.
@@ -514,7 +504,7 @@ module.exports = async (req, res, url, deps) => {
 
           // Failed — roll the tree back clean and carry the errors into the next try.
           await new Promise((resolve) =>
-            execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT, timeout: 10000, windowsHide: true }, () => resolve()));
+            execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
           feedback = {
             priorDiff: diffText,
             errors: (stats.errors && stats.errors.length)
@@ -538,7 +528,7 @@ module.exports = async (req, res, url, deps) => {
         // ── 6. tests (verification gate for commit/push) ─────────────────
         const tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
         step("tests", "start", { commands: tests });
-        const testResults = runTests(REPO_ROOT, tests);
+        const testResults = runTests(workRoot, tests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsPassed = testResults.every((r) => r.ok);
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
         step("tests", "done", { testResults, passed: testsPassed, ran: tests.length });
@@ -546,7 +536,7 @@ module.exports = async (req, res, url, deps) => {
         if (tests.length > 0 && !testsPassed) {
           // restore working tree — never leave broken changes
           await new Promise((resolve) =>
-            execFile("git", ["checkout", "--", "."], { cwd: REPO_ROOT, timeout: 10000, windowsHide: true }, () => resolve()));
+            execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
           receipt.applied = false;
           receipt.stoppedAt = "tests_failed";
           step("rollback", "done", { reason: "tests_failed" });
@@ -567,10 +557,10 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
         step("commit", "start");
-        gitAddFiles(REPO_ROOT, changedFiles); // stage ONLY patched files — never git add -A
+        gitAddFiles(workRoot, changedFiles); // stage ONLY patched files — never git add -A
         const verified = tests.length > 0 && testsPassed;
         const commitTitle = `${verified ? "" : "[unverified] "}fix: ${issueDetails.title} (fixes #${issueNumber})`;
-        gitCommit(REPO_ROOT, commitTitle);
+        gitCommit(workRoot, commitTitle);
         receipt.committed = true;
         step("commit", "done", { title: commitTitle, changedFiles, verified });
 
@@ -582,12 +572,12 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
         step("push", "start", { branch: branchName });
-        gitPush(REPO_ROOT, branchName);
+        gitPush(workRoot, branchName);
         receipt.pushed = true;
         step("push", "done");
 
         step("pr", "start");
-        const prUrl = openDraftPr(REPO_ROOT, branchName, commitTitle, `Fixes #${issueNumber}\n\n${issueDetails.body}`);
+        const prUrl = openDraftPr(workRoot, branchName, commitTitle, `Fixes #${issueNumber}\n\n${issueDetails.body}`);
         receipt.prUrl = prUrl;
         step("pr", "done", { prUrl });
 
@@ -687,6 +677,9 @@ module.exports = async (req, res, url, deps) => {
         send("error", { error: err.message });
         send("done", { ok: false, ...receipt, stoppedAt: receipt.stoppedAt || "exception" });
         res.end();
+      } finally {
+        // Always tear down the worktree — the branch (and any push) survives.
+        if (cleanupWorktree) { try { cleanupWorktree(); } catch (_e) { /* best effort */ } }
       }
     });
     return true;
