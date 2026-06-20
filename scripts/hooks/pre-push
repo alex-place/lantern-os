@@ -1,8 +1,9 @@
 #!/bin/sh
-# Per-agent workstream gate + master protection (pre-push)
+# Per-agent workstream gate + master protection + change-record gate (pre-push)
 #
-# Master merge override: OVERRIDE_MERGE=1 git push origin master
-# Workstream bypass:     SKIP_MONOWORKSTREAM=1 git push ...
+# Master merge override:     OVERRIDE_MERGE=1 git push origin master
+# Workstream bypass:         SKIP_MONOWORKSTREAM=1 git push ...
+# Change-record/bump bypass: SKIP_VERSION_CHECK=1 git push ...
 
 # ── 1. Master protection ─────────────────────────────────────────────────────
 while read local_ref local_sha remote_ref remote_sha; do
@@ -19,7 +20,28 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
 done
 
-# ── 2. Per-agent workstream gate ─────────────────────────────────────────────
+# ── 2. Change-record + version-bump gate ─────────────────────────────────────
+# A code-bearing branch must bump package.json to a new X.X.X version AND carry a
+# matching CHANGELOG.MD entry, relative to origin/master. Runs BEFORE the gh /
+# workstream checks below so it is enforced even without gh and even on branches
+# that already have an open PR.
+# Bypass: SKIP_VERSION_CHECK=1 (or SKIP_MONOWORKSTREAM=1) git push ...
+if [ "$SKIP_MONOWORKSTREAM" != "1" ] && [ "$SKIP_VERSION_CHECK" != "1" ]; then
+  _root=$(git rev-parse --show-toplevel 2>/dev/null)
+  _validator="$_root/scripts/validate-prepush-version-changelog.py"
+  if [ -f "$_validator" ]; then
+    _py=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+    if [ -n "$_py" ]; then
+      if ! "$_py" "$_validator"; then
+        exit 1
+      fi
+    else
+      echo "[prepush] python not found on PATH — skipping change-record gate."
+    fi
+  fi
+fi
+
+# ── 3. Per-agent workstream gate ─────────────────────────────────────────────
 if [ "$SKIP_MONOWORKSTREAM" = "1" ]; then exit 0; fi
 if ! command -v gh >/dev/null 2>&1; then exit 0; fi
 
@@ -73,7 +95,7 @@ if [ "${conflict:-0}" -gt 0 ]; then
   exit 1
 fi
 
-# ── 3. Staleness guard: block pushes on branches far behind master ────────────
+# ── 4. Staleness guard: block pushes on branches far behind master ────────────
 _branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 case "$_branch" in gh-pages|master|dev|"") ;;
 *)
@@ -99,7 +121,7 @@ case "$_branch" in gh-pages|master|dev|"") ;;
   ;;
 esac
 
-# ── 4. Git LFS ───────────────────────────────────────────────────────────────
+# ── 5. Git LFS ───────────────────────────────────────────────────────────────
 command -v git-lfs >/dev/null 2>&1 || {
   echo "Warning: git-lfs not found on PATH. LFS pre-push hook skipped."
   exit 0

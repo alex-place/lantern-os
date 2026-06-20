@@ -1,3 +1,91 @@
+# Changelog
+
+All notable changes to Keystone OS (formerly Lantern OS) should be documented in
+this file.
+
+The format follows the spirit of [Keep a Changelog](https://keepachangelog.com),
+with entries grouped by release. This project is private and local-first, so
+release notes stay honest about what was verified locally versus what remains
+design intent.
+
+**Versioning policy (enforced by the pre-push hook):** every code-bearing branch
+must bump `version` in `package.json` to a new semantic `X.X.X` value and add a
+matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
+`scripts/validate-prepush-version-changelog.py`.
+
+---
+
+## [Unreleased]
+
+### Planned (ORION / Lantern OS Performance)
+
+- CSF memory optimization plan: add delta-only dream-entry storage, `previous_entry_hash` checks, sparse ternary storage for the `3^12` symbolic matrix, and dictionary compression for recurring symbols such as "King of Nowhere," "birds & bees," doors, anchors, and repeated Lantern / ORION motifs.
+- Convergence IO / PCSF routing plan: cache the last 5–10 healthy provider states in memory with a 60-second expiry, default local Dream Journal routing to Ollama `Q4_K_M`, fall back to `Q5_K_M` when quality checks fail, and add a `dreamChatReply()` routing cache for repeated similar requests.
+- Digital Blackbox acceleration plan: add a configurable `internal_multiplier` defaulting to the 5x–8x range, run bounded internal convergence steps per external tick, throttle UI / external I/O through light external dilation, and guard the loop with NAP safety checks for temperature, memory, and runaway execution.
+- **Dream Art Generation (Held — post-V1 backlog):** Generate Gage-style symbolic imagery from dream entries via a local Stable Diffusion or Ollama-backed pipeline. Gate by tier (`Wanderer` = 15/month, `DeepDreamer` = unlimited). Cache recent prompts and reusable embeddings where privacy-safe; pre-warm model before requests. Acceptance criteria before promotion: (1) `POST /api/dream/art/generate` endpoint wired and returning image binary or URL; (2) tier gate enforced in middleware with a usage ledger; (3) at least one end-to-end smoke test generating an image locally; (4) prompt-injection guard on dream text before passing to diffusion model.
+- General low-risk performance plan: enable response streaming on all chat endpoints, add a redacted Debug Mode for PCSF state / selected provider / fallback reason / quantization / cache hit-miss / dilation ratio, and implement hot/cold dream memory tiers with active dreams in RAM and archived dreams in CSF.
+- Target action window: 2026-06-06 through 2026-06-12, with CSF compression first, PCSF routing second, Blackbox multiplier third, tier gating and Debug Mode fourth, then local tests, documentation, and release-note decision.
+
+### Verification Boundary (ORION / Lantern OS Performance)
+
+- This is a planning and changelog entry only; no runtime behavior changes are claimed until implementation commits and local verification receipts are added.
+- Percentage gains for memory, latency, and subjective speedup remain targets until benchmarked against the local Dream Journal / ORION runtime.
+- Required before promotion: CSF delta encode/decode round-trip tests, backward-compatibility tests for existing CSF archives, provider-routing cache and fallback tests, redaction checks for Debug Mode, and at least one local benchmark receipt.
+
+### Planned (Convergence)
+
+- **#142** Watch/Observe phase -- drift detection between convergence runs
+- **#143** Backpressure + rate limiting on TesseractEngine (bounded queue, 429 shedding)
+- **#145** Structured trace logging (OpenTelemetry-style spans per layer)
+- **#146** Idempotent slot claims (deterministic slot IDs, no orphaned slots on retry)
+- **#147** Graduated degradation (layer-by-layer fallback instead of all-or-nothing)
+- **#144** Receipt diff (compare current vs previous convergence run)
+- **#148** PII cleanup -- remove "waynesville" from persona keyword matcher
+
+### Known Bugs (Tracked)
+
+- **#160** _multi_signal_score() needs real vector similarity integration
+- **#159** Memory Engine query() is O(n) -- no keyword/entity indexes
+- **#164** hff-api dream_journal /recent route returns empty entries (TODO stub)
+- **#165** converged_tesseract.py convergence_io_route_on_slice is a placeholder stub
+- **#166** hff-api load_data_source() returns mock data -- not yet implemented
+- **#167** discord lounge bot memory_layer export_csf_stub is a placeholder
+- **#168** discord lounge bot bot.py is empty and bot_v2.py missing — bot won't start
+
+### Fixed
+
+- **#168** Restored Discord bot v2 slash commands from commit b8b5cd9; bot.py and bot_v2.py both populated
+
+- Discord bot launcher now loads .env.local and falls back to User/Machine environment variables
+
+### Added
+
+- **#169** Discord Bot settings integrated into Dream Chat settings drawer (DISCORD_BOT_TOKEN, LANTERN_DISCORD_GUILD_ID)
+- Web UI saves Discord credentials to .env.local; bot reads them automatically on startup
+- Initial workspace governance files for changelog, license, security, support,
+  code of conduct, and editor defaults.
+
+### Verification
+
+- Added as documentation-only files; no runtime behavior changed.
+
+---
+
+## [1.4.3] - 2026-06-20
+
+### Changed
+- Restructured `CHANGELOG.MD`: moved the `# Changelog` title and `## [Unreleased]` section to the top, normalized em-dash date separators (`## [x] — date` → `## [x] - date`) so every entry is machine-parseable, reordered `1.0.1`/`1.0.0`, and stripped leaked "Before pushing" reminder blocks from past entries.
+- Synced served `apps/lantern-garage/public/version.json` to match `package.json`.
+
+### Added
+- Pre-push change-record gate (`scripts/validate-prepush-version-changelog.py`): a code-bearing branch must bump `package.json` to a new `X.X.X` version (greater than its `origin/master` base) and carry a matching `## [X.X.X] - YYYY-MM-DD` changelog entry before it can be pushed. Wired into `scripts/hooks/pre-push` ahead of the `gh`/workstream checks; bypass with `SKIP_VERSION_CHECK=1`. Docs/tests/data-only branches are exempt.
+
+### Fixed
+- `validate-version-changelog.py` now resolves `CHANGELOG.MD` case-insensitively and reads files as UTF-8, so the pre-commit/pre-push validators no longer crash on Windows (cp1252) against the emoji/em-dash changelog.
+- `auto-version.js` inserts new entries below the title/`[Unreleased]` block instead of at the very top, so the header no longer gets re-buried.
+
+---
+
 ## [1.4.2] - 2026-06-18
 **Build:** 1.4.2+2026-06-18.041643
 **Commit:** 89a00dc8
@@ -31,7 +119,7 @@ test: Verify auto-merge can process real code commits
 - feat(kalshi-dashboard): add progress dashboard with live API endpoints
 - feat(kalshi-convergence): LoRA fine-tuned predictor + proactive training
 - feat(kalshi-convergence): self-improving continuous training loop
-- Merge branch 'master' of https://github.com/alex-place/lantern-os # 📚 Before pu
+- Merge branch 'master' of https://github.com/alex-place/lantern-os
 - feat(kalshi-terminal): deterministically profitable trading system
 - feat(observer): auto-start crypto_live_trader.py + observer-status endpoint — cl
 - fix(orchestration): runTests() now runs pytest instead of convergence-manager — 
@@ -43,11 +131,6 @@ test: Verify auto-merge can process real code commits
 - feat(kalshi-cio): implement momentum-aware dual-regime model (Issue #424)
 - fix(kalshi-terminal): fix duplicate side labels when API returns identical yesLa
 - fix(kalshi-terminal): fix broken titles/labels and apply dashboard palette
-
-# 📚 Before pushing: Did you read these?
-#    □ QUICKSTART.md (dual-boot system)
-#    □ AGENTS.md (monoworkstream rules)
-#    □ CLAUDE.md (project architecture)
 
 ---
 
@@ -65,14 +148,9 @@ feat: GitHub issues to agent slots sync automation
 - Fix surfaces/index.html broken links (removed non-existent directories, added Creator Dashboard)
 - Create 5 Three Doors GitHub issues (hub scene, poem mechanic, challenge system, prize pipeline, progress persistence)
 
-# 📚 Before pushing: Did you read these?
-#    □ QUICKSTART.md (dual-boot system)
-#    □ AGENTS.md (monoworkstream rules)
-#    □ CLAUDE.md (project architecture)
-
 ---
 
-## [1.3.0] — 2026-06-10 — ORION v1.0 + CSF Delta Memory + Dream Chat Full-Width
+## [1.3.0] - 2026-06-10 — ORION v1.0 + CSF Delta Memory + Dream Chat Full-Width
 
 **Build:** 1.3.0+2026-06-10  
 **Commit:** 507c9af
@@ -129,16 +207,7 @@ push
 
 ---
 
-# Changelog
-
-All notable changes to Lantern OS should be documented in this file.
-
-The format follows the spirit of Keep a Changelog, with entries grouped by
-release date. This project is currently private and local-first, so release
-notes should be honest about what was verified locally and what remains design
-intent.
-
-## [1.2.1] — 2026-06-07 — Start:master Auto-Sync, Moon Heartbeat, Markdown Renderer
+## [1.2.1] - 2026-06-07 — Start:master Auto-Sync, Moon Heartbeat, Markdown Renderer
 
 ### Boot
 - `start:master` now fetches, merges, AND pushes local commits before starting the server
@@ -152,7 +221,9 @@ intent.
 ### Versioning
 - `version.json`, root `package.json`, and garage `package.json` all set to `1.2.1`
 
-## [1.2.0] — 2026-06-07 — Autostart, UX Grounding, HFF Integration, Slop Gates
+---
+
+## [1.2.0] - 2026-06-07 — Autostart, UX Grounding, HFF Integration, Slop Gates
 
 ### Startup
 - `Start-Lantern.ps1 -RegisterAutostart` registers Windows Task Scheduler task that fires at boot and login
@@ -181,7 +252,9 @@ intent.
 - `version.json`, root `package.json`, and garage `package.json` all set to `1.2.0`
 - Stale version strings removed from HTML titles; dynamic badge reads from `version.json`
 
-## [1.1.0-rc.1] — 2026-06-06 — Parallax Dream Door + Deploy Fix
+---
+
+## [1.1.0-rc.1] - 2026-06-06 — Parallax Dream Door + Deploy Fix
 
 ### Dream Chat
 - Parallax zoom into dream door on scroll — background scales 1×→2.8×, hero text fades, glow orb drifts
@@ -193,7 +266,9 @@ intent.
 - Added `netlify.toml` + `.gitignore` for cloud deploy hygiene
 - Version now auto-bumped and tagged as RC on every deploy
 
-## [1.0.3] — 2026-06-06 — PCSF Provider Health Cache
+---
+
+## [1.0.3] - 2026-06-06 — PCSF Provider Health Cache
 
 ### Server
 - `apps/lantern-garage/lib/provider-cache.js` — 60-second in-memory TTL cache for provider routing state
@@ -206,7 +281,9 @@ intent.
 ### Versioning
 - Bumped `version.json` → `1.0.3`
 
-## [1.0.2] — 2026-06-06 — TTS Provider Chain + Version Badge
+---
+
+## [1.0.2] - 2026-06-06 — TTS Provider Chain + Version Badge
 
 ### Dream Chat
 - TTS provider chain: ElevenLabs → OpenAI → browser fallback via `POST /api/dream/tts`
@@ -221,7 +298,31 @@ intent.
 - Distinguish `all_providers_failed` from `no_provider_configured` in stream error messages
 - TTS proxy timeout (15s) + status code validation
 
-## [1.0.0] — 2026-06-05 — Dream Journal Orion Edition
+---
+
+## [1.0.1] - 2026-06-06 — Dream Journal Stability and Honesty Patch
+
+### Fixed
+- Deterministic agent selection in Dream Chat to reduce nondeterministic routing.
+- Command handling clarified: unsupported bang-commands no longer silently behave like normal chat.
+- Three Doors UX corrected so door-state behavior matches the documented experience.
+- Provider settings persistence aligned with documented local secret handling (`.env.local` preferred over `.env`).
+- Release notes and user guide corrected to match actual runtime behavior and data paths.
+- Privacy claims updated to reflect provider-key behavior, `.env` persistence, and deployed-host exposure.
+
+### Changed
+- Release messaging now distinguishes verified local behavior from planned future behavior.
+- Launch validation now uses current repo files and current test paths.
+
+### Verification
+- Local Dream Chat smoke-tested on `apps/lantern-garage`.
+- Node Dream Journal API tests passed.
+- Multi-turn Dream Chat tests passed.
+- Release blockers on master reviewed and either fixed or explicitly held.
+
+---
+
+## [1.0.0] - 2026-06-05 — Dream Journal Orion Edition
 
 ### V1.0.0 Feature Status
 
@@ -275,79 +376,7 @@ intent.
 - Claude haiku-4-5 streaming confirmed live
 - Convergence loop `promotion_ready=True`
 
-## [1.0.1] — 2026-06-06 — Dream Journal Stability and Honesty Patch
-
-### Fixed
-- Deterministic agent selection in Dream Chat to reduce nondeterministic routing.
-- Command handling clarified: unsupported bang-commands no longer silently behave like normal chat.
-- Three Doors UX corrected so door-state behavior matches the documented experience.
-- Provider settings persistence aligned with documented local secret handling (`.env.local` preferred over `.env`).
-- Release notes and user guide corrected to match actual runtime behavior and data paths.
-- Privacy claims updated to reflect provider-key behavior, `.env` persistence, and deployed-host exposure.
-
-### Changed
-- Release messaging now distinguishes verified local behavior from planned future behavior.
-- Launch validation now uses current repo files and current test paths.
-
-### Verification
-- Local Dream Chat smoke-tested on `apps/lantern-garage`.
-- Node Dream Journal API tests passed.
-- Multi-turn Dream Chat tests passed.
-- Release blockers on master reviewed and either fixed or explicitly held.
-
-## [Unreleased]
-
-### Planned (ORION / Lantern OS Performance)
-
-- CSF memory optimization plan: add delta-only dream-entry storage, `previous_entry_hash` checks, sparse ternary storage for the `3^12` symbolic matrix, and dictionary compression for recurring symbols such as "King of Nowhere," "birds & bees," doors, anchors, and repeated Lantern / ORION motifs.
-- Convergence IO / PCSF routing plan: cache the last 5–10 healthy provider states in memory with a 60-second expiry, default local Dream Journal routing to Ollama `Q4_K_M`, fall back to `Q5_K_M` when quality checks fail, and add a `dreamChatReply()` routing cache for repeated similar requests.
-- Digital Blackbox acceleration plan: add a configurable `internal_multiplier` defaulting to the 5x–8x range, run bounded internal convergence steps per external tick, throttle UI / external I/O through light external dilation, and guard the loop with NAP safety checks for temperature, memory, and runaway execution.
-- **Dream Art Generation (Held — post-V1 backlog):** Generate Gage-style symbolic imagery from dream entries via a local Stable Diffusion or Ollama-backed pipeline. Gate by tier (`Wanderer` = 15/month, `DeepDreamer` = unlimited). Cache recent prompts and reusable embeddings where privacy-safe; pre-warm model before requests. Acceptance criteria before promotion: (1) `POST /api/dream/art/generate` endpoint wired and returning image binary or URL; (2) tier gate enforced in middleware with a usage ledger; (3) at least one end-to-end smoke test generating an image locally; (4) prompt-injection guard on dream text before passing to diffusion model.
-- General low-risk performance plan: enable response streaming on all chat endpoints, add a redacted Debug Mode for PCSF state / selected provider / fallback reason / quantization / cache hit-miss / dilation ratio, and implement hot/cold dream memory tiers with active dreams in RAM and archived dreams in CSF.
-- Target action window: 2026-06-06 through 2026-06-12, with CSF compression first, PCSF routing second, Blackbox multiplier third, tier gating and Debug Mode fourth, then local tests, documentation, and release-note decision.
-
-### Verification Boundary (ORION / Lantern OS Performance)
-
-- This is a planning and changelog entry only; no runtime behavior changes are claimed until implementation commits and local verification receipts are added.
-- Percentage gains for memory, latency, and subjective speedup remain targets until benchmarked against the local Dream Journal / ORION runtime.
-- Required before promotion: CSF delta encode/decode round-trip tests, backward-compatibility tests for existing CSF archives, provider-routing cache and fallback tests, redaction checks for Debug Mode, and at least one local benchmark receipt.
-
-### Planned (Convergence)
-
-- **#142** Watch/Observe phase -- drift detection between convergence runs
-- **#143** Backpressure + rate limiting on TesseractEngine (bounded queue, 429 shedding)
-- **#145** Structured trace logging (OpenTelemetry-style spans per layer)
-- **#146** Idempotent slot claims (deterministic slot IDs, no orphaned slots on retry)
-- **#147** Graduated degradation (layer-by-layer fallback instead of all-or-nothing)
-- **#144** Receipt diff (compare current vs previous convergence run)
-- **#148** PII cleanup -- remove "waynesville" from persona keyword matcher
-
-### Known Bugs (Tracked)
-
-- **#160** _multi_signal_score() needs real vector similarity integration
-- **#159** Memory Engine query() is O(n) -- no keyword/entity indexes
-- **#164** hff-api dream_journal /recent route returns empty entries (TODO stub)
-- **#165** converged_tesseract.py convergence_io_route_on_slice is a placeholder stub
-- **#166** hff-api load_data_source() returns mock data -- not yet implemented
-- **#167** discord lounge bot memory_layer export_csf_stub is a placeholder
-- **#168** discord lounge bot bot.py is empty and bot_v2.py missing — bot won't start
-
-### Fixed
-
-- **#168** Restored Discord bot v2 slash commands from commit b8b5cd9; bot.py and bot_v2.py both populated
-
-- Discord bot launcher now loads .env.local and falls back to User/Machine environment variables
-
-### Added
-
-- **#169** Discord Bot settings integrated into Dream Chat settings drawer (DISCORD_BOT_TOKEN, LANTERN_DISCORD_GUILD_ID)
-- Web UI saves Discord credentials to .env.local; bot reads them automatically on startup
-- Initial workspace governance files for changelog, license, security, support,
-  code of conduct, and editor defaults.
-
-### Verification
-
-- Added as documentation-only files; no runtime behavior changed.
+---
 
 ## Changelog Rules
 

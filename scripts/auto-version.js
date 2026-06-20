@@ -87,7 +87,17 @@ ${commitMsg || "- Auto-update"}
     changelog = fs.readFileSync(changelogPath, "utf8");
   }
 
-  fs.writeFileSync(changelogPath, entry + "\n" + changelog);
+  // Insert the new entry above the most recent RELEASED version, keeping the
+  // "# Changelog" title and "## [Unreleased]" block pinned to the top. Falls
+  // back to a plain prepend for an empty/headerless changelog.
+  const firstRelease = changelog.search(/^## \[\d+\.\d+\.\d+/m);
+  if (firstRelease === -1) {
+    fs.writeFileSync(changelogPath, entry + "\n" + changelog);
+  } else {
+    const head = changelog.slice(0, firstRelease);
+    const rest = changelog.slice(firstRelease);
+    fs.writeFileSync(changelogPath, head + entry + "\n" + rest);
+  }
 }
 
 function main() {

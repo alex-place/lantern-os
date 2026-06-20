@@ -22,7 +22,19 @@ from datetime import datetime
 
 REPO_ROOT = Path(__file__).parent.parent
 VERSION_FILE = REPO_ROOT / "package.json"
-CHANGELOG_FILE = REPO_ROOT / "CHANGELOG.md"
+
+
+def _resolve_changelog():
+    """Find the changelog regardless of filename casing (CHANGELOG.MD on disk,
+    but case-sensitive filesystems need the exact name)."""
+    for name in ("CHANGELOG.MD", "CHANGELOG.md", "CHANGELOG.markdown"):
+        candidate = REPO_ROOT / name
+        if candidate.exists():
+            return candidate
+    return REPO_ROOT / "CHANGELOG.MD"
+
+
+CHANGELOG_FILE = _resolve_changelog()
 
 # Files that trigger version bump requirement (ignore test/doc changes)
 CODE_FILES_PATTERN = re.compile(r"""
@@ -39,8 +51,11 @@ CODE_FILES_PATTERN = re.compile(r"""
 def run_cmd(cmd):
     """Run shell command and return output."""
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.stdout.strip(), result.returncode
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True,
+            encoding="utf-8", errors="replace",
+        )
+        return (result.stdout or "").strip(), result.returncode
     except Exception as e:
         return str(e), 1
 
@@ -52,7 +67,7 @@ def get_staged_files():
 def get_current_version():
     """Read current version from package.json."""
     try:
-        with open(VERSION_FILE, 'r') as f:
+        with open(VERSION_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data.get('version', '0.0.0')
     except Exception as e:
@@ -82,7 +97,7 @@ def has_code_changes(files):
 def get_changelog_entries():
     """Parse changelog and return versions with entries."""
     try:
-        with open(CHANGELOG_FILE, 'r') as f:
+        with open(CHANGELOG_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
             # Match version headers: ## [1.2.3] - 2026-06-08
             versions = re.findall(r'## \[([^\]]+)\]', content)
@@ -93,7 +108,7 @@ def get_changelog_entries():
 def validate_changelog_entry(version):
     """Validate that changelog has proper entry for version."""
     try:
-        with open(CHANGELOG_FILE, 'r') as f:
+        with open(CHANGELOG_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
 
         # Look for version header
