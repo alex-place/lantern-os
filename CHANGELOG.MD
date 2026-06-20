@@ -71,10 +71,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.4.6] - 2026-06-20
+## [1.4.7] - 2026-06-20
 
 ### Fixed
 - **Autowork "Work" button now streams the live step panel from the natural-language path too.** Typing "what should I work on?" (the `WORK_INTENT` route in `apps/lantern-garage/public/js/dream-chat-ui.js`) wired its Auto-work button to the old non-streaming `/api/convergence/autonomous-work` endpoint — an opaque "Working… → ✓ Done" with no visible progress — while the `!ask` chips used the observable `/autonomous-work/stream` panel (plan → patch → tests → commit → push → PR). Both paths now call `runAutowork()`, so a user gets the same honest, step-by-step view regardless of whether they typed or clicked. Σ₀: no hidden agency (#527). Verified live in the dev preview against the current worktree-isolated pipeline.
+
+## [1.4.6] - 2026-06-20
+
+### Fixed
 - `feature-flags.js` `normalizeKey()` now rejects the JS reserved keys `__proto__`, `constructor`, and `prototype` (returns `""`), so `setFlag()`'s empty-key guard turns `PUT /api/admin/flags` with a reserved key into a clean `400` instead of reporting `{ok:true}` while silently storing nothing (the old `cfg.flags["__proto__"] = {…}` hit the prototype setter and dropped the value). The flags map is now `Object.create(null)` as defense-in-depth so a raw `flags[key]` read in `isFlagEnabled()` can't resolve to an inherited member. Admin-gated, low-severity correctness/hardening. Added `tests/test_feature_flags_reserved_keys.js`.
 
 ---
