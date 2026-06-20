@@ -207,6 +207,15 @@ function renderMarkdown(text) {
   h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
   h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
   h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+
+  // Markdown links [label](url) → new-tab anchors. Stash as placeholders first so the
+  // GitHub-pill and bare-URL linkifiers below never touch the URL inside them.
+  const _stash = [];
+  h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) => {
+    const i = _stash.push(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`) - 1;
+    return `\x00L${i}\x00`;
+  });
+
   h = h.replace(
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)/g,
     '<a href="https://github.com/$1/$2/pull/$3" target="_blank" rel="noopener" class="pr-pill">🔗 PR #$3 — $1/$2 →</a>'
@@ -215,6 +224,17 @@ function renderMarkdown(text) {
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/(\d+)/g,
     '<a href="https://github.com/$1/$2/issues/$3" target="_blank" rel="noopener" class="issue-pill">⚑ Issue #$3 — $1/$2 →</a>'
   );
+  // Remaining bare URLs → new-tab anchors (lookbehind skips URLs already inside an href;
+  // trailing sentence punctuation is kept outside the link).
+  h = h.replace(/(?<!["\/=])(https?:\/\/[^\s<>"')\x00]+)/g, (m, url) => {
+    const trail = (url.match(/[.,;:!?]+$/) || [''])[0];
+    const clean = trail ? url.slice(0, -trail.length) : url;
+    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${clean}</a>${trail}`;
+  });
+
+  // Restore the stashed markdown-link anchors.
+  h = h.replace(/\x00L(\d+)\x00/g, (_, i) => _stash[+i]);
+
   h = h.replace(/\n/g, '<br>');
   return h;
 }
