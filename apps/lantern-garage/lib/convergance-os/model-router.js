@@ -76,7 +76,7 @@ function classifyIntent(message) {
   for (const [intent, keywords] of Object.entries(INTENT_PATTERNS)) {
     let score = 0;
     for (const kw of keywords) {
-      if (lower.includes(kw)) score++;
+      if (kwMatch(lower, kw)) score++;
     }
     if (score > bestScore) {
       bestScore = score;
@@ -85,6 +85,22 @@ function classifyIntent(message) {
   }
 
   return bestIntent;
+}
+
+// Whole-word keyword match. A plain `includes()` mis-fires badly here: short
+// keywords like "pr" (pull request) and "ui" match INSIDE unrelated words —
+// "com**pr**ehensive", "b**ui**ld", "**pr**ocess" — so ordinary questions were
+// being classified as code routes. Boundaries are non-alphanumeric, so multi-word
+// keywords ("open a pr", "fix the") and hyphenated ones ("self-edit") still match.
+const _kwCache = new Map();
+function kwMatch(lower, kw) {
+  let re = _kwCache.get(kw);
+  if (!re) {
+    const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    re = new RegExp(`(?:^|[^a-z0-9])${esc}(?:[^a-z0-9]|$)`, "i");
+    _kwCache.set(kw, re);
+  }
+  return re.test(lower);
 }
 
 const INTENT_TO_PROFILE = {
