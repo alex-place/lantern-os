@@ -1,0 +1,150 @@
+{
+  "id": "courtney-blasioli",
+  "slug": "courtney-blasioli",
+  "ingestedAt": "2026-06-16T00:00:00.000Z",
+  "source": "Brand Identity Handoff Packet v1.0 + social audit",
+  "version": "1.0",
+
+  "identity": {
+    "fullName": "Courtney Blasioli",
+    "email": "cdblasioli@gmail.com",
+    "location": "Waynesville, Ohio",
+    "education": "Stebbins High School, Class of 2009",
+    "bio": "Dark romance creator • Storyteller • Community builder",
+    "extendedBio": "Exploring gothic aesthetics, honest creativity, and the future of imagination.",
+    "tagline": "Beautiful chaos. Honest stories."
+  },
+
+  "socials": {
+    "instagram": {
+      "handle": "@courtney_dbp",
+      "purpose": "Visual storytelling",
+      "content": ["Reels", "Photography", "Quotes", "Short videos"],
+      "status": "confirmed",
+      "confidence": "high"
+    },
+    "facebook": {
+      "handle": "Twisted Love",
+      "purpose": "Community hub",
+      "content": ["Long-form updates", "Discussions", "Events", "Reader interaction"],
+      "status": "confirmed",
+      "confidence": "high"
+    },
+    "pinterest": {
+      "handle": "courtney7991",
+      "purpose": "Discovery engine",
+      "content": ["Mood boards", "Character inspiration", "Fashion", "Books", "Gothic interiors"],
+      "status": "confirmed",
+      "confidence": "high"
+    },
+    "linkedin": {
+      "url": "linkedin.com/in/courtneyblasioli",
+      "status": "likely",
+      "confidence": "medium-high",
+      "notes": "Public profile indexed — KinderCare background, Waynesville OH"
+    },
+    "tiktok": { "status": "planned", "confidence": "low" },
+    "youtube": { "status": "planned", "confidence": "low" },
+    "discord": { "status": "planned", "confidence": "low" },
+    "threads": { "status": "not_found", "confidence": "low" },
+    "goodreads": { "status": "not_found", "confidence": "low" }
+  },
+
+  "brand": {
+    "mission": "To create immersive spaces where dark romance, honest storytelling, and beautiful aesthetics converge into a community that embraces vulnerability, creativity, and imagination.",
+    "vision": "Become a creator ecosystem that connects Dark Romance, Gothic Aesthetics, Writing and Storytelling, AI and Creative Technology, Community Building, and Independent Creative Culture.",
+    "positioning": "Courtney Blasioli is a creator exploring the intersection of dark romance, visual storytelling, and honest AI culture, building a community for people who appreciate beauty, emotion, and imagination.",
+    "mantra": "Create honestly. Build community. Leave beautiful things behind.",
+    "northStar": "Build a recognizable personal brand that connects storytelling, dark romance aesthetics, and emerging creative technology into a sustainable community-supported ecosystem.",
+
+    "archetypes": {
+      "primary": {
+        "name": "The Creator",
+        "description": "Transforms emotion into art.",
+        "traits": ["Imaginative", "Authentic", "Independent", "Expressive"]
+      },
+      "secondary": {
+        "name": "The Mystic",
+        "description": "Creates mystery and emotional depth.",
+        "traits": ["Intuitive", "Symbolic", "Dreamlike", "Reflective"]
+      },
+      "supporting": {
+        "name": "The Caregiver",
+        "description": "Builds safe communities.",
+        "traits": ["Welcoming", "Honest", "Compassionate", "Supportive"]
+      }
+    },
+
+    "voice": {
+      "traits": ["Warm", "Thoughtful", "Slightly mysterious", "Emotionally intelligent", "Never performative"],
+      "avoid": ["Clickbait", "Artificial positivity", "Excessive self-promotion", "Corporate language"]
+    }
+  },
+
+  "themes": {
+    "core": [
+      { "name": "Twisted Love", "tags": ["Dark romance", "Emotional storytelling", "Character studies"] },
+      { "name": "Gothic Aesthetic", "tags": ["Candlelight", "Vintage books", "Forests", "Moonlight", "Antique objects"] },
+      { "name": "Creative Process", "tags": ["Writing journey", "Drafts", "Inspiration", "Reading lists"] },
+      { "name": "Honest AI", "tags": ["Sigma0 philosophy", "Creative technology", "Open source awareness", "Human-centered automation"] },
+      { "name": "Community", "tags": ["Conversations", "Shared creativity", "Collaborative growth"] }
+    ],
+    "contentPillars": [
+      { "topic": "Dark romance and mood", "pct": 30 },
+      { "topic": "Writing and creativity", "pct": 20 },
+      { "topic": "Behind the scenes", "pct": 20 },
+      { "topic": "Community engagement", "pct": 15 },
+      { "topic": "AI and Sigma0", "pct": 10 },
+      { "topic": "Personal reflections", "pct": 5 }
+    ]
+  },
+
+  "visual": {
+    "mood": "Beautiful chaos",
+    "moodWords": ["Old libraries", "Rainy nights", "Roses", "Black lace", "Silver jewelry", "Typewriters", "Vintage film", "Handwritten letters"],
+    "palette": {
+      "primary": ["#0a0a0a (Black)", "#2d2d2d (Charcoal)", "#4a0e1a (Deep Burgundy)"],
+      "secondary": ["#f5f0e8 (Ivory)", "#c9a0a0 (Dusty Rose)", "#b8960c (Antique Gold)"],
+      "accent": ["#c0c0c0 (Moon Silver)"]
+    },
+    "typography": {
+      "headings": "Elegant serif",
+      "body": "Clean modern sans-serif",
+      "accent": "Handwritten script (used sparingly)"
+    }
+  },
+
+  "audience": {
+    "primary": {
+      "ageRange": "20-45",
+      "segments": ["Readers", "Writers", "Alternative aesthetics", "Creative entrepreneurs", "Indie art supporters"]
+    },
+    "secondary": {
+      "segments": ["Open source supporters", "AI enthusiasts", "Community builders", "Digital creators"]
+    }
+  },
+
+  "taglines": [
+    "Beautiful chaos. Honest stories.",
+    "Where dark romance meets imagination.",
+    "Creating worlds worth getting lost in.",
+    "Stories, shadows, and beautiful things."
+  ],
+
+  "collaboration": {
+    "partnerWith": ["Authenticity", "Creativity", "Open culture", "Ethical technology", "Independent artists", "Community over virality"],
+    "avoid": ["Rage engagement", "Manufactured controversy", "Misleading marketing"]
+  },
+
+  "ecosystem": {
+    "active": ["Instagram (@courtney_dbp)", "Facebook (Twisted Love)", "Pinterest (courtney7991)"],
+    "future": ["Website", "Newsletter", "TikTok", "YouTube", "Discord", "Creator Dashboard", "Sigma0 Journal", "LanternOS Community", "Independent Creative Studio"]
+  },
+
+  "lanternOS": {
+    "role": "creator",
+    "sigma0Connection": "AI and Sigma0 is a core content pillar (10%) — Courtney is interested in Honest AI, Sigma0 philosophy, and human-centered automation.",
+    "dreamJournalUser": "courtney",
+    "unifiedBio": "Courtney Blasioli\nDark romance creator • Storyteller • Community builder\nExploring gothic aesthetics, honest creativity, and the future of imagination."
+  }
+}
