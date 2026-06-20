@@ -672,6 +672,10 @@ async function sendMessage() {
         provider,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
+        // Scope this turn to the active chat session so it persists into the Chats
+        // drawer (#773). dream-chat.js owns the id and mirrors it to localStorage;
+        // without it, turns log untagged and never form a saved session.
+        sessionId: localStorage.getItem('lantern_chat_session') || undefined,
       }),
       signal: AbortSignal.timeout(90000),
     });
