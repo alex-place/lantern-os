@@ -71,6 +71,17 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.4] - 2026-06-20
+
+### Added
+- **v10 video-scoring modules** (`lib/feature-extractor-v10.js`, `lib/sigma0-v10-scoring.js`, `lib/analyzer-v10.js`, + offline Python trainers `lib/v10_feature_extractor.py`, `models/train_xgboost_v10.py`) — a data-driven, stability-aware engagement-scoring pipeline (Σ₀ collapse-aware) for the Creator Dashboard. **Cherry-picked from #875** and verified to import cleanly (`tests/test_v10_loads.js`). Currently **dormant** — not yet wired into the live highlight pipeline; wiring it (and whether to replace the existing detection) is a follow-up decision.
+
+### Fixed
+- **`creator-theme.css` was missing** even though `apps/lantern-garage/public/calibration.html` links it (a broken stylesheet reference on master) — added the stylesheet (cherry-picked from #875).
+
+### Notes
+- #875 (external fork "missing work") reviewed in depth; the rest excluded as regressive or junk: a **Keystone->Lantern brand reversion** in `dream-chat.js`, a facecam-rejection reversion in `render-pipeline-v2.js`, a README rewrite, and ~5,500 lines of data/report dumps. Recommend closing #875.
+
 ## [1.5.3] - 2026-06-20
 
 ### Fixed
