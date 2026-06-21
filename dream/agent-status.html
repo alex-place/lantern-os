@@ -219,6 +219,15 @@
     </div>
   </div>
 
+  <!-- Rollover: Keystone vs Claude landed-work share (#898) -->
+  <div class="section">
+    <h2>Kernel Rollover</h2>
+    <div class="card-grid" id="rollover-grid">
+      <div class="card"><span class="loading">Loading rollover status…</span></div>
+    </div>
+    <div class="meta" id="rollover-source" style="margin-top:8px;opacity:0.6;font-size:11px;"></div>
+  </div>
+
   <!-- Git / Repo Status -->
   <div class="section">
     <h2>Repository State</h2>
@@ -247,7 +256,7 @@
     $("last-updated").textContent = "Updated " + now.toLocaleTimeString();
 
     const [
-      health, version, agents, slots, actions, status, keystone, tess, mesh, agentWorkers
+      health, version, agents, slots, actions, status, keystone, tess, mesh, agentWorkers, rollover
     ] = await Promise.all([
       fetchJson("/api/health"),
       fetchJson("/api/version"),
@@ -259,6 +268,7 @@
       fetchJson("/api/agents/status"),
       fetchJson("/api/nodes/mesh"),
       fetchJson("/api/agents/workers"),
+      fetchJson("/api/rollover/status"),
     ]);
 
     // Convergence Agent Fleet
@@ -522,6 +532,42 @@
         <div class="meta">${v ? "OK" : "Not ready"}</div>
       </div>
     `).join("");
+
+    // Kernel rollover: Keystone-vs-Claude landed-work share (#898)
+    const roll = $("rollover-grid");
+    if (rollover && !rollover.error) {
+      const pct = (x) => (x == null ? "—" : Math.round(x * 100) + "%");
+      const ks = rollover.keystone || {};
+      roll.innerHTML = `
+        <div class="card">
+          <div class="icon">🎚️</div>
+          <h3>${rollover.stage || rollover.mode || "shadow"}</h3>
+          <div class="meta">Stage / mode</div>
+        </div>
+        <div class="card">
+          <div class="icon">🪨</div>
+          <h3>${pct(ks.share)}</h3>
+          <div class="meta">Keystone landed share (${ks.landed ?? 0}/${rollover.landed ?? 0})</div>
+        </div>
+        <div class="card">
+          <div class="icon">↪️</div>
+          <h3>${pct(ks.escalationRate)}</h3>
+          <div class="meta">Escalation rate (${rollover.escalations ?? 0} esc)</div>
+        </div>
+        <div class="card">
+          <div class="icon">☁️</div>
+          <h3>${(rollover.claude || {}).landed ?? 0}</h3>
+          <div class="meta">Claude landed</div>
+        </div>
+      `;
+      const g = rollover.lastGate;
+      $("rollover-source").textContent =
+        `source: ${rollover.sources?.records || "—"}, ${rollover.sources?.leaderboard || "—"}`
+        + (g ? ` · last gate: ${g.label || "?"} acc=${g.accuracy ?? "?"} bpc=${g.bytes_per_correct ?? "?"}` : "");
+    } else {
+      roll.innerHTML = `<div class="card"><span class="meta">No rollover data yet (kernel runs in default mode populate this).</span></div>`;
+      $("rollover-source").textContent = "";
+    }
 
     // Repo State
     const repo = $("repo-grid");
