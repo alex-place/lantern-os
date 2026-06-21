@@ -15,7 +15,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.6.7] - 2026-06-21
+## [1.6.9] - 2026-06-21
 
 ### Verify
 - **Close the EXTERNAL REALITY RULE loop end-to-end (#919 finding #2).** The Σ₀
@@ -43,6 +43,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
   to `#`. Verified via `test/markdown-render.xss.test.js` (14 checks) + end-to-end
   `renderMarkdownDocument` render. (The client chat renderer was already scheme-safe
   by construction — its link/image regexes hardcode `https?://`.)
+## [1.6.8] - 2026-06-21
+
+### Changed
+- **Surface convergence-engine failures instead of swallowing them (Σ₀ #919 / #941).** [`stream-chat.js`](apps/lantern-garage/lib/stream-chat.js): when the kernel convergence route falls through to a direct LLM ("Convergence unavailable — answering directly"), the underlying `convResult.error` + reason is now `console.error`-logged (mirrors #921's MemOS-fallback fix). Found via the #941 live-loop verification on 4177 — the engine error was invisible, so the loop's grounding gap couldn't be diagnosed.
+
+## [1.6.7] - 2026-06-21
+
+### Tests
+- Salvage the genuinely-new test coverage from #928 (@cdblasioli-gif): add `tests/test_collapse_canary_e2e.py` (Σ₀-K1 collapse-canary e2e, 9 cases) and harden the torch-dependent kernel tests (`test_kernel_closure`, `test_provider_nodes`, `test_snapshot_replay`) to skip on **`OSError`** (Windows torch DLL load failure), not just `ImportError` — `pytest.importorskip` misses DLL failures. #928's 5 Σ₀-K1 source modules were already byte-identical on master (#927 + siblings), so only these net-new/robustness test changes were taken; the rest of the stale-base fork (re-added files + a committed data file) was dropped.
 
 ## [1.6.6] - 2026-06-21
 

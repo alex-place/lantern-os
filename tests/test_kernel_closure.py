@@ -59,7 +59,11 @@ def test_ungrounded_continuation_routes_to_proposals(tmp_path):
 
 
 def test_cio_sde_rollout_stands_in_as_continuation(tmp_path):
-    torch = pytest.importorskip("torch")
+    try:
+        import torch  # noqa: F401
+    except (ImportError, OSError):
+        pytest.skip("torch unavailable (DLL or import error)")
+    torch = __import__("torch")
     from src.cio_sde import CIO_SDE, rollout
     m = CIO_SDE(dim=4, ctrl_dim=2, hidden=16)
     x0 = torch.zeros(2, 4)

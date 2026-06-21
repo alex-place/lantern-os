@@ -7,7 +7,10 @@ drift-equivalence question (#845) and the Ouro state-ABI (#844) are out of scope
 """
 import pytest
 
-torch = pytest.importorskip("torch")
+try:
+    import torch
+except (ImportError, OSError):
+    pytest.skip("torch unavailable (DLL or import error)", allow_module_level=True)
 
 from src.cio_sde import CIO_SDE, ProviderDynamics, route_provider_nodes
 

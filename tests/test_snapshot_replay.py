@@ -9,7 +9,10 @@ import tempfile
 
 import pytest
 
-torch = pytest.importorskip("torch")
+try:
+    import torch
+except (ImportError, OSError):
+    pytest.skip("torch unavailable (DLL or import error)", allow_module_level=True)
 
 from src.cio_sde import CIO_SDE, rollout
 from src.cio_sde.snapshot import snapshot_state, resume_state

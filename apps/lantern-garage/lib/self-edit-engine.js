@@ -917,8 +917,69 @@ async function generatePatch(repoRoot, plan, opts = {}) {
 
 // ── Module exports ────────────────────────────────────────────────────────
 
+// ── Already-implemented preflight ─────────────────────────────────────────
+// Cheap git-only check: has this issue's fix already landed? Open-but-fixed
+// issues are the #1 cause of wasted autowork runs — the loop regenerates a
+// stale diff, then aborts at the apply gate. We look for two signals on the
+// current checkout: (a) the issue number cited in a code comment/string, and
+// (b) a commit message referencing the issue. Either is treated as "likely
+// already implemented"; the caller surfaces the citation and skips unless the
+// run is forced. Heuristic by design — it errs toward surfacing, not blocking.
+function detectAlreadyImplemented(repoRoot, issueNumber) {
+  const n = String(issueNumber).replace(/[^0-9]/g, "");
+  const empty = { implemented: false, citations: [], commits: [], ref: "HEAD" };
+  if (!n) return empty;
+
+  const runGit = (args) => {
+    try {
+      return execFileSync("git", args, {
+        cwd: repoRoot, encoding: "utf8", timeout: 15000, windowsHide: true,
+      });
+    } catch (e) {
+      // git grep exits 1 when there are no matches — that's "not found", not a
+      // failure. Salvage any stdout; treat everything else as no matches.
+      return e && e.stdout ? String(e.stdout) : "";
+    }
+  };
+
+  // (a) Code citations: an issue ref in a comment/string ("issue NNN",
+  // "issues/NNN", or a hash-prefixed number) — bounded so a longer number can't
+  // match a shorter one. Restricted to source files so docs/handoffs/changelog
+  // (which mention issues without implementing them) don't trigger false hits.
+  const pattern = `(#|issues?/|issue[ #]+)0*${n}([^0-9]|$)`;
+  const citations = [];
+  const grepOut = runGit([
+    "grep", "-n", "-E", "-I", "-i", pattern, "--",
+    "*.js", "*.mjs", "*.cjs", "*.ts", "*.py", "*.ps1", "*.sh",
+    ":(exclude)**/node_modules/**",
+  ]);
+  for (const line of grepOut.split(/\r?\n/)) {
+    const m = line.match(/^([^:]+):(\d+):/);
+    if (m) citations.push({ file: m[1].replace(/\\/g, "/"), line: Number(m[2]) });
+    if (citations.length >= 10) break;
+  }
+
+  // (b) Commit messages referencing the issue (a "fixes"/"closes" hash ref).
+  const commits = [];
+  const logOut = runGit([
+    "log", "-E", "--grep", `#${n}\\b`, "--pretty=format:%h %s", "-n", "10",
+  ]);
+  for (const line of logOut.split(/\r?\n/)) {
+    const t = line.trim();
+    if (t) commits.push(t);
+  }
+
+  return {
+    implemented: citations.length > 0 || commits.length > 0,
+    citations,
+    commits,
+    ref: "HEAD",
+  };
+}
+
 module.exports = {
   isPathSafe,
+  detectAlreadyImplemented,
   sanitizeBranchName,
   parseUnifiedDiff,
   validateDiff,
