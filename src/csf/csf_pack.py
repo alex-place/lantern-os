@@ -356,6 +356,22 @@ def unpack(archive: str, dest: str) -> list[str]:
     return written
 
 
+def unpack_blobs(archive: str) -> dict:
+    """In-memory inverse of pack_blobs: return {arc_path: bytes}, verifying per-file
+    sha256. Use when resuming state from an archive without touching the filesystem."""
+    data, manifest, _flags, blob_start, _blob_end = _read_container(archive)
+    dict_data = _load_shared_dict(data, manifest, blob_start)
+    out = {}
+    for fe in manifest["files"]:
+        start = blob_start + fe["offset"]
+        chunk = data[start:start + fe["csize"]]
+        raw = _decompress_blob(chunk, _file_codec(fe), dict_data)
+        if hashlib.sha256(raw).hexdigest() != fe["sha256"]:
+            raise ValueError(f"checksum mismatch for {fe['path']}")
+        out[fe["path"]] = raw
+    return out
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
