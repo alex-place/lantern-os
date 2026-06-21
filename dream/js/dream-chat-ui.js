@@ -223,6 +223,18 @@ function lanternImgFallback(img) {
 }
 
 // ── Markdown + PR link renderer ───────────────────────────────────────────────
+// #930: scheme allowlist for any URL we interpolate into href/src. The capture
+// regexes below already require an http(s) scheme, so this is defense-in-depth
+// (parity with markdown-render.js's safeUrl from #934) — a future loosening of a
+// regex can't turn into a javascript:/data: sink. Non-allowed schemes neutralize
+// to '#'.
+function safeUrl(url) {
+  const u = String(url || '').trim();
+  if (/^(https?:|mailto:)/i.test(u)) return u;
+  if (/^[#/]/.test(u)) return u;                 // in-page anchor / site-absolute path
+  return '#';
+}
+
 // ── Tool-call rendering ──────────────────────────────────────────────────────
 // The local Σ₀ Ouro coder (FC adapter) answers tool-worthy turns with a
 // <tool_call>{"name","input"}</tool_call> block. Render it as a card instead of
@@ -288,7 +300,7 @@ function renderMarkdown(text) {
   // never renders as a blank bubble. Must run before the link rule so ![..](..)
   // isn't read as a text link.
   h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
-    _put(`<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
+    _put(`<img src="${safeUrl(url)}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
 
   // YouTube links → privacy-friendly inline embed.
   h = h.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})[^\s<>"')\x00]*/g, (_, vid) =>
@@ -296,7 +308,7 @@ function renderMarkdown(text) {
 
   // Markdown links [label](url) → new-tab anchors.
   h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) =>
-    _put(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
+    _put(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
 
   h = h.replace(
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)/g,
@@ -311,7 +323,7 @@ function renderMarkdown(text) {
   h = h.replace(/(?<!["\/=])(https?:\/\/[^\s<>"')\x00]+)/g, (m, url) => {
     const trail = (url.match(/[.,;:!?]+$/) || [''])[0];
     const clean = trail ? url.slice(0, -trail.length) : url;
-    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${clean}</a>${trail}`;
+    return `<a href="${safeUrl(clean)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${clean}</a>${trail}`;
   });
 
   // Restore the stashed markdown-link anchors.
@@ -325,6 +337,33 @@ function renderMarkdown(text) {
 // ── Conversation state ────────────────────────────────────────────────────────
 let isSending = false;
 const history = [];
+
+// #930: a user-facing Stop control. While a stream is in flight we swap the Send
+// button for a Stop button that aborts the fetch; on completion/cancel we swap back.
+function showStopButton(onStop) {
+  const sendBtn = document.getElementById('send-btn');
+  let btn = document.getElementById('stop-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'stop-btn';
+    btn.type = 'button';
+    btn.title = 'Stop generating';
+    btn.setAttribute('aria-label', 'Stop generating');
+    btn.textContent = '■';
+    btn.className = (sendBtn && sendBtn.className ? sendBtn.className + ' ' : '') + 'stop-button';
+    if (sendBtn && sendBtn.parentNode) sendBtn.parentNode.insertBefore(btn, sendBtn.nextSibling);
+    else document.body.appendChild(btn);
+  }
+  btn.onclick = () => { try { onStop(); } catch (_e) {} };
+  btn.style.display = '';
+  if (sendBtn) sendBtn.style.display = 'none';
+}
+function hideStopButton() {
+  const btn = document.getElementById('stop-btn');
+  if (btn) btn.style.display = 'none';
+  const sendBtn = document.getElementById('send-btn');
+  if (sendBtn) sendBtn.style.display = '';
+}
 
 const FALLBACKS = [
   "No AI providers are set up. Add an API key in Settings (⚙) to get started.",
@@ -872,6 +911,13 @@ async function sendMessage() {
   isSending = true;
   document.getElementById('send-btn').disabled = true;
 
+  // #930: real cancellation — an AbortController the Stop button can trigger, plus a
+  // 90s safety timer for a hung stream (replaces the old fire-and-forget timeout).
+  let userStopped = false;
+  const ac = new AbortController();
+  const abortTimer = setTimeout(() => ac.abort(), 90000);
+  showStopButton(() => { userStopped = true; ac.abort(); });
+
   addUserBubble(text);
   input.value = '';
   input.style.height = 'auto';
@@ -887,6 +933,23 @@ async function sendMessage() {
   let routeLabel = '';
   let receivedDone = false;
   let doneProvider = '';
+  // #930: coalesce per-token DOM writes into one render per animation frame instead
+  // of re-parsing+re-rendering the whole bubble on every token.
+  let rafId = 0;
+  let rafPending = false;
+  let streamEnded = false;
+  const scheduleRender = () => {
+    if (rafPending || streamEnded) return;
+    rafPending = true;
+    rafId = requestAnimationFrame(() => {
+      rafPending = false;
+      if (streamEnded) return;
+      cursor.remove();
+      bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
+      bubble.appendChild(cursor);
+      container.scrollTop = container.scrollHeight;
+    });
+  };
   const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const requestedProvider = document.getElementById('provider-select')?.value || '';
 
@@ -906,7 +969,7 @@ async function sendMessage() {
         // without it, turns log untagged and never form a saved session.
         sessionId: localStorage.getItem('lantern_chat_session') || undefined,
       }),
-      signal: AbortSignal.timeout(90000),
+      signal: ac.signal,
     });
 
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
@@ -935,10 +998,7 @@ async function sendMessage() {
           } else if (evt.type === 'token' && evt.text) {
             if (thinking.parentNode) thinking.remove();
             fullText += evt.text;
-            cursor.remove();
-            bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
-            bubble.appendChild(cursor);
-            container.scrollTop = container.scrollHeight;
+            scheduleRender(); // #930: rAF-coalesced, not a full re-render per token
           } else if (evt.type === 'error') {
             didError = true;
             if (evt.text) serverErrorText = evt.text;
@@ -963,7 +1023,16 @@ async function sendMessage() {
         } catch { /* skip malformed line */ }
       }
     }
-  } catch (e) { didError = true; }
+  } catch (e) {
+    // #930: a user Stop is a clean cancel — keep whatever already streamed. Any other
+    // abort (the 90s safety timer) or error is a real failure.
+    if (!(e && e.name === 'AbortError' && userStopped)) didError = true;
+  } finally {
+    clearTimeout(abortTimer);
+    hideStopButton();
+    streamEnded = true;            // stop scheduling and neutralize any in-flight rAF
+    if (rafId) cancelAnimationFrame(rafId);
+  }
 
   cursor.remove();
 
