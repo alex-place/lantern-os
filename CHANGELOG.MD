@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.6] - 2026-06-21
+
+### Fixed
+- **`/changelog.html` now scrolls and shows every release expanded by default.** The page reused dream-chat's `.app` shell, which `dream-chat.css` pins to `height:100vh; overflow:hidden` (a fixed-viewport chat layout) — so the ~23,000px of changelog content was clipped at the first screen with no way to scroll. Added a scoped override (`html, body { height:auto; overflow-y:auto }` + `.app { display:block; height:auto; overflow:visible }`) in the page's own `<style>`, which loads after `dream-chat.css` and wins. Also changed the render so **all** version blocks start expanded (was: only the newest), since the collapse-by-default made the full history invisible behind one-by-one clicks. Manual collapse/expand per version still works. Verified on the dev server: 47/47 expanded, page scrolls, no console errors.
+
 ## [1.7.5] - 2026-06-21
 
 ### Fixed
