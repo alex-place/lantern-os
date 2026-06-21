@@ -71,6 +71,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.5] - 2026-06-20
+
+### Added
+- **Calibration -> live-scorer bridge (V10 viral scoring).** `src/creator-intelligence/calibration/weights-artifact.js` persists/loads the operator-specific calibrated weights produced by `weight-calibration.calibrateWeights()`, and `viral-score-v10.js` now scores with them when present — reporting `calibrated:true` plus sample size/target — falling back to the heuristic/open-video priors (`calibrated:false`) otherwise. Closes the loop `calibration-engine.js` named "the bridge the V10 scorer has been waiting on." **Honesty-gated:** only a real `status:"ok"` calibration is persisted (`insufficient_data` is never saved), so the scorer can't report a calibration the data doesn't support. No behavior change until real labeled outcomes produce calibrated weights. Test: `tests/test_v10_calibrated_weights.js` (3 cases).
+
+### Removed
+- **Dead `lib/` V10 research scaffold** (`feature-extractor-v10.js`, `analyzer-v10.js`, `sigma0-v10-scoring.js`, `v10_feature_extractor.py`, `models/train_xgboost_v10.py`, `tests/test_v10_loads.js`) — cherry-picked from #875 in #880, but per `docs/V10-INTEGRATION-COMPLETE.md` they were already tried in production and reverted (their feature extractors return all `0.0`). Dormant (nothing required them); removed to cut scorer sprawl. The live V10 scorer is the real, structural `src/creator-intelligence` path; `#880`'s `creator-theme.css` fix is kept.
+
 ## [1.5.4] - 2026-06-20
 
 ### Added
