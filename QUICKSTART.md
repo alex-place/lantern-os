@@ -1,253 +1,223 @@
 ---
 author: Alex Place
 created: 2026-06-06
-updated: 2026-06-20
+updated: 2026-06-21
 ---
 
 # Keystone OS — Quick Start
 
-Get the app running in 5 minutes.
+Keystone OS is an AI assistant that runs on your own computer, remembers what matters to you, and isn't locked to a single AI company. This guide gets you up and running.
+
+> **In a hurry?** Pick the path that sounds like you:
+>
+> - **"I just want to try it."** → Go to **[lantern-os.net](https://lantern-os.net)**. Nothing to install, no account needed. [Jump to details ↓](#just-want-to-use-it-easiest)
+> - **"I want to run my own copy."** → [Run it on your computer ↓](#run-your-own-copy)
 
 ---
 
-## The Fast Path
+## Just want to use it? (easiest)
 
-If you already have Node 18+ and Python 3.10+:
+Open **[lantern-os.net](https://lantern-os.net)** in any browser and start typing. That's genuinely it — there's nothing to download and you don't need to sign up to try the chat.
 
-```powershell
-# 1. Install dependencies
-npm install --prefix apps/lantern-garage
-
-# 2. Copy the env file and add at least one AI key
-copy .env.example .env
-
-# 3. Start the server
-npm run dev --prefix apps/lantern-garage
-```
-
-Open **http://127.0.0.1:4177** — that's it.
+This is the right choice for most people. The rest of this guide is only if you want to run your *own* private copy on your *own* machine.
 
 ---
 
-## Step 1 — Requirements
+## Run your own copy
 
-You need:
+Running your own copy means you fully own your data and it works offline-first. You'll copy and paste a few commands into a terminal — you don't need to understand them, just run them in order.
 
-- **Node.js v18+** — [nodejs.org](https://nodejs.org)
-- **Python 3.10+** — [python.org](https://python.org)
-- **At least one AI provider key** (free tier is fine — see Step 3)
+> **A terminal** is the text window where you type commands: **PowerShell** on Windows, **Terminal** on Mac/Linux. Open it, then `cd` into the folder where you want Keystone to live.
 
-Check what you have:
+### What you need first
+
+| | Required? | Get it |
+|---|---|---|
+| **Node.js 18 or newer** | ✅ Yes — this runs the app | [nodejs.org](https://nodejs.org) (pick the "LTS" button) |
+| **One AI key** | ✅ Yes — at least one (a free one is fine) | See [Step 3](#step-3-add-one-ai-key) |
+| **Python 3.10+** | ⬜ Optional — only for extras (Discord bot, tools, tests) | [python.org](https://python.org) |
+
+To check what you already have, paste these into your terminal:
 
 ```bash
 node --version
 python --version
 ```
 
----
+If a version number prints, you have it. If you see "not recognized" or "command not found", install it from the links above.
 
-## Step 2 — Install
+### Step 1 — Get the code
 
 ```bash
-# Clone the repo (skip if you already have it)
 git clone https://github.com/alex-place/lantern-os
 cd lantern-os
+```
 
-# Install Node dependencies
+(No `git`? Install it from [git-scm.com](https://git-scm.com), or download the project as a ZIP from the GitHub page and unzip it.)
+
+### Step 2 — Install
+
+```bash
+# Required — installs the app
 npm install --prefix apps/lantern-garage
 
-# Install Python dependencies
+# Optional — only if you want the Python-based extras later
 python -m pip install -r requirements.txt
 ```
 
----
+### Step 3 — Add one AI key
 
-## Step 3 — Add Your AI Keys
+Keystone talks to an AI provider on your behalf. You need **one** key. It tries them in order and automatically switches to a backup if one is down, so a single key is plenty to start.
 
-Copy the example env file:
+First, make your own settings file from the example:
 
 ```bash
-copy .env.example .env        # Windows
-cp .env.example .env          # Mac / Linux
+copy .env.example .env      # Windows (PowerShell)
+cp .env.example .env        # Mac / Linux
 ```
 
-Open `.env` and fill in at least one key:
+Then open `.env` in any text editor and paste in **one** key:
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-...    # Claude (recommended)
-OPENAI_API_KEY=sk-...           # GPT-4o
-GEMINI_API_KEY=AIza...          # Gemini (free tier, generous quota)
+ANTHROPIC_API_KEY=sk-ant-...    # Claude — best quality
+GEMINI_API_KEY=AIza...          # Google Gemini — has a free tier, easiest to start
+OPENAI_API_KEY=sk-...           # ChatGPT / GPT-4o
 ```
 
-You only need **one** key to get started. The app tries providers in order and falls back automatically if one fails.
+| Provider | Where to get a key | Cost to start |
+|---|---|---|
+| Google (Gemini) | [aistudio.google.com](https://aistudio.google.com/app/apikey) | **Free tier** — recommended if you're new |
+| Anthropic (Claude) | [console.anthropic.com](https://console.anthropic.com) | Paid |
+| OpenAI (ChatGPT) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | Paid |
 
-| Provider | Where to get a key |
-|---|---|
-| Anthropic (Claude) | [console.anthropic.com](https://console.anthropic.com) |
-| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| Google (Gemini) | [aistudio.google.com](https://aistudio.google.com) |
+> **Keep your key private.** It's like a password for your AI account. Don't share your `.env` file or post the key anywhere. `.env` is already ignored by git so it won't get committed.
 
----
-
-## Step 4 — Start the Server
+### Step 4 — Start it
 
 ```bash
 npm run dev --prefix apps/lantern-garage
 ```
 
-Open **http://127.0.0.1:4177** in your browser.
+Now open **[http://127.0.0.1:4177](http://127.0.0.1:4177)** in your browser.
 
-You should see the Dream Journal — type anything to start a conversation.
+You'll land on the Keystone home page. Click **Chat** and type anything to start a conversation. 🎉
+
+To stop the server, go back to the terminal and press **Ctrl + C**.
 
 ---
 
-## Dual-Boot Mode (Recommended for Development)
+## What's where
 
-Run two servers at once, each from its **own dedicated git worktree** so the
-autonomous automation that churns the main checkout (`git checkout` /
-`git reset --hard origin/master` between turns) never yanks code or env out from
-under a running server. See [docs/DEV-SERVER-WORKTREE.md](docs/DEV-SERVER-WORKTREE.md).
+Once it's running on `http://127.0.0.1:4177`:
 
-- **Port 4177** — stable / public, served from `C:\dev\lantern-os-stable` (fronted by the Cloudflare tunnel)
-- **Port 4178** — dev / local, served from `C:\dev\lantern-os-dev` via `server-dev.js` (loopback-only, auth-bypassed)
+| Page | Address | What it is |
+|---|---|---|
+| **Home** | `/` | The landing page with links to everything |
+| **Chat** | `/dream-chat.html` | Talk to Keystone — your main way in |
+| **Help** | `/knowledgecenter.html` | Guides, docs, and your saved PDFs |
+| **Trader** | `/trader-dashboard.html` | Markets & prediction-market terminal *(needs an account)* |
+| **Create** | `/create.html` | Image and content tools *(needs an account)* |
+| **Explore** | `/explore.html` | Games, the flourishing dashboard, and more |
+
+---
+
+## Optional extras
+
+You can skip all of this — the chat works without any of it. Come back when you're curious.
+
+### Run two copies at once (for tinkering)
+
+Handy if you want to experiment without breaking your working copy: one stable copy on port 4177, and a second "playground" copy on port 4178.
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 ```
 
-`make quickstart` runs the same script — but only if GNU `make` is installed. On
-a bare Windows box, call the `pwsh` command above directly.
+- **Port 4177** — your stable copy (the `master` branch)
+- **Port 4178** — your playground (your current branch, auto-reloads as you change files)
 
-The launcher:
-- hydrates your persistent **Machine/User** environment (API keys, Discord /
-  Kalshi / Patreon credentials) into both servers — keys are **not** kept in a
-  committed `.env`;
-- stops any existing `:4177` / `:4178` instances and their child services, then
-  relaunches from the two worktrees;
-- leaves the Cloudflare tunnel running (it reconnects to `:4177`).
+*(If you happen to have `make` installed — it isn't on Windows by default — `make quickstart` does the same thing.)*
 
-This way you can break things on 4178 without touching the public version on 4177.
-
-> **Heads-up:** both instances run their own Discord bot and Kalshi collector and
-> both try to bind the shared MCP port `8771` — only one wins; the other logs a
-> bind error and keeps serving HTTP. That's expected in dual-boot.
-
-> First-run worktree setup:
-> ```powershell
-> git worktree add C:\dev\lantern-os-stable stable-server
-> git worktree add C:\dev\lantern-os-dev    dev-server
-> ```
-
----
-
-## Auto-Start on Boot (Windows)
-
-Register Keystone OS as a Windows startup task so it starts automatically every time you reboot:
+### Start automatically when your PC turns on (Windows)
 
 ```powershell
-# Run once as Administrator
+# Run once, in a PowerShell window opened "as Administrator"
 .\scripts\Start-Lantern.ps1 -RegisterAutostart
 ```
 
-After this, you don't need to do anything — the computer starts the server on boot, and restarts it automatically if it crashes.
+After this your computer starts Keystone on its own every time it boots, and restarts it if it ever crashes. Admin is only needed this one time to register the task.
 
-To remove the autostart:
+To undo it later:
 
 ```powershell
 .\scripts\Start-Lantern.ps1 -UnregisterAutostart
 ```
 
-Logs are written to `logs\lantern-autostart.log`.
+Logs are saved to `logs\lantern-autostart.log`.
 
----
+### Voice (text-to-speech)
 
-## What's Running at Port 4177
+- **Browser voice** works out of the box in Chrome and Edge — no setup.
+- **ElevenLabs** (more natural voices): add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` to `.env`.
 
-| Page | URL | What it is |
-|---|---|---|
-| Dream Journal | `/` | Freeform AI chat with agent personas |
-| Trader Dashboard | `/trader-dashboard.html` | Kalshi prediction markets terminal |
-| Creator | `/create.html` | Image and content creation tools |
-| Explore | `/explore.html` | Three Doors game, flourishing dashboard |
-| Knowledge Center | `/knowledgecenter.html` | Docs, guides, and your research PDFs |
-| Crypto Dashboard | `/crypto-dashboard.html` | BTC / ETH / SOL prices and news |
+### Discord bot
 
----
-
-## Optional Features
-
-### Discord Bot
-
-Add to `.env`:
+Add these to `.env` and the bot starts with the server:
 
 ```env
 DISCORD_BOT_TOKEN=your_bot_token
 LANTERN_DISCORD_GUILD_ID=your_server_id
 ```
 
-The bot starts automatically with the server — no extra command needed.
-Includes the Sinatra Lounge voice player. Requires ffmpeg for audio:
+Voice playback needs ffmpeg: `winget install Gyan.FFmpeg`.
 
-```powershell
-winget install Gyan.FFmpeg
-```
-
-### Voice / TTS
-
-- **Browser TTS** works out of the box in Chrome and Edge — no setup needed.
-- **ElevenLabs** (higher quality): add `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` to `.env`.
-
-### MCP Server (for AI agents / tool access)
+### Tools for AI agents (MCP)
 
 ```bash
 python src/mcp_server/server.py
 ```
 
-Runs on port 8771. Used by Claude Code and other AI agents to call Lantern tools.
+Runs on port 8771. This lets coding assistants like Claude Code call Keystone's tools. Most people don't need it.
 
-### Public Access via Cloudflare Tunnel
+### Share it on the internet (advanced)
 
-One-time setup:
+You can expose your local Keystone to the public web with a Cloudflare tunnel. See [`docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md`](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md).
 
-```bash
-cloudflared tunnel login
-cloudflared tunnel create lantern-os
-```
-
-Then the tunnel starts automatically with `npm start`. Your app is accessible at `https://lantern-os.net`.
-
-See [`docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md`](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) for the full setup guide.
+> ⚠️ **Read this first.** Putting Keystone on the public internet means **anyone with the link can reach it**, not just you. Only do this if you understand the risk, keep your keys safe, and don't expose admin/trading features to the public. If you're not sure, don't — the local `127.0.0.1` address is private to your machine and is the safe default.
 
 ---
 
-## Troubleshooting
+## If something goes wrong
 
 | Problem | Fix |
 |---|---|
-| Port 4177 already in use | Kill the existing process: `lsof -i :4177` (Mac/Linux) or check Task Manager (Windows) |
-| No AI responses | Check that at least one key in `.env` is valid |
-| Server crashes on startup | Check `logs\lantern-autostart.log` for the error |
-| TTS not working | Make sure you're on Chrome or Edge; check browser console for errors |
-| Discord bot not starting | Confirm both `DISCORD_BOT_TOKEN` and `LANTERN_DISCORD_GUILD_ID` are set in `.env` |
-| Tests fail | The API tests require the server to already be running |
+| **"Port 4177 already in use"** | Keystone (or something else) is already running on it. On Windows, find it in **Task Manager** and end it; on Mac/Linux run `lsof -i :4177` then stop that process. |
+| **No replies in chat** | Open `.env` and double-check at least one AI key is filled in and correct (no extra spaces, no quotes). |
+| **It won't start** | Look at `logs\lantern-autostart.log` for the error message. |
+| **Voice doesn't work** | Use Chrome or Edge; other browsers may not support browser voice. |
+| **Discord bot won't start** | Make sure **both** `DISCORD_BOT_TOKEN` and `LANTERN_DISCORD_GUILD_ID` are set in `.env`. |
+| **Tests fail** | The API tests need the server already running in another window first. |
+
+Still stuck? Open an issue on [GitHub](https://github.com/alex-place/lantern-os/issues) and paste the error you saw.
 
 ---
 
-## Running Tests
+## Running tests (for contributors)
 
 ```bash
 # Python unit tests
 python -m pytest tests/ -q --tb=short
 
-# Node API tests (server must be running)
+# Node API tests — start the server first, then in a second terminal:
 npm run test:api --prefix apps/lantern-garage
 ```
 
 ---
 
-## Next Steps
+## Go deeper
 
-- [AGENTS.md](AGENTS.md) — how the AI agent workflow and PR lanes work
-- [PROVIDERS.md](PROVIDERS.md) — full list of supported AI providers and configuration
-- [docs/CONVERGENCE-LOOP.md](docs/CONVERGENCE-LOOP.md) — the 12-phase reasoning loop
-- [SECURITY.md](SECURITY.md) — security model and responsible disclosure
+- **[Help & Knowledge Center](https://lantern-os.net/knowledgecenter.html)** — friendly guides and every doc in one place
+- **[PROVIDERS.md](PROVIDERS.md)** — all the AI providers and how to configure them
+- **[AGENTS.md](AGENTS.md)** — how the AI agent workflow and contribution lanes work
+- **[SECURITY.md](SECURITY.md)** — the security model and how to report a problem
+- **[docs/CONVERGENCE-LOOP.md](docs/CONVERGENCE-LOOP.md)** — how Keystone reasons under the hood

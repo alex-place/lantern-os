@@ -15,6 +15,20 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.1] - 2026-06-21
+
+### Fixed
+- **Markdown reader (`/repo/*.md`) mangled badge/image syntax — the README/QUICKSTART pages looked broken.** [`apps/lantern-garage/lib/markdown-render.js`](apps/lantern-garage/lib/markdown-render.js)'s hand-rolled inline parser turned linked badges `[![alt](img)](href)` into literal garbage (`<a href="img">![alt</a>](href)`), showed `<!-- … -->` comments as on-page text, and split every soft-wrapped line into its own `<p>`. Rewrote inline parsing to stash code/images/links/autolinks as placeholders before emphasis runs (so URLs containing `_`/`*` can't be corrupted) and restore them iteratively, so a linked badge now renders as a real `<a><img></a>`. Also added: HTML-comment stripping, soft-wrap paragraph joining, true **nested lists**, GitHub **task-list checkboxes** (`- [ ]`/`- [x]`), `<https://…>`/`<mailto:>` autolinks, `~~strikethrough~~`, and GitHub-style heading `id` slugs so in-page `#anchor` / table-of-contents links resolve. The wide-screen **newspaper column layout** (#e12dbcb5) and the **frontmatter byline** (#842) are preserved.
+
+### Changed
+- **Knowledge Center (`/knowledgecenter.html`) reworked normie-first.** [`apps/lantern-garage/public/knowledgecenter.html`](apps/lantern-garage/public/knowledgecenter.html) now leads with a friendly hero, a help search (same `/api/knowledge/query` wiring), "Start here", common questions, and the apps; the Σ₀ / Convergence / CSF research and live internals are preserved verbatim but moved into a collapsed **"Under the hood"** `<details>` so non-technical visitors aren't hit with jargon first. Matches the site tile language (tinted icon chips, eyebrow labels, hover lift). All wirings kept: grounding search, PDF gallery (`/api/pdfs` GET+DELETE), the 18 jargon glosses, theme toggle, and `auth-gate.js`.
+- **QUICKSTART.md rewritten normie-first.** Leads with the zero-install path (open `lantern-os.net`, no account), marks Python **optional** (the server runs chat without it), adds a ⚠️ security warning before the public Cloudflare-tunnel section, fixes the `/` = Home / Chat = `/dream-chat.html` mislabel, and uses per-OS commands. Keeps the already-correct `scripts/Start-DualServers.ps1` launcher and Keystone branding.
+
+### Added
+- **Keystone Chat brand guidelines** — [`docs/KEYSTONE-BRAND-GUIDELINES.md`](docs/KEYSTONE-BRAND-GUIDELINES.md): name/mark, the full light + dark color tokens (source of truth: [`css/site.css`](apps/lantern-garage/public/css/site.css)), typography, shared UI components, normie voice & tone, and accessibility. Linked from the Knowledge Center → Guides.
+
+---
+
 ## [1.6.0] - 2026-06-21
 
 ### Added

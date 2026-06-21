@@ -8,16 +8,75 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-function inlineMarkdown(value) {
-  return escapeHtml(value)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
+// GitHub-ish heading slug: lowercased, punctuation dropped, spaces → hyphens,
+// unicode letters/numbers preserved (so anchors like #σ₀-sigma-zero work).
+function slugify(text) {
+  return String(text ?? "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1") // strip link/image syntax, keep label
+    .replace(/[`*_~]/g, "")                    // strip inline emphasis markers
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")         // drop punctuation, keep letters/numbers
+    .replace(/\s+/g, "-");
+}
+
+// Bold / italic / strikethrough on an already-escaped string. Placeholders
+// ( N ) for stashed inline HTML pass through untouched.
+function emphasize(s) {
+  return s
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    // italics: single * or _ not adjacent to a word char on the open/close boundary
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
     .replace(/(^|[^*\w])\*(?!\s)([^*]+?)\*(?!\w)/g, "$1<em>$2</em>")
-    .replace(/(^|[^_\w])_(?!\s)([^_]+?)_(?!\w)/g, "$1<em>$2</em>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => (
-      `<a href="${escapeHtml(href)}">${escapeHtml(label)}</a>`
-    ));
+    .replace(/(^|[^_\w])_(?!\s)([^_]+?)_(?!\w)/g, "$1<em>$2</em>");
+}
+
+// Inline renderer. Stashes code spans, images, links and autolinks as opaque
+// placeholders so emphasis parsing can't corrupt their URLs, then restores them
+// (iteratively, so a linked image — [![alt](img)](href) — nests correctly).
+function inlineMarkdown(value) {
+  const stash = [];
+  const hold = (html) => ` ${stash.push(html) - 1} `;
+  let s = String(value ?? "");
+
+  // Inline code — content escaped, no further inline parsing inside.
+  s = s.replace(/`([^`]+)`/g, (_m, code) => hold(`<code>${escapeHtml(code)}</code>`));
+
+  // Images (must run before links so a linked badge's image is captured first).
+  s = s.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
+    (_m, alt, src, title) =>
+      hold(
+        `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"` +
+          (title ? ` title="${escapeHtml(title)}"` : "") +
+          ` loading="lazy">`
+      )
+  );
+
+  // Links — the label may already contain a stashed image placeholder.
+  s = s.replace(
+    /\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
+    (_m, label, href, title) => {
+      const rel = /^https?:/i.test(href) ? ' rel="noopener"' : "";
+      const t = title ? ` title="${escapeHtml(title)}"` : "";
+      return hold(
+        `<a href="${escapeHtml(href)}"${t}${rel}>${emphasize(escapeHtml(label))}</a>`
+      );
+    }
+  );
+
+  // Autolinks: <https://…> and <mailto:…>
+  s = s.replace(/<((?:https?:\/\/|mailto:)[^>\s]+)>/g, (_m, url) =>
+    hold(`<a href="${escapeHtml(url)}" rel="noopener">${escapeHtml(url.replace(/^mailto:/, ""))}</a>`)
+  );
+
+  // Escape the remaining plain text, then apply emphasis.
+  s = emphasize(escapeHtml(s));
+
+  // Restore stashed HTML (loop handles nested placeholders, e.g. img inside a link).
+  for (let i = 0; i < 6 && s.indexOf(" ") !== -1; i++) {
+    s = s.replace(/ (\d+) /g, (_m, idx) => stash[Number(idx)] ?? "");
+  }
+  return s;
 }
 
 // Render an array of markdown lines to an array of HTML fragments.
@@ -25,16 +84,22 @@ function inlineMarkdown(value) {
 function renderBlock(lines) {
   const body = [];
   let inCode = false;
-  let inList = false;
-  let listTag = "ul";
   let inTable = false;
   let tableRows = [];
   let quoteBuf = null;
+  let paraBuf = [];
+  const listStack = []; // [{ indent, tag }]
 
-  const closeList = () => {
-    if (inList) {
-      body.push(`</${listTag}>`);
-      inList = false;
+  const flushPara = () => {
+    if (paraBuf.length) {
+      body.push(`<p>${inlineMarkdown(paraBuf.join(" "))}</p>`);
+      paraBuf = [];
+    }
+  };
+  const closeLists = () => {
+    while (listStack.length) {
+      const top = listStack.pop();
+      body.push(`</li></${top.tag}>`);
     }
   };
   const closeTable = () => {
@@ -60,24 +125,54 @@ function renderBlock(lines) {
       quoteBuf = null;
     }
   };
+  // Add a list item, opening/closing nested <ul>/<ol> levels by indentation.
+  const addListItem = (indent, tag, content) => {
+    while (listStack.length && indent < listStack[listStack.length - 1].indent) {
+      const top = listStack.pop();
+      body.push(`</li></${top.tag}>`);
+    }
+    let top = listStack[listStack.length - 1];
+    if (!top || indent > top.indent) {
+      listStack.push({ indent, tag });
+      body.push(`<${tag}>`);
+    } else {
+      body.push("</li>");
+      if (top.tag !== tag) {
+        body.push(`</${top.tag}><${tag}>`);
+        top.tag = tag;
+      }
+    }
+    // Task-list item: - [ ] / - [x]
+    const task = /^\[([ xX])\]\s+(.*)$/.exec(content);
+    if (task) {
+      const checked = task[1].toLowerCase() === "x" ? " checked" : "";
+      body.push(`<li class="task"><input type="checkbox" disabled${checked}> ${inlineMarkdown(task[2])}`);
+    } else {
+      body.push(`<li>${inlineMarkdown(content)}`);
+    }
+  };
 
-  lines.forEach((line) => {
+  lines.forEach((rawLine) => {
+    const line = rawLine.replace(/\t/g, "    "); // tabs → spaces for indent math
+
     if (/^```/.test(line.trim())) {
-      flushQuote();
-      closeList();
+      flushPara();
+      closeLists();
       closeTable();
+      flushQuote();
       body.push(inCode ? "</code></pre>" : "<pre><code>");
       inCode = !inCode;
       return;
     }
     if (inCode) {
-      body.push(`${escapeHtml(line)}\n`);
+      body.push(`${escapeHtml(rawLine)}\n`);
       return;
     }
     // Blockquote: gather consecutive `>` lines, strip the marker, render recursively.
     const quote = /^\s*>\s?(.*)$/.exec(line);
     if (quote) {
-      closeList();
+      flushPara();
+      closeLists();
       closeTable();
       if (!quoteBuf) quoteBuf = [];
       quoteBuf.push(quote[1]);
@@ -85,7 +180,8 @@ function renderBlock(lines) {
     }
     flushQuote();
     if (/^\s*\|.+\|\s*$/.test(line)) {
-      closeList();
+      flushPara();
+      closeLists();
       inTable = true;
       tableRows.push(line);
       return;
@@ -93,38 +189,39 @@ function renderBlock(lines) {
     closeTable();
     // Horizontal rule: ---, ***, ___ (3+).
     if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
-      closeList();
+      flushPara();
+      closeLists();
       body.push("<hr>");
       return;
     }
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading) {
-      closeList();
+      flushPara();
+      closeLists();
       const level = Math.min(heading[1].length, 6);
-      body.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      const id = slugify(heading[2]);
+      body.push(`<h${level}${id ? ` id="${escapeHtml(id)}"` : ""}>${inlineMarkdown(heading[2])}</h${level}>`);
       return;
     }
-    const ordered = /^\s*\d+\.\s+(.+)$/.exec(line);
-    const unordered = /^\s*[-*]\s+(.+)$/.exec(line);
-    if (ordered || unordered) {
-      const tag = ordered ? "ol" : "ul";
-      if (inList && listTag !== tag) closeList();
-      if (!inList) {
-        body.push(`<${tag}>`);
-        inList = true;
-        listTag = tag;
-      }
-      body.push(`<li>${inlineMarkdown((ordered || unordered)[1])}</li>`);
+    const listItem = /^(\s*)(?:[-*+]|\d+[.)])\s+(.+)$/.exec(line);
+    if (listItem) {
+      flushPara();
+      const indent = listItem[1].length;
+      const tag = /^\s*\d/.test(line) ? "ol" : "ul";
+      addListItem(indent, tag, listItem[2]);
       return;
     }
     if (!line.trim()) {
-      closeList();
+      flushPara(); // blank line ends a paragraph but leaves lists open (loose lists)
       return;
     }
-    closeList();
-    body.push(`<p>${inlineMarkdown(line)}</p>`);
+    // Plain text: a continuation line that isn't a new list item closes any list.
+    closeLists();
+    paraBuf.push(line.trim());
   });
-  closeList();
+
+  flushPara();
+  closeLists();
   closeTable();
   flushQuote();
   if (inCode) body.push("</code></pre>");
@@ -147,7 +244,9 @@ function parseFrontmatter(text) {
 }
 
 function renderMarkdownDocument(markdown, sourcePath) {
-  const { meta, body: content } = parseFrontmatter(markdown.replace(/\r\n/g, "\n"));
+  const { meta, body: parsed } = parseFrontmatter(markdown.replace(/\r\n/g, "\n"));
+  // Drop HTML comments (READMEs place badge rows next to <!-- … --> dividers).
+  const content = parsed.replace(/<!--[\s\S]*?-->/g, "");
   const titleMatch = /^#\s+(.+)$/m.exec(content);
   const title = titleMatch ? titleMatch[1].trim() : path.basename(sourcePath);
   const body = renderBlock(content.split("\n"));
@@ -156,10 +255,22 @@ function renderMarkdownDocument(markdown, sourcePath) {
     : "";
 
   return `<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    /* Theme bootstrap before first paint — follows the site's saved light/dark
+       choice instead of forcing dark, matching index.html / the Knowledge Center. */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+    })();
+  </script>
   <title>${escapeHtml(title)} — Keystone OS</title>
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/narrator.css">
@@ -173,12 +284,16 @@ function renderMarkdownDocument(markdown, sourcePath) {
       border: 1px solid var(--border); border-radius: 16px;
       font-size: 1.05rem; line-height: 1.75;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+      overflow-wrap: anywhere;
     }
     .md-page p, .md-page li { margin: 0 0 1.05em; }
     .md-page li { margin-bottom: 0.5em; }
     .md-page li::marker { color: var(--accent); }
+    .md-page ul ul, .md-page ol ol, .md-page ul ol, .md-page ol ul { margin: .4em 0 .2em; }
+    .md-page li.task { list-style: none; margin-left: -1.2em; }
+    .md-page li.task input { margin: 0 .5em 0 0; accent-color: var(--accent); vertical-align: middle; }
     .md-page h1, .md-page h2, .md-page h3, .md-page h4, .md-page h5, .md-page h6 {
-      color: var(--text); line-height: 1.25; font-weight: 700;
+      color: var(--text); line-height: 1.25; font-weight: 700; scroll-margin-top: 68px;
     }
     .md-page h1 { font-size: 2rem; font-weight: 800; margin: 0 0 .5em; letter-spacing: -0.02em; }
     .md-page h2 { font-size: 1.5rem; margin: 1.85em 0 .55em; padding-top: .7em; border-top: 1px solid var(--border); }
@@ -187,6 +302,10 @@ function renderMarkdownDocument(markdown, sourcePath) {
     .md-page a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
     .md-page a:hover { color: var(--accent-hover); }
     .md-page strong { color: var(--text); font-weight: 700; }
+    .md-page del { color: var(--muted); }
+    .md-page img { max-width: 100%; height: auto; vertical-align: middle; }
+    /* Badge / shield rows: keep small inline images tidy with a little breathing room. */
+    .md-page p img { margin: 3px 5px 3px 0; border-radius: 3px; }
     .md-page code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--surface2); color: var(--accent); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px; font-size: 0.85em; }
     .md-page pre { background: var(--surface2); color: var(--text); border: 1px solid var(--border); overflow: auto; padding: 16px 18px; border-radius: 10px; margin: 1.4em 0; line-height: 1.55; }
     .md-page pre code { background: none; border: none; color: inherit; padding: 0; font-size: 0.85rem; }
@@ -263,7 +382,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
   </div>
 </nav>
 
@@ -300,4 +419,5 @@ module.exports = {
   escapeHtml,
   inlineMarkdown,
   renderMarkdownDocument,
+  slugify,
 };
