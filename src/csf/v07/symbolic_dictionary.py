@@ -1,8 +1,11 @@
-"""Symbolic Dictionary — pre-loaded with world anchors for v0.7.
+"""Symbolic Dictionary — world-anchor token table for the v0.7 lattice storage face.
 
-Dynamically extends during compression, but starts with the full
-Lantern cosmology vocabulary already encoded. This gives CSF a
-massive head-start on symbolic data compared to generic compressors.
+A **lossless primitive** (symbol ↔ token id), pre-loaded with the Lantern cosmology
+vocabulary and extended on the fly, used by the kept v0.7 lattice container
+(``csf.v07.csf_file``). It is **NOT a compressor** and gives no ratio advantage over
+the canonical core — the old lossy "symbolic compression" this once fed was
+**removed** in the v2 CSF consolidation (2026-06). For real compression use the
+canonical ``csf`` package (``csf_pack`` / ``omni``).
 """
 
 from __future__ import annotations

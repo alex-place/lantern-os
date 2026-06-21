@@ -1,4 +1,9 @@
 """
+⚠️ DEPRECATED — CSF v0.3 (dead lineage). Nothing in the live tree imports this; it
+and its dependency ``csf.base3`` are the retired v0.3 symbolic delta stream. It is
+**NOT** the CSF format — use the canonical lossless ``csf`` package (``csf_pack`` /
+``omni``) for compression and ``csf.v07`` for the lattice storage face. Historical only.
+
 Observation Delta Stream encoder/decoder for CSF v0.3.
 
 Record types:

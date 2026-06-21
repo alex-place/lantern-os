@@ -3,13 +3,16 @@
   "configurations": [
     {
       "name": "lantern-dev",
-      "comment": "Runs from the .dev-worktree junction (-> C:/dev/lantern-os-dev), isolated from the automation churn on the main checkout. See docs/DEV-SERVER-WORKTREE.md.",
+      "comment": "Preview-tool dev server: runs the main checkout's server from the project root (relative cwd, required by the sandboxed preview tool). The isolated C:/dev/lantern-os-dev worktree is launched separately by scripts, not by the preview tool. See docs/DEV-SERVER-WORKTREE.md.",
       "runtimeExecutable": "node",
       "runtimeArgs": [
-        "C:/dev/lantern-os-dev/apps/lantern-garage/server-dev.js"
+        "apps/lantern-garage/server.js"
       ],
-      "cwd": "C:/dev/lantern-os-dev",
-      "port": 4178
+      "port": 4178,
+      "autoPort": true,
+      "env": {
+        "CHAT_TOOL_EXEC": "1"
+      }
     },
     {
       "name": "lantern-preview",
