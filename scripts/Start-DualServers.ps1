@@ -1,190 +1,120 @@
 <#
 .SYNOPSIS
-    Lantern OS Dual-Boot Quickstart
-    Starts two servers simultaneously: stable release (port 4177) + dev branch (port 4178)
-    
+    Lantern OS Dual-Boot Quickstart (worktree-based).
+    Runs two servers from their own dedicated git worktrees:
+      :4177 stable / public  <-  C:\dev\lantern-os-stable   (Cloudflare tunnel)
+      :4178 dev   / local    <-  C:\dev\lantern-os-dev       (server-dev.js, loopback)
+
 .DESCRIPTION
-    This script implements the documented dual-boot system from QUICKSTART.md:
-    - Port 4177: Stable release (master branch, checked out fresh)
-    - Port 4178: Development (current working branch, with hot-reload)
-    
-    Both run concurrently. Open http://127.0.0.1:4177 for stable, :4178 for dev.
-    
+    Each server runs from a dedicated worktree, NOT the main checkout. The
+    autonomous automation does `git checkout` / `git reset --hard origin/master`
+    on the main checkout (C:\dev\lantern-os) between turns; a server running there
+    would have code and env yanked out from under it mid-request. Dedicated
+    worktrees isolate the running servers from that churn.
+    See docs/DEV-SERVER-WORKTREE.md.
+
+    API keys and credentials are NOT stored in a committed .env — they live in the
+    persistent Machine/User environment. This script hydrates that environment
+    into both servers so they come up fully provisioned.
+
 .PARAMETER NoChrome
-    Skip auto-launching Chrome
-    
+    Skip auto-launching Chrome.
+
+.PARAMETER StableRoot
+    Worktree that serves :4177 (default C:\dev\lantern-os-stable).
+
+.PARAMETER DevRoot
+    Worktree that serves :4178 (default C:\dev\lantern-os-dev).
+
 .EXAMPLE
     pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
     pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1 -NoChrome
 #>
 
 param(
-    [switch]$NoChrome
+    [switch]$NoChrome,
+    [string]$StableRoot = "C:\dev\lantern-os-stable",
+    [string]$DevRoot    = "C:\dev\lantern-os-dev"
 )
 
 $ErrorActionPreference = "Continue"
 $RepoRoot = Split-Path -Parent $PSScriptRoot | Resolve-Path
-$AppRoot = Join-Path $RepoRoot "apps" "lantern-garage"
+$LogDir   = Join-Path $RepoRoot "logs"
 
 Write-Host ""
-Write-Host "🚀 Lantern OS — Dual Boot Quickstart" -ForegroundColor Cyan
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+Write-Host "Lantern OS - Dual Boot Quickstart (worktree-based)" -ForegroundColor Cyan
+Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Verify prerequisites
-Write-Host "📋 Checking prerequisites..." -ForegroundColor Yellow
-$hasNode = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
-$hasGit = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
-
-if (-not $hasNode -or -not $hasGit) {
-    Write-Host "❌ Missing: Node.js or Git" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "✓ Node.js $(node --version)" -ForegroundColor Green
-Write-Host "✓ Git (installed)" -ForegroundColor Green
-Write-Host ""
-
-# Install dependencies
-Write-Host "📦 Installing dependencies..." -ForegroundColor Yellow
-Push-Location $AppRoot
-npm install --silent 2>&1 | Out-Null
-Pop-Location
-Write-Host "✓ Dependencies ready" -ForegroundColor Green
-Write-Host ""
-
-# Helper: Get current branch
-function Get-CurrentBranch {
-    git rev-parse --abbrev-ref HEAD 2>$null
-}
-
-# Helper: Kill process on port
-function Stop-ProcessOnPort {
-    param([int]$Port)
-    try {
-        $proc = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | 
-            Select-Object -ExpandProperty OwningProcess | Get-Unique
-        if ($proc) {
-            Stop-Process -Id $proc -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 500
-        }
+# --- Prerequisites -----------------------------------------------------------
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Write-Host "Missing: Node.js" -ForegroundColor Red; exit 1 }
+foreach ($wt in @($StableRoot, $DevRoot)) {
+    if (-not (Test-Path (Join-Path $wt "apps\lantern-garage\server.js"))) {
+        Write-Host "Worktree not found or incomplete: $wt" -ForegroundColor Red
+        Write-Host "Create the dual-boot worktrees first (see docs/DEV-SERVER-WORKTREE.md):" -ForegroundColor Yellow
+        Write-Host "  git worktree add $StableRoot stable-server" -ForegroundColor Gray
+        Write-Host "  git worktree add $DevRoot dev-server" -ForegroundColor Gray
+        exit 1
     }
-    catch { }
+}
+Write-Host ("Node {0}; worktrees present." -f (node --version)) -ForegroundColor Green
+
+# --- Hydrate persistent environment (so the servers get their keys) ----------
+# Keys/credentials live in the Machine/User environment, not a committed .env.
+foreach ($scope in 'Machine','User') {
+    $vars = [Environment]::GetEnvironmentVariables($scope)
+    foreach ($k in $vars.Keys) { try { Set-Item -Path ("env:" + $k) -Value $vars[$k] -ErrorAction SilentlyContinue } catch {} }
 }
 
-# Clean up old processes
-Write-Host "🧹 Cleaning up stale processes..." -ForegroundColor Yellow
-Stop-ProcessOnPort -Port 4177
-Stop-ProcessOnPort -Port 4178
-Write-Host "✓ Ports cleared" -ForegroundColor Green
-Write-Host ""
-
-# Get current branch (for dev server)
-$devBranch = Get-CurrentBranch
-Write-Host "🌳 Current branch: $devBranch" -ForegroundColor Cyan
-
-# Start Stable Server (Master on Port 4177)
-Write-Host ""
-Write-Host "🔵 Server 1: Stable Release (port 4177)" -ForegroundColor Blue
-Write-Host "  → Checking out master..." -ForegroundColor Gray
-
-Push-Location $RepoRoot
-git fetch origin --quiet
-git checkout master --quiet 2>&1 | Out-Null
-git pull origin master --quiet 2>&1 | Out-Null
-Pop-Location
-
-Push-Location $AppRoot
-Write-Host "  → Starting on port 4177..." -ForegroundColor Gray
-$stableProc = Start-Process -FilePath "node" `
-    -ArgumentList "server.js" `
-    -EnvironmentVariable @{"PORT"="4177"} `
-    -WindowStyle Hidden `
-    -PassThru `
-    -ErrorAction SilentlyContinue
-Pop-Location
-
-if ($stableProc) {
-    Write-Host "  ✓ Running (PID $($stableProc.Id))" -ForegroundColor Green
-} else {
-    Write-Host "  ❌ Failed to start" -ForegroundColor Red
-    exit 1
+# --- Stop any existing web servers + their child services (keep cloudflared) --
+Write-Host "Stopping existing :4177/:4178 servers and child services..." -ForegroundColor Yellow
+foreach ($port in 4177,4178,8771,8772,5050) {
+    Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique |
+        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
 }
+Start-Sleep -Milliseconds 1000
+New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
-Start-Sleep -Seconds 2
+# --- :4177 stable / public (PORT=4177 -> binds 0.0.0.0 for the Cloudflare tunnel)
+Write-Host "Starting stable :4177 from $StableRoot ..." -ForegroundColor Blue
+$env:PORT = "4177"
+$stable = Start-Process -FilePath "node" -ArgumentList "apps/lantern-garage/server.js" `
+    -WorkingDirectory $StableRoot -WindowStyle Hidden -PassThru `
+    -RedirectStandardOutput (Join-Path $LogDir "stable-4177.out.log") `
+    -RedirectStandardError  (Join-Path $LogDir "stable-4177.err.log")
 
-# Start Dev Server (Current Branch on Port 4178)
-Write-Host ""
-Write-Host "🟢 Server 2: Development ($devBranch on port 4178)" -ForegroundColor Green
-Write-Host "  → Starting with hot-reload..." -ForegroundColor Gray
+# --- :4178 dev / local (server-dev.js forces port 4178 and binds 127.0.0.1) --
+Write-Host "Starting dev :4178 from $DevRoot ..." -ForegroundColor Green
+Remove-Item env:PORT -ErrorAction SilentlyContinue   # server-dev.js sets its own port/host
+$dev = Start-Process -FilePath "node" -ArgumentList "apps/lantern-garage/server-dev.js" `
+    -WorkingDirectory $DevRoot -WindowStyle Hidden -PassThru `
+    -RedirectStandardOutput (Join-Path $LogDir "dev-4178.out.log") `
+    -RedirectStandardError  (Join-Path $LogDir "dev-4178.err.log")
 
-Push-Location $AppRoot
-$devProc = Start-Process -FilePath "node" `
-    -ArgumentList "--watch", "server.js" `
-    -EnvironmentVariable @{"PORT"="4178"} `
-    -WindowStyle Hidden `
-    -PassThru `
-    -ErrorAction SilentlyContinue
-Pop-Location
-
-if ($devProc) {
-    Write-Host "  ✓ Running (PID $($devProc.Id))" -ForegroundColor Green
-} else {
-    Write-Host "  ❌ Failed to start" -ForegroundColor Red
-    exit 1
+# --- Health check ------------------------------------------------------------
+Write-Host "Health check..." -ForegroundColor Yellow
+$stableOk = $false; $devOk = $false
+foreach ($i in 1..20) {
+    if (-not $stableOk) { try { if ((Invoke-WebRequest "http://127.0.0.1:4177/api/version" -TimeoutSec 2 -ErrorAction SilentlyContinue).StatusCode -eq 200) { $stableOk = $true } } catch {} }
+    if (-not $devOk)    { try { if ((Invoke-WebRequest "http://127.0.0.1:4178/api/version" -TimeoutSec 2 -ErrorAction SilentlyContinue).StatusCode -eq 200) { $devOk = $true } } catch {} }
+    if ($stableOk -and $devOk) { break }
+    Start-Sleep -Milliseconds 800
 }
+if ($stableOk) { Write-Host "  OK  stable :4177 (pid $($stable.Id))" -ForegroundColor Green } else { Write-Host "  WARN stable :4177 not responding - see $LogDir\stable-4177.err.log" -ForegroundColor Yellow }
+if ($devOk)    { Write-Host "  OK  dev    :4178 (pid $($dev.Id))"    -ForegroundColor Green } else { Write-Host "  WARN dev :4178 not responding - see $LogDir\dev-4178.err.log" -ForegroundColor Yellow }
 
-Start-Sleep -Seconds 2
-
-# Health check
-Write-Host ""
-Write-Host "💊 Health check..." -ForegroundColor Yellow
-$stable = $null
-$dev = $null
-
-1..5 | ForEach-Object {
-    try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4177/api/version" -ErrorAction SilentlyContinue -SkipHttpErrorCheck -TimeoutSec 2
-        if ($resp.StatusCode -eq 200) { $stable = $true }
-    } catch { }
-    
-    try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:4178/api/version" -ErrorAction SilentlyContinue -SkipHttpErrorCheck -TimeoutSec 2
-        if ($resp.StatusCode -eq 200) { $dev = $true }
-    } catch { }
-    
-    if ($stable -and $dev) { break }
-    Start-Sleep -Milliseconds 500
-}
-
-if ($stable) { Write-Host "  ✓ Stable (4177) responding" -ForegroundColor Green }
-else { Write-Host "  ⚠ Stable (4177) still initializing..." -ForegroundColor Yellow }
-
-if ($dev) { Write-Host "  ✓ Dev (4178) responding" -ForegroundColor Green }
-else { Write-Host "  ⚠ Dev (4178) still initializing..." -ForegroundColor Yellow }
-
-# Launch browser
-Write-Host ""
 if (-not $NoChrome) {
-    Write-Host "🌐 Opening Chrome..." -ForegroundColor Yellow
-    try {
-        Start-Process "chrome.exe" "http://127.0.0.1:4177/dream-chat.html" -ErrorAction SilentlyContinue
-        Write-Host "  ✓ Opened stable (4177)" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "  ⚠ Chrome not found" -ForegroundColor Yellow
-    }
+    try { Start-Process "chrome.exe" "http://127.0.0.1:4177/dream-chat.html" -ErrorAction SilentlyContinue } catch {}
 }
 
-# Summary
 Write-Host ""
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-Write-Host "✅ Dual Boot Running!" -ForegroundColor Green
+Write-Host "Dual boot running:" -ForegroundColor Cyan
+Write-Host "  Stable (public) http://127.0.0.1:4177  <- $StableRoot" -ForegroundColor Blue
+Write-Host "  Dev    (local)  http://127.0.0.1:4178  <- $DevRoot" -ForegroundColor Green
 Write-Host ""
-Write-Host "🔵 Stable: http://127.0.0.1:4177" -ForegroundColor Blue
-Write-Host "🟢 Dev:    http://127.0.0.1:4178" -ForegroundColor Green
+Write-Host "Note: both instances run their own Discord bot / Kalshi collector and try to" -ForegroundColor DarkGray
+Write-Host "bind the shared MCP port 8771 - only one wins; the other logs a bind error and" -ForegroundColor DarkGray
+Write-Host "keeps serving HTTP. The Cloudflare tunnel (if running) reconnects to :4177." -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "📚 Read QUICKSTART.md and AGENTS.md before next session" -ForegroundColor Cyan
-Write-Host ""
-
-while ($true) { Start-Sleep -Seconds 10 }
+# Servers run detached (Start-Process); this launcher returns instead of blocking.

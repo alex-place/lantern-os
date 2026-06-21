@@ -97,22 +97,40 @@ You should see the Dream Journal — type anything to start a conversation.
 
 ## Dual-Boot Mode (Recommended for Development)
 
-Run two servers at once: a stable release on port 4177, and your dev branch on 4178.
+Run two servers at once, each from its **own dedicated git worktree** so the
+autonomous automation that churns the main checkout (`git checkout` /
+`git reset --hard origin/master` between turns) never yanks code or env out from
+under a running server. See [docs/DEV-SERVER-WORKTREE.md](docs/DEV-SERVER-WORKTREE.md).
+
+- **Port 4177** — stable / public, served from `C:\dev\lantern-os-stable` (fronted by the Cloudflare tunnel)
+- **Port 4178** — dev / local, served from `C:\dev\lantern-os-dev` via `server-dev.js` (loopback-only, auth-bypassed)
 
 ```powershell
-make quickstart
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 ```
 
-Or:
+`make quickstart` runs the same script — but only if GNU `make` is installed. On
+a bare Windows box, call the `pwsh` command above directly.
 
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File start-dual-servers.ps1
-```
+The launcher:
+- hydrates your persistent **Machine/User** environment (API keys, Discord /
+  Kalshi / Patreon credentials) into both servers — keys are **not** kept in a
+  committed `.env`;
+- stops any existing `:4177` / `:4178` instances and their child services, then
+  relaunches from the two worktrees;
+- leaves the Cloudflare tunnel running (it reconnects to `:4177`).
 
-- **Port 4177** — stable (master branch, always up to date)
-- **Port 4178** — dev (your current branch, hot-reload)
+This way you can break things on 4178 without touching the public version on 4177.
 
-This way you can break things on 4178 without touching the working version on 4177.
+> **Heads-up:** both instances run their own Discord bot and Kalshi collector and
+> both try to bind the shared MCP port `8771` — only one wins; the other logs a
+> bind error and keeps serving HTTP. That's expected in dual-boot.
+
+> First-run worktree setup:
+> ```powershell
+> git worktree add C:\dev\lantern-os-stable stable-server
+> git worktree add C:\dev\lantern-os-dev    dev-server
+> ```
 
 ---
 
