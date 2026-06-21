@@ -3,6 +3,7 @@
  */
 
 const { handlePatreonStart, handlePatreonCallback, getSessionInfo, handleLogout } = require("../lib/patreon-auth");
+const { patreonAuthEnabled } = require("../lib/auth-middleware");
 
 module.exports = async function authRoutes(req, res, url, deps) {
   const path = url.pathname;
@@ -14,6 +15,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
   if (method === "GET" && path === "/api/auth/session") {
     console.log("[AUTH] Handling /api/auth/session");
     const info = getSessionInfo(req);
+    // Tell the client whether the Patreon login gate is active. When false, the
+    // client-side auth-gate.js must not bounce guests to /auth.html.
+    info.authRequired = patreonAuthEnabled();
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(info));
   }

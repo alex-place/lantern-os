@@ -5,6 +5,22 @@
  */
 
 const { getProfile } = require("./user-profiles");
+const { isFlagEnabledOr } = require("./feature-flags");
+
+/**
+ * Is the Patreon login gate active? Controlled by the admin-toggleable
+ * `patreon_auth` feature flag. Defaults ON when the flag has never been created,
+ * so the gate never silently drops open on a fresh install — an admin must
+ * explicitly create+disable `patreon_auth` to open the site.
+ *
+ * When OFF, unauthenticated visitors are treated as guests instead of being
+ * bounced to /auth.html. Role- and entitlement-gated surfaces (admin pages, the
+ * trade API) stay protected: with no Patreon login available, only the
+ * local-admin bypass (the owner's own machine) reaches them.
+ */
+function patreonAuthEnabled() {
+  return isFlagEnabledOr("patreon_auth", true);
+}
 
 // Headers that only ever appear on traffic relayed through a reverse proxy or
 // tunnel (Cloudflare in front of lantern-os.net, nginx, Railway, etc.). A
@@ -53,6 +69,8 @@ function isLocalBypass(req) {
 function requireAuth(req, res) {
   // Local-only bypass: dev port 4178, or LANTERN_LOCAL_ADMIN on loopback
   if (isLocalBypass(req)) return true;
+  // Patreon gate disabled by an admin → treat everyone as an allowed guest.
+  if (!patreonAuthEnabled()) return true;
 
   const session = req.session?.patreon;
 
@@ -74,18 +92,35 @@ function requireRole(req, res, requiredRole = "supporter") {
   // Local-only bypass: dev port 4178, or LANTERN_LOCAL_ADMIN on loopback
   if (isLocalBypass(req)) return true;
 
+  // deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
+  const roleHierarchy = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
+  const requiredLevel = roleHierarchy[requiredRole] || 0;
+
   const session = req.session?.patreon;
 
   if (!session?.id) {
+    // Patreon gate disabled → treat the visitor as a guest: serve guest-level
+    // pages, but still refuse anything that needs a higher tier (admin pages,
+    // paid tiers) with a 403 — there is no login to redirect them to, and the
+    // gate being off must never expose privileged surfaces.
+    if (!patreonAuthEnabled()) {
+      if (requiredLevel <= roleHierarchy.guest) return true;
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "Higher tier required; Patreon login is disabled.",
+          required: requiredRole,
+          current: "guest",
+        })
+      );
+      return false;
+    }
     res.writeHead(302, { Location: "/auth.html" });
     res.end();
     return false;
   }
 
-  // deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
-  const roleHierarchy = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
   const userLevel = roleHierarchy[session.role] || 0;
-  const requiredLevel = roleHierarchy[requiredRole] || 0;
 
   if (userLevel < requiredLevel) {
     // Insufficient role
@@ -160,6 +195,19 @@ function requireEntitlement(req, res, key) {
 
   const session = req.session?.patreon;
   if (!session?.id) {
+    // Gate disabled → no login to redirect to; the entitlement still isn't
+    // granted to an anonymous visitor, so deny with a 403 (keeps the trade /
+    // money API closed to the public even with the gate off).
+    if (!patreonAuthEnabled()) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "Account required; Patreon login is disabled.",
+          entitlement: key,
+        })
+      );
+      return false;
+    }
     res.writeHead(302, { Location: "/auth.html" });
     res.end();
     return false;
@@ -208,4 +256,5 @@ module.exports = {
   isAdmin,
   protectStaticPage,
   attachProfile,
+  patreonAuthEnabled,
 };

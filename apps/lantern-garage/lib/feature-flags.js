@@ -106,6 +106,18 @@ function isFlagEnabled(key) {
 }
 
 /**
+ * The flag's enabled state, or `fallback` when the flag has never been created.
+ * Unlike isFlagEnabled() (which treats unknown flags as off), this lets a caller
+ * default a gate ON until an admin explicitly creates+disables it — used for the
+ * Patreon auth gate, which must not silently drop open on a fresh install.
+ */
+function isFlagEnabledOr(key, fallback) {
+  const { flags } = loadConfig();
+  const rec = flags[normalizeKey(key)];
+  return rec ? !!rec.enabled : !!fallback;
+}
+
+/**
  * Create or update a flag. Returns the stored record.
  * Only provided fields change; `enabled` defaults to false on first create.
  */
@@ -237,6 +249,7 @@ module.exports = {
   listFlags,
   getPublicFlags,
   isFlagEnabled,
+  isFlagEnabledOr,
   setFlag,
   deleteFlag,
   getNavConfig,

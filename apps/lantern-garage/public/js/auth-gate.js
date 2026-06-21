@@ -150,7 +150,10 @@
       applyAdminControls(session);
       const canTrade = !!(session && session.entitlements && session.entitlements.trade);
       if (!canTrade) hideTradeNav();
-      if (!isPublic && (!session || !session.authenticated)) {
+      // When an admin disables the Patreon gate (server reports authRequired:false),
+      // guests browse freely — don't bounce them to /auth.html.
+      const gateOff = session && session.authRequired === false;
+      if (!isPublic && !gateOff && (!session || !session.authenticated)) {
         location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
       } else if (TRADE_PAGES.includes(pathname) && session && session.authenticated && !canTrade) {
         // Direct navigation to a trade page without entitlement → bounce home.
