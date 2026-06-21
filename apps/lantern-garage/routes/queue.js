@@ -3,33 +3,180 @@
  * Exposes queue and slot manager operations via REST API
  */
 
+/**
+ * Read the real agent slot roster from .claude/agent-slots.json and
+ * cross-reference the assigned queue so each slot reports working/idle truth.
+ * Falls back to an empty roster (not a fake "claude" slot) if config is missing.
+ */
+function loadAgentSlots(repoRoot) {
+  const fs = require("fs");
+  const path = require("path");
+
+  let configSlots = [];
+  try {
+    const cfgPath = path.join(repoRoot, ".claude", "agent-slots.json");
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      configSlots = Array.isArray(cfg.slots) ? cfg.slots : [];
+    }
+  } catch (e) {
+    console.warn("[Queue] agent-slots.json unreadable:", e.message);
+  }
+
+  // Map assigned work items by the slot/agent they're assigned to.
+  const assignedByAgent = {};
+  try {
+    const assignedDir = path.join(repoRoot, "data", "agent-work-queue", "assigned");
+    if (fs.existsSync(assignedDir)) {
+      for (const f of fs.readdirSync(assignedDir).filter((x) => x.endsWith(".json"))) {
+        try {
+          const item = JSON.parse(fs.readFileSync(path.join(assignedDir, f), "utf8"));
+          if (item.assignedTo) (assignedByAgent[item.assignedTo] ||= []).push(item);
+        } catch { /* skip unparseable */ }
+      }
+    }
+  } catch { /* no assigned dir */ }
+
+  const slots = configSlots.map((s) => {
+    const work = assignedByAgent[s.id] || assignedByAgent[s.agent] || [];
+    const working = work.length > 0;
+    return {
+      id: s.id,
+      agent: s.agent || null,
+      model: s.model || null,
+      tier: s.tier || null,
+      status: working ? "working" : (s.status === "disabled" ? "disabled" : "idle"),
+      currentWork: working ? work[0].issueNumber : null,
+      responsibilities: s.responsibilities || [],
+    };
+  });
+
+  const activeCount = slots.filter((s) => s.status === "working").length;
+  const disabledCount = slots.filter((s) => s.status === "disabled").length;
+  const idleCount = slots.length - activeCount - disabledCount;
+
+  return {
+    slots,
+    stats: {
+      totalSlots: slots.length,
+      enabledSlots: slots.length - disabledCount,
+      activeCount,
+      idleCount,
+    },
+  };
+}
+
+// CLAUDE.md monoworkstream lanes — one open PR lane per agent prefix.
+const LANE_PREFIXES = ["claude", "gemini", "codex", "devin", "grok", "openai", "sigma0"];
+
+// Short-lived cache so a 5s dashboard poll doesn't spawn a `gh` subprocess
+// every tick. { ts, data }.
+let _prLaneCache = null;
+const PR_LANE_TTL_MS = 20_000;
+
+/**
+ * Live PR-lane (Verify-stage) view: open PRs grouped by agent-prefix lane, each
+ * with its CI check rollup. Real `gh` data, shell-free via safeExec. Returns
+ * { lanes:[{prefix, pr|null, checks}], openCount, generatedAt } — or an
+ * { error } shape the UI degrades gracefully on (gh missing / not authed).
+ */
+function loadPrLanes(repoRoot) {
+  const now = Date.now();
+  if (_prLaneCache && now - _prLaneCache.ts < PR_LANE_TTL_MS) return _prLaneCache.data;
+
+  const { safeExec } = require(require("path").join(repoRoot, "apps", "lantern-garage", "lib", "safe-exec"));
+  let prs = [];
+  try {
+    const out = safeExec(
+      ["gh", "pr", "list", "--repo", "alex-place/lantern-os", "--state", "open",
+       "--json", "number,title,headRefName,statusCheckRollup,mergeable,isDraft,url",
+       "--limit", "50"],
+      { cwd: repoRoot, timeout: 15000 }
+    );
+    prs = JSON.parse(out || "[]");
+  } catch (err) {
+    const data = { error: "gh_unavailable", message: String(err.message || err).slice(0, 200), lanes: [], openCount: 0 };
+    _prLaneCache = { ts: now, data };
+    return data;
+  }
+
+  const rollup = (pr) => {
+    const checks = Array.isArray(pr.statusCheckRollup) ? pr.statusCheckRollup : [];
+    if (!checks.length) return "none";
+    const norm = checks.map((c) => (c.conclusion || c.state || c.status || "").toUpperCase());
+    if (norm.some((s) => ["FAILURE", "ERROR", "CANCELLED", "TIMED_OUT"].includes(s))) return "failing";
+    if (norm.some((s) => ["IN_PROGRESS", "QUEUED", "PENDING", "WAITING"].includes(s))) return "pending";
+    if (norm.every((s) => ["SUCCESS", "COMPLETED", "NEUTRAL", "SKIPPED"].includes(s))) return "passing";
+    return "pending";
+  };
+
+  const laneFor = (branch) => {
+    const prefix = String(branch || "").split("/")[0].toLowerCase();
+    return LANE_PREFIXES.includes(prefix) ? prefix : null;
+  };
+
+  const lanes = LANE_PREFIXES.map((prefix) => {
+    const pr = prs.find((p) => laneFor(p.headRefName) === prefix);
+    return {
+      prefix,
+      pr: pr ? {
+        number: pr.number, title: pr.title, branch: pr.headRefName, url: pr.url,
+        draft: !!pr.isDraft, mergeable: pr.mergeable, checks: rollup(pr),
+      } : null,
+    };
+  });
+
+  const data = { lanes, openCount: prs.length, generatedAt: new Date().toISOString() };
+  _prLaneCache = { ts: now, data };
+  return data;
+}
+
 module.exports = async function queueRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody, repoRoot } = deps;
   const fs = require("fs");
   const path = require("path");
 
-  // ── GET /api/queue/status ── (minimal test endpoint)
+  // ── GET /api/queue/pr-lanes ── (Verify stage: CI status per agent lane)
+  if (url.pathname === "/api/queue/pr-lanes" && req.method === "GET") {
+    try {
+      sendJson(res, loadPrLanes(repoRoot));
+    } catch (err) {
+      console.error("[Queue] PR-lanes error:", err);
+      sendJson(res, { error: err.message, lanes: [], openCount: 0 }, 500);
+    }
+    return true;
+  }
+
+  // ── GET /api/queue/status ──
+  // Real counts derived from the on-disk queue dirs (no hardcoded stub).
   if (url.pathname === "/api/queue/status" && req.method === "GET") {
-    sendJson(res, {
-      ok: true,
-      message: "Queue system online",
-      queue: {
-        pending: 0,
-        assigned: 0,
-        completed: 0,
-        failed: 0,
-      },
-      agents: {
-        totalSlots: 4,
-        enabledSlots: 1,
-        activeCount: 0,
-        idleCount: 1,
-        totalCompleted: 0,
-        totalFailed: 0,
-        successRate: 0,
-      },
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      const queueRoot = path.join(repoRoot, "data", "agent-work-queue");
+      const countJson = (dir) => {
+        const d = path.join(queueRoot, dir);
+        if (!fs.existsSync(d)) return 0;
+        return fs.readdirSync(d).filter((f) => f.endsWith(".json")).length;
+      };
+      // "in_progress" is a legacy alias for "assigned" — count either if present.
+      const pending = countJson("pending");
+      const assigned = countJson("assigned") + countJson("in_progress");
+      const completed = countJson("completed");
+      const failed = countJson("failed");
+      const total = pending + assigned + completed + failed;
+      const settled = completed + failed;
+
+      sendJson(res, {
+        ok: true,
+        message: "Queue system online",
+        queue: { pending, assigned, completed, failed, total },
+        agents: loadAgentSlots(repoRoot).stats,
+        successRate: settled > 0 ? Math.round((completed / settled) * 100) : 0,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("[Queue] Status error:", err);
+      sendJson(res, { error: err.message }, 500);
+    }
     return true;
   }
 
@@ -224,24 +371,15 @@ module.exports = async function queueRoutes(req, res, url, deps) {
   }
 
   // ── GET /api/queue/agents ──
-  // Returns agent slot status specific to queue management (not Tesseract fleet data)
+  // Real agent roster from .claude/agent-slots.json + assigned-work cross-ref.
   if (url.pathname === "/api/queue/agents" && req.method === "GET") {
-    sendJson(res, {
-      slots: [
-        { id: "claude", status: "idle", currentWork: null, completedCount: 0, failedCount: 0 },
-      ],
-      health: [{ slot: "claude", status: "idle", healthy: true, message: "Healthy" }],
-      stats: {
-        totalSlots: 4,
-        enabledSlots: 1,
-        activeCount: 0,
-        idleCount: 1,
-        totalCompleted: 0,
-        totalFailed: 0,
-        successRate: 0,
-      },
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      const { slots, stats } = loadAgentSlots(repoRoot);
+      sendJson(res, { slots, stats, timestamp: new Date().toISOString() });
+    } catch (err) {
+      console.error("[Queue] Agents error:", err);
+      sendJson(res, { error: err.message }, 500);
+    }
     return true;
   }
 

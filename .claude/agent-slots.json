@@ -141,7 +141,7 @@
       "id": "sigma0-coder-slot",
       "agent": "sigma0",
       "provider": "ollama",
-      "model": "lantern-sigma0-coder-v2",
+      "model": "ouro:latest",
       "status": "ready",
       "capabilities": { "maxTokens": 32768, "batchSize": 4, "parallelTasks": 2, "supportedTools": ["code_execution", "git", "analysis", "testing"] },
       "quotaTracking": { "enabled": false, "windowSize": 86400, "maxTokensPerWindow": 0, "fallbackAgent": "gemini-2.5-flash-slot" },
@@ -149,7 +149,7 @@
       "syncInterval": 300,
       "healthCheck": { "interval": 60, "timeout": 10 },
       "local": true,
-      "note": "Σ₀ Ouro convergence coder — the project's own convergence-fitted local coding model (Ollama). No quota; falls back to Gemini if the local runtime is unhealthy."
+      "note": "Σ₀ Ouro convergence coder — ByteDance/Ouro-1.4B + Σ₀ QLoRA adapter, served by scripts/ouro_serve.py on :11434 via the Ollama-compatible /api/chat (ouro:latest). The Ollama binary itself is sunset (#811/#823); the deprecated lantern-sigma0-coder is replaced by Ouro (#874). No quota; falls back to Gemini if the local runtime is unhealthy."
     }
   ],
   "geminiFreeTierQueue": [
