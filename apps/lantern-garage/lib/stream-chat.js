@@ -31,7 +31,7 @@ const { generateDoorSceneImage } = require("./image-generation");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { chatDilation, groundingPolicy } = require("./grounding-policy");
 const { generatePlan, generatePatch } = require("./self-edit-engine");
-const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
+const { selectProvider, selectKernelProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
 const { classifyIntent } = require("./intent-router");
 const { convergeMessage } = require("./convergence-adapter");
@@ -437,14 +437,13 @@ async function handleStreamChat(req, url, res) {
       sendToken(`🔧 Keystone Kernel Mode\n\n`);
       sendToken(`Issue: ${issue}\n\n`);
 
-      // Get the selected provider for LLM calls
-      const provider = requestedProvider || selectProvider(message, history);
-      let llmFn;
+      // Kernel path uses its own provider chain (#894): Keystone/Ouro first,
+      // Claude as explicit last-resort. Never inherits chat selectProvider defaults.
+      const { provider, model: kernelModel, mode: rolloverMode } = await selectKernelProvider(requestedProvider);
 
       try {
-        // Call keystoneRun with the appropriate LLM provider
+        // Call keystoneRun with the kernel-specific provider
         keystoneRun(issue, repoRoot, async (opts) => {
-          // Unified LLM call using the selected provider
           const systemPrompt = opts.system || KEYSTONE_SYSTEM_PROMPT;
           const messages = opts.messages || [{ role: "user", content: opts.input || "" }];
 
@@ -452,7 +451,7 @@ async function handleStreamChat(req, url, res) {
             systemPrompt,
             messages,
             provider,
-            model: null, // Let unified-agent pick the best model
+            model: kernelModel || null,
             user,
           });
 
@@ -473,6 +472,8 @@ async function handleStreamChat(req, url, res) {
               sendDone("keystone", {
                 agent: "Keystone",
                 provider,
+                model: kernelModel,
+                rolloverMode,
                 status: "success",
                 filesChanged: result.applied.length,
                 testsRun: !!result.tests,
@@ -480,13 +481,13 @@ async function handleStreamChat(req, url, res) {
             } else {
               sendToken(`\n❌ Keystone failed: ${result.error}\n`);
               sendToken(`Phase: ${result.phase}\n`);
-              sendDone("keystone", { agent: "Keystone", provider, status: "failed", error: result.error });
+              sendDone("keystone", { agent: "Keystone", provider, model: kernelModel, rolloverMode, status: "failed", error: result.error });
             }
             res.end();
           })
           .catch((err) => {
             sendToken(`\n❌ Error: ${err.message}\n`);
-            sendDone("keystone", { agent: "Keystone", provider, status: "error", error: err.message });
+            sendDone("keystone", { agent: "Keystone", provider, model: kernelModel, rolloverMode, status: "error", error: err.message });
             res.end();
           });
       } catch (e) {

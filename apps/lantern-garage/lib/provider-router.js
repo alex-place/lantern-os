@@ -45,6 +45,16 @@ const PROVIDER_CHAINS = {
     { provider: "openai", models: ["gpt-4o-mini"] },
     { provider: "mistral", models: ["mistral-large-latest"] },
   ],
+
+  // Kernel chain (#894): Keystone/Ouro model first; Claude is explicit last-resort only.
+  // Controlled by KEYSTONE_ROLLOVER_MODE:
+  //   "shadow"  = Claude only (no Keystone calls yet — Stage 0)
+  //   "default" = Keystone first, Claude fallback (Stage 1+)
+  //   unset     = same as "shadow" (safe default)
+  kernel: [
+    { provider: "ollama", models: ["keystone-ft", "ouro:latest"] },
+    { provider: "anthropic", models: ["claude-opus-4-8"] },
+  ],
 };
 
 // Provider health state (fleet-wide, shared across all requests)
@@ -382,11 +392,46 @@ function findProviderChain(providerName) {
   return null;
 }
 
+/**
+ * Select provider for the Keystone kernel path (#894).
+ * Independent of chat selectProvider — the kernel has its own chain so routing
+ * the Keystone model does not inherit the chat surface's defaults.
+ *
+ * KEYSTONE_ROLLOVER_MODE controls the stage:
+ *   "default" → kernel chain: keystone-ft/ouro first, anthropic last-resort
+ *   "shadow"  → kernel chain: anthropic only (Stage 0, safe default when unset)
+ *
+ * @param {string|null} requestedProvider  explicit override from the request
+ * @returns {{ provider: string, model: string, mode: string }}
+ */
+async function selectKernelProvider(requestedProvider = null) {
+  const mode = process.env.KEYSTONE_ROLLOVER_MODE || "shadow";
+
+  if (requestedProvider) {
+    return { provider: requestedProvider, model: null, mode };
+  }
+
+  if (mode === "default") {
+    // Try Keystone/Ouro first, fall back to Claude only on failure
+    const kernelChain = PROVIDER_CHAINS.kernel;
+    for (const step of kernelChain) {
+      if (isProviderHealthy(step.provider)) {
+        return { provider: step.provider, model: step.models[0], mode };
+      }
+    }
+  }
+
+  // Shadow mode (or all kernel providers unhealthy): use Claude
+  return { provider: "anthropic", model: "claude-opus-4-8", mode };
+}
+
 module.exports = {
   selectProvider,
+  selectKernelProvider,
   callProvider,
   isProviderHealthy,
   recordProviderSuccess,
   recordProviderFailure,
   getProviderStatus,
+  PROVIDER_CHAINS,
 };

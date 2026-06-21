@@ -136,7 +136,7 @@ def main():
         ask_loop = make_loop_engine(a.base_model, a.adapter, a.mode, a.q, a.eps, a.num_predict)
 
     rows = [json.loads(l) for l in open(PROMPTS, encoding="utf-8") if l.strip()]
-    detail, n_ok, n_cited, total_dt, approx_tokens = [], 0, 0, 0.0, 0
+    detail, n_ok, n_cited, total_dt, approx_tokens, total_bytes_correct = [], 0, 0, 0.0, 0, 0
     depths, contractions = [], []
     print(f"{'#':>2}  {'ok':<3} {'src':<3} {'lat':>6}  expected -> reply", flush=True)
     for r in rows:
@@ -150,12 +150,14 @@ def main():
         except Exception as e:
             reply, dt, ok = f"[error: {e}]", 0.0, False
         cited = has_source_citation(reply)
+        reply_bytes = len(reply.encode("utf-8"))
         n_ok += int(ok)
         n_cited += int(cited)
         total_dt += dt
         approx_tokens += max(1, len(reply.split()))
+        total_bytes_correct += reply_bytes if ok else 0
         d = {"id": r["id"], "prompt": r["prompt"], "expected": r["expected"],
-             "reply": reply, "ok": ok, "cited": cited, "latency_s": round(dt, 2)}
+             "reply": reply, "ok": ok, "cited": cited, "reply_bytes": reply_bytes, "latency_s": round(dt, 2)}
         if meta is not None:
             d["mean_depth"] = meta.get("mean_depth")
             if meta.get("mean_depth") is not None:
@@ -178,6 +180,8 @@ def main():
         "tok_per_s": round(approx_tokens / total_dt, 1) if total_dt else 0.0,
         # Gate B: fraction of replies carrying an external source citation (External Reality Rule)
         "grounding_precision": round(n_cited / n, 3) if n else 0.0,
+        # Gate F: bytes consumed per correct continuation (lower = more efficient)
+        "bytes_per_correct": round(total_bytes_correct / n_ok, 1) if n_ok else None,
         # E1: realized latent depth; E2: did the loop contract?
         "mean_depth": round(sum(depths) / len(depths), 2) if depths else None,
         "mean_contraction": round(sum(contractions) / len(contractions), 4) if contractions else None,
@@ -188,8 +192,10 @@ def main():
             f.write(json.dumps(d, ensure_ascii=False) + "\n")
     with open(os.path.join(ROOT, "data", "eval", "leaderboard.jsonl"), "a", encoding="utf-8") as f:
         f.write(json.dumps(summary, ensure_ascii=False) + "\n")
+    bpc = summary["bytes_per_correct"]
     print(f"\n{a.label}: accuracy={summary['accuracy']*100:.0f}%  "
           f"grounding_precision={summary['grounding_precision']*100:.0f}%  "
+          f"bytes_per_correct={bpc if bpc is not None else 'n/a'}  "
           f"avg_latency={summary['avg_latency_s']}s  ~{summary['tok_per_s']} tok/s  (n={n})", flush=True)
 
 
