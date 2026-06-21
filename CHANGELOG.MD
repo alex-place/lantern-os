@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.17] - 2026-06-21
+
+### Changed
+- **Orchestration page now visualizes the convergence loop.** [`orchestration.html`](apps/lantern-garage/public/orchestration.html) leads with a live **Observe -> Remember -> Reason -> Act -> Verify -> Converge** ring — each stage shows a real metric (queued issues, convergence records, reasoners, agents acting, PRs in CI, completed + grounded %) wired to `/api/convergence/status` and the queue/pr-lane feeds, with the currently-active stage highlighted and a cycle indicator. Makes "the loop" tangible instead of just a grid of cards.
+
 ## [1.7.16] - 2026-06-21
 
 ### Added
