@@ -15,6 +15,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.7] - 2026-06-21
+
+### Added
+- **Rollover promotion gate + staged plan (#895, #899).** Two halves of the Keystone-coding-agent rollover (epic #892):
+  - **Gate harness (#895):** `eval_keystone.py` gained a `--stage` arg that stamps each `leaderboard.jsonl` row with `rollover_stage`. New `scripts/rollover_gate.py` reads a stage's row (optionally running the eval first via `--run`) and evaluates two bars as an External Reality envelope `[claim, evidence, confidence, source]`: **Gate B** — accuracy must beat the 0.34 cold baseline (strictly greater); **Gate F** — bytes-per-correct must not regress vs the baseline row. Prints PASS/FAIL and exits 0/1 so CI can block a stage advance. The threshold logic is a pure `evaluate_gate()` locked by `tests/test_rollover_gate.py` (7 cases: 0.34 boundary is not a pass, cost regression blocks even when accuracy passes, envelope well-formed, failing gate zeroes confidence). Reuses `eval_keystone.py` rather than duplicating a live-eval harness (reconciles with #843).
+  - **Plan doc (#899):** new `docs/ROLLOVER.md` — the Shadow → Assist → Default → Independent stage table tied to `KEYSTONE_ROLLOVER_MODE` and the Σ₀-K1 gates, the kernel provider chain + Claude's role per stage, the fallback/escalation contract, and the **measurable Stage-3 exit criteria** for dropping the `ANTHROPIC_API_KEY` default (N=3 consecutive stages with Gate B/F PASS and escalation rate < 10%). Cross-links #894/#896/#897/#898 and the kernel spec.
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed

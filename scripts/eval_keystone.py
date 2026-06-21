@@ -144,6 +144,9 @@ def main():
     ap.add_argument("--adapter", default=os.environ.get("OURO_ADAPTER"), help="loop engine LoRA adapter dir")
     ap.add_argument("--q", type=float, default=0.5, help="loop engine Q-exit knob")
     ap.add_argument("--eps", type=float, default=0.05, help="loop engine convergence threshold")
+    ap.add_argument("--stage", default=None,
+                    help="rollover stage tag for the leaderboard row (#895): "
+                         "shadow|assist|default|independent — consumed by scripts/rollover_gate.py")
     a = ap.parse_args()
 
     ask_loop = None
@@ -188,6 +191,8 @@ def main():
         "benchmark": "keystone",
         "ts": a.ts, "label": a.label, "model": a.model, "base": a.base,
         "engine": a.engine, "mode": (a.mode if a.engine == "loop" else None),
+        # #895: rollover-stage tag so rollover_gate.py can find the row for a stage.
+        "rollover_stage": a.stage,
         "n": n, "accuracy": round(n_ok / n, 3) if n else 0.0,
         "pass@1": round(n_ok / n, 3) if n else 0.0,  # alias for cross-benchmark summary
         "avg_latency_s": round(total_dt / n, 2) if n else 0.0,
