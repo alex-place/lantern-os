@@ -71,7 +71,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.4.13] - 2026-06-20
+## [1.4.14] - 2026-06-20
 
 ### Security
 - **Operator + Keystone routes are now authorization-gated, and the operator check is proxy-header-hardened (#837, #838, #839).**
@@ -79,6 +79,17 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
   - `/api/actions/*` in `routes/operator.js` (run-loop, inspect, update -> git pull + npm install + server restart, local-controls -> PowerShell, flat-rag-ingest) had **no** auth check; they now require `isOperatorRequest`. (#838)
   - `/api/keystone/*` in `routes/keystone.js` (allowlisted exec + repo-state dump) had no auth check, and the allowlist included `node -e ".+"` (arbitrary JS). Now operator-gated, and `node -e` is removed from the allowlist. (#837)
   - Added `tests/test_request_auth_proxy_guard.js` (8 cases: clean loopback passes; proxied loopback denied; token path).
+
+## [1.4.13] - 2026-06-20
+
+### Changed
+- **Knowledge Center docs now carry author attribution.** Added YAML frontmatter (`author: Alex Place`, `created`, `updated`) to all 20 owned Knowledge Center docs (the `/repo/*.md` cards + required-reading core), oldest first. `CODE_OF_CONDUCT.md` is excluded (external Contributor Covenant boilerplate). `created` is each doc's first-commit date; `updated` is 2026-06-20.
+- **Brand: "Lantern OS" → "Keystone OS"** across those docs' prose and titles (27 replacements in 13 docs). Code identifiers and URLs (`lantern-os`, `lantern-garage`, `alex-place/lantern-os`, `lantern-os.net`) are intentionally preserved; README's `#what-is-lantern-os` TOC anchor updated to match its renamed heading; a one-time "(formerly Lantern OS)" note added to the README intro.
+
+### Added
+- `markdown-render.js` now strips a leading YAML frontmatter block and renders it as a tidy byline ("By Alex Place · Updated …") instead of a stray `<hr>` + paragraphs. `build_knowledge_index.py` strips frontmatter too, so doc metadata isn't indexed as the `(intro)` section. Knowledge index rebuilt (381 sections / 21 docs).
+
+---
 
 ## [1.4.12] - 2026-06-20
 

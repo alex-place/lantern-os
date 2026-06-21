@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-20
+updated: 2026-06-20
+---
+
 # Admin Feature Flags & Navigation Visibility
 
 An admin-only control surface for **feature flags** (named on/off switches) and

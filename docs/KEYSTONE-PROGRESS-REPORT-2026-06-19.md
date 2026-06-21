@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-19
+updated: 2026-06-20
+---
+
 # Keystone — Progress Report (Shareholder Edition)
 
 **Period ending:** 2026-06-19 · **Product:** Keystone chat (the Convergence Core / Σ₀ agent) · **Status:** Active development, pre-revenue.

@@ -1,4 +1,10 @@
-# Lantern OS Skills & Capabilities
+---
+author: Alex Place
+created: 2026-06-08
+updated: 2026-06-20
+---
+
+# Keystone OS Skills & Capabilities
 
 **⚠️ REQUIRED READING: Before working with any skill, all agents must review [SECURITY.md](SECURITY.md)**
 

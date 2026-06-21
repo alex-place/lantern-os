@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-05
+updated: 2026-06-20
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -79,7 +85,7 @@ Reject architectural sprawl. Prefer extension over addition. Maintain a single C
 
 ## Project Overview
 
-Lantern OS is a **persistent local-first reasoning system** built by a solo developer (Alex Place). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
+Keystone OS is a **persistent local-first reasoning system** built by a solo developer (Alex Place). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
 
 ## Quickstart (Read QUICKSTART.md First)
 

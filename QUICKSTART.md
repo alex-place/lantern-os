@@ -1,4 +1,10 @@
-# Lantern OS — Quick Start
+---
+author: Alex Place
+created: 2026-06-06
+updated: 2026-06-20
+---
+
+# Keystone OS — Quick Start
 
 Get the app running in 5 minutes.
 
@@ -136,7 +142,7 @@ This way you can break things on 4178 without touching the public version on 417
 
 ## Auto-Start on Boot (Windows)
 
-Register Lantern OS as a Windows startup task so it starts automatically every time you reboot:
+Register Keystone OS as a Windows startup task so it starts automatically every time you reboot:
 
 ```powershell
 # Run once as Administrator

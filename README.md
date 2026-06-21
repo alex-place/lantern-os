@@ -1,4 +1,10 @@
-# Lantern OS
+---
+author: Alex Place
+created: 2026-05-26
+updated: 2026-06-20
+---
+
+# Keystone OS
 
 <!-- Core CI / quality gates -->
 [![CI](https://github.com/alex-place/lantern-os/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/ci.yml)
@@ -30,11 +36,11 @@
 [![Release provenance](https://github.com/alex-place/lantern-os/actions/workflows/release-provenance.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/release-provenance.yml)
 [![MCP Tunnel Canary](https://github.com/alex-place/lantern-os/actions/workflows/mcp-tunnel-canary.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/mcp-tunnel-canary.yml)
 
-**Lantern OS** is a persistent local-first reasoning system with autonomous deployment, evidence-grounded convergence, and operator-controlled agent lanes.
+**Keystone OS** (formerly Lantern OS) is a persistent local-first reasoning system with autonomous deployment, evidence-grounded convergence, and operator-controlled agent lanes.
 
 It combines a web app, local memory systems, MCP tooling, multi-provider routing, and a structured convergence loop so work moves from raw context → validated artifacts → archived evidence with clear receipts and ground-truth verification.
 
-**Current state:** Σ₀ (Sigma-Zero) verification framework live (2026-06-14) · 1.6 dashboards shipped (2026-06-16) · Keystone serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`, 2026-06-18) · native Σ₀ LoopLM + standing benchmark landed (#756). The product surface is **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of Lantern OS.
+**Current state:** Σ₀ (Sigma-Zero) verification framework live (2026-06-14) · 1.6 dashboards shipped (2026-06-16) · Keystone serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`, 2026-06-18) · native Σ₀ LoopLM + standing benchmark landed (#756). The product surface is **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of Keystone OS.
 
 ---
 
@@ -49,7 +55,7 @@ It combines a web app, local memory systems, MCP tooling, multi-provider routing
 
 ## Table of Contents
 
-1. [What is Lantern OS?](#what-is-lantern-os)
+1. [What is Keystone OS?](#what-is-keystone-os)
 2. [Current Capabilities](#current-capabilities)
 3. [Release Status: v1.6](#release-status-v16)
 4. [Σ₀ (Sigma-Zero) Architecture](#σ₀-sigma-zero-architecture)
@@ -65,9 +71,9 @@ It combines a web app, local memory systems, MCP tooling, multi-provider routing
 
 ---
 
-## What is Lantern OS?
+## What is Keystone OS?
 
-Lantern OS is an **operating system for reasoning work** — not a traditional OS, but an app-level platform for managing complex, multi-step cognitive tasks.
+Keystone OS is an **operating system for reasoning work** — not a traditional OS, but an app-level platform for managing complex, multi-step cognitive tasks.
 
 ### Core Operating Model
 
@@ -79,7 +85,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 ### Who Should Use This
 
-- **Lantern OS members** (subscribers) — you get the repo, the tools, and **Keystone chat**, the operator console for your own copy of the system. See **[Keystone Chat product definition](docs/KEYSTONE-PRODUCT.md)**.
+- **Keystone OS members** (subscribers) — you get the repo, the tools, and **Keystone chat**, the operator console for your own copy of the system. See **[Keystone Chat product definition](docs/KEYSTONE-PRODUCT.md)**.
 - **Solo developers** working on complex projects that need evidence-backed decision-making
 - **AI researchers** exploring convergence dynamics, autonomous routing, and persistent memory systems
 - **Organizations** needing local-first agent workflows with operator control and audit trails
@@ -128,7 +134,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 ## Σ₀ (Sigma-Zero) Architecture
 
-Lantern OS is built on **Σ₀** — a mathematical framework for verifying that systems don't collapse due to ungrounded feedback loops.
+Keystone OS is built on **Σ₀** — a mathematical framework for verifying that systems don't collapse due to ungrounded feedback loops.
 
 ### The Five Σ₀ Paradoxes (Identified 2026-06-14)
 
@@ -334,7 +340,7 @@ See [#637](https://github.com/alex-place/lantern-os/issues/637) for resolution p
 
 ## Autonomous Systems
 
-Lantern OS includes several autonomous systems that run without operator intervention:
+Keystone OS includes several autonomous systems that run without operator intervention:
 
 ### 1. Autonomous Repair (Health Monitoring)
 
@@ -526,7 +532,7 @@ npm run dev --prefix apps/lantern-garage
 
 ## Privacy
 
-Lantern OS is **local-first by design.**
+Keystone OS is **local-first by design.**
 
 - Dream journal data and local runtime receipts stay on your machine
 - No telemetry or tracking built in
@@ -549,7 +555,7 @@ Or set in the UI settings drawer at runtime.
 
 © 2026 Alex Place
 
-Lantern OS is built with:
+Keystone OS is built with:
 - **Node.js** — Web server + API
 - **Python** — Convergence loop, MCP, memory
 - **Claude / Gemini / OpenAI** — Multi-provider routing

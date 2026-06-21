@@ -131,11 +131,29 @@ function renderBlock(lines) {
   return body;
 }
 
+// Strip a leading YAML frontmatter block (--- ... ---) and parse its simple
+// `key: value` pairs, so doc metadata (author, updated) renders as a tidy byline
+// instead of a stray <hr> + paragraphs at the top of the page.
+function parseFrontmatter(text) {
+  const stripped = text.replace(/^﻿/, "");
+  const m = /^---\n([\s\S]*?)\n---\n?/.exec(stripped);
+  if (!m) return { meta: {}, body: stripped };
+  const meta = {};
+  for (const line of m[1].split("\n")) {
+    const kv = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line.trim());
+    if (kv) meta[kv[1].toLowerCase()] = kv[2].replace(/^["']|["']$/g, "").trim();
+  }
+  return { meta, body: stripped.slice(m[0].length) };
+}
+
 function renderMarkdownDocument(markdown, sourcePath) {
-  const normalized = markdown.replace(/\r\n/g, "\n");
-  const titleMatch = /^#\s+(.+)$/m.exec(normalized);
+  const { meta, body: content } = parseFrontmatter(markdown.replace(/\r\n/g, "\n"));
+  const titleMatch = /^#\s+(.+)$/m.exec(content);
   const title = titleMatch ? titleMatch[1].trim() : path.basename(sourcePath);
-  const body = renderBlock(normalized.split("\n"));
+  const body = renderBlock(content.split("\n"));
+  const byline = meta.author
+    ? `<div class="md-byline">By ${escapeHtml(meta.author)}${meta.updated ? ` · Updated ${escapeHtml(meta.updated)}` : ""}</div>`
+    : "";
 
   return `<!doctype html>
 <html lang="en" data-theme="dark">
@@ -182,6 +200,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
     .md-page blockquote > :first-child { margin-top: .4em; }
     .md-page hr { border: none; border-top: 1px solid var(--border); margin: 2.4em 0; }
     .md-source { color: var(--muted); font-size: 0.8rem; margin-bottom: 26px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .01em; }
+    .md-byline { color: var(--muted); font-size: 0.82rem; margin: -18px 0 24px; }
     @media (max-width: 820px) { .md-page { padding: 28px 20px 48px; margin: 0; border-radius: 0; border-left: none; border-right: none; font-size: 1.02rem; } }
   </style>
 </head>
@@ -208,6 +227,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
 
 <div class="md-page">
   <div class="md-source">${escapeHtml(sourcePath)}</div>
+  ${byline}
   <article data-narrate>
   ${body.join("\n")}
   </article>

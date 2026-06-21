@@ -1,4 +1,10 @@
-# Re-grounding the "Lantern OS kernel" model question — Ouro LoopLM vs the 2026 dense small-model frontier
+---
+author: Alex Place
+created: 2026-06-19
+updated: 2026-06-20
+---
+
+# Re-grounding the "Keystone OS kernel" model question — Ouro LoopLM vs the 2026 dense small-model frontier
 
 > ## 📖 In plain English (start here)
 >
@@ -41,7 +47,7 @@ Related canon: [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · [`OURO-LOOPLM.md`]
 
 ## 0. Why the external shortlist needed re-grounding
 
-A ChatGPT/Google report shortlisted edge LLMs as a "Lantern OS kernel": **Llama 3.2 3B, Gemma "4 E2B", Phi-3.5-mini, Qwen2.5-7B** (+ Mistral-7B / Mixtral / Falcon3 / MPT alternates). Two grounding faults:
+A ChatGPT/Google report shortlisted edge LLMs as a "Keystone OS kernel": **Llama 3.2 3B, Gemma "4 E2B", Phi-3.5-mini, Qwen2.5-7B** (+ Mistral-7B / Mixtral / Falcon3 / MPT alternates). Two grounding faults:
 
 1. **It omits the kernel Lantern actually runs.** Lantern's served default is **ByteDance Ouro 1.4B LoopLM** behind an Ollama-compatible endpoint ([`scripts/ouro_serve.py`](../../scripts/ouro_serve.py)), with a native Σ₀ adaptive Q-exit loop as opt-in deep mode ([`src/sigma0/loop_lm.py`](../../src/sigma0/loop_lm.py)). The question is not "pick an edge model from scratch" — it is **"does anything beat the looped model we already serve, measured on our own metrics?"**
 2. **Its list is ~1 generation stale.** Llama 3.2 3B, Phi-3.5-mini, Qwen2.5-7B, Mistral-7B-v0.3 are the **2024–25** generation. "Gemma 4 E2B" is a mis-name for **Gemma 3n E2B** (Google, 2025). The real 2026 dense small-model frontier is **Qwen3 (4B/8B), Phi-4-mini (3.8B), Gemma 3n E2B, Llama 3.3 (caveat below)**.

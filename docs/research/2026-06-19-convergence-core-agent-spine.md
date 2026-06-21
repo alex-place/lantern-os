@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-19
+updated: 2026-06-20
+---
+
 # Wiring the rest of the agent — the Convergence Core is coded but doesn't run end-to-end
 
 > ## 📖 In plain English (start here)

@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-14
+updated: 2026-06-20
+---
+
 # Σ₀ — The Collapse Certificate
 
 *A computable stability certificate for convergence dynamics, and an honest
@@ -655,7 +661,7 @@ contraction math is attributed to Lohmiller & Slotine 1998 and Khalil 2002).*
 
 ### Original Design
 
-The intended demonstration would run the Σ₀ machinery on the Lantern OS
+The intended demonstration would run the Σ₀ machinery on the Keystone OS
 conversation log (`data/conversations/garage-conversations.jsonl`), encoding
 each turn as
 

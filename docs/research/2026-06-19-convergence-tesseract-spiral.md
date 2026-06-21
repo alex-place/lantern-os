@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-19
+updated: 2026-06-20
+---
+
 # From Early-Exit to Convergence: Recasting LoopLM Recurrence as a Continuous Contraction Spiral over the Status-Cube
 
 **Date:** 2026-06-19

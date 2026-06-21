@@ -1,6 +1,12 @@
-﻿# Contributing to Lantern OS
+---
+author: Alex Place
+created: 2026-06-02
+updated: 2026-06-20
+---
 
-Thank you for your interest in contributing to Lantern OS! This document provides guidelines and instructions for contributing to the project.
+# Contributing to Keystone OS
+
+Thank you for your interest in contributing to Keystone OS! This document provides guidelines and instructions for contributing to the project.
 
 ## Code of Conduct
 
