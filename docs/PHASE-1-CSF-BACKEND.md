@@ -1,4 +1,10 @@
-﻿# Phase 1: CSF Backend Integration — Complete ✓
+﻿---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
+# Phase 1: CSF Backend Integration — Complete ✓
 
 **Completion Date:** 2026-06-11  
 **Issue:** #334  

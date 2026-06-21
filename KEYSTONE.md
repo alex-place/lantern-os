@@ -1,4 +1,10 @@
-# Keystone: Complete LLM Integration for Lantern OS
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
+# Keystone: Complete LLM Integration for Keystone OS
 
 **Date:** 2026-06-11  
 **Status:** ✅ Complete and tested  

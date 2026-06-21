@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Phase 2: Integrate Trader as Native Lantern Capability
 
 **Status:** In Progress  
@@ -16,7 +22,7 @@
 **New approach:** Integrated capability (within Lantern)
 - Single Node.js process (4177/4178)
 - Single dashboard, single memory model
-- "Lantern OS IS the cockpit" — trader is just another capability
+- "Keystone OS IS the cockpit" — trader is just another capability
 
 ---
 

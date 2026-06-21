@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-05
+updated: 2026-06-20
+---
+
 # Dream Journal API - Complete Endpoint Reference
 
 ## Base URL

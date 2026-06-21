@@ -1,4 +1,10 @@
-# Lantern OS — Script Inventory
+---
+author: Alex Place
+created: 2026-06-06
+updated: 2026-06-20
+---
+
+# Keystone OS — Script Inventory
 
 One-stop reference for every runnable script in the repo. Skip the archaeology next time.
 

@@ -1,6 +1,12 @@
-# Lantern OS Convergence Loop
+---
+author: Alex Place
+created: 2026-05-26
+updated: 2026-06-20
+---
 
-This is the operating method for Lantern OS. It replaces skeleton-only staging
+# Keystone OS Convergence Loop
+
+This is the operating method for Keystone OS. It replaces skeleton-only staging
 and the legacy Seven smoke check as the release decision path.
 
 ## Rule

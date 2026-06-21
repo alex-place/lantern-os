@@ -1,4 +1,10 @@
-# Lantern OS v1.0.0 Readiness Gates
+---
+author: Alex Place
+created: 2026-05-26
+updated: 2026-06-20
+---
+
+# Keystone OS v1.0.0 Readiness Gates
 
 v1.0.0 is not a date. It is a gate.
 
@@ -47,7 +53,7 @@ v1.0.0 is not a date. It is a gate.
 
 - Deprecated validation language is marked retired.
 - Skeleton-only docs are upgraded or removed.
-- Old launch paths that conflict with Lantern OS are holdd.
+- Old launch paths that conflict with Keystone OS are holdd.
 
 ## Gate 8: Loop Evidence
 

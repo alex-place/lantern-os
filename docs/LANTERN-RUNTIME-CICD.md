@@ -1,8 +1,14 @@
+---
+author: Alex Place
+created: 2026-05-29
+updated: 2026-06-20
+---
+
 # Lantern Runtime & CI/CD
 
 ## Purpose
 
-This document covers the local and cloud runtime behavior, deployment gates, and CI/CD validation for Lantern OS Garage.
+This document covers the local and cloud runtime behavior, deployment gates, and CI/CD validation for Keystone OS Garage.
 
 ## Runtime Modes
 

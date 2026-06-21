@@ -1,4 +1,10 @@
-﻿# Three-Doors Kingdome Convergence Loop — Status Report
+﻿---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
+# Three-Doors Kingdome Convergence Loop — Status Report
 
 **Report Date:** 2026-06-11  
 **Session Progress:** Phases 0-2 Complete  

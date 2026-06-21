@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # IBKR API Integration — Direct REST API Setup
 
 **No Gateway needed.** Connect directly with API credentials.

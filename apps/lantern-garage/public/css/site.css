@@ -205,6 +205,11 @@ html, body {
   margin: 0 auto;
   padding: 0 20px 80px;
 }
+/* Use more of a wide display instead of stranding content in a narrow ribbon.
+   Card/panel grids inside reflow to more columns as the container grows. */
+@media (min-width: 1100px) { .page { max-width: 1100px; } }
+@media (min-width: 1700px) { .page { max-width: 1400px; } }
+@media (min-width: 2400px) { .page { max-width: 1720px; } }
 
 /* ── Common utilities ── */
 .dot {

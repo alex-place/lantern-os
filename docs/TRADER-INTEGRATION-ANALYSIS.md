@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Interactive Trader App Integration Analysis
 
 **Date:** 2026-06-12  
@@ -130,7 +136,7 @@ ai trader/
 
 ---
 
-## Lantern OS Integration Strategy
+## Keystone OS Integration Strategy
 
 ### Option 1: **Native Bounded Module** (Recommended)
 

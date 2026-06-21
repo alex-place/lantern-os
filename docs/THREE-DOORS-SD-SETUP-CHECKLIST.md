@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Three Doors Kingdome: SD Setup Checklist
 
 **Date:** 2026-06-11  

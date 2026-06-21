@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Trading Dashboard — User-Friendly Update
 
 **Status:** ✅ Complete with normie-friendly UX  
@@ -137,7 +143,7 @@ Source: 📋 Example | AI Analysis (depending on mode)
 
 ### Header Navigation (Unchanged)
 ```
-Lantern OS | Journal | Trading | News | Dashboard | Help
+Keystone OS | Journal | Trading | News | Dashboard | Help
 ```
 
 ### New Header Actions

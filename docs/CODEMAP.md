@@ -1,6 +1,12 @@
-# Lantern OS — Codemap & Feature Roadmap
+---
+author: Alex Place
+created: 2026-06-07
+updated: 2026-06-20
+---
 
-**Canonical status reference for the Lantern OS codebase.**  
+# Keystone OS — Codemap & Feature Roadmap
+
+**Canonical status reference for the Keystone OS codebase.**  
 **Version:** 2026-06-07  
 **Coverage:** System-wide feature state, active surfaces, and forward roadmap.
 
@@ -18,7 +24,7 @@
 
 ## 1. System Overview
 
-Lantern OS is a local-first operating cockpit combining:
+Keystone OS is a local-first operating cockpit combining:
 
 | Surface | Technology | Purpose |
 |---|---|---|
@@ -172,7 +178,7 @@ capture context
 
 ### Phase 3: v1.0.2 — Research & Intelligence (July 2026)
 
-**Goal:** Turn Lantern OS into a research cockpit, not just a journal.
+**Goal:** Turn Keystone OS into a research cockpit, not just a journal.
 
 - [ ] Research request pipeline: `research/requests/open/` with structured templates
 - [ ] Automated source registry freshness checks
@@ -256,4 +262,4 @@ capture context
 
 ---
 
-*This Codemap is the single source of truth for Lantern OS feature state. When in doubt, check here first.*
+*This Codemap is the single source of truth for Keystone OS feature state. When in doubt, check here first.*

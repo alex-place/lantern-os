@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-01
+updated: 2026-06-20
+---
+
 # Repository Contract: SCM vs. Archive
 
 **Effective:** 2026-06-11  

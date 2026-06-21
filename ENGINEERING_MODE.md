@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Engineering Mode for Dream Chat
 
 ## Overview
@@ -156,7 +162,7 @@ Split into focused, mergeable PRs:
 ## Work Packet: Three-Doors Kitchen-Sink Integration
 
 ### Context
-Lantern OS integrates the Three-Doors Kingdome (3-stage game) into the main Dream Chat interface. Users should be able to start the game from quick-start chips, see breadcrumbs of prior choices, and have choices feed into convergence memory.
+Keystone OS integrates the Three-Doors Kingdome (3-stage game) into the main Dream Chat interface. Users should be able to start the game from quick-start chips, see breadcrumbs of prior choices, and have choices feed into convergence memory.
 
 ### Goals
 1. Wire !three-doors command to game engine

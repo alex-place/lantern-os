@@ -1,6 +1,12 @@
+---
+author: Alex Place
+created: 2026-06-08
+updated: 2026-06-20
+---
+
 # ALEX ASI Architecture
 
-**ALEX** - Artificial Learning EXtension, a three-layer ASI architecture for Lantern OS.
+**ALEX** - Artificial Learning EXtension, a three-layer ASI architecture for Keystone OS.
 
 ## Architecture Overview
 

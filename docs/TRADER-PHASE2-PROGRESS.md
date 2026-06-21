@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Phase 2 Progress: Integrated Trader Capability
 
 **Status:** Phase 2a Complete (UI & Wrapper Framework)  

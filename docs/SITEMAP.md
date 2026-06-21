@@ -1,6 +1,12 @@
-# Lantern OS Sitemap
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
 
-Complete navigation map of Lantern OS local-first personal operating system. All pages run locally, no account required.
+# Keystone OS Sitemap
+
+Complete navigation map of Keystone OS local-first personal operating system. All pages run locally, no account required.
 
 ---
 

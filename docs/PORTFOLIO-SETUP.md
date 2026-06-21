@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-11
+updated: 2026-06-20
+---
+
 # Portfolio Integration Setup
 
 **Current Status:** System running with **demo/mock portfolio data**
@@ -53,7 +59,7 @@ This data is served from `/api/positions` via the Trading Dashboard service (por
    IBKR_PORT=4001
    ```
 
-4. **Restart Lantern OS**
+4. **Restart Keystone OS**
    ```bash
    npm run dev --prefix apps/lantern-garage
    ```
@@ -121,7 +127,7 @@ Response metadata should show:
 1. Verify IBKR Gateway is installed
 2. Launch IBKR Gateway application
 3. Check http://127.0.0.1:4001/status returns 200
-4. Restart Lantern OS
+4. Restart Keystone OS
 
 ### "Can't connect to IBKR"
 
@@ -130,7 +136,7 @@ Response metadata should show:
 **Fix:**
 1. Check IBKR Gateway settings for actual port
 2. Update `IBKR_PORT` in `.env`
-3. Restart Lantern OS
+3. Restart Keystone OS
 
 ### "Getting paper trading data instead of live"
 
@@ -140,7 +146,7 @@ Response metadata should show:
 1. Open IBKR Gateway
 2. Switch to live trading account
 3. Log in with live credentials
-4. Restart Lantern OS
+4. Restart Keystone OS
 
 ---
 

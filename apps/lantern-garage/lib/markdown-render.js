@@ -202,6 +202,48 @@ function renderMarkdownDocument(markdown, sourcePath) {
     .md-source { color: var(--muted); font-size: 0.8rem; margin-bottom: 26px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .01em; }
     .md-byline { color: var(--muted); font-size: 0.82rem; margin: -18px 0 24px; }
     @media (max-width: 820px) { .md-page { padding: 28px 20px 48px; margin: 0; border-radius: 0; border-left: none; border-right: none; font-size: 1.02rem; } }
+
+    /* ── Large-screen "newspaper" reading layout ──────────────────────────
+       A single 820px column wastes most of a 1080p / ultrawide display and
+       reads dense. On wider viewports the page widens and the body flows into
+       balanced columns. Section headings (h1/h2) and wide blocks (code,
+       tables, quotes, rules) span the FULL width like newspaper figures, so
+       each section's columns reset and stay short — you read a section's
+       columns left-to-right, not one endless ribbon. */
+    @media (min-width: 1100px) {
+      .md-page { max-width: 1240px; padding: 48px 64px 72px; }
+      .md-page article {
+        column-count: 2;
+        column-gap: 52px;
+        column-rule: 1px solid var(--border);
+      }
+      /* full-width spanners: section heads + wide blocks */
+      .md-page article > h1,
+      .md-page article > h2,
+      .md-page article > pre,
+      .md-page article > table,
+      .md-page article > blockquote,
+      .md-page article > hr { column-span: all; }
+      /* keep atomic blocks from splitting across a column boundary */
+      .md-page article > ul,
+      .md-page article > ol,
+      .md-page article li,
+      .md-page article > figure,
+      .md-page article > img { break-inside: avoid; }
+      /* never strand a sub-heading at the foot of a column */
+      .md-page article > h3,
+      .md-page article > h4 { break-after: avoid; }
+      .md-page h2 { margin-top: 1.2em; }
+    }
+    @media (min-width: 1700px) {
+      .md-page { max-width: 1640px; }
+      .md-page article { column-count: 3; column-gap: 56px; }
+    }
+    /* ultrawide (≈3440px and up) */
+    @media (min-width: 2400px) {
+      .md-page { max-width: 2200px; }
+      .md-page article { column-count: 4; column-gap: 60px; }
+    }
   </style>
 </head>
 <body>

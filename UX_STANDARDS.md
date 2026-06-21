@@ -1,4 +1,10 @@
-# Lantern OS — UX & Wording Standards
+---
+author: Alex Place
+created: 2026-06-08
+updated: 2026-06-20
+---
+
+# Keystone OS — UX & Wording Standards
 
 Applied to all pages. Updated 2026-06-08.
 
