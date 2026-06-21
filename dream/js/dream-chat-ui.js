@@ -1143,6 +1143,19 @@ document.getElementById('input').addEventListener('input', e => {
   e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
 });
 
+// ── Handoff prefill (?seed=) ──────────────────────────────────────────────────
+// Lets other surfaces (e.g. /orchestration.html) hand a task into Keystone chat.
+// Prefills the composer but never auto-sends — the human reviews/edits first.
+(function applySeedPrompt() {
+  try {
+    const seed = new URLSearchParams(location.search).get('seed');
+    if (seed && typeof fillPrompt === 'function') {
+      hideEmptyState();
+      fillPrompt(seed.slice(0, 2000));
+    }
+  } catch (e) { /* no-op */ }
+})();
+
 // ── Observer side panel ───────────────────────────────────────────────────────
 function toggleObserver() {
   const panel = document.getElementById('observer-panel');
