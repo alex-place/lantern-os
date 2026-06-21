@@ -144,6 +144,8 @@ const routes = [
   require("./routes/image"),
   require("./routes/web-images"),
   require("./routes/youtube"),
+  require("./routes/github-activity"), // Explore: latest releases + commits (cached)
+  require("./routes/discover-feeds"),  // Explore: curated discovery rail (RSS/Atom, cached)
   require("./routes/three-doors-image-pool"),
   require("./routes/three-doors-convergence"),
   require("./routes/convergence-dispatch"),

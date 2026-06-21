@@ -119,6 +119,65 @@
       display: flex; align-items: center; justify-content: center;
       height: 130px; border-style: dashed; color: var(--muted); font-size: .8rem;
     }
+
+    /* ── Discover: news/RSS card grid ── */
+    .discover-grid {
+      display: grid; gap: 12px; grid-template-columns: 1fr;
+    }
+    @media (min-width: 620px) { .discover-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 920px) { .discover-grid { grid-template-columns: repeat(3, 1fr); } }
+    .discover-card {
+      display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;
+      border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+      color: inherit; text-decoration: none;
+      transition: transform .15s, border-color .15s, box-shadow .15s;
+    }
+    .discover-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow); }
+    .discover-card .dc-title { font-size: .92rem; font-weight: 600; line-height: 1.35; }
+    .discover-card .dc-meta { font-size: .72rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+    .discover-card .dc-source { color: var(--accent); font-weight: 700; }
+    .discover-loading, .gh-loading { color: var(--muted); font-size: .85rem; padding: 8px 2px; }
+    .discover-foot { font-size: .72rem; color: var(--muted); margin: 12px 0 0; }
+
+    /* ── Build: GitHub activity ── */
+    .gh-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .gh-stars {
+      display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: .85rem;
+      padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg);
+    }
+    .gh-cta { font-size: .82rem; font-weight: 700; color: var(--accent); text-decoration: none; }
+    .gh-cta:hover { text-decoration: underline; }
+    .gh-grid { display: grid; gap: 24px; grid-template-columns: 1fr; }
+    @media (min-width: 700px) { .gh-grid { grid-template-columns: 1fr 1fr; } }
+    .gh-col h3 {
+      font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); margin: 0 0 12px;
+    }
+    .gh-list { display: flex; flex-direction: column; gap: 10px; }
+    .gh-item { display: flex; gap: 10px; align-items: baseline; color: inherit; text-decoration: none; }
+    .gh-item:hover .gh-item-text { color: var(--accent); }
+    .gh-tag {
+      flex: 0 0 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem;
+      font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--bg);
+      border: 1px solid var(--border); color: var(--accent);
+    }
+    .gh-item-text { font-size: .85rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
+    .gh-item-date { display: block; font-size: .68rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Support: Patreon tiers ── */
+    .support-tiers { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 18px; }
+    @media (min-width: 620px) { .support-tiers { grid-template-columns: repeat(3, 1fr); } }
+    .tier-card {
+      display: flex; flex-direction: column; gap: 6px; padding: 18px 16px;
+      border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+      color: inherit; text-decoration: none; text-align: center;
+      transition: transform .15s, border-color .15s, box-shadow .15s;
+    }
+    .tier-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow); }
+    .tier-name { font-weight: 800; font-size: 1rem; }
+    .tier-price { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+    .tier-price span { font-size: .8rem; font-weight: 600; color: var(--muted); }
+    .tier-perk { font-size: .78rem; color: var(--muted); line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -169,6 +228,38 @@
             allowfullscreen></iframe>
         </div>
         <div class="video-carousel" id="videoCarousel" role="list" aria-label="lanternYT videos — canon piece centered"></div>
+      </div>
+    </div>
+
+    <!-- ── Discover (curated RSS rail — /api/feeds/discover) ── -->
+    <div class="explore-section">
+      <p class="explore-section-title">🧭 Discover — fresh reads on AI, local-first &amp; building</p>
+      <div class="explore-info-box" style="max-width:920px">
+        <div class="discover-grid" id="discoverGrid" aria-busy="true" aria-label="Curated discovery feed">
+          <div class="discover-loading">Loading fresh reads…</div>
+        </div>
+        <p class="discover-foot" id="discoverFoot"></p>
+      </div>
+    </div>
+
+    <!-- ── Build (GitHub activity — /api/github/activity) ── -->
+    <div class="explore-section">
+      <p class="explore-section-title">🛠️ Build — <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer" style="color:inherit">alex-place/lantern-os ↗</a></p>
+      <div class="explore-info-box" style="max-width:920px">
+        <div class="gh-head">
+          <span class="gh-stars" id="ghStars" title="GitHub stars">★ —</span>
+          <a class="gh-cta" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">Star &amp; contribute on GitHub ↗</a>
+        </div>
+        <div class="gh-grid">
+          <div class="gh-col">
+            <h3>Latest releases</h3>
+            <div class="gh-list" id="ghReleases"><div class="gh-loading">Loading…</div></div>
+          </div>
+          <div class="gh-col">
+            <h3>Recent commits</h3>
+            <div class="gh-list" id="ghCommits"><div class="gh-loading">Loading…</div></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -235,6 +326,32 @@
           <p>Guides, live tools, research, and reference for Keystone OS — getting started, theory, data &amp; memory, and project docs all in one place.</p>
           <span class="panel-arrow">Open Knowledge Center →</span>
         </a>
+      </div>
+    </div>
+
+    <!-- ── Support (Patreon tiers — grounded in lib/patreon-auth.js tier map) ── -->
+    <div class="explore-section">
+      <p class="explore-section-title">♥ Support — <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon ↗</a></p>
+      <div class="explore-info-box" style="max-width:920px">
+        <h2 style="margin-top:0">Keep Keystone local, private &amp; free</h2>
+        <p>Keystone OS is built in the open by one person. Patreon support funds development — and unlocks a member role on the platform.</p>
+        <div class="support-tiers">
+          <a class="tier-card" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">
+            <span class="tier-name">Wanderer</span>
+            <span class="tier-price">$5<span>/mo</span></span>
+            <span class="tier-perk">Unlocks the Supporter role</span>
+          </a>
+          <a class="tier-card" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">
+            <span class="tier-name">Deep Dreamer</span>
+            <span class="tier-price">$20<span>/mo</span></span>
+            <span class="tier-perk">Unlocks the Deep Dreamer role</span>
+          </a>
+          <a class="tier-card" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">
+            <span class="tier-name">Synthesasia Guild</span>
+            <span class="tier-price">$200<span>/mo</span></span>
+            <span class="tier-perk">Unlocks the Guild (admin) role</span>
+          </a>
+        </div>
       </div>
     </div>
 
@@ -409,6 +526,83 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.ok ? r.json() : Promise.reject(r.status))
     .then(render)
     .catch(() => render(FALLBACK));
+})();
+</script>
+
+<script>
+/* Discover rail + GitHub activity — both server-side cached with baked
+   fallbacks, so the sections always render even if a feed/API is down. */
+(function () {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function shortDate(d) {
+    if (!d) return '';
+    const t = Date.parse(d);
+    if (Number.isNaN(t)) return '';
+    try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    catch { return ''; }
+  }
+
+  // ── Discover rail ──
+  const grid = document.getElementById('discoverGrid');
+  const foot = document.getElementById('discoverFoot');
+  if (grid) {
+    fetch('/api/feeds/discover', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        const items = (data && data.items) || [];
+        grid.removeAttribute('aria-busy');
+        if (!items.length) { grid.innerHTML = '<div class="discover-loading">No reads available right now.</div>'; return; }
+        grid.innerHTML = items.map(it => {
+          const ext = /^https?:/i.test(it.link);
+          const meta = [it.source ? '<span class="dc-source">' + esc(it.source) + '</span>' : '',
+                        shortDate(it.date) ? '<span>' + esc(shortDate(it.date)) + '</span>' : ''].filter(Boolean).join('');
+          return '<a class="discover-card" href="' + esc(it.link) + '"' +
+            (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
+            '<span class="dc-title">' + esc(it.title) + '</span>' +
+            (meta ? '<span class="dc-meta">' + meta + '</span>' : '') + '</a>';
+        }).join('');
+        if (foot && data.sources && data.sources.length) {
+          foot.textContent = 'Sources: ' + data.sources.map(s => s.name).join(' · ');
+        }
+      })
+      .catch(() => { grid.removeAttribute('aria-busy'); grid.innerHTML = '<div class="discover-loading">Discovery feed is offline right now.</div>'; });
+  }
+
+  // ── GitHub activity ──
+  const ghStars = document.getElementById('ghStars');
+  const ghReleases = document.getElementById('ghReleases');
+  const ghCommits = document.getElementById('ghCommits');
+  if (ghReleases || ghCommits) {
+    fetch('/api/github/activity', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (ghStars && typeof data.stars === 'number') ghStars.textContent = '★ ' + data.stars;
+        if (ghReleases) {
+          const rel = data.releases || [];
+          ghReleases.innerHTML = rel.length ? rel.map(r =>
+            '<a class="gh-item" href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' +
+            '<span class="gh-tag">' + esc(r.tag) + '</span>' +
+            '<span class="gh-item-text">' + esc(r.name) +
+            (shortDate(r.date) ? '<span class="gh-item-date">' + esc(shortDate(r.date)) + '</span>' : '') +
+            '</span></a>').join('') : '<div class="gh-loading">No releases yet.</div>';
+        }
+        if (ghCommits) {
+          const com = data.commits || [];
+          ghCommits.innerHTML = com.length ? com.map(c =>
+            '<a class="gh-item" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer">' +
+            '<span class="gh-tag">' + esc(c.sha) + '</span>' +
+            '<span class="gh-item-text">' + esc(c.msg) +
+            (shortDate(c.date) ? '<span class="gh-item-date">' + esc(shortDate(c.date)) + '</span>' : '') +
+            '</span></a>').join('') : '<div class="gh-loading">No commits found.</div>';
+        }
+      })
+      .catch(() => {
+        if (ghReleases) ghReleases.innerHTML = '<div class="gh-loading">GitHub is unreachable right now.</div>';
+        if (ghCommits) ghCommits.innerHTML = '';
+      });
+  }
 })();
 </script>
 </body>

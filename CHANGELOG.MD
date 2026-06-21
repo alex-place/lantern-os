@@ -22,6 +22,17 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.10] - 2026-06-21
+
+### Added
+- **Explore page embeds (Σ₀ Converge — discovery surface).** Three new self-refreshing sections on `explore.html`, all server-side cached with baked fallbacks so the page always renders:
+  - **🧭 Discover** — curated RSS/Atom rail (`routes/discover-feeds.js` → `GET /api/feeds/discover`) pulling on-theme sources (Simon Willison, Hacker News, MIT Tech Review); per-source resilient, merged + date-sorted, 30-min cache. Sources are an editable constant at the top of the route.
+  - **🛠️ Build** — live GitHub activity (`routes/github-activity.js` → `GET /api/github/activity`) for `alex-place/lantern-os`: star count, latest published releases, and recent commits via the public REST API (no token), 30-min cache.
+  - **♥ Support** — Patreon tier cards grounded in the real campaign tier map (Wanderer $5 / Deep Dreamer $20 / Synthesasia Guild $200), replacing the bare support link.
+- Both new routes follow the existing `routes/youtube.js` discipline (in-memory cache + verified baked fallback) and are registered in `server.js` before the static catch-all.
+- **Explore embeds surfaced in Keystone chat.** `dream-chat-ui.js` `sendMessage()` now detects an embed-intent (bang commands `!videos` / `!discover` / `!build` / `!support` / `!embeds`, or a natural-language "show/what/latest" framing) and renders the matching embed inline — reusing the same cached `/api/{youtube,feeds,github}` routes. Deterministic, no LLM cost; mirrors the existing `!convergence` / `WORK_INTENT` intercept pattern. Negatives (dream journaling, work queries, "I need support today") deliberately do not trigger.
+>>>>>>> origin/master
+
 ## [1.5.9] - 2026-06-21
 
 ### Added
