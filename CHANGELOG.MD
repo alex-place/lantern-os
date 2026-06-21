@@ -71,6 +71,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.13] - 2026-06-20
+
+### Security
+- **Operator + Keystone routes are now authorization-gated, and the operator check is proxy-header-hardened (#837, #838, #839).**
+  - `isOperatorRequest` (`lib/request-auth.js`) trusted a loopback socket as proof of the local operator, but behind the Cloudflare tunnel (lantern-os.net -> 127.0.0.1) every visitor's socket is loopback, so the whole internet counted as "operator". It now denies the loopback path whenever any proxy/forwarding header is present (mirrors `lib/auth-middleware.js`); remote callers must present the `OPERATOR_TOKEN` header. (#839)
+  - `/api/actions/*` in `routes/operator.js` (run-loop, inspect, update -> git pull + npm install + server restart, local-controls -> PowerShell, flat-rag-ingest) had **no** auth check; they now require `isOperatorRequest`. (#838)
+  - `/api/keystone/*` in `routes/keystone.js` (allowlisted exec + repo-state dump) had no auth check, and the allowlist included `node -e ".+"` (arbitrary JS). Now operator-gated, and `node -e` is removed from the allowlist. (#837)
+  - Added `tests/test_request_auth_proxy_guard.js` (8 cases: clean loopback passes; proxied loopback denied; token path).
+
 ## [1.4.12] - 2026-06-20
 
 ### Changed

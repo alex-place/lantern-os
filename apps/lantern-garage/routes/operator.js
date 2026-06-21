@@ -8,6 +8,15 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
     readConversationLog, normalizeConversationEntry, appendConversationEntry,
     runPowerShell, flatRagHousePath, writeFlatRagHouse } = deps;
 
+  // #838: the privileged server-control actions below (run-loop, inspect, update→git pull+npm+
+  // restart, local-controls→PowerShell, flat-rag-ingest) are operator-only. The local operator
+  // dashboard hits loopback un-proxied; remote callers must present the OPERATOR_TOKEN header.
+  // Previously these routes had NO auth check at all.
+  if (url.pathname.startsWith("/api/actions/") && !isOperatorRequest(req)) {
+    sendJson(res, { error: "operator auth required" }, 403);
+    return true;
+  }
+
   if (url.pathname === "/api/operator-notes" && req.method === "POST") {
     try {
       const body = await collectRequestBody(req);
