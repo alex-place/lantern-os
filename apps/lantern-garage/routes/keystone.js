@@ -13,58 +13,9 @@ const { isOperatorRequest } = require("../lib/request-auth");
 
 const MAX_OUTPUT = 4000;
 
-// Allowlisted command patterns — Keystone can only run these. Capture groups are
-// charset-restricted (no shell metacharacters), and every command is executed
-// shell-free via safeExec(tokenizeCommand(...)), so neither the regex nor the
-// runner can be coaxed into a shell (#873).
-const ALLOWED = [
-  // Git
-  { match: /^git status$/, cmd: "git status" },
-  { match: /^git status --short$/, cmd: "git status --short" },
-  { match: /^git diff$/, cmd: "git diff" },
-  { match: /^git diff --stat$/, cmd: "git diff --stat" },
-  { match: /^git log$/, cmd: "git log -n 20" },
-  { match: /^git log --oneline$/, cmd: "git log --oneline -n 20" },
-  { match: /^git log --oneline -\d{1,3}$/, cmd: null }, // pass through
-  { match: /^git add [\w./ -]+$/, cmd: null },
-  { match: /^git commit -m "[\w\s.,:'/-]+"$/, cmd: null },
-  { match: /^git push[\w\s./:+-]*$/, cmd: null },
-  { match: /^git fetch [\w./-]+$/, cmd: null },
-  { match: /^git merge [\w./-]+ --no-edit$/, cmd: null },
-  { match: /^git branch$/, cmd: "git branch" },
-  { match: /^git branch -a$/, cmd: "git branch -a" },
-  { match: /^git stash list$/, cmd: "git stash list" },
-  { match: /^git stash push -m "[\w\s.,:'/-]+"$/, cmd: null },
-  { match: /^git stash pop$/, cmd: "git stash pop" },
-  { match: /^git pull[\w\s./:+-]*$/, cmd: null },
-  // Tests
-  { match: /^npm test$/, cmd: "node tests/run-dream-journal-tests.js api chat multiturn keystone" },
-  { match: /^node tests\/test_dream_journal_api\.js$/, cmd: null },
-  { match: /^node tests\/test_dream_journal_chat\.js$/, cmd: null },
-  { match: /^node tests\/test_dream_chat_multiturns\.js$/, cmd: null },
-  { match: /^node tests\/test_dream_journal_keystone\.js$/, cmd: null },
-  { match: /^python -m pytest [\w./-]+$/, cmd: null },
-  { match: /^npm run [\w:-]+$/, cmd: null },
-  { match: /^node --check [\w./-]+$/, cmd: null },
-  // Orchestrator
-  { match: /^python src\/convergence_io_engine\.py (health|inspect|loop)$/, cmd: null },
-  // File reads (read-only)
-  { match: /^cat [\w./-]+\.(json|md|js|py|txt)$/, cmd: null },
-  { match: /^head -\d{1,4} [\w./-]+$/, cmd: null },
-  // GitHub CLI
-  { match: /^gh pr list[\w\s./:@,="'-]*$/, cmd: null },
-  { match: /^gh pr create[\w\s./:@,="'-]*$/, cmd: null },
-  { match: /^gh pr view[\w\s./:@,="'-]*$/, cmd: null },
-  // Curl (API testing) — local API path only (query strings carry ?/& and are denied)
-  { match: /^curl -s http:\/\/127\.0\.0\.1:4177\/[\w./-]*$/, cmd: null },
-];
-
-function resolveCommand(command) {
-  for (const a of ALLOWED) {
-    if (a.match.test(command)) return a.cmd || command; // use override if provided
-  }
-  return null; // not allowed
-}
+// The allowlist + resolver live in the shared lib/command-allowlist so the dream-chat
+// tool registry (lib/tool-runner.js) runs Bash through the SAME single policy (#873).
+const { ALLOWED, resolveCommand } = require("../lib/command-allowlist");
 
 module.exports = async function keystoneRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody, repoRoot } = deps;

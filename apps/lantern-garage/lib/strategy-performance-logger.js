@@ -65,7 +65,7 @@ async function logPerformance(params) {
     };
 
     // Append to JSONL log (non-blocking)
-    await appendJsonlQueued(PERF_LOG_PATH, record);
+    await appendJsonlQueued(PERF_LOG_PATH, record, { rotate: true }); // #872
 
     console.log(`[strategy-performance-logger] Logged: ${strategy_id} / ${regime} / ${record.pnl}% PnL`);
   } catch (e) {

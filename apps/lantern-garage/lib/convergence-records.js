@@ -59,7 +59,7 @@ async function emitConvergenceRecord({
       source: source == null ? null : String(source),
       applied_evidence: Array.isArray(applied_evidence) ? applied_evidence.map(String) : [],
     };
-    await appendJsonlQueued(RECORDS_PATH, record);
+    await appendJsonlQueued(RECORDS_PATH, record, { rotate: true }); // #872
     return record;
   } catch (err) {
     console.error("[convergence-records] emit failed (non-fatal):", err && err.message);

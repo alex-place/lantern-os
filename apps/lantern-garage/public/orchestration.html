@@ -1,77 +1,272 @@
-﻿<!doctype html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Keystone Orchestration — Agent Work Dashboard</title>
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid flash of wrong theme */
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    .orch-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-    .orch-header { margin-bottom: 30px; border-bottom: 2px solid var(--accent); padding-bottom: 15px; }
-    .orch-header h1 { margin: 0; font-size: 28px; display: flex; align-items: center; gap: 10px; }
-    .orch-header p { margin: 5px 0 0 0; color: var(--muted); font-size: 14px; }
+    .orch-main {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: clamp(20px, 4vh, 36px) 20px 40px;
+    }
 
-    .orch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .orch-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 8px; }
-    .orch-card h2 { margin: 0 0 15px 0; font-size: 18px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    /* ── Page header ── */
+    .orch-header { margin-bottom: 28px; }
+    .orch-header .panel-label { color: var(--accent); }
+    .orch-header h1 {
+      font-size: clamp(1.6rem, 3.4vw, 2rem);
+      margin: 2px 0 6px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .orch-header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
 
-    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
-    .stat { background: var(--bg); padding: 12px; border-radius: 4px; }
-    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-    .stat-value { font-size: 24px; font-weight: bold; color: var(--accent); }
+    /* ── Top grid of cards (reuses site.css .panel) ── */
+    .orch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    /* These panels are static cards, not clickable tiles — opt out of the
+       site.css hover lift and make children span the full card width. */
+    .orch-main .panel { gap: 14px; padding: 18px; cursor: default; }
+    .orch-main .panel:hover { border-color: var(--border); background: var(--surface); transform: none; box-shadow: var(--shadow); }
+    .orch-main .panel > * { width: 100%; }
+    .orch-grid .panel { padding: 18px; }
 
-    .agent-list { display: flex; flex-direction: column; gap: 10px; }
-    .agent-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--accent); }
-    .agent-name { font-weight: bold; }
-    .agent-status { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #888; margin-left: 8px; }
+    .btn-secondary {
+      align-self: flex-start;
+      width: auto !important;
+      padding: 8px 14px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.8rem; font-weight: 600;
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    .panel h2 {
+      margin: 0; font-size: 1rem; color: var(--accent);
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border); padding-bottom: 10px;
+    }
+
+    /* ── Stat tiles ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat {
+      background: var(--bg); border: 1px solid var(--border);
+      padding: 12px; border-radius: 10px;
+    }
+    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+    .stat-value { font-size: 1.7rem; font-weight: 700; color: var(--accent); line-height: 1; }
+    .stat-value.muted { color: var(--text); }
+
+    .info-box {
+      padding: 12px 14px; background: var(--bg); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent); border-radius: 8px;
+      font-size: 0.82rem; line-height: 1.6;
+    }
+    .info-box strong { color: var(--text); }
+
+    /* ── Agent lanes ── */
+    .agent-list { display: flex; flex-direction: column; gap: 8px; }
+    .agent-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      border-radius: 8px;
+    }
+    .agent-name { font-weight: 600; display: flex; align-items: center; }
+    .agent-meta { font-size: 0.78rem; color: var(--muted); }
+    .agent-status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #888; margin-left: 8px; }
     .agent-status.idle { background: #4a9eff; }
     .agent-status.working { background: #ffaa00; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
-    .work-queue { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
-    .work-item { padding: 12px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--accent); }
-    .work-issue { font-weight: bold; color: var(--accent); }
-    .work-title { font-size: 13px; margin: 5px 0; }
-    .work-status { font-size: 11px; color: var(--muted); }
+    /* ── Work queue ── */
+    .work-queue { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+    .work-item {
+      padding: 11px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      border-radius: 8px;
+    }
+    .work-issue { font-weight: 700; color: var(--accent); font-size: 0.85rem; }
+    .work-title { font-size: 0.82rem; margin: 4px 0; color: var(--text); }
+    .work-status { font-size: 0.72rem; color: var(--muted); }
 
-    .info-box { padding: 15px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--success, #4ade80); margin-top: 15px; font-size: 13px; line-height: 1.6; }
-    .info-box strong { color: var(--accent); }
+    .placeholder { color: var(--muted); font-size: 0.82rem; }
 
-    .action-buttons { display: flex; gap: 10px; margin-top: 15px; }
-    .btn-small { padding: 8px 12px; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
-    .btn-small:hover { opacity: 0.9; }
+    /* ── Active / recent split ── */
+    .active-split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 640px) { .active-split { grid-template-columns: 1fr; } }
+    .active-split h3 { margin: 0 0 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .active-box {
+      padding: 12px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; min-height: 60px; font-size: 0.82rem;
+    }
 
-    .refresh-time { font-size: 11px; color: var(--muted); margin-top: 10px; }
+    /* ── Verify: CI lanes ── */
+    .verify-sub { font-size: 0.68rem; font-weight: 500; color: var(--muted); letter-spacing: .03em; }
+    .lane-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+    .lane {
+      padding: 12px; background: var(--bg);
+      border: 1px solid var(--border); border-left: 3px solid var(--border);
+      border-radius: 8px;
+    }
+    .lane-prefix { font-weight: 700; font-size: 0.8rem; color: var(--text); }
+    .lane-prefix code { color: var(--accent); }
+    .lane-empty { font-size: 0.74rem; color: var(--muted); margin-top: 6px; }
+    .lane-pr { font-size: 0.76rem; margin-top: 6px; }
+    .lane-pr a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .lane-pr a:hover { text-decoration: underline; }
+    .lane-title { color: var(--text); display: block; margin-top: 2px; line-height: 1.35; }
+    .check { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; margin-top: 6px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+    .check::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #888; }
+    .check.passing::before { background: #4ade80; }
+    .check.failing::before { background: #f87171; }
+    .check.pending::before { background: #ffaa00; animation: pulse 1.5s infinite; }
+    .check.none::before  { background: #6b7280; }
+    .lane.passing { border-left-color: #4ade80; }
+    .lane.failing { border-left-color: #f87171; }
+    .lane.pending { border-left-color: #ffaa00; }
+
+    /* ── Human-in-the-loop ── */
+    .human-list { display: flex; flex-direction: column; gap: 8px; }
+    .human-item {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 11px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-left: 3px solid #a78bfa;
+      border-radius: 8px;
+    }
+    .human-kind {
+      font-size: 0.64rem; text-transform: uppercase; letter-spacing: .04em;
+      font-weight: 700; color: #a78bfa; padding: 2px 8px;
+      border: 1px solid color-mix(in srgb, #a78bfa 40%, transparent); border-radius: 999px;
+      white-space: nowrap;
+    }
+    .human-body { flex: 1 1 200px; min-width: 0; }
+    .human-title { font-size: 0.84rem; color: var(--text); font-weight: 600; }
+    .human-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    .human-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .hl-btn {
+      font-size: 0.72rem; font-weight: 600; padding: 6px 10px;
+      border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      cursor: pointer; text-decoration: none; white-space: nowrap;
+      transition: border-color .15s, color .15s;
+    }
+    .hl-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .hl-btn.primary { background: color-mix(in srgb, #a78bfa 16%, transparent); border-color: color-mix(in srgb, #a78bfa 45%, transparent); color: var(--text); }
+    .hl-btn.primary:hover { border-color: #a78bfa; color: #a78bfa; }
+
+    /* ── Verify: provider merit ── */
+    .merit-list { display: flex; flex-direction: column; gap: 6px; }
+    .merit-row {
+      display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px;
+      padding: 9px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+    }
+    .merit-rank { font-weight: 700; color: var(--muted); font-size: 0.8rem; text-align: center; }
+    .merit-name { font-weight: 600; font-size: 0.84rem; }
+    .merit-name .merit-meta { font-weight: 400; color: var(--muted); font-size: 0.72rem; margin-left: 6px; }
+    .merit-score { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+
+    .orch-footer-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-top: 18px; flex-wrap: wrap;
+    }
+    .refresh-time { font-size: 0.74rem; color: var(--muted); }
+
+    /* ── The Loop (Observe → Remember → Reason → Act → Verify → Converge), live ── */
+    .loop-panel { margin-bottom: 22px; }
+    .loop-flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .loop-stage {
+      flex: 1 1 140px; min-width: 132px;
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 14px 12px; border-radius: 12px;
+      background: var(--bg); border: 1px solid var(--border); border-top: 3px solid var(--border);
+      transition: border-color .3s, box-shadow .3s, transform .3s;
+    }
+    .loop-stage .ls-icon { font-size: 1.25rem; line-height: 1; }
+    .loop-stage .ls-name { font-weight: 700; font-size: 0.8rem; color: var(--text); letter-spacing: .02em; }
+    .loop-stage .ls-metric { font-size: 1.5rem; font-weight: 800; color: var(--accent); line-height: 1.1; }
+    .loop-stage .ls-sub { font-size: 0.68rem; color: var(--muted); }
+    .loop-stage.active {
+      border-color: var(--accent); border-top-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 10px 26px -14px var(--accent);
+      transform: translateY(-2px);
+    }
+    .loop-stage.active .ls-icon { animation: pulse 1.5s infinite; }
+    .loop-arrow { align-self: center; color: var(--muted); font-size: 1.05rem; flex: 0 0 auto; }
+    @media (max-width: 720px) { .loop-arrow { display: none; } .loop-stage { flex-basis: 44%; } }
+    .loop-cycle { text-align: center; margin-top: 12px; font-size: 0.74rem; color: var(--muted); }
+    .loop-cycle .lc-spin { color: var(--accent); display: inline-block; animation: spin 6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <title>Orchestration — Keystone OS</title>
 </head>
 <body>
 
+<!-- ── Skip to content ── -->
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<!-- ── Site nav (matches index.html) ── -->
 <nav class="site-nav">
-  <a class="nav-brand" href="/trader-dashboard.html">
-    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    Keystone OS
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">Keystone OS</span>
   </a>
   <div class="nav-links">
-    <a href="/trader-dashboard.html">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/trader-dashboard.html">Trader</a>
     <a href="/operations.html">Ops Hub</a>
     <a href="/orchestration.html" class="active">Orchestration</a>
-    <a href="/agent-status.html">System</a>
-    <a href="/agent-leaderboard.html">Leaderboard</a>
+    <a href="/explore.html">Explore</a>
   </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
   </div>
 </nav>
 
-<div class="orch-container">
-  <div class="orch-header">
-    <h1>⚙️ Keystone Agent Orchestration</h1>
-    <p>Real-time view of autonomous agent work queue, slots, and status</p>
-  </div>
+<main class="orch-main" id="main-content">
 
-  <!-- Queue Status -->
+  <header class="orch-header">
+    <span class="panel-label">Convergence · Act stage</span>
+    <h1>⚙️ Agent Orchestration</h1>
+    <p>Real-time view of the autonomous agent work queue, lanes, and convergence status.</p>
+  </header>
+
+  <!-- ── The convergence loop, live ── -->
+  <section class="panel loop-panel">
+    <h2>♾️ The Loop <span class="verify-sub">Observe → Remember → Reason → Act → Verify → Converge — live</span></h2>
+    <div class="loop-flow" id="loopFlow">
+      <div class="placeholder">Loading the loop…</div>
+    </div>
+    <div class="loop-cycle"><span class="lc-spin">↻</span> <span id="loopCycleNote">one continuous loop — every stage feeds the next</span></div>
+  </section>
+
   <div class="orch-grid">
-    <div class="orch-card">
+    <!-- Queue Status -->
+    <section class="panel">
       <h2>📊 Queue Status</h2>
       <div class="stat-grid">
         <div class="stat">
@@ -92,134 +287,379 @@
         </div>
       </div>
       <div class="info-box">
-        <strong>Total Issues in Queue:</strong> <span id="queueTotal">—</span><br>
-        <strong>Success Rate:</strong> <span id="successRate">—</span>
+        <strong>Total in queue:</strong> <span id="queueTotal">—</span><br>
+        <strong>Success rate:</strong> <span id="successRate">—</span>
       </div>
-    </div>
+    </section>
 
-    <!-- Agent Slots -->
-    <div class="orch-card">
+    <!-- Agent Lanes -->
+    <section class="panel">
       <h2>🤖 Agent Lanes</h2>
       <div class="agent-list" id="agentList">
-        <div style="color: var(--muted); font-size: 12px;">Loading agent status...</div>
+        <div class="placeholder">Loading agent status…</div>
       </div>
-      <div class="action-buttons">
-        <button class="btn-small" onclick="refreshStatus()">🔄 Refresh</button>
+      <div>
+        <button class="btn-secondary" id="refreshBtn" type="button">🔄 Refresh now</button>
       </div>
-    </div>
+    </section>
 
     <!-- Work Queue -->
-    <div class="orch-card">
+    <section class="panel">
       <h2>📋 Work Queue</h2>
       <div class="work-queue" id="workQueue">
-        <div style="color: var(--muted); font-size: 12px;">Loading queue...</div>
+        <div class="placeholder">Loading queue…</div>
       </div>
-    </div>
+    </section>
   </div>
 
   <!-- Active Work -->
-  <div class="orch-card">
-    <h2>🔄 Active Work & Recent Completions</h2>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+  <section class="panel">
+    <h2>🔄 Active Work &amp; Recent Completions</h2>
+    <div class="active-split">
       <div>
-        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted);">Currently Working On:</h3>
-        <div id="activeWork" style="padding: 12px; background: var(--bg); border-radius: 4px; min-height: 60px;">
-          <span style="color: var(--muted);">No active work</span>
-        </div>
+        <h3>Currently working on</h3>
+        <div class="active-box" id="activeWork"><span class="placeholder">No active work</span></div>
       </div>
       <div>
-        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--muted);">Recently Completed:</h3>
-        <div id="recentWork" style="padding: 12px; background: var(--bg); border-radius: 4px; min-height: 60px; font-size: 12px;">
-          <span style="color: var(--muted);">No completed work</span>
-        </div>
+        <h3>Recently completed</h3>
+        <div class="active-box" id="recentWork"><span class="placeholder">No completed work</span></div>
       </div>
     </div>
+  </section>
+
+  <!-- ── Verify stage: CI lanes + provider merit ── -->
+  <div class="orch-grid" style="margin-top: 22px;">
+    <section class="panel" style="grid-column: 1 / -1;">
+      <h2>✅ Verify · CI Lanes <span class="verify-sub" id="laneSummary"></span></h2>
+      <p class="placeholder" style="margin:-4px 0 4px;">One open PR lane per agent prefix (monoworkstream). Live <code>gh</code> check status — the Verify stage on swarm output.</p>
+      <div class="lane-grid" id="laneGrid">
+        <div class="placeholder">Loading PR lanes…</div>
+      </div>
+    </section>
+
+    <section class="panel" style="grid-column: 1 / -1;">
+      <h2>🙋 Needs Human <span class="verify-sub" id="humanSummary"></span></h2>
+      <p class="placeholder" style="margin:-4px 0 4px;">The Reason/Converge gate where the loop pauses for you. Hand any item to <strong>Keystone Chat</strong> or copy a ready prompt for <strong>Claude Code</strong>.</p>
+      <div class="human-list" id="humanList">
+        <div class="placeholder">Loading…</div>
+      </div>
+    </section>
+
+    <section class="panel" style="grid-column: 1 / -1;">
+      <h2>🏆 Provider Merit <span class="verify-sub">Σ₀-K1 routing · compositeScore</span></h2>
+      <p class="placeholder" style="margin:-4px 0 4px;">The leaderboard that routes the swarm (<code>get_routable_chain</code>) and distills losses back. Higher composite = preferred node.</p>
+      <div class="merit-list" id="meritList">
+        <div class="placeholder">Loading leaderboard…</div>
+      </div>
+    </section>
   </div>
 
-  <div class="refresh-time" id="refreshTime">Last update: never</div>
-</div>
+  <div class="orch-footer-row">
+    <span class="refresh-time" id="refreshTime">Last update: never</span>
+  </div>
 
-<script>
-async function refreshStatus() {
-  try {
-    // Fetch queue status
-    let queueData = { queue: { pending: 0, assigned: 0, completed: 0, failed: 0 } };
-    try {
-      const queueResp = await fetch("/api/queue/status");
-      if (queueResp.ok) {
-        queueData = await queueResp.json();
-      }
-    } catch (e) {
-      console.warn("Queue API unavailable, using defaults");
-    }
+</main>
 
-    // Fetch agent status (queue-specific slot data)
-    let agentData = { slots: [] };
-    try {
-      const agentResp = await fetch("/api/queue/agents");
-      if (agentResp.ok) {
-        agentData = await agentResp.json();
-      }
-    } catch (e) {
-      console.warn("Queue agents API unavailable, using defaults");
-    }
-
-    // Update queue stats
-    document.getElementById("statPending").textContent = queueData.queue?.pending || 0;
-    document.getElementById("statInProgress").textContent = queueData.queue?.assigned || 0;
-    document.getElementById("statCompleted").textContent = queueData.queue?.completed || 0;
-    document.getElementById("statFailed").textContent = queueData.queue?.failed || 0;
-
-    const total = (queueData.queue?.pending || 0) + (queueData.queue?.assigned || 0) + (queueData.queue?.completed || 0) + (queueData.queue?.failed || 0);
-    const completed = queueData.queue?.completed || 0;
-    const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-    document.getElementById("queueTotal").textContent = total;
-    document.getElementById("successRate").textContent = successRate + "%";
-
-    // Update agent slots
-    const agentHTML = (agentData.slots || []).map(slot => `
-      <div class="agent-item">
-        <span class="agent-name">
-          ${slot.id}
-          <span class="agent-status ${slot.status === 'working' ? 'working' : 'idle'}"></span>
-        </span>
-        <span style="font-size: 12px; color: var(--muted);">
-          ${slot.status === 'working' ? `⏱️ Issue #${slot.currentWork}` : '✓ Ready'}
-        </span>
-      </div>
-    `).join("");
-    document.getElementById("agentList").innerHTML = agentHTML || '<div style="color: var(--muted);">No agents available</div>';
-
-    // Fetch and display work queue
-    const pendingResp = await fetch("/api/queue/list/pending");
-    const pendingData = await pendingResp.json();
-    const workHTML = (pendingData.items || []).slice(0, 5).map(item => `
-      <div class="work-item">
-        <span class="work-issue">Issue #${item.issueNumber}</span>
-        <div class="work-title">${item.title || 'Untitled'}</div>
-        <div class="work-status">Priority: ${item.priority || 0}</div>
-      </div>
-    `).join("");
-    document.getElementById("workQueue").innerHTML = workHTML || '<div style="color: var(--muted);">No pending work</div>';
-
-    // Update refresh time
-    const now = new Date().toLocaleTimeString();
-    document.getElementById("refreshTime").textContent = `Last update: ${now}`;
-
-  } catch (err) {
-    console.error("Error refreshing status:", err);
-    document.getElementById("refreshTime").textContent = `Error: ${err.message}`;
-  }
-}
-
-// Auto-refresh every 5 seconds
-setInterval(refreshStatus, 5000);
-
-// Initial load
-refreshStatus();
-</script>
+<!-- ── Site footer (matches index.html) ── -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-brand">
+      <span class="dot online" id="status-dot" title="Server status"></span>
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
+    </span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/operations.html">Ops Hub</a>
+    <a href="/orchestration.html">Orchestration</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span class="visually-hidden" id="status-label">connecting…</span>
+  </div>
+</footer>
 
 <script src="/js/theme-toggle.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  async function fetchJson(path) {
+    try {
+      const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  }
+
+  function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
+
+  async function refreshStatus() {
+    // Queue stats + agent slots + pending list (all best-effort).
+    const [queueData, agentData, pendingData, health, convData] = await Promise.all([
+      fetchJson("/api/queue/status"),
+      fetchJson("/api/queue/agents"),
+      fetchJson("/api/queue/list?status=pending"),
+      fetchJson("/api/health"),
+      fetchJson("/api/convergence/status"),
+    ]);
+
+    // ── Queue stats ──
+    const q = (queueData && queueData.queue) || { pending: 0, assigned: 0, completed: 0, failed: 0 };
+    setText("statPending", q.pending || 0);
+    setText("statInProgress", q.assigned || 0);
+    setText("statCompleted", q.completed || 0);
+    setText("statFailed", q.failed || 0);
+
+    const total = (q.pending || 0) + (q.assigned || 0) + (q.completed || 0) + (q.failed || 0);
+    const done = q.completed || 0;
+    setText("queueTotal", total);
+    setText("successRate", (total > 0 ? Math.round((done / total) * 100) : 0) + "%");
+
+    // ── Agent lanes ──
+    const slots = (agentData && agentData.slots) || [];
+    const agentEl = $("agentList");
+    agentEl.innerHTML = slots.length
+      ? slots.map((slot) => {
+          const working = slot.status === "working";
+          const cls = working ? "working" : (slot.status === "disabled" ? "" : "idle");
+          const label = slot.model || slot.agent || slot.id;
+          const right = working
+            ? `⏱️ Issue #${slot.currentWork ?? "?"}`
+            : (slot.status === "disabled" ? "✕ Disabled" : "✓ Ready");
+          return `
+            <div class="agent-item">
+              <span class="agent-name">${escapeHtml(label)}
+                <span class="agent-status ${cls}"></span>
+              </span>
+              <span class="agent-meta">${right}</span>
+            </div>`;
+        }).join("")
+      : '<div class="placeholder">No agents available</div>';
+
+    // ── Work queue (pending) ──
+    const items = (pendingData && pendingData.items) || [];
+    const workEl = $("workQueue");
+    workEl.innerHTML = items.length
+      ? items.slice(0, 6).map((item) => `
+          <div class="work-item">
+            <span class="work-issue">Issue #${item.issueNumber ?? "—"}</span>
+            <div class="work-title">${escapeHtml(item.title || "Untitled")}</div>
+            <div class="work-status">Priority: ${item.priority || 0}${item.assignedTo ? ` · ${escapeHtml(item.assignedTo)}` : ""}</div>
+          </div>`).join("")
+      : '<div class="placeholder">No pending work</div>';
+
+    // ── Active work (assigned slots) ──
+    const active = slots.filter((s) => s.status === "working");
+    const activeEl = $("activeWork");
+    activeEl.innerHTML = active.length
+      ? active.map((s) => `<div><strong>${s.id}</strong> → Issue #${s.currentWork ?? "?"}</div>`).join("")
+      : '<span class="placeholder">No active work</span>';
+
+    // ── Verify + human-in-the-loop (share one pr-lanes fetch) ──
+    const laneData = await fetchJson("/api/queue/pr-lanes");
+    renderLanes(laneData);
+    renderLoop(convData, q, slots, laneData);
+    renderHumanLoop(laneData, items);
+    renderMerit();
+
+    // ── Footer status dot ──
+    const online = !!(health && health.ok);
+    const dot = $("status-dot");
+    if (dot) dot.className = online ? "dot online" : "dot";
+    setText("status-label", online ? "server online" : "server unreachable");
+
+    // ── Timestamp ──
+    setText("refreshTime", "Last update: " + new Date().toLocaleTimeString());
+  }
+
+  function renderLanes(data) {
+    const el = $("laneGrid");
+    if (!data) { el.innerHTML = '<div class="placeholder">PR lane status unavailable.</div>'; return; }
+    if (data.error === "gh_unavailable") {
+      el.innerHTML = '<div class="placeholder">GitHub CLI not available / not authed — CI lane status can\'t be read here.</div>';
+      setText("laneSummary", "");
+      return;
+    }
+    const lanes = data.lanes || [];
+    setText("laneSummary", `${data.openCount || 0} open PR${(data.openCount || 0) === 1 ? "" : "s"}`);
+    el.innerHTML = lanes.map((lane) => {
+      if (!lane.pr) {
+        return `<div class="lane">
+          <div class="lane-prefix"><code>${lane.prefix}/</code></div>
+          <div class="lane-empty">Lane open · no active PR</div>
+        </div>`;
+      }
+      const pr = lane.pr;
+      const checkLabel = { passing: "checks passing", failing: "checks failing", pending: "checks running", none: "no checks" }[pr.checks] || pr.checks;
+      return `<div class="lane ${pr.checks}">
+        <div class="lane-prefix"><code>${lane.prefix}/</code></div>
+        <div class="lane-pr">
+          <a href="${pr.url}" target="_blank" rel="noopener">#${pr.number}${pr.draft ? " · draft" : ""}</a>
+          <span class="lane-title">${escapeHtml(pr.title || "")}</span>
+        </div>
+        <span class="check ${pr.checks}">${checkLabel}</span>
+      </div>`;
+    }).join("");
+  }
+
+  // The Reason/Converge gate: items where the autonomous loop pauses for a human.
+  // Real signals — open PRs awaiting review/merge, and pending work not yet picked up.
+  function renderHumanLoop(laneData, pendingItems) {
+    const el = $("humanList");
+    const rows = [];
+
+    // 1. Open PRs awaiting human review/merge (checks not failing, not draft).
+    const lanes = (laneData && laneData.lanes) || [];
+    for (const lane of lanes) {
+      const pr = lane.pr;
+      if (!pr || pr.draft) continue;
+      const kind = { passing: "review PR", none: "review PR", failing: "fix PR", pending: "checks running" }[pr.checks] || "review PR";
+      const checksLabel = { passing: "checks passing", failing: "checks failing", pending: "checks running", none: "no checks" }[pr.checks] || pr.checks;
+      rows.push({
+        kind,
+        title: `#${pr.number} ${pr.title || ""}`,
+        meta: `${lane.prefix}/ lane · ${checksLabel}${pr.mergeable ? " · " + String(pr.mergeable).toLowerCase() : ""}`,
+        ghUrl: pr.url,
+        seed: `Review PR #${pr.number} ("${pr.title || ""}", ${pr.branch} lane). Checks are ${pr.checks}. Summarize the diff, flag risks, and tell me if it's safe to merge.`,
+        cc: `Review PR #${pr.number} on branch ${pr.branch}: \`gh pr diff ${pr.number}\`. Check it against the convergence + monoworkstream rules, run the tests, and report whether it's safe to merge.`,
+      });
+    }
+
+    // 2. Pending work not yet executing — waiting for a human to route/start.
+    for (const item of (pendingItems || []).slice(0, 6)) {
+      rows.push({
+        kind: "route work",
+        title: `Issue #${item.issueNumber ?? "—"} ${item.title || ""}`,
+        meta: `pending · priority ${item.priority || 0}`,
+        ghUrl: item.issueNumber ? `https://github.com/alex-place/lantern-os/issues/${item.issueNumber}` : null,
+        seed: `Work on issue #${item.issueNumber}: ${item.title || ""}. Investigate the codebase, propose a plan, and ground each claim with evidence.`,
+        cc: `Work issue #${item.issueNumber} (${item.title || ""}) in this repo per the convergence + monoworkstream rules: open a lane branch, implement, verify in preview, and open a PR.`,
+      });
+    }
+
+    setText("humanSummary", rows.length ? `${rows.length} awaiting you` : "all clear");
+    if (!rows.length) { el.innerHTML = '<div class="placeholder">Nothing waiting for a human right now.</div>'; return; }
+
+    el.innerHTML = rows.map((r, i) => {
+      const chatUrl = `/dream-chat.html?seed=${encodeURIComponent(r.seed)}`;
+      const ghBtn = r.ghUrl ? `<a class="hl-btn" href="${r.ghUrl}" target="_blank" rel="noopener">GitHub ↗</a>` : "";
+      return `<div class="human-item">
+        <span class="human-kind">${r.kind}</span>
+        <div class="human-body">
+          <div class="human-title">${escapeHtml(r.title)}</div>
+          <div class="human-meta">${escapeHtml(r.meta)}</div>
+        </div>
+        <div class="human-actions">
+          <a class="hl-btn primary" href="${chatUrl}">💬 Keystone Chat</a>
+          <button class="hl-btn" type="button" data-cc="${i}">⌨ Copy for Claude Code</button>
+          ${ghBtn}
+        </div>
+      </div>`;
+    }).join("");
+
+    // Wire clipboard handoff for Claude Code prompts.
+    el.querySelectorAll("button[data-cc]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const r = rows[Number(btn.dataset.cc)];
+        copyToClipboard(r.cc, btn);
+      });
+    });
+  }
+
+  function copyToClipboard(text, btn) {
+    const done = () => { const o = btn.textContent; btn.textContent = "✓ Copied"; setTimeout(() => (btn.textContent = o), 1500); };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else { fallbackCopy(text, done); }
+  }
+  function fallbackCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch {}
+    document.body.removeChild(ta);
+  }
+
+  // ── The Loop: live Observe → Remember → Reason → Act → Verify → Converge ──
+  const LOOP_STAGES = [
+    { icon: "👁", name: "Observe" },
+    { icon: "🧠", name: "Remember" },
+    { icon: "💭", name: "Reason" },
+    { icon: "⚡", name: "Act" },
+    { icon: "✅", name: "Verify" },
+    { icon: "🎯", name: "Converge" },
+  ];
+  function renderLoop(conv, q, slots, laneData) {
+    const el = $("loopFlow");
+    if (!el) return;
+    const working = (slots || []).filter((s) => s.status === "working").length;
+    const openPRs = (laneData && laneData.openCount) || 0;
+    const records = (conv && conv.total) || 0;
+    const reasoners = (conv && Array.isArray(conv.reasoners)) ? conv.reasoners.length : 0;
+    const grounded = (conv && conv.groundedPct != null) ? Math.round(conv.groundedPct * 100) : null;
+    const metrics = [
+      { v: q.pending || 0,   sub: "queued" },
+      { v: records,          sub: records === 1 ? "record" : "records" },
+      { v: reasoners || (q.assigned || 0), sub: reasoners ? "reasoners" : "planning" },
+      { v: working,          sub: "acting" },
+      { v: openPRs,          sub: "PRs in CI" },
+      { v: q.completed || 0, sub: grounded != null ? grounded + "% grounded" : "converged" },
+    ];
+    // Active stage = where the loop is doing work right now; rests at Converge when idle.
+    let active = 5;
+    if (working > 0) active = 3;
+    else if (openPRs > 0) active = 4;
+    else if ((q.assigned || 0) > 0) active = 2;
+    else if ((q.pending || 0) > 0) active = 0;
+    el.innerHTML = LOOP_STAGES.map((s, i) => {
+      const m = metrics[i];
+      const node = `<div class="loop-stage ${i === active ? "active" : ""}">
+          <span class="ls-icon">${s.icon}</span>
+          <span class="ls-name">${s.name}</span>
+          <span class="ls-metric">${m.v}</span>
+          <span class="ls-sub">${escapeHtml(m.sub)}</span>
+        </div>`;
+      return node + (i < LOOP_STAGES.length - 1 ? '<span class="loop-arrow">→</span>' : "");
+    }).join("");
+    const note = $("loopCycleNote");
+    if (note) {
+      note.textContent = `${records} convergence record${records === 1 ? "" : "s"}`
+        + (grounded != null ? ` · ${grounded}% externally grounded` : "")
+        + " · the loop never stops";
+    }
+  }
+
+  async function renderMerit() {
+    const el = $("meritList");
+    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=coding&topN=6&lookbackDays=14");
+    const agents = (data && data.agents) || [];
+    if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded provider runs yet (leaderboard empty).</div>'; return; }
+    el.innerHTML = agents.map((a, i) => {
+      const name = a.agentId || a.agent || a.provider || a.model || "agent";
+      const score = a.compositeScore ?? a.score ?? a.composite ?? null;
+      const calls = a.totalCalls ?? a.n ?? a.calls;
+      const sr = a.successRate != null ? Math.round(a.successRate * 100) + "% success" : null;
+      const meta = [sr, calls != null ? `${calls} calls` : null].filter(Boolean).join(" · ");
+      return `<div class="merit-row">
+        <span class="merit-rank">${i + 1}</span>
+        <span class="merit-name">${escapeHtml(String(name))}${meta ? `<span class="merit-meta">${meta}</span>` : ""}</span>
+        <span class="merit-score">${score != null ? Number(score).toFixed(2) : "—"}</span>
+      </div>`;
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = $("refreshBtn");
+    if (btn) btn.addEventListener("click", refreshStatus);
+    refreshStatus();
+    setInterval(refreshStatus, 5000);
+  });
+})();
+</script>
+
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
