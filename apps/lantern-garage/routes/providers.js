@@ -16,7 +16,8 @@ const { modelFor } = require("../lib/provider-models");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const ENV_LOCAL = path.join(REPO_ROOT, ".env.local");
-const llmAgent = new https.Agent({ rejectUnauthorized: false });
+// Centralized TLS gate — insecure only on Windows or explicit opt-in, not always. #869
+const { llmAgent } = require("../lib/insecure-tls");
 
 // Map UI provider ids → env var names + test strategies
 const PROVIDER_META = {

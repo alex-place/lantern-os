@@ -17,12 +17,32 @@ function enqueueFileWrite(filePath, operation) {
   return next;
 }
 
-async function appendJsonlQueued(filePath, record) {
+// Default rotation caps (env-tunable), shared by the hot-path callers that opt in. #872
+const JSONL_MAX_BYTES = Number(process.env.JSONL_MAX_BYTES) || 5 * 1024 * 1024;
+const JSONL_KEEP_ARCHIVES = Number(process.env.JSONL_KEEP_ARCHIVES) || 5;
+
+// opts.rotate (truthy, or {maxBytes,keepArchives}) bounds the file's growth AFTER the
+// append, reusing the same per-path queue so the rename never interleaves. Existing
+// callers (no opts) are unchanged — rotation is opt-in per #872 so the ~30 append
+// sites don't all change behavior at once.
+async function appendJsonlQueued(filePath, record, opts = {}) {
   const line = `${JSON.stringify(record)}\n`;
-  return enqueueFileWrite(filePath, async () => {
+  const result = await enqueueFileWrite(filePath, async () => {
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
     await fs.promises.appendFile(filePath, line, "utf8");
   });
+  if (opts.rotate) {
+    const cfg = opts.rotate === true
+      ? { maxBytes: JSONL_MAX_BYTES, keepArchives: JSONL_KEEP_ARCHIVES }
+      : opts.rotate;
+    await rotateJsonlIfNeeded(filePath, cfg);
+  }
+  return result;
+}
+
+// Convenience: append + bound growth with the default (or supplied) caps.
+async function appendJsonlRotating(filePath, record, rotateOpts = {}) {
+  return appendJsonlQueued(filePath, record, { rotate: rotateOpts || {} });
 }
 
 async function rotateJsonlIfNeeded(filePath, { maxBytes = 5 * 1024 * 1024, keepArchives = 5 } = {}) {
@@ -102,7 +122,10 @@ function readJsonl(relativePath, limit = 20) {
 module.exports = {
   enqueueFileWrite,
   appendJsonlQueued,
+  appendJsonlRotating,
   rotateJsonlIfNeeded,
+  JSONL_MAX_BYTES,
+  JSONL_KEEP_ARCHIVES,
   writeTextQueued,
   readText,
   readJson,

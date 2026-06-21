@@ -3,11 +3,12 @@
  * Works on both local dev server and GitHub Pages static deploys.
  */
 (function () {
-  const POLL_INTERVAL_MS = 60_000;
-  const GITHUB_API = "https://api.github.com/repos/alex-place/lantern-os/commits/master";
-  const LOCAL_API = (typeof serverBase !== "undefined" ? serverBase : "") + "/api/version";
+  // Read the LOCAL, server-cached endpoint — never api.github.com from the browser.
+  // The server makes the (rate-limited) GitHub call at most ~4x/hour and caches it, so
+  // a 5-min client poll of the local endpoint is cheap and leaks nothing externally. #879
+  const POLL_INTERVAL_MS = 5 * 60_000;
+  const UPDATE_API = (typeof serverBase !== "undefined" ? serverBase : "") + "/api/update-status";
 
-  let localCommit = null;
   let remoteCommit = null;
   let dismissed = sessionStorage.getItem("lantern_update_dismissed");
 
@@ -73,79 +74,31 @@
     if (banner) banner.remove();
   }
 
-  async function fetchLocalVersion() {
-    try {
-      const r = await fetch(LOCAL_API, { signal: AbortSignal.timeout(5000) });
-      if (!r.ok) return null;
-      const d = await r.json();
-      return d.version?.commit || null;
-    } catch {
-      return null;
-    }
-  }
-
-  async function fetchRemoteVersion() {
-    try {
-      const r = await fetch(GITHUB_API, { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) return null;
-      const d = await r.json();
-      return d.sha || null;
-    } catch {
-      return null;
-    }
-  }
-
-  async function fetchCompare(localCommit) {
-    try {
-      const r = await fetch(`https://api.github.com/repos/alex-place/lantern-os/compare/${localCommit}...master`, { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) return null;
-      const d = await r.json();
-      return { behind: d.behind_by || 0, ahead: d.ahead_by || 0, status: d.status };
-    } catch {
-      return null;
-    }
-  }
-
+  // Read the server's cached update status from the LOCAL endpoint. The server already
+  // resolved local-vs-remote (behind/ahead) against api.github.com on its own slow,
+  // rate-limited, backoff-aware timer — the browser makes ZERO external calls. On a
+  // static deploy with no server (GitHub Pages) the endpoint 404s and we simply do
+  // nothing rather than phoning GitHub from the browser. #879
   async function check() {
-    [localCommit, remoteCommit] = await Promise.all([
-      fetchLocalVersion(),
-      fetchRemoteVersion()
-    ]);
+    let status = null;
+    try {
+      const r = await fetch(UPDATE_API, { signal: AbortSignal.timeout(5000) });
+      if (r.ok) status = await r.json();
+    } catch {
+      status = null;
+    }
 
-    if (!localCommit || !remoteCommit) {
+    if (!status || !status.ok) {
+      // No server / transient error → leave the banner as-is; never call GitHub here.
+      return;
+    }
+
+    remoteCommit = status.remote || null;
+    if (status.updateAvailable && remoteCommit && dismissed !== remoteCommit) {
+      createBanner();
+    } else {
       removeBanner();
-      return;
     }
-
-    if (localCommit === remoteCommit) {
-      removeBanner();
-      return;
-    }
-
-    const compare = await fetchCompare(localCommit);
-    if (!compare) {
-      // Can't determine relationship — hide banner to avoid false positive
-      removeBanner();
-      return;
-    }
-
-    if (compare.ahead > 0) {
-      // Local is ahead of remote (unpushed commits) — no update needed
-      removeBanner();
-      return;
-    }
-
-    if (compare.behind === 0) {
-      // Up to date (diverged but not behind)
-      removeBanner();
-      return;
-    }
-
-    if (dismissed === remoteCommit) {
-      return;
-    }
-
-    createBanner();
   }
 
   // Inject styles once

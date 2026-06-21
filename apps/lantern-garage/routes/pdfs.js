@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const Busboy = require('busboy');
+const { requireEntitlement } = require('../lib/auth-middleware');
 
 function getIngestBase(repoRoot) {
   return path.join(repoRoot, 'data', 'ingest');
@@ -89,6 +90,9 @@ module.exports = async function pdfRoutes(req, res, url, deps) {
 
   // DELETE /api/pdfs?filename=<name> — remove all copies of a file from all ingest folders
   if (url.pathname === '/api/pdfs' && req.method === 'DELETE') {
+    // Mutating endpoint — gate behind the pdf_admin entitlement (admins + local
+    // bypass auto-pass; read-only GET stays public). #866
+    if (!requireEntitlement(req, res, 'pdf_admin')) return true;
     const filename = url.searchParams.get('filename');
     if (!filename || filename.includes('/') || filename.includes('\\') || !filename.toLowerCase().endsWith('.pdf')) {
       sendJson(res, { error: 'invalid filename' }, 400);
@@ -125,6 +129,9 @@ module.exports = async function pdfRoutes(req, res, url, deps) {
 
   // POST /api/pdfs/upload — save uploaded PDFs to data/ingest/
   if (url.pathname === '/api/pdfs/upload' && req.method === 'POST') {
+    // Mutating endpoint — gate behind the pdf_admin entitlement before any body
+    // parsing (rejects an unentitled 100 MB upload up front). #866
+    if (!requireEntitlement(req, res, 'pdf_admin')) return true;
     const ct = req.headers['content-type'] || '';
     if (!ct.includes('multipart/form-data')) {
       sendJson(res, { error: 'multipart/form-data required' }, 400);

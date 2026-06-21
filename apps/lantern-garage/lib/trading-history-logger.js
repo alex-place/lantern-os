@@ -55,7 +55,7 @@ async function logTrade(tradeData) {
       position_id: tradeData.position_id,
     };
 
-    await appendJsonlQueued(TRADES_LOG_PATH, record);
+    await appendJsonlQueued(TRADES_LOG_PATH, record, { rotate: true }); // per-trade hot path (#872)
     console.log(`[trading-history] Logged trade: ${record.entry_symbol} ${record.pnl_pct}% P&L`);
   } catch (e) {
     console.error(`[trading-history] Failed to log trade:`, e.message);
@@ -84,7 +84,7 @@ async function logSignal(signalData) {
       source: signalData.source || "trading-system",
     };
 
-    await appendJsonlQueued(SIGNALS_LOG_PATH, record);
+    await appendJsonlQueued(SIGNALS_LOG_PATH, record, { rotate: true }); // per-signal hot path (#872)
     console.log(`[trading-history] Logged signal: ${record.symbol} ${record.direction} (${record.confidence})`);
   } catch (e) {
     console.error(`[trading-history] Failed to log signal:`, e.message);

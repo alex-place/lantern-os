@@ -2,15 +2,28 @@
 module.exports = async function fileRoutes(req, res, url, deps) {
   const { fs, path, sendJson, sendFile, sendHtml, repoRoot, renderMarkdownDocument } = deps;
 
+  // Default-deny: /repo only serves these document/asset extensions. This closes the
+  // whole class of leaks (.git/*, dotfiles, .js/.py/.json source, data/ingest|reports)
+  // by extension instead of enumerating deny patterns forever. #868
+  const ALLOWED_EXT = new Set([
+    ".md", ".txt", ".pdf", ".tex",
+    ".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp",
+  ]);
+
   const DENY_PATTERNS = [
-    /^\.env/,
-    /^data[\/\\](private|dream_journal|dreamer|conversations)/,
+    /(^|[\/\\])\.[^\/\\]/,                       // any leading-dot segment: .git, .env, .gitignore, …
+    /^data[\/\\](private|dream_journal|dreamer|conversations|ingest|reports)/, // PII pools (allowed-ext PDFs too)
     /^logs[\/\\]/,
     /\.(jsonl|csf)$/i,
     /^secrets[\/\\]/,
   ];
 
   function isPathAllowed(relativePath) {
+    // Allowlist by extension first — anything without an approved extension
+    // (.git/HEAD, .gitignore, server.js, *.json, pack files, …) is denied.
+    const ext = path.extname(relativePath).toLowerCase();
+    if (!ALLOWED_EXT.has(ext)) return false;
+    // DENY_PATTERNS stays as defense-in-depth (e.g. a .txt under secrets/).
     return !DENY_PATTERNS.some(p => p.test(relativePath));
   }
 

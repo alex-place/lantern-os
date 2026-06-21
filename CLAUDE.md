@@ -117,12 +117,10 @@ npm run dev --prefix apps/lantern-garage
 # Install dependencies
 python -m pip install -r requirements.txt
 
-# Run all tests (safe subset — excludes known-broken/integration tests)
-python -m pytest tests/ -q --tb=short \
-  --ignore=tests/test_anti_entropy_memory.py \
-  --ignore=tests/test_audit_chain.py \
-  --ignore=tests/test_discord_bot.py \
-  --ignore=tests/test_discord_voice_gate.py
+# Run all tests. The anti-entropy + audit-chain suites pass and are no longer
+# excluded; the discord suites self-skip via importorskip when discord/dpytest are
+# absent, so the full run is clean without --ignore flags (#862).
+python -m pytest tests/ -q --tb=short
 
 # Run a single test file
 python -m pytest tests/test_dream_journal.py -q --tb=short

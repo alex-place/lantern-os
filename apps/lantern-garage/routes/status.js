@@ -125,6 +125,14 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     sendJson(res, { ok: true, version: getGitVersion(deps.repoRoot), generatedAt: new Date().toISOString() });
     return true;
   }
+  // Server-side, cached update check (#879) — the client reads this LOCAL endpoint
+  // instead of polling api.github.com on a 60s timer. Non-blocking: returns the cached
+  // snapshot and refreshes in the background at most every ~15 min (403-backoff aware).
+  if (url.pathname === "/api/update-status") {
+    const { getUpdateStatus } = require("../lib/update-check");
+    sendJson(res, { ok: true, ...getUpdateStatus(deps.repoRoot), generatedAt: new Date().toISOString() });
+    return true;
+  }
   if (url.pathname === "/api/metrics") {
     const metrics = getModelMetrics(deps.repoRoot);
     const enriched = {};

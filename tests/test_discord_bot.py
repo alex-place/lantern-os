@@ -20,11 +20,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 os.environ.setdefault("DISCORD_BOT_TOKEN", "test-token-for-pytest")
 os.environ.setdefault("LANTERN_DISCORD_GUILD_ID", "111111111111111")
 
-# OSS Discord bot test framework (dpytest)
-from discord.ext import test as dpytest  # noqa: F401 — pulled in for test env
-
-import discord
 import pytest
+
+# discord + dpytest are optional deps. importorskip cleanly skips the whole module
+# at collection time when they're absent, instead of crashing collection with a
+# ModuleNotFoundError (the reason this suite used to be CI-excluded). #862
+discord = pytest.importorskip("discord")  # noqa: F401
+dpytest = pytest.importorskip("discord.ext.test")  # noqa: F401 — OSS bot test framework
 
 # Add bot directory to path
 sys.path.insert(0, str(Path(__file__).parents[1] / "src" / "discord_lounge_bot"))

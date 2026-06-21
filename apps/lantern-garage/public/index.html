@@ -43,21 +43,56 @@
       from { transform: translate(-50%, -50%) rotate(0deg); }
       to   { transform: translate(-50%, -50%) rotate(360deg); }
     }
-    .hero-bg {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: min(86vw, 58vh, 560px);
-      height: auto;
-      opacity: 0.18;
-      z-index: 0;
-      pointer-events: none;
-      user-select: none;
-      animation: hero-spin 60s linear infinite;
+    /* Full-bleed ambient Σ₀ mandala — a fixed background field behind all
+       content. It is softly masked on every edge so it never hard-cuts against
+       the nav, footer, or viewport: a radial fade on the spinning art (rotation-
+       invariant) plus a vertical fade on the static container (handles the
+       top/bottom edges independent of the spin). Scales mobile → ultrawide. */
+    .ambient {
+      position: fixed; inset: 0;
+      z-index: 0; overflow: clip;
+      pointer-events: none; user-select: none;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
+              mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
     }
+    .ambient__mandala {
+      position: absolute; left: 50%;
+      top: clamp(260px, 44vh, 500px);
+      transform: translate(-50%, -50%);
+      width: min(150vh, 132vw, 1500px);
+      aspect-ratio: 1 / 1;
+      background: url('/sigma0-mandala.svg') center / contain no-repeat;
+      opacity: 0.42;
+      -webkit-mask-image: radial-gradient(closest-side, #000 40%, rgba(0,0,0,.5) 64%, transparent 82%);
+              mask-image: radial-gradient(closest-side, #000 40%, rgba(0,0,0,.5) 64%, transparent 82%);
+      animation: hero-spin 300s linear infinite;
+    }
+    @media (prefers-reduced-motion: reduce) { .ambient__mandala { animation: none; } }
+    /* Lift real content above the ambient layer. z-index:0 (not -1) keeps the
+       mandala painting over the body's own opaque background. */
+    .site-nav, .home-main, .site-footer { position: relative; z-index: 1; }
     .hero > h1, .hero > .tagline, .hero > .hero-cta-row, .hero > .sub { position: relative; z-index: 1; }
     .hero h1 { margin-bottom: 12px; }
     .hero .tagline { margin-bottom: 22px; }
+    /* Readability scrim behind the hero copy — sits above the mandala (all of
+       home-main is z-index:1) and below the text (z-index:1 within the hero),
+       so the copy stays crisp over the densest part of the spinning graphic. */
+    .hero::before {
+      content: "";
+      position: absolute; z-index: 0;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 150%; height: 152%;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center,
+        color-mix(in srgb, var(--bg) 72%, transparent) 0%,
+        color-mix(in srgb, var(--bg) 38%, transparent) 46%,
+        transparent 72%);
+    }
+    /* Solid, high-contrast copy over the busy background */
+    .hero .tagline { color: var(--text); max-width: 600px; margin-left: auto; margin-right: auto; }
+    html[data-theme="dark"] .hero h1 { text-shadow: 0 2px 26px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4); }
+    html[data-theme="dark"] .hero .tagline { text-shadow: 0 1px 3px rgba(0,0,0,.55); }
     /* ── Secondary experiences — redesigned tiles ── */
     .home-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     @media (max-width: 680px) { .home-tiles { grid-template-columns: 1fr; } }
@@ -114,6 +149,9 @@
 </head>
 <body>
 
+<!-- ── Ambient Σ₀ mandala — full-bleed background field, behind all content ── -->
+<div class="ambient" aria-hidden="true"><div class="ambient__mandala"></div></div>
+
 <!-- ── Skip to content link ── -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
@@ -143,7 +181,6 @@
 
   <!-- ── Hero ── -->
   <div class="hero">
-    <img src="/sigma0-mandala.svg" class="hero-bg" aria-hidden="true" alt="">
     <h1>Observe. Remember. Reason. Act. Verify. Converge.</h1>
     <p class="tagline" id="hero-tagline">Keystone OS is a local-first convergence engine — a persistent reasoning and coding system that runs entirely on your machine and improves from accumulated evidence, never locked to a single model. Chat, trade, and create on the same grounded core.</p>
     <div class="hero-cta-row">
@@ -254,25 +291,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadState() {
-    const [health, version, git, status, routing, agents, dreamer, search, mesh, workers, thisNode] = await Promise.all([
+    // #878: only these 3 endpoints drive elements that exist on this page
+    // (footer status dot/label, hero edition/commit line, version badges).
+    // The former "full index" dashboard — providers, agents, node mesh,
+    // dreamer, readiness, recent entries — was removed, so its loader and the
+    // 8 endpoints it polled (incl. /api/nodes/mesh, /api/agents/workers and
+    // /api/nodes/this, which 404'd every cycle) are gone with it.
+    const [health, version, git] = await Promise.all([
       fetchJson('/api/health'),
       fetchJson('/version.json'),
       fetchJson('/api/version'),
-      fetchJson('/api/status'),
-      fetchJson('/api/pcsf/routing'),
-      fetchJson('/api/agents'),
-      fetchJson('/api/dreamer?user=dreamer'),
-      fetchJson('/api/dream/search'),
-      fetchJson('/api/nodes/mesh'),
-      fetchJson('/api/agents/workers'),
-      fetchJson('/api/nodes/this'),
     ]);
 
-    // Server + version
+    // Server status (footer dot + label)
     const serverOnline = !!(health && health.ok);
     $('status-dot').className = serverOnline ? 'dot online' : 'dot';
     $('status-label').textContent = serverOnline ? 'server online' : 'server unreachable';
 
+    // Version + git (hero sub-line + clickable version badges)
     const v = version?.version || 'unknown';
     const g = git?.version;
     const branch = g?.branch || 'unknown';
@@ -281,9 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('hero-edition').textContent = 'Orion Edition · ' + branch;
     $('hero-git').textContent = shortCommit + (commitDate ? ' · ' + commitDate : '');
-    $('status-right').textContent = 'Keystone OS · ' + branch + ' · ' + v;
 
-    // Version badges
     document.querySelectorAll('[data-version-badge]').forEach(el => {
       const prefix = el.dataset.versionBadge || '';
       el.textContent = prefix + 'v' + v;
@@ -291,110 +325,6 @@ document.addEventListener('DOMContentLoaded', () => {
       el.title = 'View changelog';
       el.onclick = () => window.open('/repo/CHANGELOG.MD', '_blank');
     });
-
-    // Providers
-    const provMap = routing?.providers || [];
-    const provWithKey = provMap.filter(p => p.hasKey);
-    const provNames = provWithKey.map(p => p.id).join(', ');
-    if (provWithKey.length === 0) {
-      $('panel-chat-desc').textContent = 'No AI provider keys configured. Chat works offline. Add a key in Settings to stream responses.';
-      $('pill-ai-chat').className = 'pill held';
-      $('pill-ai-chat').textContent = 'Offline';
-      $('note-ai-chat').textContent = 'No provider keys found. Chat works locally. Add GEMINI_API_KEY, OPENAI_API_KEY, etc. in Settings.';
-    } else {
-      $('panel-chat-desc').textContent = 'Streaming via ' + provNames + '. Fails fast if a provider is down.';
-      $('pill-ai-chat').className = 'pill live';
-      $('pill-ai-chat').textContent = 'Live';
-      $('note-ai-chat').textContent = 'Configured: ' + provNames + '. Streams when a provider key is set.';
-    }
-    $('stat-providers').textContent = provWithKey.length + ' of ' + provMap.length + ' providers configured';
-
-    // Agents
-    const agentList = agents?.agents || [];
-    const agentNames = agentList.map(a => a.name).join(', ') || 'none';
-    $('stat-agents').textContent = agentList.length + ' agent' + (agentList.length === 1 ? '' : 's') + ' available: ' + agentNames;
-
-    // Node Mesh & Workers
-    const nodeCount = mesh?.nodeCount || 0;
-    const aliveCount = mesh?.aliveCount || 0;
-    const nodeList = mesh?.nodes || [];
-    const workersList = workers?.agents || [];
-    const totalWorkers = workers?.totalWorkers || 0;
-
-    if (nodeCount > 0) {
-      $('nodes-status').textContent = aliveCount + ' of ' + nodeCount + ' node' + (nodeCount === 1 ? '' : 's') + ' online';
-      const nodeHTML = nodeList.slice(0, 5).map(n => {
-        const alive = n.isAlive ? '🟢' : '🔴';
-        return `${alive} ${n.nodeName} (${n.agents ? n.agents.length : 0} agents, ${n.workerCount || 0} worker${n.workerCount === 1 ? '' : 's'}) — ${n.lastSeenAgo}`;
-      }).join('<br>');
-      $('nodes-list').innerHTML = nodeHTML;
-    } else {
-      $('nodes-status').textContent = 'No nodes registered yet. Machines running Keystone OS will appear here.';
-      $('nodes-list').innerHTML = '';
-    }
-
-    if (workersList.length > 0) {
-      const topWorkers = workersList.slice(0, 3).map(w => `${w.agent} (${w.totalWorkers})`).join(', ');
-      $('workers-summary').textContent = 'Total workers: ' + totalWorkers + ' across ' + workersList.length + ' agent' + (workersList.length === 1 ? '' : 's') + '. Top: ' + topWorkers;
-    } else if (totalWorkers === 0 && nodeCount === 0) {
-      $('workers-summary').textContent = 'Register nodes to see active workers and collaborators.';
-    }
-
-    // Dreamer / notebook
-    const entries = dreamer?.entries || [];
-    const entryCount = entries.length;
-    if (entryCount > 0) {
-      const latest = entries[entries.length - 1];
-      const latestDate = latest?.recordedAt ? fmtDate(latest.recordedAt) : '';
-      $('panel-journal-desc').textContent = entryCount + ' entr' + (entryCount === 1 ? 'y' : 'ies') + ' recorded' + (latestDate ? '. Latest: ' + latestDate : '') + '.';
-      $('stat-capture').textContent = entryCount + ' entr' + (entryCount === 1 ? 'y' : 'ies') + ' saved. JSONL export available.';
-    } else {
-      $('panel-journal-desc').textContent = 'No entries yet. Start capturing dreams, notes, and symbols.';
-      $('stat-capture').textContent = 'No entries yet. Dream, note, symbol, lore, mirror, and place entries supported.';
-    }
-
-    // Readiness / arc reactor
-    const readiness = status?.readiness || {};
-    const arc = status?.arc || {};
-    const readinessScore = readiness.pass ?? '—';
-    const readinessWarn = readiness.warn ?? 0;
-    const readinessFail = readiness.fail ?? 0;
-    let readinessText = 'Ready: ' + readinessScore;
-    if (readinessFail > 0) readinessText += ' · ' + readinessFail + ' failed';
-    if (readinessWarn > 0) readinessText += ' · ' + readinessWarn + ' warnings';
-    $('stat-readiness').textContent = readinessText;
-
-    $('benchmark-subtitle').textContent = 'Real-time feature status from this instance.';
-
-    // Server stat
-    $('stat-server').textContent = serverOnline ? 'Node.js running on port ' + (health?.port || '4177') : 'Server not responding';
-
-    // Recent journal entries (G2 — real backend data)
-    const recentList = $('recent-entries-list');
-    const recentSection = $('recent-entries-section');
-    if (search && search.results && search.results.length > 0 && recentList && recentSection) {
-      recentSection.style.display = '';
-      const entries = search.results.slice(0, 10);
-      recentList.innerHTML = entries.map(e => {
-        const kind = e.kind || 'dream';
-        const ts = e.timestamp ? fmtDate(e.timestamp) : '';
-        const text = (e.text || e.content || '').slice(0, 140);
-        const tags = (e.tags || []).slice(0, 4).map(t => `<span class="pill pill-recent">${t}</span>`).join('');
-        const lucid = typeof e.lucidity === 'number' ? `<span class="recent-lucidity">lucidity ${e.lucidity.toFixed(1)}</span>` : '';
-        return `<div class="recent-entry">
-          <div class="recent-entry-header">
-            <span class="recent-entry-kind">${kind}</span>
-            <span class="recent-entry-ts">${ts}</span>
-            ${lucid}
-          </div>
-          <div class="recent-entry-text">${text}${text.length >= 140 ? '…' : ''}</div>
-          <div class="recent-entry-tags">${tags}</div>
-        </div>`;
-      }).join('');
-      $('recent-subtitle').textContent = entries.length + ' latest entr' + (entries.length === 1 ? 'y' : 'ies') + ' from this instance.';
-    } else if (recentSection) {
-      recentSection.style.display = 'none';
-    }
   }
 
   loadState();

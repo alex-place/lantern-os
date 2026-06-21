@@ -178,7 +178,17 @@ const routes = [
 
 // ── Session middleware (Patreon OAuth) ──
 const session = require("express-session");
-const sessionSecret = process.env.SESSION_SECRET || "lantern-local-dev-secret-change-in-prod";
+// Fail-closed: the committed dev default may sign sessions only on loopback. Bound
+// beyond loopback (PORT set / NODE_ENV=production) without a real SESSION_SECRET,
+// refuse to boot rather than sign with a repo-public key. #867
+const { resolveSessionSecret } = require("./lib/session-secret");
+let sessionSecret;
+try {
+  sessionSecret = resolveSessionSecret(process.env);
+} catch (err) {
+  console.error("[FATAL] " + err.message);
+  process.exit(1);
+}
 const sessionMiddleware = session({
   secret: sessionSecret,
   resave: false,

@@ -15,6 +15,33 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.0] - 2026-06-21
+
+### Added
+- **CSF-Omni codec — deterministic best-fit compression (`codec="omni"`).** New [`src/csf/omni.py`](src/csf/omni.py): runs the whole codec panel (store/zlib/bz2/lzma/zstd/brotli + a byte-delta transform) per blob, round-trip-verifies each candidate, and emits the smallest behind a 7-byte self-describing, **CRC-32** header. Wired into `csf_pack` as a 4th codec alongside `zstd`/`zlib`/`store` (backward-compatible — v0.8 zstd/zlib/store archives still read byte-for-byte). It is the **upper envelope**: on three real corpora it beats every other codec (zlib/zstd/lzma/bz2) on every single stream and *ties* the brotli frontier within its header — it does **not** beat brotli's raw bytes (no PPMd/paq available). Honest result vs the shipped zstd-19: per-stream **+2.8 % / +16.3 % / +6.5 %**; on the multi-file archive only **+2 %** over `zstd`+shared-dict (`use_dict=True`) at ~7× the encode, so **zstd stays the default** and omni is the opt-in max-ratio tier for single-stream cold/archival blobs. The CRC catches corruption a raw zstd/brotli frame returns silently; `portable=True` restricts to stdlib codecs. Verified by a round-trip benchmark ([`experiments/csf_compression_benchmark.py`](experiments/csf_compression_benchmark.py)) + a 6-agent adversarial review (2 defects found & fixed: a corrupt brotli payload could decode to silently-wrong bytes → CRC + `ValueError` decode contract; a docstring over-claim → envelope wording). Docs: [`docs/CSF-FORMAT-SPECIFICATION.md`](docs/CSF-FORMAT-SPECIFICATION.md) §2.7.1 + report `/reports/csf-compression-benchmark.pdf`. Tests: [`tests/test_csf_pack.py`](tests/test_csf_pack.py) (omni round-trip, CRC integrity, payload-envelope).
+
+---
+
+## [1.5.9] - 2026-06-21
+
+### Added
+- **Grounding envelope `[claim, evidence, confidence, source]`** (Σ₀-K1 component 9 / Verify stage, closes #849). `ConvergenceRecord` now carries a `source` field in both the Python dataclass (`src/convergence/objects.py`) and JS emitter (`convergence-records.js`), schema locked by the cross-language contract tests. Three call sites (dream-chat reasoning, kalshi-suggest, stream-chat) pass `source` (reasoner/provider/model or `kalshi-market/<ticker>`), so every emitted record is a complete External-Reality-Rule envelope. Adds a `grounding_precision` metric to `eval_keystone.py`. Coexists with `applied_evidence` (#764 G9). Curated from #890 (@cdblasioli-gif) — cherry-picked the 8-file change onto clean master since the PR branch carried pre-existing conflict markers in unrelated files. 62 convergence tests pass.
+
+## [1.5.8] - 2026-06-20
+
+### Changed
+- **Gitignore runtime data that automation kept committing** (surfaced by junk PR #885, branch `auto/master`): conversation backups (`data/conversations/*.bak`, `*.cleared-*.jsonl`), the convergence audit log (`apps/data/convergence-audit.jsonl`), and the admin feature-flags runtime store (`data/admin/feature-flags.json`). These are machine-local runtime state — and the conversation backups can carry PII — so they must never be tracked. Closes the gap where the gitignore covered `garage-conversations.jsonl` but not its `.bak`/`.cleared-*` backups.
+
+## [1.5.7] - 2026-06-20
+
+### Security
+- **Session secret fails closed beyond loopback (#867).** `lib/session-secret.js` `resolveSessionSecret()` (wired in `server.js`) allows the committed dev secret ONLY on loopback; bound beyond loopback (PORT set / production) a real `SESSION_SECRET` is required or the server refuses to boot — never signs sessions with the publicly-known key. Test: `tests/test_session_secret.js`.
+- **Single-source TLS-verification gate (#869).** `lib/insecure-tls.js` consolidates the win32-only insecure-TLS workaround (verification stays ON elsewhere; opt-out `LANTERN_INSECURE_TLS=0`); `providers.js`/`stream-chat.js` share the agent so it can't drift. Test: `tests/test_insecure_tls.js`.
+- Opt-in JSONL rotation on hot paths + other hardening (`file-queue.js`, `files.js`, `pdfs.js` entitlement, `agent-worker-loop.js`).
+
+### Notes
+- Lands the unique value of **#881** (external author, consolidating #862-873), which was largely redundant with fixes the fleet had already merged. The two files that conflicted with the already-landed #873 hardening (`routes/keystone.js`, `lib/self-edit-engine.js`) keep master's tested version.
+
 ## [Unreleased]
 
 ### Planned (ORION / Lantern OS Performance)
@@ -68,13 +95,6 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 ### Verification
 
 - Added as documentation-only files; no runtime behavior changed.
-
----
-
-## [1.6.0] - 2026-06-21
-
-### Added
-- **CSF-Omni codec — deterministic best-fit compression (`codec="omni"`).** New [`src/csf/omni.py`](src/csf/omni.py): runs the whole codec panel (store/zlib/bz2/lzma/zstd/brotli + a byte-delta transform) per blob, round-trip-verifies each candidate, and emits the smallest behind a 7-byte self-describing, **CRC-32** header. Wired into `csf_pack` as a 4th codec alongside `zstd`/`zlib`/`store` (backward-compatible — v0.8 zstd/zlib/store archives still read byte-for-byte). It is the **upper envelope**: on three real corpora it beats every other codec (zlib/zstd/lzma/bz2) on every single stream and *ties* the brotli frontier within its header — it does **not** beat brotli's raw bytes (no PPMd/paq available). Honest result vs the shipped zstd-19: per-stream **+2.8 % / +16.3 % / +6.5 %**; on the multi-file archive only **+2 %** over `zstd`+shared-dict (`use_dict=True`) at ~7× the encode, so **zstd stays the default** and omni is the opt-in max-ratio tier for single-stream cold/archival blobs. The CRC catches corruption a raw zstd/brotli frame returns silently; `portable=True` restricts to stdlib codecs. Verified by a round-trip benchmark ([`experiments/csf_compression_benchmark.py`](experiments/csf_compression_benchmark.py)) + a 6-agent adversarial review (2 defects found & fixed: a corrupt brotli payload could decode to silently-wrong bytes → CRC + `ValueError` decode contract; a docstring over-claim → envelope wording). Docs: [`docs/CSF-FORMAT-SPECIFICATION.md`](docs/CSF-FORMAT-SPECIFICATION.md) §2.7.1 + report `/reports/csf-compression-benchmark.pdf`. Tests: [`tests/test_csf_pack.py`](tests/test_csf_pack.py) (omni round-trip, CRC integrity, payload-envelope).
 
 ---
 

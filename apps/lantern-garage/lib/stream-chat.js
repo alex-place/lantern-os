@@ -2,16 +2,12 @@ const https = require("https");
 const http = require("http");
 const path = require("path");
 
-// On Windows, Node's bundled CA store sometimes can't verify cloud-provider certs
-// ("unable to verify the first certificate"). Without this, every cloud request
-// throws, the auto cascade swallows the error, and the chat silently degrades to the
-// weak local Ollama model — the "calm while wrong" failure in #740. Mirror the
-// self-edit-engine / routes/providers workaround, but scope it to Windows (or an
-// explicit opt-in) so TLS verification is not disabled on other platforms. Set
-// LANTERN_INSECURE_TLS=0 to force-disable, =1 to force-enable anywhere.
-const INSECURE_TLS = process.env.LANTERN_INSECURE_TLS === "1" ||
-  (process.platform === "win32" && process.env.LANTERN_INSECURE_TLS !== "0");
-const llmAgent = INSECURE_TLS ? new https.Agent({ rejectUnauthorized: false }) : undefined;
+// TLS-verification gate centralized in lib/insecure-tls.js (shared by self-edit-engine
+// + routes/providers so the gate can't drift). Without it on Windows, cloud requests
+// throw, the auto cascade swallows the error, and chat silently degrades to the weak
+// local model — the "calm while wrong" failure in #740. Insecure only on Windows or
+// LANTERN_INSECURE_TLS=1; LANTERN_INSECURE_TLS=0 forces it off. #869
+const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse } = require("./dream-chat");
 const { modelFor } = require("./provider-models");
@@ -584,6 +580,7 @@ async function handleStreamChat(req, url, res) {
               reasoner: "convergance-council",
               verified: true,
               verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+              source: `council/${result.provider}/${result.model}`,
             });
             recordId = rec && rec.id;
           } catch (_e) { /* record emit is best-effort */ }

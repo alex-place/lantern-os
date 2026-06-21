@@ -19,8 +19,12 @@ os.environ.setdefault("DISCORD_BOT_TOKEN", "test-token-for-pytest")
 os.environ.setdefault("LANTERN_DISCORD_GUILD_ID", "111111111111111")
 os.environ.setdefault("LANTERN_DISCORD_CHANNEL_ID", "222222222222222")
 
-import discord
 import pytest
+
+# discord is an optional dep; skip the module cleanly at collection time when it's
+# absent instead of crashing with ModuleNotFoundError (the reason this suite was
+# CI-excluded). #862
+discord = pytest.importorskip("discord")  # noqa: F401
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src" / "discord_lounge_bot"))
 try:

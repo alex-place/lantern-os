@@ -358,7 +358,7 @@ async function _logProviderCall(entry) {
     await appendJsonlQueued(PROVIDER_CALL_LOG_PATH, {
       timestamp: new Date().toISOString(),
       ...entry,
-    });
+    }, { rotate: true }); // bound growth — appended on every provider call (#872)
   } catch (err) {
     console.error("[provider-router] Failed to log provider call:", err.message);
   }
