@@ -65,8 +65,13 @@ async function cloudHealthy(port) {
   const r = await post(port, "/api/dream/chat/stream",
     { message: "ping", sessionId: "auto-dispatch-cloud-probe" }, 30000);
   if (!r || !r.text) return false;
-  const degraded = /cloud unreachable|⚠\s*degraded|"degraded"\s*:\s*true|"provider"\s*:\s*"ollama"/i.test(r.text);
-  return !degraded;
+  // Require POSITIVE evidence of a COMPLETED cloud answer: a `done` event AND no
+  // degraded/local/offline marker. Absence of degraded markers is NOT enough — a
+  // hung route-only response (#965 manifests as just a `route` event, no answer)
+  // has none, and must be treated as unhealthy so the worker pauses.
+  const completed = /"type"\s*:\s*"done"/.test(r.text);
+  const bad = /cloud unreachable|degraded|"provider"\s*:\s*"ollama"|"online"\s*:\s*false/i.test(r.text);
+  return completed && !bad;
 }
 
 function pickTopIssue(repoRoot) {

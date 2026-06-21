@@ -33,6 +33,21 @@ function ok(name, cond) { assert.ok(cond, name); console.log("  ✓ " + name); p
   const healthy = await ad.cloudHealthy(1); // nothing listening on port 1
   ok("cloudHealthy() false when chat is unreachable (conservative pause)", healthy === false);
 
+  // 5b. Gate needs POSITIVE evidence of a completed cloud answer (the #965 bug: a
+  // hung route-only response has NO degraded marker but is NOT healthy).
+  const http = require("http");
+  const mock = (payload) => new Promise((resolve) => {
+    const srv = http.createServer((_req, res) => { res.writeHead(200, { "Content-Type": "text/event-stream" }); res.end(payload); });
+    srv.listen(0, "127.0.0.1", () => resolve(srv));
+  });
+  const probe = async (payload) => { const s = await mock(payload); const h = await ad.cloudHealthy(s.address().port); s.close(); return h; };
+  ok("cloudHealthy() FALSE on route-only/hung response (no done event)",
+     (await probe('data: {"type":"route","agent":"keystone"}\n\n')) === false);
+  ok("cloudHealthy() FALSE on degraded local answer (ollama done)",
+     (await probe('data: {"type":"route"}\n\ndata: {"type":"token","text":"hi"}\n\ndata: {"type":"done","provider":"ollama","online":true}\n\n')) === false);
+  ok("cloudHealthy() TRUE on completed cloud answer (gemini done, no degraded)",
+     (await probe('data: {"type":"route"}\n\ndata: {"type":"token","text":"PONG"}\n\ndata: {"type":"done","provider":"gemini","online":true}\n\n')) === true);
+
   // 6. pickTopIssue never throws (degrades to null on any failure).
   let top;
   assert.doesNotThrow(() => { top = ad.pickTopIssue(process.cwd()); });

@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.26] - 2026-06-21
+
+### Fixed
+- **auto-dispatch cloud-gate now requires positive evidence (#985 follow-up).** `lib/auto-dispatch.js` `cloudHealthy()` treated *absence of degraded markers* as healthy — but the #965 outage manifests as a hung **route-only** chat response (just a `route` event, no `done`, no answer), which has no degraded marker, so the gate would have **false-passed and dispatched during the outage**. Now it requires a completed `done` event AND no degraded/local/offline marker. Added mock-server tests (route-only → pause, ollama-done → pause, cloud-done → go). Caught while safety-checking before enabling.
+
 ## [1.7.25] - 2026-06-21
 
 ### Added
