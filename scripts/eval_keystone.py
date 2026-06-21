@@ -30,6 +30,24 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROMPTS = os.path.join(ROOT, "data", "eval", "sigma0-prompts.jsonl")
 
 
+def has_source_citation(reply: str) -> bool:
+    """Return True if the reply carries an external source citation.
+
+    A cited reply contains a URL (https?://) or an explicit evidence marker
+    ([source:…], [evidence:…], source:, evidence:). This is the proxy for
+    the External Reality Rule grounding-precision metric (Gate B, §3).
+    """
+    import re
+    r = reply.lower()
+    if re.search(r'https?://', r):
+        return True
+    if re.search(r'\[(source|evidence|claim):', r):
+        return True
+    if re.search(r'\b(source:|evidence:|according to|from the|cited in)\b', r):
+        return True
+    return False
+
+
 def score(expected: str, reply: str) -> bool:
     """Keyword-coverage rubric: the reply must satisfy EVERY comma-separated key.
 
@@ -134,9 +152,9 @@ def main():
         ask_loop = make_loop_engine(a.base_model, a.adapter, a.mode, a.q, a.eps, a.num_predict)
 
     rows = [json.loads(l) for l in open(PROMPTS, encoding="utf-8") if l.strip()]
-    detail, n_ok, total_dt, approx_tokens = [], 0, 0.0, 0
+    detail, n_ok, n_cited, total_dt, approx_tokens = [], 0, 0, 0.0, 0
     depths, contractions = [], []
-    print(f"{'#':>2}  {'ok':<3} {'lat':>6}  expected -> reply", flush=True)
+    print(f"{'#':>2}  {'ok':<3} {'src':<3} {'lat':>6}  expected -> reply", flush=True)
     for r in rows:
         meta = None
         try:
@@ -147,11 +165,13 @@ def main():
             ok = score(r["expected"], reply)
         except Exception as e:
             reply, dt, ok = f"[error: {e}]", 0.0, False
+        cited = has_source_citation(reply)
         n_ok += int(ok)
+        n_cited += int(cited)
         total_dt += dt
         approx_tokens += max(1, len(reply.split()))
         d = {"id": r["id"], "prompt": r["prompt"], "expected": r["expected"],
-             "reply": reply, "ok": ok, "latency_s": round(dt, 2)}
+             "reply": reply, "ok": ok, "cited": cited, "latency_s": round(dt, 2)}
         if meta is not None:
             d["mean_depth"] = meta.get("mean_depth")
             if meta.get("mean_depth") is not None:
@@ -160,7 +180,7 @@ def main():
                 d["mean_contraction"] = meta["mean_contraction"]
                 contractions.append(meta["mean_contraction"])
         detail.append(d)
-        cprint(f"{r['id']:>2}  {'OK ' if ok else 'x  '} {dt:>5.1f}s  {r['expected'][:18]!r} -> {reply[:50]!r}")
+        cprint(f"{r['id']:>2}  {'OK ' if ok else 'x  '} {'src' if cited else '   '} {dt:>5.1f}s  {r['expected'][:18]!r} -> {reply[:50]!r}")
 
     n = len(rows)
     summary = {
@@ -172,6 +192,8 @@ def main():
         "pass@1": round(n_ok / n, 3) if n else 0.0,  # alias for cross-benchmark summary
         "avg_latency_s": round(total_dt / n, 2) if n else 0.0,
         "tok_per_s": round(approx_tokens / total_dt, 1) if total_dt else 0.0,
+        # Gate B: fraction of replies carrying an external source citation (External Reality Rule)
+        "grounding_precision": round(n_cited / n, 3) if n else 0.0,
         # Gate F (#851): served cost per CORRECT continuation — track it down vs baseline.
         **verbosity([d["reply"] for d in detail], n_ok),
         # E1: realized latent depth; E2: did the loop contract?
@@ -185,6 +207,7 @@ def main():
     with open(os.path.join(ROOT, "data", "eval", "leaderboard.jsonl"), "a", encoding="utf-8") as f:
         f.write(json.dumps(summary, ensure_ascii=False) + "\n")
     print(f"\n{a.label}: accuracy={summary['accuracy']*100:.0f}%  "
+          f"grounding_precision={summary['grounding_precision']*100:.0f}%  "
           f"avg_latency={summary['avg_latency_s']}s  ~{summary['tok_per_s']} tok/s  (n={n})", flush=True)
 
 

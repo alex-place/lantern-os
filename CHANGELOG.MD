@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.9] - 2026-06-21
+
+### Added
+- **Grounding envelope `[claim, evidence, confidence, source]`** (Σ₀-K1 component 9 / Verify stage, closes #849). `ConvergenceRecord` now carries a `source` field in both the Python dataclass (`src/convergence/objects.py`) and JS emitter (`convergence-records.js`), schema locked by the cross-language contract tests. Three call sites (dream-chat reasoning, kalshi-suggest, stream-chat) pass `source` (reasoner/provider/model or `kalshi-market/<ticker>`), so every emitted record is a complete External-Reality-Rule envelope. Adds a `grounding_precision` metric to `eval_keystone.py`. Coexists with `applied_evidence` (#764 G9). Curated from #890 (@cdblasioli-gif) — cherry-picked the 8-file change onto clean master since the PR branch carried pre-existing conflict markers in unrelated files. 62 convergence tests pass.
+
 ## [1.5.8] - 2026-06-20
 
 ### Changed
