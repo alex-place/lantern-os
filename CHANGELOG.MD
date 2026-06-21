@@ -15,6 +15,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.4] - 2026-06-21
+
+### Changed
+- **Vendor external CDN deps locally — pdf.js + Google Fonts (#861).** The Knowledge Center loaded pdf.js from `unpkg.com` and five pages pulled fonts from `fonts.googleapis.com`/`fonts.gstatic.com`, breaking the local-first/offline guarantee, leaking reader IPs to third parties, and exposing a supply-chain surface (no SRI on the remote scripts).
+  - **pdf.js** (`pdfjs-dist@3.11.174`, pinned): `build/pdf.min.js` + `build/pdf.worker.min.js` vendored to `public/vendor/pdfjs/`; `knowledgecenter.html` now loads both from `/vendor/pdfjs/`.
+  - **Google Fonts** (Cormorant Garamond, Inter, IBM Plex Mono, IBM Plex Sans): woff2 files vendored to `public/vendor/fonts/` with a generated `fonts.css` of local `@font-face` rules. `dream-journal.css`, `kalshi-terminal.html`, `stock-trader.html`, and `trading-news.html` now `@import`/link `/vendor/fonts/fonts.css`; the `googleapis` preconnect is removed. Scoped to **latin + latin-ext** ranges (this is an English UI), trimming 96 CDN font requests to 14 local woff2 (~413 KB total).
+  - Result: zero outbound CDN requests for fonts or pdf.js; the server static-serves `public/vendor/` like the rest of `public/`.
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed

@@ -1,7 +1,7 @@
 /* Dream Journal Orion — Celestial Theme */
 /* CADD + CSF v0.7 Symbolic Qutrit Edition */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+@import url('/vendor/fonts/fonts.css'); /* #861: vendored local-first (was Google Fonts CDN) */
 
 :root {
   /* Celestial palette */
