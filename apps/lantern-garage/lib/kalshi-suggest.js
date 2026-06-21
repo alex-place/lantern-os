@@ -290,6 +290,7 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
         result: `entry ${f.side} ${favLabel} @ ${f.sideAsk}¢ · ${f.reason}`,
         confidence: Math.max(0, Math.min(1, f.conviction / 100)), // conviction is 0..100
         reasoner: "kalshi-suggest",
+        source: `kalshi-market/${m.ticker}`,
       });
     } catch { /* convergence record non-critical */ }
   }

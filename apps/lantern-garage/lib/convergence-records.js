@@ -29,6 +29,7 @@ function _id() {
  * @param {string} [o.reasoner]      which agent/tool reasoned
  * @param {boolean} [o.verified]     tested yet? (false at emit time)
  * @param {string|null} [o.verification_notes]
+ * @param {string|null} [o.source]          External Reality Rule: where did this come from?
  */
 async function emitConvergenceRecord({
   hypothesis,
@@ -38,6 +39,7 @@ async function emitConvergenceRecord({
   reasoner = "unknown",
   verified = false,
   verification_notes = null,
+  source = null,
 } = {}) {
   try {
     const record = {
@@ -50,6 +52,7 @@ async function emitConvergenceRecord({
       timestamp: new Date().toISOString(),
       verified: Boolean(verified),
       verification_notes: verification_notes == null ? null : String(verification_notes),
+      source: source == null ? null : String(source),
     };
     await appendJsonlQueued(RECORDS_PATH, record);
     return record;
