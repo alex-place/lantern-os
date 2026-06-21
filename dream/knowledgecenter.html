@@ -1,64 +1,124 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
-  <title>Knowledge Center — Keystone OS</title>
+  <link rel="manifest" href="/manifest.json">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid a flash of the wrong theme
+       (matches index.html / explore.html). theme-toggle.js re-affirms this + the
+       button label after load. */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+  <title>Help &amp; Knowledge Center — Keystone OS</title>
   <link rel="stylesheet" href="/css/site.css">
-  <link rel="stylesheet" href="css/dream-chat.css">
   <link rel="stylesheet" href="/css/narrator.css">
   <style>
-    /* This is a scrolling document page, not the fixed-height chat shell.
-       dream-chat.css locks html/body/.app to the viewport with overflow:hidden;
-       override that here so the Knowledge Center scrolls normally. */
-    html, body { height: auto; min-height: 100vh; overflow-x: hidden; overflow-y: auto; }
-    .app { display: block; height: auto; min-height: 0; overflow: visible; width: 100%; }
-    /* dream-chat.css hides scrollbars globally — restore a usable one for this page */
-    html { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-    ::-webkit-scrollbar { display: block; width: 10px; height: 10px; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
+    /* ── Help center: a normal scrolling document hub that matches the site.
+       Uses only site.css tokens (--bg/--surface/--border/--text/--muted/--accent
+       /--radius) so it stays in lock-step with the rest of Keystone OS. ── */
+    .kc-page { max-width: 1080px; margin: 0 auto; padding: 12px 24px 96px; }
 
-    .kc-page { max-width: 920px; margin: 0 auto; padding: 28px 24px 96px; }
-    /* Use the width on bigger displays — the card grids auto-fill more columns,
-       so the hub reads like a newspaper front page instead of one tall column. */
-    @media (min-width: 1100px) { .kc-page { max-width: 1180px; } }
-    @media (min-width: 1700px) { .kc-page { max-width: 1500px; } }
-    @media (min-width: 2400px) { .kc-page { max-width: 1900px; } }
-    .kc-header { margin: 4px 0 28px; }
-    .kc-header h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
-    .kc-header p { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
-    .section { margin-bottom: 40px; }
-    .section h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+    /* Hero — same centred treatment as explore.html / index.html */
+    .kc-hero { text-align: center; padding: 40px 0 8px; }
+    .kc-eyebrow {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .kc-hero h1 {
+      font-size: clamp(1.9rem, 5vw, 2.6rem); font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1.15; margin: 10px 0 12px;
+    }
+    .kc-hero p {
+      font-size: 1.04rem; color: var(--muted); line-height: 1.6;
+      max-width: 600px; margin: 0 auto;
+    }
+
+    /* Search (wraps the live grounding/help search — same API, friendlier framing) */
+    .kc-search { max-width: 640px; margin: 26px auto 8px; }
+    .kc-search-row { display: flex; gap: 8px; }
+    .kc-search input {
+      flex: 1; min-width: 0; padding: 12px 14px;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface); color: var(--text); font: inherit;
+    }
+    .kc-search input:focus { outline: none; border-color: var(--accent); }
+    .kc-search button {
+      flex: none; padding: 12px 18px; border: none; border-radius: 10px;
+      background: var(--accent); color: #fff; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .kc-search button:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .kc-search-hint { margin-top: 8px; font-size: 0.78rem; color: var(--muted); text-align: center; }
+    #kb-result pre { white-space: pre-wrap; margin: 8px 0 0; font: inherit; }
+
+    /* Sections + eyebrow heading */
+    .section { margin: 44px 0 0; }
+    .section-head { margin-bottom: 16px; }
+    .section-head .label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .section-head h2 { font-size: 1.2rem; font-weight: 700; margin: 4px 0 0; color: var(--text); }
+    .section-head p { font-size: 0.86rem; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+    /* Card grid + cards — mirrors the home tiles (tinted icon chip, lift on hover) */
     .link-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
     }
     .link-card {
-      display: flex; flex-direction: column; gap: 6px;
+      --tile: var(--accent);
+      display: flex; flex-direction: column; gap: 8px;
       padding: 18px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; text-decoration: none; color: var(--text);
-      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      border-radius: var(--radius); text-decoration: none; color: var(--text);
+      box-shadow: var(--shadow);
+      transition: border-color 0.2s, background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
     .link-card:hover {
-      border-color: var(--accent); background: var(--surface2); transform: translateY(-2px);
+      border-color: var(--tile); background: var(--surface2);
+      transform: translateY(-2px); box-shadow: var(--shadow-hover);
     }
-    .link-card .icon { font-size: 22px; }
-    .link-card h3 { font-size: 0.92rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-    .link-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
-    /* Last-modified label on Research & Theory cards — pushed to the card foot so
-       dates line up across a row. Source is each linked doc's git commit date. */
-    .link-card .card-meta {
-      margin-top: auto; padding-top: 6px;
-      font-size: 0.68rem; color: var(--muted); opacity: 0.72;
-      letter-spacing: 0.01em; font-variant-numeric: tabular-nums;
+    .link-card .icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 12px; font-size: 22px; line-height: 1;
+      background: color-mix(in srgb, var(--tile) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tile) 30%, transparent);
+      transition: transform 0.2s, background 0.2s, border-color 0.2s;
     }
+    .link-card:hover .icon {
+      transform: translateY(-1px) scale(1.05) rotate(-3deg);
+      background: color-mix(in srgb, var(--tile) 24%, transparent);
+    }
+    .link-card h3 {
+      font-size: 0.96rem; font-weight: 600; margin-top: 2px;
+      display: flex; align-items: center; gap: 6px; color: var(--text);
+    }
+    .link-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
+    .link-card .go {
+      margin-top: auto; padding-top: 6px; font-size: 0.78rem;
+      font-weight: 600; color: var(--tile);
+    }
+    /* per-card accent identities (match the home tiles) */
+    .tile-cyan   { --tile: #06b6d4; }
+    .tile-green  { --tile: #10b981; }
+    .tile-violet { --tile: #a78bfa; }
+    .tile-gold   { --tile: #f59e0b; }
+    .tile-rose   { --tile: #fb7185; }
 
-    /* Plain-English jargon glosses (#748): a small "?" affordance on jargon cards
-       that reveals a one-line normie definition on hover (the badge), keyboard
-       focus of the card, or tap (see the small handler near </body>). */
+    /* Plain-English jargon glosses (#748): a small "?" affordance that reveals a
+       one-line normie definition on hover, keyboard focus, or tap. */
     .gloss {
       position: relative; flex: none;
       display: inline-flex; align-items: center; justify-content: center;
@@ -67,7 +127,7 @@
       color: var(--muted); border: 1px solid var(--border); border-radius: 50%;
       cursor: help; user-select: none; transition: color .15s, border-color .15s;
     }
-    .link-card:hover .gloss { color: var(--accent); border-color: var(--accent); }
+    .link-card:hover .gloss { color: var(--tile); border-color: var(--tile); }
     .gloss-bubble {
       position: absolute; bottom: calc(100% + 8px); left: 50%;
       width: max-content; max-width: 230px;
@@ -87,10 +147,52 @@
     }
     @media (max-width: 520px) { .gloss-bubble { max-width: 180px; } }
 
-    /* PDF gallery */
+    /* Quick-help Q&A strip */
+    .qa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .qa {
+      padding: 18px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .qa h3 { font-size: 0.92rem; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+    .qa p { font-size: 0.84rem; color: var(--muted); line-height: 1.55; }
+    .qa a { color: var(--accent); text-decoration: none; }
+    .qa a:hover { text-decoration: underline; }
+
+    /* "Under the hood" — collapsed by default so normies aren't hit with the
+       Σ₀ / Convergence / CSF research wall first. Every link is preserved inside. */
+    details.kc-deep {
+      margin-top: 16px; border: 1px solid var(--border);
+      border-radius: var(--radius); background: var(--surface);
+    }
+    details.kc-deep > summary {
+      cursor: pointer; list-style: none; padding: 18px 20px;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 1rem; font-weight: 700; color: var(--text);
+    }
+    details.kc-deep > summary::-webkit-details-marker { display: none; }
+    details.kc-deep > summary .chev { margin-left: auto; color: var(--muted); transition: transform .2s; }
+    details.kc-deep[open] > summary .chev { transform: rotate(180deg); }
+    details.kc-deep[open] > summary { border-bottom: 1px solid var(--border); }
+    details.kc-deep > summary .badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 11px; font-size: 19px;
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .kc-deep-body { padding: 4px 20px 22px; }
+    .kc-deep-body .section:first-child { margin-top: 24px; }
+    .kc-deep-note {
+      font-size: 0.86rem; color: var(--muted); line-height: 1.55;
+      margin: 18px 0 4px; padding: 14px 16px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    }
+    .kc-deep-note a { color: var(--accent); text-decoration: none; }
+    .kc-deep-note a:hover { text-decoration: underline; }
+
+    /* PDF gallery (Documents) — unchanged behaviour, restyled to tokens */
     .pdf-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
     .pdf-search {
-      flex: 1; min-width: 180px; padding: 7px 12px;
+      flex: 1; min-width: 180px; padding: 9px 12px;
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 8px; color: var(--text); font-size: 0.88rem;
     }
@@ -138,10 +240,11 @@
       opacity: 0.7; margin-top: -4px; line-height: 1.4;
     }
     .pdf-loading { text-align: center; color: var(--muted); padding: 40px 0; }
-
   </style>
 </head>
 <body>
+
+<!-- ── Site nav (matches index.html) ── -->
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
@@ -153,298 +256,419 @@
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html" class="active">Help</a>
+    <span class="sep" style="margin: 0 4px;">·</span>
+    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
   </div>
   <div class="nav-actions">
+    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile" style="display:none;">👤</a>
+    <button class="nav-btn" id="logout-btn" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
     <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
   </div>
 </nav>
-<div class="app">
-  <div class="kc-page" data-narrate>
 
-    <div class="kc-header">
-      <h1>Knowledge Center</h1>
-      <p>Guides, live tools, research, and reference for Keystone OS.</p>
-    </div>
+<main class="kc-page" data-narrate>
 
-    <div class="section">
-      <h2>Grounding &amp; Σ₀ updates</h2>
-      <p style="opacity:.8;margin:-2px 0 12px">
-        These docs <strong>are the live grounding corpus</strong>: the assistant retrieves
-        the nearest section before answering (deterministic/near routing, $0 before the LLM).
-        <strong><a href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md">📊 Progress Report (shareholder edition, 2026-06-19)</a></strong> ·
-        Recent Σ₀ additions —
-        <a href="/repo/docs/LANTERN-SIGMA0-CODER.md">lantern-sigma0-coder</a>,
-        <a href="/repo/docs/OURO-LOOPLM.md">Ouro / LoopLM (Q-exit)</a>,
-        <a href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">Kernel model frontier</a>,
-        <a href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">Convergence-exit spiral</a>,
-        <a href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">Convergence Core spine</a>,
-        <a href="/repo/docs/SIGMA0-K1-KERNEL-SPEC.md">Σ₀-K1 kernel spec</a>,
-        <a href="/repo/docs/SIGMA0-OURO-CODER.md">Σ₀ Ouro Coder</a>,
-        <a href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">CSF-Pack v0.8</a>.
-      </p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <input id="kb-q" type="text" placeholder="Ask the knowledge base… e.g. what is Ouro looped reasoning"
-          style="flex:1;min-width:240px;padding:10px 12px;border-radius:8px;border:1px solid var(--border,#2a2a2a);background:var(--bg,#0e0e0e);color:inherit;font:inherit"
-          onkeydown="if(event.key==='Enter')kbAsk()">
-        <button onclick="kbAsk()" class="link-card" style="padding:10px 16px;cursor:pointer">Search grounding</button>
-      </div>
-      <div id="kb-result" style="margin-top:10px"></div>
-    </div>
-    <script>
-      async function kbAsk() {
-        const q = document.getElementById('kb-q').value.trim();
-        const out = document.getElementById('kb-result');
-        if (!q) return;
-        out.innerHTML = '<span style="opacity:.6">searching grounding corpus…</span>';
-        try {
-          const r = await fetch('/api/knowledge/query?q=' + encodeURIComponent(q));
-          const d = await r.json();
-          if (d && d.hit) {
-            const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-            out.innerHTML =
-              '<div class="link-card" style="display:block;cursor:default">' +
-              '<div style="font-size:.8em;opacity:.7">tier: <b>' + d.tier + '</b> · score ' + (d.score ?? '—') +
-              ' · <a href="/repo/' + esc((d.source||'').split('#')[0]) + '">' + esc(d.source) + '</a></div>' +
-              '<pre style="white-space:pre-wrap;margin:8px 0 0;font:inherit">' + esc((d.text||'').slice(0,900)) + '</pre></div>';
-          } else {
-            out.innerHTML = '<span style="opacity:.6">No strong grounding match — the assistant would answer with the full LLM.</span>';
-          }
-        } catch (e) {
-          out.innerHTML = '<span style="opacity:.6">Grounding API unavailable: ' + e.message + '</span>';
-        }
-      }
-    </script>
-
-    <div class="section">
-      <h2>Getting Started</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/repo/README.md">
-          <span class="icon">📖</span>
-          <h3>README</h3>
-          <p>Overview, architecture, and quick start.</p>
-        </a>
-        <a class="link-card" href="/repo/QUICKSTART.md">
-          <span class="icon">🚀</span>
-          <h3>Quick Start</h3>
-          <p>Install, configure, and run Keystone OS locally (dual-boot 4177 + 4178).</p>
-        </a>
-        <a class="link-card" href="/repo/AGENTS.md">
-          <span class="icon">🤖</span>
-          <h3>Agents Guide</h3>
-          <p>How AI agents and the per-agent monoworkstream lanes work.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/ADMIN-FEATURE-FLAGS.md">
-          <span class="icon">🚩</span>
-          <h3>Feature Flags <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Admin-only: on/off feature switches, plus hide or disable any navigation page. Hidden just removes the nav link; Disabled is a server-enforced kill-switch.</span></span></h3>
-          <p>Admin guide — feature flags &amp; per-page navigation visibility. Configure at <code>/admin-flags.html</code>.</p>
-        </a>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Explore</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/dream-chat.html">
-          <span class="icon">📓</span>
-          <h3>Dream Journal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A free-form chat journal. "RP" = roleplay, "personas" = different AI characters, and "provider fallback" = it switches to another AI model if one is unavailable.</span></span></h3>
-          <p>Freeform RP chat journal with agent personas and provider fallback.</p>
-        </a>
-        <a class="link-card" href="/three-doors-game.html">
-          <span class="icon">🚪</span>
-          <h3>Three Doors <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A symbolic choose-your-path game ("The Kingdome") — pick a door, see where it leads, and replay endlessly.</span></span></h3>
-          <p>The Kingdome — an infinitely replayable, symbolic door game.</p>
-        </a>
-        <a class="link-card" href="/flourishing">
-          <span class="icon">🌱</span>
-          <h3>Flourishing Dashboard <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A live dashboard that tracks well-being signals (a "sensor mesh" of inputs) against established human-flourishing frameworks.</span></span></h3>
-          <p>Human Flourishing Frameworks — the real-time sensor-mesh dashboard.</p>
-        </a>
-        <a class="link-card" href="/kalshi-terminal.html">
-          <span class="icon">📈</span>
-          <h3>Kalshi Terminal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A trading screen for Kalshi — a regulated market where you bet on real-world events (elections, weather). The "Impossibility Deck" is its swipe-to-decide card UI.</span></span></h3>
-          <p>Markets terminal — the Impossibility Deck and live event contracts.</p>
-        </a>
-        <a class="link-card" href="/crypto-dashboard.html">
-          <span class="icon">🪙</span>
-          <h3>Crypto Dashboard</h3>
-          <p>Real-time BTC / ETH / SOL / XRP / DOGE prices and market news.</p>
-        </a>
-        <a class="link-card" href="/orchestration.html">
-          <span class="icon">🧭</span>
-          <h3>Orchestration <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">How a message gets handled: it figures out what you're asking ("intent"), checks the answer is grounded in real data ("convergence gate"), and switches AI models if one fails.</span></span></h3>
-          <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
-        </a>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Research &amp; Theory</h2>
-      <p style="opacity:.8;margin:-8px 0 14px;font-size:.82rem">Sorted by last updated — newest first. Each date is the document's last git commit.</p>
-      <div class="link-grid" id="research-grid">
-        <a class="link-card" data-modified="2026-06-20T13:58:33-04:00" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
-          <span class="icon">📐</span>
-          <h3>Σ₀ Collapse Certificate <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Σ₀ ("sigma-zero") is the project's core stability math. This document proves the reasoning loop stays grounded instead of spiralling into confident nonsense.</span></span></h3>
-          <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
-          <span class="card-meta">Updated Jun 20, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T22:38:35-04:00" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent,#5b8cff)">
-          <span class="icon">📊</span>
-          <h3>Progress Report — Shareholder Edition <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An honest, evidence-tagged status of where Keystone — the bounded, self-improving agent — stands: what shipped, the real numbers, and the next milestones.</span></span></h3>
-          <p>2026-06-19 — what shipped (token-budgeted memory #772, the loop's first closing slice), the real metrics (34% golden-set baseline), the honest ceiling, and the roadmap. Every claim evidence-tagged.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T22:38:35-04:00" href="/repo/docs/SIGMA0-K1-KERNEL-SPEC.md">
-          <span class="icon">🧱</span>
-          <h3>Σ₀-K1 Kernel Spec <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The "kernel" is the small local model at the center of the loop (Ouro-1.4B, not an Ollama model). This spec freezes its first buildable design — and is honest that it's a weak core engineered to converge, not a strong model.</span></span></h3>
-          <p>The first buildable convergence kernel — Ouro-1.4B + Σ₀ QLoRA wrapped in a replayable state VM, drift-equivalent provider hot-swap, and mandatory grounding. Honest headline: a weak 1.4B core (HumanEval pass@1 0.1) engineered to converge, not a strong model. Every claim evidence-tagged; the state-ABI shim is the one true blocker.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T22:30:40-04:00" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
-          <span class="icon">🧩</span>
-          <h3>Convergence Core spine <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The design for turning Lantern's already-built parts (memory, task, tool, record + the Σ₀ safety system) into one closed agent loop — and the single feedback wire that's still missing.</span></span></h3>
-          <p>The four core objects, the six-stage loop, and the write-back closure already exist in code (kernel.py, verify.py); the gap is that none of it runs end-to-end in the serving path. Verified file-by-file, with the honest "durable agent, not AGI" ceiling.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T10:37:47-04:00" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
-          <span class="icon">📄</span>
-          <h3>LaTeX Source</h3>
-          <p>TeX source for the certificate — for typesetting and print.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T08:06:08-04:00" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
-          <span class="icon">🌀</span>
-          <h3>Convergence-exit spiral <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Instead of stopping when the model is "confident enough" (Q-exit), keep looping until its internal state stops moving — a true fixed point. Falsifiable, with a shipped prototype.</span></span></h3>
-          <p>Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract over the Status-Cube. External Reality Rule: every claim tagged implemented / proven-conditional / hypothesis, with 4 falsifiable experiments.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T04:09:37-04:00" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
-          <span class="icon">🧭</span>
-          <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Lantern runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
-          <p>Ouro LoopLM (current kernel) vs the 2026 dense small-model frontier (Qwen3-4B, Phi-4-mini, Gemma 3n E2B) — primary-source-verified, scored on Lantern's own metrics, with a benchmark plan instead of a pick.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T02:02:56-04:00" href="/repo/docs/SIGMA0-OURO-CODER.md">
-          <span class="icon">🌀</span>
-          <h3>Σ₀ Ouro Coder</h3>
-          <p>The Σ₀ coding agent on the Ouro looped LLM — Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth, served as a drop-in Ollama model the coder/agent path uses transparently.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-19T00:09:01-04:00" href="/repo/docs/OURO-LOOPLM.md">
-          <span class="icon">🔁</span>
-          <h3>Ouro / LoopLM <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A reasoning technique where the model loops internally to "think" longer on harder questions before answering, instead of replying in one pass.</span></span></h3>
-          <p>Looped latent reasoning (arXiv 2510.25741) — adaptive depth + Q-exit CDF, implemented over our local model (loop-reasoner.js) and grounded in the KB.</p>
-          <span class="card-meta">Updated Jun 19, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-18T18:13:22-04:00" href="/repo/docs/KEYSTONE-MCP.md">
-          <span class="icon">🔌</span>
-          <h3>Keystone ↔ MCP</h3>
-          <p>Keystone chat is linked to live project tools/details (GitHub issues+PRs, MCP tools) — any provider, incl. Grok, answers grounded in the real repo.</p>
-          <span class="card-meta">Updated Jun 18, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-18T15:36:29-04:00" href="/repo/docs/LANTERN-SIGMA0-CODER.md" style="opacity:.66">
-          <span class="icon">🤖</span>
-          <h3>lantern-sigma0-coder <span style="font-size:.58rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px;white-space:nowrap">Legacy</span> <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Retired. The older local coder (Qwen-based, served via Ollama). Replaced by the Σ₀ Ouro Coder, which runs the looped Ouro model trained locally — see that card above.</span></span></h3>
-          <p><strong>Deprecated — superseded by the Σ₀ Ouro Coder.</strong> The legacy Qwen2.5-Coder-3B QLoRA coder served via Ollama; its Ollama deployment + Qwen training weights have been removed. Kept for history.</p>
-          <span class="card-meta">Deprecated · originally Jun 18, 2026</span>
-        </a>
-        <a class="link-card" data-modified="2026-06-14T20:26:12-04:00" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
-          <span class="icon">🌌</span>
-          <h3>Quantum-Relativity Analysis</h3>
-          <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
-          <span class="card-meta">Updated Jun 14, 2026</span>
-        </a>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Data &amp; Memory</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/rag-house.html">
-          <span class="icon">🏠</span>
-          <h3>RAG House <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">RAG = Retrieval-Augmented Generation: the AI looks things up before answering. The "house" is a living map of how all the pieces fit together.</span></span></h3>
-          <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
-        </a>
-        <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
-          <span class="icon">🗄️</span>
-          <h3>CSF Format <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">CSF ("Convergence-Fitted Searchable Format") is the project's own file format for packing and searching its memory and archives — like a smarter, searchable zip.</span></span></h3>
-          <p>Convergence-Fitted Searchable Format — consolidated spec, <strong>CSF-Pack v0.8</strong> (SHA-256 + path-safety). Default codec is <strong>zstd-19+LDM</strong> (362× on the memory log); the new opt-in <strong>CSF-Omni</strong> best-fit codec beats it on every corpus (+3–16%) and adds CRC integrity.</p>
-        </a>
-        <a class="link-card" href="/reports/csf-compression-benchmark.pdf" target="_blank" rel="noopener">
-          <span class="icon">📊</span>
-          <h3>CSF Benchmark <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A PDF report on the CSF-Omni best-fit codec — how well CSF compresses real data versus standard tools, every result re-checked to be lossless and stress-tested by independent agents.</span></span></h3>
-          <p>PDF report (v3) — <strong>CSF-Omni</strong> best-fit vs the shipped zstd-19 on three real corpora, every codec round-trip-verified lossless, then checked by a 6-agent adversarial fleet. Honest: +3–16% over zstd, ties the brotli frontier.</p>
-        </a>
-        <a class="link-card" href="/observer-mesh-cube.html">
-          <span class="icon">🧊</span>
-          <h3>Observer Mesh Cube <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A 3-D visualization of what the system currently believes and which components ("observers") are watching each part.</span></span></h3>
-          <p>The 3D status cube — beliefs and observers across the mesh.</p>
-        </a>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Project</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/changelog.html">
-          <span class="icon">📝</span>
-          <h3>Changelog</h3>
-          <p>Release notes and version history.</p>
-        </a>
-        <a class="link-card" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">
-          <span class="icon">⚙️</span>
-          <h3>GitHub</h3>
-          <p>Source code, issues, and contributions.</p>
-        </a>
-      </div>
-    </div>
-
-    <div class="section" id="documents-section">
-      <h2>Documents</h2>
-      <div class="pdf-controls">
-        <input class="pdf-search" id="pdf-search" type="search" placeholder="Filter documents…" aria-label="Filter documents">
-        <span class="pdf-count" id="pdf-count"></span>
-      </div>
-      <div id="pdf-gallery"><p class="pdf-loading">Loading documents…</p></div>
-    </div>
-
-    <div class="section">
-      <h2>Reference</h2>
-      <div class="link-grid">
-        <a class="link-card" href="/repo/SECURITY.md">
-          <span class="icon">🔒</span>
-          <h3>Security</h3>
-          <p>Policies, vulnerability guidelines, and responsible disclosure.</p>
-        </a>
-        <a class="link-card" href="/repo/SKILLS.md">
-          <span class="icon">🛠️</span>
-          <h3>Skills</h3>
-          <p>Available capabilities, persona routing, and the provider chain.</p>
-        </a>
-        <a class="link-card" href="/repo/PROVIDERS.md">
-          <span class="icon">🔌</span>
-          <h3>Providers</h3>
-          <p>All AI providers, configuration, and the fallback chain.</p>
-        </a>
-        <a class="link-card" href="/repo/CONTRIBUTING.md">
-          <span class="icon">🤝</span>
-          <h3>Contributing</h3>
-          <p>Guidelines for pull requests and issues.</p>
-        </a>
-        <a class="link-card" href="/repo/CODE_OF_CONDUCT.md">
-          <span class="icon">💡</span>
-          <h3>Code of Conduct</h3>
-          <p>Community standards and expectations.</p>
-        </a>
-      </div>
-    </div>
+  <!-- ── Hero ── -->
+  <div class="kc-hero">
+    <div class="kc-eyebrow">Help &amp; Knowledge</div>
+    <h1>How can we help?</h1>
+    <p>Guides, answers, and tools for getting the most out of Keystone OS — whether you're just starting out or going deep under the hood.</p>
   </div>
-</div>
 
-<!-- ── Footer ── -->
+  <!-- ── Search (live grounding/help search — /api/knowledge/query) ── -->
+  <div class="kc-search">
+    <div class="kc-search-row">
+      <input id="kb-q" type="text"
+        placeholder="Search the guides… e.g. how do I start a chat?"
+        aria-label="Search the help guides and docs"
+        onkeydown="if(event.key==='Enter')kbAsk()">
+      <button onclick="kbAsk()">Search</button>
+    </div>
+    <div class="kc-search-hint">Searches Keystone's own guides and docs. No match? Just ask in <a href="/dream-chat.html" style="color:var(--accent)">Keystone Chat</a>.</div>
+    <div id="kb-result" style="margin-top:12px"></div>
+  </div>
+  <script>
+    async function kbAsk() {
+      const q = document.getElementById('kb-q').value.trim();
+      const out = document.getElementById('kb-result');
+      if (!q) return;
+      out.innerHTML = '<span style="opacity:.6">searching the guides…</span>';
+      try {
+        const r = await fetch('/api/knowledge/query?q=' + encodeURIComponent(q));
+        const d = await r.json();
+        if (d && d.hit) {
+          const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+          out.innerHTML =
+            '<div class="link-card" style="display:block;cursor:default">' +
+            '<div style="font-size:.8em;opacity:.7">tier: <b>' + d.tier + '</b> · score ' + (d.score ?? '—') +
+            ' · <a href="/repo/' + esc((d.source||'').split('#')[0]) + '">' + esc(d.source) + '</a></div>' +
+            '<pre style="white-space:pre-wrap;margin:8px 0 0;font:inherit">' + esc((d.text||'').slice(0,900)) + '</pre></div>';
+        } else {
+          out.innerHTML = '<span style="opacity:.6">No exact match in the guides — try asking Keystone Chat directly and it will answer in full.</span>';
+        }
+      } catch (e) {
+        out.innerHTML = '<span style="opacity:.6">Search is unavailable right now: ' + e.message + '</span>';
+      }
+    }
+  </script>
+
+  <!-- ── New here? ── -->
+  <section class="section">
+    <div class="section-head">
+      <div class="label">Start here</div>
+      <h2>New to Keystone?</h2>
+      <p>Four quick ways in. You don't need an account or an API key to try it.</p>
+    </div>
+    <div class="link-grid">
+      <a class="link-card tile-cyan" href="/dream-chat.html">
+        <span class="icon">✦</span>
+        <h3>Open Keystone Chat</h3>
+        <p>Talk to Keystone — ask anything, journal your day, or get help. No account needed to try.</p>
+        <span class="go">Start chatting →</span>
+      </a>
+      <a class="link-card tile-green" href="/repo/QUICKSTART.md">
+        <span class="icon">🚀</span>
+        <h3>Quick Start</h3>
+        <p>Get Keystone running on your own computer in a few minutes.</p>
+        <span class="go">Read the guide →</span>
+      </a>
+      <a class="link-card tile-violet" href="/repo/README.md">
+        <span class="icon">📖</span>
+        <h3>What is Keystone?</h3>
+        <p>The plain-English overview — what it does and the ideas behind it.</p>
+        <span class="go">Learn more →</span>
+      </a>
+      <a class="link-card tile-gold" href="/explore.html">
+        <span class="icon">🧭</span>
+        <h3>Take the tour</h3>
+        <p>Browse every app and experience Keystone offers, all in one place.</p>
+        <span class="go">Explore →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Quick help Q&A ── -->
+  <section class="section">
+    <div class="section-head">
+      <div class="label">Quick help</div>
+      <h2>Common questions</h2>
+    </div>
+    <div class="qa-grid">
+      <div class="qa">
+        <h3>What is Keystone, really?</h3>
+        <p>An AI assistant that runs on your own machine, remembers what matters to you, and gets better from experience — never locked to a single AI model.</p>
+      </div>
+      <div class="qa">
+        <h3>How do I use it?</h3>
+        <p>Just <a href="/dream-chat.html">open the chat</a> and type like you're texting a friend. Ask a question, ask for help with code, or talk about your day.</p>
+      </div>
+      <div class="qa">
+        <h3>Do I need to pay or sign up?</h3>
+        <p>No. You can try the chat for free with no account. Adding your own API key unlocks faster, smarter replies — entirely optional.</p>
+      </div>
+      <div class="qa">
+        <h3>Something's not working?</h3>
+        <p>Check the <a href="/repo/QUICKSTART.md">Quick Start</a>, browse the guides below, or report it on <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">GitHub</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Apps ── -->
+  <section class="section">
+    <div class="section-head">
+      <div class="label">Apps</div>
+      <h2>Explore Keystone</h2>
+      <p>Everything Keystone can do, in one tap.</p>
+    </div>
+    <div class="link-grid">
+      <a class="link-card tile-cyan" href="/dream-chat.html">
+        <span class="icon">📓</span>
+        <h3>Chat &amp; Journal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A free-form chat journal. Pick a "persona" (a different AI character) and it falls back to another AI model automatically if one is unavailable.</span></span></h3>
+        <p>Freeform chat and journaling with different personas — your main way in.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="link-card tile-green" href="/trader-dashboard.html">
+        <span class="icon">📈</span>
+        <h3>Trader</h3>
+        <p>Stocks, prediction markets, and live market news in one terminal.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="link-card tile-violet" href="/create.html">
+        <span class="icon">✏️</span>
+        <h3>Create</h3>
+        <p>Upload, organize, and shape your creative work.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="link-card tile-green" href="/flourishing">
+        <span class="icon">🌱</span>
+        <h3>Flourishing <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A live dashboard that tracks well-being signals against established human-flourishing frameworks.</span></span></h3>
+        <p>A real-time dashboard built around human-flourishing frameworks.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="link-card tile-gold" href="/crypto-dashboard.html">
+        <span class="icon">🪙</span>
+        <h3>Crypto Dashboard</h3>
+        <p>Real-time BTC / ETH / SOL / XRP / DOGE prices and market news.</p>
+        <span class="go">Open →</span>
+      </a>
+      <a class="link-card tile-rose" href="/three-doors-game.html">
+        <span class="icon">🚪</span>
+        <h3>Three Doors <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A symbolic choose-your-path game ("The Kingdome") — pick a door, see where it leads, and replay endlessly.</span></span></h3>
+        <p>The Kingdome — an infinitely replayable, symbolic door game.</p>
+        <span class="go">Play →</span>
+      </a>
+      <a class="link-card tile-green" href="/kalshi-terminal.html">
+        <span class="icon">🎴</span>
+        <h3>Kalshi Terminal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A trading screen for Kalshi — a regulated market where you bet on real-world events (elections, weather). The "Impossibility Deck" is its swipe-to-decide card UI.</span></span></h3>
+        <p>Markets terminal — the Impossibility Deck and live event contracts.</p>
+        <span class="go">Open →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Guides & setup ── -->
+  <section class="section">
+    <div class="section-head">
+      <div class="label">Guides</div>
+      <h2>Guides &amp; setup</h2>
+      <p>How things work, how to configure them, and how to contribute.</p>
+    </div>
+    <div class="link-grid">
+      <a class="link-card tile-violet" href="/repo/AGENTS.md">
+        <span class="icon">🤖</span>
+        <h3>Agents Guide</h3>
+        <p>How AI agents and the per-agent workstream lanes work.</p>
+      </a>
+      <a class="link-card tile-cyan" href="/repo/PROVIDERS.md">
+        <span class="icon">🔌</span>
+        <h3>AI Providers</h3>
+        <p>Every AI provider, how to configure them, and the fallback chain.</p>
+      </a>
+      <a class="link-card tile-gold" href="/repo/SKILLS.md">
+        <span class="icon">🛠️</span>
+        <h3>Skills</h3>
+        <p>Available capabilities, persona routing, and the provider chain.</p>
+      </a>
+      <a class="link-card tile-cyan" href="/repo/docs/KEYSTONE-BRAND-GUIDELINES.md">
+        <span class="icon">🎨</span>
+        <h3>Brand Guidelines</h3>
+        <p>Keystone Chat's voice, colors, type, and UI components — the look-and-feel rules.</p>
+      </a>
+      <a class="link-card tile-rose" href="/repo/docs/ADMIN-FEATURE-FLAGS.md">
+        <span class="icon">🚩</span>
+        <h3>Feature Flags <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Admin-only: on/off feature switches, plus hide or disable any navigation page. Hidden just removes the nav link; Disabled is a server-enforced kill-switch.</span></span></h3>
+        <p>Admin guide — feature flags &amp; per-page nav visibility. Set at <code>/admin-flags.html</code>.</p>
+      </a>
+      <a class="link-card tile-green" href="/repo/SECURITY.md">
+        <span class="icon">🔒</span>
+        <h3>Security</h3>
+        <p>Policies, vulnerability guidelines, and responsible disclosure.</p>
+      </a>
+      <a class="link-card tile-violet" href="/repo/CONTRIBUTING.md">
+        <span class="icon">🤝</span>
+        <h3>Contributing</h3>
+        <p>Guidelines for pull requests and issues.</p>
+      </a>
+      <a class="link-card tile-cyan" href="/repo/CODE_OF_CONDUCT.md">
+        <span class="icon">💡</span>
+        <h3>Code of Conduct</h3>
+        <p>Community standards and expectations.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Documents (PDF gallery — /api/pdfs) ── -->
+  <section class="section" id="documents-section">
+    <div class="section-head">
+      <div class="label">Documents</div>
+      <h2>Document library</h2>
+      <p>Reports, research, and reference PDFs — filter by name.</p>
+    </div>
+    <div class="pdf-controls">
+      <input class="pdf-search" id="pdf-search" type="search" placeholder="Filter documents…" aria-label="Filter documents">
+      <span class="pdf-count" id="pdf-count"></span>
+    </div>
+    <div id="pdf-gallery"><p class="pdf-loading">Loading documents…</p></div>
+  </section>
+
+  <!-- ── Project ── -->
+  <section class="section">
+    <div class="section-head">
+      <div class="label">Project</div>
+      <h2>Project &amp; releases</h2>
+    </div>
+    <div class="link-grid">
+      <a class="link-card tile-cyan" href="/changelog.html">
+        <span class="icon">📝</span>
+        <h3>Changelog</h3>
+        <p>Release notes and version history.</p>
+      </a>
+      <a class="link-card tile-violet" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">
+        <span class="icon">⚙️</span>
+        <h3>GitHub</h3>
+        <p>Source code, issues, and contributions.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Under the hood — collapsed; research + internals live here, nothing lost ── -->
+  <section class="section">
+    <details class="kc-deep">
+      <summary>
+        <span class="badge" aria-hidden="true">🔬</span>
+        <span>Under the hood — research &amp; internals</span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <div class="kc-deep-body">
+
+        <div class="kc-deep-note">
+          These are the design docs, live visualizations, and research notes that power
+          Keystone's reasoning. <strong>You don't need any of this to use the app</strong> — it's here
+          for the curious and for contributors. They double as Keystone's
+          <strong>live grounding corpus</strong>: the assistant retrieves the nearest section before
+          answering (deterministic routing, $0 before the LLM). Start with the
+          <a href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md">📊 Progress Report (shareholder edition, 2026-06-19)</a>.
+        </div>
+
+        <!-- Live internals -->
+        <div class="section">
+          <div class="section-head">
+            <div class="label">Live internals</div>
+            <h2>Watch the system think</h2>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" href="/rag-house.html">
+              <span class="icon">🏠</span>
+              <h3>RAG House <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">RAG = Retrieval-Augmented Generation: the AI looks things up before answering. The "house" is a living map of how all the pieces fit together.</span></span></h3>
+              <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
+            </a>
+            <a class="link-card" href="/observer-mesh-cube.html">
+              <span class="icon">🧊</span>
+              <h3>Observer Mesh Cube <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A 3-D visualization of what the system currently believes and which components ("observers") are watching each part.</span></span></h3>
+              <p>The 3D status cube — beliefs and observers across the mesh.</p>
+            </a>
+            <a class="link-card" href="/orchestration.html">
+              <span class="icon">🧭</span>
+              <h3>Orchestration <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">How a message gets handled: it figures out what you're asking ("intent"), checks the answer is grounded in real data ("convergence gate"), and switches AI models if one fails.</span></span></h3>
+              <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
+            </a>
+          </div>
+        </div>
+
+        <!-- Research & theory -->
+        <div class="section">
+          <div class="section-head">
+            <div class="label">Research &amp; theory</div>
+            <h2>The math and method</h2>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent)">
+              <span class="icon">📊</span>
+              <h3>Progress Report — Shareholder Edition <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An honest, evidence-tagged status of where Keystone — the bounded, self-improving agent — stands: what shipped, the real numbers, and the next milestones.</span></span></h3>
+              <p>2026-06-19 — what shipped (token-budgeted memory #772), the real metrics (34% golden-set baseline), the honest ceiling, and the roadmap. Every claim evidence-tagged.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
+              <span class="icon">📐</span>
+              <h3>Σ₀ Collapse Certificate <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Σ₀ ("sigma-zero") is the project's core stability math. This document proves the reasoning loop stays grounded instead of spiralling into confident nonsense.</span></span></h3>
+              <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
+              <span class="icon">📄</span>
+              <h3>LaTeX Source</h3>
+              <p>TeX source for the certificate — for typesetting and print.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
+              <span class="icon">🌌</span>
+              <h3>Quantum-Relativity Analysis</h3>
+              <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
+              <span class="icon">🔄</span>
+              <h3>Tesseract Convergence Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The step-by-step method the system reasons with — tracking how confident it is ("Bayesian beliefs") in a 4-D status "cube" and keeping receipts for every claim.</span></span></h3>
+              <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/LANTERN-SIGMA0-CODER.md">
+              <span class="icon">🤖</span>
+              <h3>lantern-sigma0-coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A coding AI that runs locally on your own machine, fine-tuned ("LoRA") on past Claude sessions — no cloud required.</span></span></h3>
+              <p>The local Σ₀ coding agent — a LoRA fine-tuned on past sessions, leaderboard-routed, and continually retrained.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/OURO-LOOPLM.md">
+              <span class="icon">🔁</span>
+              <h3>Ouro / LoopLM <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A reasoning technique where the model loops internally to "think" longer on harder questions before answering, instead of replying in one pass.</span></span></h3>
+              <p>Looped latent reasoning (arXiv 2510.25741) — adaptive depth + Q-exit CDF, implemented over our local model and grounded in the KB.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
+              <span class="icon">🧭</span>
+              <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Keystone runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
+              <p>Ouro LoopLM vs the 2026 dense small-model frontier (Qwen3-4B, Phi-4-mini, Gemma 3n E2B) — primary-source-verified, with a benchmark plan instead of a pick.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
+              <span class="icon">🌀</span>
+              <h3>Convergence-exit spiral <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Instead of stopping when the model is "confident enough", keep looping until its internal state stops moving — a true fixed point. Falsifiable, with a shipped prototype.</span></span></h3>
+              <p>Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract over the Status-Cube. Every claim tagged implemented / proven-conditional / hypothesis.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
+              <span class="icon">🧩</span>
+              <h3>Convergence Core spine <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The design for turning Keystone's already-built parts (memory, task, tool, record + the Σ₀ safety system) into one closed agent loop — and the single feedback wire that's still missing.</span></span></h3>
+              <p>The four core objects, the six-stage loop, and the write-back closure in code (kernel.py, verify.py) — verified file-by-file, with the honest "durable agent, not AGI" ceiling.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/SIGMA0-OURO-CODER.md">
+              <span class="icon">🌀</span>
+              <h3>Σ₀ Ouro Coder</h3>
+              <p>The Σ₀ coding agent on the Ouro looped LLM — Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth, served as a drop-in model the coder path uses transparently.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/SIGMA0-CONTINUAL-TRAINING.md">
+              <span class="icon">♻️</span>
+              <h3>Σ₀ Continual-Training Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The machinery that lets the local coding model improve from its own verified work: write code → run it to prove it works → train on the winners → keep the new model only if it scores higher on a coding exam.</span></span></h3>
+              <p>The closed flywheel — harvest → execution-verify → train → eval → eval-gated promote. Two ground-truth gates (only green subprocesses train; only a measured pass@1 win promotes), kept offline by design.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/KEYSTONE-MCP.md">
+              <span class="icon">🔌</span>
+              <h3>Keystone ↔ MCP</h3>
+              <p>Keystone chat is linked to live project tools (GitHub issues+PRs, MCP tools) — any provider answers grounded in the real repo.</p>
+            </a>
+          </div>
+        </div>
+
+        <!-- Memory & format -->
+        <div class="section">
+          <div class="section-head">
+            <div class="label">Memory &amp; format</div>
+            <h2>How Keystone stores what it learns</h2>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
+              <span class="icon">🗄️</span>
+              <h3>CSF Format <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">CSF ("Convergence-Fitted Searchable Format") is the project's own file format for packing and searching its memory and archives — like a smarter, searchable zip.</span></span></h3>
+              <p>Convergence-Fitted Searchable Format — consolidated spec. <strong>v0.9 ships CSF-Omni</strong> best-fit compression (SHA-256 + CRC integrity): the memory log went from <strong>14×</strong> (old zlib) to <strong>422×</strong>, matching the best-in-field coder while strictly beating every other codec. Adversarially verified; v0.8 archives still read.</p>
+            </a>
+            <a class="link-card" href="/reports/csf-compression-benchmark.pdf" target="_blank" rel="noopener">
+              <span class="icon">📊</span>
+              <h3>CSF Benchmark <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A head-to-head PDF report on the CSF-Omni rewrite — how well CSF compresses real data versus standard tools, every result re-checked to be lossless (decodes back to the exact original) and stress-tested by independent agents.</span></span></h3>
+              <p>PDF report (v2) — the <strong>CSF-Omni rewrite</strong>: deterministic best-fit vs zlib / bz2 / lzma / zstd / brotli on three real corpora, every codec round-trip-verified lossless, then checked by a 6-agent adversarial fleet. 14× → 422× on the memory log.</p>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </details>
+  </section>
+
+</main>
+
+<!-- ── Footer (matches site) ── -->
 <footer class="site-footer">
   <div class="footer-inner">
-    <span><strong>Keystone OS</strong> · <a href="/trader-dashboard.html">Home</a> · <a href="/dream-chat.html">Chat</a> · <a href="/three-doors-game.html">Explore</a></span>
-    <span style="margin-left: auto;"><a href="/knowledgecenter.html">Help</a></span>
+    <span class="footer-brand"><span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS</span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
 </footer>
 
@@ -637,19 +861,8 @@
   });
   document.addEventListener('click', closeAll);   // tap elsewhere closes any open gloss
 })();
-
-// Research & Theory: keep cards newest-first by last-modified. The source order
-// is already sorted; this enforces it and stays correct if cards are added or
-// edited. Sort keys come from each card's data-modified (the linked doc's git
-// commit date); ISO timestamps sort correctly as plain strings.
-(function () {
-  const grid = document.getElementById('research-grid');
-  if (!grid) return;
-  Array.from(grid.querySelectorAll('.link-card'))
-    .sort((a, b) => (b.dataset.modified || '').localeCompare(a.dataset.modified || ''))
-    .forEach((card) => grid.appendChild(card));
-})();
 </script>
 <script src="/js/narrator.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
