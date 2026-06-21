@@ -1,5 +1,5 @@
 {
-  "built_at": 1782075404.873944,
+  "built_at": 1782083094.534396,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -7,6 +7,7 @@
     "QUICKSTART.md",
     "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
+    "docs/SIGMA0-OURO-CODER.md",
     "PROVIDERS.md",
     "SKILLS.md",
     "docs/KEYSTONE-BRAND-GUIDELINES.md",
@@ -14,7 +15,6 @@
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
-    "docs/SIGMA0-OURO-CODER.md",
     "docs/SIGMA0-CONTINUAL-TRAINING.md",
     "docs/SIGMA0-CODER-CLAUDE-CODE-STATUS.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
@@ -25,5 +25,5 @@
     "docs/KEYSTONE-MCP.md"
   ],
   "sections": 409,
-  "sha256": "0b0d15f711099d5f906ba42efdd781ed988d4345a9cb015e225541096d716775"
+  "sha256": "bb43928d4e89e1f3ea595f36eabcbda27627ddb38f417980611c0ef3bf73077b"
 }
