@@ -254,18 +254,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadState() {
+    // #878: only /api/health, /version.json and /api/version drive elements
+    // that exist on this page (footer status dot/label + hero edition/commit
+    // + version badges). The other 8 endpoints fed a removed dashboard —
+    // /api/nodes/mesh, /api/agents/workers and /api/nodes/this 404'd on every
+    // 30s poll. Dropped. The unused destructure names stay declared (= undefined)
+    // so the legacy handler block below safely no-ops until it is deleted.
     const [health, version, git, status, routing, agents, dreamer, search, mesh, workers, thisNode] = await Promise.all([
       fetchJson('/api/health'),
       fetchJson('/version.json'),
       fetchJson('/api/version'),
-      fetchJson('/api/status'),
-      fetchJson('/api/pcsf/routing'),
-      fetchJson('/api/agents'),
-      fetchJson('/api/dreamer?user=dreamer'),
-      fetchJson('/api/dream/search'),
-      fetchJson('/api/nodes/mesh'),
-      fetchJson('/api/agents/workers'),
-      fetchJson('/api/nodes/this'),
     ]);
 
     // Server + version
