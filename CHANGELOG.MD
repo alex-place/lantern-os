@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.7] - 2026-06-21
+
+### Added
+- **Σ₀ serving-architecture decision package** (docs only). Peer-reviewed staff **portfolio update** (`docs/SIGMA0-AGENT-PORTFOLIO-UPDATE.md`) + **stakeholder deck** (`docs/decks/2026-06-21-sigma0-agent-stakeholder-deck.md`) recommending a **cloud-transformers floor now -> embedded ONNX/DirectML target via a gated spike**, behind one swappable client contract. Backed by **web-grounded validation** (`docs/research/2026-06-21-sigma0-serving-validation.md`: 8 option findings + 10 adversarial verdicts -- e.g. vLLM serves the Ouro loop but pins fixed R4 / drops adaptive Q-exit, conf 0.97; ONNX `Loop` expresses adaptive depth, conf 0.97; no official vLLM Windows build), a **3-lens peer-review record** (`docs/research/2026-06-21-sigma0-peer-review.md`), and the **ONNX/DirectML export spike scope + GO/NO-GO gate** (`docs/research/2026-06-21-sigma0-onnx-directml-spike.md`). No code/runtime change.
+
 ## [1.7.5] - 2026-06-21
 
 ### Fixed
