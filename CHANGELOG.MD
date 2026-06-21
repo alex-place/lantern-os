@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.3] - 2026-06-21
+
+### Added
+- **Kernel-path provider rollover (#894).** `provider-router.js` gains a `kernel` `PROVIDER_CHAIN` (`keystone-ft`/`ouro` -> `anthropic`) and `selectKernelProvider(requestedProvider)` — independent of chat `selectProvider`, so the kernel never inherits the chat surface's Claude default. Staged via `KEYSTONE_ROLLOVER_MODE`: **`shadow` (default/unset) = Claude only (Stage 0, no behavior change)**; `default` = Keystone/Ouro first, Claude explicit last-resort. `stream-chat.js`'s kernel path now `await`s it (also fixes a bug where the async `selectProvider` was used un-awaited, making `provider` a Promise) and surfaces `provider`/`model`/`rolloverMode` in the SSE `done` event. Test: `tests/test_kernel_provider_chain.js` (6 assertions). Curated from #905 (@cdblasioli-gif): cherry-picked the 3 intentional files onto clean master; excluded its stale-base noise, 3 committed runtime-data files, and the redundant #851 bytes-per-correct (already on master via the `verbosity()` Gate F).
+
 ## [1.6.2] - 2026-06-21
 
 ### Fixed
