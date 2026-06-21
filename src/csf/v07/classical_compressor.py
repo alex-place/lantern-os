@@ -6,9 +6,11 @@ Combines the best classical techniques:
   3. Delta encoding for sequential observations.
   4. Low-rank baseline approximation (SVD-style on coarse grid).
   5. Multi-level convergence for aggressive baseline collapse.
-  6. Zstd for final byte-level compression.
+  6. zlib/DEFLATE (level 3) final byte-level pass.
 
 This is the classical-computer-optimized heart of CSF v0.7.
+NOTE: the final pass is zlib, not zstd (earlier docs misstated this). For
+strong, reversible byte-level compression use `csf.csf_pack` (zstd-19).
 """
 
 from __future__ import annotations
@@ -205,12 +207,17 @@ class ClassicalCompressor:
     def compress_text(self, text: str) -> Tuple[bytes, CompressionResult]:
         """Compress plain text using hybrid classical pipeline.
 
+        ⚠️  LOSSY / NON-INVERTIBLE — analysis only, no decoder (see the
+        sibling `csf_symbolic_compressor` module header). The tokenizer drops
+        digits/whitespace/most punctuation, so the original cannot be rebuilt;
+        the returned ratio is not a real compression ratio.
+
         Strategy for normal text (where CSF is not expected to beat ZIP):
           1. Tokenize into words + punctuation.
           2. Dictionary-encode frequent tokens.
           3. Represent as token-ID stream.
           4. Sparse-encode the token stream (many repeats = sparse).
-          5. Zstd for final pass.
+          5. zlib/DEFLATE (level 3) final pass.  [NOT zstd]
 
         For symbolic text with anchors, the dictionary step captures
         recurring concepts and the sparse step handles the static structure.

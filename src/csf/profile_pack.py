@@ -97,16 +97,13 @@ def pack_profile(user: str, out_path: str | None = None, compress: bool = True) 
 
 
 def info(archive: str) -> dict:
-    """Return the embedded _profile.json without extracting."""
-    data, manifest, _flags, blob_start, _blob_end = csf_pack._read_container(archive)
-    for fe in manifest["files"]:
-        if fe["path"] == "_profile.json":
-            import zlib
-            start = blob_start + fe["offset"]
-            chunk = data[start:start + fe["csize"]]
-            raw = zlib.decompress(chunk) if fe.get("compressed") else chunk
-            return json.loads(raw.decode("utf-8"))
-    return {"error": "_profile.json not found", "manifest": manifest.get("profile")}
+    """Return the embedded _profile.json without extracting (codec-aware)."""
+    try:
+        raw = csf_pack.read_file(archive, "_profile.json")
+    except KeyError:
+        _, manifest, _flags, _bs, _be = csf_pack._read_container(archive)
+        return {"error": "_profile.json not found", "manifest": manifest.get("profile")}
+    return json.loads(raw.decode("utf-8"))
 
 
 def unpack_profile(archive: str, dest: str) -> list[str]:

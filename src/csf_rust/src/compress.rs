@@ -79,8 +79,11 @@ impl Compressor {
         meta.write(&mut body)?;
         body.write_all(&sparse_compressed)?;
 
-        let final_compressed =
-            zstd::encode_all(&body[..], 3).map_err(|e| CsfError::Compression(e.to_string()))?;
+        // Level 19: full mode optimizes ratio, not speed. Measured ~1.9x smaller
+        // than level 3 on real JSONL memory (experiments/csf_compression_benchmark.py).
+        const ZSTD_FULL_LEVEL: i32 = 19;
+        let final_compressed = zstd::encode_all(&body[..], ZSTD_FULL_LEVEL)
+            .map_err(|e| CsfError::Compression(e.to_string()))?;
         Ok(final_compressed)
     }
 

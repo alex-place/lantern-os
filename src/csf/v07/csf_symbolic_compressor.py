@@ -1,21 +1,26 @@
-"""CSF Symbolic Compressor v0.7 — End-to-end pipeline for symbolic data.
+"""CSF Symbolic Compressor v0.7 — analysis-only symbolic projection.
 
-Purely optimized for:
-  • Dream Journal entries
-  • World lore / anchor documents
-  • 3^12 light matrix observations
-  • Any text with recurring symbolic concepts
+⚠️  LOSSY / NON-INVERTIBLE — NOT a general compressor.
+    `compress_text` is a *lossy symbolic projection*, not a reversible codec:
+      • the tokenizer (`_tokenize`) drops digits, whitespace and most
+        punctuation ($ % # / ( ) etc.), and
+      • tokens below `min_freq` encode to id 0 (unknown, unstored).
+    There is **no `decompress_text`** — the original text cannot be
+    reconstructed. The reported `ratio` is therefore measured against this
+    lossy form and is **not a real compression ratio**; `CompressionResult`
+    carries `lossless=False` to make that explicit.
+    For real, reversible compression of text/memory use `csf.csf_pack`
+    (per-file zstd-19 + optional shared dictionary), benchmarked far smaller.
 
-Accepts weakness on:
-  • Raw binary / entropy-heavy files
-  • Generic prose with no symbolic structure
+Useful for:
+  • symbolic-density analysis (anchor overlap, dictionary coverage)
 
-Pipeline:
+Pipeline (lossy):
   1. Pre-loaded symbolic dictionary (world anchors baked in)
   2. Tokenize → dictionary IDs (recurring anchors cost ~1 byte)
   3. Sparse CSR for static / default token patterns
   4. Delta encoding for sequential observations
-  5. Zstd for final byte-level pass
+  5. zlib/DEFLATE (level 3) final byte-level pass  [NOT zstd, despite earlier docs]
 """
 
 from __future__ import annotations
@@ -43,6 +48,9 @@ class CompressionResult:
     active_deltas: int
     dust_percentage: float
     convergence_collapsed: int = 0
+    # compress_text is a lossy symbolic projection with no decoder; the field
+    # exists so the (invalid) text ratio can never be mistaken for a real one.
+    lossless: bool = False
 
 
 def _tokenize(text: str) -> List[str]:

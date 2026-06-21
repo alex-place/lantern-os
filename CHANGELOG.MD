@@ -71,6 +71,23 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.12] - 2026-06-20
+
+### Changed
+- **CSF-Pack (`csf_pack.py`) entropy backend: zlib → zstd-19 + long-distance matching (R1).** Per-file blobs now carry a `codec` field (`zstd`|`zlib`|`store`), defaulting to zstd when `zstandard` is installed. Measured **24.9× smaller** archives on a real 4 MB JSONL memory log (14.1× → 352.3×), lossless round-trip verified. Existing `.csf` archives (no `codec` field) still unpack byte-for-byte (default → zlib).
+- **Optional shared zstd dictionary (`use_dict=True`, R2).** Trains one dictionary across all files and appends it to the blob region, recovering cross-file redundancy **without losing per-file random access** (text+code corpus 2.65× → 3.00×). Added `csf_pack.read_file()` for verified single-member reads.
+- **Rust full-mode zstd level 3 → 19 (R4)** in `src/csf_rust/src/compress.rs` (~1.9× smaller on JSONL memory; fast mode unchanged).
+
+### Fixed
+- `profile_pack.info()` no longer hardcodes `zlib.decompress` — it is codec-aware, so zstd profile archives can be read (R1 follow-through).
+- Corrected misleading docstrings in `csf/v07/classical_compressor.py` and `csf/v07/csf_symbolic_compressor.py` that claimed a "Zstd" final pass when the code uses zlib level 3 (R4).
+- Marked the v0.7 symbolic `compress_text` path as **lossy / non-invertible** (`CompressionResult.lossless=False`, no decoder); its reported ratio is a symbolic projection, not a real compression ratio. Updated `caad/dollhouse-csf-upgrade.md` to stop citing it as a storage advantage and to use `csf_pack` for real compression (R3).
+
+### Added
+- `experiments/csf_compression_benchmark.py` — lossless-verified head-to-head of the CSF paths vs zlib/bz2/lzma/zstd/brotli on text+code, JSONL memory, and lattice-delta corpora (the evidence behind R1–R4).
+
+---
+
 ## [1.4.11] - 2026-06-20
 
 ### Changed

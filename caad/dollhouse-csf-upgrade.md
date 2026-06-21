@@ -16,10 +16,14 @@
 - Score documents by anchor overlap with Dream Journal entries
 
 ### Distill
-- Compress each document via `SymbolicCompressor.compress_text()`
-- The symbolic dictionary pre-loaded with Lantern world anchors gives
-  dollhouse docs an immediate compression advantage over generic text
-- Recurring concepts (Fleet, Agent, MCP, Convergence) compress to ~1 byte
+- Compress each document **losslessly** via `csf.csf_pack` (per-file zstd-19,
+  optional `use_dict=True` shared dictionary across the dollhouse corpus).
+- For symbolic *analysis only* (anchor coverage, dictionary overlap), run
+  `SymbolicCompressor.compress_text()` — but note it is **lossy and
+  non-invertible** (`lossless=False`, no decoder); its ratio is a symbolic
+  projection, not a real compression ratio, so do not use it for storage.
+- Recurring concepts (Fleet, Agent, MCP, Convergence) map to short dictionary
+  IDs in the analysis pass; actual byte savings come from the zstd backend.
 - Output individual `.csf` files preserving the source directory layout
 
 ### Dock
