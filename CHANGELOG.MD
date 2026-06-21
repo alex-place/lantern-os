@@ -71,6 +71,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.4.14] - 2026-06-20
+
+### Fixed
+- **Autowork can now land its patches.** The autonomous-work loop (`!work #N` in dream-chat → `/api/convergence/autonomous-work/stream`) correctly diagnosed and patched issues but aborted at `apply` with `patch_did_not_apply` — `git apply` can't fuzzy-match context (and `--3way` is useless on LLM diffs with no `index` line), and the in-process fallback was exact-match: it threw on `hunk_old_count_mismatch` (LLM `@@` headers are routinely off-by-one) before even trying to locate the change. Rewrote the fallback applier in `self-edit-engine.js` to be **fuzzy**: it ignores the `@@` header counts, locates each hunk by content (exact pass, then whitespace-normalized), applies hunks high-line-first, and preserves the file's EOL. Verified against the exact diff that previously failed (#854, surfaced while autoworking #836) plus a regression suite (`tests/test_self_edit_fuzzy_apply.js`) covering wrong header counts, line drift, whitespace fuzz, CRLF, and absent-context safety.
+
+---
+
 ## [1.4.13] - 2026-06-20
 
 ### Changed

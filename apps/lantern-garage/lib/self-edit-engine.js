@@ -140,47 +140,67 @@ function validateDiff(diffText, repoRoot) {
 
 // ── Diff application ────────────────────────────────────────────────────
 
-function applyHunk(lines, hunk) {
-  const result = [...lines];
-  const insertIndex = hunk.oldStart - 1;
-  let contextCount = 0;
-  let removeCount = 0;
-  let addCount = 0;
-  for (const l of hunk.lines) {
-    if (l.startsWith("-")) removeCount++;
-    else if (l.startsWith("+")) addCount++;
-    else if (l.startsWith(" ")) contextCount++;
-  }
-  if (contextCount + removeCount !== hunk.oldCount) {
-    throw new Error(`hunk_old_count_mismatch: expected ${hunk.oldCount}, got ${contextCount + removeCount}`);
-  }
-  if (contextCount + addCount !== hunk.newCount) {
-    throw new Error(`hunk_new_count_mismatch: expected ${hunk.newCount}, got ${contextCount + addCount}`);
-  }
-
-  // Remove old lines
-  let removed = 0;
-  for (const l of hunk.lines) {
-    if (l.startsWith("-")) {
-      const expected = l.slice(1);
-      const actual = result[insertIndex + removed];
-      if (actual !== expected) {
-        throw new Error(`hunk_content_mismatch at line ${insertIndex + removed + 1}: expected "${expected}", got "${actual}"`);
-      }
-      result.splice(insertIndex + removed, 1);
-    } else if (l.startsWith("+")) {
-      result.splice(insertIndex + removed, 0, l.slice(1));
-      removed++;
-    } else if (l.startsWith(" ")) {
-      const expected = l.slice(1);
-      const actual = result[insertIndex + removed];
-      if (actual !== expected) {
-        throw new Error(`hunk_context_mismatch at line ${insertIndex + removed + 1}: expected "${expected}", got "${actual}"`);
-      }
-      removed++;
+// Split a hunk into its "before" (context + removed) and "after" (context +
+// added) line arrays, ignoring the @@ header counts — LLM diffs routinely get
+// them wrong — and "\ No newline at end of file" markers.
+function hunkBlocks(hunk) {
+  const before = [];
+  const after = [];
+  // Drop trailing blank lines: a diff that ends with a newline parses into a
+  // spurious "" hunk line that is not real content (an interior blank context
+  // line arrives as " " or, from some generators, as a bare "").
+  let end = hunk.lines.length;
+  while (end > 0 && hunk.lines[end - 1] === "") end--;
+  for (let i = 0; i < end; i++) {
+    const l = hunk.lines[i];
+    const tag = l[0];
+    if (tag === "+") after.push(l.slice(1));
+    else if (tag === "-") before.push(l.slice(1));
+    else if (tag === "\\") continue; // "\ No newline at end of file"
+    else {
+      // context line (" foo"), or a bare blank line some generators emit as ""
+      const text = l.startsWith(" ") ? l.slice(1) : l;
+      before.push(text);
+      after.push(text);
     }
   }
-  return result;
+  return { before, after };
+}
+
+// Find where the `before` block sits in `lines`, preferring the position
+// closest to `hint`. Exact pass first, then a whitespace-normalized pass so
+// indentation / trailing-space drift still lands. Returns start index, or -1.
+function locateBlock(lines, before, hint) {
+  const n = lines.length;
+  const m = before.length;
+  if (m === 0) return Math.min(Math.max(hint, 0), n); // pure insertion
+  if (m > n) return -1;
+  const starts = [];
+  for (let i = 0; i + m <= n; i++) starts.push(i);
+  starts.sort((a, b) => Math.abs(a - hint) - Math.abs(b - hint) || a - b);
+  const matches = (start, eq) => {
+    for (let j = 0; j < m; j++) if (!eq(lines[start + j], before[j])) return false;
+    return true;
+  };
+  for (const s of starts) if (matches(s, (a, b) => a === b)) return s;
+  for (const s of starts) if (matches(s, (a, b) => a.trim() === b.trim())) return s;
+  return -1;
+}
+
+// Apply one hunk by locating its context in the file rather than trusting the
+// (often-wrong) @@ line numbers. Fuzzy: tolerant of header-count drift, line
+// drift, and whitespace differences — the failure modes of LLM-authored diffs.
+function applyHunkFuzzy(lines, hunk) {
+  const { before, after } = hunkBlocks(hunk);
+  if (before.length === 0) {
+    const at = Math.min(Math.max(hunk.oldStart - 1, 0), lines.length);
+    return [...lines.slice(0, at), ...after, ...lines.slice(at)];
+  }
+  const pos = locateBlock(lines, before, hunk.oldStart - 1);
+  if (pos < 0) {
+    throw new Error(`hunk_not_located: ${before.length}-line context near line ${hunk.oldStart} not found`);
+  }
+  return [...lines.slice(0, pos), ...after, ...lines.slice(pos + before.length)];
 }
 
 // Targets of a parsed diff, as repo-relative paths, tagged created vs changed.
@@ -195,7 +215,11 @@ function diffTargets(files) {
   return out;
 }
 
-// Strict, dependency-free applier (exact context match). Used as a fallback.
+// In-process, dependency-free fallback applier. Fuzzy: it locates each hunk by
+// content (whitespace-tolerant) instead of trusting the diff's line numbers, so
+// it lands LLM-authored diffs that git apply and an exact-match applier reject.
+// Hunks apply high-line-first so a later hunk can't shift an earlier one's index;
+// the file's EOL and trailing newline are preserved.
 function applyPatchStrict(repoRoot, files) {
   const stats = { changed: [], created: [], errors: [] };
   for (const f of files) {
@@ -203,15 +227,20 @@ function applyPatchStrict(repoRoot, files) {
     if (!target || target === "/dev/null") continue;
     target = target.replace(/^(a|b)\//, "");
     const fullPath = path.join(repoRoot, target);
-    let lines = [];
-    if (fs.existsSync(fullPath)) lines = fs.readFileSync(fullPath, "utf8").split(/\r?\n/);
+    const existed = fs.existsSync(fullPath);
+    const raw = existed ? fs.readFileSync(fullPath, "utf8") : "";
+    const eol = /\r\n/.test(raw) ? "\r\n" : "\n";
+    const trailingNewline = /\n$/.test(raw);
+    let lines = raw.length ? raw.split(/\r?\n/) : [];
+    if (trailingNewline && lines[lines.length - 1] === "") lines.pop();
     try {
       let working = lines;
-      for (let hi = f.hunks.length - 1; hi >= 0; hi--) working = applyHunk(working, f.hunks[hi]);
+      const hunks = [...f.hunks].sort((a, b) => b.oldStart - a.oldStart);
+      for (const h of hunks) working = applyHunkFuzzy(working, h);
       const dir = path.dirname(fullPath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(fullPath, working.join("\n"), "utf8");
-      if (lines.length === 0 && f.hunks.length > 0) stats.created.push(target);
+      fs.writeFileSync(fullPath, working.join(eol) + (trailingNewline || !existed ? eol : ""), "utf8");
+      if (!existed && f.hunks.length > 0) stats.created.push(target);
       else stats.changed.push(target);
     } catch (err) {
       stats.errors.push({ file: target, error: err.message });
@@ -266,11 +295,11 @@ function resolveDiffPaths(repoRoot, diffText, files) {
 }
 
 // Apply a unified diff. LLM-generated diffs almost always have line-number drift
-// and minor context fuzz, which a strict exact-match applier rejects (→ the patch
-// never lands → autowork can't actually complete issues). We use git's robust
-// applier first (with recount/fuzz/3way), and fall back to the strict applier
-// only if git is unavailable. validateDiff still gates format + path safety, and
-// the caller's anti-fraud gate still rejects empty/errored results.
+// and minor context fuzz. We try git's robust applier first (recount/fuzz/3way),
+// and fall back to an in-process *fuzzy* applier (content-located, whitespace-
+// tolerant) that lands diffs git apply rejects — without it the patch never
+// lands and autowork can't complete issues. validateDiff still gates format +
+// path safety, and the caller's anti-fraud gate still rejects empty/errored results.
 function applyPatch(repoRoot, diffText) {
   let files = validateDiff(diffText, repoRoot);
   // Repair dropped-prefix paths (e.g. ouro_serve.py -> scripts/ouro_serve.py) so the
@@ -314,7 +343,7 @@ function applyPatch(repoRoot, diffText) {
     };
   }
 
-  // git apply rejected the diff — fall back to the strict applier (exact match).
+  // git apply rejected the diff — fall back to the in-process fuzzy applier.
   const strict = applyPatchStrict(repoRoot, files);
   strict.applier = "strict";
   strict.pathRewrites = pathRewrites;
@@ -827,6 +856,7 @@ module.exports = {
   parseUnifiedDiff,
   validateDiff,
   applyPatch,
+  applyPatchStrict,
   gitCreateBranch,
   gitEnsureClean,
   gitCommit,
