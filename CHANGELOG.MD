@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.7] - 2026-06-21
+
+### Changed
+- **Knowledge Center reorganized to foreground research/internals.** Three layout changes to `apps/lantern-garage/public/knowledgecenter.html`: (1) the "🔬 Under the hood — research & internals" disclosure moved up to directly below the "New to Keystone?" hero (was buried below Quick help + Apps) and now **opens expanded by default** instead of collapsed; (2) the "Apps / Explore Keystone" card section was **removed** (the same apps are reachable from the site nav and `/explore.html`); (3) the "Document library" PDF gallery is now wrapped in a **collapsed** `kc-deep` disclosure (IDs preserved, so the `/api/pdfs` gallery + filter still work when expanded). Per-section collapse/expand verified; no console errors.
+
 ## [1.7.6] - 2026-06-21
 
 ### Fixed
