@@ -943,9 +943,35 @@ async function sendMessage() {
             didError = true;
             if (evt.text) serverErrorText = evt.text;
             if (!fullText) bubble.style.color = 'var(--muted)';
+          } else if (evt.type === 'tool' && evt.phase) {
+            // Native Anthropic tool_use loop (CHAT_TOOL_EXEC). These carry phase
+            // ('call' | 'result') and arrive OUTSIDE the token stream, so they're
+            // rendered into a persistent trace strip on the row — the bubble's
+            // innerHTML is rebuilt on every token and would wipe anything inside it.
+            let trace = msg.querySelector('.tool-trace');
+            if (!trace) {
+              trace = document.createElement('div');
+              trace.className = 'tool-trace';
+              // Full-width own line ABOVE the bubble (the row is flex-row; without
+              // this the strip becomes a cramped left column beside the answer).
+              trace.style.cssText = 'margin:4px 0;flex-basis:100%;width:100%;order:-1';
+              msg.style.flexWrap = 'wrap';
+              msg.insertBefore(trace, bubble);
+            }
+            if (evt.phase === 'call') {
+              const wrap = document.createElement('div');
+              wrap.innerHTML = buildToolCard(JSON.stringify({ name: evt.name, input: evt.input || {} }), false);
+              if (wrap.firstElementChild) trace.appendChild(wrap.firstElementChild);
+            } else if (evt.phase === 'result') {
+              const cards = trace.querySelectorAll('.tool-call-card');
+              const card = cards[cards.length - 1];
+              // fillToolSlot reads evt.result; the native result event carries a preview.
+              if (card) fillToolSlot(card.querySelector('.tcc-result'), { ok: evt.ok, result: evt.preview });
+            }
+            container.scrollTop = container.scrollHeight;
           } else if (evt.type === 'tool') {
-            // Server ran (or declined to run) the model's <tool_call>. Fill the result
-            // slot of the last tool-call card so the call + its real output show together.
+            // Local Σ₀ free-text <tool_call> path: the card is already rendered inside
+            // the bubble from the token stream; this event just fills its result slot.
             toolResults.push(evt);
             const cards = bubble.querySelectorAll('.tool-call-card');
             const card = cards[cards.length - 1];
