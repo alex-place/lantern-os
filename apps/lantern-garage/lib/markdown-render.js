@@ -288,11 +288,23 @@ function groupSections(blocks) {
     }
   }
   if (cur) panels.push(cur);
+  // Pick a column tier from each section's *flowing* text depth (paragraphs and
+  // lists — not the full-width spanners h2/pre/table/blockquote/hr, which don't
+  // balance into columns). Shallow sections stay 1 column, normal sections use up
+  // to 2, and only a genuinely deep section earns a 3rd — so a short section never
+  // fragments into thin, vertically-meaningless stubs.
+  const colClass = (blocks) => {
+    const flow = blocks
+      .filter((b) => !/^<(h2|pre|table|blockquote|hr)[\s>]/.test(b))
+      .join(" ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length;
+    const n = flow >= 1700 ? 3 : flow <= 360 ? 1 : 2;
+    return `md-panel md-cols-${n}`;
+  };
   // No H2 anywhere → wrap the whole doc in one panel so it still gets chrome.
-  if (!panels.length) return `<section class="md-panel">\n${lead.join("\n")}\n</section>`;
+  if (!panels.length) return `<section class="${colClass(lead)}">\n${lead.join("\n")}\n</section>`;
   const parts = [];
   if (lead.length) parts.push(`<header class="md-lead">\n${lead.join("\n")}\n</header>`);
-  for (const p of panels) parts.push(`<section class="md-panel">\n${p.join("\n")}\n</section>`);
+  for (const p of panels) parts.push(`<section class="${colClass(p)}">\n${p.join("\n")}\n</section>`);
   return parts.join("\n");
 }
 
@@ -396,13 +408,20 @@ function renderMarkdownDocument(markdown, sourcePath) {
     }
 
     /* ── Large-screen "newspaper panels" ──────────────────────────────────
-       Each panel's body flows into balanced columns sized by WIDTH (not a fixed
-       count), so a short panel stays a single column and only tall/wide panels
-       split — no sparse 3-column stubs. The panel heading and wide blocks (code,
-       tables, quotes, rules) span all columns like newspaper figures. */
+       Column COUNT follows each section's content depth (.md-cols-N, assigned at
+       render time in groupSections) rather than the viewport width: 2 columns is
+       the default and only a genuinely deep section earns a 3rd, so shallow
+       sections never fragment into thin stubs. The 22rem column-width floor also
+       lets the browser drop to fewer columns when a panel is too narrow. Page
+       width is capped at 1280px so the 2-column measure stays readable instead of
+       stretching across ultrawide displays. Headings + wide blocks span all
+       columns like newspaper figures. */
     @media (min-width: 1100px) {
       .md-page { max-width: 1280px; }
-      .md-panel { padding: 26px 34px 10px; columns: 22rem 2; column-gap: 48px; }
+      .md-panel { padding: 26px 34px 10px; column-gap: 48px; }
+      .md-panel.md-cols-2 { columns: 22rem 2; }
+      .md-panel.md-cols-3 { columns: 22rem 3; }
+      /* .md-cols-1 stays a single column — a short section has nothing to balance */
       .md-panel > h2,
       .md-panel > pre,
       .md-panel > table,
@@ -415,15 +434,6 @@ function renderMarkdownDocument(markdown, sourcePath) {
       .md-panel > img { break-inside: avoid; }
       .md-panel > h3,
       .md-panel > h4 { break-after: avoid; }
-    }
-    @media (min-width: 1700px) {
-      .md-page { max-width: 1560px; }
-      .md-panel { columns: 22rem 3; column-gap: 52px; }
-    }
-    /* ultrawide (≈3440px and up) */
-    @media (min-width: 2400px) {
-      .md-page { max-width: 2200px; }
-      .md-panel { columns: 22rem 4; column-gap: 56px; }
     }
   </style>
 </head>

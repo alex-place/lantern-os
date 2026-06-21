@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.15] - 2026-06-21
+
+### Changed
+- **Markdown doc viewer (`/repo/*.md`) column count now follows content depth, not screen width.** Previously every panel split into 2 columns at ≥1100px, 3 at ≥1700px, and 4 at ≥2400px — so a short section fragmented into thin, vertically-meaningless stubs on a wide display. `lib/markdown-render.js` now classifies each section at render time by its *flowing* text length (excluding full-width spanners like code/tables): shallow → 1 column, normal → **2 columns (the default)**, and only a genuinely deep section (`≥ ~1700` chars of flowing text) earns a **3rd** column. The 4-column tier is removed, and the page is capped at 1280px so the 2-column measure stays readable instead of stretching across ultrawide displays. Verified on `SIGMA0-OURO-CODER.md`: of 12 panels, 8 render 2 columns, 3 deep ones render 3, 1 short one renders 1; no panel exceeds 3 columns at 1920px.
+
 ## [1.7.14] - 2026-06-21
 
 ### Added
