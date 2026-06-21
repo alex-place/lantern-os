@@ -90,6 +90,10 @@ module.exports = {
       flags.isEnabled("calibration", env) ? calibration.calibratedRecommendations(opts) : disabledResult("calibration_flag_off"),
     weights: (opts, env) =>
       flags.isEnabled("calibration", env) ? calibration.proposeCalibratedWeights(opts) : disabledResult("calibration_flag_off"),
+    // #909: commit (persist) the calibrated-weights artifact — honesty-gated, no-op
+    // until real labeled outcomes make readiness ok.
+    commitWeights: (opts, env) =>
+      flags.isEnabled("calibration", env) ? calibration.commitCalibratedWeights(opts) : disabledResult("calibration_flag_off"),
     count: () => calibration.count(),
     thresholds: () => calibration.thresholds,
     loadEntries: () => calibration.loadEntries(),

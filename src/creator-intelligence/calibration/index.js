@@ -132,9 +132,28 @@ function importCsvFile(csvPath, opts = {}) {
 // B4 callable: propose calibrated scoring weights from the live correlation set.
 // Returns insufficient_data (priors unchanged) until calibration readiness is ok.
 const PRIOR_WEIGHTS = require("../research/viral_patterns.json").weights;
+const { saveCalibratedWeights, loadCalibratedWeights } = require("./weights-artifact");
+
 function proposeCalibratedWeights(opts = {}) {
   const corr = engine.correlations(opts);
   return weightCalibration.calibrateWeights(PRIOR_WEIGHTS, corr, opts);
+}
+
+// #909: the missing PRODUCER. Propose calibrated weights from real labeled outcomes
+// and PERSIST the artifact so viral-score-v10's loadCalibratedWeights() flips
+// calibrated:true. saveCalibratedWeights is honesty-gated (writes only when
+// status==='ok' && calibrated===true), so this is a safe no-op until enough real
+// outcome rows exist — no fabricated calibration.
+function commitCalibratedWeights(opts = {}) {
+  const result = proposeCalibratedWeights(opts);
+  const written = saveCalibratedWeights(result);
+  return {
+    written,
+    status: result.status,
+    calibrated: !!result.calibrated,
+    reason: result.reason || null,
+    weights: result.weights || null,
+  };
 }
 
 module.exports = {
@@ -160,6 +179,9 @@ module.exports = {
   // B4 — propose calibrated scoring weights (gated; priors unchanged until ready).
   calibrateWeights: weightCalibration.calibrateWeights,
   proposeCalibratedWeights,
+  commitCalibratedWeights,         // #909: propose + persist (honesty-gated)
+  saveCalibratedWeights,
+  loadCalibratedWeights,
   priorWeights: () => ({ ...PRIOR_WEIGHTS }),
   COMPONENT_FEATURES: weightCalibration.COMPONENT_FEATURES,
   count: store.count,

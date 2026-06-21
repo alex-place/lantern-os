@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.10] - 2026-06-21
+
+### Fixed
+- **Creator V10 scorer: wire the calibrated-weights producer so it can flip `calibrated:true` (#909).** #884 built the calibration bridge (`saveCalibratedWeights` + the v10 reader) but nothing ever **persisted** the artifact — `/api/creator/calibration/weights` only returned a proposal — so the live scorer was stuck `calibrated:false`. Added the missing producer: `commitCalibratedWeights()` in `src/creator-intelligence/calibration/index.js` (propose → persist), exposed as `ci.calibration.commitWeights` and as a new `POST /api/creator/calibration/weights/commit` route. `saveCalibratedWeights` is honesty-gated (writes only when `status==='ok' && calibrated===true`), so the commit is a real no-op until enough labeled operator outcomes make readiness ok — no fabricated calibration. New `tests/test_creator_calibration_commit.js` (3 cases) locks the invariant `written ⟺ artifact exists ⟺ scorer calibrated`; existing `tests/test_v10_calibrated_weights.js` still passes. (The remaining dependency is operator-supplied outcome rows via the existing `/import` route.)
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed

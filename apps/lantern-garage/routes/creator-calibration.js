@@ -69,6 +69,14 @@ module.exports = async function creatorCalibrationRoutes(req, res, url, deps) {
     return true;
   }
 
+  // POST /api/creator/calibration/weights/commit  (#909: persist the calibrated-weights
+  // artifact so viral-score-v10 flips calibrated:true. Honesty-gated end-to-end — a
+  // no-op { written:false } until real labeled outcomes make readiness ok.)
+  if (P === "/api/creator/calibration/weights/commit" && req.method === "POST") {
+    sendJson(res, ci.calibration.commitWeights({}));
+    return true;
+  }
+
   // POST /api/creator/calibration/import
   // body: { csvText, manualLinks?: [{videoRef, entryId}], dryRun?: bool,
   //         retentionByEntryId?: { [entryId]: { curveText|points, segments, durationSec } } }
