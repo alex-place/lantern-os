@@ -1,4 +1,10 @@
 """
+⚠️ DEPRECATED — CSF v0.3 (dead lineage). This is the retired v0.3 symbolic
+delta-stream encoding; nothing in the live tree imports it except the equally-dead
+``csf.delta_stream``. It is **NOT** the CSF format. For compression use the
+canonical lossless ``csf`` package (``csf_pack`` / ``omni``); for the 3^12 lattice
+storage face use ``csf.v07``. Kept for historical reference only.
+
 Variable-length base-3 positional encoding for 3^12 normalized light matrices.
 
 Coordinates are 12-tuples of base-3 digits (0, 1, 2).
