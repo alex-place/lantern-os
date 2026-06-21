@@ -15,6 +15,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.6] - 2026-06-21
+
+### Verify
+- `_convergence_rag` no longer swallows MemOS retrieval failures silently. A
+  broken MemCube now logs a `convergence_rag_memos_fallback` event before
+  degrading to flat-rag-house, so a dead primary retrieval path is observable
+  instead of invisible. Σ₀ red-team finding (#919, re-scoped finding #1).
+
 ## [1.6.5] - 2026-06-21
 
 ### Cleanup

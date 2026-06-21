@@ -1624,8 +1624,15 @@ class TesseractEngine:
             if mem_context:
                 ctx.lore_hints = [mem_context]
                 return ctx
-        except Exception as _memos_err:
-            pass  # fall through to flat-rag-house
+        except Exception as memos_err:
+            # MemOS unavailable/failed — degrade to flat-rag-house, but record it.
+            # A silent fallback hides a broken primary retrieval path (Verify gap).
+            self._log({
+                "event": "convergence_rag_memos_fallback",
+                "reason": type(memos_err).__name__,
+                "detail": str(memos_err)[:200],
+                "timestamp": _now(),
+            })
 
         # ── Flat RAG house fallback ──────────────────────────────────────────
         rag_path = self.data_dir / "rag-house" / "flat-rag-house-latest.json"
