@@ -317,3 +317,7 @@ data/conversations/*.bak
 data/conversations/*.cleared-*.jsonl
 apps/data/convergence-audit.jsonl
 data/admin/feature-flags.json
+
+# Σ₀ real-session harvest corpora — contain real secrets/PII; keep local, regenerate via scripts/harvest_tool_traces.py
+models/lantern-sigma0-coder/tool-trace-pairs.jsonl
+models/lantern-sigma0-coder/training-data-5k.jsonl

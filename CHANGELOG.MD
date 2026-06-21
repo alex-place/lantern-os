@@ -15,6 +15,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.11] - 2026-06-21
+
+### Added
+- **Σ₀ Ouro coder — function-calling (FC) training pipeline + tool-aware runtime + retraining handoff.**
+  FC corpus tooling: `scripts/harvest_tool_traces.py` (mines repo Claude Code session transcripts into `<tool_call>` pairs, secrets redacted) and `scripts/convert_fc_dataset.py` (converts public FC datasets — Hermes/ToolACE — into the exact wire format with train/serve preamble parity via `scripts/ouro_anthropic_bridge.py`). Tool-aware execution proxy `apps/lantern-garage/lib/tool-runner.js` defines one canonical tool registry (Read/LS/Glob/Grep/Bash/PowerShell/Write/Edit) used for both the prompt preamble and execution, shell tools gated through the existing allowlist + safe-exec. Also adds `scripts/sigma0_coder_agent.py`, `src/csf/coder_grounding.py`, and `tests/test_sigma0_state_abi.py`.
+- **Retraining handoff** `docs/research/2026-06-21-sigma0-coder-retraining-handoff.md`: grounded diagnosis of the FC adapter's observed unreliability (Bash over-bias = data distribution; over-refusal = template memorization; under-trigger = missing "answer-normally" class) + a prioritized, evidence-backed recipe (tool-distribution rebalance, Hammer function-masking, negatives 25%->~10-12%, lr 2e-4->~7e-5, BFCL eval + release gate). **Verified locally:** the adapter trains and emits tool calls but is **not yet reliable** — this ships the pipeline + plan, not a production-ready FC model. Training corpora (~134MB) included for reproducibility.
+
+
+
 ## [1.7.9] - 2026-06-21
 
 ### Added
