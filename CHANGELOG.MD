@@ -15,6 +15,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.5] - 2026-06-21
+
+### Changed
+- **Harden the chat box: render throttle, Stop button, scheme allowlist, single send path (#930).** Four fixes in the live dream-chat renderer (`public/js/dream-chat-ui.js` + `dream-chat.js`):
+  - **Per-token re-render → rAF-coalesced.** The token loop re-parsed and re-rendered the *entire* bubble (`bubble.innerHTML = renderMarkdown(fullText)`) on every streamed token. Writes are now coalesced into one render per animation frame via a `requestAnimationFrame` flag; the single authoritative final render (and badge attach) is preserved, and any in-flight frame is cancelled when the stream ends so it can't clobber the final output.
+  - **Stop button.** The stream used a fire-and-forget `AbortSignal.timeout(90000)` with no way to cancel. It now uses an `AbortController` (90s safety timer retained); while streaming, the Send button is swapped for a **Stop** button that aborts the fetch. A user stop is treated as a clean cancel (partial text kept, no error toast); the 90s timeout still surfaces as truncated/error.
+  - **URL-scheme allowlist (defense-in-depth).** Added a client-side `safeUrl()` (parity with `markdown-render.js`'s `safeUrl` from #934) and routed every `img`/anchor/bare-URL through it, so `javascript:`/`data:`/`vbscript:` can never reach an `href`/`src` even if a capture regex is later loosened. Unit-tested (10 cases).
+  - **Dual `sendMessage` collapsed.** `dream-chat.js` added a second keydown listener that fired its legacy IIFE-scoped `sendMessage` (the dead `.msg-row` render path) on Enter — double-sending alongside the live global `sendMessage` in `dream-chat-ui.js`. Removed that duplicate listener; the textarea's inline `onkeydown` + the Send button are now the single send path. Cache-buster bumped to `?v=20260621-930`.
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed
