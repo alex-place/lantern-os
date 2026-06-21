@@ -473,3 +473,7 @@ module.exports = async function queueRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Exposed for the auto-dispatch worker — single source of truth for the backlog queue.
+module.exports.loadOpenIssues = loadOpenIssues;
+module.exports.priorityFromLabels = priorityFromLabels;

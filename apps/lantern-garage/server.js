@@ -476,6 +476,13 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
 
+  // ── Gated auto-dispatch: auto-work the backlog into draft PRs (OFF unless AUTO_DISPATCH=1) ──
+  try {
+    require("./lib/auto-dispatch").start({ repoRoot: require("path").resolve(__dirname, "../.."), port });
+  } catch (e) {
+    console.error("[auto-dispatch] failed to start (non-fatal):", e && e.message);
+  }
+
   // ── Kalshi Tight-Band Collector (6s polling) ──
   const kalshiCollector = require("./lib/kalshi-collector");
   kalshiCollector.start();

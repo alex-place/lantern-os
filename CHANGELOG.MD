@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.25] - 2026-06-21
+
+### Added
+- **Gated auto-dispatch — auto-work the backlog into draft PRs.** New `apps/lantern-garage/lib/auto-dispatch.js`: when `AUTO_DISPATCH=1`, a scheduled worker pulls the **top-priority open issue** from the queue (`loadOpenIssues`, now exported from `routes/queue.js`), works it via the verified autonomous-work pipeline (research → plan → patch → test → **draft PR**), one at a time, then picks the next. Safety: **OFF by default** (dev/preview never auto-run), **serialized** (one in flight), **cloud-paused** (probes the live chat path and pauses when degraded to the local model, so it can't churn low-quality work during a cloud outage like #965), **draft-PRs only** (nothing auto-merges), and dispatched issues are marked `assigned/` so they aren't re-picked. Wired into `server.js` startup; `AUTO_DISPATCH_INTERVAL_MS` default 5 min (min 30s). Test: `tests/test_auto_dispatch.js` (10 checks). Closes the "backlog loads into the queue but nothing works it" gap.
+
 ## [1.7.24] - 2026-06-21
 
 ### Fixed
