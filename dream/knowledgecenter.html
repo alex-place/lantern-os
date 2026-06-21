@@ -513,6 +513,11 @@
         <h3>Σ₀ Continual-Training Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The machinery that lets the local coding model improve from its own verified work: write code → run it to prove it works → train on the winners → keep the new model only if it scores higher on a coding exam.</span></span></h3>
         <p>The closed flywheel — harvest → execution-verify → train → eval → eval-gated promote. Two ground-truth gates (only green subprocesses train; only a measured pass@1 win promotes), kept offline by design.</p>
       </a>
+      <a class="link-card" href="/repo/docs/SIGMA0-CODER-CLAUDE-CODE-STATUS.md">
+        <span class="icon">🔌</span>
+        <h3>Σ₀ Coder in Claude Code <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Honest status of using the local coding model to drive Claude Code as a tool-using agent: the bridge that connects them, what works, and why the small model isn't reliable enough yet.</span></span></h3>
+        <p>Integration status — the Anthropic↔Ollama bridge, the tool-aware chat + agent loop (shipped), the FC-retrained adapter that learned the trigger, and the honest blocker (1.4B reliability vs Claude Code's ~20k-token prompt). Links the retraining + dev-box guides.</p>
+      </a>
       <a class="link-card" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent)">
         <span class="icon">📊</span>
         <h3>Progress Report — Shareholder Edition <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An honest, evidence-tagged status of where Keystone — the bounded, self-improving agent — stands: what shipped, the real numbers, and the next milestones.</span></span></h3>
