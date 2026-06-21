@@ -297,6 +297,88 @@ function analyzeConvergenceResult(result) {
   return findings;
 }
 
+// ── Native Anthropic tool-use: stream ONE assistant turn ──────────────────────
+// Streams a single /v1/messages turn with `tools`, forwarding text deltas live via
+// onToken and accumulating any native tool_use blocks (input_json_delta → JSON).
+// Resolves { assistantContent, toolUses, stopReason } so the caller can run the
+// requested tools and append a tool_result turn for the next iteration. This is the
+// cloud-model analog of the local model's free-text <tool_call> path — same registry,
+// same executor (lib/tool-runner), reliable native protocol instead of text parsing.
+function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTokens, onToken }) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({ model, max_tokens: maxTokens, stream: true, system, messages, tools });
+    const req = https.request({
+      agent: llmAgent,
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    }, (upstream) => {
+      if (upstream.statusCode !== 200) {
+        upstream.resume();
+        reject(new Error(`anthropic_status_${upstream.statusCode}`));
+        return;
+      }
+      const blocks = [];      // index → { type:"text", text } | { type:"tool_use", id, name, jsonbuf }
+      let stopReason = null;
+      let buf = "";
+      upstream.on("data", (chunk) => {
+        buf += chunk.toString();
+        const lines = buf.split("\n");
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const raw = line.slice(5).trim();
+          if (!raw || raw === "[DONE]") continue;
+          let evt; try { evt = JSON.parse(raw); } catch { continue; }
+          if (evt.type === "content_block_start") {
+            const cb = evt.content_block || {};
+            blocks[evt.index] = cb.type === "tool_use"
+              ? { type: "tool_use", id: cb.id, name: cb.name, jsonbuf: "" }
+              : { type: "text", text: "" };
+          } else if (evt.type === "content_block_delta") {
+            const b = blocks[evt.index];
+            if (evt.delta?.type === "text_delta") {
+              if (b) b.text += evt.delta.text;
+              if (onToken && evt.delta.text) onToken(evt.delta.text);
+            } else if (evt.delta?.type === "input_json_delta" && b) {
+              b.jsonbuf += evt.delta.partial_json || "";
+            }
+          } else if (evt.type === "message_delta" && evt.delta?.stop_reason) {
+            stopReason = evt.delta.stop_reason;
+          }
+        }
+      });
+      upstream.on("end", () => {
+        const assistantContent = [];
+        const toolUses = [];
+        for (const b of blocks) {
+          if (!b) continue;
+          if (b.type === "text") {
+            if (b.text) assistantContent.push({ type: "text", text: b.text });
+          } else {
+            let input = {};
+            try { input = b.jsonbuf ? JSON.parse(b.jsonbuf) : {}; } catch { input = {}; }
+            assistantContent.push({ type: "tool_use", id: b.id, name: b.name, input });
+            toolUses.push({ id: b.id, name: b.name, input });
+          }
+        }
+        resolve({ assistantContent, toolUses, stopReason });
+      });
+      upstream.on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error("anthropic_timeout")); });
+    req.write(payload);
+    req.end();
+  });
+}
+
 async function handleStreamChat(req, url, res) {
   const { collectRequestBody } = require("./http-utils");
   const parsed = await parseStreamChatRequest(req, url, {
@@ -1185,6 +1267,16 @@ async function handleStreamChat(req, url, res) {
     sendDone("offline", { agent: doneAgentName, online: false, error: reason || "no_provider_configured", suggestions: FALLBACK_DOORS });
   };
 
+  // Honest bad-request handling: the body arrived but couldn't be parsed (malformed
+  // JSON / bad encoding), so `message` is empty for a reason that has nothing to do
+  // with providers. Say so plainly instead of falling through to "all providers
+  // failed / cloud unreachable" (which sent a debugging session down the wrong path).
+  if (parsed.bodyError && !message) {
+    sendError("I couldn't read your message — the request body was malformed or had a bad encoding (e.g. a leading UTF-8 BOM). Please resend.");
+    sendDone("offline", { agent: doneAgentName, online: false, error: "bad_request_body", suggestions: FALLBACK_DOORS });
+    return;
+  }
+
   await logConversation({
     recordedAt: new Date().toISOString(),
     surface: "dream-chat-stream",
@@ -1707,6 +1799,67 @@ async function handleStreamChat(req, url, res) {
       } else {
         claudeModel = process.env.ANTHROPIC_MODEL || claudeModel;
       }
+
+      // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) ───────────────────
+      // Gives Keystone real agency: the model can call repo tools (Read/Grep/Glob/LS
+      // for everyone; +Bash/PowerShell/Write/Edit for operators) and answer from the
+      // results instead of guessing. Same registry + executor as the local model's
+      // free-text path (lib/tool-runner), via the reliable native tool_use protocol.
+      // Off by default → the single-shot path below is byte-identical for normal chat.
+      if (process.env.CHAT_TOOL_EXEC === "1") {
+        try {
+          const toolRunner = require("./tool-runner");
+          const { isOperatorRequest } = require("./request-auth");
+          const operator = isOperatorRequest(req);
+          const tools = toolRunner.anthropicTools({ operator });
+          if (tools.length) {
+            const system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
+            const convo = [...compacted.map(h => ({ role: h.role, content: h.text })), { role: "user", content: message }];
+            const MAX_TOOL_ITERS = 6;
+            let toolCalls = 0;
+            for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+              const { assistantContent, toolUses, stopReason } = await anthropicToolTurn({
+                anthropicKey, model: claudeModel, system, messages: convo, tools,
+                maxTokens: isRpMode ? 1536 : 1024,
+                onToken: (t) => { fullReply += t; sendToken(t); },
+              });
+              if (!toolUses.length || stopReason !== "tool_use") break; // model gave its answer
+              convo.push({ role: "assistant", content: assistantContent });
+              const results = [];
+              for (const tu of toolUses) {
+                toolCalls++;
+                sse.writeData(res, { type: "tool", phase: "call", name: tu.name, input: tu.input });
+                const r = toolRunner.runTool(tu.name, tu.input, { operator });
+                const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
+                sse.writeData(res, { type: "tool", phase: "result", name: tu.name, ok: !!r.ok, preview: String(out).slice(0, 240) });
+                results.push({ type: "tool_result", tool_use_id: tu.id, content: String(out).slice(0, 6000), is_error: !r.ok });
+              }
+              convo.push({ role: "user", content: results });
+            }
+            const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+            await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+            recordProviderSuccess("anthropic");
+            recordProviderSuccessRouter("anthropic");
+            const toolReceipt = buildPcsfReceipt("anthropic", claudeModel, true);
+            sendReceipt(toolReceipt);
+            sendDone("anthropic", { agent: doneAgentName, provider: "anthropic", model: claudeModel, online: true, cleanText, suggestions, webSuggestions, receipt: toolReceipt, toolCalls });
+            return;
+          }
+        } catch (err) {
+          recordProviderFailure("anthropic", `tool_loop: ${err.message}`);
+          if (fullReply) {
+            // Already streamed partial output — finalize rather than re-streaming a
+            // fresh single-shot answer (which would duplicate/contradict on screen).
+            const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+            recordProviderSuccess("anthropic");
+            sendDone("anthropic", { agent: doneAgentName, provider: "anthropic", model: claudeModel, online: true, cleanText, suggestions, webSuggestions });
+            return;
+          }
+          if (requestedProvider) { sendError(humanError(err)); await streamLocalFallback(err.message); return; }
+          // else (auto mode, nothing streamed yet): fall through to the single-shot path
+        }
+      }
+
       // Prompt caching: the system block (Keystone/RP instructions + dream/CSF
       // context) is the stable prefix reused across turns in a session. Marking
       // it with cache_control caches it for 5 min; subsequent turns read it at
