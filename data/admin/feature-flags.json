@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "flags": {
+    "patreon_auth": {
+      "label": "Patreon login gate",
+      "description": "When ON, gated pages require a Patreon login. OFF = site open (guests browse; admin pages and the trade API stay 403-protected).",
+      "enabled": false,
+      "updatedAt": "2026-06-21T01:30:00.000Z",
+      "updatedBy": "deploy"
+    }
+  },
+  "navigation": {
+    "/trader-dashboard.html": {
+      "hidden": true,
+      "disabled": true,
+      "updatedAt": "2026-06-20T17:47:00.650Z",
+      "updatedBy": "local-admin"
+    },
+    "/create.html": {
+      "hidden": true,
+      "disabled": true,
+      "updatedAt": "2026-06-20T17:47:02.241Z",
+      "updatedBy": "local-admin"
+    },
+    "/explore.html": {
+      "hidden": true,
+      "disabled": true,
+      "updatedAt": "2026-06-20T17:47:04.685Z",
+      "updatedBy": "local-admin"
+    },
+    "/dream-chat.html": {
+      "hidden": false,
+      "disabled": false,
+      "updatedAt": "2026-06-20T19:50:15.574Z",
+      "updatedBy": "local-admin"
+    }
+  },
+  "updatedAt": "2026-06-21T01:30:00.000Z"
+}
