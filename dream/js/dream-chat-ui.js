@@ -201,6 +201,27 @@ async function testWebSearch() {
 const _origOpenSettings = openSettings;
 openSettings = function() { _origOpenSettings(); updateConnectorStatuses(); };
 
+// Broken / hallucinated image URLs used to hide themselves with display:none.
+// When the answer is image-ONLY (model replied with just `![alt](url)`), that
+// left a completely blank bubble — "the answer came through but the chat bubble
+// is hidden". Swap the dead <img> for a visible fallback link so the answer is
+// never invisible: alt text (if any) + a tap-to-open link to the source URL.
+function lanternImgFallback(img) {
+  try {
+    const url = img.getAttribute('src') || '';
+    const alt = (img.getAttribute('alt') || '').trim();
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.cssText = 'display:inline-block;color:var(--accent);text-decoration:underline;word-break:break-all;font-size:13px;margin:6px 0';
+    a.textContent = '🖼️ ' + (alt ? alt + ' — ' : '') + 'image (tap to open)';
+    img.replaceWith(a);
+  } catch (e) {
+    img.style.display = 'none';
+  }
+}
+
 // ── Markdown + PR link renderer ───────────────────────────────────────────────
 function renderMarkdown(text) {
   let h = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -213,10 +234,12 @@ function renderMarkdown(text) {
   const _stash = [];
   const _put = (html) => `\x00L${_stash.push(html) - 1}\x00`;
 
-  // Images ![alt](url) → <img>. Broken / hallucinated URLs hide themselves (onerror).
-  // Must run before the link rule so ![..](..) isn't read as a text link.
+  // Images ![alt](url) → <img>. Broken / hallucinated URLs fall back to a visible
+  // link (see lanternImgFallback) instead of vanishing — so an image-only answer
+  // never renders as a blank bubble. Must run before the link rule so ![..](..)
+  // isn't read as a text link.
   h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
-    _put(`<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
+    _put(`<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
 
   // YouTube links → privacy-friendly inline embed.
   h = h.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})[^\s<>"')\x00]*/g, (_, vid) =>
