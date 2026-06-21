@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.16] - 2026-06-21
+
+### Added
+- **Σ₀ coder dev-box setup guide + Claude-Code integration status doc**, the latter pushed to the Knowledge Center (new KC card + rebuilt grounding index). Documents how to stand up the local coder + bridge on a second machine and the honest state of driving Claude Code with it.
+
 ## [1.7.15] - 2026-06-21
 
 ### Changed

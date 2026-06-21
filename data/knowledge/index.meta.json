@@ -1,10 +1,12 @@
 {
-  "built_at": 1782027530.7256818,
+  "built_at": 1782075404.873944,
   "docs": [
     "README.md",
     "CLAUDE.md",
     "AGENTS.md",
     "QUICKSTART.md",
+    "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
+    "docs/CSF-FORMAT-SPECIFICATION.md",
     "PROVIDERS.md",
     "SKILLS.md",
     "docs/KEYSTONE-BRAND-GUIDELINES.md",
@@ -14,15 +16,14 @@
     "CODE_OF_CONDUCT.md",
     "docs/SIGMA0-OURO-CODER.md",
     "docs/SIGMA0-CONTINUAL-TRAINING.md",
-    "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
+    "docs/SIGMA0-CODER-CLAUDE-CODE-STATUS.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
     "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
     "docs/research/2026-06-19-kernel-model-frontier.md",
     "docs/research/2026-06-19-convergence-tesseract-spiral.md",
     "docs/research/2026-06-19-convergence-core-agent-spine.md",
-    "docs/KEYSTONE-MCP.md",
-    "docs/CSF-FORMAT-SPECIFICATION.md"
+    "docs/KEYSTONE-MCP.md"
   ],
-  "sections": 404,
-  "sha256": "7ae2108f176316e17e9ff83467d82ebc1826050f061c8255d5b4cc9c57a28ac7"
+  "sections": 409,
+  "sha256": "0b0d15f711099d5f906ba42efdd781ed988d4345a9cb015e225541096d716775"
 }
