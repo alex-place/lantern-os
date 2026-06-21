@@ -15,6 +15,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.5] - 2026-06-21
+
+### Cleanup
+- Remove dead `safe-zone-v25.js` (zero importers) and `safezone-confidence.js`
+  (imported only by v25). Σ₀ red-team finding on safe-zone sprawl (#918, #919).
+  Verified via importer grep + load smoke-test of the remaining v2/v3/detector chain.
+
 ## [1.6.4] - 2026-06-21
 
 ### Security
