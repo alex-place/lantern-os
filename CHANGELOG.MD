@@ -18,9 +18,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 ## [1.6.5] - 2026-06-21
 
 ### Cleanup
-- Remove dead `safe-zone-v25.js` (zero importers) and `safezone-confidence.js`
-  (imported only by v25). Σ₀ red-team finding on safe-zone sprawl (#918, #919).
-  Verified via importer grep + load smoke-test of the remaining v2/v3/detector chain.
+- Remove the dead `safe-zone-v25.js` → `safezone-confidence.js` chain (no production
+  importers) **plus its now-orphaned `tests/test_safezone_v25.js` and stale
+  `docs/SAFEZONE_V25.md`** — the test was the chain's only remaining `require()`, so
+  deleting the modules alone would have left a test loading a missing file. Σ₀ red-team
+  finding on safe-zone sprawl (#918, #919). Verified via importer grep (exports
+  `planCaptionSafeZone`/`smoothZone`/`PRIORS` used only by the deleted test) + load
+  smoke-test of the remaining v2/v3/detector chain.
 
 ## [1.6.4] - 2026-06-21
 
