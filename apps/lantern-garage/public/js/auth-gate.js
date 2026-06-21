@@ -8,7 +8,10 @@
   // dream-chat.html is public so first-time visitors can reach the chat without an
   // account, honoring the "no account needed" promise (#739). Guests get a limited
   // read-only experience; premium models/limits are still enforced by role.
-  const PUBLIC = ['/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html'];
+  // Keep in lock-step with PUBLIC_PAGES in routes/pages.js. '/' and '/index.html'
+  // are served publicly there, so they must not bounce here either — a missing '/'
+  // is why a guest landing on the home page got redirected to /auth.html?returnTo=%2F.
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/trader-dashboard.html', '/kalshi-terminal.html'];
   const pathname = window.location.pathname;
@@ -162,9 +165,10 @@
     })
     .catch(() => {
       // Session lookup failed — still apply public nav-config/flags (no admin link).
+      // Fail open: do NOT client-redirect to /auth.html on a transient error. The
+      // server is authoritative and serves its own 302 for genuinely protected
+      // pages when the gate is on, so a client bounce here is redundant and, while
+      // the login flow is being disabled, actively harmful.
       applyAdminControls(null);
-      if (!isPublic) {
-        location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
-      }
     });
 })();
