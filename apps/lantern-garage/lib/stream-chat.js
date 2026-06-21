@@ -481,17 +481,50 @@ async function handleStreamChat(req, url, res) {
             } else {
               sendToken(`\n❌ Keystone failed: ${result.error}\n`);
               sendToken(`Phase: ${result.phase}\n`);
+              // #897: every kernel failure is a recorded convergence event (External Reality Rule)
+              emitConvergenceRecord({
+                hypothesis: `Keystone kernel can land issue via ${provider}`,
+                result: `escalated-to-claude: ${result.error || "unknown failure"} (phase=${result.phase})`,
+                confidence: 0.0,
+                evidence_ids: [result.error || result.phase || "unknown"],
+                reasoner: "kernel-escalation",
+                verified: true,
+                verification_notes: `Kernel failure at phase=${result.phase}; mode=${rolloverMode}; escalating to next provider`,
+                source: `kernel/${provider}/${kernelModel || "default"}`,
+              }).catch(() => {});
               sendDone("keystone", { agent: "Keystone", provider, model: kernelModel, rolloverMode, status: "failed", error: result.error });
             }
             res.end();
           })
           .catch((err) => {
             sendToken(`\n❌ Error: ${err.message}\n`);
+            // #897: escalation from unhandled error is also a convergence record
+            emitConvergenceRecord({
+              hypothesis: `Keystone kernel can land issue via ${provider}`,
+              result: `escalated-to-claude: ${err.message}`,
+              confidence: 0.0,
+              evidence_ids: [err.message],
+              reasoner: "kernel-escalation",
+              verified: true,
+              verification_notes: `Unhandled kernel error; mode=${rolloverMode}`,
+              source: `kernel/${provider}/${kernelModel || "default"}`,
+            }).catch(() => {});
             sendDone("keystone", { agent: "Keystone", provider, model: kernelModel, rolloverMode, status: "error", error: err.message });
             res.end();
           });
       } catch (e) {
         sendToken(`Error: ${e.message}\n`);
+        // #897: sync-throw escalation also recorded
+        emitConvergenceRecord({
+          hypothesis: `Keystone kernel can land issue via ${provider || "unknown"}`,
+          result: `escalated-to-claude: ${e.message}`,
+          confidence: 0.0,
+          evidence_ids: [e.message],
+          reasoner: "kernel-escalation",
+          verified: true,
+          verification_notes: `Sync kernel error; mode=${rolloverMode || "unknown"}`,
+          source: `kernel/${provider || "unknown"}/${kernelModel || "default"}`,
+        }).catch(() => {});
         sendDone("keystone", { agent: "Keystone", status: "error", error: e.message });
         res.end();
       }
