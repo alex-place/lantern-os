@@ -46,7 +46,7 @@ async function recordAgentCallFromConvergenceReceipt(
   };
 
   try {
-    await appendJsonlQueued(AGENT_PERF_PATH, entry);
+    await appendJsonlQueued(AGENT_PERF_PATH, entry, { rotate: true }); // #872
     // Invalidate cache so next query reloads
     _cacheLoadedAt = 0;
   } catch (err) {
@@ -180,7 +180,7 @@ async function retireAgent(agentId, taskType, reason) {
   };
 
   try {
-    await appendJsonlQueued(AGENT_PERF_PATH, entry);
+    await appendJsonlQueued(AGENT_PERF_PATH, entry, { rotate: true }); // #872
     _cacheLoadedAt = 0; // Invalidate cache
     console.log(`[agent-performance] Retired ${agentId} for ${taskType}: ${reason}`);
   } catch (err) {

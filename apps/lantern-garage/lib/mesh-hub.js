@@ -95,7 +95,7 @@ async function recordHeartbeat(body) {
 
   _seedFromLog();
   _lastHeartbeat.set(memberId, heartbeat);
-  await appendJsonlQueued(HEARTBEAT_LOG, heartbeat).catch(() => {});
+  await appendJsonlQueued(HEARTBEAT_LOG, heartbeat, { rotate: true }).catch(() => {}); // #872 per-heartbeat
   return { ok: true, heartbeat };
 }
 

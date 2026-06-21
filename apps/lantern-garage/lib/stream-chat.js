@@ -76,7 +76,7 @@ function logTruncationMetric(originalChars, truncatedChars, truncationType) {
       compressionRatio: truncatedChars / originalChars
     };
     const { appendJsonlQueued } = require("./file-queue");
-    appendJsonlQueued(metricsPath, metric).catch(() => {});
+    appendJsonlQueued(metricsPath, metric, { rotate: true }).catch(() => {}); // #872 per-message hot path
   } catch (e) {
     // Best-effort logging; never block on metric failure
   }
@@ -1001,7 +1001,7 @@ async function handleStreamChat(req, url, res) {
       };
       const { appendJsonlQueued } = require("./file-queue");
       const convergencePath = path.resolve(repoRoot, "data/convergence/chat-responses.jsonl");
-      await appendJsonlQueued(convergencePath, signature).catch(() => {});
+      await appendJsonlQueued(convergencePath, signature, { rotate: true }).catch(() => {}); // #872
     } catch (e) {
       // Non-blocking convergence logging
     }
@@ -1122,7 +1122,7 @@ async function handleStreamChat(req, url, res) {
         claimsFound: total,
         checkableClaims: checkable,
         claims,
-      }).catch(() => {});
+      }, { rotate: true }).catch(() => {}); // #872 per-verify
 
       return {
         verified: true,
@@ -1243,7 +1243,7 @@ async function handleStreamChat(req, url, res) {
             score: gate.score,
             reason: gate.reason,
             features: gate.features,
-          }).catch(() => {});
+          }, { rotate: true }).catch(() => {}); // #872 per-message gate log
         } catch { /* logging is best-effort */ }
       } catch (ge) {
         console.error("[router-gate] gate error (non-fatal):", ge.message);

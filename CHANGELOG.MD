@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.6] - 2026-06-21
+
+### Fixed
+- **JSONL rotation: wire the remaining high-frequency append sites (#872).** The rotation mechanism (#771/#872 — `appendJsonlQueued(path, rec, { rotate })` + `appendJsonlRotating`, default 5 MB / keep-5, env-tunable via `JSONL_MAX_BYTES`/`JSONL_KEEP_ARCHIVES`) was enabled at only 3 callers (provider-router + 2 trading loggers), leaving the other named hot paths growing unbounded. Opted-in `{ rotate: true }` at the remaining issue-named sites: `stream-chat.js` (per-message metrics, convergence signature, verify records, router-gate decisions) + `stream-chat/helpers.js` metrics, `mesh-hub.js` (per-heartbeat), `leaderboard-routing.js`, `agent-performance.js` (×2), `strategy-performance-logger.js`, `convergence-records.js`, and `csf-memory-writer.js` (per-partition). Now 15 append sites bound their growth; low-frequency callers stay unrotated (rotation is opt-in, no behavior change for them). Existing `tests/test_file_queue_rotate.js` (4 cases) still passes.
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed
