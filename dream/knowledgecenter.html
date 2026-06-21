@@ -178,6 +178,7 @@
         <a href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">Kernel model frontier</a>,
         <a href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">Convergence-exit spiral</a>,
         <a href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">Convergence Core spine</a>,
+        <a href="/repo/docs/SIGMA0-K1-KERNEL-SPEC.md">Σ₀-K1 kernel spec</a>,
         <a href="/repo/docs/SIGMA0-OURO-CODER.md">Σ₀ Ouro Coder</a>,
         <a href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">CSF-Pack v0.8</a>.
       </p>
@@ -292,6 +293,12 @@
           <p>2026-06-19 — what shipped (token-budgeted memory #772, the loop's first closing slice), the real metrics (34% golden-set baseline), the honest ceiling, and the roadmap. Every claim evidence-tagged.</p>
           <span class="card-meta">Updated Jun 19, 2026</span>
         </a>
+        <a class="link-card" data-modified="2026-06-19T22:38:35-04:00" href="/repo/docs/SIGMA0-K1-KERNEL-SPEC.md">
+          <span class="icon">🧱</span>
+          <h3>Σ₀-K1 Kernel Spec <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The "kernel" is the small local model at the center of the loop (Ouro-1.4B, not an Ollama model). This spec freezes its first buildable design — and is honest that it's a weak core engineered to converge, not a strong model.</span></span></h3>
+          <p>The first buildable convergence kernel — Ouro-1.4B + Σ₀ QLoRA wrapped in a replayable state VM, drift-equivalent provider hot-swap, and mandatory grounding. Honest headline: a weak 1.4B core (HumanEval pass@1 0.1) engineered to converge, not a strong model. Every claim evidence-tagged; the state-ABI shim is the one true blocker.</p>
+          <span class="card-meta">Updated Jun 19, 2026</span>
+        </a>
         <a class="link-card" data-modified="2026-06-19T22:30:40-04:00" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
           <span class="icon">🧩</span>
           <h3>Convergence Core spine <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The design for turning Lantern's already-built parts (memory, task, tool, record + the Σ₀ safety system) into one closed agent loop — and the single feedback wire that's still missing.</span></span></h3>
@@ -334,11 +341,11 @@
           <p>Keystone chat is linked to live project tools/details (GitHub issues+PRs, MCP tools) — any provider, incl. Grok, answers grounded in the real repo.</p>
           <span class="card-meta">Updated Jun 18, 2026</span>
         </a>
-        <a class="link-card" data-modified="2026-06-18T15:36:29-04:00" href="/repo/docs/LANTERN-SIGMA0-CODER.md">
+        <a class="link-card" data-modified="2026-06-18T15:36:29-04:00" href="/repo/docs/LANTERN-SIGMA0-CODER.md" style="opacity:.66">
           <span class="icon">🤖</span>
-          <h3>lantern-sigma0-coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A coding AI that runs locally on your own machine (via Ollama), fine-tuned ("LoRA") on past Claude sessions — no cloud required.</span></span></h3>
-          <p>The local Σ₀ coding agent — a LoRA fine-tuned on past Claude sessions, served via Ollama, leaderboard-routed, and continually retrained.</p>
-          <span class="card-meta">Updated Jun 18, 2026</span>
+          <h3>lantern-sigma0-coder <span style="font-size:.58rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 6px;white-space:nowrap">Legacy</span> <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Retired. The older local coder (Qwen-based, served via Ollama). Replaced by the Σ₀ Ouro Coder, which runs the looped Ouro model trained locally — see that card above.</span></span></h3>
+          <p><strong>Deprecated — superseded by the Σ₀ Ouro Coder.</strong> The legacy Qwen2.5-Coder-3B QLoRA coder served via Ollama; its Ollama deployment + Qwen training weights have been removed. Kept for history.</p>
+          <span class="card-meta">Deprecated · originally Jun 18, 2026</span>
         </a>
         <a class="link-card" data-modified="2026-06-14T20:26:12-04:00" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
           <span class="icon">🌌</span>
