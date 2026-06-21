@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.1] - 2026-06-21
+
+### Fixed
+- **Auth gate: home page no longer bounces guests to `/auth.html`.** `public/js/auth-gate.js` already honors the server's `authRequired` signal (so disabling the `patreon_auth` flag opens the site), but its client-side `PUBLIC` allow-list was missing `/` and `/index.html` — which **are** served publicly by `routes/pages.js` `PUBLIC_PAGES`. The mismatch meant a guest landing on the home page got redirected to `/auth.html?returnTo=%2F` whenever the gate was on. Added both paths so the two lists stay in lock-step. Also made the `/api/auth/session` fetch-failure path **fail open** (no client redirect on a transient error) — the server remains authoritative and issues its own 302 for genuinely protected pages, so the client bounce was redundant and harmful while the login flow is being disabled. Client-only change; no behavior change for authenticated users or protected routes.
+
 ## [1.7.0] - 2026-06-21
 
 ### Changed
