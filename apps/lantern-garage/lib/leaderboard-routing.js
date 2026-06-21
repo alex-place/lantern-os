@@ -58,7 +58,7 @@ async function recordOuroLoss(entry) {
       winner_model: entry.winnerModel || entry.winnerProvider || null,
       winner_reply: String(entry.winnerReply || "").slice(0, 4000),
       reason: entry.reason || "cloud_preferred",
-    });
+    }, { rotate: true }); // #872
   } catch {
     /* non-fatal */
   }

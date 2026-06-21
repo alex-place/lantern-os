@@ -223,7 +223,68 @@ function lanternImgFallback(img) {
 }
 
 // ── Markdown + PR link renderer ───────────────────────────────────────────────
+// #930: scheme allowlist for any URL we interpolate into href/src. The capture
+// regexes below already require an http(s) scheme, so this is defense-in-depth
+// (parity with markdown-render.js's safeUrl from #934) — a future loosening of a
+// regex can't turn into a javascript:/data: sink. Non-allowed schemes neutralize
+// to '#'.
+function safeUrl(url) {
+  const u = String(url || '').trim();
+  if (/^(https?:|mailto:)/i.test(u)) return u;
+  if (/^[#/]/.test(u)) return u;                 // in-page anchor / site-absolute path
+  return '#';
+}
+
+// ── Tool-call rendering ──────────────────────────────────────────────────────
+// The local Σ₀ Ouro coder (FC adapter) answers tool-worthy turns with a
+// <tool_call>{"name","input"}</tool_call> block. Render it as a card instead of
+// leaking raw JSON. A matching `tool` SSE event (server-side execution) fills the
+// result slot; see the stream handler.
+function parseToolCallInner(inner) {
+  try { const o = JSON.parse(inner); if (o && o.name) return o; } catch {}
+  const nameM = inner.match(/"name"\s*:\s*"([^"]+)"/);
+  let input = {};
+  const inputM = inner.match(/"(?:input|arguments)"\s*:\s*(\{[\s\S]*\})/);
+  if (inputM) { try { input = JSON.parse(inputM[1]); } catch {} }
+  return nameM ? { name: nameM[1], input } : null;
+}
+function buildToolCard(inner, partial) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const tc = parseToolCallInner(inner);
+  const name = tc && tc.name ? tc.name : 'tool';
+  const args = esc(tc && tc.input ? JSON.stringify(tc.input, null, 2) : inner.trim());
+  const status = partial ? ' <span style="opacity:.6;font-weight:400">…calling</span>' : '';
+  return '<div class="tool-call-card" data-tool="' + esc(name) + '" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;margin:8px 0;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:13px">🔧 ' + esc(name) + status + '</div>'
+    + '<pre style="margin:0;padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--text,#cdd)">' + args + '</pre>'
+    + '<div class="tcc-result" style="display:none;border-top:1px solid var(--border,#2a2a3a);padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--muted,#9aa)"></div>'
+    + '</div>';
+}
+function fillToolSlot(slot, evt) {
+  if (!slot) return;
+  if (evt.ok) {
+    slot.textContent = '↳ ' + String(evt.result || '');
+    slot.style.color = 'var(--text,#cdd)';
+    slot.style.opacity = '1';
+  } else {
+    const msg = ({
+      disabled: 'tool execution is off (set CHAT_TOOL_EXEC=1)',
+      auth: 'this tool needs operator access',
+      unsafe: 'command not allowlisted',
+      unknown: 'unknown tool',
+    })[evt.reason] || ('tool error: ' + String(evt.result || evt.reason || 'failed'));
+    slot.textContent = '⚠ ' + msg;
+    slot.style.color = 'var(--muted,#9aa)';
+    slot.style.opacity = '0.7';
+  }
+  slot.style.display = 'block';
+}
 function renderMarkdown(text) {
+  // Extract tool-call blocks (closed, then a trailing unclosed one while streaming)
+  // into placeholders that survive HTML-escaping; restore as cards at the very end.
+  const _toolCards = [];
+  text = text.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi, (_, inner) => '\x00T' + (_toolCards.push(buildToolCard(inner, false)) - 1) + '\x00');
+  text = text.replace(/<tool_call>\s*([\s\S]*)$/i, (_, inner) => '\x00T' + (_toolCards.push(buildToolCard(inner, true)) - 1) + '\x00');
   let h = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
   h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
@@ -239,7 +300,7 @@ function renderMarkdown(text) {
   // never renders as a blank bubble. Must run before the link rule so ![..](..)
   // isn't read as a text link.
   h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
-    _put(`<img src="${url}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
+    _put(`<img src="${safeUrl(url)}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
 
   // YouTube links → privacy-friendly inline embed.
   h = h.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})[^\s<>"')\x00]*/g, (_, vid) =>
@@ -247,7 +308,7 @@ function renderMarkdown(text) {
 
   // Markdown links [label](url) → new-tab anchors.
   h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) =>
-    _put(`<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
+    _put(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
 
   h = h.replace(
     /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)/g,
@@ -262,19 +323,47 @@ function renderMarkdown(text) {
   h = h.replace(/(?<!["\/=])(https?:\/\/[^\s<>"')\x00]+)/g, (m, url) => {
     const trail = (url.match(/[.,;:!?]+$/) || [''])[0];
     const clean = trail ? url.slice(0, -trail.length) : url;
-    return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${clean}</a>${trail}`;
+    return `<a href="${safeUrl(clean)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${clean}</a>${trail}`;
   });
 
   // Restore the stashed markdown-link anchors.
   h = h.replace(/\x00L(\d+)\x00/g, (_, i) => _stash[+i]);
 
   h = h.replace(/\n/g, '<br>');
+  h = h.replace(/\x00T(\d+)\x00/g, (_, i) => _toolCards[+i]);  // restore tool-call cards last (after <br>) so their <pre> isn't mangled
   return h;
 }
 
 // ── Conversation state ────────────────────────────────────────────────────────
 let isSending = false;
 const history = [];
+
+// #930: a user-facing Stop control. While a stream is in flight we swap the Send
+// button for a Stop button that aborts the fetch; on completion/cancel we swap back.
+function showStopButton(onStop) {
+  const sendBtn = document.getElementById('send-btn');
+  let btn = document.getElementById('stop-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'stop-btn';
+    btn.type = 'button';
+    btn.title = 'Stop generating';
+    btn.setAttribute('aria-label', 'Stop generating');
+    btn.textContent = '■';
+    btn.className = (sendBtn && sendBtn.className ? sendBtn.className + ' ' : '') + 'stop-button';
+    if (sendBtn && sendBtn.parentNode) sendBtn.parentNode.insertBefore(btn, sendBtn.nextSibling);
+    else document.body.appendChild(btn);
+  }
+  btn.onclick = () => { try { onStop(); } catch (_e) {} };
+  btn.style.display = '';
+  if (sendBtn) sendBtn.style.display = 'none';
+}
+function hideStopButton() {
+  const btn = document.getElementById('stop-btn');
+  if (btn) btn.style.display = 'none';
+  const sendBtn = document.getElementById('send-btn');
+  if (sendBtn) sendBtn.style.display = '';
+}
 
 const FALLBACKS = [
   "No AI providers are set up. Add an API key in Settings (⚙) to get started.",
@@ -822,6 +911,13 @@ async function sendMessage() {
   isSending = true;
   document.getElementById('send-btn').disabled = true;
 
+  // #930: real cancellation — an AbortController the Stop button can trigger, plus a
+  // 90s safety timer for a hung stream (replaces the old fire-and-forget timeout).
+  let userStopped = false;
+  const ac = new AbortController();
+  const abortTimer = setTimeout(() => ac.abort(), 90000);
+  showStopButton(() => { userStopped = true; ac.abort(); });
+
   addUserBubble(text);
   input.value = '';
   input.style.height = 'auto';
@@ -837,6 +933,24 @@ async function sendMessage() {
   let routeLabel = '';
   let receivedDone = false;
   let doneProvider = '';
+  // #930: coalesce per-token DOM writes into one render per animation frame instead
+  // of re-parsing+re-rendering the whole bubble on every token.
+  let rafId = 0;
+  let rafPending = false;
+  let streamEnded = false;
+  const scheduleRender = () => {
+    if (rafPending || streamEnded) return;
+    rafPending = true;
+    rafId = requestAnimationFrame(() => {
+      rafPending = false;
+      if (streamEnded) return;
+      cursor.remove();
+      bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
+      bubble.appendChild(cursor);
+      container.scrollTop = container.scrollHeight;
+    });
+  };
+  const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const requestedProvider = document.getElementById('provider-select')?.value || '';
 
   try {
@@ -855,7 +969,7 @@ async function sendMessage() {
         // without it, turns log untagged and never form a saved session.
         sessionId: localStorage.getItem('lantern_chat_session') || undefined,
       }),
-      signal: AbortSignal.timeout(90000),
+      signal: ac.signal,
     });
 
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
@@ -884,14 +998,18 @@ async function sendMessage() {
           } else if (evt.type === 'token' && evt.text) {
             if (thinking.parentNode) thinking.remove();
             fullText += evt.text;
-            cursor.remove();
-            bubble.innerHTML = renderMarkdown(fullText.replace(/\[DOORS:[^\]]*\]?/i, '').trimEnd());
-            bubble.appendChild(cursor);
-            container.scrollTop = container.scrollHeight;
+            scheduleRender(); // #930: rAF-coalesced, not a full re-render per token
           } else if (evt.type === 'error') {
             didError = true;
             if (evt.text) serverErrorText = evt.text;
             if (!fullText) bubble.style.color = 'var(--muted)';
+          } else if (evt.type === 'tool') {
+            // Server ran (or declined to run) the model's <tool_call>. Fill the result
+            // slot of the last tool-call card so the call + its real output show together.
+            toolResults.push(evt);
+            const cards = bubble.querySelectorAll('.tool-call-card');
+            const card = cards[cards.length - 1];
+            if (card) { fillToolSlot(card.querySelector('.tcc-result'), evt); container.scrollTop = container.scrollHeight; }
           } else if (evt.type === 'sigma0' && evt.corrected) {
             // Response was revised by Σ₀ verify pass — show badge after stream completes
             bubble.dataset.sigma0Corrected = '1';
@@ -905,7 +1023,16 @@ async function sendMessage() {
         } catch { /* skip malformed line */ }
       }
     }
-  } catch (e) { didError = true; }
+  } catch (e) {
+    // #930: a user Stop is a clean cancel — keep whatever already streamed. Any other
+    // abort (the 90s safety timer) or error is a real failure.
+    if (!(e && e.name === 'AbortError' && userStopped)) didError = true;
+  } finally {
+    clearTimeout(abortTimer);
+    hideStopButton();
+    streamEnded = true;            // stop scheduling and neutralize any in-flight rAF
+    if (rafId) cancelAnimationFrame(rafId);
+  }
 
   cursor.remove();
 
@@ -922,6 +1049,15 @@ async function sendMessage() {
   }
 
   bubble.innerHTML = renderMarkdown(fullText);
+
+  // Re-apply tool results — the render above rebuilds the cards with empty result slots.
+  if (toolResults.length) {
+    const cards = bubble.querySelectorAll('.tool-call-card');
+    toolResults.forEach((evt, i) => {
+      const card = cards[i] || cards[cards.length - 1];
+      if (card) fillToolSlot(card.querySelector('.tcc-result'), evt);
+    });
+  }
 
   if (looksTruncated) {
     const truncBadge = document.createElement('span');

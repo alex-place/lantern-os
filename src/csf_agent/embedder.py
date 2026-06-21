@@ -1,19 +1,23 @@
 """
-embedder.py — co-occurrence token-frequency vectors (NOT semantic embeddings) (#937).
+embedder.py — CSF symbolic vocab co-occurrence vectorizer.
 
-This builds L2-normalized float32 vectors from raw token CO-OCCURRENCE frequency over
-csf_memory JSONL, falling back to a hardcoded 34-token seed vocab. It is a lexical
-co-occurrence counter, **not** a learned semantic embedding model — two tokens are
-only "close" if they literally co-occur in the corpus; paraphrases / synonyms are not
-captured. Named honestly per #919.1; `CSFEmbedder` is kept as a back-compat alias.
-Pure numpy — no torch/transformers.
+⚠️  NOT semantic embeddings. This is a 34-token co-occurrence frequency counter
+(pure numpy, no transformers). It produces L2-normalized vectors whose cosine
+similarity measures shared-vocabulary overlap, NOT semantic meaning. Renamed from
+misleading "embedder"/"semantic search" framing in #937.
+
+Use ``CSFCooccurrenceVectorizer`` (canonical name). ``CSFEmbedder`` is kept as a
+backwards-compat alias so existing imports keep working without changes.
 
 Usage:
-    from csf_agent.embedder import CSFCooccurrence
-    emb = CSFCooccurrence()
-    vec = emb.embed(["dream", "convergence"])   # np.ndarray shape (vocab_size,)
-    emb.save("data/csf_memory/embedder.npy")
-    emb2 = CSFEmbedder.load("data/csf_memory/embedder.npy")
+    from csf_agent.embedder import CSFCooccurrenceVectorizer
+    vec_fn = CSFCooccurrenceVectorizer()
+    vec = vec_fn.vectorize(["dream", "convergence"])   # np.ndarray shape (vocab_size,)
+    vec_fn.save("data/csf_memory/vectorizer.npy")
+    vec2 = CSFCooccurrenceVectorizer.load("data/csf_memory/vectorizer.npy")
+
+    # legacy alias
+    from csf_agent.embedder import CSFEmbedder   # still works
 """
 
 from __future__ import annotations
@@ -97,10 +101,14 @@ def _l2_normalize(v: np.ndarray) -> np.ndarray:
     return v / norm
 
 
-class CSFCooccurrence:
+class CSFCooccurrenceVectorizer:
     """
-    Maps lists of string tokens to L2-normalized float32 co-occurrence vectors of
-    vocab size (NOT semantic embeddings — see module docstring, #937).
+    Maps lists of string tokens to L2-normalized float32 co-occurrence vectors.
+
+    ⚠️  This is a co-occurrence frequency counter over a fixed 34-token seed
+    vocabulary. Cosine similarity between two vectors measures shared vocab
+    overlap, NOT semantic meaning. Do not advertise as "semantic search".
+
     Unknown tokens map to zero weight (no KeyError).
     """
 
@@ -118,12 +126,12 @@ class CSFCooccurrence:
     def vocab_size(self) -> int:
         return len(self.vocab)
 
-    def embed(self, tokens: List[str]) -> np.ndarray:
-        """
-        Return L2-normalized float32 vector of vocab_size.
-        Each position holds the weight of that vocab token scaled by
-        how many times the token appears in `tokens`.
-        Unknown tokens are silently ignored (zero contribution).
+    def vectorize(self, tokens: List[str]) -> np.ndarray:
+        """Return L2-normalized co-occurrence frequency vector of vocab_size.
+
+        Each position holds the co-occurrence weight of that vocab token scaled
+        by how many times the token appears in `tokens`. Cosine similarity of
+        two such vectors measures shared-vocabulary overlap only.
         """
         vec = np.zeros(self.vocab_size, dtype=np.float32)
         for tok in tokens:
@@ -132,6 +140,10 @@ class CSFCooccurrence:
                 vec[idx] += self._weights[idx]
         return _l2_normalize(vec)
 
+    def embed(self, tokens: List[str]) -> np.ndarray:
+        """Backwards-compat alias for vectorize(). Prefer vectorize()."""
+        return self.vectorize(tokens)
+
     def save(self, path: str | Path) -> None:
         """Save vocab + weights to a numpy .npy archive."""
         path = Path(path)
@@ -139,8 +151,8 @@ class CSFCooccurrence:
         np.save(str(path), {"vocab": self.vocab, "weights": self._weights}, allow_pickle=True)
 
     @classmethod
-    def load(cls, path: str | Path) -> "CSFCooccurrence":
-        """Load a previously saved co-occurrence model from .npy file."""
+    def load(cls, path: str | Path) -> "CSFCooccurrenceVectorizer":
+        """Load a previously saved vectorizer from .npy file."""
         data = np.load(str(path), allow_pickle=True).item()
         inst = cls.__new__(cls)
         inst.vocab = list(data["vocab"])
@@ -149,7 +161,6 @@ class CSFCooccurrence:
         return inst
 
 
-# Back-compat alias (#937): the old name claimed "embeddings"; the implementation is a
-# co-occurrence counter. Existing imports keep working; new code should prefer
-# CSFCooccurrence.
-CSFEmbedder = CSFCooccurrence
+# Backwards-compat alias — existing `from csf_agent.embedder import CSFEmbedder` keeps working.
+# New code should use CSFCooccurrenceVectorizer.
+CSFEmbedder = CSFCooccurrenceVectorizer
