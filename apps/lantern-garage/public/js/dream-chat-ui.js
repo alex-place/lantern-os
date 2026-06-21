@@ -223,7 +223,56 @@ function lanternImgFallback(img) {
 }
 
 // ── Markdown + PR link renderer ───────────────────────────────────────────────
+// ── Tool-call rendering ──────────────────────────────────────────────────────
+// The local Σ₀ Ouro coder (FC adapter) answers tool-worthy turns with a
+// <tool_call>{"name","input"}</tool_call> block. Render it as a card instead of
+// leaking raw JSON. A matching `tool` SSE event (server-side execution) fills the
+// result slot; see the stream handler.
+function parseToolCallInner(inner) {
+  try { const o = JSON.parse(inner); if (o && o.name) return o; } catch {}
+  const nameM = inner.match(/"name"\s*:\s*"([^"]+)"/);
+  let input = {};
+  const inputM = inner.match(/"(?:input|arguments)"\s*:\s*(\{[\s\S]*\})/);
+  if (inputM) { try { input = JSON.parse(inputM[1]); } catch {} }
+  return nameM ? { name: nameM[1], input } : null;
+}
+function buildToolCard(inner, partial) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const tc = parseToolCallInner(inner);
+  const name = tc && tc.name ? tc.name : 'tool';
+  const args = esc(tc && tc.input ? JSON.stringify(tc.input, null, 2) : inner.trim());
+  const status = partial ? ' <span style="opacity:.6;font-weight:400">…calling</span>' : '';
+  return '<div class="tool-call-card" data-tool="' + esc(name) + '" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;margin:8px 0;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:13px">🔧 ' + esc(name) + status + '</div>'
+    + '<pre style="margin:0;padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--text,#cdd)">' + args + '</pre>'
+    + '<div class="tcc-result" style="display:none;border-top:1px solid var(--border,#2a2a3a);padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--muted,#9aa)"></div>'
+    + '</div>';
+}
+function fillToolSlot(slot, evt) {
+  if (!slot) return;
+  if (evt.ok) {
+    slot.textContent = '↳ ' + String(evt.result || '');
+    slot.style.color = 'var(--text,#cdd)';
+    slot.style.opacity = '1';
+  } else {
+    const msg = ({
+      disabled: 'tool execution is off (set CHAT_TOOL_EXEC=1)',
+      auth: 'this tool needs operator access',
+      unsafe: 'command not allowlisted',
+      unknown: 'unknown tool',
+    })[evt.reason] || ('tool error: ' + String(evt.result || evt.reason || 'failed'));
+    slot.textContent = '⚠ ' + msg;
+    slot.style.color = 'var(--muted,#9aa)';
+    slot.style.opacity = '0.7';
+  }
+  slot.style.display = 'block';
+}
 function renderMarkdown(text) {
+  // Extract tool-call blocks (closed, then a trailing unclosed one while streaming)
+  // into placeholders that survive HTML-escaping; restore as cards at the very end.
+  const _toolCards = [];
+  text = text.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi, (_, inner) => '\x00T' + (_toolCards.push(buildToolCard(inner, false)) - 1) + '\x00');
+  text = text.replace(/<tool_call>\s*([\s\S]*)$/i, (_, inner) => '\x00T' + (_toolCards.push(buildToolCard(inner, true)) - 1) + '\x00');
   let h = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
   h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
@@ -269,6 +318,7 @@ function renderMarkdown(text) {
   h = h.replace(/\x00L(\d+)\x00/g, (_, i) => _stash[+i]);
 
   h = h.replace(/\n/g, '<br>');
+  h = h.replace(/\x00T(\d+)\x00/g, (_, i) => _toolCards[+i]);  // restore tool-call cards last (after <br>) so their <pre> isn't mangled
   return h;
 }
 
@@ -837,6 +887,7 @@ async function sendMessage() {
   let routeLabel = '';
   let receivedDone = false;
   let doneProvider = '';
+  const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const requestedProvider = document.getElementById('provider-select')?.value || '';
 
   try {
@@ -892,6 +943,13 @@ async function sendMessage() {
             didError = true;
             if (evt.text) serverErrorText = evt.text;
             if (!fullText) bubble.style.color = 'var(--muted)';
+          } else if (evt.type === 'tool') {
+            // Server ran (or declined to run) the model's <tool_call>. Fill the result
+            // slot of the last tool-call card so the call + its real output show together.
+            toolResults.push(evt);
+            const cards = bubble.querySelectorAll('.tool-call-card');
+            const card = cards[cards.length - 1];
+            if (card) { fillToolSlot(card.querySelector('.tcc-result'), evt); container.scrollTop = container.scrollHeight; }
           } else if (evt.type === 'sigma0' && evt.corrected) {
             // Response was revised by Σ₀ verify pass — show badge after stream completes
             bubble.dataset.sigma0Corrected = '1';
@@ -922,6 +980,15 @@ async function sendMessage() {
   }
 
   bubble.innerHTML = renderMarkdown(fullText);
+
+  // Re-apply tool results — the render above rebuilds the cards with empty result slots.
+  if (toolResults.length) {
+    const cards = bubble.querySelectorAll('.tool-call-card');
+    toolResults.forEach((evt, i) => {
+      const card = cards[i] || cards[cards.length - 1];
+      if (card) fillToolSlot(card.querySelector('.tcc-result'), evt);
+    });
+  }
 
   if (looksTruncated) {
     const truncBadge = document.createElement('span');

@@ -15,6 +15,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.14] - 2026-06-21
+
+### Added
+- **Tool-aware dream-chat for the local Σ₀ Ouro coder.** The chat path renders the FC adapter's `<tool_call>` as a card instead of leaking raw JSON, and (gated by `CHAT_TOOL_EXEC=1`, off by default) executes it through one canonical tool registry (`lib/tool-runner.js`): read-only tools (Read/LS/Glob/Grep) run repo-sandboxed; shell (Bash/PowerShell) and mutating (Write/Edit) tools are operator-gated and route through the shared `lib/command-allowlist.js` + `lib/safe-exec.js`. Tool names/schemas match what the adapter was trained on.
+
+### Changed
+- Extracted the operator command allowlist out of `routes/keystone.js` into `lib/command-allowlist.js` so the chat tool registry and operator console share one policy.
+
 ## [1.7.13] - 2026-06-21
 
 ### Changed

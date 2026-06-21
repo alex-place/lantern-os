@@ -1431,10 +1431,17 @@ async function handleStreamChat(req, url, res) {
     for (const ollamaModel of modelChain) {
       const _ollamaStart = Date.now();
       try {
+        // In tool mode, send the FC adapter ONLY the tool preamble it was trained/served
+        // with. The big Keystone router prompt dilutes it (the adapter then defaults to
+        // its Bash habit); the clean preamble matches the training distribution so it
+        // reliably emits a SAFE <tool_call>. Gated with execution so it toggles as a unit.
+        const sysForOllama = process.env.CHAT_TOOL_EXEC === "1"
+          ? require("./tool-runner").renderToolPreamble()
+          : systemPrompt;
         const payload = JSON.stringify({
           model: ollamaModel,
           stream: true,
-          messages: buildProviderMessages(systemPrompt, compacted, message),
+          messages: buildProviderMessages(sysForOllama, compacted, message),
           // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
           options: serving.applyOllamaDecodeParams({}),
         });
@@ -1471,6 +1478,45 @@ async function handleStreamChat(req, url, res) {
         });
         
         if (fullReply) {
+          // ── Tool-aware chat: the local Σ₀ FC adapter may answer with a <tool_call>.
+          // Always emit a `tool` event so the UI fills the card; OPTIONALLY execute a tool
+          // (gated by CHAT_TOOL_EXEC=1, off by default) and let the model ground a follow-up
+          // answer on the real result. runTool enforces the per-tool policy (read-only runs;
+          // shell/mutating need operator — same policy as the rest of the app).
+          try {
+            const toolRunner = require("./tool-runner");
+            const tc = toolRunner.parseToolCall(fullReply);
+            if (tc) {
+              const { isOperatorRequest } = require("./request-auth");
+              const result = process.env.CHAT_TOOL_EXEC !== "1"
+                ? { ok: false, reason: "disabled" }
+                : toolRunner.runTool(tc.name, tc.input, { operator: isOperatorRequest(req) });
+              sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
+                ok: result.ok, reason: result.reason || null, policy: result.policy || null,
+                result: result.ok ? result.result : (result.error || null) });
+              if (result.ok) {
+                const followMessages = buildProviderMessages(systemPrompt, compacted, message).concat([
+                  { role: "assistant", content: fullReply },
+                  { role: "user", content: `The ${tc.name} tool returned:\n${String(result.result).slice(0, 1500)}\n\nUsing only this result, answer my original request in plain text. Do not call another tool.` },
+                ]);
+                const followPayload = JSON.stringify({ model: ollamaModel, stream: true, messages: followMessages, options: serving.applyOllamaDecodeParams({}) });
+                const fu = new URL(ollamaBase);
+                let followText = "";
+                await new Promise((resolve) => {
+                  const r3 = http.request({ hostname: fu.hostname, port: fu.port || 11434, path: "/api/chat", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(followPayload) } }, (up) => {
+                    if (up.statusCode !== 200) { up.resume(); resolve(); return; }
+                    let b = "";
+                    up.on("data", (ch) => { b += ch.toString(); const ls = b.split("\n"); b = ls.pop(); for (const ln of ls) { if (!ln.trim()) continue; try { const pj = JSON.parse(ln); if (pj.message && pj.message.content) { followText += pj.message.content; sendToken(pj.message.content); } } catch {} } });
+                    up.on("end", resolve); up.on("error", () => resolve());
+                  });
+                  r3.on("error", () => resolve());
+                  r3.setTimeout(120000, () => { r3.destroy(); resolve(); });
+                  r3.write(followPayload); r3.end();
+                });
+                if (followText.trim()) fullReply += "\n\n" + followText;
+              }
+            }
+          } catch (e) { /* tool handling is non-fatal — fall through to normal render */ }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
           const imageEntryId = triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh });
           await logConversation({
