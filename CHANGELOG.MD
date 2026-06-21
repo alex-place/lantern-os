@@ -15,6 +15,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.3] - 2026-06-21
+
+### Fixed
+- **Autowork/fleet: stop reporting false verification evidence and ground the preflight on the landed state (#933, #942, #896).** Three defects that let the autonomous fleet mark unverified or no-op work as a proven success:
+  - **#933 — false convergence evidence.** `routes/convergence-dispatch.js` recorded `Patch applied: ${stats.filesModified || 0} files modified` against a field `applyPatch` never returns, so every record claimed **0 files**; it printed `Tests: PASSED` and awarded `testsPassed: 0.9` for runs with **zero tests**; and it baked a `[unverified]` marker into the commit/PR **title** on top of the issue's own conventional prefix (e.g. `[unverified] fix: chore(cleanup): …`). Now the evidence reports the real `changedFiles.length`, a no-test run reads `Tests: none run` with `testsPassed: 0.0` (and `act`/`overall` no longer earn test credit), and the title is cleaned (existing prefix stripped, verification state moved to the receipt + PR body).
+  - **#942 — preflight & worktree base used the local checkout, not the serving state.** `lib/self-edit-engine.js` `detectAlreadyImplemented()` grepped/logged against `HEAD` (a possibly-stale feature branch); `src/worktree-manager.js` cut new worktrees from local `master`. Both now best-effort `git fetch origin master` and operate on `origin/master` (falling back to local if the remote-tracking ref is absent), so the preflight sees already-landed fixes and new work branches from the real base. Includes a fix to the citation parser, which a tree-ref grep prefix (`origin/master:…`) would otherwise have broken.
+  - **#896 — inconclusive tests counted as success.** `src/agent-worker-loop.js` `runTests()` defaulted `passed:true` and treated "no tests collected" (pytest exit 5) as a pass. It now classifies output into `{passed, inconclusive}` — a positive `N passed` with no failure marker is the only pass; no-tests / silent output is **inconclusive** — and `processOne()` rolls back + requeues inconclusive runs like failures. Successful receipts now carry `{provider, model, verified, evidence}` provenance. New regression test `tests/test_worker_loop_verification.js` (6 cases) covers the classifier.
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed

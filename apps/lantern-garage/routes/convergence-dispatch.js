@@ -225,7 +225,11 @@ module.exports = async (req, res, url, deps) => {
 
         // Step 5: Commit — stage ONLY the files the patch changed (never git add -A)
         gitAddFiles(workRoot, changedFiles);
-        const commitTitle = `${testsVerified ? "" : "[unverified] "}fix: ${issueDetails.title} (fixes #${issueNumber})`;
+        // #933: don't bake a "[unverified]" marker into the commit/PR title (it
+        // double-stacks with the issue's own conventional prefix). Strip any
+        // existing prefix and record verification state in the body/receipt instead.
+        const cleanTitle228 = String(issueDetails.title || "").replace(/^(fix|feat|chore|docs|refactor|test|perf|ci|style|build)(\([^)]*\))?:\s*/i, "");
+        const commitTitle = `fix: ${cleanTitle228} (fixes #${issueNumber})`;
         gitCommit(workRoot, commitTitle);
 
         // Capture the commit SHA for the response/UI
@@ -529,6 +533,7 @@ module.exports = async (req, res, url, deps) => {
         const tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
         step("tests", "start", { commands: tests });
         const testResults = runTests(workRoot, tests, { env: worktreeTestEnv(REPO_ROOT) });
+        const ranTests = tests.length > 0; // #933: zero tests is NOT a pass
         const testsPassed = testResults.every((r) => r.ok);
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
         step("tests", "done", { testResults, passed: testsPassed, ran: tests.length });
@@ -559,7 +564,10 @@ module.exports = async (req, res, url, deps) => {
         step("commit", "start");
         gitAddFiles(workRoot, changedFiles); // stage ONLY patched files — never git add -A
         const verified = tests.length > 0 && testsPassed;
-        const commitTitle = `${verified ? "" : "[unverified] "}fix: ${issueDetails.title} (fixes #${issueNumber})`;
+        // #933: strip the issue's own conventional prefix and keep the verification
+        // state out of the title (recorded in receipt + PR body instead).
+        const cleanTitle = String(issueDetails.title || "").replace(/^(fix|feat|chore|docs|refactor|test|perf|ci|style|build)(\([^)]*\))?:\s*/i, "");
+        const commitTitle = `fix: ${cleanTitle} (fixes #${issueNumber})`;
         gitCommit(workRoot, commitTitle);
         receipt.committed = true;
         step("commit", "done", { title: commitTitle, changedFiles, verified });
@@ -577,7 +585,9 @@ module.exports = async (req, res, url, deps) => {
         step("push", "done");
 
         step("pr", "start");
-        const prUrl = openDraftPr(workRoot, branchName, commitTitle, `Fixes #${issueNumber}\n\n${issueDetails.body}`);
+        // #933: surface verification state in the PR body rather than the title.
+        const verifyLine = `_verified: ${verified}_ (tests ${ranTests ? (testsPassed ? "passed" : "failed") : "not run"})`;
+        const prUrl = openDraftPr(workRoot, branchName, commitTitle, `Fixes #${issueNumber}\n\n${verifyLine}\n\n${issueDetails.body}`);
         receipt.prUrl = prUrl;
         step("pr", "done", { prUrl });
 
@@ -595,14 +605,14 @@ module.exports = async (req, res, url, deps) => {
             `Codebase research: ${scopeFiles.length} relevant files found`,
             `Web grounding: ${webEvidence.length} external sources checked`,
             `Plan generated with ${plan.actions?.length || 0} actions`,
-            `Tests: ${testsPassed ? 'PASSED' : 'SKIPPED'}`,
-            `Patch applied: ${stats?.filesModified || 0} files modified`,
+            ranTests ? (testsPassed ? `Tests: PASSED (${tests.length})` : `Tests: FAILED (${tests.length})`) : 'Tests: none run',
+            `Patch applied: ${changedFiles.length} files modified`,
             `Observable: Full SSE stream of all steps`
           ],
           confidence: {
             codebaseResearch: scopeFiles.length > 0 ? 0.85 : 0.5,
             webGrounded: webEvidence.length > 0 ? 0.8 : 0.4,
-            testsPassed: testsPassed !== false ? 0.9 : 0.3,
+            testsPassed: ranTests ? (testsPassed ? 0.9 : 0.3) : 0.0,
             observable: 1.0, // Full SSE stream
             grounded: Math.max(
               scopeFiles.length > 0 ? 0.8 : 0.5,
@@ -611,7 +621,7 @@ module.exports = async (req, res, url, deps) => {
             overall: Math.min(
               (scopeFiles.length > 0 ? 0.85 : 0.5) * 0.4 +
               (webEvidence.length > 0 ? 0.8 : 0.4) * 0.4 +
-              (testsPassed !== false ? 0.9 : 0.3) * 0.2,
+              (ranTests ? (testsPassed ? 0.9 : 0.3) : 0.0) * 0.2,
               0.95  // Cap at 95% confidence (always room for error)
             )
           },
@@ -620,7 +630,7 @@ module.exports = async (req, res, url, deps) => {
             pr: prUrl,
             codebaseAnalysis: `Searched ${scopeFiles.length} relevant files`,
             testsRun: tests.length,
-            testsPassed: testsPassed ? 'all' : 'none'
+            testsPassed: ranTests ? (testsPassed ? 'all' : 'none') : 'n/a'
           }
         };
         step("convergence", "done", { record: convergenceRecord });
@@ -645,7 +655,7 @@ module.exports = async (req, res, url, deps) => {
             observe: issueDetails ? 0.9 : 0.5,                       // issue fetched (+ web sweep)
             research: c.codebaseResearch,                            // codebase + web grounding
             reason: (plan.actions?.length || 0) > 0 ? 0.85 : 0.5,    // plan generated
-            act: (stats?.filesModified || 0) > 0 ? 0.85 : 0.5,       // patch applied + committed
+            act: changedFiles.length > 0 ? 0.85 : 0.5,               // patch applied + committed (#933)
             verify: c.testsPassed,                                   // tests actually ran/passed
             converge: c.overall                                      // confidence record + PR
           },
