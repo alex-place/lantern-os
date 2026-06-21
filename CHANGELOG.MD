@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.5] - 2026-06-21
+
+### Fixed
+- **`/changelog.html` rendered "No versions found" — now shows all 47 releases.** Three compounding bugs: (1) the `/repo/*.md` route only served a rendered HTML *viewer*, so the page's `fetch('/repo/CHANGELOG.MD')` received HTML instead of raw markdown and the parser matched 0 version headers — added a `?raw=1` param to `routes/files.js` that returns the unrendered file (viewer links without the param are unchanged); (2) the version-header regex required an em-dash separator but `CHANGELOG.MD` uses `## [x.y.z] - date` (hyphen), so all 47 headers were skipped — now tolerates hyphen / en-dash / em-dash; (3) `parseInlineMarkdown` never escaped `<>&`, so literal angle brackets in entries injected markup and corrupted `innerHTML`, silently truncating the list to 28 — now escapes HTML before applying inline markdown. Verified on the dev server: 47/47 versions render, collapse toggle works, no console errors.
+
 ## [1.7.4] - 2026-06-21
 
 ### Changed
