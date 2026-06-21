@@ -307,6 +307,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
           result: String(result.reply || "").slice(0, 2000),
           confidence: result.online ? 0.7 : 0.3, // v1 heuristic: grounded (online) reply trusted more
           reasoner: result.agent || "unknown",
+          source: `dream-chat/${result.agent || "unknown"}/${result.provider || "local"}`,
         });
       } catch { /* convergence record non-critical */ }
       // ClaimsPacket — non-blocking, non-fatal

@@ -580,6 +580,7 @@ async function handleStreamChat(req, url, res) {
               reasoner: "convergance-council",
               verified: true,
               verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+              source: `council/${result.provider}/${result.model}`,
             });
             recordId = rec && rec.id;
           } catch (_e) { /* record emit is best-effort */ }

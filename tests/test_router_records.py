@@ -9,6 +9,7 @@ from src.convergence.objects import ConvergenceRecord
 RECORD_KEYS = {
     "id", "hypothesis", "evidence_ids", "result",
     "confidence", "reasoner", "timestamp", "verified", "verification_notes",
+    "source",
     "applied_evidence",  # #764 G9
 }
 

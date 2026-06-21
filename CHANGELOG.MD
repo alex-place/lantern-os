@@ -15,7 +15,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.5.8] - 2026-06-20
+## [1.5.10] - 2026-06-21
 
 ### Added
 - **Explore page embeds (Σ₀ Converge — discovery surface).** Three new self-refreshing sections on `explore.html`, all server-side cached with baked fallbacks so the page always renders:
@@ -24,6 +24,16 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
   - **♥ Support** — Patreon tier cards grounded in the real campaign tier map (Wanderer $5 / Deep Dreamer $20 / Synthesasia Guild $200), replacing the bare support link.
 - Both new routes follow the existing `routes/youtube.js` discipline (in-memory cache + verified baked fallback) and are registered in `server.js` before the static catch-all.
 - **Explore embeds surfaced in Keystone chat.** `dream-chat-ui.js` `sendMessage()` now detects an embed-intent (bang commands `!videos` / `!discover` / `!build` / `!support` / `!embeds`, or a natural-language "show/what/latest" framing) and renders the matching embed inline — reusing the same cached `/api/{youtube,feeds,github}` routes. Deterministic, no LLM cost; mirrors the existing `!convergence` / `WORK_INTENT` intercept pattern. Negatives (dream journaling, work queries, "I need support today") deliberately do not trigger.
+
+## [1.5.9] - 2026-06-21
+
+### Added
+- **Grounding envelope `[claim, evidence, confidence, source]`** (Σ₀-K1 component 9 / Verify stage, closes #849). `ConvergenceRecord` now carries a `source` field in both the Python dataclass (`src/convergence/objects.py`) and JS emitter (`convergence-records.js`), schema locked by the cross-language contract tests. Three call sites (dream-chat reasoning, kalshi-suggest, stream-chat) pass `source` (reasoner/provider/model or `kalshi-market/<ticker>`), so every emitted record is a complete External-Reality-Rule envelope. Adds a `grounding_precision` metric to `eval_keystone.py`. Coexists with `applied_evidence` (#764 G9). Curated from #890 (@cdblasioli-gif) — cherry-picked the 8-file change onto clean master since the PR branch carried pre-existing conflict markers in unrelated files. 62 convergence tests pass.
+
+## [1.5.8] - 2026-06-20
+
+### Changed
+- **Gitignore runtime data that automation kept committing** (surfaced by junk PR #885, branch `auto/master`): conversation backups (`data/conversations/*.bak`, `*.cleared-*.jsonl`), the convergence audit log (`apps/data/convergence-audit.jsonl`), and the admin feature-flags runtime store (`data/admin/feature-flags.json`). These are machine-local runtime state — and the conversation backups can carry PII — so they must never be tracked. Closes the gap where the gitignore covered `garage-conversations.jsonl` but not its `.bak`/`.cleared-*` backups.
 
 ## [1.5.7] - 2026-06-20
 

@@ -311,3 +311,9 @@ data/pcsf/settings.pcsf.json
 data/convergence-autonomous-memory.jsonl
 data/autonomous-acts/
 data/creator-intelligence/calibrated-weights.json
+
+# Runtime data that automation kept trying to commit (e.g. PR #885) — never track.
+data/conversations/*.bak
+data/conversations/*.cleared-*.jsonl
+apps/data/convergence-audit.jsonl
+data/admin/feature-flags.json
