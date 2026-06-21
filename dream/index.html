@@ -43,21 +43,56 @@
       from { transform: translate(-50%, -50%) rotate(0deg); }
       to   { transform: translate(-50%, -50%) rotate(360deg); }
     }
-    .hero-bg {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: min(86vw, 58vh, 560px);
-      height: auto;
-      opacity: 0.18;
-      z-index: 0;
-      pointer-events: none;
-      user-select: none;
-      animation: hero-spin 60s linear infinite;
+    /* Full-bleed ambient Σ₀ mandala — a fixed background field behind all
+       content. It is softly masked on every edge so it never hard-cuts against
+       the nav, footer, or viewport: a radial fade on the spinning art (rotation-
+       invariant) plus a vertical fade on the static container (handles the
+       top/bottom edges independent of the spin). Scales mobile → ultrawide. */
+    .ambient {
+      position: fixed; inset: 0;
+      z-index: 0; overflow: clip;
+      pointer-events: none; user-select: none;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
+              mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
     }
+    .ambient__mandala {
+      position: absolute; left: 50%;
+      top: clamp(260px, 44vh, 500px);
+      transform: translate(-50%, -50%);
+      width: min(150vh, 132vw, 1500px);
+      aspect-ratio: 1 / 1;
+      background: url('/sigma0-mandala.svg') center / contain no-repeat;
+      opacity: 0.42;
+      -webkit-mask-image: radial-gradient(closest-side, #000 40%, rgba(0,0,0,.5) 64%, transparent 82%);
+              mask-image: radial-gradient(closest-side, #000 40%, rgba(0,0,0,.5) 64%, transparent 82%);
+      animation: hero-spin 300s linear infinite;
+    }
+    @media (prefers-reduced-motion: reduce) { .ambient__mandala { animation: none; } }
+    /* Lift real content above the ambient layer. z-index:0 (not -1) keeps the
+       mandala painting over the body's own opaque background. */
+    .site-nav, .home-main, .site-footer { position: relative; z-index: 1; }
     .hero > h1, .hero > .tagline, .hero > .hero-cta-row, .hero > .sub { position: relative; z-index: 1; }
     .hero h1 { margin-bottom: 12px; }
     .hero .tagline { margin-bottom: 22px; }
+    /* Readability scrim behind the hero copy — sits above the mandala (all of
+       home-main is z-index:1) and below the text (z-index:1 within the hero),
+       so the copy stays crisp over the densest part of the spinning graphic. */
+    .hero::before {
+      content: "";
+      position: absolute; z-index: 0;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 150%; height: 152%;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center,
+        color-mix(in srgb, var(--bg) 72%, transparent) 0%,
+        color-mix(in srgb, var(--bg) 38%, transparent) 46%,
+        transparent 72%);
+    }
+    /* Solid, high-contrast copy over the busy background */
+    .hero .tagline { color: var(--text); max-width: 600px; margin-left: auto; margin-right: auto; }
+    html[data-theme="dark"] .hero h1 { text-shadow: 0 2px 26px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4); }
+    html[data-theme="dark"] .hero .tagline { text-shadow: 0 1px 3px rgba(0,0,0,.55); }
     /* ── Secondary experiences — redesigned tiles ── */
     .home-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
     @media (max-width: 680px) { .home-tiles { grid-template-columns: 1fr; } }
@@ -114,6 +149,9 @@
 </head>
 <body>
 
+<!-- ── Ambient Σ₀ mandala — full-bleed background field, behind all content ── -->
+<div class="ambient" aria-hidden="true"><div class="ambient__mandala"></div></div>
+
 <!-- ── Skip to content link ── -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
@@ -143,7 +181,6 @@
 
   <!-- ── Hero ── -->
   <div class="hero">
-    <img src="/sigma0-mandala.svg" class="hero-bg" aria-hidden="true" alt="">
     <h1>Observe. Remember. Reason. Act. Verify. Converge.</h1>
     <p class="tagline" id="hero-tagline">Keystone OS is a local-first convergence engine — a persistent reasoning and coding system that runs entirely on your machine and improves from accumulated evidence, never locked to a single model. Chat, trade, and create on the same grounded core.</p>
     <div class="hero-cta-row">
