@@ -15,6 +15,35 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.7] - 2026-06-21
+
+### Verify
+- **Close the EXTERNAL REALITY RULE loop end-to-end (#919 finding #2).** The Σ₀
+  verify pass already grounded each extracted claim into a
+  `[claim, evidence, confidence, source]` record, but those records never entered
+  the consent-gate claim-packet system — so nothing a grounded chat answer
+  asserted could be reviewed, signed, or exported as evidence. New
+  `lib/claim-draft.js` maps each genuinely-grounded, non-refuted, confident record
+  to a VALID `lantern.claim_packet.v1` packet in **`draft`** status and persists it
+  through the same `savePacket()` the API uses. Drafts are inert: not approved,
+  unsigned, never exportable — the operator still reviews/approves via the existing
+  consent gate (`routes/claims.js`). Wired into `dream-chat.verifyResponse` (Step 5),
+  so every caller benefits; gated by the existing `SIGMA0_VERIFY=true`. Verified via
+  `test/claim-draft.test.js` (10 checks: worthiness gate, packet validity,
+  inert/non-exportable invariant, end-to-end persist through the real consent gate).
+
+### Security
+- **Markdown renderer URL-scheme allowlist (red-team hardening).**
+  `lib/markdown-render.js` escaped HTML but never validated link/image **schemes**,
+  so `[x](javascript:…)` / `![](data:text/html…)` produced live XSS sinks. Since
+  automation / research-intake / harvest pipelines write `.md` into this repo that an
+  admin later views via the doc viewer (`routes/files.js`), that's a stored-XSS path.
+  New `safeUrl()` allows only http(s)/mailto/tel (+ raster `data:image/*` for `<img>`,
+  never `svg+xml`), strips control-char scheme smuggling, and collapses everything else
+  to `#`. Verified via `test/markdown-render.xss.test.js` (14 checks) + end-to-end
+  `renderMarkdownDocument` render. (The client chat renderer was already scheme-safe
+  by construction — its link/image regexes hardcode `https?://`.)
+
 ## [1.6.6] - 2026-06-21
 
 ### Verify

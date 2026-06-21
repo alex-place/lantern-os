@@ -8,6 +8,31 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
+// URL-scheme allowlist for link href / image src. The renderer escapes HTML, but
+// escaping does NOT neutralize a dangerous scheme — `[x](javascript:alert(1))`
+// would still produce a clickable script sink. Markdown rendered here can come
+// from repo files written by automation / research-intake / harvest pipelines,
+// so an attacker-authored .md viewed by an admin is a stored-XSS path. Block
+// everything except http(s), mailto, tel, and (for images) safe raster data URIs.
+// Relative / anchor URLs (no scheme before the first / ? #) pass through.
+function safeUrl(url, { allowData = false } = {}) {
+  const raw = String(url ?? "");
+  // Strip control/whitespace chars that smuggle a scheme past the regex,
+  // e.g. "java\tscript:" or a leading newline before "javascript:".
+  const probe = raw.replace(/[\u0000-\u0020\u007F-\u00A0]/g, "");
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(probe);
+  if (!scheme) return raw; // relative, anchor, or protocol-relative — safe
+  const proto = scheme[1].toLowerCase();
+  if (proto === "http" || proto === "https" || proto === "mailto" || proto === "tel") {
+    return raw;
+  }
+  // Raster data images only — never svg+xml (it can carry inline script).
+  if (allowData && /^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(probe)) {
+    return raw;
+  }
+  return "#"; // javascript:, vbscript:, data:text/html, file:, etc.
+}
+
 // GitHub-ish heading slug: lowercased, punctuation dropped, spaces → hyphens,
 // unicode letters/numbers preserved (so anchors like #σ₀-sigma-zero work).
 function slugify(text) {
@@ -46,7 +71,7 @@ function inlineMarkdown(value) {
     /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
     (_m, alt, src, title) =>
       hold(
-        `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"` +
+        `<img src="${escapeHtml(safeUrl(src, { allowData: true }))}" alt="${escapeHtml(alt)}"` +
           (title ? ` title="${escapeHtml(title)}"` : "") +
           ` loading="lazy">`
       )
@@ -56,10 +81,11 @@ function inlineMarkdown(value) {
   s = s.replace(
     /\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
     (_m, label, href, title) => {
-      const rel = /^https?:/i.test(href) ? ' rel="noopener"' : "";
+      const safeHref = safeUrl(href);
+      const rel = /^https?:/i.test(safeHref) ? ' rel="noopener"' : "";
       const t = title ? ` title="${escapeHtml(title)}"` : "";
       return hold(
-        `<a href="${escapeHtml(href)}"${t}${rel}>${emphasize(escapeHtml(label))}</a>`
+        `<a href="${escapeHtml(safeHref)}"${t}${rel}>${emphasize(escapeHtml(label))}</a>`
       );
     }
   );
@@ -421,6 +447,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
 
 module.exports = {
   escapeHtml,
+  safeUrl,
   inlineMarkdown,
   renderMarkdownDocument,
   slugify,
