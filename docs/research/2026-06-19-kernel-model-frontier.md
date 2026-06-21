@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-19
-updated: 2026-06-20
+updated: 2026-06-21
 ---
 
 # Re-grounding the "Keystone OS kernel" model question — Ouro LoopLM vs the 2026 dense small-model frontier
@@ -23,8 +23,9 @@ updated: 2026-06-20
 > its size on reasoning — while still fitting on a normal gaming GPU.
 >
 > **The honest comparison.** The fair contest is Ouro against today's best small open
-> models — **Qwen3-4B, Phi-4-mini, and Gemma 3n** (the tiny phone-friendly one from
-> Google). Not the older models the original report listed.
+> models — **Qwen3.5-4B, Phi-4-mini, and Gemma 4** (the tiny phone-friendly one from
+> Google). Not the older models the original report listed. *(Updated 2026-06-21: the
+> frontier moved again — Gemma 4 and Qwen3.5 shipped in 2026; see §2.)*
 >
 > **The catch — we measure, we don't guess.** We score these brains on *Lantern's own
 > tests* (does it continue a thought correctly? does it cite real sources? does it call the
@@ -50,7 +51,7 @@ Related canon: [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · [`OURO-LOOPLM.md`]
 A ChatGPT/Google report shortlisted edge LLMs as a "Keystone OS kernel": **Llama 3.2 3B, Gemma "4 E2B", Phi-3.5-mini, Qwen2.5-7B** (+ Mistral-7B / Mixtral / Falcon3 / MPT alternates). Two grounding faults:
 
 1. **It omits the kernel Lantern actually runs.** Lantern's served default is **ByteDance Ouro 1.4B LoopLM** behind an Ollama-compatible endpoint ([`scripts/ouro_serve.py`](../../scripts/ouro_serve.py)), with a native Σ₀ adaptive Q-exit loop as opt-in deep mode ([`src/sigma0/loop_lm.py`](../../src/sigma0/loop_lm.py)). The question is not "pick an edge model from scratch" — it is **"does anything beat the looped model we already serve, measured on our own metrics?"**
-2. **Its list is ~1 generation stale.** Llama 3.2 3B, Phi-3.5-mini, Qwen2.5-7B, Mistral-7B-v0.3 are the **2024–25** generation. "Gemma 4 E2B" is a mis-name for **Gemma 3n E2B** (Google, 2025). The real 2026 dense small-model frontier is **Qwen3 (4B/8B), Phi-4-mini (3.8B), Gemma 3n E2B, Llama 3.3 (caveat below)**.
+2. **Its list is ~1 generation stale.** Llama 3.2 3B, Phi-3.5-mini, Qwen2.5-7B, Mistral-7B-v0.3 are the **2024–25** generation. *(Correction 2026-06-21: the report's "Gemma 4 E2B" is **not** a mis-name — **Gemma 4 E2B is a real model** Google shipped Apr 2026; see the verified update in §2. This note originally read it as **Gemma 3n E2B** (Google, 2025), and that reinterpretation was itself the grounding error.)* The real 2026 dense small-model frontier (verified 2026-06-21) is **Qwen3.5-4B, Phi-4-mini (3.8B), Gemma 4 E2B/E4B** — with Ouro-1.4B as the incumbent and Llama 3.3 dropped (70B, wrong tier; caveat below).
 
 This note re-frames the question on the axis **Ouro's own paper uses — Gemma 3 / Qwen3** — and scores candidates on **Lantern's metrics**, not MMLU.
 
@@ -95,13 +96,19 @@ Every row verified against the HF model card / vendor blog. The external report'
 
 **Three corrections that matter for kernel selection:**
 
-1. **"Gemma 4 E2B" → Gemma 3n E2B.** The `E` prefix = *Effective* parameters: raw 5B, but **PLE (Per-Layer Embedding) caching + MatFormer + parameter-skipping** let it run at **~1.91B effective / ~2 GB VRAM** ([Google AI for Developers](https://ai.google.dev/gemma/docs/gemma-3n)). It is **multimodal** (MobileNet-v5 vision + audio encoders, 140 text languages). This is the only genuinely edge-class, on-device-first option — and the only multimodal one — but its 2B-effective core is a *capacity*-light model, the opposite of what LoopLM optimizes.
+1. **"Gemma 4 E2B" was real all along — NOT a mis-name** *(corrected 2026-06-21; see the verified update above).* Google shipped **Gemma 4** in Apr 2026 with a genuine **E2B = 2.3B-effective (5.1B w/ embeddings)** edge variant, so the external report's name resolves to an actual model. This note's original move — reinterpreting it as *Gemma 3n E2B* — was the grounding error (whether the source report predated Gemma 4's Apr-2026 release, making the name a lucky hallucination, or referenced the real model, is unknown; either way it must now be treated as real). **Historical context:** Gemma 3n E2B (Google 2025) is the predecessor it was confused with — `E` = *Effective* params (raw 5B → ~1.91B effective / ~2 GB VRAM via PLE caching + MatFormer + parameter-skipping), multimodal (MobileNet-v5 vision + audio, 140 langs) ([Gemma 3n](https://ai.google.dev/gemma/docs/gemma-3n)). **Gemma 4 E2B/E4B now supersede it** as the edge/multimodal candidate — still capacity-light cores, the property that cuts against the LoopLM thesis.
 
 2. **Llama 3.3 is 70B-only.** Meta shipped **no** small 3.3 variant ([HF card](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct), Dec 2024). The edge-class Llama is **3.2 1B/3B** ([Meta blog](https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/)). So "Llama 3.3" does **not** belong on a sub-8B edge-kernel shortlist — at 70B it is a different deployment tier than Ouro-1.4B (~6 GB on GPU). Treat it as a *cloud/ceiling* reference, not a kernel candidate.
 
-3. **Qwen3-4B is the right head-to-head.** It is *exactly* the model Ouro-1.4B is benchmarked against in the source paper. Any Lantern kernel decision should reproduce **Ouro-1.4B vs Qwen3-4B on our golden set**, not trust the paper's external benchmarks transitively.
+3. **Qwen3-4B is the paper's head-to-head; Qwen3.5-4B is now the current one.** Qwen3-4B is *exactly* the model Ouro-1.4B is benchmarked against in the source paper — so reproduce **that** comparison on our golden set rather than trust the paper's external benchmarks transitively. *(Corrected 2026-06-21: for a current kernel decision, bench against **Qwen3.5-4B**, the shipped successor — see §2 verified update; Qwen3-4B remains the apples-to-apples check against the paper's numbers.)*
 
-> **Frontier-has-moved-again caveat (honest, low-confidence):** June-2026 web search surfaced result *titles* implying newer releases (Gemma 4, Qwen3.5/3.6, Phi-4 successors) and an arXiv survey "[Gemma 4, Phi-4, and Qwen3: Accuracy–Efficiency Tradeoffs in Dense and MoE Reasoning LMs](https://arxiv.org/abs/2604.07035)". These were **not** verified to model-card level here and are **not** asserted as fact — flagged only as a forward-watch item. The four models scored below are the ones with confirmed primary sources and match Ouro's own comparison axis.
+> **Frontier-has-moved-again — VERIFIED 2026-06-21** (was a low-confidence forward-watch item; now grounded to model-card / arXiv level). The June-2026 titles were **real, not rendering artifacts**. Confirmed against primary sources:
+> - **Gemma 4 — REAL.** Google shipped it (initial Apr 2026; encoder-free "unified" **12B** variant Jun 3 2026). Edge-class sizes: **E2B = 2.3B effective (5.1B w/ embeddings)** and **E4B = 4.5B effective (8B w/ embeddings)**, both 128K, **multimodal text/image/audio**; plus 12B (256K), 31B dense, and a **26B-A4B MoE (3.8B active)** ([Gemma 4 model card](https://ai.google.dev/gemma/docs/core/model_card_4) · [blog.google](https://blog.google/innovation-and-ai/technology/developers-tools/introducing-gemma-4-12b/)). **This supersedes Gemma 3n E2B** as the edge/multimodal candidate scored below.
+> - **Qwen3.5 & Qwen3.6 — REAL (both).** Qwen3.5 (Feb 16 2026; 397B-A17B flagship, 262K ctx, 201 langs) ships small dense variants **Qwen3.5-9B / 4B / 2B / 0.8B**; Qwen3.6 (Apr 2026; agentic-coding focus, 27B dense + 35B-A3B MoE, 262K ctx) ([QwenLM/Qwen3.6](https://github.com/QwenLM/Qwen3.6) · [CNBC](https://www.cnbc.com/2026/02/17/china-alibaba-qwen-ai-agent-latest-model.html)). **Qwen3.5-4B is the new head-to-head**, superseding Qwen3-4B.
+> - **Phi-4 successor — NOT FOUND.** No Phi-5 / Phi-4.5 surfaced; **Phi-4-mini (3.8B) remains current** ([Azure Phi](https://azure.microsoft.com/en-us/products/phi)). The Phi rows below stand unchanged.
+> - **arXiv:2604.07035 — REAL paper, wrong title.** The title guessed above was incorrect. Actual = *"Unified Deployment-Aware Evaluation of Open Reasoning Language Models"* (Md Motaleb Hossen Manik & Ge Wang) — a **deployment-aware, multi-objective (accuracy × latency × memory) eval**, i.e. exactly Lantern's *bytes-per-correct* axis, not a leaderboard. Finding: **Gemma-4-E4B** is "a strong practical operating point … substantially lower latency and memory" ([arXiv:2604.07035](https://arxiv.org/abs/2604.07035)).
+>
+> **Net:** the frontier *this note itself* named (Qwen3-4B / Phi-4-mini / Gemma 3n E2B) is ~1 generation stale as of 2026-06-21. Corrected head-to-head set = **Qwen3.5-4B, Phi-4-mini (unchanged), Gemma 4 E2B/E4B**. Ouro-1.4B remains the incumbent (no new LoopLM release found). The §3 benchmark *plan* is unchanged in shape — only the opponent names move. The §2 table and §3 cells below are preserved as the original (now prior-gen) snapshot; read them through this correction.
 
 ---
 
@@ -148,12 +155,12 @@ LoopLM is one point in a **latent-reasoning** family; the kernel decision should
 ## 5. Conclusions (research-only — no decision taken)
 
 1. **The kernel question is not open — it has an incumbent.** Lantern serves **Ouro-1.4B LoopLM** (FAST default, 80%/23.7 s measured). The external report's omission of it makes its entire shortlist moot as written. Reframe: *"what, measured on our metrics, beats the looped model we already run?"*
-2. **The honest comparison axis is Gemma 3 / Qwen3** — the models Ouro's own paper benchmarks against — **not** Llama 3.2 3B / Phi-3.5 / Qwen2.5-7B. Use the 2026 frontier (Qwen3-4B/8B, Phi-4-mini, Gemma 3n E2B); drop "Llama 3.3" as a kernel candidate (70B, wrong tier).
+2. **The honest comparison axis is Gemma / Qwen3** — the model families Ouro's own paper benchmarks against — **not** Llama 3.2 3B / Phi-3.5 / Qwen2.5-7B. Use the **verified-current** 2026 frontier (**Qwen3.5-4B, Phi-4-mini, Gemma 4 E2B/E4B**; see §2 update of 2026-06-21); drop "Llama 3.3" as a kernel candidate (70B, wrong tier).
 3. **Decide with `eval_keystone` rows, not paper transitivity.** The highest-value next experiments, in order:
-   - **(a) Ouro-1.4B vs Qwen3-4B** on the golden set (continuation acc + grounding precision + bytes-per-correct) — the paper's exact head-to-head, reproduced on *our* data.
+   - **(a) Ouro-1.4B vs Qwen3.5-4B** on the golden set (continuation acc + grounding precision + bytes-per-correct) — the current successor to the paper's exact head-to-head (Qwen3-4B), reproduced on *our* data; run Qwen3-4B too if cross-checking the paper's numbers.
    - **(b) Phi-4-mini** as the **Act/tool-call** candidate (explicit function-calling) — measure tool-call validity against our MCP schemas.
    - **(c) Ouro-2.6B vs 1.4B** — already a roadmap item ("bench before VRAM spend"); gate the VRAM on a measured accuracy delta.
-   - **(d) Gemma 3n E2B** only if **multimodal Observe** (image/audio grounding) becomes a product requirement — its 2B-effective core is unlikely to win on pure Reason.
+   - **(d) Gemma 4 E2B/E4B** only if **multimodal Observe** (image/audio grounding) becomes a product requirement — these supersede Gemma 3n E2B, but the ~2–4.5B-effective cores are still unlikely to win on pure Reason.
 4. **Grow the golden set first** (roadmap item 5): today's 10 prompts are trivia-heavy; grounding precision / action correctness / CSF compression are **not yet instrumented** in `eval_keystone`. Those metrics must exist before any of the above rows mean anything — otherwise we'd be re-importing the MMLU mistake the external report made.
 
 **Nothing here changes serving config or selects a model.** It converts an unsourced external shortlist into a grounded, primary-source-verified benchmark plan on Lantern's own axes.
@@ -167,6 +174,6 @@ LoopLM is one point in a **latent-reasoning** family; the kernel decision should
 - Phi-4-mini — [HF model card](https://huggingface.co/microsoft/Phi-4-mini-instruct)
 - Gemma 3n — [Google AI for Developers](https://ai.google.dev/gemma/docs/gemma-3n) · [Google dev blog](https://developers.googleblog.com/en/introducing-gemma-3n-developer-guide/)
 - Llama 3.3 70B — [HF model card](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) · Llama 3.2 edge — [Meta blog](https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/)
-- Forward-watch (unverified) — [arXiv:2604.07035](https://arxiv.org/abs/2604.07035)
+- **2026-06-21 frontier verification (primary):** Gemma 4 — [model card](https://ai.google.dev/gemma/docs/core/model_card_4) · [blog.google](https://blog.google/innovation-and-ai/technology/developers-tools/introducing-gemma-4-12b/) · Qwen3.5/3.6 — [QwenLM/Qwen3.6](https://github.com/QwenLM/Qwen3.6) · [CNBC](https://www.cnbc.com/2026/02/17/china-alibaba-qwen-ai-agent-latest-model.html) · Phi-4-mini still current — [Azure Phi](https://azure.microsoft.com/en-us/products/phi) · arXiv:2604.07035 = *Unified Deployment-Aware Evaluation of Open Reasoning Language Models* (Manik & Wang) — [arXiv](https://arxiv.org/abs/2604.07035)
 
 **Internal:** [`OURO-LOOPLM.md`](../OURO-LOOPLM.md) · [`SERVING-ARCHITECTURE-2026.md`](../SERVING-ARCHITECTURE-2026.md) · [`KEYSTONE-PRODUCT.md`](../KEYSTONE-PRODUCT.md) · [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md) · [`lib/loop-reasoner.js`](../../apps/lantern-garage/lib/loop-reasoner.js)

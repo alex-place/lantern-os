@@ -1,4 +1,10 @@
-"""CSF v0.6 File Format — Binary writer and reader.
+"""⚠️ NOT the canonical CSF compression format. This is the v0.6/0.7 binary
+*container* for the 3^12 lattice "storage face" (the Tesseract substrate), used by
+the Status-Cube store (``csf.status_cube``) — not for general file/blob compression.
+For real, lossless, zstd/omni-backed compression use the canonical ``csf`` package
+(``csf.csf_pack`` / ``csf.omni``). See ``csf.v07`` for the lattice primitives.
+
+CSF v0.6 binary container — Binary writer and reader.
 
 Layout:
   [Header]         24 bytes
