@@ -1,6 +1,6 @@
 import os
 
-BASE = r"C:\Users\alexp\OneDrive\Documents\GitHub\lantern-os\apps\lantern-garage\public"
+BASE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "apps", "lantern-garage", "public"))
 JS_PATH = os.path.join(BASE, "_temp_script.js")
 OLD_PATH = os.path.join(BASE, "index.html")
 NEW_PATH = os.path.join(BASE, "index.html.new")

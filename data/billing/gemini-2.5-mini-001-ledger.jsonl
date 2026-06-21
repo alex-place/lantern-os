@@ -1,1 +1,0 @@
-{"timestamp":"2026-05-31T20:00:00Z","slotId":"gemini-2.5-mini-agent-slot-001","event":"slot_created","model":"gemini-2.5-mini","provider":"google","status":"awaiting_green_light","monthlyBudget":100,"notes":"Gemini 2.5 Mini slot initialized. Cost-efficient reasoning tier."}
