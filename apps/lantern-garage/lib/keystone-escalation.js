@@ -115,8 +115,11 @@ function _isClaudeResult(result) {
  */
 function readRolloverShare(records, { sinceTs = 0 } = {}) {
   let keystoneLanded = 0, claudeLanded = 0, escalations = 0, exhausted = 0;
+  // Accept both this module's reasoner and the earlier inline "kernel-escalation"
+  // records already on disk, so the dashboard aggregates historical escalations too.
+  const KERNEL_REASONERS = new Set([KERNEL_REASONER, "kernel-escalation"]);
   for (const r of records || []) {
-    if (!r || r.reasoner !== KERNEL_REASONER || typeof r.result !== "string") continue;
+    if (!r || !KERNEL_REASONERS.has(r.reasoner) || typeof r.result !== "string") continue;
     const ts = Date.parse(r.timestamp || r.ts || 0) || 0;
     if (ts < sinceTs) continue;
     if (r.result.startsWith("landed-by-")) {

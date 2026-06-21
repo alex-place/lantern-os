@@ -441,77 +441,66 @@ async function handleStreamChat(req, url, res) {
       let llmFn;
 
       try {
-        // Call keystoneRun with the appropriate LLM provider
-        keystoneRun(issue, repoRoot, async (opts) => {
-          // Unified LLM call using the selected provider
-          const systemPrompt = opts.system || KEYSTONE_SYSTEM_PROMPT;
-          const messages = opts.messages || [{ role: "user", content: opts.input || "" }];
+        // #897: actually escalate through the kernel chain on failure (Keystone/Ouro
+        // → … → Claude) — not just RECORD the intent — and record each escalation +
+        // the final landed-by as convergence events. In shadow mode it's Claude-only.
+        const {
+          kernelEscalationChain, runKernelWithEscalation, recordEscalation, recordLanded,
+        } = require("./keystone-escalation");
+        const runId = `kernel-${Date.now()}`;
+        const providers = rolloverMode === "default"
+          ? kernelEscalationChain()
+          : [{ provider, model: kernelModel || "claude-opus-4-8" }];
 
-          const response = await unifiedStreamSSE({
-            systemPrompt,
-            messages,
-            provider,
-            model: kernelModel || null, // kernel-selected model, or let unified-agent pick
-            user,
-          });
-
-          return response;
-        }, { verbose: true, maxFiles: 10 })
-          .then((result) => {
-            if (result.status === "success") {
-              sendToken(`\n✅ Keystone execution complete\n\n`);
-              sendToken(`**Plan:**\n${result.plan}\n\n`);
-              sendToken(`**Files changed:**\n${result.applied.map((f) => `  - ${f.path}`).join("\n")}\n\n`);
-
-              if (result.tests && result.tests.success) {
-                sendToken(`✓ Tests passed\n\n`);
-              } else if (result.tests) {
-                sendToken(`⚠️ Tests output:\n${result.tests.output}\n\n`);
-              }
-
-              sendDone("keystone", {
-                agent: "Keystone",
-                provider,
-                model: kernelModel,
-                rolloverMode,
-                status: "success",
-                filesChanged: result.applied.length,
-                testsRun: !!result.tests,
+        const { result, providerUsed, escalations } = await runKernelWithEscalation({
+          providers,
+          runOne: async (prov, mdl, i) => {
+            if (i > 0) sendToken(`\n↪ Escalating to ${prov}/${mdl}…\n`);
+            return keystoneRun(issue, repoRoot, async (opts) => {
+              const systemPrompt = opts.system || KEYSTONE_SYSTEM_PROMPT;
+              const messages = opts.messages || [{ role: "user", content: opts.input || "" }];
+              return unifiedStreamSSE({ systemPrompt, messages, provider: prov, model: mdl || null, user });
+            }, { verbose: true, maxFiles: 10 });
+          },
+          onEscalate: async (rec) => {
+            try {
+              await recordEscalation({
+                issue, failedProvider: rec.failedProvider, failedModel: rec.failedModel,
+                escalatedTo: rec.escalatedTo, runId, attempt: rec.attempt, error: rec.error, repoRoot,
               });
-            } else {
-              sendToken(`\n❌ Keystone failed: ${result.error}\n`);
-              sendToken(`Phase: ${result.phase}\n`);
-              // #897: every kernel failure is a recorded convergence event (External Reality Rule)
-              emitConvergenceRecord({
-                hypothesis: `Keystone kernel can land issue via ${provider}`,
-                result: `escalated-to-claude: ${result.error || "unknown failure"} (phase=${result.phase})`,
-                confidence: 0.0,
-                evidence_ids: [result.error || result.phase || "unknown"],
-                reasoner: "kernel-escalation",
-                verified: true,
-                verification_notes: `Kernel failure at phase=${result.phase}; mode=${rolloverMode}; escalating to next provider`,
-                source: `kernel/${provider}/${kernelModel || "default"}`,
-              }).catch(() => {});
-              sendDone("keystone", { agent: "Keystone", provider, model: kernelModel, rolloverMode, status: "failed", error: result.error });
-            }
-            res.end();
-          })
-          .catch((err) => {
-            sendToken(`\n❌ Error: ${err.message}\n`);
-            // #897: escalation from unhandled error is also a convergence record
-            emitConvergenceRecord({
-              hypothesis: `Keystone kernel can land issue via ${provider}`,
-              result: `escalated-to-claude: ${err.message}`,
-              confidence: 0.0,
-              evidence_ids: [err.message],
-              reasoner: "kernel-escalation",
-              verified: true,
-              verification_notes: `Unhandled kernel error; mode=${rolloverMode}`,
-              source: `kernel/${provider}/${kernelModel || "default"}`,
-            }).catch(() => {});
-            sendDone("keystone", { agent: "Keystone", provider, model: kernelModel, rolloverMode, status: "error", error: err.message });
-            res.end();
+            } catch (_e) { /* recording must never break the stream */ }
+          },
+        });
+
+        if (result && (result.status === "success" || result.status === "applied_unverified")) {
+          const used = providerUsed || { provider, model: kernelModel };
+          sendToken(`\n✅ Keystone execution complete (landed by ${used.provider}/${used.model})\n\n`);
+          sendToken(`**Plan:**\n${result.plan}\n\n`);
+          if (Array.isArray(result.applied)) {
+            sendToken(`**Files changed:**\n${result.applied.map((f) => `  - ${f.path}`).join("\n")}\n\n`);
+          }
+          if (result.tests && result.tests.success) sendToken(`✓ Tests passed\n\n`);
+          else if (result.tests) sendToken(`⚠️ Tests output:\n${result.tests.output}\n\n`);
+          try {
+            await recordLanded({
+              issue, provider: used.provider, model: used.model, runId,
+              verified: !!(result.tests && result.tests.success), repoRoot,
+            });
+          } catch (_e) { /* best effort */ }
+          sendDone("keystone", {
+            agent: "Keystone", provider: used.provider, model: used.model, rolloverMode,
+            status: "success", filesChanged: Array.isArray(result.applied) ? result.applied.length : 0,
+            testsRun: !!result.tests, escalations: escalations.length,
           });
+        } else {
+          sendToken(`\n❌ Keystone failed after ${escalations.length + 1} attempt(s): ${result ? result.error : "unknown"}\n`);
+          if (result && result.phase) sendToken(`Phase: ${result.phase}\n`);
+          sendDone("keystone", {
+            agent: "Keystone", provider, model: kernelModel, rolloverMode,
+            status: "failed", error: result ? result.error : "unknown", escalations: escalations.length,
+          });
+        }
+        res.end();
       } catch (e) {
         sendToken(`Error: ${e.message}\n`);
         // #897: sync-throw escalation also recorded
