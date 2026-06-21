@@ -291,25 +291,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadState() {
-    const [health, version, git, status, routing, agents, dreamer, search, mesh, workers, thisNode] = await Promise.all([
+    // #878: only these 3 endpoints drive elements that exist on this page
+    // (footer status dot/label, hero edition/commit line, version badges).
+    // The former "full index" dashboard — providers, agents, node mesh,
+    // dreamer, readiness, recent entries — was removed, so its loader and the
+    // 8 endpoints it polled (incl. /api/nodes/mesh, /api/agents/workers and
+    // /api/nodes/this, which 404'd every cycle) are gone with it.
+    const [health, version, git] = await Promise.all([
       fetchJson('/api/health'),
       fetchJson('/version.json'),
       fetchJson('/api/version'),
-      fetchJson('/api/status'),
-      fetchJson('/api/pcsf/routing'),
-      fetchJson('/api/agents'),
-      fetchJson('/api/dreamer?user=dreamer'),
-      fetchJson('/api/dream/search'),
-      fetchJson('/api/nodes/mesh'),
-      fetchJson('/api/agents/workers'),
-      fetchJson('/api/nodes/this'),
     ]);
 
-    // Server + version
+    // Server status (footer dot + label)
     const serverOnline = !!(health && health.ok);
     $('status-dot').className = serverOnline ? 'dot online' : 'dot';
     $('status-label').textContent = serverOnline ? 'server online' : 'server unreachable';
 
+    // Version + git (hero sub-line + clickable version badges)
     const v = version?.version || 'unknown';
     const g = git?.version;
     const branch = g?.branch || 'unknown';
@@ -318,9 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('hero-edition').textContent = 'Orion Edition · ' + branch;
     $('hero-git').textContent = shortCommit + (commitDate ? ' · ' + commitDate : '');
-    $('status-right').textContent = 'Keystone OS · ' + branch + ' · ' + v;
 
-    // Version badges
     document.querySelectorAll('[data-version-badge]').forEach(el => {
       const prefix = el.dataset.versionBadge || '';
       el.textContent = prefix + 'v' + v;
@@ -328,110 +325,6 @@ document.addEventListener('DOMContentLoaded', () => {
       el.title = 'View changelog';
       el.onclick = () => window.open('/repo/CHANGELOG.MD', '_blank');
     });
-
-    // Providers
-    const provMap = routing?.providers || [];
-    const provWithKey = provMap.filter(p => p.hasKey);
-    const provNames = provWithKey.map(p => p.id).join(', ');
-    if (provWithKey.length === 0) {
-      $('panel-chat-desc').textContent = 'No AI provider keys configured. Chat works offline. Add a key in Settings to stream responses.';
-      $('pill-ai-chat').className = 'pill held';
-      $('pill-ai-chat').textContent = 'Offline';
-      $('note-ai-chat').textContent = 'No provider keys found. Chat works locally. Add GEMINI_API_KEY, OPENAI_API_KEY, etc. in Settings.';
-    } else {
-      $('panel-chat-desc').textContent = 'Streaming via ' + provNames + '. Fails fast if a provider is down.';
-      $('pill-ai-chat').className = 'pill live';
-      $('pill-ai-chat').textContent = 'Live';
-      $('note-ai-chat').textContent = 'Configured: ' + provNames + '. Streams when a provider key is set.';
-    }
-    $('stat-providers').textContent = provWithKey.length + ' of ' + provMap.length + ' providers configured';
-
-    // Agents
-    const agentList = agents?.agents || [];
-    const agentNames = agentList.map(a => a.name).join(', ') || 'none';
-    $('stat-agents').textContent = agentList.length + ' agent' + (agentList.length === 1 ? '' : 's') + ' available: ' + agentNames;
-
-    // Node Mesh & Workers
-    const nodeCount = mesh?.nodeCount || 0;
-    const aliveCount = mesh?.aliveCount || 0;
-    const nodeList = mesh?.nodes || [];
-    const workersList = workers?.agents || [];
-    const totalWorkers = workers?.totalWorkers || 0;
-
-    if (nodeCount > 0) {
-      $('nodes-status').textContent = aliveCount + ' of ' + nodeCount + ' node' + (nodeCount === 1 ? '' : 's') + ' online';
-      const nodeHTML = nodeList.slice(0, 5).map(n => {
-        const alive = n.isAlive ? '🟢' : '🔴';
-        return `${alive} ${n.nodeName} (${n.agents ? n.agents.length : 0} agents, ${n.workerCount || 0} worker${n.workerCount === 1 ? '' : 's'}) — ${n.lastSeenAgo}`;
-      }).join('<br>');
-      $('nodes-list').innerHTML = nodeHTML;
-    } else {
-      $('nodes-status').textContent = 'No nodes registered yet. Machines running Keystone OS will appear here.';
-      $('nodes-list').innerHTML = '';
-    }
-
-    if (workersList.length > 0) {
-      const topWorkers = workersList.slice(0, 3).map(w => `${w.agent} (${w.totalWorkers})`).join(', ');
-      $('workers-summary').textContent = 'Total workers: ' + totalWorkers + ' across ' + workersList.length + ' agent' + (workersList.length === 1 ? '' : 's') + '. Top: ' + topWorkers;
-    } else if (totalWorkers === 0 && nodeCount === 0) {
-      $('workers-summary').textContent = 'Register nodes to see active workers and collaborators.';
-    }
-
-    // Dreamer / notebook
-    const entries = dreamer?.entries || [];
-    const entryCount = entries.length;
-    if (entryCount > 0) {
-      const latest = entries[entries.length - 1];
-      const latestDate = latest?.recordedAt ? fmtDate(latest.recordedAt) : '';
-      $('panel-journal-desc').textContent = entryCount + ' entr' + (entryCount === 1 ? 'y' : 'ies') + ' recorded' + (latestDate ? '. Latest: ' + latestDate : '') + '.';
-      $('stat-capture').textContent = entryCount + ' entr' + (entryCount === 1 ? 'y' : 'ies') + ' saved. JSONL export available.';
-    } else {
-      $('panel-journal-desc').textContent = 'No entries yet. Start capturing dreams, notes, and symbols.';
-      $('stat-capture').textContent = 'No entries yet. Dream, note, symbol, lore, mirror, and place entries supported.';
-    }
-
-    // Readiness / arc reactor
-    const readiness = status?.readiness || {};
-    const arc = status?.arc || {};
-    const readinessScore = readiness.pass ?? '—';
-    const readinessWarn = readiness.warn ?? 0;
-    const readinessFail = readiness.fail ?? 0;
-    let readinessText = 'Ready: ' + readinessScore;
-    if (readinessFail > 0) readinessText += ' · ' + readinessFail + ' failed';
-    if (readinessWarn > 0) readinessText += ' · ' + readinessWarn + ' warnings';
-    $('stat-readiness').textContent = readinessText;
-
-    $('benchmark-subtitle').textContent = 'Real-time feature status from this instance.';
-
-    // Server stat
-    $('stat-server').textContent = serverOnline ? 'Node.js running on port ' + (health?.port || '4177') : 'Server not responding';
-
-    // Recent journal entries (G2 — real backend data)
-    const recentList = $('recent-entries-list');
-    const recentSection = $('recent-entries-section');
-    if (search && search.results && search.results.length > 0 && recentList && recentSection) {
-      recentSection.style.display = '';
-      const entries = search.results.slice(0, 10);
-      recentList.innerHTML = entries.map(e => {
-        const kind = e.kind || 'dream';
-        const ts = e.timestamp ? fmtDate(e.timestamp) : '';
-        const text = (e.text || e.content || '').slice(0, 140);
-        const tags = (e.tags || []).slice(0, 4).map(t => `<span class="pill pill-recent">${t}</span>`).join('');
-        const lucid = typeof e.lucidity === 'number' ? `<span class="recent-lucidity">lucidity ${e.lucidity.toFixed(1)}</span>` : '';
-        return `<div class="recent-entry">
-          <div class="recent-entry-header">
-            <span class="recent-entry-kind">${kind}</span>
-            <span class="recent-entry-ts">${ts}</span>
-            ${lucid}
-          </div>
-          <div class="recent-entry-text">${text}${text.length >= 140 ? '…' : ''}</div>
-          <div class="recent-entry-tags">${tags}</div>
-        </div>`;
-      }).join('');
-      $('recent-subtitle').textContent = entries.length + ' latest entr' + (entries.length === 1 ? 'y' : 'ies') + ' from this instance.';
-    } else if (recentSection) {
-      recentSection.style.display = 'none';
-    }
   }
 
   loadState();
