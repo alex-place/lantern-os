@@ -15,6 +15,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.8] - 2026-06-21
+
+### Added
+- **Kernel escalation as a recorded convergence event + rollover dashboard (#897, #898).**
+  - **#897:** the live kernel path (`stream-chat.js`) previously gave up with a bare "Keystone failed" and never escalated or recorded anything. New `lib/keystone-escalation.js` provides an injectable orchestrator (`runKernelWithEscalation`) that walks the #894 kernel chain (Keystone/Ouro → … → Claude), escalating on each failed verification; every escalation is written as a convergence record (`reasoner: "keystone-kernel"`, `result: "escalated-to-<provider>"`, `verified:false`, `[claim,evidence,confidence,source]`) and queued as a hard task for the distillation loop, and the successful provider is recorded as `landed-by-<provider>`. In shadow mode the path stays Claude-only (no escalation). The orchestrator + share reader are pure/injectable and unit-tested (`tests/test_keystone_escalation.js`, 6 cases).
+  - **#898:** new `GET /api/rollover/status` (`routes/rollover.js`, registered in `server.js`) streams the convergence records (#897) + gate-tagged leaderboard rows (#895) to compute the **Keystone-vs-Claude landed-work share**, escalation rate, current stage + last gate — all traceable to their source JSONL (returned in `sources`), no new store. A "Kernel Rollover" panel was added to `agent-status.html`.
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed
