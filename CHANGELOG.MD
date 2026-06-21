@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.8] - 2026-06-21
+
+### Changed
+- **Surface convergence-engine failures instead of swallowing them (Σ₀ #919 / #941).** [`stream-chat.js`](apps/lantern-garage/lib/stream-chat.js): when the kernel convergence route falls through to a direct LLM ("Convergence unavailable — answering directly"), the underlying `convResult.error` + reason is now `console.error`-logged (mirrors #921's MemOS-fallback fix). Found via the #941 live-loop verification on 4177 — the engine error was invisible, so the loop's grounding gap couldn't be diagnosed.
+
 ## [1.6.7] - 2026-06-21
 
 ### Tests

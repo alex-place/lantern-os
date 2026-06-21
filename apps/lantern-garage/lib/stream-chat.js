@@ -1195,7 +1195,12 @@ async function handleStreamChat(req, url, res) {
       });
       return;
     }
-    // Convergence unavailable or timed out — fall through to direct LLM providers
+    // Convergence unavailable or timed out — fall through to direct LLM providers.
+    // Surface WHY (don't swallow it) so the failure is diagnosable — Σ₀ #919/#941.
+    console.error(
+      `[Convergance] unavailable (non-fatal): ${convResult.error || "no reply"}` +
+      (convResult.reply ? ` — ${String(convResult.reply).slice(0, 200)}` : "")
+    );
     sendToken("(Convergence unavailable — answering directly)\n\n");
   }
 
