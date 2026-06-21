@@ -450,6 +450,139 @@ async function runAutowork(issue, btn, base) {
   }
 }
 
+// ── Explore embeds in chat (videos · discover · build · support) ──────────────
+// Surfaces the SAME server-cached data as the Explore page inline in chat when a
+// user asks for it. Mirrors the !convergence / WORK_INTENT intercept pattern:
+// deterministic, no LLM cost, and each route carries its own baked fallback so a
+// section always renders. Σ₀: improves the Converge/grounding surface, no new
+// memory system or subsystem — pure reuse of /api/{youtube,feeds,github} routes.
+const embedBase = () => (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+
+function embedEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function embedShortDate(d) {
+  if (!d) return '';
+  const t = Date.parse(d);
+  if (Number.isNaN(t)) return '';
+  try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { return ''; }
+}
+
+// Map a typed message to an embed kind, or null. Bang commands always work; NL
+// requires an explicit "show/what/latest" framing so normal chat isn't hijacked.
+function detectEmbedIntent(text) {
+  const s = text.trim();
+  const bang = s.match(/^!(videos?|watch|youtube|discover|news|reads?|feed|build|github|releases?|commits?|support|patreon|tiers?|donate|embeds?)\b/i);
+  if (bang) {
+    const b = bang[1].toLowerCase();
+    if (/^(videos?|watch|youtube)$/.test(b)) return 'videos';
+    if (/^(discover|news|reads?|feed)$/.test(b)) return 'discover';
+    if (/^(build|github|releases?|commits?)$/.test(b)) return 'build';
+    if (/^(support|patreon|tiers?|donate)$/.test(b)) return 'support';
+    if (/^embeds?$/.test(b)) return 'all';
+  }
+  if (s.startsWith('!')) return null; // other bang commands handled elsewhere
+  const ask = /\b(show|see|view|give|got|have|where|what'?s?|which|how|latest|recent|any|list|pull up|display|open)\b/i.test(s);
+  if (!ask) return null;
+  if (/\byoutube\b/i.test(s) || /\b(latest|recent|your|the|lantern)\b[^?]*\bvideos?\b/i.test(s)) return 'videos';
+  if (/\b(discover|fresh reads?|news feed|articles?|rss feed|reading list)\b/i.test(s) || /\bwhat'?s? new\b/i.test(s)) return 'discover';
+  if (/\b(github|releases?|recent commits?|repo activity|build (status|activity))\b/i.test(s)) return 'build';
+  if (/\b(patreon|membership|tiers?|how (can i|to) support|support the (project|work))\b/i.test(s)) return 'support';
+  if (/\b(embeds?|explore (page |content |feeds?)|what can you (show|surface))\b/i.test(s)) return 'all';
+  return null;
+}
+
+async function embedVideos(base) {
+  const r = await fetch(`${base}/api/youtube/lantern-videos`, { cache: 'no-store' });
+  const d = await r.json();
+  const vids = (d.videos || []).slice(0, 6);
+  const featured = vids.find(v => v.featured || v.id === d.featured) || vids[0];
+  if (!featured) return '';
+  const thumbs = vids.map(v =>
+    `<a href="https://www.youtube.com/watch?v=${embedEsc(v.id)}" target="_blank" rel="noopener noreferrer" style="flex:0 0 auto;width:118px;text-decoration:none;color:inherit">
+       <img src="https://img.youtube.com/vi/${embedEsc(v.id)}/mqdefault.jpg" alt="" loading="lazy" style="width:118px;height:66px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">
+       <div style="font-size:10.5px;line-height:1.3;margin-top:3px;max-height:27px;overflow:hidden">${embedEsc((v.title || '').slice(0, 42))}</div>
+     </a>`).join('');
+  return `<div style="font-weight:600;margin-bottom:6px">🎬 lanternYT</div>
+    <iframe src="https://www.youtube-nocookie.com/embed/${embedEsc(featured.id)}?rel=0" width="100%" height="220" style="border:0;border-radius:8px;max-width:420px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px">${thumbs}</div>`;
+}
+
+async function embedDiscover(base) {
+  const r = await fetch(`${base}/api/feeds/discover`, { cache: 'no-store' });
+  const d = await r.json();
+  const items = (d.items || []).slice(0, 6);
+  if (!items.length) return '';
+  const rows = items.map(it => {
+    const ext = /^https?:/i.test(it.link);
+    const meta = [
+      it.source ? `<span style="color:var(--accent);font-weight:600">${embedEsc(it.source)}</span>` : '',
+      embedShortDate(it.date) ? `<span style="opacity:0.6">${embedEsc(embedShortDate(it.date))}</span>` : '',
+    ].filter(Boolean).join(' · ');
+    return `<div style="padding:6px 0;border-top:1px solid var(--border)">
+      <a href="${embedEsc(it.link)}" ${ext ? 'target="_blank" rel="noopener noreferrer"' : ''} style="color:inherit;text-decoration:none;font-weight:600;font-size:12.5px">${embedEsc(it.title)}</a>
+      ${meta ? `<div style="font-size:11px;margin-top:2px">${meta}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div style="font-weight:600;margin:12px 0 2px">🧭 Discover — fresh reads</div>${rows}`;
+}
+
+async function embedBuild(base) {
+  const r = await fetch(`${base}/api/github/activity`, { cache: 'no-store' });
+  const d = await r.json();
+  const rel = (d.releases || [])[0];
+  const commits = (d.commits || []).slice(0, 4);
+  const stars = typeof d.stars === 'number' ? `★ ${d.stars}` : '';
+  const tagPill = (txt, href) =>
+    `<a href="${embedEsc(href)}" target="_blank" rel="noopener noreferrer" style="font-family:ui-monospace,monospace;background:var(--bg,#111);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--accent);text-decoration:none">${embedEsc(txt)}</a>`;
+  const relHtml = rel ? `<div style="margin-top:4px;font-size:12px">${tagPill(rel.tag, rel.url)} ${embedEsc(rel.name || '')}</div>` : '';
+  const comHtml = commits.map(c =>
+    `<div style="padding:4px 0;font-size:12px">${tagPill(c.sha, c.url)} ${embedEsc((c.msg || '').slice(0, 74))}</div>`).join('');
+  const repo = d.repo || 'alex-place/lantern-os';
+  const url = d.url || 'https://github.com/alex-place/lantern-os';
+  return `<div style="font-weight:600;margin:12px 0 2px">🛠️ Build — <a href="${embedEsc(url)}" target="_blank" rel="noopener noreferrer" style="color:inherit">${embedEsc(repo)}</a> <span style="opacity:0.6;font-weight:400">${stars}</span></div>${relHtml}<div style="margin-top:6px">${comHtml}</div>`;
+}
+
+function embedSupport() {
+  const tiers = [
+    ['Wanderer', '$5', 'Supporter role'],
+    ['Deep Dreamer', '$20', 'Deep Dreamer role'],
+    ['Synthesasia Guild', '$200', 'Guild (admin) role'],
+  ];
+  const cards = tiers.map(([n, p, perk]) =>
+    `<a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="flex:1 1 110px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit">
+       <div style="font-weight:700;font-size:12.5px">${n}</div>
+       <div style="font-size:1.2rem;font-weight:800">${p}<span style="font-size:.7rem;opacity:.6">/mo</span></div>
+       <div style="font-size:10.5px;opacity:.65">${perk}</div>
+     </a>`).join('');
+  return `<div style="font-weight:600;margin:12px 0 6px">♥ Support — <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon</a></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cards}</div>`;
+}
+
+async function renderExploreEmbed(kind, userText) {
+  addUserBubble(userText);
+  const messages = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = '<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Pulling that up…</div>';
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  const base = embedBase();
+  try {
+    let html = '';
+    if (kind === 'videos' || kind === 'all') html += await embedVideos(base).catch(() => '');
+    if (kind === 'discover' || kind === 'all') html += await embedDiscover(base).catch(() => '');
+    if (kind === 'build' || kind === 'all') html += await embedBuild(base).catch(() => '');
+    if (kind === 'support' || kind === 'all') html += embedSupport();
+    html += `<div style="margin-top:10px;font-size:11px;opacity:0.6">See more on <a href="/explore.html" style="color:var(--accent)">Explore →</a></div>`;
+    bubble.innerHTML = html;
+  } catch (e) {
+    bubble.innerHTML = `Couldn't load that right now. Try <a href="/explore.html" style="color:var(--accent)">Explore →</a>`;
+  }
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+}
+
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('input');
@@ -638,6 +771,17 @@ async function sendMessage() {
       sysRow.querySelector('.bubble').textContent = `Convergence failed: ${e.message}`;
     }
     if (typeof scrollToBottom === 'function') scrollToBottom();
+    return;
+  }
+
+  // Explore embeds — surface videos / discover feed / GitHub activity / Patreon
+  // tiers inline when asked (bang commands or a "show/what/latest" NL framing).
+  // Deterministic, no LLM cost; same server-cached routes as the Explore page.
+  const embedKind = detectEmbedIntent(text);
+  if (embedKind) {
+    input.value = '';
+    input.style.height = 'auto';
+    renderExploreEmbed(embedKind, text).catch(e => console.error('[embed]', e));
     return;
   }
 
