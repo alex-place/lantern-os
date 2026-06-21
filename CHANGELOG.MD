@@ -15,12 +15,17 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.6.3] - 2026-06-21
+## [1.6.4] - 2026-06-21
 
 ### Security
 - **Hardened the markdown reader and Knowledge Center search against the CodeQL/OWASP findings carried in by #914.** [`apps/lantern-garage/lib/markdown-render.js`](apps/lantern-garage/lib/markdown-render.js): the HTML-comment strip now loops until stable so a nested/overlapping `<!-- <!-- --> -->` can't leave a dangling marker (CodeQL high — *incomplete multi-character sanitization*), and the block parser uses `String.match()` instead of `RegExp.exec()` so the OWASP "exec(" pattern guard stops false-positiving on regex method calls. [`apps/lantern-garage/public/knowledgecenter.html`](apps/lantern-garage/public/knowledgecenter.html): the grounding-search `esc()` helper now also encodes `"` and `'`, so a result `source` can't break out of the `href="…"` attribute (CodeQL medium — *incomplete HTML attribute sanitization*). No behaviour change to rendering (badges, anchors, nested lists, newspaper layout, byline all verified unchanged).
 
 ---
+
+## [1.6.3] - 2026-06-21
+
+### Added
+- **Kernel-path provider rollover (#894).** `provider-router.js` gains a `kernel` `PROVIDER_CHAIN` (`keystone-ft`/`ouro` -> `anthropic`) and `selectKernelProvider(requestedProvider)` — independent of chat `selectProvider`, so the kernel never inherits the chat surface's Claude default. Staged via `KEYSTONE_ROLLOVER_MODE`: **`shadow` (default/unset) = Claude only (Stage 0, no behavior change)**; `default` = Keystone/Ouro first, Claude explicit last-resort. `stream-chat.js`'s kernel path now `await`s it (also fixes a bug where the async `selectProvider` was used un-awaited, making `provider` a Promise) and surfaces `provider`/`model`/`rolloverMode` in the SSE `done` event. Test: `tests/test_kernel_provider_chain.js` (6 assertions). Curated from #905 (@cdblasioli-gif): cherry-picked the 3 intentional files onto clean master; excluded its stale-base noise, 3 committed runtime-data files, and the redundant #851 bytes-per-correct (already on master via the `verbosity()` Gate F).
 
 ## [1.6.2] - 2026-06-21
 
