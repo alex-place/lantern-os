@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.4] - 2026-06-21
+
+### Changed
+- **Knowledge Center: moved the collapsed "Under the hood — research & internals" disclosure above the "Apps / Explore Keystone" section** (`apps/lantern-garage/public/knowledgecenter.html`). The `<details class="kc-deep">` block now sits between "Quick help" and "Apps" instead of at the bottom of the page; it stays **collapsed by default**, so the only change is section order. Pure block relocation — tags balanced, lxml-parsed, preview-verified (`under_the_hood_before_apps: true`).
+
 ## [1.7.3] - 2026-06-21
 
 ### Changed

@@ -373,6 +373,74 @@
     </div>
   </section>
 
+  <!-- ── Under the hood — collapsed; research + internals live here, nothing lost ── -->
+  <section class="section">
+    <details class="kc-deep">
+      <summary>
+        <span class="badge" aria-hidden="true">🔬</span>
+        <span>Under the hood — research &amp; internals</span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <div class="kc-deep-body">
+
+        <div class="kc-deep-note">
+          These are the design docs, live visualizations, and research notes that power
+          Keystone's reasoning. <strong>You don't need any of this to use the app</strong> — it's here
+          for the curious and for contributors. They double as Keystone's
+          <strong>live grounding corpus</strong>: the assistant retrieves the nearest section before
+          answering (deterministic routing, $0 before the LLM). Start with the
+          <a href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md">📊 Progress Report (shareholder edition, 2026-06-19)</a>.
+        </div>
+
+        <!-- Live internals -->
+        <div class="section">
+          <div class="section-head">
+            <div class="label">Live internals</div>
+            <h2>Watch the system think</h2>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" href="/rag-house.html">
+              <span class="icon">🏠</span>
+              <h3>RAG House <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">RAG = Retrieval-Augmented Generation: the AI looks things up before answering. The "house" is a living map of how all the pieces fit together.</span></span></h3>
+              <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
+            </a>
+            <a class="link-card" href="/observer-mesh-cube.html">
+              <span class="icon">🧊</span>
+              <h3>Observer Mesh Cube <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A 3-D visualization of what the system currently believes and which components ("observers") are watching each part.</span></span></h3>
+              <p>The 3D status cube — beliefs and observers across the mesh.</p>
+            </a>
+            <a class="link-card" href="/orchestration.html">
+              <span class="icon">🧭</span>
+              <h3>Orchestration <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">How a message gets handled: it figures out what you're asking ("intent"), checks the answer is grounded in real data ("convergence gate"), and switches AI models if one fails.</span></span></h3>
+              <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
+            </a>
+          </div>
+        </div>
+
+        <!-- Memory & format -->
+        <div class="section">
+          <div class="section-head">
+            <div class="label">Memory &amp; format</div>
+            <h2>How Keystone stores what it learns</h2>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
+              <span class="icon">🗄️</span>
+              <h3>CSF Format <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">CSF ("Convergence-Fitted Searchable Format") is the project's own file format for packing and searching its memory and archives — like a smarter, searchable zip.</span></span></h3>
+              <p>Convergence-Fitted Searchable Format — consolidated spec. <strong>v0.9 ships CSF-Omni</strong> best-fit compression (SHA-256 + CRC integrity): the memory log went from <strong>14×</strong> (old zlib) to <strong>422×</strong>, matching the best-in-field coder while strictly beating every other codec. Adversarially verified; v0.8 archives still read.</p>
+            </a>
+            <a class="link-card" href="/reports/csf-compression-benchmark.pdf" target="_blank" rel="noopener">
+              <span class="icon">📊</span>
+              <h3>CSF Benchmark <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A head-to-head PDF report on the CSF-Omni rewrite — how well CSF compresses real data versus standard tools, every result re-checked to be lossless (decodes back to the exact original) and stress-tested by independent agents.</span></span></h3>
+              <p>PDF report (v2) — the <strong>CSF-Omni rewrite</strong>: deterministic best-fit vs zlib / bz2 / lzma / zstd / brotli on three real corpora, every codec round-trip-verified lossless, then checked by a 6-agent adversarial fleet. 14× → 422× on the memory log.</p>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </details>
+  </section>
+
   <!-- ── Apps ── -->
   <section class="section">
     <div class="section-head">
@@ -580,73 +648,6 @@
     </div>
   </section>
 
-  <!-- ── Under the hood — collapsed; research + internals live here, nothing lost ── -->
-  <section class="section">
-    <details class="kc-deep">
-      <summary>
-        <span class="badge" aria-hidden="true">🔬</span>
-        <span>Under the hood — research &amp; internals</span>
-        <span class="chev" aria-hidden="true">▾</span>
-      </summary>
-      <div class="kc-deep-body">
-
-        <div class="kc-deep-note">
-          These are the design docs, live visualizations, and research notes that power
-          Keystone's reasoning. <strong>You don't need any of this to use the app</strong> — it's here
-          for the curious and for contributors. They double as Keystone's
-          <strong>live grounding corpus</strong>: the assistant retrieves the nearest section before
-          answering (deterministic routing, $0 before the LLM). Start with the
-          <a href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md">📊 Progress Report (shareholder edition, 2026-06-19)</a>.
-        </div>
-
-        <!-- Live internals -->
-        <div class="section">
-          <div class="section-head">
-            <div class="label">Live internals</div>
-            <h2>Watch the system think</h2>
-          </div>
-          <div class="link-grid">
-            <a class="link-card" href="/rag-house.html">
-              <span class="icon">🏠</span>
-              <h3>RAG House <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">RAG = Retrieval-Augmented Generation: the AI looks things up before answering. The "house" is a living map of how all the pieces fit together.</span></span></h3>
-              <p>Living map of the architecture — Status Cube, Convergence IO, CSF, and agents.</p>
-            </a>
-            <a class="link-card" href="/observer-mesh-cube.html">
-              <span class="icon">🧊</span>
-              <h3>Observer Mesh Cube <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A 3-D visualization of what the system currently believes and which components ("observers") are watching each part.</span></span></h3>
-              <p>The 3D status cube — beliefs and observers across the mesh.</p>
-            </a>
-            <a class="link-card" href="/orchestration.html">
-              <span class="icon">🧭</span>
-              <h3>Orchestration <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">How a message gets handled: it figures out what you're asking ("intent"), checks the answer is grounded in real data ("convergence gate"), and switches AI models if one fails.</span></span></h3>
-              <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
-            </a>
-          </div>
-        </div>
-
-        <!-- Memory & format -->
-        <div class="section">
-          <div class="section-head">
-            <div class="label">Memory &amp; format</div>
-            <h2>How Keystone stores what it learns</h2>
-          </div>
-          <div class="link-grid">
-            <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
-              <span class="icon">🗄️</span>
-              <h3>CSF Format <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">CSF ("Convergence-Fitted Searchable Format") is the project's own file format for packing and searching its memory and archives — like a smarter, searchable zip.</span></span></h3>
-              <p>Convergence-Fitted Searchable Format — consolidated spec. <strong>v0.9 ships CSF-Omni</strong> best-fit compression (SHA-256 + CRC integrity): the memory log went from <strong>14×</strong> (old zlib) to <strong>422×</strong>, matching the best-in-field coder while strictly beating every other codec. Adversarially verified; v0.8 archives still read.</p>
-            </a>
-            <a class="link-card" href="/reports/csf-compression-benchmark.pdf" target="_blank" rel="noopener">
-              <span class="icon">📊</span>
-              <h3>CSF Benchmark <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A head-to-head PDF report on the CSF-Omni rewrite — how well CSF compresses real data versus standard tools, every result re-checked to be lossless (decodes back to the exact original) and stress-tested by independent agents.</span></span></h3>
-              <p>PDF report (v2) — the <strong>CSF-Omni rewrite</strong>: deterministic best-fit vs zlib / bz2 / lzma / zstd / brotli on three real corpora, every codec round-trip-verified lossless, then checked by a 6-agent adversarial fleet. 14× → 422× on the memory log.</p>
-            </a>
-          </div>
-        </div>
-
-      </div>
-    </details>
-  </section>
 
 </main>
 
