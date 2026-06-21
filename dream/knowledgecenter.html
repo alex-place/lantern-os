@@ -477,6 +477,75 @@
     </div>
   </section>
 
+  <!-- ── Research & theory (promoted above the document library) ── -->
+  <section class="section" id="research-section">
+    <div class="section-head">
+      <div class="label">Research &amp; theory</div>
+      <h2>The math and method</h2>
+      <p>Start with the local coder — <a href="/repo/docs/SIGMA0-OURO-CODER.md">Σ₀ Ouro Coder</a>
+         (the single source of truth) and its
+         <a href="/repo/docs/SIGMA0-CONTINUAL-TRAINING.md">Continual-Training Loop</a> —
+         then the convergence math and method behind it.</p>
+    </div>
+    <div class="link-grid">
+      <a class="link-card" href="/repo/docs/SIGMA0-OURO-CODER.md" style="border-color:var(--accent)">
+        <span class="icon">🌀</span>
+        <h3>Σ₀ Ouro Coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The local coding AI that runs on your own machine: a small model (Ouro) that "loops" to think harder on tough problems, fine-tuned on this repo's own past sessions.</span></span></h3>
+        <p>The single source of truth for the local coder — then (Qwen) → now (Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth) plus the loop mechanism, served as a drop-in model the coder path uses transparently.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/SIGMA0-CONTINUAL-TRAINING.md">
+        <span class="icon">♻️</span>
+        <h3>Σ₀ Continual-Training Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The machinery that lets the local coding model improve from its own verified work: write code → run it to prove it works → train on the winners → keep the new model only if it scores higher on a coding exam.</span></span></h3>
+        <p>The closed flywheel — harvest → execution-verify → train → eval → eval-gated promote. Two ground-truth gates (only green subprocesses train; only a measured pass@1 win promotes), kept offline by design.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent)">
+        <span class="icon">📊</span>
+        <h3>Progress Report — Shareholder Edition <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An honest, evidence-tagged status of where Keystone — the bounded, self-improving agent — stands: what shipped, the real numbers, and the next milestones.</span></span></h3>
+        <p>2026-06-19 — what shipped (token-budgeted memory #772), the real metrics (34% golden-set baseline), the honest ceiling, and the roadmap. Every claim evidence-tagged.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
+        <span class="icon">📐</span>
+        <h3>Σ₀ Collapse Certificate <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Σ₀ ("sigma-zero") is the project's core stability math. This document proves the reasoning loop stays grounded instead of spiralling into confident nonsense.</span></span></h3>
+        <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
+        <span class="icon">📄</span>
+        <h3>LaTeX Source</h3>
+        <p>TeX source for the certificate — for typesetting and print.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
+        <span class="icon">🌌</span>
+        <h3>Quantum-Relativity Analysis</h3>
+        <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
+        <span class="icon">🔄</span>
+        <h3>Tesseract Convergence Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The step-by-step method the system reasons with — tracking how confident it is ("Bayesian beliefs") in a 4-D status "cube" and keeping receipts for every claim.</span></span></h3>
+        <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
+        <span class="icon">🧭</span>
+        <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Keystone runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
+        <p>Ouro LoopLM vs the 2026 dense small-model frontier (Qwen3-4B, Phi-4-mini, Gemma 3n E2B) — primary-source-verified, with a benchmark plan instead of a pick.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
+        <span class="icon">🌀</span>
+        <h3>Convergence-exit spiral <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Instead of stopping when the model is "confident enough", keep looping until its internal state stops moving — a true fixed point. Falsifiable, with a shipped prototype.</span></span></h3>
+        <p>Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract over the Status-Cube. Every claim tagged implemented / proven-conditional / hypothesis.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
+        <span class="icon">🧩</span>
+        <h3>Convergence Core spine <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The design for turning Keystone's already-built parts (memory, task, tool, record + the Σ₀ safety system) into one closed agent loop — and the single feedback wire that's still missing.</span></span></h3>
+        <p>The four core objects, the six-stage loop, and the write-back closure in code (kernel.py, verify.py) — verified file-by-file, with the honest "durable agent, not AGI" ceiling.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/KEYSTONE-MCP.md">
+        <span class="icon">🔌</span>
+        <h3>Keystone ↔ MCP</h3>
+        <p>Keystone chat is linked to live project tools (GitHub issues+PRs, MCP tools) — any provider answers grounded in the real repo.</p>
+      </a>
+    </div>
+  </section>
+
   <!-- ── Documents (PDF gallery — /api/pdfs) ── -->
   <section class="section" id="documents-section">
     <div class="section-head">
@@ -551,71 +620,6 @@
               <span class="icon">🧭</span>
               <h3>Orchestration <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">How a message gets handled: it figures out what you're asking ("intent"), checks the answer is grounded in real data ("convergence gate"), and switches AI models if one fails.</span></span></h3>
               <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
-            </a>
-          </div>
-        </div>
-
-        <!-- Research & theory -->
-        <div class="section">
-          <div class="section-head">
-            <div class="label">Research &amp; theory</div>
-            <h2>The math and method</h2>
-          </div>
-          <div class="link-grid">
-            <a class="link-card" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent)">
-              <span class="icon">📊</span>
-              <h3>Progress Report — Shareholder Edition <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An honest, evidence-tagged status of where Keystone — the bounded, self-improving agent — stands: what shipped, the real numbers, and the next milestones.</span></span></h3>
-              <p>2026-06-19 — what shipped (token-budgeted memory #772), the real metrics (34% golden-set baseline), the honest ceiling, and the roadmap. Every claim evidence-tagged.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
-              <span class="icon">📐</span>
-              <h3>Σ₀ Collapse Certificate <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Σ₀ ("sigma-zero") is the project's core stability math. This document proves the reasoning loop stays grounded instead of spiralling into confident nonsense.</span></span></h3>
-              <p>Lyapunov-contraction theorem (scoped to normal A), the Σ₀ trigger, and four ground-truth-verified experiments.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
-              <span class="icon">📄</span>
-              <h3>LaTeX Source</h3>
-              <p>TeX source for the certificate — for typesetting and print.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
-              <span class="icon">🌌</span>
-              <h3>Quantum-Relativity Analysis</h3>
-              <p>Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
-              <span class="icon">🔄</span>
-              <h3>Tesseract Convergence Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The step-by-step method the system reasons with — tracking how confident it is ("Bayesian beliefs") in a 4-D status "cube" and keeping receipts for every claim.</span></span></h3>
-              <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
-              <span class="icon">🧭</span>
-              <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Keystone runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
-              <p>Ouro LoopLM vs the 2026 dense small-model frontier (Qwen3-4B, Phi-4-mini, Gemma 3n E2B) — primary-source-verified, with a benchmark plan instead of a pick.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
-              <span class="icon">🌀</span>
-              <h3>Convergence-exit spiral <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Instead of stopping when the model is "confident enough", keep looping until its internal state stops moving — a true fixed point. Falsifiable, with a shipped prototype.</span></span></h3>
-              <p>Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract over the Status-Cube. Every claim tagged implemented / proven-conditional / hypothesis.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
-              <span class="icon">🧩</span>
-              <h3>Convergence Core spine <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The design for turning Keystone's already-built parts (memory, task, tool, record + the Σ₀ safety system) into one closed agent loop — and the single feedback wire that's still missing.</span></span></h3>
-              <p>The four core objects, the six-stage loop, and the write-back closure in code (kernel.py, verify.py) — verified file-by-file, with the honest "durable agent, not AGI" ceiling.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/SIGMA0-OURO-CODER.md">
-              <span class="icon">🌀</span>
-              <h3>Σ₀ Ouro Coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The local coding AI that runs on your own machine: a small model (Ouro) that "loops" to think harder on tough problems, fine-tuned on this repo's own past sessions.</span></span></h3>
-              <p>The single source of truth for the local coder — then (Qwen) → now (Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth) plus the loop mechanism, served as a drop-in model the coder path uses transparently.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/SIGMA0-CONTINUAL-TRAINING.md">
-              <span class="icon">♻️</span>
-              <h3>Σ₀ Continual-Training Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The machinery that lets the local coding model improve from its own verified work: write code → run it to prove it works → train on the winners → keep the new model only if it scores higher on a coding exam.</span></span></h3>
-              <p>The closed flywheel — harvest → execution-verify → train → eval → eval-gated promote. Two ground-truth gates (only green subprocesses train; only a measured pass@1 win promotes), kept offline by design.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/KEYSTONE-MCP.md">
-              <span class="icon">🔌</span>
-              <h3>Keystone ↔ MCP</h3>
-              <p>Keystone chat is linked to live project tools (GitHub issues+PRs, MCP tools) — any provider answers grounded in the real repo.</p>
             </a>
           </div>
         </div>
