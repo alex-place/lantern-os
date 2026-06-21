@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.13] - 2026-06-21
+
+### Changed
+- **Markdown doc viewer (`/repo/*.md`) restyled as stacked "newspaper panels."** `lib/markdown-render.js` now groups each `##` (H2) section into its own `<section class="md-panel">` (content before the first H2 becomes a `<header class="md-lead">` masthead). Panels get a hairline border, **alternating background** (`--surface` ↔ `--surface2`) with an accent left-rule on every other panel, and an accent underline on each section heading — higher contrast and sharper edges than the previous single flowing card. Spacing between panels increased (30px) and the page's outer margin reduced (16px top / 14px sides, was 32/56). On wide screens each panel flows into width-sized columns (so short panels stay single-column) with headings and wide blocks spanning all columns. Applies to every rendered doc page (e.g. `/repo/docs/SIGMA0-OURO-CODER.md`). Verified: panels render, alternation + columns + spacing confirmed via computed styles, no console errors.
+
 ## [1.7.12] - 2026-06-21
 
 ### Fixed

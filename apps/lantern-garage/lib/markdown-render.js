@@ -269,6 +269,33 @@ function parseFrontmatter(text) {
   return { meta, body: stripped.slice(m[0].length) };
 }
 
+// Group the flat block list into newspaper "panels": everything before the first
+// H2 becomes the masthead (<header class="md-lead">), then each H2 and the blocks
+// that follow it (until the next H2) become one <section class="md-panel">. The
+// panels are what receive the alternating background + border treatment in CSS.
+function groupSections(blocks) {
+  const lead = [];
+  const panels = [];
+  let cur = null;
+  for (const b of blocks) {
+    if (/^<h2[\s>]/.test(b)) {
+      if (cur) panels.push(cur);
+      cur = [b];
+    } else if (cur) {
+      cur.push(b);
+    } else {
+      lead.push(b);
+    }
+  }
+  if (cur) panels.push(cur);
+  // No H2 anywhere → wrap the whole doc in one panel so it still gets chrome.
+  if (!panels.length) return `<section class="md-panel">\n${lead.join("\n")}\n</section>`;
+  const parts = [];
+  if (lead.length) parts.push(`<header class="md-lead">\n${lead.join("\n")}\n</header>`);
+  for (const p of panels) parts.push(`<section class="md-panel">\n${p.join("\n")}\n</section>`);
+  return parts.join("\n");
+}
+
 function renderMarkdownDocument(markdown, sourcePath) {
   const { meta, body: parsed } = parseFrontmatter(markdown.replace(/\r\n/g, "\n"));
   // Drop HTML comments (READMEs place badge rows next to <!-- … --> dividers).
@@ -306,16 +333,28 @@ function renderMarkdownDocument(markdown, sourcePath) {
   <link rel="stylesheet" href="/css/narrator.css">
   <style>
     /* Doc reading view — built entirely on the site theme variables (css/site.css)
-       so it follows the global light/dark toggle. No fixed palette, no web fonts:
-       a clean centered card that inherits the site's "Segoe UI" sans. */
+       so it follows the global light/dark toggle. No fixed palette, no web fonts.
+       The page is a transparent container; each H2 section is rendered as a boxed
+       "newspaper panel" (.md-panel) with alternating contrast and its own chrome,
+       so the page reads as stacked panels rather than one long card. */
     .md-page {
-      max-width: 820px; margin: 32px auto 96px; padding: 44px 56px 64px;
-      background: var(--surface); color: var(--text);
-      border: 1px solid var(--border); border-radius: 16px;
+      max-width: 1080px; margin: 16px auto 56px; padding: 0 14px;
+      color: var(--text);
       font-size: 1.05rem; line-height: 1.75;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
       overflow-wrap: anywhere;
     }
+    /* Masthead — the H1 + intro that precede the first H2. */
+    .md-lead { padding: 6px 6px 20px; margin-bottom: 24px; border-bottom: 3px solid var(--accent); }
+    /* Newspaper panels — one per H2 section. A hairline border + alternating
+       background give the high-contrast, sharp-edged stacked-panel look; the
+       generous bottom margin is the spacing between horizontal panels. */
+    .md-panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 20px 28px 6px; margin: 0 0 30px;
+    }
+    .md-panel:nth-of-type(even) { background: var(--surface2); border-left: 3px solid var(--accent); }
+    .md-panel:last-of-type { margin-bottom: 0; }
     .md-page p, .md-page li { margin: 0 0 1.05em; }
     .md-page li { margin-bottom: 0.5em; }
     .md-page li::marker { color: var(--accent); }
@@ -326,7 +365,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
       color: var(--text); line-height: 1.25; font-weight: 700; scroll-margin-top: 68px;
     }
     .md-page h1 { font-size: 2rem; font-weight: 800; margin: 0 0 .5em; letter-spacing: -0.02em; }
-    .md-page h2 { font-size: 1.5rem; margin: 1.85em 0 .55em; padding-top: .7em; border-top: 1px solid var(--border); }
+    .md-page h2 { font-size: 1.4rem; margin: .1em 0 .7em; padding-bottom: .35em; border-bottom: 2px solid var(--accent); }
     .md-page h3 { font-size: 1.2rem; font-weight: 600; margin: 1.55em 0 .4em; }
     .md-page h4 { font-size: 0.9rem; font-weight: 700; margin: 1.4em 0 .3em; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
     .md-page a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
@@ -344,54 +383,47 @@ function renderMarkdownDocument(markdown, sourcePath) {
     .md-page thead th { background: var(--surface2); color: var(--text); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; }
     .md-page tbody tr:nth-child(even) { background: var(--surface2); }
     .md-page blockquote { margin: 1.5em 0; padding: 6px 22px; background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; color: var(--text); }
-    .md-page blockquote h2 { margin-top: .6em; border-top: none; padding-top: 0; font-size: 1.2rem; }
+    .md-page blockquote h2 { margin-top: .6em; border-top: none; border-bottom: none; padding-top: 0; padding-bottom: 0; font-size: 1.2rem; }
     .md-page blockquote h3 { margin-top: .5em; }
     .md-page blockquote > :first-child { margin-top: .4em; }
     .md-page hr { border: none; border-top: 1px solid var(--border); margin: 2.4em 0; }
     .md-source { color: var(--muted); font-size: 0.8rem; margin-bottom: 26px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .01em; }
     .md-byline { color: var(--muted); font-size: 0.82rem; margin: -18px 0 24px; }
-    @media (max-width: 820px) { .md-page { padding: 28px 20px 48px; margin: 0; border-radius: 0; border-left: none; border-right: none; font-size: 1.02rem; } }
+    @media (max-width: 820px) {
+      .md-page { padding: 0 8px; margin: 8px auto 40px; font-size: 1.02rem; }
+      .md-panel { padding: 16px 16px 4px; margin-bottom: 18px; border-radius: 6px; }
+      .md-lead { padding: 4px 2px 14px; margin-bottom: 16px; }
+    }
 
-    /* ── Large-screen "newspaper" reading layout ──────────────────────────
-       A single 820px column wastes most of a 1080p / ultrawide display and
-       reads dense. On wider viewports the page widens and the body flows into
-       balanced columns. Section headings (h1/h2) and wide blocks (code,
-       tables, quotes, rules) span the FULL width like newspaper figures, so
-       each section's columns reset and stay short — you read a section's
-       columns left-to-right, not one endless ribbon. */
+    /* ── Large-screen "newspaper panels" ──────────────────────────────────
+       Each panel's body flows into balanced columns sized by WIDTH (not a fixed
+       count), so a short panel stays a single column and only tall/wide panels
+       split — no sparse 3-column stubs. The panel heading and wide blocks (code,
+       tables, quotes, rules) span all columns like newspaper figures. */
     @media (min-width: 1100px) {
-      .md-page { max-width: 1240px; padding: 48px 64px 72px; }
-      .md-page article {
-        column-count: 2;
-        column-gap: 52px;
-        column-rule: 1px solid var(--border);
-      }
-      /* full-width spanners: section heads + wide blocks */
-      .md-page article > h1,
-      .md-page article > h2,
-      .md-page article > pre,
-      .md-page article > table,
-      .md-page article > blockquote,
-      .md-page article > hr { column-span: all; }
-      /* keep atomic blocks from splitting across a column boundary */
-      .md-page article > ul,
-      .md-page article > ol,
-      .md-page article li,
-      .md-page article > figure,
-      .md-page article > img { break-inside: avoid; }
-      /* never strand a sub-heading at the foot of a column */
-      .md-page article > h3,
-      .md-page article > h4 { break-after: avoid; }
-      .md-page h2 { margin-top: 1.2em; }
+      .md-page { max-width: 1280px; }
+      .md-panel { padding: 26px 34px 10px; columns: 22rem 2; column-gap: 48px; }
+      .md-panel > h2,
+      .md-panel > pre,
+      .md-panel > table,
+      .md-panel > blockquote,
+      .md-panel > hr { column-span: all; }
+      .md-panel > ul,
+      .md-panel > ol,
+      .md-panel li,
+      .md-panel > figure,
+      .md-panel > img { break-inside: avoid; }
+      .md-panel > h3,
+      .md-panel > h4 { break-after: avoid; }
     }
     @media (min-width: 1700px) {
-      .md-page { max-width: 1640px; }
-      .md-page article { column-count: 3; column-gap: 56px; }
+      .md-page { max-width: 1560px; }
+      .md-panel { columns: 22rem 3; column-gap: 52px; }
     }
     /* ultrawide (≈3440px and up) */
     @media (min-width: 2400px) {
       .md-page { max-width: 2200px; }
-      .md-page article { column-count: 4; column-gap: 60px; }
+      .md-panel { columns: 22rem 4; column-gap: 56px; }
     }
   </style>
 </head>
@@ -420,7 +452,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
   <div class="md-source">${escapeHtml(sourcePath)}</div>
   ${byline}
   <article data-narrate>
-  ${body.join("\n")}
+  ${groupSections(body)}
   </article>
 </div>
 
