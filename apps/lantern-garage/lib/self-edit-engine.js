@@ -475,6 +475,47 @@ function openDraftPr(repoRoot, branch, title, body) {
 
 // ── Test runner ─────────────────────────────────────────────────────────
 
+/**
+ * Strict command tokenizer: splits an allowlisted command into argv array
+ * without shell interpolation. Rejects any tokens containing whitespace or
+ * shell metacharacters to prevent injection.
+ */
+function tokenizeCommand(cmd) {
+  const tokens = [];
+  let current = "";
+  let inQuotes = false;
+  let quoteChar = null;
+
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (!inQuotes && (ch === '"' || ch === "'")) {
+      inQuotes = true;
+      quoteChar = ch;
+    } else if (inQuotes && ch === quoteChar) {
+      inQuotes = false;
+      quoteChar = null;
+    } else if (!inQuotes && /\s/.test(ch)) {
+      if (current) {
+        // Reject tokens with shell metacharacters
+        if (/[;&|`$()[\]{}\\<>!*?]/.test(current)) {
+          throw new Error(`shell_metacharacter_in_token: ${current}`);
+        }
+        tokens.push(current);
+        current = "";
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current) {
+    if (/[;&|`$()[\]{}\\<>!*?]/.test(current)) {
+      throw new Error(`shell_metacharacter_in_token: ${current}`);
+    }
+    tokens.push(current);
+  }
+  return tokens;
+}
+
 const ALLOWED_TESTS = [
   /^node tests\/test_dream_journal_api\.js$/,
   /^node tests\/test_dream_journal_chat\.js$/,
@@ -482,9 +523,9 @@ const ALLOWED_TESTS = [
   /^node tests\/test_dream_journal_keystone\.js$/,
   /^node tests\/test_dream_chat_self_edit\.js$/,
   /^node tests\/test_convergance_routing\.js$/,
-  /^python -m pytest tests\/(.+)\.py$/,
+  /^python -m pytest tests\/[\w./-]+\.py$/,
   /^npm test$/,
-  /^npm run test$/,
+  /^npm run [\w:-]+$/,
 ];
 
 function isAllowedTest(cmd) {
@@ -502,7 +543,19 @@ function runTests(repoRoot, testCommands, opts = {}) {
       continue;
     }
     try {
-      const out = execSync(cmd, { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024, env });
+      const argv = tokenizeCommand(cmd);
+      if (!argv.length) {
+        results.push({ cmd, ok: false, error: "empty_command", output: "" });
+        continue;
+      }
+      const out = execFileSync(argv[0], argv.slice(1), {
+        cwd: repoRoot,
+        encoding: "utf8",
+        timeout: 60000,
+        maxBuffer: 1024 * 1024,
+        env,
+        shell: false,
+      });
       results.push({ cmd, ok: true, output: out.slice(0, MAX_OUTPUT), truncated: out.length > MAX_OUTPUT });
     } catch (err) {
       results.push({
@@ -515,6 +568,45 @@ function runTests(repoRoot, testCommands, opts = {}) {
     }
   }
   return results;
+}
+
+// ── Unit tests for command injection prevention ──────────────────────────
+
+function testCommandInjectionPrevention() {
+  const testCases = [
+    // Valid commands should pass
+    { cmd: "npm test", shouldPass: true },
+    { cmd: "npm run build", shouldPass: true },
+    { cmd: "npm run test:unit", shouldPass: true },
+    { cmd: "python -m pytest tests/test_foo.py", shouldPass: true },
+    { cmd: "python -m pytest tests/subdir/test_bar.py", shouldPass: true },
+    { cmd: "node tests/test_dream_journal_api.js", shouldPass: true },
+    // Injection attempts should fail
+    { cmd: "npm run build && curl evil.com", shouldPass: false },
+    { cmd: "npm test; rm -rf /", shouldPass: false },
+    { cmd: "python -m pytest tests/test.py | cat /etc/passwd", shouldPass: false },
+    { cmd: "npm run $(whoami)", shouldPass: false },
+    { cmd: "npm run `id`", shouldPass: false },
+    { cmd: "npm run $(cat /etc/passwd)", shouldPass: false },
+    { cmd: "npm run test > /tmp/out", shouldPass: false },
+    { cmd: "npm run test < /etc/passwd", shouldPass: false },
+  ];
+
+  let passed = 0;
+  let failed = 0;
+
+  for (const { cmd, shouldPass } of testCases) {
+    const allowed = isAllowedTest(cmd);
+    if (allowed === shouldPass) {
+      passed++;
+    } else {
+      failed++;
+      console.error(`FAIL: "${cmd}" - expected ${shouldPass ? "allowed" : "rejected"}, got ${allowed ? "allowed" : "rejected"}`);
+    }
+  }
+
+  console.log(`Command injection tests: ${passed} passed, ${failed} failed`);
+  return failed === 0;
 }
 
 // ── LLM helper (non-streaming) ──────────────────────────────────────────

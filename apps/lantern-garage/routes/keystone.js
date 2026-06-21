@@ -8,7 +8,7 @@
  * presenting the OPERATOR_TOKEN header may invoke these. Commands are allowlisted; `node -e`
  * (arbitrary JS) is intentionally NOT allowed.
  */
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 const { isOperatorRequest } = require("../lib/request-auth");
 
 const MAX_OUTPUT = 4000;
@@ -22,39 +22,80 @@ const ALLOWED = [
   { match: /^git diff --stat$/, cmd: "git diff --stat" },
   { match: /^git log$/, cmd: "git log -n 20" },
   { match: /^git log --oneline$/, cmd: "git log --oneline -n 20" },
-  { match: /^git log --oneline -\d+$/, cmd: null }, // pass through
-  { match: /^git add (.+)$/, cmd: null },
-  { match: /^git commit -m "(.+)"$/, cmd: null },
-  { match: /^git push(.*)$/, cmd: null },
-  { match: /^git fetch (.+)$/, cmd: null },
-  { match: /^git merge (.+) --no-edit$/, cmd: null },
+  { match: /^git log --oneline -[\d]+$/, cmd: null }, // pass through
+  { match: /^git add ([\w./-]+)$/, cmd: null },
+  { match: /^git commit -m "([\w\s.,-]+)"$/, cmd: null },
+  { match: /^git push([\w\s./-]*)$/, cmd: null },
+  { match: /^git fetch ([\w./-]+)$/, cmd: null },
+  { match: /^git merge ([\w./-]+) --no-edit$/, cmd: null },
   { match: /^git branch$/, cmd: "git branch" },
   { match: /^git branch -a$/, cmd: "git branch -a" },
   { match: /^git stash list$/, cmd: "git stash list" },
-  { match: /^git stash push -m "(.+)"$/, cmd: null },
+  { match: /^git stash push -m "([\w\s.,-]+)"$/, cmd: null },
   { match: /^git stash pop$/, cmd: "git stash pop" },
-  { match: /^git pull(.*)$/, cmd: null },
+  { match: /^git pull([\w\s./-]*)$/, cmd: null },
   // Tests
   { match: /^npm test$/, cmd: "node tests/run-dream-journal-tests.js api chat multiturn keystone" },
   { match: /^node tests\/test_dream_journal_api\.js$/, cmd: null },
   { match: /^node tests\/test_dream_journal_chat\.js$/, cmd: null },
   { match: /^node tests\/test_dream_chat_multiturns\.js$/, cmd: null },
   { match: /^node tests\/test_dream_journal_keystone\.js$/, cmd: null },
-  { match: /^python -m pytest (.+)$/, cmd: null },
-  { match: /^npm run (.+)$/, cmd: null },
-  { match: /^node --check (.+)$/, cmd: null },
+  { match: /^python -m pytest ([\w./-]+)$/, cmd: null },
+  { match: /^npm run ([\w:-]+)$/, cmd: null },
+  { match: /^node --check ([\w./-]+)$/, cmd: null },
   // Orchestrator
   { match: /^python src\/convergence_io_engine\.py (health|inspect|loop)$/, cmd: null },
   // File reads (read-only)
-  { match: /^cat (.+\.json|.+\.md|.+\.js|.+\.py|.+\.txt)$/, cmd: null },
-  { match: /^head -\d+ (.+)$/, cmd: null },
+  { match: /^cat ([\w./-]+\.(json|md|js|py|txt))$/, cmd: null },
+  { match: /^head -[\d]+ ([\w./-]+)$/, cmd: null },
   // GitHub CLI
-  { match: /^gh pr list.*$/, cmd: null },
-  { match: /^gh pr create.*$/, cmd: null },
-  { match: /^gh pr view.*$/, cmd: null },
+  { match: /^gh pr list([\w\s./-]*)$/, cmd: null },
+  { match: /^gh pr create([\w\s./-]*)$/, cmd: null },
+  { match: /^gh pr view([\w\s./-]*)$/, cmd: null },
   // Curl (API testing)
-  { match: /^curl -s http:\/\/127\.0\.0\.1:4177\/.+$/, cmd: null },
+  { match: /^curl -s http:\/\/127\.0\.0\.1:4177\/[\w./-]+$/, cmd: null },
 ];
+
+/**
+ * Strict command tokenizer: splits an allowlisted command into argv array
+ * without shell interpolation. Rejects any tokens containing whitespace or
+ * shell metacharacters to prevent injection.
+ */
+function tokenizeCommand(cmd) {
+  const tokens = [];
+  let current = "";
+  let inQuotes = false;
+  let quoteChar = null;
+
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (!inQuotes && (ch === '"' || ch === "'")) {
+      inQuotes = true;
+      quoteChar = ch;
+    } else if (inQuotes && ch === quoteChar) {
+      inQuotes = false;
+      quoteChar = null;
+    } else if (!inQuotes && /\s/.test(ch)) {
+      if (current) {
+        // Reject tokens with shell metacharacters
+        if (/[;&|`$()[\]{}\\<>!*?]/.test(current)) {
+          throw new Error(`shell_metacharacter_in_token: ${current}`);
+        }
+        tokens.push(current);
+        current = "";
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current) {
+    if (/[;&|`$()[\]{}\\<>!*?]/.test(current)) {
+      throw new Error(`shell_metacharacter_in_token: ${current}`);
+    }
+    tokens.push(current);
+  }
+  return tokens;
+}
 
 function resolveCommand(command) {
   for (const a of ALLOWED) {
