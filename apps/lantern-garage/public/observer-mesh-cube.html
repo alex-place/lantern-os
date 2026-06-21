@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Observer Mesh Cube — ORION v1.0</title>
+<title>Local AI Console — Keystone OS</title>
+<link rel="stylesheet" href="/css/site.css">
 <link rel="stylesheet" href="css/dream-chat.css">
 <style>
   html, body { overflow: auto !important; height: auto !important; min-height: 100dvh; }
@@ -135,133 +136,190 @@
 </style>
 </head>
 <body>
-<div class="app">
 
-  <header>
-    <a class="back-link" href="/" title="Home">←</a>
-    <div class="agent-avatar">⬡</div>
-    <div style="flex:1">
-      <div style="font-size:15px;font-weight:600;line-height:1.2">Observer Mesh Cube</div>
-      <div id="status-line" style="font-size:11px;color:var(--muted)">ORION v1.0 — initializing…</div>
-    </div>
-    <button onclick="refreshAll()" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit" title="Refresh">⟳</button>
-    <button id="theme-toggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit">🌙</button>
-  </header>
+<!-- ── Shared site header (matches index.html / dream-chat.html) ── -->
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">Keystone OS</span>
+  </a>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep" style="margin: 0 4px;">·</span>
+    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="refresh-btn" onclick="refreshAll()" title="Re-check local AI" aria-label="Re-check local AI">⟳</button>
+    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
+    <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
+  </div>
+</nav>
+
+<main id="main-content" style="flex:1">
+
+  <!-- Local-AI status strip -->
+  <div style="max-width:900px;margin:10px auto 0;padding:0 16px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)">
+    <span class="dot online" id="status-dot" style="width:8px;height:8px;border-radius:50%;background:#34d399;display:inline-block"></span>
+    <span style="font-weight:600;color:var(--text)">Local AI Console</span>
+    <span class="sep">·</span>
+    <span id="status-line">Checking your local AI…</span>
+  </div>
 
   <div class="cube-grid">
 
-    <!-- 3D Mesh Canvas -->
+    <!-- What is this? -->
     <div class="panel full">
-      <div class="panel-title">Kesseract Wavefront</div>
-      <canvas id="cube3d"></canvas>
+      <div class="panel-title">What is this?</div>
+      <p style="font-size:13px;line-height:1.6;color:var(--text);margin:0 0 8px">
+        This page lets you chat with an AI model that runs <strong>on this computer</strong>
+        — not in the cloud. You type a question or a thought below, it gets sent to your
+        local model (called the <em>Σ₀ Ouro coder</em>), and the answer comes back here.
+        Nothing you type leaves your machine while the local model is running.
+      </p>
+      <p style="font-size:13px;line-height:1.6;color:var(--muted);margin:0">
+        The spinning cube and the dials are just a live picture of the model working —
+        the cube glows brighter and the “thinking depth” rises when you turn up Focus.
+        If your local model is switched off, the page quietly falls back to a cloud model
+        and tells you so.
+      </p>
     </div>
 
-    <!-- Observer State -->
+    <!-- 3D Mesh Canvas -->
+    <div class="panel full">
+      <div class="panel-title">Live view</div>
+      <canvas id="cube3d"></canvas>
+      <div style="margin-top:6px;font-size:11px;color:var(--muted)">A visual of the model at work — spins faster and brighter as it engages.</div>
+    </div>
+
+    <!-- Your session (Focus + thinking depth + last question) -->
     <div class="panel">
-      <div class="panel-title">Human Observer</div>
+      <div class="panel-title">Your session</div>
       <div class="metric-row">
         <span class="metric-label">Focus</span>
         <span class="metric-value cyan" id="val-focus">0.82</span>
       </div>
       <div class="bar-track"><div class="bar-fill" id="bar-focus" style="width:82%;background:#22d3ee"></div></div>
       <div class="metric-row" style="margin-top:8px">
-        <span class="metric-label">Emotion</span>
+        <span class="metric-label">Energy</span>
         <span class="metric-value purple" id="val-emotion">0.00</span>
       </div>
       <div class="bar-track"><div class="bar-fill" id="bar-emotion" style="width:0%;background:#a78bfa"></div></div>
-      <div class="metric-row" style="margin-top:8px">
-        <span class="metric-label">Intent</span>
-        <span class="metric-value" id="val-intent" style="color:var(--muted);font-size:11px;max-width:160px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
-      </div>
-    </div>
 
-    <!-- Time Dilation -->
-    <div class="panel">
-      <div class="panel-title">Time Dilation</div>
+      <div style="margin-top:14px;font-size:11px;color:var(--muted)">Thinking depth — higher Focus means the model thinks longer before it answers.</div>
       <div class="metric-row">
-        <span class="metric-label">Internal ×</span>
+        <span class="metric-label">Thinking</span>
         <span class="metric-value amber" id="val-internal">8.0</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">External ×</span>
+        <span class="metric-label">Real time</span>
         <span class="metric-value" id="val-external">1.00</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Ratio</span>
+        <span class="metric-label">Depth ratio</span>
         <span class="metric-value green" id="val-ratio">8.00</span>
       </div>
       <div class="bar-track" style="margin-top:8px">
         <div class="bar-fill" id="bar-ratio" style="width:40%;background:#34d399"></div>
       </div>
+
+      <div class="metric-row" style="margin-top:12px">
+        <span class="metric-label">Last question</span>
+        <span class="metric-value" id="val-intent" style="color:var(--muted);font-size:11px;max-width:160px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      </div>
     </div>
 
-    <!-- Wavefront -->
+    <!-- Model & topic (kernel status + conversation state) -->
     <div class="panel">
-      <div class="panel-title">Wavefront Slice</div>
+      <div class="panel-title">Model &amp; topic</div>
       <div class="metric-row">
-        <span class="metric-label">Center</span>
-        <span class="metric-value cyan" id="val-center">lantern_core</span>
+        <span class="metric-label">Model</span>
+        <span class="metric-value cyan" id="val-kernel-model">ouro:latest</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:6px">Online</div>
+      <div class="chip-row" id="pcsf-healthy"><span class="chip" style="color:var(--muted)">checking…</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:6px">Offline</div>
+      <div class="chip-row" id="pcsf-degraded"><span class="chip" style="color:var(--muted)">none</span></div>
+      <div class="metric-row" style="margin-top:10px">
+        <span class="metric-label">Answered by</span>
+        <span class="metric-value purple" id="val-dcf">—</span>
+      </div>
+
+      <div style="margin-top:14px;font-size:11px;color:var(--muted)">Conversation</div>
+      <div class="metric-row">
+        <span class="metric-label">Focused on</span>
+        <span class="metric-value cyan" id="val-center">your local AI</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Radius</span>
+        <span class="metric-label">Context size</span>
         <span class="metric-value" id="val-radius">512</span>
       </div>
       <div class="metric-row">
-        <span class="metric-label">Strength</span>
+        <span class="metric-label">Signal</span>
         <span class="metric-value green" id="val-strength">0.68</span>
       </div>
       <div class="bar-track">
         <div class="bar-fill" id="bar-strength" style="width:68%;background:#34d399"></div>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Key symbols</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted)">Recent themes</div>
       <div class="chip-row" id="symbols-row">
-        <span class="chip healthy">birds_and_bees</span>
+        <span class="chip healthy">getting started</span>
       </div>
     </div>
 
-    <!-- PCSF State -->
-    <div class="panel">
-      <div class="panel-title">PCSF State</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Healthy</div>
-      <div class="chip-row" id="pcsf-healthy"><span class="chip healthy">ollama</span></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:6px">Degraded</div>
-      <div class="chip-row" id="pcsf-degraded"><span class="chip" style="color:var(--muted)">none</span></div>
-      <div class="metric-row" style="margin-top:10px">
-        <span class="metric-label">DCF Label</span>
-        <span class="metric-value purple" id="val-dcf">Symbolic</span>
-      </div>
-    </div>
-
-    <!-- Intent Input -->
+    <!-- Ask the model -->
     <div class="panel full">
-      <div class="panel-title">Process Intent</div>
-      <input class="intent-input" id="intent-input" type="text" placeholder="Enter symbolic intent…" onkeydown="if(event.key==='Enter')processIntent()">
+      <div class="panel-title">Ask the model</div>
+      <input class="intent-input" id="intent-input" type="text" placeholder="Type a question or a thought, then press Enter…" onkeydown="if(event.key==='Enter')processIntent()">
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-        <label style="font-size:12px;color:var(--muted)">Focus</label>
+        <label style="font-size:12px;color:var(--muted)">Focus (how hard it thinks)</label>
         <input type="range" id="focus-slider" min="0" max="100" value="82" style="flex:1" oninput="document.getElementById('focus-display').textContent=(this.value/100).toFixed(2)">
         <span id="focus-display" style="font-size:12px;color:var(--accent);font-variant-numeric:tabular-nums;min-width:30px">0.82</span>
       </div>
-      <button class="submit-btn" onclick="processIntent()">Process →</button>
+      <button class="submit-btn" onclick="processIntent()">Ask →</button>
       <div id="response-bubble"></div>
     </div>
 
-    <!-- Packet Log -->
+    <!-- History -->
     <div class="panel full">
-      <div class="panel-title">Packet Log</div>
+      <div class="panel-title">History</div>
       <div id="packet-log" style="max-height:180px;overflow-y:auto"></div>
     </div>
 
   </div>
-</div>
+</main>
+
+<!-- ── Shared site footer (matches index.html) ── -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-brand">
+      <span class="dot online" id="footer-status-dot" title="Server status"></span>
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
+    </span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+</footer>
 
 <script>
 // ── State ────────────────────────────────────────────────────────────
 let state = {
   focus: 0.82, emotion: 0.0, intent: "",
   internal: 8.0, external: 1.0,
-  center: "lantern_core", radius: 512, strength: 0.68,
-  symbols: ["birds_and_bees"],
-  healthy: ["ollama"], degraded: [], dcf: "Symbolic",
+  center: "your local AI", radius: 512, strength: 0.68,
+  symbols: ["getting started"],
+  healthy: [], degraded: [], dcf: "—",
 };
 let t0 = Date.now();
 
@@ -346,7 +404,7 @@ function drawMesh(t) {
 
   // Labels
   ctx.font = "bold 10px system-ui"; ctx.fillStyle = "rgba(167,139,250,0.6)";
-  ctx.textAlign = "left"; ctx.fillText("ORION v1.0", 10, 18);
+  ctx.textAlign = "left"; ctx.fillText("LOCAL AI", 10, 18);
   ctx.textAlign = "right";
   ctx.fillStyle = "rgba(52,211,153,0.6)";
   ctx.fillText(`Δ ${state.internal.toFixed(1)}/${state.external.toFixed(2)}`, W - 10, 18);
@@ -410,23 +468,33 @@ async function processIntent() {
     strength: Math.min(1.0, state.strength + 0.05),
   });
 
-  // Try server endpoint
-  let reply = `[${focus > 0.7 ? "resonant" : "searching"}] Intent received: '${intent}'. Wavefront expanding from ${state.center}.`;
+  // Route the symbolic intent through the Σ₀ Ouro coder kernel. `provider: "sigma0"`
+  // makes the server use the keystone-sigma0 persona + ouro:latest on :11434
+  // (see lib/dream-chat.js); it fails over to the cloud chain only if the local
+  // kernel is unreachable, and reports which source actually answered.
+  let reply = `Couldn't reach a model just now. Your question ("${intent}") wasn't answered — try again in a moment.`;
+  let source = "offline";
   try {
     const r = await fetch("/api/dream/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: intent, agent: "lantern", provider: "" }),
+      body: JSON.stringify({ message: intent, provider: "sigma0" }),
     });
     if (r.ok) {
       const d = await r.json();
       if (d.reply) reply = d.reply;
+      source = d.provider || d.source || (d.online ? "kernel" : "offline");
     }
   } catch { /* offline fallback text used */ }
+
+  // Reflect whether the local Σ₀ kernel answered or the cloud chain took over.
+  const local = /sigma0|ouro|local|ollama/i.test(source);
+  applyState({ dcf: local ? "This computer" : (source === "offline" ? "Nothing (offline)" : "Cloud backup") });
 
   const bubble = document.getElementById("response-bubble");
   bubble.style.display = "block";
   bubble.textContent = reply;
+  bubble.style.borderColor = local ? "rgba(52,211,153,0.4)" : "rgba(245,166,35,0.4)";
 
   addLog(intent, ratio);
 
@@ -453,19 +521,42 @@ function addLog(intent, ratio) {
   while (log.children.length > 20) log.removeChild(log.lastChild);
 }
 
-function refreshAll() {
-  fetch("/api/health").then(r => r.json()).then(d => {
-    document.getElementById("status-line").textContent =
-      d.ok ? "ORION v1.0 — server connected" : "ORION v1.0 — offline mode";
-  }).catch(() => {
-    document.getElementById("status-line").textContent = "ORION v1.0 — offline mode";
-  });
+// Probe the Σ₀ Ouro coder kernel. /api/dream/lantern-models pings the local
+// Ollama-compatible server on :11434 (where ouro_serve.py serves ouro:latest);
+// a response without an `error` field means the kernel endpoint is reachable.
+async function refreshAll() {
+  const statusEl = document.getElementById("status-line");
+  const modelEl = document.getElementById("val-kernel-model");
+  const dot = document.getElementById("status-dot");
+  const setDot = (color) => { if (dot) dot.style.background = color; };
+  try {
+    const r = await fetch("/api/dream/lantern-models");
+    const d = await r.json();
+    const reachable = !d.error;
+    setDot(reachable ? "#34d399" : "#f5a623");
+    if (reachable) {
+      statusEl.textContent = "Your local AI is running on this computer";
+      modelEl.textContent = "ouro:latest";
+      applyState({ healthy: ["this computer"], degraded: [] });
+    } else {
+      statusEl.textContent = "Local AI is off — using cloud backup";
+      modelEl.textContent = "ouro:latest (off)";
+      applyState({ healthy: ["cloud backup"], degraded: ["this computer"] });
+    }
+  } catch {
+    setDot("#f87171");
+    statusEl.textContent = "Can't reach the server right now";
+    modelEl.textContent = "ouro:latest (offline)";
+    applyState({ healthy: [], degraded: ["this computer"] });
+  }
 }
 
 // Init
 refreshAll();
 </script>
 <script src="js/theme-toggle.js"></script>
+<script src="/js/mandala-clock.js?v=20260621-clock3" defer></script>
+<script src="/js/update-checker.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
