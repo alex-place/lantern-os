@@ -15,10 +15,18 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.7.1] - 2026-06-21
+## [1.7.2] - 2026-06-21
 
 ### Fixed
 - **Auth gate: home page no longer bounces guests to `/auth.html`.** `public/js/auth-gate.js` already honors the server's `authRequired` signal (so disabling the `patreon_auth` flag opens the site), but its client-side `PUBLIC` allow-list was missing `/` and `/index.html` — which **are** served publicly by `routes/pages.js` `PUBLIC_PAGES`. The mismatch meant a guest landing on the home page got redirected to `/auth.html?returnTo=%2F` whenever the gate was on. Added both paths so the two lists stay in lock-step. Also made the `/api/auth/session` fetch-failure path **fail open** (no client redirect on a transient error) — the server remains authoritative and issues its own 302 for genuinely protected pages, so the client bounce was redundant and harmful while the login flow is being disabled. Client-only change; no behavior change for authenticated users or protected routes.
+
+## [1.7.1] - 2026-06-21
+
+### Fixed
+- **Repo hygiene: broken launcher, dead paths, machine-wide `make stop` (#907, #906, #902).** Three independent housekeeping bugs that survived earlier partial fixes:
+  - `scripts/OneButton-SuperJarvisLaunch.ps1` shipped on `master` with committed git conflict markers (`<<<<<<< HEAD` … `>>>>>>> pr-340`) wrapping the *entire* file, so it would not parse — the launcher was simply broken. The two conflict sides were byte-identical, so resolution is a no-op merge: strip the markers and keep one clean copy (now parses via `[Parser]::ParseFile`). (#907)
+  - `scripts/_write_index.py` hardcoded a dead OneDrive output path; `scripts/extract-session-pairs.py` hardcoded the dead `C--Users-alexp-OneDrive-…` Claude-project slug. Both now derive their paths from `__file__`/`REPO_ROOT` (the slug is computed from the repo's absolute path the way Claude Code names its transcript dir), with a `CLAUDE_SESSIONS_DIR` env override. Companion fix to the already-landed `rebuild_index.py` portability fix. (#906)
+  - `make stop-services` ran `Get-Process node,ollama | Stop-Process -Force`, killing **every** Node/Ollama process on the machine. It is now port-scoped (4177/4178/11434) via `Get-NetTCPConnection … OwningProcess`, mirroring `Start-DualServers.ps1`, and a `make stop` alias was added. (#902)
 
 ## [1.7.0] - 2026-06-21
 

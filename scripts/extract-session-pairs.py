@@ -18,7 +18,15 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = Path.home() / ".claude" / "projects" / "C--Users-alexp-OneDrive-Documents-GitHub-lantern-os"
+# Claude Code's per-project transcript dir is named after the repo's absolute
+# path with the drive-colon and every path separator replaced by '-'
+# (e.g. C:\dev\lantern-os -> C--dev-lantern-os). Derive it from REPO_ROOT so
+# this works on any machine/checkout; allow an explicit override via env var.
+_slug = str(REPO_ROOT).replace(":", "-").replace("\\", "-").replace("/", "-")
+SESSIONS_DIR = Path(
+    os.environ.get("CLAUDE_SESSIONS_DIR")
+    or Path.home() / ".claude" / "projects" / _slug
+)
 DEFAULT_OUT = REPO_ROOT / "data" / "training" / "haiku-ft-pairs.jsonl"
 
 SYSTEM_PROMPT = """You are an expert engineering assistant deeply familiar with the Lantern OS codebase — a local-first OS cockpit built by a solo developer (Alex Place).

@@ -42,5 +42,7 @@ quickstart-no-browser:
 dev:
 	npm run dev --prefix apps/lantern-garage
 
+stop: stop-services
+
 stop-services:
-	pwsh -NoProfile -Command "Get-Process node,ollama -ErrorAction SilentlyContinue | Stop-Process -Force"
+	pwsh -NoProfile -Command "foreach ($$p in 4177,4178,11434) { Get-NetTCPConnection -LocalPort $$p -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $$_ -Force -ErrorAction SilentlyContinue } }"
