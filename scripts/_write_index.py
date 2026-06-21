@@ -197,7 +197,9 @@ setInterval(loadStats,10000);
 </html>
 '''
 
-out = 'c:/Users/alexp/OneDrive/Documents/GitHub/lantern-os/apps/lantern-garage/public/index.html'
+out = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', 'apps', 'lantern-garage', 'public', 'index.html'))
 with open(out, 'w', encoding='utf-8') as f:
     f.write(HTML_HEAD + JS)
 print('Wrote', out, len(HTML_HEAD)+len(JS), 'bytes')

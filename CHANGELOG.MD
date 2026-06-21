@@ -20,6 +20,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 ### Changed
 - **Deprecation clarity: old CSF references are now unmistakable (code + docs).** Marked every retired / non-canonical CSF surface so it can't be confused with the canonical CSF-Pack + CSF-Omni (`csf` / `csf_pack` / `omni`): `src/csf/base3.py` and `src/csf/delta_stream.py` (the dead v0.3 symbolic delta-stream — banner: ⚠️ deprecated, *not* the CSF format); `src/csf/v07/csf_file.py` (re-headed from "CSF v0.6 File Format" → the v0.6/0.7 lattice **container** behind the Status-Cube store, *not* the compression format); `src/csf/v07/symbolic_dictionary.py` (reframed as a lossless lattice token table, *not* a compressor — dropped the "massive head-start … beats generic compressors" lossy-fiction claim); `src/csf/status_cube.py` (clarified it persists via the v0.7 lattice container, not canonical compression). Docs: `docs/ALEX-ASI-ARCHITECTURE.md` dropped a dangling reference to the deleted lossy `csf_symbolic_compressor.py`. Each banner points to the canonical core for real compression and to `csf.v07` as the 3¹² lattice *storage face*. Docstring-only — no functional change; 158 CSF tests pass.
 
+## [1.7.1] - 2026-06-21
+
+### Fixed
+- **Repo hygiene: broken launcher, dead paths, machine-wide `make stop` (#907, #906, #902).** Three independent housekeeping bugs that survived earlier partial fixes:
+  - `scripts/OneButton-SuperJarvisLaunch.ps1` shipped on `master` with committed git conflict markers (`<<<<<<< HEAD` … `>>>>>>> pr-340`) wrapping the *entire* file, so it would not parse — the launcher was simply broken. The two conflict sides were byte-identical, so resolution is a no-op merge: strip the markers and keep one clean copy (now parses via `[Parser]::ParseFile`). (#907)
+  - `scripts/_write_index.py` hardcoded a dead OneDrive output path; `scripts/extract-session-pairs.py` hardcoded the dead `C--Users-alexp-OneDrive-…` Claude-project slug. Both now derive their paths from `__file__`/`REPO_ROOT` (the slug is computed from the repo's absolute path the way Claude Code names its transcript dir), with a `CLAUDE_SESSIONS_DIR` env override. Companion fix to the already-landed `rebuild_index.py` portability fix. (#906)
+  - `make stop-services` ran `Get-Process node,ollama | Stop-Process -Force`, killing **every** Node/Ollama process on the machine. It is now port-scoped (4177/4178/11434) via `Get-NetTCPConnection … OwningProcess`, mirroring `Start-DualServers.ps1`, and a `make stop` alias was added. (#902)
+
 ## [1.7.0] - 2026-06-21
 
 ### Changed
