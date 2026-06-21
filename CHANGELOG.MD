@@ -15,6 +15,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.10] - 2026-06-21
+
+### Fixed
+- **Σ₀ native Q-exit decode was O(N^2).** `Sigma0LoopLM.generate` re-encoded the full growing sequence with `use_cache=False` every token (~1 s/token; 170-280 s coding outliers). Wired the model's native `UniversalTransformerCache` for incremental **O(N)** decode; `OURO_LOOP_CACHE=0` restores the legacy path. No quality change.
+
+### Added
+- **Forward-truncation (experimental, `OURO_LOOP_TRUNCATE=1`)** -- breaks the recurrent loop on Q-exit (adaptive depth as a speed win). Finding: mutually exclusive with the cross-token KV cache -> forces no-cache/O(N^2); a win for short outputs, while the cache fix wins for long. Parity-checked via `bench_ouro_loop.py --truncate`.
+- `scripts/bench_ouro_loop.py` (cache + depth + truncation-parity harness) and `docs/research/2026-06-21-sigma0-serving-perf.md` (debug/research/upgrade writeup).
+
 ## [1.7.9] - 2026-06-21
 
 ### Added
