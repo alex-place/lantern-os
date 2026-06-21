@@ -238,50 +238,6 @@
       text-align: center;
     }
 
-    .status-timeline {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 12px;
-      margin: 24px 0;
-    }
-
-    .status-step {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px;
-      text-align: center;
-      transition: all 0.2s;
-    }
-
-    .status-step.active {
-      border-color: var(--accent);
-      background: rgba(124, 106, 247, 0.1);
-    }
-
-    .status-step.completed {
-      border-color: var(--green);
-      background: rgba(76, 175, 130, 0.1);
-    }
-
-    .status-step-number {
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 4px;
-    }
-
-    .status-step.completed .status-step-number {
-      color: var(--green);
-    }
-
-    .status-step-label {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 600;
-    }
 
     .artifacts-grid {
       display: grid;
@@ -607,10 +563,6 @@
         grid-template-columns: 1fr;
       }
 
-      .status-timeline {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
       .artifacts-grid {
         grid-template-columns: 1fr;
       }
@@ -681,29 +633,6 @@
 
   <!-- Overview Tab -->
   <div id="overview" class="tab-panel active">
-    <!-- Status Timeline (Phase 10) -->
-    <div style="margin-bottom: 32px;">
-      <h3 style="margin: 0 0 16px; font-size: 1rem;">Processing Status</h3>
-      <div class="status-timeline" id="status-timeline">
-        <div class="status-step completed">
-          <div class="status-step-number">✓</div>
-          <div class="status-step-label">Uploaded</div>
-        </div>
-        <div class="status-step">
-          <div class="status-step-number">2</div>
-          <div class="status-step-label">Analyzing</div>
-        </div>
-        <div class="status-step">
-          <div class="status-step-number">3</div>
-          <div class="status-step-label">Generating</div>
-        </div>
-        <div class="status-step">
-          <div class="status-step-number">✓</div>
-          <div class="status-step-label">Complete</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Workspace Actions — re-run any stage on the STORED project, after any refresh -->
     <div style="margin-bottom: 28px;">
       <h3 style="margin: 0 0 12px; font-size: 1rem;">Workspace Actions</h3>
@@ -958,9 +887,6 @@ async function loadEntry() {
     document.getElementById("metadata-created").textContent = formattedCreated;
     document.getElementById("metadata-updated").textContent = formattedCreated;
 
-    // Update status timeline (Phase 10)
-    updateStatusTimeline(entry.status);
-
     // Load video players (Phase 7-8)
     loadVideoPlayers(entry);
 
@@ -1038,35 +964,6 @@ function formatDateTime(date) {
 }
 
 // Phase 10: Update status timeline based on current status
-function updateStatusTimeline(status) {
-  const timeline = document.getElementById('status-timeline');
-  const steps = timeline.querySelectorAll('.status-step');
-
-  // Map statuses to step indices
-  const statusMap = {
-    'uploaded': 0,
-    'analyzing': 1,
-    'generating': 2,
-    'ready': 3,
-    'failed': -1
-  };
-
-  const currentStep = statusMap[status] ?? 0;
-
-  steps.forEach((step, index) => {
-    step.classList.remove('active', 'completed');
-
-    if (currentStep === -1) {
-      // Failed state
-      step.style.opacity = '0.5';
-    } else if (index < currentStep) {
-      step.classList.add('completed');
-    } else if (index === currentStep) {
-      step.classList.add('active');
-    }
-  });
-}
-
 // Phase 9: Load and display artifacts
 function loadArtifacts(entry) {
   const artifactsGrid = document.getElementById('artifacts-grid');
