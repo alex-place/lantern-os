@@ -411,6 +411,61 @@
           </div>
         </div>
 
+        <!-- Convergence IO stack -->
+        <div class="section">
+          <div class="section-head">
+            <div class="label">Convergence IO stack</div>
+            <h2>The typed governance &amp; routing primitives</h2>
+            <p>The small, independently-tested building blocks that route every action through a
+               constraint-satisfying graph with provenance. Each maps to a numbered governance
+               principle (P1–P10). <strong>Implemented &amp; unit-tested</strong>; the live chat path
+               consumes a parallel JS adapter, so treat these as the design + tested contract.
+               Start with the <a href="/repo/docs/convergence-io/README.md">stack overview</a>.</p>
+          </div>
+          <div class="link-grid">
+            <a class="link-card" href="/repo/docs/convergence-io/README.md" style="border-color:var(--accent)">
+              <span class="icon">🧩</span>
+              <h3>Stack overview <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The index: how all seven primitives fit together, the P1–P10 principle map, the gate order, and an honest status for each.</span></span></h3>
+              <p>Index + how they compose — the P1–P10 map, the gate order (classify → deny → prove → route → record), and per-file status.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/DCF.md">
+              <span class="icon">🏷️</span>
+              <h3>DCF — Data Classification <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Every piece of data carries a class label (e.g. personal, identity), and the label sticks even through summaries — a summary of a sensitive record is still sensitive.</span></span></h3>
+              <p>P1 — every datum carries a class label; labels propagate through transformations. Gates CCF.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/NAP.md">
+              <span class="icon">⛔</span>
+              <h3>NAP — Negative Authority <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A hard "must not" list. Unlike a permission, a denial here can't be overridden by claiming you're capable — it's an enforcement boundary.</span></span></h3>
+              <p>P2 (denial form) — what agents are explicitly denied; hard denials can't be overridden by a capability claim.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/AAPF.md">
+              <span class="icon">🧾</span>
+              <h3>AAPF — Action Provenance <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A tamper-evident audit trail: every action leaves a record tying the result to who did it, with enough detail to reproduce the decision.</span></span></h3>
+              <p>P3 — every action emits a reproducible, hashed record into an append-only ledger.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/PCSF.md">
+              <span class="icon">🔌</span>
+              <h3>PCSF — Provider Capacity <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Tracks which AI providers are up, slow, or out of quota, and routes around failures: Claude → OpenAI → Gemini → Ollama → offline.</span></span></h3>
+              <p>P4 — provider availability, fallback chain, circuit breakers, and per-tier quota.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/CCF.md">
+              <span class="icon">✅</span>
+              <h3>CCF — Capability Claim <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">An agent has to prove it can actually do a thing at the moment it acts — no claiming abilities it can't back up. Tracks an "honesty score" over time.</span></span></h3>
+              <p>P4 — an agent must prove a claimed capability at action time; honesty floor enforced.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/CEG.md">
+              <span class="icon">🕸️</span>
+              <h3>CEG — Execution Graph <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The typed graph every request becomes: nodes for the goal, the tools, the rules, the memory, and the audit trail — all the other primitives plug into it.</span></span></h3>
+              <p>The substrate — <code>G=(V,E,D,τ,S,H)</code>: typed nodes + edges, an optimizer that returns a constraint-satisfying plan, four enforced invariants.</p>
+            </a>
+            <a class="link-card" href="/repo/docs/convergence-io/DILATION.md">
+              <span class="icon">⏳</span>
+              <h3>D — Time-Dilation Field <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Spend more time where the system is uncertain, less where it's confident — like gravitational time dilation, but for compute and grounding effort.</span></span></h3>
+              <p>CEG's <code>D</code> — slows uncertain regions, speeds confident ones; maps to how much grounding to buy. The live <code>grounding-policy.js</code> mirrors it.</p>
+            </a>
+          </div>
+        </div>
+
       </div>
     </details>
   </section>
@@ -512,11 +567,6 @@
         <span class="icon">♻️</span>
         <h3>Σ₀ Continual-Training Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The machinery that lets the local coding model improve from its own verified work: write code → run it to prove it works → train on the winners → keep the new model only if it scores higher on a coding exam.</span></span></h3>
         <p>The closed flywheel — harvest → execution-verify → train → eval → eval-gated promote. Two ground-truth gates (only green subprocesses train; only a measured pass@1 win promotes), kept offline by design.</p>
-      </a>
-      <a class="link-card" href="/repo/docs/SIGMA0-CODER-CLAUDE-CODE-STATUS.md">
-        <span class="icon">🔌</span>
-        <h3>Σ₀ Coder in Claude Code <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Honest status of using the local coding model to drive Claude Code as a tool-using agent: the bridge that connects them, what works, and why the small model isn't reliable enough yet.</span></span></h3>
-        <p>Integration status — the Anthropic↔Ollama bridge, the tool-aware chat + agent loop (shipped), the FC-retrained adapter that learned the trigger, and the honest blocker (1.4B reliability vs Claude Code's ~20k-token prompt). Links the retraining + dev-box guides.</p>
       </a>
       <a class="link-card" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md" style="border-color:var(--accent)">
         <span class="icon">📊</span>
@@ -625,12 +675,12 @@
 </footer>
 
 <script src="/js/theme-toggle.js"></script>
-<script src="/vendor/pdfjs/pdf.min.js"></script><!-- #861: vendored pdfjs-dist@3.11.174 local-first (was unpkg CDN) -->
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
 (function () {
   if (typeof pdfjsLib === 'undefined') return;
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    '/vendor/pdfjs/pdf.worker.min.js'; /* #861: vendored local-first (was unpkg CDN) */
+    'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
   let allCards = [];
 
