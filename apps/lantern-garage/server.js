@@ -141,6 +141,7 @@ const routes = [
   require("./routes/dream"),
   require("./routes/dreams"),
   require("./routes/keystone"),
+  require("./routes/rollover"), // #898: Keystone-vs-Claude landed-work share
   require("./routes/image"),
   require("./routes/web-images"),
   require("./routes/youtube"),

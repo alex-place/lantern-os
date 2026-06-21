@@ -181,6 +181,22 @@ function runTool(name, input, ctx = {}) {
   }
 }
 
+// ── native Anthropic tool schemas (same single source of truth as the preamble) ──
+// Renders the registry as `tools` for the Messages API. Cloud models (Haiku/Sonnet)
+// emit native `tool_use` blocks, so they don't need the free-text preamble — they get
+// the exact same name + input_schema. When !operator, advertise ONLY read-policy tools
+// so the model never emits a shell/mutating call the policy would reject (runTool still
+// enforces the policy regardless — this just keeps the advertised surface honest).
+function anthropicTools({ operator = false } = {}) {
+  return TOOL_NAMES
+    .filter((name) => operator || REGISTRY[name].policy === "read")
+    .map((name) => ({
+      name,
+      description: REGISTRY[name].desc,
+      input_schema: REGISTRY[name].schema,
+    }));
+}
+
 // ── parse the model's free-text <tool_call> (light JSON repair; not a vocab hack) ──
 function parseToolCall(text) {
   if (!text || typeof text !== "string") return null;
@@ -227,4 +243,4 @@ function _loadsLenient(raw) {
   return null;
 }
 
-module.exports = { parseToolCall, runTool, renderToolPreamble, REGISTRY, TOOL_NAMES };
+module.exports = { parseToolCall, runTool, renderToolPreamble, anthropicTools, REGISTRY, TOOL_NAMES };
