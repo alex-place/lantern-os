@@ -15,10 +15,26 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.7.7] - 2026-06-21
+## [1.7.9] - 2026-06-21
 
 ### Added
 - **Σ₀ serving-architecture decision package** (docs only). Peer-reviewed staff **portfolio update** (`docs/SIGMA0-AGENT-PORTFOLIO-UPDATE.md`) + **stakeholder deck** (`docs/decks/2026-06-21-sigma0-agent-stakeholder-deck.md`) recommending a **cloud-transformers floor now -> embedded ONNX/DirectML target via a gated spike**, behind one swappable client contract. Backed by **web-grounded validation** (`docs/research/2026-06-21-sigma0-serving-validation.md`: 8 option findings + 10 adversarial verdicts -- e.g. vLLM serves the Ouro loop but pins fixed R4 / drops adaptive Q-exit, conf 0.97; ONNX `Loop` expresses adaptive depth, conf 0.97; no official vLLM Windows build), a **3-lens peer-review record** (`docs/research/2026-06-21-sigma0-peer-review.md`), and the **ONNX/DirectML export spike scope + GO/NO-GO gate** (`docs/research/2026-06-21-sigma0-onnx-directml-spike.md`). No code/runtime change.
+## [1.7.8] - 2026-06-21
+
+### Fixed
+- **Autowork/fleet: stop reporting false verification evidence and ground the preflight on the landed state (#933, #942, #896).** Three defects that let the autonomous fleet mark unverified or no-op work as a proven success:
+  - **#933 — false convergence evidence.** `routes/convergence-dispatch.js` recorded `Patch applied: ${stats.filesModified || 0} files modified` against a field `applyPatch` never returns, so every record claimed **0 files**; it printed `Tests: PASSED` and awarded `testsPassed: 0.9` for runs with **zero tests**; and it baked a `[unverified]` marker into the commit/PR **title** on top of the issue's own conventional prefix (e.g. `[unverified] fix: chore(cleanup): …`). Now the evidence reports the real `changedFiles.length`, a no-test run reads `Tests: none run` with `testsPassed: 0.0` (and `act`/`overall` no longer earn test credit), and the title is cleaned (existing prefix stripped, verification state moved to the receipt + PR body).
+  - **#942 — preflight & worktree base used the local checkout, not the serving state.** `lib/self-edit-engine.js` `detectAlreadyImplemented()` grepped/logged against `HEAD` (a possibly-stale feature branch); `src/worktree-manager.js` cut new worktrees from local `master`. Both now best-effort `git fetch origin master` and operate on `origin/master` (falling back to local if the remote-tracking ref is absent), so the preflight sees already-landed fixes and new work branches from the real base. Includes a fix to the citation parser, which a tree-ref grep prefix (`origin/master:…`) would otherwise have broken.
+  - **#896 — inconclusive tests counted as success.** `src/agent-worker-loop.js` `runTests()` defaulted `passed:true` and treated "no tests collected" (pytest exit 5) as a pass. It now classifies output into `{passed, inconclusive}` — a positive `N passed` with no failure marker is the only pass; no-tests / silent output is **inconclusive** — and `processOne()` rolls back + requeues inconclusive runs like failures. Successful receipts now carry `{provider, model, verified, evidence}` provenance. New regression test `tests/test_worker_loop_verification.js` (6 cases) covers the classifier.
+## [1.7.7] - 2026-06-21
+
+### Changed
+- **Knowledge Center reorganized to foreground research/internals.** Three layout changes to `apps/lantern-garage/public/knowledgecenter.html`: (1) the "🔬 Under the hood — research & internals" disclosure moved up to directly below the "New to Keystone?" hero (was buried below Quick help + Apps) and now **opens expanded by default** instead of collapsed; (2) the "Apps / Explore Keystone" card section was **removed** (the same apps are reachable from the site nav and `/explore.html`); (3) the "Document library" PDF gallery is now wrapped in a **collapsed** `kc-deep` disclosure (IDs preserved, so the `/api/pdfs` gallery + filter still work when expanded). Per-section collapse/expand verified; no console errors.
+
+## [1.7.6] - 2026-06-21
+
+### Fixed
+- **`/changelog.html` now scrolls and shows every release expanded by default.** The page reused dream-chat's `.app` shell, which `dream-chat.css` pins to `height:100vh; overflow:hidden` (a fixed-viewport chat layout) — so the ~23,000px of changelog content was clipped at the first screen with no way to scroll. Added a scoped override (`html, body { height:auto; overflow-y:auto }` + `.app { display:block; height:auto; overflow:visible }`) in the page's own `<style>`, which loads after `dream-chat.css` and wins. Also changed the render so **all** version blocks start expanded (was: only the newest), since the collapse-by-default made the full history invisible behind one-by-one clicks. Manual collapse/expand per version still works. Verified on the dev server: 47/47 expanded, page scrolls, no console errors.
 
 ## [1.7.5] - 2026-06-21
 

@@ -347,35 +347,9 @@
     </div>
   </section>
 
-  <!-- ── Quick help Q&A ── -->
+  <!-- ── Under the hood — research + internals; moved up + expanded by default ── -->
   <section class="section">
-    <div class="section-head">
-      <div class="label">Quick help</div>
-      <h2>Common questions</h2>
-    </div>
-    <div class="qa-grid">
-      <div class="qa">
-        <h3>What is Keystone, really?</h3>
-        <p>An AI assistant that runs on your own machine, remembers what matters to you, and gets better from experience — never locked to a single AI model.</p>
-      </div>
-      <div class="qa">
-        <h3>How do I use it?</h3>
-        <p>Just <a href="/dream-chat.html">open the chat</a> and type like you're texting a friend. Ask a question, ask for help with code, or talk about your day.</p>
-      </div>
-      <div class="qa">
-        <h3>Do I need to pay or sign up?</h3>
-        <p>No. You can try the chat for free with no account. Adding your own API key unlocks faster, smarter replies — entirely optional.</p>
-      </div>
-      <div class="qa">
-        <h3>Something's not working?</h3>
-        <p>Check the <a href="/repo/QUICKSTART.md">Quick Start</a>, browse the guides below, or report it on <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">GitHub</a>.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Under the hood — collapsed; research + internals live here, nothing lost ── -->
-  <section class="section">
-    <details class="kc-deep">
+    <details class="kc-deep" open>
       <summary>
         <span class="badge" aria-hidden="true">🔬</span>
         <span>Under the hood — research &amp; internals</span>
@@ -441,56 +415,29 @@
     </details>
   </section>
 
-  <!-- ── Apps ── -->
+  <!-- ── Quick help Q&A ── -->
   <section class="section">
     <div class="section-head">
-      <div class="label">Apps</div>
-      <h2>Explore Keystone</h2>
-      <p>Everything Keystone can do, in one tap.</p>
+      <div class="label">Quick help</div>
+      <h2>Common questions</h2>
     </div>
-    <div class="link-grid">
-      <a class="link-card tile-cyan" href="/dream-chat.html">
-        <span class="icon">📓</span>
-        <h3>Chat &amp; Journal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A free-form chat journal. Pick a "persona" (a different AI character) and it falls back to another AI model automatically if one is unavailable.</span></span></h3>
-        <p>Freeform chat and journaling with different personas — your main way in.</p>
-        <span class="go">Open →</span>
-      </a>
-      <a class="link-card tile-green" href="/trader-dashboard.html">
-        <span class="icon">📈</span>
-        <h3>Trader</h3>
-        <p>Stocks, prediction markets, and live market news in one terminal.</p>
-        <span class="go">Open →</span>
-      </a>
-      <a class="link-card tile-violet" href="/create.html">
-        <span class="icon">✏️</span>
-        <h3>Create</h3>
-        <p>Upload, organize, and shape your creative work.</p>
-        <span class="go">Open →</span>
-      </a>
-      <a class="link-card tile-green" href="/flourishing">
-        <span class="icon">🌱</span>
-        <h3>Flourishing <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A live dashboard that tracks well-being signals against established human-flourishing frameworks.</span></span></h3>
-        <p>A real-time dashboard built around human-flourishing frameworks.</p>
-        <span class="go">Open →</span>
-      </a>
-      <a class="link-card tile-gold" href="/crypto-dashboard.html">
-        <span class="icon">🪙</span>
-        <h3>Crypto Dashboard</h3>
-        <p>Real-time BTC / ETH / SOL / XRP / DOGE prices and market news.</p>
-        <span class="go">Open →</span>
-      </a>
-      <a class="link-card tile-rose" href="/three-doors-game.html">
-        <span class="icon">🚪</span>
-        <h3>Three Doors <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A symbolic choose-your-path game ("The Kingdome") — pick a door, see where it leads, and replay endlessly.</span></span></h3>
-        <p>The Kingdome — an infinitely replayable, symbolic door game.</p>
-        <span class="go">Play →</span>
-      </a>
-      <a class="link-card tile-green" href="/kalshi-terminal.html">
-        <span class="icon">🎴</span>
-        <h3>Kalshi Terminal <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A trading screen for Kalshi — a regulated market where you bet on real-world events (elections, weather). The "Impossibility Deck" is its swipe-to-decide card UI.</span></span></h3>
-        <p>Markets terminal — the Impossibility Deck and live event contracts.</p>
-        <span class="go">Open →</span>
-      </a>
+    <div class="qa-grid">
+      <div class="qa">
+        <h3>What is Keystone, really?</h3>
+        <p>An AI assistant that runs on your own machine, remembers what matters to you, and gets better from experience — never locked to a single AI model.</p>
+      </div>
+      <div class="qa">
+        <h3>How do I use it?</h3>
+        <p>Just <a href="/dream-chat.html">open the chat</a> and type like you're texting a friend. Ask a question, ask for help with code, or talk about your day.</p>
+      </div>
+      <div class="qa">
+        <h3>Do I need to pay or sign up?</h3>
+        <p>No. You can try the chat for free with no account. Adding your own API key unlocks faster, smarter replies — entirely optional.</p>
+      </div>
+      <div class="qa">
+        <h3>Something's not working?</h3>
+        <p>Check the <a href="/repo/QUICKSTART.md">Quick Start</a>, browse the guides below, or report it on <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener">GitHub</a>.</p>
+      </div>
     </div>
   </section>
 
@@ -614,18 +561,23 @@
     </div>
   </section>
 
-  <!-- ── Documents (PDF gallery — /api/pdfs) ── -->
+  <!-- ── Documents (PDF gallery — /api/pdfs) — collapsed by default ── -->
   <section class="section" id="documents-section">
-    <div class="section-head">
-      <div class="label">Documents</div>
-      <h2>Document library</h2>
-      <p>Reports, research, and reference PDFs — filter by name.</p>
-    </div>
-    <div class="pdf-controls">
-      <input class="pdf-search" id="pdf-search" type="search" placeholder="Filter documents…" aria-label="Filter documents">
-      <span class="pdf-count" id="pdf-count"></span>
-    </div>
-    <div id="pdf-gallery"><p class="pdf-loading">Loading documents…</p></div>
+    <details class="kc-deep">
+      <summary>
+        <span class="badge" aria-hidden="true">📚</span>
+        <span>Document library</span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <div class="kc-deep-body">
+        <p class="kc-deep-note">Reports, research, and reference PDFs — filter by name.</p>
+        <div class="pdf-controls">
+          <input class="pdf-search" id="pdf-search" type="search" placeholder="Filter documents…" aria-label="Filter documents">
+          <span class="pdf-count" id="pdf-count"></span>
+        </div>
+        <div id="pdf-gallery"><p class="pdf-loading">Loading documents…</p></div>
+      </div>
+    </details>
   </section>
 
   <!-- ── Project ── -->
