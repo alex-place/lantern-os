@@ -15,6 +15,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.1] - 2026-06-21
+
+### Fixed
+- **Chat embeds no longer render a confusing blank on failure.** `dream-chat-ui.js` `renderExploreEmbed()` now surfaces a per-section message (e.g. "⚠ Discover unavailable (HTTP 404) — route not deployed") instead of swallowing errors via a silent `.catch(() => '')`. Each builder checks `r.ok` and treats an empty payload as an error. Root cause of the original blanks: the `/api/feeds/discover` + `/api/github/activity` routes 404'd before #888 was deployed.
+- **Embed fetches pinned to same-origin.** `embedBase()` now always uses `window.location.origin` (the embed routes are co-served with the page), avoiding any cross-origin/mixed-content risk from the function-scoped `serverBase`.
+- **Cache-bust `dream-chat-ui.js`** (`?v=20260621-embed2`) so browsers pick up the embed code without a manual hard-reload.
+
 ## [1.6.0] - 2026-06-21
 
 ### Added
