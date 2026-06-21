@@ -8,12 +8,15 @@
  * presenting the OPERATOR_TOKEN header may invoke these. Commands are allowlisted; `node -e`
  * (arbitrary JS) is intentionally NOT allowed.
  */
-const { execSync } = require("child_process");
+const { tokenizeCommand, safeExec } = require("../lib/safe-exec");
 const { isOperatorRequest } = require("../lib/request-auth");
 
 const MAX_OUTPUT = 4000;
 
-// Allowlisted command patterns — Keystone can only run these
+// Allowlisted command patterns — Keystone can only run these. Capture groups are
+// charset-restricted (no shell metacharacters), and every command is executed
+// shell-free via safeExec(tokenizeCommand(...)), so neither the regex nor the
+// runner can be coaxed into a shell (#873).
 const ALLOWED = [
   // Git
   { match: /^git status$/, cmd: "git status" },
@@ -22,38 +25,38 @@ const ALLOWED = [
   { match: /^git diff --stat$/, cmd: "git diff --stat" },
   { match: /^git log$/, cmd: "git log -n 20" },
   { match: /^git log --oneline$/, cmd: "git log --oneline -n 20" },
-  { match: /^git log --oneline -\d+$/, cmd: null }, // pass through
-  { match: /^git add [\w./-]+$/, cmd: null },
-  { match: /^git commit -m "[^"$`;|&<>\n]+"$/, cmd: null },
-  { match: /^git push(.*)$/, cmd: null },
-  { match: /^git fetch (.+)$/, cmd: null },
-  { match: /^git merge (.+) --no-edit$/, cmd: null },
+  { match: /^git log --oneline -\d{1,3}$/, cmd: null }, // pass through
+  { match: /^git add [\w./ -]+$/, cmd: null },
+  { match: /^git commit -m "[\w\s.,:'/-]+"$/, cmd: null },
+  { match: /^git push[\w\s./:+-]*$/, cmd: null },
+  { match: /^git fetch [\w./-]+$/, cmd: null },
+  { match: /^git merge [\w./-]+ --no-edit$/, cmd: null },
   { match: /^git branch$/, cmd: "git branch" },
   { match: /^git branch -a$/, cmd: "git branch -a" },
   { match: /^git stash list$/, cmd: "git stash list" },
-  { match: /^git stash push -m "[^"$`;|&<>\n]+"$/, cmd: null },
+  { match: /^git stash push -m "[\w\s.,:'/-]+"$/, cmd: null },
   { match: /^git stash pop$/, cmd: "git stash pop" },
-  { match: /^git pull(.*)$/, cmd: null },
+  { match: /^git pull[\w\s./:+-]*$/, cmd: null },
   // Tests
   { match: /^npm test$/, cmd: "node tests/run-dream-journal-tests.js api chat multiturn keystone" },
   { match: /^node tests\/test_dream_journal_api\.js$/, cmd: null },
   { match: /^node tests\/test_dream_journal_chat\.js$/, cmd: null },
   { match: /^node tests\/test_dream_chat_multiturns\.js$/, cmd: null },
   { match: /^node tests\/test_dream_journal_keystone\.js$/, cmd: null },
-  { match: /^python -m pytest tests\/[\w./-]+\.py$/, cmd: null },
+  { match: /^python -m pytest [\w./-]+$/, cmd: null },
   { match: /^npm run [\w:-]+$/, cmd: null },
-  { match: /^node --check [\w./-]+\.js$/, cmd: null },
+  { match: /^node --check [\w./-]+$/, cmd: null },
   // Orchestrator
   { match: /^python src\/convergence_io_engine\.py (health|inspect|loop)$/, cmd: null },
   // File reads (read-only)
   { match: /^cat [\w./-]+\.(json|md|js|py|txt)$/, cmd: null },
-  { match: /^head -\d+ [\w./-]+$/, cmd: null },
+  { match: /^head -\d{1,4} [\w./-]+$/, cmd: null },
   // GitHub CLI
-  { match: /^gh pr list.*$/, cmd: null },
-  { match: /^gh pr create.*$/, cmd: null },
-  { match: /^gh pr view.*$/, cmd: null },
-  // Curl (API testing)
-  { match: /^curl -s http:\/\/127\.0\.0\.1:4177\/.+$/, cmd: null },
+  { match: /^gh pr list[\w\s./:@,="'-]*$/, cmd: null },
+  { match: /^gh pr create[\w\s./:@,="'-]*$/, cmd: null },
+  { match: /^gh pr view[\w\s./:@,="'-]*$/, cmd: null },
+  // Curl (API testing) — local API path only (query strings carry ?/& and are denied)
+  { match: /^curl -s http:\/\/127\.0\.0\.1:4177\/[\w./-]*$/, cmd: null },
 ];
 
 function resolveCommand(command) {
@@ -96,7 +99,7 @@ module.exports = async function keystoneRoutes(req, res, url, deps) {
         return true;
       }
 
-      const output = execSync(resolved, {
+      const output = safeExec(tokenizeCommand(resolved), {
         cwd: repoRoot,
         encoding: "utf-8",
         timeout: 30000,
@@ -125,17 +128,17 @@ module.exports = async function keystoneRoutes(req, res, url, deps) {
   // GET /api/keystone/status — quick repo state dump
   if (url.pathname === "/api/keystone/status" && req.method === "GET") {
     try {
-      const git_status = execSync("git status --short", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
+      const git_status = safeExec(["git", "status", "--short"], { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
       // `git branch --show-current` is empty on a detached HEAD (CI checks out PRs detached),
       // which left `branch` blank. Fall back to the CI head-ref env vars, then the short SHA,
       // so the field is always a meaningful non-empty label.
-      let branch = execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
+      let branch = safeExec(["git", "branch", "--show-current"], { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
       if (!branch) {
         branch = (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || "").trim()
-          || execSync("git rev-parse --short HEAD", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim()
+          || safeExec(["git", "rev-parse", "--short", "HEAD"], { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim()
           || "detached";
       }
-      const log = execSync("git log --oneline -5", { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
+      const log = safeExec(["git", "log", "--oneline", "-5"], { cwd: repoRoot, encoding: "utf-8", timeout: 5000 }).trim();
       const test_count = "Run: npm test or node tests/test_dream_journal_api.js + test_dream_journal_chat.js + test_dream_chat_multiturns.js + test_dream_journal_keystone.js";
 
       sendJson(res, {
