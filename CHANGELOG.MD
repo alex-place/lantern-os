@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.8] - 2026-06-20
+
+### Changed
+- **Gitignore runtime data that automation kept committing** (surfaced by junk PR #885, branch `auto/master`): conversation backups (`data/conversations/*.bak`, `*.cleared-*.jsonl`), the convergence audit log (`apps/data/convergence-audit.jsonl`), and the admin feature-flags runtime store (`data/admin/feature-flags.json`). These are machine-local runtime state — and the conversation backups can carry PII — so they must never be tracked. Closes the gap where the gitignore covered `garage-conversations.jsonl` but not its `.bak`/`.cleared-*` backups.
+
 ## [1.5.7] - 2026-06-20
 
 ### Security
