@@ -587,16 +587,6 @@
               <h3>Tesseract Convergence Loop <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The step-by-step method the system reasons with — tracking how confident it is ("Bayesian beliefs") in a 4-D status "cube" and keeping receipts for every claim.</span></span></h3>
               <p>The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</p>
             </a>
-            <a class="link-card" href="/repo/docs/LANTERN-SIGMA0-CODER.md">
-              <span class="icon">🤖</span>
-              <h3>lantern-sigma0-coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A coding AI that runs locally on your own machine, fine-tuned ("LoRA") on past Claude sessions — no cloud required.</span></span></h3>
-              <p>The local Σ₀ coding agent — a LoRA fine-tuned on past sessions, leaderboard-routed, and continually retrained.</p>
-            </a>
-            <a class="link-card" href="/repo/docs/OURO-LOOPLM.md">
-              <span class="icon">🔁</span>
-              <h3>Ouro / LoopLM <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A reasoning technique where the model loops internally to "think" longer on harder questions before answering, instead of replying in one pass.</span></span></h3>
-              <p>Looped latent reasoning (arXiv 2510.25741) — adaptive depth + Q-exit CDF, implemented over our local model and grounded in the KB.</p>
-            </a>
             <a class="link-card" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
               <span class="icon">🧭</span>
               <h3>Kernel model frontier <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A grounded comparison of the looped model Keystone runs (Ouro) against the current crop of small open models — scored on our own metrics, not generic leaderboards.</span></span></h3>
@@ -614,8 +604,8 @@
             </a>
             <a class="link-card" href="/repo/docs/SIGMA0-OURO-CODER.md">
               <span class="icon">🌀</span>
-              <h3>Σ₀ Ouro Coder</h3>
-              <p>The Σ₀ coding agent on the Ouro looped LLM — Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth, served as a drop-in model the coder path uses transparently.</p>
+              <h3>Σ₀ Ouro Coder <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The local coding AI that runs on your own machine: a small model (Ouro) that "loops" to think harder on tough problems, fine-tuned on this repo's own past sessions.</span></span></h3>
+              <p>The single source of truth for the local coder — then (Qwen) → now (Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth) plus the loop mechanism, served as a drop-in model the coder path uses transparently.</p>
             </a>
             <a class="link-card" href="/repo/docs/SIGMA0-CONTINUAL-TRAINING.md">
               <span class="icon">♻️</span>
