@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-19
+updated: 2026-06-20
+---
+
 # Σ₀ Ouro Coder — the looped local coding agent
 
 > ## 📖 In plain English (start here)

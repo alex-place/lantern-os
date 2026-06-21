@@ -1,6 +1,12 @@
+---
+author: Alex Place
+created: 2026-06-04
+updated: 2026-06-20
+---
+
 # Security Policy
 
-Lantern OS is a private, local-first workspace. Treat local state as sensitive:
+Keystone OS is a private, local-first workspace. Treat local state as sensitive:
 journal data, RAG records, runtime receipts, secrets, tokens, operator notes,
 and private test artifacts must not be committed or shared publicly.
 

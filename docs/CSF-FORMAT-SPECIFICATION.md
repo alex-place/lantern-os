@@ -1,6 +1,12 @@
+---
+author: Alex Place
+created: 2026-06-02
+updated: 2026-06-20
+---
+
 # CSF Format Specification (canonical, consolidated)
 
-**CSF** = Convergence-Fitted Searchable Format — Lantern OS's binary container
+**CSF** = Convergence-Fitted Searchable Format — Keystone OS's binary container
 family for memory, symbolic data, and (as of v0.8) **arbitrary files**.
 
 This is the single canonical spec. It consolidates the previously-scattered CSF

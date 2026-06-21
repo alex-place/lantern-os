@@ -43,6 +43,15 @@ def knowledge_base_docs() -> list[str]:
     return [d for d in docs if (REPO / d).exists()]
 
 
+def strip_frontmatter(md: str) -> str:
+    """Drop a leading YAML frontmatter block (--- ... ---) so doc metadata
+    (author/created/updated) doesn't get indexed as the (intro) section."""
+    if md.startswith("﻿"):
+        md = md[1:]
+    m = re.match(r"^---\n.*?\n---\n?", md, re.DOTALL)
+    return md[m.end():] if m else md
+
+
 def split_sections(md: str):
     """Split markdown into (level, heading, body) sections by ATX headings."""
     lines = md.splitlines()
@@ -68,7 +77,7 @@ def main():
         p = REPO / rel
         if not p.exists():
             continue
-        md = p.read_text(encoding="utf-8", errors="replace")
+        md = strip_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
         for lv, heading, body in split_sections(md):
             text = re.sub(r"\n{3,}", "\n\n", body)[:MAX_SECTION_CHARS]
             rid = hashlib.sha1(f"{rel}#{heading}".encode()).hexdigest()[:12]

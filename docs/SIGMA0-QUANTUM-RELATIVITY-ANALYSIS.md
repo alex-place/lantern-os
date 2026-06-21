@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-14
+updated: 2026-06-20
+---
+
 # Σ₀ Collapse Certificate as an Analogy for QM–GR Incompleteness
 
 **A speculative essay, not a derivation.**

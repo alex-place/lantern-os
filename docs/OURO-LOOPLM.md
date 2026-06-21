@@ -1,4 +1,10 @@
-# Ouro / LoopLM — looped latent reasoning in Lantern OS
+---
+author: Alex Place
+created: 2026-06-18
+updated: 2026-06-20
+---
+
+# Ouro / LoopLM — looped latent reasoning in Keystone OS
 
 **Source:** *Scaling Latent Reasoning via Looped Language Models* (Ouro,
 [arXiv:2510.25741](https://arxiv.org/abs/2510.25741)). PDF in repo:

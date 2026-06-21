@@ -1,5 +1,5 @@
 {
-  "built_at": 1781923094.314502,
+  "built_at": 1782002556.3149052,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -13,15 +13,16 @@
     "docs/research/2026-06-19-convergence-core-agent-spine.md",
     "docs/SIGMA0-OURO-CODER.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
+    "docs/ADMIN-FEATURE-FLAGS.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
-    "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
     "docs/KEYSTONE-MCP.md",
+    "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
     "SECURITY.md",
     "SKILLS.md",
     "PROVIDERS.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md"
   ],
-  "sections": 371,
-  "sha256": "c43c4b3bae05d580c2a09f531768cd8c6ce47abb34d89edf7c5af3026866feca"
+  "sections": 381,
+  "sha256": "445a60dd1f0d7b604f390aa14a796c8330c44aea6e69b40066ac6e5110ef6a49"
 }

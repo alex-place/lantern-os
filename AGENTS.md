@@ -1,4 +1,10 @@
-﻿# AGENTS.md — Lantern OS
+---
+author: Alex Place
+created: 2026-05-26
+updated: 2026-06-20
+---
+
+# AGENTS.md — Keystone OS
 
 A focused guide for AI coding agents. **Read this before touching anything.**
 
@@ -195,7 +201,7 @@ Never claim a skill or fleet slot is active unless confirmed by implementation o
 
 ### Theory
 
-From the Σ₀ Collapse Certificate: ungrounded self-referential systems collapse or diverge unless they receive *persistent external grounding*. In Lantern OS:
+From the Σ₀ Collapse Certificate: ungrounded self-referential systems collapse or diverge unless they receive *persistent external grounding*. In Keystone OS:
 
 - **Quantum dust** = observations, measurements, user input, convergence signals
 - **Doors** = routing pathways between agents, memory layers, and external observations

@@ -1,3 +1,9 @@
+---
+author: Alex Place
+created: 2026-06-18
+updated: 2026-06-20
+---
+
 # Keystone ↔ MCP / live project context
 
 Keystone chat is linked to the project's real tools and details, so **any provider

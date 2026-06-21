@@ -1,6 +1,12 @@
+---
+author: Alex Place
+created: 2026-06-18
+updated: 2026-06-20
+---
+
 # lantern-sigma0-coder — local Σ₀ coding agent
 
-`lantern-sigma0-coder` is Lantern OS's **own local coding model**: a LoRA fine-tuned on the
+`lantern-sigma0-coder` is Keystone OS's **own local coding model**: a LoRA fine-tuned on the
 project's past Claude Code engineering sessions, served through Ollama, and routed to work by
 the performance leaderboard. It is the local-first coder behind autowork and the Keystone
 engineering desk — continually retrained so it keeps getting better at *this* codebase.
