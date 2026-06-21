@@ -15,7 +15,7 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
-## [1.6.1] - 2026-06-21
+## [1.6.2] - 2026-06-21
 
 ### Fixed
 - **Markdown reader (`/repo/*.md`) mangled badge/image syntax — the README/QUICKSTART pages looked broken.** [`apps/lantern-garage/lib/markdown-render.js`](apps/lantern-garage/lib/markdown-render.js)'s hand-rolled inline parser turned linked badges `[![alt](img)](href)` into literal garbage (`<a href="img">![alt</a>](href)`), showed `<!-- … -->` comments as on-page text, and split every soft-wrapped line into its own `<p>`. Rewrote inline parsing to stash code/images/links/autolinks as placeholders before emphasis runs (so URLs containing `_`/`*` can't be corrupted) and restore them iteratively, so a linked badge now renders as a real `<a><img></a>`. Also added: HTML-comment stripping, soft-wrap paragraph joining, true **nested lists**, GitHub **task-list checkboxes** (`- [ ]`/`- [x]`), `<https://…>`/`<mailto:>` autolinks, `~~strikethrough~~`, and GitHub-style heading `id` slugs so in-page `#anchor` / table-of-contents links resolve. The wide-screen **newspaper column layout** (#e12dbcb5) and the **frontmatter byline** (#842) are preserved.
@@ -28,6 +28,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 - **Keystone Chat brand guidelines** — [`docs/KEYSTONE-BRAND-GUIDELINES.md`](docs/KEYSTONE-BRAND-GUIDELINES.md): name/mark, the full light + dark color tokens (source of truth: [`css/site.css`](apps/lantern-garage/public/css/site.css)), typography, shared UI components, normie voice & tone, and accessibility. Linked from the Knowledge Center → Guides.
 
 ---
+
+## [1.6.1] - 2026-06-21
+
+### Fixed
+- **Chat embeds no longer render a confusing blank on failure.** `dream-chat-ui.js` `renderExploreEmbed()` now surfaces a per-section message (e.g. "⚠ Discover unavailable (HTTP 404) — route not deployed") instead of swallowing errors via a silent `.catch(() => '')`. Each builder checks `r.ok` and treats an empty payload as an error. Root cause of the original blanks: the `/api/feeds/discover` + `/api/github/activity` routes 404'd before #888 was deployed.
+- **Embed fetches pinned to same-origin.** `embedBase()` now always uses `window.location.origin` (the embed routes are co-served with the page), avoiding any cross-origin/mixed-content risk from the function-scoped `serverBase`.
+- **Cache-bust `dream-chat-ui.js`** (`?v=20260621-embed2`) so browsers pick up the embed code without a manual hard-reload.
 
 ## [1.6.0] - 2026-06-21
 

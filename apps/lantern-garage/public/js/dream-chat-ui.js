@@ -456,7 +456,11 @@ async function runAutowork(issue, btn, base) {
 // deterministic, no LLM cost, and each route carries its own baked fallback so a
 // section always renders. Σ₀: improves the Converge/grounding surface, no new
 // memory system or subsystem — pure reuse of /api/{youtube,feeds,github} routes.
-const embedBase = () => (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+// Always same-origin: the embed routes are co-served with this page by the same
+// server, so window.location.origin is correct on localhost, 4177/4178, and the
+// lantern-os.net tunnel alike. (Avoids the function-scoped serverBase, which can
+// point cross-origin at 127.0.0.1:4177 on non-loopback hosts.)
+const embedBase = () => window.location.origin;
 
 function embedEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -495,10 +499,11 @@ function detectEmbedIntent(text) {
 
 async function embedVideos(base) {
   const r = await fetch(`${base}/api/youtube/lantern-videos`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json();
   const vids = (d.videos || []).slice(0, 6);
   const featured = vids.find(v => v.featured || v.id === d.featured) || vids[0];
-  if (!featured) return '';
+  if (!featured) throw new Error('no videos returned');
   const thumbs = vids.map(v =>
     `<a href="https://www.youtube.com/watch?v=${embedEsc(v.id)}" target="_blank" rel="noopener noreferrer" style="flex:0 0 auto;width:118px;text-decoration:none;color:inherit">
        <img src="https://img.youtube.com/vi/${embedEsc(v.id)}/mqdefault.jpg" alt="" loading="lazy" style="width:118px;height:66px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">
@@ -511,9 +516,10 @@ async function embedVideos(base) {
 
 async function embedDiscover(base) {
   const r = await fetch(`${base}/api/feeds/discover`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json();
   const items = (d.items || []).slice(0, 6);
-  if (!items.length) return '';
+  if (!items.length) throw new Error('no items returned');
   const rows = items.map(it => {
     const ext = /^https?:/i.test(it.link);
     const meta = [
@@ -530,6 +536,7 @@ async function embedDiscover(base) {
 
 async function embedBuild(base) {
   const r = await fetch(`${base}/api/github/activity`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
   const d = await r.json();
   const rel = (d.releases || [])[0];
   const commits = (d.commits || []).slice(0, 4);
@@ -569,17 +576,21 @@ async function renderExploreEmbed(kind, userText) {
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
   const base = embedBase();
-  try {
-    let html = '';
-    if (kind === 'videos' || kind === 'all') html += await embedVideos(base).catch(() => '');
-    if (kind === 'discover' || kind === 'all') html += await embedDiscover(base).catch(() => '');
-    if (kind === 'build' || kind === 'all') html += await embedBuild(base).catch(() => '');
-    if (kind === 'support' || kind === 'all') html += embedSupport();
-    html += `<div style="margin-top:10px;font-size:11px;opacity:0.6">See more on <a href="/explore.html" style="color:var(--accent)">Explore →</a></div>`;
-    bubble.innerHTML = html;
-  } catch (e) {
-    bubble.innerHTML = `Couldn't load that right now. Try <a href="/explore.html" style="color:var(--accent)">Explore →</a>`;
-  }
+  const want = k => kind === k || kind === 'all';
+  // Surface failures instead of rendering a confusing blank: a 404 means the
+  // server predates these routes (needs a restart) or isn't deployed yet.
+  const fail = (label, e) => {
+    const m = (e && e.message) || String(e || 'error');
+    const hint = /HTTP 404/.test(m) ? ' — route not deployed (restart the server / merge the PR)' : '';
+    return `<div style="font-size:12px;opacity:0.65;margin:8px 0">⚠ ${label} unavailable (${embedEsc(m)})${hint}</div>`;
+  };
+  const parts = [];
+  if (want('videos'))   { try { parts.push(await embedVideos(base)); }   catch (e) { parts.push(fail('Videos', e)); } }
+  if (want('discover')) { try { parts.push(await embedDiscover(base)); } catch (e) { parts.push(fail('Discover', e)); } }
+  if (want('build'))    { try { parts.push(await embedBuild(base)); }    catch (e) { parts.push(fail('Build', e)); } }
+  if (want('support'))  { try { parts.push(embedSupport()); }            catch (e) { parts.push(fail('Support', e)); } }
+  parts.push(`<div style="margin-top:10px;font-size:11px;opacity:0.6">See more on <a href="/explore.html" style="color:var(--accent)">Explore →</a></div>`);
+  bubble.innerHTML = parts.filter(Boolean).join('');
   if (typeof scrollToBottom === 'function') scrollToBottom();
 }
 
