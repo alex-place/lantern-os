@@ -38,10 +38,25 @@ function gitSafe(cmd, cwd = REPO_ROOT) {
 
 // ── Test runner ───────────────────────────────────────────────────────────────
 
+// #896: classify a pytest run into {passed, inconclusive}. A run with NO tests
+// collected (pytest exit 5 / "no tests ran" / "collected 0 items") is NOT a pass —
+// it is inconclusive, and the caller must treat it like a failure rather than
+// award verification. `passed` requires a positive "<N> passed" signal AND no
+// failure marker; absence of any signal is inconclusive, never success.
+function classifyTestOutput(out) {
+  const text = String(out || "");
+  const failed = /\bFAILED\b|\bERROR(S)?\b|\b\d+ failed\b|\b\d+ error/i.test(text);
+  const noTests = /no tests ran|collected 0 items/i.test(text);
+  const passedSignal = /\b\d+ passed\b/.test(text);
+  if (failed) return { passed: false, inconclusive: false };
+  if (noTests || !passedSignal) return { passed: false, inconclusive: true };
+  return { passed: true, inconclusive: false };
+}
+
 function runTests(worktreePath) {
-  const results = { passed: true, output: "" };
+  let out = "";
   try {
-    const out = execSync(
+    out = execSync(
       "python -m pytest tests/ -q --tb=short " +
         "--ignore=tests/test_anti_entropy_memory.py " +
         "--ignore=tests/test_audit_chain.py " +
@@ -49,13 +64,13 @@ function runTests(worktreePath) {
         "--ignore=tests/test_discord_voice_gate.py",
       { cwd: worktreePath, encoding: "utf8", timeout: 120_000 }
     );
-    results.output = out.slice(-500);
-    results.passed = !out.includes("FAILED") && !out.includes("ERROR");
   } catch (e) {
-    results.output = (e.stdout || e.message).slice(-500);
-    results.passed = false;
+    // pytest exits non-zero on failures (1) AND on no-tests-collected (5) — capture
+    // stdout in both cases and let classifyTestOutput tell them apart.
+    out = String(e.stdout || "") + String(e.stderr || e.message || "");
   }
-  return results;
+  const cls = classifyTestOutput(out);
+  return { passed: cls.passed, inconclusive: cls.inconclusive, output: out.slice(-500) };
 }
 
 // ── PR creation ───────────────────────────────────────────────────────────────
@@ -228,13 +243,18 @@ async function processOne(lane, opts = {}) {
     // 3. Run tests — and GATE push/PR/complete on the result (mirror the live
     // dispatch path). A failing suite rolls back the commit and requeues. #870
     const testResult = step("tests", runTests(worktreePath));
-    if (!testResult.passed) {
-      step("rollback", { ok: false, reason: "tests_failed" });
-      gitSafe("reset --hard HEAD~1", worktreePath); // drop the just-made (broken) commit
-      await _queue.markFailed(entry.id, "tests failed — changes rolled back");
+    // #896: an INCONCLUSIVE run (no tests collected) is not verification — gate it
+    // like a failure so autowork never marks unverified work complete.
+    if (!testResult.passed || testResult.inconclusive) {
+      const reason = testResult.inconclusive
+        ? "tests inconclusive — no applicable verification (0 collected)"
+        : "tests failed — changes rolled back";
+      step("rollback", { ok: false, reason });
+      gitSafe("reset --hard HEAD~1", worktreePath); // drop the just-made (unverified) commit
+      await _queue.markFailed(entry.id, reason);
       try { _slots.completeWork(slot.id, { workId: entry.id, failed: true }); } catch {}
       receipt.ok = false;
-      receipt.stoppedAt = "tests_failed";
+      receipt.stoppedAt = testResult.inconclusive ? "tests_inconclusive" : "tests_failed";
       return receipt;
     }
 
@@ -247,6 +267,17 @@ async function processOne(lane, opts = {}) {
     }
 
     // 6. Complete queue entry — only reached when work was committed AND tests passed.
+    // #896: record provenance + verification evidence on the receipt so a completed
+    // entry carries a real proof artifact (which provider/model did the work, and
+    // that tests actually ran and passed) rather than an unattributed "ok".
+    receipt.provider = (agentResult && agentResult.provider) || process.env.AUTOWORK_PROVIDER || null;
+    receipt.model    = (agentResult && agentResult.model)    || process.env.AUTOWORK_MODEL    || null;
+    receipt.verified = true;
+    receipt.evidence = {
+      tests_passed:   true,
+      diff_committed: true,
+      output:         String(testResult.output || "").slice(-200),
+    };
     receipt.ok = true;
     await _queue.markComplete(entry.id, receipt);
     try { _slots.completeWork(slot.id, { workId: entry.id, duration: Date.now() - new Date(entry.assignedAt || Date.now()).getTime() }); } catch {}
@@ -278,4 +309,4 @@ async function runLoop(lane, opts = {}) {
   return receipts;
 }
 
-module.exports = { processOne, runLoop, runTests, commitAgentWork, createPR, prHead, originOwner };
+module.exports = { processOne, runLoop, runTests, classifyTestOutput, commitAgentWork, createPR, prHead, originOwner };

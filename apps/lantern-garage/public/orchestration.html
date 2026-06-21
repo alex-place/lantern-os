@@ -195,6 +195,32 @@
       gap: 12px; margin-top: 18px; flex-wrap: wrap;
     }
     .refresh-time { font-size: 0.74rem; color: var(--muted); }
+
+    /* ── The Loop (Observe → Remember → Reason → Act → Verify → Converge), live ── */
+    .loop-panel { margin-bottom: 22px; }
+    .loop-flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .loop-stage {
+      flex: 1 1 140px; min-width: 132px;
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 14px 12px; border-radius: 12px;
+      background: var(--bg); border: 1px solid var(--border); border-top: 3px solid var(--border);
+      transition: border-color .3s, box-shadow .3s, transform .3s;
+    }
+    .loop-stage .ls-icon { font-size: 1.25rem; line-height: 1; }
+    .loop-stage .ls-name { font-weight: 700; font-size: 0.8rem; color: var(--text); letter-spacing: .02em; }
+    .loop-stage .ls-metric { font-size: 1.5rem; font-weight: 800; color: var(--accent); line-height: 1.1; }
+    .loop-stage .ls-sub { font-size: 0.68rem; color: var(--muted); }
+    .loop-stage.active {
+      border-color: var(--accent); border-top-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 10px 26px -14px var(--accent);
+      transform: translateY(-2px);
+    }
+    .loop-stage.active .ls-icon { animation: pulse 1.5s infinite; }
+    .loop-arrow { align-self: center; color: var(--muted); font-size: 1.05rem; flex: 0 0 auto; }
+    @media (max-width: 720px) { .loop-arrow { display: none; } .loop-stage { flex-basis: 44%; } }
+    .loop-cycle { text-align: center; margin-top: 12px; font-size: 0.74rem; color: var(--muted); }
+    .loop-cycle .lc-spin { color: var(--accent); display: inline-block; animation: spin 6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
   <title>Orchestration — Keystone OS</title>
 </head>
@@ -228,6 +254,15 @@
     <h1>⚙️ Agent Orchestration</h1>
     <p>Real-time view of the autonomous agent work queue, lanes, and convergence status.</p>
   </header>
+
+  <!-- ── The convergence loop, live ── -->
+  <section class="panel loop-panel">
+    <h2>♾️ The Loop <span class="verify-sub">Observe → Remember → Reason → Act → Verify → Converge — live</span></h2>
+    <div class="loop-flow" id="loopFlow">
+      <div class="placeholder">Loading the loop…</div>
+    </div>
+    <div class="loop-cycle"><span class="lc-spin">↻</span> <span id="loopCycleNote">one continuous loop — every stage feeds the next</span></div>
+  </section>
 
   <div class="orch-grid">
     <!-- Queue Status -->
@@ -359,11 +394,12 @@
 
   async function refreshStatus() {
     // Queue stats + agent slots + pending list (all best-effort).
-    const [queueData, agentData, pendingData, health] = await Promise.all([
+    const [queueData, agentData, pendingData, health, convData] = await Promise.all([
       fetchJson("/api/queue/status"),
       fetchJson("/api/queue/agents"),
       fetchJson("/api/queue/list?status=pending"),
       fetchJson("/api/health"),
+      fetchJson("/api/convergence/status"),
     ]);
 
     // ── Queue stats ──
@@ -421,6 +457,7 @@
     // ── Verify + human-in-the-loop (share one pr-lanes fetch) ──
     const laneData = await fetchJson("/api/queue/pr-lanes");
     renderLanes(laneData);
+    renderLoop(convData, q, slots, laneData);
     renderHumanLoop(laneData, items);
     renderMerit();
 
@@ -540,6 +577,55 @@
     document.body.appendChild(ta); ta.select();
     try { document.execCommand("copy"); done(); } catch {}
     document.body.removeChild(ta);
+  }
+
+  // ── The Loop: live Observe → Remember → Reason → Act → Verify → Converge ──
+  const LOOP_STAGES = [
+    { icon: "👁", name: "Observe" },
+    { icon: "🧠", name: "Remember" },
+    { icon: "💭", name: "Reason" },
+    { icon: "⚡", name: "Act" },
+    { icon: "✅", name: "Verify" },
+    { icon: "🎯", name: "Converge" },
+  ];
+  function renderLoop(conv, q, slots, laneData) {
+    const el = $("loopFlow");
+    if (!el) return;
+    const working = (slots || []).filter((s) => s.status === "working").length;
+    const openPRs = (laneData && laneData.openCount) || 0;
+    const records = (conv && conv.total) || 0;
+    const reasoners = (conv && Array.isArray(conv.reasoners)) ? conv.reasoners.length : 0;
+    const grounded = (conv && conv.groundedPct != null) ? Math.round(conv.groundedPct * 100) : null;
+    const metrics = [
+      { v: q.pending || 0,   sub: "queued" },
+      { v: records,          sub: records === 1 ? "record" : "records" },
+      { v: reasoners || (q.assigned || 0), sub: reasoners ? "reasoners" : "planning" },
+      { v: working,          sub: "acting" },
+      { v: openPRs,          sub: "PRs in CI" },
+      { v: q.completed || 0, sub: grounded != null ? grounded + "% grounded" : "converged" },
+    ];
+    // Active stage = where the loop is doing work right now; rests at Converge when idle.
+    let active = 5;
+    if (working > 0) active = 3;
+    else if (openPRs > 0) active = 4;
+    else if ((q.assigned || 0) > 0) active = 2;
+    else if ((q.pending || 0) > 0) active = 0;
+    el.innerHTML = LOOP_STAGES.map((s, i) => {
+      const m = metrics[i];
+      const node = `<div class="loop-stage ${i === active ? "active" : ""}">
+          <span class="ls-icon">${s.icon}</span>
+          <span class="ls-name">${s.name}</span>
+          <span class="ls-metric">${m.v}</span>
+          <span class="ls-sub">${escapeHtml(m.sub)}</span>
+        </div>`;
+      return node + (i < LOOP_STAGES.length - 1 ? '<span class="loop-arrow">→</span>' : "");
+    }).join("");
+    const note = $("loopCycleNote");
+    if (note) {
+      note.textContent = `${records} convergence record${records === 1 ? "" : "s"}`
+        + (grounded != null ? ` · ${grounded}% externally grounded` : "")
+        + " · the loop never stops";
+    }
   }
 
   async function renderMerit() {

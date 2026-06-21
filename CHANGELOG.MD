@@ -15,6 +15,138 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.17] - 2026-06-21
+
+### Changed
+- **Orchestration page now visualizes the convergence loop.** [`orchestration.html`](apps/lantern-garage/public/orchestration.html) leads with a live **Observe -> Remember -> Reason -> Act -> Verify -> Converge** ring — each stage shows a real metric (queued issues, convergence records, reasoners, agents acting, PRs in CI, completed + grounded %) wired to `/api/convergence/status` and the queue/pr-lane feeds, with the currently-active stage highlighted and a cycle indicator. Makes "the loop" tangible instead of just a grid of cards.
+
+## [1.7.16] - 2026-06-21
+
+### Added
+- **Σ₀ coder dev-box setup guide + Claude-Code integration status doc**, the latter pushed to the Knowledge Center (new KC card + rebuilt grounding index). Documents how to stand up the local coder + bridge on a second machine and the honest state of driving Claude Code with it.
+
+## [1.7.15] - 2026-06-21
+
+### Changed
+- **Markdown doc viewer (`/repo/*.md`) column count now follows content depth, not screen width.** Previously every panel split into 2 columns at ≥1100px, 3 at ≥1700px, and 4 at ≥2400px — so a short section fragmented into thin, vertically-meaningless stubs on a wide display. `lib/markdown-render.js` now classifies each section at render time by its *flowing* text length (excluding full-width spanners like code/tables): shallow → 1 column, normal → **2 columns (the default)**, and only a genuinely deep section (`≥ ~1700` chars of flowing text) earns a **3rd** column. The 4-column tier is removed, and the page is capped at 1280px so the 2-column measure stays readable instead of stretching across ultrawide displays. Verified on `SIGMA0-OURO-CODER.md`: of 12 panels, 8 render 2 columns, 3 deep ones render 3, 1 short one renders 1; no panel exceeds 3 columns at 1920px.
+
+## [1.7.14] - 2026-06-21
+
+### Added
+- **Tool-aware dream-chat for the local Σ₀ Ouro coder.** The chat path renders the FC adapter's `<tool_call>` as a card instead of leaking raw JSON, and (gated by `CHAT_TOOL_EXEC=1`, off by default) executes it through one canonical tool registry (`lib/tool-runner.js`): read-only tools (Read/LS/Glob/Grep) run repo-sandboxed; shell (Bash/PowerShell) and mutating (Write/Edit) tools are operator-gated and route through the shared `lib/command-allowlist.js` + `lib/safe-exec.js`. Tool names/schemas match what the adapter was trained on.
+
+### Changed
+- Extracted the operator command allowlist out of `routes/keystone.js` into `lib/command-allowlist.js` so the chat tool registry and operator console share one policy.
+
+## [1.7.13] - 2026-06-21
+
+### Changed
+- **Markdown doc viewer (`/repo/*.md`) restyled as stacked "newspaper panels."** `lib/markdown-render.js` now groups each `##` (H2) section into its own `<section class="md-panel">` (content before the first H2 becomes a `<header class="md-lead">` masthead). Panels get a hairline border, **alternating background** (`--surface` ↔ `--surface2`) with an accent left-rule on every other panel, and an accent underline on each section heading — higher contrast and sharper edges than the previous single flowing card. Spacing between panels increased (30px) and the page's outer margin reduced (16px top / 14px sides, was 32/56). On wide screens each panel flows into width-sized columns (so short panels stay single-column) with headings and wide blocks spanning all columns. Applies to every rendered doc page (e.g. `/repo/docs/SIGMA0-OURO-CODER.md`). Verified: panels render, alternation + columns + spacing confirmed via computed styles, no console errors.
+
+## [1.7.12] - 2026-06-21
+
+### Fixed
+- **Σ₀ native Q-exit decode was O(N^2).** `Sigma0LoopLM.generate` re-encoded the full growing sequence with `use_cache=False` every token (~1 s/token; 170-280 s coding outliers). Wired the model's native `UniversalTransformerCache` for incremental **O(N)** decode; `OURO_LOOP_CACHE=0` restores the legacy path. No quality change.
+
+### Added
+- **Forward-truncation (experimental, `OURO_LOOP_TRUNCATE=1`)** -- breaks the recurrent loop on Q-exit (adaptive depth as a speed win). Finding: mutually exclusive with the cross-token KV cache -> forces no-cache/O(N^2); a win for short outputs, while the cache fix wins for long. Parity-checked via `bench_ouro_loop.py --truncate`.
+- `scripts/bench_ouro_loop.py` (cache + depth + truncation-parity harness) and `docs/research/2026-06-21-sigma0-serving-perf.md` (debug/research/upgrade writeup).
+## [1.7.11] - 2026-06-21
+
+### Added
+- **Σ₀ Ouro coder — function-calling (FC) training pipeline + tool-aware runtime + retraining handoff.**
+  FC corpus tooling: `scripts/harvest_tool_traces.py` (mines repo Claude Code session transcripts into `<tool_call>` pairs, secrets redacted) and `scripts/convert_fc_dataset.py` (converts public FC datasets — Hermes/ToolACE — into the exact wire format with train/serve preamble parity via `scripts/ouro_anthropic_bridge.py`). Tool-aware execution proxy `apps/lantern-garage/lib/tool-runner.js` defines one canonical tool registry (Read/LS/Glob/Grep/Bash/PowerShell/Write/Edit) used for both the prompt preamble and execution, shell tools gated through the existing allowlist + safe-exec. Also adds `scripts/sigma0_coder_agent.py`, `src/csf/coder_grounding.py`, and `tests/test_sigma0_state_abi.py`.
+- **Retraining handoff** `docs/research/2026-06-21-sigma0-coder-retraining-handoff.md`: grounded diagnosis of the FC adapter's observed unreliability (Bash over-bias = data distribution; over-refusal = template memorization; under-trigger = missing "answer-normally" class) + a prioritized, evidence-backed recipe (tool-distribution rebalance, Hammer function-masking, negatives 25%->~10-12%, lr 2e-4->~7e-5, BFCL eval + release gate). **Verified locally:** the adapter trains and emits tool calls but is **not yet reliable** — this ships the pipeline + plan, not a production-ready FC model. Training corpora (~134MB) included for reproducibility.
+
+
+
+## [1.7.9] - 2026-06-21
+
+### Added
+- **Σ₀ serving-architecture decision package** (docs only). Peer-reviewed staff **portfolio update** (`docs/SIGMA0-AGENT-PORTFOLIO-UPDATE.md`) + **stakeholder deck** (`docs/decks/2026-06-21-sigma0-agent-stakeholder-deck.md`) recommending a **cloud-transformers floor now -> embedded ONNX/DirectML target via a gated spike**, behind one swappable client contract. Backed by **web-grounded validation** (`docs/research/2026-06-21-sigma0-serving-validation.md`: 8 option findings + 10 adversarial verdicts -- e.g. vLLM serves the Ouro loop but pins fixed R4 / drops adaptive Q-exit, conf 0.97; ONNX `Loop` expresses adaptive depth, conf 0.97; no official vLLM Windows build), a **3-lens peer-review record** (`docs/research/2026-06-21-sigma0-peer-review.md`), and the **ONNX/DirectML export spike scope + GO/NO-GO gate** (`docs/research/2026-06-21-sigma0-onnx-directml-spike.md`). No code/runtime change.
+## [1.7.8] - 2026-06-21
+
+### Fixed
+- **Autowork/fleet: stop reporting false verification evidence and ground the preflight on the landed state (#933, #942, #896).** Three defects that let the autonomous fleet mark unverified or no-op work as a proven success:
+  - **#933 — false convergence evidence.** `routes/convergence-dispatch.js` recorded `Patch applied: ${stats.filesModified || 0} files modified` against a field `applyPatch` never returns, so every record claimed **0 files**; it printed `Tests: PASSED` and awarded `testsPassed: 0.9` for runs with **zero tests**; and it baked a `[unverified]` marker into the commit/PR **title** on top of the issue's own conventional prefix (e.g. `[unverified] fix: chore(cleanup): …`). Now the evidence reports the real `changedFiles.length`, a no-test run reads `Tests: none run` with `testsPassed: 0.0` (and `act`/`overall` no longer earn test credit), and the title is cleaned (existing prefix stripped, verification state moved to the receipt + PR body).
+  - **#942 — preflight & worktree base used the local checkout, not the serving state.** `lib/self-edit-engine.js` `detectAlreadyImplemented()` grepped/logged against `HEAD` (a possibly-stale feature branch); `src/worktree-manager.js` cut new worktrees from local `master`. Both now best-effort `git fetch origin master` and operate on `origin/master` (falling back to local if the remote-tracking ref is absent), so the preflight sees already-landed fixes and new work branches from the real base. Includes a fix to the citation parser, which a tree-ref grep prefix (`origin/master:…`) would otherwise have broken.
+  - **#896 — inconclusive tests counted as success.** `src/agent-worker-loop.js` `runTests()` defaulted `passed:true` and treated "no tests collected" (pytest exit 5) as a pass. It now classifies output into `{passed, inconclusive}` — a positive `N passed` with no failure marker is the only pass; no-tests / silent output is **inconclusive** — and `processOne()` rolls back + requeues inconclusive runs like failures. Successful receipts now carry `{provider, model, verified, evidence}` provenance. New regression test `tests/test_worker_loop_verification.js` (6 cases) covers the classifier.
+## [1.7.7] - 2026-06-21
+
+### Changed
+- **Knowledge Center reorganized to foreground research/internals.** Three layout changes to `apps/lantern-garage/public/knowledgecenter.html`: (1) the "🔬 Under the hood — research & internals" disclosure moved up to directly below the "New to Keystone?" hero (was buried below Quick help + Apps) and now **opens expanded by default** instead of collapsed; (2) the "Apps / Explore Keystone" card section was **removed** (the same apps are reachable from the site nav and `/explore.html`); (3) the "Document library" PDF gallery is now wrapped in a **collapsed** `kc-deep` disclosure (IDs preserved, so the `/api/pdfs` gallery + filter still work when expanded). Per-section collapse/expand verified; no console errors.
+
+## [1.7.6] - 2026-06-21
+
+### Fixed
+- **`/changelog.html` now scrolls and shows every release expanded by default.** The page reused dream-chat's `.app` shell, which `dream-chat.css` pins to `height:100vh; overflow:hidden` (a fixed-viewport chat layout) — so the ~23,000px of changelog content was clipped at the first screen with no way to scroll. Added a scoped override (`html, body { height:auto; overflow-y:auto }` + `.app { display:block; height:auto; overflow:visible }`) in the page's own `<style>`, which loads after `dream-chat.css` and wins. Also changed the render so **all** version blocks start expanded (was: only the newest), since the collapse-by-default made the full history invisible behind one-by-one clicks. Manual collapse/expand per version still works. Verified on the dev server: 47/47 expanded, page scrolls, no console errors.
+
+## [1.7.5] - 2026-06-21
+
+### Fixed
+- **`/changelog.html` rendered "No versions found" — now shows all 47 releases.** Three compounding bugs: (1) the `/repo/*.md` route only served a rendered HTML *viewer*, so the page's `fetch('/repo/CHANGELOG.MD')` received HTML instead of raw markdown and the parser matched 0 version headers — added a `?raw=1` param to `routes/files.js` that returns the unrendered file (viewer links without the param are unchanged); (2) the version-header regex required an em-dash separator but `CHANGELOG.MD` uses `## [x.y.z] - date` (hyphen), so all 47 headers were skipped — now tolerates hyphen / en-dash / em-dash; (3) `parseInlineMarkdown` never escaped `<>&`, so literal angle brackets in entries injected markup and corrupted `innerHTML`, silently truncating the list to 28 — now escapes HTML before applying inline markdown. Verified on the dev server: 47/47 versions render, collapse toggle works, no console errors.
+
+## [1.7.4] - 2026-06-21
+
+### Changed
+- **Knowledge Center: moved the collapsed "Under the hood — research & internals" disclosure above the "Apps / Explore Keystone" section** (`apps/lantern-garage/public/knowledgecenter.html`). The `<details class="kc-deep">` block now sits between "Quick help" and "Apps" instead of at the bottom of the page; it stays **collapsed by default**, so the only change is section order. Pure block relocation — tags balanced, lxml-parsed, preview-verified (`under_the_hood_before_apps: true`).
+
+## [1.7.3] - 2026-06-21
+
+### Changed
+- **Deprecation clarity: old CSF references are now unmistakable (code + docs).** Marked every retired / non-canonical CSF surface so it can't be confused with the canonical CSF-Pack + CSF-Omni (`csf` / `csf_pack` / `omni`): `src/csf/base3.py` and `src/csf/delta_stream.py` (the dead v0.3 symbolic delta-stream — banner: ⚠️ deprecated, *not* the CSF format); `src/csf/v07/csf_file.py` (re-headed from "CSF v0.6 File Format" → the v0.6/0.7 lattice **container** behind the Status-Cube store, *not* the compression format); `src/csf/v07/symbolic_dictionary.py` (reframed as a lossless lattice token table, *not* a compressor — dropped the "massive head-start … beats generic compressors" lossy-fiction claim); `src/csf/status_cube.py` (clarified it persists via the v0.7 lattice container, not canonical compression). Docs: `docs/ALEX-ASI-ARCHITECTURE.md` dropped a dangling reference to the deleted lossy `csf_symbolic_compressor.py`. Each banner points to the canonical core for real compression and to `csf.v07` as the 3¹² lattice *storage face*. Docstring-only — no functional change; 158 CSF tests pass.
+
+## [1.7.2] - 2026-06-21
+
+### Fixed
+- **Auth gate: home page no longer bounces guests to `/auth.html`.** `public/js/auth-gate.js` already honors the server's `authRequired` signal (so disabling the `patreon_auth` flag opens the site), but its client-side `PUBLIC` allow-list was missing `/` and `/index.html` — which **are** served publicly by `routes/pages.js` `PUBLIC_PAGES`. The mismatch meant a guest landing on the home page got redirected to `/auth.html?returnTo=%2F` whenever the gate was on. Added both paths so the two lists stay in lock-step. Also made the `/api/auth/session` fetch-failure path **fail open** (no client redirect on a transient error) — the server remains authoritative and issues its own 302 for genuinely protected pages, so the client bounce was redundant and harmful while the login flow is being disabled. Client-only change; no behavior change for authenticated users or protected routes.
+
+## [1.7.1] - 2026-06-21
+
+### Fixed
+- **Repo hygiene: broken launcher, dead paths, machine-wide `make stop` (#907, #906, #902).** Three independent housekeeping bugs that survived earlier partial fixes:
+  - `scripts/OneButton-SuperJarvisLaunch.ps1` shipped on `master` with committed git conflict markers (`<<<<<<< HEAD` … `>>>>>>> pr-340`) wrapping the *entire* file, so it would not parse — the launcher was simply broken. The two conflict sides were byte-identical, so resolution is a no-op merge: strip the markers and keep one clean copy (now parses via `[Parser]::ParseFile`). (#907)
+  - `scripts/_write_index.py` hardcoded a dead OneDrive output path; `scripts/extract-session-pairs.py` hardcoded the dead `C--Users-alexp-OneDrive-…` Claude-project slug. Both now derive their paths from `__file__`/`REPO_ROOT` (the slug is computed from the repo's absolute path the way Claude Code names its transcript dir), with a `CLAUDE_SESSIONS_DIR` env override. Companion fix to the already-landed `rebuild_index.py` portability fix. (#906)
+  - `make stop-services` ran `Get-Process node,ollama | Stop-Process -Force`, killing **every** Node/Ollama process on the machine. It is now port-scoped (4177/4178/11434) via `Get-NetTCPConnection … OwningProcess`, mirroring `Start-DualServers.ps1`, and a `make stop` alias was added. (#902)
+
+## [1.7.0] - 2026-06-21
+
+### Changed
+- **CSF-Omni: parallel panel encode (~3× faster) + skippable decode CRC.** The best-fit codec ([`src/csf/omni.py`](src/csf/omni.py)) ran the whole panel (store/zlib/bz2/lzma/zstd/brotli) serially, so its encode cost was the *sum* of all codecs — dominated by brotli-11 + lzma-9e. It now encodes the panel in a thread pool: the codecs are C extensions that release the GIL, so wall-clock drops from the sum to ~the slowest single codec while the result stays the **exact** best-fit (measured **13.1 s → 4.0 s, 3.2×**, on a 4 MB stream; same winner, byte-identical output; deterministic via a stable size+search-order sort). Decode: `omni.decompress(blob, verify=False)` skips the redundant CRC-32 pass when an outer check already covers the bytes — `csf_pack` now uses it (it verifies SHA-256 per file), speeding archive reads. (Considered a prefix-probe heuristic but dropped it: a small sample mis-ranks brotli, whose edge grows with input size, so it lost ratio; parallelism is exact and nearly as fast.) Tests: [`tests/test_csf_pack.py`](tests/test_csf_pack.py) — parallel encode is deterministic + exact; `verify` flag round-trips and still catches corruption.
+
+## [1.6.9] - 2026-06-21
+
+### Verify
+- **Close the EXTERNAL REALITY RULE loop end-to-end (#919 finding #2).** The Σ₀
+  verify pass already grounded each extracted claim into a
+  `[claim, evidence, confidence, source]` record, but those records never entered
+  the consent-gate claim-packet system — so nothing a grounded chat answer
+  asserted could be reviewed, signed, or exported as evidence. New
+  `lib/claim-draft.js` maps each genuinely-grounded, non-refuted, confident record
+  to a VALID `lantern.claim_packet.v1` packet in **`draft`** status and persists it
+  through the same `savePacket()` the API uses. Drafts are inert: not approved,
+  unsigned, never exportable — the operator still reviews/approves via the existing
+  consent gate (`routes/claims.js`). Wired into `dream-chat.verifyResponse` (Step 5),
+  so every caller benefits; gated by the existing `SIGMA0_VERIFY=true`. Verified via
+  `test/claim-draft.test.js` (10 checks: worthiness gate, packet validity,
+  inert/non-exportable invariant, end-to-end persist through the real consent gate).
+
+### Security
+- **Markdown renderer URL-scheme allowlist (red-team hardening).**
+  `lib/markdown-render.js` escaped HTML but never validated link/image **schemes**,
+  so `[x](javascript:…)` / `![](data:text/html…)` produced live XSS sinks. Since
+  automation / research-intake / harvest pipelines write `.md` into this repo that an
+  admin later views via the doc viewer (`routes/files.js`), that's a stored-XSS path.
+  New `safeUrl()` allows only http(s)/mailto/tel (+ raster `data:image/*` for `<img>`,
+  never `svg+xml`), strips control-char scheme smuggling, and collapses everything else
+  to `#`. Verified via `test/markdown-render.xss.test.js` (14 checks) + end-to-end
+  `renderMarkdownDocument` render. (The client chat renderer was already scheme-safe
+  by construction — its link/image regexes hardcode `https?://`.)
+## [1.6.8] - 2026-06-21
+
+### Changed
+- **Surface convergence-engine failures instead of swallowing them (Σ₀ #919 / #941).** [`stream-chat.js`](apps/lantern-garage/lib/stream-chat.js): when the kernel convergence route falls through to a direct LLM ("Convergence unavailable — answering directly"), the underlying `convResult.error` + reason is now `console.error`-logged (mirrors #921's MemOS-fallback fix). Found via the #941 live-loop verification on 4177 — the engine error was invisible, so the loop's grounding gap couldn't be diagnosed.
+
 ## [1.6.7] - 2026-06-21
 
 ### Tests

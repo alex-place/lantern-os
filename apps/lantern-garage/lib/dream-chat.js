@@ -1319,7 +1319,18 @@ async function verifyResponse(draft, userMessage, agentName) {
     }
   } catch { /* non-fatal */ }
 
-  return { verified, records, corrected };
+  // ── Step 5: bridge grounded records → consent-gate claim packets ──
+  // Closes the EXTERNAL REALITY RULE loop end-to-end (#919 finding #2): a
+  // grounded chat answer now drafts [claim, evidence, confidence, source]
+  // packets into the consent gate (status=draft, never auto-approved/signed).
+  // Best-effort: a packet hiccup must never corrupt the chat reply.
+  let claimDrafts = null;
+  try {
+    const { draftClaimsFromRecords } = require("./claim-draft");
+    claimDrafts = await draftClaimsFromRecords(REPO_ROOT, records, { agent: agentName });
+  } catch { /* non-fatal */ }
+
+  return { verified, records, corrected, claimDrafts };
 }
 
 // ── Initialize Token Audit ───────────────────────────────────────────

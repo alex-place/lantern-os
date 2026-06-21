@@ -917,8 +917,90 @@ async function generatePatch(repoRoot, plan, opts = {}) {
 
 // ── Module exports ────────────────────────────────────────────────────────
 
+// ── Already-implemented preflight ─────────────────────────────────────────
+// Cheap git-only check: has this issue's fix already landed? Open-but-fixed
+// issues are the #1 cause of wasted autowork runs — the loop regenerates a
+// stale diff, then aborts at the apply gate. We look for two signals on the
+// current checkout: (a) the issue number cited in a code comment/string, and
+// (b) a commit message referencing the issue. Either is treated as "likely
+// already implemented"; the caller surfaces the citation and skips unless the
+// run is forced. Heuristic by design — it errs toward surfacing, not blocking.
+function detectAlreadyImplemented(repoRoot, issueNumber, opts = {}) {
+  const n = String(issueNumber).replace(/[^0-9]/g, "");
+  // #942: ground the preflight on the SERVING state (origin/master) — not the
+  // local checkout's HEAD, which can be a stale feature branch that misses
+  // already-landed fixes. Best-effort fetch keeps origin/master current; if the
+  // ref can't be resolved we fall back to HEAD so the function still works offline.
+  let baseRef = opts.baseRef || "origin/master";
+  const empty = { implemented: false, citations: [], commits: [], ref: baseRef };
+  if (!n) return empty;
+
+  const runGit = (args) => {
+    try {
+      return execFileSync("git", args, {
+        cwd: repoRoot, encoding: "utf8", timeout: 15000, windowsHide: true,
+      });
+    } catch (e) {
+      // git grep exits 1 when there are no matches — that's "not found", not a
+      // failure. Salvage any stdout; treat everything else as no matches.
+      return e && e.stdout ? String(e.stdout) : "";
+    }
+  };
+
+  // Refresh + verify the base ref; fall back to HEAD if origin/master is absent.
+  try {
+    execFileSync("git", ["fetch", "origin", "master", "--quiet"], {
+      cwd: repoRoot, encoding: "utf8", timeout: 20000, windowsHide: true,
+    });
+  } catch (_e) { /* offline / no remote — use whatever origin/master we have */ }
+  try {
+    execFileSync("git", ["rev-parse", "--verify", "--quiet", baseRef], {
+      cwd: repoRoot, encoding: "utf8", timeout: 5000, windowsHide: true,
+    });
+  } catch (_e) { baseRef = "HEAD"; }
+
+  // (a) Code citations: an issue ref in a comment/string ("issue NNN",
+  // "issues/NNN", or a hash-prefixed number) — bounded so a longer number can't
+  // match a shorter one. Restricted to source files so docs/handoffs/changelog
+  // (which mention issues without implementing them) don't trigger false hits.
+  const pattern = `(#|issues?/|issue[ #]+)0*${n}([^0-9]|$)`;
+  const citations = [];
+  const grepOut = runGit([
+    "grep", "-n", "-E", "-I", "-i", pattern, baseRef, "--",
+    "*.js", "*.mjs", "*.cjs", "*.ts", "*.py", "*.ps1", "*.sh",
+    ":(exclude)**/node_modules/**",
+  ]);
+  // git grep against a TREE (origin/master/HEAD) prefixes each hit with "<ref>:"
+  // — strip it so the "file:line:" parse works the same as a working-tree grep (#942).
+  const refPrefix = baseRef + ":";
+  for (const raw of grepOut.split(/\r?\n/)) {
+    const line = raw.startsWith(refPrefix) ? raw.slice(refPrefix.length) : raw;
+    const m = line.match(/^([^:]+):(\d+):/);
+    if (m) citations.push({ file: m[1].replace(/\\/g, "/"), line: Number(m[2]) });
+    if (citations.length >= 10) break;
+  }
+
+  // (b) Commit messages referencing the issue (a "fixes"/"closes" hash ref).
+  const commits = [];
+  const logOut = runGit([
+    "log", "-E", "--grep", `#${n}\\b`, "--pretty=format:%h %s", "-n", "10", baseRef,
+  ]);
+  for (const line of logOut.split(/\r?\n/)) {
+    const t = line.trim();
+    if (t) commits.push(t);
+  }
+
+  return {
+    implemented: citations.length > 0 || commits.length > 0,
+    citations,
+    commits,
+    ref: baseRef,
+  };
+}
+
 module.exports = {
   isPathSafe,
+  detectAlreadyImplemented,
   sanitizeBranchName,
   parseUnifiedDiff,
   validateDiff,

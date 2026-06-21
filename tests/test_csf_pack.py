@@ -140,6 +140,39 @@ def test_omni_crc_detects_payload_corruption():
         omni.decompress(bytes(blob))
 
 
+def test_omni_parallel_encode_is_deterministic_and_exact():
+    """Large inputs encode via the thread pool: the result must be deterministic
+    (independent of thread completion order), round-trip lossless, and the EXACT
+    best-fit — i.e. equal to the panel minimum computed serially."""
+    from csf import omni
+    data = b"".join(
+        b'{"ts":%d,"px":%d,"side":"%s","id":"mkt-%06d"}\n'
+        % (i, 100 + (i % 37), b"yes" if i % 2 else b"no", i) for i in range(8_000))
+    assert len(data) > omni._PARALLEL_MIN                       # exercises the parallel path
+    a = omni.compress_best(data)
+    assert omni.compress_best(data) == a                       # deterministic across runs
+    assert omni.decompress(a) == data                          # lossless
+    for eff in ("max", "fast", "exhaustive"):
+        assert omni.decompress(omni.compress_best(data, effort=eff)) == data, eff
+    # exact best-fit: payload == the panel minimum computed serially
+    serial_min = min(len(omni.CODECS[c][2](omni.TRANSFORMS[t][1](data)))
+                     for t, c in omni._candidates("max", False))
+    assert len(a) - omni.HEADER_LEN == serial_min
+
+
+def test_omni_decompress_verify_flag():
+    """verify=False returns the same bytes but skips the CRC check (used by CSF-Pack)."""
+    from csf import omni
+    data = b"the quick brown fox " * 4000
+    blob = bytearray(omni.compress_best(data))
+    assert omni.decompress(bytes(blob), verify=True) == data
+    assert omni.decompress(bytes(blob), verify=False) == data
+    blob[-1] ^= 0x20  # corrupt a payload bit
+    # verify=True catches it; verify=False trusts the caller's outer integrity
+    with pytest.raises(ValueError):
+        omni.decompress(bytes(blob), verify=True)
+
+
 @pytest.mark.skipif(not _HAS_ZSTD, reason="zstandard not installed")
 def test_default_codec_is_zstd():
     with tempfile.TemporaryDirectory() as d:

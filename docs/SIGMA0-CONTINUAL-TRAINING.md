@@ -164,6 +164,5 @@ honest full-set figure is well under the cherry-picked first-20 `0.75`. Treat ~0
 > `data/eval/leaderboard.jsonl` when it completes.
 
 ## Related
-- [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) — the looped local coder this trains
-- [OURO-LOOPLM.md](OURO-LOOPLM.md) — the adaptive-depth Q-exit mechanism
+- [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) — the looped local coder this trains (single source of truth, incl. the adaptive-depth Q-exit mechanism)
 - [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the North Star boundary

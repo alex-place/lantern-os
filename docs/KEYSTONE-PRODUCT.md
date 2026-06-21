@@ -49,7 +49,7 @@ system.** That is the product.
 
 The **Σ₀ coding agent** is the sibling surface with its own north star — *ship changes the
 developer merges with confidence (correct, verified, proof-backed)*; see
-[LANTERN-SIGMA0-CODER](LANTERN-SIGMA0-CODER.md). Both are the same loop with different
+[SIGMA0-OURO-CODER](SIGMA0-OURO-CODER.md). Both are the same loop with different
 Verify surfaces: chat verifies by **grounding/citations**, the coder by **tests**.
 
 ---

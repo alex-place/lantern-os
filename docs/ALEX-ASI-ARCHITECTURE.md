@@ -20,9 +20,14 @@ ALEX is built on three foundational layers:
 
 CTF (Compressed Symbolic Format) provides the symbolic reasoning layer for ALEX.
 
+> ⚠️ **Deprecated/removed:** the lossy "Symbolic Compressor"
+> (`csf/v07/csf_symbolic_compressor.py`) and `ClassicalCompressor` were **removed** in
+> the v2 CSF consolidation (2026-06) — non-invertible, no decoder. For real, lossless
+> compression use the canonical `csf` package (`csf_pack` / `omni`). What remains in
+> `csf.v07` is the 3¹² lattice **storage face** (the Tesseract substrate), not a compressor.
+
 ### Components
-- **Symbolic Compressor** (`src/csf/v07/csf_symbolic_compressor.py`) - End-to-end symbolic compression pipeline
-- **Symbolic Dictionary** (`src/csf/v07/symbolic_dictionary.py`) - Pre-loaded symbolic vocabulary (4,229 bytes)
+- **Symbolic Dictionary** (`src/csf/v07/symbolic_dictionary.py`) — lossless world-anchor token table for the v0.7 lattice container (a primitive, **not** a compressor)
 - **Convergence Engine** (`src/csf/v07/convergence_engine.py`) - Quantum dust field convergence
 - **MemOS Bridge** (`src/convergence_io/memos_bridge.py`) - Semantic memory retrieval
 

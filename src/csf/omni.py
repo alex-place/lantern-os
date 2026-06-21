@@ -46,6 +46,7 @@ from __future__ import annotations
 import bz2
 import lzma
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 # Optional high-ratio codecs --------------------------------------------------
@@ -181,13 +182,22 @@ def _candidates(effort: str, portable: bool) -> list[tuple[int, int]]:
     return order
 
 
+# Above this size the panel is encoded in a thread pool — the codecs are C
+# extensions that release the GIL during compression, so the panel's wall-clock
+# drops from the SUM of all codecs to ~the slowest single one, with NO change to the
+# (exact) result. Below it, thread setup isn't worth it.
+_PARALLEL_MIN = 256 * 1024
+
+
 def _encode_all(data: bytes, effort: str, portable: bool) -> list[tuple[int, int, int, bytes]]:
     """Encode `data` with every candidate, smallest first.
 
-    Each transform is computed exactly once (cached) and reused across codecs, so a
-    pure-Python pre-pass like `delta` never runs more than once. Returns a list of
-    (payload_size, transform_id, codec_id, payload) sorted ascending by size; ties
-    keep search order (stable sort), so selection is deterministic.
+    Each transform is computed once (cached) and reused across codecs. The codec
+    encodes run in parallel for large inputs (the C codecs release the GIL), so this
+    is ~as fast as the slowest single codec rather than their sum — the result is
+    still the EXACT best-fit. Returns (payload_size, transform_id, codec_id, payload)
+    sorted by size; ties break by candidate search order, so selection is
+    deterministic regardless of thread completion order.
     """
     cands = _candidates(effort, portable)
     tcache: dict[int, bytes] = {}
@@ -197,19 +207,27 @@ def _encode_all(data: bytes, effort: str, portable: bool) -> list[tuple[int, int
         except Exception:
             tcache[tid] = None  # type: ignore[assignment]
 
-    results: list[tuple[int, int, int, bytes]] = []
-    for tid, cid in cands:
+    def _enc(item):
+        order, (tid, cid) = item
         src = tcache.get(tid)
         if src is None:
-            continue
-        _cname, _avail, enc, _dec = CODECS[cid]
+            return None
         try:
-            payload = enc(src)
+            payload = CODECS[cid][2](src)
         except Exception:
-            continue
-        results.append((len(payload), tid, cid, payload))
-    results.sort(key=lambda r: r[0])  # stable -> search order breaks ties
-    return results
+            return None
+        return (len(payload), order, tid, cid, payload)
+
+    items = list(enumerate(cands))
+    if len(data) >= _PARALLEL_MIN and len(cands) > 2:
+        with ThreadPoolExecutor(max_workers=min(8, len(cands))) as ex:
+            raw = list(ex.map(_enc, items))
+    else:
+        raw = [_enc(it) for it in items]
+
+    results = [r for r in raw if r is not None]
+    results.sort(key=lambda r: (r[0], r[1]))   # size, then search order -> deterministic
+    return [(sz, tid, cid, pl) for sz, _order, tid, cid, pl in results]
 
 
 def rank(data: bytes, effort: str = "max", portable: bool = False) -> list[tuple[str, int]]:
@@ -228,11 +246,15 @@ def rank(data: bytes, effort: str = "max", portable: bool = False) -> list[tuple
 
 
 def compress_best(data: bytes, effort: str = "max", portable: bool = False) -> bytes:
-    """Compress `data` with the deterministically smallest verified candidate.
+    """Compress `data` with the deterministically smallest verified candidate → a
+    self-describing, CRC-checked blob (decode with `decompress`).
 
-    The returned blob is self-describing and integrity-checked — decode it with
-    `decompress`. Guaranteed `len(result) <= min(len(codec(data)) for codec in panel)
-    + 7`, i.e. never worse than the best codec in the panel (plus the 7-byte header).
+    The panel is encoded in parallel for large inputs (the C codecs release the GIL),
+    so this is ~as fast as the slowest single codec while remaining the EXACT best-fit
+    — `len(result) <= min(codec(data)) + 7` (the 7-byte header).
+
+    effort: ``max`` (default, full panel) · ``fast`` (store/zlib/zstd, hot paths) ·
+    ``exhaustive`` (adds the byte transforms). Lossless + deterministic in every mode.
     """
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("compress_best expects bytes")
@@ -272,14 +294,19 @@ def _decode_method(method: int, payload: bytes) -> bytes:
                          f"({type(e).__name__}: {e})") from e
 
 
-def decompress(blob: bytes) -> bytes:
-    """Invert `compress_best`. Raises ValueError on a non-CSF-Omni blob or corruption."""
+def decompress(blob: bytes, verify: bool = True) -> bytes:
+    """Invert `compress_best`. Raises ValueError on a non-CSF-Omni blob or corruption.
+
+    `verify=True` (default) checks the CRC-32 of the decoded output — it catches
+    corruption that a raw zstd/brotli frame returns silently. Pass `verify=False` to
+    skip that O(n) pass when an OUTER integrity check already covers these bytes (e.g.
+    CSF-Pack verifies SHA-256 per file after decode), which speeds decode up materially
+    on the archive path. Magic/method are always validated.
+    """
     if len(blob) < HEADER_LEN or blob[:2] != MAGIC:
         raise ValueError("not a CSF-Omni blob (bad magic)")
-    method = blob[2]
-    crc = int.from_bytes(blob[3:7], "big")
-    result = _decode_method(method, blob[HEADER_LEN:])
-    if (zlib.crc32(result) & 0xFFFFFFFF) != crc:
+    result = _decode_method(blob[2], blob[HEADER_LEN:])
+    if verify and (zlib.crc32(result) & 0xFFFFFFFF) != int.from_bytes(blob[3:7], "big"):
         raise ValueError("CSF-Omni: integrity check failed (CRC-32 mismatch — corrupt blob)")
     return result
 
