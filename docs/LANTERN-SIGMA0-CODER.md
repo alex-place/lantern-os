@@ -4,15 +4,32 @@ created: 2026-06-18
 updated: 2026-06-20
 ---
 
-# lantern-sigma0-coder — local Σ₀ coding agent
+# lantern-sigma0-coder — local Σ₀ coding agent (LEGACY / DEPRECATED)
 
-`lantern-sigma0-coder` is Keystone OS's **own local coding model**: a LoRA fine-tuned on the
+> ## ⚠️ DEPRECATED — legacy model, superseded 2026-06-20
+>
+> `lantern-sigma0-coder` is the **legacy** local coder (Qwen2.5-Coder-3B QLoRA, served via
+> Ollama). It has been **superseded by the [Σ₀ Ouro Coder](SIGMA0-OURO-CODER.md)** — the
+> looped **Ouro-1.4B** model with a locally-trained Σ₀ QLoRA adapter — after the Ollama
+> serving sunset (issue #811 / PR #823).
+>
+> **Verified on disk (2026-06-20):** the Qwen training outputs (`D:\lantern-train\sigma0-adapters`,
+> `sigma0-merged`) have been **removed**, and `lantern-sigma0-coder-v2` is **no longer registered
+> in Ollama** (only the base `qwen2.5-coder` blob remains). The active local coder is now the Ouro
+> Σ₀ adapter at `D:\lantern-train\ouro-sigma0-adapters\final\` (base `ByteDance/Ouro-1.4B`,
+> LoRA r=16/α=32, trained locally).
+>
+> **Current coder:** [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) · [SIGMA0-K1-KERNEL-SPEC.md](SIGMA0-K1-KERNEL-SPEC.md).
+> The rest of this page is retained for history.
+
+`lantern-sigma0-coder` *was* Keystone OS's **own local coding model**: a LoRA fine-tuned on the
 project's past Claude Code engineering sessions, served through Ollama, and routed to work by
-the performance leaderboard. It is the local-first coder behind autowork and the Keystone
-engineering desk — continually retrained so it keeps getting better at *this* codebase.
+the performance leaderboard. It was the local-first coder behind autowork and the Keystone
+engineering desk.
 
-> **Status (2026-06-18):** trained, deployed, wired, and leaderboard-routed. Base is **3B**
-> (fits the dev GPU); see [Honest scope](#honest-scope).
+> **Status (superseded 2026-06-20; originally 2026-06-18):** trained, deployed, wired, and
+> leaderboard-routed on a **3B** base — now retired in favour of the looped Ouro coder. See
+> the deprecation banner above and [Honest scope](#honest-scope).
 
 ---
 

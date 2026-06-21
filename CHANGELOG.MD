@@ -71,6 +71,18 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.1] - 2026-06-20
+
+### Changed
+- **Local Σ₀ coder default flipped to the Ouro model.** `lib/model-registry.js` (`text.coder`) and `lib/model-leaderboard.js` (`preferredLocalModel()`) now default to `ouro:latest` — the Σ₀ Ouro looped coder served by `scripts/ouro_serve.py` on :11434 — instead of the legacy `lantern-sigma0-coder-v2`. `ouro_serve.py` keeps a back-compat allowlist that still serves Ouro for the old name, so the flip is non-breaking. `text.coderLoop.adapterPath` now defaults to the on-disk `D:/lantern-train/ouro-sigma0-adapters/final` (the `/v2` promotion target is not trained yet); removed the dead `adapterPathFallback` field.
+
+### Deprecated
+- **`lantern-sigma0-coder` (Qwen2.5-Coder-3B QLoRA) is deprecated**, superseded by the Σ₀ Ouro Coder. Its Qwen training outputs and Ollama deployment were removed (verified: `lantern-sigma0-coder-v2` no longer appears in Ollama manifests; only the base `qwen2.5-coder` blob remains). `docs/LANTERN-SIGMA0-CODER.md` now carries a deprecation banner and the Knowledge Center card is marked **Legacy**.
+
+### Added
+- Knowledge Center: **Σ₀-K1 Kernel Spec** research card + grounding link (`docs/SIGMA0-K1-KERNEL-SPEC.md`).
+- **Agent rule + Stop hook — "no uncommitted code":** `AGENTS.md` Workspace Hygiene gains a Commit-discipline rule, backed by `scripts/hooks/stop-warn-uncommitted.sh` (wired locally via `.claude/settings.json`) which nudges at end-of-turn when tracked code is left uncommitted.
+
 ## [1.5.0] - 2026-06-20
 
 ### Changed

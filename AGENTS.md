@@ -377,6 +377,21 @@ A clean workspace prevents context fragmentation and merge rot.
 - **Branch naming:** `<type>/<short-description>` (e.g., `feat/convergence-io-tier`, `fix/mcp-dotenv`).
 - **Valid types:** `feat`, `fix`, `docs`, `chore`, `test`, `refactor`.
 
+### Commit discipline — no uncommitted code (Critical)
+**Uncommitted code is not accepted.** Any code you author in a session must land on a branch
+and be pushed to a PR before the task is considered done. Never leave agent-authored changes
+sitting in the working tree, and never `git stash` or commit to `master` to "park" work.
+
+- Finish a task by committing your changes to a `claude/*` (or your lane's) branch and opening a PR.
+- This working tree is frequently dirty from automation churn (`data/`, caches, regenerated
+  assets) — so commit **only the files you changed** (`git add <paths>`), never `git add -A`. That
+  risks sweeping in unrelated churn or PII. When the tree is too noisy to isolate your change,
+  work in a fresh worktree off `origin/master`
+  (`git worktree add -b <lane>/<desc> ../wt origin/master`) and apply just your files there.
+- A local **Stop hook** (`scripts/hooks/stop-warn-uncommitted.sh`, wired via `.claude/settings.json`)
+  nudges you at end-of-turn when tracked code files are left uncommitted. It is a reminder, not a gate
+  (the tree's ambient churn makes a hard block impractical).
+
 ### Before starting work
 ```bash
 # 1. Check for open PRs (monoworkstream)

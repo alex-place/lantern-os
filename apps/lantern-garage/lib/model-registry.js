@@ -32,11 +32,15 @@ module.exports = {
       surfaces: ["eval", "promotion", "receipts", "task-loop"],
     },
     coder: {
-      // Continually-trained local Σ₀ coding agent. LoRA fine-tuned on Claude
-      // sessions; promoted by the continual-training loop + leaderboard.
+      // Σ₀ coding agent (fast cached serving). The legacy Qwen2.5-Coder-3B
+      // `lantern-sigma0-coder-v2` is DEPRECATED (Ollama sunset #811/#823): its Qwen
+      // weights + Ollama deployment were removed. The coder surface now serves the
+      // Σ₀ Ouro coder via ouro_serve.py (ouro:latest on :11434); ouro_serve still
+      // accepts the old name for back-compat. See docs/SIGMA0-OURO-CODER.md and
+      // docs/LANTERN-SIGMA0-CODER.md (deprecated). DEEP loop variant: `coderLoop`.
       profileId: "lantern-sigma0-coder",
-      ollamaModel: process.env.OLLAMA_MODEL || "lantern-sigma0-coder-v2",
-      baseModel: "Qwen/Qwen2.5-Coder-3B-Instruct",
+      ollamaModel: process.env.OLLAMA_MODEL || "ouro:latest",
+      baseModel: "ByteDance/Ouro-1.4B",  // legacy base was Qwen/Qwen2.5-Coder-3B-Instruct
       trainingData: "models/lantern-sigma0-coder/training-data.jsonl",
       surfaces: ["autowork", "coding", "code-execution", "task-loop"],
       continualTraining: true,
@@ -47,12 +51,13 @@ module.exports = {
       // NOT Ollama. Retrained on the execution-verified coding corpus (#781). The
       // adapter path is the promotion target every harness/loop reads by default;
       // override with OURO_ADAPTER env.
-      // v2 adapter: train with scripts/prepare_coding_train_data.py + train-qlora-ouro.py
-      //   --out D:/lantern-train/ouro-sigma0-adapters/v2
+      // Adapter default points at the trained, on-disk `/final` (verified 2026-06-20:
+      // 57.92 MB, base ByteDance/Ouro-1.4B, LoRA r=16/α=32). The `/v2` promotion target
+      // is not trained yet — retrain with scripts/prepare_coding_train_data.py +
+      // train-qlora-ouro.py --out D:/lantern-train/ouro-sigma0-adapters/v2, then repoint.
       profileId: "lantern-sigma0-coder-loop",
       baseModel: "ByteDance/Ouro-1.4B",
-      adapterPath: process.env.OURO_ADAPTER || "D:/lantern-train/ouro-sigma0-adapters/v2",
-      adapterPathFallback: "D:/lantern-train/ouro-sigma0-adapters/final",
+      adapterPath: process.env.OURO_ADAPTER || "D:/lantern-train/ouro-sigma0-adapters/final",
       trainingData: "models/lantern-sigma0-coder/training-data.jsonl",
       trainingScript: "scripts/train-qlora-ouro.py",
       prepScript: "scripts/prepare_coding_train_data.py",

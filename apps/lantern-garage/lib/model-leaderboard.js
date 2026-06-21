@@ -3,16 +3,20 @@
  *
  * Makes the local Ollama model chain LEADERBOARD-DRIVEN instead of static:
  * the best-performing model for a task (by agent-performance compositeScore)
- * is tried first, so the continually-trained local model (OLLAMA_MODEL, e.g.
- * lantern-sigma0-coder-v2) rises to the top of "work / units / tasks" as it
- * proves itself. Falls back to the static chain when there's no signal yet.
+ * is tried first, so the local coder (OLLAMA_MODEL, default ouro:latest — the
+ * Σ₀ Ouro looped coder served by ouro_serve.py on :11434) rises to the top of
+ * "work / units / tasks" as it proves itself. Falls back to the static chain
+ * when there's no signal yet.
  */
 
 const { getTopAgentsForTask, recordAgentCallFromConvergenceReceipt } = require("./agent-performance");
 
-// The continually-trained local coding model. Always a candidate for work.
+// The local coding model — always a candidate for work. Defaults to the Σ₀ Ouro
+// looped coder (ouro:latest on :11434). The legacy Qwen `lantern-sigma0-coder-v2`
+// is DEPRECATED (Ollama sunset #811/#823); ouro_serve still accepts that name for
+// back-compat, but new routing prefers ouro:latest. Override with OLLAMA_MODEL.
 function preferredLocalModel() {
-  return process.env.OLLAMA_MODEL || "lantern-sigma0-coder-v2";
+  return process.env.OLLAMA_MODEL || "ouro:latest";
 }
 
 /**
