@@ -62,6 +62,21 @@ class ConvergenceTracker:
                 and self.confidence_growth() >= 0.0
                 and self.failure_reduction() >= 0.0)
 
+
+def grounding_precision_over_records(
+    records: Iterable[ConvergenceRecord], *, threshold: float = 0.7
+) -> float:
+    """Gate B grounding-precision over ConvergenceRecords (#849).
+
+    Projects each record to a GroundingEnvelope via ``GroundingEnvelope.from_record``
+    and delegates to ``grounding.grounding_precision``.  Kept in ``metrics`` so callers
+    that already import from here don't need a second import.
+    """
+    from .grounding import GroundingEnvelope, grounding_precision
+
+    envelopes = [GroundingEnvelope.from_record(r) for r in records]
+    return grounding_precision(envelopes, threshold=threshold)
+
     def trajectory(self) -> Dict[str, Any]:
         """Summary of the convergence trajectory across all snapshots."""
         return {
