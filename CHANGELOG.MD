@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.24] - 2026-06-21
+
+### Fixed
+- **Grounder over-rejected corroborated claims (#908).** `src/convergence/research.py`: the claim-clustering `similarity_threshold` was 0.45, but verbatim per-source snippets rarely share >45% of tokens, so genuinely-corroborated claims got scored single-source/unsupported. Lowered to **0.30** (Szymkiewicz-Simpson overlap) and extracted the greedy clustering into `_cluster_claims` (test: `test_research_clustering.py`, 4 cases). Extracted from #979 — its #937/#939/#940 parts duplicated #955's already-landed csf relabel / contradiction scanner / archive-grounding consent guard, so only this unique #908 fix was taken.
+
 ## [1.7.23] - 2026-06-21
 
 ### Fixed
