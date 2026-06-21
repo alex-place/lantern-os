@@ -1,0 +1,544 @@
+/* Creator Suite Unified Theme */
+/* Shared styling for Dashboard and Project Workspace */
+
+:root {
+  /* Colors */
+  --bg: #0b0d14;
+  --surface: #13161f;
+  --surface2: #1a1d2a;
+  --border: #252840;
+  --text: #e8eaf6;
+  --muted: #7880a4;
+  --accent: #7c6af7;
+  --accent-hover: #6a54d4;
+  --accent-dim: rgba(124, 106, 247, 0.1);
+  --green: #4caf82;
+  --gold: #e2c97e;
+  --danger: #e05555;
+
+  /* Spacing */
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+  /* Typography */
+  --font-family: "Segoe UI", system-ui, sans-serif;
+  --font-size-base: 15px;
+  --font-size-sm: 0.9rem;
+  --font-size-xs: 0.85rem;
+  --line-height: 1.6;
+}
+
+html, body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height);
+  margin: 0;
+}
+
+/* ── Page Container ── */
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ── Header ── */
+header,
+.page-header {
+  margin-bottom: 24px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+header h1,
+.page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+header .entry-meta {
+  margin-left: auto;
+  text-align: right;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.back-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  margin-bottom: 16px;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Cards & Containers ── */
+.card,
+.upload-card,
+.info-box,
+.project-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.card,
+.upload-card,
+.info-box {
+  padding: 32px;
+  box-shadow: var(--shadow);
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.project-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* ── Buttons ── */
+button,
+.button,
+[class*="btn"] {
+  padding: 10px 24px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.button-primary,
+.btn-primary,
+[class*="button"]:not(.file-input-button) {
+  background: var(--accent);
+  color: white;
+}
+
+.button-primary:hover,
+.btn-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-hover);
+}
+
+.button-secondary,
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.button-secondary:hover,
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button:disabled,
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Upload Zone ── */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--surface2);
+  margin: 24px 0;
+}
+
+.upload-zone:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.upload-zone.dragging {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.upload-zone .icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.upload-zone p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.upload-zone input[type="file"] {
+  display: none;
+}
+
+/* ── Workspace Navigation ── */
+.workspace-nav {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+
+.workspace-nav-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  padding-right: 12px;
+  border-right: 1px solid var(--border);
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.tab-button {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-xs);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tab-button::before {
+  font-size: 1rem;
+  display: inline-block;
+}
+
+.tab-button[onclick*="overview"]::before {
+  content: "📊";
+}
+
+.tab-button[onclick*="analysis"]::before {
+  content: "📈";
+}
+
+.tab-button[onclick*="renders"]::before {
+  content: "🎬";
+}
+
+.tab-button[onclick*="metadata"]::before {
+  content: "📝";
+}
+
+.tab-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(124, 106, 247, 0.05);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.tab-button.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.2), var(--shadow);
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+/* ── Grid Layouts ── */
+.info-grid,
+.highlights-list,
+.artifacts-grid,
+.projects-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  margin-bottom: 24px;
+}
+
+.highlights-list,
+.artifacts-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.projects-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+/* ── Info Boxes ── */
+.info-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ── Badges & Status ── */
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-xs);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.badge-success {
+  background: rgba(76, 175, 130, 0.2);
+  color: var(--green);
+}
+
+.badge-processing {
+  background: rgba(226, 201, 126, 0.2);
+  color: var(--gold);
+}
+
+.badge-error {
+  background: rgba(224, 85, 85, 0.2);
+  color: var(--danger);
+}
+
+.status-badge {
+  position: absolute;
+  font-size: 1.2rem;
+  z-index: 2;
+}
+
+/* ── Progress Bars ── */
+.progress-bar,
+.highlight-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  margin-top: 6px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill,
+.highlight-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* ── Modals ── */
+.modal,
+.rename-modal,
+.delete-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.show,
+.rename-modal.show,
+.delete-modal.show {
+  display: flex;
+}
+
+.modal-content,
+.rename-modal-content,
+.delete-modal-content {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header,
+.rename-modal-header,
+.delete-modal-header {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.delete-modal-header {
+  color: var(--danger);
+}
+
+.modal-input,
+.rename-modal-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  margin-bottom: 24px;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.modal-input:focus,
+.rename-modal-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.modal-actions,
+.rename-modal-actions,
+.delete-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.modal-actions button,
+.rename-modal-actions button,
+.delete-modal-actions button {
+  padding: 10px 24px;
+}
+
+/* ── Status Messages ── */
+.status-message {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  display: none;
+  border: 1px solid;
+  font-size: var(--font-size-sm);
+}
+
+.status-message.show {
+  display: block;
+}
+
+.status-message.success {
+  background: rgba(76, 175, 130, 0.1);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.status-message.error {
+  background: rgba(224, 85, 85, 0.1);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.status-message.loading {
+  background: rgba(124, 106, 247, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Empty States ── */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.empty-state .icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.empty-state p {
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .page {
+    padding: 16px;
+  }
+
+  .projects-grid,
+  .artifacts-grid,
+  .highlights-list {
+    grid-template-columns: 1fr;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  header .entry-meta {
+    margin-left: 0;
+    text-align: left;
+  }
+
+  header h1,
+  .page-header h1 {
+    font-size: 1.3rem;
+  }
+}
