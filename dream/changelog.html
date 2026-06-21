@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="css/dream-chat.css">
   <style>
+    /* This page is a long scrolling document, not the fixed-viewport chat shell.
+       dream-chat.css sets html/body/.app to height:100vh + overflow:hidden, which
+       clips the changelog and blocks scrolling. Override so the page scrolls. */
+    html, body { height: auto; overflow-y: auto; }
+    .app { display: block; height: auto; overflow: visible; }
     .changelog-page { max-width: 780px; margin: 0 auto; padding: 0 24px 80px; }
     .changelog-header {
       display: flex; align-items: center; gap: 12px;
@@ -140,12 +145,12 @@
 
       return `
         <div class="version-block">
-          <div class="version-header ${idx === 0 ? 'open' : ''}" onclick="toggleVersion(this)">
+          <div class="version-header open" onclick="toggleVersion(this)">
             <h2>${escapeHtml(ver.title)}</h2>
             <span class="date">${escapeHtml(ver.date)}</span>
             <span class="toggle">▶</span>
           </div>
-          <div class="version-body ${idx === 0 ? 'open' : ''}">
+          <div class="version-body open">
             ${sectionsHtml}
           </div>
         </div>
