@@ -15,6 +15,7 @@
 
 const PRIORS = require("../research/viral_patterns.json");
 const { effectivePriors } = require("./editing-priors-adapter");
+const { loadCalibratedWeights } = require("../calibration/weights-artifact");
 
 function clamp01(x) {
   if (!Number.isFinite(x)) return 0;
@@ -199,7 +200,15 @@ function viralScoreV10(analysis = {}) {
 
   // Weights adapt to open-video research once >25 samples exist (else baseline).
   // Signal THRESHOLDS stay at baseline (units differ) — see the adapter.
-  const eff = effectivePriors(PRIORS);
+  // Calibration bridge (B4): if the operator's labeled outcomes have produced a
+  // calibrated weight set (weight-calibration -> weights-artifact), score with it and
+  // report calibrated:true. Absent that, fall back to the heuristic / open-video priors
+  // (calibrated:false). insufficient_data is never persisted, so this never fabricates.
+  const priorEff = effectivePriors(PRIORS);
+  const cal = loadCalibratedWeights();
+  const eff = cal
+    ? { weights: { ...priorEff.weights, ...cal.weights }, _priorInformed: priorEff._priorInformed, _samples: priorEff._samples }
+    : priorEff;
   const w = eff.weights;
   let viralScore = 0;
   let confWeighted = 0;
@@ -221,13 +230,15 @@ function viralScoreV10(analysis = {}) {
     viralScore: round3(clamp01(viralScore)),
     confidence: round3(clamp01(baseConfidence * dataPenalty)),
     componentScores,
-    basis: "structural_heuristic",
-    calibrated: false,
+    basis: cal ? "calibrated" : "structural_heuristic",
+    calibrated: !!cal,
     priorInformed: eff._priorInformed,
     priorSamples: eff._samples,
-    weightsSource: eff._priorInformed
-      ? "research/viral_patterns.json + editing_priors.json (open-video, >25 samples)"
-      : "research/viral_patterns.json",
+    weightsSource: cal
+      ? `calibrated: operator outcomes (n=${cal.sampleSize ?? "?"}, target=${cal.targetMetric ?? "?"})`
+      : eff._priorInformed
+        ? "research/viral_patterns.json + editing_priors.json (open-video, >25 samples)"
+        : "research/viral_patterns.json",
     signals: s,
     computedAt: new Date().toISOString(),
   };

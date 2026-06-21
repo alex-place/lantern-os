@@ -310,3 +310,4 @@ data/pcsf/settings.pcsf.json
 # the kernel memory log and per-run act scratch regenerate on every run.
 data/convergence-autonomous-memory.jsonl
 data/autonomous-acts/
+data/creator-intelligence/calibrated-weights.json
