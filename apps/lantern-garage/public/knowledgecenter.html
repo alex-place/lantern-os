@@ -297,7 +297,7 @@
         const r = await fetch('/api/knowledge/query?q=' + encodeURIComponent(q));
         const d = await r.json();
         if (d && d.hit) {
-          const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+          const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
           out.innerHTML =
             '<div class="link-card" style="display:block;cursor:default">' +
             '<div style="font-size:.8em;opacity:.7">tier: <b>' + d.tier + '</b> · score ' + (d.score ?? '—') +

@@ -143,7 +143,7 @@ function renderBlock(lines) {
       }
     }
     // Task-list item: - [ ] / - [x]
-    const task = /^\[([ xX])\]\s+(.*)$/.exec(content);
+    const task = content.match(/^\[([ xX])\]\s+(.*)$/);
     if (task) {
       const checked = task[1].toLowerCase() === "x" ? " checked" : "";
       body.push(`<li class="task"><input type="checkbox" disabled${checked}> ${inlineMarkdown(task[2])}`);
@@ -169,7 +169,7 @@ function renderBlock(lines) {
       return;
     }
     // Blockquote: gather consecutive `>` lines, strip the marker, render recursively.
-    const quote = /^\s*>\s?(.*)$/.exec(line);
+    const quote = line.match(/^\s*>\s?(.*)$/);
     if (quote) {
       flushPara();
       closeLists();
@@ -194,7 +194,7 @@ function renderBlock(lines) {
       body.push("<hr>");
       return;
     }
-    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (heading) {
       flushPara();
       closeLists();
@@ -203,7 +203,7 @@ function renderBlock(lines) {
       body.push(`<h${level}${id ? ` id="${escapeHtml(id)}"` : ""}>${inlineMarkdown(heading[2])}</h${level}>`);
       return;
     }
-    const listItem = /^(\s*)(?:[-*+]|\d+[.)])\s+(.+)$/.exec(line);
+    const listItem = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+(.+)$/);
     if (listItem) {
       flushPara();
       const indent = listItem[1].length;
@@ -233,11 +233,11 @@ function renderBlock(lines) {
 // instead of a stray <hr> + paragraphs at the top of the page.
 function parseFrontmatter(text) {
   const stripped = text.replace(/^﻿/, "");
-  const m = /^---\n([\s\S]*?)\n---\n?/.exec(stripped);
+  const m = stripped.match(/^---\n([\s\S]*?)\n---\n?/);
   if (!m) return { meta: {}, body: stripped };
   const meta = {};
   for (const line of m[1].split("\n")) {
-    const kv = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line.trim());
+    const kv = line.trim().match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (kv) meta[kv[1].toLowerCase()] = kv[2].replace(/^["']|["']$/g, "").trim();
   }
   return { meta, body: stripped.slice(m[0].length) };
@@ -246,8 +246,12 @@ function parseFrontmatter(text) {
 function renderMarkdownDocument(markdown, sourcePath) {
   const { meta, body: parsed } = parseFrontmatter(markdown.replace(/\r\n/g, "\n"));
   // Drop HTML comments (READMEs place badge rows next to <!-- … --> dividers).
-  const content = parsed.replace(/<!--[\s\S]*?-->/g, "");
-  const titleMatch = /^#\s+(.+)$/m.exec(content);
+  let content = parsed;
+  for (let prev = null; prev !== content; ) {
+    prev = content;
+    content = content.replace(/<!--[\s\S]*?-->/g, "");
+  }
+  const titleMatch = content.match(/^#\s+(.+)$/m);
   const title = titleMatch ? titleMatch[1].trim() : path.basename(sourcePath);
   const body = renderBlock(content.split("\n"));
   const byline = meta.author

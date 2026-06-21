@@ -15,6 +15,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.3] - 2026-06-21
+
+### Security
+- **Hardened the markdown reader and Knowledge Center search against the CodeQL/OWASP findings carried in by #914.** [`apps/lantern-garage/lib/markdown-render.js`](apps/lantern-garage/lib/markdown-render.js): the HTML-comment strip now loops until stable so a nested/overlapping `<!-- <!-- --> -->` can't leave a dangling marker (CodeQL high — *incomplete multi-character sanitization*), and the block parser uses `String.match()` instead of `RegExp.exec()` so the OWASP "exec(" pattern guard stops false-positiving on regex method calls. [`apps/lantern-garage/public/knowledgecenter.html`](apps/lantern-garage/public/knowledgecenter.html): the grounding-search `esc()` helper now also encodes `"` and `'`, so a result `source` can't break out of the `href="…"` attribute (CodeQL medium — *incomplete HTML attribute sanitization*). No behaviour change to rendering (badges, anchors, nested lists, newspaper layout, byline all verified unchanged).
+
+---
+
 ## [1.6.2] - 2026-06-21
 
 ### Fixed
