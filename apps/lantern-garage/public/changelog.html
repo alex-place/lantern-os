@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="css/dream-chat.css">
   <style>
+    /* This page is a long scrolling document, not the fixed-viewport chat shell.
+       dream-chat.css sets html/body/.app to height:100vh + overflow:hidden, which
+       clips the changelog and blocks scrolling. Override so the page scrolls. */
+    html, body { height: auto; overflow-y: auto; }
+    .app { display: block; height: auto; overflow: visible; }
     .changelog-page { max-width: 780px; margin: 0 auto; padding: 0 24px 80px; }
     .changelog-header {
       display: flex; align-items: center; gap: 12px;
@@ -87,7 +92,7 @@
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const versionMatch = line.match(/^## \[(.+?)\] — (.+)/);
+      const versionMatch = line.match(/^## \[(.+?)\]\s+[—–-]\s+(.+)/);
       const sectionMatch = line.match(/^### (.+)/);
       const listMatch = line.match(/^- (.+)/);
       const tableMatch = line.match(/^\|/);
@@ -112,8 +117,11 @@
   }
 
   function parseInlineMarkdown(text) {
-    // Bold, code, links
+    // Escape HTML first so literal angle brackets in changelog prose/code (generics,
+    // "< 2B", tag-like tokens) can't inject markup and corrupt the rendered DOM.
+    // Then layer on the supported inline markdown (code, bold, links).
     let html = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/`([^`]+)`/g, '<code style="background:rgba(124,106,247,0.12);padding:2px 6px;border-radius:4px;font-size:0.85em;">$1</code>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" style="color:var(--accent);">$1</a>');
@@ -129,20 +137,20 @@
     const html = blocks.map((ver, idx) => {
       const sectionsHtml = ver.sections.map(sec => {
         const itemsHtml = sec.items.map(item => {
-          if (item.type === 'table') return item.raw; // skip tables for now
+          if (item.type === 'table') return escapeHtml(item.raw); // tables not rendered yet — show as escaped text
           return '<li>' + item.html + '</li>';
         }).join('');
-        return `<h3>${sec.heading}</h3><ul>${itemsHtml}</ul>`;
+        return `<h3>${escapeHtml(sec.heading)}</h3><ul>${itemsHtml}</ul>`;
       }).join('');
 
       return `
         <div class="version-block">
-          <div class="version-header ${idx === 0 ? 'open' : ''}" onclick="toggleVersion(this)">
+          <div class="version-header open" onclick="toggleVersion(this)">
             <h2>${escapeHtml(ver.title)}</h2>
             <span class="date">${escapeHtml(ver.date)}</span>
             <span class="toggle">▶</span>
           </div>
-          <div class="version-body ${idx === 0 ? 'open' : ''}">
+          <div class="version-body open">
             ${sectionsHtml}
           </div>
         </div>
@@ -164,7 +172,7 @@
     body.classList.toggle('open');
   };
 
-  fetch('/repo/CHANGELOG.MD', { cache: 'no-store' })
+  fetch('/repo/CHANGELOG.MD?raw=1', { cache: 'no-store' })
     .then(r => r.ok ? r.text() : Promise.reject('Failed to load'))
     .then(md => renderChangelog(parseMarkdown(md)))
     .catch(err => {

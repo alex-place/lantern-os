@@ -55,9 +55,16 @@ function createWorktree(lane, issueNumber, issueTitle, repoRoot = REPO_ROOT) {
     fs.rmSync(wtPath, { recursive: true, force: true });
   }
 
-  // Create branch from master and add worktree
+  // Create branch from origin/master (the landed/serving state), not local
+  // `master`, so the worktree base includes fixes merged since this checkout
+  // last pulled (#942). Best-effort fetch keeps origin/master current; fall back
+  // to local master only if the remote-tracking ref can't be resolved.
+  try { git(`fetch origin master`, repoRoot); } catch { /* offline — use local origin/master */ }
+  let baseRef = "origin/master";
+  try { git(`rev-parse --verify --quiet ${baseRef}`, repoRoot); }
+  catch { baseRef = "master"; }
   try {
-    git(`branch ${JSON.stringify(branch)} master`, repoRoot);
+    git(`branch ${JSON.stringify(branch)} ${baseRef}`, repoRoot);
   } catch (e) {
     if (!e.message.includes("already exists")) throw e;
   }

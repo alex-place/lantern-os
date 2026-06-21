@@ -396,12 +396,11 @@
   const drawerNewChat = document.getElementById("drawer-new-chat");
   if (drawerNewChat) drawerNewChat.addEventListener("click", () => { newChat(); loadSessions(); });
 
-  inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
+  // #930: the textarea's inline onkeydown (dream-chat.html) already routes Enter to
+  // the live global sendMessage in dream-chat-ui.js. A second keydown listener here
+  // fired this file's *legacy* scoped sendMessage too, double-sending on every Enter
+  // (and rendering into the dead .msg-row path). Removed — Send button + inline Enter
+  // are the single send path now.
 
   // ── Autoupdate helper ───────────────────────────────────────────────────
   function triggerAutoupdate(label) {

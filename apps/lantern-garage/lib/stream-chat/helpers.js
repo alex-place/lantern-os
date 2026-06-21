@@ -31,7 +31,7 @@ function logTruncationMetric(originalChars, truncatedChars, truncationType) {
       compressionRatio: truncatedChars / originalChars,
     };
     const { appendJsonlQueued } = require("../file-queue");
-    appendJsonlQueued(metricsPath, metric).catch(() => {});
+    appendJsonlQueued(metricsPath, metric, { rotate: true }).catch(() => {}); // #872 per-message hot path
   } catch (e) {
     // Best-effort logging; never block on metric failure
   }

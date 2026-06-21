@@ -119,7 +119,7 @@ async function _persist(basePath, record) {
   const dir = _recordDir(basePath, record);
   await fs.promises.mkdir(dir, { recursive: true });
   await fs.promises.writeFile(_recordPath(basePath, record), JSON.stringify(record, null, 2), "utf8");
-  await appendJsonlQueued(path.join(_csfMemoryPath(basePath), `${record.cube_partition}.jsonl`), record);
+  await appendJsonlQueued(path.join(_csfMemoryPath(basePath), `${record.cube_partition}.jsonl`), record, { rotate: true }); // #872 per-partition
   return record;
 }
 
