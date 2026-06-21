@@ -4,9 +4,12 @@
  * Lets the Keystone persona actually DO things from the dream chat UX:
  * run tests, git status, commit, push, open PRs, read files, run scripts.
  *
- * All commands are allowlisted — no arbitrary shell exec.
+ * Operator-gated (#837): only the local operator dashboard (un-proxied loopback) or a caller
+ * presenting the OPERATOR_TOKEN header may invoke these. Commands are allowlisted; `node -e`
+ * (arbitrary JS) is intentionally NOT allowed.
  */
 const { execSync } = require("child_process");
+const { isOperatorRequest } = require("../lib/request-auth");
 
 const MAX_OUTPUT = 4000;
 
@@ -49,8 +52,6 @@ const ALLOWED = [
   { match: /^gh pr list.*$/, cmd: null },
   { match: /^gh pr create.*$/, cmd: null },
   { match: /^gh pr view.*$/, cmd: null },
-  // Node check
-  { match: /^node -e ".+"$/, cmd: null },
   // Curl (API testing)
   { match: /^curl -s http:\/\/127\.0\.0\.1:4177\/.+$/, cmd: null },
 ];
@@ -64,6 +65,14 @@ function resolveCommand(command) {
 
 module.exports = async function keystoneRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody, repoRoot } = deps;
+
+  // #837: command execution + repo-state dump are operator-only. The local operator dashboard
+  // hits loopback un-proxied; remote callers need the OPERATOR_TOKEN header. Without this the
+  // allowlisted-but-porous exec (shell, capture groups) was unauthenticated RCE.
+  if (url.pathname.startsWith("/api/keystone/") && !isOperatorRequest(req)) {
+    sendJson(res, { error: "operator auth required" }, 403);
+    return true;
+  }
 
   // POST /api/keystone/exec — run an allowlisted command
   if (url.pathname === "/api/keystone/exec" && req.method === "POST") {
