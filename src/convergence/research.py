@@ -445,6 +445,35 @@ class ResearchReport:
 
 # ───────────────────────────── the loop ─────────────────────────────
 
+def _cluster_claims(claims: List[Dict[str, Any]], threshold: float) -> List[Dict[str, Any]]:
+    """Greedily cluster claims by content-token overlap (#908).
+
+    Pure (no kernel/I/O) so the corroboration-merging behavior is unit-testable.
+    Two claims join the same cluster when their stopword-stripped content tokens
+    overlap (Szymkiewicz–Simpson) at/above `threshold`; the longest text in a cluster
+    is kept as its representative. Returns [{tokens, text, memory_ids:set}].
+    """
+    clusters: List[Dict[str, Any]] = []
+    for claim in claims:
+        tokens = _tokenize(claim["text"])
+        placed = False
+        for cl in clusters:
+            if _overlap(tokens, cl["tokens"]) >= threshold:
+                cl["memory_ids"].add(claim["memory_id"])
+                if len(claim["text"]) > len(cl["text"]):
+                    cl["text"] = claim["text"]
+                    cl["tokens"] = tokens
+                placed = True
+                break
+        if not placed:
+            clusters.append({
+                "tokens": tokens,
+                "text": claim["text"],
+                "memory_ids": {claim["memory_id"]},
+            })
+    return clusters
+
+
 class ResearchLoop:
     """Drives the six-stage Convergence loop for a single research question."""
 
@@ -454,7 +483,12 @@ class ResearchLoop:
         reasoner: Optional[Reasoner] = None,
         data_dir: Path = DEFAULT_DATA_DIR,
         min_sources: int = 2,
-        similarity_threshold: float = 0.45,
+        # #908: 0.45 over-rejected. Verbatim per-source snippets rarely share >45% of
+        # their content tokens, so NOTHING clustered → every claim came back
+        # single-source/unsupported (0/N). 0.30 (Szymkiewicz–Simpson overlap on
+        # stopword-stripped content tokens) merges genuine cross-source corroboration
+        # while the min-denominator coefficient still resists merging unrelated claims.
+        similarity_threshold: float = 0.30,
     ):
         self.searcher: Searcher = searcher or web_search
         self.reasoner: Reasoner = reasoner or heuristic_reasoner
@@ -511,24 +545,7 @@ class ResearchLoop:
         src_index: Dict[str, int], min_sources: Optional[int] = None,
     ) -> List[ResearchClaim]:
         ms = self.min_sources if min_sources is None else min_sources
-        clusters: List[Dict[str, Any]] = []  # {tokens, text, memory_ids}
-        for claim in claims:
-            tokens = _tokenize(claim["text"])
-            placed = False
-            for cl in clusters:
-                if _overlap(tokens, cl["tokens"]) >= self.similarity_threshold:
-                    cl["memory_ids"].add(claim["memory_id"])
-                    if len(claim["text"]) > len(cl["text"]):
-                        cl["text"] = claim["text"]
-                        cl["tokens"] = tokens
-                    placed = True
-                    break
-            if not placed:
-                clusters.append({
-                    "tokens": tokens,
-                    "text": claim["text"],
-                    "memory_ids": {claim["memory_id"]},
-                })
+        clusters = _cluster_claims(claims, self.similarity_threshold)
 
         verified: List[ResearchClaim] = []
         for cl in clusters:

@@ -1,12 +1,13 @@
 """
-scorer.py — rank issues via tesseract axes + CSF embeddings.
+scorer.py — rank issues via tesseract axes + CSF co-occurrence overlap (#937).
 
-Score = 0.4*z + 0.3*y + 0.2*cosine_sim(embed(keywords), embed(body_tokens)) + 0.1*t
+Score = 0.4*z + 0.3*y + 0.2*cosine_sim(cooccur(keywords), cooccur(body_tokens)) + 0.1*t
 
 Tesseract axes:
   z (boundary/priority): p0→1.0, p1→0.6, p2→0.3, unlabeled→0.0
   y (lane/stream):        dream-journal→1.0, convergence-io→0.8, csf-agent→0.9, other→0.0
-  cosine_sim:             embedding similarity between issue keywords and body tokens
+  cosine_sim:             co-occurrence-vector overlap between issue keywords and body
+                          tokens (lexical co-occurrence, NOT semantic similarity)
   t (recency):            +0.2 bonus for issues created within last 7 days
 
 Usage:
@@ -32,7 +33,7 @@ from csf_agent.embedder import CSFEmbedder
 # Axis weight coefficients (must sum to 1.0)
 _W_Z = 0.4   # priority/boundary
 _W_Y = 0.3   # stream/lane
-_W_SIM = 0.2  # embedding cosine similarity
+_W_SIM = 0.2  # co-occurrence-vector overlap (NOT semantic similarity, #937)
 _W_T = 0.1   # recency
 
 _Z_MAP = {"p0": 1.0, "p1": 0.6, "p2": 0.3}

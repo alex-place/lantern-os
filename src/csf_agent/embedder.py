@@ -1,13 +1,16 @@
 """
-embedder.py — map CSF symbolic vocab to L2-normalized float32 vectors.
+embedder.py — co-occurrence token-frequency vectors (NOT semantic embeddings) (#937).
 
-Uses co-occurrence frequency from csf_memory JSONL files to build weights.
-Falls back to a hardcoded seed vocab if no JSONL data is available.
+This builds L2-normalized float32 vectors from raw token CO-OCCURRENCE frequency over
+csf_memory JSONL, falling back to a hardcoded 34-token seed vocab. It is a lexical
+co-occurrence counter, **not** a learned semantic embedding model — two tokens are
+only "close" if they literally co-occur in the corpus; paraphrases / synonyms are not
+captured. Named honestly per #919.1; `CSFEmbedder` is kept as a back-compat alias.
 Pure numpy — no torch/transformers.
 
 Usage:
-    from csf_agent.embedder import CSFEmbedder
-    emb = CSFEmbedder()
+    from csf_agent.embedder import CSFCooccurrence
+    emb = CSFCooccurrence()
     vec = emb.embed(["dream", "convergence"])   # np.ndarray shape (vocab_size,)
     emb.save("data/csf_memory/embedder.npy")
     emb2 = CSFEmbedder.load("data/csf_memory/embedder.npy")
@@ -94,9 +97,10 @@ def _l2_normalize(v: np.ndarray) -> np.ndarray:
     return v / norm
 
 
-class CSFEmbedder:
+class CSFCooccurrence:
     """
-    Maps lists of string tokens to L2-normalized float32 vectors of vocab size.
+    Maps lists of string tokens to L2-normalized float32 co-occurrence vectors of
+    vocab size (NOT semantic embeddings — see module docstring, #937).
     Unknown tokens map to zero weight (no KeyError).
     """
 
@@ -135,11 +139,17 @@ class CSFEmbedder:
         np.save(str(path), {"vocab": self.vocab, "weights": self._weights}, allow_pickle=True)
 
     @classmethod
-    def load(cls, path: str | Path) -> "CSFEmbedder":
-        """Load a previously saved embedder from .npy file."""
+    def load(cls, path: str | Path) -> "CSFCooccurrence":
+        """Load a previously saved co-occurrence model from .npy file."""
         data = np.load(str(path), allow_pickle=True).item()
         inst = cls.__new__(cls)
         inst.vocab = list(data["vocab"])
         inst._vocab_index = {t: i for i, t in enumerate(inst.vocab)}
         inst._weights = np.asarray(data["weights"], dtype=np.float32)
         return inst
+
+
+# Back-compat alias (#937): the old name claimed "embeddings"; the implementation is a
+# co-occurrence counter. Existing imports keep working; new code should prefer
+# CSFCooccurrence.
+CSFEmbedder = CSFCooccurrence

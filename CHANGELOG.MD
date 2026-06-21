@@ -15,6 +15,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.9] - 2026-06-21
+
+### Fixed
+- **Grounding-stack hardening — #919 red-team findings (#908, #937, #939, #940).**
+  - **#908 — grounder over-rejected (every `research_run_next` returned 0/N supported).** `src/convergence/research.py` clustered verbatim per-source snippets at `similarity_threshold=0.45`; such snippets rarely share >45% of their content tokens, so nothing merged → every claim was single-source/unsupported. Lowered the default to **0.30** (Szymkiewicz–Simpson overlap on stopword-stripped content tokens — the min-denominator coefficient still resists merging unrelated claims) and extracted the merge logic into a pure, unit-tested `_cluster_claims`. New `tests/test_research_clustering.py` (4 cases).
+  - **#937 — "semantic" memory was a 34-token co-occurrence stub.** Relabeled honestly (no model built): `CSFEmbedder` → `CSFCooccurrence` (back-compat alias kept), with module/`__init__`/`scorer` docstrings now saying "co-occurrence token-frequency vectors (NOT semantic embeddings)". Existing `tests/test_csf_*` (25) still green via the alias.
+  - **#939 — time-aware contradiction detection.** New `lib/contradiction-detect.js`: flags only when two **approved** same-scope (`category:subcategory`) claim packets have **disjoint measurement confidence intervals** (can't both be true within stated uncertainty). Revoked packets are excluded by `listPackets('approved')`, so a sanctioned update is never a contradiction; the newer packet is reported as `current`. Pure `findContradictions` unit-tested (`tests/test_contradiction_detect.js`, 5 cases).
+  - **#940 — gate Save-Page-Now pinning.** New `lib/archive-grounding-guard.js`: read-only archive.org grounding is allowed; `pinToArchive` is **default-deny** (requires `operatorApproved` + PII-redacts submitted content before any `/save`). Test asserts the default-deny invariant **and** that no JS outside the guard references `web.archive.org/save` (`tests/test_archive_grounding_guard.js`, 6 cases).
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed
