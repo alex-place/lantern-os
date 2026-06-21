@@ -131,6 +131,77 @@ function loadPrLanes(repoRoot) {
   return data;
 }
 
+// Pending work is NOT a hand-maintained file store — it IS the open GitHub
+// issue backlog (single source of truth). Cached so a 5s dashboard poll doesn't
+// spawn a `gh` subprocess each tick.
+let _openIssuesCache = null;
+const OPEN_ISSUES_TTL_MS = 60_000;
+
+function priorityFromLabels(labels) {
+  const names = (labels || []).map((l) => (l.name || l).toLowerCase());
+  if (names.includes("p0")) return 3;
+  if (names.includes("p1")) return 2;
+  if (names.includes("p2")) return 1;
+  return 0;
+}
+
+/**
+ * Pending queue = open GitHub issues (never stale). Returns work-item-shaped
+ * rows, highest priority first. Issues already claimed locally (a file in
+ * assigned/) are dropped so they don't double-count. { items, source, error? }.
+ */
+function loadOpenIssues(repoRoot) {
+  const path = require("path");
+  const fs = require("fs");
+  const now = Date.now();
+  if (_openIssuesCache && now - _openIssuesCache.ts < OPEN_ISSUES_TTL_MS) return _openIssuesCache.data;
+
+  const { safeExec } = require(path.join(repoRoot, "apps", "lantern-garage", "lib", "safe-exec"));
+  let issues = [];
+  try {
+    const out = safeExec(
+      ["gh", "issue", "list", "--repo", "alex-place/lantern-os", "--state", "open",
+       "--json", "number,title,labels,updatedAt,url", "--limit", "100"],
+      { cwd: repoRoot, timeout: 15000 }
+    );
+    issues = JSON.parse(out || "[]");
+  } catch (err) {
+    const data = { items: [], source: "github", error: "gh_unavailable", message: String(err.message || err).slice(0, 200) };
+    _openIssuesCache = { ts: now, data };
+    return data;
+  }
+
+  // Exclude issues already claimed by an agent (tracked locally in assigned/).
+  const claimed = new Set();
+  try {
+    const assignedDir = path.join(repoRoot, "data", "agent-work-queue", "assigned");
+    if (fs.existsSync(assignedDir)) {
+      for (const f of fs.readdirSync(assignedDir).filter((x) => x.endsWith(".json"))) {
+        try { claimed.add(JSON.parse(fs.readFileSync(path.join(assignedDir, f), "utf8")).issueNumber); } catch { /* skip */ }
+      }
+    }
+  } catch { /* no assigned dir */ }
+
+  const items = issues
+    .filter((i) => !claimed.has(i.number))
+    .map((i) => ({
+      id: `issue-${i.number}`,
+      issueNumber: i.number,
+      title: i.title,
+      labels: (i.labels || []).map((l) => l.name),
+      priority: priorityFromLabels(i.labels),
+      status: "pending",
+      url: i.url,
+      updatedAt: i.updatedAt,
+      source: "github",
+    }))
+    .sort((a, b) => (b.priority - a.priority) || (new Date(b.updatedAt) - new Date(a.updatedAt)));
+
+  const data = { items, source: "github", generatedAt: new Date().toISOString() };
+  _openIssuesCache = { ts: now, data };
+  return data;
+}
+
 module.exports = async function queueRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody, repoRoot } = deps;
   const fs = require("fs");
@@ -157,8 +228,9 @@ module.exports = async function queueRoutes(req, res, url, deps) {
         if (!fs.existsSync(d)) return 0;
         return fs.readdirSync(d).filter((f) => f.endsWith(".json")).length;
       };
-      // "in_progress" is a legacy alias for "assigned" — count either if present.
-      const pending = countJson("pending");
+      // Pending = open GitHub issues (source of truth), not local files.
+      // assigned/completed/failed remain local in-flight execution state.
+      const pending = (loadOpenIssues(repoRoot).items || []).length;
       const assigned = countJson("assigned") + countJson("in_progress");
       const completed = countJson("completed");
       const failed = countJson("failed");
@@ -252,6 +324,22 @@ module.exports = async function queueRoutes(req, res, url, deps) {
   if (url.pathname === "/api/queue/list" && req.method === "GET") {
     try {
       const status = url.searchParams.get("status") || "pending";
+
+      // Pending work IS the open GitHub issue backlog (single source of truth),
+      // not a local file store. assigned/completed/failed stay file-based —
+      // they're in-flight execution state GitHub doesn't track.
+      if (status === "pending") {
+        const open = loadOpenIssues(repoRoot);
+        sendJson(res, {
+          status,
+          source: "github",
+          count: (open.items || []).length,
+          items: open.items || [],
+          ...(open.error ? { error: open.error, message: open.message } : {}),
+        });
+        return true;
+      }
+
       const queuePath = path.join(repoRoot, "data", "agent-work-queue", status);
 
       let items = [];

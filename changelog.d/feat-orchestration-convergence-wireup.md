@@ -15,6 +15,11 @@
 - `/api/queue/status` and `/api/queue/agents` now read real data (queue dirs +
   agent-slots config) instead of returning hardcoded zeros and a single fake
   `claude` slot. New `/api/queue/pr-lanes` endpoint exposes per-lane CI status.
+- **Pending work is now sourced from open GitHub issues** (the single source of
+  truth), not a hand-maintained local file store that goes stale. Priority is
+  derived from `p0`/`p1`/`p2` labels; issues already claimed by an agent
+  (tracked in `assigned/`) are excluded. assigned/completed/failed remain
+  file-based — that's in-flight execution state GitHub doesn't track.
 
 ### Fixed
 - Orchestration work-queue list called the non-existent `/api/queue/list/pending`
