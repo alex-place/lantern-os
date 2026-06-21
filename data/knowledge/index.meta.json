@@ -1,5 +1,5 @@
 {
-  "built_at": 1782025723.9664779,
+  "built_at": 1782027530.7256818,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -12,17 +12,17 @@
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
+    "docs/SIGMA0-OURO-CODER.md",
+    "docs/SIGMA0-CONTINUAL-TRAINING.md",
     "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
     "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
     "docs/research/2026-06-19-kernel-model-frontier.md",
     "docs/research/2026-06-19-convergence-tesseract-spiral.md",
     "docs/research/2026-06-19-convergence-core-agent-spine.md",
-    "docs/SIGMA0-OURO-CODER.md",
-    "docs/SIGMA0-CONTINUAL-TRAINING.md",
     "docs/KEYSTONE-MCP.md",
     "docs/CSF-FORMAT-SPECIFICATION.md"
   ],
   "sections": 404,
-  "sha256": "78c182c3d52e364f02e639fb467611290ab864dfa03e07182ebe2f7fab7f7aa7"
+  "sha256": "7ae2108f176316e17e9ff83467d82ebc1826050f061c8255d5b4cc9c57a28ac7"
 }
