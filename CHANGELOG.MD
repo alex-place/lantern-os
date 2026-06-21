@@ -15,6 +15,16 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.5.7] - 2026-06-20
+
+### Security
+- **Session secret fails closed beyond loopback (#867).** `lib/session-secret.js` `resolveSessionSecret()` (wired in `server.js`) allows the committed dev secret ONLY on loopback; bound beyond loopback (PORT set / production) a real `SESSION_SECRET` is required or the server refuses to boot — never signs sessions with the publicly-known key. Test: `tests/test_session_secret.js`.
+- **Single-source TLS-verification gate (#869).** `lib/insecure-tls.js` consolidates the win32-only insecure-TLS workaround (verification stays ON elsewhere; opt-out `LANTERN_INSECURE_TLS=0`); `providers.js`/`stream-chat.js` share the agent so it can't drift. Test: `tests/test_insecure_tls.js`.
+- Opt-in JSONL rotation on hot paths + other hardening (`file-queue.js`, `files.js`, `pdfs.js` entitlement, `agent-worker-loop.js`).
+
+### Notes
+- Lands the unique value of **#881** (external author, consolidating #862-873), which was largely redundant with fixes the fleet had already merged. The two files that conflicted with the already-landed #873 hardening (`routes/keystone.js`, `lib/self-edit-engine.js`) keep master's tested version.
+
 ## [Unreleased]
 
 ### Planned (ORION / Lantern OS Performance)
