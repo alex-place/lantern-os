@@ -1,4 +1,7 @@
-"""StatusCube — a player's ImagniVerse persisted as a single CSF v0.7 file.
+"""StatusCube — a player's ImagniVerse persisted via the v0.7 lattice container.
+
+(Built on the kept ``csf.v07`` storage face, NOT the canonical CSF compression
+format — for file/blob compression use ``csf`` / ``csf_pack`` / ``omni``.)
 
 The cube holds a player's entire game history in one compact binary file:
 

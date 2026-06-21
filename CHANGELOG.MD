@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.2] - 2026-06-21
+
+### Changed
+- **Deprecation clarity: old CSF references are now unmistakable (code + docs).** Marked every retired / non-canonical CSF surface so it can't be confused with the canonical CSF-Pack + CSF-Omni (`csf` / `csf_pack` / `omni`): `src/csf/base3.py` and `src/csf/delta_stream.py` (the dead v0.3 symbolic delta-stream — banner: ⚠️ deprecated, *not* the CSF format); `src/csf/v07/csf_file.py` (re-headed from "CSF v0.6 File Format" → the v0.6/0.7 lattice **container** behind the Status-Cube store, *not* the compression format); `src/csf/v07/symbolic_dictionary.py` (reframed as a lossless lattice token table, *not* a compressor — dropped the "massive head-start … beats generic compressors" lossy-fiction claim); `src/csf/status_cube.py` (clarified it persists via the v0.7 lattice container, not canonical compression). Docs: `docs/ALEX-ASI-ARCHITECTURE.md` dropped a dangling reference to the deleted lossy `csf_symbolic_compressor.py`. Each banner points to the canonical core for real compression and to `csf.v07` as the 3¹² lattice *storage face*. Docstring-only — no functional change; 158 CSF tests pass.
+
 ## [1.7.0] - 2026-06-21
 
 ### Changed
