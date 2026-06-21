@@ -121,7 +121,9 @@ def _decompress_blob(stored: bytes, codec: str, dict_data=None) -> bytes:
         dctx = _zstd.ZstdDecompressor(dict_data=dict_data) if dict_data else _zstd.ZstdDecompressor()
         return dctx.decompress(stored)
     if codec == "omni":
-        return omni.decompress(stored)
+        # verify=False: CSF-Pack already checks SHA-256 per file after decode, so the
+        # blob's CRC-32 pass is redundant here — skipping it speeds the archive read.
+        return omni.decompress(stored, verify=False)
     raise ValueError(f"unknown codec: {codec!r}")
 
 

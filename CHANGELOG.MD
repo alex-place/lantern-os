@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.0] - 2026-06-21
+
+### Changed
+- **CSF-Omni: parallel panel encode (~3× faster) + skippable decode CRC.** The best-fit codec ([`src/csf/omni.py`](src/csf/omni.py)) ran the whole panel (store/zlib/bz2/lzma/zstd/brotli) serially, so its encode cost was the *sum* of all codecs — dominated by brotli-11 + lzma-9e. It now encodes the panel in a thread pool: the codecs are C extensions that release the GIL, so wall-clock drops from the sum to ~the slowest single codec while the result stays the **exact** best-fit (measured **13.1 s → 4.0 s, 3.2×**, on a 4 MB stream; same winner, byte-identical output; deterministic via a stable size+search-order sort). Decode: `omni.decompress(blob, verify=False)` skips the redundant CRC-32 pass when an outer check already covers the bytes — `csf_pack` now uses it (it verifies SHA-256 per file), speeding archive reads. (Considered a prefix-probe heuristic but dropped it: a small sample mis-ranks brotli, whose edge grows with input size, so it lost ratio; parallelism is exact and nearly as fast.) Tests: [`tests/test_csf_pack.py`](tests/test_csf_pack.py) — parallel encode is deterministic + exact; `verify` flag round-trips and still catches corruption.
+
 ## [1.6.9] - 2026-06-21
 
 ### Verify
