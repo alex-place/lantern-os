@@ -367,7 +367,12 @@
         <a class="link-card" href="/repo/docs/CSF-FORMAT-SPECIFICATION.md">
           <span class="icon">🗄️</span>
           <h3>CSF Format <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">CSF ("Convergence-Fitted Searchable Format") is the project's own file format for packing and searching its memory and archives — like a smarter, searchable zip.</span></span></h3>
-          <p>Convergence-Fitted Searchable Format — consolidated spec. Now includes <strong>CSF-Pack v0.8</strong>: pack/unpack arbitrary files with SHA-256 integrity, path-safety, and zip-class compression (benchmarked).</p>
+          <p>Convergence-Fitted Searchable Format — consolidated spec, <strong>CSF-Pack v0.8</strong> (SHA-256 + path-safety). Default codec is <strong>zstd-19+LDM</strong> (362× on the memory log); the new opt-in <strong>CSF-Omni</strong> best-fit codec beats it on every corpus (+3–16%) and adds CRC integrity.</p>
+        </a>
+        <a class="link-card" href="/reports/csf-compression-benchmark.pdf" target="_blank" rel="noopener">
+          <span class="icon">📊</span>
+          <h3>CSF Benchmark <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">A PDF report on the CSF-Omni best-fit codec — how well CSF compresses real data versus standard tools, every result re-checked to be lossless and stress-tested by independent agents.</span></span></h3>
+          <p>PDF report (v3) — <strong>CSF-Omni</strong> best-fit vs the shipped zstd-19 on three real corpora, every codec round-trip-verified lossless, then checked by a 6-agent adversarial fleet. Honest: +3–16% over zstd, ties the brotli frontier.</p>
         </a>
         <a class="link-card" href="/observer-mesh-cube.html">
           <span class="icon">🧊</span>

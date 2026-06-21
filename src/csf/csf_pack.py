@@ -8,12 +8,19 @@ per-file compression (zstd by default, zlib fallback), and an integrity footer.
 
 Codec (R1/R2 upgrade)
 ---------------------
-Each file records its `codec` ("zstd" | "zlib" | "store"). The default is
+Each file records its `codec` ("zstd" | "zlib" | "store" | "omni"). The default is
 **zstd-19 + long-distance matching** when the `zstandard` package is available,
 falling back to **zlib-9** otherwise. DEFLATE's 32 KB window cannot capture the
 long-range repetition in JSONL memory logs / large blobs; zstd's large window
 does, measured ~25-30x smaller on real append-only memory (see
 `experiments/csf_compression_benchmark.py`).
+
+The opt-in **"omni"** codec (CSF-Omni, `omni.py`) is the *max-ratio* tier: it runs
+the whole codec panel per file (store/zlib/bz2/lzma/zstd/brotli + a byte transform),
+round-trip-verifies each, and keeps the smallest behind a 7-byte self-describing,
+CRC-checked header. It beats zstd-19 on every measured corpus (by 3-16%) by picking
+the per-input best coder, at a higher encode cost — use it for cold/archival packs;
+keep the zstd default for hot write paths.
 
 Backward compatibility: archives written before this change have no `codec`
 field; the reader treats a missing codec as "zlib" (when `compressed`) or
@@ -59,6 +66,8 @@ import zlib
 from pathlib import Path
 from typing import Iterable
 
+from . import omni
+
 try:
     import zstandard as _zstd
 except Exception:  # pragma: no cover - environment without zstandard
@@ -93,6 +102,11 @@ def _compress_blob(raw: bytes, codec: str, dict_data=None) -> bytes:
         if _zstd is None:
             raise RuntimeError("zstd codec requested but 'zstandard' is not installed")
         return _zstd_compressor(dict_data).compress(raw)
+    if codec == "omni":
+        # Deterministic best-fit: CSF-Omni runs the whole codec panel and keeps the
+        # smallest verified-lossless result, self-describing + CRC-checked. Ignores
+        # the shared dict (it selects per-blob). Trades encode time for max ratio.
+        return omni.compress_best(raw)
     raise ValueError(f"unknown codec: {codec!r}")
 
 
@@ -106,6 +120,8 @@ def _decompress_blob(stored: bytes, codec: str, dict_data=None) -> bytes:
             raise RuntimeError("archive uses zstd codec but 'zstandard' is not installed")
         dctx = _zstd.ZstdDecompressor(dict_data=dict_data) if dict_data else _zstd.ZstdDecompressor()
         return dctx.decompress(stored)
+    if codec == "omni":
+        return omni.decompress(stored)
     raise ValueError(f"unknown codec: {codec!r}")
 
 
@@ -121,7 +137,7 @@ def _file_codec(fe: dict) -> str:
 # Single-blob stream helpers (lightweight; 1-byte codec header, no integrity)
 # ---------------------------------------------------------------------------
 
-_CODEC_IDS = {"store": 0, "zlib": 1, "zstd": 2}
+_CODEC_IDS = {"store": 0, "zlib": 1, "zstd": 2, "omni": 3}
 _CODEC_BY_ID = {v: k for k, v in _CODEC_IDS.items()}
 
 
@@ -352,8 +368,8 @@ def _main(argv=None):
     p.add_argument("paths", nargs="+")
     p.add_argument("-o", "--out", required=True)
     p.add_argument("--no-compress", action="store_true")
-    p.add_argument("--codec", choices=["zstd", "zlib", "store"], default=None,
-                   help=f"compression codec (default: {DEFAULT_CODEC})")
+    p.add_argument("--codec", choices=["zstd", "zlib", "store", "omni"], default=None,
+                   help=f"compression codec (default: {DEFAULT_CODEC}; 'omni' = best-fit, max ratio)")
     p.add_argument("--dict", action="store_true",
                    help="train a shared zstd dictionary across files (keeps per-file random access)")
     u = sub.add_parser("unpack", help="extract a .csf archive")

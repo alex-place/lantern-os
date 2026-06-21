@@ -85,7 +85,7 @@ def test_path_traversal_rejected():
 # R1/R2 codec upgrade
 # --------------------------------------------------------------------------
 
-_CODECS = ["zlib", "store"] + (["zstd"] if _HAS_ZSTD else [])
+_CODECS = ["zlib", "store", "omni"] + (["zstd"] if _HAS_ZSTD else [])
 
 
 @pytest.mark.parametrize("codec", _CODECS)
@@ -104,6 +104,40 @@ def test_round_trip_codec(codec):
             if f.is_file():
                 rel = f.relative_to(src.parent).as_posix()
                 assert (dest / rel).read_bytes() == f.read_bytes()
+
+
+def test_omni_payload_is_panel_minimum():
+    """The best-fit omni payload must be <= every codec it absorbs (the envelope).
+    (Its blob adds a fixed 7-byte CRC header, so on tiny inputs the *archive* can be
+    a few bytes larger than a header-less single codec — the guarantee is per-payload.)"""
+    import bz2 as _bz2
+    import lzma as _lzma
+    import zlib as _zlib
+
+    from csf import omni
+    # varied-but-compressible JSONL so the codec choice matters by more than the header
+    data = b"".join(
+        ('{"ts":%d,"px":%d,"side":"%s","id":"mkt-%05d"}\n'
+         % (i, 100 + (i % 37), "yes" if i % 2 else "no", i)).encode()
+        for i in range(3000)
+    )
+    blob = omni.compress_best(data)
+    assert omni.decompress(blob) == data
+    payload = len(blob) - omni.HEADER_LEN
+    assert payload <= len(_zlib.compress(data, 9))
+    assert payload <= len(_bz2.compress(data, 9))
+    assert payload <= len(_lzma.compress(data, preset=9 | _lzma.PRESET_EXTREME))
+
+
+def test_omni_crc_detects_payload_corruption():
+    """CSF-Omni's CRC-32 must reject a corrupt payload, not return wrong bytes."""
+    from csf import omni
+    data = b"ABCABCABCDEF" * 100
+    blob = bytearray(omni.compress_best(data))
+    assert omni.decompress(bytes(blob)) == data
+    blob[-1] ^= 0x40  # flip a payload bit
+    with pytest.raises(ValueError):
+        omni.decompress(bytes(blob))
 
 
 @pytest.mark.skipif(not _HAS_ZSTD, reason="zstandard not installed")

@@ -102,8 +102,9 @@ blob = csf.compress(b"...")                           # -> bytes
 raw  = csf.decompress(blob)
 ```
 
-Codec is per-file and self-describing (`zstd` | `zlib` | `store`); a missing
-codec reads as `zlib`, so pre-codec archives still extract byte-for-byte.
+Codec is per-file and self-describing (`zstd` | `zlib` | `store` | `omni`); a missing
+codec reads as `zlib`, so pre-codec archives still extract byte-for-byte. The opt-in
+**`omni`** codec is the best-fit / max-ratio tier (see §2.7.1).
 
 ### 2.5 CLI
 
@@ -142,6 +143,45 @@ cryptographic per-file + whole-archive integrity and path-traversal protection t
 provide by default. `tar.gz` compresses better (solid stream) but offers no per-file integrity.
 Against the **legacy symbolic CSF it's a categorical upgrade** — that format can't hold arbitrary
 file bytes at all. Use CSF-Pack when integrity + safety matter; it's the format for general bundling.
+
+### 2.7.1 CSF-Omni — the opt-in best-fit codec
+
+The table above is the *archive-vs-zip* picture (text+code, ~30% spread). On the **append-only memory
+log** the codec choice dominates. CSF already ships **zstd-19 + LDM** by default, which compresses a 4 MB
+JSONL memory log **362×** (vs zlib's 14× before #835). **CSF-Omni** ([`src/csf/omni.py`](../src/csf/omni.py))
+is a new opt-in codec (`codec="omni"`) that goes one better: it runs the whole panel per blob
+(store · zlib · bz2 · lzma · zstd · brotli + a byte transform), **round-trip-verifies each**, and keeps
+the smallest behind a 7-byte self-describing, CRC-checked header — deterministically (same input → same bytes).
+
+Measured against the shipped zstd-19, every codec round-trip-verified lossless
+([`experiments/csf_compression_benchmark.py`](../experiments/csf_compression_benchmark.py); full write-up:
+[**CSF Compression Benchmark — Review v3 (PDF)**](/reports/csf-compression-benchmark.pdf)):
+
+| Corpus (raw) | zstd-19 (ships) | brotli-11 | **CSF-Omni** | Omni vs zstd |
+|---|---|---|---|---|
+| text + code (3.07 MB) | 4.11× | 4.23× | **4.23×** | +2.8% |
+| **JSONL memory log (4.0 MB)** | 362.6× | 422.1× | **421.8×** | **+16.3%** |
+| cube delta stream (25 KB) | 16.0× | 17.15× | **17.07×** | +6.5% |
+
+CSF-Omni **beats every other codec** (zlib/zstd/lzma/bz2) on every single stream and is the only
+configuration that is best-or-tied everywhere. On the **multi-file archive** the picture is narrower:
+`codec="omni"` reaches **3.06×** on the 340-file corpus, but master's existing **`zstd` + shared
+dictionary** (`use_dict=True`) already reaches **3.00×** — so omni's archive edge is only **+2 %**, at
+~7× the encode cost (omni ~31 s vs zstd+dict ~4 s vs plain zstd ~1 s). The dictionary recovers the
+cross-file redundancy that per-file omni cannot, so **omni's durable win is on single streams**, not archives.
+
+**Honest framing (Σ₀).** CSF-Omni is the *upper envelope*, not a new entropy coder: on these corpora
+brotli is the frontier, so Omni *matches* it (payload-identical, +7-byte header) — it does **not** beat
+brotli's raw bytes, and no library available here (PPMd, paq) does. Its value is guaranteed best-in-field
+selection on any input **plus** integrity (the CRC catches corruption that zstd's default frame returns
+silently) and a portable stdlib-only mode. Trade-off: the panel sweep makes the omni archiver ~31 s for
+340 files, so **zstd stays the default** (hot paths) and omni is the opt-in max-ratio tier for
+cold/archival single-stream blobs; decode is fast.
+
+**Adversarially verified.** A six-agent fleet stress-tested it (fuzz round-trip — 3,817 checks · envelope ·
+backward-compat · code review · decode-safety · honesty audit). Two defects were found and fixed: a corrupt
+brotli payload could decode to silently-wrong bytes (→ CRC-32 + a `ValueError` decode contract), and a
+docstring over-claim (→ reworded to the envelope framing above). CSF tests pass.
 
 ---
 
