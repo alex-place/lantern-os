@@ -36,8 +36,8 @@ module.exports = {
       // `lantern-sigma0-coder-v2` is DEPRECATED (Ollama sunset #811/#823): its Qwen
       // weights + Ollama deployment were removed. The coder surface now serves the
       // Σ₀ Ouro coder via ouro_serve.py (ouro:latest on :11434); ouro_serve still
-      // accepts the old name for back-compat. See docs/SIGMA0-OURO-CODER.md and
-      // docs/LANTERN-SIGMA0-CODER.md (deprecated). DEEP loop variant: `coderLoop`.
+      // accepts the old name for back-compat. See docs/SIGMA0-OURO-CODER.md (the single
+      // source of truth — then/now + loop mechanism). DEEP loop variant: `coderLoop`.
       profileId: "lantern-sigma0-coder",
       ollamaModel: process.env.OLLAMA_MODEL || "ouro:latest",
       baseModel: "ByteDance/Ouro-1.4B",  // legacy base was Qwen/Qwen2.5-Coder-3B-Instruct

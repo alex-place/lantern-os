@@ -109,7 +109,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 | **Auto-Deployment** | ✅ Live | Hourly master branch pulls, pre-deploy tests, automatic rollback |
 | **Convergence Routing** | ✅ Live | 120+ Keystone intent routes, >70% cache hit rate, deterministic local routing |
 | **Multi-Provider Fallback** | ✅ Live | Claude → OpenAI → Gemini → Grok → Local Ollama, with capacity gates |
-| **[lantern-sigma0-coder](docs/LANTERN-SIGMA0-CODER.md)** | ✅ Live (2026-06-18) | Local Σ₀ coding LoRA fine-tuned on past Claude sessions; Ollama-served, leaderboard-routed, continually retrained |
+| **[Σ₀ Ouro Coder](docs/SIGMA0-OURO-CODER.md)** | ✅ Live (2026-06-20) | Local looped Ouro-1.4B + Σ₀ QLoRA fine-tuned on past Claude sessions; drop-in served, adaptive Q-exit depth, continually retrained (supersedes the Qwen `lantern-sigma0-coder`) |
 | **CSF Memory Archive** | ✅ Live | Symbolic searchable format, tiered promotion (trace → skill) |
 | **MCP Server** | ✅ Live | Local tool surface, agent registration, OAuth2 protected endpoint |
 | **Discord Integration** | ✅ Live | Bot with convergence-aware responses |
@@ -467,7 +467,7 @@ npm run dev --prefix apps/lantern-garage
 ### For Product & Members
 
 - **[docs/KEYSTONE-PRODUCT.md](docs/KEYSTONE-PRODUCT.md)** — Keystone chat product definition (operator console for members) + serving contract (fast default / deep opt-in)
-- **[docs/LANTERN-SIGMA0-CODER.md](docs/LANTERN-SIGMA0-CODER.md)** — the Σ₀ coding agent (sibling surface): ship changes a developer merges with confidence
+- **[docs/SIGMA0-OURO-CODER.md](docs/SIGMA0-OURO-CODER.md)** — the Σ₀ coding agent (sibling surface): ship changes a developer merges with confidence
 
 ### For Architects
 
