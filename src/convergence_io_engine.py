@@ -1609,8 +1609,10 @@ class TesseractEngine:
         return ctx
 
     def _convergence_rag(self, ctx: ConvergenceContext) -> ConvergenceContext:
-        # ── MemOS semantic retrieval (primary) ───────────────────────────────
-        # Uses MemOS MemCube to semantically search dream journal memories.
+        # ── MemOS retrieval (primary) ─────────────────────────────────────────
+        # Uses MemOS MemCube for memory retrieval. The MemOS layer may use real
+        # embeddings internally; the CSFEmbedder/CSFCooccurrenceVectorizer used
+        # elsewhere is a co-occurrence counter only (NOT semantic) — see #937.
         # Falls back to flat-rag-house if MemOS not installed.
         try:
             from convergence_io.memos_bridge import get_cube  # type: ignore

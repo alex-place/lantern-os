@@ -39,7 +39,11 @@ module.exports = async function fileRoutes(req, res, url, deps) {
     if (!checkBoundary(target, relative)) { sendJson(res, { error: "forbidden" }, 403); return true; }
     if (!fs.existsSync(target)) { sendJson(res, { error: "not_found" }, 404); return true; }
     const ext = path.extname(target).toLowerCase();
-    if (ext === ".md" || ext === ".txt") {
+    // ?raw=1 serves the unrendered file. changelog.html fetches the raw markdown
+    // and parses it client-side; without this, .md/.txt render to an HTML viewer
+    // document and the fetch would receive HTML instead of markdown. #changelog
+    const wantRaw = url.searchParams.get("raw");
+    if (!wantRaw && (ext === ".md" || ext === ".txt")) {
       sendHtml(res, renderMarkdownDocument(fs.readFileSync(target, "utf8"), relative));
       return true;
     }

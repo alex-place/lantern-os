@@ -105,6 +105,55 @@ class Sigma0LoopLM:
         m = self.model
         return m.get_base_model() if hasattr(m, "get_base_model") else m
 
+    # ── forward-truncation (EXPERIMENTAL) ─────────────────────────────────────
+    # Replicates OuroModel.forward but BREAKS the recurrent loop when the last
+    # token's Q-exit fires, so simple tokens cost their realized depth instead of
+    # full R4. Uses the model's OWN components (embed_tokens / rotary_emb / norm /
+    # early_exit_gate / layers / create_causal_mask) — a faithful replica, not a
+    # reinvention. No-cache only (each call processes the full sequence and we read
+    # only the last token), so it stays O(N^2); it is a win for SHORT outputs where
+    # the avoided steps dominate. MUST pass the harness parity check before trust.
+    def _truncated_forward(self, ids, q):
+        import math
+        import sys
+        torch, *_ = _lazy()
+        m = self._backbone().model  # OuroModel
+        mod = sys.modules[type(m).__module__]
+        inputs_embeds = m.embed_tokens(ids)
+        seq = inputs_embeds.shape[1]
+        cache_position = torch.arange(seq, device=inputs_embeds.device)
+        position_ids = cache_position.unsqueeze(0)
+        mask_kwargs = dict(config=m.config, input_embeds=inputs_embeds, attention_mask=None,
+                           cache_position=cache_position, past_key_values=None, position_ids=position_ids)
+        causal = {"full_attention": mod.create_causal_mask(**mask_kwargs)}
+        if getattr(m, "has_sliding_layers", False):
+            causal["sliding_attention"] = mod.create_sliding_window_causal_mask(**mask_kwargs)
+        hidden = inputs_embeds
+        pos_emb = m.rotary_emb(hidden, position_ids)
+        hs_list, g_list = [], []
+        survival, cdf = 1.0, 0.0
+        n = m.total_ut_steps
+        for current_ut in range(n):
+            for layer in m.layers[: m.config.num_hidden_layers]:
+                hidden = layer(hidden, attention_mask=causal[layer.attention_type],
+                               position_ids=position_ids, past_key_value=None, use_cache=False,
+                               cache_position=cache_position, position_embeddings=pos_emb,
+                               current_ut=current_ut)
+            hn = m.norm(hidden)
+            g = m.early_exit_gate(hn)
+            hs_list.append(hn)
+            g_list.append(g)
+            # last-token cumulative Q-exit (paper §3) — break when CDF ≥ q
+            logit = float(g[0, -1, 0])
+            lam = 1.0 / (1.0 + math.exp(-logit))
+            t = current_ut + 1
+            p = survival if t == n else lam * survival
+            cdf += p
+            survival *= (1.0 - lam)
+            if cdf >= q:
+                break
+        return hs_list, g_list
+
     # ── native Q-exit over the last token's per-step gates (paper §3) ─────────
     @staticmethod
     def qexit_step(gate_steps, q: float, max_steps: int):
@@ -184,10 +233,39 @@ class Sigma0LoopLM:
                 dc = None  # canary is best-effort; never break generation
         q_cur, rep_cur = q, rep_penalty
         canary_max_prox, canary_spooks, canary_signal = 0.0, 0, "none"
+        # #PERF: incremental KV decode via the model's native UniversalTransformerCache.
+        # The legacy path forwarded the FULL growing sequence with use_cache=False on
+        # every token = O(N^2) decode — the dominant cost behind ~1 s/token and the
+        # 170-280 s coding outliers on the leaderboard. With the cache we encode the
+        # prompt once, then forward ONLY the new token each step (O(N) total). The model
+        # auto-creates and returns the cache (see modeling_ouro.OuroModel.forward:596,661).
+        # The gate/hidden reads below already index [-1] (last position), so they stay
+        # correct whether the pass is the full prompt or a single new token.
+        # Set OURO_LOOP_CACHE=0 to fall back to the legacy full-re-encode path.
+        _use_cache = os.environ.get("OURO_LOOP_CACHE", "1") == "1"
+        # #PERF upgrade #2: forward-truncation (EXPERIMENTAL, OURO_LOOP_TRUNCATE=1).
+        # Break the recurrent loop when the last token's Q-exit fires → simple tokens
+        # cost their realized depth instead of full R4. INCOMPATIBLE with the cross-token
+        # KV cache (an early-exiting token never writes its deeper-step KV, so later
+        # tokens can't attend to it) → truncation FORCES no-cache and stays O(N^2). Net:
+        # a win for SHORT outputs (chat); the cache fix wins for LONG outputs (coding).
+        # qexit mode only. Validate parity via `bench_ouro_loop.py --truncate` first.
+        _truncate = os.environ.get("OURO_LOOP_TRUNCATE", "0") == "1" and mode == "qexit"
+        if _truncate:
+            _use_cache = False
+        _past = None
+        _cur = ids  # first pass = full prompt; subsequent passes = only the new token
         with torch.no_grad():
             for _tok_idx in range(max_new_tokens):
-                # OuroModel.forward returns (outputs, hidden_states_list, gate_list)
-                _out, hidden_states_list, gate_list = bb.model(input_ids=ids, use_cache=False)
+                # OuroModel.forward returns (BaseModelOutputWithPast, hidden_states_list, gate_list)
+                if _truncate:
+                    hidden_states_list, gate_list = self._truncated_forward(ids, q_cur)
+                elif _use_cache:
+                    _out, hidden_states_list, gate_list = bb.model(
+                        input_ids=_cur, past_key_values=_past, use_cache=True)
+                    _past = _out.past_key_values
+                else:
+                    _out, hidden_states_list, gate_list = bb.model(input_ids=ids, use_cache=False)
                 if mode == "converge":
                     # contraction over the latent trajectory of the last token
                     h_per_step = [h[0, -1, :] for h in hidden_states_list]
@@ -226,7 +304,9 @@ class Sigma0LoopLM:
                     if adapt:  # actuator: gate knobs on Σ₀ proximity (opt-in; changes tokens)
                         k = dc.knobs(q, rep_penalty)
                         q_cur, rep_cur = k["q"], k["rep_penalty"]
-                ids = torch.cat([ids, torch.tensor([[nxt]], device=ids.device)], dim=1)
+                _nxt_t = torch.tensor([[nxt]], device=ids.device)
+                ids = torch.cat([ids, _nxt_t], dim=1)
+                _cur = _nxt_t  # next pass forwards only the new token; the cache holds the rest
                 if nxt == eos:
                     break
         text = self.tok.decode(ids[0, -len(depths):], skip_special_tokens=True)

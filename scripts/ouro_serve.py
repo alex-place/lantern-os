@@ -155,10 +155,14 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
     ids = _tok(prompt, return_tensors="pt").to(_model.device)
     # #774/fix-5: stop-strings cut 15-40% of tokens on coding tasks (HumanEval proves
     # the pattern); tokenizer= is required for stop_strings support in transformers.
-    _STOP = ["\ndef ", "\nclass ", "\nif __name__", "\n\n\n", "\n```"]
+    # OURO_NO_STOP=1 disables the codegen stop-strings. Required for tool-calling:
+    # the default "\n```" / "\n\n\n" stops truncate a JSON tool call mid-emission.
+    _STOP = [] if os.environ.get("OURO_NO_STOP") == "1" else ["\ndef ", "\nclass ", "\nif __name__", "\n\n\n", "\n```"]
     kw = dict(max_new_tokens=max_new_tokens, pad_token_id=_tok.eos_token_id,
               repetition_penalty=REP_PENALTY, no_repeat_ngram_size=NO_REPEAT_NGRAM,
-              do_sample=DO_SAMPLE, stop_strings=_STOP, tokenizer=_tok)
+              do_sample=DO_SAMPLE)
+    if _STOP:
+        kw.update(stop_strings=_STOP, tokenizer=_tok)
     if DO_SAMPLE:
         kw.update(temperature=TEMPERATURE, top_p=TOP_P)
     if stream_cb is None:
