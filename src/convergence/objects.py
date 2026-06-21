@@ -143,7 +143,7 @@ class ConvergenceRecord:
     - Converge: high-confidence records become patterns
     """
     id: str
-    hypothesis: str  # What we think is true
+    hypothesis: str  # What we think is true / the claim
     evidence_ids: List[str]  # Which memories support this?
     result: Any  # The decision/action/claim
     confidence: float  # 0.0-1.0: how certain are we?
@@ -151,6 +151,7 @@ class ConvergenceRecord:
     timestamp: datetime = field(default_factory=datetime.now)
     verified: bool = False  # Has this been tested?
     verification_notes: Optional[str] = None
+    source: Optional[str] = None  # External Reality Rule: where did this come from?
 
     def to_jsonl(self) -> str:
         """Serialize to JSONL format."""
@@ -164,4 +165,5 @@ class ConvergenceRecord:
             "timestamp": self.timestamp.isoformat(),
             "verified": self.verified,
             "verification_notes": self.verification_notes,
+            "source": self.source,
         })

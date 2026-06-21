@@ -21,11 +21,13 @@ JS_EMITTED = {
     "timestamp": "2026-06-15T10:00:01.000Z",
     "verified": False,
     "verification_notes": None,
+    "source": "dream-chat/lantern",
 }
 
 EMITTER_KEYS = {
     "id", "hypothesis", "evidence_ids", "result",
     "confidence", "reasoner", "timestamp", "verified", "verification_notes",
+    "source",
 }
 
 
@@ -41,6 +43,7 @@ def _load(d):
         timestamp=datetime.fromisoformat(d["timestamp"].replace("Z", "+00:00")),
         verified=d["verified"],
         verification_notes=d["verification_notes"],
+        source=d.get("source"),
     )
 
 
