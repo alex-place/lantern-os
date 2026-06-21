@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.6.7] - 2026-06-21
+
+### Tests
+- Salvage the genuinely-new test coverage from #928 (@cdblasioli-gif): add `tests/test_collapse_canary_e2e.py` (Σ₀-K1 collapse-canary e2e, 9 cases) and harden the torch-dependent kernel tests (`test_kernel_closure`, `test_provider_nodes`, `test_snapshot_replay`) to skip on **`OSError`** (Windows torch DLL load failure), not just `ImportError` — `pytest.importorskip` misses DLL failures. #928's 5 Σ₀-K1 source modules were already byte-identical on master (#927 + siblings), so only these net-new/robustness test changes were taken; the rest of the stale-base fork (re-added files + a committed data file) was dropped.
+
 ## [1.6.6] - 2026-06-21
 
 ### Verify
