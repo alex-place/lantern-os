@@ -782,6 +782,41 @@ async function sendMessage() {
     msg.appendChild(warn);
   }
 
+  // 🔊 Read-aloud + narration. This file is the live reply renderer, so TTS must live
+  // here — the equivalent code in dream-chat.js runs on a dead render path, which is why
+  // replies never read back. Reuses window.speakText (server TTS → browser fallback). (#858)
+  if (!didError && fullText && fullText.trim() && typeof window.speakText === 'function') {
+    const speakBtn = document.createElement('button');
+    speakBtn.type = 'button';
+    speakBtn.className = 'read-aloud-btn';
+    speakBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:13px;opacity:0.6;margin-top:4px;padding:2px 4px;color:var(--accent,inherit);';
+    speakBtn.textContent = '🔊 Read aloud';
+    speakBtn.setAttribute('aria-label', 'Read this reply aloud');
+    const resetSpeakBtn = () => {
+      speakBtn.dataset.speaking = '';
+      speakBtn.textContent = '🔊 Read aloud';
+      if (window.__activeReadReset === resetSpeakBtn) window.__activeReadReset = null;
+    };
+    const startSpeaking = () => {
+      if (window.__activeReadReset) window.__activeReadReset();  // reset whichever reply was speaking
+      window.__activeReadReset = resetSpeakBtn;
+      speakBtn.dataset.speaking = '1';
+      speakBtn.textContent = '⏹ Stop';
+      window.speakText(fullText, resetSpeakBtn);
+    };
+    speakBtn.addEventListener('click', () => {
+      if (speakBtn.dataset.speaking === '1') {
+        if (typeof window.stopSpeaking === 'function') window.stopSpeaking();
+        resetSpeakBtn();
+      } else {
+        startSpeaking();
+      }
+    });
+    msg.appendChild(speakBtn);
+    // Global narrate toggle (🔊 nav button sets window.narrateReplies): speak automatically.
+    if (window.narrateReplies) startSpeaking();
+  }
+
   if (!didError) history.push({ role: 'assistant', text: fullText });
 
   isSending = false;

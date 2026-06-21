@@ -1689,6 +1689,32 @@
   let recognition = null;
   let isListening = false;
 
+  // Transient, visible feedback near the composer so voice failures aren't silent. (#858)
+  function showVoiceHint(msg) {
+    if (!msg) return;
+    const wrap = (inputEl && inputEl.closest && inputEl.closest(".input-wrapper")) || (inputEl && inputEl.parentElement);
+    if (!wrap || !wrap.parentElement) { console.warn("[voice]", msg); return; }
+    let hint = document.getElementById("voice-hint");
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.id = "voice-hint";
+      hint.setAttribute("role", "status");
+      hint.style.cssText = "margin:4px 10px;font-size:0.8rem;line-height:1.3;color:var(--accent);opacity:0;transition:opacity .2s;";
+      wrap.parentElement.insertBefore(hint, wrap);
+    }
+    hint.textContent = msg;
+    hint.style.opacity = "1";
+    clearTimeout(hint._t);
+    hint._t = setTimeout(() => { hint.style.opacity = "0"; }, 7000);
+  }
+
+  // SpeechRecognition only works on a secure origin (https or localhost). Over a LAN IP
+  // or tunnel the browser blocks it silently — flag the mic so the user knows why. (#858)
+  if (voiceBtn && !window.isSecureContext) {
+    voiceBtn.style.opacity = "0.4";
+    voiceBtn.title = "Voice input needs https or localhost";
+  }
+
   function initVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { voiceBtn.title = "Voice not supported (use Chrome)"; voiceBtn.style.opacity = "0.4"; return; }
@@ -1703,13 +1729,10 @@
         if (e.results[i].isFinal) final += e.results[i][0].transcript;
         else interim += e.results[i][0].transcript;
       }
-      if (final) {
-        accumulated += (accumulated ? " " : "") + final.trim();
-        inputEl.value = accumulated;
-        inputEl.dispatchEvent(new Event("input"));
-      } else if (interim) {
-        inputEl.placeholder = "🎤 " + interim;
-      }
+      if (final) accumulated += (accumulated ? " " : "") + final.trim();
+      // Live feedback: show finalized + in-progress words in the composer as you speak. (#858)
+      const live = (accumulated + (interim ? (accumulated ? " " : "") + interim : "")).trim();
+      if (live) { inputEl.value = live; inputEl.dispatchEvent(new Event("input")); }
     };
     recognition.onend = () => {
       isListening = false;
@@ -1720,9 +1743,19 @@
       accumulated = "";
       if (dictated) { inputEl.value = dictated; inputEl.dispatchEvent(new Event("input")); try { inputEl.focus(); } catch (e) {} }
     };
-    recognition.onerror = () => {
+    recognition.onerror = (e) => {
       isListening = false; voiceBtn.classList.remove("listening");
-      inputEl.placeholder = "Tell me a dream…";
+      inputEl.placeholder = "Write something, ask a question…";
+      const err = (e && e.error) || "unknown";
+      const map = {
+        "not-allowed": "🎙️ Microphone blocked. Allow mic access for this site (lock icon in the address bar), then try again.",
+        "service-not-allowed": "🎙️ Microphone blocked by the browser or OS. Allow mic access and retry.",
+        "audio-capture": "🎙️ No microphone found — check your input device.",
+        "no-speech": "🎙️ Didn't catch any speech. Tap the mic and try again.",
+        "network": "🎙️ Speech service unreachable. Check your connection and retry.",
+        "aborted": ""
+      };
+      showVoiceHint(err in map ? map[err] : ("🎙️ Voice input error: " + err));
     };
     // Share this single recognition instance with the composer's voice button
     // (dream-chat-ui.js startVoiceInput() reads window.recognition).
@@ -1730,6 +1763,10 @@
   }
 
   function toggleVoice() {
+    if (!window.isSecureContext) {
+      showVoiceHint("🎙️ Voice input needs a secure connection. Open the app at http://127.0.0.1:4177 or over https.");
+      return;
+    }
     if (!recognition) initVoice();
     if (!recognition) return;
     if (isListening) {
@@ -1862,12 +1899,13 @@
     streamTtsReset();
   }
 
-  async function speakText(text) {
+  async function speakText(text, onDone) {
     stopSpeaking();
+    const done = () => { if (onDone) { const f = onDone; onDone = null; f(); } };
     const clean = text.replace(/[❆◈⬡⛤⌖⊛ᚱ]/g, "").replace(/[^\x00-\x7F]/g, (c) => {
       return c.codePointAt(0) > 0x2FFF ? " " : c;
     }).trim();
-    if (!clean) return;
+    if (!clean) { done(); return; }
 
     const prefs = JSON.parse(localStorage.getItem("lantern_tts_prefs") || "{}");
     const voiceId = prefs.ttsVoice || "";
@@ -1883,8 +1921,10 @@
         const blob = await r.blob();
         const url = URL.createObjectURL(blob);
         ttsAudio = new Audio(url);
-        ttsAudio.play();
-        ttsAudio.onended = () => { URL.revokeObjectURL(url); ttsAudio = null; };
+        ttsAudio.onended = () => { URL.revokeObjectURL(url); ttsAudio = null; done(); };
+        ttsAudio.onerror = () => { URL.revokeObjectURL(url); ttsAudio = null; done(); };
+        const _p = ttsAudio.play();
+        if (_p && _p.catch) _p.catch(() => { done(); });
         return;
       }
       const d = await r.json().catch(() => ({}));
@@ -1898,8 +1938,10 @@
     }
 
     // Browser fallback
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis) { done(); return; }
     const utt = new SpeechSynthesisUtterance(clean);
+    utt.onend = () => done();
+    utt.onerror = () => done();
     utt.rate = prefs.rate ?? 0.88;
     utt.pitch = prefs.pitch ?? 1.05;
     const voices = window.speechSynthesis.getVoices();
