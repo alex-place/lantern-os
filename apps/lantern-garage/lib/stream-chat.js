@@ -1909,7 +1909,7 @@ async function handleStreamChat(req, url, res) {
         sendFail(err.message);
         return;
       }
-      // Auto mode: swallow error silently, let next provider try
+      console.warn(`[stream-chat] gemini auto-cascade failed — trying next provider (${err.message})`);
     }
     } // end model chain loop
   }
@@ -2077,7 +2077,7 @@ async function handleStreamChat(req, url, res) {
         await streamLocalFallback(err.message);
         return;
       }
-      // Auto mode: swallow error silently, let next provider try
+      console.warn(`[stream-chat] anthropic auto-cascade failed — trying next provider (${err.message})`);
     }
   }
 
@@ -2157,7 +2157,7 @@ async function handleStreamChat(req, url, res) {
         sendFail(err.message);
         return;
       }
-      // Auto mode: swallow error silently, let next provider try
+      console.warn(`[stream-chat] openai auto-cascade failed — trying next provider (${err.message})`);
     }
   }
 
@@ -2211,7 +2211,7 @@ async function handleStreamChat(req, url, res) {
         sendFail(err.message);
         return;
       }
-      // Auto mode: swallow error silently, let next provider try
+      console.warn(`[stream-chat] xai/grok auto-cascade failed — trying next provider (${err.message})`);
     }
   }
 
