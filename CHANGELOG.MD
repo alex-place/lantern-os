@@ -3,6 +3,9 @@
 All notable changes to Keystone OS (formerly Lantern OS) should be documented in
 this file.
 
+## [1.7.50] - 2026-06-22
+- docs(sigma0): update SIGMA0-CONTINUAL-TRAINING.md status (#911) — retract stale partial-eval claim, document 600-step training run started today, add next-step command block
+
 ## [1.7.49] - 2026-06-22
 - fix(dream-chat): degraded-mode persona override (#1050) — drop `!_cloudAvailable` gate from `_useOfflinePrompt`; API keys are always present in env even when cloud providers are unreachable, so Ouro-1.4B was receiving journaling persona prompts and producing poetry for factual queries
 
