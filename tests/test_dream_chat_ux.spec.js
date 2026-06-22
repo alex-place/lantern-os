@@ -280,27 +280,39 @@ test.describe("Dream Chat — error & edge handling", () => {
 });
 
 test.describe("Dream Chat — local command routing", () => {
-  test("work-intent queries route to the instant convergence agent (no LLM)", async ({ page }) => {
+  test("work-intent queries are routed and answered via the stream endpoint", async ({ page }) => {
+    // Stage 3 unification: !ask + work/status intents flow through /api/dream/chat/stream
+    // (server short-circuits them to the convergence agent internally). The old direct
+    // /api/convergence/agent POST path is no longer called by the client.
     await mockDreamChat(page, {
-      convergence: { answer: "Top issue: fix the streaming bug.", grounded: true, actions: [] },
+      streamEvents: [
+        { type: "route", label: "Keystone · auto" },
+        { type: "token", text: "Top issue: fix the streaming bug." },
+        { type: "done", source: "claude", routeLabel: "Keystone · Claude", cleanText: "Top issue: fix the streaming bug." },
+      ],
     });
     await page.goto(PAGE);
     await send(page, "what work needs to be done?");
-    await expect(page.locator(".msg-row.agent").last()).toContainText("Top issue: fix the streaming bug.", { timeout: 8000 });
-    await expect(page.locator(".msg-row.agent").last()).toContainText("Instant answer");
-    // It must NOT have hit the streaming LLM endpoint.
-    expect(await page.evaluate(() => window.__chatRequests.length)).toBe(0);
-    expect(await page.evaluate(() => window.__convRequests.length)).toBe(1);
+    await expect(lastAgent(page)).toContainText("Top issue: fix the streaming bug.", { timeout: 8000 });
+    expect(await page.evaluate(() => window.__chatRequests.length)).toBe(1);
+    expect(await page.evaluate(() => window.__convRequests.length)).toBe(0);
   });
 
-  test("!ask routes to the convergence agent", async ({ page }) => {
+  test("!ask is handled via the stream endpoint", async ({ page }) => {
+    // Stage 3 unification: !ask routes through /api/dream/chat/stream, not the
+    // old /api/convergence/agent direct POST endpoint.
     await mockDreamChat(page, {
-      convergence: { answer: "The router caches 120 Keystone routes.", grounded: true, actions: [] },
+      streamEvents: [
+        { type: "route", label: "Keystone · auto" },
+        { type: "token", text: "The router caches 120 Keystone routes." },
+        { type: "done", source: "claude", routeLabel: "Keystone · Claude", cleanText: "The router caches 120 Keystone routes." },
+      ],
     });
     await page.goto(PAGE);
     await send(page, "!ask explain the convergence router");
-    await expect(page.locator(".msg-row.agent").last()).toContainText("120 Keystone routes", { timeout: 8000 });
-    expect(await page.evaluate(() => window.__convRequests.length)).toBe(1);
+    await expect(lastAgent(page)).toContainText("120 Keystone routes", { timeout: 8000 });
+    expect(await page.evaluate(() => window.__chatRequests.length)).toBe(1);
+    expect(await page.evaluate(() => window.__convRequests.length)).toBe(0);
   });
 
   test("!explore leaves chat for the Three Doors game route", async ({ page }) => {
