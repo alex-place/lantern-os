@@ -1,0 +1,2 @@
+### Fixed
+- Detect and surface ollama 0-byte replies instead of silently succeeding (#996). `ouro:latest` is a proxy manifest that returns 200 OK with no tokens when `ouro_serve.py` is stopped — both ollama paths now treat an empty reply as a failure: `console.warn` names the likely cause, `recordProviderFailure` is called, explicit-provider mode returns a clear user-facing error, and auto-cascade mode falls through to the next provider rather than serving an empty done event.

@@ -2249,6 +2249,9 @@ async function handleStreamChat(req, url, res) {
           sendDone("ollama", { agent: doneAgentName, provider: "ollama", online: true, cleanText, suggestions, receipt: ollamaConnectorReceipt });
           return;
         }
+        // Connected but 0 bytes — ouro:latest proxy manifest without ouro_serve.py backing (#996)
+        console.warn("[stream-chat] ollama unified-connector: 0-byte reply — ouro:latest may be a proxy manifest; is ouro_serve.py running?");
+        recordProviderFailure("ollama", "unified_connector_empty_reply");
       } catch (err) {
         recordProviderFailure("ollama", `unified_connector: ${err.message}`);
         fullReply = "";
@@ -2311,7 +2314,7 @@ async function handleStreamChat(req, url, res) {
         req2.write(payload);
         req2.end();
       });
-      if (ollamaOk) {
+      if (ollamaOk && fullReply) {
         const { cleanText: ollamaClean, suggestions: ollamaDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
         await logConversation({
           recordedAt: new Date().toISOString(),
@@ -2325,6 +2328,17 @@ async function handleStreamChat(req, url, res) {
         sendReceipt(ollamaHttpReceipt);
         sendDone("ollama", { agent: doneAgentName, provider: "ollama", online: true, cleanText: ollamaClean, suggestions: ollamaDoors, webSuggestions, receipt: ollamaHttpReceipt });
         return;
+      }
+      if (ollamaOk && !fullReply) {
+        // 200 OK but no tokens — ouro:latest proxy manifest without ouro_serve.py (#996)
+        console.warn(`[stream-chat] ollama direct-http: 200 OK but 0 bytes from ${ollamaModel} — is ouro_serve.py running?`);
+        recordProviderFailure("ollama", "direct_http_empty_reply");
+        if (requestedProvider) {
+          sendError("Local model returned empty response. Start ouro_serve.py to back the ouro:latest proxy.");
+          sendFail("ollama_empty_reply");
+          return;
+        }
+        // Auto mode: fall through to sendError below
       }
     } catch (err) {
       recordProviderFailure("ollama", err.message);
