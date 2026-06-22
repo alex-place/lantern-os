@@ -587,6 +587,28 @@ function embedShortDate(d) {
 
 // Map a typed message to an embed kind, or null. Bang commands always work; NL
 // requires an explicit "show/what/latest" framing so normal chat isn't hijacked.
+// Render convergence-agent action chips (work/ask answers). Moved out of the old
+// client-side work-intent branches; now driven by the `actions` in the chat-stream
+// done event (Stage 3 one-endpoint unification). Chip onclick stays client-side:
+// href → open tab, autonomous+issue → runAutowork stream, command → fillAndSend.
+function renderActionChips(bubble, actions, base) {
+  if (!Array.isArray(actions) || !actions.length || !bubble) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'starter-chips';
+  wrap.style.marginTop = '10px';
+  actions.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'starter-chip';
+    btn.textContent = a.label;
+    if (a.href) btn.onclick = () => window.open(a.href, '_blank', 'noopener');
+    else if (a.autonomous && a.issue) {
+      btn.onclick = () => { btn.disabled = true; btn.textContent = 'Working…'; runAutowork(a.issue, btn, base).catch(e => console.error('[autowork]', e)); };
+    } else if (a.command) btn.onclick = () => fillAndSend(a.command);
+    wrap.appendChild(btn);
+  });
+  bubble.appendChild(wrap);
+}
+
 function detectEmbedIntent(text) {
   const s = text.trim();
   const bang = s.match(/^!(videos?|watch|youtube|discover|news|reads?|feed|build|github|releases?|commits?|support|patreon|tiers?|donate|embeds?)\b/i);
@@ -709,6 +731,22 @@ async function renderExploreEmbed(kind, userText) {
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('input');
+  // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
+  // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
+  // they're folded in here so there is exactly one sendMessage, no monkey-patching.
+  // Auth gate: block roles without chat access (all current roles allow; the server
+  // enforces real limits — this fails open to that if the role globals aren't present).
+  try {
+    if (typeof LANTERN_ROLES !== "undefined" && typeof lanternSession !== "undefined") {
+      const _role = (typeof normalizeRole === "function") ? normalizeRole(lanternSession.role) : lanternSession.role;
+      if (LANTERN_ROLES[_role] && !LANTERN_ROLES[_role].canChat) {
+        if (typeof loginWithPatreon === "function") loginWithPatreon();
+        return;
+      }
+    }
+  } catch (_) { /* gate is best-effort; the server enforces limits regardless */ }
+  // Normalize the legacy !convergance command → canonical !convergence.
+  if (/^!convergance(?:\s+(?:sync|loop|run))?\s*$/i.test(String(input.value || "").trim())) input.value = "!convergence";
   const text = input.value.trim();
   if (!text || isSending) return;
 
@@ -775,59 +813,9 @@ async function sendMessage() {
     return;
   }
 
-  // !ask <question> — deterministic convergence agent (no LLM): answer + actions
-  const askMatch = text.match(/^!ask\s+(.+)/i);
-  if (askMatch) {
-    input.value = '';
-    input.style.height = 'auto';
-    const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
-    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    addUserBubble(text);
-    const messages = document.getElementById('messages');
-    const sysRow = document.createElement('div');
-    sysRow.className = 'msg-row agent';
-    sysRow.innerHTML = '<div class="msg-label">Convergence</div><div class="bubble" style="font-size:13px">Routing locally…</div>';
-    messages.appendChild(sysRow);
-    if (typeof scrollToBottom === 'function') scrollToBottom();
-    try {
-      const r = await fetch(`${base}/api/convergence/agent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: askMatch[1].trim() }),
-      });
-      const d = await r.json();
-      const bubble = sysRow.querySelector('.bubble');
-      const badge = d.grounded ? '⚡ Instant answer · from live repo data' : '⚡ Instant answer · no AI cost';
-      const meta = `<div style="font-size:11px;opacity:0.55;margin-top:8px">${badge}</div>`;
-      bubble.innerHTML = `<div style="white-space:pre-wrap;line-height:1.5">${esc(d.answer || '(no answer)')}</div>` + meta;
-      const acts = Array.isArray(d.actions) ? d.actions : [];
-      if (acts.length) {
-        const wrap = document.createElement('div');
-        wrap.className = 'starter-chips';
-        wrap.style.marginTop = '10px';
-        acts.forEach(a => {
-          const btn = document.createElement('button');
-          btn.className = 'starter-chip';
-          btn.textContent = a.label;
-          if (a.href) btn.onclick = () => { window.open(a.href, '_blank', 'noopener'); };
-          else if (a.autonomous && a.issue) {
-            btn.onclick = () => {
-              btn.disabled = true;
-              btn.textContent = 'Working…';
-              runAutowork(a.issue, btn, base).catch(e => console.error('[autowork]', e));
-            };
-          }
-          else if (a.command) btn.onclick = () => fillAndSend(a.command);
-          wrap.appendChild(btn);
-        });
-        bubble.appendChild(wrap);
-      }
-      if (typeof scrollToBottom === 'function') scrollToBottom();
-    } catch (e) {
-      sysRow.querySelector('.bubble').textContent = `Convergence agent failed: ${e.message}`;
-    }
-    return;
-  }
+  // (!ask + work/status intents now flow through the single /api/dream/chat/stream
+  // endpoint; the server short-circuits them to the convergence agent and streams the
+  // answer + `actions`, rendered below from the done event. Stage 3 of the unification.)
 
   // !work / !edit <issue#> — observable autonomous workspace (Sigma-0, issue #527)
   const workMatch = text.match(/^!(?:work|edit)\s+#?(\d+)/i);
@@ -838,62 +826,6 @@ async function sendMessage() {
     // Dummy button so runAutowork can report status without a chip
     const dummyBtn = { textContent: '', style: {} };
     runAutowork(parseInt(workMatch[1], 10), dummyBtn, base).catch(err => console.error('[autowork]', err));
-    return;
-  }
-
-  // Auto-route work/status queries to convergence agent (no LLM cost, instant)
-  const WORK_INTENT = /\b(what (work|issues?|tasks?|bugs?|tickets?|pr[s']?|pull requests?)|what (needs?|needs to be) (done|fixed|closed|worked on)|what'?s? (open|pending|left|next|the status|blocking)|show (me )?(open |the )?issues?|status (of|update)|list (issues?|tasks?|open)|open issues?|any issues?|what should i (work on|fix|do)|top issues?|priority (issues?|tasks?))\b/i;
-  if (WORK_INTENT.test(text) && !text.startsWith('!')) {
-    input.value = '';
-    input.style.height = 'auto';
-    const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
-    const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    addUserBubble(text);
-    const messages = document.getElementById('messages');
-    const sysRow = document.createElement('div');
-    sysRow.className = 'msg-row agent';
-    sysRow.innerHTML = '<div class="msg-label">Convergence</div><div class="bubble" style="font-size:13px">Routing locally…</div>';
-    messages.appendChild(sysRow);
-    if (typeof scrollToBottom === 'function') scrollToBottom();
-    try {
-      const r = await fetch(`${base}/api/convergence/agent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      });
-      const d = await r.json();
-      const bubble = sysRow.querySelector('.bubble');
-      const badge = d.grounded ? '⚡ Instant answer · from live repo data' : '⚡ Instant answer · no AI cost';
-      const meta = `<div style="font-size:11px;opacity:0.55;margin-top:8px">${badge}</div>`;
-      bubble.innerHTML = `<div style="white-space:pre-wrap;line-height:1.5">${esc(d.answer || '(no answer)')}</div>` + meta;
-      const acts = Array.isArray(d.actions) ? d.actions : [];
-      if (acts.length) {
-        const wrap = document.createElement('div');
-        wrap.className = 'starter-chips';
-        wrap.style.marginTop = '10px';
-        acts.forEach(a => {
-          const btn = document.createElement('button');
-          btn.className = 'starter-chip';
-          btn.textContent = a.label;
-          if (a.href) btn.onclick = () => window.open(a.href, '_blank', 'noopener');
-          else if (a.autonomous && a.issue) {
-            // Use the same observable streaming path as the !ask chips, so a
-            // user who *types* "what should I work on?" gets the live step
-            // panel (plan → patch → tests → commit → push → PR) instead of an
-            // opaque "Working… ✓ Done" button. Σ₀: no hidden agency (#527).
-            btn.onclick = () => {
-              btn.disabled = true; btn.textContent = 'Working…';
-              runAutowork(a.issue, btn, base).catch(e => console.error('[autowork]', e));
-            };
-          } else if (a.command) btn.onclick = () => fillAndSend(a.command);
-          wrap.appendChild(btn);
-        });
-        bubble.appendChild(wrap);
-      }
-    } catch (e) {
-      sysRow.querySelector('.bubble').textContent = `Convergence failed: ${e.message}`;
-    }
-    if (typeof scrollToBottom === 'function') scrollToBottom();
     return;
   }
 
@@ -932,6 +864,7 @@ async function sendMessage() {
   let didError = false;
   let routeLabel = '';
   let receivedDone = false;
+  let doneActions = null;   // convergence-agent action chips, from the done event (Stage 3)
   let doneProvider = '';
   // #930: coalesce per-token DOM writes into one render per animation frame instead
   // of re-parsing+re-rendering the whole bubble on every token.
@@ -1016,8 +949,9 @@ async function sendMessage() {
             bubble.dataset.sigma0Claims = evt.claims || 0;
           } else if (evt.type === 'done') {
             if (evt.cleanText) fullText = evt.cleanText;
-            if (evt.routeLabel) routeLabel = evt.routeLabel;
+            if (evt.routeLabel || evt.label) routeLabel = evt.routeLabel || evt.label;
             doneProvider = evt.source || evt.provider || '';
+            if (Array.isArray(evt.actions) && evt.actions.length) doneActions = evt.actions;
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -1049,6 +983,12 @@ async function sendMessage() {
   }
 
   bubble.innerHTML = renderMarkdown(fullText);
+
+  // Convergence-agent action chips (Stage 3): the server streamed a deterministic
+  // work/ask answer + actions through the one endpoint — render the chips here.
+  if (doneActions) {
+    renderActionChips(bubble, doneActions, (typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+  }
 
   // Re-apply tool results — the render above rebuilds the cards with empty result slots.
   if (toolResults.length) {
