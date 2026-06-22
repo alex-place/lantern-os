@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.39] - 2026-06-22
+
+### Added
+- **Σ₀ divergence→depth coupling: the loop now steps DEEPER to resolve a runaway.** Closing the actuator gap — adaptive depth (`converge`/`accel`) resolved the *per-token latent* divergence, but the *sequence-level* runaway (divergence canary) had no depth response. `DecodeCanary.knobs()` now takes an optional `eps` and returns a depth-coupled value: **DIVERGENCE tightens eps** (lower ⇒ harder to exit ⇒ the recurrent loop steps deeper to think the runaway out), **COLLAPSE loosens it** (a degenerate token needs no deep thought ⇒ exit sooner) — the certificate's two fates getting opposite depth responses. `loop_lm.generate` threads a per-token `eps_cur` through the convergence exit when `adapt` is on. Opt-in (`eps=None` ⇒ inert), so the model-free collapse tests are unchanged. Live (converge, eps0.2, UT8): `mean_depth` now scales with divergence — 4.82 @ div0 (is_even) → 6.42 @ div0.98 (runaway), quality preserved. New regression test; 34 cert + 12 canary + 4 exit tests green. No `src/cio_sde` changes.
+
 ## [1.7.38] - 2026-06-21
 
 ### Added

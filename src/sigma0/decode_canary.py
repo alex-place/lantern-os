@@ -148,17 +148,27 @@ class DecodeCanary:
 
     # ── actuator: gate decode knobs on Σ₀ proximity ───────────────────────────
     def knobs(self, q: float, rep_penalty: float, temperature: float = 0.0,
-              proximity: Optional[float] = None, divergence: Optional[float] = None) -> Dict[str, float]:
+              proximity: Optional[float] = None, divergence: Optional[float] = None,
+              eps: Optional[float] = None) -> Dict[str, float]:
         """Map Σ₀ proximity onto decode knobs. COLLAPSE (repetition) → punish repeats, inject
         novelty, exit sooner. DIVERGENCE (runaway) → exit sooner + punish repeats too, but do
         NOT inject novelty (temperature would feed the runaway). Distinct fates, per the
-        certificate; the EOS bias that actually halts a runaway lives in loop_lm.generate."""
+        certificate; the EOS bias that actually halts a runaway lives in loop_lm.generate.
+
+        When `eps` (the latent-convergence exit threshold) is supplied, it also gets a DEPTH
+        response — the 'step adaptively to resolve divergence' actuator: DIVERGENCE tightens eps
+        (lower ⇒ harder to exit ⇒ the loop steps DEEPER to think the runaway out), while COLLAPSE
+        loosens it (a degenerate token needs no deep thought ⇒ exit sooner). Floored positive.
+        None ⇒ no eps knob (inert; depth-coupling off)."""
         p = self.monitor.sigma0_proximity()["proximity"] if proximity is None else float(proximity)
         d = 0.0 if divergence is None else max(0.0, min(1.0, float(divergence)))
-        return {
+        out = {
             "q": max(0.2, min(0.95, q - 0.2 * p - 0.2 * d)),   # exit sooner under either fate
             "rep_penalty": rep_penalty + 0.7 * p + 0.3 * d,     # punish repeats harder
             "temperature": max(0.0, temperature) + 0.7 * p,     # novelty for COLLAPSE only
             "proximity": p,
             "divergence": d,
         }
+        if eps is not None:
+            out["eps"] = max(0.02, float(eps) * (1.0 + 0.5 * p - 0.6 * d))
+        return out

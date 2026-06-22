@@ -264,7 +264,7 @@ class Sigma0LoopLM:
                 dc = DecodeCanary()
             except Exception:
                 dc = None  # canary is best-effort; never break generation
-        q_cur, rep_cur = q, rep_penalty
+        q_cur, rep_cur, eps_cur = q, rep_penalty, eps
         canary_max_prox, canary_spooks, canary_signal = 0.0, 0, "none"
         # Σ₀ DIVERGENCE instrument — the certificate's SECOND fate (§7). The decode canary's
         # signals (self-repeat / n-gram echo / entropy-drop) detect COLLAPSE; they are blind to
@@ -316,7 +316,9 @@ class Sigma0LoopLM:
                     # spiral-robust second-order criterion, 'converge' the first-order one (E2).
                     h_per_step = [h[0, -1, :] for h in hidden_states_list]
                     _exit = self.accel_step if mode == "accel" else self.converge_step
-                    step, rel, reason, deltas = _exit(h_per_step, eps, self.max_steps)
+                    # eps_cur is modulated by the adapt actuator below: DIVERGENCE tightens it
+                    # (step deeper to resolve the runaway), COLLAPSE loosens it (exit sooner).
+                    step, rel, reason, deltas = _exit(h_per_step, eps_cur, self.max_steps)
                     if deltas:
                         exit_deltas.append(sum(deltas) / len(deltas))
                 else:
@@ -360,8 +362,9 @@ class Sigma0LoopLM:
                     if obs["signal"] != "none":
                         canary_signal = obs["signal"]
                     if adapt:  # actuator: gate knobs on Σ₀ proximity + divergence (opt-in)
-                        k = dc.knobs(q, rep_penalty, divergence=divergence)
+                        k = dc.knobs(q, rep_penalty, divergence=divergence, eps=eps)
                         q_cur, rep_cur = k["q"], k["rep_penalty"]
+                        eps_cur = k.get("eps", eps)   # divergence→deeper, collapse→shallower
                 _nxt_t = torch.tensor([[nxt]], device=ids.device)
                 ids = torch.cat([ids, _nxt_t], dim=1)
                 _cur = _nxt_t  # next pass forwards only the new token; the cache holds the rest

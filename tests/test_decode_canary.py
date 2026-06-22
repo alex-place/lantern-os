@@ -130,6 +130,21 @@ def test_knobs_respond_to_divergence_without_novelty():
     assert diverging["temperature"] == base["temperature"], "divergence must NOT inject novelty"
 
 
+def test_knobs_eps_depth_coupling():
+    """The eps knob is the 'step deeper to resolve divergence' actuator: DIVERGENCE tightens eps
+    (deeper), COLLAPSE loosens it (shallower), and it stays inert + positive at the extremes."""
+    dc = DecodeCanary()
+    base = dc.knobs(q=0.5, rep_penalty=1.3, proximity=0.0, divergence=0.0, eps=0.2)
+    diverging = dc.knobs(q=0.5, rep_penalty=1.3, proximity=0.0, divergence=1.0, eps=0.2)
+    collapsing = dc.knobs(q=0.5, rep_penalty=1.3, proximity=1.0, divergence=0.0, eps=0.2)
+    assert base["eps"] == pytest.approx(0.2), "zero proximity/divergence must leave eps unchanged"
+    assert diverging["eps"] < base["eps"], "divergence must TIGHTEN eps (step deeper)"
+    assert collapsing["eps"] > base["eps"], "collapse must LOOSEN eps (exit sooner)"
+    assert diverging["eps"] >= 0.02, "eps must stay positive (floored)"
+    # eps knob is opt-in: absent when eps is not supplied
+    assert "eps" not in dc.knobs(q=0.5, rep_penalty=1.3, divergence=1.0)
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
