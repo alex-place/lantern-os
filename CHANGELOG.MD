@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.36] - 2026-06-21
+
+### Added
+- **Refine the !convergence plan against the 2026 frontier (~5 min web research).** New note [`docs/research/2026-06-21-convergence-plan-refinement.md`](docs/research/2026-06-21-convergence-plan-refinement.md) re-grounds the agent-spine build order's open steps (5/6/scheduling) against 2025–26 research: a step-wise **calibrated verifier gate** on Act (PRMs / guideline-grounded evidence accumulation); a **live Σ₀ canary v2** (entropy-contraction/drift/tail-erosion triad + reuse of the §1 spectral certificate + the *boiling-frog* blind-spot warning → a mandatory time-based grounding tick); a **calibrated outcome-graded Brier confidence** to replace the frozen 0.7/0.3 heuristic (now the highest-leverage step); and **relevance-gated pattern retrieval** (avoids ExpeL's "knowledge→noise"). Each maps onto an existing symbol — extension, not addition. Back-linked from agent-spine §6. Web citations surfaced via search and flagged medium-confidence per the External Reality Rule.
+
 ## [1.7.35] - 2026-06-21
 
 ### Added
