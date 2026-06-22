@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.31] - 2026-06-21
+
+### Changed
+- **docs: reconcile the Σ₀ Collapse Certificate test count (30 → 33) after an external-reality verification pass.** Verified `tests/test_cio_sde.py` → **33 passed, 0 xfail** (was 30; 3 added since, all green), `data/sigma0_regime_sweep_report.json` → 900 collapse-prone trials / 100% prevented, and the cited symbols all present in source. Updated the stale count throughout [`SIGMA0-COLLAPSE-CERTIFICATE.md`](docs/SIGMA0-COLLAPSE-CERTIFICATE.md) + added a 2026-06-21 maintenance-log entry. Every other claim verified to hold; honoring the doc's own "status cannot silently drift" rule.
+
 ## [1.7.30] - 2026-06-21
 
 ### Added
