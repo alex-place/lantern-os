@@ -15,6 +15,12 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.46] - 2026-06-22
+
+### Added
+- `train-qlora-ouro.py`: enable `attn_implementation="sdpa"` (FlashAttention-2 tiled kernel) during QLoRA training — closes gap where serving used SDPA since #775 but training used eager O(n²) dense allocation. Reduces training activation VRAM constant factor; required step toward seq=4096 training.
+- `docs/research/2026-06-22-ouro-subquadratic-attention.md`: full research on the three O(n²) problems in the Ouro UT stack (decode fixed #810, training fixed here, architectural SWA/linear-attn roadmap) including ragged-depth KV cache as the O(N)-adaptive prize.
+
 ## [1.7.45] - 2026-06-22
 
 ### Added
