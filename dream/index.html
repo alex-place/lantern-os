@@ -52,17 +52,12 @@
       padding: 20px;
       overflow: hidden;
     }
-    /* Hero with the large, slow Sigma-0 mandala as a background layer */
+    /* Hero with the large Sigma-0 mandala as a background layer */
     .hero { position: relative; text-align: center; padding: 0; }
-    @keyframes hero-spin {
-      from { transform: translate(-50%, -50%) rotate(0deg); }
-      to   { transform: translate(-50%, -50%) rotate(360deg); }
-    }
     /* Full-bleed ambient Σ₀ mandala — a fixed background field behind all
-       content. It is softly masked on every edge so it never hard-cuts against
-       the nav, footer, or viewport: a radial fade on the spinning art (rotation-
-       invariant) plus a vertical fade on the static container (handles the
-       top/bottom edges independent of the spin). Scales mobile → ultrawide. */
+       content. The SVG has its own internal counter-rotating ring animations
+       (same principle as the nav icon); no CSS wrapper rotation is added so
+       the motion matches the header icon exactly. */
     .ambient {
       position: fixed; inset: 0;
       z-index: 0; overflow: clip;
@@ -71,18 +66,16 @@
               mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
     }
     .ambient__mandala {
+      display: block;
       position: absolute; left: 50%;
       top: clamp(260px, 44vh, 500px);
       transform: translate(-50%, -50%);
       width: min(150vh, 132vw, 1500px);
       aspect-ratio: 1 / 1;
-      background: url('/sigma0-mandala.svg') center / contain no-repeat;
       opacity: 0.42;
       -webkit-mask-image: radial-gradient(closest-side, #000 40%, rgba(0,0,0,.5) 64%, transparent 82%);
               mask-image: radial-gradient(closest-side, #000 40%, rgba(0,0,0,.5) 64%, transparent 82%);
-      animation: hero-spin 300s linear infinite;
     }
-    @media (prefers-reduced-motion: reduce) { .ambient__mandala { animation: none; } }
     /* Lift real content above the ambient layer. z-index:0 (not -1) keeps the
        mandala painting over the body's own opaque background. */
     .site-nav, .home-main, .site-footer { position: relative; z-index: 1; }
@@ -165,7 +158,7 @@
 <body>
 
 <!-- ── Ambient Σ₀ mandala — full-bleed background field, behind all content ── -->
-<div class="ambient" aria-hidden="true"><div class="ambient__mandala"></div></div>
+<div class="ambient" aria-hidden="true"><img class="ambient__mandala" src="/sigma0-mandala.svg" alt=""></div>
 
 <!-- ── Site nav ── -->
 <nav class="site-nav">
