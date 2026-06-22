@@ -804,7 +804,11 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
       "You are a helpful assistant running in offline mode on a small local model.\n" +
       "Answer questions directly and factually. If you don't know something, say so.\n" +
       "Do not use metaphor or poetic language. Keep answers short and concrete.";
-    const _useOfflinePrompt = !rp && !isCoding && !_cloudAvailable;
+    // #1050 fix: drop the !_cloudAvailable gate. Keys exist in env even when
+    // cloud providers are unreachable (degraded mode). We're already in the
+    // Ollama block, which means cloud auto-routing fell through — use the
+    // minimal prompt regardless of key presence so Ouro gives factual answers.
+    const _useOfflinePrompt = !rp && !isCoding;
     const ollamaSystemPrompt = isCoding && sigma0Persona
       ? sigma0Persona.systemPrompt
       : (_useOfflinePrompt ? _offlinePrompt : agent.systemPrompt);
