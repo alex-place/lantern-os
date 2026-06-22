@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.40] - 2026-06-22
+
+### Added
+- **Fast-layer plasticity: per-grounding calibrated trust weights (#1011 foundation).** New `lib/grounding-calibration.js` — the thesis-safe alternative to per-loop *neural* weight updates: each external grounding `{key, predicted, outcome}` updates a Beta-posterior **trust weight** + **Brier** calibration in real time, as a PURE FUNCTION of an append-only log (replayable / reversible — no catastrophic forgetting, no eval-gate needed). Exposed at `GET /api/convergence/calibration` (report card) + `POST /api/convergence/grounding` (record one grounding -> updated weight). **Live-verified through the running server:** over 5 groundings the gemini weight tracked 0.667->0.75->0.6 (right, right, wrong) while an overconfident-wrong ollama fell to 0.25 (Brier 0.81). 6/6 unit tests (`tests/test_grounding_calibration.js`). Next wires: auto-drive from settled outcomes + consume in the router.
+
 ## [1.7.39] - 2026-06-22
 
 ### Added

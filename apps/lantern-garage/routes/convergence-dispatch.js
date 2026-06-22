@@ -44,6 +44,38 @@ module.exports = async (req, res, url, deps) => {
     return true;
   }
 
+  // GET /api/convergence/calibration — fast-layer trust weights (#1011): the
+  // per-grounding, Brier-calibrated trust per key + the global Brier report card.
+  if (pathname === "/api/convergence/calibration" && req.method === "GET") {
+    try {
+      const { calibration } = require("../lib/grounding-calibration");
+      sendJson(res, { ...calibration(), description: "Per-grounding calibrated trust weights (fast-layer plasticity)" }, 200);
+    } catch (e) {
+      sendJson(res, { total_events: 0, global_brier: null, keys: {}, error: e.message }, 200);
+    }
+    return true;
+  }
+
+  // POST /api/convergence/grounding — record ONE external grounding
+  // {key, predicted, outcome} and return the UPDATED trust weight. The real-time,
+  // per-loop fast-weight adjustment: append-only, reversible, no neural change.
+  if (pathname === "/api/convergence/grounding" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      try {
+        const { recordGrounding } = require("../lib/grounding-calibration");
+        const b = JSON.parse(body.replace(/^﻿/, "") || "{}");
+        if (!b.key) { sendJson(res, { error: "key required" }, 400); return; }
+        const updated = recordGrounding({ key: b.key, predicted: b.predicted, outcome: b.outcome, source: b.source });
+        sendJson(res, { ok: true, updated }, 200);
+      } catch (e) {
+        sendJson(res, { error: e.message }, 400);
+      }
+    });
+    return true;
+  }
+
   // POST /api/convergence/route-intent — Route a message intent
   if (pathname === "/api/convergence/route-intent" && req.method === "POST") {
     let body = "";
