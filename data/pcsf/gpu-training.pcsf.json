@@ -1,6 +1,6 @@
 {
   "pcsf_type": "gpu_training",
-  "pcsf_version": "1.0.0",
+  "pcsf_version": "1.1.0",
   "component": "gpu_training",
   "description": "Free GPU provider rotation state for Ouro model training. Quota windows reset weekly (Monday 00:00 UTC). Providers are tried in priority order; exhausted providers are skipped until their window resets.",
   "generated_at": "2026-06-22T00:00:00Z",
@@ -25,7 +25,17 @@
       "quota_hours_per_week": 30,
       "session_cap_hours": 9,
       "steps_per_hour_estimate": 180,
-      "notes": "Best free programmatic option. REST kernel push via /api/v1/kernels/push. Quota refills Monday midnight."
+      "notes": "Best free programmatic option. REST kernel push via /api/v1/kernels/push. Quota refills Monday midnight.",
+      "signup_url": "https://www.kaggle.com/account/login?phase=startRegisterTab",
+      "api_key_url": "https://www.kaggle.com/settings/account",
+      "setup_steps": [
+        "1. Register at https://www.kaggle.com/account/login?phase=startRegisterTab",
+        "2. Verify your phone number (required to enable GPU in notebooks)",
+        "3. Go to https://www.kaggle.com/settings/account → API section → 'Create New API Token'",
+        "4. Download kaggle.json — it contains your username and key",
+        "5. Set env vars: KAGGLE_USERNAME=<username>  KAGGLE_KEY=<key>",
+        "6. Verify: node -e \"const d=require('./apps/lantern-garage/lib/training-dispatcher'); d.loadGpuPcsf()\" should show kaggle state=available"
+      ]
     },
     {
       "provider_id": "colab",
@@ -40,7 +50,17 @@
       "quota_hours_per_week": 22,
       "session_cap_hours": 8,
       "steps_per_hour_estimate": 180,
-      "notes": "No official API. Orchestrator emits a pre-built notebook with checkpoint URI; user opens and clicks Run."
+      "notes": "No official API. Orchestrator emits a pre-built notebook with checkpoint URI; user opens and clicks Run.",
+      "signup_url": "https://accounts.google.com/signup",
+      "api_key_url": null,
+      "setup_steps": [
+        "1. Any Google account works — sign up at https://accounts.google.com/signup if needed",
+        "2. Open https://colab.research.google.com",
+        "3. When the orchestrator emits a manual_required record, it includes notebookTemplate — copy that code into a new Colab notebook",
+        "4. Runtime → Change runtime type → T4 GPU → Save",
+        "5. Run All (Ctrl+F9) — session auto-terminates after 8–12 h",
+        "6. No env vars needed for Colab; orchestrator posts the checkpoint URI into the notebook code"
+      ]
     },
     {
       "provider_id": "sagemaker",
@@ -55,7 +75,18 @@
       "quota_hours_per_week": 28,
       "session_cap_hours": 4,
       "steps_per_hour_estimate": 180,
-      "notes": "4h GPU sessions, up to 4h/day free. Refills daily. Manual launch required."
+      "notes": "4h GPU sessions, up to 4h/day free. Refills daily. Manual launch required. No AWS account or credit card needed.",
+      "signup_url": "https://studiolab.sagemaker.aws/signup",
+      "api_key_url": null,
+      "setup_steps": [
+        "1. Request a free account at https://studiolab.sagemaker.aws/signup — no AWS account or credit card required",
+        "2. Wait for approval email (typically a few hours to a few days)",
+        "3. Click the link in the approval email to set your username and password",
+        "4. Sign in at https://studiolab.sagemaker.aws/login",
+        "5. Click 'Start runtime' → select GPU (T4, 4h session) → Open project",
+        "6. Paste the notebookTemplate from the manual_required record into a new notebook cell and run it",
+        "7. Files persist between sessions — only the runtime resets after 4 h"
+      ]
     },
     {
       "provider_id": "paperspace",
@@ -70,7 +101,17 @@
       "quota_hours_per_week": 20,
       "session_cap_hours": 6,
       "steps_per_hour_estimate": 90,
-      "notes": "8GB VRAM — fits seq=1536 but no headroom. REST API available with PAPERSPACE_API_KEY."
+      "notes": "8GB VRAM — fits seq=1536 but no headroom. REST API available. Now part of DigitalOcean.",
+      "signup_url": "https://www.paperspace.com/account/signup",
+      "api_key_url": "https://console.paperspace.com/account/api",
+      "setup_steps": [
+        "1. Sign up at https://www.paperspace.com/account/signup (free tier, no credit card for free-GPU tier)",
+        "2. After login, go to https://console.paperspace.com/account/api",
+        "3. Click 'Add' → name your key (e.g. ouro-training) → copy the key",
+        "4. Set env var: PAPERSPACE_API_KEY=<your_key>",
+        "5. When dispatching, the orchestrator calls POST /api/v1/notebooks with machine=Free-GPU",
+        "6. Note: Free-GPU (M4000, 8GB) has limited VRAM — seq_len=1536 fits but reduce batch size if OOM"
+      ]
     },
     {
       "provider_id": "lightning",
@@ -85,7 +126,17 @@
       "quota_hours_per_week": 22,
       "session_cap_hours": 6,
       "steps_per_hour_estimate": 180,
-      "notes": "Monthly free credits (~22h). Manual launch. A10 tier available when T4 busy."
+      "notes": "22 free GPU credits/month after phone verify. A10 (24GB) available when T4 busy. Manual launch.",
+      "signup_url": "https://lightning.ai/sign-up",
+      "api_key_url": null,
+      "setup_steps": [
+        "1. Sign up at https://lightning.ai/sign-up — use a .edu or company email for instant approval; personal email goes on a waitlist (~48 h wait)",
+        "2. Verify your phone number to unlock 22 free GPU credits/month (each credit ≈ 1 GPU-hour)",
+        "3. Create a new Studio at https://lightning.ai/studio",
+        "4. In the Studio, open a terminal and paste the notebookTemplate from the manual_required record",
+        "5. Run as a Python script: python train_continuation.py",
+        "6. Stop the Studio when training completes to preserve credits — idle Studios consume credits"
+      ]
     }
   ],
   "rotation_order": ["kaggle", "sagemaker", "colab", "paperspace", "lightning"],
