@@ -33,7 +33,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
+    "@anthropic-ai/sdk": "^0.105.0",
     "busboy": "^1.6.0",
     "exif-parser": "^0.1.12",
     "express-session": "^1.19.0",
