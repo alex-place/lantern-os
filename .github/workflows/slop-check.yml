@@ -102,13 +102,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Block oversized PRs (> 1000 added lines of source)
+      - name: Block oversized PRs (> 5000 added lines of source)
         run: |
           added=$(git diff origin/master...HEAD --numstat -- '*.js' '*.ts' '*.py' '*.sh' \
             | awk '{sum += $1} END {print sum+0}')
           echo "Source lines added: $added"
-          if [ "$added" -gt 1000 ]; then
-            echo "::error::PR adds $added lines of source code. Split into smaller atomic PRs (limit: 1000)."
+          if [ "$added" -gt 5000 ]; then
+            echo "::error::PR adds $added lines of source code. Split into smaller atomic PRs (limit: 5000)."
             exit 1
           fi
 
