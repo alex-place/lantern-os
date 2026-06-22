@@ -3,6 +3,9 @@
 All notable changes to Keystone OS (formerly Lantern OS) should be documented in
 this file.
 
+## [1.7.49] - 2026-06-22
+- fix(dream-chat): degraded-mode persona override (#1050) — drop `!_cloudAvailable` gate from `_useOfflinePrompt`; API keys are always present in env even when cloud providers are unreachable, so Ouro-1.4B was receiving journaling persona prompts and producing poetry for factual queries
+
 The format follows the spirit of [Keep a Changelog](https://keepachangelog.com),
 with entries grouped by release. This project is private and local-first, so
 release notes stay honest about what was verified locally versus what remains
@@ -12,6 +15,44 @@ design intent.
 must bump `version` in `package.json` to a new semantic `X.X.X` value and add a
 matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 `scripts/validate-prepush-version-changelog.py`.
+
+---
+
+## [1.7.48] - 2026-06-22
+**Build:** 1.7.48+2026-06-22.194227
+**Commit:** 50b496a4
+
+feat(update-banner): show commit id, date, and message in update notification (#1053)
+
+* fix(operator): use fetch+reset instead of git pull for update endpoint
+
+git pull fails in the stable worktree because the stable-server branch
+has no upstream tracking set (no origin/stable-server exists). Switch to
+fetch origin/master + reset --hard, matching the deploy-stable script
+and working regardless of local branch name.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* feat(update-banner): show commit id, date, and message in update notification
+
+The update available banner now displays the remote master commit's short
+SHA, formatted date, and first line of the commit message so users can
+see exactly what update is waiting without opening GitHub.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix(update-banner): restyle to match site-nav design tokens
+
+Replaces the purple gradient + accent border with the same surface/border/
+shadow tokens as .site-nav so the banner feels native to the page. Button
+text centered and aligned right; text truncates with ellipsis on narrow
+screens.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude <noreply@anthropic.com>
 
 ---
 
