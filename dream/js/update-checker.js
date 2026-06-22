@@ -10,7 +10,20 @@
   const UPDATE_API = (typeof serverBase !== "undefined" ? serverBase : "") + "/api/update-status";
 
   let remoteCommit = null;
+  let remoteInfo = {};
   let dismissed = sessionStorage.getItem("lantern_update_dismissed");
+
+  function bannerText() {
+    const sha = remoteCommit ? remoteCommit.slice(0, 8) : "";
+    const msg = remoteInfo.remoteMessage || "";
+    const date = remoteInfo.remoteDate
+      ? new Date(remoteInfo.remoteDate).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+      : "";
+    let detail = sha ? `<code>${sha}</code>` : "";
+    if (date) detail += ` &middot; ${date}`;
+    if (msg)  detail += ` &middot; ${msg}`;
+    return `Keystone OS update available on <code>master</code>${detail ? " — " + detail : ""}`;
+  }
 
   function createBanner() {
     if (document.getElementById("lantern-update-banner")) return;
@@ -18,8 +31,8 @@
     const banner = document.createElement("div");
     banner.id = "lantern-update-banner";
     banner.innerHTML = `
-      <span class="lantern-update-text">Keystone OS update available on <code>master</code></span>
-      <button class="lantern-update-btn" id="lantern-update-action" title="Update now">Update & Restart</button>
+      <span class="lantern-update-text">${bannerText()}</span>
+      <button class="lantern-update-btn" id="lantern-update-action" title="Update now">Update &amp; Restart</button>
       <button class="lantern-update-dismiss" id="lantern-update-dismiss" title="Dismiss">&times;</button>
     `;
     document.body.prepend(banner);
@@ -94,6 +107,7 @@
     }
 
     remoteCommit = status.remote || null;
+    remoteInfo = { remoteMessage: status.remoteMessage || null, remoteDate: status.remoteDate || null };
     if (status.updateAvailable && remoteCommit && dismissed !== remoteCommit) {
       createBanner();
     } else {
@@ -114,36 +128,50 @@
         align-items: center;
         justify-content: center;
         gap: 12px;
-        padding: 10px 16px;
-        background: linear-gradient(90deg, var(--surface2), var(--accent-dim) 60%, var(--surface2));
-        border-bottom: 1px solid var(--accent);
+        padding: 0 16px;
+        height: 44px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 1px 0 var(--border);
         color: var(--text);
-        font-family: "Segoe UI", system-ui, sans-serif;
-        font-size: 0.9rem;
-        box-shadow: var(--shadow-hover);
-        animation: lanternBannerSlide 0.35s ease-out;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 0.85rem;
+        animation: lanternBannerSlide 0.25s ease-out;
       }
       @keyframes lanternBannerSlide {
         from { transform: translateY(-100%); }
         to   { transform: translateY(0); }
       }
+      #lantern-update-banner .lantern-update-text {
+        flex: 1;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--muted);
+      }
       #lantern-update-banner .lantern-update-text code {
-        background: rgba(255,66,77,0.12);
-        padding: 2px 6px;
+        background: var(--surface2);
+        padding: 1px 5px;
         border-radius: 4px;
         font-family: monospace;
-        color: var(--gold);
+        font-size: 0.8rem;
+        color: var(--accent);
+        border: 1px solid var(--border);
       }
       #lantern-update-banner .lantern-update-btn {
         background: var(--accent);
         color: #fff;
         border: none;
         border-radius: 6px;
-        padding: 6px 14px;
-        font-size: 0.82rem;
+        padding: 5px 12px;
+        font-size: 0.8rem;
         font-weight: 600;
         cursor: pointer;
         transition: background 0.2s;
+        white-space: nowrap;
+        text-align: center;
+        flex-shrink: 0;
       }
       #lantern-update-banner .lantern-update-btn:hover {
         background: var(--accent-hover);
@@ -152,11 +180,11 @@
         background: transparent;
         color: var(--muted);
         border: none;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         line-height: 1;
         cursor: pointer;
-        margin-left: 4px;
-        padding: 0 4px;
+        padding: 0 2px;
+        flex-shrink: 0;
       }
       #lantern-update-banner .lantern-update-dismiss:hover {
         color: var(--text);
