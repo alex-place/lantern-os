@@ -20,7 +20,7 @@ jobs:
     name: Hardcoded secrets
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Scan diff for hardcoded secrets
@@ -41,7 +41,7 @@ jobs:
     name: Debug statement check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Check for committed debug statements
@@ -65,7 +65,7 @@ jobs:
     name: OWASP basics
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Check for eval / shell injection patterns
@@ -99,7 +99,7 @@ jobs:
     name: Commit size gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Block oversized PRs (> 1000 added lines of source)
@@ -116,7 +116,7 @@ jobs:
     name: Boilerplate / duplication check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Check new files don't duplicate existing ones
