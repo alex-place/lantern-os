@@ -325,6 +325,12 @@ function selectAgent(message) {
     (scores[p.id] > scores[best.id]) ? p : best
   );
 
+  // Σ₀ default: an unmatched message (every persona still at the baseline score) must NOT
+  // fall through to the first/dream persona — route it to the grounded Σ₀ agent instead.
+  if (scores[winner.id] <= 1) {
+    const sigma0 = personas.find((p) => p.id === "keystone-sigma0") || personas.find((p) => p.id === "keystone");
+    if (sigma0) { console.log(`[selectAgent] no keyword match → Σ₀ default (${sigma0.id})`); return sigma0; }
+  }
   console.log(`[selectAgent] Scored message "${message.slice(0, 60)}..." → ${winner.id} (score: ${scores[winner.id]})`);
   return winner;
 }

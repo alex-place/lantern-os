@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.29] - 2026-06-21
+
+### Changed
+- **Dream-chat persona routing replaced with Σ₀.** The chat ROUTER_PROMPT now leads with the grounded Keystone Σ₀ identity (convergence loop + external-reality rule + explicit "no dream/poetic language even though the background is a journal" + code-with-verification), and `selectAgent` now defaults an unmatched message to the Σ₀ agent instead of falling through to the first/dream persona. Fixes the weak local model answering technical/coding questions with dream-poetry; verified in preview — golden coding questions (is_prime, reverse_string) now return correct code, not poetry.
+
 ## [1.7.28] - 2026-06-21
 
 ### Fixed
