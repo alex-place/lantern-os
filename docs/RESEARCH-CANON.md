@@ -11,6 +11,10 @@ Curated references organized by component. Not a bookmark dump. Living document 
   - Establishes the design space for agentic systems; informs Kernel architecture
   - Key insight: agents need deliberation loops, not monolithic models
   - Relevant: six-stage loop design, state machine pattern
+- **The Overfitted Brain: Dreams evolved to assist generalization** (Hoel 2020, [arXiv:2007.09560](https://arxiv.org/abs/2007.09560))
+  - Dreams = noise injection (dropout + domain randomization) to combat overfitting → generalization
+  - Grounds the North Star rule: *no separate dream engine; dreaming = high-exploration reasoning + mandatory verification*
+  - The biological twin of Σ₀⁻¹ excitation; overfitting = the σ=0 / 42-state collapse — see [research note](research/2026-06-21-overfitted-brain-dreams-generalization.md)
 
 ### Implementation References
 - **AIOS: A Generalist Agent Operating System** 

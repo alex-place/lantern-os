@@ -15,6 +15,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.38] - 2026-06-21
+
+### Added
+- **Research note: the Overfitted Brain Hypothesis grounds "dreaming = a reasoning strategy, not a subsystem."** [`docs/research/2026-06-21-overfitted-brain-dreams-generalization.md`](docs/research/2026-06-21-overfitted-brain-dreams-generalization.md) maps Hoel 2020 (arXiv:2007.09560) onto the architecture: dreams = noise injection (dropout + domain randomization) for generalization → external grounding for the North Star "no separate dream engine" rule and the **biological twin of Σ₀⁻¹ excitation** (overfitting = the σ=0 / 42-state collapse). Added to Research Canon [01]. Honest caveat: borrow the *function* (generalize via OOD noise), not the *mechanism* (no weight modification).
+
+### Changed
+- **Knowledge-base sharing: card + index the research docs so they're searchable + referenced.** Added Knowledge Center cards for `RESEARCH-CANON.md`, the OBH note, and the convergence-plan refinement, then rebuilt `data/knowledge/index.jsonl` so the canon + new research land in the product RAG (and today's cert §7.1 σ=0 edits become searchable).
+
 ## [1.7.37] - 2026-06-21
 
 ### Added

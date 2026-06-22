@@ -1,5 +1,5 @@
 {
-  "built_at": 1782083094.534396,
+  "built_at": 1782100480.7971485,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -7,6 +7,17 @@
     "QUICKSTART.md",
     "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
+    "docs/RESEARCH-CANON.md",
+    "docs/research/2026-06-21-overfitted-brain-dreams-generalization.md",
+    "docs/research/2026-06-21-convergence-plan-refinement.md",
+    "docs/convergence-io/README.md",
+    "docs/convergence-io/DCF.md",
+    "docs/convergence-io/NAP.md",
+    "docs/convergence-io/AAPF.md",
+    "docs/convergence-io/PCSF.md",
+    "docs/convergence-io/CCF.md",
+    "docs/convergence-io/CEG.md",
+    "docs/convergence-io/DILATION.md",
     "docs/SIGMA0-OURO-CODER.md",
     "PROVIDERS.md",
     "SKILLS.md",
@@ -16,7 +27,6 @@
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
     "docs/SIGMA0-CONTINUAL-TRAINING.md",
-    "docs/SIGMA0-CODER-CLAUDE-CODE-STATUS.md",
     "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
     "docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md",
     "docs/research/2026-06-19-kernel-model-frontier.md",
@@ -24,6 +34,6 @@
     "docs/research/2026-06-19-convergence-core-agent-spine.md",
     "docs/KEYSTONE-MCP.md"
   ],
-  "sections": 409,
-  "sha256": "bb43928d4e89e1f3ea595f36eabcbda27627ddb38f417980611c0ef3bf73077b"
+  "sections": 501,
+  "sha256": "35065f23a90b76d3c9d3e3b10b37990008bc1457cf33854ec96d3a91cba2cbd7"
 }
