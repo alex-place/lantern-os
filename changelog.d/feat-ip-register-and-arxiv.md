@@ -1,0 +1,3 @@
+### Added
+- Knowledge Center: **IP Register & 2-Year Buildout** article (`docs/KEYSTONE-IP-AND-BUILDOUT.md`) — a defensive-publication IP register (8 high-signal inventions with full enabling specs, novelty claims, and prior-art exposure), the trademark + copyright list, and the 2026-H2 → 2028-H1 buildout plan. Adds a "Strategy & IP" card to `knowledgecenter.html` and rebuilds the grounding index so Keystone chat can ground on it.
+- arXiv-ready manuscript of the Σ₀ Collapse Certificate (`docs/papers/sigma0-collapse-certificate-arxiv.tex`) — self-contained paper incorporating the proven one-step anisotropy-lift lemma (L2), the 900-run anti-collapse sweep, the provable non-normal stability gates, and the reproducible router demonstration.

@@ -1,11 +1,12 @@
 {
-  "built_at": 1782100480.7971485,
+  "built_at": 1782104737.5023894,
   "docs": [
     "README.md",
     "CLAUDE.md",
     "AGENTS.md",
     "QUICKSTART.md",
     "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
+    "docs/KEYSTONE-IP-AND-BUILDOUT.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
     "docs/RESEARCH-CANON.md",
     "docs/research/2026-06-21-overfitted-brain-dreams-generalization.md",
@@ -34,6 +35,6 @@
     "docs/research/2026-06-19-convergence-core-agent-spine.md",
     "docs/KEYSTONE-MCP.md"
   ],
-  "sections": 501,
-  "sha256": "35065f23a90b76d3c9d3e3b10b37990008bc1457cf33854ec96d3a91cba2cbd7"
+  "sections": 525,
+  "sha256": "ec8ce60b69a04dd8079f05d95c6505fc8f757a53f273ee7435ce1be40fd521cb"
 }

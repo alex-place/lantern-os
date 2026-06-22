@@ -1,0 +1,597 @@
+\documentclass[11pt]{article}
+
+% ============================================================================
+%  arXiv-ready manuscript.
+%  Σ₀ — The Collapse Certificate.
+%  Self-contained: compiles with a stock TeX Live (pdflatex, 2 passes).
+%  Source of record for all code claims: src/cio_sde/ + tests/test_cio_sde.py.
+% ============================================================================
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{tcolorbox}
+
+% --- theorem environments ---
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+% --- honest-status callout boxes (a deliberate feature: every claim is tagged) ---
+\newtcolorbox{verifybox}{colback=green!4,colframe=green!45!black,boxrule=0.6pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
+\newtcolorbox{caveatbox}{colback=yellow!8,colframe=orange!70!black,boxrule=0.6pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
+
+% --- shorthands ---
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\Szero}{\Sigma_0}
+\newcommand{\PM}{P_{\!M}}
+\newcommand{\PN}{P_{\!N}}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator*{\Real}{Re}
+\DeclareMathOperator{\eig}{eig}
+\DeclareMathOperator{\spec}{spec}
+\DeclareMathOperator{\diag}{diag}
+
+\title{\textbf{$\Sigma_0$ --- The Collapse Certificate}\\[4pt]
+\large A computable stability certificate for convergence dynamics, and an honest
+account of why an ungrounded self-improving system tends to collapse or diverge}
+\author{Alex Place\\ \texttt{Keystone OS / Lantern OS project}\\ \small\texttt{src/cio\_sde/}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We give a \emph{computable} certificate for contraction in a dissipative nonlinear
+system, and use it to make a precise, falsifiable claim about recursively
+self-improving systems. Splitting the local Jacobian's symmetric part into active and
+near-null subspaces yields a Lyapunov function $V(x)=\tfrac12\norm{\PM x}^2$ whose decay
+is \emph{guaranteed} when the active spectral abscissa is negative \emph{and} the active
+subspace is invariant under the full Jacobian (e.g.\ $A$ normal). We are explicit about
+that hypothesis: the general non-normal case is not covered by the energy argument, and
+the authoritative test is the full spectrum $\max\Real\lambda(A)<0$. For the non-normal
+regime we add two sufficient, provable contraction gates --- a numerical-range gate and a
+Lyapunov/similarity-metric gate (\S\ref{sec:gates}) --- that strictly widen the certified
+region, with provably-correct transient bounds. We pair the theorem with three control
+constructs: a collapse operator $\Szero$ (a heuristic trigger plus projection onto the
+null manifold, the ``42-state''); an anti-collapse operator $\Sigma_0^{-1}$, for which we
+prove a closed-form \emph{one-step anisotropy-lift lemma} (\S\ref{sec:l2}) and report a
+$900$-run forced-collapse sweep ($100\%$ prevented); and a Kalman innovation-surprise
+``canary.'' Read together, the construction is a small, honest warning: absent external
+grounding, the linearized dynamics admit only collapse or divergence, and grounding is the
+safety mechanism --- the control-theoretic shadow of \emph{model collapse}. Theorem~1 and
+Lemma~L2 are machine-checked (\texttt{tests/test\_cio\_sde.py}, $34$ passing; the gates in
+\texttt{tests/test\_stability\_gates.py}, $14$ passing). Components that are heuristic are
+labelled as such; the AI-safety reading is the keeper and stands on the published
+model-collapse literature.
+\end{abstract}
+
+\begin{caveatbox}
+\textbf{Per-section status (honest by construction).}
+\S\ref{sec:thm} theorem: \emph{proven under an explicit hypothesis, machine-checked for
+the symmetric case.}
+\S\ref{sec:gates} non-normal gates: \emph{proven sufficient (not necessary), machine-checked.}
+\S\ref{sec:sigma0} trigger: \emph{operational definition, not derived.}
+\S\ref{sec:l2}--\ref{sec:anti} anti-collapse: \emph{L2 lift proven closed-form; full
+sufficiency theorem open; suppression measured over $900$ runs.}
+\S\ref{sec:canary} canary: \emph{eigenvalue readout retired; innovation-surprise signal
+implemented.}
+\S\ref{sec:demo} demonstration: \emph{reproducible (scripts committed, real $2678$-turn run).}
+\S\ref{sec:asi} AI-safety: \emph{the keeper, on the model-collapse literature.}
+\end{caveatbox}
+
+\tableofcontents
+\bigskip
+
+% ====================================================================
+\section{Introduction and contributions}
+\label{sec:intro}
+Self-improving systems --- optimizers, agents, models trained on their own output ---
+share a failure geometry. With no contact with an external reality, the dynamics either
+\emph{freeze} onto a single self-consistent state or \emph{run away}. Practitioners
+observe the first as \emph{model collapse} \cite{shumailov2024,dohmatob2024,feng2024} and
+the second as instability or reward-hacking \cite{amodei2016,skalse2022}. This paper gives
+the control-theoretic skeleton of that observation, together with a computable certificate
+one can run on a local Jacobian.
+
+\paragraph{Contributions.}
+\begin{enumerate}[leftmargin=1.4em]
+\item A \textbf{computable contraction certificate} (Theorem~\ref{thm:contraction}): a
+Lyapunov split on the symmetric part of the Jacobian, with an exponential-decay guarantee
+under an explicit invariance hypothesis, machine-checked for the symmetric case.
+\item \textbf{Two provable region-wideners} for non-normal $A$ (\S\ref{sec:gates}): a
+numerical-range (matrix-measure) gate and a Lyapunov similarity-metric gate, each strictly
+wider than the small-gain bound, with provably-correct transient constants
+(Crouzeix--Palencia $1+\sqrt2$).
+\item A \textbf{closed-form one-step anisotropy-lift lemma} (Lemma~\ref{lem:l2},
+\S\ref{sec:l2}): one aligned anti-collapse bump of magnitude $\ge\Delta$ provably breaks
+the collapse trigger's flatness condition. This is the deductive core toward a
+non-collapse theorem; it is unconditionally true and machine-checked.
+\item An \textbf{empirical anti-collapse result} (\S\ref{sec:anti}): over $900$ trials that
+collapse without protection, $\Sigma_0^{-1}$ suppresses collapse in $100\%$.
+\item A \textbf{reproducible demonstration} on a real $2678$-turn conversation log
+(\S\ref{sec:demo}) showing ungrounded recursion settling onto a low-dimensional fixed
+point.
+\item An \textbf{AI-safety reading} (\S\ref{sec:asi}) that ties the certificate to the
+model-collapse literature and states the ``grounding is the safety mechanism'' principle
+precisely, with honest scope.
+\end{enumerate}
+
+\paragraph{Stance on honesty.} Every claim below carries a status tag (\emph{proven},
+\emph{measured}, \emph{heuristic}). This is not decoration: a stability certificate that
+overclaims is worse than none, because it is trusted. Where the proof covers only a special
+case, we say so; where a number is illustrative rather than pinned by a test, we say so.
+
+% ====================================================================
+\section{The object}
+\label{sec:object}
+We study a dissipative nonlinear system
+\begin{equation}
+\dot{x} = f(x,u,\theta), \qquad x \in \R^{n},
+\end{equation}
+with internal state $x$ (for our running example, a conversation's encoded state),
+control / persistent-excitation input $u$, and slowly-varying parameters $\theta$.
+Linearizing along a trajectory $x^\ast$ gives the local Jacobian
+\begin{equation}
+\dot{\delta x} = A\,\delta x, \qquad
+A = \left.\frac{\partial f}{\partial x}\right|_{x^\ast},
+\end{equation}
+and everything below reasons about the eigenstructure of $A$ and its symmetric part
+$A_s = \tfrac12(A + A^{\top})$. The skew part $A_k=\tfrac12(A-A^\top)$ carries rotation and
+is \emph{not} seen by $A_s$; the gap between the two is exactly what makes the general case
+harder than the symmetric one.
+
+% ====================================================================
+\section{The collapse-guarantee theorem}
+\label{sec:thm}
+Split the state space using $A_s$ into the \emph{near-null} subspace
+$N = \operatorname{span}\{\, v_i : |\lambda_i(A_s)| < \varepsilon \,\}$ and its orthogonal
+complement, the \emph{active} subspace $M$ with projector $\PM$. Define the Lyapunov
+function on the active modes only,
+\begin{equation}
+V(x) = \tfrac12 \norm{\PM x}^2,
+\end{equation}
+and let the active spectral abscissa be
+$\alpha = \max\{\, \lambda_i(A_s) : v_i \in M \,\}$.
+
+\begin{theorem}[Contraction on the active subspace]
+\label{thm:contraction}
+Assume $\alpha < 0$ \textbf{and} the active subspace $M$ is $A$-invariant, i.e.\
+$\PM A \PN = 0$ (equivalently: $A$ is normal, $A=A_s$, or $A$ commutes with $\PM$). Then
+\begin{equation}
+\dot V \le 2\alpha V
+\quad\Longrightarrow\quad
+\norm{\PM x(t)} \le \norm{\PM x(0)}\, e^{\alpha t}.
+\end{equation}
+The active modes decay exponentially at rate $|\alpha|$ and the trajectory contracts onto
+the invariant null manifold $N$: under this hypothesis, collapse is guaranteed. If
+$\alpha \ge 0$, some active mode is non-contracting and collapse is not guaranteed.
+\end{theorem}
+
+\begin{proof}
+Differentiating $V$ along the flow,
+\[
+\dot V = (\PM x)^{\top}\PM A\,x
+= (\PM x)^{\top} A_s (\PM x)
+\;+\; \underbrace{(\PM x)^{\top} A\,(\PN x)}_{\text{cross term}}.
+\]
+The first term is $\le 2\alpha V$ by the definition of $\alpha$. The cross term vanishes
+exactly when $M$ is $A$-invariant ($\PM A \PN = 0$), which holds automatically if $A$ is
+normal. Under that hypothesis $\dot V \le 2\alpha V$, and Gr\"onwall's inequality gives the
+exponential bound.
+\end{proof}
+
+\subsection{Why the hypothesis is required}
+\label{sec:hypothesis}
+For a general non-normal $A$ the skew part $A_k$ couples the active and null components,
+the cross term need not vanish, and the simple energy bound can fail.
+
+\begin{caveatbox}
+\textbf{Counterexample.} For $A=\begin{psmallmatrix}-1 & 3\\ -3 & 0\end{psmallmatrix}$ the
+active abscissa is $\alpha=-1<0$, yet a direct scan finds
+$\max \dot V/V \approx +8.8\times10^{4} \gg 2\alpha=-2$, and integrating from
+$x_0=(0.3,1.0)$ makes $V$ \emph{grow} $0.045\to0.341$ --- a sign violation of
+$\dot V\le 2\alpha V$. Collapse still occurs here, but it is rescued by a different
+argument (\S\ref{sec:gates}), not by the energy proof. The ``exact, not approximate''
+reading applies only to the symmetric case.
+\end{caveatbox}
+
+\subsection{The authoritative test: the full spectrum}
+$\alpha<0$ on the symmetric part is \emph{necessary but not sufficient} for strict
+contraction of the full system. The conservative, always-correct condition is
+\begin{equation}
+\max \Real\,\lambda(A) < 0 \quad\text{on the \emph{full} } A
+\ (\text{via } \eig, \text{ not } \texttt{eigvalsh}).
+\end{equation}
+A Bendixson bound gives $\Real\lambda(A)\le\lambda_{\max}(A_s)$, so $\alpha$ bounds the
+real parts but does not by itself certify them: a rotation
+$A=\begin{psmallmatrix}-1&0&0\\0&0&2\\0&-2&0\end{psmallmatrix}$ has $\alpha=-1$ yet
+eigenvalues $\{-1,\pm 2i\}$ --- a center that never collapses in its rotating plane.
+\texttt{collapse\_certificate()} therefore reports \emph{both} $\alpha$ (a conservative
+small-gain bound $\max\lambda(A_s)+\norm{A-A_s}_2$) and $\max\Real\lambda(A)$ (the exact
+abscissa via $\eig$, with a \texttt{full\_contracting} flag).
+
+\begin{verifybox}
+\textbf{Verification.} The shipped test uses $A=-0.8\,I$, which is \emph{symmetric}
+($A=A_s$, hypothesis holds exactly, cross term identically zero). The certificate predicts
+contraction rate $0.8$ and a rollout shows $V$ decaying monotonically --- confirming the
+theorem in precisely the special case where the proof is unconditionally valid; it does
+\emph{not} exercise the non-normal case.
+(\texttt{collapse\_certificate}, \texttt{lyapunov\_value}, \texttt{src/cio\_sde/collapse.py}.)
+\end{verifybox}
+
+% ====================================================================
+\section{Provable region-wideners for non-normal $A$}
+\label{sec:gates}
+The small-gain bound over-rejects strongly non-normal $A$, and $\max\Real\lambda(A)<0$
+alone is necessary-not-sufficient (transient growth). \texttt{stability\_gates()} adds two
+\emph{sufficient, provable} contraction certificates, each strictly wider than small-gain
+(margin $m\ge0$):
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{Numerical-range gate (monotone).}
+$\omega(A)=\lambda_{\max}(A_s)<-m \implies \norm{e^{tA}}_2\le e^{\omega t}$ --- a strict,
+no-transient contraction (matrix measure $\mu_2$; Lohmiller--Slotine 1998
+\cite{lohmiller1998}). $\omega(A)$ is the rightmost point of the numerical range $W(A)$;
+since $\spec(A)\subset W(A)$, this gate \emph{implies} the Lyapunov gate.
+\item \textbf{Lyapunov gate (asymptotic, optimal metric).} For margin $m\ge0$,
+$\exists P\succ0:\ (A+mI)^\top P+P(A+mI)\prec0 \iff \max\Real\lambda(A)<-m$ (classical
+Lyapunov theorem \cite{khalil2002}; $=\inf_T\mu_2(TAT^{-1})<-m$). Certified by solving
+$(A+mI)^\top P+P(A+mI)=-I$ and checking $P\succ0$ (with a relative ill-conditioning guard,
+so the boundary is never certified independent of solver warnings). It \emph{accepts} the
+\S\ref{sec:hypothesis} counterexample $\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$
+(Hurwitz at $-\tfrac12$) that the energy proof and small-gain bound reject;
+$\sqrt{\kappa(P_0)}$ (the margin-$0$ solve) bounds the Euclidean transient
+$\sup_t\norm{e^{tA}}$.
+\end{enumerate}
+
+\paragraph{Honest scope.} Sufficient, not necessary; they certify the \emph{full}
+Jacobian's contraction, not collapse-onto-manifold (the active/null alignment gap is
+separate, see \S\ref{sec:l2}). The \emph{proven} transient constant is Crouzeix--Palencia
+(2017) \cite{crouzeix2017}: $\norm{e^{tA}}\le 1+\sqrt2$ when $W(A)\subset$~LHP
+($\omega\le0$); the sharper constant $2$ is Crouzeix's still-open conjecture. These gates
+\emph{extend the proven region of \S\ref{sec:thm}; they do not make the system globally
+uncollapsible.}
+
+\begin{verifybox}
+\textbf{Verification.} \texttt{tests/test\_stability\_gates.py} ($14$ tests): the
+$\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$ case (small-gain rejects, Lyapunov
+accepts, numerical-range flags the transient), a $400$-matrix red-team finding \emph{no}
+false-positive certificate, and matrix-exponential checks that the monotone ($e^{\omega t}$),
+Lyapunov ($\sqrt{\kappa(P)}$), and Crouzeix--Palencia ($1+\sqrt2$) bounds each hold.
+\end{verifybox}
+
+% ====================================================================
+\section{The collapse trigger $\Sigma_0$}
+\label{sec:sigma0}
+\begin{caveatbox}
+\textbf{Status: operational definition --- not derived from Theorem~\ref{thm:contraction}.}
+\end{caveatbox}
+$\Szero$ fires when \emph{all four} conditions hold simultaneously (a control singularity
+over a structureless field):
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{$}l<{$}l@{}}
+\toprule
+\textrm{Condition} & \textrm{Meaning} \\
+\midrule
+\norm{\nabla_x L} < \varepsilon_g & no optimization signal remains \\
+\rank(J_f) < \rho\, n & drift Jacobian has lost directional structure \\
+\Sigma \textrm{ isotropically flat} & uncertainty has no preferred direction \\
+\norm{\partial H/\partial u} < \varepsilon_c & control cannot distinguish actions \\
+\bottomrule
+\end{tabular}
+\end{center}
+None of these four quantities is the spectral abscissa $\alpha$ of
+Theorem~\ref{thm:contraction}. They are an operational definition of ``underdetermined''
+--- a soft AND-gate $p=\min(p_\nabla,p_{\text{rank}},p_{\text{aniso}},p_{\text{ctrl}})$
+(a G\"odel t-norm) over four independent signs of degeneracy. The link between ``the four
+conditions fire'' and ``$\alpha<0$'' is a \emph{modeling assumption}, not a proof. When
+triggered, $\Szero$ projects the state onto the null eigenmodes of $A_s$,
+\begin{equation}
+x^\ast = P x, \qquad P = V_{\mathrm{null}} V_{\mathrm{null}}^{\top},
+\end{equation}
+the ``42-state'' (a colloquial name, no formal meaning).
+
+\begin{caveatbox}
+\textbf{Caveat.} $x^\ast=Px$ is a true fixed point only when $A$ is normal. For non-normal
+$A$ the projection kills the symmetric part but the skew rotation leaves $\norm{A x^\ast}$
+large, so $x^\ast$ is not an equilibrium of the real flow. In the implementation the
+apparent ``freeze'' is produced by the integrator overwriting $x_{\text{next}}=x^\ast$ and
+discarding the diffusion term --- a clamp, not an emergent attractor.
+(\texttt{SemanticCollapseOperator}.)
+\end{caveatbox}
+
+% ====================================================================
+\section{Lemma L2: the one-step anisotropy lift}
+\label{sec:l2}
+The trigger's flat leg fires when the eigenvalue coefficient of variation
+$a(\Sigma)=\operatorname{std}(\lambda)/\operatorname{mean}(\lambda)<\varepsilon_a$. The
+anti-collapse operator (\S\ref{sec:anti}) adds, in one step, $\Sigma^+ = \Sigma + bP$ with
+$b\ge0$ and $P$ a rank-$k$ orthogonal projector. We prove a closed-form threshold above
+which one bump provably breaks flatness.
+
+\begin{lemma}[One-step anisotropy lift]
+\label{lem:l2}
+Let $\Sigma\succeq0$ be real symmetric $d\times d$ ($d\ge2$) with eigenvalues
+$\lambda_1,\dots,\lambda_d>0$, mean $\mu>0$, and population CoV $a=\sigma_{\mathrm{pop}}/\mu<\varepsilon$
+for some $\varepsilon\in(0,1)$. Let $P$ be an orthogonal projector of rank $k$,
+$1\le k\le d-1$, whose range is spanned by $k$ eigenvectors of $\Sigma$ (alignment
+hypothesis). Then for $b>0$,
+\begin{equation}
+b \;\ge\; \Delta \;:=\; \frac{(\varepsilon + a)\,\mu\,d}{\sqrt{k(d-k)} - \varepsilon k}
+\qquad\Longrightarrow\qquad a(\Sigma + bP) \;\ge\; \varepsilon,
+\end{equation}
+provided the denominator is positive, i.e.\ $\varepsilon < \sqrt{(d-k)/k}$ (true for every
+$1\le k\le d-1$ when $\varepsilon\le0.05$ and $d\le400$).
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+Because $P$ aligns with eigenvectors of $\Sigma$, $\Sigma^+=\Sigma+bP$ has the same
+eigenvectors and eigenvalues $\lambda_i^+=\lambda_i+b$ on the bumped set $B$ ($|B|=k$),
+$\lambda_j^+=\lambda_j$ otherwise. By the law of total variance with weights $k/d$,
+$(d-k)/d$, adding the constant $b$ to every element of $B$ leaves the within-group variance
+invariant, so
+$(\sigma^+)^2 \ge \tfrac{k(d-k)}{d^2}\big(b-|\mu_B-\mu_U|\big)^2$. Bounding the pre-bump gap
+by the total spread, $|\mu_B-\mu_U|\le a\mu d/\sqrt{k(d-k)}$, and using the exact post-bump
+mean $\mu^+=\mu+(k/d)b$, the inequality $a(\Sigma^+)=\sigma^+/\mu^+\ge\varepsilon$ reduces
+to $b\,(\sqrt{k(d-k)}-\varepsilon k)/d \ge (\varepsilon+a)\mu$, i.e.\ $b\ge\Delta$. Every
+step is an exact inequality, so $\Delta$ is a sufficient (conservative) threshold.
+\end{proof}
+
+\paragraph{Consequence and scope.} With $\varepsilon=\varepsilon_a$, one aligned bump of
+magnitude $b\ge\Delta$ lifts the anisotropy above threshold, so the trigger's flat
+condition is false on the next step and the four-condition AND-gate cannot fire --- the
+freeze is skipped that step. L2 is \emph{unconditionally true} and machine-checked
+(\texttt{experiments/prove\_l2\_anisotropy\_lift.py};
+\texttt{tests/test\_cio\_sde.py::test\_l2\_anisotropy\_lift}). It does \emph{not} by itself
+prove non-collapse: that needs the alignment hypothesis (proven for normal $A$, open for
+non-normal) and a proximity floor (an engineered hypothesis). L2 is the part that is
+unconditionally true.
+
+% ====================================================================
+\section{The anti-collapse operator $\Sigma_0^{-1}$}
+\label{sec:anti}
+\begin{caveatbox}
+\textbf{Status: measured over distribution ($900$-run sweep, $100\%$ prevented). L2
+(\S\ref{sec:l2}) is the proven lemma toward a sufficiency theorem; the full theorem ---
+non-normal $A$, all initial conditions --- is the one open frontier.}
+\end{caveatbox}
+Where $\Szero$ projects \emph{onto} the null subspace, $\Sigma_0^{-1}$ injects energy
+\emph{along} it:
+\begin{equation}
+dx = f\,dt + dW + \Sigma_0^{-1}, \qquad
+\Sigma_0^{-1} = s\cdot p \cdot (V_{\mathrm{null}}\,\xi),
+\end{equation}
+with $\xi$ standard normal, $s$ the strength, and $p\in[0,1]$ the collapse proximity ---
+$0$ far from the boundary (a no-op that costs nothing), rising toward $1$ as $\nabla L$,
+rank, anisotropy, and control sensitivity all approach their thresholds. The implementation
+injects noise in the null subspace and re-anisotropizes $\Sigma$
+(\texttt{AntiCollapseOperator.excite}); the proximity gate is the soft-AND of the four
+\S\ref{sec:sigma0} signals.
+
+\begin{verifybox}
+\textbf{Evidence (measured).} \texttt{experiments/sigma0\_regime\_sweep.py} runs
+forced-collapse rollouts with and without $\Sigma_0^{-1}$ across an
+$\alpha\times$ non-normality $\times$ noise grid (fixed $3$-dim-null Jacobian). Over the
+\textbf{$900$ trials that genuinely collapse without protection}, $\Sigma_0^{-1}$
+suppressed collapse and re-excited the state in \textbf{$100\%$}
+(\texttt{data/sigma0\_regime\_sweep\_report.json}:
+\texttt{collapse\_prone\_trials\_total=900},
+\texttt{headline\_conditional\_prevention\_rate=1.0}). Honest caveat: in this construction
+the non-normal off-diagonal lifts the Jacobian's effective rank, so the collapse-prone
+cells are the diagonal ones; a sufficiency \emph{theorem} for all non-normal $A$ remains
+future work.
+\end{verifybox}
+
+\begin{remark}
+On ``persistent excitation.'' The classical PE result (Anderson 1977 \cite{anderson1977})
+concerns estimator/parameter convergence under $\int\varphi\varphi^\top\ge\alpha I$. Here
+there is no estimator and no parameter being identified --- only a state kept off a
+manifold. So $\Sigma_0^{-1}$ is \emph{inspired by / analogous to} persistent excitation; no
+PE condition is established.
+\end{remark}
+
+% ====================================================================
+\section{The early-warning scalar (the ``canary'')}
+\label{sec:canary}
+\begin{caveatbox}
+\textbf{Status: the eigenvalue readout is retired; the right signal --- innovation surprise
+--- is implemented (\texttt{src/cio\_sde/surprise.py}).}
+\end{caveatbox}
+Near a bifurcation the dominant eigenvalue flattens (critical slowing down
+\cite{wissel1984,scheffer2009}). Eigenvalue-based readouts
+$p_{\mathrm{unbounded}}=1/|\Real\lambda_{\max}(A_s)|$ and
+$p_{\mathrm{gate}}=\operatorname{clip}(1-|\Real\lambda_{\max}|/\varepsilon,0,1)$ were
+proposed but never drove the operator (the actual driver is the four-condition
+$\texttt{proximity()}$) and are formally retired.
+
+\begin{verifybox}
+\textbf{The right canary, implemented.} The correct early-warning is \emph{surprise
+relative to uncertainty}: the Kalman normalized innovation squared
+$\mathrm{NIS}=\nu^\top S^{-1}\nu$ with $\nu=y-C\hat x$, $S=C\Sigma C^\top + R$.
+$\mathrm{NIS}\approx m$ means model and reality agree; $\mathrm{NIS}\gg m$ means the model
+is overconfident and has drifted without knowing it --- the standard innovation-consistency
+$\chi^2$ test \cite{barshalom2001}. \texttt{forward\_step} runs a Kalman predict/update
+cycle with process noise $Q=(g\cdot\text{dilation})^2 dt$, so smooth exploration stays
+consistent (NIS$\approx m$, silent) while the collapse snap / $\Sigma_0^{-1}$ kick spikes
+NIS. \texttt{experiments/sigma0\_horse\_blinders.py} shows the regime the eigenvalue signal
+cannot: a low-coupling observer staying \emph{calm while wrong} before the surprise spikes.
+The dangerous state is the quiet before the spook, not the spook.
+\end{verifybox}
+
+% ====================================================================
+\section{Global structure: the attractor graph $G$}
+\label{sec:graph}
+The system is multistable. Collect its attractors $\{A_1,\dots,A_k\}$, each with a basin
+$B_i = \{\, x_0 : \lim_{t\to\infty}\phi_t(x_0) \in A_i \,\}$. Coarse-graining to a graph
+$G=(V,E)$ gives an induced Markov process over basins,
+$P_{ij}(u) = \Pr\!\big(\pi(x_{t+1}) = A_j \mid \pi(x_t) = A_i,\, u_t\big)$, with partition
+map $\pi:\R^n\to V$. This is the standard Markov-state-model construction; it is genuinely
+Markov only under timescale separation (fast intra-basin relaxation vs.\ slow inter-basin
+hops). A boundary studded with \emph{saddles} has stable manifolds --- ridges one can ride
+with structured control (spin, the imaginary part $\Im\lambda$, is orthogonal to capture,
+the real part).
+
+% ====================================================================
+\section{Demonstration on router data}
+\label{sec:demo}
+\begin{verifybox}
+\textbf{Reproducible.} The two driver scripts are committed and the numbers below are
+produced from committed code over the real conversation log ($2678$ turns):
+\texttt{python experiments/router\_sigma0\_encoder.py} and
+\texttt{python experiments/router\_reservoir\_G.py}.
+\end{verifybox}
+Each turn is encoded as $x=[\text{novelty},\text{self\_repeat},\text{echo},\text{length}]
+\in[0,1]^4$, with a local Jacobian fitted over a $10$-turn sliding window by finite
+difference.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Encoder ($2678$ turns, $2673$ with a fitted Jacobian)} & Value \\
+\midrule
+Mean Jacobian spectral radius $\rho$ & $1.064$ \\
+Max $\rho$ & $27.93$ \\
+Fraction of windows with $\rho>1$ & $0.346$ \\
+\midrule
+\textbf{Reservoir $G$ (echo-state, size $50$, $\rho=0.9$, ridge readout)} & \\
+One-step reconstruction MSE (held-out) & $0.0097$ \\
+Correlation dimension of reservoir trajectory & $0.74$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The mean spectral radius sitting just above $1$ (a third of windows locally expanding) is
+the signature of a system perched near its stability boundary. The autonomous rollout
+(feeding the readout through the projection $\pi$ onto $[0,1]^4$) converges to a
+\emph{low-dimensional fixed point} (correlation dimension $\approx0.74$) --- the
+\S\ref{sec:thm} prediction: absent external grounding the flow settles onto a single
+self-consistent state.
+
+\begin{caveatbox}
+\textbf{Honest deviation.} The converged state is \emph{not} the hand-sketched ``parrot
+attractor''; the real log settles at high-novelty / low-echo / short-length. The
+qualitative claim (ungrounded recursion collapses onto a degenerate fixed point) is
+supported; the earlier specific numbers were not data-derived and are replaced by the
+produced ones. The source log is also partly synthetic test traffic, so the deliverable is
+the reproducible pipeline, not a population-level value.
+\end{caveatbox}
+
+% ====================================================================
+\section{Why this is a warning against ASI}
+\label{sec:asi}
+\begin{verifybox}
+\textbf{Status: the one downstream claim worth keeping --- as a machine-learning claim, on
+ML evidence, not as a consequence of the physics or of \S\ref{sec:demo}.}
+\end{verifybox}
+A system that optimizes against its own representations with no external anchor is the flow
+$\dot x = f(x)$ where $f$ only ever sees $x$. The linearized certificate frames two
+degenerate fates absent outside contact: \textbf{collapse} onto a dead fixed point (the
+42-state, mirrors agreeing with mirrors), or \textbf{divergence}. The only stable middle
+required an external bound. \textbf{Grounding is the safety mechanism.}
+
+This does not need the certificate's physics or the \S\ref{sec:demo} numbers: it is the
+documented phenomenon of \emph{model collapse} \cite{shumailov2024}. Dohmatob et al.\
+\cite{dohmatob2024} show synthetic data \emph{changes the scaling law itself} --- even a
+$1\%$ synthetic fraction can truncate scaling --- and Feng et al.\ \cite{feng2024} show that
+\emph{verification} of synthesized samples prevents collapse: the published analogue of the
+external-grounding requirement. The phenomenon is closely related to reward hacking /
+specification gaming \cite{amodei2016,skalse2022}.
+
+\paragraph{Two honest qualifications.} The strict ``collapse or diverge, no third'' dichotomy
+is the \emph{linearized} framing, not a general ML theorem (real training also admits limit
+cycles and partial-information equilibria --- better stated as ``tends to degenerate or
+destabilize absent grounding''). And the in-repo demonstration, though now reproducible,
+runs on a partly-synthetic log, so the \emph{argument} rests primarily on the published
+model-collapse literature.
+
+% ====================================================================
+\section{Limitations and open problems}
+\label{sec:limits}
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{The non-collapse theorem is open.} L2 (\S\ref{sec:l2}) proves one aligned bump
+breaks flatness; a closed-form proof that $\Sigma_0^{-1}$ \emph{always} prevents collapse,
+for non-normal $A$ and all initial conditions, is future work. The empirical support is a
+$900$-run distribution, not a theorem.
+\item \textbf{Alignment for non-normal $A$.} The bump-basis-aligns-with-$\eig(\Sigma)$
+hypothesis is proven only for normal $A$; the non-normal cross-term is the same debt as
+Theorem~\ref{thm:contraction}.
+\item \textbf{Safety $\ne$ capability.} The certificate bounds collapse; it says nothing
+about whether the bounded system is useful.
+\item \textbf{Mechanization.} Theorem~\ref{thm:contraction} and Lemma~\ref{lem:l2} are
+amenable to a Lean/Mathlib formalization (Weyl/interlacing $+$ a scalar CoV inequality); we
+have machine-checked numerics but not yet a proof assistant.
+\end{itemize}
+
+% ====================================================================
+\section{Conclusion}
+A computable contraction certificate, two provable non-normal gates, a closed-form
+anisotropy-lift lemma, and a reproducible demonstration together support one disciplined
+claim: an ungrounded self-improving system has no benign limit, and external grounding is
+the mechanism that supplies one. We have been deliberate about the boundary between what is
+proven, what is measured, and what is heuristic --- because a stability certificate is only
+worth as much as its honesty.
+
+% ====================================================================
+\begin{thebibliography}{99}
+\bibitem{lyapunov1892} A.\,M. Lyapunov.
+  \emph{The General Problem of the Stability of Motion}. 1892.
+\bibitem{poincare} H. Poincar\'e.
+  \emph{M\'emoire sur les courbes d\'efinies par une \'equation diff\'erentielle}. 1880s.
+\bibitem{bendixson1901} I. Bendixson.
+  Sur les courbes d\'efinies par des \'equations diff\'erentielles. \emph{Acta Math.}, 1901.
+\bibitem{wissel1984} C. Wissel.
+  A universal law of the characteristic return time near thresholds. \emph{Oecologia}, 1984.
+\bibitem{scheffer2009} M. Scheffer et al.
+  Early-warning signals for critical transitions. \emph{Nature}, 461:53--59, 2009.
+\bibitem{anderson1977} B.\,D.\,O. Anderson.
+  Exponential stability of linear equations arising in adaptive identification.
+  \emph{IEEE Trans.\ Automat.\ Control}, 1977.
+\bibitem{barshalom2001} Y. Bar-Shalom, X.-R. Li, T. Kirubarajan.
+  \emph{Estimation with Applications to Tracking and Navigation}. Wiley, 2001.
+\bibitem{lohmiller1998} W. Lohmiller, J.-J.\,E. Slotine.
+  On contraction analysis for nonlinear systems. \emph{Automatica}, 34(6):683--696, 1998.
+\bibitem{khalil2002} H.\,K. Khalil.
+  \emph{Nonlinear Systems}. 3rd ed., Prentice Hall, 2002.
+\bibitem{crouzeix2017} M. Crouzeix, C. Palencia.
+  The numerical range is a $(1+\sqrt2)$-spectral set. \emph{SIAM J.\ Matrix Anal.\ Appl.},
+  38(2):649--655, 2017.
+\bibitem{pathak2018} J. Pathak et al.
+  Model-free prediction of large spatiotemporally chaotic systems from data.
+  \emph{Phys.\ Rev.\ Lett.}, 2018.
+\bibitem{shumailov2024} I. Shumailov et al.
+  AI models collapse when trained on recursively generated data. \emph{Nature}, 2024.
+\bibitem{dohmatob2024} E. Dohmatob, Y. Feng, P. Yang, F. Charton, J. Kempe.
+  A tale of tails: model collapse as a change of scaling laws. \emph{ICML}, 2024.
+  arXiv:2402.07043.
+\bibitem{feng2024} Y. Feng, E. Dohmatob, P. Yang, F. Charton, J. Kempe.
+  Beyond model collapse: scaling up with synthesized data requires verification.
+  \emph{ICML}, 2024. arXiv:2406.07515.
+\bibitem{amodei2016} D. Amodei et al.
+  Concrete problems in AI safety. arXiv:1606.06565, 2016.
+\bibitem{skalse2022} J. Skalse et al.
+  Defining and characterizing reward hacking. \emph{NeurIPS}, 2022.
+\end{thebibliography}
+
+\paragraph{Reproducibility.}
+Code of record: \texttt{src/cio\_sde/collapse.py} (\texttt{SemanticCollapseOperator},
+\texttt{collapse\_certificate}, \texttt{AntiCollapseOperator}, \texttt{stability\_gates}),
+\texttt{src/cio\_sde/surprise.py} (\texttt{SurpriseMonitor} $+$ Kalman update). Tests:
+\texttt{tests/test\_cio\_sde.py} ($34$ passing; Theorem~1 and L2), \texttt{tests/test\_stability\_gates.py}
+($14$ passing). Experiments: \texttt{sigma0\_regime\_sweep.py} ($900$-run sweep),
+\texttt{prove\_l2\_anisotropy\_lift.py} (symbolic $+$ numerical L2),
+\texttt{router\_sigma0\_encoder.py}, \texttt{router\_reservoir\_G.py} (\S\ref{sec:demo}),
+\texttt{sigma0\_horse\_blinders.py} (the canary).
+
+\end{document}
