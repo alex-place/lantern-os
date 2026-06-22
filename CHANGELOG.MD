@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.30] - 2026-06-21
+
+### Added
+- **Σ₀ DecodeCanary + adapt actuator wired into ouro_serve.** The native Q-exit loop (`OURO_NATIVE=1`) now passes `canary=True` (env `OURO_CANARY`, default on) and `adapt` (env `OURO_ADAPT`, default off) to `Sigma0LoopLM.generate`, and logs per-generation collapse telemetry (`[ouro][canary] prox/spooks/signal/collapse_events/mean_depth/adapt`) plus the same fields to the eval leaderboard. Previously the served model ran with the collapse monitor and its actuator disabled — only the fast cached HF path was reachable, so the intrinsic anti-degeneration mechanism never engaged. Off-by-default for the fast path; opt in for the deep/native path.
+
 ## [1.7.29] - 2026-06-21
 
 ### Changed

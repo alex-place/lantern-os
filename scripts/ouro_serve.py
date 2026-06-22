@@ -50,6 +50,15 @@ _SERVED_MODELS = {
 NATIVE = os.environ.get("OURO_NATIVE", "0") == "1"
 NATIVE_Q = float(os.environ.get("OURO_Q", "0.5"))
 NATIVE_MAX = int(os.environ.get("OURO_NATIVE_MAX", "80"))
+# Σ₀ DecodeCanary (#766/#793): per-token collapse monitor — folds self-repeat / n-gram echo /
+# argmax-margin / entropy-collapse z-alarm into a single sigma0_proximity score. OURO_CANARY=1
+# (default in native) runs it OBSERVE-ONLY (telemetry: canary_max_proximity/spooks/signal).
+# OURO_ADAPT=1 turns on the ACTUATOR: when proximity rises, knobs() deepens the recurrent loop
+# (q) and raises the repetition penalty — the model reacting to its own incipient collapse,
+# which is the intrinsic anti-degeneration mechanism. Native loop only (the fast cached path
+# is plain HF decode and never sees the canary).
+NATIVE_CANARY = os.environ.get("OURO_CANARY", "1") == "1"
+NATIVE_ADAPT = os.environ.get("OURO_ADAPT", "0") == "1"
 # Decode quality (both paths): repetition penalty + no-repeat n-gram kill the small-model
 # degeneration (e.g. "✅✅✅…"). Greedy by default for reproducibility; set OURO_SAMPLE=1 for chat-natural sampling.
 REP_PENALTY = float(os.environ.get("OURO_REP_PENALTY", "1.3"))
@@ -124,7 +133,8 @@ if NATIVE:
     _bb = _model.get_base_model() if hasattr(_model, "get_base_model") else _model
     _steps_n = int(getattr(_bb.config, "total_ut_steps", 4) or 4)
     _loop = Sigma0LoopLM(model=_model, tok=_tok, max_steps=_steps_n)
-    print(f"[ouro] native Sigma0 adaptive Q-exit loop ON (q={NATIVE_Q}, max_steps={_steps_n})", flush=True)
+    print(f"[ouro] native Sigma0 adaptive Q-exit loop ON (q={NATIVE_Q}, max_steps={_steps_n}, "
+          f"canary={NATIVE_CANARY}, adapt={NATIVE_ADAPT})", flush=True)
 
 print(f"[ouro] ready on :{PORT} as '{MODEL_NAME}' (native={NATIVE})", flush=True)
 
@@ -160,6 +170,11 @@ def _persist_loop_meta(out: dict) -> None:
             "tokens": out.get("tokens"),
             "q": NATIVE_Q,
             "mean_contraction": out.get("mean_contraction"),
+            "canary_max_proximity": out.get("canary_max_proximity"),
+            "canary_spooks": out.get("canary_spooks"),
+            "canary_signal": out.get("canary_signal"),
+            "collapse_events": len(out.get("collapse_events") or []),
+            "adapt": out.get("adapt"),
         }
         with lb.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row) + "\n")
@@ -170,8 +185,19 @@ def _persist_loop_meta(out: dict) -> None:
 def _generate(prompt, max_new_tokens=512, stream_cb=None):
     # Native Σ₀ adaptive loop: one-shot (no token streamer); emit whole text.
     if _loop is not None:
-        out = _loop.generate(prompt, q=NATIVE_Q, max_new_tokens=min(max_new_tokens, NATIVE_MAX))
+        out = _loop.generate(prompt, q=NATIVE_Q, max_new_tokens=min(max_new_tokens, NATIVE_MAX),
+                             canary=NATIVE_CANARY, adapt=NATIVE_ADAPT)
         text = out["text"]
+        if NATIVE_CANARY:
+            # Σ₀ collapse telemetry per generation — proves the canary fired and (with adapt)
+            # whether the actuator engaged. proximity→8.0 = collapse threshold; signal != "none"
+            # = anti-collapse alarm; collapse_events = entropy-spike count.
+            print(f"[ouro][canary] prox={out.get('canary_max_proximity')} "
+                  f"spooks={out.get('canary_spooks')} signal={out.get('canary_signal')} "
+                  f"collapse_events={len(out.get('collapse_events') or [])} "
+                  f"mean_depth={out.get('mean_depth')}/{out.get('max_steps')} "
+                  f"adapt={out.get('adapt')} stability_accepted={out.get('stability_accepted')} "
+                  f"tokens={out.get('tokens')}", flush=True)
         _persist_loop_meta(out)  # #777: persist depth/contraction to leaderboard
         if stream_cb is not None and text:
             stream_cb(text)
