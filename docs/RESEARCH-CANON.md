@@ -63,6 +63,10 @@ Curated references organized by component. Not a bookmark dump. Living document 
   - Knowledge graphs as memory substrate
   - Persistent, queryable, updateable
   - Directly applicable to code understanding
+- **In-Context Learning can Perform Continual Learning Like Humans** ([arXiv:2509.22764](https://arxiv.org/abs/2509.22764))
+  - In-context continual learning (ICCL): retain + accumulate across sequential tasks with **zero parameter updates**, purely via context-window scheduling — and it *outperforms* gradient-based CL (SGD, Experience Replay, EWC) on the benchmarks
+  - Published grounding for the North Star *"persistent learning, NOT weight modification — improve via retrieval/reasoning, not retraining"* (this section's "Never retrain. Accumulate.")
+  - Actionable: the **spacing effect** (distributed/interleaved exposure > massed, with an inter-task "sweet spot") → space repeated memory re-surfacing in the Convergence Core rather than dumping it at once; linear-attention models (Mamba, RWKV-7) show the most human-like retention (ACT-R / HRS-MD)
 
 ### Implementation References
 - **Mem0: The Memory Layer for Large Language Models** (https://mem0.ai)

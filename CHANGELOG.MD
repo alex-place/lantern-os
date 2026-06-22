@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.33] - 2026-06-21
+
+### Added
+- **Research Canon: cite In-Context Continual Learning (arXiv:2509.22764) under [03] LANTERN-MEMORY.** Published grounding for the *"persistent learning, NOT weight modification — improve via retrieval/reasoning, not retraining"* North Star: ICCL retains + accumulates across sequential tasks with **zero parameter updates** (pure context-window scheduling) and *outperforms* gradient-based continual learning (SGD / Experience Replay / EWC). Actionable insight recorded: the **spacing effect** (distributed/interleaved > massed) informs how the Convergence Core should schedule memory re-surfacing. [`RESEARCH-CANON.md`](docs/RESEARCH-CANON.md).
+
 ## [1.7.32] - 2026-06-21
 
 ### Changed
