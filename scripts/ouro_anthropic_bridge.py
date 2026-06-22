@@ -332,16 +332,24 @@ class H(BaseHTTPRequestHandler):
 
     def _send_json(self, obj, code=200):
         b = json.dumps(obj).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(b)))
-        self.end_headers()
-        self.wfile.write(b)
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+        except OSError:
+            # Client disconnected mid-response (e.g. it timed out). Swallow it — an
+            # uncaught ConnectionAbortedError here was taking the whole bridge down.
+            pass
 
     def _sse(self, event, data):
-        self.wfile.write(f"event: {event}\n".encode())
-        self.wfile.write(f"data: {json.dumps(data)}\n\n".encode())
-        self.wfile.flush()
+        try:
+            self.wfile.write(f"event: {event}\n".encode())
+            self.wfile.write(f"data: {json.dumps(data)}\n\n".encode())
+            self.wfile.flush()
+        except OSError:
+            pass  # client gone mid-stream — don't crash the bridge
 
     def do_GET(self):
         if self.path.startswith("/v1/models"):

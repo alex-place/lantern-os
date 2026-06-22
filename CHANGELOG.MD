@@ -15,6 +15,15 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.28] - 2026-06-21
+
+### Fixed
+- **Σ₀ serving `OURO_UT_STEPS` cache-overflow crash.** The recurrent-step KV cache is sized from `config.total_ut_steps` but the forward loop runs `range(self.total_ut_steps)` (a per-module instance attr); setting only the config overflowed the smaller cache (`IndexError: Cache index N exceeds max_cache_size`). Now also sets the instance attr on every submodule.
+- **Σ₀ Anthropic bridge crashed on client disconnect** — `_send_json`/`_sse` writes wrapped in `try/except OSError` (a timed-out client took the whole bridge down).
+
+### Added
+- **`OURO_4BIT=1` 4-bit (NF4) serving** in `ouro_serve.py` (resident VRAM ~7.7GB->1.85GB; auto-skips fp16-only merge). With `OURO_UT_STEPS=2` (halves the recurrent KV cache), CC-scale 15-20k-token prompts FIT on an 8GB 3070 (~70s @ 15k) instead of OOMing.
+
 ## [1.7.27] - 2026-06-21
 
 ### Added

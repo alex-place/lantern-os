@@ -67,7 +67,19 @@ ATTN = os.environ.get("OURO_ATTN", "sdpa")         # was "" — safe: try/except
 
 print(f"[ouro] loading {MODEL_ID} (cuda={torch.cuda.is_available()})…", flush=True)
 _tok = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+# OURO_4BIT=1: load the base in 4-bit (NF4) to free VRAM for long-context activations.
+# A 1.4B fp16 base + the looped recurrent KV caches saturate an 8GB card and OOM on
+# CC-scale (15-20k-token) prompts; 4-bit drops resident VRAM ~7.7GB->1.85GB. 4-bit is
+# incompatible with merge_and_unload, so it forces MERGE off (LoRA runs unmerged).
+# The recommended 8GB CC-scale config is `OURO_4BIT=1 OURO_UT_STEPS=2` (the depth lever
+# halves the recurrent KV cache — the real long-context hog); 15k prefill ~70s, fits.
+FOUR_BIT = os.environ.get("OURO_4BIT", "0") == "1"
 _load_kw = dict(trust_remote_code=True, dtype=torch.float16, device_map="auto")
+if FOUR_BIT:
+    from transformers import BitsAndBytesConfig
+    _load_kw["quantization_config"] = BitsAndBytesConfig(
+        load_in_4bit=True, bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True)
 if ATTN:
     _load_kw["attn_implementation"] = ATTN
 try:
@@ -81,14 +93,26 @@ if ADAPTER:
     from peft import PeftModel
     _model = PeftModel.from_pretrained(_model, ADAPTER)
     print(f"[ouro] LoRA adapter applied: {ADAPTER}", flush=True)
-    if MERGE:
+    if MERGE and not FOUR_BIT:
         _model = _model.merge_and_unload()
         print("[ouro] LoRA merged into base (merge_and_unload)", flush=True)
+    elif FOUR_BIT:
+        print("[ouro] 4-bit base: LoRA kept unmerged (merge needs fp16)", flush=True)
 _steps = os.environ.get("OURO_UT_STEPS")
 if _steps:
+    _n = int(_steps)
+    # Set BOTH the config (the recurrent KV cache is sized from config.total_ut_steps ×
+    # num_hidden_layers at generate-time) AND every per-module INSTANCE attribute (the
+    # forward loop runs range(self.total_ut_steps), cached on the module at __init__).
+    # Setting only the config left the loop at the old depth and overflowed the smaller
+    # cache (IndexError: Cache index N exceeds max_cache_size). #bug-fix.
     for attr in ("total_ut_steps", "num_recurrent_steps"):
         if hasattr(_model.config, attr):
-            setattr(_model.config, attr, int(_steps))
+            setattr(_model.config, attr, _n)
+    for _mod in _model.modules():
+        for attr in ("total_ut_steps", "num_recurrent_steps"):
+            if isinstance(getattr(_mod, attr, None), int):
+                setattr(_mod, attr, _n)
 _model.eval()
 
 # Wrap the already-loaded model in the native Σ₀ Q-exit loop (no second load).
