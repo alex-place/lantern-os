@@ -675,6 +675,21 @@
         <h3>Keystone ↔ MCP</h3>
         <p>Keystone chat is linked to live project tools (GitHub issues+PRs, MCP tools) — any provider answers grounded in the real repo.</p>
       </a>
+      <a class="link-card" href="/repo/docs/SIGMA0-COLLAPSE-EXPLAINER.md">
+        <span class="icon">🗺️</span>
+        <h3>Collapse Certificate — Plain-Language Guide <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Not the math paper — the plain-English version. What the theorem actually proves, what's measured vs proven, the four-signal collapse trigger, the NIS canary, and the one open question. Start here before the certificate itself.</span></span></h3>
+        <p>What Σ₀ is, why grounding is the safety mechanism, and the honest confidence levels behind each claim — PROVEN, MEASURED, HEURISTIC. No prior control-theory background needed.</p>
+      </a>
+      <a class="link-card" href="/repo/docs/research/2026-06-22-ouro-subquadratic-attention.md">
+        <span class="icon">⚡</span>
+        <h3>Sub-Quadratic Attention — Ouro UT <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">Three separate O(n²) problems in the Ouro stack — decoded, mapped, and partially fixed. The training SDPA gap is now closed; SWA is the next architectural lever, and the UT recurrence is exactly why it fits.</span></span></h3>
+        <p>The O(n²×T) training-cost problem mapped across the full stack — SDPA training fix shipped, forward-truncation status, SWA as the highest-fit architectural solution (UT recurrence = built-in long-range via depth), and the ragged-depth KV cache as the long-term O(N) prize.</p>
+      </a>
+      <a class="link-card" href="/reports/sigma0-fc-adapter-results.pdf" target="_blank" rel="noopener">
+        <span class="icon">📊</span>
+        <h3>Σ₀ FC Adapter — Training &amp; Test Results <span class="gloss" aria-hidden="true">?<span class="gloss-bubble">The 600-step combined QLoRA adapter run: 15,234 training rows (hermes FC + xlam-irrelevance negatives + coding), loss=0.038, test results showing the model correctly declines tools for irrelevant queries but has not yet triggered auto tool-calls.</span></span></h3>
+        <p>Full report on the combined FC adapter: dataset composition, 6h 19m training run (train_loss 0.038), bridge test results — correct negative discrimination, positive trigger analysis, and next-step training plan.</p>
+      </a>
     </div>
   </section>
 
