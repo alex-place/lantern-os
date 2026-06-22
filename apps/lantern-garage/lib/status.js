@@ -72,6 +72,16 @@ function getStatus() {
     },
     // #672: live Cloudflare Tunnel state — updated by server.js lifecycle hooks
     cloudflare_tunnel: getTunnelState(),
+    // #1049: key presence (boolean only, never expose values) so the root cause of
+    // degraded mode (missing env vars in scheduled-task spawn) is immediately visible.
+    api_keys: {
+      anthropic: !!process.env.ANTHROPIC_API_KEY,
+      openai:    !!process.env.OPENAI_API_KEY,
+      gemini:    !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+      xai:       !!process.env.XAI_API_KEY,
+      discord:   !!process.env.DISCORD_TOKEN,
+      kalshi:    !!process.env.KALSHI_API_KEY,
+    },
   };
 }
 

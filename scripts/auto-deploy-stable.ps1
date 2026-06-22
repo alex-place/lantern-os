@@ -38,6 +38,18 @@ function StopServer {
   if ($p) { Log "stopping server tree PID $p"; & taskkill /PID $p /T /F 2>&1 | Out-Null; Start-Sleep -Seconds 2 }
 }
 function StartServer {
+  # Hydrate User-scope API keys into the current process before spawning node so the
+  # child inherits them. Scheduled tasks run as the user account but do NOT get the
+  # interactive User-scope env block -- this was the root cause of permanent degraded
+  # mode (#1049): keys set in User env were invisible to the server process.
+  foreach ($key in @(
+    'ANTHROPIC_API_KEY','OPENAI_API_KEY','GEMINI_API_KEY','GOOGLE_API_KEY',
+    'XAI_API_KEY','DISCORD_TOKEN','KALSHI_API_KEY','KALSHI_API_SECRET',
+    'SESSION_SECRET','PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_CAMPAIGN_ID'
+  )) {
+    $val = [System.Environment]::GetEnvironmentVariable($key, 'User')
+    if ($val) { [System.Environment]::SetEnvironmentVariable($key, $val, 'Process') }
+  }
   Start-Process -FilePath 'node' -ArgumentList 'apps/lantern-garage/server.js' -WorkingDirectory $STABLE -WindowStyle Hidden
 }
 function HealthOk {

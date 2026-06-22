@@ -816,7 +816,24 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   if (!rp || rp === "ollama" || rp === "local" || rp === "sigma0") {
     const isCoding = rp === "sigma0" || _isCodingRequest(text);
     const sigma0Persona = _getPersonas().find(p => p.id === "keystone-sigma0") || _DEFAULT_PERSONAS.find(p => p.id === "keystone-sigma0");
-    const ollamaSystemPrompt = isCoding && sigma0Persona ? sigma0Persona.systemPrompt : agent.systemPrompt;
+
+    // #1050: in degraded/offline mode (no cloud keys + provider not explicitly set)
+    // the tiny local model cannot follow rich persona prompts — it produces in-persona
+    // metaphor poetry instead of factual answers. Swap in a minimal direct-answer
+    // prompt so factual queries (time, tools, model identity) get usable responses.
+    const _cloudAvailable = !!(
+      process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY ||
+      process.env.GEMINI_API_KEY    || process.env.GOOGLE_API_KEY ||
+      process.env.XAI_API_KEY
+    );
+    const _offlinePrompt =
+      "You are a helpful assistant running in offline mode on a small local model.\n" +
+      "Answer questions directly and factually. If you don't know something, say so.\n" +
+      "Do not use metaphor or poetic language. Keep answers short and concrete.";
+    const _useOfflinePrompt = !rp && !isCoding && !_cloudAvailable;
+    const ollamaSystemPrompt = isCoding && sigma0Persona
+      ? sigma0Persona.systemPrompt
+      : (_useOfflinePrompt ? _offlinePrompt : agent.systemPrompt);
     const ollamaUserPrompt = isCoding
       ? `REQUIREMENT TO VERIFY: ${text}\n\nConfirm what files/lines you read, then respond in the <REQUIREMENT><EVIDENCE><CODE><VERIFICATION><CONFIDENCE> format.`
       : userPrompt;
@@ -885,7 +902,8 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
         }
         const ollamaSuggestions = reply.doors && reply.doors.length > 0 ? reply.doors : suggestions;
         recordProviderSuccessRouter("ollama"); // Log to provider-router for performance tracking
-        return { reply: reply.content, agent: agent.name, suggestions: ollamaSuggestions, online: true, source: "ollama", webSuggestions };
+        const offlineBanner = _useOfflinePrompt ? "\n\n---\n⚠ Running offline on local model — factual accuracy may be limited." : "";
+        return { reply: reply.content + offlineBanner, agent: agent.name, suggestions: ollamaSuggestions, online: true, source: "ollama", degraded: _useOfflinePrompt, webSuggestions };
       }
     } catch (err) {
       console.error("Ollama API error:", err.message);
