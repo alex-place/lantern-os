@@ -1,0 +1,2 @@
+### Added
+- Rollover dashboard panel on orchestration.html showing Keystone-vs-Claude landed-work share (#898). Time-band selector (24h / 7d / 30d / all). Git attribution (merged PRs by branch prefix: claude/, auto/, gemini/, codex/, grok/, openai/, human) rendered as progress bars. Kernel attribution from convergence records (reasoner=keystone-kernel) shown when data exists. Last eval result from leaderboard.jsonl. Route `/api/rollover/status` now includes `git` and `lastEval` fields in addition to `kernel` share.

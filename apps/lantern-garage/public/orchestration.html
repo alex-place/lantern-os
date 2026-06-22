@@ -354,6 +354,22 @@
     </section>
   </div>
 
+  <!-- ── Rollover dashboard (#898) ── -->
+  <section class="panel" style="margin-top: 22px;">
+    <h2>🔀 Rollover · Keystone vs Claude
+      <span class="verify-sub">landed-work share · git attribution</span>
+      <span style="margin-left:auto; display:flex; gap:6px; font-size:0.75rem; font-weight:500;">
+        <button class="btn-secondary" id="band-24h" onclick="setRolloverBand('24h')">24h</button>
+        <button class="btn-secondary" id="band-7d" onclick="setRolloverBand('7d')">7d</button>
+        <button class="btn-secondary" id="band-30d" onclick="setRolloverBand('30d')" style="border-color:var(--accent);color:var(--accent);">30d</button>
+        <button class="btn-secondary" id="band-all" onclick="setRolloverBand('all')">all</button>
+      </span>
+    </h2>
+    <div id="rolloverBody" style="margin-top:10px;">
+      <div class="placeholder">Loading rollover data…</div>
+    </div>
+  </section>
+
   <div class="orch-footer-row">
     <span class="refresh-time" id="refreshTime">Last update: never</span>
   </div>
@@ -651,11 +667,99 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // ── Rollover dashboard (#898) ──────────────────────────────────────────────
+  let _rolloverBand = "30d";
+
+  window.setRolloverBand = function(band) {
+    _rolloverBand = band;
+    ["24h","7d","30d","all"].forEach((b) => {
+      const el = $(`band-${b}`);
+      if (!el) return;
+      el.style.borderColor = b === band ? "var(--accent)" : "";
+      el.style.color = b === band ? "var(--accent)" : "";
+    });
+    renderRollover();
+  };
+
+  async function renderRollover() {
+    const el = $("rolloverBody");
+    if (!el) return;
+    const band = _rolloverBand === "all" ? "" : _rolloverBand;
+    const data = await fetchJson(`/api/rollover/status?band=${band}`);
+    if (!data) { el.innerHTML = '<div class="placeholder">Rollover data unavailable.</div>'; return; }
+
+    const git = data.git || {};
+    const gitTotal = git.total || 0;
+    const kernel = data.kernel || {};
+    const pct = (n) => gitTotal > 0 ? Math.round((n / gitTotal) * 100) : 0;
+    const bar = (n, color) => {
+      const w = gitTotal > 0 ? Math.max(2, Math.round((n / gitTotal) * 100)) : 0;
+      return `<div style="height:14px;border-radius:4px;background:${color};width:${w}%;min-width:${n>0?'4px':'0'};transition:width .4s;"></div>`;
+    };
+
+    const mode = data.mode || "shadow";
+    const stage = data.stage || "pre-stage-1";
+    const lastEval = data.lastEval;
+    const evalStr = lastEval
+      ? `<strong>${lastEval.label || lastEval.benchmark || "eval"}</strong>: ${lastEval.accuracy != null ? (lastEval.accuracy * 100).toFixed(0) + "% acc" : ""} ${lastEval["pass@1"] != null ? "· pass@1=" + lastEval["pass@1"] : ""}`
+      : "No eval runs yet";
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+        <div class="stat"><div class="stat-label">Mode</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(mode)}</div></div>
+        <div class="stat"><div class="stat-label">Rollover Stage</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(stage)}</div></div>
+        <div class="stat"><div class="stat-label">PRs merged (${escapeHtml(data.band || "30d")})</div><div class="stat-value">${gitTotal}</div></div>
+        <div class="stat"><div class="stat-label">Kernel runs</div><div class="stat-value ${kernel.landed === 0 ? 'muted' : ''}">${kernel.landed}</div></div>
+      </div>
+
+      <div class="info-box" style="margin-bottom:14px;">
+        <strong>Git attribution</strong> — merged PRs by agent lane (${escapeHtml(data.band || "30d")})
+        <div style="margin:10px 0 4px;font-size:0.78rem;color:var(--muted);">
+          Each bar = share of ${gitTotal} merged PR${gitTotal===1?"":"s"}
+        </div>
+        ${[
+          { label: "claude/", n: git.claude || 0, color: "#06b6d4" },
+          { label: "auto/ (Keystone)", n: git.keystone || 0, color: "#a855f7" },
+          { label: "gemini/", n: git.gemini || 0, color: "#22c55e" },
+          { label: "codex/", n: git.codex || 0, color: "#f59e0b" },
+          { label: "grok/", n: git.grok || 0, color: "#ef4444" },
+          { label: "openai/", n: git.openai || 0, color: "#8b5cf6" },
+          { label: "human", n: git.human || 0, color: "#64748b" },
+        ].map(({ label, n, color }) => `
+          <div style="display:flex;align-items:center;gap:10px;margin:5px 0;font-size:0.8rem;">
+            <span style="width:140px;color:var(--muted);white-space:nowrap;">${escapeHtml(label)}</span>
+            <div style="flex:1;background:var(--bg);border-radius:4px;border:1px solid var(--border);overflow:hidden;">
+              ${bar(n, color)}
+            </div>
+            <span style="width:48px;text-align:right;font-weight:600;">${n} <span style="color:var(--muted);font-weight:400;">(${pct(n)}%)</span></span>
+          </div>`).join("")}
+      </div>
+
+      ${kernel.landed > 0 ? `
+      <div class="info-box" style="margin-bottom:14px;">
+        <strong>Kernel attribution</strong> — convergence records (reasoner=keystone-kernel)
+        <div style="margin-top:8px;font-size:0.82rem;">
+          Keystone: <strong>${kernel.keystoneLanded}</strong>
+          · Claude: <strong>${kernel.claudeLanded}</strong>
+          · Share: <strong>${kernel.keystoneShare != null ? (kernel.keystoneShare*100).toFixed(0)+"%" : "—"}</strong>
+          · Escalation rate: <strong>${kernel.escalationRate != null ? (kernel.escalationRate*100).toFixed(0)+"%" : "—"}</strong>
+        </div>
+      </div>` : ""}
+
+      <div class="info-box">
+        <strong>Last eval</strong> — ${evalStr}
+        <span style="margin-left:8px;font-size:0.75rem;color:var(--muted);">source: data/eval/leaderboard.jsonl</span>
+      </div>
+    `;
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     const btn = $("refreshBtn");
     if (btn) btn.addEventListener("click", refreshStatus);
     refreshStatus();
+    renderRollover();
     setInterval(refreshStatus, 5000);
+    setInterval(renderRollover, 15000);
   });
 })();
 </script>
