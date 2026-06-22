@@ -3,6 +3,9 @@
 All notable changes to Keystone OS (formerly Lantern OS) should be documented in
 this file.
 
+## [1.7.51] - 2026-06-22
+- feat(orchestrator): GPU training rotation — dispatch Ouro fine-tune jobs across Kaggle, Colab, SageMaker, Paperspace, Lightning AI free tiers; CSF checkpoint transport via HuggingFace Hub; quota-aware provider rotation in PCSF; wired into runWeeklyImprovement (#1062-#1065)
+
 ## [1.7.50] - 2026-06-22
 - docs(sigma0): update SIGMA0-CONTINUAL-TRAINING.md status (#911) — retract stale partial-eval claim, document 600-step training run started today, add next-step command block
 
