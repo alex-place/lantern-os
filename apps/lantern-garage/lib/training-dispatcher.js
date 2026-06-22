@@ -6,6 +6,7 @@
 // Issues: #1062 (pack/upload), #1063 (dispatch), #1064 (poll/rotate)
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { appendJsonlQueued } = require("./file-queue");
@@ -160,16 +161,20 @@ function _kaggleAuthHeader() {
 async function _dispatchKaggle(checkpointUri, steps) {
   const cfg = getProviderConfig("kaggle");
   const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
-  // Reuse a fixed kernel ID across runs (push = update existing version, not create new kernel).
-  // kernel_id is stored in PCSF so it can be changed without a code deploy.
   const kernelId = cfg?.kernel_id || "lanternfounder/ouro-training";
-  const [username, kernelSlug] = kernelId.split("/");
+  const [, kernelSlug] = kernelId.split("/");
 
-  const kernelPayload = {
-    id: kernelId,                           // "username/slug" — required to address the kernel
+  // Write kernel-metadata.json + train.py to a temp dir and push via the CLI.
+  // The Python CLI handles proto serialisation correctly; plain REST JSON silently
+  // changes field types across SDK versions and broke our direct fetch approach.
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "kaggle-push-"));
+  const metaPath = path.join(tmpDir, "kernel-metadata.json");
+  const scriptPath = path.join(tmpDir, "train.py");
+
+  const meta = {
+    id: kernelId,
     title: `Ouro Training — ${steps} steps`,
-    code_file: "train.py",                  // filename within the push payload
-    source_code: _kaggleScript(checkpointUri, hfRepo, steps),
+    code_file: "train.py",
     language: "python",
     kernel_type: "script",
     is_private: true,
@@ -181,25 +186,26 @@ async function _dispatchKaggle(checkpointUri, steps) {
     model_sources: [],
   };
 
-  let responseData;
-  try {
-    const res = await fetch("https://www.kaggle.com/api/v1/kernels/push", {
-      method: "POST",
-      headers: { "Authorization": _kaggleAuthHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(kernelPayload),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      return { error: "kaggle_push_failed", httpStatus: res.status, detail: text };
-    }
-    responseData = await res.json();
-  } catch (err) {
-    return { error: "kaggle_network_error", detail: err.message };
-  }
+  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+  fs.writeFileSync(scriptPath, _kaggleScript(checkpointUri, hfRepo, steps), "utf8");
 
-  if (responseData.hasError) {
-    return { error: "kaggle_business_error", detail: responseData.error, kernelId };
+  const env = {
+    ...process.env,
+    KAGGLE_API_TOKEN: process.env.KAGGLE_API_TOKEN || "",
+    // Legacy auth for the Python kaggle package
+    KAGGLE_USERNAME: cfg?.username || process.env.KAGGLE_USERNAME || "lanternfounder",
+    KAGGLE_KEY: process.env.KAGGLE_KEY || "",
+  };
+
+  let raw;
+  try {
+    raw = execFileSync("python", ["-m", "kaggle", "kernels", "push", "-p", tmpDir],
+      { encoding: "utf8", timeout: 60_000, env });
+  } catch (err) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    return { error: "kaggle_push_failed", detail: err.message + (err.stderr || "") };
   }
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 
   const hoursEstimated = Math.ceil(steps / (cfg?.steps_per_hour_estimate || 180));
   const record = {
@@ -209,9 +215,10 @@ async function _dispatchKaggle(checkpointUri, steps) {
     jobId: kernelSlug,
     kernelId,
     kernelUrl: `https://www.kaggle.com/code/${kernelId}`,
-    checkpointUri,
+    checkpointUri: checkpointUri || null,
     steps,
     hoursEstimated,
+    cliOutput: raw.trim(),
     dispatchedAt: isoNow(),
   };
   ensureDir(JOBS_LOG);
@@ -389,27 +396,67 @@ function _buildColabNotebook(checkpointUri, hfRepo, steps) {
 }
 
 function _kaggleScript(checkpointUri, hfRepo, steps) {
-  const filename = checkpointUri ? path.basename(checkpointUri) : "checkpoint.csf";
-  return [
-    "import subprocess, sys",
-    "subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'huggingface_hub', 'zstandard'], check=True)",
-    "import csf, json",
-    "from huggingface_hub import hf_hub_download, upload_file",
-    `local_csf = hf_hub_download(repo_id="${hfRepo}", filename="${filename}", repo_type="model")`,
-    "csf.unpack(local_csf, '/kaggle/working/checkpoint')",
-    `result = subprocess.run([`,
-    `  sys.executable, 'scripts/train_ouro.py',`,
-    `  '--resume_from', '/kaggle/working/checkpoint',`,
-    `  '--max_steps', '${steps}',`,
-    `  '--seq_len', '1536',`,
-    `  '--output_dir', '/kaggle/working/output',`,
-    `], capture_output=True, text=True)`,
-    "print(result.stdout); print(result.stderr, file=sys.stderr)",
-    "result.check_returncode()",
-    "manifest = csf.pack(['/kaggle/working/output'], '/kaggle/working/output.csf')",
-    `upload_file(path_or_fileobj='/kaggle/working/output.csf', path_in_repo='output.csf', repo_id="${hfRepo}", repo_type='model')`,
-    `print(json.dumps({'status': 'done', 'steps': ${steps}, 'sha256': manifest.get('footer_sha256')}))`,
-  ].join("\n");
+  // Generates a self-contained Python script pushed to Kaggle via /api/v1/kernels/push.
+  // Clones the lantern-os repo so train-qlora-ouro.py and training data are available.
+  // Cold start (no checkpoint) skips HF download — saves adapter to Kaggle output storage.
+  // If HF_TOKEN is set as a Kaggle secret it also uploads to hfRepo for cross-provider handoff.
+  const resumeBlock = checkpointUri ? `
+# Resume from checkpoint
+from huggingface_hub import hf_hub_download
+local_csf = hf_hub_download(repo_id="${hfRepo}", filename="${path.basename(checkpointUri)}", repo_type="model")
+import sys as _sys; _sys.path.insert(0, "/kaggle/working/lantern-os/src")
+import csf
+csf.unpack(local_csf, "/kaggle/working/checkpoint")
+resume_args = ["--resume_from", "/kaggle/working/checkpoint"]
+` : `resume_args = []  # cold start`;
+
+  return `import subprocess, sys, os, json
+
+print("=== Ouro QLoRA training — ${steps} steps ===")
+
+# Install dependencies
+subprocess.run([sys.executable, "-m", "pip", "install", "-q",
+    "transformers>=4.40", "peft>=0.10", "bitsandbytes>=0.43",
+    "datasets", "accelerate", "scipy", "huggingface_hub", "zstandard"],
+    check=True)
+
+# Clone repo (training script + data)
+REPO = "/kaggle/working/lantern-os"
+if not os.path.exists(REPO):
+    subprocess.run(["git", "clone", "--depth", "1",
+        "https://github.com/alex-place/lantern-os", REPO], check=True)
+
+os.chdir(REPO)
+sys.path.insert(0, os.path.join(REPO, "src"))
+
+${resumeBlock}
+
+# Run QLoRA fine-tune
+subprocess.run([
+    sys.executable, "scripts/train-qlora-ouro.py",
+    "--base", "ByteDance/Ouro-1.4B",
+    "--data", "models/lantern-sigma0-coder/training-data.jsonl",
+    "--out", "/kaggle/working/output",
+    "--max-steps", "${steps}",
+    "--seq", "1536",
+    *resume_args,
+], check=True)
+
+# Upload to HF if token available (cross-provider handoff)
+hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+if hf_token:
+    import csf
+    from huggingface_hub import upload_file
+    manifest = csf.pack(["/kaggle/working/output"], "/kaggle/working/output.csf")
+    upload_file(path_or_fileobj="/kaggle/working/output.csf", path_in_repo="output.csf",
+                repo_id="${hfRepo}", repo_type="model", token=hf_token)
+    print(json.dumps({"status": "done", "steps": ${steps},
+                      "sha256": manifest.get("footer_sha256"), "uploaded_to_hf": True}))
+else:
+    print(json.dumps({"status": "done", "steps": ${steps},
+                      "output": "/kaggle/working/output", "uploaded_to_hf": False,
+                      "note": "Set HF_TOKEN Kaggle secret to enable cross-provider checkpoint handoff"}))
+`;
 }
 
 function _notebookTemplate(provider, checkpointUri, steps) {
