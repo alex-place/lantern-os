@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.32] - 2026-06-21
+
+### Changed
+- **docs: reconcile the Σ₀ Collapse Certificate #764 hardening section — queued bugs have landed.** Verified #765 (PCSF circuit-breaker `AttributeError`), #766 (`loop_lm.generate()`→canary instrument→actuator loop), #767 (memory confidence laundering), and #768 (`stability_gates()` region-wideners) are all **closed and reflected in source** — yet the doc still listed them as "Planned"/"queued". Updated to landed/resolved + clarified that the §3 *sufficiency theorem* (still open) is distinct from #768's now-landed gates. Follow-up to #998; docs-only.
+
 ## [1.7.31] - 2026-06-21
 
 ### Changed
