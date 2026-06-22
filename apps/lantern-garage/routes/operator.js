@@ -195,22 +195,13 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
       const { execSync } = require("child_process");
       const steps = [];
 
-      // Step 1: git pull current branch (or fallback to master)
+      // Step 1: fetch origin/master and reset to it (works regardless of local branch name,
+      // including worktrees where the branch has no upstream tracking configured)
       try {
-        let currentBranch = "master";
-        try {
-          currentBranch = execSync("git branch --show-current", { cwd: repoRoot, encoding: "utf8" }).trim();
-        } catch {}
-        // Stash local data-file changes so pull doesn't fail on dirty working tree
-        try { execSync("git stash --include-untracked -m autoupdate", { cwd: repoRoot, encoding: "utf8" }); } catch {}
-        let pull;
-        try {
-          pull = execSync(`git pull origin ${currentBranch}`, { cwd: repoRoot, encoding: "utf8", timeout: 30000 });
-        } finally {
-          // Always restore stashed data files after pull
-          try { execSync("git stash pop", { cwd: repoRoot, encoding: "utf8" }); } catch {}
-        }
-        steps.push({ step: "git_pull", ok: true, output: pull.trim(), branch: currentBranch });
+        execSync("git fetch origin master --quiet", { cwd: repoRoot, encoding: "utf8", timeout: 30000 });
+        const fetchedSha = execSync("git rev-parse origin/master", { cwd: repoRoot, encoding: "utf8" }).trim();
+        execSync("git reset --hard origin/master", { cwd: repoRoot, encoding: "utf8" });
+        steps.push({ step: "git_pull", ok: true, output: `Reset to origin/master @ ${fetchedSha.slice(0, 8)}`, branch: "master" });
       } catch (e) {
         steps.push({ step: "git_pull", ok: false, output: e.stdout?.trim() || e.message });
       }
