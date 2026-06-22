@@ -15,6 +15,13 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.47] - 2026-06-22
+
+### Fixed
+- **#1049** `deploy-stable-from-master.ps1`: `StartServer` now reads User-scope API keys and hydrates them into the spawning process before starting node. Scheduled tasks run without the interactive user env block — this was causing all cloud providers to 401 silently and lock the server into permanent degraded mode.
+- **#1049** `/api/status` now reports `api_keys` presence map (boolean only, no values) so the missing-env root cause is immediately observable.
+- **#1050** `dream-chat.js`: local Ouro fallback in offline/degraded mode now uses a minimal direct-answer system prompt instead of the full persona prompt. The full persona prompt caused the 1.4B model to produce in-persona metaphor poetry for factual queries. Offline replies include a `⚠ Running offline` banner and carry `degraded: true` in the response object.
+
 ## [1.7.46] - 2026-06-22
 
 ### Added
