@@ -112,8 +112,9 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
 
   if (provider === "kaggle") return _dispatchKaggle(checkpointUri, steps);
   if (provider === "paperspace") return _dispatchPaperspace(checkpointUri, steps);
+  if (provider === "colab") return _dispatchColab(checkpointUri, steps);
 
-  // Colab, SageMaker, Lightning — emit a manual-handoff record
+  // SageMaker, Lightning — basic manual-handoff record
   const cfg = getProviderConfig(provider);
   const record = {
     type: "training_dispatch",
@@ -121,7 +122,6 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
     status: "manual_required",
     checkpointUri,
     steps,
-    instructionsUrl: cfg?.api || null,
     notebookTemplate: _notebookTemplate(provider, checkpointUri, steps),
     dispatchedAt: isoNow(),
   };
@@ -160,17 +160,25 @@ function _kaggleAuthHeader() {
 async function _dispatchKaggle(checkpointUri, steps) {
   const cfg = getProviderConfig("kaggle");
   const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
-  const slug = `ouro-train-${Date.now()}`;
+  // Reuse a fixed kernel ID across runs (push = update existing version, not create new kernel).
+  // kernel_id is stored in PCSF so it can be changed without a code deploy.
+  const kernelId = cfg?.kernel_id || "lanternfounder/ouro-training";
+  const [username, kernelSlug] = kernelId.split("/");
 
   const kernelPayload = {
+    id: kernelId,                           // "username/slug" — required to address the kernel
     title: `Ouro Training — ${steps} steps`,
-    slug,
+    code_file: "train.py",                  // filename within the push payload
     source_code: _kaggleScript(checkpointUri, hfRepo, steps),
     language: "python",
     kernel_type: "script",
     is_private: true,
     enable_gpu: true,
     enable_internet: true,
+    dataset_sources: [],
+    kernel_sources: [],
+    competition_sources: [],
+    model_sources: [],
   };
 
   let responseData;
@@ -189,15 +197,18 @@ async function _dispatchKaggle(checkpointUri, steps) {
     return { error: "kaggle_network_error", detail: err.message };
   }
 
-  const jobId = responseData.ref || slug;
-  const hoursEstimated = Math.ceil((steps / (cfg?.steps_per_hour_estimate || 180)));
+  if (responseData.hasError) {
+    return { error: "kaggle_business_error", detail: responseData.error, kernelId };
+  }
 
+  const hoursEstimated = Math.ceil(steps / (cfg?.steps_per_hour_estimate || 180));
   const record = {
     type: "training_dispatch",
     provider: "kaggle",
     status: "queued",
-    jobId,
-    slug,
+    jobId: kernelSlug,
+    kernelId,
+    kernelUrl: `https://www.kaggle.com/code/${kernelId}`,
     checkpointUri,
     steps,
     hoursEstimated,
@@ -249,6 +260,132 @@ async function _dispatchPaperspace(checkpointUri, steps) {
   ensureDir(JOBS_LOG);
   await appendJsonlQueued(JOBS_LOG, record);
   return record;
+}
+
+async function _dispatchColab(checkpointUri, steps) {
+  const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
+  const ts = Date.now();
+  const nbFilename = `ouro-training-${ts}.ipynb`;
+  const nbPath = path.join(REPO_ROOT, "data", "self-improvement", "colab-notebooks", nbFilename);
+
+  const notebook = _buildColabNotebook(checkpointUri, hfRepo, steps);
+  ensureDir(nbPath);
+  fs.writeFileSync(nbPath, JSON.stringify(notebook, null, 2), "utf8");
+
+  // Colab badge URL — opens the notebook directly in Colab from the GitHub raw URL.
+  // Requires the file to be committed and pushed to master to be accessible.
+  const ghRawBase = "https://raw.githubusercontent.com/alex-place/lantern-os/master";
+  const nbRelPath = `data/self-improvement/colab-notebooks/${nbFilename}`;
+  const colabBadgeUrl = `https://colab.research.google.com/github/alex-place/lantern-os/blob/master/${nbRelPath}`;
+  const rawUrl = `${ghRawBase}/${nbRelPath}`;
+
+  const record = {
+    type: "training_dispatch",
+    provider: "colab",
+    status: "manual_required",
+    checkpointUri,
+    steps,
+    notebookPath: nbPath,
+    colabBadgeUrl,
+    rawUrl,
+    instructions: [
+      `1. Commit and push ${nbRelPath} to master (or open the local file in Colab via File > Upload)`,
+      `2. Open in Colab: ${colabBadgeUrl}`,
+      "3. Runtime → Change runtime type → T4 GPU → Save",
+      "4. Run All (Ctrl+F9) — session runs up to 8 h then terminates",
+    ],
+    dispatchedAt: isoNow(),
+  };
+  ensureDir(JOBS_LOG);
+  await appendJsonlQueued(JOBS_LOG, record);
+  return record;
+}
+
+function _buildColabNotebook(checkpointUri, hfRepo, steps) {
+  const filename = checkpointUri ? path.basename(checkpointUri) : "checkpoint.csf";
+  const cells = [
+    {
+      cell_type: "markdown",
+      metadata: {},
+      source: [
+        "# Ouro Training Continuation\n",
+        `**Steps:** ${steps} | **Checkpoint:** \`${checkpointUri || "cold start"}\`\n\n`,
+        "**Before running:** Runtime → Change runtime type → **T4 GPU** → Save\n\n",
+        "Then: Runtime → Run all (Ctrl+F9)",
+      ],
+    },
+    {
+      cell_type: "code",
+      execution_count: null,
+      metadata: { id: "setup" },
+      outputs: [],
+      source: [
+        "!pip install -q huggingface_hub zstandard\n",
+        "import subprocess, sys, json\n",
+        "import csf\n",
+        "from huggingface_hub import hf_hub_download, upload_file\n",
+      ],
+    },
+    {
+      cell_type: "code",
+      execution_count: null,
+      metadata: { id: "pull_checkpoint" },
+      outputs: [],
+      source: [
+        `HF_REPO = "${hfRepo}"\n`,
+        `CHECKPOINT_FILE = "${filename}"\n`,
+        `STEPS = ${steps}\n`,
+        "\n",
+        "local_csf = hf_hub_download(repo_id=HF_REPO, filename=CHECKPOINT_FILE, repo_type='model')\n",
+        "csf.unpack(local_csf, '/content/checkpoint')\n",
+        "print('Checkpoint unpacked.')\n",
+      ],
+    },
+    {
+      cell_type: "code",
+      execution_count: null,
+      metadata: { id: "train" },
+      outputs: [],
+      source: [
+        "result = subprocess.run([\n",
+        "    sys.executable, 'scripts/train_ouro.py',\n",
+        "    '--resume_from', '/content/checkpoint',\n",
+        "    f'--max_steps', str(STEPS),\n",
+        "    '--seq_len', '1536',\n",
+        "    '--output_dir', '/content/output',\n",
+        "], check=True)\n",
+        "print('Training complete.')\n",
+      ],
+    },
+    {
+      cell_type: "code",
+      execution_count: null,
+      metadata: { id: "upload_checkpoint" },
+      outputs: [],
+      source: [
+        "manifest = csf.pack(['/content/output'], '/content/output.csf')\n",
+        "upload_file(\n",
+        "    path_or_fileobj='/content/output.csf',\n",
+        "    path_in_repo='output.csf',\n",
+        "    repo_id=HF_REPO,\n",
+        "    repo_type='model',\n",
+        ")\n",
+        "print(json.dumps({'status': 'done', 'steps': STEPS, 'sha256': manifest.get('footer_sha256')}))\n",
+      ],
+    },
+  ];
+
+  return {
+    nbformat: 4,
+    nbformat_minor: 5,
+    metadata: {
+      accelerator: "GPU",
+      colab: { provenance: [] },
+      kernelspec: { display_name: "Python 3", language: "python", name: "python3" },
+      language_info: { name: "python" },
+    },
+    cells,
+  };
 }
 
 function _kaggleScript(checkpointUri, hfRepo, steps) {
@@ -312,13 +449,14 @@ async function _pollKaggle(jobId) {
   const creds = _checkCredentials("kaggle");
   if (creds.error) return creds;
 
-  const username = process.env.KAGGLE_USERNAME || "lanternfounder";
+  const cfg = getProviderConfig("kaggle");
+  const username = cfg?.username || process.env.KAGGLE_USERNAME || "lanternfounder";
+  // Confirmed working URL: GET /api/v1/kernels/status?userName=&kernelSlug=
+  const url = `https://www.kaggle.com/api/v1/kernels/status?userName=${username}&kernelSlug=${jobId}`;
+
   let data;
   try {
-    const res = await fetch(
-      `https://www.kaggle.com/api/v1/kernels/${username}/${jobId}/status`,
-      { headers: { "Authorization": _kaggleAuthHeader() } }
-    );
+    const res = await fetch(url, { headers: { "Authorization": _kaggleAuthHeader() } });
     if (!res.ok) return { error: "kaggle_poll_failed", httpStatus: res.status };
     data = await res.json();
   } catch (err) {
@@ -328,7 +466,15 @@ async function _pollKaggle(jobId) {
   const statusMap = { complete: "done", running: "running", error: "failed", queued: "queued", cancelAcknowledged: "cancelled" };
   const status = statusMap[data.status] || data.status;
 
-  const update = { type: "training_poll", provider: "kaggle", jobId, status, rawStatus: data.status, polledAt: isoNow() };
+  const update = {
+    type: "training_poll",
+    provider: "kaggle",
+    jobId,
+    status,
+    rawStatus: data.status,
+    failureMessage: data.failureMessage || null,
+    polledAt: isoNow(),
+  };
   await appendJsonlQueued(JOBS_LOG, update);
   return update;
 }
