@@ -325,6 +325,17 @@ module.exports = async (req, res, url, deps) => {
       const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       const step = (phase, status, extra = {}) => send("step", { phase, status, ...extra });
 
+      // SSE heartbeat — the plan/patch steps make LLM calls that emit NO bytes for
+      // 30-60s. Idle stream-proxies (the Cloudflare tunnel on lantern-os.net, any
+      // reverse proxy) sever silent connections, which the browser surfaces as a raw
+      // "network error" mid-run (it froze the UI at "Generate plan"). A periodic
+      // comment line keeps the connection warm without disturbing the event parser
+      // (clients ignore lines starting with ":"). Cleared in `finally`.
+      const heartbeat = setInterval(() => {
+        try { res.write(`: keepalive ${Date.now()}\n\n`); } catch (_e) { /* socket gone */ }
+      }, 15000);
+      heartbeat.unref && heartbeat.unref();
+
       const path = require("path");
       const { execFile } = require("child_process");
       const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -720,6 +731,7 @@ module.exports = async (req, res, url, deps) => {
         send("done", { ok: false, ...receipt, stoppedAt: receipt.stoppedAt || "exception" });
         res.end();
       } finally {
+        clearInterval(heartbeat);
         // Always tear down the worktree — the branch (and any push) survives.
         if (cleanupWorktree) { try { cleanupWorktree(); } catch (_e) { /* best effort */ } }
       }

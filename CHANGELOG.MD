@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.42] - 2026-06-22
+
+### Fixed
+- **autowork SSE stream: 15s keepalive heartbeat so long LLM steps don't drop the connection.** The plan/patch steps make LLM calls that emit no bytes for 30-60s; idle stream-proxies (the Cloudflare tunnel on lantern-os.net, any reverse proxy) sever the silent SSE connection, surfacing as a raw "network error" mid-run (froze the UI at "Generate plan"). A periodic `:` comment line keeps it warm without disturbing the event parser; cleared in `finally`. Extracted clean from #1016 (which also carried runtime data + stale orchestration changes — dropped).
+
 ## [1.7.41] - 2026-06-22
 
 ### Added
