@@ -146,22 +146,33 @@ Outputs:
 
 The promotion gate does **not** read a stored number — `stage_eval` **re-evaluates the
 incumbent `final/` adapter live** each run and compares it to the candidate in memory.
-For reference, the full 164-problem rerun of the current `final/` adapter is logged to
-`data/eval/leaderboard.jsonl` (label `ouro-final-rerun-full`).
 
-**The full set is harder than the first-20 subset.** Prior logged points (FAST cached
+**The full set is harder than the first-20 subset.** Logged points to date (FAST cached
 path) were on a 20-problem slice: baseline HE-20 `pass@1 0.05` → coding-v3 HE-20
-`pass@1 0.75`. Across **all 164** problems the same adapter settles around **~0.58**
-(67/115 at the partial mark below) — HumanEval's back half is materially harder, so the
-honest full-set figure is well under the cherry-picked first-20 `0.75`. Treat ~0.58, not
-0.75, as the real incumbent bar the gate must beat.
+`pass@1 0.75`. The full 164-problem rerun (`ouro-final-rerun-full`) was attempted but
+**did not complete** — no entry exists in `data/eval/leaderboard.jsonl` for it.
+The in-flight partial (~67/115 at ~58% pass rate) is an **interrupted estimate, not a
+measured result**. Treat the first-20 `0.75` as the only hard data point until the full
+rerun completes. HumanEval's back half is materially harder; the real full-set figure is
+likely well below `0.75` but is pending measurement.
 
-> **Status (2026-06-21):** harvest + execution-verify + promote-gate **built, run, and
+> **Status (2026-06-22):** harvest + execution-verify + promote-gate **built, run, and
 > tested** (adversarially reviewed — loop-breaking and data-quality findings fixed; the
 > crash-safe promote swap is unit-tested incl. forced mid-swap failure → rollback).
-> Full-HumanEval rerun of `final/` **partial: ~58% (67/115) and still running**; the
-> final `ouro-final-rerun-full` `pass@1` will be appended here + to
-> `data/eval/leaderboard.jsonl` when it completes.
+> Full-HumanEval rerun of `final/` (`ouro-final-rerun-full`) **did not complete** — the
+> eval was interrupted; `data/eval/leaderboard.jsonl` has no full-run entry.
+> A 600-step combined adapter training run was started 2026-06-22 ~06:29 (est. ~6.3 hr);
+> the eval + promote-gate have **not** been run against the resulting adapter yet.
+>
+> **Next required steps (see [#911](https://github.com/alex-place/lantern-os/issues/911)):**
+> stop `ouro_serve.py` to free the GPU, then run:
+> ```
+> continual_ouro_pipeline.py --eval --promote --full --candidate <new-adapter-path>
+> ```
+> This will re-evaluate the incumbent live, compare against the candidate, and — if the
+> candidate wins — swap it into `final/` and append a Convergence Record to
+> `data/eval/ouro-promotion-log.jsonl`. Record the `ouro-final-rerun-full` `pass@1` in
+> this section when it completes.
 
 ## Related
 - [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) — the looped local coder this trains (single source of truth, incl. the adaptive-depth Q-exit mechanism)
