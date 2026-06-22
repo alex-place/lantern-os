@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.27] - 2026-06-21
+
+### Added
+- **`CHAT_CLOUD_FIRST=1` — Auto-mode chat prefers cloud over the local-first ladder.** `lib/stream-chat.js`: when set, Auto mode (no explicit provider) skips the Ollama local-first model ladder and goes straight to the configured cloud providers (gemini/anthropic), so deployments that want cloud quality/grounding use their API keys by default instead of routing to the local Σ₀ coder (which emits raw `<tool_call>`s in chat). Off by default — local-first behavior preserved; an explicit `ollama`/`local` request still wins. Fixes the default-routes-to-local half of #965.
+
 ## [1.7.26] - 2026-06-21
 
 ### Fixed

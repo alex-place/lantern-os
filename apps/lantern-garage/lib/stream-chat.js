@@ -1506,7 +1506,12 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  const ollamaLocalFirst = (!requestedProvider || requestedProvider === "ollama" || requestedProvider === "local") && !autoPrefersAnthropic;
+  // CHAT_CLOUD_FIRST=1 makes Auto-mode chat prefer cloud providers (use the configured
+  // API keys) over the local-first Ollama ladder — for deployments where cloud
+  // quality/grounding matters more than local latency/cost. Off by default (local-first
+  // preserved). Honored only in Auto mode (an explicit ollama/local request still wins).
+  const cloudFirst = process.env.CHAT_CLOUD_FIRST === "1" && !requestedProvider;
+  const ollamaLocalFirst = (!requestedProvider || requestedProvider === "ollama" || requestedProvider === "local") && !autoPrefersAnthropic && !cloudFirst;
   if (ollamaLocalFirst && message && !isKeystoneDebug) {
     
     for (const ollamaModel of modelChain) {
