@@ -8,7 +8,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   MAX_NEW_FILES: 25
   MAX_NEW_MARKDOWN: 12
-  ALLOWED_TOP_LEVEL: src,apps,docs,tests,scripts,config,data,ops,integrations,skills,manifests,surfaces,archive,experiments,csf,lore,reports,research,assets,caad,.github
+  ALLOWED_TOP_LEVEL: src,apps,docs,tests,scripts,config,data,ops,integrations,skills,manifests,surfaces,archive,experiments,csf,lore,reports,research,assets,caad,.github,changelog.d
 
 jobs:
   anti-sprawl:
