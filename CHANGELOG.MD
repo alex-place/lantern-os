@@ -8,6 +8,9 @@ with entries grouped by release. This project is private and local-first, so
 release notes stay honest about what was verified locally versus what remains
 design intent.
 
+## [1.7.48] - 2026-06-22
+- feat(kernel): keystoneRun() now emits a Convergence Record (data/convergence/records.jsonl) on every terminal outcome — success (confidence 0.95), applied_unverified (0.50), verification_failed (0.10). Closes the Act→Verify→Converge loop in the live serving path (#848).
+
 **Versioning policy (enforced by the pre-push hook):** every code-bearing branch
 must bump `version` in `package.json` to a new semantic `X.X.X` value and add a
 matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See

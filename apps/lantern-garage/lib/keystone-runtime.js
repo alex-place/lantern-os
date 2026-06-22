@@ -24,6 +24,7 @@ const execAsync = promisify(exec);
 
 const { searchRepoFiles, readFileContent } = require("./repo-context");
 const { applyPatch, validatePatch, parsePatch } = require("./patch-engine");
+const { appendJsonlQueued } = require("./file-queue");
 
 const KEYSTONE_SYSTEM_PROMPT = `You are Keystone Code Kernel inside Lantern OS.
 You are a repository-first coding agent modeled after Claude Code.
@@ -317,7 +318,7 @@ Output ONLY the diffs and new files. No explanation.`;
 
       if (verify.ran && verify.success) {
         log(verbose, `✅ Verified green on attempt ${attempt}`);
-        return {
+        const result = {
           status: "success",
           issue,
           plan,
@@ -328,11 +329,13 @@ Output ONLY the diffs and new files. No explanation.`;
           verified: true,
           fullResults: results,
         };
+        emitConvergenceRecord({ issue, result, confidence: 0.95 }).catch(() => {});
+        return result;
       }
 
       if (verify.inconclusive && allowUnverified) {
         log(verbose, "⚠ No applicable tests — completing unverified (allowed).");
-        return {
+        const result = {
           status: "applied_unverified",
           issue,
           plan,
@@ -343,6 +346,8 @@ Output ONLY the diffs and new files. No explanation.`;
           verified: false,
           fullResults: results,
         };
+        emitConvergenceRecord({ issue, result, confidence: 0.5 }).catch(() => {});
+        return result;
       }
 
       // Not green — revert this attempt's changes before trying a fresh fix,
@@ -361,7 +366,7 @@ Output ONLY the diffs and new files. No explanation.`;
       await restoreSnapshots(snapshots, repo);
       reverted = true;
     }
-    return {
+    const result = {
       status: "verification_failed",
       issue,
       plan,
@@ -379,9 +384,29 @@ Output ONLY the diffs and new files. No explanation.`;
       reverted,
       fullResults: results,
     };
+    emitConvergenceRecord({ issue, result, confidence: 0.1 }).catch(() => {});
+    return result;
   } catch (err) {
     return { status: "error", error: err.message, phase: "unknown", fullResults: results };
   }
+}
+
+async function emitConvergenceRecord({ issue, result, confidence }) {
+  const record = {
+    ts: new Date().toISOString(),
+    source: "keystone-kernel",
+    hypothesis: `Kernel run resolves issue: ${String(issue).slice(0, 200)}`,
+    evidence: {
+      status: result.status,
+      verified: result.verified,
+      attempts: result.attempts,
+      applied: Array.isArray(result.applied) ? result.applied : [],
+      test_output: result.tests?.output ? String(result.tests.output).slice(0, 500) : null,
+    },
+    result: result.status,
+    confidence,
+  };
+  await appendJsonlQueued("data/convergence/records.jsonl", record);
 }
 
 function log(verbose, message) {
