@@ -1494,6 +1494,14 @@ async function handleStreamChat(req, url, res) {
   const staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
   let modelChain = staticChain;
   try { modelChain = await orderChainByLeaderboard(staticChain, intent); } catch { /* keep static */ }
+  // Lead with the operator-pinned served model (OLLAMA_MODEL) when set, so the chat
+  // uses the model that's actually pulled/served (e.g. ouro:latest) instead of the
+  // static chain's default first entry. Deduped so it leads exactly once. Previously
+  // OLLAMA_MODEL was documented as "always a candidate" but never actually led.
+  if (process.env.OLLAMA_MODEL) {
+    const _pinned = process.env.OLLAMA_MODEL;
+    modelChain = [_pinned, ...modelChain.filter((x) => x !== _pinned)];
+  }
 
   // ── Tier 0: cheap Knowledge Center answer before any model ($0, no LLM) ──
   // Only short-circuit informational queries with a confident KB hit. Coding,
