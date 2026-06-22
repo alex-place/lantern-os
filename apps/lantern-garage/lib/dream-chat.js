@@ -1134,12 +1134,40 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   };
 }
 
+// ── Grounding gate ──────────────────────────────────────────────────
+// The Σ₀ verify pass is ON by default and operator-toggleable. Precedence:
+//   1. SIGMA0_VERIFY=true / =false — explicit env override (back-compat).
+//   2. otherwise the `chat_grounding` admin flag, defaulting ON until an admin
+//      creates+disables it (same isFlagEnabledOr pattern as the Patreon gate).
+function isVerifyEnabled() {
+  const env = process.env.SIGMA0_VERIFY;
+  if (env === "true") return true;
+  if (env === "false") return false;
+  try {
+    const { isFlagEnabledOr } = require("./feature-flags");
+    return isFlagEnabledOr("chat_grounding", true);
+  } catch { return true; }
+}
+
+// Map verify-pass grounding records → grounding-calibration events. Only claims
+// that got an EXTERNAL signal (codebase/web/gemini) carry ground truth; a claim
+// with no grounding ("none") is skipped — absence of evidence is not an outcome.
+// outcome = 1 when a source confirmed the claim, 0 when it actively refuted it.
+function calibrationEventsFor(records, agentName) {
+  const key = `agent:${agentName || "lantern"}`;
+  return (records || [])
+    .filter((r) => r && r.source && r.source !== "none")
+    .map((r) => ({ key, predicted: r.confidence, outcome: r.refuted ? 0 : 1, source: r.source }));
+}
+
 // ── Σ₀ Self-Correcting Verify Pass ──────────────────────────────────
 // Three grounding sources: (1) codebase grep, (2) web search via MCP,
 // (3) Gemini grounding API. Low-confidence claims trigger a revision pass.
-// Appends convergence records. Runs when SIGMA0_VERIFY=true.
+// Appends convergence records + feeds grounding calibration. ON by default
+// (see isVerifyEnabled); set SIGMA0_VERIFY=false or disable the chat_grounding
+// admin flag to turn off.
 async function verifyResponse(draft, userMessage, agentName) {
-  if (process.env.SIGMA0_VERIFY !== "true") return { verified: draft, records: [], corrected: false };
+  if (!isVerifyEnabled()) return { verified: draft, records: [], corrected: false };
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return { verified: draft, records: [], corrected: false };
@@ -1147,8 +1175,11 @@ async function verifyResponse(draft, userMessage, agentName) {
   const fs = require("fs");
   const path = require("path");
   const { webSearchMcp } = require("./web-search-client");
-  const { execSync } = require("child_process");
-  const REPO_ROOT = path.resolve(__dirname, "..", "..");
+  const { execFile } = require("child_process");
+  const execFileAsync = require("util").promisify(execFile);
+  // lib/ → lantern-garage/ → apps/ → repo root (THREE levels). Records + the
+  // codebase grep must resolve against the real repo root, not apps/.
+  const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
   const RECORDS_PATH = path.join(REPO_ROOT, "data", "convergence", "records.jsonl");
 
   // ── Helper: call Claude Haiku ─────────────────────────────────────
@@ -1253,7 +1284,15 @@ async function verifyResponse(draft, userMessage, agentName) {
       try {
         const terms = c.claim.replace(/[^a-zA-Z0-9_\-. ]/g, " ").split(/\s+/).filter(t => t.length > 4).slice(0, 2).join("|");
         if (terms) {
-          const res = execSync(`git grep -l --ignore-case -E "${terms}" -- "*.js" "*.json" "*.md" 2>NUL`, { cwd: REPO_ROOT, timeout: 3000, encoding: "utf8" }).trim();
+          // Shell-free AND non-blocking: execFile (shell:false) interpolates
+          // `terms` as a regex ARG, never into a command string — no injection
+          // surface even though grounding now runs every turn (#873) — and the
+          // async form keeps the event loop free (sync exec here would block all
+          // concurrent requests for up to 3s/claim). git grep exits non-zero on
+          // no match → the promise rejects → handled by the catch.
+          const { stdout } = await execFileAsync("git", ["grep", "-l", "--ignore-case", "-E", terms, "--", "*.js", "*.json", "*.md"],
+            { cwd: REPO_ROOT, timeout: 3000, encoding: "utf8" });
+          const res = stdout.trim();
           if (res) { evidence = `codebase: ${res.split("\n").slice(0, 2).join(", ")}`; confidence = 0.85; source = "codebase-grep"; sources.push(evidence); }
         }
       } catch { /* not found */ }
@@ -1325,6 +1364,14 @@ async function verifyResponse(draft, userMessage, agentName) {
     }
   } catch { /* non-fatal */ }
 
+  // Feed each externally-grounded claim into the fast-layer grounding calibration
+  // (Brier/trust per agent). Defaults to the repo-root data/ store the same way
+  // /api/convergence writes it — so chat now contributes to calibration too.
+  try {
+    const { recordGrounding } = require("./grounding-calibration");
+    for (const evt of calibrationEventsFor(records, agentName)) recordGrounding(evt);
+  } catch { /* non-fatal */ }
+
   // ── Step 5: bridge grounded records → consent-gate claim packets ──
   // Closes the EXTERNAL REALITY RULE loop end-to-end (#919 finding #2): a
   // grounded chat answer now drafts [claim, evidence, confidence, source]
@@ -1350,5 +1397,7 @@ module.exports = {
   handleConvergenceCommand,
   dreamChatReply,
   verifyResponse,
+  isVerifyEnabled,
+  calibrationEventsFor,
   tokenAudit,
 };

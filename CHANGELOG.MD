@@ -15,6 +15,25 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.44] - 2026-06-22
+
+### Added
+- Σ₀ chat grounding is now **ON by default** and operator-toggleable. A new
+  `isVerifyEnabled()` gate makes the verify/refute+revise pass run by default;
+  an explicit `SIGMA0_VERIFY=true|false` env var still wins, otherwise the
+  `chat_grounding` admin flag decides (defaults ON, like the Patreon gate).
+- Chat responses now feed the per-agent grounding-calibration log (Brier/trust),
+  which previously only `/api/convergence` wrote — alongside the existing #919
+  claim-packet drafting. Live-verified: Gemini confirmed/refuted real claims and
+  triggered a self-correction.
+
+### Fixed
+- `verifyResponse` was writing convergence records to a stray `apps/data/` tree
+  (`REPO_ROOT` was one `..` short); records now land in the canonical
+  `data/convergence/records.jsonl`. The codebase-grep grounding step is now
+  shell-free and non-blocking (async `execFile`), required now that grounding
+  runs on every chat turn.
+
 ## [1.7.43] - 2026-06-22
 
 ### Added

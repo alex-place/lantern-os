@@ -18,7 +18,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
     readRecentDreams, dreamChatReply, appendConversationEntry,
     unifiedAgentGreet, unifiedAgentHealth, unifiedAgentInspect,
     handleStreamChat } = deps;
-  const { handleConvergenceCommand, selectAgent, verifyResponse } = require("../lib/dream-chat");
+  const { handleConvergenceCommand, selectAgent, verifyResponse, isVerifyEnabled } = require("../lib/dream-chat");
   const { classifyIntent, CAPABILITY_REGISTRY } = require("../lib/intent-router");
 
   // ── CSF search endpoint ───────────────────────────────────────────────
@@ -267,7 +267,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
       } else {
         result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "");
         // Σ₀ self-correction pass (only when SIGMA0_VERIFY=true and reply exists)
-        if (result.reply && process.env.SIGMA0_VERIFY === "true") {
+        if (result.reply && isVerifyEnabled()) {
           try {
             const { verified, corrected, records } = await verifyResponse(result.reply, message, result.agent || "lantern");
             if (corrected) result.reply = verified;

@@ -9,7 +9,7 @@ const path = require("path");
 // LANTERN_INSECURE_TLS=1; LANTERN_INSECURE_TLS=0 forces it off. #869
 const { llmAgent } = require("./insecure-tls");
 
-const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse } = require("./dream-chat");
+const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
 const { modelFor } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
@@ -1223,7 +1223,7 @@ async function handleStreamChat(req, url, res) {
   // Enabled by SIGMA0_VERIFY=true in env. Runs a second fast LLM call after
   // the draft is complete; extracts factual claims and logs them.
   // Falls back silently on timeout or error — never blocks the response.
-  const SIGMA0_VERIFY = process.env.SIGMA0_VERIFY === "true";
+  const SIGMA0_VERIFY = isVerifyEnabled();
   const VERIFY_TIMEOUT_MS = 8000;
 
   async function verifyResponse(draft, userMsg) {
@@ -1838,7 +1838,7 @@ async function handleStreamChat(req, url, res) {
       let { cleanText: geminiClean, suggestions: geminiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       // Σ₀ verify pass
       let geminiSigma0 = null;
-      if (process.env.SIGMA0_VERIFY === "true") {
+      if (isVerifyEnabled()) {
         try {
           const vr = await verifyResponse(geminiClean, message, doneAgentName);
           if (vr.corrected) {
@@ -2006,7 +2006,7 @@ async function handleStreamChat(req, url, res) {
       let { cleanText: anthropicClean, suggestions: anthropicDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       // Σ₀ verify pass — ground claims against codebase, web, Gemini
       let anthropicSigma0 = null;
-      if (process.env.SIGMA0_VERIFY === "true") {
+      if (isVerifyEnabled()) {
         try {
           const vr = await verifyResponse(anthropicClean, message, doneAgentName);
           if (vr.corrected) {
