@@ -709,6 +709,22 @@ async function renderExploreEmbed(kind, userText) {
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('input');
+  // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
+  // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
+  // they're folded in here so there is exactly one sendMessage, no monkey-patching.
+  // Auth gate: block roles without chat access (all current roles allow; the server
+  // enforces real limits — this fails open to that if the role globals aren't present).
+  try {
+    if (typeof LANTERN_ROLES !== "undefined" && typeof lanternSession !== "undefined") {
+      const _role = (typeof normalizeRole === "function") ? normalizeRole(lanternSession.role) : lanternSession.role;
+      if (LANTERN_ROLES[_role] && !LANTERN_ROLES[_role].canChat) {
+        if (typeof loginWithPatreon === "function") loginWithPatreon();
+        return;
+      }
+    }
+  } catch (_) { /* gate is best-effort; the server enforces limits regardless */ }
+  // Normalize the legacy !convergance command → canonical !convergence.
+  if (/^!convergance(?:\s+(?:sync|loop|run))?\s*$/i.test(String(input.value || "").trim())) input.value = "!convergence";
   const text = input.value.trim();
   if (!text || isSending) return;
 

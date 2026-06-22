@@ -41,13 +41,9 @@
       sendBtn.addEventListener("click", () => normalizeInput(input), true);
     }
 
-    const originalSendMessage = window.sendMessage;
-    if (typeof originalSendMessage === "function") {
-      window.sendMessage = function (...args) {
-        normalizeInput(input);
-        return originalSendMessage.apply(this, args);
-      };
-    }
+    // (The !convergance→!convergence normalize is now folded into the single
+    // sendMessage in dream-chat-ui.js — no more wrapping window.sendMessage here.
+    // The Enter/click input normalization above is kept as a convenience.)
 
     return true;
   }

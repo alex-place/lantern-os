@@ -379,6 +379,47 @@ function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTo
   });
 }
 
+// ── Σ₀ convergence brain: order the providers for THIS turn ───────────────────
+// The brain (provider-router.selectProvider, surfaced as `hintProvider`) decides who
+// LEADS; an explicit request pins to one; otherwise the brain's pick leads and a
+// stable backstop chain follows. Filtered to providers that actually have a key
+// (ollama/local is always reachable). This is the single ranked list the dispatch
+// loop walks — it replaces the hardcoded gemini→anthropic→openai→xai→ollama order.
+const _PROVIDER_ALIASES = {
+  claude: "anthropic", "claude-sonnet": "anthropic", anthropic: "anthropic",
+  google: "gemini", gemini: "gemini", openai: "openai", gpt: "openai",
+  grok: "xai", xai: "xai", ollama: "ollama", local: "ollama",
+};
+function _dispatchHasKey(p) {
+  const e = process.env;
+  switch (p) {
+    case "anthropic": return !!e.ANTHROPIC_API_KEY;
+    case "gemini": return !!(e.GEMINI_API_KEY || e.GOOGLE_API_KEY);
+    case "openai": return !!e.OPENAI_API_KEY;
+    case "xai": return !!e.XAI_API_KEY;
+    case "ollama": return true;
+    default: return false;
+  }
+}
+function buildBrainOrder({ requestedProvider, hintProvider }) {
+  const DISPATCH = ["anthropic", "gemini", "openai", "xai", "ollama"];
+  const norm = (p) => {
+    const s = String(p || "").toLowerCase();
+    if (s.startsWith("gemini-")) return "gemini";   // gemini-2.5-pro etc.
+    return _PROVIDER_ALIASES[s] || null;
+  };
+  if (requestedProvider) {
+    const n = norm(requestedProvider);
+    return n && DISPATCH.includes(n) ? [n] : [];   // explicit request pins to one
+  }
+  const seen = new Set();
+  const order = [];
+  const push = (p) => { const n = norm(p); if (n && DISPATCH.includes(n) && !seen.has(n)) { seen.add(n); order.push(n); } };
+  push(hintProvider);                  // the brain's pick leads
+  for (const p of DISPATCH) push(p);   // stable backstop chain after it
+  return order.filter(_dispatchHasKey);
+}
+
 async function handleStreamChat(req, url, res) {
   const { collectRequestBody } = require("./http-utils");
   const parsed = await parseStreamChatRequest(req, url, {
@@ -1667,9 +1708,17 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  // Provider 1: Gemini (streaming) — cloud fallback
+  // ── Σ₀ convergence brain: ONE dispatch over the brain's ranked provider order ──
+  // Replaces the hardcoded gemini→anthropic→openai→xai→ollama cascade. selectProvider
+  // (the brain) chose `autoHintProvider`; buildBrainOrder turns it into the ranked,
+  // key-filtered order this loop walks. Each provider's streamer body is unchanged: on
+  // success it returns; on auto-mode failure it falls through to the next brain pick.
+  for (const _p of buildBrainOrder({ requestedProvider, hintProvider: autoHintProvider })) {
+    fullReply = "";   // fresh per provider — never carry a failed attempt's partial text
+
+  // Provider: Gemini (streaming)
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (geminiKey && message && ((!requestedProvider && !autoPrefersAnthropic) || requestedProvider === "gemini" || requestedProvider === "google" || requestedProvider.startsWith("gemini-"))) {
+  if (_p === "gemini" && geminiKey) {
     // Gemini model fallback chain: primary -> fallbacks on 429/quota
     // Note: gemini-2.0-flash-lite shut down June 1 2026; gemini-3.5-flash is GA with free grounding
     const GEMINI_MODEL_CHAIN = [
@@ -1778,9 +1827,9 @@ async function handleStreamChat(req, url, res) {
     } // end model chain loop
   }
 
-  // Provider 2: Anthropic Claude (streaming)
+  // Provider: Anthropic Claude (streaming)
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey && message && (!requestedProvider || requestedProvider === "claude" || requestedProvider === "anthropic" || requestedProvider === "claude-sonnet")) {
+  if (_p === "anthropic" && anthropicKey) {
     try {
       let claudeModel = "claude-haiku-4-5-20251001";
       if (requestedProvider === "claude-sonnet") {
@@ -1945,9 +1994,9 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  // Provider 3: OpenAI (streaming)
+  // Provider: OpenAI (streaming)
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey && message && (!requestedProvider || requestedProvider === "openai" || requestedProvider === "gpt")) {
+  if (_p === "openai" && openaiKey) {
     try {
       // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
       const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
@@ -2025,9 +2074,9 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  // Provider 4: Grok / xAI (streaming — OpenAI-compatible)
+  // Provider: Grok / xAI (streaming — OpenAI-compatible)
   const xaiKey = process.env.XAI_API_KEY;
-  if (xaiKey && message && (!requestedProvider || requestedProvider === "grok" || requestedProvider === "xai")) {
+  if (_p === "xai" && xaiKey) {
     try {
       const xaiModel = modelFor("xai");
       // xAI/Grok is OpenAI-compatible → FAST-mode decode params (issue #729).
@@ -2079,8 +2128,8 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  // Provider 5: Ollama (streaming) — last-resort fallback (local-first already tried above)
-  if (message && (!requestedProvider || requestedProvider === "ollama" || requestedProvider === "local")) {
+  // Provider: Ollama (streaming) — last-resort
+  if (_p === "ollama") {
     // Attempt 1: Unified Agent Connector (health-checked, provider-ranked, Python-side SSE)
     if (!requestedProvider || requestedProvider === "ollama" || requestedProvider === "local") {
       try {
@@ -2198,6 +2247,7 @@ async function handleStreamChat(req, url, res) {
       // Auto mode: swallow error silently, let next provider try
     }
   }
+  }  // ── end Σ₀ brain dispatch loop ──
 
   // No provider available — stream local persona fallback
   const fallbackReason = anyProviderConfigured
@@ -2206,4 +2256,4 @@ async function handleStreamChat(req, url, res) {
   await streamLocalFallback(fallbackReason);
 }
 
-module.exports = { handleStreamChat, extractDoors, doorsOrFallback };
+module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder };
