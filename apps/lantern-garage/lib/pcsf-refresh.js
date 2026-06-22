@@ -179,7 +179,7 @@ function refreshGpuTrainingPcsf(repoRoot) {
   saveJson(p, data);
 
   const available = (data.providers || []).filter(p => p.state === "available").map(p => p.provider_id);
-  console.log("[PCSF] gpu-training.pcsf.json refreshed — available:", available.join(", ") || "none");
+  console.error("[PCSF] gpu-training.pcsf.json refreshed — available:", available.join(", ") || "none");
 }
 
 function refreshAllPcsf(repoRoot) {

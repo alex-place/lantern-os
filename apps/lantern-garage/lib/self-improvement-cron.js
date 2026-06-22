@@ -281,7 +281,8 @@ async function maybeDispatchTraining(repoRoot, promoted) {
     }
   } catch { /* no log yet — default to kaggle */ }
 
-  const provider = rotateProvider(lastProvider) || lastProvider;
+  const provider = rotateProvider(lastProvider);
+  if (!provider) return { trainingDispatched: false, reason: "all_providers_exhausted" };
   const steps = Number(process.env.TRAINING_STEPS || 600);
   const dispatchResult = await dispatchTrainingJob(provider, checkpointUri, steps).catch(err => ({
     error: err.message,
