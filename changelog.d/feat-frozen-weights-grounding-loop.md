@@ -1,2 +1,6 @@
 ### Added
 - Research spec: **The Frozen-Weights, Memory-Grounding Convergence Loop** (`docs/research/2026-06-22-frozen-weights-grounding-loop.md`) — the on-canon "online convergence loop": neural weights frozen, adaptation via append-only memory + retrieval + Beta-posterior calibration, re-grounded every interval, Σ₀-guarded. Includes a live-code status table (what's built vs. just wiring, audited against master), the keystone `collapseProximity` wire, an ordered build ladder, and a measurement plan. New "Frozen-weights grounding loop" Knowledge Center card; grounding index rebuilt.
+- Step-1 wiring — fast-layer calibration goes live in the autonomous convergence loop (`routes/convergence-dispatch.js`): records an external grounding event at the test gate (predicted = research-based prior, outcome = test result — capturing passes **and** failures) and consults the Brier-calibrated `trust("autowork:patch")` at convergence, surfaced as `confidence.calibratedTrust`. Frozen weights: append-only trust log only, no neural change; best-effort, never breaks the loop.
+
+### Tests
+- Added `apps/lantern-garage/test/grounding-calibration.test.js` — 7 unit tests for the fast-layer plasticity module (Beta-posterior trust, Brier, append-only record/consult, replayable fold). The module previously had none.

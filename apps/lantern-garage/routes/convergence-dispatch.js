@@ -581,6 +581,24 @@ module.exports = async (req, res, url, deps) => {
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
         step("tests", "done", { testResults, passed: testsPassed, ran: tests.length });
 
+        // Σ₀ fast-layer plasticity (#1011): record this run's test gate as an external
+        // grounding event — predicted = the research-based confidence we carried into
+        // verification, outcome = the test ground truth. Recorded HERE, before the
+        // fail-return below, so both PASSES and FAILURES calibrate the loop. Frozen
+        // weights: this only appends to the replayable trust log, never the model.
+        if (ranTests) {
+          try {
+            require("../lib/grounding-calibration").recordGrounding({
+              key: "autowork:patch",
+              predicted: scopeFiles.length > 0 ? 0.8 : 0.5,
+              outcome: testsPassed ? 1 : 0,
+              source: `autowork#${issueNumber}`,
+            });
+          } catch (e) {
+            console.error("[convergence] grounding-calibration record failed (non-fatal):", e && e.message);
+          }
+        }
+
         if (tests.length > 0 && !testsPassed) {
           // restore working tree — never leave broken changes
           await new Promise((resolve) =>
@@ -636,6 +654,12 @@ module.exports = async (req, res, url, deps) => {
 
         // ── 9. convergence (Σ₀: record hypothesis + evidence + confidence) ─
         step("convergence", "start");
+        // Consult the fast-layer calibrated trust for this loop (#1011): the empirical,
+        // Brier-calibrated reliability of "autowork:patch" accumulated across prior runs.
+        // A frozen-weights adaptation — it shifts every interval as outcomes land, with
+        // no neural change. 0.5 prior until grounded.
+        let calibratedTrust = 0.5;
+        try { calibratedTrust = require("../lib/grounding-calibration").trust("autowork:patch"); } catch (_) {}
         const convergenceRecord = {
           timestamp: new Date().toISOString(),
           issue: issueNumber,
@@ -666,7 +690,10 @@ module.exports = async (req, res, url, deps) => {
               (webEvidence.length > 0 ? 0.8 : 0.4) * 0.4 +
               (ranTests ? (testsPassed ? 0.9 : 0.3) : 0.0) * 0.2,
               0.95  // Cap at 95% confidence (always room for error)
-            )
+            ),
+            // #1011 fast-layer plasticity: the loop's Brier-calibrated reliability,
+            // consulted (not retrained) each run; 0.5 until grounded by real outcomes.
+            calibratedTrust,
           },
           sources: {
             issue: `github.com/alex-place/lantern-os/issues/${issueNumber}`,
