@@ -322,3 +322,21 @@ data/admin/feature-flags.json
 # Σ₀ real-session harvest corpora — contain real secrets/PII; keep local, regenerate via scripts/harvest_tool_traces.py
 models/lantern-sigma0-coder/tool-trace-pairs.jsonl
 models/lantern-sigma0-coder/training-data-5k.jsonl
+
+# ─── Generated / runtime churn (2026-06-22) — silence the untracked noise ──────
+# Doc-gallery thumbnails: regenerated at runtime, and *.png is LFS-tracked while
+# the LFS endpoint rejects pushes, so these are local-only by design (~247 files).
+apps/lantern-garage/public/knowledge-gallery/
+# Fast-layer calibration log + eval/harvest per-run outputs (rewritten every run;
+# the curated trail lives in data/convergence/records.jsonl + data/eval/leaderboard.jsonl).
+data/convergence/grounding-calibration.jsonl
+data/eval/humaneval/
+data/keystone-test-runs.jsonl
+data/ouro-harvest-candidates.jsonl
+data/backlog-triage-verdicts.json
+data/batch1-specs.json
+# Generated benchmark PDFs (the *.json result artifacts stay tracked).
+experiments/results/*.pdf
+# Process / scratch artifacts.
+*.pid
+tmp.*.patch
