@@ -815,7 +815,8 @@ async function handleStreamChat(req, url, res) {
 
     // Three Doors variants: start fresh game if no history, else strip command and continue
     if (cmd.name === "three-doors" || cmd.name === "threedoors" || cmd.name === "three_doors"
-        || cmd.name === "converge" || cmd.name === "convergance") {
+        || cmd.name === "converge" || cmd.name === "convergance"
+        || cmd.name === "ask") {   // !ask falls through to the convergence-agent short-circuit below
       if (cmd.name === "converge" || cmd.name === "convergance") { /* already handled above */ }
       if (history && history.length > 0) {
         // Game already in progress — strip the bang command, keep any surrounding text
@@ -1305,6 +1306,29 @@ async function handleStreamChat(req, url, res) {
     sendError("I couldn't read your message — the request body was malformed or had a bad encoding (e.g. a leading UTF-8 BOM). Please resend.");
     sendDone("offline", { agent: doneAgentName, online: false, error: "bad_request_body", suggestions: FALLBACK_DOORS });
     return;
+  }
+
+  // ── One receive endpoint (Stage 3): deterministic work/ask intent → convergence
+  // agent ($0, no LLM), streamed HERE instead of via a separate client fetch to
+  // /api/convergence/agent. The client now POSTs every turn to /api/dream/chat/stream;
+  // the brain recognizes a work/status/ask query and answers from live repo data,
+  // emitting `actions` in the done event for the client to render as chips.
+  {
+    const _askM = message.match(/^!ask\s+(.+)/i);
+    const _WORK_INTENT = /\b(what (work|issues?|tasks?|bugs?|tickets?|pr[s']?|pull requests?)|what (needs?|needs to be) (done|fixed|closed|worked on)|what'?s? (open|pending|left|next|the status|blocking)|show (me )?(open |the )?issues?|status (of|update)|list (issues?|tasks?|open)|open issues?|any issues?|what should i (work on|fix|do)|top issues?|priority (issues?|tasks?))\b/i;
+    if (!isKeystoneDebug && surfaceMode !== "three-doors" && (_askM || (_WORK_INTENT.test(message) && !message.startsWith("!")))) {
+      try {
+        const _q = _askM ? _askM[1].trim() : message;
+        const r = await require("./convergence-agent").respond(_q);
+        const _ans = (r && r.answer) ? String(r.answer) : "(no answer)";
+        sendToken(_ans);
+        await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: _ans.slice(0, maxConversationTextLength) }).catch(() => {});
+        sendDone("convergence-agent", { agent: doneAgentName, online: true, cleanText: _ans, actions: Array.isArray(r && r.actions) ? r.actions : [], grounded: !!(r && r.grounded), instant: true, label: "Convergence · instant · $0" });
+        return;
+      } catch (e) {
+        console.error("[convergence-agent] short-circuit failed (non-fatal, falling through):", e.message);
+      }
+    }
   }
 
   await logConversation({
