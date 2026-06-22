@@ -1,0 +1,2 @@
+### Fixed
+- `verifyResponse` in `stream-chat.js` was shadowed by a local duplicate that only extracted claims via a second API call, leaving `dream-chat.js`'s full grounding (codebase grep + web search + Gemini API + calibration records) unreachable (#997). Removed the local shadow; the `sendDone` path and cloud provider paths now all use the imported rich `verifyResponse`. Grounding is on by default via the `chat_grounding` admin flag (`isVerifyEnabled`).

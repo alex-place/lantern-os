@@ -1119,9 +1119,9 @@ async function handleStreamChat(req, url, res) {
       signature.degraded = true;
       finalRouteLabel = `${routeLabel} · ⚠ degraded — local model (cloud unreachable)`;
     }
-    // Σ₀ verify: fire-and-forget — logs claims to convergence/records.jsonl
+    // Σ₀ verify: fire-and-forget — full grounding via dream-chat.js::verifyResponse
     if (SIGMA0_VERIFY && fullReply && message) {
-      verifyResponse(fullReply, message).catch(() => {});
+      verifyResponse(fullReply, message, agent.id || agent.name || "keystone").catch(() => {});
     }
     // ── Σ₀ collapse canary (#1010) ──────────────────────────────────────────
     // Passive observer on the live serving path: score the completed reply for
@@ -1257,79 +1257,11 @@ async function handleStreamChat(req, url, res) {
     return msg;
   }
 
-  // ── Σ₀ self-correcting verification pass (#662) ──────────────────────────
-  // Enabled by SIGMA0_VERIFY=true in env. Runs a second fast LLM call after
-  // the draft is complete; extracts factual claims and logs them.
-  // Falls back silently on timeout or error — never blocks the response.
+  // ── Σ₀ verify gate (#997) ────────────────────────────────────────────────
+  // ON by default via the chat_grounding admin flag (isVerifyEnabled in dream-chat.js).
+  // Falls back silently — never blocks the reply. Uses the rich verifyResponse from
+  // dream-chat.js (codebase grep + web + Gemini grounding + calibration records).
   const SIGMA0_VERIFY = isVerifyEnabled();
-  const VERIFY_TIMEOUT_MS = 8000;
-
-  async function verifyResponse(draft, userMsg) {
-    if (!SIGMA0_VERIFY || !draft || draft.length < 40) return { verified: false };
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) return { verified: false };
-
-    const EXTRACT_PROMPT = `You are a claim extractor. Given a draft AI response, extract up to 5 specific factual claims (not opinions, not questions). Return JSON only: {"claims": [{"claim": "...", "checkable": true}]}. If none, return {"claims": []}.`;
-
-    try {
-      const body = JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 300,
-        system: EXTRACT_PROMPT,
-        messages: [{ role: "user", content: `User asked: ${userMsg.slice(0, 200)}\n\nDraft:\n${draft.slice(0, 800)}` }],
-      });
-
-      const result = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("verify_timeout")), VERIFY_TIMEOUT_MS);
-        const req = https.request({
-          agent: llmAgent,
-          hostname: "api.anthropic.com",
-          path: "/v1/messages",
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": anthropicKey,
-            "anthropic-version": "2023-06-01",
-            "Content-Length": Buffer.byteLength(body),
-          },
-        }, (res2) => {
-          let d = "";
-          res2.on("data", c => { d += c; });
-          res2.on("end", () => { clearTimeout(timer); try { resolve(JSON.parse(d)); } catch { reject(new Error("parse_fail")); } });
-        });
-        req.on("error", e => { clearTimeout(timer); reject(e); });
-        req.write(body);
-        req.end();
-      });
-
-      const text = result?.content?.[0]?.text || "{}";
-      let parsed;
-      try { parsed = JSON.parse(text); } catch { return { verified: false }; }
-      const claims = parsed.claims || [];
-      const total = claims.length;
-      const checkable = claims.filter(c => c.checkable).length;
-
-      const { appendJsonlQueued } = require("./file-queue");
-      const recordsPath = path.resolve(repoRoot, "data", "convergence", "records.jsonl");
-      appendJsonlQueued(recordsPath, {
-        timestamp: new Date().toISOString(),
-        surface: "dream-chat-verify",
-        userMsg: userMsg.slice(0, 200),
-        claimsFound: total,
-        checkableClaims: checkable,
-        claims,
-      }, { rotate: true }).catch(() => {}); // #872 per-verify
-
-      return {
-        verified: true,
-        total,
-        checkable,
-        badge: total > 0
-          ? `⚡ ${total} claim${total !== 1 ? "s" : ""} verified · Σ₀`
-          : "✓ No factual claims · Σ₀",
-      };
-    } catch { return { verified: false }; }
-  }
 
   const sendError = (msg) => sse.sendError(res, msg);
   const sendFail = (reason) => {
