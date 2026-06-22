@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.45] - 2026-06-22
+
+### Added
+- **int8 KV cache (`QuantizedUTCache`) — the key lever toward 20k-context on 8GB.** Ouro's KV cache is ~4x a normal model's (it caches K/V at every UT loop step, and uses full MHA with no GQA), so 20k tokens needs ~15.4 GB in fp16 and OOMs an 8GB card. `sigma0.quantized_cache.QuantizedUTCache` is a drop-in for the model's `UniversalTransformerCache` that stores each slot as **int8 + a per-token scale** and dequantizes one slot at a time on read (only one transient fp16 view ever materialized). Measured vs the bf16 cache: **6/6 identical tokens** (near-lossless) at 3k/6k/9k, **1.25→1.45x lower peak VRAM** (growing with context), and it **runs 12k where bf16 OOMs**. Confirmed HF `generate()` uses it when passed as `past_key_values`. Wired into `ouro_serve` behind **`OURO_KV_INT8=1`** (cached path); combine with `OURO_4BIT=1`/`OURO_UT_STEPS=2` to fit 20k on 8GB. This is the BitNet/ternary low-bit substrate (that the CSF lattice is built on) applied at the live-tensor layer — where a byte-archive compressor (CSF-Omni) cannot run. New regression tests (4); no model or `src/cio_sde` changes.
+
 ## [1.7.44] - 2026-06-22
 
 ### Added

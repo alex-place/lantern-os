@@ -65,6 +65,12 @@ NATIVE_ADAPT = os.environ.get("OURO_ADAPT", "0") == "1"
 # order acceleration exit (Two-Scale arXiv:2509.23314), the certificate-consistent upgrade.
 NATIVE_MODE = os.environ.get("OURO_MODE", "qexit")
 NATIVE_EPS = float(os.environ.get("OURO_EPS", "0.05"))
+# OURO_KV_INT8=1: store the KV cache as int8 + per-token scale (sigma0.quantized_cache).
+# Ouro's cache is ~4x a normal model's (UT-step KV × full MHA); int8 ~halves it, near-lossless
+# (measured 6/6 identical tokens vs bf16), and reaches contexts where bf16 OOMs — the key lever
+# for CC-scale (20k) prompts on 8GB. It is the BitNet/ternary low-bit substrate (the CSF lattice
+# is built on) applied at the live-tensor layer. Cached path only.
+KV_INT8 = os.environ.get("OURO_KV_INT8", "0") == "1"
 # Decode quality (both paths): repetition penalty + no-repeat n-gram kill the small-model
 # degeneration (e.g. "✅✅✅…"). Greedy by default for reproducibility; set OURO_SAMPLE=1 for chat-natural sampling.
 REP_PENALTY = float(os.environ.get("OURO_REP_PENALTY", "1.3"))
@@ -202,6 +208,17 @@ def _canary_classes():
     return _CANARY_CLS
 
 
+_QCACHE_CLS = None
+def _quantized_cache_cls():
+    global _QCACHE_CLS
+    if _QCACHE_CLS is None:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+        from sigma0.quantized_cache import QuantizedUTCache
+        _QCACHE_CLS = QuantizedUTCache
+    return _QCACHE_CLS
+
+
 def _print_cached_canary(proc):
     if proc is None:
         return
@@ -258,6 +275,8 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
         kw.update(stop_strings=_STOP, tokenizer=_tok)
     if DO_SAMPLE:
         kw.update(temperature=TEMPERATURE, top_p=TOP_P)
+    if KV_INT8:
+        kw["past_key_values"] = _quantized_cache_cls()()   # int8 KV — ~halves cache VRAM
     if stream_cb is None:
         with torch.no_grad():
             out = _model.generate(**ids, **kw)
