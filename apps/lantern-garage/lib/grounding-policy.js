@@ -10,7 +10,27 @@ const D_MIN = 0.1;
 const D_MAX = 5.0;
 const D_DEFAULT = 1.0;
 
+// Boiling-frog defense (#1012): a HARD time cadence for external grounding. Cert §4's
+// "calm while wrong" regime + the 2026 Boiling Frog Threshold result (arXiv:2603.08455)
+// show internal monitors carry no extractable signal for gradual/periodic drift — so
+// proximity-triggered grounding alone is provably insufficient. We re-touch external
+// reality on a timer regardless of how low collapse-proximity is. Configurable via
+// GROUNDING_TICK_MS; set 0 to disable. Default 30 min.
+const GROUNDING_TICK_MS = (() => {
+  const v = parseInt(process.env.GROUNDING_TICK_MS, 10);
+  return Number.isFinite(v) ? v : 30 * 60 * 1000;
+})();
+
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+// Is a mandatory grounding tick due? Pure (now/cadence injectable for tests).
+//   lastGroundedAtMs : ms epoch of the last grounding, or 0/null if never
+//   returns true when the cadence has elapsed (or grounding never happened).
+function isGroundingDue(lastGroundedAtMs, nowMs = Date.now(), cadenceMs = GROUNDING_TICK_MS) {
+  if (!cadenceMs || cadenceMs <= 0) return false; // cadence disabled
+  if (!lastGroundedAtMs) return true;             // never grounded → ground now
+  return nowMs - lastGroundedAtMs >= cadenceMs;
+}
 
 // Mirror of dilation() including the G12 collapse-proximity sign-fix:
 // near collapse (proximity→1) D deflates toward D_MIN instead of inflating.
@@ -55,4 +75,4 @@ function chatDilation(message, { confidence = 0.5, collapseProximity = 0 } = {})
   return dilation(clamp(u, 0, 1), 0, confidence, collapseProximity);
 }
 
-module.exports = { dilation, groundingPolicy, chatDilation, D_MIN, D_MAX, D_DEFAULT };
+module.exports = { dilation, groundingPolicy, chatDilation, isGroundingDue, GROUNDING_TICK_MS, D_MIN, D_MAX, D_DEFAULT };

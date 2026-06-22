@@ -19,13 +19,17 @@ const { emitConvergenceRecord } = require("./convergence-records");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
+const { scoreReplyCollapse, antiCollapseSignal } = require("./collapse-canary");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
 const { generateDoorSceneImage } = require("./image-generation");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
-const { chatDilation, groundingPolicy } = require("./grounding-policy");
+const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
+// #1012 boiling-frog defense: ms epoch of the last mandatory external-grounding tick.
+// Module-level so the cadence spans requests for this server process.
+let _lastGroundingTickMs = 0;
 const { generatePlan, generatePatch } = require("./self-edit-engine");
 const { selectProvider, selectKernelProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
@@ -952,17 +956,31 @@ async function handleStreamChat(req, url, res) {
   let groundingContext = "";
   const groundingD = chatDilation(message);
   const gpol = groundingPolicy(groundingD);
-  if (!isKeystoneDebug && (needsGrounding(message) || groundingD >= 1.5)) {
-    const searchQuery = extractSearchQuery(message);
+  // #1012 boiling-frog defense: a hard time cadence forces an external re-check even
+  // when proximity~0 and the message wouldn't otherwise trigger grounding. Internal
+  // monitors are provably blind to slow drift, so we ground on a timer regardless.
+  const groundingTickDue = isGroundingDue(_lastGroundingTickMs);
+  if (!isKeystoneDebug && (needsGrounding(message) || groundingD >= 1.5 || groundingTickDue)) {
+    // On a mandatory tick fall back to the message itself when no query extracts, so
+    // the cadence still reaches external reality on otherwise un-groundable turns.
+    const searchQuery = extractSearchQuery(message) || (groundingTickDue ? String(message || "").slice(0, 120).trim() : "");
     if (searchQuery) {
       try {
         const searchResult = await withTimeout(webSearchMcp(searchQuery, gpol.maxResults), GROUNDING_TIMEOUT_MS, { success: false });
         if (searchResult.success && searchResult.results) {
           groundingContext = formatGroundingContext(searchResult.results, searchQuery);
         }
+        if (groundingTickDue) {
+          _lastGroundingTickMs = Date.now();
+          console.warn(`[grounding-tick] mandatory external-grounding tick fired (cadence=${GROUNDING_TICK_MS}ms, ok=${!!(searchResult && searchResult.success)})`);
+        }
       } catch (e) {
         console.error("[web-search] Grounding failed (non-fatal):", e.message);
       }
+    } else if (groundingTickDue) {
+      // Due but nothing to query — advance the clock + log so the cadence doesn't retry every turn.
+      _lastGroundingTickMs = Date.now();
+      console.warn(`[grounding-tick] due but no query extracted; cadence reset (cadence=${GROUNDING_TICK_MS}ms)`);
     }
   }
 
@@ -1105,6 +1123,26 @@ async function handleStreamChat(req, url, res) {
     if (SIGMA0_VERIFY && fullReply && message) {
       verifyResponse(fullReply, message).catch(() => {});
     }
+    // ── Σ₀ collapse canary (#1010) ──────────────────────────────────────────
+    // Passive observer on the live serving path: score the completed reply for
+    // loop-collapse / phrase-echo / lexical contraction. Stamp proximity onto the
+    // done signature so the cert can't read "healthy" while output is collapsing;
+    // on a crossing, emit a logged canary signal. No behavior change when healthy.
+    try {
+      if (fullReply) {
+        const canary = scoreReplyCollapse(fullReply);
+        signature.sigma0_proximity = canary.proximity;
+        if (canary.collapsed) {
+          const sig = antiCollapseSignal(canary);
+          signature.canary = sig;
+          console.warn(
+            `[canary_collapse] proximity=${canary.proximity} action=${sig.action} ` +
+            `source=${source} provider=${signature.provider} ` +
+            `signals=${JSON.stringify(canary.signals)}`
+          );
+        }
+      }
+    } catch { /* canary must never break a reply */ }
     return sse.sendDone(res, source, { ...extra, ...signature, routeLabel: finalRouteLabel });
   };
 

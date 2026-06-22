@@ -301,12 +301,31 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
       // Guarded: a failed record must never break the reply.
       try {
         const { emitConvergenceRecord } = require("../lib/convergence-records");
+        // #1011: retire the frozen 0.7/0.3 heuristic. Prefer an OUTCOME-GRADED
+        // calibrated trust (Beta posterior over graded groundings for this provider
+        // key) once we have enough graded events; otherwise fall back to the
+        // heuristic and say so in verification_notes — never pass an ungraded number
+        // off as calibrated. Grade the outcome, never the self-assessment.
+        const heuristicConfidence = result.online ? 0.7 : 0.3;
+        let confidence = heuristicConfidence;
+        let confNote = `confidence=heuristic(${result.online ? "online→0.7" : "offline→0.3"}) — no graded outcomes for this key yet`;
+        try {
+          const cal = require("../lib/grounding-calibration");
+          const calKey = `chat:${result.provider || (result.online ? (body.provider || "auto") : "local")}`;
+          const evs = cal.readEvents().filter((e) => e && e.key === calKey);
+          if (evs.length >= 3) {
+            const folded = cal.foldKey(evs);
+            confidence = folded.trust;
+            confNote = `confidence=calibrated key=${calKey} n=${evs.length} brier=${folded.brier != null ? folded.brier.toFixed(3) : "n/a"}`;
+          }
+        } catch { /* calibration optional — keep heuristic */ }
         await emitConvergenceRecord({
           hypothesis: message.slice(0, 280),
           evidence_ids: (recentDreams || []).map((d) => d && (d.id || d.recordedAt)).filter(Boolean),
           result: String(result.reply || "").slice(0, 2000),
-          confidence: result.online ? 0.7 : 0.3, // v1 heuristic: grounded (online) reply trusted more
+          confidence,
           reasoner: result.agent || "unknown",
+          verification_notes: confNote,
           source: `dream-chat/${result.agent || "unknown"}/${result.provider || "local"}`,
         });
       } catch { /* convergence record non-critical */ }
