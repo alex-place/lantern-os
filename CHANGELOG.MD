@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.43] - 2026-06-22
+
+### Added
+- **Calibration math consolidated: ECE alongside Brier (#1011, salvaged from #1015).** Landed `lib/outcome-grader.js` (Brier + Expected Calibration Error + multiclass Brier — pure functions) and wired it into the live `grounding-calibration.js`: one Brier implementation now, and `GET /api/convergence/calibration` reports `ece` (how well predicted confidence matched reality) alongside per-key trust. Replaced #1015's truncated `describe/it` test with a runnable plain-node suite (6/6); dropped #1015's unwired `convergence-record.js` (it duplicated + name-collided with the existing `convergence-records.js` emitter). Consolidated, not duplicated, the #1011 work already live from #1017.
+
 ## [1.7.42] - 2026-06-22
 
 ### Fixed

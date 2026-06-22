@@ -18,6 +18,7 @@
 //                 (0 = perfect, 0.25 = a coin flip, lower = better).
 const fs = require("fs");
 const path = require("path");
+const { computeBrier, trackECE } = require("./outcome-grader");
 
 const LOG_REL = "data/convergence/grounding-calibration.jsonl";
 function logPath(root) { return path.join(root || process.cwd(), LOG_REL); }
@@ -29,7 +30,7 @@ function foldKey(events) {
   let n = 0, hits = 0, sumBrier = 0;
   for (const e of events) {
     const p = clamp01(e.predicted), o = e.outcome ? 1 : 0;
-    n++; hits += o; sumBrier += (p - o) * (p - o);
+    n++; hits += o; sumBrier += computeBrier(p, o).brier;
   }
   return {
     key: events[0] && events[0].key,
@@ -43,15 +44,21 @@ function foldKey(events) {
 function summarize(events) {
   const byKey = new Map();
   let n = 0, sumBrier = 0;
+  const preds = [], outs = [];
   for (const e of events) {
     if (!byKey.has(e.key)) byKey.set(e.key, []);
     byKey.get(e.key).push(e);
     const p = clamp01(e.predicted), o = e.outcome ? 1 : 0;
-    n++; sumBrier += (p - o) * (p - o);
+    n++; sumBrier += computeBrier(p, o).brier; preds.push(p); outs.push(o);
   }
   const keys = {};
   for (const [k, evs] of byKey) keys[k] = foldKey(evs);
-  return { total_events: n, global_brier: n ? sumBrier / n : null, keys };
+  return {
+    total_events: n,
+    global_brier: n ? sumBrier / n : null,
+    ece: n ? trackECE(preds, outs).ece : null,   // Expected Calibration Error (outcome-grader)
+    keys,
+  };
 }
 
 // ── I/O (append-only, replayable) ─────────────────────────────────────────────
