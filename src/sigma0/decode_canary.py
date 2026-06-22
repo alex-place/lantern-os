@@ -74,7 +74,8 @@ class DecodeCanary:
 
     def observe(self, token_id: int, *, margin: Optional[float] = None,
                 exit_depth: Optional[int] = None, max_steps: Optional[int] = None,
-                entropy: Optional[float] = None, token_idx: Optional[int] = None) -> Dict[str, Any]:
+                entropy: Optional[float] = None, token_idx: Optional[int] = None,
+                divergence: Optional[float] = None) -> Dict[str, Any]:
         """Feed one generated token; returns {self_repeat, echo, degeneracy, nis, spook,
         proximity, signal, exit_depth, entropy, entropy_z}.
 
@@ -122,10 +123,17 @@ class DecodeCanary:
             "length": min(1.0, len(self._ids) / max(1, self.window)),
         })
         prox = self.monitor.sigma0_proximity()
+        # Σ₀ divergence (the certificate's SECOND fate — runaway / non-termination). The
+        # model-free canary cannot tell runaway-but-varied from healthy-varied output, so the
+        # caller (loop_lm, which sees the token budget) supplies it. Kept DISTINCT from collapse
+        # `proximity` per §4; `proximity_any` is the max for actuation. None ⇒ inert.
+        _div = None if divergence is None else max(0.0, min(1.0, float(divergence)))
         out = {
             "self_repeat": round(self_repeat, 4), "echo": round(echo, 4),
             "degeneracy": round(degeneracy, 4), "nis": float(ev["nis"].item()),
             "spook": bool(ev["spook"].item()), "proximity": prox["proximity"],
+            "divergence": None if _div is None else round(_div, 4),
+            "proximity_any": round(max(prox["proximity"], _div or 0.0), 4),
             "signal": self.monitor.anti_collapse_signal(), "exit_depth": exit_depth,
             "entropy": None if entropy is None else round(float(entropy), 3),
             "entropy_z": None if ent_z is None else round(float(ent_z), 2),
@@ -140,13 +148,17 @@ class DecodeCanary:
 
     # ── actuator: gate decode knobs on Σ₀ proximity ───────────────────────────
     def knobs(self, q: float, rep_penalty: float, temperature: float = 0.0,
-              proximity: Optional[float] = None) -> Dict[str, float]:
-        """Map Σ₀ proximity onto decode knobs. As the decoder nears collapse: punish
-        repetition harder, inject novelty (temperature), and exit the loop sooner (lower q)."""
+              proximity: Optional[float] = None, divergence: Optional[float] = None) -> Dict[str, float]:
+        """Map Σ₀ proximity onto decode knobs. COLLAPSE (repetition) → punish repeats, inject
+        novelty, exit sooner. DIVERGENCE (runaway) → exit sooner + punish repeats too, but do
+        NOT inject novelty (temperature would feed the runaway). Distinct fates, per the
+        certificate; the EOS bias that actually halts a runaway lives in loop_lm.generate."""
         p = self.monitor.sigma0_proximity()["proximity"] if proximity is None else float(proximity)
+        d = 0.0 if divergence is None else max(0.0, min(1.0, float(divergence)))
         return {
-            "q": max(0.2, min(0.95, q - 0.2 * p)),       # exit sooner under collapse
-            "rep_penalty": rep_penalty + 0.7 * p,         # punish repeats harder
-            "temperature": max(0.0, temperature) + 0.7 * p,  # inject novelty
+            "q": max(0.2, min(0.95, q - 0.2 * p - 0.2 * d)),   # exit sooner under either fate
+            "rep_penalty": rep_penalty + 0.7 * p + 0.3 * d,     # punish repeats harder
+            "temperature": max(0.0, temperature) + 0.7 * p,     # novelty for COLLAPSE only
             "proximity": p,
+            "divergence": d,
         }

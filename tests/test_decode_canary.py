@@ -102,6 +102,34 @@ def test_entropy_drop_records_collapse_event():
     assert ev["token"] == 12 and ev["z"] < 0, f"collapse event mis-recorded: {ev}"
 
 
+def test_divergence_inert_when_absent():
+    """Without a divergence arg the second-fate signal stays inert (None), exactly like entropy —
+    so the model-free unit path and the certificate's collapse tests are unaffected."""
+    out = DecodeCanary().observe(5)
+    assert out["divergence"] is None
+    assert out["proximity_any"] == out["proximity"], "proximity_any must reduce to collapse proximity"
+
+
+def test_divergence_surfaced_and_distinct_from_collapse():
+    """A supplied divergence (runaway) is surfaced and folded into proximity_any, but kept
+    DISTINCT from the collapse `proximity` (the certificate §4 keeps the two fates separate)."""
+    out = DecodeCanary().observe(5, divergence=0.8)        # varied token, no repetition
+    assert out["divergence"] == 0.8, "supplied divergence not surfaced"
+    assert out["proximity"] < 0.3, "a single varied token must not read as COLLAPSE"
+    assert out["proximity_any"] >= 0.8, "proximity_any must reflect the divergence fate"
+
+
+def test_knobs_respond_to_divergence_without_novelty():
+    """Divergence must pull the decoder toward STOPPING (lower q, higher rep_penalty) but must
+    NOT inject novelty (temperature) — novelty would feed a runaway."""
+    dc = DecodeCanary()
+    base = dc.knobs(q=0.5, rep_penalty=1.3, temperature=0.0, proximity=0.0, divergence=0.0)
+    diverging = dc.knobs(q=0.5, rep_penalty=1.3, temperature=0.0, proximity=0.0, divergence=1.0)
+    assert diverging["q"] < base["q"], "divergence did not lower q (exit/stop sooner)"
+    assert diverging["rep_penalty"] > base["rep_penalty"], "divergence did not raise rep_penalty"
+    assert diverging["temperature"] == base["temperature"], "divergence must NOT inject novelty"
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

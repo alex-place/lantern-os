@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.34] - 2026-06-21
+
+### Added
+- **Σ₀ decode canary now instruments DIVERGENCE, not just collapse.** The DecodeCanary only ever measured the certificate's *collapse* fate (self-repeat / n-gram echo / entropy-drop); it read `prox=0.0` while the model ran away — diverse rambling that never terminates (the certificate's *second* fate, §7). `loop_lm.generate` now measures a divergence proximity (ramps as generation approaches the token cap without EOS), passes it to `DecodeCanary.observe(divergence=…)` (optional, inert when absent — collapse tests unchanged), kept DISTINCT from collapse `proximity` per §4 and surfaced as `proximity_any`. Two actuators: a hard stop+truncate on a stray training-template turn marker (restart), and (under `adapt`) an EOS-logit bias that grows with divergence to pull a runaway toward terminating. New regression tests; the certificate's 33 machine-checked tests and the 8 collapse-canary tests are unchanged.
+
 ## [1.7.33] - 2026-06-21
 
 ### Added

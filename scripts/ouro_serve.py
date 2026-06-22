@@ -193,6 +193,7 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
             # whether the actuator engaged. proximity→8.0 = collapse threshold; signal != "none"
             # = anti-collapse alarm; collapse_events = entropy-spike count.
             print(f"[ouro][canary] prox={out.get('canary_max_proximity')} "
+                  f"div={out.get('canary_max_divergence')} stop={out.get('stop_reason')} "
                   f"spooks={out.get('canary_spooks')} signal={out.get('canary_signal')} "
                   f"collapse_events={len(out.get('collapse_events') or [])} "
                   f"mean_depth={out.get('mean_depth')}/{out.get('max_steps')} "

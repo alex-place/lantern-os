@@ -196,7 +196,7 @@ class Sigma0LoopLM:
     # ── generation with per-token adaptive depth ─────────────────────────────
     def generate(self, prompt: str, q: float = 0.5, max_new_tokens: int = 200, messages=None,
                  rep_penalty: float = 1.3, mode: str = "qexit", eps: float = 0.05,
-                 canary: bool = True, adapt: bool = False):
+                 canary: bool = True, adapt: bool = False, stop=None):
         """mode='qexit' (baseline, exit on confidence) or 'converge' (exit on
         latent fixed point). 'converge' also returns the mean contraction delta
         so the spiral hypothesis (E2) is falsifiable from real trajectories.
@@ -233,6 +233,18 @@ class Sigma0LoopLM:
                 dc = None  # canary is best-effort; never break generation
         q_cur, rep_cur = q, rep_penalty
         canary_max_prox, canary_spooks, canary_signal = 0.0, 0, "none"
+        # Σ₀ DIVERGENCE instrument — the certificate's SECOND fate (§7). The decode canary's
+        # signals (self-repeat / n-gram echo / entropy-drop) detect COLLAPSE; they are blind to
+        # divergence: runaway generation that never terminates (varied tokens, low repeat, so
+        # degeneracy≈0). We instrument it here, where the tokenizer + token budget are visible.
+        # proximity ramps from _div_start → max_new_tokens ("running to the length limit"), and a
+        # stray training-template turn marker is an unambiguous restart → hard stop + truncate.
+        canary_max_div, stop_reason, _trunc_text = 0.0, None, None
+        _div_start = max(8, int(0.6 * max_new_tokens))
+        _stop_markers = stop if stop is not None else [
+            "\n### Instruction:", "\n### Response:", "\n### Task:", "\n### Input:",
+            "</answer>", "<|im_end|>"]
+        _EOS_BIAS = 6.0   # logit boost added to EOS, scaled by divergence, only when adapt=True
         # #PERF: incremental KV decode via the model's native UniversalTransformerCache.
         # The legacy path forwarded the FULL growing sequence with use_cache=False on
         # every token = O(N^2) decode — the dominant cost behind ~1 s/token and the
@@ -285,6 +297,17 @@ class Sigma0LoopLM:
                     for tid in set(ids[0, -len(depths):].tolist()):
                         v = logits[tid]
                         logits[tid] = v / rep_cur if v > 0 else v * rep_cur
+                # Σ₀ divergence proximity: 0 until _div_start, ramps to 1 at the token cap —
+                # approaching the length limit without terminating IS the divergence fate.
+                divergence = 0.0
+                if max_new_tokens > _div_start:
+                    divergence = max(0.0, min(1.0, (_tok_idx - _div_start) / (max_new_tokens - _div_start)))
+                canary_max_div = max(canary_max_div, divergence)
+                # Divergence actuator (opt-in via adapt): bias toward EOS as the run nears the cap,
+                # so a runaway is pulled to a stop instead of rambling to the limit. Gentle + late
+                # (only past _div_start) — healthy short answers emit EOS well before it, untouched.
+                if adapt and divergence > 0.0 and eos is not None:
+                    logits[eos] = logits[eos] + _EOS_BIAS * divergence
                 nxt = int(torch.argmax(logits))
                 if dc is not None:
                     # Feed both decode-health signals to the one canary: argmax margin
@@ -296,20 +319,28 @@ class Sigma0LoopLM:
                     margin = float((top2[0] - top2[1]).item())
                     entropy = float(-(probs * (probs + 1e-10).log()).sum().item())
                     obs = dc.observe(nxt, margin=margin, exit_depth=step, max_steps=self.max_steps,
-                                     entropy=entropy, token_idx=_tok_idx)
+                                     entropy=entropy, token_idx=_tok_idx, divergence=divergence)
                     canary_max_prox = max(canary_max_prox, obs["proximity"])
                     canary_spooks += int(obs["spook"])
                     if obs["signal"] != "none":
                         canary_signal = obs["signal"]
-                    if adapt:  # actuator: gate knobs on Σ₀ proximity (opt-in; changes tokens)
-                        k = dc.knobs(q, rep_penalty)
+                    if adapt:  # actuator: gate knobs on Σ₀ proximity + divergence (opt-in)
+                        k = dc.knobs(q, rep_penalty, divergence=divergence)
                         q_cur, rep_cur = k["q"], k["rep_penalty"]
                 _nxt_t = torch.tensor([[nxt]], device=ids.device)
                 ids = torch.cat([ids, _nxt_t], dim=1)
                 _cur = _nxt_t  # next pass forwards only the new token; the cache holds the rest
                 if nxt == eos:
                     break
-        text = self.tok.decode(ids[0, -len(depths):], skip_special_tokens=True)
+                # Σ₀ divergence hard-stop: a training-template turn marker means the model has
+                # finished the answer and is hallucinating a NEW turn (a restart) — terminate and
+                # truncate before the marker rather than letting the tail ramble/rot.
+                _g = self.tok.decode(ids[0, -len(depths):], skip_special_tokens=True)
+                _hit = next(((m, _g.find(m)) for m in _stop_markers if m in _g), None)
+                if _hit is not None:
+                    _trunc_text, stop_reason = _g[:_hit[1]].rstrip(), "restart_marker"
+                    break
+        text = _trunc_text if _trunc_text is not None else self.tok.decode(ids[0, -len(depths):], skip_special_tokens=True)
         mean_depth = sum(depths) / len(depths) if depths else 0
 
         # #768: empirical discrete Jacobian from consecutive exit-depth hidden vectors.
@@ -355,6 +386,8 @@ class Sigma0LoopLM:
             out["canary_max_proximity"] = round(canary_max_prox, 4)
             out["canary_spooks"] = canary_spooks
             out["canary_signal"] = canary_signal
+            out["canary_max_divergence"] = round(canary_max_div, 4)  # §7 second fate (runaway)
+            out["stop_reason"] = stop_reason                          # 'restart_marker' | None
             out["adapt"] = adapt
         if mode == "converge":
             # mean contraction delta across tokens: < eps ⇒ loop genuinely converges (E2)
