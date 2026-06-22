@@ -1,0 +1,5 @@
+### Added
+- `src/csf/coder_grounding.py` — Σ₀ Ouro Coder ↔ Knowledge Center grounding in one omni CSF file (#904). Packs the KC index into a single integrity-checked CSF archive using the best-fit omni codec; `retrieve(query, k)` does TF-IDF retrieval mirroring knowledge-router.js; `grounding_context()` returns a preamble + evidence IDs ready for the coder gate. Auto-builds the archive on first call if absent. CLI: `python -m csf.coder_grounding build|query|gate`.
+- `docs/research/2026-06-20-lapse-tesseract.md` — Lapse Tesseract design doc: curved metric on the 3¹² lattice where 4th-axis thickness = code length `−log₂p`; rigorous links compression ratio ↔ lapse √g₀₀ and code length ↔ potential Φ/c²; measured lapse field is non-uniform (62–70% deep-well cells on lattice data). Critic verdict: partly-novel (Fisher–Rao/MDL is the 30-yr prior; the novel act is the CSF-attached stored metric).
+- `experiments/lapse_field_demo.py` — reproduces the lapse field measurement.
+- 7 tests for `coder_grounding` (omni round-trip, archive integrity, TF-IDF relevance ordering, empty-query, grounding_context preamble).
