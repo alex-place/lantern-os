@@ -19,7 +19,8 @@
       "state": "available",
       "automatable": true,
       "api": "https://www.kaggle.com/api/v1",
-      "auth_env": ["KAGGLE_USERNAME", "KAGGLE_KEY"],
+      "auth_env": ["KAGGLE_API_TOKEN"],
+      "auth_env_legacy": ["KAGGLE_USERNAME", "KAGGLE_KEY"],
       "gpu": "T4 / P100",
       "vram_gb": 16,
       "quota_hours_per_week": 30,
@@ -31,10 +32,10 @@
       "setup_steps": [
         "1. Register at https://www.kaggle.com/account/login?phase=startRegisterTab",
         "2. Verify your phone number (required to enable GPU in notebooks)",
-        "3. Go to https://www.kaggle.com/settings/account → API section → 'Create New API Token'",
-        "4. Download kaggle.json — it contains your username and key",
-        "5. Set env vars: KAGGLE_USERNAME=<username>  KAGGLE_KEY=<key>",
-        "6. Verify: node -e \"const d=require('./apps/lantern-garage/lib/training-dispatcher'); d.loadGpuPcsf()\" should show kaggle state=available"
+        "3. Go to https://www.kaggle.com/settings/account → API Tokens → 'Generate New Token' → copy the KGAT_... value",
+        "4. Set env var (User scope, persistent): [System.Environment]::SetEnvironmentVariable('KAGGLE_API_TOKEN', 'KGAT_...', 'User')",
+        "5. Legacy alternative: Settings → Legacy API Credentials → Create → download kaggle.json → set KAGGLE_USERNAME + KAGGLE_KEY",
+        "6. Dispatcher auto-detects: prefers KAGGLE_API_TOKEN (Bearer), falls back to KAGGLE_USERNAME+KAGGLE_KEY (Basic)"
       ]
     },
     {

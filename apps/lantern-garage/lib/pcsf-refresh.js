@@ -163,11 +163,16 @@ function refreshGpuTrainingPcsf(repoRoot) {
   try { data = JSON.parse(fs.readFileSync(p, "utf8")); } catch { return; }
 
   for (const prov of data.providers || []) {
-    const allKeysPresent = (prov.auth_env || []).every(k => envPresent(k));
-    const newState = (!prov.auth_env || prov.auth_env.length === 0 || allKeysPresent)
-      ? "available"
-      : "no_key";
-    prov.state = newState;
+    // Kaggle accepts either the new Bearer token OR the legacy username+key pair
+    let credOk;
+    if (prov.provider_id === "kaggle") {
+      credOk = envPresent("KAGGLE_API_TOKEN")
+        || (envPresent("KAGGLE_USERNAME") && envPresent("KAGGLE_KEY"));
+    } else {
+      credOk = !prov.auth_env || prov.auth_env.length === 0
+        || prov.auth_env.every(k => envPresent(k));
+    }
+    prov.state = credOk ? "available" : "no_key";
     prov.last_checked = _now();
   }
   data.generated_at = _now();

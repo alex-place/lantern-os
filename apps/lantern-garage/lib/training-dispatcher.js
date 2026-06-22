@@ -133,6 +133,13 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
 function _checkCredentials(provider) {
   const cfg = getProviderConfig(provider);
   if (!cfg) return { error: "unknown_provider", provider };
+  if (provider === "kaggle") {
+    // Accept new Bearer token OR legacy Basic credentials
+    if (!process.env.KAGGLE_API_TOKEN && !(process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY)) {
+      return { error: "missing_credentials", provider, required: ["KAGGLE_API_TOKEN", "or KAGGLE_USERNAME+KAGGLE_KEY"] };
+    }
+    return {};
+  }
   for (const envKey of (cfg.auth_env || [])) {
     if (!process.env[envKey]) {
       return { error: "missing_credentials", provider, required: cfg.auth_env };
@@ -141,9 +148,16 @@ function _checkCredentials(provider) {
   return {};
 }
 
+// Returns the Authorization header value for Kaggle — Bearer token preferred over Basic.
+function _kaggleAuthHeader() {
+  if (process.env.KAGGLE_API_TOKEN) {
+    return `Bearer ${process.env.KAGGLE_API_TOKEN}`;
+  }
+  const creds = Buffer.from(`${process.env.KAGGLE_USERNAME}:${process.env.KAGGLE_KEY}`).toString("base64");
+  return `Basic ${creds}`;
+}
+
 async function _dispatchKaggle(checkpointUri, steps) {
-  const username = process.env.KAGGLE_USERNAME;
-  const key = process.env.KAGGLE_KEY;
   const cfg = getProviderConfig("kaggle");
   const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
   const slug = `ouro-train-${Date.now()}`;
@@ -159,12 +173,11 @@ async function _dispatchKaggle(checkpointUri, steps) {
     enable_internet: true,
   };
 
-  const auth = Buffer.from(`${username}:${key}`).toString("base64");
   let responseData;
   try {
     const res = await fetch("https://www.kaggle.com/api/v1/kernels/push", {
       method: "POST",
-      headers: { "Authorization": `Basic ${auth}`, "Content-Type": "application/json" },
+      headers: { "Authorization": _kaggleAuthHeader(), "Content-Type": "application/json" },
       body: JSON.stringify(kernelPayload),
     });
     if (!res.ok) {
@@ -299,15 +312,12 @@ async function _pollKaggle(jobId) {
   const creds = _checkCredentials("kaggle");
   if (creds.error) return creds;
 
-  const username = process.env.KAGGLE_USERNAME;
-  const key = process.env.KAGGLE_KEY;
-  const auth = Buffer.from(`${username}:${key}`).toString("base64");
-
+  const username = process.env.KAGGLE_USERNAME || "lanternfounder";
   let data;
   try {
     const res = await fetch(
       `https://www.kaggle.com/api/v1/kernels/${username}/${jobId}/status`,
-      { headers: { "Authorization": `Basic ${auth}` } }
+      { headers: { "Authorization": _kaggleAuthHeader() } }
     );
     if (!res.ok) return { error: "kaggle_poll_failed", httpStatus: res.status };
     data = await res.json();
