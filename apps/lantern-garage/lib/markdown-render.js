@@ -380,14 +380,18 @@ function renderMarkdownDocument(markdown, sourcePath) {
     .md-page h2 { font-size: 1.4rem; margin: .1em 0 .7em; padding-bottom: .35em; border-bottom: 2px solid var(--accent); }
     .md-page h3 { font-size: 1.2rem; font-weight: 600; margin: 1.55em 0 .4em; }
     .md-page h4 { font-size: 0.9rem; font-weight: 700; margin: 1.4em 0 .3em; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-    .md-page a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+    .md-page a { color: var(--accent); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 2px; }
     .md-page a:hover { color: var(--accent-hover); }
+    /* Light mode: the cyan accent is too pale for body-size link text (~2.5:1 on the panels),
+       so links use full-contrast text with an accent underline as the affordance. Dark mode
+       keeps colored links, where the accent already clears 4.5:1. */
+    [data-theme="light"] .md-page a, [data-theme="light"] .md-page a:hover { color: var(--text); }
     .md-page strong { color: var(--text); font-weight: 700; }
     .md-page del { color: var(--muted); }
     .md-page img { max-width: 100%; height: auto; vertical-align: middle; }
     /* Badge / shield rows: keep small inline images tidy with a little breathing room. */
     .md-page p img { margin: 3px 5px 3px 0; border-radius: 3px; }
-    .md-page code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--surface2); color: var(--accent); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px; font-size: 0.85em; }
+    .md-page code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--accent-dim); color: var(--text); border: 1px solid var(--accent); padding: 1px 6px; border-radius: 5px; font-size: 0.85em; }
     .md-page pre { background: var(--surface2); color: var(--text); border: 1px solid var(--border); overflow: auto; padding: 16px 18px; border-radius: 10px; margin: 1.4em 0; line-height: 1.55; }
     .md-page pre code { background: none; border: none; color: inherit; padding: 0; font-size: 0.85rem; }
     .md-page table { width: 100%; border-collapse: collapse; margin: 1.6em 0; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
