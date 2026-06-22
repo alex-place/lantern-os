@@ -18,6 +18,7 @@ import pytest  # noqa: E402
 # sigma0.decode_canary imports torch at module load; CI does not install it.
 # Skip the module rather than error collection where torch is unavailable.
 pytest.importorskip("torch")
+import torch  # noqa: E402
 from sigma0.decode_canary import DecodeCanary  # noqa: E402
 
 
@@ -143,6 +144,37 @@ def test_knobs_eps_depth_coupling():
     assert diverging["eps"] >= 0.02, "eps must stay positive (floored)"
     # eps knob is opt-in: absent when eps is not supplied
     assert "eps" not in dc.knobs(q=0.5, rep_penalty=1.3, divergence=1.0)
+
+
+def test_canary_logits_processor_runs_and_biases_eos():
+    """The cached-path CanaryLogitsProcessor must run on HF-generate-style (input_ids, scores),
+    accumulate telemetry, and — with adapt — bias EOS UP as the length-based divergence rises."""
+    from sigma0.decode_canary import CanaryLogitsProcessor
+    V, EOS = 50, 7
+    proc = CanaryLogitsProcessor(prompt_len=2, max_new_tokens=20, eos_id=EOS,
+                                 adapt=True, div_start_frac=0.0)  # div_start floors at 8
+    last_eos = 0.0
+    for k in range(16):                       # generate 16 tokens; div ramps after step 8
+        ids = torch.arange(2 + k).unsqueeze(0)   # prompt(2) + k generated
+        out = proc(ids, torch.zeros(1, V))
+        assert out.shape == (1, V), "processor must return same-shape scores"
+        last_eos = float(out[0, EOS])
+    tel = proc.telemetry()
+    assert tel["tokens"] == 16
+    assert tel["canary_max_divergence"] > 0.0, "divergence must ramp as the run nears the cap"
+    assert last_eos > 0.0, "EOS score must be biased up once divergence is engaged"
+
+
+def test_canary_logits_processor_inert_without_adapt():
+    """Without adapt the processor only OBSERVES — it must not modify the scores."""
+    from sigma0.decode_canary import CanaryLogitsProcessor
+    proc = CanaryLogitsProcessor(prompt_len=1, max_new_tokens=20, eos_id=3, adapt=False,
+                                 div_start_frac=0.0)
+    for k in range(12):
+        scores = torch.zeros(1, 40)
+        out = proc(torch.arange(1 + k).unsqueeze(0), scores)
+        assert torch.equal(out, torch.zeros(1, 40)), "observe-only must leave scores untouched"
+    assert proc.telemetry()["tokens"] == 12
 
 
 if __name__ == "__main__":

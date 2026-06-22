@@ -189,6 +189,29 @@ def _persist_loop_meta(out: dict) -> None:
         pass  # never crash the serving path over telemetry
 
 
+# Lazy handle to the Σ₀ canary classes — used by the FAST cached path via a logits processor,
+# so the collapse+divergence stack rides on HF generate (~2.5× the native loop's throughput).
+_CANARY_CLS = None
+def _canary_classes():
+    global _CANARY_CLS
+    if _CANARY_CLS is None:
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+        from sigma0.decode_canary import CanaryLogitsProcessor, RESTART_MARKERS
+        _CANARY_CLS = (CanaryLogitsProcessor, RESTART_MARKERS)
+    return _CANARY_CLS
+
+
+def _print_cached_canary(proc):
+    if proc is None:
+        return
+    t = proc.telemetry()
+    print(f"[ouro][canary] mode=cached prox={t['canary_max_proximity']} "
+          f"div={t['canary_max_divergence']} spooks={t['canary_spooks']} "
+          f"signal={t['canary_signal']} collapse_events={t['collapse_events']} "
+          f"tokens={t['tokens']}", flush=True)
+
+
 def _generate(prompt, max_new_tokens=512, stream_cb=None):
     # Native Σ₀ adaptive loop: one-shot (no token streamer); emit whole text.
     if _loop is not None:
@@ -221,6 +244,16 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
     kw = dict(max_new_tokens=max_new_tokens, pad_token_id=_tok.eos_token_id,
               repetition_penalty=REP_PENALTY, no_repeat_ngram_size=NO_REPEAT_NGRAM,
               do_sample=DO_SAMPLE)
+    # Σ₀ canary on the fast cached path (#perf): the collapse+divergence stack + actuators
+    # (EOS bias on divergence, extra repeat penalty on collapse, restart-marker hard-stop) ride
+    # on HF generate via a logits processor — same safety as the native loop at ~2.5× throughput,
+    # minus native-only depth control / contraction telemetry. Gated by OURO_CANARY.
+    _proc = None
+    if NATIVE_CANARY:
+        _Proc, _RESTART = _canary_classes()
+        _proc = _Proc(ids["input_ids"].shape[1], max_new_tokens, _tok.eos_token_id, adapt=NATIVE_ADAPT)
+        kw["logits_processor"] = [_proc]
+        _STOP = list(_STOP) + _RESTART   # hard-stop on a training-template turn restart
     if _STOP:
         kw.update(stop_strings=_STOP, tokenizer=_tok)
     if DO_SAMPLE:
@@ -228,6 +261,7 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
     if stream_cb is None:
         with torch.no_grad():
             out = _model.generate(**ids, **kw)
+        _print_cached_canary(_proc)
         return _tok.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True), None
     streamer = TextIteratorStreamer(_tok, skip_prompt=True, skip_special_tokens=True)
     th = threading.Thread(target=lambda: _model.generate(**ids, streamer=streamer, **kw))
@@ -237,6 +271,7 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
         full.append(piece)
         stream_cb(piece)
     th.join()
+    _print_cached_canary(_proc)
     return "".join(full), None
 
 

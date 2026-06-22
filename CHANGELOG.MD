@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.41] - 2026-06-22
+
+### Added
+- **Σ₀ canary on the FAST cached decode path — ~2.5× throughput for the local model.** Measured: the native Σ₀ loop runs ~0.8 s/tok (Python per-step loop) while HF cached generate runs ~0.33 s/tok (optimized forward + the model's trained adaptive exit) — but the canary only ran on the slow native path. New `CanaryLogitsProcessor` (src/sigma0/decode_canary.py) runs the full collapse+divergence stack ON cached generate via a logits processor: argmax-margin + softmax-entropy + self-repeat feed the DecodeCanary, a length-based divergence drives an EOS bias (pull a runaway to a stop) and an extra collapse repetition-penalty, and the training-template restart markers become `stop_strings`. `ouro_serve` wires it into the cached path gated by `OURO_CANARY` (negligible overhead — 22.2 s vs 20 s for 60 tok). So the recommended interactive/chat config is now `OURO_NATIVE=0 OURO_CANARY=1 OURO_ADAPT=1` (cached speed + the Σ₀ safety stack); the native loop stays the deep/research mode for per-step contraction telemetry. Verified live in dream-chat: open-ended prompts render fast + coherent. Native-only losses: per-step recurrent depth control + mean_contraction. 34 cert + 14 canary + 4 exit tests green; no src/cio_sde changes.
+
 ## [1.7.40] - 2026-06-22
 
 ### Added
