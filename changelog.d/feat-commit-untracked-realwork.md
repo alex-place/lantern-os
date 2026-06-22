@@ -1,0 +1,2 @@
+### Added
+- Commit real source that had been sitting untracked in the working tree: `apps/lantern-garage/lib/collapse-canary.js` + its test (the JS Σ₀ decode canary — phrase-echo / single-token degeneration detector; 4 passing checks), `src/sigma0/quantized_cache.py` (deep-mode KV-cache quantization — prepared, not yet wired), the changelog-release system the repo already uses (`scripts/assemble-changelog.js` + `changelog.d/README.md`), and the `scripts/hooks/` guards (`block-git-stash.sh`, `require-pr-before-stop.sh`).
