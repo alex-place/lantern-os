@@ -15,6 +15,11 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.37] - 2026-06-21
+
+### Added
+- **Σ₀ recurrent-loop exit policy: web-grounded `accel` mode + `OURO_MODE` serving knob.** The looped-LM had two per-token depth-exit policies — `qexit` (trained confidence gate) and `converge` (first-order latent fixed point `‖Δh‖<eps`). Web research (Two-Scale Latent Dynamics, arXiv:2509.23314) shows the first-order criterion **false-exits on spiral dynamics** (`‖Δh‖` plateaus while direction keeps rotating) — exactly the non-normal/skew rotation the collapse certificate §1.1 flags as the hard case. Added `mode="accel"`: the spiral-robust **second-order acceleration** exit (`‖Δᵏ−Δᵏ⁻¹‖<eps` for 2 consecutive steps), the certificate-consistent upgrade. Wired `OURO_MODE`/`OURO_EPS` into `ouro_serve` (default `qexit`) + `mean_contraction` telemetry. New `tests/test_loop_exit.py` (4 tests) proves the distinction in code. **A/B finding (Ouro-1.4B, 4-step budget):** the loop does NOT reach a fixed point in 4 steps (`mean_contraction` 0.41–0.71 ≫ eps), so `converge`/`accel` are operationally identical (both ride to full depth) and `qexit` is the right served default; `accel` is the correct policy to enable at higher recurrent-step budgets. Does not touch `src/cio_sde` (cert tests unchanged).
+
 ## [1.7.36] - 2026-06-21
 
 ### Added

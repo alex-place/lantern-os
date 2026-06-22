@@ -193,13 +193,46 @@ class Sigma0LoopLM:
                 return t + 1, rel, "fixed_point", deltas   # 1-indexed exit depth
         return n, (deltas[-1] if deltas else 0.0), "max_depth", deltas
 
+    # ── acceleration-based convergence exit (the certificate-consistent upgrade) ─
+    # Second-order step-size criterion (Two-Scale, arXiv:2509.23314): exit when the
+    # ACCELERATION aᵏ = ‖Δᵏ − Δᵏ⁻¹‖ (normalized) stays < eps for `patience` consecutive
+    # steps. The first-order converge_step above false-exits on SPIRAL dynamics — a looped
+    # block makes orthogonal refinements, so ‖Δh‖ plateaus at a small nonzero value while the
+    # direction keeps ROTATING. That rotation is exactly the non-normal / skew case the collapse
+    # certificate §1.1 flags as the hard one (where the energy proof fails), so acceleration is
+    # both the SOTA exit and the certificate-consistent choice. `deltas` is still the first-order
+    # ‖Δh‖/‖h‖ trajectory, kept identical to converge_step so E2 mean_contraction is unchanged.
+    @staticmethod
+    def accel_step(hidden_per_step, eps: float, max_steps: int, patience: int = 2):
+        """Returns (exit_step_1indexed, accel_at_exit, reason, deltas)."""
+        deltas, diffs, hits = [], [], 0
+        n = len(hidden_per_step)
+        for t in range(1, n):
+            prev, cur = hidden_per_step[t - 1], hidden_per_step[t]
+            denom = float(prev.norm()) or 1e-9
+            d = cur - prev
+            deltas.append(float(d.norm()) / denom)
+            diffs.append(d)
+            if len(diffs) >= 2:
+                accel = float((diffs[-1] - diffs[-2]).norm())
+                accel /= (float(diffs[-1].norm()) + float(diffs[-2].norm()) + 1e-9)
+                if accel < eps:
+                    hits += 1
+                    if hits >= patience:
+                        return t + 1, accel, "accel_fixed_point", deltas
+                else:
+                    hits = 0
+        return n, (deltas[-1] if deltas else 0.0), "max_depth", deltas
+
     # ── generation with per-token adaptive depth ─────────────────────────────
     def generate(self, prompt: str, q: float = 0.5, max_new_tokens: int = 200, messages=None,
                  rep_penalty: float = 1.3, mode: str = "qexit", eps: float = 0.05,
                  canary: bool = True, adapt: bool = False, stop=None):
-        """mode='qexit' (baseline, exit on confidence) or 'converge' (exit on
-        latent fixed point). 'converge' also returns the mean contraction delta
-        so the spiral hypothesis (E2) is falsifiable from real trajectories.
+        """mode='qexit' (baseline, exit on the trained confidence gate — what Ouro was trained
+        for), 'converge' (exit on first-order latent fixed point ‖Δh‖<eps), or 'accel' (exit on
+        the spiral-robust second-order acceleration ‖Δᵏ−Δᵏ⁻¹‖<eps for 2 steps — the certificate-
+        consistent upgrade). 'converge'/'accel' also return the mean contraction delta so the
+        spiral hypothesis (E2) is falsifiable from real trajectories.
 
         canary=True wires the decode stream into the Σ₀ SurpriseMonitor (#766): per-token
         self-repeat/echo/argmax-margin feed sigma0_proximity, surfaced as `canary_*` in the
@@ -278,10 +311,12 @@ class Sigma0LoopLM:
                     _past = _out.past_key_values
                 else:
                     _out, hidden_states_list, gate_list = bb.model(input_ids=ids, use_cache=False)
-                if mode == "converge":
-                    # contraction over the latent trajectory of the last token
+                if mode in ("converge", "accel"):
+                    # contraction over the latent trajectory of the last token; 'accel' uses the
+                    # spiral-robust second-order criterion, 'converge' the first-order one (E2).
                     h_per_step = [h[0, -1, :] for h in hidden_states_list]
-                    step, rel, reason, deltas = self.converge_step(h_per_step, eps, self.max_steps)
+                    _exit = self.accel_step if mode == "accel" else self.converge_step
+                    step, rel, reason, deltas = _exit(h_per_step, eps, self.max_steps)
                     if deltas:
                         exit_deltas.append(sum(deltas) / len(deltas))
                 else:
@@ -389,7 +424,7 @@ class Sigma0LoopLM:
             out["canary_max_divergence"] = round(canary_max_div, 4)  # §7 second fate (runaway)
             out["stop_reason"] = stop_reason                          # 'restart_marker' | None
             out["adapt"] = adapt
-        if mode == "converge":
+        if mode in ("converge", "accel"):
             # mean contraction delta across tokens: < eps ⇒ loop genuinely converges (E2)
             out["eps"] = eps
             out["mean_contraction"] = round(sum(exit_deltas) / len(exit_deltas), 4) if exit_deltas else None
