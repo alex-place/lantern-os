@@ -3,8 +3,8 @@
 Verifies the six-stage loop applied to research, fully offline (fake searcher):
 - Observe + Remember: web results persisted as evidence memories
 - Reason: candidate claims grounded in evidence
-- Verify: External Reality Rule — corroboration across distinct domains raises
-  confidence and marks a claim "supported"; single-source claims stay unverified
+- Verify: External Reality Rule — any single external source marks a claim "supported"
+  (confidence 0.45); cross-source corroboration raises confidence (2→0.65, 3→0.85)
 - Converge: a cited report + persisted convergence records
 - ResearchProgram: durable JSONL queue drained continuously
 """

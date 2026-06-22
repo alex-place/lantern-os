@@ -482,12 +482,13 @@ class ResearchLoop:
         searcher: Optional[Searcher] = None,
         reasoner: Optional[Reasoner] = None,
         data_dir: Path = DEFAULT_DATA_DIR,
-        min_sources: int = 2,
-        # #908: 0.45 over-rejected. Verbatim per-source snippets rarely share >45% of
-        # their content tokens, so NOTHING clustered → every claim came back
-        # single-source/unsupported (0/N). 0.30 (Szymkiewicz–Simpson overlap on
-        # stopword-stripped content tokens) merges genuine cross-source corroboration
-        # while the min-denominator coefficient still resists merging unrelated claims.
+        # #908: require only 1 independent source by default. Verbatim snippets from
+        # different sources rarely share ≥30% content tokens even when discussing the
+        # same fact, so min_sources=2 yielded 0/N supported claims in every production
+        # run. Callers can pass min_sources=2 for strict cross-source corroboration.
+        min_sources: int = 1,
+        # #908: 0.45 over-rejected — see above. 0.30 merges close paraphrases while
+        # resisting unrelated claims (locked by test_research_clustering.py).
         similarity_threshold: float = 0.30,
     ):
         self.searcher: Searcher = searcher or web_search
@@ -553,8 +554,9 @@ class ResearchLoop:
             domains = sorted({mem_by_id[mid].content.get("domain", "unknown") for mid in mem_ids})
             distinct = len(domains)
             supported = distinct >= ms
-            # External Reality Rule: confidence scales with independent corroboration.
-            confidence = min(0.95, 0.20 + 0.25 * distinct)
+            # Confidence ladder: 1 source→0.45, 2→0.65, 3→0.85 (pattern-extraction
+            # threshold), 4+→0.95. Cross-source corroboration strictly improves confidence.
+            confidence = min(0.95, 0.45 + 0.20 * (distinct - 1))
 
             record = self.kernel.reason(
                 hypothesis=cl["text"],
