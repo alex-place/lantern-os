@@ -137,7 +137,19 @@ function extractDoors(text) {
   return { cleanText, doors };
 }
 
+// Cut a local model's output at the first instruction-template echo or new-turn
+// marker it appends AFTER it has already answered (### Response:, <|im_end|>,
+// "\n\nUser:", …). These are turn/template boundaries, never legitimate answer
+// content; cloud models don't emit them, so this is a no-op for Claude/Gemini/GPT.
+// The #1 reliability fix for served local models that ramble past their answer.
+function stripModelArtifacts(text) {
+  if (!text || typeof text !== "string") return text;
+  const m = text.match(/\n*#{2,}\s*(?:response|instruction)\b|<\|(?:im_end|im_start|endoftext|eot_id)\|>|\n\n+\s*(?:user|human|assistant|question|system)\s*:/i);
+  return (m && m.index > 0) ? text.slice(0, m.index).trimEnd() : text;
+}
+
 function doorsOrFallback(text, skipDoors = false) {
+  text = stripModelArtifacts(text);
   if (skipDoors) return { cleanText: text.trim(), suggestions: [] };
   const { cleanText, doors } = extractDoors(text);
   // Always return exactly 3 suggestions. Pad with fallbacks if model gave fewer than 3.
@@ -2293,4 +2305,4 @@ async function handleStreamChat(req, url, res) {
   await streamLocalFallback(fallbackReason);
 }
 
-module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder };
+module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder, stripModelArtifacts };

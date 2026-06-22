@@ -54,12 +54,31 @@ function getDecodeParams(mode) {
  * Apply Ollama-shaped decode params onto an `options` object (mutates + returns it).
  * Ollama uses repeat_penalty / repeat_last_n rather than frequency_penalty.
  */
+// Stop sequences that cut a local instruction/chat-tuned model's output the moment
+// it tries to start a *new* turn or echo its prompt template — the #1 reliability
+// problem with served local models (e.g. ouro:latest answers correctly, then appends
+// "### Response:" and rambles into a fresh instruction block). These are turn/template
+// markers, not content, so they never appear mid-answer in a clean reply.
+const OLLAMA_STOP = Object.freeze([
+  "### Response:", "### Instruction:", "### Input:", "### Task:",
+  "<|im_end|>", "<|endoftext|>", "<|eot_id|>",
+  "\n\nUser:", "\n\nHuman:", "\n\nAssistant:", "\n\nQuestion:",
+]);
+
 function applyOllamaDecodeParams(options, mode) {
   const opts = options || {};
-  const dp = getDecodeParams(mode);
+  const m = mode || getServingMode();
+  const dp = getDecodeParams(m);
   opts.top_p = dp.top_p;
   opts.repeat_penalty = dp.repetition_penalty;
   opts.repeat_last_n = dp.repeat_last_n;
+  // Reliability over a small local model (Σ₀ thesis: grounded + clean beats raw size):
+  // a steadier temperature so it doesn't wander, a length ceiling so a runaway can't
+  // ramble forever, and stop sequences so it ends cleanly after the answer instead of
+  // echoing its template. Caller-supplied values win.
+  if (opts.temperature == null) opts.temperature = m.name === "deep" ? 0.6 : 0.4;
+  if (opts.num_predict == null) opts.num_predict = m.name === "deep" ? 2048 : 768;
+  opts.stop = Array.isArray(opts.stop) ? Array.from(new Set([...opts.stop, ...OLLAMA_STOP])) : OLLAMA_STOP.slice();
   return opts;
 }
 
