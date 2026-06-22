@@ -333,6 +333,8 @@ data/convergence/grounding-calibration.jsonl
 data/eval/humaneval/
 data/keystone-test-runs.jsonl
 data/ouro-harvest-candidates.jsonl
+# Live coding-success harvest log (#911) — agent-derived, local only
+data/harvest/live-coding-successes.jsonl
 data/backlog-triage-verdicts.json
 data/batch1-specs.json
 # Generated benchmark PDFs (the *.json result artifacts stay tracked).

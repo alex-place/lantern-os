@@ -1,0 +1,3 @@
+### Added
+- `lib/harvest-emitter.js` — fire-and-forget offline log of verified autowork coding successes (#911). Appends `{fn, instruction, code, asserts, source, ts, verified, meta}` rows to `data/harvest/live-coding-successes.jsonl` for the continual-training pipeline (`scripts/harvest_coding_corpus.py --source-jsonl`). Never blocks the live request path; never triggers retraining. Wired into both autowork dispatch routes (`/api/convergence/dispatch` and `/api/convergence/autonomous-work/stream`) at the `testsVerified/verified` commit point.
+- `.gitignore`: suppress `data/harvest/live-coding-successes.jsonl` (agent-derived, local only).

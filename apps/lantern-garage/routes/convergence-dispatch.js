@@ -273,6 +273,21 @@ module.exports = async (req, res, url, deps) => {
         // Step 6: Push
         gitPush(workRoot, branchName);
 
+        // harvest emitter (#911): log verified coding successes offline
+        if (testsVerified) {
+          try {
+            require("../lib/harvest-emitter").emitCodingSuccess({
+              fn: null,
+              instruction: String(issueDetails.title || "").slice(0, 500),
+              code: diffText || "",
+              asserts: [],
+              source: "autowork",
+              verified: true,
+              meta: { issue: issueNumber, branch: branchName, changedFiles },
+            });
+          } catch (_e) { /* best effort */ }
+        }
+
         // Step 7: Open PR — flag unverified when no tests actually ran
         const prBody = `Fixes #${issueNumber}\n\n${issueDetails.body}\n\n---\n` +
           (testsVerified
@@ -632,6 +647,22 @@ module.exports = async (req, res, url, deps) => {
         gitCommit(workRoot, commitTitle);
         receipt.committed = true;
         step("commit", "done", { title: commitTitle, changedFiles, verified });
+
+        // ── harvest emitter (#911): log verified coding successes offline ─
+        // Fire-and-forget — never blocks the live path, never triggers training.
+        if (verified) {
+          try {
+            require("../lib/harvest-emitter").emitCodingSuccess({
+              fn: null,
+              instruction: String(issueDetails.title || "").slice(0, 500),
+              code: diffText,
+              asserts: [],
+              source: "autowork",
+              verified: true,
+              meta: { issue: issueNumber, branch: branchName, changedFiles },
+            });
+          } catch (_e) { /* best effort */ }
+        }
 
         // ── 8. push + PR (opt-in) ────────────────────────────────────────
         if (!autoPush) {
