@@ -110,11 +110,12 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
   const creds = _checkCredentials(provider);
   if (creds.error) return creds;
 
-  if (provider === "kaggle") return _dispatchKaggle(checkpointUri, steps);
+  if (provider === "kaggle")     return _dispatchKaggle(checkpointUri, steps);
   if (provider === "paperspace") return _dispatchPaperspace(checkpointUri, steps);
-  if (provider === "colab") return _dispatchColab(checkpointUri, steps);
+  if (provider === "colab")      return _dispatchColab(checkpointUri, steps);
+  if (provider === "lightning")  return _dispatchLightning(checkpointUri, steps);
 
-  // SageMaker, Lightning — basic manual-handoff record
+  // SageMaker — basic manual-handoff record
   const cfg = getProviderConfig(provider);
   const record = {
     type: "training_dispatch",
@@ -134,7 +135,6 @@ function _checkCredentials(provider) {
   const cfg = getProviderConfig(provider);
   if (!cfg) return { error: "unknown_provider", provider };
   if (provider === "kaggle") {
-    // Accept new Bearer token OR legacy Basic credentials
     if (!process.env.KAGGLE_API_TOKEN && !(process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY)) {
       return { error: "missing_credentials", provider, required: ["KAGGLE_API_TOKEN", "or KAGGLE_USERNAME+KAGGLE_KEY"] };
     }
@@ -146,6 +146,20 @@ function _checkCredentials(provider) {
     }
   }
   return {};
+}
+
+// Invoke scripts/lightning_dispatch.py via execFileSync, return parsed JSON output.
+function _runLightningScript(subcommand, extraArgs = []) {
+  const script = path.join(REPO_ROOT, "scripts", "lightning_dispatch.py");
+  const env = {
+    ...process.env,
+    LIGHTNING_USER_ID:  process.env.LIGHTNING_USER_ID  || "",
+    LIGHTNING_API_KEY:  process.env.LIGHTNING_API_KEY  || "",
+    HF_TRAINING_REPO:   process.env.HF_TRAINING_REPO   || "ouro-checkpoints",
+  };
+  const raw = execFileSync("python", [script, subcommand, ...extraArgs],
+    { encoding: "utf8", timeout: 120_000, env });
+  return JSON.parse(raw.trim());
 }
 
 // Returns the Authorization header value for Kaggle — Bearer token preferred over Basic.
@@ -301,6 +315,43 @@ async function _dispatchColab(checkpointUri, steps) {
   return record;
 }
 
+async function _dispatchLightning(checkpointUri, steps) {
+  const cfg = getProviderConfig("lightning");
+  const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
+
+  let result;
+  try {
+    result = _runLightningScript("dispatch", [
+      "--steps", String(steps),
+      "--checkpoint-uri", checkpointUri || "",
+      "--hf-repo", hfRepo,
+    ]);
+  } catch (err) {
+    return { error: "lightning_dispatch_failed", detail: err.message };
+  }
+
+  if (result.error) return { error: result.error, provider: "lightning", detail: result };
+
+  const hoursEstimated = Math.ceil(steps / (cfg?.steps_per_hour_estimate || 180));
+  const record = {
+    type: "training_dispatch",
+    provider: "lightning",
+    status: result.status || "running",
+    jobId: result.studio,
+    studioName: result.studio,
+    machine: result.machine,
+    checkpointUri,
+    steps,
+    hoursEstimated,
+    logPath: result.log_path,
+    pollCmd: result.poll_cmd,
+    dispatchedAt: isoNow(),
+  };
+  ensureDir(JOBS_LOG);
+  await appendJsonlQueued(JOBS_LOG, record);
+  return record;
+}
+
 function _buildColabNotebook(checkpointUri, hfRepo, steps) {
   const filename = checkpointUri ? path.basename(checkpointUri) : "checkpoint.csf";
   const cells = [
@@ -437,10 +488,42 @@ function _notebookTemplate(provider, checkpointUri, steps) {
 // ---------------------------------------------------------------------------
 
 async function pollJobStatus(provider, jobId) {
-  if (provider === "kaggle") return _pollKaggle(jobId);
+  if (provider === "kaggle")     return _pollKaggle(jobId);
   if (provider === "paperspace") return _pollPaperspace(jobId);
-  // Manual providers — caller must check externally
+  if (provider === "lightning")  return _pollLightning(jobId);
+  // SageMaker, Colab — manual check
   const update = { type: "training_poll", provider, jobId, status: "manual_required", polledAt: isoNow() };
+  await appendJsonlQueued(JOBS_LOG, update);
+  return update;
+}
+
+async function _pollLightning(studioName) {
+  const creds = _checkCredentials("lightning");
+  if (creds.error) return creds;
+
+  let result;
+  try {
+    result = _runLightningScript("poll", ["--studio", studioName || "ouro-training"]);
+  } catch (err) {
+    return { error: "lightning_poll_failed", detail: err.message };
+  }
+
+  if (result.error) return { error: result.error, provider: "lightning" };
+
+  // Auto-stop the studio when training finishes to preserve credits
+  if (result.status === "done") {
+    try { _runLightningScript("stop", ["--studio", studioName || "ouro-training"]); } catch {}
+  }
+
+  const update = {
+    type: "training_poll",
+    provider: "lightning",
+    jobId: studioName,
+    status: result.status,
+    studioStatus: result.studio_status,
+    lastLogLine: result.last_log_line,
+    polledAt: isoNow(),
+  };
   await appendJsonlQueued(JOBS_LOG, update);
   return update;
 }

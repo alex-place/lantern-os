@@ -121,9 +121,9 @@
       "display": "Lightning AI Studios",
       "priority": 5,
       "state": "available",
-      "automatable": false,
-      "api": null,
-      "auth_env": [],
+      "automatable": true,
+      "api": "lightning-sdk (python)",
+      "auth_env": ["LIGHTNING_USER_ID", "LIGHTNING_API_KEY"],
       "gpu": "T4 / A10",
       "vram_gb": 16,
       "quota_hours_per_week": 22,
@@ -132,13 +132,16 @@
       "notes": "22 free GPU credits/month after phone verify. A10 (24GB) available when T4 busy. Manual launch.",
       "signup_url": "https://lightning.ai/sign-up",
       "api_key_url": null,
+      "studio_name_env": "LIGHTNING_STUDIO_NAME",
+      "studio_name_default": "ouro-training",
+      "dispatch_script": "scripts/lightning_dispatch.py",
       "setup_steps": [
-        "1. Sign up at https://lightning.ai/sign-up — use a .edu or company email for instant approval; personal email goes on a waitlist (~48 h wait)",
-        "2. Verify your phone number to unlock 22 free GPU credits/month (each credit ≈ 1 GPU-hour)",
-        "3. Create a new Studio at https://lightning.ai/studio",
-        "4. In the Studio, open a terminal and paste the notebookTemplate from the manual_required record",
-        "5. Run as a Python script: python train_continuation.py",
-        "6. Stop the Studio when training completes to preserve credits — idle Studios consume credits"
+        "1. Sign up at https://lightning.ai/sign-up — .edu or company email gets instant approval; personal email may wait ~48 h",
+        "2. Verify your phone number to unlock 22 free GPU credits/month (1 credit ≈ 1 T4 GPU-hour)",
+        "3. Go to account settings → Keys → Programmatic Login — copy LIGHTNING_USER_ID and LIGHTNING_API_KEY",
+        "4. Set env vars (User scope, persistent): [System.Environment]::SetEnvironmentVariable('LIGHTNING_USER_ID', '<id>', 'User') and same for LIGHTNING_API_KEY",
+        "5. Dispatch is now fully automated: orchestrator calls scripts/lightning_dispatch.py dispatch → Studio.start() → switch_machine(T4) → run training → auto-stop on done",
+        "6. Studio name is ouro-training by default; override via LIGHTNING_STUDIO_NAME env var"
       ]
     }
   ],
