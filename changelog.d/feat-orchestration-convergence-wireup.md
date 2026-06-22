@@ -22,6 +22,13 @@
   file-based — that's in-flight execution state GitHub doesn't track.
 
 ### Fixed
+- Autowork SSE stream (`/api/convergence/autonomous-work/stream`) now sends a
+  15s keepalive heartbeat. The plan/patch steps make LLM calls that emit no bytes
+  for 30-60s; idle stream-proxies (the Cloudflare tunnel on lantern-os.net, any
+  reverse proxy) severed the silent connection mid-run, which the browser
+  surfaced as a bare "network error" that froze the UI at "Generate plan". The
+  backend pipeline itself was never broken — only the long-idle stream was
+  getting cut before completion.
 - Orchestration work-queue list called the non-existent `/api/queue/list/pending`
   path (always 404'd, showed "no pending work"); now uses `?status=pending`.
 - Stale `sigma0-coder-slot` model in `.claude/agent-slots.json`
