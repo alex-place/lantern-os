@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--max-steps", type=int, default=-1, help="override epochs (smoke test); -1 = use epochs")
     ap.add_argument("--lr", type=float, default=2e-4)
+    ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank; alpha=2*r (handoff recipe: 32)")
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
     a = ap.parse_args()
 
@@ -60,7 +61,7 @@ def main():
     # all-linear is robust for a custom (trust_remote_code) architecture whose
     # exact projection names we don't want to hardcode.
     model = get_peft_model(model, LoraConfig(
-        r=16, lora_alpha=32, lora_dropout=0.05, bias="none",
+        r=a.lora_r, lora_alpha=2 * a.lora_r, lora_dropout=0.05, bias="none",
         task_type="CAUSAL_LM", target_modules="all-linear"))
     model.print_trainable_parameters()
 

@@ -248,6 +248,7 @@ data/creator/pipeline-test-summary.json
 # Session-derived training data — privacy: never commit
 data/training/
 models/*/training-data.jsonl
+models/*/training-data-rebalanced.jsonl
 models/*/adapters/
 
 # isolated training venv

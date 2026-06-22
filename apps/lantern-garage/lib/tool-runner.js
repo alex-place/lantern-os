@@ -137,12 +137,22 @@ const REGISTRY = {
 
 const TOOL_NAMES = Object.keys(REGISTRY);
 
+// Match Python json.dumps() default separators (", " / ": ") so this preamble is
+// BYTE-identical to the bridge's _render_tools (scripts/ouro_anthropic_bridge.py), which
+// the FC training corpus is generated through. Train/serve parity is the #1 FC rule —
+// a model trained on the bridge format must see the bridge format here too.
+function _pyJson(o) {
+  if (Array.isArray(o)) return "[" + o.map(_pyJson).join(", ") + "]";
+  if (o && typeof o === "object") return "{" + Object.keys(o).map((k) => JSON.stringify(k) + ": " + _pyJson(o[k])).join(", ") + "}";
+  return JSON.stringify(o);
+}
+
 function renderToolPreamble() {
   const lines = [
     "You can use tools. To answer the user directly, reply in plain text.",
     "When you need a tool, respond with EXACTLY ONE tool call on a SINGLE LINE, nothing else, in this exact format (no code fences, no blank lines):",
     '<tool_call>{"name": "TOOL_NAME", "input": {"ARG": "VALUE"}}</tool_call>',
-    'Rules: "name" must be one of the tools below, spelled exactly. "input" is a JSON object of arguments. Double quotes only, no trailing commas. Emit the call and STOP; do not explain it. Only call a tool if needed.',
+    'Rules: "name" must be one of the tools below, spelled exactly. "input" is a JSON object of arguments (use {} if none). Double quotes only, no trailing commas. Emit the call and STOP; do not explain it. Only call a tool if needed.',
     "",
     "Available tools:",
   ];
@@ -152,7 +162,7 @@ function renderToolPreamble() {
     lines.push(`Tool: ${name}`);
     lines.push(`Description: ${t.desc}`);
     lines.push(`Input (JSON schema): ${JSON.stringify(t.schema)}`);
-    lines.push(`Example: <tool_call>${JSON.stringify({ name, input: ex })}</tool_call>`);
+    lines.push(`Example: <tool_call>${_pyJson({ name, input: ex })}</tool_call>`);
   }
   lines.push("");
   lines.push("Remember: plain text OR exactly one single-line <tool_call>...</tool_call>. Never both.");
