@@ -157,12 +157,33 @@ function refreshHealthPcsf(repoRoot) {
   console.log("[PCSF] health.pcsf.json refreshed — entries:", journal.total_entries, "CTF:", journal.entries_with_ctf, changed ? "(changed)" : "(unchanged)");
 }
 
+function refreshGpuTrainingPcsf(repoRoot) {
+  const p = path.join(repoRoot, "data", "pcsf", "gpu-training.pcsf.json");
+  let data;
+  try { data = JSON.parse(fs.readFileSync(p, "utf8")); } catch { return; }
+
+  for (const prov of data.providers || []) {
+    const allKeysPresent = (prov.auth_env || []).every(k => envPresent(k));
+    const newState = (!prov.auth_env || prov.auth_env.length === 0 || allKeysPresent)
+      ? "available"
+      : "no_key";
+    prov.state = newState;
+    prov.last_checked = _now();
+  }
+  data.generated_at = _now();
+  saveJson(p, data);
+
+  const available = (data.providers || []).filter(p => p.state === "available").map(p => p.provider_id);
+  console.log("[PCSF] gpu-training.pcsf.json refreshed — available:", available.join(", ") || "none");
+}
+
 function refreshAllPcsf(repoRoot) {
   console.log("[PCSF] Starting live refresh…");
   refreshSettingsPcsf(repoRoot);
   refreshProviderPcsf(repoRoot);
   refreshHealthPcsf(repoRoot);
+  refreshGpuTrainingPcsf(repoRoot);
   console.log("[PCSF] Live refresh complete.");
 }
 
-module.exports = { refreshAllPcsf };
+module.exports = { refreshAllPcsf, refreshGpuTrainingPcsf };
