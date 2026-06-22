@@ -113,6 +113,7 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
   if (provider === "kaggle")     return _dispatchKaggle(checkpointUri, steps);
   if (provider === "paperspace") return _dispatchPaperspace(checkpointUri, steps);
   if (provider === "colab")      return _dispatchColab(checkpointUri, steps);
+  if (provider === "lightning")  return _dispatchLightning(checkpointUri, steps);
 
   // SageMaker — basic manual-handoff record
   const cfg = getProviderConfig(provider);
@@ -438,8 +439,81 @@ function _notebookTemplate(provider, checkpointUri, steps) {
 async function pollJobStatus(provider, jobId) {
   if (provider === "kaggle")     return _pollKaggle(jobId);
   if (provider === "paperspace") return _pollPaperspace(jobId);
-  // SageMaker, Colab, Lightning — manual check
+  if (provider === "lightning")  return _pollLightning(jobId);
+  // SageMaker, Colab — manual check
   const update = { type: "training_poll", provider, jobId, status: "manual_required", polledAt: isoNow() };
+  await appendJsonlQueued(JOBS_LOG, update);
+  return update;
+}
+
+// Invoke scripts/lightning_dispatch.py via execFileSync, return parsed JSON output.
+function _runLightningScript(subcommand, extraArgs = []) {
+  const script = path.join(REPO_ROOT, "scripts", "lightning_dispatch.py");
+  const env = {
+    ...process.env,
+    LIGHTNING_USER_ID:        process.env.LIGHTNING_USER_ID        || "",
+    LIGHTNING_API_KEY:        process.env.LIGHTNING_API_KEY        || "",
+    LIGHTNING_STUDIO_USER:    process.env.LIGHTNING_STUDIO_USER    || "alexplace7",
+    LIGHTNING_STUDIO_TEAMSPACE: process.env.LIGHTNING_STUDIO_TEAMSPACE || "custom-ml-model-development-project",
+    HF_TRAINING_REPO:         process.env.HF_TRAINING_REPO         || "ouro-checkpoints",
+  };
+  const raw = execFileSync("python", [script, subcommand, ...extraArgs],
+    { encoding: "utf8", timeout: 120_000, env });
+  return JSON.parse(raw.trim());
+}
+
+async function _dispatchLightning(checkpointUri, steps) {
+  const cfg = getProviderConfig("lightning");
+  const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
+  let result;
+  try {
+    result = _runLightningScript("dispatch", [
+      "--steps", String(steps),
+      "--checkpoint-uri", checkpointUri || "",
+      "--hf-repo", hfRepo,
+    ]);
+  } catch (err) {
+    return { error: "lightning_dispatch_failed", detail: err.message };
+  }
+  if (result.error) return { error: result.error, provider: "lightning", detail: result };
+  const hoursEstimated = Math.ceil(steps / (cfg?.steps_per_hour_estimate || 180));
+  const record = {
+    type: "training_dispatch",
+    provider: "lightning",
+    status: result.status || "running",
+    jobId: result.studio,
+    studioName: result.studio,
+    machine: result.machine,
+    checkpointUri,
+    steps,
+    hoursEstimated,
+    logPath: result.log_path,
+    dispatchedAt: isoNow(),
+  };
+  ensureDir(JOBS_LOG);
+  await appendJsonlQueued(JOBS_LOG, record);
+  return record;
+}
+
+async function _pollLightning(studioName) {
+  const creds = _checkCredentials("lightning");
+  if (creds.error) return creds;
+  let result;
+  try {
+    result = _runLightningScript("poll", ["--studio", studioName || "ouro-training"]);
+  } catch (err) {
+    return { error: "lightning_poll_failed", detail: err.message };
+  }
+  if (result.error) return { error: result.error, provider: "lightning" };
+  // Auto-stop when done to preserve credits
+  if (result.status === "done") {
+    try { _runLightningScript("stop", ["--studio", studioName || "ouro-training"]); } catch {}
+  }
+  const update = {
+    type: "training_poll", provider: "lightning", jobId: studioName,
+    status: result.status, studioStatus: result.studio_status,
+    lastLogLine: result.last_log_line, polledAt: isoNow(),
+  };
   await appendJsonlQueued(JOBS_LOG, update);
   return update;
 }

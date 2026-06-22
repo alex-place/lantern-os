@@ -150,6 +150,6 @@
       ]
     }
   ],
-  "rotation_order": ["kaggle", "sagemaker", "colab", "paperspace", "lightning"],
-  "weekly_total_hours": 122
+  "rotation_order": ["kaggle", "sagemaker", "colab", "lightning"],
+  "weekly_total_hours": 102
 }
