@@ -19,7 +19,7 @@ const REFRESH_MS = Number(process.env.UPDATE_CHECK_INTERVAL_MS) || 15 * 60_000; 
 const BACKOFF_MS = Number(process.env.UPDATE_CHECK_BACKOFF_MS) || 60 * 60_000;  // 1 h after a 403
 const UA = "lantern-os-update-check";
 
-let cache = { local: null, remote: null, behind: 0, ahead: 0, updateAvailable: false, checkedAt: 0, error: null };
+let cache = { local: null, remote: null, remoteMessage: null, remoteDate: null, behind: 0, ahead: 0, updateAvailable: false, checkedAt: 0, error: null };
 let inflight = null;
 
 // Pure: an update is available only when the remote differs AND local is strictly
@@ -62,6 +62,8 @@ async function refresh(repoRoot) {
   try {
     const head = await ghGet(`/repos/${REPO}/commits/master`);
     const remote = head.sha || null;
+    const remoteMessage = head.commit?.message?.split("\n")[0] || null;
+    const remoteDate = head.commit?.author?.date || head.commit?.committer?.date || null;
     let behind = 0, ahead = 0;
     if (local && remote && local !== remote) {
       try {
@@ -73,7 +75,7 @@ async function refresh(repoRoot) {
         ahead = cmp.behind_by || 0;
       } catch { /* compare failed (e.g. local commit unknown to remote) → leave 0/0 */ }
     }
-    cache = { local, remote, behind, ahead,
+    cache = { local, remote, remoteMessage, remoteDate, behind, ahead,
       updateAvailable: computeUpdate(local, remote, behind, ahead),
       checkedAt: Date.now(), error: null };
   } catch (e) {

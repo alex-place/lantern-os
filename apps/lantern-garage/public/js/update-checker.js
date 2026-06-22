@@ -10,7 +10,20 @@
   const UPDATE_API = (typeof serverBase !== "undefined" ? serverBase : "") + "/api/update-status";
 
   let remoteCommit = null;
+  let remoteInfo = {};
   let dismissed = sessionStorage.getItem("lantern_update_dismissed");
+
+  function bannerText() {
+    const sha = remoteCommit ? remoteCommit.slice(0, 8) : "";
+    const msg = remoteInfo.remoteMessage || "";
+    const date = remoteInfo.remoteDate
+      ? new Date(remoteInfo.remoteDate).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+      : "";
+    let detail = sha ? `<code>${sha}</code>` : "";
+    if (date) detail += ` &middot; ${date}`;
+    if (msg)  detail += ` &middot; ${msg}`;
+    return `Keystone OS update available on <code>master</code>${detail ? " — " + detail : ""}`;
+  }
 
   function createBanner() {
     if (document.getElementById("lantern-update-banner")) return;
@@ -18,8 +31,8 @@
     const banner = document.createElement("div");
     banner.id = "lantern-update-banner";
     banner.innerHTML = `
-      <span class="lantern-update-text">Keystone OS update available on <code>master</code></span>
-      <button class="lantern-update-btn" id="lantern-update-action" title="Update now">Update & Restart</button>
+      <span class="lantern-update-text">${bannerText()}</span>
+      <button class="lantern-update-btn" id="lantern-update-action" title="Update now">Update &amp; Restart</button>
       <button class="lantern-update-dismiss" id="lantern-update-dismiss" title="Dismiss">&times;</button>
     `;
     document.body.prepend(banner);
@@ -94,6 +107,7 @@
     }
 
     remoteCommit = status.remote || null;
+    remoteInfo = { remoteMessage: status.remoteMessage || null, remoteDate: status.remoteDate || null };
     if (status.updateAvailable && remoteCommit && dismissed !== remoteCommit) {
       createBanner();
     } else {
