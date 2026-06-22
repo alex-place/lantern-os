@@ -1453,10 +1453,10 @@ async function handleStreamChat(req, url, res) {
         const keywordTaskType = taskType;
         const applied = gate.escalate && taskType !== "coding" && taskType !== "reasoning";
         if (applied) {
-          console.log(`[router-gate] escalate -> reasoning (${gate.reason})`);
+          console.warn(`[router-gate] escalate -> reasoning (${gate.reason})`);
           taskType = "reasoning";
         } else {
-          console.log(`[router-gate] no-op for ${taskType} (${gate.reason})`);
+          console.warn(`[router-gate] no-op for ${taskType} (${gate.reason})`);
         }
         try {
           const { appendJsonlQueued } = require("./file-queue");
@@ -1481,7 +1481,7 @@ async function handleStreamChat(req, url, res) {
 
     const { provider: recommendedProvider, reason: selectionReason } = await selectProvider(message, taskType, requestedProvider);
     primaryProviderHint = { provider: recommendedProvider, taskType, reason: selectionReason };
-    console.log(`[provider-router] Selected ${recommendedProvider} for ${taskType}: ${selectionReason}`);
+    console.warn(`[provider-router] Selected ${recommendedProvider} for ${taskType}: ${selectionReason}`);
   } catch (e) {
     console.error("[provider-router] Selection error (non-fatal):", e.message);
     // Continue with default fallback if router fails
@@ -2243,6 +2243,7 @@ async function handleStreamChat(req, url, res) {
             text: cleanText.slice(0, maxConversationTextLength),
           }).catch(() => {});
           recordProviderSuccess("ollama");
+          await recordConvergenceSignature("ollama", "unified-agent", cleanText, true);
           const ollamaConnectorReceipt = buildPcsfReceipt("ollama", "unified-agent", true);
           sendReceipt(ollamaConnectorReceipt);
           sendDone("ollama", { agent: doneAgentName, provider: "ollama", online: true, cleanText, suggestions, receipt: ollamaConnectorReceipt });
@@ -2319,6 +2320,7 @@ async function handleStreamChat(req, url, res) {
           text: ollamaClean.slice(0, maxConversationTextLength),
         }).catch(() => {});
         recordProviderSuccess("ollama");
+        await recordConvergenceSignature("ollama", ollamaModel, ollamaClean, true);
         const ollamaHttpReceipt = buildPcsfReceipt("ollama", ollamaModel, true);
         sendReceipt(ollamaHttpReceipt);
         sendDone("ollama", { agent: doneAgentName, provider: "ollama", online: true, cleanText: ollamaClean, suggestions: ollamaDoors, webSuggestions, receipt: ollamaHttpReceipt });
