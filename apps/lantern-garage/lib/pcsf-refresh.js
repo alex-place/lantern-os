@@ -42,7 +42,18 @@ function saveJson(p, data) {
 }
 
 function envPresent(key) {
-  return !!(process.env[key] && process.env[key].trim().length > 0);
+  if (process.env[key] && process.env[key].trim().length > 0) return true;
+  // On Windows, server process may not inherit User-scope env vars set after boot.
+  // Fall back to reading from HKCU\Environment (the User-scope env store).
+  if (process.platform === "win32") {
+    try {
+      const { execFileSync } = require("child_process");
+      const out = execFileSync("reg", ["query", "HKCU\\Environment", "/v", key], { encoding: "utf8", timeout: 3000 });
+      const m = out.match(/REG_\w+\s+(.+)/);
+      if (m && m[1].trim().length > 0) return true;
+    } catch {}
+  }
+  return false;
 }
 
 function refreshSettingsPcsf(repoRoot) {

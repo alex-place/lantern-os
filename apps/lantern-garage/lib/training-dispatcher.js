@@ -207,14 +207,22 @@ async function _dispatchKaggle(checkpointUri, steps) {
   }
   fs.rmSync(tmpDir, { recursive: true, force: true });
 
+  // Extract actual slug from the CLI output URL — title may produce a different slug
+  // e.g. "Ouro Training — 600 steps" → "ouro-training-600-steps" not "ouro-training"
+  const slugMatch = raw.match(/kaggle\.com\/code\/[^/]+\/([^\s"]+)/);
+  const actualSlug = slugMatch ? slugMatch[1].replace(/[^\w-]/g, "") : kernelSlug;
+  const actualKernelUrl = slugMatch
+    ? `https://www.kaggle.com/code/${cfg?.username || "lanternfounder"}/${actualSlug}`
+    : `https://www.kaggle.com/code/${kernelId}`;
+
   const hoursEstimated = Math.ceil(steps / (cfg?.steps_per_hour_estimate || 180));
   const record = {
     type: "training_dispatch",
     provider: "kaggle",
     status: "queued",
-    jobId: kernelSlug,
+    jobId: actualSlug,
     kernelId,
-    kernelUrl: `https://www.kaggle.com/code/${kernelId}`,
+    kernelUrl: actualKernelUrl,
     checkpointUri: checkpointUri || null,
     steps,
     hoursEstimated,
