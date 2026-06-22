@@ -198,61 +198,101 @@ def hammer_mask(query, name, args, rng):
     return masked_tools, name_map.get(name, name), masked_args
 
 
-# ── synthesis (varied params) to floor under-represented tools without dup-memorization ──
-EXTS = ["js", "py", "ts", "json", "md", "jsonl", "html", "css", "sh", "ps1", "yml", "txt"]
+# ── synthesis (diverse params + combinatorial phrasings) to floor under-represented
+# tools without dup-memorization. Over-templated synthetic data overfits the template and
+# hurts generalization (arXiv:2601.17829, 2511.01490), so each query is assembled
+# combinatorially — lead-in × base phrasing × tail × wide param vocab — and the report
+# tracks the distinct-query ratio so over-templating is visible.
+EXTS = ["js", "py", "ts", "json", "md", "jsonl", "html", "css", "sh", "ps1", "yml",
+        "txt", "tsx", "mjs", "cjs", "toml", "cfg", "xml", "svg", "yaml"]
 DIRS = ["src", "scripts", "apps/lantern-garage/lib", "apps/lantern-garage/public", "docs",
-        "tests", "data", "models", "src/csf", "src/sigma0", "apps/lantern-garage/routes"]
+        "tests", "data", "models", "src/csf", "src/sigma0", "apps/lantern-garage/routes",
+        "experiments", "apps/lantern-garage/public/js", "src/mcp_server", "docs/research",
+        "data/convergence", "src/cio_sde"]
 FILES = ["README.md", "package.json", "server.js", "CHANGELOG.MD", "requirements.txt",
          "scripts/ouro_serve.py", "docs/SIGMA0-COLLAPSE-CERTIFICATE.md", "AGENTS.md",
-         "apps/lantern-garage/lib/tool-runner.js", "CLAUDE.md", ".gitignore"]
+         "apps/lantern-garage/lib/tool-runner.js", "CLAUDE.md", ".gitignore", "Makefile",
+         "pytest.ini", "apps/lantern-garage/lib/stream-chat.js", "src/csf/csf_pack.py",
+         "docs/RESEARCH-CANON.md", "SECURITY.md", "QUICKSTART.md", "PROVIDERS.md"]
 PATTERNS = ["TODO", "FIXME", "import", "def ", "function", "require\\(", "class ", "async ",
-            "ANTHROPIC", "convergence", "tool_call", "Σ₀"]
+            "ANTHROPIC", "convergence", "tool_call", "Σ₀", "export ", "module.exports",
+            "raise ", "assert ", "process.env", "api/dream", "OURO_", "collapse"]
+SHELL_CMDS = ["git status", "git log --oneline -5", "npm test", "python -m pytest tests/ -q",
+              "git diff --stat", "node --check server.js", "git fetch origin",
+              "git branch --show-current", "npm run lint", "git rev-parse HEAD",
+              "python -m pytest tests/test_cio_sde.py -q", "git remote -v"]
+WRITE_FILES = ["notes.md", "scratch.txt", "out/result.json", "tmp/plan.md", "TODO.txt",
+               "docs/draft.md", "data/scratch.jsonl", "notes/ideas.md"]
+EDIT_OLD = ["version", "TODO", "0.1.0", "draft", "placeholder", "WIP", "FIXME", "alpha"]
+LEAD = ["", "", "", "", "Please ", "Can you ", "Could you ", "I need you to ",
+        "Quick one — ", "Hey, ", "When you get a sec, ", "Go ahead and ", "Let's ", "First, "]
+TAIL = ["", "", "", "", "", " for me", " please", " real quick", " when you can", " thanks"]
+
+
+def _cap(s):
+    return s[0].upper() + s[1:] if s else s
+
+
+def _wrap(rng, base):
+    """lead-in × base × tail -> a varied surface form of a lowercase imperative base."""
+    lead = rng.choice(LEAD)
+    return ((lead + base) if lead else _cap(base)) + rng.choice(TAIL)
 
 
 def synth_positive(tool, rng):
     """One varied (query, name, args) for the given canonical tool."""
     if tool == "LS":
         d = rng.choice(DIRS)
-        q = rng.choice([f"List the files in {d}", f"What's in the {d} directory?",
-                        f"Show me the contents of {d}/"])
-        return q, "LS", {"path": d}
+        base = rng.choice([f"list the files in {d}", f"what's in the {d} directory?",
+                           f"show me the contents of {d}/", f"what files are under {d}?",
+                           f"give me a directory listing of {d}", f"ls {d}",
+                           f"enumerate the entries in {d}", f"what does {d}/ contain?"])
+        return _wrap(rng, base), "LS", {"path": d}
     if tool == "Glob":
         e = rng.choice(EXTS); d = rng.choice(DIRS + ["."])
         scope = "" if d == "." else f" under {d}"
-        q = rng.choice([f"Find all {e} files{scope}", f"Locate every *.{e} file{scope}",
-                        f"Which {e} files exist{scope}?"])
+        base = rng.choice([f"find all {e} files{scope}", f"locate every *.{e} file{scope}",
+                           f"which {e} files exist{scope}?", f"list the {e} files{scope}",
+                           f"glob for **/*.{e}{scope}", f"show me all .{e} sources{scope}",
+                           f"track down the {e} files{scope}"])
         args = {"pattern": f"**/*.{e}"}
         if d != ".":
             args["path"] = d
-        return q, "Glob", args
+        return _wrap(rng, base), "Glob", args
     if tool == "Grep":
         p = rng.choice(PATTERNS); d = rng.choice(DIRS + ["."])
         scope = "" if d == "." else f" in {d}"
-        q = rng.choice([f"Search for {p!r}{scope}", f"Where is {p!r} used{scope}?",
-                        f"Grep for {p}{scope}"])
+        base = rng.choice([f"search for {p!r}{scope}", f"where is {p!r} used{scope}?",
+                           f"grep for {p}{scope}", f"find references to {p!r}{scope}",
+                           f"which files mention {p!r}{scope}?", f"look for {p!r}{scope}",
+                           f"hunt down every {p!r}{scope}"])
         args = {"pattern": p}
         if d != ".":
             args["path"] = d
-        return q, "Grep", args
+        return _wrap(rng, base), "Grep", args
     if tool == "Read":
         f = rng.choice(FILES)
-        q = rng.choice([f"Read {f}", f"Show me {f}", f"Open {f} and show its contents",
-                        f"What's in {f}?"])
-        return q, "Read", {"file_path": f}
+        base = rng.choice([f"read {f}", f"show me {f}", f"open {f} and show its contents",
+                           f"what's in {f}?", f"print {f}", f"let me see {f}",
+                           f"pull up {f}", f"display the contents of {f}"])
+        return _wrap(rng, base), "Read", {"file_path": f}
     if tool == "Write":
-        f = rng.choice(["notes.md", "scratch.txt", "out/result.json", "tmp/plan.md", "TODO.txt"])
-        q = rng.choice([f"Create {f} with a short header", f"Write a placeholder {f}"])
-        return q, "Write", {"file_path": f, "content": rng.choice(["# Notes\n", "placeholder\n", "{}\n", "TODO\n"])}
+        f = rng.choice(WRITE_FILES)
+        content = rng.choice(["# Notes\n", "placeholder\n", "{}\n", "TODO\n", "# Draft\n\n", "[]\n"])
+        base = rng.choice([f"create {f} with a short header", f"write a placeholder {f}",
+                           f"make a new file {f}", f"scaffold {f}", f"start {f} with a stub"])
+        return _wrap(rng, base), "Write", {"file_path": f, "content": content}
     if tool == "Edit":
-        f = rng.choice(FILES)
-        old = rng.choice(["version", "TODO", "0.1.0", "draft", "placeholder"])
-        q = rng.choice([f"In {f}, change {old!r} to its replacement", f"Update the {old!r} string in {f}"])
-        return q, "Edit", {"file_path": f, "old_string": old, "new_string": old + "-updated"}
+        f = rng.choice(FILES); old = rng.choice(EDIT_OLD)
+        base = rng.choice([f"in {f}, change {old!r} to its replacement",
+                           f"update the {old!r} string in {f}", f"replace {old!r} in {f}",
+                           f"swap out {old!r} in {f}", f"fix the {old!r} value in {f}"])
+        return _wrap(rng, base), "Edit", {"file_path": f, "old_string": old, "new_string": old + "-updated"}
     if tool in ("Bash", "PowerShell"):
-        cmd = rng.choice(["git status", "git log --oneline -5", "npm test",
-                          "python -m pytest tests/ -q", "git diff --stat", "node --check server.js"])
-        q = rng.choice([f"Run `{cmd}`", f"Execute {cmd}", f"Can you run {cmd}?"])
-        return q, tool, {"command": cmd}
+        cmd = rng.choice(SHELL_CMDS)
+        base = rng.choice([f"run `{cmd}`", f"execute {cmd}", f"can you run {cmd}?",
+                           f"kick off {cmd}", f"go run {cmd}", f"run {cmd} and show the output"])
+        return _wrap(rng, base), tool, {"command": cmd}
     raise ValueError(tool)
 
 
@@ -349,7 +389,7 @@ def main():
     ap.add_argument("--out", default="models/lantern-sigma0-coder/training-data-rebalanced.jsonl")
     ap.add_argument("--public", type=int, default=4000, help="public-FC positives to keep (hermes+toolace)")
     ap.add_argument("--mask-frac", type=float, default=0.5, help="fraction of canonical positives to Hammer-mask")
-    ap.add_argument("--neg-frac", type=float, default=0.11)
+    ap.add_argument("--neg-frac", type=float, default=0.10, help="Hammer's measured-optimal irrelevance ratio ~10% (arXiv:2410.04587)")
     ap.add_argument("--prose-frac", type=float, default=0.09)
     a = ap.parse_args()
     rng = random.Random(SEED)
@@ -385,13 +425,15 @@ def main():
     # ── 2. resample to TARGETS (draw real first, synth-fill the rest) ─────────────────
     canonical = []
     synth_added = Counter()
+    synth_queries = []
     for tool, target in TARGETS.items():
         real = by_tool[tool][:]
         rng.shuffle(real)
         take = real[:target]
         canonical.extend(take)
         for _ in range(max(0, target - len(take))):
-            canonical.append(synth_positive(tool, rng))
+            s = synth_positive(tool, rng)
+            canonical.append(s); synth_queries.append(s[0])
             synth_added[tool] += 1
     rng.shuffle(canonical)
 
@@ -473,6 +515,11 @@ def main():
     print(f"public-FC positives={len(public)}")
     print(f"shell cleanup: dropped degenerate={dropped_degenerate}  rewrites cat/find/grep->typed={dict(rewrites)}")
     print(f"synth-filled per tool: {dict(synth_added)}")
+    if synth_queries:
+        uniq = len(set(synth_queries)); topn = Counter(synth_queries).most_common(1)[0][1]
+        flag = "OK" if topn <= max(3, 0.02 * len(synth_queries)) else "OVER-TEMPLATED"
+        print(f"synth diversity: {uniq}/{len(synth_queries)} distinct queries "
+              f"({100*uniq/len(synth_queries):.1f}%), top-phrasing x{topn} [{flag}]")
     print(f"validation: dropped bad-positive={bad_pos} bad-negative(parsed-as-call)={bad_neg} oversize={oversize}")
     print("real-name canonical-tool counts (unmasked; masked rows use aliases):")
     for t in CANON_NAMES:
