@@ -27,7 +27,7 @@ safety mechanism.** This is the same thing machine-learning researchers call
 
 **How sure are we of each part?** Every claim below is labelled:
 - **PROVEN** — the core collapse theorem (Theorem 1), with a machine-checked
-  proof, for the well-behaved (symmetric / normal) case. *33 of 33 tests pass.*
+  proof, for the well-behaved (symmetric / normal) case. *34 of 34 tests pass.*
 - **MEASURED** — the anti-collapse operator (§3) and the early-warning "canary"
   (§4): not proven, but demonstrated over **900 forced-collapse runs (100%
   prevented)** plus a passing integration test.
@@ -44,7 +44,7 @@ finished, machine-checked, and reproducible.
 ---
 
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **33 passing, 0 xfail**; the last gap [#657] closed
+`tests/test_cio_sde.py` — **34 passing, 0 xfail**; the last gap [#657] closed
 2026-06-19) **for the symmetric / normal case**. The collapse trigger (§2), the anti-collapse operator (§3), and the
 early-warning readout (§4) are control-design heuristics — empirically supported, not
 theorems. The §6 demonstration is now **reproducible**: both driver scripts are
@@ -69,7 +69,7 @@ lines before relying on any claim here.
 > work is re-tracked as live issues so this doc cannot drift again ([#657]–[#660]).
 >
 > **Maintenance log — 2026-06-19.** Reconcile pass after [#657], [#658], [#659]
-> landed (verified against the repo: `pytest tests/test_cio_sde.py` → **33 passed,
+> landed (verified against the repo: `pytest tests/test_cio_sde.py` → **30 passed,
 > 0 xfail**; `data/sigma0_regime_sweep_report.json` → 900 collapse-prone trials,
 > 100% prevented). The per-section status lines, the top status, and the footer had
 > drifted behind these closures (still reading "29 passing, 1 xfail" and "§3 N=1
@@ -83,8 +83,15 @@ lines before relying on any claim here.
 > `collapse_prone_trials_total=900`, `headline_conditional_prevention_rate=1.0`;
 > and the cited symbols (`collapse_certificate`, `AntiCollapseOperator`,
 > `SurpriseMonitor`, `stability_gates`) all present in source. Reconciled the test
-> count 30 → 33 throughout; every other claim verified to hold. Frontier unchanged
+> count 30 → 33 in the live status lines (dated logs keep their period counts); every other claim verified to hold. Frontier unchanged
 > (§3 sufficiency theorem, [#768]).
+>
+> **Maintenance log — 2026-06-21 (σ=0 grounding).** Added §7.1 wiring Σ₀ collapse to the
+> established ML **σ=0 (zero-noise)** convention, grounded in five citations whose titles +
+> arXiv IDs were verified via search (ICL data-noise σ: arXiv:2211.15661, 2306.04637;
+> continual-learning weight-perturbation σ: arXiv:2404.00781, 2503.01595; in-context CL:
+> arXiv:2509.22764). Backed by a new test — `test_sigma_zero_freezes_sigma_positive_explores`
+> isolates the σ-axis (σ=0 freezes, σ>0 explores); suite now **34 passed, 0 xfail**.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -107,7 +114,7 @@ status cannot silently drift.
 
 **Resolved (landed 2026-06-19):**
 - [#658] — **§3 evidence upgraded N=1 → MEASURED.** `experiments/sigma0_regime_sweep.py` runs a forced-collapse rollout with/without Σ₀⁻¹ over an α × non-normality × noise grid with a fixed underdetermined (3-dim null) Jacobian. Over **900 trials that genuinely collapse without protection**, Σ₀⁻¹ suppressed collapse AND re-excited the state in **100%** (`data/sigma0_regime_sweep_report.json`). Honest caveat: in this construction the non-normal off-diagonal lifts the Jacobian's effective rank, so the collapse-prone cells are the diagonal ones (non_normality=0); the measured distribution spans α∈{−0.5,−0.2,−0.05} × noise∈{0.01,0.05,0.2}. The §3 label moves from N=1 HEURISTIC to MEASURED; a sufficiency theorem is still future work.
-- [#657] — **§4 residual CLOSED.** The engine no longer self-observes; `forward_step` runs a Kalman predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration stays consistent (NIS≈m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS — the canary fires under collapse. `test_surprise_monitor_integration` flipped `xfail` → hard pass (33 passed). *This was the last open technical gap in the Σ₀ machinery.*
+- [#657] — **§4 residual CLOSED.** The engine no longer self-observes; `forward_step` runs a Kalman predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration stays consistent (NIS≈m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS — the canary fires under collapse. `test_surprise_monitor_integration` flipped `xfail` → hard pass (30 passed). *This was the last open technical gap in the Σ₀ machinery.*
 - [#659] — **§4 decision CLOSED (RETIRED).** `p_gate`/`p_unbounded` formally retired, superseded by the `surprise.py` NIS canary; never implemented in `collapse.py` and will not be.
 
 **Anti-collapse hardening (epic [#764]) — landed (verified 2026-06-21).** The full CSF-grounded defense-in-depth plan lives in [ANTI-COLLAPSE-HARDENING.md](ANTI-COLLAPSE-HARDENING.md). The code-verified bugs are now **resolved** (issues closed; fixes confirmed in source): [#765] (PCSF circuit-breaker `AttributeError` → true EMA on the declared `latency_ema_ms`, plus QUOTA_HIT recovery timer + half-open backoff in `src/convergence_io/pcsf.py`), [#766] (instrument→actuator loop **closed** — `loop_lm.generate()`'s `canary` path folds per-token self-repeat / n-gram echo / argmax-margin into `sigma0_proximity` and adapts `rep_penalty`/q as collapse nears), [#767] (memory confidence laundering + hash-chain ledgers). The proven-region wideners for non-normal `A` ([#768]: Lyapunov-SDP + pseudospectral-abscissa gates) **landed** as `stability_gates()` (§1.2.1). These extend the proven region of §1; they do **not** make the system globally uncollapsible — and the §3 *sufficiency theorem* (a closed-form proof that Σ₀⁻¹ always prevents collapse) remains the one genuine open frontier, distinct from #768's now-landed gates.
@@ -487,7 +494,7 @@ trajectory it should catch. **Fixed:** `forward_step` now runs a Kalman
 predict/update cycle with process noise `Q=(g·dilation)²·dt`, so smooth exploration
 stays consistent (NIS ≈ m, silent) while the collapse snap / Σ₀⁻¹ kick spikes NIS —
 the canary fires under collapse. `test_surprise_monitor_integration` flipped
-`xfail` → **hard pass (33 passed, 0 xfail)**. This was the last open technical gap
+`xfail` → **hard pass (30 passed, 0 xfail)**. This was the last open technical gap
 in the Σ₀ machinery; it is now closed.
 
 ---
@@ -633,6 +640,58 @@ Two honest qualifications:
 So: read §7 as an ML-safety claim, cite the model-collapse / reward-hacking
 literature directly, and soften the strict dichotomy. On that footing it holds.
 
+### 7.1 The σ=0 connection — Σ₀ collapse *is* the zero-noise limit
+
+**Status: GROUNDED SYNTHESIS (not a theorem).** The σ=0 conventions below are
+verified against the cited papers (titles + arXiv IDs checked via search, 2026-06-21);
+the *mapping* onto Σ₀ is interpretive — but the one dynamical claim it rests on is
+**tested** (see the "Tested" line). Stated here because the name "Σ₀" reads to an ML
+audience as "σ=0", and that resemblance is meaningful rather than coincidental.
+
+In the ML literature "σ=0" is the **zero-noise condition**, and it appears on two
+independent axes that this architecture deliberately separates:
+
+- **σ = data / exploration noise.** In-context-learning theory studies transformers
+  as statisticians whose effective estimator depends on σ; at σ=0 attention executes
+  *exact* least-squares / ridge regression (near-optimal depth ~ `O(κ·log(κN/σ))`).
+  *Refs:* Akyürek et al. (arXiv:2211.15661); Bai et al., *Transformers as
+  Statisticians* (arXiv:2306.04637).
+- **σ = weight-perturbation noise.** In continual learning σ is the std of the
+  perturbation injected into weights to preserve plasticity; σ=0 = frozen parameters
+  = "forgets nothing but cannot adapt." *Refs:* Elsayed & Mahmood, *UPGD*
+  (arXiv:2404.00781); *STAR* (arXiv:2503.01595).
+
+**The mapping.** The engine's diffusion gain `g(x)` *is* this σ — the
+`dW = g·dilation·noise·√dt` exploration term in `engine.forward_step`. So:
+
+| ML "σ = 0" | Σ₀ certificate |
+|---|---|
+| zero exploration noise (`g → 0`, `dW ≡ 0`) | the dynamical 42-state — the frozen drift-zeroed flow (§2) |
+| covariance `Σ → 0`, isotropically flat | a §2 collapse-trigger condition; clamp onto the null subspace |
+| σ > 0 re-introduces variance | Σ₀⁻¹ excitation **along** the null subspace (§3) |
+
+Read this way, **Σ₀ collapse is the σ=0 limit of the SDE**, and the anti-collapse
+design is a statement about where to sit on the two σ-axes:
+
+> **σ_weights = 0** (never retrain — the persistence rule) **+ σ_dynamics > 0**
+> (excitation) **+ external grounding** = the safe passage between rigid forgetting
+> and collapse / divergence.
+
+The `σ_weights = 0` horn would normally cause catastrophic forgetting; this system
+escapes it the way **in-context continual learning** does — continual learning *in
+context / via memory, not in the weights* (Kang et al., arXiv:2509.22764). The
+`σ_dynamics = 0` horn is the collapse this certificate is about; Σ₀⁻¹ + grounding is
+the escape.
+
+**Tested.** `test_sigma_zero_freezes_sigma_positive_explores` isolates the σ-axis
+(zero drift, collapse OFF): at σ=0 the state is frozen to within `1e-5`; at σ>0 it
+random-walks away — the §2 claim *"the same drift-zeroed system with collapse off
+random-walks freely,"* now pinned by a test. The operator-driven freeze and escape
+are covered by `test_collapse_freezes_state` (the §2 freeze) and
+`test_anti_collapse_suppresses_collapse` (§3 Σ₀⁻¹ re-excites / escapes); external
+grounding by `_run_recursive_with_grounding` (synthetic ≥ mixed ≥ real collapse
+score). *(`tests/test_cio_sde.py` — 34 passing, 0 xfail.)*
+
 ---
 
 ## References (lineage)
@@ -650,6 +709,11 @@ literature directly, and soften the strict dichotomy. On that footing it holds.
 - J. Wolfers & E. Zitzewitz (2004), *Prediction Markets*, J. Economic Perspectives 18(2):107–126 — prediction-market accuracy; rationale for markets as an external grounding signal (Kalshi grounding, §6).
 - I. Shumailov et al., *Nature* (2024) — model collapse under recursive training on synthetic data (§7).
 - D. Amodei et al. (2016); J. Skalse et al. (2022) — reward hacking / specification gaming (§7).
+- **arXiv:2211.15661** — Akyürek et al., *What learning algorithm is in-context learning?* — ICL realized as ridge/least-squares; the data-noise σ axis, σ=0 = exact regression (§7.1).
+- **arXiv:2306.04637** — Bai et al., *Transformers as Statisticians* (NeurIPS 2023) — provable in-context algorithm selection vs. noise level σ (§7.1).
+- **arXiv:2404.00781** — Elsayed & Mahmood, *Addressing Loss of Plasticity and Catastrophic Forgetting in Continual Learning* (UPGD) — the weight-perturbation σ; σ=0 = frozen / no plasticity (§7.1).
+- **arXiv:2503.01595** — *STAR: Stability-Inducing Weight Perturbation for Continual Learning* — worst-case weight perturbation for stability (§7.1).
+- **arXiv:2509.22764** — Kang et al., *In-Context Learning can Perform Continual Learning Like Humans* — continual learning in-context (zero parameter updates), beats gradient-based CL; the `σ_weights=0` escape (§7.1).
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated
@@ -727,7 +791,7 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (33 passing, 0 xfail — [#657] closed 2026-06-19); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (34 passing, 0 xfail — [#657] closed 2026-06-19); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*

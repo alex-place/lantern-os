@@ -15,6 +15,14 @@ matching `## [X.X.X] - YYYY-MM-DD` entry below before it can be pushed. See
 
 ---
 
+## [1.7.35] - 2026-06-21
+
+### Added
+- **Σ₀ Collapse Certificate §7.1 — grounds the Σ₀↔σ=0 (zero-noise) connection + a test that pins it.** The SDE's diffusion gain `g(x)` *is* the exploration noise σ, so **Σ₀ collapse is the σ=0 limit**; the architecture deliberately sits at **σ_weights=0** (never retrain) **+ σ_dynamics>0** (excitation) **+ external grounding** — the safe passage between rigid forgetting and collapse. Five citations verified via live search (ICL data-noise σ: arXiv:2211.15661, 2306.04637; continual-learning weight-perturbation σ: arXiv:2404.00781, 2503.01595; in-context CL: arXiv:2509.22764). New test `test_sigma_zero_freezes_sigma_positive_explores` isolates the σ-axis (σ=0 freezes to <1e-5; σ>0 random-walks away) — `tests/test_cio_sde.py` now **34 passing, 0 xfail**. Labeled GROUNDED SYNTHESIS (not a theorem), per the doc's epistemic discipline.
+
+### Fixed
+- **docs(sigma0): restore the certificate's dated maintenance-log counts.** #998's count reconcile over-bumped the 2026-06-19 maintenance log + #657-closure notes from their period-correct **30** to 33; restored them (current status is the live 34).
+
 ## [1.7.34] - 2026-06-21
 
 ### Added

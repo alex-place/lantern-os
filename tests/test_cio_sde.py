@@ -180,6 +180,40 @@ def test_collapse_freezes_state():
     assert abs(norms[-1] - norms[-2]) < 1e-3
 
 
+def test_sigma_zero_freezes_sigma_positive_explores():
+    """The σ-axis directly — grounds the Σ₀-collapse ↔ ML σ=0 (zero-noise) link.
+
+    The SDE's diffusion gain g(x) IS the exploration noise σ (engine.forward_step:
+    ``dW = g · dilation · noise · √dt`` — the "noise gain (exploration)"). With the
+    drift zeroed (A=0) and the Σ₀ collapse operator OFF, this isolates the σ-axis:
+      • σ = 0  → dW ≡ 0 → the state is FROZEN (the zero-noise limit; no exploration).
+        This is the dynamical twin of the certificate's 42-state and of ML's σ=0
+        (clean-data ICL / zero weight-perturbation continual learning).
+      • σ > 0  → dW ≠ 0 → the state RANDOM-WALKS (explores / escapes the point) —
+        the motion Σ₀⁻¹ relies on, and what external grounding steers.
+    Refs (verified): ICL σ — arXiv:2306.04637, 2211.15661; continual-learning σ
+    (weight-perturbation std) — arXiv:2404.00781, 2503.01595.
+    """
+    node = LinearDynamics(torch.zeros(4, 4), B=torch.zeros(4, 2), noise=0.0)
+    m = CIO_SDE(dim=4, ctrl_dim=2, hidden=8)
+    m.graph.active = node          # zero drift ⇒ ONLY the diffusion gain σ moves x
+    m.collapse_op = None           # operators OFF: this is the σ-axis, not Σ₀
+    m.anti_collapse_op = None
+    m.pcsf.u_max = 1e-6            # control off (drift is already 0) — pure σ-axis
+    x0, s0 = _init_state(scale=0.01)
+
+    node._noise = 0.0              # σ = 0 — the zero-noise limit
+    _, _, tr0 = rollout(m, x0.clone(), s0.clone(), steps=30, base_seed=1)
+    n0 = tr0.x_norms()
+    assert abs(n0[-1] - n0[0]) < 1e-5      # frozen: the state does not move at all
+
+    node._noise = 0.5              # σ > 0 — exploration on (same noise seed)
+    _, _, tr1 = rollout(m, x0.clone(), s0.clone(), steps=30, base_seed=1)
+    n1 = tr1.x_norms()
+    assert all(v == v for v in n1)         # finite (no NaN/divergence)
+    assert n1[-1] > n0[-1] + 0.2           # explored: random-walked away from x0
+
+
 # ── Lyapunov collapse certificate ────────────────────────────────────────────
 
 def test_certificate_guaranteed_for_negative_definite():
