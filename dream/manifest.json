@@ -1,19 +1,13 @@
 {
-  "name": "Dream Journal — Lantern OS",
-  "short_name": "Dream Journal",
-  "description": "A private, local-first dream journal with AI reflection. Capture dreams and talk to Lantern agents.",
+  "name": "Keystone OS",
+  "short_name": "Keystone",
+  "description": "A local-first AI assistant that remembers you — runs on your machine, works with any model.",
   "start_url": "/dream-chat.html",
   "display": "standalone",
-  "background_color": "#0f1117",
-  "theme_color": "#7c6af7",
+  "background_color": "#0a0e17",
+  "theme_color": "#06b6d4",
   "orientation": "any",
   "icons": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127769;</text></svg>",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
@@ -25,7 +19,7 @@
       "type": "image/png"
     }
   ],
-  "categories": ["lifestyle", "health", "productivity"],
+  "categories": ["productivity", "utilities"],
   "lang": "en",
   "scope": "/"
 }

@@ -18,6 +18,21 @@
       }
     })();
 
+    /* SW cleanup — unregister any cached service worker and reload once.
+       Runs synchronously before any deferred scripts or fetches so the SW
+       cannot intercept resources on this load. A sessionStorage flag prevents
+       reload loops if the SW somehow re-registers itself. */
+    (function() {
+      if (!('serviceWorker' in navigator)) return;
+      if (sessionStorage.getItem('sw_cleaned')) return;
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        if (!regs.length) return;
+        sessionStorage.setItem('sw_cleaned', '1');
+        Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
+          window.location.reload();
+        });
+      });
+    })();
   </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
@@ -182,7 +197,7 @@
   <!-- ── Hero ── -->
   <div class="hero">
     <h1>Observe. Remember. Reason. Act. Verify. Converge.</h1>
-    <p class="tagline" id="hero-tagline">Keystone OS is a local-first convergence engine — a persistent reasoning and coding system that runs entirely on your machine and improves from accumulated evidence, never locked to a single model. Chat, trade, and create on the same grounded core.</p>
+    <p class="tagline" id="hero-tagline">Your AI that actually remembers you — runs on your own machine, works with any model, and never sells your conversations. Just type like you're texting a friend.</p>
     <div class="hero-cta-row">
       <a class="btn-primary" href="/dream-chat.html">✦ Keystone Chat</a>
     </div>
@@ -195,21 +210,21 @@
       <span class="panel-icon" aria-hidden="true">📈</span>
       <span class="panel-label">Markets</span>
       <h2>Trader</h2>
-      <p>Stocks, prediction markets, and live market news.</p>
+      <p>Live markets, prediction trading, and the news that moves them.</p>
       <span class="panel-arrow">Open Trader →</span>
     </a>
     <a class="panel tile-create" href="/create.html">
       <span class="panel-icon" aria-hidden="true">✏️</span>
       <span class="panel-label">Studio</span>
       <h2>Create</h2>
-      <p>Upload, organize, and shape your creative work.</p>
+      <p>Write, upload, and organize your creative projects.</p>
       <span class="panel-arrow">Open Create →</span>
     </a>
     <a class="panel tile-explore" href="/explore.html">
       <span class="panel-icon" aria-hidden="true">🧭</span>
       <span class="panel-label">Convergence</span>
       <h2>Explore</h2>
-      <p>Kingdome of Hearts, agents, archives, and settings.</p>
+      <p>Games, tools, your personal archive, and settings.</p>
       <span class="panel-arrow">Open Explore →</span>
     </a>
   </div>
