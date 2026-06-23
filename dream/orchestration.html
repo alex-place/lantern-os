@@ -1199,10 +1199,10 @@
     try {
       const data = await fetchJson("/api/gpu-training/status");
       const active = data?.active;
-      const recent = data?.recent || [];
+      const recent = data?.recentJobs || [];
 
       const running = recent.filter(j => j.status === "running").length;
-      const queued = recent.filter(j => j.status === "queued").length;
+      const queued = recent.filter(j => j.status === "queued" || j.status === "manual_required").length;
 
       $("planDispatchCount").textContent = queued;
       $("planRunningCount").textContent = running;
