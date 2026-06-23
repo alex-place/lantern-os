@@ -252,8 +252,49 @@
   <header class="orch-header">
     <span class="panel-label">Convergence · Act stage</span>
     <h1>⚙️ Agent Orchestration</h1>
-    <p>See what Keystone is doing right now, what needs you, and how the self-improvement loop is holding up.</p>
+    <p>See what Keystone is doing right now, what needs you, how the loop is holding up, and which AI models are available.</p>
   </header>
+
+  <!-- ── AI Provider Configuration ── -->
+  <section class="panel" style="margin-bottom: 22px;">
+    <h2>🤖 AI Providers
+      <span class="verify-sub" id="providersSummary">Loading…</span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-secondary" id="providersRefreshBtn" onclick="refreshProviderStatus()">⟳ Refresh</button>
+      </span>
+    </h2>
+    <p class="placeholder" style="margin:-4px 0 6px;font-size:0.86rem;line-height:1.5;">
+      Keystone can talk to 10+ AI providers. Set API keys below, then Keystone automatically picks the best one for each task
+      <strong>(coding, reasoning, creative, etc.).</strong> Your keys are saved <strong>on this computer only</strong> — never uploaded.
+    </p>
+
+    <!-- Provider grid (available providers) -->
+    <h3 style="margin:12px 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Available providers</h3>
+    <div id="providerGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:18px;">
+      <div class="placeholder">Loading providers…</div>
+    </div>
+
+    <!-- Task-type routing -->
+    <h3 style="margin:12px 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider chains by task type</h3>
+    <p class="placeholder" style="margin:0 0 10px;font-size:0.8rem;color:var(--muted);">Each task type has a fallback chain. Keystone tries the first, then the next if unavailable.</p>
+    <div id="providerChains" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:18px;">
+      <div class="placeholder">Loading task chains…</div>
+    </div>
+
+    <!-- API key management -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        🔑 Connect your API keys
+        <span class="verify-sub" id="providerKeysSummary"></span>
+      </h3>
+      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
+        Each provider links to where you grab a free API key. Paste it below — keys are saved locally in your user account.
+      </p>
+      <div id="providerKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+        <div class="placeholder">Loading accounts…</div>
+      </div>
+    </div>
+  </section>
 
   <!-- ── The convergence loop, live ── -->
   <section class="panel loop-panel">
@@ -1297,6 +1338,175 @@
   window.renderCalibration = renderCalibration;
   window.renderKeystoneTests = renderKeystoneTests;
 
+  // ── LLM Provider Configuration ─────────────────────────────────────────────
+  const LLM_PROVIDERS = [
+    { id: "anthropic", icon: "🧠", name: "Anthropic Claude",
+      blurb: "Best-in-class reasoning. Fast, capable, and reliable.",
+      get: "https://console.anthropic.com/settings/keys",
+      key: "ANTHROPIC_API_KEY", model: "claude-opus-4-8" },
+    { id: "openai", icon: "🔷", name: "OpenAI GPT",
+      blurb: "Fast, widely compatible, strong at most tasks.",
+      get: "https://platform.openai.com/api-keys",
+      key: "OPENAI_API_KEY", model: "gpt-4o-mini" },
+    { id: "gemini", icon: "✨", name: "Google Gemini",
+      blurb: "Vision/multimodal strength, generous free tier.",
+      get: "https://aistudio.google.com/app/apikey",
+      key: "GEMINI_API_KEY", model: "gemini-2.5-flash" },
+    { id: "mistral", icon: "🚀", name: "Mistral AI",
+      blurb: "Strong coding, long-context, competitive pricing.",
+      get: "https://console.mistral.ai/api-keys/",
+      key: "MISTRAL_API_KEY", model: "mistral-large-latest" },
+    { id: "deepseek", icon: "🔍", name: "DeepSeek",
+      blurb: "Emerging provider, strong reasoning, affordable.",
+      get: "https://platform.deepseek.com/api_keys",
+      key: "DEEPSEEK_API_KEY", model: "deepseek-chat" },
+    { id: "cohere", icon: "🌊", name: "Cohere",
+      blurb: "Long-context RAG, summarization specialist.",
+      get: "https://dashboard.cohere.com/api-keys",
+      key: "COHERE_API_KEY", model: "command-r-plus" },
+    { id: "perplexity", icon: "🔬", name: "Perplexity AI",
+      blurb: "Search-augmented answers with live citations.",
+      get: "https://www.perplexity.ai/settings/api",
+      key: "PERPLEXITY_API_KEY", model: "sonar-pro" },
+    { id: "openrouter", icon: "🌐", name: "OpenRouter",
+      blurb: "Gateway to 100+ models, unified pricing, smart routing.",
+      get: "https://openrouter.ai/settings/keys",
+      key: "OPENROUTER_API_KEY", model: "auto" },
+    { id: "ollama", icon: "🦙", name: "Ollama (Local)",
+      blurb: "Private, offline, no keys needed. Privacy first.",
+      get: "https://ollama.ai",
+      key: null, model: "auto" },
+  ];
+
+  async function refreshProviderStatus() {
+    const data = await fetchJson("/api/providers/status");
+    if (!data) {
+      $("providersSummary").textContent = "error loading";
+      return;
+    }
+
+    // Render provider grid (availability + health)
+    const gridEl = $("providerGrid");
+    gridEl.innerHTML = LLM_PROVIDERS.map(p => {
+      const status = data.providers?.[p.id] || {};
+      const hasKey = status.hasKey;
+      const available = status.available;
+      const lastCheck = status.lastCheck ? new Date(status.lastCheck).toLocaleTimeString() : "—";
+      const dot = available ? "🟢" : hasKey ? "🟡" : "🔴";
+      const badge = available ? "available" : hasKey ? "no key" : "not connected";
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span>${p.icon}</span>
+            <strong style="font-size:0.88rem;">${p.name}</strong>
+            <span style="margin-left:auto;font-size:1.2rem;">${dot}</span>
+          </div>
+          <div style="font-size:0.74rem;color:var(--muted);margin-bottom:4px;">${p.blurb}</div>
+          <div style="font-size:0.72rem;color:var(--muted);">${badge} · model: ${p.model}</div>
+        </div>`;
+    }).join("");
+
+    // Render task-type chains
+    const chainEl = $("providerChains");
+    if (data.chains) {
+      chainEl.innerHTML = Object.entries(data.chains).map(([taskType, chain]) => {
+        const providers = chain.map(c => {
+          const status = data.providers?.[c.provider] || {};
+          const dot = status.available ? "🟢" : "🔴";
+          return `<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--bg);font-size:0.72rem;margin:2px 2px 2px 0;">${dot} ${c.provider}</span>`;
+        }).join("");
+        return `
+          <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
+            <div style="font-weight:600;font-size:0.88rem;margin-bottom:6px;text-transform:capitalize;">${taskType}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:2px;">${providers}</div>
+          </div>`;
+      }).join("");
+    }
+
+    // Summary
+    const connected = Object.values(data.providers || {}).filter(p => p.hasKey).length;
+    const available = Object.values(data.providers || {}).filter(p => p.available).length;
+    $("providersSummary").textContent = `${available} available · ${connected} keys set`;
+
+    // Render keys
+    await renderProviderKeys();
+  }
+
+  async function renderProviderKeys() {
+    const el = $("providerKeysList");
+    let data = null;
+    try {
+      const r = await fetch("/api/providers/keys", { cache: "no-store", signal: AbortSignal.timeout(10000) });
+      if (r.ok) data = await r.json();
+    } catch { /* handled below */ }
+
+    if (!data || !Array.isArray(data.keys)) {
+      el.innerHTML = '<div class="placeholder">Couldn\'t load API key status — <button class="hl-btn" type="button" onclick="renderProviderKeys()">retry</button></div>';
+      return;
+    }
+
+    const keyMap = {};
+    data.keys.forEach(k => { keyMap[k.env] = k; });
+
+    // Summary: how many providers are connected
+    const connected = LLM_PROVIDERS.filter(p => p.key && keyMap[p.key]?.set).length;
+    $("providerKeysSummary").textContent = `${connected}/${LLM_PROVIDERS.filter(p => p.key).length} keys set`;
+
+    el.innerHTML = LLM_PROVIDERS.filter(p => p.key).map(p => {
+      const info = keyMap[p.key] || {};
+      const isSet = info.set;
+      const badge = isSet
+        ? '<span style="color:#22c55e;font-size:0.72rem;font-weight:600;">✓ set</span>'
+        : '<span style="color:var(--muted);font-size:0.72rem;">not set</span>';
+      const placeholder = isSet ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:13px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
+            <span>${p.icon}</span><strong style="font-size:0.9rem;">${p.name}</strong>
+            <span style="margin-left:auto;">${badge}</span>
+          </div>
+          <div style="font-size:0.74rem;color:var(--muted);line-height:1.45;">${p.blurb}</div>
+          <a href="${p.get}" target="_blank" rel="noopener" style="font-size:0.74rem;color:var(--accent);">Get your key ↗</a>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+            <input type="password" autocomplete="off" data-provider="${p.id}" placeholder="${placeholder}"
+              style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:0.78rem;">
+            <button class="hl-btn" type="button" data-saveprov="${p.id}" style="padding:6px 9px;">Save</button>
+          </div>
+        </div>`;
+    }).join("");
+
+    el.querySelectorAll("button[data-saveprov]").forEach(btn => {
+      btn.addEventListener("click", () => saveProviderKey(btn.dataset.saveprov, el, btn));
+    });
+  }
+
+  async function saveProviderKey(providerId, scope, btn) {
+    const p = LLM_PROVIDERS.find(x => x.id === providerId);
+    if (!p || !p.key) return;
+    const input = scope.querySelector(`input[data-provider="${providerId}"]`);
+    const value = input ? input.value.trim() : "";
+    if (!value) { input?.focus(); return; }
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/providers/keys", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: p.id, key: p.key, value }),
+      });
+      const result = await r.json();
+      if (result.error) { btn.textContent = "✕ failed"; }
+      else {
+        btn.textContent = result.persisted ? "✓ saved" : "✓ (session)";
+        await renderProviderKeys();      // refresh saved/masked state
+        refreshProviderStatus();         // availability may change
+      }
+    } catch { btn.textContent = "✕ error"; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
+  }
+
+  window.refreshProviderStatus = refreshProviderStatus;
+  window.renderProviderKeys = renderProviderKeys;
+
   document.addEventListener("DOMContentLoaded", () => {
     const btn = $("refreshBtn");
     if (btn) btn.addEventListener("click", refreshStatus);
@@ -1304,11 +1514,13 @@
     renderRollover();
     renderGpuTraining();
     renderGpuKeys();
+    refreshProviderStatus();
     renderCalibration();
     renderKeystoneTests();
     setInterval(refreshStatus, 5000);
     setInterval(renderRollover, 15000);
     setInterval(renderGpuTraining, 30000);
+    setInterval(refreshProviderStatus, 45000);
     setInterval(renderCalibration, 30000);
     setInterval(renderKeystoneTests, 60000);
   });
