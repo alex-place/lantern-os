@@ -20,7 +20,7 @@ const GPU_PCSF = path.join(REPO_ROOT, "data", "pcsf", "gpu-training.pcsf.json");
 const GPU_KEY_ALLOWLIST = [
   "HF_TOKEN", "HF_TRAINING_REPO",
   "KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY",
-  "LIGHTNING_USER_ID", "LIGHTNING_API_KEY",
+  "LIGHTNING_USER_ID", "LIGHTNING_API_KEY", "LIGHTNING_PYTHON",
   "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET",
   "VAST_AI_API_KEY", "RUNPOD_API_KEY", "PAPERSPACE_API_KEY",
 ];
@@ -666,8 +666,9 @@ function _runLightningScript(subcommand, extraArgs = []) {
     HF_TRAINING_REPO:         process.env.HF_TRAINING_REPO         || "ouro-checkpoints",
   };
   try {
-    const raw = execFileSync("python", [script, subcommand, ...extraArgs],
-      { encoding: "utf8", timeout: 60_000, env, stdio: ["pipe", "pipe", "pipe"] });
+    const pythonExe = process.env.LIGHTNING_PYTHON || "python";
+    const raw = execFileSync(pythonExe, [script, subcommand, ...extraArgs],
+      { encoding: "utf8", timeout: 120_000, env, stdio: ["pipe", "pipe", "pipe"] });
     return JSON.parse(raw.trim());
   } catch (err) {
     if (err.code === "ETIMEDOUT") {

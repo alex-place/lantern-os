@@ -138,7 +138,7 @@ def cmd_dispatch(args):
                 studio.switch_machine(Machine.T4)
             except Exception:
                 pass  # already on T4
-        remote_path = "/teamspace/studios/this_studio/ouro_train_lightning.py"
+        remote_path = "/home/zeus/ouro_train_lightning.py"
         studio.upload_file(script_path, remote_path)
         studio.run(f"nohup python {remote_path} > /tmp/train.log 2>&1 &")
         result = {
