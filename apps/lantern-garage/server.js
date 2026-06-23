@@ -156,6 +156,7 @@ const routes = [
   require("./routes/cubes"),
   require("./routes/csf"),
   require("./routes/training"),
+  require("./routes/gpu-training"),
   require("./routes/token-audit"),
   require("./routes/trading"),
   require("./routes/agent-performance"),
