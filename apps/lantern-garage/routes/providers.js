@@ -9,6 +9,27 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const { loadClaudeSessionUsage } = require("../lib/claude-session-usage");
+
+// Normalize a leaderboard agentId (a model OR provider name) to a provider
+// bucket so local models and cloud providers consolidate into one reliance
+// table. Anything not matching a known cloud name is an Ollama-hosted local.
+const CLOUD_NAME_MAP = {
+  anthropic: "claude", claude: "claude",
+  openai: "openai", gpt: "openai",
+  gemini: "gemini", google: "gemini",
+  mistral: "mistral", deepseek: "deepseek", cohere: "cohere",
+  perplexity: "perplexity", openrouter: "openrouter",
+  xai: "xai", grok: "xai",
+};
+function normProvider(agentId) {
+  const a = String(agentId || "").toLowerCase();
+  for (const [needle, provider] of Object.entries(CLOUD_NAME_MAP)) {
+    if (a.includes(needle)) return { provider, kind: "cloud" };
+  }
+  return { provider: "local", kind: "local" };
+}
+function fmtK(n) { return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n); }
 
 // Windows User environment sync — reads provider API keys from User scope
 const PROVIDER_KEY_ALLOWLIST = [
@@ -137,6 +158,76 @@ module.exports = async function providerRoutes(req, res, url, deps) {
       providers,
       chains: chainsByType,
       summary: { available, hasKeys, total: Object.keys(providers).length },
+    });
+    return true;
+  }
+
+  // ── GET /api/providers/reliance ────────────────────────────────────────
+  // Consolidated "who is actually doing the AI work" view. Merges cloud-Claude
+  // reliance (from Claude Code transcripts) with chat-model outcomes (from
+  // agent-performance.jsonl), normalized to one provider table with share +
+  // reliability. Σ₀: every unit is a real recorded turn or call.
+  if (req.method === "GET" && url.pathname === "/api/providers/reliance") {
+    const band = url.searchParams.get("band") || "all";
+    const bandDays = { "24h": 1, "7d": 7, "30d": 30 }[band] || null;
+    const cutoff = bandDays ? Date.now() - bandDays * 86400000 : 0;
+
+    let claude = null;
+    try { claude = loadClaudeSessionUsage(process.cwd()); } catch { /* no transcripts */ }
+    const claudeUnits = claude ? (claude.bandTurns?.[band] ?? claude.bandTurns?.all ?? claude.turns) : 0;
+
+    // Chat-model reliance from the leaderboard log.
+    const perfPath = path.resolve(__dirname, "..", "..", "data", "agent-performance.jsonl");
+    const chat = {};
+    try {
+      const raw = fs.readFileSync(perfPath, "utf8").replace(/^﻿/, "");
+      for (const line of raw.split(/\r?\n/)) {
+        if (!line) continue;
+        let r; try { r = JSON.parse(line); } catch { continue; }
+        const ts = r.timestamp ? new Date(r.timestamp).getTime() : 0;
+        if (cutoff && ts < cutoff) continue;
+        const { provider, kind } = normProvider(r.agentId);
+        if (!chat[provider]) chat[provider] = { units: 0, successes: 0, kind, models: new Set() };
+        chat[provider].units += 1;
+        if (r.success) chat[provider].successes += 1;
+        if (r.agentId) chat[provider].models.add(r.agentId);
+      }
+    } catch { /* no chat data yet */ }
+
+    const rows = [];
+    if (claude && claudeUnits > 0) {
+      const detail = Object.entries(claude.byModel || {})
+        .sort((a, b) => b[1].turns - a[1].turns)
+        .map(([m, v]) => `${m.replace(/^claude-/, "").replace(/-\d.*$/, "")} ${fmtK(v.turns)}`)
+        .join(" · ");
+      rows.push({
+        provider: "claude", label: "Claude", kind: "cloud",
+        source: "Claude Code (engineering)",
+        units: claudeUnits, successRate: null, detail,
+        outputTokens: claude.outputTokens, sessions: claude.sessions,
+      });
+    }
+    for (const [provider, c] of Object.entries(chat)) {
+      rows.push({
+        provider,
+        label: provider === "local" ? "Local (Ollama)" : provider[0].toUpperCase() + provider.slice(1),
+        kind: c.kind, source: "chat serving",
+        units: c.units,
+        successRate: c.units ? c.successes / c.units : null,
+        detail: [...c.models].slice(0, 4).join(", "),
+      });
+    }
+    const total = rows.reduce((s, r) => s + r.units, 0) || 1;
+    rows.forEach(r => { r.share = r.units / total; });
+    rows.sort((a, b) => b.units - a.units);
+
+    sendJson(res, {
+      generatedAt: new Date().toISOString(),
+      band,
+      totalUnits: rows.reduce((s, r) => s + r.units, 0),
+      hasClaudeSessions: !!claude,
+      providers: rows,
+      note: claude ? null : "No Claude Code transcripts found on this host — Claude reliance unavailable here.",
     });
     return true;
   }
