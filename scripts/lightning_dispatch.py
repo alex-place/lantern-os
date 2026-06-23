@@ -5,8 +5,9 @@ lightning_dispatch.py — programmatic Lightning AI Studio dispatch for Ouro tra
 Auth env vars (set via [System.Environment]::SetEnvironmentVariable ... 'User'):
   LIGHTNING_USER_ID         — from lightning.ai → account settings → Keys → Programmatic Login
   LIGHTNING_API_KEY         — same page
-  LIGHTNING_STUDIO_USER     — lightning.ai username (default: alexplace7)
-  LIGHTNING_STUDIO_TEAMSPACE — teamspace name (default: custom-ml-model-development-project)
+  LIGHTNING_STUDIO_ORG      — lightning.ai org (default: lantern — account has no personal
+                               "alexplace7" teamspace, only org membership)
+  LIGHTNING_STUDIO_TEAMSPACE — teamspace name (default: api-credential-management-project)
   LIGHTNING_STUDIO_NAME     — studio to start (default: ouro-training)
 
 Usage:
@@ -46,15 +47,15 @@ def _check_auth():
 
 
 STUDIO_NAME      = os.environ.get("LIGHTNING_STUDIO_NAME",      "ouro-training")
-STUDIO_USER      = os.environ.get("LIGHTNING_STUDIO_USER",      "alexplace7")
-STUDIO_TEAMSPACE = os.environ.get("LIGHTNING_STUDIO_TEAMSPACE", "custom-ml-model-development-project")
+STUDIO_ORG       = os.environ.get("LIGHTNING_STUDIO_ORG",       "lantern")
+STUDIO_TEAMSPACE = os.environ.get("LIGHTNING_STUDIO_TEAMSPACE", "api-credential-management-project")
 
 
 def _get_studio(name=None):
     Studio, _ = _sdk()
     return Studio(
         name=name or STUDIO_NAME,
-        user=STUDIO_USER,
+        org=STUDIO_ORG,
         teamspace=STUDIO_TEAMSPACE,
         create_ok=True,
     )
