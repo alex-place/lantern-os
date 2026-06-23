@@ -112,19 +112,12 @@ def make_loop_engine(base_model: str, adapter, mode: str, q: float, eps: float, 
 
 
 def main():
-    # Windows consoles default to cp1252; model replies routinely contain chars
-    # outside it (em-dashes, box-drawing, emoji). Without this, the per-prompt
-    # print() crashes mid-run (UnicodeEncodeError) and NO leaderboard row is
-    # written — the whole eval is lost on the last surprising character.
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
 
     def cprint(s):
-        """Print a progress line that can never crash on console encoding.
-        Replaces chars the current stdout can't encode (cp1252 on Windows) with
-        '?'. The full reply is preserved verbatim in the utf-8 detail JSONL."""
         enc = getattr(sys.stdout, "encoding", None) or "ascii"
         print(s.encode(enc, "replace").decode(enc, "replace"), flush=True)
 
@@ -135,7 +128,6 @@ def main():
     ap.add_argument("--num-predict", type=int, default=48)
     ap.add_argument("--timeout", type=float, default=180)
     ap.add_argument("--ts", default=str(int(time.time())), help="run timestamp (override for determinism)")
-    # in-process loop engine (E1/E2)
     ap.add_argument("--engine", choices=["http", "loop"], default="http",
                     help="http=Ollama API (default); loop=in-process Sigma0LoopLM (E1/E2)")
     ap.add_argument("--mode", choices=["qexit", "converge"], default="qexit",
@@ -186,24 +178,30 @@ def main():
         cprint(f"{r['id']:>2}  {'OK ' if ok else 'x  '} {'src' if cited else '   '} {dt:>5.1f}s  {r['expected'][:18]!r} -> {reply[:50]!r}")
 
     n = len(rows)
+    diff_n = {}
+    diff_ok = {}
+    for row, det in zip(rows, detail):
+        tier = row.get("difficulty", "unknown")
+        diff_n[tier] = diff_n.get(tier, 0) + 1
+        diff_ok[tier] = diff_ok.get(tier, 0) + int(det["ok"])
+    accuracy_by_difficulty = {
+        tier: round(diff_ok[tier] / diff_n[tier], 3)
+        for tier in sorted(diff_n)
+    }
     summary = {
-        # reconciled schema — "benchmark" key shared across all eval scripts (#776)
         "benchmark": "keystone",
         "ts": a.ts, "label": a.label, "model": a.model, "base": a.base,
         "engine": a.engine, "mode": (a.mode if a.engine == "loop" else None),
-        # #895: rollover-stage tag so rollover_gate.py can find the row for a stage.
         "rollover_stage": a.stage,
         "n": n, "accuracy": round(n_ok / n, 3) if n else 0.0,
-        "pass@1": round(n_ok / n, 3) if n else 0.0,  # alias for cross-benchmark summary
+        "pass@1": round(n_ok / n, 3) if n else 0.0,
         "avg_latency_s": round(total_dt / n, 2) if n else 0.0,
         "tok_per_s": round(approx_tokens / total_dt, 1) if total_dt else 0.0,
-        # Gate B: fraction of replies carrying an external source citation (External Reality Rule)
         "grounding_precision": round(n_cited / n, 3) if n else 0.0,
-        # Gate F (#851): served cost per CORRECT continuation — track it down vs baseline.
         **verbosity([d["reply"] for d in detail], n_ok),
-        # E1: realized latent depth; E2: did the loop contract?
         "mean_depth": round(sum(depths) / len(depths), 2) if depths else None,
         "mean_contraction": round(sum(contractions) / len(contractions), 4) if contractions else None,
+        "accuracy_by_difficulty": accuracy_by_difficulty,
     }
     os.makedirs(os.path.join(ROOT, "data", "eval", "runs"), exist_ok=True)
     with open(os.path.join(ROOT, "data", "eval", "runs", f"{a.label}-{a.ts}.jsonl"), "w", encoding="utf-8") as f:
@@ -214,6 +212,8 @@ def main():
     print(f"\n{a.label}: accuracy={summary['accuracy']*100:.0f}%  "
           f"grounding_precision={summary['grounding_precision']*100:.0f}%  "
           f"avg_latency={summary['avg_latency_s']}s  ~{summary['tok_per_s']} tok/s  (n={n})", flush=True)
+    tier_line = "  ".join(f"{tier}={score*100:.0f}%" for tier, score in sorted(accuracy_by_difficulty.items()))
+    print(f"  by difficulty: {tier_line}", flush=True)
 
 
 if __name__ == "__main__":
