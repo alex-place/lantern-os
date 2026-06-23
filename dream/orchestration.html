@@ -354,6 +354,43 @@
     </section>
   </div>
 
+  <!-- ── GPU Training Orchestration ── -->
+  <section class="panel" id="gpuTrainingSection" style="margin-top: 22px;">
+    <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      🖥️ GPU Training
+      <span class="verify-sub" id="gpuSummary">Loading…</span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-secondary" id="gpuDispatchBtn" onclick="gpuDispatch()" style="border-color:var(--accent);color:var(--accent);">▶ Dispatch</button>
+        <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollActive()">↻ Poll</button>
+        <button class="btn-secondary" onclick="renderGpuTraining()">⟳ Refresh</button>
+      </span>
+    </h2>
+    <p class="placeholder" style="margin:-4px 0 8px;font-size:0.82rem;">
+      Free-tier GPU rotation: Kaggle (30 h/wk) → SageMaker (28 h/wk) → Colab (22 h/wk) → Lightning AI (22 h/wk) · 102 h/wk total
+    </p>
+
+    <!-- Provider cards -->
+    <div id="gpuProviders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="placeholder">Loading providers…</div>
+    </div>
+
+    <!-- Active job -->
+    <div id="gpuActiveJob" style="margin-bottom:14px;"></div>
+
+    <!-- Manual dispatch controls -->
+    <div id="gpuDispatchControls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <select id="gpuProviderSelect" class="btn-secondary" style="padding:8px 10px;cursor:pointer;min-width:160px;">
+        <option value="">Auto (rotate)</option>
+      </select>
+      <input id="gpuStepsInput" type="number" value="600" min="50" max="3000" step="50"
+        style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);width:100px;">
+      <span style="font-size:0.8rem;color:var(--muted);">steps</span>
+    </div>
+
+    <!-- Recent jobs -->
+    <div id="gpuHistory" style="font-size:0.82rem;"></div>
+  </section>
+
   <!-- ── Rollover dashboard (#898) ── -->
   <section class="panel" style="margin-top: 22px;">
     <h2>🔀 Rollover · Keystone vs Claude
@@ -753,13 +790,163 @@
     `;
   }
 
+  // ── GPU Training ────────────────────────────────────────────────
+  const PROVIDER_ICONS = { kaggle: "🏆", colab: "📓", sagemaker: "☁️", paperspace: "📐", lightning: "⚡" };
+  const STATE_DOT = { available: "🟢", no_key: "🔴", unavailable: "⚫" };
+
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  async function renderGpuTraining() {
+    const data = await fetchJson("/api/gpu-training/status");
+    if (!data) {
+      $("gpuSummary").textContent = "unavailable";
+      $("gpuProviders").innerHTML = '<div class="placeholder">API not reachable</div>';
+      return;
+    }
+
+    const { providers = [], active, nextProvider, recentJobs = [], weekly_total_hours } = data;
+
+    // Summary line
+    const avail = providers.filter(p => p.state === "available").length;
+    $("gpuSummary").textContent = `${avail}/${providers.length} providers ready · ${weekly_total_hours} h/wk`;
+
+    // Provider cards
+    $("gpuProviders").innerHTML = providers.map(p => {
+      const dot = STATE_DOT[p.state] || "⚫";
+      const icon = PROVIDER_ICONS[p.provider_id] || "🖥️";
+      const autoTag = p.automatable ? '<span style="color:var(--accent);font-size:0.7rem;font-weight:600;">AUTO</span>' : '<span style="color:var(--muted);font-size:0.7rem;">manual</span>';
+      const quota = p.quota_hours_per_week > 0 ? `${p.quota_hours_per_week} h/wk` : '<span style="color:var(--muted)">no quota</span>';
+      const isNext = p.provider_id === nextProvider;
+      const border = isNext ? "border-color:var(--accent);" : "";
+      const unavailNote = p.unavailable_reason ? `<div style="color:var(--muted);font-size:0.7rem;margin-top:4px;">${escapeHtml(p.unavailable_reason)}</div>` : "";
+      return `
+        <div style="border:1px solid var(--border);${border}border-radius:10px;padding:12px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span>${icon}</span>
+            <strong style="font-size:0.88rem;">${escapeHtml(p.display)}</strong>
+            <span style="margin-left:auto;">${dot}</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;font-size:0.78rem;color:var(--muted);">
+            ${autoTag} · ${escapeHtml(p.gpu || "CPU")} · ${quota}
+          </div>
+          ${isNext ? '<div style="font-size:0.7rem;color:var(--accent);margin-top:4px;">▶ next in rotation</div>' : ""}
+          ${unavailNote}
+        </div>`;
+    }).join("");
+
+    // Populate provider select
+    const sel = $("gpuProviderSelect");
+    if (sel && sel.options.length === 1) {
+      providers.filter(p => p.automatable && p.state === "available").forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.provider_id;
+        opt.textContent = `${PROVIDER_ICONS[p.provider_id] || ""} ${p.display}`;
+        sel.appendChild(opt);
+      });
+    }
+
+    // Active job
+    if (active) {
+      const st = active.currentStatus || active.status;
+      const stColor = st === "running" ? "#22c55e" : st === "done" ? "var(--accent)" : st === "failed" ? "#ef4444" : "var(--muted)";
+      const link = active.kernelUrl
+        ? `<a href="${escapeHtml(active.kernelUrl)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.78rem;">view on Kaggle ↗</a>`
+        : active.colabBadgeUrl
+        ? `<a href="${escapeHtml(active.colabBadgeUrl)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.78rem;">open in Colab ↗</a>`
+        : "";
+      $("gpuActiveJob").innerHTML = `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <strong>Active job</strong>
+            <span style="font-size:0.78rem;padding:2px 8px;border-radius:12px;background:var(--bg);color:${stColor};border:1px solid ${stColor};">${escapeHtml(st)}</span>
+            <span style="font-size:0.78rem;color:var(--muted);">${PROVIDER_ICONS[active.provider] || ""} ${escapeHtml(active.provider)}</span>
+            ${link}
+          </div>
+          <div style="font-size:0.8rem;color:var(--muted);">
+            Job: <code>${escapeHtml(active.jobId)}</code> ·
+            Steps: <strong>${active.steps}</strong> ·
+            Est: <strong>${active.hoursEstimated} h</strong> ·
+            Started: ${escapeHtml(new Date(active.dispatchedAt).toLocaleTimeString())}
+          </div>
+        </div>`;
+    } else {
+      $("gpuActiveJob").innerHTML = '<div style="font-size:0.82rem;color:var(--muted);padding:6px 0;">No active job — use ▶ Dispatch to start one.</div>';
+    }
+
+    // Recent history
+    if (recentJobs.length) {
+      $("gpuHistory").innerHTML = `
+        <div style="font-weight:600;margin-bottom:6px;font-size:0.82rem;">Recent jobs</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+        ${recentJobs.slice(0, 8).map(j => {
+          const icon = PROVIDER_ICONS[j.provider] || "🖥️";
+          const st = j.currentStatus || j.status;
+          const stColor = st === "running" || st === "queued" ? "#22c55e" : st === "done" ? "var(--accent)" : st === "failed" ? "#ef4444" : "var(--muted)";
+          const time = j.dispatchedAt || j.polledAt ? new Date(j.dispatchedAt || j.polledAt).toLocaleString() : "";
+          return `<div style="display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.78rem;">
+            <span>${icon} ${escapeHtml(j.provider)}</span>
+            <span style="color:${stColor};">${escapeHtml(j.type === "training_poll" ? "poll:" + st : st)}</span>
+            <span style="color:var(--muted);">${j.steps ? j.steps + " steps" : ""}</span>
+            <span style="margin-left:auto;color:var(--muted);">${escapeHtml(time)}</span>
+          </div>`;
+        }).join("")}
+        </div>`;
+    }
+  }
+
+  async function gpuDispatch() {
+    const btn = $("gpuDispatchBtn");
+    const provider = $("gpuProviderSelect")?.value || "";
+    const steps = parseInt($("gpuStepsInput")?.value || "600", 10);
+    if (btn) { btn.disabled = true; btn.textContent = "Dispatching…"; }
+    try {
+      const r = await fetch("/api/gpu-training/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: provider || undefined, steps }),
+      });
+      const result = await r.json();
+      if (result.error) {
+        alert("Dispatch error: " + (result.message || result.error));
+      } else {
+        await renderGpuTraining();
+      }
+    } catch (e) {
+      alert("Dispatch failed: " + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "▶ Dispatch"; }
+    }
+  }
+
+  async function gpuPollActive() {
+    const btn = $("gpuPollBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Polling…"; }
+    try {
+      const data = await fetchJson("/api/gpu-training/status");
+      const active = data?.active;
+      if (!active?.jobId) { await renderGpuTraining(); return; }
+      await fetch("/api/gpu-training/poll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: active.provider, jobId: active.jobId }),
+      });
+      await renderGpuTraining();
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll"; }
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     const btn = $("refreshBtn");
     if (btn) btn.addEventListener("click", refreshStatus);
     refreshStatus();
     renderRollover();
+    renderGpuTraining();
     setInterval(refreshStatus, 5000);
     setInterval(renderRollover, 15000);
+    setInterval(renderGpuTraining, 30000);
   });
 })();
 </script>

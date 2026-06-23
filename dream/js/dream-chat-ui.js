@@ -662,6 +662,131 @@ function renderYoutube(query) {
   if (typeof scrollToBottom === 'function') scrollToBottom();
 }
 
+// ── Explore embed helpers ─────────────────────────────────────────────────────
+const embedBase = () => window.location.origin;
+function embedEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function embedShortDate(d) {
+  if (!d) return '';
+  const t = Date.parse(d);
+  if (Number.isNaN(t)) return '';
+  try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { return ''; }
+}
+async function embedVideos(base) {
+  const r = await fetch(`${base}/api/youtube/lantern-videos`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  const vids = (d.videos || []).slice(0, 6);
+  const featured = vids.find(v => v.featured || v.id === d.featured) || vids[0];
+  if (!featured) throw new Error('no videos returned');
+  const thumbs = vids.map(v =>
+    `<a href="https://www.youtube.com/watch?v=${embedEsc(v.id)}" target="_blank" rel="noopener noreferrer" style="flex:0 0 auto;width:118px;text-decoration:none;color:inherit">
+       <img src="https://img.youtube.com/vi/${embedEsc(v.id)}/mqdefault.jpg" alt="" loading="lazy" style="width:118px;height:66px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">
+       <div style="font-size:10.5px;line-height:1.3;margin-top:3px;max-height:27px;overflow:hidden">${embedEsc((v.title || '').slice(0, 42))}</div>
+     </a>`).join('');
+  return `<div style="font-weight:600;margin-bottom:6px">🎬 lanternYT</div>
+    <iframe src="https://www.youtube-nocookie.com/embed/${embedEsc(featured.id)}?rel=0" width="100%" height="220" style="border:0;border-radius:8px;max-width:420px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px">${thumbs}</div>`;
+}
+async function embedDiscover(base) {
+  const r = await fetch(`${base}/api/feeds/discover`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  const items = (d.items || []).slice(0, 6);
+  if (!items.length) throw new Error('no items returned');
+  const rows = items.map(it => {
+    const ext = /^https?:/i.test(it.link);
+    const meta = [
+      it.source ? `<span style="color:var(--accent);font-weight:600">${embedEsc(it.source)}</span>` : '',
+      embedShortDate(it.date) ? `<span style="opacity:0.6">${embedEsc(embedShortDate(it.date))}</span>` : '',
+    ].filter(Boolean).join(' · ');
+    return `<div style="padding:6px 0;border-top:1px solid var(--border)">
+      <a href="${embedEsc(it.link)}" ${ext ? 'target="_blank" rel="noopener noreferrer"' : ''} style="color:inherit;text-decoration:none;font-weight:600;font-size:12.5px">${embedEsc(it.title)}</a>
+      ${meta ? `<div style="font-size:11px;margin-top:2px">${meta}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div style="font-weight:600;margin:12px 0 2px">🧭 Discover — fresh reads</div>${rows}`;
+}
+async function embedBuild(base) {
+  const r = await fetch(`${base}/api/github/activity`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  const rel = (d.releases || [])[0];
+  const commits = (d.commits || []).slice(0, 4);
+  const stars = typeof d.stars === 'number' ? `★ ${d.stars}` : '';
+  const tagPill = (txt, href) =>
+    `<a href="${embedEsc(href)}" target="_blank" rel="noopener noreferrer" style="font-family:ui-monospace,monospace;background:var(--bg,#111);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--accent);text-decoration:none">${embedEsc(txt)}</a>`;
+  const relHtml = rel ? `<div style="margin-top:4px;font-size:12px">${tagPill(rel.tag, rel.url)} ${embedEsc(rel.name || '')}</div>` : '';
+  const comHtml = commits.map(c =>
+    `<div style="padding:4px 0;font-size:12px">${tagPill(c.sha, c.url)} ${embedEsc((c.msg || '').slice(0, 74))}</div>`).join('');
+  const repo = d.repo || 'alex-place/lantern-os';
+  const url = d.url || 'https://github.com/alex-place/lantern-os';
+  return `<div style="font-weight:600;margin:12px 0 2px">🛠️ Build — <a href="${embedEsc(url)}" target="_blank" rel="noopener noreferrer" style="color:inherit">${embedEsc(repo)}</a> <span style="opacity:0.6;font-weight:400">${stars}</span></div>${relHtml}<div style="margin-top:6px">${comHtml}</div>`;
+}
+function embedSupport() {
+  const tiers = [
+    ['Wanderer', '$5', 'Supporter role'],
+    ['Deep Dreamer', '$20', 'Deep Dreamer role'],
+    ['Synthesasia Guild', '$200', 'Guild (admin) role'],
+  ];
+  const cards = tiers.map(([n, p, perk]) =>
+    `<a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="flex:1 1 110px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit">
+       <div style="font-weight:700;font-size:12.5px">${n}</div>
+       <div style="font-size:1.2rem;font-weight:800">${p}<span style="font-size:.7rem;opacity:.6">/mo</span></div>
+       <div style="font-size:10.5px;opacity:.65">${perk}</div>
+     </a>`).join('');
+  return `<div style="font-weight:600;margin:12px 0 6px">♥ Support — <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon</a></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cards}</div>`;
+}
+async function renderExploreEmbed(kind, userText) {
+  addUserBubble(userText);
+  const messages = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = '<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Pulling that up…</div>';
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  const base = embedBase();
+  const want = k => kind === k || kind === 'all';
+  const fail = (label, e) => {
+    const m = (e && e.message) || String(e || 'error');
+    const hint = /HTTP 404/.test(m) ? ' — route not deployed (restart the server / merge the PR)' : '';
+    return `<div style="font-size:12px;opacity:0.65;margin:8px 0">⚠ ${label} unavailable (${embedEsc(m)})${hint}</div>`;
+  };
+  const parts = [];
+  if (want('videos'))   { try { parts.push(await embedVideos(base)); }   catch (e) { parts.push(fail('Videos', e)); } }
+  if (want('discover')) { try { parts.push(await embedDiscover(base)); } catch (e) { parts.push(fail('Discover', e)); } }
+  if (want('build'))    { try { parts.push(await embedBuild(base)); }    catch (e) { parts.push(fail('Build', e)); } }
+  if (want('support'))  { try { parts.push(embedSupport()); }            catch (e) { parts.push(fail('Support', e)); } }
+  parts.push(`<div style="margin-top:10px;font-size:11px;opacity:0.6">See more on <a href="/explore.html" style="color:var(--accent)">Explore →</a></div>`);
+  bubble.innerHTML = parts.filter(Boolean).join('');
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+}
+
+// ── Explore embed intent detection ───────────────────────────────────────────
+function detectEmbedIntent(text) {
+  const s = text.trim();
+  const bang = s.match(/^!(videos?|watch|youtube|discover|news|reads?|feed|build|github|releases?|commits?|support|patreon|tiers?|donate|embeds?)\b/i);
+  if (bang) {
+    const b = bang[1].toLowerCase();
+    if (/^(videos?|watch|youtube)$/.test(b)) return 'videos';
+    if (/^(discover|news|reads?|feed)$/.test(b)) return 'discover';
+    if (/^(build|github|releases?|commits?)$/.test(b)) return 'build';
+    if (/^(support|patreon|tiers?|donate)$/.test(b)) return 'support';
+    if (/^embeds?$/.test(b)) return 'all';
+  }
+  if (s.startsWith('!')) return null;
+  const ask = /\b(show|see|view|give|got|have|where|what'?s?|which|how|latest|recent|any|list|pull up|display|open)\b/i.test(s);
+  if (!ask) return null;
+  if (/\byoutube\b/i.test(s) || /\b(latest|recent|your|the|lantern)\b[^?]*\bvideos?\b/i.test(s)) return 'videos';
+  if (/\b(discover|fresh reads?|news feed|articles?|rss feed|reading list)\b/i.test(s) || /\bwhat'?s? new\b/i.test(s)) return 'discover';
+  if (/\b(github|releases?|recent commits?|repo activity|build (status|activity))\b/i.test(s)) return 'build';
+  if (/\b(patreon|membership|tiers?|how (can i|to) support|support the (project|work))\b/i.test(s)) return 'support';
+  if (/\b(embeds?|explore (page |content |feeds?)|what can you (show|surface))\b/i.test(s)) return 'all';
+  return null;
+}
+
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage() {
   const input = document.getElementById('input');
@@ -924,6 +1049,8 @@ async function sendMessage() {
     hideStopButton();
     streamEnded = true;            // stop scheduling and neutralize any in-flight rAF
     if (rafId) cancelAnimationFrame(rafId);
+    isSending = false;
+    document.getElementById('send-btn').disabled = false;
   }
 
   cursor.remove();
@@ -1030,9 +1157,6 @@ async function sendMessage() {
   }
 
   if (!didError) history.push({ role: 'assistant', text: fullText });
-
-  isSending = false;
-  document.getElementById('send-btn').disabled = false;
 }
 
 // ── Auto-expand textarea ──────────────────────────────────────────────────────
