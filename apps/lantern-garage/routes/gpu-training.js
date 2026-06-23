@@ -15,6 +15,7 @@ const {
 } = require("../lib/training-dispatcher");
 
 const JOBS_LOG_REL = ["data", "self-improvement", "training-jobs.jsonl"];
+const CONVERGENCE_LOG_REL = ["data", "training", "convergence-records.jsonl"];
 
 // Only these keys may be set via the UI — prevents arbitrary env injection
 const GPU_KEY_ALLOWLIST = [
@@ -64,12 +65,16 @@ function _syncUserEnvKeys() {
   }
 }
 
-function readJobsLog(fs, path, repoRoot) {
-  const p = path.join(repoRoot, ...JOBS_LOG_REL);
+function readJsonl(fs, path, repoRoot, relPath) {
+  const p = path.join(repoRoot, ...relPath);
   try {
     const lines = fs.readFileSync(p, "utf8").trim().split("\n").filter(Boolean);
     return lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   } catch { return []; }
+}
+
+function readJobsLog(fs, path, repoRoot) {
+  return readJsonl(fs, path, repoRoot, JOBS_LOG_REL);
 }
 
 function activeJob(jobs) {
@@ -111,6 +116,9 @@ module.exports = async function gpuTrainingRoutes(req, res, url, deps) {
     const active = activeJob(jobs);
     const nextProvider = rotateProvider(active?.provider || null);
 
+    const crAll = readJsonl(fs, path, repoRoot, CONVERGENCE_LOG_REL);
+    const recentConvergence = crAll.slice(-10).reverse();
+
     sendJson(res, {
       providers: pcsf?.providers || [],
       rotation_order: pcsf?.rotation_order || [],
@@ -119,6 +127,7 @@ module.exports = async function gpuTrainingRoutes(req, res, url, deps) {
       nextProvider,
       recentJobs: last20,
       totalJobs: jobs.length,
+      recentConvergence,
     });
     return true;
   }

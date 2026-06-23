@@ -13,9 +13,67 @@ const { appendJsonlQueued } = require("./file-queue");
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const JOBS_LOG = path.join(REPO_ROOT, "data", "self-improvement", "training-jobs.jsonl");
+const CONVERGENCE_LOG = path.join(REPO_ROOT, "data", "training", "convergence-records.jsonl");
 const GPU_PCSF = path.join(REPO_ROOT, "data", "pcsf", "gpu-training.pcsf.json");
 
 function isoNow() { return new Date().toISOString(); }
+
+// !convergence — every training event gets a ConvergenceRecord appended to CONVERGENCE_LOG.
+// Format: { timestamp, runId, type, provider, claim, evidence, confidence, source }
+// Nothing is accepted without evidence; confidence is observable (1.0 = directly verified).
+async function logConvergenceRecord(record) {
+  const cr = {
+    timestamp: isoNow(),
+    runId: record.jobId || record.testType || record.type,
+    type: record.type,
+    provider: record.provider,
+    claim: _buildClaim(record),
+    evidence: _buildEvidence(record),
+    confidence: _buildConfidence(record),
+    source: record.source || "training_dispatcher",
+  };
+  ensureDir(CONVERGENCE_LOG);
+  await appendJsonlQueued(CONVERGENCE_LOG, cr);
+}
+
+function _buildClaim(r) {
+  if (r.type === "training_dispatch") return `Dispatched ${r.steps || "?"}-step training run on ${r.provider}`;
+  if (r.type === "training_poll")     return `${r.provider} job ${r.jobId} is ${r.status}`;
+  if (r.type === "training_run")      return r.claim || `Local training run completed on ${r.provider}`;
+  if (r.type === "provider_test")     return r.claim || `Provider test: ${r.provider} ${r.testType}`;
+  return `${r.type} on ${r.provider}`;
+}
+
+function _buildEvidence(r) {
+  if (r.type === "training_dispatch") {
+    return { jobId: r.jobId, kernelUrl: r.kernelUrl || r.studioName, steps: r.steps,
+             cliOutput: r.cliOutput ? r.cliOutput.slice(0, 200) : undefined };
+  }
+  if (r.type === "training_poll") {
+    return { jobId: r.jobId, rawStatus: r.rawStatus, failureMessage: r.failureMessage };
+  }
+  return r.evidence || { status: r.status };
+}
+
+// Single write point: job log + convergence record in one call.
+async function logJob(record) {
+  await logJob(record);
+  logConvergenceRecord(record).catch(() => {});
+}
+
+function _buildConfidence(r) {
+  if (r.confidence !== undefined) return r.confidence;
+  if (r.type === "training_run")  return 1.0;
+  if (r.type === "provider_test") return r.status === "done" ? 1.0 : 0.5;
+  if (r.type === "training_poll") {
+    if (r.status === "done")    return 1.0;
+    if (r.status === "running") return 0.7;
+    if (r.status === "failed")  return 1.0;
+    return 0.5;
+  }
+  if (r.type === "training_dispatch") return 0.6; // dispatched but not yet confirmed running
+  return 0.5;
+}
 
 function ensureDir(p) { fs.mkdirSync(path.dirname(p), { recursive: true }); }
 
@@ -98,8 +156,7 @@ async function packAndUploadCheckpoint(checkpointDir, hfRepoId) {
     hfRepo,
     uploadedAt: isoNow(),
   };
-  ensureDir(JOBS_LOG);
-  await appendJsonlQueued(JOBS_LOG, record);
+  await logJob(record);
   return record;
 }
 
@@ -127,8 +184,7 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
     notebookTemplate: _notebookTemplate(provider, checkpointUri, steps),
     dispatchedAt: isoNow(),
   };
-  ensureDir(JOBS_LOG);
-  await appendJsonlQueued(JOBS_LOG, record);
+  await logJob(record);
   return record;
 }
 
@@ -234,8 +290,7 @@ async function _dispatchKaggle(checkpointUri, steps) {
     cliOutput: raw.trim(),
     dispatchedAt: isoNow(),
   };
-  ensureDir(JOBS_LOG);
-  await appendJsonlQueued(JOBS_LOG, record);
+  await logJob(record);
   return record;
 }
 
@@ -277,8 +332,7 @@ async function _dispatchPaperspace(checkpointUri, steps) {
     hoursEstimated,
     dispatchedAt: isoNow(),
   };
-  ensureDir(JOBS_LOG);
-  await appendJsonlQueued(JOBS_LOG, record);
+  await logJob(record);
   return record;
 }
 
@@ -316,8 +370,7 @@ async function _dispatchColab(checkpointUri, steps) {
     ],
     dispatchedAt: isoNow(),
   };
-  ensureDir(JOBS_LOG);
-  await appendJsonlQueued(JOBS_LOG, record);
+  await logJob(record);
   return record;
 }
 
@@ -491,23 +544,57 @@ else:
 }
 
 function _notebookTemplate(provider, checkpointUri, steps) {
-  const hfRepo = process.env.HF_TRAINING_REPO || "ouro-checkpoints";
-  const filename = checkpointUri ? path.basename(checkpointUri) : "checkpoint.csf";
-  return [
-    `# Ouro training continuation — ${steps} steps on ${provider}`,
-    `# Provider: ${provider} | Checkpoint: ${checkpointUri || "(none — cold start)"}`,
-    "!pip install -q huggingface_hub zstandard",
-    "import csf, subprocess, sys",
-    "from huggingface_hub import hf_hub_download, upload_file",
-    `local_csf = hf_hub_download(repo_id="${hfRepo}", filename="${filename}", repo_type="model")`,
-    "csf.unpack(local_csf, '/tmp/checkpoint')",
-    `subprocess.run([sys.executable, 'scripts/train_ouro.py',`,
-    `  '--resume_from', '/tmp/checkpoint', '--max_steps', '${steps}',`,
-    `  '--seq_len', '1536', '--output_dir', '/tmp/output'], check=True)`,
-    "manifest = csf.pack(['/tmp/output'], '/tmp/output.csf')",
-    `upload_file('/tmp/output.csf', 'output.csf', repo_id="${hfRepo}", repo_type='model')`,
-    "print('Done — checkpoint uploaded to HuggingFace Hub')",
-  ].join("\n");
+  const hfRepo = process.env.HF_TRAINING_REPO || "lanternfounder/ouro-checkpoints";
+  const hfToken = process.env.HUGGINGFACE_TOKEN || "";
+  const checkpointFile = checkpointUri ? path.basename(checkpointUri) : "";
+  // Returns a bash startup script (Paperspace startupScript / Colab init)
+  return `#!/usr/bin/env bash
+set -euo pipefail
+echo "=== Ouro training startup: ${steps} steps on ${provider} ==="
+
+pip install -q "transformers>=4.40,<4.53" peft bitsandbytes datasets accelerate \\
+  scipy huggingface_hub zstandard
+
+# Clone repo (skip LFS blobs — budget often exceeded)
+REPO=/tmp/lantern-os
+if [ ! -d "$REPO" ]; then
+  GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 \\
+    https://github.com/alex-place/lantern-os "$REPO"
+fi
+cd "$REPO"
+export PYTHONPATH="$REPO/src:$PYTHONPATH"
+
+# Pull checkpoint from HF if provided
+RESUME_ARGS=""
+if [ -n "${checkpointFile}" ]; then
+  python3 -c "
+from huggingface_hub import hf_hub_download
+hf_hub_download(repo_id='${hfRepo}', filename='${checkpointFile}',
+    repo_type='model', local_dir='/tmp/checkpoint')
+"
+  RESUME_ARGS="--resume_from /tmp/checkpoint"
+fi
+
+# Run training
+HF_HOME=/tmp/hf-cache python3 scripts/train-qlora-ouro.py \\
+  --base ByteDance/Ouro-1.4B \\
+  --data models/lantern-sigma0-coder/training-data.jsonl \\
+  --out /tmp/output \\
+  --max-steps ${steps} \\
+  --seq 1536 \\
+  $RESUME_ARGS
+
+# Pack + upload checkpoint
+python3 -c "
+import csf, sys
+sys.path.insert(0, '$REPO/src')
+from huggingface_hub import upload_file
+manifest = csf.pack(['/tmp/output'], '/tmp/output.csf')
+upload_file('/tmp/output.csf', 'output.csf', repo_id='${hfRepo}', repo_type='model')
+print('checkpoint uploaded to HuggingFace Hub')
+"
+echo "=== Done ==="
+`;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,7 +607,7 @@ async function pollJobStatus(provider, jobId) {
   if (provider === "lightning")  return _pollLightning(jobId);
   // SageMaker, Colab — manual check
   const update = { type: "training_poll", provider, jobId, status: "manual_required", polledAt: isoNow() };
-  await appendJsonlQueued(JOBS_LOG, update);
+  await logJob(update);
   return update;
 }
 
@@ -566,8 +653,7 @@ async function _dispatchLightning(checkpointUri, steps) {
     logPath: result.log_path,
     dispatchedAt: isoNow(),
   };
-  ensureDir(JOBS_LOG);
-  await appendJsonlQueued(JOBS_LOG, record);
+  await logJob(record);
   return record;
 }
 
@@ -590,7 +676,7 @@ async function _pollLightning(studioName) {
     status: result.status, studioStatus: result.studio_status,
     lastLogLine: result.last_log_line, polledAt: isoNow(),
   };
-  await appendJsonlQueued(JOBS_LOG, update);
+  await logJob(update);
   return update;
 }
 
@@ -624,7 +710,7 @@ async function _pollKaggle(jobId) {
     failureMessage: data.failureMessage || null,
     polledAt: isoNow(),
   };
-  await appendJsonlQueued(JOBS_LOG, update);
+  await logJob(update);
   return update;
 }
 
@@ -647,7 +733,7 @@ async function _pollPaperspace(jobId) {
   const status = statusMap[data.state] || data.state;
 
   const update = { type: "training_poll", provider: "paperspace", jobId, status, rawStatus: data.state, polledAt: isoNow() };
-  await appendJsonlQueued(JOBS_LOG, update);
+  await logJob(update);
   return update;
 }
 

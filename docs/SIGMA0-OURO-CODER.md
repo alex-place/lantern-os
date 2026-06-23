@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-19
-updated: 2026-06-21
+updated: 2026-06-23
 ---
 
 # Σ₀ Ouro Coder — the local coding agent (single source of truth)
@@ -91,7 +91,7 @@ rebuild it**; the live retrain pipeline is [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0
 | | |
 |---|---|
 | **Base model** | `ByteDance/Ouro-1.4B-Thinking` (weight-tied recurrent transformer) |
-| **Σ₀ tune** | QLoRA on the Σ₀ Claude-session set ([`scripts/train-qlora-ouro.py`](../scripts/train-qlora-ouro.py); 3 epochs, 4-bit nf4, LoRA r=16/α=32 over `all-linear`, lr 2e-4, seq 1024) |
+| **Σ₀ tune** | QLoRA on the Σ₀ Claude-session set ([`scripts/train-qlora-ouro.py`](../scripts/train-qlora-ouro.py); 3 epochs, 4-bit nf4, LoRA r=16/α=32 over `all-linear`, lr 2e-4, **seq 1536**) |
 | **Adaptive depth** | `Sigma0LoopLM` Q-exit ([`src/sigma0/loop_lm.py`](../src/sigma0/loop_lm.py)) — exit at the first recurrent step where `CDF(t) ≥ q` |
 | **Serving** | [`scripts/ouro_serve.py`](../scripts/ouro_serve.py) — drop-in **Ollama HTTP API** (`ouro:latest` on `:11434`) |
 | **Integration** | transparent: the coder/agent path POSTs to `OLLAMA_BASE_URL` (default `:11434`) — point it at ouro_serve and the whole path uses Ouro |
@@ -209,12 +209,17 @@ model-broker leaderboard — that's a follow-up.)
 Decode-quality guards apply on both paths to kill small-model degeneration:
 `OURO_REP_PENALTY=1.3`, `OURO_NO_REPEAT_NGRAM=3`, greedy by default (`OURO_SAMPLE=1` to
 sample); `OURO_UT_STEPS` overrides the recurrent-step count. The API re-prompt loop (§2 above)
-is gated separately by `LOOP_REASONER=1`. Ouro's custom modeling code needs **transformers
-4.57** (pinned only in the train script — no `transformers` entry in `requirements.txt`).
+is gated separately by `LOOP_REASONER=1`. Ouro's custom modeling code is **tested locally on transformers 4.57.6** (current local `.venv-train`).
+`ROPE_INIT_FUNCTIONS['default']` is present in 4.57.6 but was removed in some intermediate 4.5x
+builds — the monkey-patch in `train-qlora-ouro.py` handles both cases. `OuroConfig.pad_token_id`
+is `None` and must be patched to `bos_token_id` before `from_pretrained`; this is done in the
+script. Cloud dispatches (Kaggle) pin `transformers>=4.40,<4.53` to avoid the affected range; the
+local env does not need the cap since 4.57.6 has the key restored. No `transformers` entry in
+`requirements.txt` (training env only).
 
 ## Run it
 ```bash
-# 1. (optional) train the Σ₀ adapter — needs transformers 4.57 + a CUDA GPU
+# 1. (optional) train the Σ₀ adapter — needs transformers>=4.40 + a CUDA GPU (local: 4.57.6 works)
 python scripts/train-qlora-ouro.py --epochs 3
 
 # 2. serve Ouro as a drop-in Ollama model on :11434
@@ -258,6 +263,38 @@ the **Reason/Act** stages; every turn still emits a PCSF receipt + Convergence R
   the model-broker leaderboard (that integration is a follow-up).
 - **Realized-depth / training-loss numbers are not persisted** to eval/log artifacts yet —
   treat `python -m sigma0.loop_lm` / console output as live observations, not benchmarks.
+
+## Training status (2026-06-23)
+
+Cloud GPU dispatch system (`orchestration.html` → `routes/gpu-training.js` → `lib/training-dispatcher.js`)
+is wired and tested. Providers are configured via `data/pcsf/gpu-training.pcsf.json`; credentials live in
+Windows User-scope env vars and are synced into `process.env` at first call.
+
+| Provider | Status |
+|---|---|
+| **Kaggle** (T4/P100, 30 h/wk free) | Kernel v7 dispatched ✓ — running with all fixes; poll confirms `status:running` |
+| **Lightning AI** (T4 on-demand) | Studio "ouro-training" dispatched ✓ — background run in progress |
+| **HuggingFace Hub** (`lanternfounder/ouro-checkpoints`) | ✓ upload + download roundtrip passes |
+| **Paperspace** | ⚠ API credentials valid; `GET /v1/notebooks` accessible; `POST /v1/notebooks` returns 500 for all machine types — Gradient notebooks plan may be inactive on this account. Script is correct (fixed bash template + git clone + LFS skip). Needs account upgrade or manual UI dispatch. |
+| **Colab / SageMaker** | ✓ smoke-test passes (credentials present; full dispatch untested) |
+
+**Bugs fixed to reach this state (2026-06-22–23):**
+
+| Bug | Fix |
+|---|---|
+| `KeyError: 'default'` in `ROPE_INIT_FUNCTIONS` (transformers ≥4.53) | Monkey-patch in `train-qlora-ouro.py`; version pin `>=4.40,<4.53` in Kaggle notebook |
+| `AttributeError: OuroConfig has no attribute 'pad_token_id'` | Load `AutoConfig` first; set `pad_token_id = bos_token_id`; pass `config=` to both `from_pretrained` calls |
+| Kaggle LFS clone failure (LFS budget exceeded) | `GIT_LFS_SKIP_SMUDGE=1` in clone subprocess |
+| Kaggle 409 Conflict on kernel push | Fixed `kernel_id` slug in PCSF + title spacing trick to control Kaggle's slugifier |
+| `HF_HOME=D:/hf-cache` crashing on Linux/Kaggle | Guarded with `if os.name == "nt"` in script; Kaggle notebook overrides with `/kaggle/working/hf-cache` |
+| Lightning "No such file" — bare script name | Use full path `/teamspace/studios/this_studio/ouro_train_lightning.py` |
+| Lightning "Studio already running on T4" error | Check `studio.status` before calling `start()`; only call it if not already running |
+| Lightning `--checkpoint-uri ""` argparse crash | Only append flag when `checkpointUri` is non-empty |
+| Paperspace 404 (domain migration) | `api.paperspace.io` → `api.paperspace.com` in dispatcher + PCSF |
+
+Seq-length note: audited the training corpus p99 at 1219 tokens; bumped to **seq=1536** so the tail of
+function-call outputs is no longer truncated. Kaggle T4 (16 GB) fits this without swapping to CPU;
+Kaggle P100 also confirmed (same VRAM tier).
 
 ## Related
 - [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) — the offline retrain flywheel that improves this adapter
