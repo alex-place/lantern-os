@@ -9,6 +9,7 @@ const { execFileSync } = require("child_process");
 
 const {
   dispatchTrainingJob,
+  dispatchAllAutomatable,
   pollJobStatus,
   rotateProvider,
   loadGpuPcsf,
@@ -154,6 +155,22 @@ module.exports = async function gpuTrainingRoutes(req, res, url, deps) {
 
     try {
       const result = await dispatchTrainingJob(provider, checkpointUri, steps);
+      sendJson(res, result);
+    } catch (e) {
+      sendJson(res, { error: e.message }, 500);
+    }
+    return true;
+  }
+
+  // ── POST /api/gpu-training/dispatch-all ─────────────────────────
+  // Fan out to ALL automatable providers with quota simultaneously.
+  // PCSF state updated per provider: "dispatched" on success, "degraded" on error.
+  if (url.pathname === "/api/gpu-training/dispatch-all" && req.method === "POST") {
+    let body = {};
+    try { body = JSON.parse(await collectRequestBody(req)); } catch {}
+    const { checkpointUri = "", steps = 600 } = body;
+    try {
+      const result = await dispatchAllAutomatable(checkpointUri, Number(steps));
       sendJson(res, result);
     } catch (e) {
       sendJson(res, { error: e.message }, 500);

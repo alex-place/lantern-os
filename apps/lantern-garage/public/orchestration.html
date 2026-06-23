@@ -1138,73 +1138,56 @@
   // ── Training Plan Executor ────────────────────────────────────────────────
   async function executePlan() {
     const btn = $("planExecuteBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Executing…"; }
+    if (btn) { btn.disabled = true; btn.textContent = "Dispatching all…"; }
 
-    const status = $("planExecutionStatus");
-    if (status) status.style.display = "block";
+    const statusEl = $("planExecutionStatus");
+    if (statusEl) statusEl.style.display = "block";
 
-    const errors = [];
+    const progressEl = $("planProgress");
+    if (progressEl) progressEl.innerHTML = "";
 
     try {
-      const providers = ["kaggle", "lightning", "sagemaker", "colab"];
-      const results = [];
+      const r = await fetch("/api/gpu-training/dispatch-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steps: 600 }),
+      });
+      const result = await r.json();
 
-      for (const provider of providers) {
-        const progressEl = $("planProgress");
+      if (result.error && !result.dispatched?.length) {
+        alert("Dispatch-all failed: " + result.error);
+        return;
+      }
+
+      const dispatched = result.dispatched || [];
+      const errors = [];
+
+      for (const d of dispatched) {
         if (progressEl) {
           const badge = document.createElement("div");
-          badge.style.cssText = "padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.75rem;color:var(--muted);";
-          badge.textContent = `${provider}: dispatching…`;
+          badge.style.cssText = "padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.75rem;";
+          if (d.error) {
+            badge.style.color = "#ef4444";
+            badge.textContent = `${d.provider}: ${d.error}`;
+            errors.push(`${d.provider}: ${d.error}`);
+          } else {
+            badge.style.color = "#22c55e";
+            badge.textContent = `${d.provider}: dispatched (${d.status || "queued"})`;
+          }
           progressEl.appendChild(badge);
         }
-
-        try {
-          const r = await fetch("/api/gpu-training/dispatch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ provider, steps: 600 }),
-          });
-          const result = await r.json();
-          results.push({ provider, success: !result.error, result });
-
-          if (progressEl) {
-            const badge = progressEl.lastChild;
-            if (result.error) {
-              const status = result.error;
-              const msg = result.message || status;
-              badge.style.color = "#ef4444";
-              badge.textContent = `${provider}: ${status}`;
-              errors.push(`${provider}: ${msg}`);
-            } else {
-              badge.style.color = "#22c55e";
-              badge.textContent = `${provider}: queued`;
-            }
-          }
-        } catch (e) {
-          results.push({ provider, success: false, error: e.message });
-          if (progressEl) {
-            const badge = progressEl.lastChild;
-            badge.style.color = "#ef4444";
-            badge.textContent = `${provider}: error`;
-          }
-          errors.push(`${provider}: ${e.message}`);
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      const successful = results.filter(r => r.success).length;
-
-      // Show error details if any
-      if (errors.length > 0) {
-        const errEl = $("planErrors");
-        if (errEl) {
-          errEl.textContent = "Issues: " + errors.join(" • ");
-          errEl.style.display = "block";
-        }
+      const errEl = $("planErrors");
+      if (errors.length > 0 && errEl) {
+        errEl.textContent = "Issues: " + errors.join(" • ");
+        errEl.style.display = "block";
+      } else if (errEl) {
+        errEl.style.display = "none";
       }
 
-      alert(`Weekly plan executed!\n\n${successful}/${providers.length} providers dispatched successfully.\n\nCheck Recent runs below for status.`);
+      const successful = dispatched.filter(d => !d.error).length;
+      alert(`Dispatch complete!\n\n${successful}/${dispatched.length} automatable providers dispatched.\nPCSF state updated — degraded providers marked.\n\nCheck Recent runs below.`);
 
       await renderGpuTraining();
       await refreshPlanStatus();
