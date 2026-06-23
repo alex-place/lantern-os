@@ -476,6 +476,18 @@ Be honest. If there's not enough data, say so.`;
     });
 
     if (reply) {
+      _appendConvergenceRecord({
+        hypothesis: `${agent.name} synthesizes ${recentDreams.length} recent dream entries`,
+        evidence: recentDreams.slice(0, 5).map((d) => String(d.text || "").slice(0, 150)),
+        result: reply,
+        fix: null,
+        confidence: Math.min(0.5 + recentDreams.length * 0.08, 0.9),
+        reasoner: agent.id || "lantern",
+        verified: false,
+        priority: "LOW",
+        loop_stage: "Converge",
+        tags: ["dream-convergence", "!convergance", agent.id || "lantern"],
+      });
       return {
         reply: `✦ Convergence:\n\n${reply}`,
         agent: agent.name,
@@ -495,6 +507,26 @@ Be honest. If there's not enough data, say so.`;
     online: false,
     source: "convergence",
   };
+}
+
+// Appends a convergence record to data/convergence/records.jsonl.
+// Called from handleConvergenceCommand and verifyResponse.
+function _appendConvergenceRecord(fields) {
+  const id = "cr-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  const record = {
+    id,
+    timestamp: new Date().toISOString(),
+    ...fields,
+  };
+  try {
+    const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+    const RECORDS_PATH = path.join(REPO_ROOT, "data", "convergence", "records.jsonl");
+    fs.mkdirSync(path.dirname(RECORDS_PATH), { recursive: true });
+    fs.appendFileSync(RECORDS_PATH, JSON.stringify(record) + "\n", "utf8");
+  } catch (e) {
+    console.error("[convergence] record write failed:", e.message);
+  }
+  return record;
 }
 
 // Door-series canon — loaded from MCP resource (data/contexts/doors.json)
@@ -1396,4 +1428,5 @@ module.exports = {
   isVerifyEnabled,
   calibrationEventsFor,
   tokenAudit,
+  appendConvergenceRecord: _appendConvergenceRecord,
 };

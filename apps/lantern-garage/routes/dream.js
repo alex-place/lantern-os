@@ -355,11 +355,67 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
 
   if ((url.pathname === "/api/dream/stream" && req.method === "GET") ||
       (url.pathname === "/api/dream/chat/stream" && req.method === "POST")) {
+    const { appendConvergenceRecord } = require("../lib/dream-chat");
+
+    // Intercept SSE writes so we can log every model interaction as a convergence
+    // record after the stream finishes — success or failure.
+    const sseChunks = [];
+    const origWrite = res.write.bind(res);
+    const origEnd   = res.end.bind(res);
+    res.write = (chunk, ...rest) => { sseChunks.push(String(chunk)); return origWrite(chunk, ...rest); };
+
+    // Parse the accumulated SSE buffer for the done event after the stream ends.
+    const _logInteraction = (inputMessage, errorText) => {
+      try {
+        const raw = sseChunks.join('');
+        let responseText = '', provider = 'unknown', agentId = 'lantern';
+        // Extract done-event payload
+        const doneMatch = raw.match(/^data:\s*(\{[^\n]*"type"\s*:\s*"done"[^\n]*\})/m);
+        if (doneMatch) {
+          try {
+            const d = JSON.parse(doneMatch[1]);
+            if (d.cleanText) responseText = d.cleanText;
+            if (d.source || d.provider) provider = d.source || d.provider;
+            if (d.routeLabel) agentId = d.routeLabel.split('·')[0].trim();
+          } catch { /* parse best-effort */ }
+        }
+        if (!responseText) {
+          // Fallback: concatenate all token events
+          const toks = [...raw.matchAll(/^data:\s*(\{[^\n]*"type"\s*:\s*"token"[^\n]*\})/mg)];
+          responseText = toks.map(m => { try { return JSON.parse(m[1]).text || ''; } catch { return ''; } }).join('');
+        }
+        const failed = !!errorText;
+        appendConvergenceRecord({
+          hypothesis: inputMessage ? `model interaction: "${String(inputMessage).slice(0, 100)}"` : 'model interaction',
+          evidence: inputMessage ? [String(inputMessage).slice(0, 500)] : [],
+          result: failed ? `ERROR: ${errorText}` : (responseText.slice(0, 1000) || '(empty response)'),
+          fix: null,
+          confidence: failed ? 0.1 : (responseText.length > 20 ? 0.6 : 0.3),
+          reasoner: provider || 'unknown',
+          verified: false,
+          priority: failed ? 'HIGH' : 'LOW',
+          loop_stage: 'Act',
+          tags: ['chat-interaction', provider, agentId, ...(failed ? ['failure'] : [])].filter(Boolean),
+        });
+      } catch (e) {
+        console.error('[convergence] chat log failed:', e.message);
+      }
+    };
+
+    // Override res.end to fire the log after the socket closes.
+    res.end = (...args) => {
+      const result = origEnd(...args);
+      res.write = origWrite; // restore in case of reuse
+      _logInteraction('', null);
+      return result;
+    };
+
     try {
       await handleStreamChat(req, url, res);
     } catch (err) {
       // Honest fallback: never leave an SSE socket hanging on an internal throw.
       console.error("[dream/stream] handler error (non-fatal to client):", err && err.stack ? err.stack : err);
+      _logInteraction('', String(err && err.message || err));
       if (!res.writableEnded) {
         try {
           if (!res.headersSent) {
@@ -371,12 +427,93 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
               "X-Accel-Buffering": "no",
             });
           }
-          res.write(`data: ${JSON.stringify({ type: "error", text: "The streaming engine hit an internal error." })}\n\n`);
-          res.write(`data: ${JSON.stringify({ type: "done", source: "offline", online: false, error: String(err && err.message || err) })}\n\n`);
-          res.end();
+          origWrite(`data: ${JSON.stringify({ type: "error", text: "The streaming engine hit an internal error." })}\n\n`);
+          origWrite(`data: ${JSON.stringify({ type: "done", source: "offline", online: false, error: String(err && err.message || err) })}\n\n`);
+          origEnd();
         } catch { /* socket already gone */ }
       }
     }
+    return true;
+  }
+
+  // ── Debug: validate chat pipeline end-to-end ─────────────────────────────
+  // POST /api/debug/chat-validate — sends a synthetic test turn, reads the SSE
+  // response, verifies a convergence record was appended, returns pass/fail.
+  // Only available in dev / operator context (not gated further — server is local).
+  if (url.pathname === "/api/debug/chat-validate" && req.method === "POST") {
+    const { appendConvergenceRecord } = require("../lib/dream-chat");
+    const recordsBefore = (() => {
+      try {
+        const p = path.join(repoRoot, "data", "convergence", "records.jsonl");
+        return fs.readFileSync(p, "utf8").trim().split("\n").filter(Boolean).length;
+      } catch { return 0; }
+    })();
+    const t0 = Date.now();
+    let ok = false, responsePreview = '', errorText = '';
+    try {
+      const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
+      const payload = JSON.stringify({ message: "__debug_validate__", user: "debug" });
+      const streamRes = await new Promise((resolve, reject) => {
+        const mod = require(port === 443 ? "https" : "http");
+        const r = mod.request({ host: "127.0.0.1", port, path: "/api/dream/chat/stream", method: "POST",
+          headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } }, resolve);
+        r.on("error", reject);
+        r.write(payload); r.end();
+      });
+      await new Promise((resolve) => {
+        let buf = '';
+        streamRes.on("data", (chunk) => {
+          buf += chunk.toString();
+          const lines = buf.split("\n");
+          buf = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const ev = JSON.parse(line.slice(6));
+              if (ev.type === "token" && ev.text) responsePreview += ev.text;
+              if (ev.type === "done") { ok = true; resolve(); }
+              if (ev.type === "error") { errorText = ev.text || "server error event"; }
+            } catch { /* skip */ }
+          }
+        });
+        streamRes.on("end", resolve);
+        streamRes.on("error", (e) => { errorText = e.message; resolve(); });
+        setTimeout(resolve, 30000);
+      });
+    } catch (e) { errorText = e.message; }
+    const latencyMs = Date.now() - t0;
+    // Wait briefly for the convergence record to be flushed, then count
+    await new Promise(r => setTimeout(r, 200));
+    const recordsAfter = (() => {
+      try {
+        const p = path.join(repoRoot, "data", "convergence", "records.jsonl");
+        return fs.readFileSync(p, "utf8").trim().split("\n").filter(Boolean).length;
+      } catch { return 0; }
+    })();
+    const recordWritten = recordsAfter > recordsBefore;
+    if (!recordWritten && ok) {
+      // Write a diagnostic record so failures are always auditable
+      appendConvergenceRecord({
+        hypothesis: "debug-validate: convergence record not written after successful stream",
+        evidence: [`latencyMs: ${latencyMs}`, `responsePreview: ${responsePreview.slice(0, 100)}`],
+        result: "record missing — _logInteraction may have failed silently",
+        confidence: 0.9,
+        reasoner: "debug-validate",
+        verified: true,
+        priority: "HIGH",
+        loop_stage: "Verify",
+        tags: ["debug-validate", "failure", "missing-record"],
+      });
+    }
+    sendJson(res, {
+      ok,
+      latencyMs,
+      responsePreview: responsePreview.slice(0, 200),
+      recordWritten,
+      recordsBefore,
+      recordsAfter,
+      error: errorText || null,
+    });
     return true;
   }
 
