@@ -295,10 +295,19 @@ async function _dispatchKaggle(checkpointUri, steps) {
   let raw;
   try {
     raw = execFileSync("python", ["-m", "kaggle", "kernels", "push", "-p", tmpDir],
-      { encoding: "utf8", timeout: 60_000, env });
+      { encoding: "utf8", timeout: 30_000, env, stdio: ["pipe", "pipe", "pipe"] });
   } catch (err) {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    return { error: "kaggle_push_failed", detail: err.message + (err.stderr || "") };
+    const msg = err.message || "Unknown error";
+    const stderr = (err.stderr || "").toString().slice(0, 500);
+    const detail = [msg, stderr].filter(Boolean).join("\n");
+    if (err.code === "ETIMEDOUT") {
+      return { error: "kaggle_timeout", detail: "Kaggle CLI did not respond within 30 seconds. Check your internet connection or credentials." };
+    }
+    if (msg.includes("not found") || msg.includes("no such file")) {
+      return { error: "kaggle_not_installed", detail: "Kaggle CLI not found. Install with: pip install kaggle" };
+    }
+    return { error: "kaggle_push_failed", detail };
   }
   fs.rmSync(tmpDir, { recursive: true, force: true });
 
@@ -656,9 +665,19 @@ function _runLightningScript(subcommand, extraArgs = []) {
     LIGHTNING_STUDIO_TEAMSPACE: process.env.LIGHTNING_STUDIO_TEAMSPACE || "custom-ml-model-development-project",
     HF_TRAINING_REPO:         process.env.HF_TRAINING_REPO         || "ouro-checkpoints",
   };
-  const raw = execFileSync("python", [script, subcommand, ...extraArgs],
-    { encoding: "utf8", timeout: 120_000, env });
-  return JSON.parse(raw.trim());
+  try {
+    const raw = execFileSync("python", [script, subcommand, ...extraArgs],
+      { encoding: "utf8", timeout: 60_000, env, stdio: ["pipe", "pipe", "pipe"] });
+    return JSON.parse(raw.trim());
+  } catch (err) {
+    if (err.code === "ETIMEDOUT") {
+      return { error: "lightning_timeout", message: "Lightning CLI did not respond within 60 seconds." };
+    }
+    if (err.message.includes("not found")) {
+      return { error: "lightning_not_configured", message: "Lightning training script not found or not configured." };
+    }
+    return { error: "lightning_script_error", message: err.message };
+  }
 }
 
 async function _dispatchLightning(checkpointUri, steps) {
