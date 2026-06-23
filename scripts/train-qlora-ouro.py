@@ -15,7 +15,8 @@ import argparse
 import json
 import os
 
-os.environ.setdefault("HF_HOME", "D:/hf-cache")
+if os.name == "nt":  # Windows local dev only — don't stomp HF_HOME on Linux/Kaggle
+    os.environ.setdefault("HF_HOME", "D:/hf-cache")
 
 
 def main():

@@ -173,7 +173,7 @@ async function _dispatchKaggle(checkpointUri, steps) {
 
   const meta = {
     id: kernelId,
-    title: `Ouro Training — ${steps} steps`,
+    title: "Ouro Training",
     code_file: "train.py",
     language: "python",
     kernel_type: "script",
@@ -439,7 +439,9 @@ sys.path.insert(0, os.path.join(REPO, "src"))
 
 ${resumeBlock}
 
-# Run QLoRA fine-tune
+# Run QLoRA fine-tune — override HF_HOME to a writable Linux path
+# (train-qlora-ouro.py defaults to D:/hf-cache which is Windows-only)
+train_env = {**os.environ, "HF_HOME": "/kaggle/working/hf-cache"}
 subprocess.run([
     sys.executable, "scripts/train-qlora-ouro.py",
     "--base", "ByteDance/Ouro-1.4B",
@@ -448,7 +450,7 @@ subprocess.run([
     "--max-steps", "${steps}",
     "--seq", "1536",
     *resume_args,
-], check=True)
+], check=True, env=train_env)
 
 # Upload to HF if token available (cross-provider handoff)
 hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
