@@ -615,7 +615,7 @@
   // ── Read-only wired panels ────────────────────────────────────────────────
   async function renderMerit() {
     const el = $("meritList");
-    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=coding&topN=6&lookbackDays=14");
+    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=6&lookbackDays=14");
     const agents = (data && data.agents) || [];
     if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded runs yet.</div>'; return; }
     el.innerHTML = agents.map((a, i) => {
@@ -636,6 +636,7 @@
     if (!data || !data.keys) { el.innerHTML = '<div class="placeholder">Trust calibration unavailable.</div>'; return; }
     const entries = Object.values(data.keys).sort((a, b) => b.trust - a.trust);
     setText("calSummary", `${data.total_events || 0} verified events`);
+    if (!entries.length) { el.innerHTML = '<div class="placeholder">No calibrated groundings yet — runs accrue trust as convergence events are verified.</div>'; if (gl) gl.innerHTML = ""; return; }
     el.innerHTML = entries.map(e => {
       const pct = Math.round((e.trust || 0) * 100);
       const c = pct >= 80 ? "#4ade80" : pct >= 60 ? "#facc15" : "#f87171";
