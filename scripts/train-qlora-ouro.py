@@ -53,15 +53,21 @@ def main():
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
+    from transformers import AutoConfig
+    cfg = AutoConfig.from_pretrained(a.base, trust_remote_code=True)
+    # OuroConfig (newer transformers / Python 3.12) may lack pad_token_id — set it from bos.
+    if not hasattr(cfg, "pad_token_id") or cfg.pad_token_id is None:
+        cfg.pad_token_id = getattr(cfg, "bos_token_id", tok.pad_token_id)
+
     bnb = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                              bnb_4bit_compute_dtype=compute_dtype, bnb_4bit_use_double_quant=True)
     try:
         model = AutoModelForCausalLM.from_pretrained(
-            a.base, quantization_config=bnb, device_map="auto", trust_remote_code=True,
+            a.base, config=cfg, quantization_config=bnb, device_map="auto", trust_remote_code=True,
             attn_implementation="sdpa")   # ouro_serve.py has used sdpa since #775; mirror here
     except (ValueError, TypeError):
         model = AutoModelForCausalLM.from_pretrained(
-            a.base, quantization_config=bnb, device_map="auto", trust_remote_code=True)
+            a.base, config=cfg, quantization_config=bnb, device_map="auto", trust_remote_code=True)
     model.config.use_cache = False
     model = prepare_model_for_kbit_training(model)
     # all-linear is robust for a custom (trust_remote_code) architecture whose
