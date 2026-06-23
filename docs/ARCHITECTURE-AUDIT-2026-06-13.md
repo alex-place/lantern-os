@@ -1,4 +1,9 @@
 # Architecture Audit — ConvergenceIO, PCSF, and Runtime Systems
+
+> **⚠ Historical (superseded 2026-06-23).** The canonical current-state architecture is now
+> [ARCHITECTURE.md](ARCHITECTURE.md). This dated audit is retained for history only; do not
+> treat its specifics as current without re-verifying against the tree.
+
 **Date:** 2026-06-13  
 **Method:** Direct code inspection (implementation, call graph, state transitions, persistence boundaries)  
 **Auditor:** Independent review — no assumptions from prior documentation accepted without verification
