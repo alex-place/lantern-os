@@ -4,7 +4,7 @@
   "component": "gpu_training",
   "state": "active",
   "description": "Free GPU provider rotation state for Ouro model training. Quota windows reset weekly (Monday 00:00 UTC). Providers are tried in priority order; exhausted providers are skipped until their window resets.",
-  "generated_at": "2026-06-22T22:50:05.779Z",
+  "generated_at": "2026-06-23T02:45:37.194Z",
   "checkpoint_transport": "csf",
   "checkpoint_repo_env": "HF_TRAINING_REPO",
   "checkpoint_repo_default": "ouro-checkpoints",
@@ -17,7 +17,7 @@
       "provider_id": "kaggle",
       "display": "Kaggle Notebooks",
       "priority": 1,
-      "state": "no_key",
+      "state": "available",
       "automatable": true,
       "api": "https://www.kaggle.com/api/v1",
       "auth_env": [
@@ -45,7 +45,7 @@
         "5. Legacy alternative: Settings → Legacy API Credentials → Create → download kaggle.json → set KAGGLE_USERNAME + KAGGLE_KEY",
         "6. Dispatcher auto-detects: prefers KAGGLE_API_TOKEN (Bearer), falls back to KAGGLE_USERNAME+KAGGLE_KEY (Basic)"
       ],
-      "last_checked": "2026-06-22T22:50:05.779Z"
+      "last_checked": "2026-06-23T02:45:37.026Z"
     },
     {
       "provider_id": "colab",
@@ -71,7 +71,7 @@
         "5. Run All (Ctrl+F9) — session auto-terminates after 8–12 h",
         "6. No env vars needed for Colab; orchestrator posts the checkpoint URI into the notebook code"
       ],
-      "last_checked": "2026-06-22T22:50:05.779Z"
+      "last_checked": "2026-06-23T02:45:37.026Z"
     },
     {
       "provider_id": "sagemaker",
@@ -98,16 +98,16 @@
         "6. Paste the notebookTemplate from the manual_required record into a new notebook cell and run it",
         "7. Files persist between sessions — only the runtime resets after 4 h"
       ],
-      "last_checked": "2026-06-22T22:50:05.779Z"
+      "last_checked": "2026-06-23T02:45:37.026Z"
     },
     {
       "provider_id": "paperspace",
       "display": "Paperspace Gradient",
       "priority": 4,
-      "state": "no_key",
+      "state": "available",
       "unavailable_reason": "Free GPU machines now require a paid PRO subscription. No truly free GPU tier as of 2026.",
       "automatable": true,
-      "api": "https://api.paperspace.io",
+      "api": "https://api.paperspace.com",
       "auth_env": [
         "PAPERSPACE_API_KEY"
       ],
@@ -126,7 +126,7 @@
         "4. Click 'Add' → name your key (e.g. ouro-training) → copy the key",
         "5. Set env var: PAPERSPACE_API_KEY=<your_key> and restore quota_hours_per_week to 20"
       ],
-      "last_checked": "2026-06-22T22:50:05.779Z"
+      "last_checked": "2026-06-23T02:45:37.096Z"
     },
     {
       "provider_id": "lightning",
@@ -135,7 +135,10 @@
       "state": "available",
       "automatable": true,
       "api": null,
-      "auth_env": ["LIGHTNING_USER_ID", "LIGHTNING_API_KEY"],
+      "auth_env": [
+        "LIGHTNING_USER_ID",
+        "LIGHTNING_API_KEY"
+      ],
       "gpu": "T4 / A10",
       "vram_gb": 16,
       "quota_hours_per_week": 22,
@@ -159,7 +162,7 @@
         "5. Dispatch is now fully automated: orchestrator calls scripts/lightning_dispatch.py dispatch → Studio.start() → switch_machine(T4) → run training → auto-stop on done",
         "6. Studio name is ouro-training by default; override via LIGHTNING_STUDIO_NAME env var"
       ],
-      "last_checked": "2026-06-22T22:50:05.779Z"
+      "last_checked": "2026-06-23T02:45:37.194Z"
     }
   ],
   "rotation_order": [
