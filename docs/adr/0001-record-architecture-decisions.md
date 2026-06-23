@@ -1,9 +1,10 @@
 ---
 adr: 0001
 title: Record architecture decisions
-status: Accepted
+status: Proposed
 date: 2026-06-23
 deciders: Alex Place
+approved-by: pending
 supersedes: none
 superseded-by: none
 ---
@@ -12,7 +13,8 @@ superseded-by: none
 
 ## Status
 
-Accepted
+Proposed — awaiting explicit approval from Alex Place (the approval gate this ADR itself
+establishes applies to this ADR).
 
 ## Context
 
@@ -47,6 +49,10 @@ We will record architecture decisions as **Architecture Decision Records (ADRs)*
 - [`docs/adr/README.md`](README.md) is the index and the authoring guide.
 - ADRs record *why* (the decision history); [ARCHITECTURE.md](../ARCHITECTURE.md) records
   *what is true now* (the current-state snapshot). The two are kept consistent.
+- **Approval gate:** an ADR may only move from `Proposed` to `Accepted` with the **explicit
+  approval of the repo owner (Alex Place)**. Agents and contributors draft ADRs as `Proposed`
+  with `approved-by: pending` and never self-approve — including backfilled ADRs that document
+  decisions already in force (the decision may bind; the *record* does not until approved).
 
 ## Consequences
 
