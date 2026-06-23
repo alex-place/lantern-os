@@ -8,6 +8,45 @@ const fs = require("fs");
 let _modelMetricsCache = { data: null, ts: 0 };
 const METRICS_CACHE_TTL_MS = 5000;
 
+// Probe the local Ollama-API model server (:11434 by default) to report the
+// actual offline model wired into the coder/agent path. OLLAMA_MODEL is the
+// operator-pinned local model (e.g. ouro:latest, the Σ₀ Ouro Coder); we report
+// whether it is genuinely being served right now vs only configured.
+async function probeLocalModel() {
+  const base = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+  const pinned = process.env.OLLAMA_MODEL || null;
+  const out = {
+    base,
+    pinned,                                   // configured offline model (e.g. ouro:latest)
+    adapter: process.env.OURO_ADAPTER || null,
+    serving: false,                           // is the local model server reachable?
+    served_models: [],                        // model tags actually loaded on the server
+    pinned_served: false,                     // is the pinned model actually being served?
+    active_model: null,                       // what the coder path will really use right now
+  };
+  try {
+    const u = new URL(base);
+    const tags = await new Promise((resolve, reject) => {
+      const r = require("http").request(
+        { hostname: u.hostname, port: u.port || 11434, path: "/api/tags", method: "GET" },
+        (up) => { let d = ""; up.on("data", c => (d += c)); up.on("end", () => { try { resolve(JSON.parse(d)); } catch { resolve({}); } }); }
+      );
+      r.on("error", reject);
+      r.setTimeout(3000, () => { r.destroy(); reject(new Error("timeout")); });
+      r.end();
+    });
+    out.serving = true;
+    out.served_models = (tags.models || []).map(m => String(m.name || "")).filter(Boolean);
+    const norm = s => String(s || "").replace(/:latest$/, "").toLowerCase();
+    out.pinned_served = !!pinned && out.served_models.some(m => norm(m) === norm(pinned));
+    // The coder path leads with the pinned model when served, else the first served tag.
+    out.active_model = out.pinned_served ? pinned : (out.served_models[0] || null);
+  } catch {
+    // server unreachable → serving stays false
+  }
+  return out;
+}
+
 function getModelMetrics(repoRoot) {
   const now = Date.now();
   if (_modelMetricsCache.data && (now - _modelMetricsCache.ts) < METRICS_CACHE_TTL_MS) {
@@ -185,6 +224,7 @@ module.exports = async function statusRoutes(req, res, url, deps) {
       ).trim();
       modeDetail = JSON.parse(raw);
     } catch { /* Python unavailable — fall back to env-based inference */ }
+    const localModel = await probeLocalModel();
     sendJson(res, {
       ok: true,
       fast_mode_active: fastActive,
@@ -193,6 +233,7 @@ module.exports = async function statusRoutes(req, res, url, deps) {
       description: modeDetail?.description || null,
       max_latency_ms: modeDetail?.max_latency_ms || (fastActive ? 2000 : 120000),
       decode_params: modeDetail?.decode_params || null,
+      local_model: localModel,
       generatedAt: new Date().toISOString(),
     });
     return true;

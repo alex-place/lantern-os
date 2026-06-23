@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.60] - 2026-06-23
+- feat(orchestration): surface the local/offline model on orchestration.html. New "Local Model" panel shows the actual wired-in offline brain — the pinned `OLLAMA_MODEL` (e.g. `ouro:latest`, the Σ₀ Ouro Coder), whether it's genuinely being served vs only configured, the model actually active right now, the Σ₀ adapter, served-model list, and fast/deep mode. Backed by a new `local_model` block on `/api/serving/status` that live-probes the local Ollama-API server (`:11434/api/tags`). When the pinned model isn't served, the panel explains how to start it (`ouro_serve.py`). Previously the page had no local-model view at all — its only "offline" label was a server-reachability light.
+
 ## [1.7.59] - 2026-06-23
 - fix(orchestration): leaderboard panel was empty — agent-performance lib grouped agents by splitting the joined `taskType_agentId` cache key on "_", but both halves contain underscores (dream_chat, ...Q4_K_M), collapsing all agents into one bogus bucket; now groups by each record's own agentId/taskType and supports `taskType=all` aggregation. orchestration.html queried `taskType=coding` (zero records) → switched to `taskType=all`. Calibration panel now shows a placeholder instead of blank space when no groundings are calibrated.
 

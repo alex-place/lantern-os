@@ -164,6 +164,13 @@
     <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
 
+  <!-- ── Local / Offline Model (the wired-in brain) ── -->
+  <section class="panel">
+    <h2>🧠 Local Model <span class="section-meta" id="localModelMode"></span></h2>
+    <p class="panel-sub">The offline model wired into the coder/agent path — runs fully on this computer, no cloud. <code>OLLAMA_MODEL</code> is the pinned target; it only runs if it's actually being served on the local API.</p>
+    <div id="localModelBody"><div class="placeholder">Checking local model…</div></div>
+  </section>
+
   <!-- ── Training Control (primary action) ── -->
   <section class="panel">
     <h2>⚡ Training Control <span class="section-meta" id="trainSummary"></span></h2>
@@ -613,6 +620,56 @@
   }
 
   // ── Read-only wired panels ────────────────────────────────────────────────
+  async function renderLocalModel() {
+    const el = $("localModelBody");
+    const data = await fetchJson("/api/serving/status");
+    const lm = data && data.local_model;
+    if (!lm) { el.innerHTML = '<div class="placeholder">Local model status unavailable.</div>'; setText("localModelMode", ""); return; }
+
+    // Mode badge (fast cached vs deep adaptive)
+    const mode = data.mode || (data.fast_mode_active ? "fast" : "deep");
+    setText("localModelMode", mode === "deep" ? "deep · adaptive Q-exit" : "fast · cached");
+
+    const pinned = lm.pinned || "—";
+    const active = lm.active_model || "—";
+    // The pinned offline model is "live" only if the server is up AND it's actually served.
+    const live = lm.serving && lm.pinned_served;
+    const dotC = live ? "#4ade80" : lm.serving ? "#facc15" : "#ef4444";
+    const stateLabel = !lm.serving ? "local server offline"
+      : lm.pinned_served ? "serving" : "pinned but not served";
+
+    const row = (label, val, extra = "") =>
+      `<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.84rem;">
+        <span style="color:var(--muted);">${label}</span><span>${val}${extra}</span></div>`;
+
+    const served = (lm.served_models || []).map(m => {
+      const isActive = m === active;
+      return `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 2px 0;border:1px solid ${isActive ? "var(--accent)" : "var(--border)"};border-radius:999px;font-size:0.74rem;${isActive ? "font-weight:700;color:var(--accent);" : "color:var(--muted);"}">${escapeHtml(m)}${isActive ? " ◂ active" : ""}</span>`;
+    }).join("") || '<span style="color:var(--muted);font-size:0.78rem;">none</span>';
+
+    const warn = (lm.serving && !lm.pinned_served)
+      ? `<div style="margin-top:10px;padding:8px 12px;border:1px solid #facc15;border-radius:8px;background:rgba(250,204,21,0.08);font-size:0.8rem;line-height:1.5;">
+          ⚠ <b>${escapeHtml(pinned)}</b> is pinned as the offline model but isn't being served, so the path falls through to <b>${escapeHtml(active)}</b>.
+          Start it with <code>OURO_ADAPTER=&lt;adapter&gt; python scripts/ouro_serve.py</code> (serves <code>${escapeHtml(pinned)}</code> on the local API).</div>`
+      : (!lm.serving
+        ? `<div style="margin-top:10px;padding:8px 12px;border:1px solid #ef4444;border-radius:8px;background:rgba(239,68,68,0.08);font-size:0.8rem;line-height:1.5;">
+          ⚠ No local model server reachable at <code>${escapeHtml(lm.base)}</code>. The coder path has no offline brain until one is served.</div>`
+        : "");
+
+    el.innerHTML =
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="width:10px;height:10px;border-radius:50%;background:${dotC};display:inline-block;"></span>
+        <span style="font-weight:700;font-size:1.05rem;">${escapeHtml(active)}</span>
+        <span style="font-size:0.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${stateLabel}</span>
+      </div>` +
+      row("Pinned (offline)", `<b>${escapeHtml(pinned)}</b>`, lm.pinned_served ? ' <span style="color:#4ade80;">✓ served</span>' : ' <span style="color:#facc15;">not served</span>') +
+      row("Active now", escapeHtml(active)) +
+      (lm.adapter ? row("Σ₀ adapter", `<code style="font-size:0.76rem;">${escapeHtml(lm.adapter)}</code>`) : "") +
+      row("Endpoint", `<code style="font-size:0.78rem;">${escapeHtml(lm.base)}</code>`) +
+      row("Served models", served) +
+      warn;
+  }
+
   async function renderMerit() {
     const el = $("meritList");
     const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=6&lookbackDays=14");
@@ -726,6 +783,7 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
+    renderLocalModel();
     refreshProviderStatus();
     renderTrainingSection();
     renderGpuKeys();
@@ -735,6 +793,7 @@
     renderRollover();
     updateStatus();
 
+    setInterval(renderLocalModel, 30000);
     setInterval(renderTrainingSection, 30000);
     setInterval(refreshProviderStatus, 60000);
     setInterval(updateStatus, 15000);
