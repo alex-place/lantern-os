@@ -210,9 +210,24 @@
     <div id="providerChains"><div class="placeholder">Loading…</div></div>
   </section>
 
+  <!-- ── Provider Reliance (consolidated) ── -->
+  <section class="panel">
+    <h2>🤖 AI Provider Reliance <span class="section-meta" id="relianceSummary">who's actually doing the work</span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-secondary" id="rel-24h" onclick="setRelianceBand('24h')" style="font-size:0.72rem;padding:4px 9px;">24h</button>
+        <button class="btn-secondary" id="rel-7d" onclick="setRelianceBand('7d')" style="font-size:0.72rem;padding:4px 9px;">7d</button>
+        <button class="btn-secondary" id="rel-30d" onclick="setRelianceBand('30d')" style="font-size:0.72rem;padding:4px 9px;">30d</button>
+        <button class="btn-secondary" id="rel-all" onclick="setRelianceBand('all')" style="border-color:var(--accent);color:var(--accent);font-size:0.72rem;padding:4px 9px;">all</button>
+      </span>
+    </h2>
+    <p class="panel-sub">Share of real AI work (Claude Code engineering turns + chat model calls). Reliance = how much each provider carries; reliability = its success rate. Local is bucketed under one Ollama row.</p>
+    <div id="relianceList"><div class="placeholder">Loading…</div></div>
+  </section>
+
   <!-- ── Leaderboard (read-only) ── -->
   <section class="panel">
-    <h2>🏆 Provider Leaderboard <span class="section-meta">graded coding runs · last 14 days</span></h2>
+    <h2>🏆 Chat Model Reliability <span class="section-meta">per-model success rate · last 14 days</span></h2>
+    <p class="panel-sub">Granular view of the local/cloud models that serve chat — the small sliver above. Ranked by success rate.</p>
     <div class="merit-list" id="meritList"><div class="placeholder">Loading…</div></div>
   </section>
 
@@ -672,19 +687,86 @@
 
   async function renderMerit() {
     const el = $("meritList");
-    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=6&lookbackDays=14");
-    const agents = (data && data.agents) || [];
+    // Pull a wide slice, then rank for display by success rate (the headline metric).
+    // The endpoint sorts by a cost/latency composite used for routing — not what a
+    // human "who's performing best" panel should lead with.
+    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=20&lookbackDays=14");
+    const agents = ((data && data.agents) || []).slice().sort((a, b) => {
+      const sa = a.successRate ?? 0, sb = b.successRate ?? 0;
+      if (sb !== sa) return sb - sa;
+      return (b.totalCalls ?? 0) - (a.totalCalls ?? 0);
+    }).slice(0, 6);
     if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded runs yet.</div>'; return; }
     el.innerHTML = agents.map((a, i) => {
       const name = a.agentId || a.agent || a.provider || a.model || "agent";
-      const score = a.compositeScore ?? a.score ?? a.composite ?? null;
       const calls = a.totalCalls ?? a.n ?? a.calls;
-      const sr = a.successRate != null ? Math.round(a.successRate * 100) + "% success" : null;
-      const meta = [sr, calls != null ? `${calls} calls` : null].filter(Boolean).join(" · ");
+      const pct = a.successRate != null ? Math.round(a.successRate * 100) : null;
+      const c = pct == null ? "var(--accent)" : pct >= 70 ? "#4ade80" : pct >= 40 ? "#facc15" : "#f87171";
+      const meta = calls != null ? `${calls} call${calls !== 1 ? "s" : ""}` : "";
       return `<div class="merit-row"><span class="merit-rank">${i + 1}</span>
         <span class="merit-name">${escapeHtml(String(name))}${meta ? `<span class="merit-meta">${meta}</span>` : ""}</span>
-        <span class="merit-score">${score != null ? Number(score).toFixed(2) : "—"}</span></div>`;
+        <span class="merit-score" style="color:${c};">${pct != null ? pct + "%" : "—"}</span></div>`;
     }).join("");
+  }
+
+  let _relianceBand = "all";
+  window.setRelianceBand = function(band) {
+    _relianceBand = band;
+    ["24h","7d","30d","all"].forEach(b => {
+      const el = $(`rel-${b}`); if (!el) return;
+      el.style.borderColor = b === band ? "var(--accent)" : "";
+      el.style.color = b === band ? "var(--accent)" : "";
+    });
+    renderReliance();
+  };
+  async function renderReliance() {
+    const el = $("relianceList");
+    const data = await fetchJson(`/api/providers/reliance?band=${_relianceBand}`);
+    if (!data || !Array.isArray(data.providers)) { el.innerHTML = '<div class="placeholder">Reliance data unavailable.</div>'; return; }
+    const rows = data.providers;
+    if (!rows.length) {
+      el.innerHTML = '<div class="placeholder">No AI work recorded in this window yet.</div>';
+      setText("relianceSummary", "");
+      return;
+    }
+    const top = rows[0];
+    setText("relianceSummary", `${top.label} carries ${Math.round(top.share * 100)}% of AI work`);
+    const fmt = n => n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+    const pctLabel = s => { const p = s * 100; return p > 0 && p < 1 ? "<1%" : Math.round(p) + "%"; };
+    el.innerHTML = rows.map(r => {
+      const pct = pctLabel(r.share);
+      const barW = Math.max(2, r.share * 100); // keep tiny shares visible
+      const barColor = r.kind === "cloud" ? "var(--accent)" : "#a855f7";
+      const kindBadge = `<span class="train-badge ${r.kind === "cloud" ? "tbadge-auto" : "tbadge-manual"}">${r.kind}</span>`;
+      let reli = "";
+      if (r.successRate != null) {
+        const sp = Math.round(r.successRate * 100);
+        const sc = sp >= 70 ? "#4ade80" : sp >= 40 ? "#facc15" : "#f87171";
+        reli = `<span style="color:${sc};font-weight:700;">${sp}% ok</span>`;
+      } else {
+        reli = `<span style="color:var(--muted);">completed</span>`;
+      }
+      // outputTokens / sessions are lifetime totals (not band-filtered) — only show on "all".
+      const lifetime = _relianceBand === "all";
+      const tokens = (lifetime && r.outputTokens) ? ` · ${fmt(r.outputTokens)} out tok` : "";
+      const sessions = (lifetime && r.sessions) ? ` · ${r.sessions} sessions` : "";
+      return `<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;background:var(--bg);margin-bottom:8px;border-left:3px solid ${barColor};">
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px;">
+          <strong style="font-size:0.9rem;">${escapeHtml(r.label)}</strong>${kindBadge}
+          <span style="margin-left:auto;font-weight:800;color:${barColor};font-size:1.05rem;">${pct}</span>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;height:12px;overflow:hidden;margin-bottom:7px;">
+          <div style="width:${barW}%;height:100%;background:${barColor};"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.74rem;color:var(--muted);align-items:center;">
+          <span><b style="color:var(--text);">${fmt(r.units)}</b> ${r.units === 1 ? "unit" : "units"}</span>
+          ${reli}
+          <span>${escapeHtml(r.source || "")}${tokens}${sessions}</span>
+        </div>
+        ${r.detail ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">${escapeHtml(r.detail)}</div>` : ""}
+      </div>`;
+    }).join("");
+    if (data.note) el.innerHTML += `<div class="placeholder" style="margin-top:6px;">${escapeHtml(data.note)}</div>`;
   }
 
   async function renderCalibration() {
@@ -787,6 +869,7 @@
     refreshProviderStatus();
     renderTrainingSection();
     renderGpuKeys();
+    renderReliance();
     renderMerit();
     renderCalibration();
     renderKeystoneTests();
