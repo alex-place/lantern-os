@@ -403,6 +403,51 @@
       <div class="placeholder">Loading providers…</div>
     </div>
 
+    <!-- Training Plan Executor (NEW) -->
+    <div style="border:2px solid var(--accent);border-radius:12px;padding:16px;margin-bottom:18px;background:rgba(var(--accent-rgb),0.03);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:1.2rem;">📊</span>
+        <h3 style="margin:0;font-size:0.92rem;color:var(--accent);">Weekly Training Plan</h3>
+        <span class="verify-sub" id="planSummary">Loading…</span>
+      </div>
+
+      <p style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;color:var(--text);">
+        Automatically dispatch to <strong>all free GPU providers</strong> to maximize training capacity.
+        Runs 600 steps on each provider, cascading through the week as quotas refill.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;">
+        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent);">
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Free Hours/Week</div>
+          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planTotalHours">102</div>
+        </div>
+        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid #4ade80;">
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Dispatches Queued</div>
+          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planDispatchCount">0</div>
+        </div>
+        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid #f97316;">
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Currently Running</div>
+          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planRunningCount">0</div>
+        </div>
+      </div>
+
+      <div id="planExecutionStatus" style="margin-bottom:12px;display:none;">
+        <div style="font-size:0.8rem;margin-bottom:8px;color:var(--muted);text-transform:uppercase;">Execution Progress</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div id="planProgress" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="planExecuteBtn" class="btn-secondary" onclick="executePlan()" style="border-color:var(--accent);color:var(--accent);font-weight:600;flex:1;min-width:180px;">
+          ▶ Execute Weekly Plan
+        </button>
+        <button id="planStatusBtn" class="btn-secondary" onclick="refreshPlanStatus()" style="flex:0 0 auto;">
+          ⟳ Status
+        </button>
+      </div>
+    </div>
+
     <!-- Cloud GPU API keys -->
     <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:6px;">
       <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -1048,6 +1093,86 @@
     }
   }
 
+  // ── Training Plan Executor ────────────────────────────────────────────────
+  async function executePlan() {
+    const btn = $("planExecuteBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Executing…"; }
+
+    const status = $("planExecutionStatus");
+    if (status) status.style.display = "block";
+
+    try {
+      const providers = ["kaggle", "lightning", "sagemaker", "colab"];
+      const results = [];
+
+      for (const provider of providers) {
+        const progressEl = $("planProgress");
+        if (progressEl) {
+          const badge = document.createElement("div");
+          badge.style.cssText = "padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.75rem;color:var(--muted);";
+          badge.textContent = `${provider}: dispatching…`;
+          progressEl.appendChild(badge);
+        }
+
+        try {
+          const r = await fetch("/api/gpu-training/dispatch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider, steps: 600 }),
+          });
+          const result = await r.json();
+          results.push({ provider, success: !result.error, result });
+
+          if (progressEl) {
+            const badge = progressEl.lastChild;
+            const status = result.error ? "failed" : "queued";
+            const color = result.error ? "#ef4444" : "#22c55e";
+            badge.style.color = color;
+            badge.textContent = `${provider}: ${status}`;
+          }
+        } catch (e) {
+          results.push({ provider, success: false, error: e.message });
+          if (progressEl) {
+            const badge = progressEl.lastChild;
+            badge.style.color = "#ef4444";
+            badge.textContent = `${provider}: error`;
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const successful = results.filter(r => r.success).length;
+      alert(`Weekly plan executed!\n\n${successful}/${providers.length} providers dispatched successfully.\n\nCheck Recent runs below for status.`);
+
+      await renderGpuTraining();
+      await refreshPlanStatus();
+    } catch (e) {
+      alert("Plan execution failed: " + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "▶ Execute Weekly Plan"; }
+    }
+  }
+
+  async function refreshPlanStatus() {
+    try {
+      const data = await fetchJson("/api/gpu-training/status");
+      const active = data?.active;
+      const recent = data?.recent || [];
+
+      const running = recent.filter(j => j.status === "running").length;
+      const queued = recent.filter(j => j.status === "queued").length;
+
+      $("planDispatchCount").textContent = queued;
+      $("planRunningCount").textContent = running;
+      $("planSummary").textContent = active ? "Training in progress" : "Ready to execute";
+
+      await renderGpuTraining();
+    } catch (e) {
+      console.error("Failed to refresh plan status:", e);
+    }
+  }
+
   // ── Cloud GPU API keys ─────────────────────────────────────────────────
   const GPU_PROVIDERS = [
     { id: "huggingface", icon: "🤗", name: "Hugging Face",
@@ -1164,6 +1289,8 @@
   // is why the Dispatch/Poll/Refresh buttons were previously dead).
   window.gpuDispatch = gpuDispatch;
   window.gpuPollActive = gpuPollActive;
+  window.executePlan = executePlan;
+  window.refreshPlanStatus = refreshPlanStatus;
   window.renderGpuTraining = renderGpuTraining;
   window.renderGpuKeys = renderGpuKeys;
 
