@@ -171,9 +171,14 @@ async function _dispatchKaggle(checkpointUri, steps) {
   const metaPath = path.join(tmpDir, "kernel-metadata.json");
   const scriptPath = path.join(tmpDir, "train.py");
 
+  // Title must slugify to exactly the slug portion of kernelId.
+  // Kaggle slugifies titles by replacing spaces → hyphens; hyphens IN the title are
+  // stripped (not kept), so "ouro-qlora" → "ouroqlora" ≠ "ouro-qlora".
+  // Use spaces: "ouro qlora" → slug "ouro-qlora" ✓
+  const [, kernelSlugOnly] = kernelId.split("/");
   const meta = {
     id: kernelId,
-    title: "Ouro Training",
+    title: kernelSlugOnly.replace(/-/g, " "),
     code_file: "train.py",
     language: "python",
     kernel_type: "script",
@@ -207,9 +212,9 @@ async function _dispatchKaggle(checkpointUri, steps) {
   }
   fs.rmSync(tmpDir, { recursive: true, force: true });
 
-  // Extract actual slug from the CLI output URL — title may produce a different slug
-  // e.g. "Ouro Training — 600 steps" → "ouro-training-600-steps" not "ouro-training"
-  const slugMatch = raw.match(/kaggle\.com\/code\/[^/]+\/([^\s"]+)/);
+  // Extract actual slug from the CLI output URL — handles both URL formats:
+  // old: kaggle.com/code/user/slug  new: kaggle.com/user/slug
+  const slugMatch = raw.match(/kaggle\.com(?:\/code)?\/[^/]+\/([^\s"]+)/);
   const actualSlug = slugMatch ? slugMatch[1].replace(/[^\w-]/g, "") : kernelSlug;
   const actualKernelUrl = slugMatch
     ? `https://www.kaggle.com/code/${cfg?.username || "lanternfounder"}/${actualSlug}`

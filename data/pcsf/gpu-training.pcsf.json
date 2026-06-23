@@ -34,7 +34,7 @@
       "steps_per_hour_estimate": 180,
       "notes": "Best free programmatic option. REST kernel push via /api/v1/kernels/push. Quota refills Monday midnight.",
       "username": "lanternfounder",
-      "kernel_id": "lanternfounder/ouro-training",
+      "kernel_id": "lanternfounder/ouro-qlora",
       "signup_url": "https://www.kaggle.com/account/login?phase=startRegisterTab",
       "api_key_url": "https://www.kaggle.com/settings/account",
       "setup_steps": [
