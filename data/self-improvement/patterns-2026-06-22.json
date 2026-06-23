@@ -1,0 +1,31 @@
+{
+  "minedAt": "2026-06-22T21:10:05.024Z",
+  "source": "data/convergence",
+  "totalScanned": 97,
+  "highConfidence": [
+    {
+      "id": "cr-mqpjsf1j-rav4ag",
+      "reasoner": "claude-keystone-audit",
+      "confidence": 0.88,
+      "verified": false,
+      "timestamp": "2026-06-22T18:30:00.000Z"
+    },
+    {
+      "id": "cr-mqpjsf1u-b6vst5",
+      "reasoner": "claude-keystone-audit",
+      "confidence": 0.92,
+      "verified": false,
+      "timestamp": "2026-06-22T18:30:01.000Z"
+    }
+  ],
+  "lowConfidence": [
+    {
+      "id": null,
+      "reasoner": null,
+      "confidence": 0.3,
+      "status": null,
+      "timestamp": "2026-06-22T19:54:19.221515+00:00"
+    }
+  ],
+  "promoted": 0
+}

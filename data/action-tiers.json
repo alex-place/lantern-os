@@ -1,0 +1,17 @@
+{
+  "tier1": {
+    "description": "auto — fires immediately, no approval needed",
+    "tools": ["Read", "LS", "Glob", "Grep"],
+    "categories": ["file_read", "web_search", "append_memory"]
+  },
+  "tier2": {
+    "description": "confirm — queued for human approval before execution",
+    "tools": ["Write", "Edit", "Bash", "PowerShell"],
+    "categories": ["mutating", "kalshi_order", "github_pr", "send_email"]
+  },
+  "tier3": {
+    "description": "blocked — never executes under any circumstance",
+    "tools": [],
+    "categories": ["delete_production_data", "move_money", "credential_change"]
+  }
+}
