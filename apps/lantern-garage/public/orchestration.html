@@ -212,7 +212,7 @@
 
   <!-- ── Leaderboard (read-only) ── -->
   <section class="panel">
-    <h2>🏆 Provider Leaderboard <span class="section-meta">graded coding runs · last 14 days</span></h2>
+    <h2>🏆 Provider Leaderboard <span class="section-meta">success rate across all tasks · last 14 days</span></h2>
     <div class="merit-list" id="meritList"><div class="placeholder">Loading…</div></div>
   </section>
 
@@ -672,18 +672,25 @@
 
   async function renderMerit() {
     const el = $("meritList");
-    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=6&lookbackDays=14");
-    const agents = (data && data.agents) || [];
+    // Pull a wide slice, then rank for display by success rate (the headline metric).
+    // The endpoint sorts by a cost/latency composite used for routing — not what a
+    // human "who's performing best" panel should lead with.
+    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=20&lookbackDays=14");
+    const agents = ((data && data.agents) || []).slice().sort((a, b) => {
+      const sa = a.successRate ?? 0, sb = b.successRate ?? 0;
+      if (sb !== sa) return sb - sa;
+      return (b.totalCalls ?? 0) - (a.totalCalls ?? 0);
+    }).slice(0, 6);
     if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded runs yet.</div>'; return; }
     el.innerHTML = agents.map((a, i) => {
       const name = a.agentId || a.agent || a.provider || a.model || "agent";
-      const score = a.compositeScore ?? a.score ?? a.composite ?? null;
       const calls = a.totalCalls ?? a.n ?? a.calls;
-      const sr = a.successRate != null ? Math.round(a.successRate * 100) + "% success" : null;
-      const meta = [sr, calls != null ? `${calls} calls` : null].filter(Boolean).join(" · ");
+      const pct = a.successRate != null ? Math.round(a.successRate * 100) : null;
+      const c = pct == null ? "var(--accent)" : pct >= 70 ? "#4ade80" : pct >= 40 ? "#facc15" : "#f87171";
+      const meta = calls != null ? `${calls} call${calls !== 1 ? "s" : ""}` : "";
       return `<div class="merit-row"><span class="merit-rank">${i + 1}</span>
         <span class="merit-name">${escapeHtml(String(name))}${meta ? `<span class="merit-meta">${meta}</span>` : ""}</span>
-        <span class="merit-score">${score != null ? Number(score).toFixed(2) : "—"}</span></div>`;
+        <span class="merit-score" style="color:${c};">${pct != null ? pct + "%" : "—"}</span></div>`;
     }).join("");
   }
 
