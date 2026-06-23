@@ -252,7 +252,7 @@
   <header class="orch-header">
     <span class="panel-label">Convergence · Act stage</span>
     <h1>⚙️ Agent Orchestration</h1>
-    <p>Real-time view of the autonomous agent work queue, lanes, and convergence status.</p>
+    <p>See what Keystone is doing right now, what needs you, and how the self-improvement loop is holding up.</p>
   </header>
 
   <!-- ── The convergence loop, live ── -->
@@ -330,29 +330,52 @@
   <!-- ── Verify stage: CI lanes + provider merit ── -->
   <div class="orch-grid" style="margin-top: 22px;">
     <section class="panel" style="grid-column: 1 / -1;">
-      <h2>✅ Verify · CI Lanes <span class="verify-sub" id="laneSummary"></span></h2>
-      <p class="placeholder" style="margin:-4px 0 4px;">One open PR lane per agent prefix (monoworkstream). Live <code>gh</code> check status — the Verify stage on swarm output.</p>
+      <h2>✅ Code Safety Check <span class="verify-sub" id="laneSummary"></span></h2>
+      <p class="placeholder" style="margin:-4px 0 4px;">Every agent gets one open pull request at a time. Tests must pass before anything merges. Green = safe to land, red = needs a fix.</p>
       <div class="lane-grid" id="laneGrid">
         <div class="placeholder">Loading PR lanes…</div>
       </div>
     </section>
 
     <section class="panel" style="grid-column: 1 / -1;">
-      <h2>🙋 Needs Human <span class="verify-sub" id="humanSummary"></span></h2>
-      <p class="placeholder" style="margin:-4px 0 4px;">The Reason/Converge gate where the loop pauses for you. Hand any item to <strong>Keystone Chat</strong> or copy a ready prompt for <strong>Claude Code</strong>.</p>
+      <h2>🙋 Your Turn <span class="verify-sub" id="humanSummary"></span></h2>
+      <p class="placeholder" style="margin:-4px 0 4px;">The loop paused here and is waiting for you. Each card has a one-click way to hand it off — send it to Keystone Chat or copy a ready prompt for Claude Code.</p>
       <div class="human-list" id="humanList">
         <div class="placeholder">Loading…</div>
       </div>
     </section>
 
     <section class="panel" style="grid-column: 1 / -1;">
-      <h2>🏆 Provider Merit <span class="verify-sub">Σ₀-K1 routing · compositeScore</span></h2>
-      <p class="placeholder" style="margin:-4px 0 4px;">The leaderboard that routes the swarm (<code>get_routable_chain</code>) and distills losses back. Higher composite = preferred node.</p>
+      <h2>🏆 Provider Leaderboard <span class="verify-sub">who's performing best</span></h2>
+      <p class="placeholder" style="margin:-4px 0 4px;">Keystone grades each AI model on every job it completes. The top scorer gets priority for future tasks. This is the live scoreboard.</p>
       <div class="merit-list" id="meritList">
         <div class="placeholder">Loading leaderboard…</div>
       </div>
     </section>
   </div>
+
+  <!-- ── Trust Calibration ── -->
+  <section class="panel" style="margin-top: 22px;">
+    <h2>⚖️ Who Keystone Trusts <span class="verify-sub" id="calSummary"></span></h2>
+    <p class="placeholder" style="margin:-4px 0 4px;">
+      Every time Keystone checks a claim against reality it records whether it was right. These trust scores update automatically — higher trust means that source gets believed faster next time.
+    </p>
+    <div id="calList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+      <div class="placeholder">Loading trust scores…</div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;" id="calGlobal"></div>
+  </section>
+
+  <!-- ── Keystone Self-Tests ── -->
+  <section class="panel" style="margin-top: 22px;">
+    <h2>🧪 Self-Tests <span class="verify-sub" id="ksTestSummary"></span></h2>
+    <p class="placeholder" style="margin:-4px 0 4px;">
+      Keystone audits itself — picks a real issue, tries to solve it, then grades its own work with evidence. Here's the audit trail.
+    </p>
+    <div id="ksTestList" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+      <div class="placeholder">Loading test history…</div>
+    </div>
+  </section>
 
   <!-- ── GPU Training Orchestration ── -->
   <section class="panel" id="gpuTrainingSection" style="margin-top: 22px;">
@@ -365,29 +388,53 @@
         <button class="btn-secondary" onclick="renderGpuTraining()">⟳ Refresh</button>
       </span>
     </h2>
-    <p class="placeholder" style="margin:-4px 0 8px;font-size:0.82rem;">
-      Free-tier GPU rotation: Kaggle (30 h/wk) → SageMaker (28 h/wk) → Colab (22 h/wk) → Lightning AI (22 h/wk) · 102 h/wk total
+    <p style="margin:-4px 0 6px;font-size:0.86rem;color:var(--text);line-height:1.5;">
+      Keystone makes its own local coding model smarter by training it on borrowed cloud GPUs — for <strong>free</strong>.
+      It hops between providers so it never runs out of free hours. Connect your free accounts below, then hit
+      <strong>Dispatch</strong> to kick off a run.
+    </p>
+    <p class="placeholder" style="margin:0 0 14px;font-size:0.78rem;">
+      Free-tier rotation: Kaggle (30 h/wk) → SageMaker (28 h/wk) → Colab (22 h/wk) → Lightning AI (22 h/wk) · ~102 h/wk total free.
     </p>
 
-    <!-- Provider cards -->
-    <div id="gpuProviders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:16px;">
+    <!-- Provider status cards -->
+    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider status</h3>
+    <div id="gpuProviders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
       <div class="placeholder">Loading providers…</div>
     </div>
 
+    <!-- Cloud GPU API keys -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:6px;">
+      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        🔑 Connect your free GPU accounts
+        <span class="verify-sub" id="gpuKeysSummary"></span>
+      </h3>
+      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
+        Paste each provider's API key so Keystone can send training jobs there for you. Keys are saved
+        <strong>on this computer only</strong> (your Windows user account) — never uploaded anywhere. Each card links to where you grab the key.
+      </p>
+      <div id="gpuKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+        <div class="placeholder">Loading accounts…</div>
+      </div>
+    </div>
+
     <!-- Active job -->
-    <div id="gpuActiveJob" style="margin-bottom:14px;"></div>
+    <div id="gpuActiveJob" style="margin:18px 0 14px;"></div>
 
     <!-- Manual dispatch controls -->
-    <div id="gpuDispatchControls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Start a training run</h3>
+    <div id="gpuDispatchControls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
       <select id="gpuProviderSelect" class="btn-secondary" style="padding:8px 10px;cursor:pointer;min-width:160px;">
-        <option value="">Auto (rotate)</option>
+        <option value="">Auto — pick the next free one</option>
       </select>
       <input id="gpuStepsInput" type="number" value="600" min="50" max="3000" step="50"
         style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);width:100px;">
-      <span style="font-size:0.8rem;color:var(--muted);">steps</span>
+      <span style="font-size:0.8rem;color:var(--muted);">training steps (more = smarter but slower)</span>
     </div>
+    <p class="placeholder" style="margin:0 0 14px;font-size:0.75rem;">Tip: leave it on “Auto” and Keystone uses whichever provider still has free hours this week.</p>
 
     <!-- Recent jobs -->
+    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Recent runs</h3>
     <div id="gpuHistory" style="font-size:0.82rem;"></div>
   </section>
 
@@ -701,7 +748,74 @@
   }
 
   function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ── Trust Calibration ────────────────────────────────────────────────────
+  async function renderCalibration() {
+    const el = document.getElementById("calList");
+    const gl = document.getElementById("calGlobal");
+    const data = await fetchJson("/api/convergence/calibration");
+    if (!data || !data.keys) {
+      el.innerHTML = '<div class="placeholder">Trust calibration unavailable.</div>';
+      return;
+    }
+    const entries = Object.values(data.keys).sort((a, b) => b.trust - a.trust);
+    const total = data.total_events || 0;
+    const setText = document.getElementById("calSummary");
+    if (setText) setText.textContent = `${total} verified events`;
+    el.innerHTML = entries.map((e) => {
+      const pct = Math.round((e.trust || 0) * 100);
+      const barColor = pct >= 80 ? "#4ade80" : pct >= 60 ? "#facc15" : "#f87171";
+      const label = e.key.replace("agent:", "").replace(":", " · ");
+      return `<div style="display:grid;grid-template-columns:140px 1fr 52px 60px;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
+        <span style="font-size:0.82rem;font-weight:600;">${escapeHtml(label)}</span>
+        <div style="background:var(--surface);border-radius:4px;height:10px;overflow:hidden;border:1px solid var(--border);">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;transition:width .4s;"></div>
+        </div>
+        <span style="font-weight:700;color:${barColor};font-size:0.9rem;">${pct}%</span>
+        <span style="font-size:0.72rem;color:var(--muted);">${e.n} check${e.n !== 1 ? "s" : ""}</span>
+      </div>`;
+    }).join("");
+    if (gl) {
+      const ece = data.ece != null ? (data.ece * 100).toFixed(1) + "% calibration error" : null;
+      const brier = data.global_brier != null ? data.global_brier.toFixed(3) + " Brier score" : null;
+      gl.innerHTML = [ece, brier].filter(Boolean).map((t) =>
+        `<span style="font-size:0.74rem;color:var(--muted);padding:4px 10px;border:1px solid var(--border);border-radius:6px;">${t}</span>`
+      ).join("");
+    }
+  }
+
+  // ── Keystone Self-Tests ─────────────────────────────────────────────────
+  async function renderKeystoneTests() {
+    const el = document.getElementById("ksTestList");
+    const sumEl = document.getElementById("ksTestSummary");
+    const data = await fetchJson("/api/convergence/keystone-test/runs");
+    if (!data) { el.innerHTML = '<div class="placeholder">Test history unavailable.</div>'; return; }
+    const runs = (data.runs || []).slice(0, 5);
+    if (sumEl) sumEl.textContent = runs.length ? `${data.count || runs.length} total run${(data.count || runs.length) !== 1 ? "s" : ""}` : "";
+    if (!runs.length) { el.innerHTML = '<div class="placeholder">No self-tests recorded yet.</div>'; return; }
+    el.innerHTML = runs.map((r) => {
+      const ts = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
+      const conf = r.convergence?.confidence?.overall;
+      const confPct = conf != null ? Math.round(conf * 100) : null;
+      const confColor = confPct >= 80 ? "#4ade80" : confPct >= 60 ? "#facc15" : "#f87171";
+      const filed = (r.filed_issues || []).map((n) =>
+        `<a href="https://github.com/alex-place/lantern-os/issues/${n.replace("#", "")}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none;">${n}</a>`
+      ).join(", ");
+      const hyp = r.convergence?.hypothesis || "";
+      const evidence = (r.convergence?.evidence || []).slice(0, 2);
+      return `<div style="border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;background:var(--bg);">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <span style="font-size:0.72rem;color:var(--muted);">${escapeHtml(ts)}</span>
+          ${confPct != null ? `<span style="font-size:0.72rem;font-weight:700;color:${confColor};padding:1px 8px;border:1px solid ${confColor};border-radius:999px;">${confPct}% confident</span>` : ""}
+          ${filed ? `<span style="font-size:0.72rem;">Filed: ${filed}</span>` : ""}
+          <span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">${r.scenarios_completed ?? 1} scenario${(r.scenarios_completed ?? 1) !== 1 ? "s" : ""} · ${r.findings_high_confidence ?? 0} high-confidence finding${(r.findings_high_confidence ?? 0) !== 1 ? "s" : ""}</span>
+        </div>
+        ${hyp ? `<div style="font-size:0.82rem;color:var(--text);font-weight:500;margin-bottom:4px;">${escapeHtml(hyp)}</div>` : ""}
+        ${evidence.length ? `<div style="font-size:0.74rem;color:var(--muted);">Evidence: ${evidence.map((e) => escapeHtml(e)).join(" · ")}</div>` : ""}
+      </div>`;
+    }).join("");
   }
 
   // ── Rollover dashboard (#898) ──────────────────────────────────────────────
@@ -793,10 +907,6 @@
   // ── GPU Training ────────────────────────────────────────────────
   const PROVIDER_ICONS = { kaggle: "🏆", colab: "📓", sagemaker: "☁️", paperspace: "📐", lightning: "⚡" };
   const STATE_DOT = { available: "🟢", no_key: "🔴", unavailable: "⚫" };
-
-  function escapeHtml(s) {
-    return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  }
 
   async function renderGpuTraining() {
     const data = await fetchJson("/api/gpu-training/status");
@@ -938,15 +1048,142 @@
     }
   }
 
+  // ── Cloud GPU API keys ─────────────────────────────────────────────────
+  const GPU_PROVIDERS = [
+    { id: "huggingface", icon: "🤗", name: "Hugging Face",
+      blurb: "Free parking spot the trained model uses to hop between GPUs. Set this one first.",
+      get: "https://huggingface.co/settings/tokens",
+      keys: [ { env: "HF_TOKEN", label: "Access token" }, { env: "HF_TRAINING_REPO", label: "Training repo (user/name)" } ] },
+    { id: "kaggle", icon: "🏆", name: "Kaggle",
+      blurb: "30 free GPU hours every week, fully automatic. The workhorse.",
+      get: "https://www.kaggle.com/settings/account",
+      keys: [ { env: "KAGGLE_API_TOKEN", label: "API token (kaggle.json)" }, { env: "KAGGLE_USERNAME", label: "Username" }, { env: "KAGGLE_KEY", label: "Key" } ] },
+    { id: "lightning", icon: "⚡", name: "Lightning AI",
+      blurb: "22 free credits a month. Automatic once connected.",
+      get: "https://lightning.ai/",
+      keys: [ { env: "LIGHTNING_USER_ID", label: "User ID" }, { env: "LIGHTNING_API_KEY", label: "API key" } ] },
+    { id: "modal", icon: "🚀", name: "Modal",
+      blurb: "$30/month of free H100/A100 time. Automatic.",
+      get: "https://modal.com/settings/tokens",
+      keys: [ { env: "MODAL_TOKEN_ID", label: "Token ID" }, { env: "MODAL_TOKEN_SECRET", label: "Token secret" } ] },
+    { id: "vast", icon: "💹", name: "Vast.ai",
+      blurb: "Cheap rented GPUs (~$0.15–0.40/hr) when the free tiers run dry.",
+      get: "https://cloud.vast.ai/account/",
+      keys: [ { env: "VAST_AI_API_KEY", label: "API key" } ] },
+    { id: "runpod", icon: "🟣", name: "RunPod",
+      blurb: "Cheap on-demand GPUs (~$0.20–0.50/hr). Pay-as-you-go.",
+      get: "https://www.runpod.io/console/user/settings",
+      keys: [ { env: "RUNPOD_API_KEY", label: "API key" } ] },
+    { id: "paperspace", icon: "📐", name: "Paperspace",
+      blurb: "Needs a PRO plan (~$8/mo) — the free GPU tier was removed.",
+      get: "https://console.paperspace.com/account/api",
+      keys: [ { env: "PAPERSPACE_API_KEY", label: "API key" } ] },
+  ];
+
+  async function renderGpuKeys() {
+    const el = $("gpuKeysList");
+    // Longer timeout than the shared fetchJson: the first call warms keys from
+    // the Windows user env (spawns PowerShell per key), which can take >5s cold.
+    let data = null;
+    try {
+      const r = await fetch("/api/gpu-training/keys", { cache: "no-store", signal: AbortSignal.timeout(20000) });
+      if (r.ok) data = await r.json();
+    } catch { /* handled below */ }
+    if (!data || !Array.isArray(data.keys)) {
+      el.innerHTML = '<div class="placeholder">Couldn\'t load account status — <button class="hl-btn" type="button" onclick="renderGpuKeys()">retry</button></div>';
+      return;
+    }
+    const setMap = {};
+    data.keys.forEach(k => { setMap[k.key] = k; });
+
+    // Summary: how many providers are fully connected.
+    const connected = GPU_PROVIDERS.filter(p => p.keys.every(k => setMap[k.env]?.set)
+      || (p.id === "kaggle" && (setMap.KAGGLE_API_TOKEN?.set || (setMap.KAGGLE_USERNAME?.set && setMap.KAGGLE_KEY?.set)))).length;
+    $("gpuKeysSummary").textContent = `${connected}/${GPU_PROVIDERS.length} connected`;
+
+    el.innerHTML = GPU_PROVIDERS.map(p => {
+      const anySet = p.keys.some(k => setMap[k.env]?.set);
+      const allSet = p.keys.every(k => setMap[k.env]?.set);
+      const badge = allSet
+        ? '<span style="color:#22c55e;font-size:0.72rem;font-weight:600;">✓ connected</span>'
+        : anySet
+        ? '<span style="color:#ffaa00;font-size:0.72rem;font-weight:600;">partly set</span>'
+        : '<span style="color:var(--muted);font-size:0.72rem;">not connected</span>';
+      const rows = p.keys.map(k => {
+        const info = setMap[k.env] || {};
+        const placeholder = info.set ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
+        return `
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <label style="font-size:0.72rem;color:var(--muted);min-width:118px;">${escapeHtml(k.label)}</label>
+            <input type="password" autocomplete="off" data-keyenv="${k.env}" placeholder="${placeholder}"
+              style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:0.78rem;">
+            <button class="hl-btn" type="button" data-savekey="${k.env}" style="padding:6px 9px;">Save</button>
+          </div>`;
+      }).join("");
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:13px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap;">
+            <span>${p.icon}</span><strong style="font-size:0.9rem;">${p.name}</strong>
+            <span style="margin-left:auto;">${badge}</span>
+          </div>
+          <div style="font-size:0.74rem;color:var(--muted);line-height:1.45;">${p.blurb}</div>
+          <a href="${p.get}" target="_blank" rel="noopener" style="font-size:0.74rem;color:var(--accent);">Get your key ↗</a>
+          ${rows}
+        </div>`;
+    }).join("");
+
+    el.querySelectorAll("button[data-savekey]").forEach(btn => {
+      btn.addEventListener("click", () => saveGpuKey(btn.dataset.savekey, el, btn));
+    });
+  }
+
+  async function saveGpuKey(env, scope, btn) {
+    const input = scope.querySelector(`input[data-keyenv="${env}"]`);
+    const value = input ? input.value.trim() : "";
+    if (!value) { input?.focus(); return; }
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/gpu-training/keys", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: env, value }),
+      });
+      const result = await r.json();
+      if (result.error) { btn.textContent = "✕ failed"; }
+      else {
+        btn.textContent = result.persisted ? "✓ saved" : "✓ (session)";
+        await renderGpuKeys();      // refresh saved/masked state
+        renderGpuTraining();        // provider availability may change
+      }
+    } catch { btn.textContent = "✕ error"; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
+  }
+
+  // Inline onclick= handlers in the GPU markup need these on window (the script
+  // body is an IIFE, so function declarations are otherwise unreachable — this
+  // is why the Dispatch/Poll/Refresh buttons were previously dead).
+  window.gpuDispatch = gpuDispatch;
+  window.gpuPollActive = gpuPollActive;
+  window.renderGpuTraining = renderGpuTraining;
+  window.renderGpuKeys = renderGpuKeys;
+
+  window.renderCalibration = renderCalibration;
+  window.renderKeystoneTests = renderKeystoneTests;
+
   document.addEventListener("DOMContentLoaded", () => {
     const btn = $("refreshBtn");
     if (btn) btn.addEventListener("click", refreshStatus);
     refreshStatus();
     renderRollover();
     renderGpuTraining();
+    renderGpuKeys();
+    renderCalibration();
+    renderKeystoneTests();
     setInterval(refreshStatus, 5000);
     setInterval(renderRollover, 15000);
     setInterval(renderGpuTraining, 30000);
+    setInterval(renderCalibration, 30000);
+    setInterval(renderKeystoneTests, 60000);
   });
 })();
 </script>
