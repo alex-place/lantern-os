@@ -1,4 +1,4 @@
-"""
+﻿"""
 Keystone chat — standing performance benchmark.
 
 "Model performance is key" → make it measured, not asserted. This scores ANY
@@ -186,6 +186,17 @@ def main():
         cprint(f"{r['id']:>2}  {'OK ' if ok else 'x  '} {'src' if cited else '   '} {dt:>5.1f}s  {r['expected'][:18]!r} -> {reply[:50]!r}")
 
     n = len(rows)
+    # #843: accuracy broken down by difficulty tier (smoke / easy / medium / hard)
+    diff_n: dict = {}
+    diff_ok: dict = {}
+    for row, det in zip(rows, detail):
+        tier = row.get("difficulty", "unknown")
+        diff_n[tier] = diff_n.get(tier, 0) + 1
+        diff_ok[tier] = diff_ok.get(tier, 0) + int(det["ok"])
+    accuracy_by_difficulty = {
+        k: round(diff_ok[k] / diff_n[k], 3)
+        for k in sorted(diff_n)
+    }
     summary = {
         # reconciled schema — "benchmark" key shared across all eval scripts (#776)
         "benchmark": "keystone",
@@ -204,6 +215,8 @@ def main():
         # E1: realized latent depth; E2: did the loop contract?
         "mean_depth": round(sum(depths) / len(depths), 2) if depths else None,
         "mean_contraction": round(sum(contractions) / len(contractions), 4) if contractions else None,
+        # #843: per-difficulty breakdown {smoke, easy, medium, hard}
+        "accuracy_by_difficulty": accuracy_by_difficulty,
     }
     os.makedirs(os.path.join(ROOT, "data", "eval", "runs"), exist_ok=True)
     with open(os.path.join(ROOT, "data", "eval", "runs", f"{a.label}-{a.ts}.jsonl"), "w", encoding="utf-8") as f:
@@ -214,6 +227,8 @@ def main():
     print(f"\n{a.label}: accuracy={summary['accuracy']*100:.0f}%  "
           f"grounding_precision={summary['grounding_precision']*100:.0f}%  "
           f"avg_latency={summary['avg_latency_s']}s  ~{summary['tok_per_s']} tok/s  (n={n})", flush=True)
+    tier_line = "  ".join(f"{k}={v*100:.0f}%" for k, v in sorted(accuracy_by_difficulty.items()))
+    print(f"  by difficulty: {tier_line}", flush=True)
 
 
 if __name__ == "__main__":

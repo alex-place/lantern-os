@@ -1,5 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Lore / symbol exploration (not agent work)
-    url: https://github.com/alex-place/lantern-os/blob/master/lore/LORE.md
-    about: Symbols stay in the lore sandbox until promoted. Agents only work labeled task issues.

@@ -1,9 +1,0 @@
-{
-  "lastDispatchAt": 0,
-  "running": false,
-  "updatedAt": "2026-05-30T01:15:09.916Z",
-  "held": true,
-  "results": [],
-  "fleetCounts": {},
-  "nextHumanAction": "${ORCHESTRATOR_REPO_PATH}\\scripts\\Get-OrchestratorStatus.ps1 : A parameter cannot be found that "
-}
