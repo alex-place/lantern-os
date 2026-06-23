@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.52] - 2026-06-22
+- feat(wip): land working-tree files from session (consequence-gate, goal-engine, gpu-training route, mandala-clock, action-tiers, self-improvement data, convergence work records, experiment scripts)
+
 All notable changes to Keystone OS (formerly Lantern OS) should be documented in
 this file.
 
