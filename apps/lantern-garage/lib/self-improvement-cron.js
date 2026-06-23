@@ -5,8 +5,7 @@ const path = require("path");
 const { appendJsonlQueued } = require("./file-queue");
 const {
   packAndUploadCheckpoint,
-  dispatchTrainingJob,
-  rotateProvider,
+  dispatchAllAutomatable,
   loadGpuPcsf,
 } = require("./training-dispatcher");
 
@@ -270,34 +269,31 @@ async function maybeDispatchTraining(repoRoot, promoted) {
     }
   }
 
-  // Pick provider — start from last used, rotate if quota exhausted
-  const lastJobsLog = path.join(repoRoot, "data", "self-improvement", "training-jobs.jsonl");
-  let lastProvider = "kaggle";
-  try {
-    const lines = fs.readFileSync(lastJobsLog, "utf8").split(/\r?\n/).filter(Boolean);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const r = JSON.parse(lines[i]);
-      if (r.type === "training_dispatch" && r.provider) { lastProvider = r.provider; break; }
-    }
-  } catch { /* no log yet — default to kaggle */ }
-
-  const provider = rotateProvider(lastProvider);
-  if (!provider) return { trainingDispatched: false, reason: "all_providers_exhausted" };
+  // Fan out to all automatable providers with quota in parallel.
+  // PCSF state is updated per provider from outcomes — "dispatched" on success, "degraded" on error.
   const steps = Number(process.env.TRAINING_STEPS || 600);
-  const dispatchResult = await dispatchTrainingJob(provider, checkpointUri, steps).catch(err => ({
-    error: err.message,
+  const fanOut = await dispatchAllAutomatable(checkpointUri, steps).catch(err => ({
+    error: err.message, dispatched: [],
   }));
 
-  if (dispatchResult.error) {
-    console.error("[self-improvement] training dispatch failed:", dispatchResult.error);
-    return { trainingDispatched: false, reason: dispatchResult.error };
+  if (fanOut.error && !(fanOut.dispatched?.length)) {
+    return { trainingDispatched: false, reason: fanOut.error };
+  }
+
+  const successful = (fanOut.dispatched || []).filter(d => !d.error);
+  const failed = (fanOut.dispatched || []).filter(d => d.error);
+  if (failed.length > 0) {
+    console.error(
+      "[self-improvement] dispatch degraded providers:",
+      failed.map(d => `${d.provider}:${d.error}`).join(", ")
+    );
   }
 
   return {
-    trainingDispatched: true,
-    provider,
-    jobId: dispatchResult.jobId || null,
-    status: dispatchResult.status,
+    trainingDispatched: successful.length > 0,
+    dispatched: fanOut.dispatched,
+    successCount: successful.length,
+    failCount: failed.length,
     steps,
   };
 }
