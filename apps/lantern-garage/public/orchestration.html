@@ -477,6 +477,7 @@
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div id="planProgress" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
         </div>
+        <div id="planErrors" style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;border-left:3px solid #ef4444;font-size:0.75rem;color:var(--muted);display:none;"></div>
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1142,6 +1143,8 @@
     const status = $("planExecutionStatus");
     if (status) status.style.display = "block";
 
+    const errors = [];
+
     try {
       const providers = ["kaggle", "lightning", "sagemaker", "colab"];
       const results = [];
@@ -1166,10 +1169,16 @@
 
           if (progressEl) {
             const badge = progressEl.lastChild;
-            const status = result.error ? "failed" : "queued";
-            const color = result.error ? "#ef4444" : "#22c55e";
-            badge.style.color = color;
-            badge.textContent = `${provider}: ${status}`;
+            if (result.error) {
+              const status = result.error;
+              const msg = result.message || status;
+              badge.style.color = "#ef4444";
+              badge.textContent = `${provider}: ${status}`;
+              errors.push(`${provider}: ${msg}`);
+            } else {
+              badge.style.color = "#22c55e";
+              badge.textContent = `${provider}: queued`;
+            }
           }
         } catch (e) {
           results.push({ provider, success: false, error: e.message });
@@ -1178,12 +1187,23 @@
             badge.style.color = "#ef4444";
             badge.textContent = `${provider}: error`;
           }
+          errors.push(`${provider}: ${e.message}`);
         }
 
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       const successful = results.filter(r => r.success).length;
+
+      // Show error details if any
+      if (errors.length > 0) {
+        const errEl = $("planErrors");
+        if (errEl) {
+          errEl.textContent = "Issues: " + errors.join(" • ");
+          errEl.style.display = "block";
+        }
+      }
+
       alert(`Weekly plan executed!\n\n${successful}/${providers.length} providers dispatched successfully.\n\nCheck Recent runs below for status.`);
 
       await renderGpuTraining();
