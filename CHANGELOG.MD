@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.7.56] - 2026-06-23
+- fix(orchestration): improve GPU training dispatch error reporting — add error display panel with specific failure codes (missing_credentials, kaggle_timeout, lightning_not_configured, etc.)
+- fix(gpu-training): add timeout guards and better error handling for dispatch — reduce Kaggle timeout 60s→30s, Lightning 120s→60s, prevent interactive prompts via stdio pipe config
+
 ## [1.7.55] - 2026-06-23
 - feat(orchestration): add provider management UI — LLM provider grid, task-type routing chains, secure API key storage in orchestration.html; new /api/providers/* endpoints for status and key management; Keystone automatically selects best provider per task type with automatic fallback
 
