@@ -425,7 +425,7 @@
       <span class="verify-sub" id="gpuSummary">Loading…</span>
       <span style="margin-left:auto;display:flex;gap:6px;">
         <button class="btn-secondary" id="gpuDispatchBtn" onclick="gpuDispatch()" style="border-color:var(--accent);color:var(--accent);">▶ Dispatch</button>
-        <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollActive()">↻ Poll</button>
+        <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollAll()">↻ Poll All</button>
         <button class="btn-secondary" onclick="renderGpuTraining()">⟳ Refresh</button>
       </span>
     </h2>
@@ -1117,21 +1117,33 @@
     }
   }
 
-  async function gpuPollActive() {
+  async function gpuPollAll() {
     const btn = $("gpuPollBtn");
     if (btn) { btn.disabled = true; btn.textContent = "Polling…"; }
     try {
       const data = await fetchJson("/api/gpu-training/status");
-      const active = data?.active;
-      if (!active?.jobId) { await renderGpuTraining(); return; }
-      await fetch("/api/gpu-training/poll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: active.provider, jobId: active.jobId }),
+      // Collect all unique running/queued dispatch jobs (dedupe by provider+jobId)
+      const seen = new Set();
+      const toPoll = (data?.recentJobs || []).filter(j => {
+        if (j.type !== "training_dispatch") return false;
+        const st = j.status;
+        if (st !== "running" && st !== "queued") return false;
+        const key = `${j.provider}:${j.jobId}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
       });
+      if (!toPoll.length) { await renderGpuTraining(); return; }
+      await Promise.allSettled(toPoll.map(j =>
+        fetch("/api/gpu-training/poll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider: j.provider, jobId: j.jobId }),
+        })
+      ));
       await renderGpuTraining();
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll"; }
+      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll All"; }
     }
   }
 
@@ -1332,7 +1344,7 @@
   // body is an IIFE, so function declarations are otherwise unreachable — this
   // is why the Dispatch/Poll/Refresh buttons were previously dead).
   window.gpuDispatch = gpuDispatch;
-  window.gpuPollActive = gpuPollActive;
+  window.gpuPollAll = gpuPollAll;
   window.executePlan = executePlan;
   window.refreshPlanStatus = refreshPlanStatus;
   window.renderGpuTraining = renderGpuTraining;

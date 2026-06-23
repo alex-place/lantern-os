@@ -6,6 +6,7 @@
       "comment": "Preview-tool dev server: runs the main checkout's server from the project root (relative cwd, required by the sandboxed preview tool). The isolated C:/dev/lantern-os-dev worktree is launched separately by scripts, not by the preview tool. See docs/DEV-SERVER-WORKTREE.md.",
       "runtimeExecutable": "node",
       "runtimeArgs": [
+        "--watch",
         "apps/lantern-garage/server.js"
       ],
       "port": 4178,
@@ -18,6 +19,7 @@
       "name": "lantern-preview",
       "runtimeExecutable": "node",
       "runtimeArgs": [
+        "--watch",
         "apps/lantern-garage/server.js"
       ],
       "port": 4177,

@@ -100,7 +100,7 @@ const PROVIDER_CHAINS = {
   ],
 };
 
-module.exports = function providerRoutes(req, res, url, deps) {
+module.exports = async function providerRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
 
   _syncUserEnvKeys();
@@ -154,49 +154,54 @@ module.exports = function providerRoutes(req, res, url, deps) {
 
   // ── POST /api/providers/keys ───────────────────────────────────────────
   if (req.method === "POST" && url.pathname === "/api/providers/keys") {
-    collectRequestBody(req, async (body) => {
-      try {
-        const data = JSON.parse(body || "{}");
-        const { provider, key, value } = data;
+    let body;
+    try {
+      body = await collectRequestBody(req);
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+      return true;
+    }
+    try {
+      const data = JSON.parse(body || "{}");
+      const { provider, key, value } = data;
 
-        if (!provider || !key || !value) {
-          sendJson(res, { error: "provider, key, and value required" }, 400);
-          return;
-        }
-
-        if (!PROVIDER_KEY_ALLOWLIST.includes(key)) {
-          sendJson(res, { error: "invalid key name" }, 400);
-          return;
-        }
-
-        // Save to session env
-        process.env[key] = value;
-        _keysSynced = false; // re-sync on next check
-
-        // Try to save to Windows user environment (best-effort)
-        let persisted = false;
-        try {
-          const escaped = value.replace(/"/g, '`"');
-          execFileSync("powershell", [
-            "-NonInteractive", "-Command",
-            `[System.Environment]::SetEnvironmentVariable('${key}', "${escaped}", 'User')`,
-          ], { timeout: 10_000 });
-          persisted = true;
-        } catch {
-          // Silent fail; key is still in session
-        }
-
-        sendJson(res, {
-          ok: true,
-          provider,
-          key,
-          persisted,
-          masked: maskValue(value),
-        });
-      } catch (err) {
-        sendJson(res, { error: err.message }, 500);
+      if (!provider || !key || !value) {
+        sendJson(res, { error: "provider, key, and value required" }, 400);
+        return true;
       }
-    });
+
+      if (!PROVIDER_KEY_ALLOWLIST.includes(key)) {
+        sendJson(res, { error: "invalid key name" }, 400);
+        return true;
+      }
+
+      // Save to session env
+      process.env[key] = value;
+      _keysSynced = false; // re-sync on next check
+
+      // Try to save to Windows user environment (best-effort)
+      let persisted = false;
+      try {
+        const escaped = value.replace(/"/g, '`"');
+        execFileSync("powershell", [
+          "-NonInteractive", "-Command",
+          `[System.Environment]::SetEnvironmentVariable('${key}', "${escaped}", 'User')`,
+        ], { timeout: 10_000 });
+        persisted = true;
+      } catch {
+        // Silent fail; key is still in session
+      }
+
+      sendJson(res, {
+        ok: true,
+        provider,
+        key,
+        persisted,
+        masked: maskValue(value),
+      });
+    } catch (err) {
+      sendJson(res, { error: err.message }, 500);
+    }
     return true;
   }
 
