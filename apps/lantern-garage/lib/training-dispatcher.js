@@ -433,11 +433,16 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q",
     "datasets", "accelerate", "scipy", "huggingface_hub", "zstandard"],
     check=True)
 
-# Clone repo (training script + data)
+# Clone repo (training script + data).
+# GIT_LFS_SKIP_SMUDGE=1 skips downloading LFS objects (*.png, *.pdf, *.zip) —
+# the repo LFS budget is exceeded; we only need the Python script + JSONL data,
+# neither of which is tracked by LFS.
 REPO = "/kaggle/working/lantern-os"
 if not os.path.exists(REPO):
+    clone_env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
     subprocess.run(["git", "clone", "--depth", "1",
-        "https://github.com/alex-place/lantern-os", REPO], check=True)
+        "https://github.com/alex-place/lantern-os", REPO],
+        env=clone_env, check=True)
 
 os.chdir(REPO)
 sys.path.insert(0, os.path.join(REPO, "src"))
