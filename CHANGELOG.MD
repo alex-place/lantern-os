@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.61] - 2026-06-23
+- fix(knowledgecenter): PDF report links were all broken (403) and many showed "(anonymous)" as the title. The `/api/pdfs` list advertised `/repo/data/ingest/…` URLs, but the `/repo` handler deliberately denies `data/ingest` as a PII pool (#868), so every PDF link 403'd. Added a bounded `GET /api/pdfs/file?filename=…` endpoint that serves only `.pdf` files from inside the ingest pool (path-traversal/extension guarded; the broad `/repo` deny stays intact) and a `fileUrl` field the Knowledge Center now links to. Junk PDF titles (`(anonymous)`, blank, whitespace) are normalized to null server- and client-side so cards fall back to the readable filename — consistent with how the markdown docs display.
+
 ## [1.7.60] - 2026-06-23
 - feat(orchestration): surface the local/offline model on orchestration.html. New "Local Model" panel shows the actual wired-in offline brain — the pinned `OLLAMA_MODEL` (e.g. `ouro:latest`, the Σ₀ Ouro Coder), whether it's genuinely being served vs only configured, the model actually active right now, the Σ₀ adapter, served-model list, and fast/deep mode. Backed by a new `local_model` block on `/api/serving/status` that live-probes the local Ollama-API server (`:11434/api/tags`). When the pinned model isn't served, the panel explains how to start it (`ouro_serve.py`). Previously the page had no local-model view at all — its only "offline" label was a server-reachability light.
 

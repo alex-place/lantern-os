@@ -657,13 +657,21 @@
     } catch { apply(); return; }
     const pdfs = (data && data.pdfs) || [];
     const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    // A real, human title or null — guards against junk "(anonymous)"/blank
+    // titles so we fall back to the filename (mirrors cleanPdfTitle server-side).
+    const cleanTitle = t => {
+      if (!t) return null;
+      const s = String(t).trim();
+      if (!s || /^\(?\s*anonymous\s*\)?$/i.test(s)) return null;
+      return s;
+    };
 
     for (const pdf of pdfs) {
       const card = document.createElement('a');
       card.className = 'doc-card';
       card.dataset.cat = 'reports';
       card.dataset.type = 'pdf';
-      card.href = pdf.repoPath;
+      card.href = pdf.fileUrl || pdf.repoPath;
       card.target = '_blank';
       card.rel = 'noopener';
 
@@ -676,7 +684,7 @@
       card.innerHTML =
         '<span class="doc-ico">📄</span>' +
         '<span class="doc-body">' +
-          '<span class="doc-title">' + esc(pdf.pdfTitle || pdf.name) + '</span>' +
+          '<span class="doc-title">' + esc(cleanTitle(pdf.pdfTitle) || pdf.name) + '</span>' +
           '<span class="doc-sum">' + esc(metaParts.join(' · ')) + '</span>' +
         '</span>' +
         '<span class="doc-meta"><span class="doc-cat">Reports</span><span class="doc-fmt">PDF</span></span>' +

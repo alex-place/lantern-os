@@ -20,6 +20,17 @@ function loadPublicationDates(repoRoot) {
   } catch { return {}; }
 }
 
+// Some ingested PDFs carry a junk metadata title ("(anonymous)", blank, or
+// whitespace) extracted from the file's /Author or /Title. Treat those as no
+// title so the UI falls back to the human-readable filename instead.
+function cleanPdfTitle(t) {
+  if (!t) return null;
+  const s = String(t).trim();
+  if (!s) return null;
+  if (/^\(?\s*anonymous\s*\)?$/i.test(s)) return null;
+  return s;
+}
+
 function scanPdfs(ingestBase, repoRoot) {
   const pdfs = [];
 
@@ -55,7 +66,7 @@ function scanPdfs(ingestBase, repoRoot) {
 }
 
 module.exports = async function pdfRoutes(req, res, url, deps) {
-  const { sendJson, repoRoot } = deps;
+  const { sendJson, sendFile, repoRoot } = deps;
   const ingestBase = getIngestBase(repoRoot);
 
   // GET /api/pdfs — list all unique PDFs
@@ -71,7 +82,14 @@ module.exports = async function pdfRoutes(req, res, url, deps) {
       return true;
     }).map(({ absolutePath, ...rest }) => {
       const meta = pubDates[rest.filename.toLowerCase()] || {};
-      return { ...rest, publishedAt: meta.publishedAt || null, pdfTitle: meta.pdfTitle || null };
+      return {
+        ...rest,
+        // Working download URL. The generic /repo handler denies data/ingest as a
+        // PII pool (#868), so PDFs are served via this curated endpoint instead.
+        fileUrl: '/api/pdfs/file?filename=' + encodeURIComponent(rest.filename),
+        publishedAt: meta.publishedAt || null,
+        pdfTitle: cleanPdfTitle(meta.pdfTitle),
+      };
     });
 
     // Sort: PDF publication date → file modification date → alphabetical
@@ -85,6 +103,28 @@ module.exports = async function pdfRoutes(req, res, url, deps) {
     });
 
     sendJson(res, { pdfs: unique, total: unique.length });
+    return true;
+  }
+
+  // GET /api/pdfs/file?filename=<name> — serve a PDF from the research pool.
+  // The generic /repo handler denies data/ingest as a PII pool (#868); this curated
+  // endpoint serves only .pdf files from inside ingestBase, mirroring the public
+  // read-only list above so the Knowledge Center links actually resolve.
+  if (url.pathname === '/api/pdfs/file' && req.method === 'GET') {
+    const filename = url.searchParams.get('filename') || '';
+    if (!filename || filename.includes('/') || filename.includes('\\') || !filename.toLowerCase().endsWith('.pdf')) {
+      sendJson(res, { error: 'invalid filename' }, 400);
+      return true;
+    }
+    const match = scanPdfs(ingestBase, repoRoot).find(p => p.filename.toLowerCase() === filename.toLowerCase());
+    if (!match) { sendJson(res, { error: 'not_found' }, 404); return true; }
+    // Boundary: only ever serve a real .pdf from inside the ingest pool.
+    const resolved = path.resolve(match.absolutePath);
+    if (!resolved.startsWith(path.resolve(ingestBase) + path.sep) || path.extname(resolved).toLowerCase() !== '.pdf') {
+      sendJson(res, { error: 'forbidden' }, 403);
+      return true;
+    }
+    sendFile(res, resolved);
     return true;
   }
 
