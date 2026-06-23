@@ -117,8 +117,9 @@ keyword; with no match it falls back to the Σ₀ default (`:332`).
 
 ## 5. Provider abstraction (models are interchangeable)
 
-Providers are **data, not code**: declared in
-[`data/pcsf/provider.pcsf.json`](../data/pcsf/provider.pcsf.json) with fallback order + default
+Providers are **data, not code**: declared in the PCSF layer — `data/pcsf/provider.pcsf.json`
+(the registry; a **gitignored runtime file**) plus the committed model roster
+[`data/pcsf/model.pcsf.json`](../data/pcsf/model.pcsf.json) — with fallback order + default
 models ([PROVIDERS.md:17](../PROVIDERS.md)). `server.js` reads `.env` at startup; keys can be
 hot-reloaded via `POST /api/settings/providers` without restart ([PROVIDERS.md:22](../PROVIDERS.md)).
 
