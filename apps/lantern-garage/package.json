@@ -1,6 +1,6 @@
 {
   "name": "lantern-garage-app",
-  "version": "1.7.49",
+  "version": "1.7.55",
   "private": true,
   "description": "Local-first Lantern OS garage full-stack app.",
   "scripts": {

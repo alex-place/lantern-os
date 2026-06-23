@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.55] - 2026-06-23
+- feat(orchestration): add provider management UI — LLM provider grid, task-type routing chains, secure API key storage in orchestration.html; new /api/providers/* endpoints for status and key management; Keystone automatically selects best provider per task type with automatic fallback
+
+## [1.7.55] - 2026-06-23
+- feat(orchestration): add provider management UI — LLM provider grid, task-type routing chains, secure API key storage in orchestration.html; new /api/providers/* endpoints for status and key management; Keystone automatically selects best provider per task type with automatic fallback
+
 ## [1.7.54] - 2026-06-23
 - fix(training): ROPE_INIT_FUNCTIONS['default'] monkey-patch for transformers>=4.53 (OuroRotaryEmbedding KeyError on Kaggle)
 - fix(training): pin transformers>=4.40,<4.53 in Kaggle script as belt-and-suspenders

@@ -252,8 +252,49 @@
   <header class="orch-header">
     <span class="panel-label">Convergence · Act stage</span>
     <h1>⚙️ Agent Orchestration</h1>
-    <p>See what Keystone is doing right now, what needs you, and how the self-improvement loop is holding up.</p>
+    <p>See what Keystone is doing right now, what needs you, how the loop is holding up, and which AI models are available.</p>
   </header>
+
+  <!-- ── AI Provider Configuration ── -->
+  <section class="panel" style="margin-bottom: 22px;">
+    <h2>🤖 AI Providers
+      <span class="verify-sub" id="providersSummary">Loading…</span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-secondary" id="providersRefreshBtn" onclick="refreshProviderStatus()">⟳ Refresh</button>
+      </span>
+    </h2>
+    <p class="placeholder" style="margin:-4px 0 6px;font-size:0.86rem;line-height:1.5;">
+      Keystone can talk to 10+ AI providers. Set API keys below, then Keystone automatically picks the best one for each task
+      <strong>(coding, reasoning, creative, etc.).</strong> Your keys are saved <strong>on this computer only</strong> — never uploaded.
+    </p>
+
+    <!-- Provider grid (available providers) -->
+    <h3 style="margin:12px 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Available providers</h3>
+    <div id="providerGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:18px;">
+      <div class="placeholder">Loading providers…</div>
+    </div>
+
+    <!-- Task-type routing -->
+    <h3 style="margin:12px 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider chains by task type</h3>
+    <p class="placeholder" style="margin:0 0 10px;font-size:0.8rem;color:var(--muted);">Each task type has a fallback chain. Keystone tries the first, then the next if unavailable.</p>
+    <div id="providerChains" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:18px;">
+      <div class="placeholder">Loading task chains…</div>
+    </div>
+
+    <!-- API key management -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        🔑 Connect your API keys
+        <span class="verify-sub" id="providerKeysSummary"></span>
+      </h3>
+      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
+        Each provider links to where you grab a free API key. Paste it below — keys are saved locally in your user account.
+      </p>
+      <div id="providerKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+        <div class="placeholder">Loading accounts…</div>
+      </div>
+    </div>
+  </section>
 
   <!-- ── The convergence loop, live ── -->
   <section class="panel loop-panel">
@@ -264,64 +305,7 @@
     <div class="loop-cycle"><span class="lc-spin">↻</span> <span id="loopCycleNote">one continuous loop — every stage feeds the next</span></div>
   </section>
 
-  <!-- ── GPU Training (Act stage — model self-improvement) ── -->
-  <section class="panel" id="gpuTrainingSection" style="margin-top:22px;">
-    <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      🖥️ GPU Training
-      <span class="verify-sub" id="gpuSummary">Loading…</span>
-      <span style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn-secondary" id="gpuDispatchBtn" onclick="gpuDispatch()" style="border-color:var(--accent);color:var(--accent);">▶ Dispatch</button>
-        <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollActive()">↻ Poll</button>
-        <button class="btn-secondary" onclick="renderGpuTraining()">⟳ Refresh</button>
-      </span>
-    </h2>
-    <p style="margin:-4px 0 14px;font-size:0.86rem;color:var(--text);line-height:1.5;">
-      Keystone improves its local coding model on borrowed cloud GPUs — for <strong>free</strong>.
-      It rotates across providers so it never runs out of hours.
-    </p>
-
-    <!-- 1. Recent runs — newest first -->
-    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Recent runs</h3>
-    <div id="gpuHistory" style="font-size:0.82rem;margin-bottom:18px;"></div>
-
-    <!-- 2. Active job -->
-    <div id="gpuActiveJob" style="margin-bottom:14px;"></div>
-
-    <!-- 3. Dispatch controls -->
-    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Start a training run</h3>
-    <div id="gpuDispatchControls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
-      <select id="gpuProviderSelect" class="btn-secondary" style="padding:8px 10px;cursor:pointer;min-width:160px;">
-        <option value="">Auto — pick the next free one</option>
-      </select>
-      <input id="gpuStepsInput" type="number" value="600" min="50" max="3000" step="50"
-        style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);width:100px;">
-      <span style="font-size:0.8rem;color:var(--muted);">steps · more = smarter but slower</span>
-    </div>
-    <p class="placeholder" style="margin:0 0 18px;font-size:0.75rem;">Leave on "Auto" and Keystone picks whichever provider still has free hours this week.</p>
-
-    <!-- 4. Provider status -->
-    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider status</h3>
-    <div id="gpuProviders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
-      <div class="placeholder">Loading providers…</div>
-    </div>
-
-    <!-- 5. API keys (setup, infrequent) -->
-    <div style="border-top:1px solid var(--border);padding-top:16px;">
-      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        🔑 Connect your free GPU accounts
-        <span class="verify-sub" id="gpuKeysSummary"></span>
-      </h3>
-      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
-        Paste each provider's API key so Keystone can send training jobs automatically.
-        Keys are saved <strong>on this computer only</strong> — never uploaded anywhere.
-      </p>
-      <div id="gpuKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
-        <div class="placeholder">Loading accounts…</div>
-      </div>
-    </div>
-  </section>
-
-  <div class="orch-grid" style="margin-top:22px;">
+  <div class="orch-grid">
     <!-- Queue Status -->
     <section class="panel">
       <h2>📊 Queue Status</h2>
@@ -432,6 +416,112 @@
     <div id="ksTestList" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
       <div class="placeholder">Loading test history…</div>
     </div>
+  </section>
+
+  <!-- ── GPU Training Orchestration ── -->
+  <section class="panel" id="gpuTrainingSection" style="margin-top: 22px;">
+    <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      🖥️ GPU Training
+      <span class="verify-sub" id="gpuSummary">Loading…</span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-secondary" id="gpuDispatchBtn" onclick="gpuDispatch()" style="border-color:var(--accent);color:var(--accent);">▶ Dispatch</button>
+        <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollActive()">↻ Poll</button>
+        <button class="btn-secondary" onclick="renderGpuTraining()">⟳ Refresh</button>
+      </span>
+    </h2>
+    <p style="margin:-4px 0 6px;font-size:0.86rem;color:var(--text);line-height:1.5;">
+      Keystone makes its own local coding model smarter by training it on borrowed cloud GPUs — for <strong>free</strong>.
+      It hops between providers so it never runs out of free hours. Connect your free accounts below, then hit
+      <strong>Dispatch</strong> to kick off a run.
+    </p>
+    <p class="placeholder" style="margin:0 0 14px;font-size:0.78rem;">
+      Free-tier rotation: Kaggle (30 h/wk) → SageMaker (28 h/wk) → Colab (22 h/wk) → Lightning AI (22 h/wk) · ~102 h/wk total free.
+    </p>
+
+    <!-- Provider status cards -->
+    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider status</h3>
+    <div id="gpuProviders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
+      <div class="placeholder">Loading providers…</div>
+    </div>
+
+    <!-- Training Plan Executor (NEW) -->
+    <div style="border:2px solid var(--accent);border-radius:12px;padding:16px;margin-bottom:18px;background:rgba(var(--accent-rgb),0.03);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:1.2rem;">📊</span>
+        <h3 style="margin:0;font-size:0.92rem;color:var(--accent);">Weekly Training Plan</h3>
+        <span class="verify-sub" id="planSummary">Loading…</span>
+      </div>
+
+      <p style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;color:var(--text);">
+        Automatically dispatch to <strong>all free GPU providers</strong> to maximize training capacity.
+        Runs 600 steps on each provider, cascading through the week as quotas refill.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;">
+        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent);">
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Free Hours/Week</div>
+          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planTotalHours">102</div>
+        </div>
+        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid #4ade80;">
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Dispatches Queued</div>
+          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planDispatchCount">0</div>
+        </div>
+        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid #f97316;">
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Currently Running</div>
+          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planRunningCount">0</div>
+        </div>
+      </div>
+
+      <div id="planExecutionStatus" style="margin-bottom:12px;display:none;">
+        <div style="font-size:0.8rem;margin-bottom:8px;color:var(--muted);text-transform:uppercase;">Execution Progress</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div id="planProgress" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="planExecuteBtn" class="btn-secondary" onclick="executePlan()" style="border-color:var(--accent);color:var(--accent);font-weight:600;flex:1;min-width:180px;">
+          ▶ Execute Weekly Plan
+        </button>
+        <button id="planStatusBtn" class="btn-secondary" onclick="refreshPlanStatus()" style="flex:0 0 auto;">
+          ⟳ Status
+        </button>
+      </div>
+    </div>
+
+    <!-- Cloud GPU API keys -->
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:6px;">
+      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        🔑 Connect your free GPU accounts
+        <span class="verify-sub" id="gpuKeysSummary"></span>
+      </h3>
+      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
+        Paste each provider's API key so Keystone can send training jobs there for you. Keys are saved
+        <strong>on this computer only</strong> (your Windows user account) — never uploaded anywhere. Each card links to where you grab the key.
+      </p>
+      <div id="gpuKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+        <div class="placeholder">Loading accounts…</div>
+      </div>
+    </div>
+
+    <!-- Active job -->
+    <div id="gpuActiveJob" style="margin:18px 0 14px;"></div>
+
+    <!-- Manual dispatch controls -->
+    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Start a training run</h3>
+    <div id="gpuDispatchControls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+      <select id="gpuProviderSelect" class="btn-secondary" style="padding:8px 10px;cursor:pointer;min-width:160px;">
+        <option value="">Auto — pick the next free one</option>
+      </select>
+      <input id="gpuStepsInput" type="number" value="600" min="50" max="3000" step="50"
+        style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);width:100px;">
+      <span style="font-size:0.8rem;color:var(--muted);">training steps (more = smarter but slower)</span>
+    </div>
+    <p class="placeholder" style="margin:0 0 14px;font-size:0.75rem;">Tip: leave it on “Auto” and Keystone uses whichever provider still has free hours this week.</p>
+
+    <!-- Recent jobs -->
+    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Recent runs</h3>
+    <div id="gpuHistory" style="font-size:0.82rem;"></div>
   </section>
 
   <!-- ── Rollover dashboard (#898) ── -->
@@ -912,8 +1002,7 @@
       return;
     }
 
-    const { providers = [], active, nextProvider, recentJobs = [], weekly_total_hours,
-            recentConvergence = [] } = data;
+    const { providers = [], active, nextProvider, recentJobs = [], weekly_total_hours } = data;
 
     // Summary line
     const avail = providers.filter(p => p.state === "available").length;
@@ -982,111 +1071,23 @@
       $("gpuActiveJob").innerHTML = '<div style="font-size:0.82rem;color:var(--muted);padding:6px 0;">No active job — use ▶ Dispatch to start one.</div>';
     }
 
-    // Recent runs — collapse polls into their dispatch; surface standalone tests too.
+    // Recent history
     if (recentJobs.length) {
-      // --- helpers ---
-      const stPill = (st, small) => {
-        const sz = small ? "0.7rem" : "0.75rem";
-        const col = { running:"#22c55e", queued:"#f59e0b", done:"var(--accent)",
-                      failed:"#ef4444", manual_required:"var(--muted)", cancelled:"var(--muted)" };
-        const lbl = { running:"▶ running", queued:"⏳ queued", done:"✓ done",
-                      failed:"✗ failed", manual_required:"📋 manual", cancelled:"cancelled" };
-        return `<span style="color:${col[st]||"var(--muted)"};font-weight:600;white-space:nowrap;font-size:${sz};">${escapeHtml(lbl[st]||st)}</span>`;
-      };
-
-      const confBadge = (c) => {
-        if (c == null) return "";
-        const pct = Math.round(c * 100);
-        const col = c >= 0.9 ? "var(--accent)" : c >= 0.6 ? "#f59e0b" : "#ef4444";
-        return `<span style="font-size:0.68rem;color:${col};font-weight:600;" title="Convergence confidence">${pct}%</span>`;
-      };
-
-      const fmtTime = (iso) => iso ? new Date(iso).toLocaleString([],
-        {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
-
-      // Build confidence lookup from recentConvergence by runId
-      const crByRunId = {};
-      for (const cr of recentConvergence) { crByRunId[cr.runId] = cr; }
-
-      // --- partition: dispatch-type (collapse polls) vs standalone tests ---
-      const byJob = new Map();
-      const standalones = [];
-      for (const j of recentJobs) {
-        if (j.type === "training_dispatch") {
-          const key = `${j.provider}:${j.jobId}`;
-          if (!byJob.has(key)) byJob.set(key, { dispatch: j, latestPoll: null });
-        } else if (j.type === "training_poll") {
-          const key = `${j.provider}:${j.jobId}`;
-          if (byJob.has(key) && !byJob.get(key).latestPoll) byJob.get(key).latestPoll = j;
-        } else if (j.type === "provider_test" || j.type === "training_run") {
-          standalones.push(j);
-        }
-      }
-
-      const dispatchRows = [...byJob.values()].slice(0, 4);
-
-      // --- render dispatch rows ---
-      const dispatchHtml = dispatchRows.map(({ dispatch: d, latestPoll: p }) => {
-        const icon = PROVIDER_ICONS[d.provider] || "🖥️";
-        const st = p?.status || d.status || "queued";
-        const elapsed = p?.polledAt && d.dispatchedAt
-          ? Math.round((new Date(p.polledAt) - new Date(d.dispatchedAt)) / 60000) : null;
-        const jobLink = d.kernelUrl
-          ? `<a href="${escapeHtml(d.kernelUrl)}" target="_blank" rel="noopener"
-               style="color:var(--accent);text-decoration:none;font-size:0.72rem;margin-left:auto;">view ↗</a>`
-          : (d.studioName ? `<span style="color:var(--muted);font-size:0.72rem;margin-left:auto;">${escapeHtml(d.studioName)}</span>` : "");
-        const cr = crByRunId[d.jobId];
-        return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-                            padding:7px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);">
-          <span title="${escapeHtml(d.provider)}">${icon}</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:0.8rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${escapeHtml(d.provider)}${d.steps ? ` · ${d.steps} steps` : ""}${d.notes ? ` <span style="color:var(--muted);font-size:0.68rem;">· ${escapeHtml(d.notes)}</span>` : ""}
-            </div>
-            <div style="font-size:0.7rem;color:var(--muted);">${escapeHtml(fmtTime(d.dispatchedAt))}${elapsed != null ? ` · ${elapsed}m` : ""}</div>
-          </div>
-          ${stPill(st)}
-          ${cr ? confBadge(cr.confidence) : ""}
-          ${jobLink}
-        </div>`;
-      }).join("");
-
-      // --- render standalone test rows ---
-      const testHtml = standalones.slice(0, 4).map(j => {
-        const icon = j.provider === "huggingface" ? "🤗" : j.provider === "all" ? "🔑"
-                   : j.provider === "local" ? "🖥️" : PROVIDER_ICONS[j.provider] || "🧪";
-        const st = j.status || "done";
-        const ts = j.testedAt || j.dispatchedAt;
-        const label = j.testType === "roundtrip" ? "HF roundtrip"
-                    : j.testType === "smoke_test" ? "all providers smoke-test"
-                    : j.testType === "notebook_dispatch" ? "Paperspace API probe"
-                    : j.type === "training_run" ? `local · ${j.hardware||"GPU"}`
-                    : j.testType || j.type;
-        const detail = j.type === "training_run" && j.evidence
-          ? `loss ${j.evidence.loss} · ${j.evidence.steps} step · seq ${j.evidence.seq}`
-          : j.type === "provider_test" && j.status === "failed" && j.detail
-          ? j.detail.slice(0, 60)
-          : "";
-        return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-                            padding:7px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);
-                            border-left:3px solid ${st==="done"?"var(--accent)":st==="failed"?"#ef4444":"#f59e0b"};">
-          <span>${icon}</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:0.78rem;font-weight:500;">${escapeHtml(label)}</div>
-            ${detail ? `<div style="font-size:0.7rem;color:var(--muted);">${escapeHtml(detail)}</div>` : ""}
-            <div style="font-size:0.7rem;color:var(--muted);">${escapeHtml(fmtTime(ts))}</div>
-          </div>
-          ${stPill(st, true)}
-          ${confBadge(j.confidence)}
-        </div>`;
-      }).join("");
-
       $("gpuHistory").innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          ${dispatchHtml}
-          ${standalones.length ? `
-            <div style="font-size:0.72rem;color:var(--muted);margin:4px 0 2px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Tests</div>
-            ${testHtml}` : ""}
+        <div style="font-weight:600;margin-bottom:6px;font-size:0.82rem;">Recent jobs</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+        ${recentJobs.slice(0, 8).map(j => {
+          const icon = PROVIDER_ICONS[j.provider] || "🖥️";
+          const st = j.currentStatus || j.status;
+          const stColor = st === "running" || st === "queued" ? "#22c55e" : st === "done" ? "var(--accent)" : st === "failed" ? "#ef4444" : "var(--muted)";
+          const time = j.dispatchedAt || j.polledAt ? new Date(j.dispatchedAt || j.polledAt).toLocaleString() : "";
+          return `<div style="display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.78rem;">
+            <span>${icon} ${escapeHtml(j.provider)}</span>
+            <span style="color:${stColor};">${escapeHtml(j.type === "training_poll" ? "poll:" + st : st)}</span>
+            <span style="color:var(--muted);">${j.steps ? j.steps + " steps" : ""}</span>
+            <span style="margin-left:auto;color:var(--muted);">${escapeHtml(time)}</span>
+          </div>`;
+        }).join("")}
         </div>`;
     }
   }
@@ -1130,6 +1131,86 @@
       await renderGpuTraining();
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = "↻ Poll"; }
+    }
+  }
+
+  // ── Training Plan Executor ────────────────────────────────────────────────
+  async function executePlan() {
+    const btn = $("planExecuteBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Executing…"; }
+
+    const status = $("planExecutionStatus");
+    if (status) status.style.display = "block";
+
+    try {
+      const providers = ["kaggle", "lightning", "sagemaker", "colab"];
+      const results = [];
+
+      for (const provider of providers) {
+        const progressEl = $("planProgress");
+        if (progressEl) {
+          const badge = document.createElement("div");
+          badge.style.cssText = "padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.75rem;color:var(--muted);";
+          badge.textContent = `${provider}: dispatching…`;
+          progressEl.appendChild(badge);
+        }
+
+        try {
+          const r = await fetch("/api/gpu-training/dispatch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider, steps: 600 }),
+          });
+          const result = await r.json();
+          results.push({ provider, success: !result.error, result });
+
+          if (progressEl) {
+            const badge = progressEl.lastChild;
+            const status = result.error ? "failed" : "queued";
+            const color = result.error ? "#ef4444" : "#22c55e";
+            badge.style.color = color;
+            badge.textContent = `${provider}: ${status}`;
+          }
+        } catch (e) {
+          results.push({ provider, success: false, error: e.message });
+          if (progressEl) {
+            const badge = progressEl.lastChild;
+            badge.style.color = "#ef4444";
+            badge.textContent = `${provider}: error`;
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const successful = results.filter(r => r.success).length;
+      alert(`Weekly plan executed!\n\n${successful}/${providers.length} providers dispatched successfully.\n\nCheck Recent runs below for status.`);
+
+      await renderGpuTraining();
+      await refreshPlanStatus();
+    } catch (e) {
+      alert("Plan execution failed: " + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "▶ Execute Weekly Plan"; }
+    }
+  }
+
+  async function refreshPlanStatus() {
+    try {
+      const data = await fetchJson("/api/gpu-training/status");
+      const active = data?.active;
+      const recent = data?.recent || [];
+
+      const running = recent.filter(j => j.status === "running").length;
+      const queued = recent.filter(j => j.status === "queued").length;
+
+      $("planDispatchCount").textContent = queued;
+      $("planRunningCount").textContent = running;
+      $("planSummary").textContent = active ? "Training in progress" : "Ready to execute";
+
+      await renderGpuTraining();
+    } catch (e) {
+      console.error("Failed to refresh plan status:", e);
     }
   }
 
@@ -1249,11 +1330,182 @@
   // is why the Dispatch/Poll/Refresh buttons were previously dead).
   window.gpuDispatch = gpuDispatch;
   window.gpuPollActive = gpuPollActive;
+  window.executePlan = executePlan;
+  window.refreshPlanStatus = refreshPlanStatus;
   window.renderGpuTraining = renderGpuTraining;
   window.renderGpuKeys = renderGpuKeys;
 
   window.renderCalibration = renderCalibration;
   window.renderKeystoneTests = renderKeystoneTests;
+
+  // ── LLM Provider Configuration ─────────────────────────────────────────────
+  const LLM_PROVIDERS = [
+    { id: "anthropic", icon: "🧠", name: "Anthropic Claude",
+      blurb: "Best-in-class reasoning. Fast, capable, and reliable.",
+      get: "https://console.anthropic.com/settings/keys",
+      key: "ANTHROPIC_API_KEY", model: "claude-opus-4-8" },
+    { id: "openai", icon: "🔷", name: "OpenAI GPT",
+      blurb: "Fast, widely compatible, strong at most tasks.",
+      get: "https://platform.openai.com/api-keys",
+      key: "OPENAI_API_KEY", model: "gpt-4o-mini" },
+    { id: "gemini", icon: "✨", name: "Google Gemini",
+      blurb: "Vision/multimodal strength, generous free tier.",
+      get: "https://aistudio.google.com/app/apikey",
+      key: "GEMINI_API_KEY", model: "gemini-2.5-flash" },
+    { id: "mistral", icon: "🚀", name: "Mistral AI",
+      blurb: "Strong coding, long-context, competitive pricing.",
+      get: "https://console.mistral.ai/api-keys/",
+      key: "MISTRAL_API_KEY", model: "mistral-large-latest" },
+    { id: "deepseek", icon: "🔍", name: "DeepSeek",
+      blurb: "Emerging provider, strong reasoning, affordable.",
+      get: "https://platform.deepseek.com/api_keys",
+      key: "DEEPSEEK_API_KEY", model: "deepseek-chat" },
+    { id: "cohere", icon: "🌊", name: "Cohere",
+      blurb: "Long-context RAG, summarization specialist.",
+      get: "https://dashboard.cohere.com/api-keys",
+      key: "COHERE_API_KEY", model: "command-r-plus" },
+    { id: "perplexity", icon: "🔬", name: "Perplexity AI",
+      blurb: "Search-augmented answers with live citations.",
+      get: "https://www.perplexity.ai/settings/api",
+      key: "PERPLEXITY_API_KEY", model: "sonar-pro" },
+    { id: "openrouter", icon: "🌐", name: "OpenRouter",
+      blurb: "Gateway to 100+ models, unified pricing, smart routing.",
+      get: "https://openrouter.ai/settings/keys",
+      key: "OPENROUTER_API_KEY", model: "auto" },
+    { id: "ollama", icon: "🦙", name: "Ollama (Local)",
+      blurb: "Private, offline, no keys needed. Privacy first.",
+      get: "https://ollama.ai",
+      key: null, model: "auto" },
+  ];
+
+  async function refreshProviderStatus() {
+    const data = await fetchJson("/api/providers/status");
+    if (!data) {
+      $("providersSummary").textContent = "error loading";
+      return;
+    }
+
+    // Render provider grid (availability + health)
+    const gridEl = $("providerGrid");
+    gridEl.innerHTML = LLM_PROVIDERS.map(p => {
+      const status = data.providers?.[p.id] || {};
+      const hasKey = status.hasKey;
+      const available = status.available;
+      const lastCheck = status.lastCheck ? new Date(status.lastCheck).toLocaleTimeString() : "—";
+      const dot = available ? "🟢" : hasKey ? "🟡" : "🔴";
+      const badge = available ? "available" : hasKey ? "no key" : "not connected";
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <span>${p.icon}</span>
+            <strong style="font-size:0.88rem;">${p.name}</strong>
+            <span style="margin-left:auto;font-size:1.2rem;">${dot}</span>
+          </div>
+          <div style="font-size:0.74rem;color:var(--muted);margin-bottom:4px;">${p.blurb}</div>
+          <div style="font-size:0.72rem;color:var(--muted);">${badge} · model: ${p.model}</div>
+        </div>`;
+    }).join("");
+
+    // Render task-type chains
+    const chainEl = $("providerChains");
+    if (data.chains) {
+      chainEl.innerHTML = Object.entries(data.chains).map(([taskType, chain]) => {
+        const providers = chain.map(c => {
+          const status = data.providers?.[c.provider] || {};
+          const dot = status.available ? "🟢" : "🔴";
+          return `<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--bg);font-size:0.72rem;margin:2px 2px 2px 0;">${dot} ${c.provider}</span>`;
+        }).join("");
+        return `
+          <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
+            <div style="font-weight:600;font-size:0.88rem;margin-bottom:6px;text-transform:capitalize;">${taskType}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:2px;">${providers}</div>
+          </div>`;
+      }).join("");
+    }
+
+    // Summary
+    const connected = Object.values(data.providers || {}).filter(p => p.hasKey).length;
+    const available = Object.values(data.providers || {}).filter(p => p.available).length;
+    $("providersSummary").textContent = `${available} available · ${connected} keys set`;
+
+    // Render keys
+    await renderProviderKeys();
+  }
+
+  async function renderProviderKeys() {
+    const el = $("providerKeysList");
+    let data = null;
+    try {
+      const r = await fetch("/api/providers/keys", { cache: "no-store", signal: AbortSignal.timeout(10000) });
+      if (r.ok) data = await r.json();
+    } catch { /* handled below */ }
+
+    if (!data || !Array.isArray(data.keys)) {
+      el.innerHTML = '<div class="placeholder">Couldn\'t load API key status — <button class="hl-btn" type="button" onclick="renderProviderKeys()">retry</button></div>';
+      return;
+    }
+
+    const keyMap = {};
+    data.keys.forEach(k => { keyMap[k.env] = k; });
+
+    // Summary: how many providers are connected
+    const connected = LLM_PROVIDERS.filter(p => p.key && keyMap[p.key]?.set).length;
+    $("providerKeysSummary").textContent = `${connected}/${LLM_PROVIDERS.filter(p => p.key).length} keys set`;
+
+    el.innerHTML = LLM_PROVIDERS.filter(p => p.key).map(p => {
+      const info = keyMap[p.key] || {};
+      const isSet = info.set;
+      const badge = isSet
+        ? '<span style="color:#22c55e;font-size:0.72rem;font-weight:600;">✓ set</span>'
+        : '<span style="color:var(--muted);font-size:0.72rem;">not set</span>';
+      const placeholder = isSet ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:13px 14px;background:var(--surface);">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
+            <span>${p.icon}</span><strong style="font-size:0.9rem;">${p.name}</strong>
+            <span style="margin-left:auto;">${badge}</span>
+          </div>
+          <div style="font-size:0.74rem;color:var(--muted);line-height:1.45;">${p.blurb}</div>
+          <a href="${p.get}" target="_blank" rel="noopener" style="font-size:0.74rem;color:var(--accent);">Get your key ↗</a>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+            <input type="password" autocomplete="off" data-provider="${p.id}" placeholder="${placeholder}"
+              style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:0.78rem;">
+            <button class="hl-btn" type="button" data-saveprov="${p.id}" style="padding:6px 9px;">Save</button>
+          </div>
+        </div>`;
+    }).join("");
+
+    el.querySelectorAll("button[data-saveprov]").forEach(btn => {
+      btn.addEventListener("click", () => saveProviderKey(btn.dataset.saveprov, el, btn));
+    });
+  }
+
+  async function saveProviderKey(providerId, scope, btn) {
+    const p = LLM_PROVIDERS.find(x => x.id === providerId);
+    if (!p || !p.key) return;
+    const input = scope.querySelector(`input[data-provider="${providerId}"]`);
+    const value = input ? input.value.trim() : "";
+    if (!value) { input?.focus(); return; }
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/providers/keys", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: p.id, key: p.key, value }),
+      });
+      const result = await r.json();
+      if (result.error) { btn.textContent = "✕ failed"; }
+      else {
+        btn.textContent = result.persisted ? "✓ saved" : "✓ (session)";
+        await renderProviderKeys();      // refresh saved/masked state
+        refreshProviderStatus();         // availability may change
+      }
+    } catch { btn.textContent = "✕ error"; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
+  }
+
+  window.refreshProviderStatus = refreshProviderStatus;
+  window.renderProviderKeys = renderProviderKeys;
 
   document.addEventListener("DOMContentLoaded", () => {
     const btn = $("refreshBtn");
@@ -1262,11 +1514,13 @@
     renderRollover();
     renderGpuTraining();
     renderGpuKeys();
+    refreshProviderStatus();
     renderCalibration();
     renderKeystoneTests();
     setInterval(refreshStatus, 5000);
     setInterval(renderRollover, 15000);
     setInterval(renderGpuTraining, 30000);
+    setInterval(refreshProviderStatus, 45000);
     setInterval(renderCalibration, 30000);
     setInterval(renderKeystoneTests, 60000);
   });
