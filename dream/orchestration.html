@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
   <script>
-    /* Theme bootstrap — set before first paint to avoid flash of wrong theme */
     (function() {
       try {
         var stored = localStorage.getItem('lantern-theme');
@@ -19,217 +18,123 @@
   </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    .orch-main {
-      max-width: 1200px;
-      width: 100%;
-      margin: 0 auto;
-      padding: clamp(20px, 4vh, 36px) 20px 40px;
-    }
+    .orch-main { max-width: 1100px; width: 100%; margin: 0 auto; padding: clamp(14px, 3vh, 26px) 16px 48px; }
 
-    /* ── Page header ── */
-    .orch-header { margin-bottom: 28px; }
-    .orch-header .panel-label { color: var(--accent); }
-    .orch-header h1 {
-      font-size: clamp(1.6rem, 3.4vw, 2rem);
-      margin: 2px 0 6px;
-      display: flex; align-items: center; gap: 10px;
+    /* slim status line */
+    .orch-status {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      padding: 10px 16px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 16px; font-size: 0.82rem;
     }
-    .orch-header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .orch-status .pill { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+    .orch-status .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .orch-status .pill.online .dot { background: var(--green); animation: spulse 2s infinite; }
+    .orch-status .pill.online { color: var(--green); }
+    .orch-status .pill.offline { color: #ef4444; }
+    .orch-status .pill.offline .dot { background: #ef4444; }
+    @keyframes spulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .orch-status .sdiv { width: 1px; height: 18px; background: var(--border); }
+    .orch-status .smeta { color: var(--muted); }
+    .orch-status .smeta b { color: var(--text); }
+    .orch-status .stitle { margin-left: auto; color: var(--muted); font-size: 0.76rem; }
 
-    /* ── Top grid of cards (reuses site.css .panel) ── */
-    .orch-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 16px;
-      margin-bottom: 22px;
-    }
-    /* These panels are static cards, not clickable tiles — opt out of the
-       site.css hover lift and make children span the full card width. */
-    .orch-main .panel { gap: 14px; padding: 18px; cursor: default; }
+    .orch-main .panel { gap: 12px; padding: 16px 18px; cursor: default; margin-bottom: 16px; }
     .orch-main .panel:hover { border-color: var(--border); background: var(--surface); transform: none; box-shadow: var(--shadow); }
     .orch-main .panel > * { width: 100%; }
-    .orch-grid .panel { padding: 18px; }
+    .panel h2 { margin: 0; font-size: 0.98rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 10px; flex-wrap: wrap; }
+    .panel-sub { font-size: 0.78rem; color: var(--muted); margin: -2px 0 8px; line-height: 1.5; }
+    .section-meta { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
 
     .btn-secondary {
-      align-self: flex-start;
-      width: auto !important;
-      padding: 8px 14px;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.8rem; font-weight: 600;
-      cursor: pointer;
+      width: auto !important; padding: 7px 13px;
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
       transition: border-color .2s, color .2s;
     }
     .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-    .panel h2 {
-      margin: 0; font-size: 1rem; color: var(--accent);
-      display: flex; align-items: center; gap: 8px;
-      border-bottom: 1px solid var(--border); padding-bottom: 10px;
-    }
-
-    /* ── Stat tiles ── */
-    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .stat {
-      background: var(--bg); border: 1px solid var(--border);
-      padding: 12px; border-radius: 10px;
-    }
-    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
-    .stat-value { font-size: 1.7rem; font-weight: 700; color: var(--accent); line-height: 1; }
-    .stat-value.muted { color: var(--text); }
-
-    .info-box {
-      padding: 12px 14px; background: var(--bg); border: 1px solid var(--border);
-      border-left: 3px solid var(--accent); border-radius: 8px;
-      font-size: 0.82rem; line-height: 1.6;
-    }
-    .info-box strong { color: var(--text); }
-
-    /* ── Agent lanes ── */
-    .agent-list { display: flex; flex-direction: column; gap: 8px; }
-    .agent-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 12px; background: var(--bg);
-      border: 1px solid var(--border); border-left: 3px solid var(--accent);
-      border-radius: 8px;
-    }
-    .agent-name { font-weight: 600; display: flex; align-items: center; }
-    .agent-meta { font-size: 0.78rem; color: var(--muted); }
-    .agent-status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #888; margin-left: 8px; }
-    .agent-status.idle { background: #4a9eff; }
-    .agent-status.working { background: #ffaa00; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-
-    /* ── Work queue ── */
-    .work-queue { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
-    .work-item {
-      padding: 11px 12px; background: var(--bg);
-      border: 1px solid var(--border); border-left: 3px solid var(--accent);
-      border-radius: 8px;
-    }
-    .work-issue { font-weight: 700; color: var(--accent); font-size: 0.85rem; }
-    .work-title { font-size: 0.82rem; margin: 4px 0; color: var(--text); }
-    .work-status { font-size: 0.72rem; color: var(--muted); }
-
+    .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
     .placeholder { color: var(--muted); font-size: 0.82rem; }
 
-    /* ── Active / recent split ── */
-    .active-split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    @media (max-width: 640px) { .active-split { grid-template-columns: 1fr; } }
-    .active-split h3 { margin: 0 0 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-    .active-box {
-      padding: 12px; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 8px; min-height: 60px; font-size: 0.82rem;
+    /* ── Training control (primary action) ── */
+    .train-start-btn {
+      width: 100%; padding: 13px; border-radius: 10px;
+      background: var(--accent); color: #0a0e17; font-weight: 800; font-size: 0.95rem;
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity .15s;
     }
+    .train-start-btn:hover { opacity: .88; }
+    .train-start-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .train-provider-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 9px 12px; background: var(--bg); border: 1px solid var(--border);
+      border-left: 3px solid var(--border); border-radius: 8px; font-size: 0.82rem; margin-bottom: 6px;
+    }
+    .train-provider-row.auto { border-left-color: var(--accent); }
+    .train-provider-row.running { border-left-color: var(--green); }
+    .train-provider-row.failed { border-left-color: #f87171; }
+    .train-prov-name { font-weight: 600; display: flex; align-items: center; gap: 7px; }
+    .train-prov-meta { font-size: 0.72rem; color: var(--muted); }
+    .train-prov-spacer { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .train-badge { font-size: 0.64rem; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+    .tbadge-auto { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+    .tbadge-manual { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .tbadge-queued { background: color-mix(in srgb, #60a5fa 15%, transparent); color: #60a5fa; }
+    .tbadge-running { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+    .tbadge-failed { background: color-mix(in srgb, #f87171 15%, transparent); color: #f87171; }
+    .train-dispatch-btn {
+      font-size: 0.74rem; font-weight: 700; padding: 5px 12px; border-radius: 7px;
+      border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; white-space: nowrap;
+    }
+    .train-dispatch-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .train-dispatch-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .train-dispatch-result { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); font-size: 0.8rem; display: none; }
+    .train-recent { display: flex; gap: 8px; align-items: center; padding: 5px 9px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); font-size: 0.76rem; margin-bottom: 4px; }
 
-    /* ── Verify: CI lanes ── */
-    .verify-sub { font-size: 0.68rem; font-weight: 500; color: var(--muted); letter-spacing: .03em; }
-    .lane-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-    .lane {
-      padding: 12px; background: var(--bg);
-      border: 1px solid var(--border); border-left: 3px solid var(--border);
-      border-radius: 8px;
+    /* ── Key entry rows (editable) ── */
+    .key-card { border: 1px solid var(--border); border-radius: 10px; padding: 13px 14px; background: var(--bg); margin-bottom: 8px; }
+    .key-card.set { border-left: 3px solid var(--green); }
+    .key-card.unset { border-left: 3px solid var(--border); }
+    .key-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+    .key-head strong { font-size: 0.9rem; }
+    .key-badge-set { color: var(--green); font-size: 0.72rem; font-weight: 700; }
+    .key-badge-unset { color: var(--muted); font-size: 0.72rem; }
+    .key-badge-partial { color: #ffaa00; font-size: 0.72rem; font-weight: 700; }
+    .key-blurb { font-size: 0.74rem; color: var(--muted); line-height: 1.45; margin-bottom: 2px; }
+    .key-get { font-size: 0.74rem; color: var(--accent); text-decoration: none; }
+    .key-get:hover { text-decoration: underline; }
+    .key-input-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+    .key-input-row label { font-size: 0.72rem; color: var(--muted); min-width: 118px; }
+    .key-input-row input {
+      flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border);
+      border-radius: 7px; background: var(--surface); color: var(--text); font-size: 0.8rem;
     }
-    .lane-prefix { font-weight: 700; font-size: 0.8rem; color: var(--text); }
-    .lane-prefix code { color: var(--accent); }
-    .lane-empty { font-size: 0.74rem; color: var(--muted); margin-top: 6px; }
-    .lane-pr { font-size: 0.76rem; margin-top: 6px; }
-    .lane-pr a { color: var(--accent); text-decoration: none; font-weight: 600; }
-    .lane-pr a:hover { text-decoration: underline; }
-    .lane-title { color: var(--text); display: block; margin-top: 2px; line-height: 1.35; }
-    .check { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; margin-top: 6px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
-    .check::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #888; }
-    .check.passing::before { background: #4ade80; }
-    .check.failing::before { background: #f87171; }
-    .check.pending::before { background: #ffaa00; animation: pulse 1.5s infinite; }
-    .check.none::before  { background: #6b7280; }
-    .lane.passing { border-left-color: #4ade80; }
-    .lane.failing { border-left-color: #f87171; }
-    .lane.pending { border-left-color: #ffaa00; }
+    .key-input-row input:focus { outline: none; border-color: var(--accent); }
+    .key-save-btn { font-size: 0.76rem; font-weight: 700; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; white-space: nowrap; }
+    .key-save-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .key-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 8px; }
 
-    /* ── Human-in-the-loop ── */
-    .human-list { display: flex; flex-direction: column; gap: 8px; }
-    .human-item {
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-      padding: 11px 12px; background: var(--bg);
-      border: 1px solid var(--border); border-left: 3px solid #a78bfa;
-      border-radius: 8px;
-    }
-    .human-kind {
-      font-size: 0.64rem; text-transform: uppercase; letter-spacing: .04em;
-      font-weight: 700; color: #a78bfa; padding: 2px 8px;
-      border: 1px solid color-mix(in srgb, #a78bfa 40%, transparent); border-radius: 999px;
-      white-space: nowrap;
-    }
-    .human-body { flex: 1 1 200px; min-width: 0; }
-    .human-title { font-size: 0.84rem; color: var(--text); font-weight: 600; }
-    .human-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
-    .human-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .hl-btn {
-      font-size: 0.72rem; font-weight: 600; padding: 6px 10px;
-      border-radius: 7px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--text);
-      cursor: pointer; text-decoration: none; white-space: nowrap;
-      transition: border-color .15s, color .15s;
-    }
-    .hl-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .hl-btn.primary { background: color-mix(in srgb, #a78bfa 16%, transparent); border-color: color-mix(in srgb, #a78bfa 45%, transparent); color: var(--text); }
-    .hl-btn.primary:hover { border-color: #a78bfa; color: #a78bfa; }
-
-    /* ── Verify: provider merit ── */
+    /* ── Read-only wired panels (flat) ── */
     .merit-list { display: flex; flex-direction: column; gap: 6px; }
-    .merit-row {
-      display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px;
-      padding: 9px 12px; background: var(--bg);
-      border: 1px solid var(--border); border-radius: 8px;
-    }
+    .merit-row { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
     .merit-rank { font-weight: 700; color: var(--muted); font-size: 0.8rem; text-align: center; }
     .merit-name { font-weight: 600; font-size: 0.84rem; }
     .merit-name .merit-meta { font-weight: 400; color: var(--muted); font-size: 0.72rem; margin-left: 6px; }
     .merit-score { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+    .info-box { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; font-size: 0.82rem; line-height: 1.6; }
+    .info-box strong { color: var(--text); }
+    .stat { background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 10px; }
+    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--accent); line-height: 1; }
+    .stat-value.muted { color: var(--text); }
 
-    .orch-footer-row {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; margin-top: 18px; flex-wrap: wrap;
-    }
-    .refresh-time { font-size: 0.74rem; color: var(--muted); }
-
-    /* ── The Loop (Observe → Remember → Reason → Act → Verify → Converge), live ── */
-    .loop-panel { margin-bottom: 22px; }
-    .loop-flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 6px; justify-content: center; }
-    .loop-stage {
-      flex: 1 1 140px; min-width: 132px;
-      display: flex; flex-direction: column; gap: 3px;
-      padding: 14px 12px; border-radius: 12px;
-      background: var(--bg); border: 1px solid var(--border); border-top: 3px solid var(--border);
-      transition: border-color .3s, box-shadow .3s, transform .3s;
-    }
-    .loop-stage .ls-icon { font-size: 1.25rem; line-height: 1; }
-    .loop-stage .ls-name { font-weight: 700; font-size: 0.8rem; color: var(--text); letter-spacing: .02em; }
-    .loop-stage .ls-metric { font-size: 1.5rem; font-weight: 800; color: var(--accent); line-height: 1.1; }
-    .loop-stage .ls-sub { font-size: 0.68rem; color: var(--muted); }
-    .loop-stage.active {
-      border-color: var(--accent); border-top-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent), 0 10px 26px -14px var(--accent);
-      transform: translateY(-2px);
-    }
-    .loop-stage.active .ls-icon { animation: pulse 1.5s infinite; }
-    .loop-arrow { align-self: center; color: var(--muted); font-size: 1.05rem; flex: 0 0 auto; }
-    @media (max-width: 720px) { .loop-arrow { display: none; } .loop-stage { flex-basis: 44%; } }
-    .loop-cycle { text-align: center; margin-top: 12px; font-size: 0.74rem; color: var(--muted); }
-    .loop-cycle .lc-spin { color: var(--accent); display: inline-block; animation: spin 6s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .refresh-time { font-size: 0.74rem; color: var(--muted); display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: 8px; }
   </style>
   <title>Orchestration — Keystone OS</title>
 </head>
 <body>
 
-<!-- ── Skip to content ── -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<!-- ── Site nav (matches index.html) ── -->
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
@@ -249,309 +154,98 @@
 
 <main class="orch-main" id="main-content">
 
-  <header class="orch-header">
-    <span class="panel-label">Convergence · Act stage</span>
-    <h1>⚙️ Agent Orchestration</h1>
-    <p>See what Keystone is doing right now, what needs you, how the loop is holding up, and which AI models are available.</p>
-  </header>
-
-  <!-- ── AI Provider Configuration ── -->
-  <section class="panel" style="margin-bottom: 22px;">
-    <h2>🤖 AI Providers
-      <span class="verify-sub" id="providersSummary">Loading…</span>
-      <span style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn-secondary" id="providersRefreshBtn" onclick="refreshProviderStatus()">⟳ Refresh</button>
-      </span>
-    </h2>
-    <p class="placeholder" style="margin:-4px 0 6px;font-size:0.86rem;line-height:1.5;">
-      Keystone can talk to 10+ AI providers. Set API keys below, then Keystone automatically picks the best one for each task
-      <strong>(coding, reasoning, creative, etc.).</strong> Your keys are saved <strong>on this computer only</strong> — never uploaded.
-    </p>
-
-    <!-- Provider grid (available providers) -->
-    <h3 style="margin:12px 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Available providers</h3>
-    <div id="providerGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:18px;">
-      <div class="placeholder">Loading providers…</div>
-    </div>
-
-    <!-- Task-type routing -->
-    <h3 style="margin:12px 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider chains by task type</h3>
-    <p class="placeholder" style="margin:0 0 10px;font-size:0.8rem;color:var(--muted);">Each task type has a fallback chain. Keystone tries the first, then the next if unavailable.</p>
-    <div id="providerChains" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:18px;">
-      <div class="placeholder">Loading task chains…</div>
-    </div>
-
-    <!-- API key management -->
-    <div style="border-top:1px solid var(--border);padding-top:16px;">
-      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        🔑 Connect your API keys
-        <span class="verify-sub" id="providerKeysSummary"></span>
-      </h3>
-      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
-        Each provider links to where you grab a free API key. Paste it below — keys are saved locally in your user account.
-      </p>
-      <div id="providerKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
-        <div class="placeholder">Loading accounts…</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── The convergence loop, live ── -->
-  <section class="panel loop-panel">
-    <h2>♾️ The Loop <span class="verify-sub">Observe → Remember → Reason → Act → Verify → Converge — live</span></h2>
-    <div class="loop-flow" id="loopFlow">
-      <div class="placeholder">Loading the loop…</div>
-    </div>
-    <div class="loop-cycle"><span class="lc-spin">↻</span> <span id="loopCycleNote">one continuous loop — every stage feeds the next</span></div>
-  </section>
-
-  <div class="orch-grid">
-    <!-- Queue Status -->
-    <section class="panel">
-      <h2>📊 Queue Status</h2>
-      <div class="stat-grid">
-        <div class="stat">
-          <div class="stat-label">Pending</div>
-          <div class="stat-value" id="statPending">0</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">In Progress</div>
-          <div class="stat-value" id="statInProgress">0</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Completed</div>
-          <div class="stat-value" id="statCompleted">0</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Failed</div>
-          <div class="stat-value" id="statFailed">0</div>
-        </div>
-      </div>
-      <div class="info-box">
-        <strong>Total in queue:</strong> <span id="queueTotal">—</span><br>
-        <strong>Success rate:</strong> <span id="successRate">—</span>
-      </div>
-    </section>
-
-    <!-- Agent Lanes -->
-    <section class="panel">
-      <h2>🤖 Agent Lanes</h2>
-      <div class="agent-list" id="agentList">
-        <div class="placeholder">Loading agent status…</div>
-      </div>
-      <div>
-        <button class="btn-secondary" id="refreshBtn" type="button">🔄 Refresh now</button>
-      </div>
-    </section>
-
-    <!-- Work Queue -->
-    <section class="panel">
-      <h2>📋 Work Queue</h2>
-      <div class="work-queue" id="workQueue">
-        <div class="placeholder">Loading queue…</div>
-      </div>
-    </section>
+  <!-- ── Slim status line ── -->
+  <div class="orch-status">
+    <span id="statusPill" class="pill"><span class="dot"></span> Checking…</span>
+    <span class="sdiv"></span>
+    <span class="smeta"><b id="statusAiCount">—</b> AIs connected</span>
+    <span class="sdiv"></span>
+    <span class="smeta">Training: <b id="statusTrain">—</b></span>
+    <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
 
-  <!-- Active Work -->
+  <!-- ── Training Control (primary action) ── -->
   <section class="panel">
-    <h2>🔄 Active Work &amp; Recent Completions</h2>
-    <div class="active-split">
-      <div>
-        <h3>Currently working on</h3>
-        <div class="active-box" id="activeWork"><span class="placeholder">No active work</span></div>
-      </div>
-      <div>
-        <h3>Recently completed</h3>
-        <div class="active-box" id="recentWork"><span class="placeholder">No completed work</span></div>
-      </div>
+    <h2>⚡ Training Control <span class="section-meta" id="trainSummary"></span></h2>
+    <p class="panel-sub">Fire a self-improvement run on the free GPU providers. <b>Start</b> fans out to every automatable provider with quota; or dispatch one provider at a time.</p>
+    <button class="train-start-btn" id="startTrainBtn" onclick="startTraining()">▶ Start Training Now — all providers</button>
+    <div id="trainDispatchResult" class="train-dispatch-result"></div>
+    <div id="trainProviders" style="margin-top:12px;"><div class="placeholder">Loading providers…</div></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollAll()">↻ Poll running jobs</button>
+      <button class="btn-secondary" onclick="renderTrainingSection()">⟳ Refresh</button>
     </div>
+    <div id="trainRecentJobs" style="margin-top:12px;"></div>
   </section>
 
-  <!-- ── Verify stage: CI lanes + provider merit ── -->
-  <div class="orch-grid" style="margin-top: 22px;">
-    <section class="panel" style="grid-column: 1 / -1;">
-      <h2>✅ Code Safety Check <span class="verify-sub" id="laneSummary"></span></h2>
-      <p class="placeholder" style="margin:-4px 0 4px;">Every agent gets one open pull request at a time. Tests must pass before anything merges. Green = safe to land, red = needs a fix.</p>
-      <div class="lane-grid" id="laneGrid">
-        <div class="placeholder">Loading PR lanes…</div>
-      </div>
-    </section>
-
-    <section class="panel" style="grid-column: 1 / -1;">
-      <h2>🙋 Your Turn <span class="verify-sub" id="humanSummary"></span></h2>
-      <p class="placeholder" style="margin:-4px 0 4px;">The loop paused here and is waiting for you. Each card has a one-click way to hand it off — send it to Keystone Chat or copy a ready prompt for Claude Code.</p>
-      <div class="human-list" id="humanList">
-        <div class="placeholder">Loading…</div>
-      </div>
-    </section>
-
-    <section class="panel" style="grid-column: 1 / -1;">
-      <h2>🏆 Provider Leaderboard <span class="verify-sub">who's performing best</span></h2>
-      <p class="placeholder" style="margin:-4px 0 4px;">Keystone grades each AI model on every job it completes. The top scorer gets priority for future tasks. This is the live scoreboard.</p>
-      <div class="merit-list" id="meritList">
-        <div class="placeholder">Loading leaderboard…</div>
-      </div>
-    </section>
-  </div>
-
-  <!-- ── Trust Calibration ── -->
-  <section class="panel" style="margin-top: 22px;">
-    <h2>⚖️ Who Keystone Trusts <span class="verify-sub" id="calSummary"></span></h2>
-    <p class="placeholder" style="margin:-4px 0 4px;">
-      Every time Keystone checks a claim against reality it records whether it was right. These trust scores update automatically — higher trust means that source gets believed faster next time.
-    </p>
-    <div id="calList" style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
-      <div class="placeholder">Loading trust scores…</div>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;" id="calGlobal"></div>
+  <!-- ── AI Provider Keys (editable) ── -->
+  <section class="panel">
+    <h2>🔑 AI Provider Keys <span class="section-meta" id="providerKeysSummary"></span>
+      <button class="btn-secondary" onclick="refreshProviderStatus()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">Paste an API key to connect a model. Saved to this computer's Windows user account only — never uploaded.</p>
+    <div id="providerKeysList" class="key-grid"><div class="placeholder">Loading…</div></div>
   </section>
 
-  <!-- ── Keystone Self-Tests ── -->
-  <section class="panel" style="margin-top: 22px;">
-    <h2>🧪 Self-Tests <span class="verify-sub" id="ksTestSummary"></span></h2>
-    <p class="placeholder" style="margin:-4px 0 4px;">
-      Keystone audits itself — picks a real issue, tries to solve it, then grades its own work with evidence. Here's the audit trail.
-    </p>
-    <div id="ksTestList" style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
-      <div class="placeholder">Loading test history…</div>
-    </div>
+  <!-- ── GPU Account Keys (editable) ── -->
+  <section class="panel">
+    <h2>🖥️ GPU Account Keys <span class="section-meta" id="gpuKeysSummary"></span>
+      <button class="btn-secondary" onclick="renderGpuKeys()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">Connect free GPU accounts so the Start button can dispatch training automatically. Set Hugging Face first — it's the checkpoint parking spot.</p>
+    <div id="gpuKeysList" class="key-grid"><div class="placeholder">Loading accounts…</div></div>
   </section>
 
-  <!-- ── GPU Training Orchestration ── -->
-  <section class="panel" id="gpuTrainingSection" style="margin-top: 22px;">
-    <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      🖥️ GPU Training
-      <span class="verify-sub" id="gpuSummary">Loading…</span>
+  <!-- ── Provider Chains (read-only reference) ── -->
+  <section class="panel">
+    <h2>🔗 Provider Chains <span class="section-meta" id="providersSummary"></span></h2>
+    <p class="panel-sub">Each task type tries providers in order — the first connected one wins. Set keys above to light these up.</p>
+    <div id="providerChains"><div class="placeholder">Loading…</div></div>
+  </section>
+
+  <!-- ── Leaderboard (read-only) ── -->
+  <section class="panel">
+    <h2>🏆 Provider Leaderboard <span class="section-meta">graded coding runs · last 14 days</span></h2>
+    <div class="merit-list" id="meritList"><div class="placeholder">Loading…</div></div>
+  </section>
+
+  <!-- ── Trust Calibration (read-only) ── -->
+  <section class="panel">
+    <h2>⚖️ Trust Calibration <span class="section-meta" id="calSummary"></span></h2>
+    <p class="panel-sub">How much each agent's confidence has matched verified reality.</p>
+    <div id="calList" style="display:flex;flex-direction:column;gap:6px;"><div class="placeholder">Loading…</div></div>
+    <div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;" id="calGlobal"></div>
+  </section>
+
+  <!-- ── Self-Tests (read-only) ── -->
+  <section class="panel">
+    <h2>🧪 Self-Test History <span class="section-meta" id="ksTestSummary"></span></h2>
+    <div id="ksTestList" style="display:flex;flex-direction:column;gap:8px;"><div class="placeholder">Loading…</div></div>
+  </section>
+
+  <!-- ── Rollover (read-only) ── -->
+  <section class="panel">
+    <h2>🔀 Rollover · Keystone vs Claude <span class="section-meta">landed-work share</span>
       <span style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn-secondary" id="gpuDispatchBtn" onclick="gpuDispatch()" style="border-color:var(--accent);color:var(--accent);">▶ Dispatch</button>
-        <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollActive()">↻ Poll</button>
-        <button class="btn-secondary" onclick="renderGpuTraining()">⟳ Refresh</button>
+        <button class="btn-secondary" id="band-24h" onclick="setRolloverBand('24h')" style="font-size:0.72rem;padding:4px 9px;">24h</button>
+        <button class="btn-secondary" id="band-7d" onclick="setRolloverBand('7d')" style="font-size:0.72rem;padding:4px 9px;">7d</button>
+        <button class="btn-secondary" id="band-30d" onclick="setRolloverBand('30d')" style="border-color:var(--accent);color:var(--accent);font-size:0.72rem;padding:4px 9px;">30d</button>
+        <button class="btn-secondary" id="band-all" onclick="setRolloverBand('all')" style="font-size:0.72rem;padding:4px 9px;">all</button>
       </span>
     </h2>
-    <p style="margin:-4px 0 6px;font-size:0.86rem;color:var(--text);line-height:1.5;">
-      Keystone makes its own local coding model smarter by training it on borrowed cloud GPUs — for <strong>free</strong>.
-      It hops between providers so it never runs out of free hours. Connect your free accounts below, then hit
-      <strong>Dispatch</strong> to kick off a run.
-    </p>
-    <p class="placeholder" style="margin:0 0 14px;font-size:0.78rem;">
-      Free-tier rotation: Kaggle (30 h/wk) → SageMaker (28 h/wk) → Colab (22 h/wk) → Lightning AI (22 h/wk) · ~102 h/wk total free.
-    </p>
-
-    <!-- Provider status cards -->
-    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Provider status</h3>
-    <div id="gpuProviders" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
-      <div class="placeholder">Loading providers…</div>
-    </div>
-
-    <!-- Training Plan Executor (NEW) -->
-    <div style="border:2px solid var(--accent);border-radius:12px;padding:16px;margin-bottom:18px;background:rgba(var(--accent-rgb),0.03);">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-        <span style="font-size:1.2rem;">📊</span>
-        <h3 style="margin:0;font-size:0.92rem;color:var(--accent);">Weekly Training Plan</h3>
-        <span class="verify-sub" id="planSummary">Loading…</span>
-      </div>
-
-      <p style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;color:var(--text);">
-        Automatically dispatch to <strong>all free GPU providers</strong> to maximize training capacity.
-        Runs 600 steps on each provider, cascading through the week as quotas refill.
-      </p>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;">
-        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent);">
-          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Free Hours/Week</div>
-          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planTotalHours">102</div>
-        </div>
-        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid #4ade80;">
-          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Dispatches Queued</div>
-          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planDispatchCount">0</div>
-        </div>
-        <div style="padding:10px;background:var(--bg);border-radius:8px;border-left:3px solid #f97316;">
-          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;">Currently Running</div>
-          <div style="font-size:1.3rem;font-weight:600;color:var(--text);" id="planRunningCount">0</div>
-        </div>
-      </div>
-
-      <div id="planExecutionStatus" style="margin-bottom:12px;display:none;">
-        <div style="font-size:0.8rem;margin-bottom:8px;color:var(--muted);text-transform:uppercase;">Execution Progress</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div id="planProgress" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
-        </div>
-        <div id="planErrors" style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;border-left:3px solid #ef4444;font-size:0.75rem;color:var(--muted);display:none;"></div>
-      </div>
-
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button id="planExecuteBtn" class="btn-secondary" onclick="executePlan()" style="border-color:var(--accent);color:var(--accent);font-weight:600;flex:1;min-width:180px;">
-          ▶ Execute Weekly Plan
-        </button>
-        <button id="planStatusBtn" class="btn-secondary" onclick="refreshPlanStatus()" style="flex:0 0 auto;">
-          ⟳ Status
-        </button>
-      </div>
-    </div>
-
-    <!-- Cloud GPU API keys -->
-    <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:6px;">
-      <h3 style="margin:0 0 4px;font-size:0.92rem;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        🔑 Connect your free GPU accounts
-        <span class="verify-sub" id="gpuKeysSummary"></span>
-      </h3>
-      <p class="placeholder" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
-        Paste each provider's API key so Keystone can send training jobs there for you. Keys are saved
-        <strong>on this computer only</strong> (your Windows user account) — never uploaded anywhere. Each card links to where you grab the key.
-      </p>
-      <div id="gpuKeysList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
-        <div class="placeholder">Loading accounts…</div>
-      </div>
-    </div>
-
-    <!-- Active job -->
-    <div id="gpuActiveJob" style="margin:18px 0 14px;"></div>
-
-    <!-- Manual dispatch controls -->
-    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Start a training run</h3>
-    <div id="gpuDispatchControls" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
-      <select id="gpuProviderSelect" class="btn-secondary" style="padding:8px 10px;cursor:pointer;min-width:160px;">
-        <option value="">Auto — pick the next free one</option>
-      </select>
-      <input id="gpuStepsInput" type="number" value="600" min="50" max="3000" step="50"
-        style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);width:100px;">
-      <span style="font-size:0.8rem;color:var(--muted);">training steps (more = smarter but slower)</span>
-    </div>
-    <p class="placeholder" style="margin:0 0 14px;font-size:0.75rem;">Tip: leave it on “Auto” and Keystone uses whichever provider still has free hours this week.</p>
-
-    <!-- Recent jobs -->
-    <h3 style="margin:0 0 8px;font-size:0.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">Recent runs</h3>
-    <div id="gpuHistory" style="font-size:0.82rem;"></div>
+    <div id="rolloverBody"><div class="placeholder">Loading…</div></div>
   </section>
 
-  <!-- ── Rollover dashboard (#898) ── -->
-  <section class="panel" style="margin-top: 22px;">
-    <h2>🔀 Rollover · Keystone vs Claude
-      <span class="verify-sub">landed-work share · git attribution</span>
-      <span style="margin-left:auto; display:flex; gap:6px; font-size:0.75rem; font-weight:500;">
-        <button class="btn-secondary" id="band-24h" onclick="setRolloverBand('24h')">24h</button>
-        <button class="btn-secondary" id="band-7d" onclick="setRolloverBand('7d')">7d</button>
-        <button class="btn-secondary" id="band-30d" onclick="setRolloverBand('30d')" style="border-color:var(--accent);color:var(--accent);">30d</button>
-        <button class="btn-secondary" id="band-all" onclick="setRolloverBand('all')">all</button>
-      </span>
-    </h2>
-    <div id="rolloverBody" style="margin-top:10px;">
-      <div class="placeholder">Loading rollover data…</div>
-    </div>
-  </section>
-
-  <div class="orch-footer-row">
-    <span class="refresh-time" id="refreshTime">Last update: never</span>
+  <div class="refresh-time" id="footerTime">
+    <span class="dot online" id="status-dot" title="Server status"></span>
+    <span id="status-label">connecting…</span>
   </div>
 
 </main>
 
-<!-- ── Site footer (matches index.html) ── -->
 <footer class="site-footer">
   <div class="footer-inner">
     <span class="footer-brand">
-      <span class="dot online" id="status-dot" title="Server status"></span>
       <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
     </span>
     <span class="sep">·</span>
@@ -561,7 +255,6 @@
     <a href="/orchestration.html">Orchestration</a>
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <span class="visually-hidden" id="status-label">connecting…</span>
   </div>
 </footer>
 
@@ -569,887 +262,224 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
+  let _cache = { providerData: null, gpuData: null };
 
-  async function fetchJson(path) {
+  async function fetchJson(path, timeoutMs = 6000) {
     try {
-      const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
       return r.ok ? await r.json() : null;
     } catch { return null; }
   }
-
   function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
-
-  async function refreshStatus() {
-    // Queue stats + agent slots + pending list (all best-effort).
-    const [queueData, agentData, pendingData, health, convData] = await Promise.all([
-      fetchJson("/api/queue/status"),
-      fetchJson("/api/queue/agents"),
-      fetchJson("/api/queue/list?status=pending"),
-      fetchJson("/api/health"),
-      fetchJson("/api/convergence/status"),
-    ]);
-
-    // ── Queue stats ──
-    const q = (queueData && queueData.queue) || { pending: 0, assigned: 0, completed: 0, failed: 0 };
-    setText("statPending", q.pending || 0);
-    setText("statInProgress", q.assigned || 0);
-    setText("statCompleted", q.completed || 0);
-    setText("statFailed", q.failed || 0);
-
-    const total = (q.pending || 0) + (q.assigned || 0) + (q.completed || 0) + (q.failed || 0);
-    const done = q.completed || 0;
-    setText("queueTotal", total);
-    setText("successRate", (total > 0 ? Math.round((done / total) * 100) : 0) + "%");
-
-    // ── Agent lanes ──
-    const slots = (agentData && agentData.slots) || [];
-    const agentEl = $("agentList");
-    agentEl.innerHTML = slots.length
-      ? slots.map((slot) => {
-          const working = slot.status === "working";
-          const cls = working ? "working" : (slot.status === "disabled" ? "" : "idle");
-          const label = slot.model || slot.agent || slot.id;
-          const right = working
-            ? `⏱️ Issue #${slot.currentWork ?? "?"}`
-            : (slot.status === "disabled" ? "✕ Disabled" : "✓ Ready");
-          return `
-            <div class="agent-item">
-              <span class="agent-name">${escapeHtml(label)}
-                <span class="agent-status ${cls}"></span>
-              </span>
-              <span class="agent-meta">${right}</span>
-            </div>`;
-        }).join("")
-      : '<div class="placeholder">No agents available</div>';
-
-    // ── Work queue (pending) ──
-    const items = (pendingData && pendingData.items) || [];
-    const workEl = $("workQueue");
-    workEl.innerHTML = items.length
-      ? items.slice(0, 6).map((item) => `
-          <div class="work-item">
-            <span class="work-issue">Issue #${item.issueNumber ?? "—"}</span>
-            <div class="work-title">${escapeHtml(item.title || "Untitled")}</div>
-            <div class="work-status">Priority: ${item.priority || 0}${item.assignedTo ? ` · ${escapeHtml(item.assignedTo)}` : ""}</div>
-          </div>`).join("")
-      : '<div class="placeholder">No pending work</div>';
-
-    // ── Active work (assigned slots) ──
-    const active = slots.filter((s) => s.status === "working");
-    const activeEl = $("activeWork");
-    activeEl.innerHTML = active.length
-      ? active.map((s) => `<div><strong>${s.id}</strong> → Issue #${s.currentWork ?? "?"}</div>`).join("")
-      : '<span class="placeholder">No active work</span>';
-
-    // ── Verify + human-in-the-loop (share one pr-lanes fetch) ──
-    const laneData = await fetchJson("/api/queue/pr-lanes");
-    renderLanes(laneData);
-    renderLoop(convData, q, slots, laneData);
-    renderHumanLoop(laneData, items);
-    renderMerit();
-
-    // ── Footer status dot ──
-    const online = !!(health && health.ok);
-    const dot = $("status-dot");
-    if (dot) dot.className = online ? "dot online" : "dot";
-    setText("status-label", online ? "server online" : "server unreachable");
-
-    // ── Timestamp ──
-    setText("refreshTime", "Last update: " + new Date().toLocaleTimeString());
-  }
-
-  function renderLanes(data) {
-    const el = $("laneGrid");
-    if (!data) { el.innerHTML = '<div class="placeholder">PR lane status unavailable.</div>'; return; }
-    if (data.error === "gh_unavailable") {
-      el.innerHTML = '<div class="placeholder">GitHub CLI not available / not authed — CI lane status can\'t be read here.</div>';
-      setText("laneSummary", "");
-      return;
-    }
-    const lanes = data.lanes || [];
-    setText("laneSummary", `${data.openCount || 0} open PR${(data.openCount || 0) === 1 ? "" : "s"}`);
-    el.innerHTML = lanes.map((lane) => {
-      if (!lane.pr) {
-        return `<div class="lane">
-          <div class="lane-prefix"><code>${lane.prefix}/</code></div>
-          <div class="lane-empty">Lane open · no active PR</div>
-        </div>`;
-      }
-      const pr = lane.pr;
-      const checkLabel = { passing: "checks passing", failing: "checks failing", pending: "checks running", none: "no checks" }[pr.checks] || pr.checks;
-      return `<div class="lane ${pr.checks}">
-        <div class="lane-prefix"><code>${lane.prefix}/</code></div>
-        <div class="lane-pr">
-          <a href="${pr.url}" target="_blank" rel="noopener">#${pr.number}${pr.draft ? " · draft" : ""}</a>
-          <span class="lane-title">${escapeHtml(pr.title || "")}</span>
-        </div>
-        <span class="check ${pr.checks}">${checkLabel}</span>
-      </div>`;
-    }).join("");
-  }
-
-  // The Reason/Converge gate: items where the autonomous loop pauses for a human.
-  // Real signals — open PRs awaiting review/merge, and pending work not yet picked up.
-  function renderHumanLoop(laneData, pendingItems) {
-    const el = $("humanList");
-    const rows = [];
-
-    // 1. Open PRs awaiting human review/merge (checks not failing, not draft).
-    const lanes = (laneData && laneData.lanes) || [];
-    for (const lane of lanes) {
-      const pr = lane.pr;
-      if (!pr || pr.draft) continue;
-      const kind = { passing: "review PR", none: "review PR", failing: "fix PR", pending: "checks running" }[pr.checks] || "review PR";
-      const checksLabel = { passing: "checks passing", failing: "checks failing", pending: "checks running", none: "no checks" }[pr.checks] || pr.checks;
-      rows.push({
-        kind,
-        title: `#${pr.number} ${pr.title || ""}`,
-        meta: `${lane.prefix}/ lane · ${checksLabel}${pr.mergeable ? " · " + String(pr.mergeable).toLowerCase() : ""}`,
-        ghUrl: pr.url,
-        seed: `Review PR #${pr.number} ("${pr.title || ""}", ${pr.branch} lane). Checks are ${pr.checks}. Summarize the diff, flag risks, and tell me if it's safe to merge.`,
-        cc: `Review PR #${pr.number} on branch ${pr.branch}: \`gh pr diff ${pr.number}\`. Check it against the convergence + monoworkstream rules, run the tests, and report whether it's safe to merge.`,
-      });
-    }
-
-    // 2. Pending work not yet executing — waiting for a human to route/start.
-    for (const item of (pendingItems || []).slice(0, 6)) {
-      rows.push({
-        kind: "route work",
-        title: `Issue #${item.issueNumber ?? "—"} ${item.title || ""}`,
-        meta: `pending · priority ${item.priority || 0}`,
-        ghUrl: item.issueNumber ? `https://github.com/alex-place/lantern-os/issues/${item.issueNumber}` : null,
-        seed: `Work on issue #${item.issueNumber}: ${item.title || ""}. Investigate the codebase, propose a plan, and ground each claim with evidence.`,
-        cc: `Work issue #${item.issueNumber} (${item.title || ""}) in this repo per the convergence + monoworkstream rules: open a lane branch, implement, verify in preview, and open a PR.`,
-      });
-    }
-
-    setText("humanSummary", rows.length ? `${rows.length} awaiting you` : "all clear");
-    if (!rows.length) { el.innerHTML = '<div class="placeholder">Nothing waiting for a human right now.</div>'; return; }
-
-    el.innerHTML = rows.map((r, i) => {
-      const chatUrl = `/dream-chat.html?seed=${encodeURIComponent(r.seed)}`;
-      const ghBtn = r.ghUrl ? `<a class="hl-btn" href="${r.ghUrl}" target="_blank" rel="noopener">GitHub ↗</a>` : "";
-      return `<div class="human-item">
-        <span class="human-kind">${r.kind}</span>
-        <div class="human-body">
-          <div class="human-title">${escapeHtml(r.title)}</div>
-          <div class="human-meta">${escapeHtml(r.meta)}</div>
-        </div>
-        <div class="human-actions">
-          <a class="hl-btn primary" href="${chatUrl}">💬 Keystone Chat</a>
-          <button class="hl-btn" type="button" data-cc="${i}">⌨ Copy for Claude Code</button>
-          ${ghBtn}
-        </div>
-      </div>`;
-    }).join("");
-
-    // Wire clipboard handoff for Claude Code prompts.
-    el.querySelectorAll("button[data-cc]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const r = rows[Number(btn.dataset.cc)];
-        copyToClipboard(r.cc, btn);
-      });
-    });
-  }
-
-  function copyToClipboard(text, btn) {
-    const done = () => { const o = btn.textContent; btn.textContent = "✓ Copied"; setTimeout(() => (btn.textContent = o), 1500); };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
-    } else { fallbackCopy(text, done); }
-  }
-  function fallbackCopy(text, done) {
-    const ta = document.createElement("textarea");
-    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); done(); } catch {}
-    document.body.removeChild(ta);
-  }
-
-  // ── The Loop: live Observe → Remember → Reason → Act → Verify → Converge ──
-  const LOOP_STAGES = [
-    { icon: "👁", name: "Observe" },
-    { icon: "🧠", name: "Remember" },
-    { icon: "💭", name: "Reason" },
-    { icon: "⚡", name: "Act" },
-    { icon: "✅", name: "Verify" },
-    { icon: "🎯", name: "Converge" },
-  ];
-  function renderLoop(conv, q, slots, laneData) {
-    const el = $("loopFlow");
-    if (!el) return;
-    const working = (slots || []).filter((s) => s.status === "working").length;
-    const openPRs = (laneData && laneData.openCount) || 0;
-    const records = (conv && conv.total) || 0;
-    const reasoners = (conv && Array.isArray(conv.reasoners)) ? conv.reasoners.length : 0;
-    const grounded = (conv && conv.groundedPct != null) ? Math.round(conv.groundedPct * 100) : null;
-    const metrics = [
-      { v: q.pending || 0,   sub: "queued" },
-      { v: records,          sub: records === 1 ? "record" : "records" },
-      { v: reasoners || (q.assigned || 0), sub: reasoners ? "reasoners" : "planning" },
-      { v: working,          sub: "acting" },
-      { v: openPRs,          sub: "PRs in CI" },
-      { v: q.completed || 0, sub: grounded != null ? grounded + "% grounded" : "converged" },
-    ];
-    // Active stage = where the loop is doing work right now; rests at Converge when idle.
-    let active = 5;
-    if (working > 0) active = 3;
-    else if (openPRs > 0) active = 4;
-    else if ((q.assigned || 0) > 0) active = 2;
-    else if ((q.pending || 0) > 0) active = 0;
-    el.innerHTML = LOOP_STAGES.map((s, i) => {
-      const m = metrics[i];
-      const node = `<div class="loop-stage ${i === active ? "active" : ""}">
-          <span class="ls-icon">${s.icon}</span>
-          <span class="ls-name">${s.name}</span>
-          <span class="ls-metric">${m.v}</span>
-          <span class="ls-sub">${escapeHtml(m.sub)}</span>
-        </div>`;
-      return node + (i < LOOP_STAGES.length - 1 ? '<span class="loop-arrow">→</span>' : "");
-    }).join("");
-    const note = $("loopCycleNote");
-    if (note) {
-      note.textContent = `${records} convergence record${records === 1 ? "" : "s"}`
-        + (grounded != null ? ` · ${grounded}% externally grounded` : "")
-        + " · the loop never stops";
-    }
-  }
-
-  async function renderMerit() {
-    const el = $("meritList");
-    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=coding&topN=6&lookbackDays=14");
-    const agents = (data && data.agents) || [];
-    if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded provider runs yet (leaderboard empty).</div>'; return; }
-    el.innerHTML = agents.map((a, i) => {
-      const name = a.agentId || a.agent || a.provider || a.model || "agent";
-      const score = a.compositeScore ?? a.score ?? a.composite ?? null;
-      const calls = a.totalCalls ?? a.n ?? a.calls;
-      const sr = a.successRate != null ? Math.round(a.successRate * 100) + "% success" : null;
-      const meta = [sr, calls != null ? `${calls} calls` : null].filter(Boolean).join(" · ");
-      return `<div class="merit-row">
-        <span class="merit-rank">${i + 1}</span>
-        <span class="merit-name">${escapeHtml(String(name))}${meta ? `<span class="merit-meta">${meta}</span>` : ""}</span>
-        <span class="merit-score">${score != null ? Number(score).toFixed(2) : "—"}</span>
-      </div>`;
-    }).join("");
-  }
-
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  // ── Trust Calibration ────────────────────────────────────────────────────
-  async function renderCalibration() {
-    const el = document.getElementById("calList");
-    const gl = document.getElementById("calGlobal");
-    const data = await fetchJson("/api/convergence/calibration");
-    if (!data || !data.keys) {
-      el.innerHTML = '<div class="placeholder">Trust calibration unavailable.</div>';
-      return;
+  // ── Slim status line ──────────────────────────────────────────────────────
+  async function updateStatus() {
+    const health = await fetchJson("/api/health");
+    const online = !!(health && health.ok);
+    const pill = $("statusPill");
+    if (pill) {
+      pill.className = online ? "pill online" : "pill offline";
+      pill.innerHTML = `<span class="dot"></span> ${online ? "Online" : "Offline"}`;
     }
-    const entries = Object.values(data.keys).sort((a, b) => b.trust - a.trust);
-    const total = data.total_events || 0;
-    const setText = document.getElementById("calSummary");
-    if (setText) setText.textContent = `${total} verified events`;
-    el.innerHTML = entries.map((e) => {
-      const pct = Math.round((e.trust || 0) * 100);
-      const barColor = pct >= 80 ? "#4ade80" : pct >= 60 ? "#facc15" : "#f87171";
-      const label = e.key.replace("agent:", "").replace(":", " · ");
-      return `<div style="display:grid;grid-template-columns:140px 1fr 52px 60px;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
-        <span style="font-size:0.82rem;font-weight:600;">${escapeHtml(label)}</span>
-        <div style="background:var(--surface);border-radius:4px;height:10px;overflow:hidden;border:1px solid var(--border);">
-          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;transition:width .4s;"></div>
-        </div>
-        <span style="font-weight:700;color:${barColor};font-size:0.9rem;">${pct}%</span>
-        <span style="font-size:0.72rem;color:var(--muted);">${e.n} check${e.n !== 1 ? "s" : ""}</span>
-      </div>`;
-    }).join("");
-    if (gl) {
-      const ece = data.ece != null ? (data.ece * 100).toFixed(1) + "% calibration error" : null;
-      const brier = data.global_brier != null ? data.global_brier.toFixed(3) + " Brier score" : null;
-      gl.innerHTML = [ece, brier].filter(Boolean).map((t) =>
-        `<span style="font-size:0.74rem;color:var(--muted);padding:4px 10px;border:1px solid var(--border);border-radius:6px;">${t}</span>`
-      ).join("");
-    }
+    const dot = $("status-dot");
+    if (dot) dot.className = online ? "dot online" : "dot";
+    setText("status-label", online ? "server online" : "server unreachable");
+
+    const connected = _cache.providerData
+      ? Object.values(_cache.providerData.providers || {}).filter(p => p.available).length
+      : "—";
+    setText("statusAiCount", connected);
+
+    const recent = _cache.gpuData?.recentJobs || [];
+    const running = recent.find(j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued"));
+    setText("statusTrain", running ? (running.status === "running" ? "running" : "queued") : "idle");
+
+    setText("refreshTime", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
   }
 
-  // ── Keystone Self-Tests ─────────────────────────────────────────────────
-  async function renderKeystoneTests() {
-    const el = document.getElementById("ksTestList");
-    const sumEl = document.getElementById("ksTestSummary");
-    const data = await fetchJson("/api/convergence/keystone-test/runs");
-    if (!data) { el.innerHTML = '<div class="placeholder">Test history unavailable.</div>'; return; }
-    const runs = (data.runs || []).slice(0, 5);
-    if (sumEl) sumEl.textContent = runs.length ? `${data.count || runs.length} total run${(data.count || runs.length) !== 1 ? "s" : ""}` : "";
-    if (!runs.length) { el.innerHTML = '<div class="placeholder">No self-tests recorded yet.</div>'; return; }
-    el.innerHTML = runs.map((r) => {
-      const ts = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
-      const conf = r.convergence?.confidence?.overall;
-      const confPct = conf != null ? Math.round(conf * 100) : null;
-      const confColor = confPct >= 80 ? "#4ade80" : confPct >= 60 ? "#facc15" : "#f87171";
-      const filed = (r.filed_issues || []).map((n) =>
-        `<a href="https://github.com/alex-place/lantern-os/issues/${n.replace("#", "")}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none;">${n}</a>`
-      ).join(", ");
-      const hyp = r.convergence?.hypothesis || "";
-      const evidence = (r.convergence?.evidence || []).slice(0, 2);
-      return `<div style="border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;background:var(--bg);">
-        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-          <span style="font-size:0.72rem;color:var(--muted);">${escapeHtml(ts)}</span>
-          ${confPct != null ? `<span style="font-size:0.72rem;font-weight:700;color:${confColor};padding:1px 8px;border:1px solid ${confColor};border-radius:999px;">${confPct}% confident</span>` : ""}
-          ${filed ? `<span style="font-size:0.72rem;">Filed: ${filed}</span>` : ""}
-          <span style="font-size:0.72rem;color:var(--muted);margin-left:auto;">${r.scenarios_completed ?? 1} scenario${(r.scenarios_completed ?? 1) !== 1 ? "s" : ""} · ${r.findings_high_confidence ?? 0} high-confidence finding${(r.findings_high_confidence ?? 0) !== 1 ? "s" : ""}</span>
-        </div>
-        ${hyp ? `<div style="font-size:0.82rem;color:var(--text);font-weight:500;margin-bottom:4px;">${escapeHtml(hyp)}</div>` : ""}
-        ${evidence.length ? `<div style="font-size:0.74rem;color:var(--muted);">Evidence: ${evidence.map((e) => escapeHtml(e)).join(" · ")}</div>` : ""}
-      </div>`;
-    }).join("");
-  }
-
-  // ── Rollover dashboard (#898) ──────────────────────────────────────────────
-  let _rolloverBand = "30d";
-
-  window.setRolloverBand = function(band) {
-    _rolloverBand = band;
-    ["24h","7d","30d","all"].forEach((b) => {
-      const el = $(`band-${b}`);
-      if (!el) return;
-      el.style.borderColor = b === band ? "var(--accent)" : "";
-      el.style.color = b === band ? "var(--accent)" : "";
-    });
-    renderRollover();
-  };
-
-  async function renderRollover() {
-    const el = $("rolloverBody");
-    if (!el) return;
-    const band = _rolloverBand === "all" ? "" : _rolloverBand;
-    const data = await fetchJson(`/api/rollover/status?band=${band}`);
-    if (!data) { el.innerHTML = '<div class="placeholder">Rollover data unavailable.</div>'; return; }
-
-    const git = data.git || {};
-    const gitTotal = git.total || 0;
-    const kernel = data.kernel || {};
-    const pct = (n) => gitTotal > 0 ? Math.round((n / gitTotal) * 100) : 0;
-    const bar = (n, color) => {
-      const w = gitTotal > 0 ? Math.max(2, Math.round((n / gitTotal) * 100)) : 0;
-      return `<div style="height:14px;border-radius:4px;background:${color};width:${w}%;min-width:${n>0?'4px':'0'};transition:width .4s;"></div>`;
-    };
-
-    const mode = data.mode || "shadow";
-    const stage = data.stage || "pre-stage-1";
-    const lastEval = data.lastEval;
-    const evalStr = lastEval
-      ? `<strong>${lastEval.label || lastEval.benchmark || "eval"}</strong>: ${lastEval.accuracy != null ? (lastEval.accuracy * 100).toFixed(0) + "% acc" : ""} ${lastEval["pass@1"] != null ? "· pass@1=" + lastEval["pass@1"] : ""}`
-      : "No eval runs yet";
-
-    el.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
-        <div class="stat"><div class="stat-label">Mode</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(mode)}</div></div>
-        <div class="stat"><div class="stat-label">Rollover Stage</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(stage)}</div></div>
-        <div class="stat"><div class="stat-label">PRs merged (${escapeHtml(data.band || "30d")})</div><div class="stat-value">${gitTotal}</div></div>
-        <div class="stat"><div class="stat-label">Kernel runs</div><div class="stat-value ${kernel.landed === 0 ? 'muted' : ''}">${kernel.landed}</div></div>
-      </div>
-
-      <div class="info-box" style="margin-bottom:14px;">
-        <strong>Git attribution</strong> — merged PRs by agent lane (${escapeHtml(data.band || "30d")})
-        <div style="margin:10px 0 4px;font-size:0.78rem;color:var(--muted);">
-          Each bar = share of ${gitTotal} merged PR${gitTotal===1?"":"s"}
-        </div>
-        ${[
-          { label: "claude/", n: git.claude || 0, color: "#06b6d4" },
-          { label: "auto/ (Keystone)", n: git.keystone || 0, color: "#a855f7" },
-          { label: "gemini/", n: git.gemini || 0, color: "#22c55e" },
-          { label: "codex/", n: git.codex || 0, color: "#f59e0b" },
-          { label: "grok/", n: git.grok || 0, color: "#ef4444" },
-          { label: "openai/", n: git.openai || 0, color: "#8b5cf6" },
-          { label: "human", n: git.human || 0, color: "#64748b" },
-        ].map(({ label, n, color }) => `
-          <div style="display:flex;align-items:center;gap:10px;margin:5px 0;font-size:0.8rem;">
-            <span style="width:140px;color:var(--muted);white-space:nowrap;">${escapeHtml(label)}</span>
-            <div style="flex:1;background:var(--bg);border-radius:4px;border:1px solid var(--border);overflow:hidden;">
-              ${bar(n, color)}
-            </div>
-            <span style="width:48px;text-align:right;font-weight:600;">${n} <span style="color:var(--muted);font-weight:400;">(${pct(n)}%)</span></span>
-          </div>`).join("")}
-      </div>
-
-      ${kernel.landed > 0 ? `
-      <div class="info-box" style="margin-bottom:14px;">
-        <strong>Kernel attribution</strong> — convergence records (reasoner=keystone-kernel)
-        <div style="margin-top:8px;font-size:0.82rem;">
-          Keystone: <strong>${kernel.keystoneLanded}</strong>
-          · Claude: <strong>${kernel.claudeLanded}</strong>
-          · Share: <strong>${kernel.keystoneShare != null ? (kernel.keystoneShare*100).toFixed(0)+"%" : "—"}</strong>
-          · Escalation rate: <strong>${kernel.escalationRate != null ? (kernel.escalationRate*100).toFixed(0)+"%" : "—"}</strong>
-        </div>
-      </div>` : ""}
-
-      <div class="info-box">
-        <strong>Last eval</strong> — ${evalStr}
-        <span style="margin-left:8px;font-size:0.75rem;color:var(--muted);">source: data/eval/leaderboard.jsonl</span>
-      </div>
-    `;
-  }
-
-  // ── GPU Training ────────────────────────────────────────────────
+  // ── Training control ──────────────────────────────────────────────────────
   const PROVIDER_ICONS = { kaggle: "🏆", colab: "📓", sagemaker: "☁️", paperspace: "📐", lightning: "⚡" };
-  const STATE_DOT = { available: "🟢", no_key: "🔴", unavailable: "⚫" };
 
-  async function renderGpuTraining() {
+  async function renderTrainingSection() {
     const data = await fetchJson("/api/gpu-training/status");
-    if (!data) {
-      $("gpuSummary").textContent = "unavailable";
-      $("gpuProviders").innerHTML = '<div class="placeholder">API not reachable</div>';
-      return;
-    }
+    _cache.gpuData = data;
+    if (!data) { $("trainProviders").innerHTML = '<div class="placeholder">Training status unavailable.</div>'; return; }
 
-    const { providers = [], active, nextProvider, recentJobs = [], weekly_total_hours } = data;
+    const { providers = [], recentJobs = [] } = data;
+    const automatable = providers.filter(p => p.automatable && p.quota_hours_per_week > 0).length;
+    setText("trainSummary", `${automatable} provider${automatable !== 1 ? "s" : ""} ready to auto-dispatch`);
 
-    // Summary line
-    const avail = providers.filter(p => p.state === "available").length;
-    $("gpuSummary").textContent = `${avail}/${providers.length} providers ready · ${weekly_total_hours} h/wk`;
-
-    // Provider cards
-    $("gpuProviders").innerHTML = providers.map(p => {
-      const dot = STATE_DOT[p.state] || "⚫";
+    $("trainProviders").innerHTML = providers.map(p => {
       const icon = PROVIDER_ICONS[p.provider_id] || "🖥️";
-      const autoTag = p.automatable ? '<span style="color:var(--accent);font-size:0.7rem;font-weight:600;">AUTO</span>' : '<span style="color:var(--muted);font-size:0.7rem;">manual</span>';
-      const quota = p.quota_hours_per_week > 0 ? `${p.quota_hours_per_week} h/wk` : '<span style="color:var(--muted)">no quota</span>';
-      const isNext = p.provider_id === nextProvider;
-      const border = isNext ? "border-color:var(--accent);" : "";
-      const unavailNote = p.unavailable_reason ? `<div style="color:var(--muted);font-size:0.7rem;margin-top:4px;">${escapeHtml(p.unavailable_reason)}</div>` : "";
-      return `
-        <div style="border:1px solid var(--border);${border}border-radius:10px;padding:12px 14px;background:var(--surface);">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span>${icon}</span>
-            <strong style="font-size:0.88rem;">${escapeHtml(p.display)}</strong>
-            <span style="margin-left:auto;">${dot}</span>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;font-size:0.78rem;color:var(--muted);">
-            ${autoTag} · ${escapeHtml(p.gpu || "CPU")} · ${quota}
-          </div>
-          ${isNext ? '<div style="font-size:0.7rem;color:var(--accent);margin-top:4px;">▶ next in rotation</div>' : ""}
-          ${unavailNote}
-        </div>`;
+      const autoTag = p.automatable
+        ? '<span class="train-badge tbadge-auto">Auto</span>'
+        : '<span class="train-badge tbadge-manual">Manual</span>';
+      const quota = p.quota_hours_per_week > 0 ? `${p.quota_hours_per_week}h/wk` : "no free quota";
+
+      const recent = recentJobs.find(j => j.provider === p.provider_id && j.type === "training_dispatch");
+      let statusBadge = "", rowCls = p.automatable ? "auto" : "";
+      if (recent) {
+        const st = recent.status;
+        const cls = st === "running" ? "tbadge-running" : st === "queued" ? "tbadge-queued" : st === "failed" ? "tbadge-failed" : "";
+        const label = st === "failed" ? "error" : st;
+        if (cls) statusBadge = `<span class="train-badge ${cls}">${label}</span>`;
+        if (st === "running") rowCls = "running";
+        else if (st === "failed") rowCls = "failed";
+      }
+
+      const canDispatch = p.quota_hours_per_week > 0 || p.provider_id === "paperspace";
+      const dispatchBtn = canDispatch
+        ? `<button class="train-dispatch-btn" data-dispatch="${p.provider_id}" onclick="gpuDispatch('${p.provider_id}')">${p.automatable ? "Dispatch" : "Get notebook"}</button>`
+        : "";
+
+      return `<div class="train-provider-row ${rowCls}">
+        <span class="train-prov-name">${icon} ${escapeHtml(p.display)} ${autoTag}</span>
+        <span class="train-prov-meta">${quota}</span>
+        <span class="train-prov-spacer">${statusBadge}${dispatchBtn}</span>
+      </div>`;
     }).join("");
 
-    // Populate provider select
-    const sel = $("gpuProviderSelect");
-    if (sel && sel.options.length === 1) {
-      providers.filter(p => p.automatable && p.state === "available").forEach(p => {
-        const opt = document.createElement("option");
-        opt.value = p.provider_id;
-        opt.textContent = `${PROVIDER_ICONS[p.provider_id] || ""} ${p.display}`;
-        sel.appendChild(opt);
-      });
-    }
-
-    // Active job
-    if (active) {
-      const st = active.currentStatus || active.status;
-      const stColor = st === "running" ? "#22c55e" : st === "done" ? "var(--accent)" : st === "failed" ? "#ef4444" : "var(--muted)";
-      const link = active.kernelUrl
-        ? `<a href="${escapeHtml(active.kernelUrl)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.78rem;">view on Kaggle ↗</a>`
-        : active.colabBadgeUrl
-        ? `<a href="${escapeHtml(active.colabBadgeUrl)}" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.78rem;">open in Colab ↗</a>`
-        : "";
-      $("gpuActiveJob").innerHTML = `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <strong>Active job</strong>
-            <span style="font-size:0.78rem;padding:2px 8px;border-radius:12px;background:var(--bg);color:${stColor};border:1px solid ${stColor};">${escapeHtml(st)}</span>
-            <span style="font-size:0.78rem;color:var(--muted);">${PROVIDER_ICONS[active.provider] || ""} ${escapeHtml(active.provider)}</span>
-            ${link}
-          </div>
-          <div style="font-size:0.8rem;color:var(--muted);">
-            Job: <code>${escapeHtml(active.jobId)}</code> ·
-            Steps: <strong>${active.steps}</strong> ·
-            Est: <strong>${active.hoursEstimated} h</strong> ·
-            Started: ${escapeHtml(new Date(active.dispatchedAt).toLocaleTimeString())}
-          </div>
+    const history = recentJobs.slice(0, 6);
+    $("trainRecentJobs").innerHTML = history.length ? `
+      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px;">Recent runs</div>
+      ${history.map(j => {
+        const icon = PROVIDER_ICONS[j.provider] || "🖥️";
+        const st = j.status;
+        const stColor = (st === "running" || st === "queued") ? "var(--green)" : st === "done" ? "var(--accent)" : st === "failed" ? "#f87171" : "var(--muted)";
+        const time = (j.polledAt || j.dispatchedAt) ? new Date(j.polledAt || j.dispatchedAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : "";
+        const label = j.type === "training_poll" ? `poll · ${st}` : st;
+        return `<div class="train-recent">
+          <span>${icon}</span><span style="font-weight:600;">${escapeHtml(j.provider)}</span>
+          <span style="color:${stColor};">${escapeHtml(label)}</span>
+          ${j.steps ? `<span style="color:var(--muted);">${j.steps} steps</span>` : ""}
+          <span style="margin-left:auto;color:var(--muted);">${escapeHtml(time)}</span>
         </div>`;
-    } else {
-      $("gpuActiveJob").innerHTML = '<div style="font-size:0.82rem;color:var(--muted);padding:6px 0;">No active job — use ▶ Dispatch to start one.</div>';
-    }
+      }).join("")}` : "";
 
-    // Recent history
-    if (recentJobs.length) {
-      $("gpuHistory").innerHTML = `
-        <div style="font-weight:600;margin-bottom:6px;font-size:0.82rem;">Recent jobs</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-        ${recentJobs.slice(0, 8).map(j => {
-          const icon = PROVIDER_ICONS[j.provider] || "🖥️";
-          const st = j.currentStatus || j.status;
-          const stColor = st === "running" || st === "queued" ? "#22c55e" : st === "done" ? "var(--accent)" : st === "failed" ? "#ef4444" : "var(--muted)";
-          const time = j.dispatchedAt || j.polledAt ? new Date(j.dispatchedAt || j.polledAt).toLocaleString() : "";
-          return `<div style="display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.78rem;">
-            <span>${icon} ${escapeHtml(j.provider)}</span>
-            <span style="color:${stColor};">${escapeHtml(j.type === "training_poll" ? "poll:" + st : st)}</span>
-            <span style="color:var(--muted);">${j.steps ? j.steps + " steps" : ""}</span>
-            <span style="margin-left:auto;color:var(--muted);">${escapeHtml(time)}</span>
-          </div>`;
-        }).join("")}
-        </div>`;
-    }
+    updateStatus();
   }
 
-  async function gpuDispatch() {
-    const btn = $("gpuDispatchBtn");
-    const provider = $("gpuProviderSelect")?.value || "";
-    const steps = parseInt($("gpuStepsInput")?.value || "600", 10);
-    if (btn) { btn.disabled = true; btn.textContent = "Dispatching…"; }
+  // Start — dispatch-all
+  window.startTraining = async function() {
+    const btn = $("startTrainBtn");
+    const resultEl = $("trainDispatchResult");
+    if (btn) { btn.disabled = true; btn.textContent = "Dispatching to all providers…"; }
+    if (resultEl) { resultEl.style.display = "block"; resultEl.innerHTML = '<span class="placeholder">Sending to free GPU providers…</span>'; }
     try {
-      const r = await fetch("/api/gpu-training/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: provider || undefined, steps }),
+      const r = await fetch("/api/gpu-training/dispatch-all", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ steps: 600 }),
       });
       const result = await r.json();
-      if (result.error) {
-        alert("Dispatch error: " + (result.message || result.error));
-      } else {
-        await renderGpuTraining();
+      const dispatched = result.dispatched || [];
+      const ok = dispatched.filter(d => !d.error);
+      const fail = dispatched.filter(d => d.error);
+      if (resultEl) {
+        resultEl.innerHTML = [
+          ok.length ? `<div style="color:var(--green);margin-bottom:4px;">✓ Dispatched to ${ok.length}: ${ok.map(d => d.provider).join(", ")}</div>` : "",
+          fail.length ? `<div style="color:#f87171;">Issues: ${fail.map(d => `${d.provider}: ${escapeHtml(d.error)}`).join(" · ")}</div>` : "",
+          !dispatched.length ? `<div class="placeholder">${escapeHtml(result.error || "No automatable providers with quota available.")}</div>` : "",
+        ].filter(Boolean).join("");
       }
+      await renderTrainingSection();
     } catch (e) {
-      alert("Dispatch failed: " + e.message);
+      if (resultEl) resultEl.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "▶ Dispatch"; }
+      if (btn) { btn.disabled = false; btn.textContent = "▶ Start Training Now — all providers"; }
     }
-  }
+  };
 
-  async function gpuPollActive() {
+  // Per-provider dispatch
+  window.gpuDispatch = async function(provider) {
+    const btn = document.querySelector(`button[data-dispatch="${provider}"]`);
+    const resultEl = $("trainDispatchResult");
+    const orig = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    if (resultEl) { resultEl.style.display = "block"; resultEl.innerHTML = `<span class="placeholder">Dispatching ${escapeHtml(provider)}…</span>`; }
+    try {
+      const r = await fetch("/api/gpu-training/dispatch", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, steps: 600 }),
+      });
+      const result = await r.json();
+      if (resultEl) {
+        if (result.error) resultEl.innerHTML = `<div style="color:#f87171;">${escapeHtml(provider)}: ${escapeHtml(result.error)}</div>`;
+        else if (result.manual_required) resultEl.innerHTML = `<div style="color:#ffaa00;">${escapeHtml(provider)} is manual — open the notebook and Run All. ${result.notebookUrl ? `<a class="key-get" href="${escapeHtml(result.notebookUrl)}" target="_blank" rel="noopener">open ↗</a>` : ""}</div>`;
+        else resultEl.innerHTML = `<div style="color:var(--green);">✓ ${escapeHtml(provider)} dispatched${result.jobId ? ` · job ${escapeHtml(String(result.jobId))}` : ""}</div>`;
+      }
+      await renderTrainingSection();
+    } catch (e) {
+      if (resultEl) resultEl.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+    }
+  };
+
+  // Poll all running jobs
+  window.gpuPollAll = async function() {
     const btn = $("gpuPollBtn");
     if (btn) { btn.disabled = true; btn.textContent = "Polling…"; }
     try {
       const data = await fetchJson("/api/gpu-training/status");
-      const active = data?.active;
-      if (!active?.jobId) { await renderGpuTraining(); return; }
-      await fetch("/api/gpu-training/poll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: active.provider, jobId: active.jobId }),
+      const seen = new Set();
+      const toPoll = (data?.recentJobs || []).filter(j => {
+        if (j.type !== "training_dispatch") return false;
+        if (j.status !== "running" && j.status !== "queued") return false;
+        const key = `${j.provider}:${j.jobId}`;
+        if (seen.has(key)) return false;
+        seen.add(key); return true;
       });
-      await renderGpuTraining();
+      if (toPoll.length) {
+        await Promise.allSettled(toPoll.map(j =>
+          fetch("/api/gpu-training/poll", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: j.provider, jobId: j.jobId }),
+          })
+        ));
+      }
+      await renderTrainingSection();
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll"; }
+      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll running jobs"; }
     }
-  }
+  };
 
-  // ── Training Plan Executor ────────────────────────────────────────────────
-  async function executePlan() {
-    const btn = $("planExecuteBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Executing…"; }
-
-    const status = $("planExecutionStatus");
-    if (status) status.style.display = "block";
-
-    const errors = [];
-
-    try {
-      const providers = ["kaggle", "lightning", "sagemaker", "colab"];
-      const results = [];
-
-      for (const provider of providers) {
-        const progressEl = $("planProgress");
-        if (progressEl) {
-          const badge = document.createElement("div");
-          badge.style.cssText = "padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:0.75rem;color:var(--muted);";
-          badge.textContent = `${provider}: dispatching…`;
-          progressEl.appendChild(badge);
-        }
-
-        try {
-          const r = await fetch("/api/gpu-training/dispatch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ provider, steps: 600 }),
-          });
-          const result = await r.json();
-          results.push({ provider, success: !result.error, result });
-
-          if (progressEl) {
-            const badge = progressEl.lastChild;
-            if (result.error) {
-              const status = result.error;
-              const msg = result.message || status;
-              badge.style.color = "#ef4444";
-              badge.textContent = `${provider}: ${status}`;
-              errors.push(`${provider}: ${msg}`);
-            } else {
-              badge.style.color = "#22c55e";
-              badge.textContent = `${provider}: queued`;
-            }
-          }
-        } catch (e) {
-          results.push({ provider, success: false, error: e.message });
-          if (progressEl) {
-            const badge = progressEl.lastChild;
-            badge.style.color = "#ef4444";
-            badge.textContent = `${provider}: error`;
-          }
-          errors.push(`${provider}: ${e.message}`);
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      const successful = results.filter(r => r.success).length;
-
-      // Show error details if any
-      if (errors.length > 0) {
-        const errEl = $("planErrors");
-        if (errEl) {
-          errEl.textContent = "Issues: " + errors.join(" • ");
-          errEl.style.display = "block";
-        }
-      }
-
-      alert(`Weekly plan executed!\n\n${successful}/${providers.length} providers dispatched successfully.\n\nCheck Recent runs below for status.`);
-
-      await renderGpuTraining();
-      await refreshPlanStatus();
-    } catch (e) {
-      alert("Plan execution failed: " + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "▶ Execute Weekly Plan"; }
-    }
-  }
-
-  async function refreshPlanStatus() {
-    try {
-      const data = await fetchJson("/api/gpu-training/status");
-      const active = data?.active;
-      const recent = data?.recentJobs || [];
-
-      const running = recent.filter(j => j.status === "running").length;
-      const queued = recent.filter(j => j.status === "queued" || j.status === "manual_required").length;
-
-      $("planDispatchCount").textContent = queued;
-      $("planRunningCount").textContent = running;
-      $("planSummary").textContent = active ? "Training in progress" : "Ready to execute";
-
-      await renderGpuTraining();
-    } catch (e) {
-      console.error("Failed to refresh plan status:", e);
-    }
-  }
-
-  // ── Cloud GPU API keys ─────────────────────────────────────────────────
-  const GPU_PROVIDERS = [
-    { id: "huggingface", icon: "🤗", name: "Hugging Face",
-      blurb: "Free parking spot the trained model uses to hop between GPUs. Set this one first.",
-      get: "https://huggingface.co/settings/tokens",
-      keys: [ { env: "HF_TOKEN", label: "Access token" }, { env: "HF_TRAINING_REPO", label: "Training repo (user/name)" } ] },
-    { id: "kaggle", icon: "🏆", name: "Kaggle",
-      blurb: "30 free GPU hours every week, fully automatic. The workhorse.",
-      get: "https://www.kaggle.com/settings/account",
-      keys: [ { env: "KAGGLE_API_TOKEN", label: "API token (kaggle.json)" }, { env: "KAGGLE_USERNAME", label: "Username" }, { env: "KAGGLE_KEY", label: "Key" } ] },
-    { id: "lightning", icon: "⚡", name: "Lightning AI",
-      blurb: "22 free credits a month. Automatic once connected.",
-      get: "https://lightning.ai/",
-      keys: [ { env: "LIGHTNING_USER_ID", label: "User ID" }, { env: "LIGHTNING_API_KEY", label: "API key" } ] },
-    { id: "modal", icon: "🚀", name: "Modal",
-      blurb: "$30/month of free H100/A100 time. Automatic.",
-      get: "https://modal.com/settings/tokens",
-      keys: [ { env: "MODAL_TOKEN_ID", label: "Token ID" }, { env: "MODAL_TOKEN_SECRET", label: "Token secret" } ] },
-    { id: "vast", icon: "💹", name: "Vast.ai",
-      blurb: "Cheap rented GPUs (~$0.15–0.40/hr) when the free tiers run dry.",
-      get: "https://cloud.vast.ai/account/",
-      keys: [ { env: "VAST_AI_API_KEY", label: "API key" } ] },
-    { id: "runpod", icon: "🟣", name: "RunPod",
-      blurb: "Cheap on-demand GPUs (~$0.20–0.50/hr). Pay-as-you-go.",
-      get: "https://www.runpod.io/console/user/settings",
-      keys: [ { env: "RUNPOD_API_KEY", label: "API key" } ] },
-    { id: "paperspace", icon: "📐", name: "Paperspace",
-      blurb: "Needs a PRO plan (~$8/mo) — the free GPU tier was removed.",
-      get: "https://console.paperspace.com/account/api",
-      keys: [ { env: "PAPERSPACE_API_KEY", label: "API key" } ] },
-  ];
-
-  async function renderGpuKeys() {
-    const el = $("gpuKeysList");
-    // Longer timeout than the shared fetchJson: the first call warms keys from
-    // the Windows user env (spawns PowerShell per key), which can take >5s cold.
-    let data = null;
-    try {
-      const r = await fetch("/api/gpu-training/keys", { cache: "no-store", signal: AbortSignal.timeout(20000) });
-      if (r.ok) data = await r.json();
-    } catch { /* handled below */ }
-    if (!data || !Array.isArray(data.keys)) {
-      el.innerHTML = '<div class="placeholder">Couldn\'t load account status — <button class="hl-btn" type="button" onclick="renderGpuKeys()">retry</button></div>';
-      return;
-    }
-    const setMap = {};
-    data.keys.forEach(k => { setMap[k.key] = k; });
-
-    // Summary: how many providers are fully connected.
-    const connected = GPU_PROVIDERS.filter(p => p.keys.every(k => setMap[k.env]?.set)
-      || (p.id === "kaggle" && (setMap.KAGGLE_API_TOKEN?.set || (setMap.KAGGLE_USERNAME?.set && setMap.KAGGLE_KEY?.set)))).length;
-    $("gpuKeysSummary").textContent = `${connected}/${GPU_PROVIDERS.length} connected`;
-
-    el.innerHTML = GPU_PROVIDERS.map(p => {
-      const anySet = p.keys.some(k => setMap[k.env]?.set);
-      const allSet = p.keys.every(k => setMap[k.env]?.set);
-      const badge = allSet
-        ? '<span style="color:#22c55e;font-size:0.72rem;font-weight:600;">✓ connected</span>'
-        : anySet
-        ? '<span style="color:#ffaa00;font-size:0.72rem;font-weight:600;">partly set</span>'
-        : '<span style="color:var(--muted);font-size:0.72rem;">not connected</span>';
-      const rows = p.keys.map(k => {
-        const info = setMap[k.env] || {};
-        const placeholder = info.set ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
-        return `
-          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-            <label style="font-size:0.72rem;color:var(--muted);min-width:118px;">${escapeHtml(k.label)}</label>
-            <input type="password" autocomplete="off" data-keyenv="${k.env}" placeholder="${placeholder}"
-              style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:0.78rem;">
-            <button class="hl-btn" type="button" data-savekey="${k.env}" style="padding:6px 9px;">Save</button>
-          </div>`;
-      }).join("");
-      return `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:13px 14px;background:var(--surface);">
-          <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap;">
-            <span>${p.icon}</span><strong style="font-size:0.9rem;">${p.name}</strong>
-            <span style="margin-left:auto;">${badge}</span>
-          </div>
-          <div style="font-size:0.74rem;color:var(--muted);line-height:1.45;">${p.blurb}</div>
-          <a href="${p.get}" target="_blank" rel="noopener" style="font-size:0.74rem;color:var(--accent);">Get your key ↗</a>
-          ${rows}
-        </div>`;
-    }).join("");
-
-    el.querySelectorAll("button[data-savekey]").forEach(btn => {
-      btn.addEventListener("click", () => saveGpuKey(btn.dataset.savekey, el, btn));
-    });
-  }
-
-  async function saveGpuKey(env, scope, btn) {
-    const input = scope.querySelector(`input[data-keyenv="${env}"]`);
-    const value = input ? input.value.trim() : "";
-    if (!value) { input?.focus(); return; }
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = "Saving…";
-    try {
-      const r = await fetch("/api/gpu-training/keys", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: env, value }),
-      });
-      const result = await r.json();
-      if (result.error) { btn.textContent = "✕ failed"; }
-      else {
-        btn.textContent = result.persisted ? "✓ saved" : "✓ (session)";
-        await renderGpuKeys();      // refresh saved/masked state
-        renderGpuTraining();        // provider availability may change
-      }
-    } catch { btn.textContent = "✕ error"; }
-    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
-  }
-
-  // Inline onclick= handlers in the GPU markup need these on window (the script
-  // body is an IIFE, so function declarations are otherwise unreachable — this
-  // is why the Dispatch/Poll/Refresh buttons were previously dead).
-  window.gpuDispatch = gpuDispatch;
-  window.gpuPollActive = gpuPollActive;
-  window.executePlan = executePlan;
-  window.refreshPlanStatus = refreshPlanStatus;
-  window.renderGpuTraining = renderGpuTraining;
-  window.renderGpuKeys = renderGpuKeys;
-
-  window.renderCalibration = renderCalibration;
-  window.renderKeystoneTests = renderKeystoneTests;
-
-  // ── LLM Provider Configuration ─────────────────────────────────────────────
+  // ── AI Provider Keys (editable) ───────────────────────────────────────────
   const LLM_PROVIDERS = [
-    { id: "anthropic", icon: "🧠", name: "Anthropic Claude",
-      blurb: "Best-in-class reasoning. Fast, capable, and reliable.",
-      get: "https://console.anthropic.com/settings/keys",
-      key: "ANTHROPIC_API_KEY", model: "claude-opus-4-8" },
-    { id: "openai", icon: "🔷", name: "OpenAI GPT",
-      blurb: "Fast, widely compatible, strong at most tasks.",
-      get: "https://platform.openai.com/api-keys",
-      key: "OPENAI_API_KEY", model: "gpt-4o-mini" },
-    { id: "gemini", icon: "✨", name: "Google Gemini",
-      blurb: "Vision/multimodal strength, generous free tier.",
-      get: "https://aistudio.google.com/app/apikey",
-      key: "GEMINI_API_KEY", model: "gemini-2.5-flash" },
-    { id: "mistral", icon: "🚀", name: "Mistral AI",
-      blurb: "Strong coding, long-context, competitive pricing.",
-      get: "https://console.mistral.ai/api-keys/",
-      key: "MISTRAL_API_KEY", model: "mistral-large-latest" },
-    { id: "deepseek", icon: "🔍", name: "DeepSeek",
-      blurb: "Emerging provider, strong reasoning, affordable.",
-      get: "https://platform.deepseek.com/api_keys",
-      key: "DEEPSEEK_API_KEY", model: "deepseek-chat" },
-    { id: "cohere", icon: "🌊", name: "Cohere",
-      blurb: "Long-context RAG, summarization specialist.",
-      get: "https://dashboard.cohere.com/api-keys",
-      key: "COHERE_API_KEY", model: "command-r-plus" },
-    { id: "perplexity", icon: "🔬", name: "Perplexity AI",
-      blurb: "Search-augmented answers with live citations.",
-      get: "https://www.perplexity.ai/settings/api",
-      key: "PERPLEXITY_API_KEY", model: "sonar-pro" },
-    { id: "openrouter", icon: "🌐", name: "OpenRouter",
-      blurb: "Gateway to 100+ models, unified pricing, smart routing.",
-      get: "https://openrouter.ai/settings/keys",
-      key: "OPENROUTER_API_KEY", model: "auto" },
-    { id: "ollama", icon: "🦙", name: "Ollama (Local)",
-      blurb: "Private, offline, no keys needed. Privacy first.",
-      get: "https://ollama.ai",
-      key: null, model: "auto" },
+    { id: "anthropic", icon: "🧠", name: "Claude", key: "ANTHROPIC_API_KEY", get: "https://console.anthropic.com/settings/keys", blurb: "Best-in-class reasoning. The default brain." },
+    { id: "openai", icon: "🔷", name: "OpenAI GPT", key: "OPENAI_API_KEY", get: "https://platform.openai.com/api-keys", blurb: "Fast, widely compatible, strong all-rounder." },
+    { id: "gemini", icon: "✨", name: "Gemini", key: "GEMINI_API_KEY", get: "https://aistudio.google.com/app/apikey", blurb: "Vision/multimodal, generous free tier." },
+    { id: "mistral", icon: "🚀", name: "Mistral", key: "MISTRAL_API_KEY", get: "https://console.mistral.ai/api-keys/", blurb: "Strong coding, long-context, cheap." },
+    { id: "deepseek", icon: "🔍", name: "DeepSeek", key: "DEEPSEEK_API_KEY", get: "https://platform.deepseek.com/api_keys", blurb: "Strong reasoning, very affordable." },
+    { id: "cohere", icon: "🌊", name: "Cohere", key: "COHERE_API_KEY", get: "https://dashboard.cohere.com/api-keys", blurb: "Long-context RAG + summarization." },
+    { id: "perplexity", icon: "🔬", name: "Perplexity", key: "PERPLEXITY_API_KEY", get: "https://www.perplexity.ai/settings/api", blurb: "Search-augmented answers with citations." },
+    { id: "openrouter", icon: "🌐", name: "OpenRouter", key: "OPENROUTER_API_KEY", get: "https://openrouter.ai/settings/keys", blurb: "Gateway to 100+ models, smart routing." },
+    { id: "xai", icon: "𝕏", name: "Grok / xAI", key: "XAI_API_KEY", get: "https://x.ai/api", blurb: "Reasoning + real-time data." },
   ];
 
   async function refreshProviderStatus() {
     const data = await fetchJson("/api/providers/status");
-    if (!data) {
-      $("providersSummary").textContent = "error loading";
-      return;
+    _cache.providerData = data;
+    if (data) {
+      const chainEl = $("providerChains");
+      if (chainEl && data.chains) {
+        chainEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">` +
+          Object.entries(data.chains).map(([taskType, chain]) => {
+            const providers = chain.map(c => {
+              const dot = data.providers?.[c.provider]?.available ? "🟢" : "🔴";
+              return `<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--bg);font-size:0.72rem;margin:2px 2px 0 0;">${dot} ${c.provider}</span>`;
+            }).join("");
+            return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface);">
+              <div style="font-weight:600;font-size:0.84rem;margin-bottom:5px;text-transform:capitalize;">${taskType}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:2px;">${providers}</div></div>`;
+          }).join("") + `</div>`;
+      }
+      const available = Object.values(data.providers || {}).filter(p => p.available).length;
+      const keys = Object.values(data.providers || {}).filter(p => p.hasKey).length;
+      setText("providersSummary", `${available} available · ${keys} keys set`);
     }
-
-    // Render provider grid (availability + health)
-    const gridEl = $("providerGrid");
-    gridEl.innerHTML = LLM_PROVIDERS.map(p => {
-      const status = data.providers?.[p.id] || {};
-      const hasKey = status.hasKey;
-      const available = status.available;
-      const lastCheck = status.lastCheck ? new Date(status.lastCheck).toLocaleTimeString() : "—";
-      const dot = available ? "🟢" : hasKey ? "🟡" : "🔴";
-      const badge = available ? "available" : hasKey ? "no key" : "not connected";
-      return `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span>${p.icon}</span>
-            <strong style="font-size:0.88rem;">${p.name}</strong>
-            <span style="margin-left:auto;font-size:1.2rem;">${dot}</span>
-          </div>
-          <div style="font-size:0.74rem;color:var(--muted);margin-bottom:4px;">${p.blurb}</div>
-          <div style="font-size:0.72rem;color:var(--muted);">${badge} · model: ${p.model}</div>
-        </div>`;
-    }).join("");
-
-    // Render task-type chains
-    const chainEl = $("providerChains");
-    if (data.chains) {
-      chainEl.innerHTML = Object.entries(data.chains).map(([taskType, chain]) => {
-        const providers = chain.map(c => {
-          const status = data.providers?.[c.provider] || {};
-          const dot = status.available ? "🟢" : "🔴";
-          return `<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--bg);font-size:0.72rem;margin:2px 2px 2px 0;">${dot} ${c.provider}</span>`;
-        }).join("");
-        return `
-          <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);">
-            <div style="font-weight:600;font-size:0.88rem;margin-bottom:6px;text-transform:capitalize;">${taskType}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:2px;">${providers}</div>
-          </div>`;
-      }).join("");
-    }
-
-    // Summary
-    const connected = Object.values(data.providers || {}).filter(p => p.hasKey).length;
-    const available = Object.values(data.providers || {}).filter(p => p.available).length;
-    $("providersSummary").textContent = `${available} available · ${connected} keys set`;
-
-    // Render keys
     await renderProviderKeys();
+    updateStatus();
   }
 
   async function renderProviderKeys() {
@@ -1458,51 +488,38 @@
     try {
       const r = await fetch("/api/providers/keys", { cache: "no-store", signal: AbortSignal.timeout(10000) });
       if (r.ok) data = await r.json();
-    } catch { /* handled below */ }
-
-    if (!data || !Array.isArray(data.keys)) {
-      el.innerHTML = '<div class="placeholder">Couldn\'t load API key status — <button class="hl-btn" type="button" onclick="renderProviderKeys()">retry</button></div>';
-      return;
-    }
-
+    } catch {}
+    if (!data || !Array.isArray(data.keys)) { el.innerHTML = '<div class="placeholder">Couldn\'t load API key status.</div>'; return; }
     const keyMap = {};
     data.keys.forEach(k => { keyMap[k.env] = k; });
-
-    // Summary: how many providers are connected
-    const connected = LLM_PROVIDERS.filter(p => p.key && keyMap[p.key]?.set).length;
-    $("providerKeysSummary").textContent = `${connected}/${LLM_PROVIDERS.filter(p => p.key).length} keys set`;
-
-    el.innerHTML = LLM_PROVIDERS.filter(p => p.key).map(p => {
+    const connected = LLM_PROVIDERS.filter(p => keyMap[p.key]?.set).length;
+    setText("providerKeysSummary", `${connected}/${LLM_PROVIDERS.length} keys set`);
+    el.innerHTML = LLM_PROVIDERS.map(p => {
       const info = keyMap[p.key] || {};
       const isSet = info.set;
-      const badge = isSet
-        ? '<span style="color:#22c55e;font-size:0.72rem;font-weight:600;">✓ set</span>'
-        : '<span style="color:var(--muted);font-size:0.72rem;">not set</span>';
+      const badge = isSet ? '<span class="key-badge-set">✓ set</span>' : '<span class="key-badge-unset">not set</span>';
       const placeholder = isSet ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
-      return `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:13px 14px;background:var(--surface);">
-          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap;">
-            <span>${p.icon}</span><strong style="font-size:0.9rem;">${p.name}</strong>
-            <span style="margin-left:auto;">${badge}</span>
-          </div>
-          <div style="font-size:0.74rem;color:var(--muted);line-height:1.45;">${p.blurb}</div>
-          <a href="${p.get}" target="_blank" rel="noopener" style="font-size:0.74rem;color:var(--accent);">Get your key ↗</a>
-          <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
-            <input type="password" autocomplete="off" data-provider="${p.id}" placeholder="${placeholder}"
-              style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:0.78rem;">
-            <button class="hl-btn" type="button" data-saveprov="${p.id}" style="padding:6px 9px;">Save</button>
-          </div>
-        </div>`;
+      return `<div class="key-card ${isSet ? "set" : "unset"}">
+        <div class="key-head"><span>${p.icon}</span><strong>${p.name}</strong><span style="margin-left:auto;">${badge}</span></div>
+        <div class="key-blurb">${p.blurb}</div>
+        <a class="key-get" href="${p.get}" target="_blank" rel="noopener">Get your key ↗</a>
+        <div class="key-input-row">
+          <input type="password" autocomplete="off" data-provider="${p.id}" placeholder="${placeholder}">
+          <button class="key-save-btn" type="button" data-saveprov="${p.id}">Save</button>
+        </div>
+      </div>`;
     }).join("");
-
     el.querySelectorAll("button[data-saveprov]").forEach(btn => {
       btn.addEventListener("click", () => saveProviderKey(btn.dataset.saveprov, el, btn));
+    });
+    el.querySelectorAll("input[data-provider]").forEach(inp => {
+      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") el.querySelector(`button[data-saveprov="${inp.dataset.provider}"]`)?.click(); });
     });
   }
 
   async function saveProviderKey(providerId, scope, btn) {
     const p = LLM_PROVIDERS.find(x => x.id === providerId);
-    if (!p || !p.key) return;
+    if (!p) return;
     const input = scope.querySelector(`input[data-provider="${providerId}"]`);
     const value = input ? input.value.trim() : "";
     if (!value) { input?.focus(); return; }
@@ -1515,34 +532,211 @@
       });
       const result = await r.json();
       if (result.error) { btn.textContent = "✕ failed"; }
-      else {
-        btn.textContent = result.persisted ? "✓ saved" : "✓ (session)";
-        await renderProviderKeys();      // refresh saved/masked state
-        refreshProviderStatus();         // availability may change
-      }
+      else { btn.textContent = result.persisted ? "✓ saved" : "✓ (session)"; await refreshProviderStatus(); }
     } catch { btn.textContent = "✕ error"; }
     finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
   }
 
-  window.refreshProviderStatus = refreshProviderStatus;
-  window.renderProviderKeys = renderProviderKeys;
+  // ── GPU Account Keys (editable) ───────────────────────────────────────────
+  const GPU_PROVIDERS = [
+    { id: "huggingface", icon: "🤗", name: "Hugging Face", blurb: "Checkpoint parking spot the model uses to hop between GPUs. Set this first.", get: "https://huggingface.co/settings/tokens", keys: [{ env: "HF_TOKEN", label: "Access token" }, { env: "HF_TRAINING_REPO", label: "Training repo" }] },
+    { id: "kaggle", icon: "🏆", name: "Kaggle", blurb: "30 free GPU hours/week, fully automatic. The workhorse.", get: "https://www.kaggle.com/settings/account", keys: [{ env: "KAGGLE_API_TOKEN", label: "API token" }, { env: "KAGGLE_USERNAME", label: "Username" }, { env: "KAGGLE_KEY", label: "Key" }] },
+    { id: "lightning", icon: "⚡", name: "Lightning AI", blurb: "22 free credits/month. Automatic once connected.", get: "https://lightning.ai/", keys: [{ env: "LIGHTNING_USER_ID", label: "User ID" }, { env: "LIGHTNING_API_KEY", label: "API key" }] },
+    { id: "modal", icon: "🚀", name: "Modal", blurb: "$30/mo free H100/A100 time. Automatic.", get: "https://modal.com/settings/tokens", keys: [{ env: "MODAL_TOKEN_ID", label: "Token ID" }, { env: "MODAL_TOKEN_SECRET", label: "Token secret" }] },
+    { id: "vast", icon: "💹", name: "Vast.ai", blurb: "Cheap rented GPUs (~$0.15–0.40/hr) for overflow.", get: "https://cloud.vast.ai/account/", keys: [{ env: "VAST_AI_API_KEY", label: "API key" }] },
+    { id: "runpod", icon: "🟣", name: "RunPod", blurb: "Cheap on-demand GPUs (~$0.20–0.50/hr).", get: "https://www.runpod.io/console/user/settings", keys: [{ env: "RUNPOD_API_KEY", label: "API key" }] },
+    { id: "paperspace", icon: "📐", name: "Paperspace", blurb: "Needs a PRO plan (~$8/mo) — free GPU tier removed.", get: "https://console.paperspace.com/account/api", keys: [{ env: "PAPERSPACE_API_KEY", label: "API key" }] },
+  ];
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const btn = $("refreshBtn");
-    if (btn) btn.addEventListener("click", refreshStatus);
-    refreshStatus();
+  async function renderGpuKeys() {
+    const el = $("gpuKeysList");
+    let data = null;
+    try {
+      const r = await fetch("/api/gpu-training/keys", { cache: "no-store", signal: AbortSignal.timeout(20000) });
+      if (r.ok) data = await r.json();
+    } catch {}
+    if (!data || !Array.isArray(data.keys)) {
+      el.innerHTML = '<div class="placeholder">Couldn\'t load account status — <button class="btn-secondary" type="button" onclick="renderGpuKeys()" style="font-size:0.72rem;padding:3px 8px;">retry</button></div>';
+      return;
+    }
+    const setMap = {};
+    data.keys.forEach(k => { setMap[k.key] = k; });
+    const connected = GPU_PROVIDERS.filter(p =>
+      p.keys.every(k => setMap[k.env]?.set)
+      || (p.id === "kaggle" && (setMap.KAGGLE_API_TOKEN?.set || (setMap.KAGGLE_USERNAME?.set && setMap.KAGGLE_KEY?.set)))
+    ).length;
+    setText("gpuKeysSummary", `${connected}/${GPU_PROVIDERS.length} connected`);
+    el.innerHTML = GPU_PROVIDERS.map(p => {
+      const anySet = p.keys.some(k => setMap[k.env]?.set);
+      const allSet = p.keys.every(k => setMap[k.env]?.set);
+      const cls = allSet ? "set" : "unset";
+      const badge = allSet ? '<span class="key-badge-set">✓ connected</span>' : anySet ? '<span class="key-badge-partial">partly set</span>' : '<span class="key-badge-unset">not connected</span>';
+      const rows = p.keys.map(k => {
+        const info = setMap[k.env] || {};
+        const placeholder = info.set ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
+        return `<div class="key-input-row">
+          <label>${escapeHtml(k.label)}</label>
+          <input type="password" autocomplete="off" data-keyenv="${k.env}" placeholder="${placeholder}">
+          <button class="key-save-btn" type="button" data-savekey="${k.env}">Save</button>
+        </div>`;
+      }).join("");
+      return `<div class="key-card ${cls}">
+        <div class="key-head"><span>${p.icon}</span><strong>${p.name}</strong><span style="margin-left:auto;">${badge}</span></div>
+        <div class="key-blurb">${p.blurb}</div>
+        <a class="key-get" href="${p.get}" target="_blank" rel="noopener">Get your key ↗</a>
+        ${rows}
+      </div>`;
+    }).join("");
+    el.querySelectorAll("button[data-savekey]").forEach(btn => {
+      btn.addEventListener("click", () => saveGpuKey(btn.dataset.savekey, el, btn));
+    });
+    el.querySelectorAll("input[data-keyenv]").forEach(inp => {
+      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") el.querySelector(`button[data-savekey="${inp.dataset.keyenv}"]`)?.click(); });
+    });
+  }
+
+  async function saveGpuKey(env, scope, btn) {
+    const input = scope.querySelector(`input[data-keyenv="${env}"]`);
+    const value = input ? input.value.trim() : "";
+    if (!value) { input?.focus(); return; }
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/gpu-training/keys", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: env, value }),
+      });
+      const result = await r.json();
+      if (result.error) { btn.textContent = "✕ failed"; }
+      else { btn.textContent = result.persisted ? "✓ saved" : "✓ (session)"; await renderGpuKeys(); renderTrainingSection(); }
+    } catch { btn.textContent = "✕ error"; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
+  }
+
+  // ── Read-only wired panels ────────────────────────────────────────────────
+  async function renderMerit() {
+    const el = $("meritList");
+    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=coding&topN=6&lookbackDays=14");
+    const agents = (data && data.agents) || [];
+    if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded runs yet.</div>'; return; }
+    el.innerHTML = agents.map((a, i) => {
+      const name = a.agentId || a.agent || a.provider || a.model || "agent";
+      const score = a.compositeScore ?? a.score ?? a.composite ?? null;
+      const calls = a.totalCalls ?? a.n ?? a.calls;
+      const sr = a.successRate != null ? Math.round(a.successRate * 100) + "% success" : null;
+      const meta = [sr, calls != null ? `${calls} calls` : null].filter(Boolean).join(" · ");
+      return `<div class="merit-row"><span class="merit-rank">${i + 1}</span>
+        <span class="merit-name">${escapeHtml(String(name))}${meta ? `<span class="merit-meta">${meta}</span>` : ""}</span>
+        <span class="merit-score">${score != null ? Number(score).toFixed(2) : "—"}</span></div>`;
+    }).join("");
+  }
+
+  async function renderCalibration() {
+    const el = $("calList"), gl = $("calGlobal");
+    const data = await fetchJson("/api/convergence/calibration");
+    if (!data || !data.keys) { el.innerHTML = '<div class="placeholder">Trust calibration unavailable.</div>'; return; }
+    const entries = Object.values(data.keys).sort((a, b) => b.trust - a.trust);
+    setText("calSummary", `${data.total_events || 0} verified events`);
+    el.innerHTML = entries.map(e => {
+      const pct = Math.round((e.trust || 0) * 100);
+      const c = pct >= 80 ? "#4ade80" : pct >= 60 ? "#facc15" : "#f87171";
+      const label = e.key.replace("agent:", "").replace(":", " · ");
+      return `<div style="display:grid;grid-template-columns:140px 1fr 52px 60px;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
+        <span style="font-size:0.82rem;font-weight:600;">${escapeHtml(label)}</span>
+        <div style="background:var(--surface);border-radius:4px;height:10px;overflow:hidden;border:1px solid var(--border);"><div style="width:${pct}%;height:100%;background:${c};"></div></div>
+        <span style="font-weight:700;color:${c};font-size:0.9rem;">${pct}%</span>
+        <span style="font-size:0.72rem;color:var(--muted);">${e.n} check${e.n !== 1 ? "s" : ""}</span></div>`;
+    }).join("");
+    if (gl) {
+      const ece = data.ece != null ? (data.ece * 100).toFixed(1) + "% calibration error" : null;
+      const brier = data.global_brier != null ? data.global_brier.toFixed(3) + " Brier score" : null;
+      gl.innerHTML = [ece, brier].filter(Boolean).map(t => `<span style="font-size:0.74rem;color:var(--muted);padding:4px 10px;border:1px solid var(--border);border-radius:6px;">${t}</span>`).join("");
+    }
+  }
+
+  async function renderKeystoneTests() {
+    const el = $("ksTestList");
+    const data = await fetchJson("/api/convergence/keystone-test/runs");
+    if (!data) { el.innerHTML = '<div class="placeholder">Test history unavailable.</div>'; return; }
+    const runs = (data.runs || []).slice(0, 5);
+    setText("ksTestSummary", runs.length ? `${data.count || runs.length} total run${(data.count || runs.length) !== 1 ? "s" : ""}` : "");
+    if (!runs.length) { el.innerHTML = '<div class="placeholder">No self-tests recorded yet.</div>'; return; }
+    el.innerHTML = runs.map(r => {
+      const ts = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
+      const conf = r.convergence?.confidence?.overall;
+      const confPct = conf != null ? Math.round(conf * 100) : null;
+      const c = confPct >= 80 ? "#4ade80" : confPct >= 60 ? "#facc15" : "#f87171";
+      const filed = (r.filed_issues || []).map(n => `<a href="https://github.com/alex-place/lantern-os/issues/${n.replace("#", "")}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none;">${n}</a>`).join(", ");
+      const hyp = r.convergence?.hypothesis || "";
+      return `<div style="border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;background:var(--bg);">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <span style="font-size:0.72rem;color:var(--muted);">${escapeHtml(ts)}</span>
+          ${confPct != null ? `<span style="font-size:0.72rem;font-weight:700;color:${c};padding:1px 8px;border:1px solid ${c};border-radius:999px;">${confPct}% confident</span>` : ""}
+          ${filed ? `<span style="font-size:0.72rem;">Filed: ${filed}</span>` : ""}
+        </div>
+        ${hyp ? `<div style="font-size:0.82rem;color:var(--text);font-weight:500;">${escapeHtml(hyp)}</div>` : ""}</div>`;
+    }).join("");
+  }
+
+  let _rolloverBand = "30d";
+  window.setRolloverBand = function(band) {
+    _rolloverBand = band;
+    ["24h","7d","30d","all"].forEach(b => {
+      const el = $(`band-${b}`); if (!el) return;
+      el.style.borderColor = b === band ? "var(--accent)" : ""; el.style.color = b === band ? "var(--accent)" : "";
+    });
     renderRollover();
-    renderGpuTraining();
-    renderGpuKeys();
+  };
+  async function renderRollover() {
+    const el = $("rolloverBody"); if (!el) return;
+    const band = _rolloverBand === "all" ? "" : _rolloverBand;
+    const data = await fetchJson(`/api/rollover/status?band=${band}`);
+    if (!data) { el.innerHTML = '<div class="placeholder">Rollover data unavailable.</div>'; return; }
+    const git = data.git || {}, gitTotal = git.total || 0, kernel = data.kernel || {};
+    const pct = n => gitTotal > 0 ? Math.round((n / gitTotal) * 100) : 0;
+    const bar = (n, color) => `<div style="height:14px;border-radius:4px;background:${color};width:${gitTotal > 0 ? Math.max(2, Math.round((n / gitTotal) * 100)) : 0}%;"></div>`;
+    const lastEval = data.lastEval;
+    const evalStr = lastEval ? `<strong>${lastEval.label || lastEval.benchmark || "eval"}</strong>: ${lastEval.accuracy != null ? (lastEval.accuracy * 100).toFixed(0) + "% acc" : ""}` : "No eval runs yet";
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px;">
+        <div class="stat"><div class="stat-label">Mode</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(data.mode || "shadow")}</div></div>
+        <div class="stat"><div class="stat-label">Stage</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(data.stage || "pre-stage-1")}</div></div>
+        <div class="stat"><div class="stat-label">PRs merged (${escapeHtml(data.band || "30d")})</div><div class="stat-value">${gitTotal}</div></div>
+        <div class="stat"><div class="stat-label">Kernel runs</div><div class="stat-value ${kernel.landed === 0 ? "muted" : ""}">${kernel.landed ?? 0}</div></div>
+      </div>
+      <div class="info-box" style="margin-bottom:12px;"><strong>Git attribution</strong> — merged PRs by lane (${escapeHtml(data.band || "30d")})
+        ${[
+          { label: "claude/", n: git.claude || 0, color: "#06b6d4" },
+          { label: "auto/ (Keystone)", n: git.keystone || 0, color: "#a855f7" },
+          { label: "gemini/", n: git.gemini || 0, color: "#22c55e" },
+          { label: "codex/", n: git.codex || 0, color: "#f59e0b" },
+          { label: "human", n: git.human || 0, color: "#64748b" },
+        ].map(({ label, n, color }) => `<div style="display:flex;align-items:center;gap:10px;margin:5px 0;font-size:0.8rem;">
+          <span style="width:140px;color:var(--muted);">${escapeHtml(label)}</span>
+          <div style="flex:1;background:var(--bg);border-radius:4px;border:1px solid var(--border);overflow:hidden;">${bar(n, color)}</div>
+          <span style="width:54px;text-align:right;font-weight:600;">${n} <span style="color:var(--muted);font-weight:400;">(${pct(n)}%)</span></span></div>`).join("")}
+      </div>
+      <div class="info-box"><strong>Last eval</strong> — ${evalStr}</div>`;
+  }
+
+  // ── globals for onclick ───────────────────────────────────────────────────
+  window.renderTrainingSection = renderTrainingSection;
+  window.renderGpuKeys = renderGpuKeys;
+  window.refreshProviderStatus = refreshProviderStatus;
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
     refreshProviderStatus();
+    renderTrainingSection();
+    renderGpuKeys();
+    renderMerit();
     renderCalibration();
     renderKeystoneTests();
-    setInterval(refreshStatus, 5000);
-    setInterval(renderRollover, 15000);
-    setInterval(renderGpuTraining, 30000);
-    setInterval(refreshProviderStatus, 45000);
-    setInterval(renderCalibration, 30000);
-    setInterval(renderKeystoneTests, 60000);
+    renderRollover();
+    updateStatus();
+
+    setInterval(renderTrainingSection, 30000);
+    setInterval(refreshProviderStatus, 60000);
+    setInterval(updateStatus, 15000);
   });
 })();
 </script>
