@@ -69,22 +69,23 @@ async function getTopAgentsForTask(taskType, lookbackDays = LOOKBACK_DAYS, limit
   }
 
   const cutoff = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
-  const key = `${taskType}_*`; // Wildcard match for this task type
+  // taskType "all"/"*"/empty aggregates across every task type.
+  const matchAll = !taskType || taskType === "all" || taskType === "*";
 
-  // Aggregate stats per agent for this task type
+  // Aggregate stats per agent. Group by the record's own agentId/taskType fields
+  // rather than parsing the joined cache key — agentIds and taskTypes can both
+  // contain underscores (e.g. "dream_chat", "…Q4_K_M"), which broke key splitting.
   const agentStats = {};
 
-  for (const [cacheKey, calls] of Object.entries(_performanceCache)) {
-    if (!cacheKey.startsWith(taskType + "_")) continue;
-
-    const agentId = cacheKey.split("_")[1];
-    if (!agentStats[agentId]) {
-      agentStats[agentId] = { successes: 0, totalCalls: 0, totalLatency: 0, totalCost: 0, calls: [] };
-    }
-
+  for (const calls of Object.values(_performanceCache)) {
     for (const call of calls) {
-      if (new Date(call.timestamp) < new Date(cutoff)) continue;
+      if (!matchAll && call.taskType !== taskType) continue;
+      if (new Date(call.timestamp).getTime() < cutoff) continue;
 
+      const agentId = call.agentId || "unknown";
+      if (!agentStats[agentId]) {
+        agentStats[agentId] = { successes: 0, totalCalls: 0, totalLatency: 0, totalCost: 0, calls: [] };
+      }
       agentStats[agentId].totalCalls++;
       agentStats[agentId].totalLatency += call.latencyMs || 0;
       agentStats[agentId].totalCost += call.costUsd || 0;

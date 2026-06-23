@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.59] - 2026-06-23
+- fix(orchestration): leaderboard panel was empty — agent-performance lib grouped agents by splitting the joined `taskType_agentId` cache key on "_", but both halves contain underscores (dream_chat, ...Q4_K_M), collapsing all agents into one bogus bucket; now groups by each record's own agentId/taskType and supports `taskType=all` aggregation. orchestration.html queried `taskType=coding` (zero records) → switched to `taskType=all`. Calibration panel now shows a placeholder instead of blank space when no groundings are calibrated.
+
 ## [1.7.58] - 2026-06-23
 - refactor(orchestration): rebuild orchestration.html as an action-first operator control panel. API-key entry (9 LLM providers + 7 GPU accounts, inline Save) and training dispatch (Start-all + per-provider Dispatch/Get-notebook + Poll) are the primary surface; removed the invented read-only panels (AI Brains, Needs Attention, queue/agent/work cluster, hero stats, loop strip) and the collapsing accordion. Wired read-only panels (provider chains, leaderboard, calibration, self-tests, rollover) kept flat below. No new API routes.
 
