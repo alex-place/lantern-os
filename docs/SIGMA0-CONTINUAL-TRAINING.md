@@ -174,6 +174,68 @@ likely well below `0.75` but is pending measurement.
 > `data/eval/ouro-promotion-log.jsonl`. Record the `ouro-final-rerun-full` `pass@1` in
 > this section when it completes.
 
+---
+
+## Cloud GPU Rotation Orchestrator (2026-06-22)
+
+The local RTX 3070 (8GB VRAM) runs at seq=1536 in ~38 sec/step but is single-process — it
+can't train while serving Ouro. To decouple training from the live session, all cloud
+training now goes through a **provider rotation system** in `routes/gpu-training.js` and
+`lib/training-dispatcher.js`, configured by `data/pcsf/gpu-training.pcsf.json`.
+
+### Providers (rotation order, most to least preferred)
+
+| Provider | GPU | VRAM | Quota | Automatable | Status |
+|---|---|---|---|---|---|
+| **Kaggle** | T4 / P100 | 16 GB | 30 h/wk | Yes (REST kernel push) | Active |
+| **SageMaker Studio Lab** | T4 | 16 GB | 28 h/wk | Manual | Next up |
+| **Google Colab** | T4 | 15 GB | 22 h/wk | Manual (notebook emit) | Available |
+| **Lightning AI** | T4 / A10 | 16–24 GB | 22 h/wk | Yes (lightning-sdk) | Available |
+| **Local RTX 3070** | RTX 3070 | 8 GB | Unlimited | Yes | Available when idle |
+| Paperspace | M4000 | 8 GB | 0 h/wk | Yes | PRO required ($8/mo) |
+
+**Total free cloud quota: 102 h/wk.**
+
+### API endpoints
+
+```
+GET  /api/gpu-training/status     — providers + last 20 jobs + active job + next provider
+GET  /api/gpu-training/providers  — PCSF config
+POST /api/gpu-training/dispatch   — { provider?, steps?, checkpointUri? }
+POST /api/gpu-training/poll       — { provider, jobId }
+POST /api/gpu-training/test       — smoke-test credential resolution (no GPU spin-up)
+GET  /api/gpu-training/keys       — credential status (masked)
+POST /api/gpu-training/keys       — { key, value } — set + persist to Windows User env
+```
+
+The UI (Dashboard / `orchestration.html`) wraps these endpoints with a provider card grid,
+a dispatch form, and a live job log.
+
+### Training job log (as of 2026-06-23)
+
+| Time (UTC) | Provider | Job | Status | Notes |
+|---|---|---|---|---|
+| 2026-06-22 22:14 | Colab | ouro-training-1782166464438 | `manual_required` | Notebook emitted; awaiting manual launch |
+| 2026-06-22 22:14 | Kaggle | ouro-training-test | `done` | Smoke-test — no training run |
+| 2026-06-22 22:45 | Kaggle | ouro-training-600-steps | `running` (last poll) | Polled once as running; no completion record — likely session expired |
+| 2026-06-22 23:40 | Kaggle | ouro-training-202606222340-600-steps | **`failed`** | rawStatus: `error`; polled 00:19 UTC; no failure message returned by Kaggle API |
+
+**Root cause of Kaggle failure (likely):** the kernel title slug mismatch logged in `cliOutput`
+(`"Your kernel title does not resolve to the specified id"`) suggests the kernel was pushed
+but Kaggle's scheduler rejected it before it ran. The training script itself was not the
+issue — the kernel push/title resolution needs fixing in `training-dispatcher.js`.
+
+**Next action:** SageMaker is next in rotation (manual launch). Open
+`https://studiolab.sagemaker.aws/`, start a GPU runtime, paste the notebook template from
+the next dispatch record, run all cells.
+
+### Convergence record implication
+
+Every dispatch + poll is written to `data/self-improvement/training-jobs.jsonl`. Every
+model interaction in dream-chat now also writes a convergence record to
+`data/convergence/records.jsonl` (implemented 2026-06-22, PR #1066). Failures are logged
+with `priority: HIGH` and `confidence: 0.1` for audit.
+
 ## Related
 - [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) — the looped local coder this trains (single source of truth, incl. the adaptive-depth Q-exit mechanism)
 - [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the North Star boundary
