@@ -4,15 +4,23 @@ title: <short imperative title>
 status: Proposed
 date: YYYY-MM-DD
 deciders: <who made or owns this decision>
+approved-by: pending   # only Alex Place flips this; agents leave it `pending`
 supersedes: <ADR-NNNN, or none>
 superseded-by: <ADR-NNNN, or none>
 ---
+
+<!--
+  APPROVAL GATE: leave status `Proposed` and approved-by `pending`. An ADR is not
+  binding until Alex Place explicitly approves it; only then set status `Accepted`
+  and approved-by `Alex Place (YYYY-MM-DD)`. Never self-approve.
+-->
+
 
 # ADR-NNNN: <Title>
 
 ## Status
 
-Proposed <!-- Accepted | Superseded by ADR-NNNN | Deprecated -->
+Proposed <!-- Accepted (Alex-approved only) | Superseded by ADR-NNNN | Deprecated -->
 
 ## Context
 

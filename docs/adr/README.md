@@ -26,21 +26,31 @@ chat logs. If a decision shapes the system's structure, it gets an ADR. If you w
 ARCHITECTURE.md answers "what is true now"; ADRs answer "what did we decide and why".
 When an ADR changes the current state, ARCHITECTURE.md is updated to match.
 
+## Approval gate (required)
+
+**No ADR becomes `Accepted` without the explicit approval of the repo owner (Alex Place).**
+Agents and contributors may *draft* ADRs and open PRs for them, but must leave them
+`Status: Proposed` and `approved-by: pending`. Only Alex flips an ADR to `Accepted` and fills
+`approved-by`. This applies to backfilled ADRs documenting already-made decisions too: the
+*decision* may already be in force, but the *record* is not binding until approved.
+
 ## How to write an ADR
 
 1. Copy [`0000-template.md`](0000-template.md) to `NNNN-short-kebab-title.md`, using the
    next free 4-digit number.
 2. Fill in Context → Decision → Consequences → Alternatives. Keep it short — one decision.
-3. Set **Status** to `Proposed`. Open a PR. On merge/acceptance, flip to `Accepted`.
-4. Never edit the decision of an `Accepted` ADR. To change a decision, write a **new** ADR
+3. Set **Status** to `Proposed` and `approved-by: pending`. Open a PR.
+4. **Wait for Alex's explicit approval.** On approval, flip Status to `Accepted` and set
+   `approved-by: Alex Place (YYYY-MM-DD)`. Never self-approve.
+5. Never edit the decision of an `Accepted` ADR. To change a decision, write a **new** ADR
    that supersedes it, and set the old one's status to `Superseded by ADR-NNNN`.
-5. Honor the **External Reality Rule**: every important claim carries evidence — link to a
+6. Honor the **External Reality Rule**: every important claim carries evidence — link to a
    real `file:line`, commit, or PR, with a confidence note.
 
 ## Status values
 
-- **Proposed** — under discussion, not yet binding.
-- **Accepted** — binding; reflects how the system is built.
+- **Proposed** — drafted, under review, **not yet binding**. Default for any new ADR.
+- **Accepted** — binding; reflects how the system is built. **Requires Alex's explicit approval.**
 - **Superseded by ADR-NNNN** — replaced by a later decision (kept for history).
 - **Deprecated** — no longer the chosen approach, with no direct successor.
 
@@ -48,6 +58,6 @@ When an ADR changes the current state, ARCHITECTURE.md is updated to match.
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->
