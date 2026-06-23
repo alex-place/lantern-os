@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.62] - 2026-06-23
+- fix(training): Lightning AI dispatch was broken by #1079, which set `org=lantern` + teamspace `api-credential-management-project`. The ouro-training studio actually lives in the user-owned teamspace `lightning.ai/alexplace7/custom-ml-model-development-project`, so the SDK could not infer the owner ("Neither name is provided nor can the user be inferred..."). Restore `user=alexplace7` resolution (org is now an optional override) with the correct teamspace, in both `lightning_dispatch.py` and the dispatcher env.
+- fix(training): the Lightning train script was uploaded to an absolute remote path (`/home/zeus/...`); a Windows dispatch client mangled it into a single backslash-named file in the studio working dir, so the run command never found it. Upload to a bare filename and run it relative to the studio working dir.
+- fix(training): write the generated Lightning train script as UTF-8. The default cp1252 encoding on a Windows dispatch client turned the em-dash in a comment into a lone `\x97` byte, which the studio's Python 3 rejected (`Non-UTF-8 code ... no encoding declared`).
+- fix(training): pin `transformers>=4.40,<4.53` in the Lightning train script (matching the Kaggle dispatch). 4.53+ removed `ROPE_INIT_FUNCTIONS['default']`, which `OuroRotaryEmbedding` looks up at init → `KeyError: 'default'` killed every run.
+
 ## [1.7.61] - 2026-06-23
 - fix(knowledgecenter): PDF report links were all broken (403) and many showed "(anonymous)" as the title. The `/api/pdfs` list advertised `/repo/data/ingest/…` URLs, but the `/repo` handler deliberately denies `data/ingest` as a PII pool (#868), so every PDF link 403'd. Added a bounded `GET /api/pdfs/file?filename=…` endpoint that serves only `.pdf` files from inside the ingest pool (path-traversal/extension guarded; the broad `/repo` deny stays intact) and a `fileUrl` field the Knowledge Center now links to. Junk PDF titles (`(anonymous)`, blank, whitespace) are normalized to null server- and client-side so cards fall back to the readable filename — consistent with how the markdown docs display.
 

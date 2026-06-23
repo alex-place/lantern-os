@@ -695,8 +695,14 @@ function _runLightningScript(subcommand, extraArgs = []) {
     ...process.env,
     LIGHTNING_USER_ID:        process.env.LIGHTNING_USER_ID        || "",
     LIGHTNING_API_KEY:        process.env.LIGHTNING_API_KEY        || "",
-    LIGHTNING_STUDIO_ORG:     process.env.LIGHTNING_STUDIO_ORG     || "lantern",
-    LIGHTNING_STUDIO_TEAMSPACE: process.env.LIGHTNING_STUDIO_TEAMSPACE || "api-credential-management-project",
+    // The ouro-training studio lives in a USER-owned teamspace
+    // (lightning.ai/alexplace7/custom-ml-model-development-project). Resolve under
+    // the user by default; org stays empty (set LIGHTNING_STUDIO_ORG only for an
+    // org-owned teamspace). #1079 set org=lantern + the wrong teamspace, which made
+    // the SDK unable to infer the owner and broke every Lightning dispatch.
+    LIGHTNING_STUDIO_USER:      process.env.LIGHTNING_STUDIO_USER      || "alexplace7",
+    LIGHTNING_STUDIO_ORG:       process.env.LIGHTNING_STUDIO_ORG       || "",
+    LIGHTNING_STUDIO_TEAMSPACE: process.env.LIGHTNING_STUDIO_TEAMSPACE || "custom-ml-model-development-project",
     HF_TRAINING_REPO:         process.env.HF_TRAINING_REPO         || "ouro-checkpoints",
   };
   try {
