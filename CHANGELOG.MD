@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.57] - 2026-06-23
+- fix(operator): /api/actions/update no longer runs `git reset --hard origin/master` over a dirty serving checkout. The auto-update used to silently destroy uncommitted interactive/agent edits in the live checkout; it now refuses on a dirty tree (local changes preserved, count reported) and only resets a clean checkout, matching Invoke-OrchestratorRepoSync.ps1's dirty-guard policy.
+
 ## [1.7.56] - 2026-06-23
 - fix(orchestration): improve GPU training dispatch error reporting — add error display panel with specific failure codes (missing_credentials, kaggle_timeout, lightning_not_configured, etc.)
 - fix(gpu-training): add timeout guards and better error handling for dispatch — reduce Kaggle timeout 60s→30s, Lightning 120s→60s, prevent interactive prompts via stdio pipe config
