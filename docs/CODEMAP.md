@@ -242,6 +242,8 @@ capture context
 
 | Document | Path | What It Covers |
 |---|---|---|
+| Architecture (current state) | `docs/ARCHITECTURE.md` | Canonical "what the system is today" snapshot |
+| Architecture Decision Records | `docs/adr/README.md` | Decision log — *why* the architecture is the way it is |
 | Dream Journal Roadmap | `docs/DREAM-JOURNAL-ROADMAP.md` | Dream Journal specific features, tiers, 3 Door Game |
 | Research Contract | `archive/gm-agent-orchestrator/docs/research/research-contract.md` | How research is ingested, audited, and promoted |
 | Repo Contract | `docs/REPO-CONTRACT.md` | Git workflow, convergence rules, merge policy |

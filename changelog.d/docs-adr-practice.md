@@ -1,0 +1,2 @@
+### Docs
+- Establish an Architecture Decision Record (ADR) practice under `docs/adr/`: index + authoring guide (`README.md`), MADR-style template (`0000-template.md`), and the meta-ADR adopting ADRs (`0001-record-architecture-decisions.md`). Add a stub `docs/ARCHITECTURE.md` (the canonical current-state snapshot, to be written in Phase 2) and wire both into `docs/CODEMAP.md` Canonical Links. ADRs record *why* the architecture is the way it is; ARCHITECTURE.md records *what is true now*. Phase 1 of #1083.
