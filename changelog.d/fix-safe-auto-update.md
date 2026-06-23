@@ -1,0 +1,2 @@
+### Fixed
+- `/api/actions/update` no longer runs `git reset --hard origin/master` over a dirty serving checkout. The auto-update used to silently destroy uncommitted interactive/agent edits in the live checkout; it now refuses on a dirty tree (preserving local changes) and reports how many files were left untouched, mirroring `Invoke-OrchestratorRepoSync.ps1`'s dirty-guard. Clean checkouts update as before.

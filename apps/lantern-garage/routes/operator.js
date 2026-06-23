@@ -196,12 +196,25 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
       const steps = [];
 
       // Step 1: fetch origin/master and reset to it (works regardless of local branch name,
-      // including worktrees where the branch has no upstream tracking configured)
+      // including worktrees where the branch has no upstream tracking configured).
+      //
+      // Guard: NEVER `reset --hard` over uncommitted work in the serving checkout.
+      // A hard reset here silently destroys an in-progress interactive/agent edit
+      // (this auto-update has clobbered live local changes — see autowork worktree
+      // isolation). Mirror Invoke-OrchestratorRepoSync.ps1's policy and refuse on a
+      // dirty tree; the operator can commit/stash, or update from a clean checkout.
       try {
         execSync("git fetch origin master --quiet", { cwd: repoRoot, encoding: "utf8", timeout: 30000 });
         const fetchedSha = execSync("git rev-parse origin/master", { cwd: repoRoot, encoding: "utf8" }).trim();
-        execSync("git reset --hard origin/master", { cwd: repoRoot, encoding: "utf8" });
-        steps.push({ step: "git_pull", ok: true, output: `Reset to origin/master @ ${fetchedSha.slice(0, 8)}`, branch: "master" });
+        const dirty = execSync("git status --porcelain", { cwd: repoRoot, encoding: "utf8" }).trim();
+        if (dirty) {
+          const n = dirty.split("\n").filter(Boolean).length;
+          steps.push({ step: "git_pull", ok: false,
+            output: `Refusing to reset --hard origin/master: the serving checkout has ${n} uncommitted change(s). Local edits were preserved. Commit/stash them, or update from a clean checkout/worktree.` });
+        } else {
+          execSync("git reset --hard origin/master", { cwd: repoRoot, encoding: "utf8" });
+          steps.push({ step: "git_pull", ok: true, output: `Reset to origin/master @ ${fetchedSha.slice(0, 8)}`, branch: "master" });
+        }
       } catch (e) {
         steps.push({ step: "git_pull", ok: false, output: e.stdout?.trim() || e.message });
       }
