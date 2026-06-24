@@ -635,7 +635,7 @@ class UnifiedAgentConnector:
         replies = {
             "lantern": f"The flame holds steady. '{snippet}...' You can always come home safe. What light did you bring back?",
             "blinkbug": f"[STATIC] '{snippet}...' [GLITCH] Windows XP door detected. Hidden lore? Unhinged energy rising. What did the CRT show you?",
-            "keystone": f"'{snippet}...' Truth: this connects to something older. The Return Door remembers. What pattern repeats?",
+            "keystone": f"I can't answer that right now — no local model is running (Ollama/Ouro on :11434) and the cloud providers are unreachable, so there's no LLM to handle '{snippet}...'. Start a local model or set a cloud API key, then resend. (Keystone is a technical assistant, not a dream narrator.)",
             "waterfall": f"'{snippet}...' flows like water. What feeling wants to move through?",
             "xenon": f"'{snippet}...' charts a course. Where does this dream point — and who walks with you?",
             "founder": f"'{snippet}...' carries a wish. What are you protecting, and where do you need to return?",

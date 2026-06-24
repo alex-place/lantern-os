@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.67] - 2026-06-24
+- fix(chat): remove the hardcoded dream-persona slop from Keystone's offline reply. When both cloud and local models were unreachable, `unified_agent_connector._offline_reply` returned a fake mystical line for the keystone agent ("Truth: this connects to something older. The Return Door remembers. What pattern repeats?"). Keystone is a technical assistant, not a dream narrator — it now returns an honest "no model is reachable; start a local model or set a cloud key" message. (The other Three-Doors RP personas keep their flavor.)
+
 ## [1.7.66] - 2026-06-24
 - fix(chat): show the tool workflow for cloud models. Claude/OpenAI/Gemini use the native tool-use loop (server emits `{type:"tool",phase:"call"/"result"}`), but the chat UI only knew how to fill cards parsed from the *local* model's `<tool_call>` text — so native tool calls ran invisibly and only the final answer appeared. The stream handler now records native calls and synthesizes the same tool-call cards at finalize (filled with the real results), so the user sees `🔧 web_search → 🔧 web_fetch → answer`. `fillToolSlot` also reads the native `preview` field.
 
