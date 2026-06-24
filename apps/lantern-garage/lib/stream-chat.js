@@ -38,6 +38,11 @@ const serving = require("./serving-modes");
 const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
+// Extracted helper modules (split out of this file for smaller-context editing):
+const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
+const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
+const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
+const { buildBrainOrder } = require("./stream-chat/provider-order");
 
 const repoRoot = path.resolve(__dirname, "../../../");
 
@@ -57,159 +62,7 @@ function withTimeout(promise, ms, fallback) {
   ]);
 }
 
-// Fallback doors when AI omits the marker or provider fails
-const FALLBACK_DOORS = ["Tell me more about that", "What happened next?", "How are you feeling about it?"];
 
-// Conversation history compaction thresholds
-// Increased for richer RP context (issue #332 — journal/Three Doors felt flat)
-const FULL_FIDELITY_RECENT_TURNS = 6;
-const MID_FIDELITY_TURNS = 4;
-const MID_FIDELITY_CHAR_LIMIT = 400;
-const LOW_FIDELITY_WORD_LIMIT = 10;
-
-// Log truncation metrics to track information loss
-function logTruncationMetric(originalChars, truncatedChars, truncationType) {
-  try {
-    const metricsPath = path.resolve(__dirname, "../../data/truncation-metrics.jsonl");
-    const metric = {
-      timestamp: new Date().toISOString(),
-      originalChars,
-      truncatedChars,
-      charsSaved: originalChars - truncatedChars,
-      truncationType, // "mid_fidelity" or "low_fidelity"
-      compressionRatio: truncatedChars / originalChars
-    };
-    const { appendJsonlQueued } = require("./file-queue");
-    appendJsonlQueued(metricsPath, metric, { rotate: true }).catch(() => {}); // #872 per-message hot path
-  } catch (e) {
-    // Best-effort logging; never block on metric failure
-  }
-}
-
-// Conversation history compaction: tiered summarization to reduce provider token costs.
-// Only compacts turns older than the most recent FULL_FIDELITY_RECENT_TURNS exchanges;
-// never re-compacts already-compacted text (FlowKV principle).
-// Σ₀ Fix: Track truncation metrics to measure information loss
-function compactHistory(history) {
-  if (!Array.isArray(history) || history.length === 0) return [];
-  return history.map((h, i) => {
-    const text = String(h.text != null ? h.text : (h.content != null ? h.content : ""));
-    const role = h.role || "user";
-    if (i >= history.length - FULL_FIDELITY_RECENT_TURNS) {
-      return { role, text }; // Full fidelity, no truncation
-    }
-    if (i >= history.length - FULL_FIDELITY_RECENT_TURNS - MID_FIDELITY_TURNS) {
-      if (text.length > MID_FIDELITY_CHAR_LIMIT) {
-        const truncated = text.slice(0, MID_FIDELITY_CHAR_LIMIT) + "…";
-        logTruncationMetric(text.length, truncated.length, "mid_fidelity");
-        return { role, text: truncated };
-      }
-      return { role, text };
-    }
-    // Low fidelity: first N words only
-    const words = text.trim().split(/\s+/).filter(Boolean).slice(0, LOW_FIDELITY_WORD_LIMIT).join(" ");
-    const roleLabel = role === "assistant" ? "Keystone" : "Dreamer";
-    const summary = words.length > 0 ? `[${roleLabel}: ${words}…]` : `[${roleLabel}]`;
-    logTruncationMetric(text.length, summary.length, "low_fidelity");
-    return { role, text: summary };
-  });
-}
-
-// Build the provider messages array from compacted history + current message.
-// Single source of truth — all providers call this instead of inlining history.map.
-function buildProviderMessages(systemPrompt, compacted, currentMessage) {
-  return [
-    { role: "system", content: systemPrompt },
-    ...compacted.map(h => ({ role: h.role, content: h.text })),
-    { role: "user", content: currentMessage },
-  ];
-}
-
-// Parse [DOORS: A | B | C] out of the full reply and return cleaned text + doors array.
-// Local models (Ollama) sometimes use commas instead of pipes — fall back gracefully.
-function extractDoors(text) {
-  // Match complete [DOORS: A | B | C] or incomplete [DOORS: A | B | C (no closing bracket)
-  const match = text.match(/\[DOORS:\s*([^\]]+)\]?/i);
-  if (!match) return { cleanText: text.trim(), doors: [] };
-  let doors = match[1].split("|").map(d => d.trim()).filter(Boolean).slice(0, 3);
-  // Fallback: if pipe-split didn't produce 3 doors, try comma-before-capital split
-  if (doors.length < 3) {
-    const commaSplit = match[1].split(/,\s*(?=[A-Z])/).map(d => d.trim()).filter(Boolean).slice(0, 3);
-    if (commaSplit.length > doors.length) doors = commaSplit;
-  }
-  const cleanText = text.replace(/\[DOORS:[^\]]*\]?/i, "").replace(/\n{3,}/g, "\n\n").trim();
-  return { cleanText, doors };
-}
-
-// Cut a local model's output at the first instruction-template echo or new-turn
-// marker it appends AFTER it has already answered (### Response:, <|im_end|>,
-// "\n\nUser:", …). These are turn/template boundaries, never legitimate answer
-// content; cloud models don't emit them, so this is a no-op for Claude/Gemini/GPT.
-// The #1 reliability fix for served local models that ramble past their answer.
-function stripModelArtifacts(text) {
-  if (!text || typeof text !== "string") return text;
-  const m = text.match(/\n*#{2,}\s*(?:response|instruction)\b|<\|(?:im_end|im_start|endoftext|eot_id)\|>|\n\n+\s*(?:user|human|assistant|question|system)\s*:/i);
-  return (m && m.index > 0) ? text.slice(0, m.index).trimEnd() : text;
-}
-
-function doorsOrFallback(text, skipDoors = false) {
-  text = stripModelArtifacts(text);
-  if (skipDoors) return { cleanText: text.trim(), suggestions: [] };
-  const { cleanText, doors } = extractDoors(text);
-  // Always return exactly 3 suggestions. Pad with fallbacks if model gave fewer than 3.
-  let finalDoors;
-  if (doors.length >= 3) {
-    finalDoors = doors.slice(0, 3);
-  } else if (doors.length > 0) {
-    finalDoors = [...doors, ...FALLBACK_DOORS].slice(0, 3);
-  } else {
-    finalDoors = FALLBACK_DOORS;
-  }
-  if (doors.length > 0) {
-    try { saveDoorChoice(null, finalDoors); } catch {}
-  }
-  return { cleanText, suggestions: finalDoors };
-}
-
-// Extract key topics from user message and generate 3 web search suggestion links
-function generateWebSuggestions(userMessage) {
-  const topicPatterns = {
-    sports: /\b(basketball|football|baseball|soccer|hockey|tennis|golf|cricket|boxing)s?\b/i,
-    trains: /\b(trains?|railways?|locomotives?|stations?|transit|rails?)\b/i,
-    recipes: /\b(recipes?|cooking|cook|meals?|dishes?|foods?|ingredients?)\b/i,
-    movies: /\b(movies?|films?|cinemas?|watch|actors?|actresses?|directors?)\b/i,
-    music: /\b(musics?|songs?|albums?|artists?|concerts?|bands?|genres?)\b/i,
-    tech: /\b(technology|software|hardware|ai|code|programming|apps?)\b/i,
-    travel: /\b(travels?|trips?|destinations?|vacations?|hotels?|flights?|tours?)\b/i,
-    science: /\b(science|research|studies?|discoveries?|experiments?|biology|physics)\b/i,
-    news: /\b(news|current|todays?|today's|latest|breaking)\b/i,
-    health: /\b(health|fitness|diets?|exercises?|wellness|nutrition)\b/i,
-  };
-
-  let matchedTopics = [];
-  for (const [topic, pattern] of Object.entries(topicPatterns)) {
-    if (pattern.test(userMessage)) {
-      matchedTopics.push(topic);
-    }
-  }
-
-  // If no patterns match, extract first meaningful word
-  if (matchedTopics.length === 0) {
-    const words = userMessage.split(/\s+/).filter(w => w.length > 4 && !/^(what|when|where|which|how|about)$/i.test(w));
-    if (words.length > 0) matchedTopics.push(words[0].toLowerCase());
-  }
-
-  const topicLabel = matchedTopics[0] || "interesting topics";
-
-  // Generate 3 search suggestion links with generic but relevant queries
-  const suggestions = [
-    { label: "Explore on Google", url: `https://www.google.com/search?q=${encodeURIComponent(topicLabel)}`, icon: "🔍" },
-    { label: "Latest on Wikipedia", url: `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(topicLabel)}&title=Special:Search`, icon: "📖" },
-    { label: "News & Articles", url: `https://news.google.com/search?q=${encodeURIComponent(topicLabel)}`, icon: "📰" },
-  ];
-
-  return suggestions;
-}
 
 // Non-blocking image generation sidecar for Three Doors mode
 function triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh }) {
@@ -313,128 +166,6 @@ function analyzeConvergenceResult(result) {
   return findings;
 }
 
-// ── Native Anthropic tool-use: stream ONE assistant turn ──────────────────────
-// Streams a single /v1/messages turn with `tools`, forwarding text deltas live via
-// onToken and accumulating any native tool_use blocks (input_json_delta → JSON).
-// Resolves { assistantContent, toolUses, stopReason } so the caller can run the
-// requested tools and append a tool_result turn for the next iteration. This is the
-// cloud-model analog of the local model's free-text <tool_call> path — same registry,
-// same executor (lib/tool-runner), reliable native protocol instead of text parsing.
-function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTokens, onToken }) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ model, max_tokens: maxTokens, stream: true, system, messages, tools });
-    const req = https.request({
-      agent: llmAgent,
-      hostname: "api.anthropic.com",
-      path: "/v1/messages",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Length": Buffer.byteLength(payload),
-      },
-    }, (upstream) => {
-      if (upstream.statusCode !== 200) {
-        upstream.resume();
-        reject(new Error(`anthropic_status_${upstream.statusCode}`));
-        return;
-      }
-      const blocks = [];      // index → { type:"text", text } | { type:"tool_use", id, name, jsonbuf }
-      let stopReason = null;
-      let buf = "";
-      upstream.on("data", (chunk) => {
-        buf += chunk.toString();
-        const lines = buf.split("\n");
-        buf = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith("data:")) continue;
-          const raw = line.slice(5).trim();
-          if (!raw || raw === "[DONE]") continue;
-          let evt; try { evt = JSON.parse(raw); } catch { continue; }
-          if (evt.type === "content_block_start") {
-            const cb = evt.content_block || {};
-            blocks[evt.index] = cb.type === "tool_use"
-              ? { type: "tool_use", id: cb.id, name: cb.name, jsonbuf: "" }
-              : { type: "text", text: "" };
-          } else if (evt.type === "content_block_delta") {
-            const b = blocks[evt.index];
-            if (evt.delta?.type === "text_delta") {
-              if (b) b.text += evt.delta.text;
-              if (onToken && evt.delta.text) onToken(evt.delta.text);
-            } else if (evt.delta?.type === "input_json_delta" && b) {
-              b.jsonbuf += evt.delta.partial_json || "";
-            }
-          } else if (evt.type === "message_delta" && evt.delta?.stop_reason) {
-            stopReason = evt.delta.stop_reason;
-          }
-        }
-      });
-      upstream.on("end", () => {
-        const assistantContent = [];
-        const toolUses = [];
-        for (const b of blocks) {
-          if (!b) continue;
-          if (b.type === "text") {
-            if (b.text) assistantContent.push({ type: "text", text: b.text });
-          } else {
-            let input = {};
-            try { input = b.jsonbuf ? JSON.parse(b.jsonbuf) : {}; } catch { input = {}; }
-            assistantContent.push({ type: "tool_use", id: b.id, name: b.name, input });
-            toolUses.push({ id: b.id, name: b.name, input });
-          }
-        }
-        resolve({ assistantContent, toolUses, stopReason });
-      });
-      upstream.on("error", reject);
-    });
-    req.on("error", reject);
-    req.setTimeout(30000, () => { req.destroy(); reject(new Error("anthropic_timeout")); });
-    req.write(payload);
-    req.end();
-  });
-}
-
-// ── Σ₀ convergence brain: order the providers for THIS turn ───────────────────
-// The brain (provider-router.selectProvider, surfaced as `hintProvider`) decides who
-// LEADS; an explicit request pins to one; otherwise the brain's pick leads and a
-// stable backstop chain follows. Filtered to providers that actually have a key
-// (ollama/local is always reachable). This is the single ranked list the dispatch
-// loop walks — it replaces the hardcoded gemini→anthropic→openai→xai→ollama order.
-const _PROVIDER_ALIASES = {
-  claude: "anthropic", "claude-sonnet": "anthropic", anthropic: "anthropic",
-  google: "gemini", gemini: "gemini", openai: "openai", gpt: "openai",
-  grok: "xai", xai: "xai", ollama: "ollama", local: "ollama",
-};
-function _dispatchHasKey(p) {
-  const e = process.env;
-  switch (p) {
-    case "anthropic": return !!e.ANTHROPIC_API_KEY;
-    case "gemini": return !!(e.GEMINI_API_KEY || e.GOOGLE_API_KEY);
-    case "openai": return !!e.OPENAI_API_KEY;
-    case "xai": return !!e.XAI_API_KEY;
-    case "ollama": return true;
-    default: return false;
-  }
-}
-function buildBrainOrder({ requestedProvider, hintProvider }) {
-  const DISPATCH = ["anthropic", "gemini", "openai", "xai", "ollama"];
-  const norm = (p) => {
-    const s = String(p || "").toLowerCase();
-    if (s.startsWith("gemini-")) return "gemini";   // gemini-2.5-pro etc.
-    return _PROVIDER_ALIASES[s] || null;
-  };
-  if (requestedProvider) {
-    const n = norm(requestedProvider);
-    return n && DISPATCH.includes(n) ? [n] : [];   // explicit request pins to one
-  }
-  const seen = new Set();
-  const order = [];
-  const push = (p) => { const n = norm(p); if (n && DISPATCH.includes(n) && !seen.has(n)) { seen.add(n); order.push(n); } };
-  push(hintProvider);                  // the brain's pick leads
-  for (const p of DISPATCH) push(p);   // stable backstop chain after it
-  return order.filter(_dispatchHasKey);
-}
 
 async function handleStreamChat(req, url, res) {
   const { collectRequestBody } = require("./http-utils");
@@ -1473,7 +1204,15 @@ async function handleStreamChat(req, url, res) {
   // a candidate for work. Falls back to the static chain when there's no signal.
   const intent = converganceDecision?.intent || "default";
   const { orderChainByLeaderboard, recordModelOutcome } = require("./model-leaderboard");
-  const staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
+  let staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
+  // Keystone chat (non-RP) is a technical/tool assistant — never fall back to the
+  // dream-tuned `lantern-csf-dream`, which ignores tools and emits dream-journal
+  // narrative ("the Return Door remembers…"). That model is for the Three Doors RP
+  // surface only. Without this, an offline/degraded Keystone chat answers in persona.
+  if (!isRpMode) {
+    const cleaned = staticChain.filter((m) => m !== "lantern-csf-dream");
+    if (cleaned.length) staticChain = cleaned;
+  }
   let modelChain = staticChain;
   try { modelChain = await orderChainByLeaderboard(staticChain, intent); } catch { /* keep static */ }
   // Lead with the operator-pinned served model (OLLAMA_MODEL) when set, so the chat
@@ -1626,35 +1365,46 @@ async function handleStreamChat(req, url, res) {
           // shell/mutating need operator — same policy as the rest of the app).
           try {
             const toolRunner = require("./tool-runner");
-            const tc = toolRunner.parseToolCall(fullReply);
-            if (tc) {
+            const execEnabled = process.env.CHAT_TOOL_EXEC === "1";
+            let tc = toolRunner.parseToolCall(fullReply);
+            if (tc && !execEnabled) {
+              // Execution disabled — still surface the intended call so the UI card fills.
+              sse.writeData(res, { type: "tool", name: tc.name, input: tc.input, ok: false, reason: "disabled" });
+            } else if (tc && execEnabled) {
               const { isOperatorRequest } = require("./request-auth");
-              const result = process.env.CHAT_TOOL_EXEC !== "1"
-                ? { ok: false, reason: "disabled" }
-                : toolRunner.runTool(tc.name, tc.input, { operator: isOperatorRequest(req) });
-              sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
-                ok: result.ok, reason: result.reason || null, policy: result.policy || null,
-                result: result.ok ? result.result : (result.error || null) });
-              if (result.ok) {
-                const followMessages = buildProviderMessages(systemPrompt, compacted, message).concat([
-                  { role: "assistant", content: fullReply },
-                  { role: "user", content: `The ${tc.name} tool returned:\n${String(result.result).slice(0, 1500)}\n\nUsing only this result, answer my original request in plain text. Do not call another tool.` },
-                ]);
-                const followPayload = JSON.stringify({ model: ollamaModel, stream: true, messages: followMessages, options: serving.applyOllamaDecodeParams({}) });
+              const operator = isOperatorRequest(req);
+              // Stream one follow-up Ollama turn, returning its text (tokens already sent).
+              const streamOllamaFollow = (messages) => new Promise((resolve) => {
+                const fp = JSON.stringify({ model: ollamaModel, stream: true, messages, options: serving.applyOllamaDecodeParams({}) });
                 const fu = new URL(ollamaBase);
-                let followText = "";
-                await new Promise((resolve) => {
-                  const r3 = http.request({ hostname: fu.hostname, port: fu.port || 11434, path: "/api/chat", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(followPayload) } }, (up) => {
-                    if (up.statusCode !== 200) { up.resume(); resolve(); return; }
-                    let b = "";
-                    up.on("data", (ch) => { b += ch.toString(); const ls = b.split("\n"); b = ls.pop(); for (const ln of ls) { if (!ln.trim()) continue; try { const pj = JSON.parse(ln); if (pj.message && pj.message.content) { followText += pj.message.content; sendToken(pj.message.content); } } catch {} } });
-                    up.on("end", resolve); up.on("error", () => resolve());
-                  });
-                  r3.on("error", () => resolve());
-                  r3.setTimeout(120000, () => { r3.destroy(); resolve(); });
-                  r3.write(followPayload); r3.end();
+                let t = "";
+                const r3 = http.request({ hostname: fu.hostname, port: fu.port || 11434, path: "/api/chat", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(fp) } }, (up) => {
+                  if (up.statusCode !== 200) { up.resume(); resolve(""); return; }
+                  let b = "";
+                  up.on("data", (ch) => { b += ch.toString(); const ls = b.split("\n"); b = ls.pop(); for (const ln of ls) { if (!ln.trim()) continue; try { const pj = JSON.parse(ln); if (pj.message && pj.message.content) { t += pj.message.content; sendToken(pj.message.content); } } catch {} } });
+                  up.on("end", () => resolve(t)); up.on("error", () => resolve(t));
                 });
-                if (followText.trim()) fullReply += "\n\n" + followText;
+                r3.on("error", () => resolve(t));
+                r3.setTimeout(120000, () => { r3.destroy(); resolve(t); });
+                r3.write(fp); r3.end();
+              });
+              // Multi-step loop: run the tool, feed the result back, and let the model
+              // call another tool or answer — matching the cloud models' agency. Bounded.
+              const convo = buildProviderMessages(sysForOllama, compacted, message);
+              let lastTurn = fullReply;
+              const MAX_TOOL_ITERS = 5;
+              for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
+                const result = await toolRunner.runTool(tc.name, tc.input, { operator });
+                const out = result.ok ? result.result : (result.error || `ERROR(${result.reason || "error"})`);
+                sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
+                  ok: result.ok, reason: result.reason || null, policy: result.policy || null,
+                  result: result.ok ? result.result : (result.error || null) });
+                convo.push({ role: "assistant", content: lastTurn });
+                convo.push({ role: "user", content: `The ${tc.name} tool returned:\n${String(out).slice(0, 1500)}\n\nIf you need another tool, reply with exactly one <tool_call>…</tool_call>. Otherwise answer my original request in plain text.` });
+                const followText = await streamOllamaFollow(convo);
+                const nextTc = toolRunner.parseToolCall(followText);
+                if (nextTc) { tc = nextTc; lastTurn = followText; } // markup already streamed; keep going
+                else { if (followText.trim()) fullReply += "\n\n" + followText; tc = null; }
               }
             }
           } catch (e) { /* tool handling is non-fatal — fall through to normal render */ }
@@ -1738,6 +1488,65 @@ async function handleStreamChat(req, url, res) {
   // Provider: Gemini (streaming)
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (_p === "gemini" && geminiKey) {
+    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — Gemini function-calling
+    // over the same registry/executor. When active we use our functionDeclarations
+    // (which include web_search) instead of the googleSearch builtin. Off by default →
+    // the grounded single-shot path below is unchanged.
+    if (process.env.CHAT_TOOL_EXEC === "1") {
+      try {
+        const toolRunner = require("./tool-runner");
+        const { isOperatorRequest } = require("./request-auth");
+        const operator = isOperatorRequest(req);
+        const tools = toolRunner.geminiTools({ operator });
+        if (tools[0] && tools[0].functionDeclarations.length) {
+          const geminiModelName = modelFor("gemini");
+          const generationConfig = { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7 };
+          const contents = [
+            ...compacted.map((h) => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.text }] })),
+            { role: "user", parts: [{ text: message }] },
+          ];
+          const MAX_TOOL_ITERS = 6;
+          let toolCalls = 0;
+          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+            const turn = await geminiToolTurn({
+              apiKey: geminiKey, model: geminiModelName, contents, tools,
+              systemInstruction: systemPrompt, generationConfig,
+              onToken: (t) => { fullReply += t; sendToken(t); },
+            });
+            if (!turn.functionCalls.length) break;
+            contents.push({ role: "model", parts: turn.modelParts });
+            const responseParts = [];
+            for (const fc of turn.functionCalls) {
+              toolCalls++;
+              const input = fc.args || {};
+              sse.writeData(res, { type: "tool", phase: "call", name: fc.name, input });
+              const r = await toolRunner.runTool(fc.name, input, { operator });
+              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
+              sse.writeData(res, { type: "tool", phase: "result", name: fc.name, ok: !!r.ok, preview: String(out).slice(0, 240) });
+              responseParts.push({ functionResponse: { name: fc.name, response: { result: String(out).slice(0, 6000) } } });
+            }
+            contents.push({ role: "user", parts: responseParts });
+          }
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          recordProviderSuccess("gemini");
+          const geminiReceipt = buildPcsfReceipt("gemini", geminiModelName, true);
+          sendReceipt(geminiReceipt);
+          sendDone("gemini", { agent: doneAgentName, provider: "gemini", model: geminiModelName, online: true, cleanText, suggestions, webSuggestions, receipt: geminiReceipt, toolCalls });
+          return;
+        }
+      } catch (err) {
+        recordProviderFailure("gemini", `tool_loop: ${err.message}`);
+        if (fullReply) {
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          recordProviderSuccess("gemini");
+          sendDone("gemini", { agent: doneAgentName, provider: "gemini", model: modelFor("gemini"), online: true, cleanText, suggestions, webSuggestions });
+          return;
+        }
+        if (requestedProvider && !requestedProvider.startsWith("gemini-")) { sendError(humanError(err)); sendFail(err.message); return; }
+        // else: fall through to grounded single-shot / model chain
+      }
+    }
     // Gemini model fallback chain: primary -> fallbacks on 429/quota
     // Note: gemini-2.0-flash-lite shut down June 1 2026; gemini-3.5-flash is GA with free grounding
     const GEMINI_MODEL_CHAIN = [
@@ -1886,7 +1695,7 @@ async function handleStreamChat(req, url, res) {
               for (const tu of toolUses) {
                 toolCalls++;
                 sse.writeData(res, { type: "tool", phase: "call", name: tu.name, input: tu.input });
-                const r = toolRunner.runTool(tu.name, tu.input, { operator });
+                const r = await toolRunner.runTool(tu.name, tu.input, { operator });
                 const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
                 sse.writeData(res, { type: "tool", phase: "result", name: tu.name, ok: !!r.ok, preview: String(out).slice(0, 240) });
                 results.push({ type: "tool_result", tool_use_id: tu.id, content: String(out).slice(0, 6000), is_error: !r.ok });
@@ -2016,6 +1825,58 @@ async function handleStreamChat(req, url, res) {
   // Provider: OpenAI (streaming)
   const openaiKey = process.env.OPENAI_API_KEY;
   if (_p === "openai" && openaiKey) {
+    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — same registry/executor
+    // as the Claude and local paths, via OpenAI function-calling. Off by default →
+    // the single-shot path below is byte-identical for normal chat.
+    if (process.env.CHAT_TOOL_EXEC === "1") {
+      try {
+        const toolRunner = require("./tool-runner");
+        const { isOperatorRequest } = require("./request-auth");
+        const operator = isOperatorRequest(req);
+        const tools = toolRunner.openaiTools({ operator });
+        if (tools.length) {
+          const openaiModelName = modelFor("openai");
+          const decode = serving.applyOpenAIDecodeParams({});
+          const messages = buildProviderMessages(systemPrompt, compacted, message);
+          const MAX_TOOL_ITERS = 6;
+          let toolCalls = 0;
+          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+            const turn = await openaiCompatibleToolTurn({
+              host: "api.openai.com", apiKey: openaiKey, model: openaiModelName,
+              messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
+            });
+            if (!turn.toolCalls.length) break; // model gave its answer
+            messages.push(turn.assistantMessage);
+            for (const tc of turn.toolCalls) {
+              toolCalls++;
+              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
+              sse.writeData(res, { type: "tool", phase: "result", name: tc.name, ok: !!r.ok, preview: String(out).slice(0, 240) });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
+            }
+          }
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          recordProviderSuccess("openai");
+          recordProviderSuccessRouter("openai");
+          const openaiReceipt = buildPcsfReceipt("openai", openaiModelName, true);
+          sendReceipt(openaiReceipt);
+          sendDone("openai", { agent: doneAgentName, provider: "openai", model: openaiModelName, online: true, cleanText, suggestions, webSuggestions, receipt: openaiReceipt, toolCalls });
+          return;
+        }
+      } catch (err) {
+        recordProviderFailure("openai", `tool_loop: ${err.message}`);
+        if (fullReply) {
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          recordProviderSuccess("openai");
+          sendDone("openai", { agent: doneAgentName, provider: "openai", model: modelFor("openai"), online: true, cleanText, suggestions, webSuggestions });
+          return;
+        }
+        if (requestedProvider) { sendError(humanError(err)); sendFail(err.message); return; }
+        // else (auto mode, nothing streamed): fall through to the single-shot path
+      }
+    }
     try {
       // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
       const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
@@ -2096,6 +1957,56 @@ async function handleStreamChat(req, url, res) {
   // Provider: Grok / xAI (streaming — OpenAI-compatible)
   const xaiKey = process.env.XAI_API_KEY;
   if (_p === "xai" && xaiKey) {
+    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — xAI/Grok is OpenAI-
+    // compatible, so it reuses the same turn helper + registry/executor.
+    if (process.env.CHAT_TOOL_EXEC === "1") {
+      try {
+        const toolRunner = require("./tool-runner");
+        const { isOperatorRequest } = require("./request-auth");
+        const operator = isOperatorRequest(req);
+        const tools = toolRunner.openaiTools({ operator });
+        if (tools.length) {
+          const xaiModelName = modelFor("xai");
+          const decode = serving.applyOpenAIDecodeParams({});
+          const messages = buildProviderMessages(systemPrompt, compacted, message);
+          const MAX_TOOL_ITERS = 6;
+          let toolCalls = 0;
+          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+            const turn = await openaiCompatibleToolTurn({
+              host: "api.x.ai", apiKey: xaiKey, model: xaiModelName,
+              messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
+            });
+            if (!turn.toolCalls.length) break;
+            messages.push(turn.assistantMessage);
+            for (const tc of turn.toolCalls) {
+              toolCalls++;
+              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
+              sse.writeData(res, { type: "tool", phase: "result", name: tc.name, ok: !!r.ok, preview: String(out).slice(0, 240) });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
+            }
+          }
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          recordProviderSuccess("xai");
+          const grokReceipt = buildPcsfReceipt("grok", xaiModelName, true);
+          sendReceipt(grokReceipt);
+          sendDone("grok", { agent: doneAgentName, provider: "grok", model: xaiModelName, online: true, cleanText, suggestions, webSuggestions, receipt: grokReceipt, toolCalls });
+          return;
+        }
+      } catch (err) {
+        recordProviderFailure("xai", `tool_loop: ${err.message}`);
+        if (fullReply) {
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          recordProviderSuccess("xai");
+          sendDone("grok", { agent: doneAgentName, provider: "grok", model: modelFor("xai"), online: true, cleanText, suggestions, webSuggestions });
+          return;
+        }
+        if (requestedProvider) { sendError(humanError(err)); sendFail(err.message); return; }
+        // else: fall through to single-shot
+      }
+    }
     try {
       const xaiModel = modelFor("xai");
       // xAI/Grok is OpenAI-compatible → FAST-mode decode params (issue #729).
