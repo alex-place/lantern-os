@@ -955,6 +955,9 @@ async function sendMessage() {
   let receivedDone = false;
   let doneActions = null;   // convergence-agent action chips, from the done event (Stage 3)
   let doneProvider = '';
+  let doneModel = '';       // actual model id from the PCSF receipt (e.g. claude-haiku-4-5)
+  let doneTimestamp = '';   // receipt generatedAt — the signature timestamp
+  let doneOnline = true;    // false when no model answered (offline path)
   // #930: coalesce per-token DOM writes into one render per animation frame instead
   // of re-parsing+re-rendering the whole bubble on every token.
   let rafId = 0;
@@ -1047,7 +1050,10 @@ async function sendMessage() {
           } else if (evt.type === 'done') {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel || evt.label) routeLabel = evt.routeLabel || evt.label;
-            doneProvider = evt.source || evt.provider || '';
+            doneProvider = evt.source || evt.provider || (evt.receipt && evt.receipt.provider) || '';
+            doneModel = evt.model || (evt.receipt && evt.receipt.model) || '';
+            doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
+            doneOnline = evt.online !== false;
             if (Array.isArray(evt.actions) && evt.actions.length) doneActions = evt.actions;
             receivedDone = true;
           }
@@ -1142,11 +1148,25 @@ async function sendMessage() {
     bubble.appendChild(badge);
   }
 
-  if (routeLabel) {
+  // PCSF signature line — ALWAYS shown, so a normal answer and an offline answer carry
+  // the same shape: <route> · <provider/model> · <time>. Previously only `routeLabel`
+  // rendered (no provider/model/timestamp), and the offline path showed nothing at all,
+  // which is why the two looked inconsistent.
+  if (!didError) {
     const sig = document.createElement('div');
     sig.className = 'msg-route-sig';
-    sig.setAttribute('aria-label', `Active route: ${routeLabel}`);
-    sig.textContent = routeLabel;
+    const t = doneTimestamp ? new Date(doneTimestamp) : new Date();
+    const time = isNaN(t) ? '' : t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const parts = [routeLabel || 'Keystone'];
+    if (doneOnline === false) {
+      parts.push('no model available');
+    } else {
+      const pm = [doneProvider, doneModel].filter(Boolean).join('/');
+      if (pm) parts.push(pm);
+    }
+    if (time) parts.push(time);
+    sig.textContent = parts.join(' · ');
+    sig.setAttribute('aria-label', `Route signature: ${sig.textContent}`);
     msg.appendChild(sig);
   }
 
@@ -1166,7 +1186,16 @@ async function sendMessage() {
   // 🔊 Read-aloud + narration. This file is the live reply renderer, so TTS must live
   // here — the equivalent code in dream-chat.js runs on a dead render path, which is why
   // replies never read back. Reuses window.speakText (server TTS → browser fallback). (#858)
-  if (!didError && fullText && fullText.trim() && typeof window.speakText === 'function') {
+  // Narration reads the ANSWER only — never the tool calls. Strip <tool_call> markup
+  // (and the hidden [DOORS] tag) so the narrator doesn't read raw JSON / tool I/O aloud;
+  // the user opens a tool card deliberately if they want its detail.
+  const speakableText = (fullText || '')
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '')
+    .replace(/<tool_call>[\s\S]*$/i, '')
+    .replace(/\[DOORS:[^\]]*\]?/i, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (!didError && speakableText && typeof window.speakText === 'function') {
     const speakBtn = document.createElement('button');
     speakBtn.type = 'button';
     speakBtn.className = 'read-aloud-btn';
@@ -1183,7 +1212,7 @@ async function sendMessage() {
       window.__activeReadReset = resetSpeakBtn;
       speakBtn.dataset.speaking = '1';
       speakBtn.textContent = '⏹ Stop';
-      window.speakText(fullText, resetSpeakBtn);
+      window.speakText(speakableText, resetSpeakBtn);
     };
     speakBtn.addEventListener('click', () => {
       if (speakBtn.dataset.speaking === '1') {
