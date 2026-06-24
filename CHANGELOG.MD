@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.68] - 2026-06-24
+- ux(chat): tool-call cards are now collapsed by default. Each call renders as a `<details>` summary (`🔧 web_search ✓`) that expands to show args + result on click, and multiple native (Claude/OpenAI/Gemini) tool calls are grouped under a single collapsed parent (`🔧 N tool calls`). The workflow is visible but no longer takes over the message — open it only when you want the detail.
+
 ## [1.7.67] - 2026-06-24
 - fix(chat): remove the hardcoded dream-persona slop from Keystone's offline reply. When both cloud and local models were unreachable, `unified_agent_connector._offline_reply` returned a fake mystical line for the keystone agent ("Truth: this connects to something older. The Return Door remembers. What pattern repeats?"). Keystone is a technical assistant, not a dream narrator — it now returns an honest "no model is reachable; start a local model or set a cloud key" message. (The other Three-Doors RP personas keep their flavor.)
 
