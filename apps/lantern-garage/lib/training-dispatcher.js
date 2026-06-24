@@ -557,10 +557,13 @@ resume_args = ["--resume_from", "/kaggle/working/checkpoint"]
 
 print("=== Ouro QLoRA training — ${steps} steps ===")
 
-# Install dependencies — pin transformers <4.53 (ROPE_INIT_FUNCTIONS changed in 4.53+)
+# Install dependencies — pin transformers==4.57.6 (the local .venv-train version).
+# Ouro's configuration_ouro.py needs layer_type_validation (added ~4.54), so <4.53
+# fails to import; the rope monkey-patch below + train-qlora-ouro.py restore the
+# 'default' rope that 4.53+ dropped.
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-    "transformers>=4.40,<4.53", "peft>=0.10", "bitsandbytes>=0.43",
-    "datasets", "accelerate", "scipy", "huggingface_hub", "zstandard"],
+    "transformers==4.57.6", "peft>=0.19", "bitsandbytes>=0.46",
+    "datasets", "accelerate>=1.10", "scipy", "huggingface_hub", "zstandard"],
     check=True)
 
 # Monkey-patch: restore 'default' rope type in case transformers>=4.53 was pre-installed
@@ -629,7 +632,7 @@ function _notebookTemplate(provider, checkpointUri, steps) {
 set -euo pipefail
 echo "=== Ouro training startup: ${steps} steps on ${provider} ==="
 
-pip install -q "transformers>=4.40,<4.53" peft bitsandbytes datasets accelerate \\
+pip install -q "transformers==4.57.6" "peft>=0.19" "bitsandbytes>=0.46" datasets accelerate \\
   scipy huggingface_hub zstandard
 
 # Clone repo (skip LFS blobs — budget often exceeded)

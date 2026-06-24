@@ -77,13 +77,15 @@ HF_REPO = "{hf_repo}"
 CHECKPOINT_FILE = "{checkpoint_file}"
 STEPS = {steps}
 
-# Pin transformers <4.53: 4.53+ dropped ROPE_INIT_FUNCTIONS['default'], which
-# OuroRotaryEmbedding looks up at model init -> KeyError: 'default' (same pin the
-# Kaggle dispatch script uses). This installs into the shared env that the
-# train-qlora-ouro.py subprocess below inherits.
+# Pin transformers==4.57.6 — the version the local .venv-train trains Ouro on.
+# Ouro-1.4B's remote configuration_ouro.py imports `layer_type_validation` (added
+# ~4.54), so anything <4.53 fails to import; but the newest releases drop
+# `_compute_default_rope_parameters`, which breaks train-qlora-ouro.py's rope patch
+# and resurfaces KeyError: 'default'. 4.57.6 is the proven middle ground: new enough
+# for Ouro's config, and train-qlora-ouro.py restores ROPE_INIT_FUNCTIONS['default'].
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-                "transformers>=4.40,<4.53", "peft>=0.10", "bitsandbytes>=0.43",
-                "datasets", "accelerate", "scipy", "huggingface_hub", "zstandard"],
+                "transformers==4.57.6", "peft>=0.19", "bitsandbytes>=0.46",
+                "datasets", "accelerate>=1.10", "scipy", "huggingface_hub", "zstandard"],
                check=True)
 
 # Clone lantern-os for training script + data (skip LFS blobs — budget exceeded)
