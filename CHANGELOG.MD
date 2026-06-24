@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.66] - 2026-06-24
+- fix(chat): show the tool workflow for cloud models. Claude/OpenAI/Gemini use the native tool-use loop (server emits `{type:"tool",phase:"call"/"result"}`), but the chat UI only knew how to fill cards parsed from the *local* model's `<tool_call>` text — so native tool calls ran invisibly and only the final answer appeared. The stream handler now records native calls and synthesizes the same tool-call cards at finalize (filled with the real results), so the user sees `🔧 web_search → 🔧 web_fetch → answer`. `fillToolSlot` also reads the native `preview` field.
+
 ## [1.7.65] - 2026-06-24
 - chore(gitignore): stop runtime-generated artifacts from churning into unrelated commits/PRs — ignore `data/convergence/patch-receipts.jsonl`, generated `data/self-improvement/colab-notebooks/`, and `models/*/training-data.*.jsonl`.
 

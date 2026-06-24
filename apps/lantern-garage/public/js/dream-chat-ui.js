@@ -263,7 +263,7 @@ function buildToolCard(inner, partial) {
 function fillToolSlot(slot, evt) {
   if (!slot) return;
   if (evt.ok) {
-    slot.textContent = '↳ ' + String(evt.result || '');
+    slot.textContent = '↳ ' + String(evt.result ?? evt.preview ?? '');
     slot.style.color = 'var(--text,#cdd)';
     slot.style.opacity = '1';
   } else {
@@ -967,6 +967,7 @@ async function sendMessage() {
     });
   };
   const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
+  const nativeToolCalls = [];  // cloud-model (Claude/OpenAI/Gemini) tool *calls* — they emit no <tool_call> text, so we synthesize the cards at finalize
   const requestedProvider = document.getElementById('provider-select')?.value || '';
 
   try {
@@ -1020,12 +1021,19 @@ async function sendMessage() {
             if (evt.text) serverErrorText = evt.text;
             if (!fullText) bubble.style.color = 'var(--muted)';
           } else if (evt.type === 'tool') {
-            // Server ran (or declined to run) the model's <tool_call>. Fill the result
-            // slot of the last tool-call card so the call + its real output show together.
-            toolResults.push(evt);
-            const cards = bubble.querySelectorAll('.tool-call-card');
-            const card = cards[cards.length - 1];
-            if (card) { fillToolSlot(card.querySelector('.tcc-result'), evt); container.scrollTop = container.scrollHeight; }
+            // Two shapes reach here:
+            //  • native cloud loop → {phase:"call",name,input} then {phase:"result",name,ok,preview}
+            //  • local Ouro path   → a single {name,input,ok,result} (its <tool_call> text already drew a card)
+            // For native calls there is no text card, so record the call and synthesize
+            // the card at finalize; results fill the last open card (and re-apply at the end).
+            if (evt.phase === 'call') {
+              nativeToolCalls.push({ name: evt.name, input: evt.input || {} });
+            } else {
+              toolResults.push(evt);
+              const cards = bubble.querySelectorAll('.tool-call-card');
+              const card = cards[cards.length - 1];
+              if (card) { fillToolSlot(card.querySelector('.tcc-result'), evt); container.scrollTop = container.scrollHeight; }
+            }
           } else if (evt.type === 'sigma0' && evt.corrected) {
             // Response was revised by Σ₀ verify pass — show badge after stream completes
             bubble.dataset.sigma0Corrected = '1';
@@ -1065,6 +1073,14 @@ async function sendMessage() {
     msg.classList.add('error');
     bubble.style.color = 'var(--muted)';
     bubble.style.fontStyle = 'italic';
+  }
+
+  // Native cloud tool calls emit no <tool_call> text, and the done event replaces
+  // fullText with the markup-free cleanText — so synthesize the markup now (above the
+  // answer) so renderMarkdown draws the workflow cards and the re-apply below fills them.
+  if (nativeToolCalls.length && !/<tool_call>/i.test(fullText)) {
+    const blocks = nativeToolCalls.map(tc => '<tool_call>' + JSON.stringify(tc) + '</tool_call>').join('\n');
+    fullText = blocks + '\n\n' + fullText;
   }
 
   bubble.innerHTML = renderMarkdown(fullText);
