@@ -253,19 +253,24 @@ function buildToolCard(inner, partial) {
   const tc = parseToolCallInner(inner);
   const name = tc && tc.name ? tc.name : 'tool';
   const args = esc(tc && tc.input ? JSON.stringify(tc.input, null, 2) : inner.trim());
-  const status = partial ? ' <span style="opacity:.6;font-weight:400">…calling</span>' : '';
-  return '<div class="tool-call-card" data-tool="' + esc(name) + '" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;margin:8px 0;overflow:hidden">'
-    + '<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:13px">🔧 ' + esc(name) + status + '</div>'
+  const status = partial ? ' …calling' : '';
+  // Collapsed by default (<details> with no `open`): a tool call isn't typically
+  // something the user needs to read — they click the summary to expand args+result.
+  return '<details class="tool-call-card" data-tool="' + esc(name) + '" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;margin:8px 0;overflow:hidden">'
+    + '<summary style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:13px;list-style:none">🔧 ' + esc(name) + '<span class="tcc-status" style="opacity:.7;font-weight:400">' + status + '</span></summary>'
     + '<pre style="margin:0;padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--text,#cdd)">' + args + '</pre>'
     + '<div class="tcc-result" style="display:none;border-top:1px solid var(--border,#2a2a3a);padding:8px 10px;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--muted,#9aa)"></div>'
-    + '</div>';
+    + '</details>';
 }
 function fillToolSlot(slot, evt) {
   if (!slot) return;
+  const card = slot.closest('.tool-call-card');
+  const statusEl = card && card.querySelector('.tcc-status');
   if (evt.ok) {
     slot.textContent = '↳ ' + String(evt.result ?? evt.preview ?? '');
     slot.style.color = 'var(--text,#cdd)';
     slot.style.opacity = '1';
+    if (statusEl) { statusEl.textContent = ' ✓'; statusEl.style.color = '#4ade80'; }
   } else {
     const msg = ({
       disabled: 'tool execution is off (set CHAT_TOOL_EXEC=1)',
@@ -276,6 +281,7 @@ function fillToolSlot(slot, evt) {
     slot.textContent = '⚠ ' + msg;
     slot.style.color = 'var(--muted,#9aa)';
     slot.style.opacity = '0.7';
+    if (statusEl) { statusEl.textContent = ' ⚠'; statusEl.style.color = '#f87171'; }
   }
   slot.style.display = 'block';
 }
@@ -1098,6 +1104,26 @@ async function sendMessage() {
       const card = cards[i] || cards[cards.length - 1];
       if (card) fillToolSlot(card.querySelector('.tcc-result'), evt);
     });
+  }
+
+  // Group the synthesized native tool cards under ONE collapsed parent — the whole
+  // workflow is rarely something the user needs expanded. (Single call: no parent.)
+  if (nativeToolCalls.length > 1) {
+    const group = [...bubble.querySelectorAll('.tool-call-card')].slice(0, nativeToolCalls.length);
+    if (group.length > 1 && group[0].parentNode) {
+      const parent = document.createElement('details');
+      parent.className = 'tool-workflow';
+      parent.style.cssText = 'border:1px solid var(--border,#2a2a3a);border-radius:10px;margin:8px 0;overflow:hidden';
+      const sum = document.createElement('summary');
+      sum.style.cssText = 'cursor:pointer;padding:6px 10px;background:rgba(92,200,255,.08);color:var(--accent,#5cc8ff);font-weight:600;font-size:13px;list-style:none';
+      sum.textContent = '🔧 ' + group.length + ' tool calls';
+      parent.appendChild(sum);
+      group[0].parentNode.insertBefore(parent, group[0]);
+      const inner = document.createElement('div');
+      inner.style.cssText = 'padding:0 8px 4px';
+      parent.appendChild(inner);
+      group.forEach(c => { c.style.margin = '6px 0'; inner.appendChild(c); });
+    }
   }
 
   if (looksTruncated) {
