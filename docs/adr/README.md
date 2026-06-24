@@ -66,4 +66,6 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0006](0006-dual-boot-worktree-topology.md) | Dual-boot 4177/4178 worktree topology | Proposed (awaiting Alex's approval) |
 | [0007](0007-monoworkstream-one-pr-lane-per-agent.md) | Monoworkstream — one PR lane per agent | Proposed (awaiting Alex's approval) |
 
+| [0008](0008-end-product-personal-ai-wrapper.md) | End product is a personal AI wrapper — capabilities are Tools + Skills | Proposed (awaiting Alex's approval) |
+
 <!-- Add new ADRs to this table on merge. -->
