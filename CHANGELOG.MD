@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.73] - 2026-06-24
+- feat(chat): document upload + AI rewrite + download in Keystone chat. The "+" attach menu now has "📝 Improve a document (.docx)": pick a .docx, type an instruction (or accept the default), and Keystone extracts the text, rewrites it with Claude per your instruction (truthfully — no invented facts), regenerates a styled .docx, and returns a download link inline. New `POST /api/documents/process` + `GET /api/documents/file` (routes/documents.js, operator-gated) backed by a python-docx helper (scripts/resume_docx.py) that reads headers/footers (name/contact) too. Adds `python-docx` to requirements.
+
 ## [1.7.72] - 2026-06-24
 - feat(training): build the private Kaggle Ouro corpus from Claude, authentic Codex tool traces, and authentic tool-using ChatGPT exports with provenance, scrubbing, deterministic deduplication, and a fail-closed dataset mount (#1142).
 

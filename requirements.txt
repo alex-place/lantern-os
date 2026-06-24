@@ -49,3 +49,6 @@ pytest==9.0.3
 
 # Facecam V3 face detection (optional — detector falls back to a heuristic if absent)
 opencv-python>=4.8
+
+# Chat document-processing feature (routes/documents.js → scripts/resume_docx.py)
+python-docx>=1.1.0

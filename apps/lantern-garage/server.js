@@ -171,6 +171,7 @@ const routes = [
   require("./routes/research"), // open-video learning flywheel status
 
   require("./routes/pdfs"), // PDF document listing for Knowledge Center
+  require("./routes/documents"), // .docx upload → LLM rewrite → return new version
   require("./routes/features"),
   require("./routes/admin-flags"),     // Admin feature flags + per-page nav visibility
   require("./routes/personal-cube"),

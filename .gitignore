@@ -348,3 +348,6 @@ experiments/results/*.pdf
 # Process / scratch artifacts.
 *.pid
 tmp.*.patch
+
+# Chat document-processing work dir (uploads + generated .docx)
+data/documents/

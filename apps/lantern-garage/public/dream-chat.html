@@ -209,8 +209,8 @@
         <button type="button" class="attach-item" disabled aria-disabled="true">
           <span class="attach-ico">🖼️</span> Upload Image <span class="attach-soon">soon</span>
         </button>
-        <button type="button" class="attach-item" disabled aria-disabled="true">
-          <span class="attach-ico">📁</span> Upload File <span class="attach-soon">soon</span>
+        <button type="button" class="attach-item" role="menuitem" onclick="lanternAttach.improveDoc()">
+          <span class="attach-ico">📝</span> Improve a document (.docx)
         </button>
         <button type="button" class="attach-item" disabled aria-disabled="true">
           <span class="attach-ico">✎</span> Paste Research <span class="attach-soon">soon</span>
@@ -224,6 +224,7 @@
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
       <input type="file" id="attach-pdf-input" accept=".pdf" multiple style="display:none">
+      <input type="file" id="attach-docx-input" accept=".docx" style="display:none">
     </div>
 
   </div><!-- /.app-main -->
@@ -566,10 +567,48 @@
     fileInput.value = '';
   }
 
+  // ── Improve a document (.docx): upload → LLM rewrite → download new version ──
+  const docxInput = document.getElementById('attach-docx-input');
+  async function processDocx(file, instruction) {
+    const bubble = sysBubble('Processing <b>' + esc(file.name) + '</b> — reading, rewriting, and rebuilding the document…').querySelector('.bubble');
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('instruction', instruction);
+    try {
+      const res = await fetch(base + '/api/documents/process', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.ok && data.downloadUrl) {
+        const secs = (data.sections || []).map(esc).join(' · ');
+        bubble.innerHTML = '✓ Updated <b>' + esc(data.name || file.name) + '</b>'
+          + (secs ? '<br><span style="opacity:.7">Sections: ' + secs + '</span>' : '')
+          + '<br><a href="' + esc(base + data.downloadUrl) + '" download="' + esc(data.filename || 'updated.docx') + '" '
+          + 'style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download updated .docx</a>';
+      } else {
+        bubble.innerHTML = '✗ Could not process the document: ' + esc((data && data.error) || 'unknown error');
+      }
+    } catch (e) {
+      bubble.innerHTML = '✗ Error: ' + esc(e.message);
+    }
+    docxInput.value = '';
+  }
+
   window.lanternAttach = {
     toggle() { menu.classList.contains('open') ? closeMenu() : openMenu(); },
     pickPdf() { closeMenu(); fileInput.click(); },
+    improveDoc() { closeMenu(); docxInput.click(); },
   };
+
+  docxInput.addEventListener('change', () => {
+    const f = docxInput.files && docxInput.files[0];
+    if (!f) return;
+    const typed = (document.getElementById('input') || {}).value || '';
+    const instruction = (typed.trim())
+      || window.prompt('What should I change in "' + f.name + '"?\n(e.g. "polish and tighten", "tailor to a software engineering role", "add my recent work")',
+                       'Polish and modernize: fix formatting, tighten wording, and strengthen the bullets — without inventing facts.');
+    if (instruction == null) { docxInput.value = ''; return; }
+    if (typed.trim()) { const el = document.getElementById('input'); if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); } }
+    processDocx(f, instruction);
+  });
 
   fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadPdfs(fileInput.files); });
   document.addEventListener('click', (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); });
