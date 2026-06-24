@@ -309,7 +309,9 @@ async function _dispatchKaggle(checkpointUri, steps) {
     is_private: true,
     enable_gpu: true,
     enable_internet: true,
-    dataset_sources: [],
+    // Attach the Ouro training set as a Kaggle Dataset (66 MB; too large to commit
+    // to the repo the kernel clones). Override via KAGGLE_TRAINING_DATASET.
+    dataset_sources: [process.env.KAGGLE_TRAINING_DATASET || "lanternfounder/ouro-claude-sessions"],
     kernel_sources: [],
     competition_sources: [],
     model_sources: [],
@@ -593,10 +595,17 @@ ${resumeBlock}
 # Run QLoRA fine-tune — override HF_HOME to a writable Linux path
 # (train-qlora-ouro.py defaults to D:/hf-cache which is Windows-only)
 train_env = {**os.environ, "HF_HOME": "/kaggle/working/hf-cache"}
+# Data comes from the attached Kaggle Dataset (mounted at /kaggle/input/<slug>),
+# not the cloned repo — the 66 MB Ouro set is too large to commit. Fall back to
+# the repo's small in-tree file if the dataset mount is absent.
+data_path = "/kaggle/input/ouro-claude-sessions/training-data.claude-combined.jsonl"
+if not os.path.exists(data_path):
+    data_path = "models/lantern-sigma0-coder/training-data.jsonl"
+print(f"training data: {data_path}")
 subprocess.run([
     sys.executable, "scripts/train-qlora-ouro.py",
     "--base", "ByteDance/Ouro-1.4B",
-    "--data", "models/lantern-sigma0-coder/training-data.jsonl",
+    "--data", data_path,
     "--out", "/kaggle/working/output",
     "--max-steps", "${steps}",
     "--seq", "1536",
