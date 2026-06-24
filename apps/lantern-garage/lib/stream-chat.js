@@ -1667,7 +1667,7 @@ async function handleStreamChat(req, url, res) {
               const { isOperatorRequest } = require("./request-auth");
               const result = process.env.CHAT_TOOL_EXEC !== "1"
                 ? { ok: false, reason: "disabled" }
-                : toolRunner.runTool(tc.name, tc.input, { operator: isOperatorRequest(req) });
+                : await toolRunner.runTool(tc.name, tc.input, { operator: isOperatorRequest(req) });
               sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
                 ok: result.ok, reason: result.reason || null, policy: result.policy || null,
                 result: result.ok ? result.result : (result.error || null) });
@@ -1922,7 +1922,7 @@ async function handleStreamChat(req, url, res) {
               for (const tu of toolUses) {
                 toolCalls++;
                 sse.writeData(res, { type: "tool", phase: "call", name: tu.name, input: tu.input });
-                const r = toolRunner.runTool(tu.name, tu.input, { operator });
+                const r = await toolRunner.runTool(tu.name, tu.input, { operator });
                 const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
                 sse.writeData(res, { type: "tool", phase: "result", name: tu.name, ok: !!r.ok, preview: String(out).slice(0, 240) });
                 results.push({ type: "tool_result", tool_use_id: tu.id, content: String(out).slice(0, 6000), is_error: !r.ok });

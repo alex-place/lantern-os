@@ -23,6 +23,8 @@
  */
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
+const https = require("https");
 const { tokenizeCommand, safeExec } = require("./safe-exec");
 const { resolveCommand } = require("./command-allowlist");
 
@@ -50,6 +52,61 @@ function _runShell(command) {
     cwd: REPO, encoding: "utf-8", timeout: 30000, maxBuffer: 1024 * 1024,
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
   });
+}
+
+// SSRF guard for web_fetch: block loopback / private / link-local hosts so the
+// model can't poke internal services (the local server, cloud metadata, LAN).
+function _blockedHost(hostname) {
+  const h = String(hostname || "").toLowerCase();
+  if (!h || h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 127 || a === 0 || a === 10) return true;              // loopback / this-host / private-A
+    if (a === 169 && b === 254) return true;                        // link-local + cloud metadata
+    if (a === 192 && b === 168) return true;                        // private-C
+    if (a === 172 && b >= 16 && b <= 31) return true;               // private-B
+  }
+  return false;
+}
+
+// Minimal HTTP(S) GET with redirect handling + timeout, for web_fetch.
+function _httpGet(url, redirects = 3) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(url); } catch { return reject(new Error("invalid url")); }
+    if (u.protocol !== "http:" && u.protocol !== "https:") return reject(new Error("only http(s) urls"));
+    if (_blockedHost(u.hostname)) return reject(new Error("host blocked (loopback/private/metadata)"));
+    const lib = u.protocol === "https:" ? https : http;
+    const req = lib.get(u, {
+      timeout: 12000,
+      headers: { "User-Agent": "KeystoneOS/1.0 (+web_fetch tool)", "Accept": "text/html,text/plain,*/*" },
+    }, (res) => {
+      const code = res.statusCode || 0;
+      if (code >= 300 && code < 400 && res.headers.location && redirects > 0) {
+        res.resume();
+        return resolve(_httpGet(new URL(res.headers.location, u).toString(), redirects - 1));
+      }
+      if (code >= 400) { res.resume(); return reject(new Error(`http ${code}`)); }
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => { data += c; if (data.length > 600_000) { req.destroy(); } });
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(new Error("fetch timeout")); });
+  });
+}
+
+function _htmlToText(html) {
+  return String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<\/(p|div|li|h[1-6]|tr|br)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&[a-z#0-9]+;/gi, " ")
+    .replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim();
 }
 
 // ── canonical registry (names/schemas == training == Claude Code) ───────────────
@@ -133,6 +190,43 @@ const REGISTRY = {
       return `edited ${i.file_path}`;
     },
   },
+  // ── user-capability tools (ADR-0008): information lookup, read-policy/safe ──────
+  web_search: {
+    policy: "read", desc: "Search the web for current information. Returns ranked results (title, url, snippet).",
+    schema: { type: "object", properties: { query: { type: "string" }, max_results: { type: "integer" } }, required: ["query"] },
+    async run(i) {
+      const q = String(i.query || "").trim();
+      if (!q) return "[web_search: empty query]";
+      const { webSearchMcp } = require("./web-search-client");
+      const n = Math.max(1, Math.min(8, parseInt(i.max_results, 10) || 5));
+      const raw = await webSearchMcp(q, n);
+      // Unwrap MCP envelope {content:[{type:'text',text:'<json>'}]} or a direct {results}.
+      let payload = raw;
+      if (raw && Array.isArray(raw.content)) {
+        const t = raw.content.find((c) => c && c.type === "text");
+        try { payload = t ? JSON.parse(t.text) : raw; } catch { payload = raw; }
+      }
+      if (raw && raw.isError) return `[web_search error: ${payload && payload.error ? payload.error : "search failed"}]`;
+      if (payload && payload.success === false) return `[web_search error: ${payload.error || "search failed"}]`;
+      const results = (payload && payload.results) || [];
+      if (!results.length) return `[no results for "${q}"]`;
+      return results.slice(0, n).map((r) =>
+        `[${r.rank || "?"}] ${r.title || "(untitled)"}\n    ${r.url || ""}` + (r.snippet ? `\n    ${r.snippet}` : "")
+      ).join("\n");
+    },
+  },
+  web_fetch: {
+    policy: "read", desc: "Fetch a web page and return its readable text (truncated). http(s) only; internal hosts are blocked.",
+    schema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
+    async run(i) {
+      const url = String(i.url || "").trim();
+      if (!/^https?:\/\//i.test(url)) return "[web_fetch: url must start with http:// or https://]";
+      let html;
+      try { html = await _httpGet(url); } catch (e) { return `[web_fetch error: ${e.message}]`; }
+      const text = _htmlToText(html);
+      return text ? text.slice(0, 8000) : "[web_fetch: no readable text]";
+    },
+  },
 };
 
 const TOOL_NAMES = Object.keys(REGISTRY);
@@ -176,14 +270,15 @@ function renderToolPreamble() {
  * @param {{operator?:boolean}} ctx
  * @returns {{ok:boolean, result?:string, reason?:string, error?:string, policy?:string}}
  */
-function runTool(name, input, ctx = {}) {
+async function runTool(name, input, ctx = {}) {
   const entry = REGISTRY[name];
   if (!entry) return { ok: false, reason: "unknown", error: `unknown tool '${name}' (available: ${TOOL_NAMES.join(", ")})` };
   if (entry.policy !== "read" && !ctx.operator) {
     return { ok: false, reason: "auth", policy: entry.policy, error: `'${name}' (${entry.policy}) requires operator access` };
   }
   try {
-    let out = String(entry.run(input || {}) || "");
+    // run() may be sync (returns a string) or async (returns a Promise); await covers both.
+    let out = String((await entry.run(input || {})) || "");
     if (out.length > MAX_OUT) out = out.slice(0, MAX_OUT) + "\n…[truncated]";
     return { ok: true, result: out, policy: entry.policy };
   } catch (e) {
