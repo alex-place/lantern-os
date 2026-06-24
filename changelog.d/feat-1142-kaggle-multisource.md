@@ -1,0 +1,1 @@
+- feat(training): build the private Kaggle Ouro corpus from Claude, authentic Codex tool traces, and authentic tool-using ChatGPT exports with provenance, scrubbing, deterministic deduplication, and a fail-closed dataset mount (#1142).

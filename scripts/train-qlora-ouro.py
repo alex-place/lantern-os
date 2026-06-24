@@ -19,6 +19,25 @@ if os.name == "nt":  # Windows local dev only — don't stomp HF_HOME on Linux/K
     os.environ.setdefault("HF_HOME", "D:/hf-cache")
 
 
+def load_training_records(path):
+    """Accept the Kaggle JSON array and legacy local JSONL files."""
+    with open(path, encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else [parsed]
+    except json.JSONDecodeError:
+        records = []
+        for line in raw.splitlines():
+            if not line.strip():
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+        return records
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="ByteDance/Ouro-1.4B")
@@ -88,18 +107,13 @@ def main():
     model.print_trainable_parameters()
 
     rows = []
-    with open(a.data, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                r = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            instr, out = r.get("instruction", ""), r.get("output", "")
-            if instr and out:
-                rows.append({"text": f"### Instruction:\n{instr}\n\n### Response:\n{out}{tok.eos_token}"})
+    records = load_training_records(a.data)
+    for r in records:
+        if not isinstance(r, dict):
+            continue
+        instr, out = r.get("instruction", ""), r.get("output", "")
+        if instr and out:
+            rows.append({"text": f"### Instruction:\n{instr}\n\n### Response:\n{out}{tok.eos_token}"})
     print(f"training rows: {len(rows)}")
     ds = Dataset.from_list(rows)
 

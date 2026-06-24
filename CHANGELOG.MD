@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.72] - 2026-06-24
+- feat(training): build the private Kaggle Ouro corpus from Claude, authentic Codex tool traces, and authentic tool-using ChatGPT exports with provenance, scrubbing, deterministic deduplication, and a fail-closed dataset mount (#1142).
+
 ## [1.7.71] - 2026-06-24
 - feat(mcp): expose Dream Chat's canonical tool manifest and executor through MCP with matching schemas, policy gates, structured denials, and receipt shape (#1139).
 

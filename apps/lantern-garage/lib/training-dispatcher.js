@@ -595,12 +595,15 @@ ${resumeBlock}
 # Run QLoRA fine-tune — override HF_HOME to a writable Linux path
 # (train-qlora-ouro.py defaults to D:/hf-cache which is Windows-only)
 train_env = {**os.environ, "HF_HOME": "/kaggle/working/hf-cache"}
-# Data comes from the attached Kaggle Dataset (mounted at /kaggle/input/<slug>),
-# not the cloned repo — the 66 MB Ouro set is too large to commit. Fall back to
-# the repo's small in-tree file if the dataset mount is absent.
-data_path = "/kaggle/input/ouro-claude-sessions/training-data.claude-combined.jsonl"
+# Data comes from the attached private Kaggle Dataset, not the cloned repo.
+# It contains the scrubbed Claude + Codex + tool-using ChatGPT corpus. Fail
+# closed if the mount is missing; silently using the tiny seed corrupts runs.
+data_path = "/kaggle/input/ouro-claude-sessions/training-data.claude-combined.json"
 if not os.path.exists(data_path):
-    data_path = "models/lantern-sigma0-coder/training-data.jsonl"
+    raise FileNotFoundError(
+        "Attach Kaggle dataset lanternfounder/ouro-claude-sessions; missing "
+        + data_path
+    )
 print(f"training data: {data_path}")
 subprocess.run([
     sys.executable, "scripts/train-qlora-ouro.py",
