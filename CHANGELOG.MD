@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.64] - 2026-06-24
+- test(eval): lock `accuracy_by_difficulty` in the keystone leaderboard (#843). Clean re-cut of PR #1090 — that branch was stale and showed a destructive −515k-line/2564-file diff; the feature itself already landed on master, so only the (BOM-stripped) test is added here.
+
 ## [1.7.63] - 2026-06-24
 - refactor(chat): split `lib/stream-chat.js` (the streaming dispatcher) into focused modules under `lib/stream-chat/` — `history.js` (compaction + provider-message assembly), `doors.js` (reply post-processing + door/web suggestions), `tool-turns.js` (per-provider native tool-use turn helpers), `provider-order.js` (brain ordering). Smaller files for smaller-context coding agents; behavior unchanged.
 - feat(chat): universal tool access — every chat provider now reaches the same `tool-runner` registry. Added native function-calling loops for OpenAI and xAI/Grok and a `functionDeclarations` loop for Gemini (new `openaiTools()`/`geminiTools()` adapters), and upgraded the local Ouro path from single-shot to a bounded multi-step tool loop. Gated by `CHAT_TOOL_EXEC=1` as before.
