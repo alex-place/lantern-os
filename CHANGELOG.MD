@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.65] - 2026-06-24
+- chore(gitignore): stop runtime-generated artifacts from churning into unrelated commits/PRs — ignore `data/convergence/patch-receipts.jsonl`, generated `data/self-improvement/colab-notebooks/`, and `models/*/training-data.*.jsonl`.
+
 ## [1.7.64] - 2026-06-24
 - test(eval): lock `accuracy_by_difficulty` in the keystone leaderboard (#843). Clean re-cut of PR #1090 — that branch was stale and showed a destructive −515k-line/2564-file diff; the feature itself already landed on master, so only the (BOM-stripped) test is added here.
 
