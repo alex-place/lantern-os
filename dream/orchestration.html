@@ -55,6 +55,27 @@
     .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
     .placeholder { color: var(--muted); font-size: 0.82rem; }
 
+    .research-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto auto; gap: 8px; align-items: center; }
+    .research-controls input, .research-controls select {
+      min-width: 0; padding: 8px 10px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg); color: var(--text); font-size: 0.8rem;
+    }
+    .research-list { display: flex; flex-direction: column; gap: 8px; }
+    .research-item { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 9px; }
+    .research-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+    .research-title { flex: 1 1 300px; font-size: 0.86rem; font-weight: 650; line-height: 1.4; }
+    .research-badge { padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--accent); font-size: 0.68rem; font-weight: 800; }
+    .research-meta { margin: 6px 0 9px; color: var(--muted); font-size: 0.72rem; }
+    .research-labels { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+    .research-label { padding: 1px 6px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); }
+    .research-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .research-action { padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 0.72rem; font-weight: 650; text-decoration: none; cursor: pointer; }
+    .research-action:hover { border-color: var(--accent); color: var(--accent); }
+    .research-action.primary { border-color: var(--accent); color: var(--accent); }
+    .research-state { padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.8rem; }
+    .research-state.error { border-color: #f87171; color: #f87171; }
+    @media (max-width: 720px) { .research-controls { grid-template-columns: 1fr 1fr; } .research-controls input { grid-column: 1 / -1; } }
+
     /* ── Training control (primary action) ── */
     .train-start-btn {
       width: 100%; padding: 13px; border-radius: 10px;
@@ -163,6 +184,27 @@
     <span class="smeta">Training: <b id="statusTrain">—</b></span>
     <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
+
+  <section class="panel" id="researchHandoffPanel">
+    <h2>Research &amp; Handoff <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
+    <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Keystone Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
+    <div class="research-controls">
+      <input id="researchSearch" type="search" placeholder="Search issue, title, or label" aria-label="Search open issues">
+      <select id="researchPriority" aria-label="Filter by priority">
+        <option value="all">All priorities</option>
+        <option value="p0">P0</option>
+        <option value="p1">P1</option>
+        <option value="p2">P2</option>
+        <option value="unlabeled">Unlabeled</option>
+      </select>
+      <select id="researchSort" aria-label="Sort issues">
+        <option value="priority">Priority + updated</option>
+        <option value="updated">Recently updated</option>
+      </select>
+      <button class="btn-secondary" id="researchRefresh" type="button">Refresh</button>
+    </div>
+    <div id="researchQueue" class="research-list"><div class="research-state">Loading open GitHub issues...</div></div>
+  </section>
 
   <!-- ── Local / Offline Model (the wired-in brain) ── -->
   <section class="panel">
@@ -281,6 +323,7 @@
 </footer>
 
 <script src="/js/theme-toggle.js"></script>
+<script src="/js/orchestration-research.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -295,6 +338,135 @@
   function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  const RESEARCH_HISTORY_KEY = "keystone-research-handoff-history";
+  let _researchItems = [];
+
+  function researchHistory(entry) {
+    try {
+      const current = JSON.parse(localStorage.getItem(RESEARCH_HISTORY_KEY) || "[]");
+      localStorage.setItem(
+        RESEARCH_HISTORY_KEY,
+        JSON.stringify(OrchestrationResearch.appendHistory(current, entry))
+      );
+    } catch { /* local history is optional */ }
+  }
+
+  function fallbackResearchCopy(text, done) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try { document.execCommand("copy"); done(); } catch { /* leave button unchanged */ }
+    textarea.remove();
+  }
+
+  function copyResearchText(text, button, entry) {
+    const done = () => {
+      const original = button.textContent;
+      button.textContent = "Copied";
+      setTimeout(() => { button.textContent = original; }, 1400);
+      researchHistory(entry);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackResearchCopy(text, done));
+    } else {
+      fallbackResearchCopy(text, done);
+    }
+  }
+
+  function renderResearchQueue() {
+    const queue = $("researchQueue");
+    const visible = OrchestrationResearch.filterAndSort(_researchItems, {
+      query: $("researchSearch")?.value,
+      priority: $("researchPriority")?.value,
+      sort: $("researchSort")?.value,
+    });
+    setText("researchSummary", `${visible.length} of ${_researchItems.length} open, unclaimed issues`);
+    if (!visible.length) {
+      queue.innerHTML = '<div class="research-state">No open issues match these filters.</div>';
+      return;
+    }
+    queue.innerHTML = visible.map((item) => {
+      const labels = (item.labels || [])
+        .map((label) => `<span class="research-label">${escapeHtml(label)}</span>`)
+        .join("");
+      const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "unknown";
+      return `<article class="research-item" data-issue="${escapeHtml(item.issueNumber)}">
+        <div class="research-head">
+          <span class="research-badge">${escapeHtml(OrchestrationResearch.priorityLabel(item))}</span>
+          <div class="research-title">#${escapeHtml(item.issueNumber)} ${escapeHtml(item.title)}</div>
+        </div>
+        <div class="research-meta">ready for research · unclaimed · updated ${escapeHtml(updated)}
+          ${labels ? ` · <span class="research-labels">${labels}</span>` : ""}
+        </div>
+        <div class="research-actions">
+          <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
+          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Keystone Chat</button>
+          <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
+          <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
+        </div>
+      </article>`;
+    }).join("");
+  }
+
+  async function loadResearchQueue() {
+    const queue = $("researchQueue");
+    queue.innerHTML = '<div class="research-state">Loading open GitHub issues...</div>';
+    try {
+      const response = await fetch("/api/queue/list?status=pending", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) throw new Error(data.message || data.error || `HTTP ${response.status}`);
+      if (data.source !== "github" || !Array.isArray(data.items)) {
+        throw new Error("Queue response did not contain the GitHub issue backlog.");
+      }
+      _researchItems = data.items;
+      renderResearchQueue();
+    } catch (error) {
+      _researchItems = [];
+      setText("researchSummary", "GitHub queue unavailable");
+      queue.innerHTML = `<div class="research-state error">Could not load open GitHub issues: ${escapeHtml(error.message)}. Verify GitHub CLI authentication on this computer, then choose Refresh.</div>`;
+    }
+  }
+
+  function findResearchItem(issueNumber) {
+    return _researchItems.find((item) => String(item.issueNumber) === String(issueNumber));
+  }
+
+  function bindResearchQueue() {
+    ["researchSearch", "researchPriority", "researchSort"].forEach((id) => {
+      $(id)?.addEventListener(id === "researchSearch" ? "input" : "change", renderResearchQueue);
+    });
+    $("researchRefresh")?.addEventListener("click", loadResearchQueue);
+    $("researchQueue")?.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      const issueNumber = button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
+      const item = findResearchItem(issueNumber);
+      if (!item) return;
+      if (button.dataset.research) {
+        const prompt = OrchestrationResearch.buildResearchPrompt(item);
+        researchHistory({ issueNumber: item.issueNumber, target: "keystone-chat", timestamp: new Date().toISOString() });
+        window.open(`/dream-chat.html?seed=${encodeURIComponent(prompt)}`, "_blank", "noopener");
+        return;
+      }
+      const target = button.dataset.copyClaude ? "Claude Code" : "Codex";
+      copyResearchText(
+        OrchestrationResearch.buildHandoff(item, target),
+        button,
+        {
+          issueNumber: item.issueNumber,
+          target: target.toLowerCase().replace(/\s+/g, "-"),
+          timestamp: new Date().toISOString(),
+        }
+      );
+    });
   }
 
   // ── Slim status line ──────────────────────────────────────────────────────
@@ -865,6 +1037,8 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
+    bindResearchQueue();
+    loadResearchQueue();
     renderLocalModel();
     refreshProviderStatus();
     renderTrainingSection();
