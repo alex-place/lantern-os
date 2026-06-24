@@ -1,0 +1,103 @@
+{
+  "_schema": "sigma0-claim-registry/v1",
+  "_note": "Machine-readable registry of all public Σ₀ claims. Every claim must list status, assumptions, code entry point, artifact, and invalidation condition. No claim may be reported as theorem-backed outside its stated assumption set.",
+  "claims": [
+    {
+      "id": "theorem-1-symmetric",
+      "label": "Lyapunov collapse prevention — symmetric/normal dynamics",
+      "status": "theorem",
+      "scope": "simulation",
+      "description": "For symmetric dynamics A = Aᵀ, the anti-collapse operator provably prevents Σ₀ collapse (covariance contraction to zero) when the excitation magnitude exceeds the Riccati sink rate.",
+      "assumptions": [
+        "dynamics are symmetric (A = Aᵀ)",
+        "diffusion gain g(x) > 0 everywhere",
+        "excitation is applied along null modes of A",
+        "no external state reset between steps"
+      ],
+      "code_entry_point": "src/cio_sde/collapse.py",
+      "test_artifact": "tests/test_cio_sde.py",
+      "invalidation_condition": "asymmetric A (off-diagonal coupling > 0) or zero diffusion gain",
+      "owning_issue": "#1135",
+      "owning_pr": null
+    },
+    {
+      "id": "measured-anti-collapse-sweep",
+      "label": "Anti-collapse performance over forced-collapse regime sweep",
+      "status": "measured",
+      "scope": "simulation",
+      "description": "Anti-collapse operator reduces collapse events in a forced-collapse scenario sweep (documented in docs/SIGMA0-COLLAPSE-CERTIFICATE.md).",
+      "assumptions": [
+        "forced-collapse regime as defined in the certificate",
+        "specific Dynamics and parameter range from the sweep",
+        "results do not transfer to arbitrary dynamics outside the sweep"
+      ],
+      "code_entry_point": "src/cio_sde/engine.py::CIO_SDE.forward_step",
+      "test_artifact": "docs/SIGMA0-COLLAPSE-CERTIFICATE.md",
+      "invalidation_condition": "dynamics outside sweep range; different noise regime; non-symmetric A",
+      "owning_issue": "#1135",
+      "owning_pr": null
+    },
+    {
+      "id": "heuristic-trigger-design",
+      "label": "Collapse trigger and early-warning control design",
+      "status": "heuristic",
+      "scope": "simulation",
+      "description": "The proximity function and NIS-based surprise spook are heuristic designs. Trigger thresholds are calibrated by hand and validated only over the documented test scenarios.",
+      "assumptions": [
+        "proximity function is a reasonable heuristic for collapse imminence",
+        "NIS threshold (chi² with dim dof) is appropriate for this diffusion process",
+        "heuristic thresholds may produce false positives in novel regimes"
+      ],
+      "code_entry_point": "src/cio_sde/engine.py::CIO_SDE.forward_step (anti_collapse_op.proximity, surprise_monitor)",
+      "test_artifact": "tests/test_cio_sde.py",
+      "invalidation_condition": "novel dynamics regime; non-Gaussian diffusion; very high or very low dimensions",
+      "owning_issue": "#1135",
+      "owning_pr": null
+    },
+    {
+      "id": "observe-only-safe-default",
+      "label": "observe_only=True does not mutate x_next or sigma_next",
+      "status": "measured",
+      "scope": "simulation",
+      "description": "When InterventionPolicy.observe_only=True, forward_step computes trigger proximity/NIS but never mutates x_next or sigma_next. Proved by test: same output as no-operator baseline under identical seed.",
+      "assumptions": [
+        "policy object is not mutated between construction and forward_step call",
+        "no other code path mutates x_next (e.g. custom subclass overrides)"
+      ],
+      "code_entry_point": "src/cio_sde/engine.py::CIO_SDE.forward_step (policy branch)",
+      "test_artifact": "tests/test_cio_sde_observe_only.py::test_observe_only_does_not_mutate_state",
+      "invalidation_condition": "InterventionPolicy.observe_only set to False; budget > 0",
+      "owning_issue": "#1138",
+      "owning_pr": "1145"
+    },
+    {
+      "id": "unimplemented-general-sufficiency",
+      "label": "General sufficiency theorem for anti-collapse (non-normal/asymmetric dynamics)",
+      "status": "unimplemented",
+      "scope": "theory",
+      "description": "A general sufficiency theorem for the anti-collapse operator under non-symmetric dynamics has not been proven. The symmetric/normal case (Theorem 1) is proven; extension to the general case remains an open theoretical frontier.",
+      "assumptions": [],
+      "code_entry_point": null,
+      "test_artifact": null,
+      "invalidation_condition": "N/A — not yet implemented",
+      "owning_issue": "#1135",
+      "owning_pr": null
+    },
+    {
+      "id": "cio-sde-not-wired-to-chat",
+      "label": "CIO-SDE is NOT wired to Keystone Chat, PCSF routing, cloud egress, or user memory",
+      "status": "measured",
+      "scope": "product",
+      "description": "Architectural audit: CIO-SDE forward_step does not call any server route, LLM API, PCSF selector, or persistent-memory writer. It is a standalone PyTorch module used in research scripts only.",
+      "assumptions": [
+        "no future integration has been added without updating this registry",
+        "server.js and stream-chat.js do not import from src/cio_sde"
+      ],
+      "code_entry_point": "src/cio_sde/engine.py",
+      "test_artifact": null,
+      "invalidation_condition": "any import of src/cio_sde in apps/lantern-garage/ or server-side code",
+      "owning_issue": "#1135",
+      "owning_pr": null
+    }
+  ]
+}

@@ -51,6 +51,13 @@ from .collapse import (
 )
 from .surprise import SurpriseMonitor, kalman_predict
 from .providers import ProviderDynamics, route_provider_nodes
+from .calibration import (
+    ScenarioLabel,
+    ScenarioResult,
+    CalibrationReport,
+    run_scenario,
+    run_calibration,
+)
 
 __all__ = [
     "Dynamics",
@@ -81,4 +88,9 @@ __all__ = [
     "InterventionReceipt",
     "PairedRunSummary",
     "paired_control_rollout",
+    "ScenarioLabel",
+    "ScenarioResult",
+    "CalibrationReport",
+    "run_scenario",
+    "run_calibration",
 ]
