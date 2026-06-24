@@ -5,9 +5,11 @@ lightning_dispatch.py — programmatic Lightning AI Studio dispatch for Ouro tra
 Auth env vars (set via [System.Environment]::SetEnvironmentVariable ... 'User'):
   LIGHTNING_USER_ID         — from lightning.ai → account settings → Keys → Programmatic Login
   LIGHTNING_API_KEY         — same page
-  LIGHTNING_STUDIO_ORG      — lightning.ai org (default: lantern — account has no personal
-                               "alexplace7" teamspace, only org membership)
-  LIGHTNING_STUDIO_TEAMSPACE — teamspace name (default: api-credential-management-project)
+  LIGHTNING_STUDIO_USER     — lightning.ai username that owns the teamspace (default: alexplace7)
+  LIGHTNING_STUDIO_ORG      — lightning.ai org, OPTIONAL. Leave empty to resolve the teamspace
+                               under the user (the default). Set only for an org-owned teamspace.
+  LIGHTNING_STUDIO_TEAMSPACE — teamspace name (default: custom-ml-model-development-project —
+                               the user-owned teamspace that holds the ouro-training studio)
   LIGHTNING_STUDIO_NAME     — studio to start (default: ouro-training)
 
 Usage:
@@ -47,18 +49,24 @@ def _check_auth():
 
 
 STUDIO_NAME      = os.environ.get("LIGHTNING_STUDIO_NAME",      "ouro-training")
-STUDIO_ORG       = os.environ.get("LIGHTNING_STUDIO_ORG",       "lantern")
-STUDIO_TEAMSPACE = os.environ.get("LIGHTNING_STUDIO_TEAMSPACE", "api-credential-management-project")
+STUDIO_USER      = os.environ.get("LIGHTNING_STUDIO_USER",      "alexplace7")
+STUDIO_ORG       = os.environ.get("LIGHTNING_STUDIO_ORG",       "")
+STUDIO_TEAMSPACE = os.environ.get("LIGHTNING_STUDIO_TEAMSPACE", "custom-ml-model-development-project")
 
 
 def _get_studio(name=None):
+    # Resolve the studio under its owner. The teamspace is user-owned
+    # (lightning.ai/<user>/<teamspace>), so pass `user=` by default; only pass
+    # `org=` when an org-owned teamspace is explicitly configured. Passing org=""
+    # to the SDK makes it unable to infer the owner ("Neither name is provided nor
+    # can the user be inferred ..."), which is what broke dispatch under #1079.
     Studio, _ = _sdk()
-    return Studio(
-        name=name or STUDIO_NAME,
-        org=STUDIO_ORG,
-        teamspace=STUDIO_TEAMSPACE,
-        create_ok=True,
-    )
+    kwargs = {"name": name or STUDIO_NAME, "teamspace": STUDIO_TEAMSPACE, "create_ok": True}
+    if STUDIO_ORG:
+        kwargs["org"] = STUDIO_ORG
+    else:
+        kwargs["user"] = STUDIO_USER
+    return Studio(**kwargs)
 
 
 TRAIN_SCRIPT = """#!/usr/bin/env python3
@@ -69,8 +77,12 @@ HF_REPO = "{hf_repo}"
 CHECKPOINT_FILE = "{checkpoint_file}"
 STEPS = {steps}
 
+# Pin transformers <4.53: 4.53+ dropped ROPE_INIT_FUNCTIONS['default'], which
+# OuroRotaryEmbedding looks up at model init -> KeyError: 'default' (same pin the
+# Kaggle dispatch script uses). This installs into the shared env that the
+# train-qlora-ouro.py subprocess below inherits.
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-                "transformers>=4.40", "peft>=0.10", "bitsandbytes>=0.43",
+                "transformers>=4.40,<4.53", "peft>=0.10", "bitsandbytes>=0.43",
                 "datasets", "accelerate", "scipy", "huggingface_hub", "zstandard"],
                check=True)
 
@@ -126,7 +138,10 @@ def cmd_dispatch(args):
     script_content = TRAIN_SCRIPT.format(
         hf_repo=hf_repo, checkpoint_file=checkpoint_file, steps=steps)
     script_path = os.path.join(tempfile.gettempdir(), "ouro_train_lightning.py")
-    with open(script_path, "w") as f:
+    # Always write UTF-8: on a Windows dispatch client the default text encoding is
+    # cp1252, which turns the em-dash in the script's comments into a lone \x97 byte
+    # that the studio's Python 3 rejects ("Non-UTF-8 code ... no encoding declared").
+    with open(script_path, "w", encoding="utf-8") as f:
         f.write(script_content)
 
     try:
@@ -139,9 +154,14 @@ def cmd_dispatch(args):
                 studio.switch_machine(Machine.T4)
             except Exception:
                 pass  # already on T4
-        remote_path = "/home/zeus/ouro_train_lightning.py"
-        studio.upload_file(script_path, remote_path)
-        studio.run(f"nohup python {remote_path} > /tmp/train.log 2>&1 &")
+        # Upload to a BARE filename (no directory). studio.run() executes in the
+        # studio working dir (/teamspace/studios/this_studio) and upload_file places
+        # the file there too. An absolute remote path like "/home/zeus/..." gets
+        # mangled by a Windows client's os.path into a single backslash-named file in
+        # the cwd, so the run command never found it — keep the path slash-free.
+        remote_name = "ouro_train_lightning.py"
+        studio.upload_file(script_path, remote_name)
+        studio.run(f"nohup python {remote_name} > /tmp/train.log 2>&1 &")
         result = {
             "status": "running", "studio": STUDIO_NAME, "machine": "T4",
             "steps": steps, "checkpoint_uri": checkpoint_uri,

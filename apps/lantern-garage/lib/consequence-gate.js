@@ -47,7 +47,7 @@ async function runToolGated(name, input, ctx, opts = {}) {
   }
 
   if (tier === 1) {
-    const result = _runTool(name, input, ctx);
+    const result = await _runTool(name, input, ctx);
     return { ok: result.ok, tier: 1, result: result.result, error: result.error };
   }
 
@@ -89,7 +89,7 @@ async function approvePending(pendingId, ctx) {
   if (!record) {
     return { ok: false, error: `no pending approval found with id '${pendingId}'` };
   }
-  const result = _runTool(record.tool, record.input, ctx);
+  const result = await _runTool(record.tool, record.input, ctx);
   await appendJsonlQueued(PENDING_PATH, {
     id: pendingId,
     status: result.ok ? "approved" : "failed",

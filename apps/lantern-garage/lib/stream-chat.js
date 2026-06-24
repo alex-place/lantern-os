@@ -43,10 +43,37 @@ const { compactHistory, buildProviderMessages } = require("./stream-chat/history
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
 const { buildBrainOrder } = require("./stream-chat/provider-order");
+const { appendJsonlQueued } = require("./file-queue");
+const { emitClaimDraft } = require("./claim-drafter");
 
 const repoRoot = path.resolve(__dirname, "../../../");
+const OURO_HARVEST_LIVE = path.resolve(repoRoot, "data/ouro-harvest-live.jsonl");
 
 const maxConversationTextLength = 4000;
+
+// ── Issue #911: live coding success emitter ──────────────────────────────────
+// When any keystone/chat reply contains a Python def + assert block, log a raw
+// candidate row to data/ouro-harvest-live.jsonl. Fire-and-forget only — NEVER
+// triggers retraining; the offline continual_ouro_pipeline.py reads this via
+// --source-jsonl when the user explicitly runs it. Boundary: OFFLINE + OPT-IN.
+const _PY_FUNC_RE = /```python\s*(def\s+\w+\([^)]*\)[^`]*?)```/gs;
+const _ASSERT_RE = /assert\s+[^\n]+/g;
+
+function _emitCodingCandidate(instruction, reply) {
+  try {
+    const matches = [...reply.matchAll(_PY_FUNC_RE)];
+    if (!matches.length) return;
+    for (const m of matches) {
+      const code = m[1].trim();
+      const fn = (code.match(/^def\s+(\w+)/) || [])[1] || "fn";
+      const asserts = (code.match(_ASSERT_RE) || []).join("\n");
+      appendJsonlQueued(OURO_HARVEST_LIVE, {
+        fn, instruction: instruction.slice(0, 200), code, asserts,
+        source: "live-chat", ts: Date.now(),
+      }).catch(() => {});
+    }
+  } catch { /* emitter must never break a reply */ }
+}
 
 // Per-request grounding (web search + live GitHub project context) is best-effort
 // enrichment that runs BEFORE the model is called. If the network or the `gh` CLI
@@ -874,6 +901,15 @@ async function handleStreamChat(req, url, res) {
         }
       }
     } catch { /* canary must never break a reply */ }
+    // ── #911 live coding emitter: log Python candidates offline ─────────────
+    if (fullReply && message) { _emitCodingCandidate(message, fullReply); }
+    // ── #919 finding #2: auto-draft claim packet for grounded replies ────────
+    if (fullReply && message && groundingContext) {
+      emitClaimDraft({
+        reply: fullReply, message, groundingCtx: groundingContext,
+        agentId: agent.id || agent.name || "keystone",
+      });
+    }
     return sse.sendDone(res, source, { ...extra, ...signature, routeLabel: finalRouteLabel });
   };
 
