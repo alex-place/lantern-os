@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.69] - 2026-06-24
+- fix(chat): narration (🔊) no longer reads tool calls. The auto-narrate toggle and Read-aloud button now speak the answer only — `<tool_call>` markup and the hidden `[DOORS]` tag are stripped from the spoken text, so the narrator never reads raw tool JSON/IO aloud.
+- feat(chat): the PCSF signature line under each reply now shows the actual provider, model, and timestamp from the receipt (e.g. `Keystone · chat · anthropic/claude-haiku-4-5 · 2:50 PM`) instead of just `Keystone · chat`.
+- fix(chat): the signature is now rendered for EVERY reply, including the offline/no-model path (shows `Keystone · no model available · <time>`), so a normal answer and a degraded answer have the same shape — they previously looked inconsistent because the offline path rendered no signature at all.
+
 ## [1.7.68] - 2026-06-24
 - ux(chat): tool-call cards are now collapsed by default. Each call renders as a `<details>` summary (`🔧 web_search ✓`) that expands to show args + result on click, and multiple native (Claude/OpenAI/Gemini) tool calls are grouped under a single collapsed parent (`🔧 N tool calls`). The workflow is visible but no longer takes over the message — open it only when you want the detail.
 
