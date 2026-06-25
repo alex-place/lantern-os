@@ -185,8 +185,10 @@
     }
     .home-tiles .panel:hover .panel-arrow { transform: translateX(5px); }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
-    /* Fallback: allow scroll only on very short viewports */
-    @media (max-height: 560px) { body { overflow: auto; } .home-main { justify-content: flex-start; } }
+    /* Fallback: allow scroll whenever the one-screen shell can't fit its
+       content (short viewports, and typical phones where the stacked tiles
+       + footer exceed the viewport height and were being clipped). */
+    @media (max-height: 900px) { body { overflow: auto; } .home-main { justify-content: flex-start; } }
 
     /* ── Accessibility: High Contrast ── */
     @media (prefers-contrast: more) {
@@ -382,8 +384,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('status-label').textContent = serverOnline ? 'server online' : 'server unreachable';
 
     // Version + git (hero sub-line + clickable version badges)
-    const v = version?.version || 'unknown';
+    // /version.json can 500 in some checkouts; fall back to the git
+    // endpoint's semver (already fetched below) before giving up.
     const g = git?.version;
+    const v = version?.version || g?.semver || 'unknown';
     const branch = g?.branch || '';
     const shortCommit = g?.commit ? g.commit.slice(0, 7) : '—';
     const commitDate = g?.date ? fmtDate(g.date) : '';
