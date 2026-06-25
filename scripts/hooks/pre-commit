@@ -11,6 +11,34 @@
 #
 # Bypass: SKIP_MONOWORKSTREAM=1 git commit ...
 
+# ── Primary-checkout master guard (runs before all bypasses) ────────────────
+# A long-running automation must NEVER commit the SHARED git index of the live
+# (primary) checkout: the index is shared, so a commit here sweeps up whatever
+# another worker (a human, another agent) has staged or left modified — the
+# "clobber" bug. Require master/main commits to come from an isolated linked
+# worktree, where the index is private.
+# Deliberate bypass ONLY: OVERRIDE_MERGE=1 (intentionally NOT honouring
+# SKIP_MONOWORKSTREAM here, so routine automation that sets it can't slip past).
+__guard_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+case "$__guard_branch" in
+  master|main)
+    if [ "$OVERRIDE_MERGE" != "1" ]; then
+      __gd=$(git rev-parse --git-dir 2>/dev/null)
+      __cd=$(git rev-parse --git-common-dir 2>/dev/null)
+      if [ "$__gd" = "$__cd" ]; then
+        echo ""
+        echo "PRIMARY-CHECKOUT MASTER GUARD: refusing to commit to '$__guard_branch' from the primary checkout."
+        echo "  The primary working tree's git index is SHARED — committing here can sweep up"
+        echo "  another worker's staged/working changes (the clobber bug)."
+        echo "  Fix: commit from an isolated linked worktree (git worktree add ...)."
+        echo "  Deliberate override: OVERRIDE_MERGE=1 git commit ..."
+        echo ""
+        exit 1
+      fi
+    fi
+    ;;
+esac
+
 if [ "$SKIP_MONOWORKSTREAM" = "1" ]; then exit 0; fi
 if ! command -v gh >/dev/null 2>&1; then
   echo "Warning: gh CLI not found — per-agent workstream gate skipped."
