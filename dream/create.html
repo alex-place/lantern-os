@@ -872,26 +872,7 @@
 </head>
 <body>
 
-<!-- Site nav -->
-<nav class="site-nav">
-  <a class="nav-brand" href="/">
-    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    Lantern OS
-  </a>
-  <div class="nav-links">
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/trader-dashboard.html">Trader</a>
-    <a href="/create.html" class="active">Create</a>
-    <a href="/calibration.html">Calibration</a>
-    <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Lantern on Patreon</a>
-  </div>
-  <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
-  </div>
-</nav>
+<!-- Site nav injected by /js/site-chrome.js -->
 
 <div class="page">
   <!-- Compact dashboard banner — click to expand help -->
@@ -996,6 +977,7 @@
 </div>
 
 <script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
 <script>
 const uploadZone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');

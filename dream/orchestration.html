@@ -149,6 +149,56 @@
     .stat-value.muted { color: var(--text); }
 
     .refresh-time { font-size: 0.74rem; color: var(--muted); display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+
+    /* ── Team work board ── */
+    .board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+    .stat.live-stale { opacity: .5; }
+    .stat-sub { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── PR lanes ── */
+    .lane-row { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px; margin-bottom: 6px; }
+    .lane-row.has-pr { border-left-color: var(--accent); }
+    .lane-prefix { font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    .lane-title { font-size: 0.82rem; line-height: 1.35; }
+    .lane-title a { color: var(--text); text-decoration: none; }
+    .lane-title a:hover { color: var(--accent); text-decoration: underline; }
+    .lane-empty { font-size: 0.78rem; color: var(--muted); }
+    .ci-badge { font-size: 0.64rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+    .ci-passing { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+    .ci-failing { background: color-mix(in srgb, #f87171 16%, transparent); color: #f87171; }
+    .ci-pending { background: color-mix(in srgb, #60a5fa 16%, transparent); color: #60a5fa; }
+    .ci-none    { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .lane-flags { font-size: 0.66rem; color: var(--muted); margin-left: 6px; }
+
+    /* ── Agent slots ── */
+    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+    .slot-card { padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px; }
+    .slot-card.working { border-left-color: var(--green); }
+    .slot-card.disabled { opacity: .55; }
+    .slot-name { font-weight: 650; font-size: 0.82rem; display: flex; align-items: center; gap: 6px; }
+    .slot-meta { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+    .slot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .slot-dot.working { background: var(--green); }
+
+    /* ── Recently landed ── */
+    .landed-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; margin-bottom: 6px; }
+    .landed-title { font-size: 0.82rem; line-height: 1.35; }
+    .landed-title a { color: var(--text); text-decoration: none; }
+    .landed-title a:hover { color: var(--accent); text-decoration: underline; }
+    .landed-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+    .lane-chip { font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; }
+
+    /* ── Fleet activity log ── */
+    .fleet-log { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; }
+    .fleet-step { display: grid; grid-template-columns: 18px 150px 1fr; align-items: baseline; gap: 8px; padding: 5px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; }
+    .fleet-step .fs-icon { text-align: center; }
+    .fleet-step .fs-phase { font-weight: 650; }
+    .fleet-step .fs-detail { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; }
+    .fleet-step.err { border-color: #f87171; }
+    .fleet-step.done-ok { border-left: 3px solid var(--green); }
+    .fleet-final { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-size: 0.82rem; }
+    .research-action.delegate { border-color: #a855f7; color: #a855f7; }
+    .research-action.delegate:hover { background: color-mix(in srgb, #a855f7 12%, transparent); }
   </style>
   <title>Orchestration — Keystone OS</title>
 </head>
@@ -185,8 +235,40 @@
     <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
 
+  <!-- ── Live Work Board (the team loop, real-time truth) ── -->
+  <section class="panel" id="workBoardPanel">
+    <h2>📋 Work Board <span class="section-meta" id="workBoardMeta">live queue + PR truth</span>
+      <button class="btn-secondary" onclick="refreshWorkBoard()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">Real-time state straight from GitHub + the on-disk queue — nothing cached or hand-edited. Open issues are pending work; PR lanes are in review; merged PRs are landed.</p>
+    <div class="board-grid" id="boardStats">
+      <div class="stat"><div class="stat-label">Open Issues</div><div class="stat-value" id="bStatPending">—</div><div class="stat-sub">unclaimed backlog</div></div>
+      <div class="stat"><div class="stat-label">In Progress</div><div class="stat-value muted" id="bStatProgress">—</div><div class="stat-sub">claimed locally</div></div>
+      <div class="stat"><div class="stat-label">Open PRs</div><div class="stat-value muted" id="bStatPRs">—</div><div class="stat-sub">awaiting review/merge</div></div>
+      <div class="stat"><div class="stat-label">Landed</div><div class="stat-value" id="bStatLanded">—</div><div class="stat-sub">recent merges</div></div>
+      <div class="stat"><div class="stat-label">Active Agents</div><div class="stat-value muted" id="bStatAgents">—</div><div class="stat-sub" id="bStatAgentsSub">of — slots</div></div>
+    </div>
+    <div class="refresh-time"><span id="boardUpdated">—</span></div>
+  </section>
+
+  <!-- ── PR Lanes (Verify stage: live CI per agent lane) ── -->
+  <section class="panel" id="prLanesPanel">
+    <h2>🚦 PR Lanes <span class="section-meta" id="prLanesMeta">one open PR per agent lane</span></h2>
+    <p class="panel-sub">Each agent prefix gets one open PR lane (CLAUDE.md monoworkstream rule). CI rollup is live from GitHub checks — green/red here is the real gate.</p>
+    <div id="prLanesBody"><div class="placeholder">Loading PR lanes…</div></div>
+  </section>
+
+  <!-- ── Fleet Activity (live delegated runs) ── -->
+  <section class="panel" id="fleetRunPanel" hidden>
+    <h2>🛰️ Fleet Activity <span class="section-meta" id="fleetRunMeta"></span>
+      <button class="btn-secondary" onclick="document.getElementById('fleetRunPanel').hidden=true" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">Dismiss</button>
+    </h2>
+    <p class="panel-sub">Live stream of a delegated autonomous run — the fleet plans, patches, tests in an isolated worktree, then opens a draft PR in that lane. Every step is the real engine event, not a simulation.</p>
+    <div id="fleetRunLog" class="fleet-log"></div>
+  </section>
+
   <section class="panel" id="researchHandoffPanel">
-    <h2>Research &amp; Handoff <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
+    <h2>📥 Pull Work <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
     <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Keystone Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
     <div class="research-controls">
       <input id="researchSearch" type="search" placeholder="Search issue, title, or label" aria-label="Search open issues">
@@ -204,6 +286,38 @@
       <button class="btn-secondary" id="researchRefresh" type="button">Refresh</button>
     </div>
     <div id="researchQueue" class="research-list"><div class="research-state">Loading open GitHub issues...</div></div>
+  </section>
+
+  <!-- ── Agent Slots (who's working right now) ── -->
+  <section class="panel" id="agentSlotsPanel">
+    <h2>👥 Agent Slots <span class="section-meta" id="agentSlotsMeta"></span>
+      <button class="btn-secondary" onclick="renderAgentSlots()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">The roster from <code>.claude/agent-slots.json</code>, cross-referenced with the assigned queue — who's actively on an issue vs idle.</p>
+    <div id="agentSlotsBody" class="slot-grid"><div class="placeholder">Loading roster…</div></div>
+  </section>
+
+  <!-- ── Recently Landed (what we've shipped, real-time) ── -->
+  <section class="panel" id="landedPanel">
+    <h2>✅ Recently Landed <span class="section-meta" id="landedMeta">merged PRs</span>
+      <button class="btn-secondary" onclick="renderLanded()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">What the group has actually shipped — most recent merges first, straight from GitHub. This is the truth of "done."</p>
+    <div id="landedBody"><div class="placeholder">Loading…</div></div>
+  </section>
+
+  <!-- ── Research Team: repo memory (grounds the fleet) ── -->
+  <section class="panel" id="repoLearnPanel">
+    <h2>🔬 Research Team · Repo Memory <span class="section-meta" id="repoLearnMeta"></span>
+      <button class="btn-secondary" id="repoLearnRunBtn" onclick="runRepoLearn()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">▶ Run learning pass</button>
+    </h2>
+    <p class="panel-sub">The fleet's grounding. Every doc + live module is learned into the <strong>one</strong> Convergence Memory as a grounded, evidence-cited record — so delegated agents and chat retrieve real repo facts instead of guessing. This is how "actually remember you" becomes true. Counts are read straight from the memory log; nothing is fabricated.</p>
+    <div class="board-grid" id="repoLearnStats">
+      <div class="stat"><div class="stat-label">Files Learned</div><div class="stat-value" id="rlFiles">—</div><div class="stat-sub">in repo manifest</div></div>
+      <div class="stat"><div class="stat-label">Grounded Memories</div><div class="stat-value muted" id="rlMems">—</div><div class="stat-sub">in Convergence Memory</div></div>
+      <div class="stat"><div class="stat-label">Last Pass</div><div class="stat-value muted" id="rlLast" style="font-size:1.1rem;">—</div><div class="stat-sub" id="rlLangs">—</div></div>
+    </div>
+    <div id="repoLearnResult" class="train-dispatch-result"></div>
   </section>
 
   <!-- ── Local / Offline Model (the wired-in brain) ── -->
@@ -405,6 +519,7 @@
         </div>
         <div class="research-actions">
           <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
+          <button class="research-action delegate" type="button" data-delegate="${escapeHtml(item.issueNumber)}" title="Hand this issue to the autonomous fleet — it works it in an isolated worktree and opens a draft PR">🛰️ Delegate to fleet</button>
           <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Keystone Chat</button>
           <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
           <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
@@ -447,9 +562,13 @@
     $("researchQueue")?.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button) return;
-      const issueNumber = button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
+      const issueNumber = button.dataset.delegate || button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
       const item = findResearchItem(issueNumber);
       if (!item) return;
+      if (button.dataset.delegate) {
+        delegateToFleet(item, button);
+        return;
+      }
       if (button.dataset.research) {
         const prompt = OrchestrationResearch.buildResearchPrompt(item);
         researchHistory({ issueNumber: item.issueNumber, target: "keystone-chat", timestamp: new Date().toISOString() });
@@ -1030,7 +1149,224 @@
       <div class="info-box"><strong>Last eval</strong> — ${evalStr}</div>`;
   }
 
+  // ── Team work board (queue + lanes + slots + landed) ─────────────────────
+  function relTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso); const s = (Date.now() - d.getTime()) / 1000;
+    if (Number.isNaN(s)) return "";
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  }
+
+  async function renderWorkBoard() {
+    const status = await fetchJson("/api/queue/status", 12000);
+    if (status && status.queue) {
+      setText("bStatPending", status.queue.pending);
+      setText("bStatProgress", status.queue.assigned);
+      const ag = status.agents || {};
+      setText("bStatAgents", ag.activeCount ?? "—");
+      setText("bStatAgentsSub", `of ${ag.totalSlots ?? "—"} slots`);
+      $("boardStats")?.classList.remove("live-stale");
+    } else {
+      ["bStatPending", "bStatProgress", "bStatAgents"].forEach(id => setText(id, "—"));
+      setText("workBoardMeta", "queue unavailable");
+    }
+    setText("boardUpdated", "updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  }
+
+  async function renderPrLanes() {
+    const el = $("prLanesBody");
+    const data = await fetchJson("/api/queue/pr-lanes", 20000);
+    if (!data || data.error) {
+      el.innerHTML = `<div class="research-state error">PR lanes unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}. Check gh auth on this computer.</div>`;
+      setText("prLanesMeta", "gh unavailable");
+      setText("bStatPRs", "—");
+      return;
+    }
+    setText("bStatPRs", data.openCount ?? 0);
+    setText("prLanesMeta", `${data.openCount} open PR${data.openCount === 1 ? "" : "s"} across ${data.lanes.length} lanes`);
+    el.innerHTML = data.lanes.map(lane => {
+      if (!lane.pr) {
+        return `<div class="lane-row"><span class="lane-prefix">${escapeHtml(lane.prefix)}</span><span class="lane-empty">— lane open, no PR —</span><span></span></div>`;
+      }
+      const pr = lane.pr;
+      const ciCls = pr.checks === "passing" ? "ci-passing" : pr.checks === "failing" ? "ci-failing" : pr.checks === "pending" ? "ci-pending" : "ci-none";
+      const ciLabel = pr.checks === "none" ? "no checks" : pr.checks;
+      const flags = [pr.draft ? "draft" : "", pr.mergeable === "CONFLICTING" ? "conflicts" : ""].filter(Boolean).join(" · ");
+      return `<div class="lane-row has-pr">
+        <span class="lane-prefix">${escapeHtml(lane.prefix)}</span>
+        <span class="lane-title"><a href="${escapeHtml(pr.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(pr.number))} ${escapeHtml(pr.title)}</a>${flags ? `<span class="lane-flags">${escapeHtml(flags)}</span>` : ""}</span>
+        <span class="ci-badge ${ciCls}">${escapeHtml(ciLabel)}</span>
+      </div>`;
+    }).join("");
+  }
+
+  async function renderAgentSlots() {
+    const el = $("agentSlotsBody");
+    const data = await fetchJson("/api/queue/agents", 10000);
+    const slots = data?.slots;
+    if (!Array.isArray(slots)) { el.innerHTML = '<div class="placeholder">Roster unavailable.</div>'; setText("agentSlotsMeta", ""); return; }
+    const working = slots.filter(s => s.status === "working").length;
+    setText("agentSlotsMeta", `${working} working · ${slots.length} slots`);
+    if (!slots.length) { el.innerHTML = '<div class="placeholder">No agent slots configured.</div>'; return; }
+    el.innerHTML = slots.map(s => {
+      const cls = s.status === "working" ? "working" : s.status === "disabled" ? "disabled" : "";
+      const work = s.currentWork ? `on #${escapeHtml(String(s.currentWork))}` : s.status;
+      return `<div class="slot-card ${cls}">
+        <div class="slot-name"><span class="slot-dot ${s.status === "working" ? "working" : ""}"></span>${escapeHtml(s.agent || s.id)}</div>
+        <div class="slot-meta">${escapeHtml(s.model || s.id)} · ${escapeHtml(s.tier || "—")} · ${escapeHtml(work)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  async function renderLanded() {
+    const el = $("landedBody");
+    const data = await fetchJson("/api/queue/recent-merges?limit=15", 20000);
+    if (!data || data.error) {
+      el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
+      setText("landedMeta", "gh unavailable");
+      setText("bStatLanded", "—");
+      return;
+    }
+    setText("bStatLanded", data.count ?? 0);
+    setText("landedMeta", `${data.count} recent merge${data.count === 1 ? "" : "s"}`);
+    if (!data.merges.length) { el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
+    el.innerHTML = data.merges.map(m => `<div class="landed-row">
+      <span class="landed-title"><span class="lane-chip">${escapeHtml(m.lane)}</span> <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(m.number))} ${escapeHtml(m.title)}</a></span>
+      <span class="landed-meta">${escapeHtml(m.author)} · ${escapeHtml(relTime(m.mergedAt))}</span>
+    </div>`).join("");
+  }
+
+  async function refreshWorkBoard() {
+    await Promise.all([renderWorkBoard(), renderPrLanes(), renderAgentSlots(), renderLanded()]);
+  }
+
+  // ── Fleet delegation (live streamed autonomous run) ───────────────────────
+  const FLEET_STEP_ICON = { start: "⏳", done: "✓", error: "✗" };
+
+  function fleetAppendStep(phase, status, extra) {
+    const log = $("fleetRunLog");
+    if (!log) return;
+    const id = "fstep-" + phase;
+    let row = document.getElementById(id);
+    if (!row) {
+      row = document.createElement("div");
+      row.id = id;
+      row.className = "fleet-step";
+      row.innerHTML = `<span class="fs-icon"></span><span class="fs-phase"></span><span class="fs-detail"></span>`;
+      log.appendChild(row);
+    }
+    row.classList.toggle("err", status === "error");
+    row.classList.toggle("done-ok", status === "done");
+    row.querySelector(".fs-icon").textContent = FLEET_STEP_ICON[status] || "•";
+    row.querySelector(".fs-phase").textContent = phase.replace(/_/g, " ");
+    const detail = extra.title || extra.error || extra.message || extra.branch || extra.files != null ? JSON.stringify(extra).slice(0, 200) : "";
+    row.querySelector(".fs-detail").textContent = detail;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function delegateToFleet(item, button) {
+    const panel = $("fleetRunPanel"), log = $("fleetRunLog");
+    panel.hidden = false;
+    setText("fleetRunMeta", `#${item.issueNumber} — ${item.title}`.slice(0, 90));
+    log.innerHTML = "";
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    const origLabel = button.textContent;
+    button.disabled = true; button.textContent = "Delegating…";
+    fleetAppendStep("delegate", "start", { issue: item.issueNumber });
+
+    try {
+      const resp = await fetch("/api/convergence/autonomous-work/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue: item.issueNumber }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const frames = buf.split("\n\n");
+        buf = frames.pop();  // keep partial frame
+        for (const frame of frames) {
+          let event = "message", data = "";
+          for (const line of frame.split("\n")) {
+            if (line.startsWith(":")) continue;            // heartbeat comment
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).trim();
+          }
+          if (!data) continue;
+          let payload; try { payload = JSON.parse(data); } catch { continue; }
+          if (event === "step") fleetAppendStep(payload.phase, payload.status, payload);
+          else if (event === "error") fleetAppendStep("error", "error", payload);
+          else if (event === "done") {
+            const ok = payload.ok;
+            const final = document.createElement("div");
+            final.className = "fleet-final";
+            if (ok && payload.prUrl) {
+              final.innerHTML = `<span style="color:var(--green);font-weight:700;">✓ Delegated successfully</span> — draft PR opened: <a href="${escapeHtml(payload.prUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.prUrl)}</a>${payload.testsPassed != null ? ` · tests ${payload.testsPassed ? "passed" : "failed"}` : ""}`;
+              refreshWorkBoard();          // new PR shows up in lanes
+              loadResearchQueue();         // issue may now be claimed
+            } else {
+              final.innerHTML = `<span style="color:#f87171;font-weight:700;">Run stopped</span> at <b>${escapeHtml(payload.stoppedAt || "unknown")}</b>${payload.message ? ` — ${escapeHtml(payload.message)}` : ""}. Nothing was pushed.`;
+            }
+            log.appendChild(final);
+            log.scrollTop = log.scrollHeight;
+          }
+        }
+      }
+    } catch (e) {
+      const final = document.createElement("div");
+      final.className = "fleet-final";
+      final.innerHTML = `<span style="color:#f87171;font-weight:700;">Delegation failed:</span> ${escapeHtml(e.message)}`;
+      log.appendChild(final);
+    } finally {
+      button.disabled = false; button.textContent = origLabel;
+    }
+  }
+
+  // ── Research Team: repo memory ─────────────────────────────────────────────
+  async function renderRepoLearn() {
+    const d = await fetchJson("/api/research/repo/status", 8000);
+    if (!d || !d.ok) { setText("repoLearnMeta", "status unavailable"); return; }
+    setText("rlFiles", d.filesKnown ?? 0);
+    setText("rlMems", d.memoriesGrounded ?? 0);
+    setText("rlLast", d.lastLearnedAt ? relTime(d.lastLearnedAt) : "never");
+    const langs = Object.entries(d.byLang || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${escapeHtml(k)}`).join(" · ");
+    setText("rlLangs", langs || "—");
+    setText("repoLearnMeta", d.filesKnown ? `${d.filesKnown} files grounded in memory` : "no repo learned yet — run a pass");
+  }
+
+  async function runRepoLearn() {
+    const btn = $("repoLearnRunBtn"), out = $("repoLearnResult");
+    if (btn) { btn.disabled = true; btn.textContent = "Learning…"; }
+    if (out) { out.style.display = "block"; out.innerHTML = '<span class="placeholder">Learning the repo into Convergence Memory…</span>'; }
+    try {
+      const r = await fetch("/api/research/repo/learn", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ max: 1000 }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) throw new Error(data.message || data.error || `HTTP ${r.status}`);
+      if (out) out.innerHTML = `<div style="color:var(--green);">✓ Scanned ${data.scanned} files · +${data.learned} new · ~${data.updated} changed · ${data.unchanged} unchanged${data.capped ? " · (capped — run again for the rest)" : ""} · ${data.took_ms}ms</div>`;
+      renderRepoLearn();
+    } catch (e) {
+      if (out) out.innerHTML = `<span style="color:#f87171;">Learning pass failed: ${escapeHtml(e.message)}</span>`;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "▶ Run learning pass"; }
+    }
+  }
+
   // ── globals for onclick ───────────────────────────────────────────────────
+  window.runRepoLearn = runRepoLearn;
+  window.refreshWorkBoard = refreshWorkBoard;
+  window.renderAgentSlots = renderAgentSlots;
+  window.renderLanded = renderLanded;
   window.renderTrainingSection = renderTrainingSection;
   window.renderGpuKeys = renderGpuKeys;
   window.refreshProviderStatus = refreshProviderStatus;
@@ -1039,6 +1375,8 @@
   document.addEventListener("DOMContentLoaded", () => {
     bindResearchQueue();
     loadResearchQueue();
+    refreshWorkBoard();
+    renderRepoLearn();
     renderLocalModel();
     refreshProviderStatus();
     renderTrainingSection();
@@ -1050,6 +1388,8 @@
     renderRollover();
     updateStatus();
 
+    setInterval(refreshWorkBoard, 20000);
+    setInterval(renderRepoLearn, 60000);
     setInterval(renderLocalModel, 30000);
     setInterval(renderTrainingSection, 30000);
     setInterval(refreshProviderStatus, 60000);

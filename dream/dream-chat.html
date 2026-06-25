@@ -563,25 +563,33 @@
     handle();
   });
 
-  /* Auto-process a .docx forwarded from the home chat bar via sessionStorage */
+  /* Auto-process a file forwarded from the home chat bar via sessionStorage.
+       ?autoprocess=docx → pendingDocx (improve & rewrite the document)
+       ?autoprocess=pdf  → pendingPdf  (add to the Knowledge Center) */
   (function () {
     const params = new URLSearchParams(location.search);
-    if (params.get('autoprocess') !== 'docx') return;
-    const stored = sessionStorage.getItem('pendingDocx');
+    const kind = params.get('autoprocess');
+    if (kind !== 'docx' && kind !== 'pdf') return;
+    const key = kind === 'docx' ? 'pendingDocx' : 'pendingPdf';
+    const stored = sessionStorage.getItem(key);
     if (!stored) return;
-    sessionStorage.removeItem('pendingDocx');
+    sessionStorage.removeItem(key);
     let meta;
     try { meta = JSON.parse(stored); } catch { return; }
     const { name, data, instruction } = meta;
     const [header, b64] = data.split(',');
-    const mime = (header.match(/:(.*?);/) || [])[1] || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const fallbackMime = kind === 'docx'
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : 'application/pdf';
+    const mime = (header.match(/:(.*?);/) || [])[1] || fallbackMime;
     const bytes = atob(b64);
     const buf = new Uint8Array(bytes.length);
     for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
     const file = new File([buf], name, { type: mime });
     function tryProcess() {
       if (!window.lanternAttach) { setTimeout(tryProcess, 80); return; }
-      lanternAttach.dropDocx(file, instruction || undefined);
+      if (kind === 'docx') lanternAttach.dropDocx(file, instruction || undefined);
+      else lanternAttach.dropPdf(file);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryProcess);
     else tryProcess();
