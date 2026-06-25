@@ -783,6 +783,13 @@
     .dash-banner-cta { font-size: 0.85rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
     @media (max-width: 560px) { .dash-banner-sub { display: none; } }
 
+    /* Top action row: the dashboard help banner + the brand-profile link sit
+       side by side and share the .dash-banner look. */
+    .dash-row { display: flex; gap: 12px; align-items: stretch; margin-bottom: 20px; }
+    .dash-row .dash-banner { margin-bottom: 0; flex: 1; }
+    .dash-banner.brand-link { text-decoration: none; }
+    @media (max-width: 560px) { .dash-row { flex-direction: column; } }
+
     .upload-zone.compact { padding: 28px 24px; margin-bottom: 8px; }
 
     /* ── Inline upload progress (matches workspace .wa-progress bars) ── */
@@ -894,14 +901,25 @@
 </nav>
 
 <div class="page">
-  <!-- Compact dashboard banner — click to expand help -->
-  <button class="dash-banner" id="dash-banner" onclick="openHelp()" title="What can I do here?">
-    <div class="dash-banner-main">
-      <span class="dash-banner-title">Creator Dashboard</span>
-      <span class="dash-banner-sub">Upload • Analyze • Edit • Export</span>
-    </div>
-    <span class="dash-banner-cta">Learn more</span>
-  </button>
+  <!-- Top actions: dashboard help banner + brand-profile link -->
+  <div class="dash-row">
+    <!-- Compact dashboard banner — click to expand help -->
+    <button class="dash-banner" id="dash-banner" onclick="openHelp()" title="What can I do here?">
+      <div class="dash-banner-main">
+        <span class="dash-banner-title">Creator Dashboard</span>
+        <span class="dash-banner-sub">Upload • Analyze • Edit • Export</span>
+      </div>
+      <span class="dash-banner-cta">Learn more</span>
+    </button>
+    <!-- Brand identity onboarding -->
+    <a class="dash-banner brand-link" href="/creator-intake.html" title="Set up your brand identity profile">
+      <div class="dash-banner-main">
+        <span class="dash-banner-title">Brand Profile</span>
+        <span class="dash-banner-sub">Identity • Voice • Audience</span>
+      </div>
+      <span class="dash-banner-cta">Open →</span>
+    </a>
+  </div>
 
   <!-- Status Messages -->
   <div id="status" class="status-message"></div>
