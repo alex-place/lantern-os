@@ -228,9 +228,9 @@
       padding: 16px 18px;
     }
     .flourish-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .flourish-head .panel-label { color: #22c55e; font-size: 0.62rem; }
+    .flourish-head .panel-label { color: var(--accent); font-size: 0.62rem; }
     .flourish-head h2 { margin: 1px 0 0; font-size: 1.12rem; }
-    .flourish-more { font-size: 0.78rem; color: #22c55e; white-space: nowrap; align-self: center; }
+    .flourish-more { font-size: 0.78rem; color: var(--accent); white-space: nowrap; align-self: center; }
     .flourish-domains { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 20px; }
     @media (max-width: 480px) { .flourish-domains { grid-template-columns: 1fr; } }
     .fd-row { display: flex; flex-direction: column; gap: 4px; }
@@ -240,13 +240,19 @@
     .fd-bar { position: relative; height: 7px; border-radius: 9999px;
               background: color-mix(in srgb, var(--muted) 22%, transparent); overflow: hidden; }
     .fd-ci { position: absolute; top: 0; bottom: 0;
-             background: color-mix(in srgb, #22c55e 30%, transparent); }
-    .fd-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px; background: #22c55e; }
+             background: color-mix(in srgb, var(--accent) 30%, transparent); }
+    .fd-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px; background: var(--accent); }
     .flourish-q { font-size: 0.82rem; color: var(--text); line-height: 1.45;
                   background: color-mix(in srgb, var(--accent) 8%, transparent);
                   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
                   border-radius: 10px; padding: 8px 11px; }
     .flourish-q b { color: var(--accent); }
+    .flourish-pattern { font-size: 0.8rem; color: var(--text); line-height: 1.4;
+                        background: color-mix(in srgb, var(--accent) 9%, transparent);
+                        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+                        border-radius: 10px; padding: 7px 11px; }
+    .flourish-pattern b { color: var(--accent); }
+    .flourish-pattern .fp-r { font-variant-numeric: tabular-nums; color: var(--muted); }
     .flourish-prov { font-size: 0.7rem; color: var(--muted); }
     .flourish-prov a, .flourish-prov u { color: var(--muted); }
   </style>
@@ -331,12 +337,13 @@
     <div class="flourish-head">
       <div>
         <span class="panel-label">World Model</span>
-        <h2>Flourishing — grounded state of the world</h2>
+        <h2>Flourishing — the Bayesian world model</h2>
       </div>
       <a class="flourish-more" href="/flourishing.html">Full dashboard →</a>
     </div>
     <div class="flourish-domains" id="flourish-domains"></div>
     <div class="flourish-q" id="flourish-q" hidden></div>
+    <div class="flourish-pattern" id="flourish-pattern" hidden></div>
     <div class="flourish-prov" id="flourish-prov"></div>
   </section>
 
@@ -522,6 +529,21 @@ document.addEventListener('DOMContentLoaded', () => {
       (ung ? ` · <u title="no live feed — literature-only in the source model">${ung} not live-grounded</u>` : '');
 
     panel.hidden = false;
+
+    // Cross-domain patterns load separately — the per-country correlation fetch is heavier,
+    // so it must not block the belief panel. Populates the pattern line when it arrives.
+    fetch('/api/flourishing/correlations', { cache: 'no-store', signal: AbortSignal.timeout(45000) })
+      .then(r => (r.ok ? r.json() : null))
+      .then(c => {
+        const top = c && c.correlations && c.correlations[0];
+        if (!top) return;
+        const pe = document.getElementById('flourish-pattern');
+        const sign = top.r >= 0 ? '+' : '';
+        pe.innerHTML = `<b>Pattern →</b> ${top.label} ` +
+          `<span class="fp-r">(r=${sign}${top.r}, ${top.strength} ${top.direction}, n=${top.n} countries)</span>`;
+        pe.hidden = false;
+      })
+      .catch(() => {});
   } catch (_) { /* leave hidden */ }
 })();
 </script>
