@@ -78,29 +78,80 @@ function refreshSettingsPcsf(repoRoot) {
   }
 }
 
-function refreshProviderPcsf(repoRoot) {
+// Known providers + their env keys. Used to bootstrap provider.pcsf.json when it
+// is absent (it is git-ignored, so a fresh checkout has no file) and to mark each
+// provider available/no_key.
+const KNOWN_PROVIDERS = [
+  { provider_id: "anthropic", env_key: "ANTHROPIC_API_KEY" },
+  { provider_id: "gemini",    env_key: "GEMINI_API_KEY" },
+  { provider_id: "openai",    env_key: "OPENAI_API_KEY" },
+  { provider_id: "xai",       env_key: "XAI_API_KEY" },
+  { provider_id: "mistral",   env_key: "MISTRAL_API_KEY" },
+  { provider_id: "cohere",    env_key: "COHERE_API_KEY" },
+  { provider_id: "deepseek",  env_key: "DEEPSEEK_API_KEY" },
+  { provider_id: "ollama",    env_key: "" },
+];
+
+function _envKeyFor(providerId) {
+  const k = KNOWN_PROVIDERS.find((x) => x.provider_id === providerId);
+  return k ? k.env_key : "";
+}
+
+// Compute the live provider ranking per task type from real leaderboard outcomes
+// (agent-performance compositeScore), so provider.pcsf.json becomes the persisted,
+// inspectable projection of the merit ranking — the source of truth the router reads.
+async function _buildRouting() {
+  const { rankCandidates } = require("./model-leaderboard");
+  const { PROVIDER_CHAINS } = require("./provider-router");
+  let CLOUD_PROVIDERS;
+  try { CLOUD_PROVIDERS = require("./leaderboard-routing").CLOUD_PROVIDERS; } catch { CLOUD_PROVIDERS = null; }
+
+  // Only rank providers the streaming dispatch (stream-chat buildBrainOrder) can
+  // actually execute — ranking a provider it can't run would be silently dropped.
+  const EXECUTABLE = new Set(["anthropic", "gemini", "openai", "xai", "ollama"]);
+
+  const byTask = {};
+  for (const [taskType, chain] of Object.entries(PROVIDER_CHAINS)) {
+    // Rank the chain's executable cloud providers that actually have a key; keep
+    // ollama last as the offline backstop (not merit-ranked).
+    const cands = chain
+      .filter((s) => s.provider !== "ollama" && EXECUTABLE.has(s.provider) && envPresent(_envKeyFor(s.provider)))
+      .map((s) => ({ provider: s.provider, model: s.models[0], key: s.provider }));
+    let order = [];
+    if (cands.length) {
+      const ranked = await rankCandidates(cands, taskType, { cloudSet: CLOUD_PROVIDERS });
+      order = ranked.map((c) => c.provider);
+    }
+    if (chain.some((s) => s.provider === "ollama")) order.push("ollama");
+    byTask[taskType] = order;
+  }
+  return { source: "leaderboard", generated_at: _now(), by_task_type: byTask };
+}
+
+async function refreshProviderPcsf(repoRoot) {
   const p = path.join(repoRoot, "data", "pcsf", "provider.pcsf.json");
-  const data = loadJson(p);
-  if (!data) return;
-  let changed = false;
-  for (const prov of data.providers || []) {
-    if (!prov.env_key) continue;
+  let data = loadJson(p);
+  if (!data) data = { schema: "provider.pcsf/2", providers: [] };          // bootstrap (file is git-ignored)
+  if (!Array.isArray(data.providers) || !data.providers.length) {
+    data.providers = KNOWN_PROVIDERS.map((k) => ({ provider_id: k.provider_id, env_key: k.env_key }));
+  }
+  for (const prov of data.providers) {
+    if (!prov.env_key) { prov.state = "available"; prov.is_routable = false; prov.last_checked = _now(); continue; } // ollama
     const present = envPresent(prov.env_key);
-    const newState = present ? "available" : "no_key";
-    if (prov.state !== newState) {
-      prov.state = newState;
-      changed = true;
-    }
-    const routable = present && prov.provider_id !== "ollama";
-    if (prov.is_routable !== routable) {
-      prov.is_routable = routable;
-      changed = true;
-    }
+    prov.state = present ? "available" : "no_key";
+    prov.is_routable = present && prov.provider_id !== "ollama";
     prov.last_checked = _now();
+  }
+  // Live, leaderboard-derived ranking — what lib/provider-router.js reads.
+  try {
+    data.routing = await _buildRouting();
+  } catch (e) {
+    console.error("[PCSF] routing rank failed (keeping prior/none):", e.message);
   }
   data.generated_at = _now();
   saveJson(p, data);
-  console.log("[PCSF] provider.pcsf.json refreshed —", changed ? "states changed" : "states unchanged");
+  const routed = data.routing && data.routing.by_task_type ? Object.keys(data.routing.by_task_type).length : 0;
+  console.log("[PCSF] provider.pcsf.json refreshed — providers:", data.providers.length, "routing task-types:", routed);
 }
 
 function loadDreamEntries(repoRoot) {
@@ -193,10 +244,10 @@ function refreshGpuTrainingPcsf(repoRoot) {
   console.error("[PCSF] gpu-training.pcsf.json refreshed — available:", available.join(", ") || "none");
 }
 
-function refreshAllPcsf(repoRoot) {
+async function refreshAllPcsf(repoRoot) {
   console.log("[PCSF] Starting live refresh…");
   refreshSettingsPcsf(repoRoot);
-  refreshProviderPcsf(repoRoot);
+  await refreshProviderPcsf(repoRoot);
   refreshHealthPcsf(repoRoot);
   refreshGpuTrainingPcsf(repoRoot);
   console.log("[PCSF] Live refresh complete.");

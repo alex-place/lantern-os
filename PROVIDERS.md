@@ -215,20 +215,24 @@ updated: 2026-06-20
    curl http://127.0.0.1:4177/api/settings/providers
    ```
 
-### Change the Fallback Order
+### Provider Ranking (live, PCSF-backed)
 
-Edit `data/pcsf/provider.pcsf.json` line 50–56:
-```json
-"fallback_chain": [
-  "gemini",
-  "anthropic",
-  "openai",
-  "xai",
-  "ollama"
-]
-```
+Provider order is **not** a hand-edited static list. `lib/provider-router.js` picks a
+task-type chain (`PROVIDER_CHAINS`: kernel/coding/reasoning/creative/default — the
+candidate set + cold fallback) and reorders it by the **live ranking** in
+`data/pcsf/provider.pcsf.json` → `routing.by_task_type`.
 
-Then restart the server or manually refresh the PCSF cache.
+That ranking is regenerated on every server start by `lib/pcsf-refresh.js` from real
+**leaderboard outcomes** (`agent-performance` compositeScore), constrained to the
+providers the streaming dispatch can actually execute (`anthropic`, `gemini`,
+`openai`, `xai`, `ollama`). With no outcomes yet it cold-starts (cloud explored
+before local); real scores take over as calls accumulate.
+
+- **Inspect** the current ranking: `cat data/pcsf/provider.pcsf.json` (the file is
+  git-ignored — it is a generated runtime artifact, bootstrapped on first boot).
+- **Force a refresh:** restart the server (the router caches the file for 60 s).
+- **Kill-switch:** set `PCSF_ROUTING=0` to ignore PCSF and use the static chain order.
+- An explicit `provider` on the request still pins to that provider (bypasses ranking).
 
 ### Use a Specific Provider
 

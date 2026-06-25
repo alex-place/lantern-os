@@ -618,7 +618,7 @@ server.listen(port, host, () => {
   } else {
     console.log("[PR Watcher] disabled — set PR_WATCHER_ENABLED=1 on ONE fleet host to enable");
   }
-  refreshAllPcsf(repoRoot);
+  Promise.resolve(refreshAllPcsf(repoRoot)).catch((e) => console.error("[PCSF] refresh failed:", e.message));
 
   // ── CSF Research Tesseract — auto-pack on startup ──────────────────────────
   // Runs in background; skips if archive is less than 24 hours old.
