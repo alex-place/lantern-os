@@ -1567,7 +1567,16 @@ async function handleStreamChat(req, url, res) {
   // key-filtered order this loop walks. Each provider's streamer body is unchanged: on
   // success it returns; on auto-mode failure it falls through to the next brain pick.
   _turnStart = Date.now();   // reset so cloud leaderboard latency measures the actual provider turn
-  for (const _p of buildBrainOrder({ requestedProvider, hintProvider: autoHintProvider })) {
+  const _brainOrder = buildBrainOrder({ requestedProvider, hintProvider: autoHintProvider });
+  for (let _pIdx = 0; _pIdx < _brainOrder.length; _pIdx++) {
+    const _p = _brainOrder[_pIdx];
+    // A pinned provider leads but backstops through the rest of the order; only emit a
+    // hard error if the pinned provider is also the LAST one standing. Otherwise its
+    // failure falls through to the next provider so chat still answers.
+    const _isLastProvider = _pIdx === _brainOrder.length - 1;
+    // A pinned provider's failure is only a hard error when it's the last option;
+    // otherwise it falls through to the backstop. Gates every per-provider guard.
+    const _hardPin = requestedProvider && _isLastProvider;
     fullReply = "";   // fresh per provider — never carry a failed attempt's partial text
 
   // Provider: Gemini (streaming)
@@ -1630,7 +1639,7 @@ async function handleStreamChat(req, url, res) {
           sendDone("gemini", { agent: doneAgentName, provider: "gemini", model: modelFor("gemini"), online: true, cleanText, suggestions, webSuggestions });
           return;
         }
-        if (requestedProvider && !requestedProvider.startsWith("gemini-")) { sendError(humanError(err)); sendFail(err.message); return; }
+        if (_hardPin && !requestedProvider.startsWith("gemini-")) { sendError(humanError(err)); sendFail(err.message); return; }
         // else: fall through to grounded single-shot / model chain
       }
     }
@@ -1732,7 +1741,7 @@ async function handleStreamChat(req, url, res) {
       // On 429/quota, try next model in chain before emitting error
       const is429 = err.message.includes("429") || err.message.includes("quota");
       if (is429) { fullReply = ""; continue; } // retry with next model silently
-      if (requestedProvider) {
+      if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
         return;
@@ -1810,7 +1819,7 @@ async function handleStreamChat(req, url, res) {
             sendDone("anthropic", { agent: doneAgentName, provider: "anthropic", model: claudeModel, online: true, cleanText, suggestions, webSuggestions });
             return;
           }
-          if (requestedProvider) { sendError(humanError(err)); await streamLocalFallback(err.message); return; }
+          if (_hardPin) { sendError(humanError(err)); await streamLocalFallback(err.message); return; }
           // else (auto mode, nothing streamed yet): fall through to the single-shot path
         }
       }
@@ -1902,7 +1911,7 @@ async function handleStreamChat(req, url, res) {
       const errorCode = err.message.includes("anthropic_status_") ? err.message : "unknown";
       recordProviderFailure("anthropic", err.message);
       recordProviderFailureRouter("anthropic", errorCode); // Also log to provider-router
-      if (requestedProvider) {
+      if (_hardPin) {
         sendError(humanError(err));
         await streamLocalFallback(err.message);
         return;
@@ -1964,7 +1973,7 @@ async function handleStreamChat(req, url, res) {
           sendDone("openai", { agent: doneAgentName, provider: "openai", model: modelFor("openai"), online: true, cleanText, suggestions, webSuggestions });
           return;
         }
-        if (requestedProvider) { sendError(humanError(err)); sendFail(err.message); return; }
+        if (_hardPin) { sendError(humanError(err)); sendFail(err.message); return; }
         // else (auto mode, nothing streamed): fall through to the single-shot path
       }
     }
@@ -2036,7 +2045,7 @@ async function handleStreamChat(req, url, res) {
       const errorCode = err.message.includes("openai_status_") ? err.message : "unknown";
       recordProviderFailure("openai", err.message);
       recordProviderFailureRouter("openai", errorCode); // Also log to provider-router
-      if (requestedProvider) {
+      if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
         return;
@@ -2096,7 +2105,7 @@ async function handleStreamChat(req, url, res) {
           sendDone("grok", { agent: doneAgentName, provider: "grok", model: modelFor("xai"), online: true, cleanText, suggestions, webSuggestions });
           return;
         }
-        if (requestedProvider) { sendError(humanError(err)); sendFail(err.message); return; }
+        if (_hardPin) { sendError(humanError(err)); sendFail(err.message); return; }
         // else: fall through to single-shot
       }
     }
@@ -2142,7 +2151,7 @@ async function handleStreamChat(req, url, res) {
       return;
     } catch (err) {
       recordProviderFailure("xai", err.message);
-      if (requestedProvider) {
+      if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
         return;
@@ -2269,7 +2278,7 @@ async function handleStreamChat(req, url, res) {
         // 200 OK but no tokens — ouro:latest proxy manifest without ouro_serve.py (#996)
         console.warn(`[stream-chat] ollama direct-http: 200 OK but 0 bytes from ${ollamaModel} — is ouro_serve.py running?`);
         recordProviderFailure("ollama", "direct_http_empty_reply");
-        if (requestedProvider) {
+        if (_hardPin) {
           sendError("Local model returned empty response. Start ouro_serve.py to back the ouro:latest proxy.");
           sendFail("ollama_empty_reply");
           return;
@@ -2278,7 +2287,7 @@ async function handleStreamChat(req, url, res) {
       }
     } catch (err) {
       recordProviderFailure("ollama", err.message);
-      if (requestedProvider) {
+      if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
         return;

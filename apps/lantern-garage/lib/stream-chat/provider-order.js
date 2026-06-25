@@ -30,7 +30,14 @@ function buildBrainOrder({ requestedProvider, hintProvider }) {
   };
   if (requestedProvider) {
     const n = norm(requestedProvider);
-    return n && DISPATCH.includes(n) ? [n] : [];   // explicit request pins to one
+    if (!n || !DISPATCH.includes(n)) return [];
+    // The pinned provider LEADS, but the rest of the chain backstops it: a pinned
+    // provider that is rate-limited / down must not dead-end the whole turn. The
+    // dispatch loop emits a hard error only if the pinned provider is also the last
+    // one standing (see _isLastProvider in stream-chat.js).
+    const order = [n];
+    for (const p of DISPATCH) if (p !== n) order.push(p);
+    return order.filter(_dispatchHasKey);
   }
   const seen = new Set();
   const order = [];
