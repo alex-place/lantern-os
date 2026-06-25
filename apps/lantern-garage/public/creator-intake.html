@@ -722,6 +722,7 @@ function renderPillars() {
 function updateTotal() {
   const total = pillars.reduce((s, p) => s + (parseInt(p.pct) || 0), 0);
   const el = document.getElementById("pct-total");
+  if (!el) return;
   el.textContent = `Total: ${total}%`;
   el.className = "pct-total " + (total === 100 ? "ok" : "warn");
 }
@@ -731,6 +732,7 @@ function esc(s) { return (s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").re
 
 function showStatus(msg, type) {
   const el = document.getElementById("status");
+  if (!el) return;
   el.textContent = msg;
   el.className = `status-bar show ${type}`;
   if (type !== "loading") setTimeout(() => el.classList.remove("show"), 5000);
@@ -758,9 +760,13 @@ async function loadProfile(slug) {
   try {
     const r = await fetch(`/api/creators/${slug}`);
     if (!r.ok) { showStatus("Profile not found", "error"); return; }
-    const { creator } = await r.json();
-    fillForm(creator);
-    showStatus(`Loaded: ${creator.identity?.fullName || slug}`, "success");
+    const data = await r.json();
+    if (!data || !data.creator) {
+      showStatus("Invalid response from server", "error");
+      return;
+    }
+    fillForm(data.creator);
+    showStatus(`Loaded: ${data.creator.identity?.fullName || slug}`, "success");
   } catch (e) {
     showStatus("Load error: " + e.message, "error");
   }
@@ -846,9 +852,11 @@ function fillForm(c) {
   setField("f-sigma0-note", los.sigma0Connection);
 
   const banner = document.getElementById("profile-banner");
-  document.getElementById("banner-name").textContent = id.fullName || c.slug;
-  document.getElementById("banner-meta").textContent = ` — ${c.slug} · loaded ${new Date().toLocaleTimeString()}`;
-  banner.classList.add("show");
+  const bannerName = document.getElementById("banner-name");
+  const bannerMeta = document.getElementById("banner-meta");
+  if (bannerName) bannerName.textContent = id.fullName || c.slug;
+  if (bannerMeta) bannerMeta.textContent = ` — ${c.slug} · loaded ${new Date().toLocaleTimeString()}`;
+  if (banner) banner.classList.add("show");
 }
 
 function csv(s) { return (s||"").split(",").map(x=>x.trim()).filter(Boolean); }
@@ -918,8 +926,10 @@ function clearForm() {
   document.getElementById("intake-form").reset();
   pillars = DEFAULT_PILLARS.map(p => ({ ...p }));
   renderPillars();
-  document.getElementById("profile-banner").classList.remove("show");
-  document.getElementById("status").classList.remove("show");
+  const banner = document.getElementById("profile-banner");
+  if (banner) banner.classList.remove("show");
+  const status = document.getElementById("status");
+  if (status) status.classList.remove("show");
 }
 
 document.getElementById("intake-form").addEventListener("submit", async (e) => {
@@ -941,9 +951,12 @@ document.getElementById("intake-form").addEventListener("submit", async (e) => {
     if (r.ok) {
       const result = await r.json();
       showStatus(`✓ Saved: data/creators/${result.slug}.json`, "success");
-      document.getElementById("banner-name").textContent = payload.identity.fullName || payload.slug;
-      document.getElementById("banner-meta").textContent = ` — saved at ${new Date().toLocaleTimeString()}`;
-      document.getElementById("profile-banner").classList.add("show");
+      const bannerName = document.getElementById("banner-name");
+      const bannerMeta = document.getElementById("banner-meta");
+      const banner = document.getElementById("profile-banner");
+      if (bannerName) bannerName.textContent = payload.identity.fullName || payload.slug;
+      if (bannerMeta) bannerMeta.textContent = ` — saved at ${new Date().toLocaleTimeString()}`;
+      if (banner) banner.classList.add("show");
     } else {
       const err = await r.json();
       showStatus("Error: " + (err.error || "unknown"), "error");

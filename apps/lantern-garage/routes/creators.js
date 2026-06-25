@@ -11,7 +11,7 @@ module.exports = async function creatorsRoutes(req, res, url, deps) {
   // GET /api/creators — list all creator slugs
   if (url.pathname === "/api/creators" && req.method === "GET") {
     ensureDir();
-    const files = fs.readdirSync(creatorsDir).filter(f => f.endsWith(".json"));
+    const files = fs.readdirSync(creatorsDir).filter(f => f.endsWith(".json")).sort();
     const slugs = files.map(f => f.replace(".json", ""));
     sendJson(res, { creators: slugs });
     return true;
@@ -19,13 +19,24 @@ module.exports = async function creatorsRoutes(req, res, url, deps) {
 
   // GET /api/creators/:slug — load a creator profile
   if (url.pathname.startsWith("/api/creators/") && req.method === "GET") {
-    const slug = url.pathname.split("/api/creators/")[1].replace(/[^a-z0-9-]/g, "");
+    // Validate (don't silently sanitize) so behavior matches the POST handler.
+    const slug = url.pathname.split("/api/creators/")[1] || "";
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      sendJson(res, { error: "Invalid slug (lowercase letters, numbers, hyphens only)" }, 400);
+      return true;
+    }
     const filePath = path.join(creatorsDir, `${slug}.json`);
     if (!fs.existsSync(filePath)) {
       sendJson(res, { error: "Creator not found" }, 404);
       return true;
     }
-    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (err) {
+      sendJson(res, { error: "Failed to parse creator profile" }, 500);
+      return true;
+    }
     sendJson(res, { creator: data });
     return true;
   }

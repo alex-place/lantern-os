@@ -56,7 +56,11 @@ module.exports = async function creatorRoutes(req, res, url, deps) {
   // Get job status and progress
 
   if (url.pathname.startsWith("/api/creator/job/") && req.method === "GET") {
-    const jobId = url.pathname.split("/").pop();
+    const jobId = url.pathname.split("/api/creator/job/")[1] || "";
+    if (!jobId) {
+      sendJson(res, { error: "Invalid job ID" }, 400);
+      return true;
+    }
     const job = jobQueue.getJob(jobId);
 
     if (!job) {
