@@ -1276,6 +1276,28 @@ document.getElementById('input').addEventListener('input', e => {
   } catch (e) { /* no-op */ }
 })();
 
+// ── Provider selection handoff (?provider=) ─────────────────────────────────────
+// Allows orchestration.html to route chat through a specific AI provider.
+// Non-auto selections override the router's fallback chain for this session.
+(function applyProviderSelection() {
+  try {
+    const provider = new URLSearchParams(location.search).get('provider');
+    const select = document.getElementById('provider-select');
+    if (provider && select) {
+      // Try to set the selected provider
+      if (select.querySelector(`option[value="${provider}"]`)) {
+        select.value = provider;
+        console.log(`[dream-chat] Provider set to: ${provider}`);
+      } else if (provider !== 'auto') {
+        // Provider not available; log but don't break
+        console.warn(`[dream-chat] Requested provider '${provider}' not available, using router default`);
+      }
+      // Dispatch change event so any listeners update
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  } catch (e) { /* no-op */ }
+})();
+
 // ── Observer side panel ───────────────────────────────────────────────────────
 function toggleObserver() {
   const panel = document.getElementById('observer-panel');
