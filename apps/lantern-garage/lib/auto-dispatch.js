@@ -18,21 +18,87 @@
  *   5. Assigned-tracking — a dispatched issue is marked in data/agent-work-queue/assigned/
  *      so `loadOpenIssues` excludes it and it isn't re-picked.
  *
- * Env: AUTO_DISPATCH=1 (enable), AUTO_DISPATCH_INTERVAL_MS (default 300000 = 5 min).
+ * Env: AUTO_DISPATCH=1 (enable default), AUTO_DISPATCH_INTERVAL_MS (default 300000 = 5 min).
+ *
+ * Runtime control: the orchestration dashboard can flip the kill switch live
+ * (setEnabled) without a restart — the timer always runs; tick() honors the
+ * current enabled state. A runtime toggle is persisted so it survives restarts
+ * and overrides the env default. setEnabled(false) stops NEW pickups; an
+ * already in-flight run finishes (a worktree run can't be safely aborted mid-way).
  */
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
+const DEFAULT_REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
+const STATE_FILE = () => path.join(DEFAULT_REPO_ROOT, "data", "agent-work-queue", "auto-dispatch-state.json");
+
 let inFlight = false;
 let timer = null;
 
-function enabled() {
+// Runtime status (truthful, in-memory; persisted bits reload on boot).
+const status = {
+  enabledOverride: null,   // null = follow env; true/false = runtime override
+  lastTickAt: null,
+  lastPick: null,          // { issueNumber, title, at }
+  lastResult: null,        // { issueNumber, ok, prUrl|stoppedAt, at }
+  history: [],             // recent results, newest first (cap 20)
+};
+
+function loadState() {
+  try {
+    const s = JSON.parse(fs.readFileSync(STATE_FILE(), "utf8"));
+    if (typeof s.enabledOverride === "boolean") status.enabledOverride = s.enabledOverride;
+    if (Array.isArray(s.history)) status.history = s.history.slice(0, 20);
+    if (s.lastResult) status.lastResult = s.lastResult;
+    if (s.lastPick) status.lastPick = s.lastPick;
+  } catch { /* no state yet */ }
+}
+loadState();
+
+function saveState() {
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE()), { recursive: true });
+    fs.writeFileSync(STATE_FILE(), JSON.stringify({
+      enabledOverride: status.enabledOverride,
+      lastPick: status.lastPick,
+      lastResult: status.lastResult,
+      history: status.history.slice(0, 20),
+    }, null, 2));
+  } catch { /* best-effort */ }
+}
+
+function envEnabled() {
   return process.env.AUTO_DISPATCH === "1";
+}
+function enabled() {
+  return status.enabledOverride === null ? envEnabled() : status.enabledOverride;
+}
+function setEnabled(on) {
+  status.enabledOverride = !!on;
+  saveState();
+  console.log(`[auto-dispatch] runtime ${on ? "ENABLED" : "DISABLED"} via dashboard kill switch`);
+  return enabled();
 }
 function intervalMs() {
   const n = Number(process.env.AUTO_DISPATCH_INTERVAL_MS);
   return Number.isFinite(n) && n >= 30000 ? n : 5 * 60 * 1000;
+}
+
+function getStatus() {
+  return {
+    enabled: enabled(),
+    source: status.enabledOverride === null ? "env" : "runtime",
+    inFlight,
+    intervalMs: intervalMs(),
+    lastTickAt: status.lastTickAt,
+    nextRunAt: timer && status.lastTickAt ? new Date(new Date(status.lastTickAt).getTime() + intervalMs()).toISOString() : null,
+    lastPick: status.lastPick,
+    lastResult: status.lastResult,
+    history: status.history.slice(0, 10),
+    // surfaced guardrails (all enforced in tick)
+    guardrails: ["serialized (1 in flight)", "cloud-paused", "draft PRs only", "one PR per lane", "assigned-tracked"],
+  };
 }
 
 // Small loopback POST helper returning the parsed body (or null).
@@ -100,16 +166,37 @@ function markAssigned(repoRoot, issue) {
   } catch (_e) { /* best-effort */ }
 }
 
+// One-PR-per-lane guard: autonomous-work opens PRs on the claude/ lane. If that
+// lane already has an open PR, a new run would be blocked by the monoworkstream
+// rule, so pause this tick instead of wasting a 20-min run.
+function claudeLaneOccupied(repoRoot) {
+  try {
+    const queue = require("../routes/queue");
+    if (typeof queue.loadPrLanes !== "function") return false;
+    const data = queue.loadPrLanes(repoRoot);
+    if (!data || !Array.isArray(data.lanes)) return false;
+    const lane = data.lanes.find((l) => l.prefix === "claude");
+    return !!(lane && lane.pr);
+  } catch { return false; }
+}
+
 async function tick(ctx) {
   if (!enabled() || inFlight) return;
+  status.lastTickAt = new Date().toISOString();
   const port = ctx.port;
   if (!(await cloudHealthy(port))) {
     console.log("[auto-dispatch] paused — cloud is unreachable (chat degraded to local); retrying next tick");
     return;
   }
+  if (claudeLaneOccupied(ctx.repoRoot)) {
+    console.log("[auto-dispatch] paused — claude lane already has an open PR (one PR per lane); retrying next tick");
+    return;
+  }
   const issue = pickTopIssue(ctx.repoRoot);
   if (!issue) return; // empty backlog
   inFlight = true;
+  status.lastPick = { issueNumber: issue.issueNumber, title: issue.title, at: new Date().toISOString() };
+  saveState();
   console.log(`[auto-dispatch] working top issue #${issue.issueNumber} — ${String(issue.title || "").slice(0, 60)}`);
   try {
     // Draft PR via the verified autonomous-work pipeline (research→plan→patch→test→openDraftPr).
@@ -117,13 +204,19 @@ async function tick(ctx) {
       { issue: issue.issueNumber, push: true, commit: true }, 20 * 60 * 1000);
     let result = null;
     try { result = r && r.text ? JSON.parse(r.text) : null; } catch { /* non-JSON */ }
+    const rec = { issueNumber: issue.issueNumber, title: issue.title, at: new Date().toISOString() };
     if (result && result.prUrl) {
       markAssigned(ctx.repoRoot, issue); // opened a draft PR → don't re-pick
+      rec.ok = true; rec.prUrl = result.prUrl;
       console.log(`[auto-dispatch] ✓ #${issue.issueNumber} → draft PR ${result.prUrl}`);
     } else {
-      const why = (result && (result.stoppedAt || result.error)) || "no PR produced";
-      console.log(`[auto-dispatch] #${issue.issueNumber} produced no PR (${why}) — leaving in queue for retry`);
+      rec.ok = false; rec.stoppedAt = (result && (result.stoppedAt || result.error)) || "no PR produced";
+      console.log(`[auto-dispatch] #${issue.issueNumber} produced no PR (${rec.stoppedAt}) — leaving in queue for retry`);
     }
+    status.lastResult = rec;
+    status.history.unshift(rec);
+    status.history = status.history.slice(0, 20);
+    saveState();
   } catch (e) {
     console.error("[auto-dispatch] error (non-fatal):", e && e.message);
   } finally {
@@ -132,11 +225,14 @@ async function tick(ctx) {
 }
 
 function start(ctx) {
-  if (!enabled()) {
-    console.log("[auto-dispatch] disabled (set AUTO_DISPATCH=1 to auto-work the backlog into draft PRs)");
-    return null;
-  }
-  console.log(`[auto-dispatch] ENABLED — gated worker every ${Math.round(intervalMs() / 1000)}s · serialized · draft PRs · cloud-paused`);
+  // The timer ALWAYS runs so the dashboard kill switch can flip the loop on/off
+  // live without a restart; tick() is a no-op while disabled.
+  console.log(
+    enabled()
+      ? `[auto-dispatch] ENABLED — gated worker every ${Math.round(intervalMs() / 1000)}s · serialized · draft PRs · cloud-paused · one-PR-per-lane`
+      : `[auto-dispatch] standby — loop armed, disabled (toggle on from the orchestration dashboard, or set AUTO_DISPATCH=1)`
+  );
+  if (timer) return timer;
   timer = setInterval(() => { tick(ctx).catch(() => {}); }, intervalMs());
   if (timer.unref) timer.unref();
   return timer;
@@ -146,4 +242,7 @@ function stop() {
   if (timer) { clearInterval(timer); timer = null; }
 }
 
-module.exports = { start, stop, tick, enabled, intervalMs, cloudHealthy, pickTopIssue, _inFlight: () => inFlight };
+module.exports = {
+  start, stop, tick, enabled, setEnabled, getStatus, intervalMs,
+  cloudHealthy, pickTopIssue, _inFlight: () => inFlight,
+};

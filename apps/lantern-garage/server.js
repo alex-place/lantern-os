@@ -161,6 +161,7 @@ const routes = [
   require("./routes/convergence-dispatch"),
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
+  require("./routes/auto-dispatch"),    // Autonomous auto-pull loop: status + kill switch
   require("./routes/flourishing"),
   require("./routes/claims"),
   require("./routes/cubes"),
