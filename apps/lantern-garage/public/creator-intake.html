@@ -3,18 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#7c6af7">
+  <meta name="theme-color" content="#06b6d4">
   <title>Creator Intake — Lantern OS</title>
+  <script>
+    /* Theme bootstrap — set before first paint to avoid flash of wrong theme */
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
     :root {
-      --bg: #0b0d14;
-      --surface: #13161f;
-      --surface2: #1a1d2a;
-      --border: #252840;
-      --text: #e8eaf6;
-      --muted: #7880a4;
-      --accent: #7c6af7;
+      /* Brand-specific accents layered on top of the global site.css theme
+         tokens (--bg / --surface / --surface2 / --border / --text / --muted /
+         --accent), which drive both light and dark to match the rest of the
+         site. Do not redefine the global tokens here — that broke theming. */
       --burgundy: #6b1a2a;
       --rose: #c9a0a0;
       --gold: #b8960c;
@@ -102,7 +112,7 @@
       margin-left: auto;
       font-size: 0.7rem; padding: 2px 8px;
       border-radius: 99px;
-      background: rgba(124,106,247,0.12);
+      background: var(--accent-dim);
       color: var(--accent); font-weight: 600;
     }
 
@@ -136,7 +146,7 @@
     .form-group textarea:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(124,106,247,0.12);
+      box-shadow: 0 0 0 2px var(--accent-dim);
     }
 
     textarea { min-height: 80px; resize: vertical; }
@@ -177,7 +187,7 @@
     /* Tag chips */
     .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .tag-chip {
-      background: rgba(124,106,247,0.12);
+      background: var(--accent-dim);
       color: var(--accent); border-radius: 99px;
       padding: 3px 10px; font-size: 0.78rem; font-weight: 600;
     }
@@ -194,7 +204,7 @@
     .status-bar.show  { display: block; }
     .status-bar.success { background: rgba(76,175,130,0.1); border-color: var(--green); color: var(--green); }
     .status-bar.error   { background: rgba(224,85,85,0.1); border-color: var(--danger); color: var(--danger); }
-    .status-bar.loading { background: rgba(124,106,247,0.1); border-color: var(--accent); color: var(--accent); }
+    .status-bar.loading { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
     /* Archetypes */
     .archetype-card {
@@ -205,7 +215,7 @@
 
     /* Loaded profile banner */
     .profile-banner {
-      background: linear-gradient(135deg, rgba(107,26,42,0.2), rgba(124,106,247,0.1));
+      background: linear-gradient(135deg, rgba(107,26,42,0.2), var(--accent-dim));
       border: 1px solid var(--burgundy);
       border-radius: 10px; padding: 14px 18px;
       margin-bottom: 20px; display: none;
