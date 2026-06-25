@@ -1,0 +1,1 @@
+feat(ui): add a provider pin selector to the home chat bar (index.html). Sticky choice (localStorage) forwarded to dream-chat via ?provider=, which routes the turn to that provider; "Auto" uses the live PCSF-ranked pick. Lets the user pin Gemini (or any provider) for their chats from the landing page.
