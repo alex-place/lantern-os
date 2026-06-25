@@ -199,6 +199,21 @@
     .fleet-final { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-size: 0.82rem; }
     .research-action.delegate { border-color: #a855f7; color: #a855f7; }
     .research-action.delegate:hover { background: color-mix(in srgb, #a855f7 12%, transparent); }
+
+    /* ── Auto-pull kill switch ── */
+    .ap-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .ap-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .ap-track { width: 38px; height: 22px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); position: relative; transition: background .18s, border-color .18s; flex-shrink: 0; }
+    .ap-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .18s, background .18s; }
+    .ap-switch input:checked + .ap-track { background: color-mix(in srgb, var(--green) 30%, transparent); border-color: var(--green); }
+    .ap-switch input:checked + .ap-track .ap-thumb { transform: translateX(16px); background: var(--green); }
+    .ap-switch input:focus-visible + .ap-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .ap-label { font-size: 0.78rem; font-weight: 700; color: var(--muted); min-width: 22px; }
+    .ap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .ap-guards { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+    .ap-guard { font-size: 0.66rem; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+    .ap-hist-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; margin-bottom: 4px; font-size: 0.78rem; }
+    .ap-hist-row .ok { color: var(--green); } .ap-hist-row .no { color: #f87171; }
   </style>
   <title>Orchestration — Keystone OS</title>
 </head>
@@ -219,7 +234,7 @@
     <a href="/explore.html">Explore</a>
   </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
   </div>
 </nav>
 
@@ -256,6 +271,19 @@
     <h2>🚦 PR Lanes <span class="section-meta" id="prLanesMeta">one open PR per agent lane</span></h2>
     <p class="panel-sub">Each agent prefix gets one open PR lane (CLAUDE.md monoworkstream rule). CI rollup is live from GitHub checks — green/red here is the real gate.</p>
     <div id="prLanesBody"><div class="placeholder">Loading PR lanes…</div></div>
+  </section>
+
+  <!-- ── Auto-Pull Fleet (opt-in autonomous loop) ── -->
+  <section class="panel" id="autoPullPanel">
+    <h2>🤖 Auto-Pull Fleet <span class="section-meta" id="autoPullMeta">opt-in autonomous loop</span>
+      <label class="ap-switch" style="margin-left:auto;" title="Kill switch — flip off any time">
+        <input type="checkbox" id="autoPullToggle" onchange="toggleAutoPull(this.checked)" aria-label="Toggle the autonomous auto-pull loop">
+        <span class="ap-track"><span class="ap-thumb"></span></span>
+        <span id="autoPullToggleLabel" class="ap-label">Off</span>
+      </label>
+    </h2>
+    <p class="panel-sub">When on, the fleet pulls the top-priority open issue and works it into a draft PR unattended — <strong>one at a time, cloud-paused, one PR per lane, nothing auto-merges</strong>. This toggle is the kill switch (no restart needed); it persists across restarts.</p>
+    <div id="autoPullBody"><div class="placeholder">Loading…</div></div>
   </section>
 
   <!-- ── Fleet Activity (live delegated runs) ── -->
@@ -1240,7 +1268,7 @@
   }
 
   async function refreshWorkBoard() {
-    await Promise.all([renderWorkBoard(), renderPrLanes(), renderAgentSlots(), renderLanded()]);
+    await Promise.all([renderWorkBoard(), renderPrLanes(), renderAgentSlots(), renderLanded(), renderAutoPull()]);
   }
 
   // ── Fleet delegation (live streamed autonomous run) ───────────────────────
@@ -1330,6 +1358,52 @@
       button.disabled = false; button.textContent = origLabel;
     }
   }
+
+  // ── Auto-Pull Fleet (opt-in autonomous loop) ──────────────────────────────
+  async function renderAutoPull() {
+    const d = await fetchJson("/api/convergence/auto-dispatch/status", 8000);
+    const toggle = $("autoPullToggle"), label = $("autoPullToggleLabel"), body = $("autoPullBody");
+    if (!d || !d.ok) { setText("autoPullMeta", "status unavailable"); if (body) body.innerHTML = '<div class="placeholder">Loop status unavailable.</div>'; return; }
+    if (toggle && document.activeElement !== toggle) toggle.checked = !!d.enabled;
+    if (label) { label.textContent = d.enabled ? "On" : "Off"; label.style.color = d.enabled ? "var(--green)" : "var(--muted)"; }
+    setText("autoPullMeta", d.enabled ? (d.inFlight ? "running a job now" : "armed · waiting for next tick") : "off");
+
+    const pick = d.lastPick;
+    const nextRun = d.enabled && d.nextRunAt ? relTime(d.nextRunAt).replace(" ago", "") + " (approx)" : "—";
+    const guards = (d.guardrails || []).map(g => `<span class="ap-guard">✓ ${escapeHtml(g)}</span>`).join("");
+    const hist = (d.history || []).map(h => `<div class="ap-hist-row">
+        <span class="${h.ok ? "ok" : "no"}">${h.ok ? "✓" : "✗"}</span>
+        <span>#${escapeHtml(String(h.issueNumber))} ${escapeHtml(h.title || "")}</span>
+        <span class="landed-meta">${h.ok && h.prUrl ? `<a href="${escapeHtml(h.prUrl)}" target="_blank" rel="noopener noreferrer">PR ↗</a>` : escapeHtml(h.stoppedAt || "")} · ${escapeHtml(relTime(h.at))}</span>
+      </div>`).join("");
+    body.innerHTML = `
+      <div class="ap-grid">
+        <div class="stat"><div class="stat-label">State</div><div class="stat-value ${d.enabled ? "" : "muted"}" style="font-size:1.15rem;">${d.enabled ? (d.inFlight ? "Working" : "Armed") : "Off"}</div><div class="stat-sub">control: ${escapeHtml(d.source)}</div></div>
+        <div class="stat"><div class="stat-label">Interval</div><div class="stat-value muted" style="font-size:1.15rem;">${Math.round((d.intervalMs || 0) / 1000)}s</div><div class="stat-sub">next: ${escapeHtml(nextRun)}</div></div>
+        <div class="stat"><div class="stat-label">Last Pick</div><div class="stat-value muted" style="font-size:1.1rem;">${pick ? "#" + escapeHtml(String(pick.issueNumber)) : "—"}</div><div class="stat-sub">${pick ? escapeHtml(relTime(pick.at)) : "none yet"}</div></div>
+      </div>
+      <div class="ap-guards">${guards}</div>
+      ${hist ? `<div class="section-meta" style="margin-bottom:6px;">Recent autonomous runs</div>${hist}` : '<div class="placeholder">No autonomous runs yet.</div>'}`;
+  }
+
+  async function toggleAutoPull(on) {
+    const toggle = $("autoPullToggle");
+    if (toggle) toggle.disabled = true;
+    try {
+      const r = await fetch("/api/convergence/auto-dispatch/toggle", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: !!on }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    } catch (e) {
+      if (toggle) toggle.checked = !on;  // revert on failure
+      alert("Could not toggle auto-pull: " + e.message);
+    } finally {
+      if (toggle) toggle.disabled = false;
+      renderAutoPull();
+    }
+  }
+  window.toggleAutoPull = toggleAutoPull;
 
   // ── Research Team: repo memory ─────────────────────────────────────────────
   async function renderRepoLearn() {
