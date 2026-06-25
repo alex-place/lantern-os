@@ -119,7 +119,16 @@ async function _buildRouting() {
       .map((s) => ({ provider: s.provider, model: s.models[0], key: s.provider }));
     let order = [];
     if (cands.length) {
-      const ranked = await rankCandidates(cands, taskType, { cloudSet: CLOUD_PROVIDERS });
+      let ranked = await rankCandidates(cands, taskType, { cloudSet: CLOUD_PROVIDERS });
+      // Per-task signal can be empty because outcomes are recorded under the
+      // intent taxonomy (dream_chat, technical_debug, …) while the chains use
+      // detectTaskType keys (coding, reasoning, …). When nothing is scored for
+      // this task type, fall back to the AGGREGATE ("all") ranking so accumulated
+      // outcomes still drive order; per-task specialization takes over once that
+      // task type has its own scored data.
+      if (!ranked.some((c) => c.scored)) {
+        ranked = await rankCandidates(cands, "all", { cloudSet: CLOUD_PROVIDERS });
+      }
       order = ranked.map((c) => c.provider);
     }
     if (chain.some((s) => s.provider === "ollama")) order.push("ollama");
