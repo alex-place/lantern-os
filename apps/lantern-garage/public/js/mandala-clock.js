@@ -71,27 +71,6 @@
     register(svg, { minute: ".inner", hour: ".mid", day: [".outer-a", ".outer-b"] });
   }
 
-  // 2. .ambient__mandala (large sigma0 background mandala)
-  function upgradeAmbient(el, text) {
-    const svg = parseSvg(text);
-    if (!svg) return;
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
-    svg.setAttribute("aria-hidden", "true");
-    svg.style.display = "block";
-    // Tighten the wheel: the source viewBox (-8 -8 216 216) renders the outer
-    // ring at ~89% radius, but the container's radial mask goes fully transparent
-    // past 82% — so the rim colour was being masked away. Widen the viewBox
-    // (recentred on the true ring centre 100,100) so the whole mandala draws
-    // smaller, landing the outer ring near ~70% where the mask still shows it.
-    svg.setAttribute("viewBox", "-37 -37 274 274");
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    el.style.backgroundImage = "none"; // drop the CSS background copy
-    el.style.animation = "none";       // stop the whole-div hero-spin; rings are the hands now
-    el.appendChild(svg);
-    register(svg, { minute: ".ring3", hour: ".ring2", day: [".ring1"] });
-  }
-
   // Seconds elapsed into the current period (the negative animation-delay that
   // phase-aligns a `period`-second linear spin to the real wall-clock).
   function phaseInto(period, now) {
@@ -150,11 +129,6 @@
     );
     if (imgs.length) {
       jobs.push(withSvg("/mandala.svg", (text) => imgs.forEach((img) => upgradeImg(img, text))));
-    }
-
-    const ambient = [...document.querySelectorAll(".ambient__mandala")];
-    if (ambient.length) {
-      jobs.push(withSvg("/sigma0-mandala.svg", (text) => ambient.forEach((el) => upgradeAmbient(el, text))));
     }
 
     Promise.all(jobs).then(start).catch(() => { /* leave originals as fallback */ });

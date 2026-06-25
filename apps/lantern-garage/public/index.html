@@ -53,29 +53,16 @@
       overflow: hidden;
     }
     .hero { position: relative; text-align: center; padding: 0; }
-    .ambient {
-      position: fixed; inset: 0;
-      z-index: 0; overflow: clip;
+    /* Hero mandala — the same self-contained animated SVG used in the header,
+       sized up and centered above the title. Renders reliably in Chrome
+       (replaces the masked full-bleed ambient background that did not). */
+    .hero__mandala {
+      display: block;
+      width: clamp(88px, 14vh, 148px);
+      height: auto; aspect-ratio: 1;
+      margin: 0 auto clamp(10px, 2vh, 20px);
       pointer-events: none; user-select: none;
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 15%, #000 78%, transparent 100%);
-              mask-image: linear-gradient(to bottom, transparent 0, #000 15%, #000 78%, transparent 100%);
     }
-    .ambient__mandala {
-      position: absolute; left: 50%;
-      top: clamp(240px, 42vh, 480px);
-      width: min(160vh, 140vw, 1600px);
-      height: min(160vh, 140vw, 1600px);
-      object-fit: contain;
-      opacity: 0.48;
-      -webkit-mask-image: radial-gradient(closest-side, #000 35%, rgba(0,0,0,.45) 62%, transparent 80%);
-              mask-image: radial-gradient(closest-side, #000 35%, rgba(0,0,0,.45) 62%, transparent 80%);
-      animation: ambient-spin 72s linear infinite;
-    }
-    @keyframes ambient-spin {
-      from { transform: translate(-50%, -50%) rotate(0deg); }
-      to   { transform: translate(-50%, -50%) rotate(360deg); }
-    }
-    .site-nav, .home-main, .site-footer { position: relative; z-index: 1; }
     .hero h1 { margin-bottom: 6px; font-size: clamp(2rem, 6vw, 3.2rem); letter-spacing: -0.01em; }
     .hero .motto { font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
     .hero .tagline { color: var(--text); max-width: 560px; margin: 0 auto 20px; font-size: 1rem; line-height: 1.55; }
@@ -98,7 +85,7 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
     }
-    .home-chat button {
+    .home-chat button[type="submit"] {
       padding: 12px 22px;
       border: none; border-radius: 9999px;
       background: var(--accent); color: #fff;
@@ -106,9 +93,33 @@
       cursor: pointer; white-space: nowrap;
       transition: background .18s, transform .12s;
     }
-    .home-chat button:hover { transform: scale(1.03); }
-    .home-chat button:active { transform: scale(0.97); }
+    .home-chat button[type="submit"]:hover { transform: scale(1.03); }
+    .home-chat button[type="submit"]:active { transform: scale(0.97); }
+    /* ── "+" attach button ── */
+    .home-attach-btn {
+      flex-shrink: 0;
+      width: 46px; padding: 0;
+      border: 1.5px solid var(--border);
+      border-radius: 9999px;
+      background: var(--bg); color: var(--muted);
+      font-size: 22px; line-height: 1; cursor: pointer;
+      transition: border-color .18s, color .18s, background .18s;
+    }
+    .home-attach-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .home-attach-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .home-chat.drag-over { outline: 2px dashed var(--accent); outline-offset: 5px; }
+    /* ── Whole-screen file drop overlay ── */
+    #home-drop-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      background: color-mix(in srgb, var(--accent) 16%, rgba(0,0,0,.55));
+      color: #fff; font-size: 1.4rem; font-weight: 700; text-align: center;
+      -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+      pointer-events: none;
+    }
+    #home-drop-overlay.active { display: flex; }
+    #home-drop-overlay .drop-sub { font-size: 0.85rem; font-weight: 400; opacity: .82; }
     .home-file-chip {
       display: none; align-items: center; gap: 6px;
       max-width: 560px; margin: -8px auto 0;
@@ -214,8 +225,8 @@
 </head>
 <body>
 
-<!-- ── Ambient Σ₀ mandala — full-bleed background field, behind all content ── -->
-<div class="ambient" aria-hidden="true"><img class="ambient__mandala" src="/sigma0-mandala.svg" alt=""></div>
+<!-- ── Whole-screen file drop overlay ── -->
+<div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">.pdf → Knowledge Center &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
 
 <!-- ── Site nav ── -->
 <nav class="site-nav">
@@ -242,6 +253,7 @@
 
   <!-- ── Hero ── -->
   <div class="hero">
+    <img class="hero__mandala" src="/mandala.svg" alt="" aria-hidden="true" width="148" height="148">
     <h1>Keystone OS</h1>
     <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
     <p class="tagline">Your AI that actually remembers you — local, private, and free.</p>
@@ -249,9 +261,11 @@
 
   <!-- ── Home chat bar ── -->
   <form class="home-chat" id="home-chat-form" onsubmit="homeChat(event)" role="search" aria-label="Start a chat">
+    <button type="button" class="home-attach-btn" id="home-attach-btn" onclick="homeAttachPick()" aria-label="Attach a file (PDF or Word .docx)" title="Attach a file — PDF or .docx">+</button>
     <input id="home-chat-input" type="text" placeholder="Ask Keystone anything…" autocomplete="off" aria-label="Chat message">
     <button type="submit">Chat ✦</button>
   </form>
+  <input type="file" id="home-file-input" accept=".pdf,.docx" multiple style="display:none">
   <div class="home-file-chip" id="home-file-chip">
     <span id="home-file-chip-name">📄 file.docx</span>
     <button type="button" onclick="clearHomeDocx()" aria-label="Remove file">✕</button>
@@ -470,24 +484,51 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q);
   };
 
-  /* Drag-and-drop on the home chat form */
-  const form = document.getElementById('home-chat-form');
-  let dragDepth = 0;
+  /* Route picked/dropped files: .docx → chip (improve flow on submit),
+     .pdf → forward to the chat's Knowledge Center upload. Mirrors the
+     dream-chat.html drop handler so both pages behave the same. */
+  function forwardPdf(file) {
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        sessionStorage.setItem('pendingPdf', JSON.stringify({ name: file.name, data: reader.result }));
+      } catch { /* storage full — chat will fall back to its own picker */ }
+      window.location.href = '/dream-chat.html?autoprocess=pdf';
+    };
+    reader.readAsDataURL(file);
+  }
 
-  form.addEventListener('dragenter', (e) => {
+  function handleHomeFiles(fileList) {
+    const files = [...(fileList || [])];
+    if (!files.length) return;
+    const docx = files.find(f => f.name.toLowerCase().endsWith('.docx'));
+    const pdf  = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (docx) setDocxChip(docx);
+    else if (pdf) forwardPdf(pdf);
+    else document.getElementById('home-chat-input').placeholder = 'Please choose a PDF or Word (.docx) file…';
+  }
+
+  /* "+" attach button → native file picker */
+  const fileInput = document.getElementById('home-file-input');
+  window.homeAttachPick = function () { fileInput.click(); };
+  fileInput.addEventListener('change', () => { handleHomeFiles(fileInput.files); fileInput.value = ''; });
+
+  /* Whole-screen drag-and-drop — drop a file anywhere on the page */
+  const overlay = document.getElementById('home-drop-overlay');
+  let dragDepth = 0;
+  document.addEventListener('dragenter', (e) => {
     e.preventDefault();
     if (![...(e.dataTransfer.types || [])].includes('Files')) return;
-    if (++dragDepth === 1) form.classList.add('drag-over');
+    if (++dragDepth === 1) overlay.classList.add('active');
   });
-  form.addEventListener('dragleave', () => {
-    if (--dragDepth <= 0) { dragDepth = 0; form.classList.remove('drag-over'); }
+  document.addEventListener('dragleave', () => {
+    if (--dragDepth <= 0) { dragDepth = 0; overlay.classList.remove('active'); }
   });
-  form.addEventListener('dragover', (e) => e.preventDefault());
-  form.addEventListener('drop', (e) => {
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => {
     e.preventDefault();
-    dragDepth = 0; form.classList.remove('drag-over');
-    const file = [...(e.dataTransfer.files || [])].find(f => f.name.toLowerCase().endsWith('.docx'));
-    if (file) setDocxChip(file);
+    dragDepth = 0; overlay.classList.remove('active');
+    handleHomeFiles(e.dataTransfer.files);
   });
 })();
 </script>
