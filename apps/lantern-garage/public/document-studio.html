@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Document Studio — Keystone OS</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    :root { --gap: 14px; }
+    body { margin: 0; }
+    .ds-nav { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border,#27272a); }
+    .ds-nav .brand { font-weight:600; font-size:16px; }
+    .ds-nav a { color:var(--muted,#9aa0aa); text-decoration:none; font-size:14px; }
+    .ds-nav a:hover { color:var(--text,#e5e7eb); }
+    .ds-title { font-size:15px; font-weight:600; background:transparent; border:1px solid transparent; color:var(--text,#e5e7eb); padding:4px 8px; border-radius:6px; min-width:200px; }
+    .ds-title:hover, .ds-title:focus { border-color:var(--border,#27272a); outline:none; }
+    .ds-spacer { flex:1; }
+    .ds-btn { background:var(--surface,#16161e); border:1px solid var(--border,#27272a); color:var(--text,#e5e7eb); border-radius:8px; padding:6px 12px; font-size:13px; cursor:pointer; }
+    .ds-btn:hover:not(:disabled) { border-color:var(--accent,#06b6d4); color:var(--accent,#06b6d4); }
+    .ds-btn:disabled { opacity:.45; cursor:default; }
+    .ds-btn.primary { background:var(--accent,#06b6d4); color:#06121a; border-color:var(--accent,#06b6d4); font-weight:600; }
+
+    .ds-main { display:grid; grid-template-columns: 1fr 420px; height: calc(100vh - 53px); }
+    @media (max-width: 900px){ .ds-main{ grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
+
+    /* Left: document canvas */
+    .ds-canvas-wrap { overflow:auto; padding:28px; background:var(--bg,#0b0b0f); border-right:1px solid var(--border,#27272a); }
+    .ds-canvas { max-width:760px; margin:0 auto; background:#fdfdfb; color:#1a1a1a; border-radius:8px; padding:48px 56px; box-shadow:0 6px 30px rgba(0,0,0,.35); line-height:1.55; }
+    .ds-canvas h1 { font-size:24px; margin:0 0 10px; }
+    .ds-canvas h2 { font-size:18px; margin:18px 0 6px; border-bottom:1px solid #ddd; padding-bottom:3px; }
+    .ds-canvas h3 { font-size:15px; margin:14px 0 4px; }
+    .ds-canvas p { margin:6px 0; }
+    .ds-canvas ul { margin:6px 0; padding-left:22px; }
+    .ds-canvas li { margin:2px 0; }
+    .ds-empty { color:var(--muted,#9aa0aa); text-align:center; margin-top:80px; }
+
+    /* Right: chat */
+    .ds-chat { display:flex; flex-direction:column; height:100%; background:var(--surface,#101014); }
+    .ds-chat-head { padding:10px 14px; border-bottom:1px solid var(--border,#27272a); font-size:13px; color:var(--muted,#9aa0aa); display:flex; align-items:center; gap:8px; }
+    .ds-rev { margin-left:auto; background:var(--bg,#0b0b0f); border:1px solid var(--border,#27272a); color:var(--text,#e5e7eb); border-radius:6px; padding:3px 6px; font-size:12px; }
+    .ds-msgs { flex:1; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
+    .ds-msg { font-size:13.5px; line-height:1.5; }
+    .ds-msg .who { font-size:11px; color:var(--muted,#9aa0aa); margin-bottom:3px; }
+    .ds-msg.user .bubble { background:var(--accent,#06b6d4); color:#06121a; border-radius:10px; padding:7px 11px; display:inline-block; }
+    .ds-msg.keystone .bubble { background:var(--bg,#0b0b0f); border:1px solid var(--border,#27272a); border-radius:10px; padding:9px 12px; }
+    .ds-diff { margin-top:8px; border:1px solid var(--border,#27272a); border-radius:8px; overflow:hidden; font-family:ui-monospace,monospace; font-size:12px; }
+    .ds-diff .dl { padding:1px 8px; white-space:pre-wrap; word-break:break-word; }
+    .ds-diff .add { background:rgba(74,222,128,.14); color:#86efac; }
+    .ds-diff .del { background:rgba(248,113,113,.14); color:#fca5a5; text-decoration:line-through; }
+    .ds-diff .ctx { color:var(--muted,#9aa0aa); }
+    .ds-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+    .ds-input { border-top:1px solid var(--border,#27272a); padding:10px; display:flex; gap:8px; }
+    .ds-input textarea { flex:1; resize:none; background:var(--bg,#0b0b0f); border:1px solid var(--border,#27272a); color:var(--text,#e5e7eb); border-radius:8px; padding:9px 11px; font:inherit; font-size:13.5px; min-height:42px; }
+    .ds-sel-chip { font-size:11px; color:var(--accent,#06b6d4); padding:2px 0; }
+    .ds-hint { font-size:11px; color:var(--muted,#9aa0aa); padding:0 14px 8px; }
+  </style>
+</head>
+<body>
+  <div class="ds-nav">
+    <span class="brand">📝 Document Studio</span>
+    <a href="/dream-chat.html">← Chat</a>
+    <input id="title" class="ds-title" value="Untitled document" aria-label="Document title">
+    <span class="ds-spacer"></span>
+    <button class="ds-btn" id="new-btn">New</button>
+    <button class="ds-btn" id="import-btn">Import .docx</button>
+    <button class="ds-btn" id="undo-btn" disabled>↶ Undo</button>
+    <button class="ds-btn primary" id="export-btn" disabled>⬇ Export .docx</button>
+    <input type="file" id="docx-input" accept=".docx" style="display:none">
+  </div>
+
+  <div class="ds-main">
+    <div class="ds-canvas-wrap">
+      <div id="canvas" class="ds-canvas"><div class="ds-empty">Start a document — type an instruction on the right (“Write a cover letter for a software engineer role”), or <b>Import a .docx</b>.</div></div>
+    </div>
+    <div class="ds-chat">
+      <div class="ds-chat-head">
+        Keystone · document mode
+        <select id="rev-select" class="ds-rev" title="Revision history"></select>
+      </div>
+      <div id="msgs" class="ds-msgs"></div>
+      <div id="sel-chip" class="ds-sel-chip" style="padding:0 14px"></div>
+      <div class="ds-input">
+        <textarea id="instr" placeholder="Tell Keystone what to change… (select text in the doc to target it)"></textarea>
+        <button class="ds-btn primary" id="send-btn">Send</button>
+      </div>
+      <div class="ds-hint">Edits are proposed as a diff — nothing changes until you click <b>Apply</b>. Undo or pick any prior revision anytime.</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const API = '/api/docmode';
+  let doc = null;            // current doc view
+  let pending = null;        // pending proposal {explanation,newText,msgEl}
+  let selection = '';
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // ── minimal markdown → HTML for the canvas ──
+  function mdToHtml(md) {
+    const lines = (md || '').split('\n'); let html = ''; let inList = false;
+    const inline = t => esc(t).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>');
+    const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+    for (const raw of lines) {
+      const line = raw.replace(/\s+$/,'');
+      if (!line.trim()) { closeList(); continue; }
+      if (line.startsWith('### ')) { closeList(); html += '<h3>'+inline(line.slice(4))+'</h3>'; }
+      else if (line.startsWith('## ')) { closeList(); html += '<h2>'+inline(line.slice(3))+'</h2>'; }
+      else if (line.startsWith('# ')) { closeList(); html += '<h1>'+inline(line.slice(2))+'</h1>'; }
+      else if (/^\s*[-*]\s+/.test(line)) { if (!inList){ html+='<ul>'; inList=true; } html += '<li>'+inline(line.replace(/^\s*[-*]\s+/,''))+'</li>'; }
+      else { closeList(); html += '<p>'+inline(line)+'</p>'; }
+    }
+    closeList();
+    return html || '<div class="ds-empty">Empty document.</div>';
+  }
+
+  // ── line-level diff (LCS) for the proposal preview ──
+  function diffLines(a, b) {
+    const A = a.split('\n'), B = b.split('\n');
+    const n = A.length, m = B.length;
+    const dp = Array.from({length:n+1}, () => new Array(m+1).fill(0));
+    for (let i=n-1;i>=0;i--) for (let j=m-1;j>=0;j--) dp[i][j] = A[i]===B[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+    const out = []; let i=0,j=0;
+    while (i<n && j<m) {
+      if (A[i]===B[j]) { out.push({t:'ctx',s:A[i]}); i++; j++; }
+      else if (dp[i+1][j] >= dp[i][j+1]) { out.push({t:'del',s:A[i]}); i++; }
+      else { out.push({t:'add',s:B[j]}); j++; }
+    }
+    while (i<n) out.push({t:'del',s:A[i++]});
+    while (j<m) out.push({t:'add',s:B[j++]});
+    return out;
+  }
+  function renderDiff(a, b) {
+    const rows = diffLines(a, b).filter(r => !(r.t==='ctx' && !r.s.trim()));
+    // collapse long runs of unchanged context
+    let html = '<div class="ds-diff">'; let ctxRun = 0;
+    for (const r of rows) {
+      if (r.t==='ctx') { ctxRun++; if (ctxRun>2) continue; }
+      else ctxRun = 0;
+      const cls = r.t; const pre = r.t==='add'?'+ ':r.t==='del'?'− ':'  ';
+      html += '<div class="dl '+cls+'">'+esc(pre+r.s)+'</div>';
+    }
+    return html + '</div>';
+  }
+
+  function render() {
+    $('canvas').innerHTML = doc && doc.text ? mdToHtml(doc.text) : '<div class="ds-empty">Empty document — ask Keystone to write something.</div>';
+    $('title').value = doc ? doc.title : 'Untitled document';
+    $('export-btn').disabled = !doc;
+    $('undo-btn').disabled = !doc || doc.current <= 0;
+    const sel = $('rev-select'); sel.innerHTML = '';
+    if (doc) for (let k = doc.revisions.length-1; k>=0; k--) {
+      const r = doc.revisions[k];
+      const o = document.createElement('option'); o.value = r.index;
+      o.textContent = 'v'+(r.index+1)+' · '+r.note+(r.index===doc.current?'  ✓':'');
+      if (r.index===doc.current) o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+
+  function addMsg(who, html) {
+    const el = document.createElement('div');
+    el.className = 'ds-msg ' + who;
+    el.innerHTML = '<div class="who">'+(who==='user'?'You':'Keystone')+'</div><div class="bubble">'+html+'</div>';
+    $('msgs').appendChild(el); $('msgs').scrollTop = $('msgs').scrollHeight;
+    return el;
+  }
+
+  async function api(pathname, opts) {
+    const r = await fetch(API + pathname, opts);
+    return r.json();
+  }
+
+  async function loadDoc(id) {
+    doc = await api('/get?id=' + encodeURIComponent(id));
+    if (doc && !doc.error) { history.replaceState(null,'','?id='+doc.id); render(); }
+  }
+
+  async function ensureDoc(starterText) {
+    if (doc) return doc;
+    doc = await api('/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title: $('title').value || 'Untitled document', text: starterText || '' }) });
+    history.replaceState(null,'','?id='+doc.id); render(); return doc;
+  }
+
+  async function send() {
+    const instr = $('instr').value.trim();
+    if (!instr) return;
+    $('instr').value = ''; $('send-btn').disabled = true;
+    addMsg('user', esc(instr) + (selection ? ' <span style="opacity:.7">(on selection)</span>' : ''));
+    try {
+      await ensureDoc();
+      const thinking = addMsg('keystone', '<span style="opacity:.6">thinking…</span>');
+      const res = await api('/propose', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: doc.id, instruction: instr, selection }) });
+      selection = ''; $('sel-chip').textContent = '';
+      if (!res.ok) { thinking.querySelector('.bubble').innerHTML = '⚠ ' + esc(res.error || 'failed'); return; }
+      pending = { explanation: res.explanation, newText: res.newText };
+      thinking.querySelector('.bubble').innerHTML =
+        esc(res.explanation)
+        + renderDiff(doc.text || '', res.newText || '')
+        + '<div class="ds-actions">'
+        + '<button class="ds-btn primary" data-act="apply">✓ Apply</button>'
+        + '<button class="ds-btn" data-act="discard">Discard</button>'
+        + '<span style="font-size:11px;color:var(--muted);align-self:center">or keep typing to refine</span>'
+        + '</div>';
+      thinking.querySelector('[data-act="apply"]').onclick = () => applyPending(thinking);
+      thinking.querySelector('[data-act="discard"]').onclick = () => { pending = null; thinking.querySelector('.ds-actions').remove(); };
+    } catch (e) { addMsg('keystone', '⚠ ' + esc(e.message)); }
+    finally { $('send-btn').disabled = false; }
+  }
+
+  async function applyPending(msgEl) {
+    if (!pending) return;
+    doc = await api('/apply', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: doc.id, text: pending.newText, note: pending.explanation.slice(0,60) }) });
+    pending = null; render();
+    if (msgEl) { const a = msgEl.querySelector('.ds-actions'); if (a) a.innerHTML = '<span style="color:#4ade80;font-size:12px">✓ Applied</span>'; }
+  }
+
+  // events
+  $('send-btn').onclick = send;
+  $('instr').addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+  $('undo-btn').onclick = async () => { if (doc && doc.current>0) { doc = await api('/revert', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:doc.id,index:doc.current-1})}); render(); } };
+  $('rev-select').onchange = async (e) => { doc = await api('/revert', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:doc.id,index:Number(e.target.value)})}); render(); };
+  $('export-btn').onclick = () => { if (doc) window.location = API + '/export?id=' + encodeURIComponent(doc.id); };
+  $('new-btn').onclick = () => { location.href = '/document-studio.html'; };
+  $('title').onchange = async () => { if (doc) await api('/title', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:doc.id,title:$('title').value})}); };
+  $('import-btn').onclick = () => $('docx-input').click();
+  $('docx-input').addEventListener('change', async () => {
+    const f = $('docx-input').files[0]; if (!f) return;
+    addMsg('keystone', 'Importing <b>'+esc(f.name)+'</b>…');
+    const fd = new FormData(); fd.append('file', f);
+    doc = await api('/create', { method:'POST', body: fd });
+    $('docx-input').value=''; if (doc && !doc.error) { history.replaceState(null,'','?id='+doc.id); render(); addMsg('keystone','Imported. Tell me what to change.'); }
+  });
+  // capture a selection inside the canvas to target edits
+  document.getElementById('canvas').addEventListener('mouseup', () => {
+    const s = (window.getSelection && window.getSelection().toString() || '').trim();
+    if (s && s.length > 1) { selection = s; $('sel-chip').textContent = '✎ editing selection: "' + s.slice(0,60) + (s.length>60?'…':'') + '"'; }
+  });
+
+  // boot
+  const id = new URLSearchParams(location.search).get('id');
+  if (id) loadDoc(id); else render();
+})();
+</script>
+</body>
+</html>

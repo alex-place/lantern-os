@@ -172,6 +172,7 @@ const routes = [
 
   require("./routes/pdfs"), // PDF document listing for Knowledge Center
   require("./routes/documents"), // .docx upload → LLM rewrite → return new version
+  require("./routes/docmode"), // Document Mode — versioned collaborative doc editor
   require("./routes/features"),
   require("./routes/admin-flags"),     // Admin feature flags + per-page nav visibility
   require("./routes/personal-cube"),

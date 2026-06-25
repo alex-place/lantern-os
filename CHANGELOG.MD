@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.74] - 2026-06-25
+- feat(chat): Document Studio — a collaborative, versioned document editor (Slice 1: markdown/plain-text). Open it from the chat "+" menu ("📐 Document Studio") or /document-studio.html: document canvas on the left, Keystone chat on the right. Say what to change ("make this less corporate", "add a stronger closing", "fix grammar, keep my meaning") and Keystone proposes a minimal edit shown as a DIFF with an explanation — nothing changes until you click Apply. Each accepted turn is a new revision; Undo and a revision dropdown roll back to any prior version; Export rebuilds a styled .docx. Edits stay local until you export. New `lib/docmode-store.js` (file-persisted revisions), `routes/docmode.js` (create/import-docx/get/propose/apply/revert/title/export, operator-gated), `public/document-studio.html`, and markdown⇄docx modes in `scripts/resume_docx.py`. Slice 2 (full .docx heading/list/table fidelity) is the next step.
+
 ## [1.7.73] - 2026-06-24
 - feat(chat): document upload + AI rewrite + download in Keystone chat. The "+" attach menu now has "📝 Improve a document (.docx)": pick a .docx, type an instruction (or accept the default), and Keystone extracts the text, rewrites it with Claude per your instruction (truthfully — no invented facts), regenerates a styled .docx, and returns a download link inline. New `POST /api/documents/process` + `GET /api/documents/file` (routes/documents.js, operator-gated) backed by a python-docx helper (scripts/resume_docx.py) that reads headers/footers (name/contact) too. Adds `python-docx` to requirements.
 

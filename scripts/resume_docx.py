@@ -165,16 +165,105 @@ def build(path, spec):
     sys.stdout.write(json.dumps({"ok": True, "path": path}))
 
 
+# ── Markdown <-> docx for Document Mode (routes/docmode.js) ──────────────────
+def extract_md(path):
+    """docx -> markdown: headings (#/##/###), bullets (-), paragraphs."""
+    import docx
+    doc = docx.Document(path)
+    out = []
+    seen = set()
+    for section in doc.sections:
+        for part in (section.header,):
+            try:
+                for p in part.paragraphs:
+                    t = p.text.strip()
+                    if t and t not in seen:
+                        seen.add(t)
+                        out.append(t)
+            except Exception:
+                pass
+    if out:
+        out.append("")
+    for p in doc.paragraphs:
+        t = p.text.rstrip()
+        style = (p.style.name or "").lower() if p.style else ""
+        if not t.strip():
+            out.append("")
+            continue
+        if "heading 1" in style or style == "title":
+            out.append("# " + t.strip())
+        elif "heading 2" in style:
+            out.append("## " + t.strip())
+        elif "heading 3" in style:
+            out.append("### " + t.strip())
+        elif "list" in style or "bullet" in style:
+            out.append("- " + t.strip())
+        else:
+            out.append(t)
+    sys.stdout.write("\n".join(out))
+
+
+def _add_md_runs(paragraph, text):
+    """Render minimal inline markdown (**bold**, *italic*) into runs."""
+    import re as _re
+    parts = _re.split(r"(\*\*[^*]+\*\*|\*[^*]+\*)", text)
+    for seg in parts:
+        if not seg:
+            continue
+        if seg.startswith("**") and seg.endswith("**"):
+            paragraph.add_run(seg[2:-2]).bold = True
+        elif seg.startswith("*") and seg.endswith("*"):
+            paragraph.add_run(seg[1:-1]).italic = True
+        else:
+            paragraph.add_run(seg)
+
+
+def build_md(path, md):
+    """markdown -> styled docx (headings, bullets, paragraphs)."""
+    import docx
+    from docx.shared import Pt, Inches
+    doc = docx.Document()
+    normal = doc.styles["Normal"]
+    normal.font.name = "Calibri"
+    normal.font.size = Pt(11)
+    for s in doc.sections:
+        s.top_margin = s.bottom_margin = Inches(0.8)
+        s.left_margin = s.right_margin = Inches(0.9)
+
+    for raw in (md or "").split("\n"):
+        line = raw.rstrip()
+        if not line.strip():
+            doc.add_paragraph()
+            continue
+        if line.startswith("### "):
+            doc.add_heading(line[4:].strip(), level=3)
+        elif line.startswith("## "):
+            doc.add_heading(line[3:].strip(), level=2)
+        elif line.startswith("# "):
+            doc.add_heading(line[2:].strip(), level=1)
+        elif line.lstrip().startswith(("- ", "* ")):
+            p = doc.add_paragraph(style="List Bullet")
+            _add_md_runs(p, line.lstrip()[2:].strip())
+        else:
+            p = doc.add_paragraph()
+            _add_md_runs(p, line)
+    doc.save(path)
+    sys.stdout.write(json.dumps({"ok": True, "path": path}))
+
+
 def main():
     if len(sys.argv) < 3:
-        sys.stderr.write("usage: resume_docx.py <extract|build> <path>\n")
+        sys.stderr.write("usage: resume_docx.py <extract|build|extract-md|build-md> <path>\n")
         sys.exit(2)
     mode, path = sys.argv[1], sys.argv[2]
     if mode == "extract":
         extract(path)
     elif mode == "build":
-        spec = json.loads(sys.stdin.read() or "{}")
-        build(path, spec)
+        build(path, json.loads(sys.stdin.read() or "{}"))
+    elif mode == "extract-md":
+        extract_md(path)
+    elif mode == "build-md":
+        build_md(path, sys.stdin.read())
     else:
         sys.stderr.write("unknown mode: %s\n" % mode)
         sys.exit(2)
