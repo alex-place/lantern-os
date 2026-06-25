@@ -1,0 +1,231 @@
+{
+  "generated_utc": "2026-06-25T09:25:50.514245+00:00",
+  "archive": "data/csf_archives/corpus-public-20260625-02.csf",
+  "archive_sha256": "20438154d6728ad2cb94f9ac24dea82e76fd5f7e5e8ada66392a6f5876aa66db",
+  "archive_bytes": 85250916,
+  "group": "public-shard-02",
+  "files_in": 55,
+  "unique_members": 54,
+  "members": {
+    "csf/ingest/2026-06-04-convergence-io-relative-cadence.md": {
+      "sha256": "6e5fbcfd36ff6b903308a69dc6a0c35303353f782a24709aa88c49733a7cb547",
+      "member": "csf/ingest/2026-06-04-convergence-io-relative-cadence.md"
+    },
+    "csf/ingest/2026-06-06-elephant-door-memories.md": {
+      "sha256": "54231cf9057a4268e33d7a5a82d1a3a016149b3e6e0988cffc4283112eba9114",
+      "member": "csf/ingest/2026-06-06-elephant-door-memories.md"
+    },
+    "csf/ingest/2026-06-06-root-index-and-knowledge-update.md": {
+      "sha256": "cb8dbe0fc234548d27691b16fafe98ccfc7bc42fbbe017beaca3fc29a9263e7f",
+      "member": "csf/ingest/2026-06-06-root-index-and-knowledge-update.md"
+    },
+    "csf/ingest/2026-06-07-hff-mcp-integration-fixes.md": {
+      "sha256": "1f5f193556dcb57337f8f0b696d1a4ed80aecd927eed100333f72fae30f450be",
+      "member": "csf/ingest/2026-06-07-hff-mcp-integration-fixes.md"
+    },
+    "csf/ingest/2026-06-08-fuzzy-testing-three-doors-bugfixes.md": {
+      "sha256": "400a0f8f29ffdee0615b41e5d11c4464f8c7488611d778014810daeea915e239",
+      "member": "csf/ingest/2026-06-08-fuzzy-testing-three-doors-bugfixes.md"
+    },
+    "csf/ingest/2026-06-14-cio-agent-context.md": {
+      "sha256": "1e71e567f0667445cf47d45ccb586e134701dcb135ec622b684919df1040544e",
+      "member": "csf/ingest/2026-06-14-cio-agent-context.md"
+    },
+    "csf/ingest/2026-06-14-keystone-image-gallery-adr.md": {
+      "sha256": "412b414907363d1a8f081994c3a773fde9c8f3ca54a154f5f2db95659717cddc",
+      "member": "csf/ingest/2026-06-14-keystone-image-gallery-adr.md"
+    },
+    "csf/ingest/2026-06-14-waking-the-delegation.md": {
+      "sha256": "1e452fc65ef4a15f2dafbe2aa0b7076317bf156b95308f8c693c3757fbd0349b",
+      "member": "csf/ingest/2026-06-14-waking-the-delegation.md"
+    },
+    "csf/ingest/2026-06-19-tesseract-convergence-update.md": {
+      "sha256": "1cba5101f27c9860b729fa7fab2963eeb29047e0bccbd90e2375da2d208aee58",
+      "member": "csf/ingest/2026-06-19-tesseract-convergence-update.md"
+    },
+    "csf/ingest/convergence-asmr-tts-chain.md": {
+      "sha256": "bf262a6bb9611008554fae7d0338c97622a9b42059b1a87d1d0f211025352c09",
+      "member": "csf/ingest/convergence-asmr-tts-chain.md"
+    },
+    "csf/ingest/convergence-kvcache-compression.md": {
+      "sha256": "12ff0b27caf9c0d3e9465d364ef34616d6eb67ed2c8d5d9f87b47b1ffa9d812a",
+      "member": "csf/ingest/convergence-kvcache-compression.md"
+    },
+    "csf/ingest/convergence-model-training.md": {
+      "sha256": "db7f274c4f3f9fa77ccf6c65cd7a313a1160be3a4577b75e692bea62217ab234",
+      "member": "csf/ingest/convergence-model-training.md"
+    },
+    "csf/ingest/convergence-patreon-tiers.md": {
+      "sha256": "400f2dfb36533ee4287710afd1f5679c37f885ce4b3dbdbae8b0babb373d5ddd",
+      "member": "csf/ingest/convergence-patreon-tiers.md"
+    },
+    "csf/ingest/convergence-web-refinement.md": {
+      "sha256": "5c9c89baebb5bbe70ef2cf6a8c787b62a22e2e328543972ae6269b4b9c4eb486",
+      "member": "csf/ingest/convergence-web-refinement.md"
+    },
+    "csf/ingest/convergence-webrtc-voice.md": {
+      "sha256": "d9f0fb5a641a9889ae10fdb50a98687fa7fd6304346d565a047fe23990296c0e",
+      "member": "csf/ingest/convergence-webrtc-voice.md"
+    },
+    "csf/ingest/enhanced-dream-chat-with-personal-cube.md": {
+      "sha256": "237c141cf678fa69bf41136326aebbd314e5a83b7940bff688fa68dd4f662c29",
+      "member": "csf/ingest/enhanced-dream-chat-with-personal-cube.md"
+    },
+    "csf/ingest/focused-internet-map-status-cube.md": {
+      "sha256": "b395b9850036ef3666591a570a6789fe82aeb1a70546bcb171c409932d496e4d",
+      "member": "csf/ingest/focused-internet-map-status-cube.md"
+    },
+    "csf/ingest/internet-action-status-cube.md": {
+      "sha256": "b75fa4b9d18a8c1c3b7a9a8cf8b5e9d8dbaec795f04a13baf004bd0b6be3cee3",
+      "member": "csf/ingest/internet-action-status-cube.md"
+    },
+    "csf/ingest/personal-development-status-cube.md": {
+      "sha256": "08a4bfcf0bcff8415fccc0ba9904ee32ef0aeb0e6cfc4ae9facc26554ee5e4f8",
+      "member": "csf/ingest/personal-development-status-cube.md"
+    },
+    "csf/ingest/shelby-elephant-oasis-room-2026-06-05.md": {
+      "sha256": "9da90a881dfaf4bf7f763169d6cf84602680b3feb05e4f82b4292e0eb8849df4",
+      "member": "csf/ingest/shelby-elephant-oasis-room-2026-06-05.md"
+    },
+    "csf/ingest/three-doors/2026-06-08-elephant-oasis-local-model-session.md": {
+      "sha256": "0eb8193bb57cc64de1d92dc70a34e5e6e79bf78fc1b0b5dc2118b64c422ba375",
+      "member": "csf/ingest/three-doors/2026-06-08-elephant-oasis-local-model-session.md"
+    },
+    "csf/ingest/three-doors/2026-06-09-kingdom-of-hearts-lore-expansion.md": {
+      "sha256": "35cd611656fd86eb11c6a8b3ce2f6e0814c505f22c07d14bd21501ea427c033f",
+      "member": "csf/ingest/three-doors/2026-06-09-kingdom-of-hearts-lore-expansion.md"
+    },
+    "csf/ingest/three-doors/2026-06-09-kingdome-of-hearts-lore-expansion.md": {
+      "sha256": "1222e5f911d6014aa0cac8421a8bc3e477fbf44cfe68d6a3551fb861cbbb3397",
+      "member": "csf/ingest/three-doors/2026-06-09-kingdome-of-hearts-lore-expansion.md"
+    },
+    "csf/ingest/three-doors/2026-06-22-full-memory-reload-and-poster-content.md": {
+      "sha256": "6ea0b0093b20c890da7bff9717fc8484a032edaa4cd005e88302dcf933d95927",
+      "member": "csf/ingest/three-doors/2026-06-22-full-memory-reload-and-poster-content.md"
+    },
+    "csf/ingest/three-doors/2026-06-23-keystone-hidden-object-quest-art-direction.md": {
+      "sha256": "60065b3cb308327e06434b72b1c9e78f76a1970c877de80b20258992f06f4465",
+      "member": "csf/ingest/three-doors/2026-06-23-keystone-hidden-object-quest-art-direction.md"
+    },
+    "data/reports/caadi/8495630 (1).pdf": {
+      "sha256": "51ee4dc452472863699532711557ba5eb5aef69f0ac9fa5e5d7e695541f0c2c9",
+      "member": "data/reports/caadi/8495630 (1).pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial Superintelligence _ASI_ Alliance Vision Paper - CUDOS Edition.pdf": {
+      "sha256": "25776b3a8543d7c334ba315083d255c1b8c62b8b7dbbf77319984877adbc9a89",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial Superintelligence _ASI_ Alliance Vision Paper - CUDOS Edition.pdf"
+    },
+    "data/reports/caadi/Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf": {
+      "sha256": "25776b3a8543d7c334ba315083d255c1b8c62b8b7dbbf77319984877adbc9a89",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial Superintelligence _ASI_ Alliance Vision Paper - CUDOS Edition.pdf"
+    },
+    "data/reports/caadi/Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf": {
+      "sha256": "c59f844e6a2255c785a748d6e9d62f198b0ce0d7058eae4b28d09e7401ee8b2f",
+      "member": "data/reports/caadi/Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf"
+    },
+    "data/reports/caadi/Zero Hash and Zero Hash Liquidity Services User Agreement.pdf": {
+      "sha256": "556833a751fc396d70bfcced509355d952c347ee51b1bfa378063d5716412758",
+      "member": "data/reports/caadi/Zero Hash and Zero Hash Liquidity Services User Agreement.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_0a032d693bfe4c24be09944eb193f1d9.pdf": {
+      "sha256": "6a009cc21dc397390741f2358370fdbdb4bcb6f9143890e1f2c422bff4f844ac",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_0a032d693bfe4c24be09944eb193f1d9.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_5b94cc955833475ebe28af2fe7944da7.pdf": {
+      "sha256": "f10e90b1eee70110baab056a8d40140a48892fb216baaebc0aa666503512a6db",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_5b94cc955833475ebe28af2fe7944da7.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_68e847c83097487cb6a7da2726ef3fab.pdf": {
+      "sha256": "f06925ab52e58332e65a31d00b5b4de517c4512d078b3c520c85ea46d0549c7d",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_68e847c83097487cb6a7da2726ef3fab.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_b75de03714bf4f9f9a31f4e47d72ce79.pdf": {
+      "sha256": "5a2cdfef962e34fa6219248b3306fa304240eff44c665140204cb0139aa33bc7",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_b75de03714bf4f9f9a31f4e47d72ce79.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_c54f3c4462e1459387944ed327741506.pdf": {
+      "sha256": "dc1db94d0d4fc16e5d06223569e1b01b413817fc77b8a1a5e6a824d75265b67e",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_c54f3c4462e1459387944ed327741506.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_dd1437532a3a4935b39fcfb540c58d5b.pdf": {
+      "sha256": "988aefd918ea105b0c2c671538c4f4fa4b6e208df45b9408a7b0b0fc1510fe06",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_dd1437532a3a4935b39fcfb540c58d5b.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial_Intelligence_and_Quantum_Computing_white_paper.pdf": {
+      "sha256": "2e5fb75021cb674376b0ae241c776745d168a9f254d41680e5c3c9616c54328d",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial_Intelligence_and_Quantum_Computing_white_paper.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/DD-Player-Handbook.pdf": {
+      "sha256": "a8cf2985df5bb802f5c8db2428c9700743dcb86675e4f2446e54609e08e7363e",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/DD-Player-Handbook.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/NTIBIO_AI_FINAL.pdf": {
+      "sha256": "03897f5ad6df156e0464c02af4bf3bf804bf59321f08a4ea0cc30fe4e2e0e989",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/NTIBIO_AI_FINAL.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/atarc_whitepaper_cyber_ai-convergence.pdf": {
+      "sha256": "6b3d162922def374be19028f5b486d18d9b4efe678bf87a7466ac51a517b1fce",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/atarc_whitepaper_cyber_ai-convergence.pdf"
+    },
+    "data/rag-intake/external-llm-web-cache/human-in-the-loop-asi-agi-2026-06-07.json": {
+      "sha256": "839903508227b8d55469367c87bbd6df855103ad92515e329de2587779df5a0b",
+      "member": "data/rag-intake/external-llm-web-cache/human-in-the-loop-asi-agi-2026-06-07.json"
+    },
+    "docs/research-papers/asi-alliance-vision-cudos.pdf": {
+      "sha256": "9c8fa7c03204d7845d1daa78018622929aab62764502867eaf69557d43eb576b",
+      "member": "docs/research-papers/asi-alliance-vision-cudos.pdf"
+    },
+    "docs/research-papers/b2b-marketing-playbook-2026.pdf": {
+      "sha256": "4fca18e9633cfb3d0acb20408cdc67135e0c845ad9c9c662bf3c9cf1d8c56b68",
+      "member": "docs/research-papers/b2b-marketing-playbook-2026.pdf"
+    },
+    "docs/research-papers/coconut-latent-reasoning-2412.06769.pdf": {
+      "sha256": "8281f80c3780b97b0a955f8d673065dbbdbcda64543a29c0a42fad35ae48c3a9",
+      "member": "docs/research-papers/coconut-latent-reasoning-2412.06769.pdf"
+    },
+    "docs/research-papers/game-theory-dutta-strategies-1999.pdf": {
+      "sha256": "01262b3a0de0dbb64c61b8bf74d406bfafb51c9e7f145c77a93248e1a6dad414",
+      "member": "docs/research-papers/game-theory-dutta-strategies-1999.pdf"
+    },
+    "docs/research-papers/game-theory-osborne-rubinstein.pdf": {
+      "sha256": "5690c0834ed9be2e4e528c24002f82722230c6bd6794598c72e46b09a2cba018",
+      "member": "docs/research-papers/game-theory-osborne-rubinstein.pdf"
+    },
+    "docs/research-papers/hft-systems-development.pdf": {
+      "sha256": "c4c2ed1a43fa0786e3038e05f9addc264125af8a961c51b1f126ff35caa71e48",
+      "member": "docs/research-papers/hft-systems-development.pdf"
+    },
+    "docs/research-papers/ouro-looped-llm-2510.25741.pdf": {
+      "sha256": "f77e5b9f7c574e23c53e9f5cea759cddc74c1a66e28e6589bcb75c18e1e1cc3b",
+      "member": "docs/research-papers/ouro-looped-llm-2510.25741.pdf"
+    },
+    "docs/research-papers/quantum-canary-teleportation.pdf": {
+      "sha256": "b9f8fbe86f39634991f271b2c6710e1c3d83fe21a64c286f7ff3180d75abfc3c",
+      "member": "docs/research-papers/quantum-canary-teleportation.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-high-dimensions-1906.09697.pdf": {
+      "sha256": "9857657c4b141786e23da968fc612523766a618192bb30a216c1d0c6f901c751",
+      "member": "docs/research-papers/quantum-teleportation-high-dimensions-1906.09697.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-of-image.pdf": {
+      "sha256": "0f5fa4001711933480939c786a657fe6ccfac05cc97aca38867efe50abe7a189",
+      "member": "docs/research-papers/quantum-teleportation-of-image.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-overview.pdf": {
+      "sha256": "e81ba18ebe7054e60da4968718f5ca441b7c2e150862f7028ddb7e9e6578c28f",
+      "member": "docs/research-papers/quantum-teleportation-overview.pdf"
+    },
+    "docs/research-papers/subliminal-learning-2507.14805.pdf": {
+      "sha256": "a380f951369744abddddef2bc74273ed2d15f5812c582936d9bb6058df3bb3f2",
+      "member": "docs/research-papers/subliminal-learning-2507.14805.pdf"
+    },
+    "docs/research-papers/trading-architecture.pdf": {
+      "sha256": "63f134995223769fcd2362bacc01d39db8771d59ee1ef30e339004c46eb21ee7",
+      "member": "docs/research-papers/trading-architecture.pdf"
+    },
+    "docs/research-papers/wargames-scientific-method-air-war-college.pdf": {
+      "sha256": "2ea405768ffeaf3c4e1aca1fbddbb52f8685054354681896f1fca5b9e10dc01a",
+      "member": "docs/research-papers/wargames-scientific-method-air-war-college.pdf"
+    }
+  }
+}

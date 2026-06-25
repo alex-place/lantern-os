@@ -353,5 +353,8 @@ tmp.*.patch
 data/documents/
 data/tmp-kaggle-out/
 
-# CSF condensed corpus archives (local lossless store; holds data/ingest PII pool — never commit)
-data/csf_archives/*.csf
+# CSF condensed corpus archives. The PUBLIC archive (research/report PDFs) is
+# committed for durability. The INGEST archive + its manifest hold the data/ingest
+# PII pool (#868) and stay LOCAL ONLY — never commit them to this public repo.
+data/csf_archives/*ingest*.csf
+data/csf_archives/*ingest*.manifest.json

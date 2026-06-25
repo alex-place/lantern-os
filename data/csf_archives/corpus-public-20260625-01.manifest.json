@@ -1,0 +1,215 @@
+{
+  "generated_utc": "2026-06-25T09:24:14.358734+00:00",
+  "archive": "data/csf_archives/corpus-public-20260625-01.csf",
+  "archive_sha256": "bf9b8acaaaa9cb6e44e0a98896b4fda54f35dc03179fd20588d703430925dbd4",
+  "archive_bytes": 86353362,
+  "group": "public-shard-01",
+  "files_in": 51,
+  "unique_members": 50,
+  "members": {
+    "csf/ingest/2026-06-05-orch-diagnosis.md": {
+      "sha256": "4c2c9c57aa7a941bfc9e1cdfdc601fa268eead87814c923e71b5a50b50369dc4",
+      "member": "csf/ingest/2026-06-05-orch-diagnosis.md"
+    },
+    "csf/ingest/2026-06-08-skills-quickstart-convergence.md": {
+      "sha256": "8213e6f3b915225998186dcbf6c2dba9dd227719b9092f3428e3755998bc5540",
+      "member": "csf/ingest/2026-06-08-skills-quickstart-convergence.md"
+    },
+    "csf/ingest/2026-06-14-csf-agent-inspect-wire.md": {
+      "sha256": "fc73981ac341a2a2a29e6589cae5d18f3e037d992592bde34ed1248e67ec972f",
+      "member": "csf/ingest/2026-06-14-csf-agent-inspect-wire.md"
+    },
+    "csf/ingest/2026-06-14-kalshi-cio-tightband-observations.md": {
+      "sha256": "7c144074f36ae18d2d11bf57f5be134f0accd16c29b6f054b6feede19c31a5d1",
+      "member": "csf/ingest/2026-06-14-kalshi-cio-tightband-observations.md"
+    },
+    "csf/ingest/2026-06-14-keystone-gallery-implementation.md": {
+      "sha256": "6dad16ce8d47a5e1cae3583e1e52e1fcf81f155af179cb750249da3672d27590",
+      "member": "csf/ingest/2026-06-14-keystone-gallery-implementation.md"
+    },
+    "csf/ingest/2026-06-24-kaggle-multisource-session-dataset.md": {
+      "sha256": "0794f7271f4ef932633471be1219a79a8a7eee952fa88375394382138160e849",
+      "member": "csf/ingest/2026-06-24-kaggle-multisource-session-dataset.md"
+    },
+    "csf/ingest/ROOT-DOCS-CONSOLIDATION.md": {
+      "sha256": "6b8d4b7c979ad3468d1dc1ad586effd9f48c2d226a1a10c97f6955904592a4e6",
+      "member": "csf/ingest/ROOT-DOCS-CONSOLIDATION.md"
+    },
+    "csf/ingest/convergence-conversation-tree.md": {
+      "sha256": "83f207cc03f0c40a2d3254f1a4345354ff6aa3ba239cd5967576fe1af57a3051",
+      "member": "csf/ingest/convergence-conversation-tree.md"
+    },
+    "csf/ingest/convergence-stable-diffusion-doors.md": {
+      "sha256": "5401ed2c0cadb49a25b486f6986bbc8cb17973065936c4aa5eeaf43084be229f",
+      "member": "csf/ingest/convergence-stable-diffusion-doors.md"
+    },
+    "csf/ingest/convergence/2026-06-16-issue-628-local-ollama-coder-diagnosis.md": {
+      "sha256": "5c293ebac54fb5b50accf8bf47e033329bda4e7f7dac07a146692ed5396ad999",
+      "member": "csf/ingest/convergence/2026-06-16-issue-628-local-ollama-coder-diagnosis.md"
+    },
+    "csf/ingest/three-doors/2026-06-04-lantern-consolidate.md": {
+      "sha256": "dff58e1a26a122cf6601038733e4fe3ec036ae499dec6e74a46579b35eb5466d",
+      "member": "csf/ingest/three-doors/2026-06-04-lantern-consolidate.md"
+    },
+    "csf/ingest/three-doors/2026-06-05-three-doors-game.md": {
+      "sha256": "1d89637dd3d177fdc52e2cb5f1d4b0c7fb7611d448e794dc53be7aeb10b2b7ee",
+      "member": "csf/ingest/three-doors/2026-06-05-three-doors-game.md"
+    },
+    "csf/ingest/three-doors/2026-06-16-canonical-seven-doors-skill-update.md": {
+      "sha256": "b1828b59d28a28c0850f6e7fddaf90cca8b93b9d3b1adb52ee9f51a3505a7db3",
+      "member": "csf/ingest/three-doors/2026-06-16-canonical-seven-doors-skill-update.md"
+    },
+    "csf/ingest/three-doors/2026-06-16-kingdome-spine-xp-awakening.md": {
+      "sha256": "720b74c485d0d380c1bcf81438c911a5b278618d71da6513b2072a712793e1d9",
+      "member": "csf/ingest/three-doors/2026-06-16-kingdome-spine-xp-awakening.md"
+    },
+    "csf/ingest/universe-slicing-csf-extension.md": {
+      "sha256": "a760673e6fb2eecf8c3e3da260ce0ddc203817b638356e360917a0e546378cbf",
+      "member": "csf/ingest/universe-slicing-csf-extension.md"
+    },
+    "data/reports/caadi/Artificial Superintelligence (ASI) Alliance Vision Paper.pdf": {
+      "sha256": "3412a5dd589a72602f97d9c5ccfb3c387afd74dc5882fb40807cd6ae7f5eaa64",
+      "member": "data/reports/caadi/Artificial Superintelligence (ASI) Alliance Vision Paper.pdf"
+    },
+    "data/reports/caadi/GWI Connecting the Dots 2026.pdf": {
+      "sha256": "fba144e433fd14452ccdd6d87b178f060a2d2f5cb30935a16fb651cb35bfb8c1",
+      "member": "data/reports/caadi/GWI Connecting the Dots 2026.pdf"
+    },
+    "data/reports/caadi/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf": {
+      "sha256": "a7a5e805776cb9bb36cc353975b2a94769eb6e8750884e4f4f1bc8ba7eb7cba8",
+      "member": "data/reports/caadi/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf"
+    },
+    "data/reports/caadi/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf": {
+      "sha256": "47d9fa99b89530fdbf7c2ab3b796464ad63d384ebbce9514709c625d5ff3840f",
+      "member": "data/reports/caadi/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a459a111164e8a64a76d43cbb8c81256074dc44b0336ec0174a73646fc7e63c2",
+      "member": "data/reports/caadi/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/Marketing Trends in 2026 _ IDHL.pdf": {
+      "sha256": "cccf245304e0d13a275b1b6624f402d09b9d25d7869037800de4d4051def46af",
+      "member": "data/reports/caadi/Marketing Trends in 2026 _ IDHL.pdf"
+    },
+    "data/reports/caadi/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "data/reports/caadi/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (2).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "data/reports/caadi/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a89a1dd2b7691d0ce0843700e7a64b6247fc43a72e499a6d31ee43b7143d5612",
+      "member": "data/reports/caadi/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_03572f3966cb48728e692acbcdfffdf0.pdf": {
+      "sha256": "a3e82acb18c8ea7f6c773444c9c88e11cef0050f0a83246a298d247b4fae16ae",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_03572f3966cb48728e692acbcdfffdf0.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_29dd6156220b43edb06ec167dc30d9fa.pdf": {
+      "sha256": "ea3e5308aeaf6ba78604250c0fca9497521012cac50ffbb376e402c86d93d36f",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_29dd6156220b43edb06ec167dc30d9fa.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_87aa189565154f608c9c48964ee26888.pdf": {
+      "sha256": "ec8520563c141a972664a378b752af70367762d6447d187893b93369eae5b081",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_87aa189565154f608c9c48964ee26888.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_e3b4379474e745fb83a7d9f4e44a16dd.pdf": {
+      "sha256": "697ee09d318e3e63ec7b8cdf6d00386d9f18ae3f16b6d72c9dc37b7af6ea102f",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_e3b4379474e745fb83a7d9f4e44a16dd.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/AI-Singularity-Navigating-Implications-and-Framing-Strategic-Recommendations.pdf": {
+      "sha256": "8d3f6f0fb0d3d65c7f07905d5b8c365055e4f18c5a092345f9735ab943a7ddda",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/AI-Singularity-Navigating-Implications-and-Framing-Strategic-Recommendations.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Clifford-Chance-Deutsche-Bank-Guide-on-Thought-Leadership-Convergence-of-AI-and-DLT-Sep2025.pdf": {
+      "sha256": "d7be092daaa2c39946a84beb0191cfd57e3cb615ed05709c4843060be43c9fe0",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/Clifford-Chance-Deutsche-Bank-Guide-on-Thought-Leadership-Convergence-of-AI-and-DLT-Sep2025.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/My Characters - D_D Beyond.html": {
+      "sha256": "dcf4e4215cd73bb6555a72a4bd3de40e764f2ee1248fea6ba7d1a074a0bd5cfd",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/My Characters - D_D Beyond.html"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Quantum_Relativity _1_.pdf": {
+      "sha256": "c30f1dcb1833657300b8ae322393180895599a3398e8a0d88d9ec4609d288ec9",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/Quantum_Relativity _1_.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Quantum_relativity.pdf": {
+      "sha256": "c1d3d804e1506e7ffebd3c6b011b47287483eee765c576f3db0c3fe20d4845d3",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/Quantum_relativity.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/james-d-bjorken-sidney-d-drell-relativistic-quantum-mechanics-1964.pdf": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "member": "data/rag-intake/downloads-merge-2026-05-27/assets/james-d-bjorken-sidney-d-drell-relativistic-quantum-mechanics-1964.pdf"
+    },
+    "data/rag-intake/research-synthesis-human-in-the-loop-asi-agi-2026-06-07.md": {
+      "sha256": "48c76a7938a12cb29ba4555e911437f9009266b9994fae41407253a131a6ca9a",
+      "member": "data/rag-intake/research-synthesis-human-in-the-loop-asi-agi-2026-06-07.md"
+    },
+    "docs/research-papers/ai-neurosymbolic-runtime.pdf": {
+      "sha256": "3b52dfb2235f24d7dc4be005e073c5e45682f335493d24d7f5b80565b521d800",
+      "member": "docs/research-papers/ai-neurosymbolic-runtime.pdf"
+    },
+    "docs/research-papers/asi-alliance-vision-paper.pdf": {
+      "sha256": "5fef6398d625b2e54f6b835ede1fe73498baa67802679e8a1c78368d0667541c",
+      "member": "docs/research-papers/asi-alliance-vision-paper.pdf"
+    },
+    "docs/research-papers/asi-coordination-strategy.pdf": {
+      "sha256": "2a8c17836191b9bc2bc2ea6b81a5e204b0071c6bd94f920af5a8c8759a11645c",
+      "member": "docs/research-papers/asi-coordination-strategy.pdf"
+    },
+    "docs/research-papers/blue-wheel-paid-media-guide-2026.pdf": {
+      "sha256": "977150f9b4b355be9b2678d95ca7227970e63ded915ddd39ccf7c083b192344e",
+      "member": "docs/research-papers/blue-wheel-paid-media-guide-2026.pdf"
+    },
+    "docs/research-papers/game-theory-bonanno-2024.pdf": {
+      "sha256": "657bbb0e5e30fb2636f283d6c2c128ff90cdd3c8c71ef8d25a2e5237cdb8a017",
+      "member": "docs/research-papers/game-theory-bonanno-2024.pdf"
+    },
+    "docs/research-papers/game-theory-osborne-2003.pdf": {
+      "sha256": "1a8232bffec2645e8d347af8a26be9109d814f24f53f9bab65c4c4998edf519a",
+      "member": "docs/research-papers/game-theory-osborne-2003.pdf"
+    },
+    "docs/research-papers/gpt2-language-models-2019.pdf": {
+      "sha256": "a44fcd816a98fec35252cc8cc7ff704185748eda610708cc60652bb0fdd56b53",
+      "member": "docs/research-papers/gpt2-language-models-2019.pdf"
+    },
+    "docs/research-papers/gwi-connecting-dots-2026.pdf": {
+      "sha256": "a9b96d2a65dc4f598f327bb4da044d3bb477250828157126c08e62e8b2eb4e5b",
+      "member": "docs/research-papers/gwi-connecting-dots-2026.pdf"
+    },
+    "docs/research-papers/hft-nimrod.pdf": {
+      "sha256": "d864514a50ecee5599a9d9c7e4dd8c4b428236847166f98c85d16b4d8ae27c0e",
+      "member": "docs/research-papers/hft-nimrod.pdf"
+    },
+    "docs/research-papers/kalshi-sports-trading-app.pdf": {
+      "sha256": "c62753a38e121cd3b3987bbb6cf29ebbdb2b4b50303da5db988e9542eb21446a",
+      "member": "docs/research-papers/kalshi-sports-trading-app.pdf"
+    },
+    "docs/research-papers/marketing-trends-2026-idhl.pdf": {
+      "sha256": "44bcd8d8376e7d9e683d13d37243c60125ef383a38ba64502a94d9bb3f79d4b8",
+      "member": "docs/research-papers/marketing-trends-2026-idhl.pdf"
+    },
+    "docs/research-papers/quantum-entangled-photons-teleportation-mocanu.pdf": {
+      "sha256": "326c41a8d84f23874bfb5dcc880b8dc5e40d550200a44f1929b2609f143d7ab2",
+      "member": "docs/research-papers/quantum-entangled-photons-teleportation-mocanu.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-maaike.pdf": {
+      "sha256": "7a5054bce454d4324a391cd42bc21de190576466e51f79e4b8a7ec776aaad117",
+      "member": "docs/research-papers/quantum-teleportation-maaike.pdf"
+    },
+    "docs/research-papers/smartsheet-ai-whitepaper-2026.pdf": {
+      "sha256": "be81a0b2c755b7613688acb9bc1fa7f71d5c0ea577e0ef8aea50e8349d999af3",
+      "member": "docs/research-papers/smartsheet-ai-whitepaper-2026.pdf"
+    },
+    "docs/research-papers/smartwatches-healthcare-2026.pdf": {
+      "sha256": "68fdbf4d056c29d7a004f4dfafeaf69fbb6f2a4682f6d6caf78a3bc8d3a57dfb",
+      "member": "docs/research-papers/smartwatches-healthcare-2026.pdf"
+    },
+    "docs/research-papers/wargames-handbook-dunnigan.pdf": {
+      "sha256": "71a6288da16d254b071e921adc2daf2da5ef7edb0716bd0e376779ce9233a79c",
+      "member": "docs/research-papers/wargames-handbook-dunnigan.pdf"
+    }
+  }
+}
