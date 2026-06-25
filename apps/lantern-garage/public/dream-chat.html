@@ -106,10 +106,27 @@
     line-height: 1.45;
     color: var(--muted, #9aa0aa);
   }
+  /* ── File drop overlay ── */
+  #drop-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: color-mix(in srgb, var(--accent, #06b6d4) 10%, rgba(0,0,0,.55));
+    border: 3px dashed var(--accent, #06b6d4);
+    align-items: center; justify-content: center;
+    pointer-events: none;
+    flex-direction: column; gap: 10px;
+    color: var(--accent, #06b6d4); font-size: 1.3rem; font-weight: 600;
+  }
+  #drop-overlay.active { display: flex; }
+  #drop-overlay .drop-sub { font-size: 0.85rem; font-weight: 400; opacity: .75; }
 </style>
 
 </head>
 <body>
+<div id="drop-overlay" aria-hidden="true">
+  📄 Drop to process
+  <span class="drop-sub">.docx — improve &amp; rewrite &nbsp;·&nbsp; .pdf — add to Knowledge Center</span>
+</div>
 <div class="app">
   <div class="app-main">
 
@@ -517,6 +534,61 @@
 <script src="js/convergance-sync.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>
+/* ── File drag-and-drop + cross-page handoff from index.html ── */
+(function () {
+  const overlay = document.getElementById('drop-overlay');
+  let dragDepth = 0;
+
+  document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    if (![...(e.dataTransfer.types || [])].includes('Files')) return;
+    if (++dragDepth === 1) overlay.classList.add('active');
+  });
+  document.addEventListener('dragleave', () => {
+    if (--dragDepth <= 0) { dragDepth = 0; overlay.classList.remove('active'); }
+  });
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0; overlay.classList.remove('active');
+    const files = [...(e.dataTransfer.files || [])];
+    if (!files.length) return;
+    function handle() {
+      if (!window.lanternAttach) { setTimeout(handle, 80); return; }
+      const docx = files.find(f => f.name.toLowerCase().endsWith('.docx'));
+      const pdf  = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
+      if (docx) lanternAttach.dropDocx(docx);
+      else if (pdf) lanternAttach.dropPdf(pdf);
+    }
+    handle();
+  });
+
+  /* Auto-process a .docx forwarded from the home chat bar via sessionStorage */
+  (function () {
+    const params = new URLSearchParams(location.search);
+    if (params.get('autoprocess') !== 'docx') return;
+    const stored = sessionStorage.getItem('pendingDocx');
+    if (!stored) return;
+    sessionStorage.removeItem('pendingDocx');
+    let meta;
+    try { meta = JSON.parse(stored); } catch { return; }
+    const { name, data, instruction } = meta;
+    const [header, b64] = data.split(',');
+    const mime = (header.match(/:(.*?);/) || [])[1] || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const bytes = atob(b64);
+    const buf = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
+    const file = new File([buf], name, { type: mime });
+    function tryProcess() {
+      if (!window.lanternAttach) { setTimeout(tryProcess, 80); return; }
+      lanternAttach.dropDocx(file, instruction || undefined);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryProcess);
+    else tryProcess();
+  })();
+})();
+</script>
+<script>
 (function () {
   const q = new URLSearchParams(window.location.search).get('q');
   if (!q) return;
@@ -614,6 +686,20 @@
     toggle() { menu.classList.contains('open') ? closeMenu() : openMenu(); },
     pickPdf() { closeMenu(); fileInput.click(); },
     improveDoc() { closeMenu(); docxInput.click(); },
+    dropDocx(file, presetInstruction) {
+      const typed = (document.getElementById('input') || {}).value || '';
+      const instruction = presetInstruction || typed.trim()
+        || window.prompt(
+            'What should I do with "' + file.name + '"?\n(e.g. "polish and tighten", "tailor to a software engineering role")',
+            'Polish and modernize: fix formatting, tighten wording, and strengthen the bullets — without inventing facts.');
+      if (instruction == null) return;
+      if (!presetInstruction && typed.trim()) {
+        const el = document.getElementById('input');
+        if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
+      }
+      processDocx(file, instruction);
+    },
+    dropPdf(file) { uploadPdfs([file]); },
   };
 
   docxInput.addEventListener('change', () => {

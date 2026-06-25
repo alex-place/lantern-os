@@ -108,6 +108,24 @@
     }
     .home-chat button:hover { transform: scale(1.03); }
     .home-chat button:active { transform: scale(0.97); }
+    .home-chat.drag-over { outline: 2px dashed var(--accent); outline-offset: 5px; }
+    .home-file-chip {
+      display: none; align-items: center; gap: 6px;
+      max-width: 560px; margin: -8px auto 0;
+      padding: 5px 12px 5px 10px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+      border-radius: 9999px;
+      font-size: 0.8rem; color: var(--text);
+    }
+    .home-file-chip.visible { display: flex; }
+    .home-file-chip span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .home-file-chip button {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 13px; line-height: 1; padding: 0;
+      flex-shrink: 0;
+    }
+    .home-file-chip button:hover { color: var(--text); }
     /* ── Secondary experiences — redesigned tiles ── */
     .home-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
     @media (max-width: 480px) { .home-tiles { grid-template-columns: 1fr; } }
@@ -232,6 +250,10 @@
     <input id="home-chat-input" type="text" placeholder="Ask Keystone anything…" autocomplete="off" aria-label="Chat message">
     <button type="submit">Chat ✦</button>
   </form>
+  <div class="home-file-chip" id="home-file-chip">
+    <span id="home-file-chip-name">📄 file.docx</span>
+    <button type="button" onclick="clearHomeDocx()" aria-label="Remove file">✕</button>
+  </div>
   <p class="sub" style="text-align:center;margin-top:-4px;"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></p>
 
   <!-- ── Secondary experiences ── -->
@@ -403,12 +425,67 @@ document.addEventListener('DOMContentLoaded', () => {
 <script src="/js/update-checker.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>
-function homeChat(e) {
-  e.preventDefault();
-  const q = document.getElementById('home-chat-input').value.trim();
-  if (!q) { document.getElementById('home-chat-input').focus(); return; }
-  window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q);
-}
+(function () {
+  let pendingDocx = null;
+
+  function setDocxChip(file) {
+    pendingDocx = file;
+    const chip = document.getElementById('home-file-chip');
+    document.getElementById('home-file-chip-name').textContent = '📄 ' + file.name;
+    chip.classList.add('visible');
+    const input = document.getElementById('home-chat-input');
+    input.placeholder = 'Add an instruction (or leave blank to polish)…';
+    input.focus();
+  }
+
+  window.clearHomeDocx = function () {
+    pendingDocx = null;
+    document.getElementById('home-file-chip').classList.remove('visible');
+    document.getElementById('home-chat-input').placeholder = 'Ask Keystone anything…';
+  };
+
+  window.homeChat = function (e) {
+    e.preventDefault();
+    const q = document.getElementById('home-chat-input').value.trim();
+    if (pendingDocx) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        try {
+          sessionStorage.setItem('pendingDocx', JSON.stringify({
+            name: pendingDocx.name,
+            data: reader.result,
+            instruction: q || null,
+          }));
+        } catch { /* storage full — skip, dream-chat will prompt */ }
+        window.location.href = '/dream-chat.html?autoprocess=docx';
+      };
+      reader.readAsDataURL(pendingDocx);
+      return;
+    }
+    if (!q) { document.getElementById('home-chat-input').focus(); return; }
+    window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q);
+  };
+
+  /* Drag-and-drop on the home chat form */
+  const form = document.getElementById('home-chat-form');
+  let dragDepth = 0;
+
+  form.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    if (![...(e.dataTransfer.types || [])].includes('Files')) return;
+    if (++dragDepth === 1) form.classList.add('drag-over');
+  });
+  form.addEventListener('dragleave', () => {
+    if (--dragDepth <= 0) { dragDepth = 0; form.classList.remove('drag-over'); }
+  });
+  form.addEventListener('dragover', (e) => e.preventDefault());
+  form.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0; form.classList.remove('drag-over');
+    const file = [...(e.dataTransfer.files || [])].find(f => f.name.toLowerCase().endsWith('.docx'));
+    if (file) setDocxChip(file);
+  });
+})();
 </script>
 </body>
 </html>
