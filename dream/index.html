@@ -508,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const lo = Math.max(0, pct - u), hi = Math.min(100, pct + u);
       return `<div class="fd-row">
         <div class="fd-top"><span class="fd-name">${d.domain}</span>
-          <span class="fd-val">${pct}% ±${u}% · ${d.n} feed${d.n === 1 ? '' : 's'}</span></div>
+          <span class="fd-val">${pct}% ±${u}% · ${d.n} belief${d.n === 1 ? '' : 's'} · ${d.n_sources || d.n} src</span></div>
         <div class="fd-bar"><span class="fd-ci" style="left:${lo}%;width:${hi - lo}%"></span>
           <span class="fd-fill" style="width:${pct}%"></span></div>
       </div>`;
@@ -518,15 +518,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const qEl = document.getElementById('flourish-q');
     if (q) {
       qEl.innerHTML = `<b>Question Machine →</b> next to ground: <b>${q.entity}</b> ` +
-        `(±${Math.round(q.uncertainty * 100)}%, via ${q.channel})`;
+        `(±${Math.round(q.uncertainty * 100)}%, ${q.n_sources || 1} source${(q.n_sources || 1) === 1 ? '' : 's'}${q.agreement ? ' · ' + q.agreement : ''})`;
       qEl.hidden = false;
     }
 
     const upd = p.updated_at ? new Date(p.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'now';
     const ung = (p.ungrounded_domains || []).join(', ');
+    const corr = p.corroboration || {};
     document.getElementById('flourish-prov').innerHTML =
-      `Grounded from ${(p.sources || ['World Bank']).join(', ')} yearly aggregates · updated ${upd}` +
-      (ung ? ` · <u title="no live feed — literature-only in the source model">${ung} not live-grounded</u>` : '');
+      `${(p.sources || ['World Bank']).join(' · ')} · ` +
+      `<u title="beliefs grounded by ≥2 independent sources — agreement tightens uncertainty">` +
+      `${corr.multi_source || 0}/${corr.beliefs || 0} corroborated</u> · updated ${upd}` +
+      (ung ? ` · <u title="no live feed for this domain">${ung} not live-grounded</u>` : '');
 
     panel.hidden = false;
 
