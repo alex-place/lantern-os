@@ -517,6 +517,21 @@
 <script src="js/convergance-sync.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>
+(function () {
+  const q = new URLSearchParams(window.location.search).get('q');
+  if (!q) return;
+  function trySubmit() {
+    const input = document.getElementById('input');
+    if (!input || typeof sendMessage !== 'function') { setTimeout(trySubmit, 80); return; }
+    input.value = q;
+    input.dispatchEvent(new Event('input'));
+    sendMessage();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', trySubmit);
+  else trySubmit();
+})();
+</script>
+<script>
 /* ── Journal attachments → Knowledge Center ──
    Reuses the existing PDF ingest endpoint (/api/pdfs/upload). The uploaded
    file lands in data/ingest and appears in the Knowledge Center; a confirmation
