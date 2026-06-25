@@ -1,0 +1,6 @@
+### Orchestration: team work board + Research Team repo-memory
+
+- Refocused `orchestration.html` around the team loop (pull issues → work → status): a live **Work Board** (open issues, in-progress, open PRs, landed, active agents), **PR Lanes** with live CI rollup per agent lane, **Agent Slots**, and **Recently Landed** merges — all wired to real `gh`/queue endpoints with honest error states (no cached fiction).
+- New `GET /api/queue/recent-merges` — recently merged PRs straight from `gh` (shell-free, limit-aware cache).
+- New **Research Team · Repo Memory**: `src/convergence/repo_learn.py` incrementally learns every doc + live module into the one Convergence `MemoryStore` as grounded, evidence-cited records (passes the #767 confidence gate; lands in the trusted convergence log, never proposals). Surfaced via `GET /api/research/repo/status` + `POST /api/research/repo/learn` and an orchestration panel. Repo facts are now retrievable through `/api/memory/query`, grounding delegated agents and chat.
+- Shared site chrome: `js/site-chrome.js` injects the canonical header/footer; trader-dashboard, create, explore, knowledgecenter, admin-flags now use it (fixes drift, the stale "Lantern OS" brand, and create.html's missing footer).
