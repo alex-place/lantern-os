@@ -16,7 +16,7 @@
     {
       "provider_id": "kaggle",
       "display": "Kaggle Notebooks",
-      "priority": 1,
+      "priority": 4,
       "state": "available",
       "automatable": true,
       "api": "https://www.kaggle.com/api/v1",
@@ -32,7 +32,7 @@
       "quota_hours_per_week": 30,
       "session_cap_hours": 9,
       "steps_per_hour_estimate": 180,
-      "notes": "Best free programmatic option. REST kernel push via /api/v1/kernels/push. Quota refills Monday midnight.",
+      "notes": "Crash-free FALLBACK only, behind Lightning (#1171). GPUs are pre-Ampere (T4 cc7.5 / P100 cc6.0) with NO bf16 — the arch-aware fixes degrade instead of crashing, but do NOT trust fp16 adapters for the Ouro reasoning LM. Best free programmatic option for arch-tolerant jobs. REST kernel push via /api/v1/kernels/push. Quota refills Monday midnight.",
       "username": "lanternfounder",
       "kernel_id": "lanternfounder/ouro-qlora",
       "signup_url": "https://www.kaggle.com/account/login?phase=startRegisterTab",
@@ -131,7 +131,7 @@
     {
       "provider_id": "lightning",
       "display": "Lightning AI Studios",
-      "priority": 5,
+      "priority": 1,
       "state": "available",
       "automatable": true,
       "api": null,
@@ -139,12 +139,12 @@
         "LIGHTNING_USER_ID",
         "LIGHTNING_API_KEY"
       ],
-      "gpu": "T4 / A10",
-      "vram_gb": 16,
+      "gpu": "L4 (bf16) / A100",
+      "vram_gb": 24,
       "quota_hours_per_week": 22,
       "session_cap_hours": 6,
       "steps_per_hour_estimate": 180,
-      "notes": "22 free GPU credits/month after phone verify. A10 (24GB) available when T4 busy. Manual launch.",
+      "notes": "Preferred Ouro target (#1171): bf16-capable. Defaults to L4 (Ada, cc 8.9, native bf16, 24GB); set LIGHTNING_MACHINE=A100 to scale up. 22 free GPU credits/month after phone verify. NOTE: the SDK has no 'A10' machine — L4 is the entry bf16 GPU.",
       "signup_url": "https://lightning.ai/sign-up",
       "api_key_url": null,
       "studio_name_env": "LIGHTNING_STUDIO_NAME",
@@ -166,10 +166,10 @@
     }
   ],
   "rotation_order": [
-    "kaggle",
+    "lightning",
     "sagemaker",
     "colab",
-    "lightning"
+    "kaggle"
   ],
   "weekly_total_hours": 102
 }

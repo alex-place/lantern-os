@@ -11,6 +11,12 @@ Auth env vars (set via [System.Environment]::SetEnvironmentVariable ... 'User'):
   LIGHTNING_STUDIO_TEAMSPACE — teamspace name (default: custom-ml-model-development-project —
                                the user-owned teamspace that holds the ouro-training studio)
   LIGHTNING_STUDIO_NAME     — studio to start (default: ouro-training)
+  LIGHTNING_MACHINE         — GPU machine to run on (default: L4). MUST be a bf16-capable
+                               (Ampere cc>=8.0 or newer) machine: train-qlora-ouro.py
+                               requires bf16 (fp16 QLoRA on this reasoning LM overflows to
+                               NaN). T4 (Turing, cc 7.5) has NO bf16 and is rejected. The
+                               Lightning SDK exposes no "A10"; L4 (Ada, cc 8.9) is the
+                               entry bf16 GPU, A100 the next step up. See issue #1171.
 
 Usage:
   python scripts/lightning_dispatch.py dispatch --steps 600 --checkpoint-uri <uri> --hf-repo ouro-checkpoints
@@ -52,6 +58,40 @@ STUDIO_NAME      = os.environ.get("LIGHTNING_STUDIO_NAME",      "ouro-training")
 STUDIO_USER      = os.environ.get("LIGHTNING_STUDIO_USER",      "alexplace7")
 STUDIO_ORG       = os.environ.get("LIGHTNING_STUDIO_ORG",       "")
 STUDIO_TEAMSPACE = os.environ.get("LIGHTNING_STUDIO_TEAMSPACE", "custom-ml-model-development-project")
+
+# Default to L4 — the cheapest bf16-capable GPU in the Lightning catalog (Ada
+# Lovelace, cc 8.9). The recipe needs bf16; T4 (Turing, cc 7.5) has none and
+# bakes a NaN adapter (#1171). "A10" is not a Lightning SDK machine name.
+STUDIO_MACHINE   = os.environ.get("LIGHTNING_MACHINE",         "L4")
+
+# Machines WITHOUT native bf16 (pre-Ampere). Refuse to dispatch onto these for the
+# Ouro recipe — a fp16 QLoRA run silently produces a garbage (NaN) adapter.
+NON_BF16_MACHINES = {"T4", "T4_SMALL", "T4_X_2", "T4_X_4", "T4_X_8"}
+
+
+def _resolve_machine(Machine):
+    """Resolve LIGHTNING_MACHINE to a Machine enum value, refusing non-bf16 GPUs.
+
+    Returns (machine, error_dict). On success error_dict is None. The caller
+    prints the error and exits so the JS dispatcher logs a real failure instead
+    of training a NaN adapter on the wrong hardware."""
+    name = (STUDIO_MACHINE or "").strip().upper()
+    if name in NON_BF16_MACHINES:
+        return None, {
+            "error": "non_bf16_machine",
+            "machine": name,
+            "message": (f"{name} has no native bf16 (pre-Ampere); the Ouro QLoRA recipe "
+                        f"requires bf16. Set LIGHTNING_MACHINE to a bf16 GPU (e.g. L4, A100)."),
+        }
+    machine = getattr(Machine, name, None)
+    if machine is None:
+        return None, {
+            "error": "unknown_machine",
+            "machine": name,
+            "message": (f"'{name}' is not a Lightning SDK Machine. Use a bf16-capable name "
+                        f"such as L4 or A100 (note: there is no 'A10')."),
+        }
+    return machine, None
 
 
 def _get_studio(name=None):
@@ -131,6 +171,11 @@ def cmd_dispatch(args):
     _check_auth()
     _, Machine = _sdk()
 
+    machine, mach_err = _resolve_machine(Machine)
+    if mach_err:
+        print(json.dumps(mach_err))
+        sys.exit(1)
+
     hf_repo = args.hf_repo or os.environ.get("HF_TRAINING_REPO", "ouro-checkpoints")
     checkpoint_uri = args.checkpoint_uri or ""
     checkpoint_file = os.path.basename(checkpoint_uri) if checkpoint_uri else ""
@@ -149,12 +194,12 @@ def cmd_dispatch(args):
         studio = _get_studio()
         status = studio.status
         if str(status).lower() not in ("running",):
-            studio.start(Machine.T4)
+            studio.start(machine)
         else:
             try:
-                studio.switch_machine(Machine.T4)
+                studio.switch_machine(machine)
             except Exception:
-                pass  # already on T4
+                pass  # already on the requested machine
         # Upload to a BARE filename (no directory). studio.run() executes in the
         # studio working dir (/teamspace/studios/this_studio) and upload_file places
         # the file there too. An absolute remote path like "/home/zeus/..." gets
@@ -164,7 +209,7 @@ def cmd_dispatch(args):
         studio.upload_file(script_path, remote_name)
         studio.run(f"nohup python {remote_name} > /tmp/train.log 2>&1 &")
         result = {
-            "status": "running", "studio": STUDIO_NAME, "machine": "T4",
+            "status": "running", "studio": STUDIO_NAME, "machine": STUDIO_MACHINE,
             "steps": steps, "checkpoint_uri": checkpoint_uri,
             "log_path": "/tmp/train.log",
         }

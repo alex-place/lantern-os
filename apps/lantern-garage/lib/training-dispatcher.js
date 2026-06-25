@@ -730,6 +730,10 @@ function _runLightningScript(subcommand, extraArgs = []) {
     LIGHTNING_STUDIO_USER:      process.env.LIGHTNING_STUDIO_USER      || "alexplace7",
     LIGHTNING_STUDIO_ORG:       process.env.LIGHTNING_STUDIO_ORG       || "",
     LIGHTNING_STUDIO_TEAMSPACE: process.env.LIGHTNING_STUDIO_TEAMSPACE || "custom-ml-model-development-project",
+    // Prefer a bf16-capable Ampere-class GPU. The Ouro QLoRA recipe needs bf16;
+    // T4 (Turing) bakes a NaN adapter. L4 (Ada, cc 8.9) is the cheapest bf16 GPU
+    // in the Lightning catalog (there is no "A10" SDK machine). See issue #1171.
+    LIGHTNING_MACHINE:        process.env.LIGHTNING_MACHINE        || "L4",
     HF_TRAINING_REPO:         process.env.HF_TRAINING_REPO         || "ouro-checkpoints",
   };
   try {
