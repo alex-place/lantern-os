@@ -1,0 +1,2 @@
+### Fixed
+- A11y audit (Site Audit & A11y Tests workflow) is green again on master. The decorative ambient mandala on the home page (`/sigma0-mandala.svg`) now carries `aria-hidden="true"` on the `<img>` itself (not just its wrapper), and the dream-chat file inputs (`attach-pdf-input`, `attach-docx-input`), provider selector, and per-provider API-key fields (`key-claude`/`key-gemini`/`key-openai`/`key-grok`) now have associated labels/`aria-label`s — clearing the WCAG 2.1 AA image-alt and form-label violations.
