@@ -413,9 +413,12 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
     """Pick up a queued task and run it through the Convergence Loop (Kernel) — the honest
     consumer for the queue. Claims the named task (full id or unique prefix) or the top
     pending task, marks it active (so active_slots reflects real in-flight work), routes it
-    to the local Σ₀ reasoning path (Reason/Act), writes an append-only Convergence Record +
-    PCSF receipt (Verify/Converge), then marks it done. Per the LANTERN-DREAM rule, results
-    are PROPOSALS: confidence is capped at 0.3 until Σ₀-verified."""
+    to the TOOL-ENABLED streaming chat path (Reason/Act) so the model (Gemini/Claude/OpenAI)
+    can actually call repo tools — Read/Grep/Glob plus operator Edit/Write/Bash on loopback —
+    instead of only proposing text, then writes an append-only Convergence Record + PCSF
+    receipt (Verify/Converge) and marks it done. Tool execution requires CHAT_TOOL_EXEC=1 on
+    the garage server. Per the LANTERN-DREAM rule, results are PROPOSALS: confidence is capped
+    at 0.3 until Σ₀-verified. tool_calls reports how many tools the model executed."""
     import urllib.request
 
     # ── Observe: select the task ──
@@ -449,19 +452,65 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
         f"Task: {goal}"
     )
 
-    # ── Reason/Act: route to the local convergence/Σ₀ path via the garage server ──
-    reply, provider, online, err = "", "unknown", False, None
+    # ── Reason/Act: route to the TOOL-ENABLED streaming chat path ──────────────
+    # We POST to /api/dream/chat/stream (not the non-streaming /api/dream/chat,
+    # which has NO tool loop). The streaming handler runs the native tool-use loop
+    # (Gemini functionDeclarations / Anthropic tool_use / OpenAI function-calling
+    # over lib/tool-runner) when CHAT_TOOL_EXEC=1. Because this POST is an
+    # un-proxied loopback hit, isOperatorRequest() is true → the model gets the
+    # full operator toolset (Read/Grep/Glob/Edit/Write/Bash), so it can actually
+    # work the code issue instead of only proposing text.
+    #
+    # SSE wire format (lib/stream-chat/sse): events arrive as `data:` lines whose
+    # JSON carries a `type`: {"type":"token","text":...} streams the reply,
+    # {"type":"tool","phase":"call"|"result",...} marks each tool step, and
+    # {"type":"done",...,"cleanText",provider,online,toolCalls} is the terminal
+    # event. (A named-event variant `event: token`/`event: done` exists on other
+    # branches, so we also honour evt.get("done"); both are handled below.)
+    reply, provider, online, err, tool_calls = "", "unknown", False, None, 0
     try:
         body = json.dumps({"message": prompt}).encode("utf-8")
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        op_token = os.getenv("OPERATOR_TOKEN")
+        if op_token:
+            headers["X-Operator-Token"] = op_token
         req = urllib.request.Request(
-            f"{garage}/api/dream/chat", data=body,
-            headers={"Content-Type": "application/json"}, method="POST",
+            f"{garage}/api/dream/chat/stream", data=body,
+            headers=headers, method="POST",
         )
+        acc_tokens, done_meta = [], None
         with urllib.request.urlopen(req, timeout=int(os.getenv("TASK_RUN_TIMEOUT_SEC", "300"))) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="replace"))
-        reply = str(data.get("reply", "") or "")
-        provider = data.get("source") or "unknown"
-        online = bool(data.get("online"))
+            for raw_line in resp:
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if not payload:
+                    continue
+                try:
+                    evt = json.loads(payload)
+                except Exception:
+                    continue
+                etype = evt.get("type")
+                if etype == "token" or "token" in evt:
+                    tok = evt.get("text") if etype == "token" else evt.get("token")
+                    if tok:
+                        acc_tokens.append(str(tok))
+                elif etype == "done" or evt.get("done"):
+                    done_meta = evt
+                elif etype == "tool" and evt.get("phase") in (None, "call"):
+                    tool_calls += 1
+        if done_meta:
+            reply = str(done_meta.get("cleanText") or "".join(acc_tokens) or "")
+            provider = done_meta.get("provider") or done_meta.get("source") or "unknown"
+            online = bool(done_meta.get("online"))
+            tool_calls = done_meta.get("toolCalls", tool_calls) or tool_calls
+            if done_meta.get("error") and not reply:
+                err = str(done_meta.get("error"))
+        else:
+            reply = "".join(acc_tokens)
+            if not reply:
+                err = "no_done_event"
     except Exception as exc:
         err = str(exc)
 
@@ -480,6 +529,7 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
         "result": reply[:2000],
         "confidence": confidence,
         "reasoner": provider,
+        "tool_calls": tool_calls,
         "verified": False,
         "task_id": task["id"],
     })
@@ -517,6 +567,7 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
         "confidence": confidence,
         "latency_ms": latency_ms,
         "result_preview": reply[:500],
+        "tool_calls": tool_calls,
         "error": err,
         "convergence_record": "data/convergence/records.jsonl",
         "pcsf_receipt": "data/pcsf/convergance-receipts.jsonl",

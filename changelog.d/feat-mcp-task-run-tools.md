@@ -1,0 +1,1 @@
+feat(mcp): task_run now drives the tool-enabled streaming chat path so the reasoning model (Gemini/Claude/OpenAI) executes repo tools — Read/Grep/Glob plus operator Edit/Write/Bash on loopback — instead of returning a text-only proposal. Requires CHAT_TOOL_EXEC=1; result reports tool_calls.
