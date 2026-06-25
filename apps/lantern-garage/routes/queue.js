@@ -202,10 +202,75 @@ function loadOpenIssues(repoRoot) {
   return data;
 }
 
+// Recently landed work = merged PRs (Converge stage, real-time "what we shipped").
+// Short cache so a dashboard poll doesn't spawn a `gh` subprocess each tick.
+let _mergesCache = null;
+const MERGES_TTL_MS = 30_000;
+
+/**
+ * Live "recently landed" view: the last N merged PRs straight from `gh`, shell-free
+ * via safeExec. Returns { merges:[{number,title,url,branch,lane,author,mergedAt}],
+ * count, generatedAt } — or an honest { error, merges:[] } shape (gh missing /
+ * not authed). Never fabricates rows.
+ */
+function loadRecentMerges(repoRoot, limit = 15) {
+  const now = Date.now();
+  if (_mergesCache && _mergesCache.limit === limit && now - _mergesCache.ts < MERGES_TTL_MS) return _mergesCache.data;
+
+  const { safeExec } = require(require("path").join(repoRoot, "apps", "lantern-garage", "lib", "safe-exec"));
+  let prs = [];
+  try {
+    const out = safeExec(
+      ["gh", "pr", "list", "--repo", "alex-place/lantern-os", "--state", "merged",
+       "--json", "number,title,headRefName,url,mergedAt,author",
+       "--limit", String(limit)],
+      { cwd: repoRoot, timeout: 15000 }
+    );
+    prs = JSON.parse(out || "[]");
+  } catch (err) {
+    const data = { error: "gh_unavailable", message: String(err.message || err).slice(0, 200), merges: [], count: 0 };
+    _mergesCache = { ts: now, limit, data };
+    return data;
+  }
+
+  const laneFor = (branch) => {
+    const prefix = String(branch || "").split("/")[0].toLowerCase();
+    return LANE_PREFIXES.includes(prefix) ? prefix : (prefix.startsWith("auto") ? "auto" : "human");
+  };
+
+  const merges = prs
+    .map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      url: pr.url,
+      branch: pr.headRefName,
+      lane: laneFor(pr.headRefName),
+      author: pr.author?.login || pr.author?.name || "unknown",
+      mergedAt: pr.mergedAt || null,
+    }))
+    .sort((a, b) => new Date(b.mergedAt || 0) - new Date(a.mergedAt || 0));
+
+  const data = { merges, count: merges.length, generatedAt: new Date().toISOString() };
+  _mergesCache = { ts: now, limit, data };
+  return data;
+}
+
 module.exports = async function queueRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody, repoRoot } = deps;
   const fs = require("fs");
   const path = require("path");
+
+  // ── GET /api/queue/recent-merges ── (Converge stage: recently landed PRs)
+  if (url.pathname === "/api/queue/recent-merges" && req.method === "GET") {
+    try {
+      const limit = Math.min(parseInt(url.searchParams.get("limit"), 10) || 15, 50);
+      sendJson(res, loadRecentMerges(repoRoot, limit));
+    } catch (err) {
+      console.error("[Queue] recent-merges error:", err);
+      sendJson(res, { error: err.message, merges: [], count: 0 }, 500);
+    }
+    return true;
+  }
 
   // ── GET /api/queue/pr-lanes ── (Verify stage: CI status per agent lane)
   if (url.pathname === "/api/queue/pr-lanes" && req.method === "GET") {

@@ -152,6 +152,7 @@ const routes = [
   require("./routes/three-doors-convergence"),
   require("./routes/convergence-dispatch"),
   require("./routes/memory"),
+  require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),
   require("./routes/claims"),
   require("./routes/cubes"),

@@ -482,25 +482,7 @@
 <!-- ── Skip to content link ── -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<!-- ── Site nav ── -->
-<nav class="site-nav">
-  <a class="nav-brand" href="/">
-    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    Keystone OS
-  </a>
-  <div class="nav-links">
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/trader-dashboard.html">Trader</a>
-    <a href="/create.html">Create</a>
-    <a href="/explore.html" class="active">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
-  </div>
-  <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
-  </div>
-</nav>
+<!-- Site nav injected by /js/site-chrome.js -->
 
 <div class="page">
 
@@ -713,29 +695,11 @@
 
 </div>
 
-<!-- ── Site footer ── -->
-<footer class="site-footer">
-  <div class="footer-inner">
-    <span class="footer-brand">
-      <span class="dot online" id="status-dot" title="Server status"></span>
-      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
-    </span>
-    <span class="sep">·</span>
-    <a href="/">Home</a>
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/trader-dashboard.html">Trader</a>
-    <a href="/create.html">Create</a>
-    <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
-    <span class="sep">·</span>
-    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <span class="visually-hidden" id="status-label">connecting…</span>
-  </div>
-</footer>
+<!-- Site footer injected by /js/site-chrome.js -->
 
 <script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
 <script>
 /* Theme toggle event listener */
 document.addEventListener('DOMContentLoaded', () => {
