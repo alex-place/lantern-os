@@ -12,3 +12,7 @@
   `data/convergence-records.jsonl`.
 - App-served / skill / test binaries (`apps/**/public`, `data/images/three-doors`,
   `skills/lantern-rag-dollhouse/assets`, `tests/screenshots`) are deliberately untouched.
+- Wire CSF-backed PDF serving: `pdfs.js` reconstructs the Knowledge Center research-PDF
+  library from the committed manifest and streams individual PDFs straight out of the CSF
+  archive via `scripts/csf_read_member.py` (shell-free `execFile`). List works on every node;
+  byte serving needs the local `.csf` present (returns 503 `archived` if absent).

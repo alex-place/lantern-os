@@ -1,10 +1,66 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const Busboy = require('busboy');
 const { requireEntitlement } = require('../lib/auth-middleware');
 
 function getIngestBase(repoRoot) {
   return path.join(repoRoot, 'data', 'ingest');
+}
+
+// ── CSF condensed-corpus backing ──────────────────────────────────────────
+// The intake/research dump corpus was folded into one lossless CSF archive
+// (scripts/csf_condense_corpus.py) and the loose originals removed. The PDF
+// library is reconstructed from the committed manifest (works on every node)
+// and individual PDFs are streamed out of the archive on demand. The manifest
+// is small + tracked; the .csf blob is large + gitignored, so it must be
+// present locally for byte serving — if it is absent the list still shows but
+// /api/pdfs/file returns 503 (archived-not-available) rather than a hard break.
+function findManifest(repoRoot) {
+  const dir = path.join(repoRoot, 'data', 'csf_archives');
+  let files;
+  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.manifest.json')); } catch { return null; }
+  if (!files.length) return null;
+  files.sort(); // dated names → newest last
+  return path.join(dir, files[files.length - 1]);
+}
+
+// Returns { archiveAbs, present, byFilename: Map(lowerName -> entry) } or null.
+function loadArchiveIndex(repoRoot) {
+  const manifestPath = findManifest(repoRoot);
+  if (!manifestPath) return null;
+  let manifest;
+  try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')); } catch { return null; }
+  const archiveAbs = path.resolve(repoRoot, manifest.archive || '');
+  const byFilename = new Map();
+  for (const [origPath, info] of Object.entries(manifest.members || {})) {
+    if (!origPath.toLowerCase().endsWith('.pdf')) continue;
+    const filename = path.basename(origPath);
+    const key = filename.toLowerCase();
+    if (byFilename.has(key)) continue; // first wins (dedup by basename)
+    const ingestRel = origPath.startsWith('data/ingest/')
+      ? path.dirname(origPath).slice('data/ingest/'.length) : '';
+    byFilename.set(key, {
+      name: path.basename(filename, '.pdf'),
+      filename,
+      member: info.member,
+      folder: ingestRel,
+      source: 'csf-archive',
+    });
+  }
+  return { archiveAbs, present: fs.existsSync(archiveAbs), byFilename };
+}
+
+// Stream one PDF member out of the archive. Fixed argv (python + script + 2
+// positional args), shell:false — no shell, no injection surface. Returns a
+// Buffer or throws.
+function readPdfFromArchive(repoRoot, archiveAbs, member) {
+  const python = process.env.PYTHON_BIN || 'python';
+  const script = path.join(repoRoot, 'scripts', 'csf_read_member.py');
+  return execFileSync(python, [script, archiveAbs, member], {
+    maxBuffer: 128 * 1024 * 1024, // largest corpus PDF ~61 MB
+    windowsHide: true,
+  });
 }
 
 function loadPublicationDates(repoRoot) {
@@ -69,10 +125,25 @@ module.exports = async function pdfRoutes(req, res, url, deps) {
   const { sendJson, sendFile, repoRoot } = deps;
   const ingestBase = getIngestBase(repoRoot);
 
-  // GET /api/pdfs — list all unique PDFs
+  // GET /api/pdfs — list all unique PDFs (live ingest dir + CSF archive)
   if (url.pathname === '/api/pdfs' && req.method === 'GET') {
     const pdfs = scanPdfs(ingestBase, repoRoot);
     const pubDates = loadPublicationDates(repoRoot);
+
+    // Merge in PDFs that now live only in the condensed CSF archive. Live files
+    // (still on disk) take precedence; archive entries fill in the rest.
+    const archive = loadArchiveIndex(repoRoot);
+    if (archive) {
+      const live = new Set(pdfs.map(p => p.filename.toLowerCase()));
+      for (const [key, e] of archive.byFilename) {
+        if (live.has(key)) continue;
+        pdfs.push({
+          name: e.name, filename: e.filename, absolutePath: null,
+          repoPath: null, folder: e.folder, size: null,
+          createdAt: null, modifiedAt: null, source: e.source,
+        });
+      }
+    }
 
     const seen = new Set();
     const unique = pdfs.filter(p => {
@@ -117,14 +188,38 @@ module.exports = async function pdfRoutes(req, res, url, deps) {
       return true;
     }
     const match = scanPdfs(ingestBase, repoRoot).find(p => p.filename.toLowerCase() === filename.toLowerCase());
-    if (!match) { sendJson(res, { error: 'not_found' }, 404); return true; }
-    // Boundary: only ever serve a real .pdf from inside the ingest pool.
-    const resolved = path.resolve(match.absolutePath);
-    if (!resolved.startsWith(path.resolve(ingestBase) + path.sep) || path.extname(resolved).toLowerCase() !== '.pdf') {
-      sendJson(res, { error: 'forbidden' }, 403);
+    if (match) {
+      // Boundary: only ever serve a real .pdf from inside the ingest pool.
+      const resolved = path.resolve(match.absolutePath);
+      if (!resolved.startsWith(path.resolve(ingestBase) + path.sep) || path.extname(resolved).toLowerCase() !== '.pdf') {
+        sendJson(res, { error: 'forbidden' }, 403);
+        return true;
+      }
+      sendFile(res, resolved);
       return true;
     }
-    sendFile(res, resolved);
+
+    // Not on disk — try the condensed CSF archive.
+    const archive = loadArchiveIndex(repoRoot);
+    const entry = archive && archive.byFilename.get(filename.toLowerCase());
+    if (!entry) { sendJson(res, { error: 'not_found' }, 404); return true; }
+    if (!archive.present) {
+      sendJson(res, { error: 'archived', detail: 'CSF archive not available on this node' }, 503);
+      return true;
+    }
+    let buf;
+    try {
+      buf = readPdfFromArchive(repoRoot, archive.archiveAbs, entry.member);
+    } catch (e) {
+      sendJson(res, { error: 'archive_read_failed', detail: String(e.message || e) }, 500);
+      return true;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Length': buf.length,
+      'Content-Disposition': 'inline; filename="' + filename.replace(/[^a-zA-Z0-9._\- ]/g, '_') + '"',
+    });
+    res.end(buf);
     return true;
   }
 
