@@ -187,6 +187,18 @@
     .landed-title a:hover { color: var(--accent); text-decoration: underline; }
     .landed-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
     .lane-chip { font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; }
+
+    /* ── Fleet activity log ── */
+    .fleet-log { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; }
+    .fleet-step { display: grid; grid-template-columns: 18px 150px 1fr; align-items: baseline; gap: 8px; padding: 5px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; }
+    .fleet-step .fs-icon { text-align: center; }
+    .fleet-step .fs-phase { font-weight: 650; }
+    .fleet-step .fs-detail { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; }
+    .fleet-step.err { border-color: #f87171; }
+    .fleet-step.done-ok { border-left: 3px solid var(--green); }
+    .fleet-final { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-size: 0.82rem; }
+    .research-action.delegate { border-color: #a855f7; color: #a855f7; }
+    .research-action.delegate:hover { background: color-mix(in srgb, #a855f7 12%, transparent); }
   </style>
   <title>Orchestration — Keystone OS</title>
 </head>
@@ -244,6 +256,15 @@
     <h2>🚦 PR Lanes <span class="section-meta" id="prLanesMeta">one open PR per agent lane</span></h2>
     <p class="panel-sub">Each agent prefix gets one open PR lane (CLAUDE.md monoworkstream rule). CI rollup is live from GitHub checks — green/red here is the real gate.</p>
     <div id="prLanesBody"><div class="placeholder">Loading PR lanes…</div></div>
+  </section>
+
+  <!-- ── Fleet Activity (live delegated runs) ── -->
+  <section class="panel" id="fleetRunPanel" hidden>
+    <h2>🛰️ Fleet Activity <span class="section-meta" id="fleetRunMeta"></span>
+      <button class="btn-secondary" onclick="document.getElementById('fleetRunPanel').hidden=true" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">Dismiss</button>
+    </h2>
+    <p class="panel-sub">Live stream of a delegated autonomous run — the fleet plans, patches, tests in an isolated worktree, then opens a draft PR in that lane. Every step is the real engine event, not a simulation.</p>
+    <div id="fleetRunLog" class="fleet-log"></div>
   </section>
 
   <section class="panel" id="researchHandoffPanel">
@@ -498,6 +519,7 @@
         </div>
         <div class="research-actions">
           <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
+          <button class="research-action delegate" type="button" data-delegate="${escapeHtml(item.issueNumber)}" title="Hand this issue to the autonomous fleet — it works it in an isolated worktree and opens a draft PR">🛰️ Delegate to fleet</button>
           <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Keystone Chat</button>
           <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
           <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
@@ -540,9 +562,13 @@
     $("researchQueue")?.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button) return;
-      const issueNumber = button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
+      const issueNumber = button.dataset.delegate || button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
       const item = findResearchItem(issueNumber);
       if (!item) return;
+      if (button.dataset.delegate) {
+        delegateToFleet(item, button);
+        return;
+      }
       if (button.dataset.research) {
         const prompt = OrchestrationResearch.buildResearchPrompt(item);
         researchHistory({ issueNumber: item.issueNumber, target: "keystone-chat", timestamp: new Date().toISOString() });
@@ -1215,6 +1241,94 @@
 
   async function refreshWorkBoard() {
     await Promise.all([renderWorkBoard(), renderPrLanes(), renderAgentSlots(), renderLanded()]);
+  }
+
+  // ── Fleet delegation (live streamed autonomous run) ───────────────────────
+  const FLEET_STEP_ICON = { start: "⏳", done: "✓", error: "✗" };
+
+  function fleetAppendStep(phase, status, extra) {
+    const log = $("fleetRunLog");
+    if (!log) return;
+    const id = "fstep-" + phase;
+    let row = document.getElementById(id);
+    if (!row) {
+      row = document.createElement("div");
+      row.id = id;
+      row.className = "fleet-step";
+      row.innerHTML = `<span class="fs-icon"></span><span class="fs-phase"></span><span class="fs-detail"></span>`;
+      log.appendChild(row);
+    }
+    row.classList.toggle("err", status === "error");
+    row.classList.toggle("done-ok", status === "done");
+    row.querySelector(".fs-icon").textContent = FLEET_STEP_ICON[status] || "•";
+    row.querySelector(".fs-phase").textContent = phase.replace(/_/g, " ");
+    const detail = extra.title || extra.error || extra.message || extra.branch || extra.files != null ? JSON.stringify(extra).slice(0, 200) : "";
+    row.querySelector(".fs-detail").textContent = detail;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function delegateToFleet(item, button) {
+    const panel = $("fleetRunPanel"), log = $("fleetRunLog");
+    panel.hidden = false;
+    setText("fleetRunMeta", `#${item.issueNumber} — ${item.title}`.slice(0, 90));
+    log.innerHTML = "";
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    const origLabel = button.textContent;
+    button.disabled = true; button.textContent = "Delegating…";
+    fleetAppendStep("delegate", "start", { issue: item.issueNumber });
+
+    try {
+      const resp = await fetch("/api/convergence/autonomous-work/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue: item.issueNumber }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const frames = buf.split("\n\n");
+        buf = frames.pop();  // keep partial frame
+        for (const frame of frames) {
+          let event = "message", data = "";
+          for (const line of frame.split("\n")) {
+            if (line.startsWith(":")) continue;            // heartbeat comment
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).trim();
+          }
+          if (!data) continue;
+          let payload; try { payload = JSON.parse(data); } catch { continue; }
+          if (event === "step") fleetAppendStep(payload.phase, payload.status, payload);
+          else if (event === "error") fleetAppendStep("error", "error", payload);
+          else if (event === "done") {
+            const ok = payload.ok;
+            const final = document.createElement("div");
+            final.className = "fleet-final";
+            if (ok && payload.prUrl) {
+              final.innerHTML = `<span style="color:var(--green);font-weight:700;">✓ Delegated successfully</span> — draft PR opened: <a href="${escapeHtml(payload.prUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.prUrl)}</a>${payload.testsPassed != null ? ` · tests ${payload.testsPassed ? "passed" : "failed"}` : ""}`;
+              refreshWorkBoard();          // new PR shows up in lanes
+              loadResearchQueue();         // issue may now be claimed
+            } else {
+              final.innerHTML = `<span style="color:#f87171;font-weight:700;">Run stopped</span> at <b>${escapeHtml(payload.stoppedAt || "unknown")}</b>${payload.message ? ` — ${escapeHtml(payload.message)}` : ""}. Nothing was pushed.`;
+            }
+            log.appendChild(final);
+            log.scrollTop = log.scrollHeight;
+          }
+        }
+      }
+    } catch (e) {
+      const final = document.createElement("div");
+      final.className = "fleet-final";
+      final.innerHTML = `<span style="color:#f87171;font-weight:700;">Delegation failed:</span> ${escapeHtml(e.message)}`;
+      log.appendChild(final);
+    } finally {
+      button.disabled = false; button.textContent = origLabel;
+    }
   }
 
   // ── Research Team: repo memory ─────────────────────────────────────────────
