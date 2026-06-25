@@ -243,8 +243,8 @@
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
-      <input type="file" id="attach-pdf-input" accept=".pdf" multiple style="display:none">
-      <input type="file" id="attach-docx-input" accept=".docx" style="display:none">
+      <input type="file" id="attach-pdf-input" accept=".pdf" multiple style="display:none" aria-label="Attach PDF files">
+      <input type="file" id="attach-docx-input" accept=".docx" style="display:none" aria-label="Attach Word document">
     </div>
 
   </div><!-- /.app-main -->
@@ -316,7 +316,7 @@
     <div class="modal-body">
 
       <div class="form-group">
-        <label class="form-label">AI Provider</label>
+        <label class="form-label" for="provider-select">AI Provider</label>
         <select id="provider-select" class="form-input">
           <option value="">Auto (pick best)</option>
           <option value="claude">Claude</option>
@@ -337,7 +337,7 @@
             <div class="setting-card-status" id="status-claude">Not configured</div>
           </div>
         </div>
-        <input type="password" id="key-claude" class="form-input" placeholder="ANTHROPIC_API_KEY" onchange="saveKey('claude','ANTHROPIC_API_KEY','key-claude')">
+        <input type="password" id="key-claude" class="form-input" placeholder="ANTHROPIC_API_KEY" aria-label="Claude API key" onchange="saveKey('claude','ANTHROPIC_API_KEY','key-claude')">
         <a href="https://console.anthropic.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
       </div>
 
@@ -349,7 +349,7 @@
             <div class="setting-card-status" id="status-gemini">Not configured</div>
           </div>
         </div>
-        <input type="password" id="key-gemini" class="form-input" placeholder="GEMINI_API_KEY" onchange="saveKey('gemini','GEMINI_API_KEY','key-gemini')">
+        <input type="password" id="key-gemini" class="form-input" placeholder="GEMINI_API_KEY" aria-label="Gemini API key" onchange="saveKey('gemini','GEMINI_API_KEY','key-gemini')">
         <a href="https://aistudio.google.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
       </div>
 
@@ -361,7 +361,7 @@
             <div class="setting-card-status" id="status-openai">Not configured</div>
           </div>
         </div>
-        <input type="password" id="key-openai" class="form-input" placeholder="OPENAI_API_KEY" onchange="saveKey('openai','OPENAI_API_KEY','key-openai')">
+        <input type="password" id="key-openai" class="form-input" placeholder="OPENAI_API_KEY" aria-label="OpenAI API key" onchange="saveKey('openai','OPENAI_API_KEY','key-openai')">
         <a href="https://platform.openai.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
       </div>
 
@@ -373,7 +373,7 @@
             <div class="setting-card-status" id="status-grok">Not configured</div>
           </div>
         </div>
-        <input type="password" id="key-grok" class="form-input" placeholder="XAI_API_KEY" onchange="saveKey('grok','XAI_API_KEY','key-grok')">
+        <input type="password" id="key-grok" class="form-input" placeholder="XAI_API_KEY" aria-label="Grok API key" onchange="saveKey('grok','XAI_API_KEY','key-grok')">
         <a href="https://console.x.ai" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
       </div>
 
