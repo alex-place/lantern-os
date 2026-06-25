@@ -85,6 +85,18 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
     }
+    .home-chat select {
+      flex-shrink: 0;
+      padding: 0 12px; height: 46px;
+      border: 1.5px solid var(--border);
+      border-radius: 9999px;
+      background: var(--bg); color: var(--text);
+      font-size: 0.9rem; cursor: pointer; outline: none;
+      transition: border-color .18s, color .18s;
+    }
+    .home-chat select:hover { border-color: var(--accent); }
+    .home-chat select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+    @media (max-width: 520px) { .home-chat { flex-wrap: wrap; } .home-chat select { flex: 1; } }
     .home-chat button[type="submit"] {
       padding: 12px 22px;
       border: none; border-radius: 9999px;
@@ -298,6 +310,15 @@
   <form class="home-chat" id="home-chat-form" onsubmit="homeChat(event)" role="search" aria-label="Start a chat">
     <button type="button" class="home-attach-btn" id="home-attach-btn" onclick="homeAttachPick()" aria-label="Attach a file (PDF or Word .docx)" title="Attach a file — PDF or .docx">+</button>
     <input id="home-chat-input" type="text" placeholder="Ask Keystone anything…" autocomplete="off" aria-label="Chat message">
+    <select id="home-provider-pin" aria-label="Pin AI provider" title="Pin which AI provider answers (Auto = best-ranked)">
+      <option value="">Auto</option>
+      <option value="claude">Claude</option>
+      <option value="openai">ChatGPT</option>
+      <option value="gemini">Gemini</option>
+      <option value="grok">Grok</option>
+      <option value="ollama">Local Σ₀</option>
+      <option value="keystone-ft">Keystone FT</option>
+    </select>
     <button type="submit">Chat ✦</button>
   </form>
   <input type="file" id="home-file-input" accept=".pdf,.docx" multiple style="display:none">
@@ -572,6 +593,22 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('home-chat-input').placeholder = 'Ask Keystone anything…';
   };
 
+  // ── Provider pin: sticky choice forwarded to dream-chat via ?provider= ──────
+  // dream-chat-ui.js reads ?provider= and routes the turn to that provider
+  // (empty = Auto, i.e. the live PCSF-ranked pick). Persisted in localStorage so
+  // the pin survives reloads.
+  const providerPin = document.getElementById('home-provider-pin');
+  if (providerPin) {
+    try { providerPin.value = localStorage.getItem('keystone.providerPin') || ''; } catch {}
+    providerPin.addEventListener('change', () => {
+      try { localStorage.setItem('keystone.providerPin', providerPin.value); } catch {}
+    });
+  }
+  function pinnedProviderQS() {
+    const v = providerPin && providerPin.value;
+    return v ? '&provider=' + encodeURIComponent(v) : '';
+  }
+
   window.homeChat = function (e) {
     e.preventDefault();
     const q = document.getElementById('home-chat-input').value.trim();
@@ -591,7 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (!q) { document.getElementById('home-chat-input').focus(); return; }
-    window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q);
+    window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q) + pinnedProviderQS();
   };
 
   /* Route picked/dropped files: .docx → chip (improve flow on submit),
