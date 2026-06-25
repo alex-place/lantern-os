@@ -352,3 +352,6 @@ tmp.*.patch
 # Chat document-processing work dir (uploads + generated .docx)
 data/documents/
 data/tmp-kaggle-out/
+
+# CSF condensed corpus archives (local lossless store; holds data/ingest PII pool — never commit)
+data/csf_archives/*.csf

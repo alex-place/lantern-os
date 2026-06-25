@@ -1,0 +1,1371 @@
+{
+  "generated_utc": "2026-06-25T07:05:20.093450+00:00",
+  "archive": "data\\csf_archives\\corpus-condense-20260625.csf",
+  "archive_sha256": "d895312c0cf2412cb2369b86432e1dbe69b0c0284cc75f205d0c066375c934ab",
+  "archive_bytes": 372801322,
+  "corpus_globs": [
+    "data/ingest/**",
+    "data/rag-intake/**",
+    "data/reports/**",
+    "docs/research-papers/**",
+    "csf/ingest/**"
+  ],
+  "files_in": 338,
+  "unique_members": 191,
+  "total_bytes": 862598806,
+  "unique_bytes": 426679319,
+  "members": {
+    "csf/ingest/2026-06-04-convergence-io-relative-cadence.md": {
+      "sha256": "6e5fbcfd36ff6b903308a69dc6a0c35303353f782a24709aa88c49733a7cb547",
+      "member": "2026-06-04-convergence-io-relative-cadence.md"
+    },
+    "csf/ingest/2026-06-05-orch-diagnosis.md": {
+      "sha256": "4c2c9c57aa7a941bfc9e1cdfdc601fa268eead87814c923e71b5a50b50369dc4",
+      "member": "2026-06-05-orch-diagnosis.md"
+    },
+    "csf/ingest/2026-06-06-elephant-door-memories.md": {
+      "sha256": "54231cf9057a4268e33d7a5a82d1a3a016149b3e6e0988cffc4283112eba9114",
+      "member": "2026-06-06-elephant-door-memories.md"
+    },
+    "csf/ingest/2026-06-06-root-index-and-knowledge-update.md": {
+      "sha256": "cb8dbe0fc234548d27691b16fafe98ccfc7bc42fbbe017beaca3fc29a9263e7f",
+      "member": "2026-06-06-root-index-and-knowledge-update.md"
+    },
+    "csf/ingest/2026-06-07-hff-mcp-integration-fixes.md": {
+      "sha256": "1f5f193556dcb57337f8f0b696d1a4ed80aecd927eed100333f72fae30f450be",
+      "member": "2026-06-07-hff-mcp-integration-fixes.md"
+    },
+    "csf/ingest/2026-06-08-fuzzy-testing-three-doors-bugfixes.md": {
+      "sha256": "400a0f8f29ffdee0615b41e5d11c4464f8c7488611d778014810daeea915e239",
+      "member": "2026-06-08-fuzzy-testing-three-doors-bugfixes.md"
+    },
+    "csf/ingest/2026-06-08-skills-quickstart-convergence.md": {
+      "sha256": "8213e6f3b915225998186dcbf6c2dba9dd227719b9092f3428e3755998bc5540",
+      "member": "2026-06-08-skills-quickstart-convergence.md"
+    },
+    "csf/ingest/2026-06-14-cio-agent-context.md": {
+      "sha256": "1e71e567f0667445cf47d45ccb586e134701dcb135ec622b684919df1040544e",
+      "member": "2026-06-14-cio-agent-context.md"
+    },
+    "csf/ingest/2026-06-14-csf-agent-inspect-wire.md": {
+      "sha256": "fc73981ac341a2a2a29e6589cae5d18f3e037d992592bde34ed1248e67ec972f",
+      "member": "2026-06-14-csf-agent-inspect-wire.md"
+    },
+    "csf/ingest/2026-06-14-kalshi-cio-tightband-observations.md": {
+      "sha256": "7c144074f36ae18d2d11bf57f5be134f0accd16c29b6f054b6feede19c31a5d1",
+      "member": "2026-06-14-kalshi-cio-tightband-observations.md"
+    },
+    "csf/ingest/2026-06-14-keystone-gallery-implementation.md": {
+      "sha256": "6dad16ce8d47a5e1cae3583e1e52e1fcf81f155af179cb750249da3672d27590",
+      "member": "2026-06-14-keystone-gallery-implementation.md"
+    },
+    "csf/ingest/2026-06-14-keystone-image-gallery-adr.md": {
+      "sha256": "412b414907363d1a8f081994c3a773fde9c8f3ca54a154f5f2db95659717cddc",
+      "member": "2026-06-14-keystone-image-gallery-adr.md"
+    },
+    "csf/ingest/2026-06-14-waking-the-delegation.md": {
+      "sha256": "1e452fc65ef4a15f2dafbe2aa0b7076317bf156b95308f8c693c3757fbd0349b",
+      "member": "2026-06-14-waking-the-delegation.md"
+    },
+    "csf/ingest/2026-06-19-tesseract-convergence-update.md": {
+      "sha256": "1cba5101f27c9860b729fa7fab2963eeb29047e0bccbd90e2375da2d208aee58",
+      "member": "2026-06-19-tesseract-convergence-update.md"
+    },
+    "csf/ingest/2026-06-24-kaggle-multisource-session-dataset.md": {
+      "sha256": "0794f7271f4ef932633471be1219a79a8a7eee952fa88375394382138160e849",
+      "member": "2026-06-24-kaggle-multisource-session-dataset.md"
+    },
+    "csf/ingest/ROOT-DOCS-CONSOLIDATION.md": {
+      "sha256": "6b8d4b7c979ad3468d1dc1ad586effd9f48c2d226a1a10c97f6955904592a4e6",
+      "member": "ROOT-DOCS-CONSOLIDATION.md"
+    },
+    "csf/ingest/convergence-asmr-tts-chain.md": {
+      "sha256": "bf262a6bb9611008554fae7d0338c97622a9b42059b1a87d1d0f211025352c09",
+      "member": "convergence-asmr-tts-chain.md"
+    },
+    "csf/ingest/convergence-conversation-tree.md": {
+      "sha256": "83f207cc03f0c40a2d3254f1a4345354ff6aa3ba239cd5967576fe1af57a3051",
+      "member": "convergence-conversation-tree.md"
+    },
+    "csf/ingest/convergence-kvcache-compression.md": {
+      "sha256": "12ff0b27caf9c0d3e9465d364ef34616d6eb67ed2c8d5d9f87b47b1ffa9d812a",
+      "member": "convergence-kvcache-compression.md"
+    },
+    "csf/ingest/convergence-model-training.md": {
+      "sha256": "db7f274c4f3f9fa77ccf6c65cd7a313a1160be3a4577b75e692bea62217ab234",
+      "member": "convergence-model-training.md"
+    },
+    "csf/ingest/convergence-patreon-tiers.md": {
+      "sha256": "400f2dfb36533ee4287710afd1f5679c37f885ce4b3dbdbae8b0babb373d5ddd",
+      "member": "convergence-patreon-tiers.md"
+    },
+    "csf/ingest/convergence-stable-diffusion-doors.md": {
+      "sha256": "5401ed2c0cadb49a25b486f6986bbc8cb17973065936c4aa5eeaf43084be229f",
+      "member": "convergence-stable-diffusion-doors.md"
+    },
+    "csf/ingest/convergence-web-refinement.md": {
+      "sha256": "5c9c89baebb5bbe70ef2cf6a8c787b62a22e2e328543972ae6269b4b9c4eb486",
+      "member": "convergence-web-refinement.md"
+    },
+    "csf/ingest/convergence-webrtc-voice.md": {
+      "sha256": "d9f0fb5a641a9889ae10fdb50a98687fa7fd6304346d565a047fe23990296c0e",
+      "member": "convergence-webrtc-voice.md"
+    },
+    "csf/ingest/convergence/2026-06-16-issue-628-local-ollama-coder-diagnosis.md": {
+      "sha256": "5c293ebac54fb5b50accf8bf47e033329bda4e7f7dac07a146692ed5396ad999",
+      "member": "2026-06-16-issue-628-local-ollama-coder-diagnosis.md"
+    },
+    "csf/ingest/enhanced-dream-chat-with-personal-cube.md": {
+      "sha256": "237c141cf678fa69bf41136326aebbd314e5a83b7940bff688fa68dd4f662c29",
+      "member": "enhanced-dream-chat-with-personal-cube.md"
+    },
+    "csf/ingest/focused-internet-map-status-cube.md": {
+      "sha256": "b395b9850036ef3666591a570a6789fe82aeb1a70546bcb171c409932d496e4d",
+      "member": "focused-internet-map-status-cube.md"
+    },
+    "csf/ingest/internet-action-status-cube.md": {
+      "sha256": "b75fa4b9d18a8c1c3b7a9a8cf8b5e9d8dbaec795f04a13baf004bd0b6be3cee3",
+      "member": "internet-action-status-cube.md"
+    },
+    "csf/ingest/personal-development-status-cube.md": {
+      "sha256": "08a4bfcf0bcff8415fccc0ba9904ee32ef0aeb0e6cfc4ae9facc26554ee5e4f8",
+      "member": "personal-development-status-cube.md"
+    },
+    "csf/ingest/shelby-elephant-oasis-room-2026-06-05.md": {
+      "sha256": "9da90a881dfaf4bf7f763169d6cf84602680b3feb05e4f82b4292e0eb8849df4",
+      "member": "shelby-elephant-oasis-room-2026-06-05.md"
+    },
+    "csf/ingest/three-doors/2026-06-04-lantern-consolidate.md": {
+      "sha256": "dff58e1a26a122cf6601038733e4fe3ec036ae499dec6e74a46579b35eb5466d",
+      "member": "2026-06-04-lantern-consolidate.md"
+    },
+    "csf/ingest/three-doors/2026-06-05-three-doors-game.md": {
+      "sha256": "1d89637dd3d177fdc52e2cb5f1d4b0c7fb7611d448e794dc53be7aeb10b2b7ee",
+      "member": "2026-06-05-three-doors-game.md"
+    },
+    "csf/ingest/three-doors/2026-06-08-elephant-oasis-local-model-session.md": {
+      "sha256": "0eb8193bb57cc64de1d92dc70a34e5e6e79bf78fc1b0b5dc2118b64c422ba375",
+      "member": "2026-06-08-elephant-oasis-local-model-session.md"
+    },
+    "csf/ingest/three-doors/2026-06-09-kingdom-of-hearts-lore-expansion.md": {
+      "sha256": "35cd611656fd86eb11c6a8b3ce2f6e0814c505f22c07d14bd21501ea427c033f",
+      "member": "2026-06-09-kingdom-of-hearts-lore-expansion.md"
+    },
+    "csf/ingest/three-doors/2026-06-09-kingdome-of-hearts-lore-expansion.md": {
+      "sha256": "1222e5f911d6014aa0cac8421a8bc3e477fbf44cfe68d6a3551fb861cbbb3397",
+      "member": "2026-06-09-kingdome-of-hearts-lore-expansion.md"
+    },
+    "csf/ingest/three-doors/2026-06-16-canonical-seven-doors-skill-update.md": {
+      "sha256": "b1828b59d28a28c0850f6e7fddaf90cca8b93b9d3b1adb52ee9f51a3505a7db3",
+      "member": "2026-06-16-canonical-seven-doors-skill-update.md"
+    },
+    "csf/ingest/three-doors/2026-06-16-kingdome-spine-xp-awakening.md": {
+      "sha256": "720b74c485d0d380c1bcf81438c911a5b278618d71da6513b2072a712793e1d9",
+      "member": "2026-06-16-kingdome-spine-xp-awakening.md"
+    },
+    "csf/ingest/three-doors/2026-06-22-full-memory-reload-and-poster-content.md": {
+      "sha256": "6ea0b0093b20c890da7bff9717fc8484a032edaa4cd005e88302dcf933d95927",
+      "member": "2026-06-22-full-memory-reload-and-poster-content.md"
+    },
+    "csf/ingest/three-doors/2026-06-23-keystone-hidden-object-quest-art-direction.md": {
+      "sha256": "60065b3cb308327e06434b72b1c9e78f76a1970c877de80b20258992f06f4465",
+      "member": "2026-06-23-keystone-hidden-object-quest-art-direction.md"
+    },
+    "csf/ingest/universe-slicing-csf-extension.md": {
+      "sha256": "a760673e6fb2eecf8c3e3da260ce0ddc203817b638356e360917a0e546378cbf",
+      "member": "universe-slicing-csf-extension.md"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/00_EXEMPLAR_CONVERGENCE_REPORT.pdf": {
+      "sha256": "1991c43f676efac3bac04bd6243c97bc570c8d537ee6cee5e0445c3d89135414",
+      "member": "00_EXEMPLAR_CONVERGENCE_REPORT.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/00_EXEMPLAR_CONVERGENCE_REPORT.pdf": {
+      "sha256": "1991c43f676efac3bac04bd6243c97bc570c8d537ee6cee5e0445c3d89135414",
+      "member": "00_EXEMPLAR_CONVERGENCE_REPORT.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/00_EXEMPLAR_CONVERGENCE_REPORT_PERFECTED.pdf": {
+      "sha256": "47eb0da2096feaa6abec7e80992d99620752cac52e904c820f77511f41eeba81",
+      "member": "00_EXEMPLAR_CONVERGENCE_REPORT_PERFECTED.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/00_EXEMPLAR_CONVERGENCE_REPORT_PERFECTED.pdf": {
+      "sha256": "47eb0da2096feaa6abec7e80992d99620752cac52e904c820f77511f41eeba81",
+      "member": "00_EXEMPLAR_CONVERGENCE_REPORT_PERFECTED.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/01ab8d_eff73f6238854c7e847f15f412148fb8.pdf": {
+      "sha256": "a0483d2559138f2ab5d1e4f50df32f9a756e39377c3640c55029c30f61090baf",
+      "member": "01ab8d_eff73f6238854c7e847f15f412148fb8.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/01ab8d_eff73f6238854c7e847f15f412148fb8.pdf": {
+      "sha256": "a0483d2559138f2ab5d1e4f50df32f9a756e39377c3640c55029c30f61090baf",
+      "member": "01ab8d_eff73f6238854c7e847f15f412148fb8.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/074de53e9672f70dd29b9e9ea934e045.pdf": {
+      "sha256": "5caa30021526b9ad6d8c7f24a6ab459874cb658385d7f7a54ce6b7b1ea632945",
+      "member": "074de53e9672f70dd29b9e9ea934e045.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/074de53e9672f70dd29b9e9ea934e045.pdf": {
+      "sha256": "5caa30021526b9ad6d8c7f24a6ab459874cb658385d7f7a54ce6b7b1ea632945",
+      "member": "074de53e9672f70dd29b9e9ea934e045.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/170d082d-4550-4017-a2c7-3be22dd3c4d7.png": {
+      "sha256": "83d0237ef7bf921afa126213bacdaec584fc1d88d12bea36a84ca1b2b16b557f",
+      "member": "170d082d-4550-4017-a2c7-3be22dd3c4d7.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/170d082d-4550-4017-a2c7-3be22dd3c4d7.png": {
+      "sha256": "83d0237ef7bf921afa126213bacdaec584fc1d88d12bea36a84ca1b2b16b557f",
+      "member": "170d082d-4550-4017-a2c7-3be22dd3c4d7.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/1906.09697v2.pdf": {
+      "sha256": "759fe9378448b7454cb556656cf70a55ac59025ac5b970f5a375d929056fe3d1",
+      "member": "1906.09697v2.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/1906.09697v2.pdf": {
+      "sha256": "759fe9378448b7454cb556656cf70a55ac59025ac5b970f5a375d929056fe3d1",
+      "member": "1906.09697v2.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/1bc6adcb-84fa-446b-a7dd-7157f243bea8.png": {
+      "sha256": "7a22c251cca5e196962bfceec6950dc110b5ecc3e0d0195c435ec07baa5cfbaa",
+      "member": "1bc6adcb-84fa-446b-a7dd-7157f243bea8.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/1bc6adcb-84fa-446b-a7dd-7157f243bea8.png": {
+      "sha256": "7a22c251cca5e196962bfceec6950dc110b5ecc3e0d0195c435ec07baa5cfbaa",
+      "member": "1bc6adcb-84fa-446b-a7dd-7157f243bea8.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/20240826194003_D-24-213.1.pdf": {
+      "sha256": "b0f169c6df34a908eb827c09e7dadac04a3a6aaaede0dc8731f5db55d2a02e56",
+      "member": "20240826194003_D-24-213.1.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/20240826194003_D-24-213.1.pdf": {
+      "sha256": "b0f169c6df34a908eb827c09e7dadac04a3a6aaaede0dc8731f5db55d2a02e56",
+      "member": "20240826194003_D-24-213.1.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/30cf6cf0-4d63-4285-8f0a-42483daaf385 (1).png": {
+      "sha256": "9a01af1bf6511a6885abea404e0226970ca61024513174b9eaabe8e8f9cbaa14",
+      "member": "30cf6cf0-4d63-4285-8f0a-42483daaf385 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/30cf6cf0-4d63-4285-8f0a-42483daaf385.png": {
+      "sha256": "9a01af1bf6511a6885abea404e0226970ca61024513174b9eaabe8e8f9cbaa14",
+      "member": "30cf6cf0-4d63-4285-8f0a-42483daaf385 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/30cf6cf0-4d63-4285-8f0a-42483daaf385 (1).png": {
+      "sha256": "9a01af1bf6511a6885abea404e0226970ca61024513174b9eaabe8e8f9cbaa14",
+      "member": "30cf6cf0-4d63-4285-8f0a-42483daaf385 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/30cf6cf0-4d63-4285-8f0a-42483daaf385.png": {
+      "sha256": "9a01af1bf6511a6885abea404e0226970ca61024513174b9eaabe8e8f9cbaa14",
+      "member": "30cf6cf0-4d63-4285-8f0a-42483daaf385 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/53207192-6e7c-4da5-982d-3edd16273e99 (1).png": {
+      "sha256": "b2ba6ecc07ed8b452e20ffc051b8225bdb4c630fc7ce1b86216a85d0a92dbff7",
+      "member": "53207192-6e7c-4da5-982d-3edd16273e99 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/53207192-6e7c-4da5-982d-3edd16273e99.png": {
+      "sha256": "b2ba6ecc07ed8b452e20ffc051b8225bdb4c630fc7ce1b86216a85d0a92dbff7",
+      "member": "53207192-6e7c-4da5-982d-3edd16273e99 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/53207192-6e7c-4da5-982d-3edd16273e99 (1).png": {
+      "sha256": "b2ba6ecc07ed8b452e20ffc051b8225bdb4c630fc7ce1b86216a85d0a92dbff7",
+      "member": "53207192-6e7c-4da5-982d-3edd16273e99 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/53207192-6e7c-4da5-982d-3edd16273e99.png": {
+      "sha256": "b2ba6ecc07ed8b452e20ffc051b8225bdb4c630fc7ce1b86216a85d0a92dbff7",
+      "member": "53207192-6e7c-4da5-982d-3edd16273e99 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/69087ab07e0f8dd43b0f41a8_The_2026_B2B_Marketing_Playbook.pdf": {
+      "sha256": "ddb913ab2024daf55e5d9ae9720c10012fa8e3dd1c48e9b85d119aeb67ca9286",
+      "member": "69087ab07e0f8dd43b0f41a8_The_2026_B2B_Marketing_Playbook.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/69087ab07e0f8dd43b0f41a8_The_2026_B2B_Marketing_Playbook.pdf": {
+      "sha256": "ddb913ab2024daf55e5d9ae9720c10012fa8e3dd1c48e9b85d119aeb67ca9286",
+      "member": "69087ab07e0f8dd43b0f41a8_The_2026_B2B_Marketing_Playbook.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/6e439b40-f7c2-4d35-b8b5-dbd3319bb14b (1).png": {
+      "sha256": "aa509907bca1a14db026ba7ed4ab3b640e16cdc8e878598d391e3b153b1e81b5",
+      "member": "6e439b40-f7c2-4d35-b8b5-dbd3319bb14b (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/6e439b40-f7c2-4d35-b8b5-dbd3319bb14b.png": {
+      "sha256": "aa509907bca1a14db026ba7ed4ab3b640e16cdc8e878598d391e3b153b1e81b5",
+      "member": "6e439b40-f7c2-4d35-b8b5-dbd3319bb14b (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/6e439b40-f7c2-4d35-b8b5-dbd3319bb14b (1).png": {
+      "sha256": "aa509907bca1a14db026ba7ed4ab3b640e16cdc8e878598d391e3b153b1e81b5",
+      "member": "6e439b40-f7c2-4d35-b8b5-dbd3319bb14b (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/6e439b40-f7c2-4d35-b8b5-dbd3319bb14b.png": {
+      "sha256": "aa509907bca1a14db026ba7ed4ab3b640e16cdc8e878598d391e3b153b1e81b5",
+      "member": "6e439b40-f7c2-4d35-b8b5-dbd3319bb14b (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/7b5869ab-ac75-4812-a334-a2ca7e2aab96 (1).png": {
+      "sha256": "94629b93a0fa51cd35af0b113d974634bcd1137a4d547cf456455358e2e73ee9",
+      "member": "7b5869ab-ac75-4812-a334-a2ca7e2aab96 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/7b5869ab-ac75-4812-a334-a2ca7e2aab96.png": {
+      "sha256": "94629b93a0fa51cd35af0b113d974634bcd1137a4d547cf456455358e2e73ee9",
+      "member": "7b5869ab-ac75-4812-a334-a2ca7e2aab96 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/7b5869ab-ac75-4812-a334-a2ca7e2aab96 (1).png": {
+      "sha256": "94629b93a0fa51cd35af0b113d974634bcd1137a4d547cf456455358e2e73ee9",
+      "member": "7b5869ab-ac75-4812-a334-a2ca7e2aab96 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/7b5869ab-ac75-4812-a334-a2ca7e2aab96.png": {
+      "sha256": "94629b93a0fa51cd35af0b113d974634bcd1137a4d547cf456455358e2e73ee9",
+      "member": "7b5869ab-ac75-4812-a334-a2ca7e2aab96 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8495630 (1).pdf": {
+      "sha256": "51ee4dc452472863699532711557ba5eb5aef69f0ac9fa5e5d7e695541f0c2c9",
+      "member": "8495630 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8495630.pdf": {
+      "sha256": "51ee4dc452472863699532711557ba5eb5aef69f0ac9fa5e5d7e695541f0c2c9",
+      "member": "8495630 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8495630 (1).pdf": {
+      "sha256": "51ee4dc452472863699532711557ba5eb5aef69f0ac9fa5e5d7e695541f0c2c9",
+      "member": "8495630 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8495630.pdf": {
+      "sha256": "51ee4dc452472863699532711557ba5eb5aef69f0ac9fa5e5d7e695541f0c2c9",
+      "member": "8495630 (1).pdf"
+    },
+    "data/reports/caadi/8495630 (1).pdf": {
+      "sha256": "51ee4dc452472863699532711557ba5eb5aef69f0ac9fa5e5d7e695541f0c2c9",
+      "member": "8495630 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8495631.pdf": {
+      "sha256": "07a4925c1070076e1faf144cce19616b06991502e0366e40a5c94f218de71388",
+      "member": "8495631.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8495631.pdf": {
+      "sha256": "07a4925c1070076e1faf144cce19616b06991502e0366e40a5c94f218de71388",
+      "member": "8495631.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8495632.pdf": {
+      "sha256": "a43be2a6ab4ae1e57f769ae5e774c009e0633af153469d047e6cf28aa8a5bfdc",
+      "member": "8495632.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8495632.pdf": {
+      "sha256": "a43be2a6ab4ae1e57f769ae5e774c009e0633af153469d047e6cf28aa8a5bfdc",
+      "member": "8495632.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8495633.pdf": {
+      "sha256": "2722eb48fe32fd925f71cf8dbfd11700d2a4bd8b724157b12510dfb347bd9412",
+      "member": "8495633.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8495633.pdf": {
+      "sha256": "2722eb48fe32fd925f71cf8dbfd11700d2a4bd8b724157b12510dfb347bd9412",
+      "member": "8495633.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8495634.pdf": {
+      "sha256": "8885cc1350d1268bd68f3e5be58a4e2e3d0044067469a1aadcdbeeffd72d0ea9",
+      "member": "8495634.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8495634.pdf": {
+      "sha256": "8885cc1350d1268bd68f3e5be58a4e2e3d0044067469a1aadcdbeeffd72d0ea9",
+      "member": "8495634.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8673746d-b14a-463f-a810-a328e78462fe.png": {
+      "sha256": "e8c4e951fba7342c32cdf69c33619e5e8cdb23828baa769f5d0677fd178cefad",
+      "member": "8673746d-b14a-463f-a810-a328e78462fe.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8673746d-b14a-463f-a810-a328e78462fe.png": {
+      "sha256": "e8c4e951fba7342c32cdf69c33619e5e8cdb23828baa769f5d0677fd178cefad",
+      "member": "8673746d-b14a-463f-a810-a328e78462fe.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8dac87bb-ad81-4f61-a382-0ec30b983d2e.png": {
+      "sha256": "6f6fb0e8810a946c057974c91f7fee00a7f09f4cd336a936290dc3107451b49f",
+      "member": "8dac87bb-ad81-4f61-a382-0ec30b983d2e.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8dac87bb-ad81-4f61-a382-0ec30b983d2e.png": {
+      "sha256": "6f6fb0e8810a946c057974c91f7fee00a7f09f4cd336a936290dc3107451b49f",
+      "member": "8dac87bb-ad81-4f61-a382-0ec30b983d2e.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8e06ca7b-8d4a-4928-880e-f6d395e19fe2.png": {
+      "sha256": "921ea4249e21d56648037e690a6201766909fd9ad542a772a0d1dfd7cc0028cd",
+      "member": "8e06ca7b-8d4a-4928-880e-f6d395e19fe2.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8e06ca7b-8d4a-4928-880e-f6d395e19fe2.png": {
+      "sha256": "921ea4249e21d56648037e690a6201766909fd9ad542a772a0d1dfd7cc0028cd",
+      "member": "8e06ca7b-8d4a-4928-880e-f6d395e19fe2.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/8ebc034a-35dc-4e8c-b039-4df639e6af59.png": {
+      "sha256": "82a734316b60e1b9f2d2b39aeef496f39f621b535d6024cf73f7e57de305cbcc",
+      "member": "8ebc034a-35dc-4e8c-b039-4df639e6af59.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image May 31, 2026, 01_33_08 AM.png": {
+      "sha256": "82a734316b60e1b9f2d2b39aeef496f39f621b535d6024cf73f7e57de305cbcc",
+      "member": "8ebc034a-35dc-4e8c-b039-4df639e6af59.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/8ebc034a-35dc-4e8c-b039-4df639e6af59.png": {
+      "sha256": "82a734316b60e1b9f2d2b39aeef496f39f621b535d6024cf73f7e57de305cbcc",
+      "member": "8ebc034a-35dc-4e8c-b039-4df639e6af59.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image May 31, 2026, 01_33_08 AM.png": {
+      "sha256": "82a734316b60e1b9f2d2b39aeef496f39f621b535d6024cf73f7e57de305cbcc",
+      "member": "8ebc034a-35dc-4e8c-b039-4df639e6af59.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/AD1038115.pdf": {
+      "sha256": "2b4d7bf6ee3b208a5e3a302e2b287259f018805de55b58d7c7eb6d4b433b4204",
+      "member": "AD1038115.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/AD1038115.pdf": {
+      "sha256": "2b4d7bf6ee3b208a5e3a302e2b287259f018805de55b58d7c7eb6d4b433b4204",
+      "member": "AD1038115.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ADA390681.pdf": {
+      "sha256": "8bafb1bcf73340a679513f46cd0e5e278352e76b49a673fb0593b0a429e10db1",
+      "member": "ADA390681.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ADA390681.pdf": {
+      "sha256": "8bafb1bcf73340a679513f46cd0e5e278352e76b49a673fb0593b0a429e10db1",
+      "member": "ADA390681.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/AddictionSeverityIndex,5thedition.pdf": {
+      "sha256": "e572f261079520e1679551b7224138d914c008b57e6cbb7613c393eba541e522",
+      "member": "AddictionSeverityIndex,5thedition.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/AddictionSeverityIndex,5thedition.pdf": {
+      "sha256": "e572f261079520e1679551b7224138d914c008b57e6cbb7613c393eba541e522",
+      "member": "AddictionSeverityIndex,5thedition.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf": {
+      "sha256": "25776b3a8543d7c334ba315083d255c1b8c62b8b7dbbf77319984877adbc9a89",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf": {
+      "sha256": "25776b3a8543d7c334ba315083d255c1b8c62b8b7dbbf77319984877adbc9a89",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial Superintelligence _ASI_ Alliance Vision Paper - CUDOS Edition.pdf": {
+      "sha256": "25776b3a8543d7c334ba315083d255c1b8c62b8b7dbbf77319984877adbc9a89",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf"
+    },
+    "data/reports/caadi/Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf": {
+      "sha256": "25776b3a8543d7c334ba315083d255c1b8c62b8b7dbbf77319984877adbc9a89",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper - CUDOS Edition.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Artificial Superintelligence (ASI) Alliance Vision Paper.pdf": {
+      "sha256": "3412a5dd589a72602f97d9c5ccfb3c387afd74dc5882fb40807cd6ae7f5eaa64",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Artificial Superintelligence (ASI) Alliance Vision Paper.pdf": {
+      "sha256": "3412a5dd589a72602f97d9c5ccfb3c387afd74dc5882fb40807cd6ae7f5eaa64",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper.pdf"
+    },
+    "data/reports/caadi/Artificial Superintelligence (ASI) Alliance Vision Paper.pdf": {
+      "sha256": "3412a5dd589a72602f97d9c5ccfb3c387afd74dc5882fb40807cd6ae7f5eaa64",
+      "member": "Artificial Superintelligence (ASI) Alliance Vision Paper.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Artificial_Superintelligence.pdf": {
+      "sha256": "b5f026e9786af1b7a085495a6a7198d49938df9aabf1e7545af06baf3e0eb590",
+      "member": "Artificial_Superintelligence.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Artificial_Superintelligence.pdf": {
+      "sha256": "b5f026e9786af1b7a085495a6a7198d49938df9aabf1e7545af06baf3e0eb590",
+      "member": "Artificial_Superintelligence.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Blue-Wheel-2026-Paid-Media-Guide.pdf": {
+      "sha256": "12b076c6bc72bfc19e14f5825407922a804d95bbf3a58c8ae6b2a5608d248c05",
+      "member": "Blue-Wheel-2026-Paid-Media-Guide.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Blue-Wheel-2026-Paid-Media-Guide.pdf": {
+      "sha256": "12b076c6bc72bfc19e14f5825407922a804d95bbf3a58c8ae6b2a5608d248c05",
+      "member": "Blue-Wheel-2026-Paid-Media-Guide.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf": {
+      "sha256": "c59f844e6a2255c785a748d6e9d62f198b0ce0d7058eae4b28d09e7401ee8b2f",
+      "member": "Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf": {
+      "sha256": "c59f844e6a2255c785a748d6e9d62f198b0ce0d7058eae4b28d09e7401ee8b2f",
+      "member": "Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf"
+    },
+    "data/reports/caadi/Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf": {
+      "sha256": "c59f844e6a2255c785a748d6e9d62f198b0ce0d7058eae4b28d09e7401ee8b2f",
+      "member": "Building a Kalshi Sports Trading App With Plain-Language PDF Reports.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/CanaryTeleportation.pdf": {
+      "sha256": "48ea6f059633f73115deb7e9499101cc3c7e5526271a007b64e92e264861b2b5",
+      "member": "CanaryTeleportation.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/CanaryTeleportation.pdf": {
+      "sha256": "48ea6f059633f73115deb7e9499101cc3c7e5526271a007b64e92e264861b2b5",
+      "member": "CanaryTeleportation.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image Jun 1, 2026, 10_59_33 PM.png": {
+      "sha256": "d087bf694460ff3865d18fe90f602b097ba267c7d3210e98287c4eba527c2cbf",
+      "member": "ChatGPT Image Jun 1, 2026, 10_59_33 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image Jun 1, 2026, 10_59_33 PM.png": {
+      "sha256": "d087bf694460ff3865d18fe90f602b097ba267c7d3210e98287c4eba527c2cbf",
+      "member": "ChatGPT Image Jun 1, 2026, 10_59_33 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image Jun 1, 2026, 11_06_45 PM.png": {
+      "sha256": "c1ce5f3d35f8e3854d5f3d287dfe4fe51398e1a0e1f498c3b567ec3c93ccc541",
+      "member": "ChatGPT Image Jun 1, 2026, 11_06_45 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image Jun 1, 2026, 11_06_45 PM.png": {
+      "sha256": "c1ce5f3d35f8e3854d5f3d287dfe4fe51398e1a0e1f498c3b567ec3c93ccc541",
+      "member": "ChatGPT Image Jun 1, 2026, 11_06_45 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image Jun 1, 2026, 11_06_59 PM.png": {
+      "sha256": "18820e5a30a08d66c192851925cd4d478ceb2720babc85305851df514168f727",
+      "member": "ChatGPT Image Jun 1, 2026, 11_06_59 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image Jun 1, 2026, 11_06_59 PM.png": {
+      "sha256": "18820e5a30a08d66c192851925cd4d478ceb2720babc85305851df514168f727",
+      "member": "ChatGPT Image Jun 1, 2026, 11_06_59 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image Jun 1, 2026, 11_11_44 PM.png": {
+      "sha256": "38774e6e0fc2533dabf573f03311095707a6298ed198bc4e31394a24eca01868",
+      "member": "ChatGPT Image Jun 1, 2026, 11_11_44 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/banner1.png": {
+      "sha256": "38774e6e0fc2533dabf573f03311095707a6298ed198bc4e31394a24eca01868",
+      "member": "ChatGPT Image Jun 1, 2026, 11_11_44 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image Jun 1, 2026, 11_11_44 PM.png": {
+      "sha256": "38774e6e0fc2533dabf573f03311095707a6298ed198bc4e31394a24eca01868",
+      "member": "ChatGPT Image Jun 1, 2026, 11_11_44 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/banner1.png": {
+      "sha256": "38774e6e0fc2533dabf573f03311095707a6298ed198bc4e31394a24eca01868",
+      "member": "ChatGPT Image Jun 1, 2026, 11_11_44 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image May 28, 2026, 09_12_35 PM.png": {
+      "sha256": "6bdc2ac4a1fd9cbe3f47b5d479fa1fb3b7186d91427d7755b074d49c1961e4a5",
+      "member": "ChatGPT Image May 28, 2026, 09_12_35 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/c528afdf-74ee-4eeb-bd5d-ccd438b6bbdd.png": {
+      "sha256": "6bdc2ac4a1fd9cbe3f47b5d479fa1fb3b7186d91427d7755b074d49c1961e4a5",
+      "member": "ChatGPT Image May 28, 2026, 09_12_35 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image May 28, 2026, 09_12_35 PM.png": {
+      "sha256": "6bdc2ac4a1fd9cbe3f47b5d479fa1fb3b7186d91427d7755b074d49c1961e4a5",
+      "member": "ChatGPT Image May 28, 2026, 09_12_35 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/c528afdf-74ee-4eeb-bd5d-ccd438b6bbdd.png": {
+      "sha256": "6bdc2ac4a1fd9cbe3f47b5d479fa1fb3b7186d91427d7755b074d49c1961e4a5",
+      "member": "ChatGPT Image May 28, 2026, 09_12_35 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image May 28, 2026, 10_02_12 PM.png": {
+      "sha256": "e5d57073cd71ab3c19654264ad20463b80550f8d999f0ce18f2f07ce1a6230b4",
+      "member": "ChatGPT Image May 28, 2026, 10_02_12 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image May 28, 2026, 10_02_12 PM.png": {
+      "sha256": "e5d57073cd71ab3c19654264ad20463b80550f8d999f0ce18f2f07ce1a6230b4",
+      "member": "ChatGPT Image May 28, 2026, 10_02_12 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image May 31, 2026, 03_04_23 PM.png": {
+      "sha256": "cc560b41fa0d54c75a6c01b44e2b74c86520abc28146c1ec43db5797fee7c9db",
+      "member": "ChatGPT Image May 31, 2026, 03_04_23 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image May 31, 2026, 03_06_53 PM.png": {
+      "sha256": "cc560b41fa0d54c75a6c01b44e2b74c86520abc28146c1ec43db5797fee7c9db",
+      "member": "ChatGPT Image May 31, 2026, 03_04_23 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image May 31, 2026, 03_04_23 PM.png": {
+      "sha256": "cc560b41fa0d54c75a6c01b44e2b74c86520abc28146c1ec43db5797fee7c9db",
+      "member": "ChatGPT Image May 31, 2026, 03_04_23 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image May 31, 2026, 03_06_53 PM.png": {
+      "sha256": "cc560b41fa0d54c75a6c01b44e2b74c86520abc28146c1ec43db5797fee7c9db",
+      "member": "ChatGPT Image May 31, 2026, 03_04_23 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ChatGPT Image May 31, 2026, 04_10_02 PM.png": {
+      "sha256": "1b2c6c2d390b9257841c0a6d9a46ed0a696a17c1e1219554e6aa5e20bdef0d39",
+      "member": "ChatGPT Image May 31, 2026, 04_10_02 PM.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ChatGPT Image May 31, 2026, 04_10_02 PM.png": {
+      "sha256": "1b2c6c2d390b9257841c0a6d9a46ed0a696a17c1e1219554e6aa5e20bdef0d39",
+      "member": "ChatGPT Image May 31, 2026, 04_10_02 PM.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Complete-Wargames-Handbook-Dunnigan.pdf": {
+      "sha256": "49624486b7b26df25bde8c1bf362118b798b24081ff4c30b35ffd4e5dbf0c78e",
+      "member": "Complete-Wargames-Handbook-Dunnigan.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Complete-Wargames-Handbook-Dunnigan.pdf": {
+      "sha256": "49624486b7b26df25bde8c1bf362118b798b24081ff4c30b35ffd4e5dbf0c78e",
+      "member": "Complete-Wargames-Handbook-Dunnigan.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Developing-High-Frequency-Trading-Systems-Learn-how-to-implement-high-frequency-trading-from-scratch-with-C++or-Java-basics.pdf": {
+      "sha256": "705b968c6dded33c13fc78c06e476fb5b8842284649245a09c6f506b517d2d0c",
+      "member": "Developing-High-Frequency-Trading-Systems-Learn-how-to-implement-high-frequency-trading-from-scratch-with-C++or-Java-basics.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Developing-High-Frequency-Trading-Systems-Learn-how-to-implement-high-frequency-trading-from-scratch-with-C++or-Java-basics.pdf": {
+      "sha256": "705b968c6dded33c13fc78c06e476fb5b8842284649245a09c6f506b517d2d0c",
+      "member": "Developing-High-Frequency-Trading-Systems-Learn-how-to-implement-high-frequency-trading-from-scratch-with-C++or-Java-basics.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/February2026.pdf": {
+      "sha256": "d4515eb90e9f6eb7f93649bb5c2bb1d1b3cbbe31bd3a05d28dac295e837b647b",
+      "member": "February2026.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/February2026.pdf": {
+      "sha256": "d4515eb90e9f6eb7f93649bb5c2bb1d1b3cbbe31bd3a05d28dac295e837b647b",
+      "member": "February2026.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/GT_book.pdf": {
+      "sha256": "5bea4225a01deae278f613414faaf2a5bca77dd9444e5bb966ee6be4682627a9",
+      "member": "GT_book.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/GT_book.pdf": {
+      "sha256": "5bea4225a01deae278f613414faaf2a5bca77dd9444e5bb966ee6be4682627a9",
+      "member": "GT_book.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/GWI Connecting the Dots 2026.pdf": {
+      "sha256": "fba144e433fd14452ccdd6d87b178f060a2d2f5cb30935a16fb651cb35bfb8c1",
+      "member": "GWI Connecting the Dots 2026.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/GWI Connecting the Dots 2026.pdf": {
+      "sha256": "fba144e433fd14452ccdd6d87b178f060a2d2f5cb30935a16fb651cb35bfb8c1",
+      "member": "GWI Connecting the Dots 2026.pdf"
+    },
+    "data/reports/caadi/GWI Connecting the Dots 2026.pdf": {
+      "sha256": "fba144e433fd14452ccdd6d87b178f060a2d2f5cb30935a16fb651cb35bfb8c1",
+      "member": "GWI Connecting the Dots 2026.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/KALSHI-BAYESIAN-50-DOLLAR-BRIEF-2026-05-30.pdf": {
+      "sha256": "986906d20b465146e138b66ce88ad872de733e4fc59147ea391b7f62010d4812",
+      "member": "KALSHI-BAYESIAN-50-DOLLAR-BRIEF-2026-05-30.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/KALSHI-BAYESIAN-50-DOLLAR-BRIEF-2026-05-30.pdf": {
+      "sha256": "986906d20b465146e138b66ce88ad872de733e4fc59147ea391b7f62010d4812",
+      "member": "KALSHI-BAYESIAN-50-DOLLAR-BRIEF-2026-05-30.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf": {
+      "sha256": "a7a5e805776cb9bb36cc353975b2a94769eb6e8750884e4f4f1bc8ba7eb7cba8",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2.pdf": {
+      "sha256": "a7a5e805776cb9bb36cc353975b2a94769eb6e8750884e4f4f1bc8ba7eb7cba8",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf": {
+      "sha256": "a7a5e805776cb9bb36cc353975b2a94769eb6e8750884e4f4f1bc8ba7eb7cba8",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2.pdf": {
+      "sha256": "a7a5e805776cb9bb36cc353975b2a94769eb6e8750884e4f4f1bc8ba7eb7cba8",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf"
+    },
+    "data/reports/caadi/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf": {
+      "sha256": "a7a5e805776cb9bb36cc353975b2a94769eb6e8750884e4f4f1bc8ba7eb7cba8",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v2 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v3.pdf": {
+      "sha256": "2d22364d8d3b922d370dd8d96fc2df43b0ab89db3716cdcac80c46c9d698ba3b",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v3.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v3.pdf": {
+      "sha256": "2d22364d8d3b922d370dd8d96fc2df43b0ab89db3716cdcac80c46c9d698ba3b",
+      "member": "KALSHI-KOFI-WATCHLIST-REVENUE-REPORT-2026-05-29-v3.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-BASELINE-MODEL-v1.pdf": {
+      "sha256": "ff49cad6e6356a31167351a94ffdbd5a228d1d7cb9fdde70c2b906e68854152c",
+      "member": "LANTERN-BASELINE-MODEL-v1.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-BASELINE-MODEL-v1.pdf": {
+      "sha256": "ff49cad6e6356a31167351a94ffdbd5a228d1d7cb9fdde70c2b906e68854152c",
+      "member": "LANTERN-BASELINE-MODEL-v1.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-FOUNDER-OSS-FUNDING-2026-05-28.pdf": {
+      "sha256": "5033c9c25eff4ad1dc5300a138e18d9c85ab10700b846e358d3fceedac5c95d7",
+      "member": "LANTERN-OS-FOUNDER-OSS-FUNDING-2026-05-28.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-FOUNDER-OSS-FUNDING-2026-05-28.pdf": {
+      "sha256": "5033c9c25eff4ad1dc5300a138e18d9c85ab10700b846e358d3fceedac5c95d7",
+      "member": "LANTERN-OS-FOUNDER-OSS-FUNDING-2026-05-28.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-ORION-FOUNDER-PRODUCT-LINE-PATENT-REPORT-2026-05-29.pdf": {
+      "sha256": "956f1c5bc37affd4ca12d6a1e568b34554e41ec8ecd3d8245dccf1603a7f9d09",
+      "member": "LANTERN-OS-ORION-FOUNDER-PRODUCT-LINE-PATENT-REPORT-2026-05-29.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-ORION-FOUNDER-PRODUCT-LINE-PATENT-REPORT-2026-05-29.pdf": {
+      "sha256": "956f1c5bc37affd4ca12d6a1e568b34554e41ec8ecd3d8245dccf1603a7f9d09",
+      "member": "LANTERN-OS-ORION-FOUNDER-PRODUCT-LINE-PATENT-REPORT-2026-05-29.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf": {
+      "sha256": "47d9fa99b89530fdbf7c2ab3b796464ad63d384ebbce9514709c625d5ff3840f",
+      "member": "LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29.pdf": {
+      "sha256": "47d9fa99b89530fdbf7c2ab3b796464ad63d384ebbce9514709c625d5ff3840f",
+      "member": "LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf": {
+      "sha256": "47d9fa99b89530fdbf7c2ab3b796464ad63d384ebbce9514709c625d5ff3840f",
+      "member": "LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29.pdf": {
+      "sha256": "47d9fa99b89530fdbf7c2ab3b796464ad63d384ebbce9514709c625d5ff3840f",
+      "member": "LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf": {
+      "sha256": "47d9fa99b89530fdbf7c2ab3b796464ad63d384ebbce9514709c625d5ff3840f",
+      "member": "LANTERN-OS-PREDICTION-MARKET-BASELINE-TABLE-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-RAGDOLL-REPORTS-UPDATE-2026-05-29.pdf": {
+      "sha256": "45150d4a48cdf6eb834c4e03481d6504e5566c508e28af6b5d8e8d173676b92d",
+      "member": "LANTERN-OS-RAGDOLL-REPORTS-UPDATE-2026-05-29.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-RAGDOLL-REPORTS-UPDATE-2026-05-29.pdf": {
+      "sha256": "45150d4a48cdf6eb834c4e03481d6504e5566c508e28af6b5d8e8d173676b92d",
+      "member": "LANTERN-OS-RAGDOLL-REPORTS-UPDATE-2026-05-29.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-ROBINHOOD-TEST-ACTIONS-2026-05-29.pdf": {
+      "sha256": "addc2669a33ce9d27fb76a5565e2cda05e81a7d361e33779a9ae922d6cbd3cbb",
+      "member": "LANTERN-OS-ROBINHOOD-TEST-ACTIONS-2026-05-29.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-ROBINHOOD-TEST-ACTIONS-2026-05-29.pdf": {
+      "sha256": "addc2669a33ce9d27fb76a5565e2cda05e81a7d361e33779a9ae922d6cbd3cbb",
+      "member": "LANTERN-OS-ROBINHOOD-TEST-ACTIONS-2026-05-29.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-SPANISH-ABODE-FOUNDER-ROUTE-CONCEPT-SHEET-2026-05-28.png": {
+      "sha256": "3ee6c8b4e1f73c1442146ac41e23cecadf7d3862e26767a75e64237ff9a870fc",
+      "member": "LANTERN-OS-SPANISH-ABODE-FOUNDER-ROUTE-CONCEPT-SHEET-2026-05-28.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-SPANISH-ABODE-FOUNDER-ROUTE-CONCEPT-SHEET-2026-05-28.png": {
+      "sha256": "3ee6c8b4e1f73c1442146ac41e23cecadf7d3862e26767a75e64237ff9a870fc",
+      "member": "LANTERN-OS-SPANISH-ABODE-FOUNDER-ROUTE-CONCEPT-SHEET-2026-05-28.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a459a111164e8a64a76d43cbb8c81256074dc44b0336ec0174a73646fc7e63c2",
+      "member": "LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29.pdf": {
+      "sha256": "a459a111164e8a64a76d43cbb8c81256074dc44b0336ec0174a73646fc7e63c2",
+      "member": "LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a459a111164e8a64a76d43cbb8c81256074dc44b0336ec0174a73646fc7e63c2",
+      "member": "LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29.pdf": {
+      "sha256": "a459a111164e8a64a76d43cbb8c81256074dc44b0336ec0174a73646fc7e63c2",
+      "member": "LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a459a111164e8a64a76d43cbb8c81256074dc44b0336ec0174a73646fc7e63c2",
+      "member": "LANTERN-OS-TWO-CONVERGENCES-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/LANTERN-TRADING-APP-PERFECT-REPORT-2026-05-30.pdf": {
+      "sha256": "e4b3b3c674ebbcc7c69de9736124c782fd4a0272316bace82c014fb27378f4b5",
+      "member": "LANTERN-TRADING-APP-PERFECT-REPORT-2026-05-30.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/LANTERN-TRADING-APP-PERFECT-REPORT-2026-05-30.pdf": {
+      "sha256": "e4b3b3c674ebbcc7c69de9736124c782fd4a0272316bace82c014fb27378f4b5",
+      "member": "LANTERN-TRADING-APP-PERFECT-REPORT-2026-05-30.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Marketing Trends in 2026 _ IDHL.pdf": {
+      "sha256": "cccf245304e0d13a275b1b6624f402d09b9d25d7869037800de4d4051def46af",
+      "member": "Marketing Trends in 2026 _ IDHL.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Marketing Trends in 2026 _ IDHL.pdf": {
+      "sha256": "cccf245304e0d13a275b1b6624f402d09b9d25d7869037800de4d4051def46af",
+      "member": "Marketing Trends in 2026 _ IDHL.pdf"
+    },
+    "data/reports/caadi/Marketing Trends in 2026 _ IDHL.pdf": {
+      "sha256": "cccf245304e0d13a275b1b6624f402d09b9d25d7869037800de4d4051def46af",
+      "member": "Marketing Trends in 2026 _ IDHL.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Mary_Place_Best_Helper_Handout_Post_Convergence.pdf": {
+      "sha256": "38bbc77e2c5ee9f1c113e48f1c4a5b09aa15fa268c17c545f5a98f8e829fee87",
+      "member": "Mary_Place_Best_Helper_Handout_Post_Convergence.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Mary_Place_Best_Helper_Handout_Post_Convergence.pdf": {
+      "sha256": "38bbc77e2c5ee9f1c113e48f1c4a5b09aa15fa268c17c545f5a98f8e829fee87",
+      "member": "Mary_Place_Best_Helper_Handout_Post_Convergence.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Mary_Place_Healing_Report_Waterfalls_Peacocks.pdf": {
+      "sha256": "0ce4a34a0bd357fe80915aa62e2e550dce51398b43da07227227b3ba2ee5a0c3",
+      "member": "Mary_Place_Healing_Report_Waterfalls_Peacocks.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Mary_Place_Healing_Report_Waterfalls_Peacocks.pdf": {
+      "sha256": "0ce4a34a0bd357fe80915aa62e2e550dce51398b43da07227227b3ba2ee5a0c3",
+      "member": "Mary_Place_Healing_Report_Waterfalls_Peacocks.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Mirrors-by-Harold-W-Percival.pdf": {
+      "sha256": "ae331863aff246906b06f6179a16622a1d90e42529d1bb80be0d48c7f17cc4fd",
+      "member": "Mirrors-by-Harold-W-Percival.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Mirrors-by-Harold-W-Percival.pdf": {
+      "sha256": "ae331863aff246906b06f6179a16622a1d90e42529d1bb80be0d48c7f17cc4fd",
+      "member": "Mirrors-by-Harold-W-Percival.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Nimrod_High_Frequency_Trading.pdf": {
+      "sha256": "d850d07a6a1ac1cbd94bd5a4ce16e3703dfbea8d9657dc254f0ad0f5463cb873",
+      "member": "Nimrod_High_Frequency_Trading.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Nimrod_High_Frequency_Trading.pdf": {
+      "sha256": "d850d07a6a1ac1cbd94bd5a4ce16e3703dfbea8d9657dc254f0ad0f5463cb873",
+      "member": "Nimrod_High_Frequency_Trading.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ONE-IDE-STATUS-LATEST.pdf": {
+      "sha256": "7b9fe89e9e867eb7e0b3a1c99c2dbfe9ac2c5ff960c4451926566c1621efd62c",
+      "member": "ONE-IDE-STATUS-LATEST.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ONE-IDE-STATUS-LATEST.pdf": {
+      "sha256": "7b9fe89e9e867eb7e0b3a1c99c2dbfe9ac2c5ff960c4451926566c1621efd62c",
+      "member": "ONE-IDE-STATUS-LATEST.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/OsborneRubinsteinMasterpiece.pdf": {
+      "sha256": "70733e532ffbcd7a010f5c9fc041ddb07eab56f9caacd860e2ad4578fccd22c8",
+      "member": "OsborneRubinsteinMasterpiece.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/OsborneRubinsteinMasterpiece.pdf": {
+      "sha256": "70733e532ffbcd7a010f5c9fc041ddb07eab56f9caacd860e2ad4578fccd22c8",
+      "member": "OsborneRubinsteinMasterpiece.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (2).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29.pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (2).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29.pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (2).pdf": {
+      "sha256": "5462c2c01d9f6ee68cfb6c1c81f3a94cce0dce7401788523ca9bb6fd11ea67ae",
+      "member": "POLYMARKET-TOP-20-CASH-FIRST-CONVERGENCE-REPORT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a89a1dd2b7691d0ce0843700e7a64b6247fc43a72e499a6d31ee43b7143d5612",
+      "member": "PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29.pdf": {
+      "sha256": "a89a1dd2b7691d0ce0843700e7a64b6247fc43a72e499a6d31ee43b7143d5612",
+      "member": "PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a89a1dd2b7691d0ce0843700e7a64b6247fc43a72e499a6d31ee43b7143d5612",
+      "member": "PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29.pdf": {
+      "sha256": "a89a1dd2b7691d0ce0843700e7a64b6247fc43a72e499a6d31ee43b7143d5612",
+      "member": "PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/reports/caadi/PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf": {
+      "sha256": "a89a1dd2b7691d0ce0843700e7a64b6247fc43a72e499a6d31ee43b7143d5612",
+      "member": "PREDICTION-MARKET-RAGDOLL-PERFECT-2026-05-29 (1).pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Prajit-K.-Dutta-Strategies-and-Games_-Theory-and-Practice-The-MIT-Press-1999.pdf": {
+      "sha256": "9fc8b1618747f3579f0959cb35d938352b29e65273576753c092c0474b9a9ae6",
+      "member": "Prajit-K.-Dutta-Strategies-and-Games_-Theory-and-Practice-The-MIT-Press-1999.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Prajit-K.-Dutta-Strategies-and-Games_-Theory-and-Practice-The-MIT-Press-1999.pdf": {
+      "sha256": "9fc8b1618747f3579f0959cb35d938352b29e65273576753c092c0474b9a9ae6",
+      "member": "Prajit-K.-Dutta-Strategies-and-Games_-Theory-and-Practice-The-MIT-Press-1999.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Quantum_teleportation_of_an_image.pdf": {
+      "sha256": "c4c3ed6cacdd57101b189abfe160d04baa5662963062ccec872ea1102be88226",
+      "member": "Quantum_teleportation_of_an_image.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Quantum_teleportation_of_an_image.pdf": {
+      "sha256": "c4c3ed6cacdd57101b189abfe160d04baa5662963062ccec872ea1102be88226",
+      "member": "Quantum_teleportation_of_an_image.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Teleportation.pdf": {
+      "sha256": "ec2e65bc8b02564221fc70f58e8230e5a7e9ea6a9961de91f3d7049133975c25",
+      "member": "Teleportation.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Teleportation.pdf": {
+      "sha256": "ec2e65bc8b02564221fc70f58e8230e5a7e9ea6a9961de91f3d7049133975c25",
+      "member": "Teleportation.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/Zero Hash and Zero Hash Liquidity Services User Agreement.pdf": {
+      "sha256": "556833a751fc396d70bfcced509355d952c347ee51b1bfa378063d5716412758",
+      "member": "Zero Hash and Zero Hash Liquidity Services User Agreement.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/Zero Hash and Zero Hash Liquidity Services User Agreement.pdf": {
+      "sha256": "556833a751fc396d70bfcced509355d952c347ee51b1bfa378063d5716412758",
+      "member": "Zero Hash and Zero Hash Liquidity Services User Agreement.pdf"
+    },
+    "data/reports/caadi/Zero Hash and Zero Hash Liquidity Services User Agreement.pdf": {
+      "sha256": "556833a751fc396d70bfcced509355d952c347ee51b1bfa378063d5716412758",
+      "member": "Zero Hash and Zero Hash Liquidity Services User Agreement.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/a8e06107-8f66-4152-8697-dfd6e405e59c.png": {
+      "sha256": "799aaa83810c2e9cbef78581713703f2cc97413a99d07900a1ee89a5e7a0c78f",
+      "member": "a8e06107-8f66-4152-8697-dfd6e405e59c.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/a8e06107-8f66-4152-8697-dfd6e405e59c.png": {
+      "sha256": "799aaa83810c2e9cbef78581713703f2cc97413a99d07900a1ee89a5e7a0c78f",
+      "member": "a8e06107-8f66-4152-8697-dfd6e405e59c.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/addiction_severity_index_baseline_followup_4.pdf": {
+      "sha256": "41da36c5504ea81515edd01736e46df36b697eda65ef44c79b50ccf304cb5ed2",
+      "member": "addiction_severity_index_baseline_followup_4.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/addiction_severity_index_baseline_followup_4.pdf": {
+      "sha256": "41da36c5504ea81515edd01736e46df36b697eda65ef44c79b50ccf304cb5ed2",
+      "member": "addiction_severity_index_baseline_followup_4.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/alex-family-portrait.png": {
+      "sha256": "6bab95a2b12e4603e0fae5fa1769cd7370042be9b92917d612a5fceb7c075889",
+      "member": "alex-family-portrait.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/alex-family-portrait.png": {
+      "sha256": "6bab95a2b12e4603e0fae5fa1769cd7370042be9b92917d612a5fceb7c075889",
+      "member": "alex-family-portrait.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1) (1).png": {
+      "sha256": "51640eff41a897664b6be1d59a9bbd10bc369ac2907ef2f283642b6a85cee81f",
+      "member": "b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1) (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1) (1).png": {
+      "sha256": "51640eff41a897664b6be1d59a9bbd10bc369ac2907ef2f283642b6a85cee81f",
+      "member": "b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1) (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1).png": {
+      "sha256": "e20aa62bc65e8831647558ce14521c3d419fc321a0b74e5ad188ba4b19a4ceef",
+      "member": "b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1.png": {
+      "sha256": "e20aa62bc65e8831647558ce14521c3d419fc321a0b74e5ad188ba4b19a4ceef",
+      "member": "b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1).png": {
+      "sha256": "e20aa62bc65e8831647558ce14521c3d419fc321a0b74e5ad188ba4b19a4ceef",
+      "member": "b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1.png": {
+      "sha256": "e20aa62bc65e8831647558ce14521c3d419fc321a0b74e5ad188ba4b19a4ceef",
+      "member": "b3efadf0-d93c-47b6-9c6a-2f5968d8b3c1 (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/b4c4638a-7111-4f18-8624-15b709863e9f (1).png": {
+      "sha256": "eb46d6f12a95e4853292593960c8a41f3471d7f6563bbdf28d457786bbe27142",
+      "member": "b4c4638a-7111-4f18-8624-15b709863e9f (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/b4c4638a-7111-4f18-8624-15b709863e9f.png": {
+      "sha256": "eb46d6f12a95e4853292593960c8a41f3471d7f6563bbdf28d457786bbe27142",
+      "member": "b4c4638a-7111-4f18-8624-15b709863e9f (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/b4c4638a-7111-4f18-8624-15b709863e9f (1).png": {
+      "sha256": "eb46d6f12a95e4853292593960c8a41f3471d7f6563bbdf28d457786bbe27142",
+      "member": "b4c4638a-7111-4f18-8624-15b709863e9f (1).png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/b4c4638a-7111-4f18-8624-15b709863e9f.png": {
+      "sha256": "eb46d6f12a95e4853292593960c8a41f3471d7f6563bbdf28d457786bbe27142",
+      "member": "b4c4638a-7111-4f18-8624-15b709863e9f (1).png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/eJIFCC2026Vol37No1pp16-25.pdf": {
+      "sha256": "f40cbb1739c828f818bbb32068112fb2a198e807f35ea397442adf265e21cd41",
+      "member": "eJIFCC2026Vol37No1pp16-25.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/eJIFCC2026Vol37No1pp16-25.pdf": {
+      "sha256": "f40cbb1739c828f818bbb32068112fb2a198e807f35ea397442adf265e21cd41",
+      "member": "eJIFCC2026Vol37No1pp16-25.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/ebf59017-a582-4616-9ddb-3eea83c525e8.png": {
+      "sha256": "d8a44dfdb6c9ee4452e55f79b5ccaa30ef4a95ede05a89fd49c8c2088caef8a1",
+      "member": "ebf59017-a582-4616-9ddb-3eea83c525e8.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/ebf59017-a582-4616-9ddb-3eea83c525e8.png": {
+      "sha256": "d8a44dfdb6c9ee4452e55f79b5ccaa30ef4a95ede05a89fd49c8c2088caef8a1",
+      "member": "ebf59017-a582-4616-9ddb-3eea83c525e8.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/icon1.png": {
+      "sha256": "656f6cce05d7d47e962add7c95525ad43c2c70e4640453d5d57f51912155252e",
+      "member": "icon1.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/icon1.png": {
+      "sha256": "656f6cce05d7d47e962add7c95525ad43c2c70e4640453d5d57f51912155252e",
+      "member": "icon1.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-3-to-12-minus-1-convergence-methodology.pdf": {
+      "sha256": "def1a47c4b555397cca8ffa5fd1db01549719ccae70d7f435834166e47c01995",
+      "member": "lantern-3-to-12-minus-1-convergence-methodology.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-3-to-12-minus-1-convergence-methodology.pdf": {
+      "sha256": "def1a47c4b555397cca8ffa5fd1db01549719ccae70d7f435834166e47c01995",
+      "member": "lantern-3-to-12-minus-1-convergence-methodology.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-ip-verification-best-effort-report.pdf": {
+      "sha256": "d69eece981eb9eaff29183ec1c94f99c3c7a72389700331596770d1a94db4ed6",
+      "member": "lantern-ip-verification-best-effort-report.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-ip-verification-best-effort-report.pdf": {
+      "sha256": "d69eece981eb9eaff29183ec1c94f99c3c7a72389700331596770d1a94db4ed6",
+      "member": "lantern-ip-verification-best-effort-report.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-agent-fleet-blackhole-core-04.png": {
+      "sha256": "ebceab6c907d2afcd3289b300e15e100ebf10c3a7b01bb4d1a62f385d25a6769",
+      "member": "lantern-os-agent-fleet-blackhole-core-04.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-agent-fleet-blackhole-core-04.png": {
+      "sha256": "ebceab6c907d2afcd3289b300e15e100ebf10c3a7b01bb4d1a62f385d25a6769",
+      "member": "lantern-os-agent-fleet-blackhole-core-04.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-founder-sacred-tesseract.png": {
+      "sha256": "cf700a941e8cdad33d9573bf395150bbf09c5e7f162b29fb6403c20a0ef3f7c0",
+      "member": "lantern-os-founder-sacred-tesseract.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-founder-sacred-tesseract.png": {
+      "sha256": "cf700a941e8cdad33d9573bf395150bbf09c5e7f162b29fb6403c20a0ef3f7c0",
+      "member": "lantern-os-founder-sacred-tesseract.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-founder-tesseract-blackhole.png": {
+      "sha256": "8a2584ace9a66bda9b30c063e538f2fdbcb56bbfecbdd5f40f8f37e97a241134",
+      "member": "lantern-os-founder-tesseract-blackhole.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-founder-tesseract-blackhole.png": {
+      "sha256": "8a2584ace9a66bda9b30c063e538f2fdbcb56bbfecbdd5f40f8f37e97a241134",
+      "member": "lantern-os-founder-tesseract-blackhole.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-infinity-mural-agents-love-03.png": {
+      "sha256": "ae057a0a58f159cf05cbd742d915ecca4752287b7773326c1934c25a68b4dfd8",
+      "member": "lantern-os-infinity-mural-agents-love-03.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-infinity-mural-agents-love-03.png": {
+      "sha256": "ae057a0a58f159cf05cbd742d915ecca4752287b7773326c1934c25a68b4dfd8",
+      "member": "lantern-os-infinity-mural-agents-love-03.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-matrix-mural-agents-love-01.png": {
+      "sha256": "3a8ed30a87fe7ca562452bed2393cc13767e68a2047f7b4c9ebb555e24b0bf1b",
+      "member": "lantern-os-matrix-mural-agents-love-01.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-matrix-mural-agents-love-01.png": {
+      "sha256": "3a8ed30a87fe7ca562452bed2393cc13767e68a2047f7b4c9ebb555e24b0bf1b",
+      "member": "lantern-os-matrix-mural-agents-love-01.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-one-converged-full-breakdown-claim-report.pdf": {
+      "sha256": "5692088c5ab39686ecb055f14620b50565074ed1d27e80e2e21bd52c895ca8f9",
+      "member": "lantern-os-one-converged-full-breakdown-claim-report.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-one-converged-full-breakdown-claim-report.pdf": {
+      "sha256": "5692088c5ab39686ecb055f14620b50565074ed1d27e80e2e21bd52c895ca8f9",
+      "member": "lantern-os-one-converged-full-breakdown-claim-report.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-patent-claim-charts-ingestion-packet.pdf": {
+      "sha256": "fb9907c7f3f768e322dce461668846945400ffdb06e5a3952115dd08afcc09a1",
+      "member": "lantern-os-patent-claim-charts-ingestion-packet.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-patent-claim-charts-ingestion-packet.pdf": {
+      "sha256": "fb9907c7f3f768e322dce461668846945400ffdb06e5a3952115dd08afcc09a1",
+      "member": "lantern-os-patent-claim-charts-ingestion-packet.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-os-superjarvis-command-chamber-02.png": {
+      "sha256": "42b351824becd892eae5cbefb1815b7abf1465c47770afd0f73d5fb6f361d8ba",
+      "member": "lantern-os-superjarvis-command-chamber-02.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-os-superjarvis-command-chamber-02.png": {
+      "sha256": "42b351824becd892eae5cbefb1815b7abf1465c47770afd0f73d5fb6f361d8ba",
+      "member": "lantern-os-superjarvis-command-chamber-02.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern-wallet-demo.html": {
+      "sha256": "4090a476ec02453536942f91ca832f217867c07801c612ed9594398d668a0c2a",
+      "member": "lantern-wallet-demo.html"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern-wallet-demo.html": {
+      "sha256": "4090a476ec02453536942f91ca832f217867c07801c612ed9594398d668a0c2a",
+      "member": "lantern-wallet-demo.html"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/lantern_ring_audio_gate_mk1_v0_2_concept_sheet.png": {
+      "sha256": "2ed5c45f9ac759728fc7db8218b82040c5ff88f23598bf3327c63614cdfccad0",
+      "member": "lantern_ring_audio_gate_mk1_v0_2_concept_sheet.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/lantern_ring_audio_gate_mk1_v0_2_concept_sheet.png": {
+      "sha256": "2ed5c45f9ac759728fc7db8218b82040c5ff88f23598bf3327c63614cdfccad0",
+      "member": "lantern_ring_audio_gate_mk1_v0_2_concept_sheet.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/louise_hay_mirror-work.pdf": {
+      "sha256": "c95b294b6128993541529ee833306a79e5b4fc4705cb96c816546be61e7a4474",
+      "member": "louise_hay_mirror-work.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/louise_hay_mirror-work.pdf": {
+      "sha256": "c95b294b6128993541529ee833306a79e5b4fc4705cb96c816546be61e7a4474",
+      "member": "louise_hay_mirror-work.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/maaike.pdf": {
+      "sha256": "349fee70bed1c172ea5cff8cdfecff7c6a8360784b58facaadd159c7313b48fa",
+      "member": "maaike.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/maaike.pdf": {
+      "sha256": "349fee70bed1c172ea5cff8cdfecff7c6a8360784b58facaadd159c7313b48fa",
+      "member": "maaike.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/martin_j-_osborne-an_introduction_to_game_theory-oxford_university_press_usa2003.pdf": {
+      "sha256": "d5c9774e7d45f971cb2e20d90004f8a2a0da95a5dbb93227b7d58092d6dd2a0d",
+      "member": "martin_j-_osborne-an_introduction_to_game_theory-oxford_university_press_usa2003.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/martin_j-_osborne-an_introduction_to_game_theory-oxford_university_press_usa2003.pdf": {
+      "sha256": "d5c9774e7d45f971cb2e20d90004f8a2a0da95a5dbb93227b7d58092d6dd2a0d",
+      "member": "martin_j-_osborne-an_introduction_to_game_theory-oxford_university_press_usa2003.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/mocanu.pdf": {
+      "sha256": "b79cc75855ac06674c7bb7710587e42739e9e27175593fe80c839ca32590d8e9",
+      "member": "mocanu.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/mocanu.pdf": {
+      "sha256": "b79cc75855ac06674c7bb7710587e42739e9e27175593fe80c839ca32590d8e9",
+      "member": "mocanu.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/public-bounty-radar.png": {
+      "sha256": "b3b415f3b78c9f9f01e31124fc907327a58dbb75050d28e8958367d3919bc13a",
+      "member": "public-bounty-radar.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/public-bounty-radar.png": {
+      "sha256": "b3b415f3b78c9f9f01e31124fc907327a58dbb75050d28e8958367d3919bc13a",
+      "member": "public-bounty-radar.png"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/smartsheet-ai-whitepaper-march-2026.pdf": {
+      "sha256": "530a6d622e1b19de3d5a960774612e1a1a9a2cab50bf6acfb1c2de8dd405413d",
+      "member": "smartsheet-ai-whitepaper-march-2026.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/smartsheet-ai-whitepaper-march-2026.pdf": {
+      "sha256": "530a6d622e1b19de3d5a960774612e1a1a9a2cab50bf6acfb1c2de8dd405413d",
+      "member": "smartsheet-ai-whitepaper-march-2026.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/theMendicant_Vol8No1.pdf": {
+      "sha256": "1c635a477fc9638fb3f6e108f5495e00c6387b14344c8ec3ef54cf165422429a",
+      "member": "theMendicant_Vol8No1.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/theMendicant_Vol8No1.pdf": {
+      "sha256": "1c635a477fc9638fb3f6e108f5495e00c6387b14344c8ec3ef54cf165422429a",
+      "member": "theMendicant_Vol8No1.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/trading_architecture.pdf": {
+      "sha256": "552333356d5e22e2bc4410d7b7e0c07b33c1c0c40fbccaa158966a9d3f7c41be",
+      "member": "trading_architecture.pdf"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/trading_architecture.pdf": {
+      "sha256": "552333356d5e22e2bc4410d7b7e0c07b33c1c0c40fbccaa158966a9d3f7c41be",
+      "member": "trading_architecture.pdf"
+    },
+    "data/ingest/imagesandreports-2026-06-02/imagesandreports/wallet-safe-revenue-route.png": {
+      "sha256": "e807c3726615703084cf47168676444f509c04bddc131380fcaff33bdeb629ec",
+      "member": "wallet-safe-revenue-route.png"
+    },
+    "data/ingest/imagesandreports-20260602/imagesandreports/wallet-safe-revenue-route.png": {
+      "sha256": "e807c3726615703084cf47168676444f509c04bddc131380fcaff33bdeb629ec",
+      "member": "wallet-safe-revenue-route.png"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_03572f3966cb48728e692acbcdfffdf0.pdf": {
+      "sha256": "a3e82acb18c8ea7f6c773444c9c88e11cef0050f0a83246a298d247b4fae16ae",
+      "member": "01ab8d_03572f3966cb48728e692acbcdfffdf0.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_0a032d693bfe4c24be09944eb193f1d9.pdf": {
+      "sha256": "6a009cc21dc397390741f2358370fdbdb4bcb6f9143890e1f2c422bff4f844ac",
+      "member": "01ab8d_0a032d693bfe4c24be09944eb193f1d9.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_29dd6156220b43edb06ec167dc30d9fa.pdf": {
+      "sha256": "ea3e5308aeaf6ba78604250c0fca9497521012cac50ffbb376e402c86d93d36f",
+      "member": "01ab8d_29dd6156220b43edb06ec167dc30d9fa.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_5b94cc955833475ebe28af2fe7944da7.pdf": {
+      "sha256": "f10e90b1eee70110baab056a8d40140a48892fb216baaebc0aa666503512a6db",
+      "member": "01ab8d_5b94cc955833475ebe28af2fe7944da7.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_68e847c83097487cb6a7da2726ef3fab.pdf": {
+      "sha256": "f06925ab52e58332e65a31d00b5b4de517c4512d078b3c520c85ea46d0549c7d",
+      "member": "01ab8d_68e847c83097487cb6a7da2726ef3fab.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_87aa189565154f608c9c48964ee26888.pdf": {
+      "sha256": "ec8520563c141a972664a378b752af70367762d6447d187893b93369eae5b081",
+      "member": "01ab8d_87aa189565154f608c9c48964ee26888.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_b75de03714bf4f9f9a31f4e47d72ce79.pdf": {
+      "sha256": "5a2cdfef962e34fa6219248b3306fa304240eff44c665140204cb0139aa33bc7",
+      "member": "01ab8d_b75de03714bf4f9f9a31f4e47d72ce79.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_c54f3c4462e1459387944ed327741506.pdf": {
+      "sha256": "dc1db94d0d4fc16e5d06223569e1b01b413817fc77b8a1a5e6a824d75265b67e",
+      "member": "01ab8d_c54f3c4462e1459387944ed327741506.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_dd1437532a3a4935b39fcfb540c58d5b.pdf": {
+      "sha256": "988aefd918ea105b0c2c671538c4f4fa4b6e208df45b9408a7b0b0fc1510fe06",
+      "member": "01ab8d_dd1437532a3a4935b39fcfb540c58d5b.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/01ab8d_e3b4379474e745fb83a7d9f4e44a16dd.pdf": {
+      "sha256": "697ee09d318e3e63ec7b8cdf6d00386d9f18ae3f16b6d72c9dc37b7af6ea102f",
+      "member": "01ab8d_e3b4379474e745fb83a7d9f4e44a16dd.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/AI-Singularity-Navigating-Implications-and-Framing-Strategic-Recommendations.pdf": {
+      "sha256": "8d3f6f0fb0d3d65c7f07905d5b8c365055e4f18c5a092345f9735ab943a7ddda",
+      "member": "AI-Singularity-Navigating-Implications-and-Framing-Strategic-Recommendations.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Artificial_Intelligence_and_Quantum_Computing_white_paper.pdf": {
+      "sha256": "2e5fb75021cb674376b0ae241c776745d168a9f254d41680e5c3c9616c54328d",
+      "member": "Artificial_Intelligence_and_Quantum_Computing_white_paper.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Clifford-Chance-Deutsche-Bank-Guide-on-Thought-Leadership-Convergence-of-AI-and-DLT-Sep2025.pdf": {
+      "sha256": "d7be092daaa2c39946a84beb0191cfd57e3cb615ed05709c4843060be43c9fe0",
+      "member": "Clifford-Chance-Deutsche-Bank-Guide-on-Thought-Leadership-Convergence-of-AI-and-DLT-Sep2025.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/DD-Player-Handbook.pdf": {
+      "sha256": "a8cf2985df5bb802f5c8db2428c9700743dcb86675e4f2446e54609e08e7363e",
+      "member": "DD-Player-Handbook.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/My Characters - D_D Beyond.html": {
+      "sha256": "dcf4e4215cd73bb6555a72a4bd3de40e764f2ee1248fea6ba7d1a074a0bd5cfd",
+      "member": "My Characters - D_D Beyond.html"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/NTIBIO_AI_FINAL.pdf": {
+      "sha256": "03897f5ad6df156e0464c02af4bf3bf804bf59321f08a4ea0cc30fe4e2e0e989",
+      "member": "NTIBIO_AI_FINAL.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Quantum_Relativity _1_.pdf": {
+      "sha256": "c30f1dcb1833657300b8ae322393180895599a3398e8a0d88d9ec4609d288ec9",
+      "member": "Quantum_Relativity _1_.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/Quantum_relativity.pdf": {
+      "sha256": "c1d3d804e1506e7ffebd3c6b011b47287483eee765c576f3db0c3fe20d4845d3",
+      "member": "Quantum_relativity.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/atarc_whitepaper_cyber_ai-convergence.pdf": {
+      "sha256": "6b3d162922def374be19028f5b486d18d9b4efe678bf87a7466ac51a517b1fce",
+      "member": "atarc_whitepaper_cyber_ai-convergence.pdf"
+    },
+    "data/rag-intake/downloads-merge-2026-05-27/assets/james-d-bjorken-sidney-d-drell-relativistic-quantum-mechanics-1964.pdf": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "member": "james-d-bjorken-sidney-d-drell-relativistic-quantum-mechanics-1964.pdf"
+    },
+    "data/rag-intake/external-llm-web-cache/human-in-the-loop-asi-agi-2026-06-07.json": {
+      "sha256": "839903508227b8d55469367c87bbd6df855103ad92515e329de2587779df5a0b",
+      "member": "human-in-the-loop-asi-agi-2026-06-07.json"
+    },
+    "data/rag-intake/research-synthesis-human-in-the-loop-asi-agi-2026-06-07.md": {
+      "sha256": "48c76a7938a12cb29ba4555e911437f9009266b9994fae41407253a131a6ca9a",
+      "member": "research-synthesis-human-in-the-loop-asi-agi-2026-06-07.md"
+    },
+    "docs/research-papers/ai-neurosymbolic-runtime.pdf": {
+      "sha256": "3b52dfb2235f24d7dc4be005e073c5e45682f335493d24d7f5b80565b521d800",
+      "member": "ai-neurosymbolic-runtime.pdf"
+    },
+    "docs/research-papers/asi-alliance-vision-cudos.pdf": {
+      "sha256": "9c8fa7c03204d7845d1daa78018622929aab62764502867eaf69557d43eb576b",
+      "member": "asi-alliance-vision-cudos.pdf"
+    },
+    "docs/research-papers/asi-alliance-vision-paper.pdf": {
+      "sha256": "5fef6398d625b2e54f6b835ede1fe73498baa67802679e8a1c78368d0667541c",
+      "member": "asi-alliance-vision-paper.pdf"
+    },
+    "docs/research-papers/asi-coordination-strategy.pdf": {
+      "sha256": "2a8c17836191b9bc2bc2ea6b81a5e204b0071c6bd94f920af5a8c8759a11645c",
+      "member": "asi-coordination-strategy.pdf"
+    },
+    "docs/research-papers/b2b-marketing-playbook-2026.pdf": {
+      "sha256": "4fca18e9633cfb3d0acb20408cdc67135e0c845ad9c9c662bf3c9cf1d8c56b68",
+      "member": "b2b-marketing-playbook-2026.pdf"
+    },
+    "docs/research-papers/blue-wheel-paid-media-guide-2026.pdf": {
+      "sha256": "977150f9b4b355be9b2678d95ca7227970e63ded915ddd39ccf7c083b192344e",
+      "member": "blue-wheel-paid-media-guide-2026.pdf"
+    },
+    "docs/research-papers/coconut-latent-reasoning-2412.06769.pdf": {
+      "sha256": "8281f80c3780b97b0a955f8d673065dbbdbcda64543a29c0a42fad35ae48c3a9",
+      "member": "coconut-latent-reasoning-2412.06769.pdf"
+    },
+    "docs/research-papers/game-theory-bonanno-2024.pdf": {
+      "sha256": "657bbb0e5e30fb2636f283d6c2c128ff90cdd3c8c71ef8d25a2e5237cdb8a017",
+      "member": "game-theory-bonanno-2024.pdf"
+    },
+    "docs/research-papers/game-theory-dutta-strategies-1999.pdf": {
+      "sha256": "01262b3a0de0dbb64c61b8bf74d406bfafb51c9e7f145c77a93248e1a6dad414",
+      "member": "game-theory-dutta-strategies-1999.pdf"
+    },
+    "docs/research-papers/game-theory-osborne-2003.pdf": {
+      "sha256": "1a8232bffec2645e8d347af8a26be9109d814f24f53f9bab65c4c4998edf519a",
+      "member": "game-theory-osborne-2003.pdf"
+    },
+    "docs/research-papers/game-theory-osborne-rubinstein.pdf": {
+      "sha256": "5690c0834ed9be2e4e528c24002f82722230c6bd6794598c72e46b09a2cba018",
+      "member": "game-theory-osborne-rubinstein.pdf"
+    },
+    "docs/research-papers/gpt2-language-models-2019.pdf": {
+      "sha256": "a44fcd816a98fec35252cc8cc7ff704185748eda610708cc60652bb0fdd56b53",
+      "member": "gpt2-language-models-2019.pdf"
+    },
+    "docs/research-papers/gwi-connecting-dots-2026.pdf": {
+      "sha256": "a9b96d2a65dc4f598f327bb4da044d3bb477250828157126c08e62e8b2eb4e5b",
+      "member": "gwi-connecting-dots-2026.pdf"
+    },
+    "docs/research-papers/hft-nimrod.pdf": {
+      "sha256": "d864514a50ecee5599a9d9c7e4dd8c4b428236847166f98c85d16b4d8ae27c0e",
+      "member": "hft-nimrod.pdf"
+    },
+    "docs/research-papers/hft-systems-development.pdf": {
+      "sha256": "c4c2ed1a43fa0786e3038e05f9addc264125af8a961c51b1f126ff35caa71e48",
+      "member": "hft-systems-development.pdf"
+    },
+    "docs/research-papers/kalshi-sports-trading-app.pdf": {
+      "sha256": "c62753a38e121cd3b3987bbb6cf29ebbdb2b4b50303da5db988e9542eb21446a",
+      "member": "kalshi-sports-trading-app.pdf"
+    },
+    "docs/research-papers/marketing-trends-2026-idhl.pdf": {
+      "sha256": "44bcd8d8376e7d9e683d13d37243c60125ef383a38ba64502a94d9bb3f79d4b8",
+      "member": "marketing-trends-2026-idhl.pdf"
+    },
+    "docs/research-papers/ouro-looped-llm-2510.25741.pdf": {
+      "sha256": "f77e5b9f7c574e23c53e9f5cea759cddc74c1a66e28e6589bcb75c18e1e1cc3b",
+      "member": "ouro-looped-llm-2510.25741.pdf"
+    },
+    "docs/research-papers/quantum-canary-teleportation.pdf": {
+      "sha256": "b9f8fbe86f39634991f271b2c6710e1c3d83fe21a64c286f7ff3180d75abfc3c",
+      "member": "quantum-canary-teleportation.pdf"
+    },
+    "docs/research-papers/quantum-entangled-photons-teleportation-mocanu.pdf": {
+      "sha256": "326c41a8d84f23874bfb5dcc880b8dc5e40d550200a44f1929b2609f143d7ab2",
+      "member": "quantum-entangled-photons-teleportation-mocanu.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-high-dimensions-1906.09697.pdf": {
+      "sha256": "9857657c4b141786e23da968fc612523766a618192bb30a216c1d0c6f901c751",
+      "member": "quantum-teleportation-high-dimensions-1906.09697.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-maaike.pdf": {
+      "sha256": "7a5054bce454d4324a391cd42bc21de190576466e51f79e4b8a7ec776aaad117",
+      "member": "quantum-teleportation-maaike.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-of-image.pdf": {
+      "sha256": "0f5fa4001711933480939c786a657fe6ccfac05cc97aca38867efe50abe7a189",
+      "member": "quantum-teleportation-of-image.pdf"
+    },
+    "docs/research-papers/quantum-teleportation-overview.pdf": {
+      "sha256": "e81ba18ebe7054e60da4968718f5ca441b7c2e150862f7028ddb7e9e6578c28f",
+      "member": "quantum-teleportation-overview.pdf"
+    },
+    "docs/research-papers/smartsheet-ai-whitepaper-2026.pdf": {
+      "sha256": "be81a0b2c755b7613688acb9bc1fa7f71d5c0ea577e0ef8aea50e8349d999af3",
+      "member": "smartsheet-ai-whitepaper-2026.pdf"
+    },
+    "docs/research-papers/smartwatches-healthcare-2026.pdf": {
+      "sha256": "68fdbf4d056c29d7a004f4dfafeaf69fbb6f2a4682f6d6caf78a3bc8d3a57dfb",
+      "member": "smartwatches-healthcare-2026.pdf"
+    },
+    "docs/research-papers/subliminal-learning-2507.14805.pdf": {
+      "sha256": "a380f951369744abddddef2bc74273ed2d15f5812c582936d9bb6058df3bb3f2",
+      "member": "subliminal-learning-2507.14805.pdf"
+    },
+    "docs/research-papers/trading-architecture.pdf": {
+      "sha256": "63f134995223769fcd2362bacc01d39db8771d59ee1ef30e339004c46eb21ee7",
+      "member": "trading-architecture.pdf"
+    },
+    "docs/research-papers/wargames-handbook-dunnigan.pdf": {
+      "sha256": "71a6288da16d254b071e921adc2daf2da5ef7edb0716bd0e376779ce9233a79c",
+      "member": "wargames-handbook-dunnigan.pdf"
+    },
+    "docs/research-papers/wargames-scientific-method-air-war-college.pdf": {
+      "sha256": "2ea405768ffeaf3c4e1aca1fbddbb52f8685054354681896f1fca5b9e10dc01a",
+      "member": "wargames-scientific-method-air-war-college.pdf"
+    }
+  }
+}
