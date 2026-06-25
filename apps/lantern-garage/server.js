@@ -83,8 +83,16 @@ const jobQueue = new JobQueue(repoRoot);
 const jobWorker = new JobWorker(jobQueue, repoRoot);
 jobWorker.start(2000); // Poll every 2 seconds for new jobs
 
-// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet
-const prWatcher = new PrWatcher({ repoRoot, port, idleMs: Number(process.env.PR_WATCHER_IDLE_MS || 3 * 60_000) });
+// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and (when
+// PR_WATCHER_AUTOMERGE=1) auto-merges reviewed + green + conflict-free PRs.
+const prWatcher = new PrWatcher({
+  repoRoot, port,
+  idleMs: Number(process.env.PR_WATCHER_IDLE_MS || 3 * 60_000),
+  autoMerge: process.env.PR_WATCHER_AUTOMERGE === "1",
+  mergeIgnoreChecks: process.env.PR_WATCHER_MERGE_IGNORE_CHECKS
+    ? process.env.PR_WATCHER_MERGE_IGNORE_CHECKS.split(",").map((s) => s.trim()).filter(Boolean)
+    : null,
+});
 
 // Shared dependency bundle passed to every route module
 const deps = {
@@ -606,6 +614,7 @@ server.listen(port, host, () => {
   // others). Enable PR_WATCHER_ENABLED=1 on exactly ONE machine.
   if (process.env.PR_WATCHER_ENABLED === "1") {
     prWatcher.start();
+    console.log(`[PR Watcher] auto-merge ${process.env.PR_WATCHER_AUTOMERGE === "1" ? "ENABLED" : "off (set PR_WATCHER_AUTOMERGE=1 to land ready PRs)"}`);
   } else {
     console.log("[PR Watcher] disabled — set PR_WATCHER_ENABLED=1 on ONE fleet host to enable");
   }

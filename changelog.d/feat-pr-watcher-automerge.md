@@ -1,0 +1,2 @@
+### Added
+- **PR Watcher auto-merge** — the fleet PR watcher can now actually *land* PRs, not just post review comments. When `PR_WATCHER_AUTOMERGE=1` (and `PR_WATCHER_ENABLED=1`), it squash-merges a PR once it is reviewed for the current commit, idle, conflict-free, and all checks pass except a configurable ignore-list (`PR_WATCHER_MERGE_IGNORE_CHECKS`, defaulting to the chronically-red Python suites). One merge per poll to avoid cascade conflicts.

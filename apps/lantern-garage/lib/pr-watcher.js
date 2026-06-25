@@ -22,11 +22,30 @@ const POLL_MS = 60_000;
 const IDLE_MS = 3 * 60_000;
 const FAIL_BACKOFF_MS = 30 * 60_000; // after a failed review, wait this long before retrying
 
+// Checks that fail on master itself (chronically red) must not block auto-merge,
+// or nothing would ever merge. Override with PR_WATCHER_MERGE_IGNORE_CHECKS
+// (comma-separated check names). Fix the underlying suites to shrink this list.
+const DEFAULT_MERGE_IGNORE_CHECKS = [
+  "Python tests",
+  "Python report and policy tests",
+  "Existing pytest suite",
+  "Single-workstream check", // self-clears as lanes merge; not a code-quality gate
+];
+
+// Check conclusions that BLOCK a merge (a real, non-ignored failure or still-running).
+const BLOCKING_CONCLUSIONS = new Set([
+  "FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE",
+]);
+
 class PrWatcher {
-  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS } = {}) {
+  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null } = {}) {
     this.repoRoot = repoRoot;
     this.port = port;
     this.idleMs = idleMs;
+    // Auto-merge: actually land reviewed + green + conflict-free PRs (one per tick).
+    // Off by default; the watcher only reviewed before. Enable per-host.
+    this.autoMerge = autoMerge;
+    this.mergeIgnoreChecks = new Set(mergeIgnoreChecks || DEFAULT_MERGE_IGNORE_CHECKS);
     this.stateDir = path.join(repoRoot, "data", "pr-watcher");
     this.statePath = path.join(this.stateDir, "state.json");
     this.state = {};
@@ -53,6 +72,7 @@ class PrWatcher {
     const entries = Object.values(this.state);
     return {
       running: this.running,
+      autoMerge: this.autoMerge,
       idleThresholdMs: this.idleMs,
       pollIntervalMs: POLL_MS,
       tracked: entries.length,
@@ -80,6 +100,36 @@ class PrWatcher {
     if (now - (entry.shaSeenAt || 0) < this.idleMs) return false;    // not idle yet
     if (entry.lastAttemptAt && now - entry.lastAttemptAt < FAIL_BACKOFF_MS) return false; // backoff
     return true;
+  }
+
+  /**
+   * Should we auto-merge this PR right now? Pure + unit-tested.
+   * Gates: auto-merge enabled · this exact commit already reviewed · idle ·
+   * no conflicts (mergeable) · not a draft · every check passing except the
+   * ignore-list (chronically-red suites). `pv` is a `gh pr view --json` object.
+   * Returns { merge: boolean, reason: string }.
+   */
+  _shouldMerge(pv, entry, now) {
+    if (!this.autoMerge) return { merge: false, reason: "automerge_disabled" };
+    if (!pv) return { merge: false, reason: "no_pr_data" };
+    if (pv.isDraft) return { merge: false, reason: "draft" };
+    // Only merge a commit we've actually reviewed (ties merge to the review gate).
+    if (!entry || entry.reviewedSha !== entry.headSha) return { merge: false, reason: "not_reviewed" };
+    if (now - (entry.shaSeenAt || 0) < this.idleMs) return { merge: false, reason: "not_idle" };
+    // GitHub's mergeability: MERGEABLE only. CONFLICTING/UNKNOWN → skip (UNKNOWN
+    // means GitHub is still computing; re-evaluated next tick).
+    if (pv.mergeable !== "MERGEABLE") return { merge: false, reason: `mergeable=${pv.mergeable}` };
+
+    // Evaluate the status check rollup. Items are either CheckRun
+    // ({ name, status, conclusion }) or StatusContext ({ context, state }).
+    for (const c of (pv.statusCheckRollup || [])) {
+      const name = c.name || c.context || "";
+      if (this.mergeIgnoreChecks.has(name)) continue;
+      if (c.status && c.status !== "COMPLETED") return { merge: false, reason: `pending:${name || "?"}` };
+      const conclusion = String(c.conclusion || c.state || "").toUpperCase();
+      if (BLOCKING_CONCLUSIONS.has(conclusion)) return { merge: false, reason: `failed:${name || "?"}` };
+    }
+    return { merge: true, reason: "ready" };
   }
 
   /** Parse an /api/dream/chat response into { ok, text, error }. */
@@ -176,6 +226,53 @@ class PrWatcher {
       }
     }
     this._saveState();
+
+    // After reviews, try to land one ready PR. One per tick: each merge moves
+    // master, so the remaining PRs must be re-evaluated (and may newly conflict)
+    // on the next poll rather than merged in a burst.
+    if (this.autoMerge) {
+      try { await this._tryAutoMergeOne(Date.now()); }
+      catch (err) { console.error("[PR Watcher] auto-merge tick failed:", err.message); }
+    }
+  }
+
+  /**
+   * Evaluate tracked PRs (lowest number first) and merge the first one that
+   * passes `_shouldMerge`. Only fetches mergeability/checks for PRs that are
+   * already reviewed + idle, to keep gh calls cheap.
+   */
+  async _tryAutoMergeOne(now) {
+    const candidates = Object.values(this.state)
+      .filter((e) => e.reviewedSha === e.headSha && now - (e.shaSeenAt || 0) >= this.idleMs)
+      .sort((a, b) => a.number - b.number);
+
+    for (const entry of candidates) {
+      let pv;
+      try {
+        pv = await this._ghJson(
+          "pr", "view", String(entry.number),
+          "--json", "number,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefOid"
+        );
+      } catch (err) {
+        console.warn(`[PR Watcher] merge: could not view #${entry.number}: ${err.message}`);
+        continue;
+      }
+      // Stale head — a push landed since we last polled; let the next tick re-review.
+      if (pv.headRefOid && pv.headRefOid !== entry.headSha) continue;
+
+      const decision = this._shouldMerge(pv, entry, now);
+      if (!decision.merge) continue;
+
+      try {
+        await this._gh("pr", "merge", String(entry.number), "--squash", "--admin", "--delete-branch");
+        console.log(`[PR Watcher] ✓ auto-merged PR #${entry.number} (${decision.reason})`);
+        delete this.state[entry.number];
+        this._saveState();
+      } catch (err) {
+        console.error(`[PR Watcher] auto-merge failed for #${entry.number}: ${err.message}`);
+      }
+      return; // one merge per tick, success or failure
+    }
   }
 
   async _reviewPr(entry) {

@@ -39,4 +39,20 @@ ok("comment bump cannot re-trigger", w._shouldReview({ headSha: "A", reviewedSha
 // A genuine new commit (SHA changes) IS eligible again after idle.
 ok("new commit eligible after idle", w._shouldReview({ headSha: "B", reviewedSha: "A", shaSeenAt: now - 2000 }, now) === true);
 
+// ── _shouldMerge: reviewed + idle + mergeable + checks-green (minus ignore list) ──
+const m = new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: true, mergeIgnoreChecks: ["Python tests"] });
+const reviewed = { headSha: "A", reviewedSha: "A", shaSeenAt: now - 2000 };
+const green = [{ name: "CI", status: "COMPLETED", conclusion: "SUCCESS" }];
+
+ok("merge: ready -> true", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === true);
+ok("merge: draft -> false", m._shouldMerge({ isDraft: true, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === false);
+ok("merge: conflicting -> false", m._shouldMerge({ isDraft: false, mergeable: "CONFLICTING", statusCheckRollup: green }, reviewed, now).merge === false);
+ok("merge: unreviewed commit -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, { headSha: "B", reviewedSha: "A", shaSeenAt: now - 2000 }, now).merge === false);
+ok("merge: not idle -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, { headSha: "A", reviewedSha: "A", shaSeenAt: now }, now).merge === false);
+ok("merge: real check failure -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "CI", status: "COMPLETED", conclusion: "FAILURE" }] }, reviewed, now).merge === false);
+ok("merge: ignored check failure -> true", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Python tests", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now).merge === true);
+ok("merge: pending check -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "CI", status: "IN_PROGRESS" }] }, reviewed, now).merge === false);
+ok("merge: StatusContext failure -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ context: "legacy", state: "FAILURE" }] }, reviewed, now).merge === false);
+ok("merge: disabled -> false", new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: false })._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === false);
+
 console.log(`\n${pass} checks passed`);
