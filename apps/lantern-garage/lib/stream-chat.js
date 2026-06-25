@@ -858,6 +858,12 @@ async function handleStreamChat(req, url, res) {
   const sendRoute = (route) => sse.sendRoute(res, route);
   const sendReceipt = (receipt) => sse.sendReceipt(res, receipt);
 
+  // Turn-start for cloud leaderboard latency; reset just before the dispatch loop.
+  let _turnStart = Date.now();
+  // Cloud providers the streaming dispatch can actually run. Local (ollama/keystone-ft)
+  // already records its own outcomes in-line; we only fill the cloud gap here.
+  const _EXECUTABLE_CLOUD = new Set(["anthropic", "gemini", "openai", "xai"]);
+
   // Consistent sendDone with Σ₀ PCSF signature for all responses
   const sendDone = (source, extra = {}) => {
     const signature = {
@@ -920,6 +926,20 @@ async function handleStreamChat(req, url, res) {
         agentId: agent.id || agent.name || "keystone",
       });
     }
+    // ── Feed the leaderboard cloud outcomes (the missing half) ───────────────
+    // Previously only the ollama path called recordModelOutcome, so cloud
+    // providers stayed cold-start forever and PCSF could never rank them on
+    // merit. Record a success here when a cloud provider produced a real reply
+    // (not degraded-to-local). agentId = provider name so it ranks in the same
+    // table as local models. (Cloud FAILURE recording is intentionally deferred:
+    // the per-provider catch blocks also fire on 429-retries that then succeed,
+    // so recording there would over-penalize — a follow-up will add it safely.)
+    try {
+      const prov = extra.provider;
+      if (prov && _EXECUTABLE_CLOUD.has(prov) && extra.online !== false && !degradedLocal && fullReply) {
+        recordModelOutcome(prov, intent, true, Date.now() - _turnStart);
+      }
+    } catch { /* leaderboard must never break a reply */ }
     return sse.sendDone(res, source, { ...extra, ...signature, routeLabel: finalRouteLabel });
   };
 
@@ -1546,6 +1566,7 @@ async function handleStreamChat(req, url, res) {
   // (the brain) chose `autoHintProvider`; buildBrainOrder turns it into the ranked,
   // key-filtered order this loop walks. Each provider's streamer body is unchanged: on
   // success it returns; on auto-mode failure it falls through to the next brain pick.
+  _turnStart = Date.now();   // reset so cloud leaderboard latency measures the actual provider turn
   for (const _p of buildBrainOrder({ requestedProvider, hintProvider: autoHintProvider })) {
     fullReply = "";   // fresh per provider — never carry a failed attempt's partial text
 
