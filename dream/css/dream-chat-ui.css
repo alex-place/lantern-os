@@ -522,3 +522,15 @@
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Spinner: apply animation via class so reduced-motion can override cleanly */
+.thinking-spin { animation: spin 2s linear infinite; }
+
+/* Respect prefers-reduced-motion — stop decorative spin, keep label visible */
+@media (prefers-reduced-motion: reduce) {
+  .thinking-spin { animation: none; opacity: 0.4; }
+}
+
+/* Disclosure triangle for per-reply debug details — reset browser default marker */
+.sig-debug > summary { display: inline; list-style: none; }
+.sig-debug > summary::-webkit-details-marker { display: none; }

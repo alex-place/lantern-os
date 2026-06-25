@@ -419,7 +419,14 @@ function createAgentBubble(isError) {
   bubble.className = 'message-content';
   const thinking = document.createElement('span');
   thinking.className = 'thinking-mandala';
-  thinking.innerHTML = '<img src="/mandala.svg" alt="" style="width:20px;height:20px;opacity:0.5;animation:spin 2s linear infinite;vertical-align:middle">';
+  // aria-live="polite" so screen readers announce state changes without interrupting.
+  // role="status" marks this as a live region for assistive tech.
+  thinking.setAttribute('role', 'status');
+  thinking.setAttribute('aria-live', 'polite');
+  thinking.setAttribute('aria-label', 'Thinking');
+  thinking.innerHTML =
+    '<img src="/mandala.svg" alt="" class="thinking-spin" style="width:18px;height:18px;opacity:0.5;vertical-align:middle;margin-right:6px">' +
+    '<span class="thinking-label" style="font-size:12px;opacity:0.6;vertical-align:middle">Thinking…</span>';
   bubble.appendChild(thinking);
   const cursor = document.createElement('span');
   cursor.className = 'stream-cursor';
@@ -1021,6 +1028,9 @@ async function sendMessage() {
               rc.textContent = evt.label || `${evt.agentName} · ${evt.surface}`;
               bubble.insertBefore(rc, cursor);
             }
+            // Reflect routing in the spinner so users see real activity, not decorative spin.
+            const _rl = thinking.querySelector('.thinking-label');
+            if (_rl) { _rl.textContent = 'Researching…'; thinking.setAttribute('aria-label', 'Researching'); }
           } else if (evt.type === 'token' && evt.text) {
             if (thinking.parentNode) thinking.remove();
             fullText += evt.text;
@@ -1037,6 +1047,10 @@ async function sendMessage() {
             // the card at finalize; results fill the last open card (and re-apply at the end).
             if (evt.phase === 'call') {
               nativeToolCalls.push({ name: evt.name, input: evt.input || {} });
+              // Show "Checking <tool>…" so users understand what the delay is.
+              const _tl = thinking.querySelector('.thinking-label');
+              const readableTool = (evt.name || 'tool').replace(/_/g, ' ');
+              if (_tl) { _tl.textContent = `Checking ${readableTool}…`; thinking.setAttribute('aria-label', `Checking ${readableTool}`); }
             } else {
               toolResults.push(evt);
               const cards = bubble.querySelectorAll('.tool-call-card');
@@ -1148,25 +1162,38 @@ async function sendMessage() {
     bubble.appendChild(badge);
   }
 
-  // PCSF signature line — ALWAYS shown, so a normal answer and an offline answer carry
-  // the same shape: <route> · <provider/model> · <time>. Previously only `routeLabel`
-  // rendered (no provider/model/timestamp), and the offline path showed nothing at all,
-  // which is why the two looked inconsistent.
+  // Signature line: always show a human-readable label + time. Raw provider/model id
+  // goes in a collapsed <details> so curious users can inspect it without it cluttering
+  // every reply for normal users. (#1141)
   if (!didError) {
     const sig = document.createElement('div');
     sig.className = 'msg-route-sig';
     const t = doneTimestamp ? new Date(doneTimestamp) : new Date();
     const time = isNaN(t) ? '' : t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const parts = [routeLabel || 'Keystone'];
+    // Human-readable label: "Keystone · chat" or the agent route label.
+    const displayLabel = routeLabel || 'Keystone · chat';
     if (doneOnline === false) {
-      parts.push('no model available');
+      // Offline path: make it explicit for the user.
+      sig.textContent = `${displayLabel} · offline${time ? ' · ' + time : ''}`;
+      sig.setAttribute('aria-label', `Keystone replied offline${time ? ' at ' + time : ''}`);
     } else {
       const pm = [doneProvider, doneModel].filter(Boolean).join('/');
-      if (pm) parts.push(pm);
+      // Visible part: label + time only.
+      const visibleText = [displayLabel, time].filter(Boolean).join(' · ');
+      if (pm) {
+        // Wrap provider/model in a disclosure so it's accessible but not noisy.
+        sig.innerHTML =
+          `<span>${visibleText}</span>` +
+          `<details class="sig-debug" style="display:inline-block;margin-left:6px">` +
+          `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none" aria-label="Debug details">▸ debug</summary>` +
+          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}</span>` +
+          `</details>`;
+        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}; model: ${pm}`);
+      } else {
+        sig.textContent = visibleText;
+        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}`);
+      }
     }
-    if (time) parts.push(time);
-    sig.textContent = parts.join(' · ');
-    sig.setAttribute('aria-label', `Route signature: ${sig.textContent}`);
     msg.appendChild(sig);
   }
 
