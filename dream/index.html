@@ -138,8 +138,18 @@
       transform: scaleX(0); transform-origin: left;
       transition: transform .28s ease;
     }
-    .home-tiles .panel:hover { border-color: var(--tile); }
-    .home-tiles .panel:hover::before { transform: scaleX(1); }
+    .home-tiles .panel:hover,
+    .home-tiles .panel:focus-visible {
+      border-color: var(--tile);
+    }
+    .home-tiles .panel:hover::before,
+    .home-tiles .panel:focus-visible::before {
+      transform: scaleX(1);
+    }
+    .home-tiles .panel:focus-visible {
+      outline: 2px solid var(--tile);
+      outline-offset: 2px;
+    }
     /* icon in a tinted rounded chip */
     .home-tiles .panel-icon {
       display: inline-flex; align-items: center; justify-content: center;
@@ -166,6 +176,35 @@
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* Fallback: allow scroll only on very short viewports */
     @media (max-height: 560px) { body { overflow: auto; } .home-main { justify-content: flex-start; } }
+
+    /* ── Accessibility: Reduced Motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ── Accessibility: High Contrast ── */
+    @media (prefers-contrast: more) {
+      .home-tiles .panel {
+        border-width: 2px;
+      }
+      .home-tiles .panel:focus-visible {
+        outline-width: 3px;
+      }
+    }
+
+    /* ── Accessibility: Forced Colors ── */
+    @media (forced-colors: active) {
+      .home-tiles .panel {
+        border: 2px solid CanvasText;
+      }
+      .home-tiles .panel::before {
+        background: CanvasText;
+      }
+    }
   </style>
   <title>Keystone OS</title>
 </head>
