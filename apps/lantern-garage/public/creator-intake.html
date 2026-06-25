@@ -272,7 +272,6 @@
       <p>Brand identity onboarding — powered by Lantern OS</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-ghost" id="load-courtney-btn" onclick="loadCourtney()">Load Courtney</button>
       <button class="btn btn-secondary" id="load-slug-btn" onclick="promptLoad()">Load Profile</button>
     </div>
   </header>
@@ -301,11 +300,11 @@
       <div class="grid-2">
         <div class="form-group">
           <label for="f-name">Full Name</label>
-          <input id="f-name" name="fullName" placeholder="Courtney Blasioli" required>
+          <input id="f-name" name="fullName" placeholder="Jordan Rivera" required>
         </div>
         <div class="form-group">
           <label for="f-slug">Profile Slug</label>
-          <input id="f-slug" name="slug" placeholder="courtney-blasioli" pattern="[a-z0-9-]+" required>
+          <input id="f-slug" name="slug" placeholder="jordan-rivera" pattern="[a-z0-9-]+" required>
         </div>
         <div class="form-group">
           <label for="f-email">Email</label>
@@ -317,15 +316,15 @@
         </div>
         <div class="form-group col-span">
           <label for="f-bio">Short Bio (one line)</label>
-          <input id="f-bio" name="bio" placeholder="Dark romance creator • Storyteller • Community builder">
+          <input id="f-bio" name="bio" placeholder="Storyteller • Maker • Community builder">
         </div>
         <div class="form-group col-span">
           <label for="f-extended-bio">Extended Bio</label>
-          <textarea id="f-extended-bio" name="extendedBio" placeholder="Exploring gothic aesthetics, honest creativity, and the future of imagination."></textarea>
+          <textarea id="f-extended-bio" name="extendedBio" placeholder="What you make, who it's for, and why it matters to you."></textarea>
         </div>
         <div class="form-group col-span">
           <label for="f-tagline">Primary Tagline</label>
-          <input id="f-tagline" name="tagline" placeholder="Beautiful chaos. Honest stories.">
+          <input id="f-tagline" name="tagline" placeholder="Your one-line promise to your audience.">
         </div>
       </div>
     </div>
@@ -557,23 +556,23 @@
       <div class="grid-2">
         <div class="form-group">
           <label for="f-mood">Visual Mood</label>
-          <input id="f-mood" name="mood" placeholder="Beautiful chaos">
+          <input id="f-mood" name="mood" placeholder="Warm and minimal">
         </div>
         <div class="form-group">
           <label for="f-mood-words">Mood Words <span style="color:var(--muted);font-weight:400;">(comma-separated)</span></label>
-          <input id="f-mood-words" name="moodWords" placeholder="Old libraries, Rainy nights, Roses…">
+          <input id="f-mood-words" name="moodWords" placeholder="Sunlit rooms, Fresh ink, Open roads…">
         </div>
         <div class="form-group">
           <label for="f-palette-primary">Primary Palette</label>
-          <input id="f-palette-primary" name="palettePrimary" placeholder="Black, Charcoal, Deep Burgundy">
+          <input id="f-palette-primary" name="palettePrimary" placeholder="Ink, Charcoal, Slate">
         </div>
         <div class="form-group">
           <label for="f-palette-secondary">Secondary Palette</label>
-          <input id="f-palette-secondary" name="paletteSecondary" placeholder="Ivory, Dusty Rose, Antique Gold">
+          <input id="f-palette-secondary" name="paletteSecondary" placeholder="Ivory, Sand, Warm Gold">
         </div>
         <div class="form-group">
           <label for="f-palette-accent">Accent</label>
-          <input id="f-palette-accent" name="paletteAccent" placeholder="Moon Silver">
+          <input id="f-palette-accent" name="paletteAccent" placeholder="Electric Blue">
         </div>
         <div class="form-group">
           <label>Reference Swatches</label>
@@ -607,7 +606,7 @@
         </div>
         <div class="form-group">
           <label for="f-aud-primary">Primary Segments <span style="color:var(--muted);font-weight:400;">(comma-separated)</span></label>
-          <input id="f-aud-primary" name="audiencePrimary" placeholder="Readers, Writers, Alternative aesthetics…">
+          <input id="f-aud-primary" name="audiencePrimary" placeholder="Readers, Makers, Early adopters…">
         </div>
         <div class="form-group col-span">
           <label for="f-aud-secondary">Secondary Segments <span style="color:var(--muted);font-weight:400;">(comma-separated)</span></label>
@@ -625,19 +624,19 @@
       <div class="grid-2">
         <div class="form-group">
           <label for="f-tag-a">Option A</label>
-          <input id="f-tag-a" name="taglineA" placeholder="Beautiful chaos. Honest stories.">
+          <input id="f-tag-a" name="taglineA" placeholder="Short, memorable, true to you.">
         </div>
         <div class="form-group">
           <label for="f-tag-b">Option B</label>
-          <input id="f-tag-b" name="taglineB" placeholder="Where dark romance meets imagination.">
+          <input id="f-tag-b" name="taglineB" placeholder="What you stand for, in a line.">
         </div>
         <div class="form-group">
           <label for="f-tag-c">Option C</label>
-          <input id="f-tag-c" name="taglineC" placeholder="Creating worlds worth getting lost in.">
+          <input id="f-tag-c" name="taglineC" placeholder="An invitation your audience remembers.">
         </div>
         <div class="form-group">
           <label for="f-tag-d">Option D</label>
-          <input id="f-tag-d" name="taglineD" placeholder="Stories, shadows, and beautiful things.">
+          <input id="f-tag-d" name="taglineD" placeholder="Another angle on your promise.">
         </div>
       </div>
     </div>
@@ -678,7 +677,7 @@
         </div>
         <div class="form-group">
           <label for="f-los-user">Dream Journal Username</label>
-          <input id="f-los-user" name="dreamUser" placeholder="courtney">
+          <input id="f-los-user" name="dreamUser" placeholder="your-handle">
         </div>
         <div class="form-group col-span">
           <label for="f-sigma0-note">Sigma0 / Honest AI Connection</label>
@@ -701,12 +700,12 @@
 <script>
 /* ─── Default pillars ─── */
 const DEFAULT_PILLARS = [
-  { topic: "Dark romance and mood", pct: 30 },
-  { topic: "Writing and creativity", pct: 20 },
-  { topic: "Behind the scenes",     pct: 20 },
-  { topic: "Community engagement",  pct: 15 },
-  { topic: "AI and Sigma0",         pct: 10 },
-  { topic: "Personal reflections",  pct: 5  }
+  { topic: "Your craft or niche",  pct: 30 },
+  { topic: "Tips and how-tos",     pct: 20 },
+  { topic: "Behind the scenes",    pct: 20 },
+  { topic: "Community engagement", pct: 15 },
+  { topic: "Personal reflections", pct: 10 },
+  { topic: "News and updates",     pct: 5  }
 ];
 
 let pillars = DEFAULT_PILLARS.map(p => ({ ...p }));
@@ -755,13 +754,8 @@ function setField(id, val) {
   else el.value = val || "";
 }
 
-/* ─── Load Courtney's saved profile ─── */
-async function loadCourtney() {
-  await loadProfile("courtney-blasioli");
-}
-
 async function promptLoad() {
-  const slug = prompt("Enter creator slug to load (e.g. courtney-blasioli):");
+  const slug = prompt("Enter creator slug to load (e.g. jordan-rivera):");
   if (slug) await loadProfile(slug.trim());
 }
 
