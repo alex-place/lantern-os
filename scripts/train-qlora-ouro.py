@@ -50,8 +50,9 @@ def main():
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
     a = ap.parse_args()
 
-    import torch
+    # datasets must be imported before torch on Windows to avoid pyarrow/CUDA DLL conflict
     from datasets import Dataset
+    import torch
     from transformers import (AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig,
                               Trainer, TrainingArguments, default_data_collator)
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training

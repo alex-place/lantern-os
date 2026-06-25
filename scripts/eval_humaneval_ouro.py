@@ -110,9 +110,10 @@ def main():
     ap.add_argument("--ts", default=str(int(time.time())))
     a = ap.parse_args()
 
+    # datasets must be imported before torch on Windows to avoid pyarrow/CUDA DLL conflict
+    from datasets import load_dataset
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    from datasets import load_dataset
 
     print("Loading HumanEval (openai_humaneval) ...", flush=True)
     ds = load_dataset("openai_humaneval", split="test")
@@ -120,8 +121,10 @@ def main():
 
     print(f"Loading {a.base_model} + adapter={a.adapter} ...", flush=True)
     tok = AutoTokenizer.from_pretrained(a.base_model, trust_remote_code=True)
-    if tok.pad_token is None:
-        tok.pad_token = tok.eos_token
+    # Ouro uses token 0 as both bos and eos — use bos as pad so pad_token_id != eos_token_id.
+    # When pad==eos, HF generate() interprets the first generated eos as immediate stop,
+    # returning 1 token even for code-completion prompts.
+    tok.pad_token = tok.bos_token
     model = AutoModelForCausalLM.from_pretrained(a.base_model, trust_remote_code=True,
                                                  dtype=torch.float16, device_map="auto")
     if a.adapter:
@@ -137,9 +140,14 @@ def main():
         ids = tok(ex["prompt"], return_tensors="pt").input_ids.to(model.device)
         attn = torch.ones_like(ids)
         with torch.no_grad():
+            # eos_token_id=None: Ouro uses token 0 (endoftext) as a separator BEFORE
+            # the generated body, not after — so disabling eos-stopping lets the
+            # model emit the body; stop_strings catch the end of the function.
             out = model.generate(ids, attention_mask=attn, max_new_tokens=a.max_new, do_sample=False,
                                  repetition_penalty=1.1, pad_token_id=tok.pad_token_id,
+                                 eos_token_id=None,
                                  stop_strings=STOP, tokenizer=tok)
+        # skip_special_tokens strips the leading endoftext separator token
         text = tok.decode(out[0, ids.shape[1]:], skip_special_tokens=True)
         cand = make_candidate(text, ex["entry_point"], ex["prompt"])
         ok, note = run_test(cand, ex["test"], ex["entry_point"])
