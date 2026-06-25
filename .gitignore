@@ -256,6 +256,10 @@ models/*/adapters/
 # per-user CSF profile archives (user data — privacy)
 data/profiles/*.csf
 
+# creator intake profiles (PII — name/email/location). The durable home is the
+# per-user personal CSF archive above; these JSON working copies stay local.
+data/creators/*.json
+
 # Gaming layout suite — user-supplied clips + debug frames (never committed)
 tests/gaming-layout-suite/*.mp4
 tests/gaming-layout-suite/*.mkv

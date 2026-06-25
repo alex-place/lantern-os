@@ -36,6 +36,7 @@ def _user_sources(user: str) -> list[Path]:
         REPO / "data" / "cubes" / f"{user}.private",
         REPO / "data" / "cubes" / user,
         REPO / "data" / "profiles" / f"{user}.json",
+        REPO / "data" / "creators" / f"{user}.json",
         REPO / "data" / "csf_memory" / user,
         REPO / "data" / "dreamer" / "notebooks" / f"{user}.jsonl",
         REPO / "apps" / "data" / "dreamer" / "notebooks" / f"{user}.jsonl",
