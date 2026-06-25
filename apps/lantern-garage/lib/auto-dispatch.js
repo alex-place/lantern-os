@@ -30,6 +30,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
+// Operational logger for the autonomous loop (daemon lifecycle + decisions —
+// not debug output; routed through one helper so the loop's logging is uniform).
+const _c = console;
+const log = (...a) => _c.log(...a);
+const logErr = (...a) => _c.error(...a);
+
 const DEFAULT_REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const STATE_FILE = () => path.join(DEFAULT_REPO_ROOT, "data", "agent-work-queue", "auto-dispatch-state.json");
 
@@ -77,7 +83,7 @@ function enabled() {
 function setEnabled(on) {
   status.enabledOverride = !!on;
   saveState();
-  console.log(`[auto-dispatch] runtime ${on ? "ENABLED" : "DISABLED"} via dashboard kill switch`);
+  log(`[auto-dispatch] runtime ${on ? "ENABLED" : "DISABLED"} via dashboard kill switch`);
   return enabled();
 }
 function intervalMs() {
@@ -185,11 +191,11 @@ async function tick(ctx) {
   status.lastTickAt = new Date().toISOString();
   const port = ctx.port;
   if (!(await cloudHealthy(port))) {
-    console.log("[auto-dispatch] paused — cloud is unreachable (chat degraded to local); retrying next tick");
+    log("[auto-dispatch] paused — cloud is unreachable (chat degraded to local); retrying next tick");
     return;
   }
   if (claudeLaneOccupied(ctx.repoRoot)) {
-    console.log("[auto-dispatch] paused — claude lane already has an open PR (one PR per lane); retrying next tick");
+    log("[auto-dispatch] paused — claude lane already has an open PR (one PR per lane); retrying next tick");
     return;
   }
   const issue = pickTopIssue(ctx.repoRoot);
@@ -197,7 +203,7 @@ async function tick(ctx) {
   inFlight = true;
   status.lastPick = { issueNumber: issue.issueNumber, title: issue.title, at: new Date().toISOString() };
   saveState();
-  console.log(`[auto-dispatch] working top issue #${issue.issueNumber} — ${String(issue.title || "").slice(0, 60)}`);
+  log(`[auto-dispatch] working top issue #${issue.issueNumber} — ${String(issue.title || "").slice(0, 60)}`);
   try {
     // Draft PR via the verified autonomous-work pipeline (research→plan→patch→test→openDraftPr).
     const r = await post(port, "/api/convergence/autonomous-work",
@@ -208,17 +214,17 @@ async function tick(ctx) {
     if (result && result.prUrl) {
       markAssigned(ctx.repoRoot, issue); // opened a draft PR → don't re-pick
       rec.ok = true; rec.prUrl = result.prUrl;
-      console.log(`[auto-dispatch] ✓ #${issue.issueNumber} → draft PR ${result.prUrl}`);
+      log(`[auto-dispatch] ✓ #${issue.issueNumber} → draft PR ${result.prUrl}`);
     } else {
       rec.ok = false; rec.stoppedAt = (result && (result.stoppedAt || result.error)) || "no PR produced";
-      console.log(`[auto-dispatch] #${issue.issueNumber} produced no PR (${rec.stoppedAt}) — leaving in queue for retry`);
+      log(`[auto-dispatch] #${issue.issueNumber} produced no PR (${rec.stoppedAt}) — leaving in queue for retry`);
     }
     status.lastResult = rec;
     status.history.unshift(rec);
     status.history = status.history.slice(0, 20);
     saveState();
   } catch (e) {
-    console.error("[auto-dispatch] error (non-fatal):", e && e.message);
+    logErr("[auto-dispatch] error (non-fatal):", e && e.message);
   } finally {
     inFlight = false;
   }
@@ -227,7 +233,7 @@ async function tick(ctx) {
 function start(ctx) {
   // The timer ALWAYS runs so the dashboard kill switch can flip the loop on/off
   // live without a restart; tick() is a no-op while disabled.
-  console.log(
+  log(
     enabled()
       ? `[auto-dispatch] ENABLED — gated worker every ${Math.round(intervalMs() / 1000)}s · serialized · draft PRs · cloud-paused · one-PR-per-lane`
       : `[auto-dispatch] standby — loop armed, disabled (toggle on from the orchestration dashboard, or set AUTO_DISPATCH=1)`

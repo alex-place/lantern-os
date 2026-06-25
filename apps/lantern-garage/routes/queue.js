@@ -663,3 +663,5 @@ module.exports = async function queueRoutes(req, res, url, deps) {
 // Exposed for the auto-dispatch worker — single source of truth for the backlog queue.
 module.exports.loadOpenIssues = loadOpenIssues;
 module.exports.priorityFromLabels = priorityFromLabels;
+// Exposed for the auto-pull loop's one-PR-per-lane guard (lib/auto-dispatch.js).
+module.exports.loadPrLanes = loadPrLanes;

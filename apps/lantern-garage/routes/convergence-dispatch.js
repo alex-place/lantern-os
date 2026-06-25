@@ -11,8 +11,9 @@
 
 const { getRouter } = require("../lib/convergence-router");
 const convergenceAgent = require("../lib/convergence-agent");
-const { sendJson } = require("../lib/http-utils");
+const { sendJson, collectRequestBody } = require("../lib/http-utils");
 const { appendConversationEntry } = require("../lib/conversation-store");
+const autoDispatch = require("../lib/auto-dispatch");
 const maxConversationTextLength = 2000;
 
 module.exports = async (req, res, url, deps) => {
@@ -30,6 +31,33 @@ module.exports = async (req, res, url, deps) => {
         cacheHitRatePercent: 70
       }
     }, 200);
+    return true;
+  }
+
+  // GET /api/convergence/auto-dispatch/status — autonomous auto-pull loop status
+  if (pathname === "/api/convergence/auto-dispatch/status" && req.method === "GET") {
+    try {
+      sendJson(res, { ok: true, ...autoDispatch.getStatus() }, 200);
+    } catch (err) {
+      sendJson(res, { ok: false, error: err.message }, 500);
+    }
+    return true;
+  }
+
+  // POST /api/convergence/auto-dispatch/toggle — runtime kill switch { enabled: bool }
+  if (pathname === "/api/convergence/auto-dispatch/toggle" && req.method === "POST") {
+    try {
+      const body = await collectRequestBody(req);
+      const { enabled } = JSON.parse(body || "{}");
+      if (typeof enabled !== "boolean") {
+        sendJson(res, { ok: false, error: "enabled_boolean_required" }, 400);
+        return true;
+      }
+      const now = autoDispatch.setEnabled(enabled);
+      sendJson(res, { ok: true, enabled: now, ...autoDispatch.getStatus() }, 200);
+    } catch (err) {
+      sendJson(res, { ok: false, error: err.message }, 500);
+    }
     return true;
   }
 
