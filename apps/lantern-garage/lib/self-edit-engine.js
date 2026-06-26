@@ -442,11 +442,14 @@ function taskTitle(task) {
     .map((l) => l.trim())
     .find((l) => l.length > 0) || "";
   const cleaned = firstLine
-    .replace(/^!?(?:work|autowork|edit)\b[:\s]*/i, "") // drop a trigger prefix if present
-    .replace(/^[-*\d.\s]+/, "")                        // drop list bullets / numbering
+    // Strip a trigger ONLY in its command forms — `!work`/`!edit …` or `autowork: …` —
+    // never bare prose: "Edit the handler" / "Work on X" must keep their first word, and
+    // the digit/bullet strip below must not eat a semantic leading number ("3D", "2FA").
+    .replace(/^!\s*(?:work|autowork|edit)\b[:\s]*/i, "") // bang command: !work / !edit
+    .replace(/^(?:autowork|work|edit)\s*:\s*/i, "")       // label form:   "autowork: …"
+    .replace(/^(?:[-*•]\s+|\d+[.)]\s+)/, "")              // a real list bullet / "1. " / "1) "
     .trim();
-  // Default applied only as a final fallback — never run through the strip above,
-  // or "Autowork task" would itself match the trigger prefix and collapse to "task".
+  // Default applied only as a final fallback (after the strips, so it can't be eaten).
   return (cleaned || "Autowork task").slice(0, 120);
 }
 
@@ -454,7 +457,7 @@ function taskTitle(task) {
 // autowork pipeline (which keys off a real issue number) can work it. Returns
 // { number, url, title }. Used by the suggest-then-confirm "Run as autowork"
 // path — a free-form coding request first becomes a tracked issue, then a PR.
-function createIssueFromTask(repoRoot, task, opts = {}) {
+function createIssueFromTask(repoRoot, task) {
   const text = String(task || "").trim();
   if (!text) throw new Error("task_required");
   const title = taskTitle(text);
