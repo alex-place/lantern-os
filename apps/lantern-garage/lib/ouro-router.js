@@ -57,6 +57,11 @@ function classifyIntentOuro(message, opts = {}) {
       model,
       prompt: CLASSIFY_PROMPT(message.slice(0, 2000)),
       stream: false,
+      // Keep the router model resident between turns. Without this, Ollama unloads it
+      // after its default idle TTL (~5m), so on a low-traffic server the NEXT Auto turn
+      // pays a cold model-load that blows the timeout -> keyword fallback every time.
+      // 30m keeps it warm with light periodic traffic. Tunable via OURO_ROUTER_KEEP_ALIVE.
+      keep_alive: process.env.OURO_ROUTER_KEEP_ALIVE || "30m",
       // Tiny, deterministic decode — we only need one label word.
       options: { temperature: 0, top_p: 1, num_predict: 8, stop: ["\n"] },
     });
