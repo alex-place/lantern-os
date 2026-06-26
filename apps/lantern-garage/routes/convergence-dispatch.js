@@ -257,7 +257,18 @@ module.exports = async (req, res, url, deps) => {
         const MAX_PATCH_ATTEMPTS = 3;
         let diffText = "", applyStats = null, changedFiles = [], feedback = null, applied = false;
         for (let attempt = 1; attempt <= MAX_PATCH_ATTEMPTS; attempt++) {
-          const gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+          let gen;
+          try {
+            gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+          } catch (genErr) {
+            // generatePatch itself failed (e.g. diff_parse_failed — the model returned
+            // no valid diff). Feed that back and retry instead of 500ing on attempt 1.
+            feedback = { priorDiff: "", errors:
+              `patch generation failed: ${genErr.message}. Output ONLY a valid unified diff `
+              + `(--- a/path / +++ b/path / @@ hunks with exact context) — no prose, no fences.` };
+            if (attempt < MAX_PATCH_ATTEMPTS) continue;
+            break; // exhausted → fall through to the !applied abort
+          }
           diffText = gen.diffText;
           applyStats = applyPatch(workRoot, diffText);
           changedFiles = [...(applyStats.changed || []), ...(applyStats.created || [])];
@@ -595,7 +606,18 @@ module.exports = async (req, res, url, deps) => {
         let diffText = "", stats = null, changedFiles = [], feedback = null, applied = false;
         for (let attempt = 1; attempt <= MAX_PATCH_ATTEMPTS; attempt++) {
           step("patch", attempt === 1 ? "start" : "retry", { attempt, of: MAX_PATCH_ATTEMPTS });
-          const gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+          let gen;
+          try {
+            gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+          } catch (genErr) {
+            // generatePatch failed (e.g. diff_parse_failed) — feed it back and retry.
+            feedback = { priorDiff: "", errors:
+              `patch generation failed: ${genErr.message}. Output ONLY a valid unified diff `
+              + `(--- a/path / +++ b/path / @@ hunks with exact context) — no prose, no fences.` };
+            step("patch", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error", { attempt, error: genErr.message });
+            if (attempt < MAX_PATCH_ATTEMPTS) continue;
+            break;
+          }
           diffText = gen.diffText;
           const affected = (gen.files || []).map((f) => (f.newFile || f.oldFile || "").replace(/^[ab]\//, ""));
           send("diff", { diffText, files: affected, attempt });
