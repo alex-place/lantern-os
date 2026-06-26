@@ -668,6 +668,34 @@ function renderWebImage(prompt) {
     .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
 }
 
+// Vision: send an uploaded image to a vision model (Claude / GPT-4o, server-side) and render
+// the answer. Used when the user attaches an image via "+" and asks about it.
+function renderVisionAnswer(prompt, attachment) {
+  const messages = document.getElementById('messages');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Looking at <b>${esc(attachment.name)}</b>…</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  fetch('/api/vision/analyze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, image: attachment.image, mimeType: attachment.mimeType }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.ok && d.text) {
+        bubble.innerHTML = (typeof renderMarkdown === 'function' ? renderMarkdown(d.text) : esc(d.text))
+          + `<div style="opacity:.5;font-size:11px;margin-top:4px">👁 vision · ${esc(d.model || 'vision')}</div>`;
+      } else {
+        bubble.innerHTML = `Couldn't analyze <b>${esc(attachment.name)}</b>: ${esc((d && d.error) || 'vision unavailable')}`;
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+    })
+    .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
+}
+
 // ── Video requests ──────────────────────────────────────────────────────────────
 // Detect a request to see a video and return the search query, else null. Forms:
 // explicit (!video / /video <query>) and natural language ("show me a youtube video
@@ -853,6 +881,18 @@ async function sendMessage() {
   if (/^!convergance(?:\s+(?:sync|loop|run))?\s*$/i.test(String(input.value || "").trim())) input.value = "!convergence";
   const text = input.value.trim();
   if (!text || isSending) return;
+
+  // Image attachment → vision: the user uploaded an image via "+" to ask about it. The image
+  // is sent to a vision model (Claude / GPT-4o) so the chat can actually SEE it. Sticky, so
+  // follow-up questions about the same image keep working until the chip is removed.
+  const visionAttach = (window.pendingAttachments || []).find(a => a && a.image);
+  if (visionAttach && text) {
+    input.value = '';
+    input.style.height = 'auto';
+    addUserBubble(text);
+    renderVisionAnswer(text, visionAttach);
+    return;
+  }
 
   // Image request → return a visible image from the web (deterministic, no LLM —
   // the desk model can't draw and just declines). Handles "draw me a picture of X"

@@ -723,9 +723,12 @@
   function renderChips() {
     if (!chipWrap) return;
     chipWrap.innerHTML = window.pendingAttachments.map((a, i) => {
-      const meta = a.pending ? 'reading…' : (a.chars != null ? a.chars.toLocaleString() + ' chars' + (a.truncated ? ' (truncated)' : '') : fmtSize(a.size || 0));
+      const icon = a.isImage ? '🖼️' : '📎';
+      const meta = a.pending ? 'reading…'
+        : a.isImage ? 'image · ask about it'
+        : (a.chars != null ? a.chars.toLocaleString() + ' chars' + (a.truncated ? ' (truncated)' : '') : fmtSize(a.size || 0));
       return '<span class="attach-chip' + (a.pending ? ' pending' : '') + '">'
-        + '<span class="chip-name">📎 ' + esc(a.name) + '</span>'
+        + '<span class="chip-name">' + icon + ' ' + esc(a.name) + '</span>'
         + '<span class="chip-meta">' + esc(meta) + '</span>'
         + '<button class="chip-x" type="button" aria-label="Remove ' + esc(a.name) + '" onclick="lanternAttach.removeAttachment(' + i + ')">×</button>'
         + '</span>';
@@ -743,22 +746,28 @@
 
   async function handleAnyFiles(files) {
     for (const file of [...files]) {
-      const slot = { name: file.name, size: file.size, pending: true };
+      const isImage = (file.type || '').startsWith('image/');
+      const slot = { name: file.name, size: file.size, pending: true, isImage };
       window.pendingAttachments.push(slot);
       renderChips();
       const drop = () => { const i = window.pendingAttachments.indexOf(slot); if (i >= 0) window.pendingAttachments.splice(i, 1); };
       try {
         const dataUrl = await readAsDataURL(file);
-        const res = await fetch(base + '/api/files/extract', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: file.name, mimeType: file.type || 'application/octet-stream', content: dataUrl }),
-        });
-        const data = await res.json();
-        if (data && data.ok && data.text) {
-          slot.text = data.text; slot.chars = data.chars; slot.truncated = !!data.truncated; slot.pending = false;
+        if (isImage) {
+          // Images are analyzed by a vision model on send (no OCR round-trip needed).
+          slot.image = dataUrl; slot.mimeType = file.type || 'image/png'; slot.pending = false;
         } else {
-          drop();
-          sysBubble('✗ Could not read <b>' + esc(file.name) + '</b>: ' + esc((data && (data.note || data.error)) || 'no extractable text'));
+          const res = await fetch(base + '/api/files/extract', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: file.name, mimeType: file.type || 'application/octet-stream', content: dataUrl }),
+          });
+          const data = await res.json();
+          if (data && data.ok && data.text) {
+            slot.text = data.text; slot.chars = data.chars; slot.truncated = !!data.truncated; slot.pending = false;
+          } else {
+            drop();
+            sysBubble('✗ Could not read <b>' + esc(file.name) + '</b>: ' + esc((data && (data.note || data.error)) || 'no extractable text'));
+          }
         }
       } catch (e) {
         drop();
