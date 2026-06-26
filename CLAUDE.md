@@ -39,7 +39,7 @@ These documents are non-negotiable for safe, compliant contributions.
 
 **THE ENTIRE PROJECT IS ONE LOOP:**
 
-```
+```text
 Observe → Remember → Reason → Act → Verify → Converge
 ```
 
@@ -65,7 +65,7 @@ The Convergence Core never assumes a specific LLM. All models plug in as replace
 Store experience (memories + convergence records). Improve via retrieval and reasoning, not retraining.
 
 **EXTERNAL REALITY RULE** (non-negotiable):
-```
+```text
 Nothing is accepted without evidence.
 Every important claim must have: [claim, evidence, confidence, source]
 ```
@@ -111,7 +111,7 @@ npm run dev --prefix apps/lantern-garage
 # See QUICKSTART.md section 1 for complete setup
 ```
 
-## Commands
+## Development Commands
 
 ### Python tests
 
@@ -351,7 +351,7 @@ Rules:
 - Slop commit messages (empty, < 8 chars, "wip", "placeholder", "temp", etc.) are blocked
 
 Install hooks:
-```powershell
+```text
 powershell -ExecutionPolicy Bypass -File scripts/Install-MonoworkstreamHooks.ps1
 ```
 

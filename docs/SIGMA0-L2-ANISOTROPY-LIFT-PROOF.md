@@ -1,7 +1,7 @@
 # Lemma L2 — the one-step anisotropy lift (closed form, proven)
 
 **Status: PROVEN (closed-form) + machine-checked.** This is the deductive core of the
-Σ₀⁻¹ "finitely-often" (C3) program for [#768] (see [ANTI-COLLAPSE-HARDENING.md](ANTI-COLLAPSE-HARDENING.md) §… and [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) §3). It proves that a single Σ₀⁻¹ covariance bump breaks the collapse trigger's **flat** condition. It does **not** by itself prove non-collapse — that needs L1 (alignment, open for non-normal `A`) and L4 (a proximity floor, an engineered hypothesis). L2 is the part that is unconditionally true.
+Σ₀⁻¹ "finitely-often" (C3) program for [#768] (see [ANTI-COLLAPSE-HARDENING.md](ANTI-COLLAPSE-HARDENING.md) §… and [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) §3). It proves that a single Σ₀⁻¹ covariance bump breaks the collapse trigger's **flat** condition. The strengthened form **L2′** (below) discharges the alignment hypothesis L1 for **all `A`** (normal and non-normal) via a Frobenius reverse-triangle bound; the only remaining engineered hypothesis is L4 (the μ-aware proximity floor). L2/L2′ are the parts that are unconditionally true; they do **not** touch Theorem 1's separate contraction question for non-normal `A` ([#768]).
 
 Proof script: `experiments/prove_l2_anisotropy_lift.py` (symbolic + numerical). Test: `tests/test_cio_sde.py::test_l2_anisotropy_lift`.
 
@@ -74,13 +74,44 @@ Every inequality is exact (no asymptotics): (1) drops `within⁺ ≥ 0`, (2) dro
 `within ≥ 0`, both rigorous. The threshold `Δ` is therefore a **sufficient** (conservative)
 bound; the true crossing point is `≤ Δ`.
 
+## L2′ — the alignment-free strengthening (L1 is removable)
+
+**Status: PROVEN (closed-form) + machine-checked (2026-06-26).** The alignment hypothesis
+L1 above is **not actually needed**. The bound of step (3) — `σ⁺ ≥ √(k(d−k))/d·b − aμ` —
+holds for an **arbitrary** rank-`k` orthogonal projector `P` (`1 ≤ k ≤ d−1`), with no
+relation to `Σ`'s eigenvectors, via the reverse triangle inequality in Frobenius norm.
+
+Recall `σ⁺² = (1/d)‖Σ⁺ − μ⁺ I‖_F²` (population variance of the spectrum). Write the bumped,
+recentred matrix as a sum and apply reverse-triangle:
+
+$$\Sigma^+ - \mu^+ I = (\Sigma - \mu I) + b\big(P - \tfrac{k}{d}I\big),\qquad
+\lVert \Sigma^+ - \mu^+ I\rVert_F \;\ge\; b\,\big\lVert P - \tfrac{k}{d}I\big\rVert_F - \lVert\Sigma-\mu I\rVert_F.$$
+
+The two norms are exact and **basis-free**:
+
+$$\big\lVert P - \tfrac{k}{d}I\big\rVert_F = \sqrt{\tfrac{k(d-k)}{d}},\qquad
+\lVert\Sigma-\mu I\rVert_F = \sqrt{d}\,\sigma = a\mu\sqrt{d}.$$
+
+Dividing by `√d` gives `σ⁺ ≥ √(k(d−k))/d·b − aμ` — **identical to step (3) of the aligned
+proof**, but with no eigenvector alignment used. The same algebra (steps 4–5) then yields
+the same threshold `b ≥ Δ ⟹ a(Σ⁺) ≥ ε`. Equivalently, the only place alignment entered was
+the misalignment penalty `tr((Σ−μI)P) = tr((Σ−μI)(P−\tfrac{k}{d}I))`, which Cauchy–Schwarz
+bounds by `‖Σ−μI‖_F‖P−\tfrac{k}{d}I‖_F = aμ√(k(d−k))` — controlled by `a(Σ)`, which
+`cond_flat` forces below `ε`. **So L1 is discharged unconditionally, for normal *and*
+non-normal `A`.** Verified: `experiments/prove_c3_noncollapse_nonnormal.py` (4000 genuinely
+non-normal configs incl. the adversarial worst-case alignment, 0 lift failures) and
+`tests/test_cio_sde.py::test_c3_nonnormal_covariance_lift`.
+
 ## What L2 does and does not give
 
-- ✅ **Gives:** a closed-form `Δ` and a proof that one aligned bump of size `≥ Δ` breaks
-  `cond_flat`, hence skips the freeze that step (L2 + L3). Mechanizable (Weyl/interlacing +
-  a scalar CoV inequality; feasible in Lean/Mathlib).
-- ❌ **Does not give:** (L1) that the bump basis `eig(A_s)` aligns with `eig(Σ)` — proven
-  for **normal `A`**, open for non-normal `A` (the same cross-term debt as Theorem 1, [#768]);
-  (L4) that the operator actually fires (`proximity ≥ p_min`) on a freeze-approach step —
-  **false for the current `min`-gate**, an engineered hypothesis. The full C3 non-collapse
-  theorem is `L1(normal) ∧ L2 ∧ L3 ∧ L4(fixed) ∧ L5 ⇒ P(permanent freeze) = 0`.
+- ✅ **Gives:** a closed-form `Δ` and a proof that one bump of size `≥ Δ` breaks
+  `cond_flat`, hence skips the freeze that step (L2 + L3) — **for any rank-`k` projector,
+  no alignment needed** (L2′ above). Mechanizable (a Frobenius reverse-triangle + a scalar
+  CoV inequality; feasible in Lean/Mathlib).
+- ❌ **Does not give:** (L4) that the operator actually fires (`proximity ≥ p_min`) on a
+  freeze-approach step — handled by the μ-aware floor (Fix A), an engineered hypothesis.
+  Nor does it touch **Theorem 1's contraction** for non-normal `A` (whether an ungrounded
+  system collapses onto the manifold at all vs. diverges — the §1 cross-term, [#768]); L2/L2′
+  are about the *rescue* breaking the freeze gate, a different question from *whether* the
+  bad dynamics contract. The full C3 non-collapse theorem is
+  `L2′ ∧ L3 ∧ L4(fixed) ∧ L5 ⇒ P(permanent freeze) = 0`, now with **L2′ holding for all `A`**.

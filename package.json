@@ -13,7 +13,9 @@
     "research-nightly": "node scripts/open-video-research.js --nightly",
     "research-calibrate": "node scripts/open-video-research.js --calibrate",
     "test:ui": "node tests/ui-test.js",
-    "creator-intelligence": "node scripts/creator-intelligence-loop.js --forever"
+    "creator-intelligence": "node scripts/creator-intelligence-loop.js --forever",
+    "lint:claude": "npx @felixgeelhaar/cclint lint CLAUDE.md --summary",
+    "lint:claude:fix": "npx @felixgeelhaar/cclint lint CLAUDE.md --fix"
   },
   "engines": {
     "node": ">=20"
@@ -22,6 +24,7 @@
     "busboy": "^1.6.0"
   },
   "devDependencies": {
+    "@felixgeelhaar/cclint": "^0.15.0",
     "@playwright/test": "^1.61.0",
     "jsdom": "^29.1.1",
     "playwright": "^1.61.0"

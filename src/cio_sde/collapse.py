@@ -476,18 +476,77 @@ class AntiCollapseOperator:
         return min(p_grad, p_rank, p_flat, p_ctrl)   # all must be near to act
 
     @torch.no_grad()
+    def _near_null_basis(self, A: Tensor) -> Tensor:
+        """The m smallest-|λ(A_s)| eigenvectors — the banded near-null subspace (Fix B).
+
+        m = clamp(max(hard_null_count, d − round(eff_rank)), 1, d−1).
+
+        Two corrections over the old hard `|λ| < eig_eps` cutoff (see
+        docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md §2.2):
+          • G13 — modes parked just above eig_eps no longer yield a rank-0 (blank)
+            bump: the rank deficit `d − eff_rank` guarantees `m ≥ 1` whenever
+            `cond_rank` fires.
+          • k=d clamp — `m ≤ d−1` always leaves ≥1 mode unbumped, so the covariance
+            bump creates genuine anisotropy. Bumping ALL d modes is `Σ + b·I`, a
+            uniform shift that LOWERS anisotropy (std unchanged, mean up) — the
+            opposite of the intent, and L2's denominator √(k(d−k)) − ε·k is negative
+            at k=d. Full degeneracy is handled as a k=d−1 bump.
+        """
+        Abar = 0.5 * (A.mean(0) + A.mean(0).T) if A.dim() == 3 else 0.5 * (A + A.T)
+        d = Abar.shape[-1]
+        evals, evecs = torch.linalg.eigh(Abar)
+        absval = evals.abs()
+        hard_null = int((absval < self.eig_eps).sum().item())
+        eff_rank = self.detector._effective_rank(A if A.dim() == 3 else A.unsqueeze(0))
+        m = max(hard_null, d - int(round(eff_rank)))
+        m = max(1, min(m, d - 1))                          # proper subspace: 1 ≤ m ≤ d−1
+        idx = torch.argsort(absval)[:m]                    # m smallest |λ| modes
+        return evecs[:, idx]                               # (d, m)
+
+    @torch.no_grad()
+    def _cov_floor(self, sigma: Tensor, d: int, m: int) -> float:
+        """L2's exact per-step bump threshold Δ(a, μ, d, m) — the μ-aware floor (Fix A).
+
+            Δ = (ε_a + a)·μ·d / (√(m(d−m)) − ε_a·m),   a = clip(a(Σ),0,ε_a), μ = mean λ(Σ)
+
+        Scale-equivariant (Δ ∝ μ), so a rescaling Σ ↦ cΣ — which leaves the trigger
+        invariant — cannot defeat it. Denominator > 0 since m ≤ d−1.
+        """
+        eps_a = self.detector.anisotropy_eps
+        sym = 0.5 * (sigma + sigma.transpose(-1, -2))
+        ev = torch.linalg.eigvalsh(sym).clamp_min(1e-12)
+        mu = float(ev.mean().item())
+        a = min(self.detector._anisotropy(sigma), eps_a)
+        denom = (m * (d - m)) ** 0.5 - eps_a * m
+        if denom <= 0:
+            return 0.0
+        return (eps_a + a) * mu * d / denom
+
+    @torch.no_grad()
     def excite(self, x: Tensor, sigma: Tensor, A: Tensor, p: float,
                noise: Tensor) -> tuple[Tensor, Tensor]:
-        """Return (dx_extra, sigma_extra) injected along the null subspace."""
-        Abar = 0.5 * (A.mean(0) + A.mean(0).T)
-        evals, evecs = torch.linalg.eigh(Abar)
-        null = evecs[:, evals.abs() < self.eig_eps]      # (d, k)
-        if null.shape[1] == 0:
-            return torch.zeros_like(x), torch.zeros_like(sigma)
-        coeff = noise @ null                              # (B, k) random in null
+        """Return (dx_extra, sigma_extra) injected along the banded near-null subspace.
+
+        Two decoupled legs (docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md §2.2):
+          • covariance leg — the bump `b_cov · P_N` that breaks `cond_flat`. Its
+            magnitude is FLOORED to L2's threshold Δ (μ-aware), so one bump provably
+            lifts anisotropy above ε_a (Theorem C3, normal A). This is the certificate
+            leg.
+          • state-kick leg — the random `dx_extra` that raises ‖x‖ (and so the gradient
+            signal); kept at `strength·p` exactly as before, so the measured escape
+            behavior is unchanged.
+        """
+        null = self._near_null_basis(A)                   # (d, m), 1 ≤ m ≤ d−1
+        m = null.shape[1]
+        d = null.shape[0]
+
+        # state-kick leg — unchanged (cond_grad escape)
+        coeff = noise @ null                              # (B, m) random in null
         dx_extra = self.strength * p * (coeff @ null.T)   # back to state space
-        # re-anisotropize Σ along the recovered directions
-        bump = self.strength * p * (null @ null.T)
+
+        # covariance leg — μ-aware floor so b_cov ≥ Δ (L2 hypothesis), breaking cond_flat
+        b_cov = max(self.strength * p, self._cov_floor(sigma, d, m))
+        bump = b_cov * (null @ null.T)                    # (d, d), rank m
         sigma_extra = bump.unsqueeze(0).expand_as(sigma)
         return dx_extra, sigma_extra
 

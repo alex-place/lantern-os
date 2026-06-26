@@ -50,6 +50,28 @@ from .collapse import (
     ReconstructionOperator,
 )
 from .surprise import SurpriseMonitor, kalman_predict
+from .question import (
+    QuestionMachine,
+    Question,
+    ConsolidationResult,
+    forward_states,
+    control_jacobian,
+    backward_costate,
+)
+from .question_loop import (
+    QuestionDrivenLoop,
+    Channel,
+    CallbackChannel,
+    HumanChannel,
+    OracleChannel,
+    MirrorChannel,
+    CorroboratedChannel,
+    WebChannel,
+    WebEvidence,
+    Observation,
+    LoopRecord,
+    LoopResult,
+)
 from .providers import ProviderDynamics, route_provider_nodes
 from .calibration import (
     ScenarioLabel,
@@ -84,6 +106,24 @@ __all__ = [
     "ReconstructionOperator",
     "SurpriseMonitor",
     "kalman_predict",
+    "QuestionMachine",
+    "Question",
+    "ConsolidationResult",
+    "forward_states",
+    "control_jacobian",
+    "backward_costate",
+    "QuestionDrivenLoop",
+    "Channel",
+    "CallbackChannel",
+    "HumanChannel",
+    "OracleChannel",
+    "MirrorChannel",
+    "CorroboratedChannel",
+    "WebChannel",
+    "WebEvidence",
+    "Observation",
+    "LoopRecord",
+    "LoopResult",
     "InterventionPolicy",
     "InterventionReceipt",
     "PairedRunSummary",

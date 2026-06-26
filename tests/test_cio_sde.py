@@ -8,6 +8,7 @@ from src.cio_sde import (
     free_energy, gaussian_kl,
     SemanticCollapseOperator, CollapseOutcome,
     collapse_certificate, lyapunov_value, AntiCollapseOperator,
+    InterventionPolicy,
     SurpriseMonitor,
 )
 
@@ -21,6 +22,15 @@ def _init_state(b=8, dim=4, scale=1.0):
     x0 = scale * torch.randn(b, dim)
     s0 = torch.eye(dim).expand(b, dim, dim).clone()
     return x0, s0
+
+
+def _acting(m, budget=10_000):
+    """Enable Σ₀ intervention. Observe-only is the production default (#1138), so a
+    test that exercises what happens WHEN the operator ACTS (freeze, projection,
+    the canary spiking on the snap/kick) must opt in — otherwise tr.collapses stays
+    empty by policy and the behavior under test never runs."""
+    m.intervention_policy = InterventionPolicy(observe_only=False, max_interventions=budget)
+    return m
 
 
 # ── SDE rollout ──────────────────────────────────────────────────────────────
@@ -160,6 +170,7 @@ def test_collapse_fires_in_degenerate_regime():
     for p in m.graph.active.drift_net.parameters():
         torch.nn.init.zeros_(p)
     m.collapse_op = SemanticCollapseOperator()
+    _acting(m)
     x0, s0 = _init_state(scale=0.01)
     _, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
     assert len(tr.collapses) > 0
@@ -173,6 +184,7 @@ def test_collapse_freezes_state():
     for p in m.graph.active.drift_net.parameters():
         torch.nn.init.zeros_(p)
     m.collapse_op = SemanticCollapseOperator()
+    _acting(m)
     x0, s0 = _init_state(scale=0.01)
     xf, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
     # last few x-norms should be essentially constant (frozen attractor)
@@ -279,7 +291,7 @@ def _collapse_prone_model(dim=4, seed=0):
     for p in m.graph.active.drift_net.parameters():
         torch.nn.init.zeros_(p)
     m.collapse_op = SemanticCollapseOperator()
-    return m
+    return _acting(m)
 
 
 def _run_recursive_with_grounding(real_fraction, *, dim=4, segments=8,
@@ -396,6 +408,7 @@ def test_surprise_monitor_integration():
     m.surprise_monitor = SurpriseMonitor(spook_sigmas=3.0, anti_collapse_trigger=True)
     m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
     m.collapse_op = SemanticCollapseOperator()
+    _acting(m)
 
     x0, s0 = _init_state(scale=0.01)
     _, _, tr = rollout(m, x0, s0, steps=30, base_seed=1)
@@ -496,6 +509,7 @@ def test_collapse_is_nonexpansive_projection():
     for p in m.graph.active.drift_net.parameters():
         torch.nn.init.zeros_(p)
 
+    _acting(m)
     x0, s0 = _init_state(scale=0.01)
     _, _, tr = rollout(m, x0, s0, steps=20, base_seed=1)
 
@@ -579,6 +593,163 @@ def test_l2_anisotropy_lift():
     assert counterexamples == 0, f"L2 violated in {counterexamples}/{checked} cases"
 
 
+# ── Theorem C3 (normal A): Σ₀⁻¹ floor + banded near-null prevent permanent freeze ──
+# Proof: docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md
+# Machine-check sweep: experiments/prove_c3_noncollapse.py
+#
+# L4 (Fix A): the μ-aware covariance floor delivers a bump b_cov ≥ Δ even when the
+#   min-gate proximity p is tiny, so one bump lifts anisotropy above ε_a (L2).
+# G13 (Fix B): banded near-null aiming clamped to 1≤m≤d−1 never injects a zero-rank
+#   (blank) bump, and never bumps all d modes (a uniform shift that LOWERS anisotropy).
+# L5: a freeze trigger at t forces ¬cond_flat at t+1 — no two consecutive freezes.
+
+def _near_isotropic_diag(d, a_unbiased_target, mu=1.0, seed=7):
+    """Diagonal Σ eigenvalues whose UNBIASED CoV (what _anisotropy measures) ≈ target.
+
+    _anisotropy uses torch's Bessel-corrected std = √(d/(d−1))·pop_std, so we scale the
+    population CoV down by that factor to hit the requested measured value.
+    """
+    import math
+    z = torch.randn(d, generator=torch.Generator().manual_seed(seed))
+    z = z - z.mean()
+    z = z / z.pow(2).mean().sqrt()                      # unit population std
+    pop_cov = a_unbiased_target / math.sqrt(d / (d - 1))
+    return (mu + pop_cov * mu * z).clamp_min(1e-6)
+
+
+def test_l4_floor_lifts_anisotropy():
+    """Fix A — the μ-aware covariance floor lifts a flat Σ above ε_a in ONE bump even
+    when strength·p ≪ Δ, exactly where the old scale-blind bump leaves it frozen."""
+    op = AntiCollapseOperator(strength=0.5)
+    eps_a = op.detector.anisotropy_eps
+    d = 4
+    sigma = torch.diag(_near_isotropic_diag(d, 0.5 * eps_a)).unsqueeze(0)
+    assert op.detector._anisotropy(sigma) < eps_a               # flat: cond_flat holds
+    # partially-degenerate A_s (one active mode, rest null) → proper null subspace,
+    # diagonal so its eigenbasis aligns with the diagonal Σ (L1, normal A).
+    A = torch.diag(torch.tensor([0.8, 0.0, 0.0, 0.0])).unsqueeze(0)
+    x = torch.zeros(1, d)
+    noise = torch.zeros(1, d)                                   # isolate the covariance leg
+    p = 0.01                                                    # tiny gate → weak old bump
+
+    _, sig_extra = op.excite(x, sigma, A, p, noise)
+    assert op.detector._anisotropy(sigma + sig_extra) >= eps_a  # NEW: floor broke cond_flat
+
+    # Same null modes, OLD scale-blind magnitude (strength·p): does NOT lift it.
+    null = op._near_null_basis(A)
+    old_bump = (op.strength * p) * (null @ null.T)
+    assert op.detector._anisotropy(sigma + old_bump.unsqueeze(0)) < eps_a
+
+
+def test_l4_floor_scale_equivariant():
+    """Fix A — Δ ∝ μ: rescaling Σ↦cΣ (which leaves the trigger invariant) scales the
+    floor by c, so the lift holds at every scale. A fixed floor would fail at large c."""
+    op = AntiCollapseOperator(strength=0.5)
+    eps_a = op.detector.anisotropy_eps
+    d, m = 4, 3
+    sigma = torch.diag(_near_isotropic_diag(d, 0.5 * eps_a)).unsqueeze(0)
+    c = 100.0
+    f1 = op._cov_floor(sigma, d, m)
+    fc = op._cov_floor(c * sigma, d, m)
+    assert fc == pytest.approx(c * f1, rel=1e-3)                # scale-equivariant
+    A = torch.diag(torch.tensor([0.8, 0.0, 0.0, 0.0])).unsqueeze(0)
+    x = torch.zeros(1, d); noise = torch.zeros(1, d)
+    for scale in (1.0, c):
+        _, sig_extra = op.excite(x, scale * sigma, A, 0.01, noise)
+        assert op.detector._anisotropy(scale * sigma + sig_extra) >= eps_a
+
+
+def test_g13_no_zero_rank_bump():
+    """Fix B / G13 — a rank-deficient A whose near-null modes sit just ABOVE eig_eps no
+    longer injects a blank bump. Old hard cutoff |λ|<eig_eps → rank-0 → zero injection."""
+    op = AntiCollapseOperator(strength=0.5, eig_eps=1e-2)
+    # one dominant mode (2.0) + three at 0.015: ABOVE eig_eps (0.01) absolute, but BELOW
+    # eig_eps·max (0.02) relative → effective rank 1 (< d/2): genuinely rank-deficient.
+    A = torch.diag(torch.tensor([2.0, 0.015, 0.015, 0.015])).unsqueeze(0)
+    A_s_ev = torch.linalg.eigvalsh(0.5 * (A.mean(0) + A.mean(0).T))
+    assert int((A_s_ev.abs() < op.eig_eps).sum()) == 0          # old cutoff: nothing to aim at
+    assert op.detector._effective_rank(A) < 0.5 * 4            # but rank-deficient (cond_rank)
+    basis = op._near_null_basis(A)
+    assert basis.shape[1] >= 1                                  # NEW: non-empty aim
+    assert basis.shape[1] <= 3                                  # …and never all d (k=d clamp)
+    x = torch.zeros(1, 4); noise = torch.randn(1, 4)
+    sigma = torch.eye(4).unsqueeze(0)
+    _, sig_extra = op.excite(x, sigma, A, 0.5, noise)
+    assert float(sig_extra.abs().sum()) > 0.0                   # non-blank covariance bump
+
+
+def test_c3_no_consecutive_freeze():
+    """Theorem C3 (normal A), L5 core step: a freeze trigger at t forces ¬cond_flat at
+    t+1, so the four-condition gate cannot fire on two consecutive steps."""
+    m = _model()
+    for p in m.graph.active.drift_net.parameters():
+        torch.nn.init.zeros_(p)                                # zero drift ⇒ A=0 (normal)
+    detector = SemanticCollapseOperator()
+    op = AntiCollapseOperator(detector=detector, strength=0.5)
+    eps_a = detector.anisotropy_eps
+    d = 4
+
+    # State on the freeze boundary: ∇L≈0 (tiny x), ∂H/∂u≈0 (u=0), flat Σ, A≈0.
+    x = torch.full((1, d), 1e-3)
+    u = torch.zeros(1, m.ctrl_dim)
+    A = torch.zeros(1, d, d)
+    sigma = torch.diag(_near_isotropic_diag(d, 0.5 * eps_a)).unsqueeze(0)
+
+    res_t = detector.evaluate(m, x, u, sigma, A)
+    assert res_t.triggered, f"setup must trigger the freeze: {res_t.summary()}"
+
+    # Σ₀⁻¹ fires (the engine gates excite on proximity>0, which holds here).
+    p = op.proximity(m, x, u, sigma, A)
+    assert p > 0.0
+    _, sig_extra = op.excite(x, sigma, A, p, torch.zeros(1, d))
+    sigma_plus = sigma + sig_extra                             # read-after-bump (engine ordering)
+
+    res_t1 = detector.evaluate(m, x, u, sigma_plus, A)
+    assert detector._anisotropy(sigma_plus) >= eps_a           # cond_flat broke…
+    assert not res_t1.triggered                                # …so no consecutive freeze
+
+
+def test_c3_nonnormal_covariance_lift():
+    """Theorem C3 extends to NON-NORMAL A — the alignment hypothesis L1 is removable.
+
+    The aligned L2 proof gets σ⁺ ≥ √(m(d−m))/d·b − aμ via the law of total variance.
+    The SAME bound holds for ANY rank-m orthogonal projector via the reverse triangle
+    inequality in Frobenius norm: ‖Σ⁺−μ⁺I‖_F ≥ b‖P−(m/d)I‖_F − ‖Σ−μI‖_F, with no
+    alignment — the misalignment penalty tr((Σ−μI)P) ≤ ‖Σ−μI‖_F·‖P‖_F = a·μ·√(dm) is
+    bounded by a(Σ), which cond_flat forces below ε_a. So the floored bump breaks
+    cond_flat for non-normal A too, even when Σ's eigenbasis is ADVERSARIALLY
+    misaligned (Σ's smallest eigendirections forced onto the bump basis — least
+    Frobenius gain). This closes the covariance-leg half of [#768]."""
+    detector = SemanticCollapseOperator()
+    op = AntiCollapseOperator(detector=detector, strength=0.5)
+    eps_a = detector.anisotropy_eps
+    g = torch.Generator().manual_seed(20260626)
+
+    for d in (4, 5, 6, 8):
+        # genuinely non-normal A: rank-deficient symmetric part + nonzero skew part
+        Q, _ = torch.linalg.qr(torch.randn(d, d, generator=g))
+        lam = torch.zeros(d); lam[0] = 0.7                      # one active mode ⇒ null > d/2
+        K = torch.randn(d, d, generator=g)
+        A = ((Q * lam) @ Q.T + (K - K.T) / (K - K.T).norm()).unsqueeze(0)
+        assert (A[0] @ A[0].T - A[0].T @ A[0]).norm() > 1e-6    # confirm A is non-normal
+
+        # adversarial worst case: build Σ so its m SMALLEST eigendirections ARE the bump
+        # basis (eig(A_s)), i.e. minimal tr(ΣP) — the hardest alignment for the lift.
+        P_basis = op._near_null_basis(A)                        # (d, m), from A_s
+        m_rank = P_basis.shape[1]
+        full = torch.randn(d, d, generator=g)
+        full[:, :m_rank] = P_basis
+        Qs, _ = torch.linalg.qr(full)
+        Qs[:, :m_rank] = P_basis                                # keep bump basis exact
+        ev = torch.sort(_near_isotropic_diag(d, 0.5 * eps_a, mu=2.0)).values  # ascending
+        sigma = ((Qs * ev) @ Qs.T).unsqueeze(0)                 # smallest λ on bump basis
+        assert detector._anisotropy(sigma) < eps_a             # cond_flat holds pre-bump
+
+        # tiny min-gate proximity — the regime where the floor (not strength·p) carries it
+        _, sig_extra = op.excite(torch.zeros(1, d), sigma, A, 0.01, torch.zeros(1, d))
+        assert detector._anisotropy(sigma + sig_extra) >= eps_a  # lifted — no alignment used
+
+
 # ── Σ₀-K1 component 8: collapse certificate + NIS canary, end-to-end (#852) ──
 
 def test_collapse_certificate_and_nis_canary_on_live_trajectory():
@@ -596,6 +767,7 @@ def test_collapse_certificate_and_nis_canary_on_live_trajectory():
     m.surprise_monitor = SurpriseMonitor(spook_sigmas=3.0, anti_collapse_trigger=True)
     m.anti_collapse_op = AntiCollapseOperator(strength=0.5)
     m.collapse_op = SemanticCollapseOperator()
+    _acting(m)
 
     x0, s0 = _init_state(scale=0.01)
     xf, sf, tr = rollout(m, x0, s0, steps=30, base_seed=1)

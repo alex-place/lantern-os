@@ -12,7 +12,9 @@
       "port": 4178,
       "autoPort": true,
       "env": {
-        "CHAT_TOOL_EXEC": "1"
+        "CHAT_TOOL_EXEC": "1",
+        "VERTEX_PROJECT": "843848914143",
+        "VERTEX_LOCATION": "us-central1"
       }
     },
     {

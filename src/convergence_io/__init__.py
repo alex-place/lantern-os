@@ -19,6 +19,7 @@ from .pcsf import ProviderCapacityState, ProviderRegistry, ProviderState, Dreame
 from .ccf import CapabilityClaim, CapabilityGate, GateResult, HonestyTracker
 from .aapf import ActionRecord, ProvenanceLedger
 from .nap import NegativeAuthorityProfile, AuthorityGate
+from .sanctions_oracle import SanctionsOracle, ScreeningResult, denial_overrides_capability
 from .dcf import DataClassification, ClassificationLabel, DREAM_LABELS
 from .engine import ConvergenceIO, RouteResult
 from .status_cube import StatusCube, StatusArtifact, StatusCoordinate, BayesianBelief
@@ -41,6 +42,7 @@ __all__ = [
     "CapabilityClaim", "CapabilityGate", "GateResult", "HonestyTracker",
     "ActionRecord", "ProvenanceLedger",
     "NegativeAuthorityProfile", "AuthorityGate",
+    "SanctionsOracle", "ScreeningResult", "denial_overrides_capability",
     "DataClassification", "ClassificationLabel", "DREAM_LABELS",
     "StatusCube", "StatusArtifact", "StatusCoordinate", "BayesianBelief",
     # v0.3 CEG

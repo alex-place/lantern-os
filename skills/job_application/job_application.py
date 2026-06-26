@@ -15,6 +15,7 @@ Callable from:
 import re
 import json
 import textwrap
+from dataclasses import dataclass, field, asdict
 from datetime import date
 from pathlib import Path
 
@@ -202,6 +203,204 @@ def run_job_application_skill(params: dict) -> dict:
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ── Analysis / tailoring public API (#1098) ─────────────────────────────────────
+#
+# These are the pure-Python, testable entry points used by tests/ and by the
+# MCP/Node tool-runner. They sit alongside build_application_package above:
+# analyze_job_posting() reads a posting, tailor_highlights() matches it against
+# the operator's background, and build_application_summary() renders a human
+# review summary. No I/O, no LLM call — heuristic extraction only.
+
+_TECH_RE = re.compile(
+    r'\b(python|javascript|typescript|react|node\.?js|sql|postgresql|postgres|'
+    r'redis|mongodb|aws|gcp|azure|docker|kubernetes|git|ci/cd|machine learning|'
+    r'llm|apis?|rest|graphql|java|go|rust|c\+\+|ruby|rails|django|flask|fastapi)\b',
+    re.I,
+)
+
+_SIGNAL_WORDS = [
+    "fast-paced", "remote", "hybrid", "on-site", "equity", "startup",
+    "scrappy", "hustle", "mentor", "growth", "ownership",
+]
+
+
+@dataclass
+class JobPostingAnalysis:
+    """Structured view of a job posting (heuristic extraction)."""
+    role: str = ""
+    company: str = ""
+    required_skills: list = field(default_factory=list)
+    preferred_skills: list = field(default_factory=list)
+    key_responsibilities: list = field(default_factory=list)
+    signals: list = field(default_factory=list)
+    raw_text_length: int = 0
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class TailoringResult:
+    """Result of matching an operator's background against a posting."""
+    matched_skills: list = field(default_factory=list)
+    gap_skills: list = field(default_factory=list)
+    tailored_bullets: list = field(default_factory=list)
+    cover_letter_opening: str = ""
+    confidence: float = 0.0
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def _bullets_under(text: str, header_pattern: str) -> list:
+    """Collect bullet lines under a "Header:" line until the next section."""
+    out = []
+    collecting = False
+    for line in text.splitlines():
+        s = line.strip()
+        if not collecting:
+            if re.search(header_pattern, s, re.I) and s.endswith(":"):
+                collecting = True
+            continue
+        if not s:
+            continue
+        if s.endswith(":"):  # next section header
+            break
+        if s.startswith(("-", "*", "•")):
+            out.append(s.lstrip("-*• ").strip())
+        else:  # non-bullet prose ends the section
+            break
+    return out
+
+
+def _tech_tokens(text: str) -> list:
+    return list(dict.fromkeys(m.group(0) for m in _TECH_RE.finditer(text)))
+
+
+def analyze_job_posting(posting_text: str) -> JobPostingAnalysis:
+    """
+    Extract role, company, skills, responsibilities, and culture signals from a
+    raw job posting. Pure heuristic — no LLM. Empty input yields an empty
+    analysis (role == "", required_skills == []).
+    """
+    text = posting_text or ""
+    if not text.strip():
+        return JobPostingAnalysis(raw_text_length=len(text))
+
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    role, company = "", ""
+    if lines:
+        m = re.match(r"(.+?)\s+at\s+(.+)", lines[0], re.I)
+        if m:
+            role = m.group(1).strip()
+            company = m.group(2).strip()
+        else:
+            role = lines[0]
+
+    required_block = " ".join(_bullets_under(text, r"required|requirements|must.?have")) \
+        or text  # fall back to whole posting if no explicit section
+    preferred_block = " ".join(_bullets_under(text, r"preferred|nice.?to.?have|bonus"))
+
+    required_skills = _tech_tokens(required_block)
+    preferred_skills = [s for s in _tech_tokens(preferred_block) if s not in required_skills]
+
+    responsibilities = _bullets_under(text, r"responsibilities|what you.?ll do|the role")
+
+    low = text.lower()
+    signals = [w for w in _SIGNAL_WORDS if w in low]
+
+    return JobPostingAnalysis(
+        role=role,
+        company=company,
+        required_skills=required_skills,
+        preferred_skills=preferred_skills,
+        key_responsibilities=responsibilities,
+        signals=signals,
+        raw_text_length=len(text),
+    )
+
+
+def tailor_highlights(analysis: JobPostingAnalysis, background: dict) -> TailoringResult:
+    """
+    Match the operator's background against an analyzed posting. Returns matched
+    skills (subset of the operator's skills), gap skills (required but absent),
+    experience bullets relevant to the posting, a cover-letter opening, and a
+    confidence fraction = (required skills the operator has) / (required skills).
+    """
+    background = background or {}
+    user_skills = background.get("skills", []) or []
+    user_lower = {s.lower(): s for s in user_skills}
+
+    required = analysis.required_skills or []
+    req_unique, seen = [], set()
+    for s in required + (analysis.preferred_skills or []):
+        sl = s.lower()
+        if sl not in seen:
+            seen.add(sl)
+            req_unique.append(s)
+
+    matched, gaps = [], []
+    for s in req_unique:
+        if s.lower() in user_lower:
+            matched.append(user_lower[s.lower()])
+        else:
+            gaps.append(s)
+
+    # tailored bullets: experience bullets that mention a relevant skill
+    relevant = {s.lower() for s in req_unique} | set(user_lower.keys())
+    tailored_bullets = []
+    for exp in background.get("experience", []) or []:
+        for b in exp.get("bullets", []) or []:
+            bl = b.lower()
+            if any(skill in bl for skill in relevant):
+                tailored_bullets.append(b)
+
+    req_lower = {s.lower() for s in required}
+    have = len(req_lower & set(user_lower.keys()))
+    confidence = round(have / len(req_lower), 3) if req_lower else 0.0
+    confidence = max(0.0, min(1.0, confidence))
+
+    company = analysis.company or "your company"
+    role = analysis.role or "this role"
+    opening = (
+        f"Dear {company} hiring team, I am excited to apply for the {role} "
+        f"position at {company}."
+    )
+
+    return TailoringResult(
+        matched_skills=matched,
+        gap_skills=gaps,
+        tailored_bullets=tailored_bullets,
+        cover_letter_opening=opening,
+        confidence=confidence,
+    )
+
+
+def build_application_summary(
+    candidate_name: str,
+    analysis: JobPostingAnalysis,
+    tailoring: TailoringResult,
+) -> str:
+    """Render a human-readable review summary of the tailored application."""
+    pct = round(tailoring.confidence * 100)
+    lines = [
+        f"Application summary for {candidate_name}",
+        f"Role: {analysis.role or 'unknown'} at {analysis.company or 'unknown'}",
+        f"Match confidence: {pct}%",
+        f"Matched skills: {', '.join(tailoring.matched_skills) or 'none'}",
+    ]
+    if tailoring.gap_skills:
+        lines.append(
+            "Gaps (skills required but not mentioned in your background): "
+            + ", ".join(tailoring.gap_skills)
+        )
+    lines.append(
+        "Next step: call generate_document to produce the tailored resume + "
+        "cover letter, then review and submit manually."
+    )
+    return "\n".join(lines)
 
 
 # ── Quick self-test ────────────────────────────────────────────────────────────

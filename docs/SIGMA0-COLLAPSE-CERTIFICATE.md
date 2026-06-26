@@ -26,17 +26,21 @@ safety mechanism.** This is the same thing machine-learning researchers call
 **model collapse** — train a model on its own output long enough and it degrades.
 
 **How sure are we of each part?** Every claim below is labelled:
-- **PROVEN** — the core collapse theorem (Theorem 1), with a machine-checked
-  proof, for the well-behaved (symmetric / normal) case. *34 of 34 tests pass.*
-- **MEASURED** — the anti-collapse operator (§3) and the early-warning "canary"
-  (§4): not proven, but demonstrated over **900 forced-collapse runs (100%
-  prevented)** plus a passing integration test.
+- **PROVEN** — the core collapse theorem (Theorem 1), for the well-behaved
+  (symmetric / normal) case; **and** that the anti-collapse operator *prevents
+  permanent freeze* (§3, Theorem C3) — now for **all `A`, normal and non-normal**
+  (the alignment hypothesis was removable; 2026-06-26). *39 of 39 tests pass.*
+- **MEASURED** — the early-warning "canary" (§4) and the operator's broader escape
+  behavior: demonstrated over **900 forced-collapse runs (100% prevented)** plus
+  passing integration tests, beyond what the freeze theorem covers.
 - **HEURISTIC** — the four-signal collapse *trigger* (§2): a sensible operational
   definition, deliberately *not* dressed up as a theorem.
 
-**What's left.** One genuine frontier: a *proof* (not just measurement) that the
-anti-collapse operator always works. Everything else verified as of 2026-06-19 is
-finished, machine-checked, and reproducible.
+**What's left.** One genuine frontier remains: Theorem 1's **contraction** for
+non-normal *drift* (the §1 cross-term, [#768]) — whether an ungrounded system
+collapses vs. diverges. This is distinct from the anti-collapse *freeze* claim,
+which is now proven for all `A`. ("Machine-checked" throughout means closed-form
+algebra + numerical sweep + pytest, **not** a Lean/Mathlib formal proof.)
 
 > **For the precise version, read on.** Each section carries its own status line.
 > The summary above is the honest gist, not a substitute for the math.
@@ -44,10 +48,11 @@ finished, machine-checked, and reproducible.
 ---
 
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **34 passing, 0 xfail**; the last gap [#657] closed
-2026-06-19) **for the symmetric / normal case**. The collapse trigger (§2), the anti-collapse operator (§3), and the
-early-warning readout (§4) are control-design heuristics — empirically supported, not
-theorems. The §6 demonstration is now **reproducible**: both driver scripts are
+`tests/test_cio_sde.py` — **39 passing, 0 xfail**) **for the symmetric / normal case**.
+The **anti-collapse operator's freeze-prevention (§3) is now also PROVEN** — Theorem C3,
+for **all `A`** (normal and non-normal; 2026-06-26). The collapse trigger (§2) and the
+early-warning readout (§4) remain control-design heuristics — empirically supported, not
+theorems. The §6 demonstration is **reproducible**: both driver scripts are
 committed and produce checked-in run logs (see §6). Read the per-section status
 lines before relying on any claim here.
 
@@ -92,6 +97,42 @@ lines before relying on any claim here.
 > continual-learning weight-perturbation σ: arXiv:2404.00781, 2503.01595; in-context CL:
 > arXiv:2509.22764). Backed by a new test — `test_sigma_zero_freezes_sigma_positive_explores`
 > isolates the σ-axis (σ=0 freezes, σ>0 explores); suite now **34 passed, 0 xfail**.
+>
+> **Maintenance log — 2026-06-25 (§3 closed for normal A).** The §3 sufficiency claim is
+> now PROVEN for **normal `A`** — [Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md), chaining
+> `L1(normal) ∧ L2 ∧ L3 ∧ L4 ∧ L5 ⇒ P(permanent freeze) = 0`. Closing it surfaced (and
+> fixed) two real defects in the shipped `AntiCollapseOperator`: (1) the bump magnitude
+> `strength·p` was **scale-blind** while L2's threshold `Δ ∝ μ` — fixed with a μ-aware
+> covariance floor (`_cov_floor`); (2) the hard `|λ|<eig_eps` aim could inject a
+> **zero-rank** bump (G13) or, in full degeneracy, **all `d` modes** (a uniform shift that
+> *lowers* anisotropy — the L2 `k=d` boundary) — fixed with banded near-null aiming clamped
+> to `1 ≤ m ≤ d−1` (`_near_null_basis`). Machine-checked: 4 new tests
+> (`test_c3_no_consecutive_freeze`, `test_l4_floor_lifts_anisotropy`,
+> `test_l4_floor_scale_equivariant`, `test_g13_no_zero_rank_bump`) + the sweep
+> `experiments/prove_c3_noncollapse.py` (3000 configs, 0 counterexamples, old bump fails
+> 100%). Non-normal `A` remains the lone frontier ([#768]). *Honest caveat:* 8 pre-existing
+> `test_cio_sde.py` failures (orphaned by the #1138 observe-only intervention default +
+> surprise-canary tuning) are unrelated to this change and untouched by it.
+>
+> **Maintenance log — 2026-06-26 (§3 closed for ALL `A`; the 8 orphans fixed).** Two
+> things landed. **(1) Non-normal freeze closed.** The §3 sufficiency claim now holds for
+> **non-normal `A` too**: the alignment hypothesis L1 — the one place the normal-A proof
+> used normality — was unnecessary. L2's operative bound `σ⁺ ≥ √(m(d−m))/d·b − aμ` holds
+> for *any* rank-`m` orthogonal projector via the Frobenius reverse-triangle inequality
+> (at `cond_flat`, Σ≈μI, so the misalignment penalty `≤ aμ√(m(d−m))` is bounded by the
+> very `a(Σ)<ε_a` the gate asserts). Verified: `experiments/prove_c3_noncollapse_nonnormal.py`
+> (4000 genuinely non-normal configs incl. the adversarial worst-case alignment, 0 lift
+> failures) + `tests/test_cio_sde.py::test_c3_nonnormal_covariance_lift`. The C3 doc gains a
+> §7 (L2′) and the L2 doc gains the alignment-free strengthening. **What is NOT closed:**
+> Theorem 1's **contraction** for non-normal drift (the §1 cross-term) — a different claim,
+> still [#768]; the freeze half of #768 is now split off and closed. **(2) The 8 orphan
+> failures fixed.** They were tests of collapse-machinery *behavior* (freeze, projection,
+> NIS-canary-on-snap) running under the #1138 observe-only default, which suppresses the
+> action they assert. Fixed by a `_acting(m)` test helper that opts each into
+> `InterventionPolicy(observe_only=False)` — the regime they actually test — not by
+> weakening assertions. `pytest tests/test_cio_sde.py` → **39 passed, 0 failed** (was
+> 30 passed / 8 failed). "Machine-checked" here means closed-form algebra + sweep + pytest,
+> **not** a Lean/Mathlib formal proof.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -107,8 +148,25 @@ status cannot silently drift.
 - [#516] / [#517] / [#520] — model-collapse literature integrated (two-phase collapse, double-scaling law, prediction-markets-as-grounding; §7 + References).
 - [#508] — `.md`/`.tex` status-box reconcile pass.
 
-**Open (the one genuine remaining frontier):**
-- **§3 sufficiency *theorem*.** Σ₀⁻¹ is now MEASURED over a 900-run regime sweep ([#658], resolved below) — but a closed-form *proof* that it always prevents collapse (option a) is still future work. This is the sole real gap, and it is acknowledged honestly rather than tracked as a defect.
+**Open (the one genuine remaining frontier — now in progress):**
+- **Theorem 1's *contraction* for non-normal drift `A`** ([#768]). The §1 cross-term
+  (`P_M A P_N ≠ 0` for non-normal `A`) means the simple energy proof can fail; whether an
+  ungrounded non-normal system collapses onto the manifold vs. diverges is certified only
+  by the conservative small-gain / pseudospectral gates (§1.2.1), which over-reject. This
+  is the **drift** question, and it is the sole remaining theorem-shaped gap. **In progress:**
+  [SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md) develops the
+  spectral (Riesz) dichotomy — split by `A`'s own spectrum so the cross-term vanishes by
+  invariance; active block contracts (Lyapunov), slow block's sign gives collapse-vs-diverge.
+  Core verified (`‖[Π_M,A]‖≤3e-11` over 600 random non-normal `A`); proof + machine-check pending.
+
+- **§3 sufficiency *theorem* — now closed for ALL `A`** (2026-06-26). [Theorem
+  C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md) proves Σ₀⁻¹ prevents permanent freeze: first for
+  normal `A` (landed 2026-06-25), then for **non-normal `A` too** once L2′ (§7 of the C3
+  doc) showed the alignment hypothesis L1 was removable — *any* rank-`m` bump lifts
+  anisotropy at `cond_flat` (Σ≈μI) by a Frobenius reverse-triangle bound. The 900-run
+  sweep ([#658]) is now corroboration. **[#768] is split:** its *freeze* half is closed
+  here; its *contraction* half (above) remains. This is the **rescue** question, distinct
+  from the drift one.
 
   *All previously-tracked gaps are now closed: [#657], [#658], [#659] landed 2026-06-19; [#660] (`.md`/`.tex` attribution + web-citation verification) closed.*
 
@@ -378,13 +436,30 @@ a fixed point of the dynamics.** (`SemanticCollapseOperator`.)
 
 ## 3. The anti-collapse operator Σ₀⁻¹
 
-**Status: MEASURED-over-distribution (as of 2026-06-19, [#658]). A 900-run regime
-sweep (100 trials × 9 collapse-prone cells) shows Σ₀⁻¹ suppresses forced collapse in
-100% of collapse-prone trials. A key lemma toward the proof is now CLOSED:
-[L2 — the one-step anisotropy lift](SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md) is proven
-closed-form and machine-checked (a single Σ₀⁻¹ bump provably breaks the trigger's
-flat condition). The full sufficiency *theorem* — non-normal `A`, all initial
-conditions — remains the one open frontier ([#768]).**
+**Status: PROVEN for all `A` (covariance leg, machine-checked 2026-06-26).**
+The §3 sufficiency claim — *Σ₀⁻¹ prevents permanent freeze* — is now closed for **normal
+and non-normal `A` alike**. The 2026-06-25 proof closed the normal/symmetric regime; the
+2026-06-26 strengthening **L2′** removed the alignment hypothesis L1 (the one place
+normality was used) via a Frobenius reverse-triangle bound, so the conclusion holds for
+all `A`. *Distinct from this:* Theorem 1's **contraction** for non-normal `A` (whether the
+ungrounded drift collapses vs. diverges — the §1 cross-term) remains the open frontier
+([#768]); C3 is the *rescue*, not the *drift*. [Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md)
+chains the lemmas — `L2′ ∧ L3 ∧ L4 ∧ L5 ⇒ P(permanent freeze) = 0` — where
+[L2](SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md) is closed-form proven and L4/L5 are
+machine-checked (`tests/test_cio_sde.py::test_c3_no_consecutive_freeze`,
+`::test_l4_floor_lifts_anisotropy`, `::test_l4_floor_scale_equivariant`,
+`::test_g13_no_zero_rank_bump`; sweep `experiments/prove_c3_noncollapse.py` — 3000
+configs, 0 floor counterexamples, 0 cond_flat survivals, old scale-blind bump fails
+100% → the floor is necessary). Closing it required two **code fixes** to the shipped
+operator (`AntiCollapseOperator`): a **μ-aware covariance floor** (`b_cov ≥ Δ`, so the
+bump is not scale-blind) and **banded near-null aiming clamped to `1 ≤ m ≤ d−1`** (so
+the bump is never zero-rank — G13 — and never a uniform shift that *lowers* anisotropy).
+Two honest scopes remain: (i) C3 is no-permanent-*freeze*, not contraction — Theorem 1's
+**non-normal drift** case (the §1 cross-term) is the open frontier [#768], separate from
+the rescue operator C3 governs; (ii) the proof governs the operator's *action* — in the
+live engine Σ₀⁻¹ is observe-only by default (intervention policy, #1138), so C3 is
+conditional on the operator being permitted to act. The non-normal *freeze* gap is now
+**closed** by L2′ (see §7 of the C3 doc), not merely measured.**
 
 Where Σ₀ projects **onto** the null subspace, Σ₀⁻¹ injects energy **along** it:
 
@@ -393,17 +468,24 @@ $$dx = f\,dt + dW + \Sigma_0^{-1}, \qquad \Sigma_0^{-1} = s\cdot p \cdot (V_{\te
 with `ξ` random and `p ∈ [0,1]` the **collapse proximity** — 0 far from the
 boundary (a no-op that costs nothing), rising toward 1 as `∇L`, rank, anisotropy,
 and control sensitivity all approach their thresholds. The implementation
-(`AntiCollapseOperator.excite` in `src/cio_sde/collapse.py`) correctly injects
-noise in the null subspace and re-anisotropizes `Σ`. The proximity gate
+(`AntiCollapseOperator.excite` in `src/cio_sde/collapse.py`) injects along the
+**banded near-null subspace** (`_near_null_basis`, `1 ≤ m ≤ d−1` modes) and
+re-anisotropizes `Σ` with a **μ-aware floor** (`_cov_floor`) so the covariance bump
+clears L2's threshold `Δ` even when the gate is weak. The proximity gate
 (`AntiCollapseOperator.proximity`) is the soft-AND `min(p_grad, p_rank, p_flat,
-p_ctrl)` over the four §2 signals.
+p_ctrl)` over the four §2 signals; the floor decouples the **covariance leg** (which
+breaks `cond_flat`, the certificate leg) from the random **state-kick leg** (which
+raises `‖x‖` and so `cond_grad`).
 
-**What is and isn't claimed.** This is a *well-motivated* control design:
-re-exciting directions that have gone flat is a sensible way to keep the system
-off the null manifold. But there is **no companion theorem** stating that Σ₀⁻¹
-*prevents* collapse — in contrast to Theorem 1, which is proven (under §1's
-hypothesis). That theorem-shaped gap is the one residual; the empirical support,
-however, is now a distribution rather than a single run ([#658], resolved).
+**What is and isn't claimed.** Re-exciting directions that have gone flat keeps the
+system off the null manifold. There is now a companion theorem —
+[Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md) — that Σ₀⁻¹ *prevents permanent freeze*
+(the gate cannot fire on two consecutive steps) for **all `A`, normal and non-normal**:
+the alignment hypothesis L1 was removable (L2′, a Frobenius reverse-triangle bound — at
+`cond_flat` Σ≈μI, so *any* rank-`m` bump lifts anisotropy). The 900-run distribution
+([#658]) is now corroboration, not the primary support. What remains a theorem-shaped gap
+is Theorem 1's **contraction** for non-normal drift (the §1 cross-term, [#768]) — a
+different claim from C3's anti-freeze.
 
 **Empirical evidence (MEASURED, [#658] — landed 2026-06-19).**
 `experiments/sigma0_regime_sweep.py` runs forced-collapse rollouts with and without
@@ -690,7 +772,7 @@ random-walks freely,"* now pinned by a test. The operator-driven freeze and esca
 are covered by `test_collapse_freezes_state` (the §2 freeze) and
 `test_anti_collapse_suppresses_collapse` (§3 Σ₀⁻¹ re-excites / escapes); external
 grounding by `_run_recursive_with_grounding` (synthetic ≥ mixed ≥ real collapse
-score). *(`tests/test_cio_sde.py` — 34 passing, 0 xfail.)*
+score). *(`tests/test_cio_sde.py` — 39 passing, 0 xfail.)*
 
 ---
 
@@ -791,7 +873,7 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (34 passing, 0 xfail — [#657] closed 2026-06-19); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (39 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*
