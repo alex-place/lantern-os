@@ -409,7 +409,7 @@ def _tool_queue_clear(status: str = "") -> Dict[str, Any]:
     return {"ok": True, "removed": before - len(_task_queue), "queue_depth": len(_task_queue), "filter": status or "all"}
 
 
-def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
+def _tool_task_run(task_id: str = "", provider: str = "") -> Dict[str, Any]:
     """Pick up a queued task and run it through the Convergence Loop (Kernel) — the honest
     consumer for the queue. Claims the named task (full id or unique prefix) or the top
     pending task, marks it active (so active_slots reflects real in-flight work), routes it
@@ -418,7 +418,12 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
     instead of only proposing text, then writes an append-only Convergence Record + PCSF
     receipt (Verify/Converge) and marks it done. Tool execution requires CHAT_TOOL_EXEC=1 on
     the garage server. Per the LANTERN-DREAM rule, results are PROPOSALS: confidence is capped
-    at 0.3 until Σ₀-verified. tool_calls reports how many tools the model executed."""
+    at 0.3 until Σ₀-verified. tool_calls reports how many tools the model executed.
+
+    Pass `provider` (e.g. "gemini", "claude", "openai", "grok", "ollama") to PIN the
+    reasoner instead of auto-routing; it is forwarded to the streaming chat as the
+    request `provider`. Empty = auto-route (PCSF leaderboard). Loopback POST = operator,
+    so the pinned provider gets the full toolset."""
     import urllib.request
 
     # ── Observe: select the task ──
@@ -469,7 +474,12 @@ def _tool_task_run(task_id: str = "") -> Dict[str, Any]:
     # branches, so we also honour evt.get("done"); both are handled below.)
     reply, provider, online, err, tool_calls = "", "unknown", False, None, 0
     try:
-        body = json.dumps({"message": prompt}).encode("utf-8")
+        chat_payload = {"message": prompt}
+        if provider and provider.strip():
+            # Pin the reasoner (e.g. Gemini) instead of auto-routing; request.js
+            # reads body.provider into requestedProvider (#1235).
+            chat_payload["provider"] = provider.strip().lower()
+        body = json.dumps(chat_payload).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
         op_token = os.getenv("OPERATOR_TOKEN")
         if op_token:
