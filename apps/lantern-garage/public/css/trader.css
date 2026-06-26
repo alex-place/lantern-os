@@ -1,0 +1,47 @@
+/* Disconnected/unavailable states for trader pages */
+
+.state-disconnected,
+.state-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(92, 99, 112, 0.08);
+  border: 1px solid rgba(92, 99, 112, 0.2);
+  border-radius: 6px;
+  color: var(--text2, #5c6370);
+  font-size: 0.9rem;
+  text-align: center;
+  min-height: 80px;
+}
+
+.state-disconnected {
+  background: rgba(255, 95, 109, 0.05);
+  border-color: rgba(255, 95, 109, 0.15);
+  color: var(--text1, #9aa0ad);
+}
+
+.connection-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.connection-status-badge.disconnected {
+  background: rgba(255, 95, 109, 0.15);
+  color: var(--red, #ff5f6d);
+  border: 1px solid rgba(255, 95, 109, 0.3);
+}
+
+.connection-status-badge.connected {
+  background: rgba(0, 212, 170, 0.15);
+  color: var(--green, #00d4aa);
+  border: 1px solid rgba(0, 212, 170, 0.3);
+}
