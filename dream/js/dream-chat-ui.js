@@ -425,8 +425,8 @@ function createAgentBubble(isError) {
   thinking.setAttribute('aria-live', 'polite');
   thinking.setAttribute('aria-label', 'Thinking');
   thinking.innerHTML =
-    '<img src="/mandala.svg" alt="" class="thinking-spin" style="width:18px;height:18px;opacity:0.5;vertical-align:middle;margin-right:6px">' +
-    '<span class="thinking-label" style="font-size:12px;opacity:0.6;vertical-align:middle">Thinking…</span>';
+    '<img src="/mandala.svg" alt="" class="thinking-spin" style="width:44px;height:44px;opacity:0.85;vertical-align:middle;margin-right:12px">' +
+    '<span class="thinking-label" style="font-size:14px;opacity:0.7;vertical-align:middle">Thinking…</span>';
   bubble.appendChild(thinking);
   const cursor = document.createElement('span');
   cursor.className = 'stream-cursor';
@@ -984,11 +984,10 @@ async function sendMessage(opts = {}) {
     return;
   }
 
-  // Three-doors game lives on its own page now — Keystone guides there, not in chat
-  const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts|explore)\b/i);
-  if (kingdomeMatch) {
+  // !explore opens the Explore page (the Three-Doors game was removed 2026-06-26).
+  if (/^!explore\b/i.test(text)) {
     input.value = '';
-    window.location.href = '/three-doors-game.html';
+    window.location.href = '/explore.html';
     return;
   }
 
