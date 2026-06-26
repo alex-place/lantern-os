@@ -271,6 +271,8 @@
     // conversation half-visible after "New chat".
     messagesEl.querySelectorAll(".msg-row, .message").forEach((n) => n.remove());
     if (emptyState) emptyState.style.display = "";
+    // Drop any persisted file attachments — a new chat starts with a clean slate.
+    if (window.clearPendingAttachments) window.clearPendingAttachments();
     inputEl.value = "";
     try { inputEl.focus(); } catch { /* no-op */ }
   }

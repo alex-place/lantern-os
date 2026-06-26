@@ -1007,7 +1007,9 @@ async function sendMessage() {
       }),
       signal: ac.signal,
     });
-    if (sentAttachments.length && window.clearPendingAttachments) window.clearPendingAttachments();
+    // Attachments PERSIST across turns (work-tool semantics): the file content is re-sent each
+    // turn so you can keep discussing/editing it. The chip stays visible; clear via the chip ×
+    // or by starting a new chat. (Without this, a follow-up loses the file — only turn 1 has it.)
 
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
