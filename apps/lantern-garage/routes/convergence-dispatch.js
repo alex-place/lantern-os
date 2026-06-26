@@ -165,6 +165,11 @@ module.exports = async (req, res, url, deps) => {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", async () => {
+      // Declared OUTSIDE the try so the `finally` worktree-teardown can reference them.
+      // A `let` inside the try is block-scoped → `cleanupWorktree is not defined` in the
+      // `finally`, an unhandled rejection that CRASHED the whole server after every
+      // autonomous-work run (the real reason the Auto-Pull loop kept killing 4177).
+      let workRoot = null, cleanupWorktree = null;
       try {
         const { issue } = JSON.parse(body || "{}");
         const issueNumber = parseInt(issue, 10);
@@ -182,8 +187,9 @@ module.exports = async (req, res, url, deps) => {
         const REPO_ROOT = path.resolve(__dirname, "../../..");
         const GH_REPO = "alex-place/lantern-os";
         // Code-mutating git ops run in `workRoot` (an isolated worktree), not the
-        // live serving checkout (REPO_ROOT). Torn down in `finally`.
-        let workRoot = REPO_ROOT, cleanupWorktree = null;
+        // live serving checkout (REPO_ROOT). Torn down in `finally`. (Declared above
+        // the try; assigned here once REPO_ROOT exists.)
+        workRoot = REPO_ROOT;
 
         // Fetch issue details
         const issueDetails = await new Promise((resolve) => {
