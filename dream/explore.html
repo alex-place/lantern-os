@@ -40,6 +40,125 @@
       line-height: 1.5;
     }
 
+    /* ── Single-pane ranked feed (#1217) ── */
+    .feed-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 auto 24px;
+      max-width: 920px;
+    }
+    .feed-chip {
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .feed-chip:hover { border-color: var(--accent); color: var(--text); }
+    .feed-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .feed-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .feed-stream {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    @media (min-width: 720px) { .feed-stream { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1100px) { .feed-stream { grid-template-columns: repeat(3, 1fr); } }
+
+    .feed-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px 16px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: inherit;
+      text-decoration: none;
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .feed-card:hover, .feed-card:focus-within {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-hover);
+    }
+    .feed-card .fc-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .feed-card .fc-type { color: var(--accent); }
+    .feed-card .fc-date { color: var(--muted); margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .feed-card .fc-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .feed-card .fc-title:hover { color: var(--accent); }
+    .feed-card .fc-why {
+      font-size: 0.74rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .feed-card .fc-why .fc-src { color: var(--accent); font-weight: 700; }
+    .feed-card .fc-dismiss {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+    }
+    .feed-card:hover .fc-dismiss, .feed-card:focus-within .fc-dismiss { opacity: 1; }
+    .feed-card .fc-dismiss:hover { background: var(--surface2); color: var(--text); }
+    .feed-card .fc-dismiss:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
+    .feed-status { max-width: 920px; margin: 0 auto; color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
+
+    .all-tools {
+      max-width: 920px;
+      margin: 48px auto 0;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+    .all-tools > summary {
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 14px 0;
+      list-style: none;
+    }
+    .all-tools > summary::-webkit-details-marker { display: none; }
+    .all-tools > summary::before { content: '▸ '; }
+    .all-tools[open] > summary::before { content: '▾ '; }
+
     .explore-section {
       margin: 40px 0;
     }
@@ -494,53 +613,21 @@
 
   <main id="main-content">
 
-    <!-- ── Watch (lanternYT — all channel videos, Gage's canon piece centered) ── -->
-    <div class="explore-section">
-      <p class="explore-section-title">🎬 Watch — <a href="https://www.youtube.com/@lantern1975" target="_blank" rel="noopener noreferrer" style="color:inherit">lanternYT ↗</a></p>
-      <div class="explore-info-box" style="max-width:920px">
-        <div class="video-embed">
-          <iframe id="ytPlayer"
-            src="https://www.youtube-nocookie.com/embed/_bjDjkQsTs0?rel=0"
-            title="lanternYT video"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerpolicy="strict-origin-when-cross-origin"
-            allowfullscreen></iframe>
-        </div>
-        <div class="video-carousel" id="videoCarousel" role="list" aria-label="lanternYT videos — canon piece centered"></div>
-      </div>
+    <!-- ── Single ranked content pane (#1217) — /api/explore/feed ── -->
+    <div class="feed-chips" id="feedChips" role="tablist" aria-label="Filter feed by type">
+      <button type="button" class="feed-chip active" data-type="all" role="tab" aria-selected="true">All</button>
+      <button type="button" class="feed-chip" data-type="read" role="tab" aria-selected="false">📰 Read</button>
+      <button type="button" class="feed-chip" data-type="watch" role="tab" aria-selected="false">🎬 Watch</button>
+      <button type="button" class="feed-chip" data-type="build" role="tab" aria-selected="false">🛠️ Build</button>
+      <button type="button" class="feed-chip" data-type="doc" role="tab" aria-selected="false">📚 Docs</button>
+      <button type="button" class="feed-chip" data-type="belief" role="tab" aria-selected="false">🌍 Beliefs</button>
     </div>
+    <div class="feed-status" id="feedStatus" aria-live="polite">Loading your feed…</div>
+    <div class="feed-stream" id="feedStream" aria-label="Ranked content feed"></div>
 
-    <!-- ── Discover (curated RSS rail — /api/feeds/discover) ── -->
-    <div class="explore-section">
-      <p class="explore-section-title">🧭 Discover — fresh reads on AI, local-first &amp; building</p>
-      <div class="explore-info-box" style="max-width:920px">
-        <div class="discover-grid" id="discoverGrid" aria-busy="true" aria-label="Curated discovery feed">
-          <div class="discover-loading">Loading fresh reads…</div>
-        </div>
-        <p class="discover-foot" id="discoverFoot"></p>
-      </div>
-    </div>
-
-    <!-- ── Build (GitHub activity — /api/github/activity) ── -->
-    <div class="explore-section">
-      <p class="explore-section-title">🛠️ Build — <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer" style="color:inherit">alex-place/lantern-os ↗</a></p>
-      <div class="explore-info-box" style="max-width:920px">
-        <div class="gh-head">
-          <span class="gh-stars" id="ghStars" title="GitHub stars">★ —</span>
-          <a class="gh-cta" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">Star &amp; contribute on GitHub ↗</a>
-        </div>
-        <div class="gh-grid">
-          <div class="gh-col">
-            <h3>Latest releases</h3>
-            <div class="gh-list" id="ghReleases"><div class="gh-loading">Loading…</div></div>
-          </div>
-          <div class="gh-col">
-            <h3>Recent commits</h3>
-            <div class="gh-list" id="ghCommits"><div class="gh-loading">Loading…</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ── All tools & sections (demoted — nothing lost) ── -->
+    <details class="all-tools">
+      <summary>All tools &amp; sections</summary>
 
     <!-- ── Dreams & Stories ── -->
     <section class="explore-section" aria-labelledby="section-dreams">
@@ -691,6 +778,8 @@
       </div>
     </div>
 
+    </details>
+
   </main>
 
 </div>
@@ -735,135 +824,113 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
-/* Watch panel — every video from the lanternYT channel, fetched live from
-   /api/youtube/lantern-videos (scraped + cached server-side). Gage's canon piece
-   is centered & featured. Falls back to the known videos if the API is down. */
+/* Single ranked content pane (#1217) — /api/explore/feed.
+   One PCSF-ranked stream of typed cards with filter chips. Every card carries a
+   "why surfaced" line (the Verify rule, made visible). Click = engagement,
+   ✕ = dismiss; both POST to /api/explore/interaction so the leaderboard learns. */
 (function () {
-  const FEATURED_ID = '_bjDjkQsTs0';
-  const FALLBACK = {
-    featured: FEATURED_ID,
-    videos: [
-      { id: '20t9zSUXhhw', title: 'learning Mario [lantern gaming]' },
-      { id: '_bjDjkQsTs0', title: 'playing doom 1 half playthrough [lantern gaming]', featured: true },
-    ],
-  };
-  const player = document.getElementById('ytPlayer');
-  const car = document.getElementById('videoCarousel');
-  if (!player || !car) return;
+  const stream = document.getElementById('feedStream');
+  const statusEl = document.getElementById('feedStatus');
+  const chips = document.getElementById('feedChips');
+  if (!stream) return;
 
-  const embed = (id, autoplay) =>
-    'https://www.youtube-nocookie.com/embed/' + id + '?rel=0' + (autoplay ? '&autoplay=1' : '');
-
-  function render(data) {
-    const featured = data.featured || FEATURED_ID;
-    const videos = (data.videos && data.videos.length) ? data.videos : FALLBACK.videos;
-    car.innerHTML = '';
-    videos.forEach(v => {
-      const isFeat = v.featured || v.id === featured;
-      const t = document.createElement('button');
-      t.type = 'button';
-      t.setAttribute('role', 'listitem');
-      t.className = 'video-thumb' + (isFeat ? ' active' : '');
-      t.setAttribute('aria-label', 'Play ' + (v.title || v.id));
-      t.innerHTML =
-        '<img loading="lazy" src="https://img.youtube.com/vi/' + v.id + '/hqdefault.jpg" alt="">' +
-        '<div class="vt-title">' + (isFeat ? '<span class="vt-badge">★ Canon</span> ' : '') +
-        (v.title || v.id) + '</div>';
-      t.addEventListener('click', () => {
-        player.src = embed(v.id, true);
-        car.querySelectorAll('.video-thumb').forEach(e => e.classList.remove('active'));
-        t.classList.add('active');
-      });
-      car.appendChild(t);
-    });
-    // load the featured video into the player and center its thumb
-    const featVid = videos.find(v => v.featured || v.id === featured) || videos[0];
-    if (featVid) player.src = embed(featVid.id, false);
-    const active = car.querySelector('.video-thumb.active') || car.querySelector('.video-thumb');
-    if (active) car.scrollLeft = Math.max(0, active.offsetLeft - (car.clientWidth - active.offsetWidth) / 2);
-  }
-
-  fetch('/api/youtube/lantern-videos', { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(render)
-    .catch(() => render(FALLBACK));
-})();
-</script>
-
-<script>
-/* Discover rail + GitHub activity — both server-side cached with baked
-   fallbacks, so the sections always render even if a feed/API is down. */
-(function () {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const ICON = { read: '📰', watch: '🎬', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
+
+  // Only http(s) and root-relative URLs are linkable. A card url is sourced from
+  // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
+  // href (esc() escapes quotes but not the scheme). Anything else renders inert.
+  const safeUrl = u => (/^https?:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '#';
 
   function shortDate(d) {
     if (!d) return '';
-    const t = Date.parse(d);
-    if (Number.isNaN(t)) return '';
+    const t = typeof d === 'number' ? (d > 1e12 ? d : d * 1000) : Date.parse(d);
+    if (!t || Number.isNaN(t)) return '';
     try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
     catch { return ''; }
   }
 
-  // ── Discover rail ──
-  const grid = document.getElementById('discoverGrid');
-  const foot = document.getElementById('discoverFoot');
-  if (grid) {
-    fetch('/api/feeds/discover', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        const items = (data && data.items) || [];
-        grid.removeAttribute('aria-busy');
-        if (!items.length) { grid.innerHTML = '<div class="discover-loading">No reads available right now.</div>'; return; }
-        grid.innerHTML = items.map(it => {
-          const ext = /^https?:/i.test(it.link);
-          const meta = [it.source ? '<span class="dc-source">' + esc(it.source) + '</span>' : '',
-                        shortDate(it.date) ? '<span>' + esc(shortDate(it.date)) + '</span>' : ''].filter(Boolean).join('');
-          return '<a class="discover-card" href="' + esc(it.link) + '"' +
-            (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
-            '<span class="dc-title">' + esc(it.title) + '</span>' +
-            (meta ? '<span class="dc-meta">' + meta + '</span>' : '') + '</a>';
-        }).join('');
-        if (foot && data.sources && data.sources.length) {
-          foot.textContent = 'Sources: ' + data.sources.map(s => s.name).join(' · ');
-        }
-      })
-      .catch(() => { grid.removeAttribute('aria-busy'); grid.innerHTML = '<div class="discover-loading">Discovery feed is offline right now.</div>'; });
+  function record(key, event, dwellMs) {
+    if (!key) return;
+    try {
+      navigator.sendBeacon
+        ? navigator.sendBeacon('/api/explore/interaction',
+            new Blob([JSON.stringify({ key, event, dwellMs })], { type: 'application/json' }))
+        : fetch('/api/explore/interaction', { method: 'POST', keepalive: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, event, dwellMs }) });
+    } catch (e) { /* non-blocking */ }
   }
 
-  // ── GitHub activity ──
-  const ghStars = document.getElementById('ghStars');
-  const ghReleases = document.getElementById('ghReleases');
-  const ghCommits = document.getElementById('ghCommits');
-  if (ghReleases || ghCommits) {
-    fetch('/api/github/activity', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        if (ghStars && typeof data.stars === 'number') ghStars.textContent = '★ ' + data.stars;
-        if (ghReleases) {
-          const rel = data.releases || [];
-          ghReleases.innerHTML = rel.length ? rel.map(r =>
-            '<a class="gh-item" href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="gh-tag">' + esc(r.tag) + '</span>' +
-            '<span class="gh-item-text">' + esc(r.name) +
-            (shortDate(r.date) ? '<span class="gh-item-date">' + esc(shortDate(r.date)) + '</span>' : '') +
-            '</span></a>').join('') : '<div class="gh-loading">No releases yet.</div>';
-        }
-        if (ghCommits) {
-          const com = data.commits || [];
-          ghCommits.innerHTML = com.length ? com.map(c =>
-            '<a class="gh-item" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="gh-tag">' + esc(c.sha) + '</span>' +
-            '<span class="gh-item-text">' + esc(c.msg) +
-            (shortDate(c.date) ? '<span class="gh-item-date">' + esc(shortDate(c.date)) + '</span>' : '') +
-            '</span></a>').join('') : '<div class="gh-loading">No commits found.</div>';
-        }
-      })
-      .catch(() => {
-        if (ghReleases) ghReleases.innerHTML = '<div class="gh-loading">GitHub is unreachable right now.</div>';
-        if (ghCommits) ghCommits.innerHTML = '';
-      });
+  let allCards = [];
+  let filter = 'all';
+
+  function cardEl(c) {
+    const href = safeUrl(c.url);
+    const ext = /^https?:/i.test(href);
+    const el = document.createElement('div');
+    el.className = 'feed-card';
+    el.dataset.type = c.type;
+    const date = shortDate(c.published);
+    const why = c.evidence && c.evidence.why ? c.evidence.why : '';
+    el.innerHTML =
+      '<div class="fc-top"><span class="fc-type">' + (ICON[c.type] || '•') + ' ' + esc(c.type) + '</span>' +
+        (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
+      '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
+        esc(c.title) + '</a>' +
+      '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+      '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
+    el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
+    el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      record(c.key, 'dismiss', 0);
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 150);
+    });
+    return el;
   }
+
+  function render() {
+    stream.innerHTML = '';
+    const shown = filter === 'all' ? allCards : allCards.filter(c => c.type === filter);
+    if (!shown.length) {
+      stream.innerHTML = '<div class="feed-status">No cards for this filter right now.</div>';
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    shown.forEach(c => frag.appendChild(cardEl(c)));
+    stream.appendChild(frag);
+  }
+
+  if (chips) {
+    chips.addEventListener('click', (e) => {
+      const btn = e.target.closest('.feed-chip');
+      if (!btn) return;
+      filter = btn.dataset.type;
+      chips.querySelectorAll('.feed-chip').forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      render();
+    });
+  }
+
+  fetch('/api/explore/feed', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(data => {
+      allCards = (data && data.cards) || [];
+      if (statusEl) {
+        statusEl.textContent = allCards.length
+          ? allCards.length + ' cards · ranked by your engagement (editorial order until you click)'
+          : 'No content available right now.';
+      }
+      render();
+    })
+    .catch(() => {
+      if (statusEl) statusEl.textContent = 'Feed is offline right now — open All tools below.';
+    });
 })();
 </script>
 </body>

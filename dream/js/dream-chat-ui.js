@@ -698,13 +698,23 @@ function renderVisionAnswer(prompt, attachment) {
 
 // ── Document generation ──────────────────────────────────────────────────────────
 // Detect a request to produce a document and return {prompt, format}, else null. Forms:
-// explicit (!doc / !pdf / /document <prompt>) and natural language ("make me a PDF/report/
-// brief about X"). Requires a document noun so ordinary asks don't trigger it.
+// explicit (!doc / !pdf / !docx / !deck <prompt>) and natural language ("make me a
+// Word doc / spreadsheet / deck about X"). Requires a document noun so ordinary asks
+// don't trigger it. Format inferred from the noun: word→docx, excel→xlsx, deck→pptx.
+function docFormatOf(noun) {
+  const n = String(noun).toLowerCase();
+  if (/docx|word/.test(n)) return 'docx';
+  if (/xlsx|excel|spread\s?sheet|workbook/.test(n)) return 'xlsx';
+  if (/pptx|power\s?point|slide|deck|presentation/.test(n)) return 'pptx';
+  return 'pdf';
+}
+// One alternation of document nouns, ordered specific→general so the format is inferable.
+var DOC_NOUNS = 'docx|word\\s?document|word\\s?doc|word\\s?file|word(?!s)|xlsx|spread\\s?sheet|excel|workbook|pptx|power\\s?point|slide\\s?deck|slide\\s?show|slides?|deck|presentation|pdf|document|report|brief|memo|white\\s?paper|one[- ]?pager|write[- ]?up';
 function parseDocRequest(text) {
-  const explicit = text.match(/^[!/](?:doc|document|pdf)\s+(.+)/i);
-  if (explicit) return { prompt: explicit[1].trim(), format: 'pdf' };
-  const nl = text.match(/\b(?:make|create|generate|write|draft|build|produce|prepare)\b[^.?!]*?\b(?:pdf|document|report|brief|memo|white\s?paper|one[- ]?pager|write[- ]?up)\b\s*(?:about|on|for|covering|titled|of|:)?\s*(.+)/i);
-  if (nl && nl[1] && nl[1].trim().length >= 3) return { prompt: nl[1].trim().replace(/[.?!]+$/, ''), format: 'pdf' };
+  const explicit = text.match(new RegExp('^[!/](' + DOC_NOUNS + '|doc)\\s+(.+)', 'i'));
+  if (explicit) return { prompt: explicit[2].trim(), format: docFormatOf(explicit[1]) };
+  const nl = text.match(new RegExp('\\b(?:make|create|generate|write|draft|build|produce|prepare)\\b[^.?!]*?\\b(' + DOC_NOUNS + ')\\b\\s*(?:about|on|for|covering|titled|of|:)?\\s*(.+)', 'i'));
+  if (nl && nl[2] && nl[2].trim().length >= 3) return { prompt: nl[2].trim().replace(/[.?!]+$/, ''), format: docFormatOf(nl[1]) };
   return null;
 }
 
@@ -901,8 +911,13 @@ function detectEmbedIntent(text) {
 }
 
 // ── Main send ─────────────────────────────────────────────────────────────────
-async function sendMessage() {
+async function sendMessage(opts = {}) {
   const input = document.getElementById('input');
+  // "Ground this" retry path: re-run a specific message with forced web grounding
+  // (groundedness canary loop). overrideText comes from the button, not the input
+  // box — so we must not read or clear the box on this path.
+  const overrideText = (opts && typeof opts.text === 'string') ? opts.text : null;
+  const forceGround = !!(opts && opts.forceGround);
   // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
   // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
   // they're folded in here so there is exactly one sendMessage, no monkey-patching.
@@ -919,7 +934,7 @@ async function sendMessage() {
   } catch (_) { /* gate is best-effort; the server enforces limits regardless */ }
   // Normalize the legacy !convergance command → canonical !convergence.
   if (/^!convergance(?:\s+(?:sync|loop|run))?\s*$/i.test(String(input.value || "").trim())) input.value = "!convergence";
-  const text = input.value.trim();
+  const text = (overrideText != null ? overrideText : input.value).trim();
   if (!text || isSending) return;
 
   // Image attachment → vision: the user uploaded an image via "+" to ask about it. The image
@@ -1069,9 +1084,9 @@ async function sendMessage() {
   const abortTimer = setTimeout(() => ac.abort(), 90000);
   showStopButton(() => { userStopped = true; ac.abort(); });
 
-  addUserBubble(text);
-  input.value = '';
-  input.style.height = 'auto';
+  addUserBubble(forceGround && overrideText != null ? text + '  ↻ grounding' : text);
+  // Don't clear the input box on a "Ground this" retry — the user didn't type this.
+  if (overrideText == null) { input.value = ''; input.style.height = 'auto'; }
   history.push({ role: 'user', text });
   writeCubeDelta('chat_message', [], 'conversation:' + Date.now());
 
@@ -1123,6 +1138,8 @@ async function sendMessage() {
         attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
+        // "Ground this" retry: force the server's web-search grounding branch.
+        forceGround: forceGround || undefined,
         // Scope this turn to the active chat session so it persists into the Chats
         // drawer (#773). dream-chat.js owns the id and mirrors it to localStorage;
         // without it, turns log untagged and never form a saved session.
@@ -1198,6 +1215,15 @@ async function sendMessage() {
             doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
             doneOnline = evt.online !== false;
             if (Array.isArray(evt.actions) && evt.actions.length) doneActions = evt.actions;
+            // Σ₀ groundedness canary (42-state guardrail): the reply asserted confident
+            // claims with no external anchor. Flag it so the user knows it's self-
+            // consistent but unverified, rather than letting it pass as grounded.
+            if (evt.ungrounded) {
+              bubble.dataset.ungrounded = '1';
+              if (evt.sigma0_grounding && evt.sigma0_grounding.risk != null) {
+                bubble.dataset.ungroundedRisk = String(evt.sigma0_grounding.risk);
+              }
+            }
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -1289,6 +1315,35 @@ async function sendMessage() {
     badge.style.cssText = 'font-size:10px;opacity:0.55;margin-left:6px;vertical-align:middle';
     badge.textContent = '✓ Σ₀';
     bubble.appendChild(badge);
+  }
+
+  // Σ₀ groundedness canary: confident claims, no external anchor (the 42-state).
+  // Honest signal to the user — internally consistent but unverified. Suppressed
+  // when Σ₀ verify already grounded the reply.
+  if (bubble.dataset.ungrounded && !bubble.dataset.sigma0Corrected) {
+    const risk = bubble.dataset.ungroundedRisk;
+    const badge = document.createElement('span');
+    badge.title = 'Confident claims with no external source — self-consistent but unverified.'
+      + (risk ? ` (Σ₀ groundedness risk ${risk})` : '');
+    badge.style.cssText = 'font-size:10px;opacity:0.7;margin-left:6px;vertical-align:middle;color:#f5a623;cursor:help';
+    badge.textContent = '⚠ ungrounded';
+    bubble.appendChild(badge);
+    // Actionable half: offer a one-click retry that re-runs THIS question with forced
+    // web grounding — detect → actually ground, the 42-state loop closed in the UI.
+    // Suppressed when we're online-less (web search can't reach reality) or when this
+    // turn was already a forced-grounding retry (don't invite an endless re-ground).
+    if (doneOnline !== false && !forceGround) {
+      const reground = document.createElement('button');
+      reground.type = 'button';
+      reground.textContent = '🌐 Ground this';
+      reground.title = 'Re-answer this question with a live web search for sources.';
+      reground.style.cssText = 'font-size:10px;margin-left:8px;vertical-align:middle;color:var(--accent);background:none;border:1px solid currentColor;border-radius:4px;padding:1px 6px;cursor:pointer;opacity:0.85';
+      reground.addEventListener('click', () => {
+        reground.disabled = true;
+        sendMessage({ text, forceGround: true });
+      });
+      bubble.appendChild(reground);
+    }
   }
 
   // Signature line: always show a human-readable label + time. Raw provider/model id
