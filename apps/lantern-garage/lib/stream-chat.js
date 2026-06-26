@@ -1222,7 +1222,14 @@ async function handleStreamChat(req, url, res) {
 
   // converganceDecision already computed above (before systemPrompt)
 
-  if (routeDecision.requires_convergence && !isKeystoneDebug && surfaceMode !== "three-doors") {
+  // ── Coding bypasses the convergence/persona engine (locked design 2026-06-26, PR #1265) ──
+  // classifyIntent flags coding as requires_convergence → convergeMessage() runs the
+  // Python convergence engine with the keystone persona, which serves coding asks as
+  // dream-flavored non-code ("…carries a wish. What are you protecting?"). Coding must
+  // reach the cloud-first provider dispatch below instead (where Claude/GPT lead). Skip
+  // the short-circuit for coding intents. CODING_LOCAL_FIRST=1 restores the old path.
+  const _convCodingBypass = isCodingIntent && process.env.CODING_LOCAL_FIRST !== "1";
+  if (routeDecision.requires_convergence && !isKeystoneDebug && surfaceMode !== "three-doors" && !_convCodingBypass) {
     const convResult = await convergeMessage(message, routeDecision.agent, requestedProvider || null, {
       timeoutMs: Number(process.env.CONVERGENCE_ROUTE_TIMEOUT_MS || 20000),
     });
