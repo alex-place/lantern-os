@@ -46,6 +46,7 @@ let timer = null;
 const status = {
   enabledOverride: null,   // null = follow env; true/false = runtime override
   lastTickAt: null,
+  pauseReason: null,       // why the last tick did NOT dispatch (cloud/lane/empty/disabled) — visibility
   lastPick: null,          // { issueNumber, title, at }
   lastResult: null,        // { issueNumber, ok, prUrl|stoppedAt, at }
   history: [],             // recent results, newest first (cap 20)
@@ -58,6 +59,8 @@ function loadState() {
     if (Array.isArray(s.history)) status.history = s.history.slice(0, 20);
     if (s.lastResult) status.lastResult = s.lastResult;
     if (s.lastPick) status.lastPick = s.lastPick;
+    if (s.lastTickAt) status.lastTickAt = s.lastTickAt;
+    if (s.pauseReason) status.pauseReason = s.pauseReason;
   } catch { /* no state yet */ }
 }
 loadState();
@@ -67,6 +70,8 @@ function saveState() {
     fs.mkdirSync(path.dirname(STATE_FILE()), { recursive: true });
     fs.writeFileSync(STATE_FILE(), JSON.stringify({
       enabledOverride: status.enabledOverride,
+      lastTickAt: status.lastTickAt,
+      pauseReason: status.pauseReason,
       lastPick: status.lastPick,
       lastResult: status.lastResult,
       history: status.history.slice(0, 20),
@@ -98,6 +103,7 @@ function getStatus() {
     inFlight,
     intervalMs: intervalMs(),
     lastTickAt: status.lastTickAt,
+    pauseReason: status.pauseReason,
     nextRunAt: timer && status.lastTickAt ? new Date(new Date(status.lastTickAt).getTime() + intervalMs()).toISOString() : null,
     lastPick: status.lastPick,
     lastResult: status.lastResult,
@@ -187,20 +193,26 @@ function claudeLaneOccupied(repoRoot) {
 }
 
 async function tick(ctx) {
-  if (!enabled() || inFlight) return;
+  if (!enabled()) { status.pauseReason = "disabled (kill switch off)"; return; }
+  if (inFlight) { status.pauseReason = "a run is already in flight (serialized)"; return; }
   status.lastTickAt = new Date().toISOString();
   const port = ctx.port;
   if (!(await cloudHealthy(port))) {
+    status.pauseReason = "cloud unreachable — chat degraded to the local model";
+    saveState();
     log("[auto-dispatch] paused — cloud is unreachable (chat degraded to local); retrying next tick");
     return;
   }
   if (claudeLaneOccupied(ctx.repoRoot)) {
+    status.pauseReason = "claude lane already has an open PR (one PR per lane)";
+    saveState();
     log("[auto-dispatch] paused — claude lane already has an open PR (one PR per lane); retrying next tick");
     return;
   }
   const issue = pickTopIssue(ctx.repoRoot);
-  if (!issue) return; // empty backlog
+  if (!issue) { status.pauseReason = "backlog empty — no unclaimed open issues"; saveState(); return; }
   inFlight = true;
+  status.pauseReason = null;
   status.lastPick = { issueNumber: issue.issueNumber, title: issue.title, at: new Date().toISOString() };
   saveState();
   log(`[auto-dispatch] working top issue #${issue.issueNumber} — ${String(issue.title || "").slice(0, 60)}`);
@@ -216,7 +228,15 @@ async function tick(ctx) {
       rec.ok = true; rec.prUrl = result.prUrl;
       log(`[auto-dispatch] ✓ #${issue.issueNumber} → draft PR ${result.prUrl}`);
     } else {
-      rec.ok = false; rec.stoppedAt = (result && (result.stoppedAt || result.error)) || "no PR produced";
+      rec.ok = false;
+      // Categorize the failure honestly instead of a generic "no PR produced":
+      // a null response = the 20-min dispatch timed out / connection dropped; a
+      // parsed error/stoppedAt = the pipeline aborted (e.g. patch_did_not_apply,
+      // tests_failed); ok-but-no-url = PR creation returned nothing.
+      if (!r) rec.stoppedAt = "dispatch timed out or connection dropped (20m budget)";
+      else if (result && (result.error || result.stoppedAt)) rec.stoppedAt = result.error || result.stoppedAt;
+      else rec.stoppedAt = `pipeline returned no PR url (HTTP ${r.status})`;
+      if (r && r.status) rec.httpStatus = r.status;
       log(`[auto-dispatch] #${issue.issueNumber} produced no PR (${rec.stoppedAt}) — leaving in queue for retry`);
     }
     status.lastResult = rec;

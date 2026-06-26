@@ -1370,7 +1370,9 @@
     if (!d || !d.ok) { setText("autoPullMeta", "status unavailable"); if (body) body.innerHTML = '<div class="placeholder">Loop status unavailable.</div>'; return; }
     if (toggle && document.activeElement !== toggle) toggle.checked = !!d.enabled;
     if (label) { label.textContent = d.enabled ? "On" : "Off"; label.style.color = d.enabled ? "var(--green)" : "var(--muted)"; }
-    setText("autoPullMeta", d.enabled ? (d.inFlight ? "running a job now" : "armed · waiting for next tick") : "off");
+    setText("autoPullMeta", d.enabled
+      ? (d.inFlight ? "running a job now" : (d.pauseReason ? `armed · paused: ${d.pauseReason}` : "armed · waiting for next tick"))
+      : "off");
 
     const pick = d.lastPick;
     const nextRun = d.enabled && d.nextRunAt ? relTime(d.nextRunAt).replace(" ago", "") + " (approx)" : "—";

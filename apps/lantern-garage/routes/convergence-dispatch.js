@@ -242,24 +242,46 @@ module.exports = async (req, res, url, deps) => {
         // Step 1: Generate plan
         const plan = await generatePlan(workRoot, issueDetails.title + "\n\n" + issueDetails.body, [], []);
 
-        // Step 2: Generate patch
-        const { diffText, files } = await generatePatch(workRoot, plan);
+        // Steps 2-3: generate patch → apply, with a feedback retry loop. LLM diffs
+        // routinely miss exact hunk context/counts; on failure we feed the apply
+        // errors + ground-truth file back and let the model self-correct. The stream
+        // path already did this — this (the autonomous FLEET loop's) path used to
+        // single-shot and abort, which is the #1 reason the loop "produced no PR"
+        // (verified: a real run aborted with hunk_not_located on attempt 1).
+        const MAX_PATCH_ATTEMPTS = 3;
+        let diffText = "", applyStats = null, changedFiles = [], feedback = null, applied = false;
+        for (let attempt = 1; attempt <= MAX_PATCH_ATTEMPTS; attempt++) {
+          const gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+          diffText = gen.diffText;
+          applyStats = applyPatch(workRoot, diffText);
+          changedFiles = [...(applyStats.changed || []), ...(applyStats.created || [])];
+          // Anti-fraud gate: a usable patch changes ≥1 file with zero hunk errors —
+          // otherwise a hallucinated/failed patch could let unrelated data-file churn
+          // be committed as the "fix".
+          if (changedFiles.length > 0 && !(applyStats.errors && applyStats.errors.length > 0)) {
+            applied = true;
+            break;
+          }
+          // Failed — roll the tree back clean and carry the errors into the next try.
+          await new Promise((resolve) =>
+            execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+          feedback = {
+            priorDiff: diffText,
+            errors: (applyStats.errors && applyStats.errors.length)
+              ? applyStats.errors.map((e) => `${e.file}: ${e.error}`).join("\n")
+              : "the diff changed no files (paths/hunks did not match the repo)",
+          };
+        }
 
-        // Step 3: Apply patch — capture stats so we can verify it actually changed code
-        const applyStats = applyPatch(workRoot, diffText);
-        const changedFiles = [...(applyStats.changed || []), ...(applyStats.created || [])];
-
-        // Anti-fraud gate: the patch MUST produce real, clean code changes.
-        // Without this, a hallucinated/failed patch leaves the working tree
-        // unchanged, then `git add -A` would commit unrelated runtime data churn
-        // (prices.jsonl etc.) as the "fix" — closing the issue with no real work.
-        if (changedFiles.length === 0 || (applyStats.errors && applyStats.errors.length > 0)) {
-          execFile("git", ["checkout", "--", "."], { cwd: workRoot });
+        if (!applied) {
+          await new Promise((resolve) =>
+            execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
           sendJson(res, {
             ok: false,
             error: "patch_did_not_apply",
+            attempts: MAX_PATCH_ATTEMPTS,
             applyStats,
-            message: "Generated patch produced no usable code changes (hunks failed or empty). Aborted — nothing committed.",
+            message: `Generated patch produced no usable code changes after ${MAX_PATCH_ATTEMPTS} attempts (hunks failed or empty). Aborted — nothing committed.`,
           }, 422);
           return;
         }
