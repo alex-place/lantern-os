@@ -1367,11 +1367,14 @@ async function verifyResponse(draft, userMessage, agentName) {
         .map(r => `- "${r.claim}" → ${r.evidence} (confidence: ${r.confidence.toFixed(2)})`)
         .join("\n");
       const raw2 = await callHaiku(
-        `You are a self-correcting AI. A grounding source actively CONTRADICTED these claims in your response:\n${refutedClaims}\n\nOriginal response:\n${draft}\n\nRevise to correct or qualify only these refuted claims. Use "I believe...", "I'm not certain, but...", or "According to available sources..." where appropriate. Leave everything else unchanged. Return only the revised response.`,
+        `A fact-check pass found these claims in an AI response to be contradicted by evidence:\n${refutedClaims}\n\nOriginal response:\n${draft}\n\nRewrite the response to correct or qualify only the contradicted claims, using phrasing like "I believe...", "I'm not certain, but...", or "According to available sources...". Leave everything else unchanged.\n\nOutput ONLY the rewritten response text, exactly as it should be shown to the end user. Do not include any preamble, headers (e.g. "Revised response:"), meta-commentary about the rewrite, or notes about your own process.`,
         1024
       );
       const revised = JSON.parse(raw2).content?.[0]?.text?.trim();
-      if (revised && revised.length > 50) { verified = revised; corrected = true; }
+      // Guard against the correction pass leaking its own scaffolding/meta-commentary
+      // into the user-facing reply instead of a clean rewrite (#1268).
+      const looksLikeMeta = revised && /^(revised response|note:|---|i appreciate the exercise|in actual practice)/i.test(revised);
+      if (revised && revised.length > 50 && !looksLikeMeta) { verified = revised; corrected = true; }
     } catch { /* keep original */ }
   }
 

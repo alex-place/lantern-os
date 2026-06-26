@@ -2,6 +2,7 @@
   "name": "lantern-os",
   "version": "1.7.74",
   "private": true,
+  "main": "index.js",
   "description": "Lantern OS ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Dream Journal",
   "scripts": {
     "setup": "node scripts/ensure-rust.js && node scripts/build-csf-rust.js",

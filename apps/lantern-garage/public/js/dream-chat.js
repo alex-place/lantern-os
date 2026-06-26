@@ -251,7 +251,27 @@
         const row = document.createElement("div");
         row.className = `msg-row ${isUser ? "user" : "agent"}`;
         const time = entry.recordedAt ? new Date(entry.recordedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Keystone"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
+        // #1268: replay the same PCSF signature (provider/model/agent) the live SSE
+        // 'done' event shows, when the persisted entry carries one. Older entries
+        // (and tool turns without a model) simply have no meta — sig stays blank.
+        let sig = "";
+        if (!isUser && entry.meta && (entry.meta.provider || entry.meta.model)) {
+          const pm = [entry.meta.provider, entry.meta.model].filter(Boolean).join("/");
+          sig = `<div class="msg-route-sig" aria-label="model: ${escapeHtml(pm)}">` +
+            `<span>${escapeHtml(entry.meta.agent || "Keystone")} · chat${time ? " · " + time : ""}</span>` +
+            `<details class="sig-debug" style="display:inline-block;margin-left:6px">` +
+            `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none">▸ debug</summary>` +
+            `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${escapeHtml(pm)}</span>` +
+            `</details></div>`;
+        }
+        // #1270: a persisted tool turn (image / youtube / document) rebuilds its
+        // rich element from meta.tool; everything else replays as escaped text.
+        let bubbleHtml = escapeHtml(entry.text);
+        if (!isUser && entry.meta && entry.meta.tool && typeof window.renderToolReplay === "function") {
+          const rich = window.renderToolReplay(entry.meta.tool);
+          if (rich) bubbleHtml = rich;
+        }
+        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Keystone"}${time ? " · " + time : ""}</div><div class="bubble">${bubbleHtml}</div>${sig}`;
         fragment.appendChild(row);
       }
       messagesEl.appendChild(fragment);
@@ -259,6 +279,7 @@
     } catch { /* non-critical — fresh session is fine */ }
   }
   loadConversationHistory();
+  loadSessions();
 
   // ── New chat: clear the visible history and start a fresh session ─────────
   // Non-destructive — rotates the session id so prior turns are archived, not shown.
@@ -278,7 +299,7 @@
   }
   window.newChat = newChat;
   const newChatBtn = document.getElementById("new-chat-btn");
-  if (newChatBtn) newChatBtn.addEventListener("click", newChat);
+  if (newChatBtn) newChatBtn.addEventListener("click", () => { newChat(); loadSessions(); });
 
   // ── #773 Multi-session UX: list, resume/switch, gated clear ───────────────
   function resetChatView() {
@@ -295,6 +316,7 @@
       localStorage.setItem(CHAT_SESSION_KEY, chatSessionId);
       resetChatView();
       await loadConversationHistory();
+      loadSessions(); // refresh the sidebar's active-session highlight (#1268)
     }
     closeSessions();
   }
@@ -347,22 +369,106 @@
       open.appendChild(title);
       open.appendChild(meta);
       open.addEventListener("click", () => switchSession(s.sessionId));
-      const del = document.createElement("button");
-      del.className = "session-del";
-      del.title = "Delete this session";
-      del.setAttribute("aria-label", "Delete session");
-      del.textContent = "✕";
-      del.addEventListener("click", (e) => { e.stopPropagation(); clearSession(s.sessionId); });
+      // ⋯ menu button (and right-click anywhere on the row) opens the context menu.
+      const menuBtn = document.createElement("button");
+      menuBtn.className = "session-menu-btn";
+      menuBtn.title = "Chat options";
+      menuBtn.setAttribute("aria-label", "Chat options");
+      menuBtn.textContent = "⋯";
+      menuBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const r = menuBtn.getBoundingClientRect();
+        openSessionMenu(r.right, r.bottom, s, title);
+      });
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        openSessionMenu(e.clientX, e.clientY, s, title);
+      });
       row.appendChild(open);
-      row.appendChild(del);
+      row.appendChild(menuBtn);
       listEl.appendChild(row);
     }
+  }
+
+  // ── Chat context menu (Rename / Delete) — #1269 ───────────────────────────
+  let sessionMenuEl = null;
+  function closeSessionMenu() {
+    if (sessionMenuEl) { sessionMenuEl.remove(); sessionMenuEl = null; }
+    document.removeEventListener("click", closeSessionMenu);
+    document.removeEventListener("keydown", onSessionMenuKey);
+  }
+  function onSessionMenuKey(e) { if (e.key === "Escape") closeSessionMenu(); }
+  function openSessionMenu(x, y, session, titleEl) {
+    closeSessionMenu();
+    const menu = document.createElement("div");
+    menu.className = "session-menu";
+    menu.setAttribute("role", "menu");
+    const mkItem = (label, cls, onClick) => {
+      const b = document.createElement("button");
+      b.className = "session-menu-item" + (cls ? " " + cls : "");
+      b.setAttribute("role", "menuitem");
+      b.textContent = label;
+      b.addEventListener("click", (e) => { e.stopPropagation(); closeSessionMenu(); onClick(); });
+      return b;
+    };
+    menu.appendChild(mkItem("Rename", "", () => renameSession(session, titleEl)));
+    menu.appendChild(mkItem("Delete", "danger", () => clearSession(session.sessionId)));
+    document.body.appendChild(menu);
+    // Keep the menu on-screen: flip left/up if it would overflow the viewport.
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    const left = Math.min(x, window.innerWidth - mw - 8);
+    const top = Math.min(y, window.innerHeight - mh - 8);
+    menu.style.left = Math.max(8, left) + "px";
+    menu.style.top = Math.max(8, top) + "px";
+    sessionMenuEl = menu;
+    // Defer so the opening click doesn't immediately dismiss the menu.
+    setTimeout(() => {
+      document.addEventListener("click", closeSessionMenu);
+      document.addEventListener("keydown", onSessionMenuKey);
+    }, 0);
+  }
+
+  // Inline rename: swap the title for an editable field; Enter/blur saves, Esc cancels.
+  function renameSession(session, titleEl) {
+    if (!titleEl) return;
+    const current = (session.title && session.title !== "(untitled session)") ? session.title : "";
+    const input = document.createElement("input");
+    input.className = "session-rename-input";
+    input.value = current;
+    input.maxLength = 80;
+    input.setAttribute("aria-label", "Rename chat");
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const commit = async (save) => {
+      if (done) return; done = true;
+      const next = input.value.replace(/\s+/g, " ").trim();
+      if (save && next && next !== current) {
+        try {
+          await fetch(`${serverBase}/api/conversations`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role: "session-title", text: next, sessionId: session.sessionId }),
+          });
+        } catch { /* best-effort — list refresh will show the truth */ }
+      }
+      loadSessions();
+    };
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") { e.preventDefault(); commit(true); }
+      else if (e.key === "Escape") { e.preventDefault(); commit(false); }
+    });
+    input.addEventListener("blur", () => commit(true));
+    input.addEventListener("click", (e) => e.stopPropagation());
   }
 
   // Per-session clear is self-service (server archives then removes that session's turns).
   async function clearSession(id) {
     if (!id) return;
-    if (!confirm("Delete this chat session? Its turns are archived first, then removed.")) return;
+    // No confirmation popup by request (#1269) — deletion archives turns first
+    // server-side, so it's recoverable from the timestamped .bak.
     try {
       await fetch(`${serverBase}/api/conversations?sessionId=${encodeURIComponent(id)}`, { method: "DELETE" });
     } catch { /* best-effort */ }
@@ -382,21 +488,26 @@
   }
   window.clearAllHistory = clearAllHistory;
 
+  // The sidebar is permanently visible on desktop; on narrow screens it's an
+  // off-canvas drawer toggled by the ☰ button (CSS: .chat-sidebar.open).
   function openSessions() {
-    const ov = document.getElementById("sessions-overlay");
-    if (ov) ov.classList.add("open");
+    const sb = document.getElementById("chat-sidebar");
+    if (sb) sb.classList.add("open");
     loadSessions();
   }
   function closeSessions() {
-    const ov = document.getElementById("sessions-overlay");
-    if (ov) ov.classList.remove("open");
+    const sb = document.getElementById("chat-sidebar");
+    if (sb) sb.classList.remove("open");
   }
   window.openSessions = openSessions;
   window.closeSessions = closeSessions;
-  const sessionsBtn = document.getElementById("sessions-btn");
-  if (sessionsBtn) sessionsBtn.addEventListener("click", openSessions);
-  const drawerNewChat = document.getElementById("drawer-new-chat");
-  if (drawerNewChat) drawerNewChat.addEventListener("click", () => { newChat(); loadSessions(); });
+  const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener("click", () => {
+      const sb = document.getElementById("chat-sidebar");
+      if (sb) sb.classList.contains("open") ? closeSessions() : openSessions();
+    });
+  }
 
   // #930: the textarea's inline onkeydown (dream-chat.html) already routes Enter to
   // the live global sendMessage in dream-chat-ui.js. A second keydown listener here

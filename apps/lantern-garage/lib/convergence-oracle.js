@@ -88,12 +88,17 @@ function sliceFor(question) {
   for (const [keys, band] of KEYMAP) {
     if (keys.some((k) => q.includes(k))) return Object.assign({ band }, BANDS[band]);
   }
-  return Object.assign({ band: NOW }, BANDS[NOW]);   // best-grounded slice fallback
+  return null;   // not a cosmology/deep-time question — no slice, no forced grounding
 }
 
-// The grounding block injected into the prompt for every question.
+// The grounding block injected into the prompt — only for questions that actually
+// match a cosmic-time band. Earlier this defaulted every unmatched question to the
+// NOW band, so unrelated chat turns ("give me a picture of X") got a cosmology
+// grounding block prepended, and the model would respond to that injected context
+// instead of (or alongside) the real question. #1268
 function formatGrounding(question) {
   const s = sliceFor(question);
+  if (!s) return "";
   const lines = [
     "Convergence Oracle — time-banded grounding for this question. Cite the KNOWN facts (with " +
     "their sources) as evidence and be honest about the UNKNOWNs; never bluff the boundaries " +

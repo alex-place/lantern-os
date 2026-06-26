@@ -3,11 +3,11 @@
   "configurations": [
     {
       "name": "lantern-dev",
-      "comment": "Preview-tool dev server: runs the main checkout's server from the project root (relative cwd, required by the sandboxed preview tool). The isolated C:/dev/lantern-os-dev worktree is launched separately by scripts, not by the preview tool. See docs/DEV-SERVER-WORKTREE.md.",
+      "comment": "Preview-tool dev server: runs the main checkout's server from the project root (relative cwd, required by the sandboxed preview tool). The isolated C:/dev/lantern-os-dev worktree is launched separately by scripts, not by the preview tool. Uses server-dev.js (not server.js) so the launcher-injected PORT env var is stripped before boot, otherwise session-secret.js refuses to start (PORT set => non-loopback => SESSION_SECRET required). See docs/DEV-SERVER-WORKTREE.md.",
       "runtimeExecutable": "node",
       "runtimeArgs": [
         "--watch",
-        "apps/lantern-garage/server.js"
+        "apps/lantern-garage/server-dev.js"
       ],
       "port": 4178,
       "autoPort": true,

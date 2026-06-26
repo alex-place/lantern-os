@@ -1204,7 +1204,7 @@ async function handleStreamChat(req, url, res) {
         const r = await require("./convergence-agent").respond(_q);
         const _ans = (r && r.answer) ? String(r.answer) : "(no answer)";
         sendToken(_ans);
-        await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: _ans.slice(0, maxConversationTextLength) }).catch(() => {});
+        await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: _ans.slice(0, maxConversationTextLength), meta: { provider: "convergence-agent", model: "$0", agent: doneAgentName } }).catch(() => {});
         sendDone("convergence-agent", { agent: doneAgentName, online: true, cleanText: _ans, actions: Array.isArray(r && r.actions) ? r.actions : [], grounded: !!(r && r.grounded), instant: true, label: "Convergence · instant · $0" });
         return;
       } catch (e) {
@@ -1255,6 +1255,7 @@ async function handleStreamChat(req, url, res) {
         surface: "dream-chat-stream",
         role: "lantern",
         text: String(convResult.reply).slice(0, maxConversationTextLength),
+        meta: { provider: "convergence", agent: convResult.agent || routeDecision.agent },
       }).catch(() => {});
       sendToken(convResult.reply);
       sendDone("convergence", {
@@ -1459,6 +1460,7 @@ async function handleStreamChat(req, url, res) {
     await logConversation({
       recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
       role: "lantern", text: ans.slice(0, maxConversationTextLength),
+      meta: { provider: "knowledge", model: "knowledge-center", agent: doneAgentName },
     }).catch(() => {});
     try { recordProviderSuccess("knowledge"); } catch (_e) {}
     sendDone("knowledge", {
@@ -1512,7 +1514,8 @@ async function handleStreamChat(req, url, res) {
       if (lr && lr.reply) {
         const { cleanText, suggestions } = doorsOrFallback(lr.reply, true);
         await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
-          role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          role: "lantern", text: cleanText.slice(0, maxConversationTextLength),
+          meta: { provider: "ollama", model: loopModel, agent: doneAgentName } }).catch(() => {});
         sendToken(cleanText);
         try { recordProviderSuccess("ollama"); recordModelOutcome(loopModel, leaderboardTaskType, true, 0); } catch (_e) {}
         sendDone("ollama", { agent: doneAgentName, online: true, cleanText, suggestions, model: loopModel,
@@ -1650,6 +1653,7 @@ async function handleStreamChat(req, url, res) {
             surface: "dream-chat-stream",
             role: "lantern",
             text: cleanText.slice(0, maxConversationTextLength),
+            meta: { provider: "ollama", model: ollamaModel, agent: doneAgentName },
           }).catch(() => {});
           recordProviderSuccess("ollama");
           recordModelOutcome(ollamaModel, leaderboardTaskType, true, Date.now() - _ollamaStart); // feed leaderboard
@@ -1695,6 +1699,7 @@ async function handleStreamChat(req, url, res) {
           surface: "dream-chat-stream",
           role: "lantern",
           text: cleanText.slice(0, maxConversationTextLength),
+          meta: { provider: "keystone-ft", model: "keystone-ft-claude", agent: doneAgentName },
         }).catch(() => {});
         recordProviderSuccess("keystone-ft");
         await recordConvergenceSignature("keystone-ft", "keystone-ft-claude", cleanText, true);
@@ -1777,7 +1782,7 @@ async function handleStreamChat(req, url, res) {
             contents.push({ role: "user", parts: responseParts });
           }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "gemini", model: geminiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("gemini");
           const geminiReceipt = buildPcsfReceipt("gemini", geminiModelName, true);
           sendReceipt(geminiReceipt);
@@ -1885,6 +1890,7 @@ async function handleStreamChat(req, url, res) {
         surface: "dream-chat-stream",
         role: "lantern",
         text: geminiClean.slice(0, maxConversationTextLength),
+        meta: { provider: "gemini", model: geminiModel, agent: doneAgentName },
       }).catch(() => {});
       recordProviderSuccess("gemini");
       const geminiModelName = modelFor("gemini");
@@ -1969,7 +1975,7 @@ async function handleStreamChat(req, url, res) {
               convo.push({ role: "user", content: results });
             }
             const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-            await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+            await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "anthropic", model: claudeModel, agent: doneAgentName } }).catch(() => {});
             recordProviderSuccess("anthropic");
             recordProviderSuccessRouter("anthropic");
             const toolReceipt = buildPcsfReceipt("anthropic", claudeModel, true);
@@ -2066,6 +2072,7 @@ async function handleStreamChat(req, url, res) {
         surface: "dream-chat-stream",
         role: "lantern",
         text: anthropicClean.slice(0, maxConversationTextLength),
+        meta: { provider: "anthropic", model: claudeModel, agent: doneAgentName },
       }).catch(() => {});
       recordProviderSuccess("anthropic");
       recordProviderSuccessRouter("anthropic");
@@ -2128,7 +2135,7 @@ async function handleStreamChat(req, url, res) {
             }
           }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "openai", model: openaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("openai");
           recordProviderSuccessRouter("openai");
           const openaiReceipt = buildPcsfReceipt("openai", openaiModelName, true);
@@ -2203,6 +2210,7 @@ async function handleStreamChat(req, url, res) {
         surface: "dream-chat-stream",
         role: "lantern",
         text: openaiClean.slice(0, maxConversationTextLength),
+        meta: { provider: "openai", model: modelFor("openai"), agent: doneAgentName },
       }).catch(() => {});
       recordProviderSuccess("openai");
       recordProviderSuccessRouter("openai");
@@ -2262,7 +2270,7 @@ async function handleStreamChat(req, url, res) {
             }
           }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("xai");
           const grokReceipt = buildPcsfReceipt("grok", xaiModelName, true);
           sendReceipt(grokReceipt);
@@ -2313,7 +2321,7 @@ async function handleStreamChat(req, url, res) {
         req2.write(payload); req2.end();
       });
       const { cleanText: xaiClean, suggestions: xaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-      await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength) }).catch(() => {});
+      await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModel, agent: doneAgentName } }).catch(() => {});
       recordProviderSuccess("xai");
       const grokModelName = xaiModel; // receipt MUST reflect the model actually sent
       await recordConvergenceSignature("grok", grokModelName, xaiClean, true);
@@ -2360,6 +2368,7 @@ async function handleStreamChat(req, url, res) {
             surface: "dream-chat-stream",
             role: "lantern",
             text: cleanText.slice(0, maxConversationTextLength),
+            meta: { provider: "ollama", model: "unified-agent", agent: doneAgentName },
           }).catch(() => {});
           recordProviderSuccess("ollama");
           await recordConvergenceSignature("ollama", "unified-agent", cleanText, true);
@@ -2440,6 +2449,7 @@ async function handleStreamChat(req, url, res) {
           surface: "dream-chat-stream",
           role: "lantern",
           text: ollamaClean.slice(0, maxConversationTextLength),
+          meta: { provider: "ollama", model: ollamaModel, agent: doneAgentName },
         }).catch(() => {});
         recordProviderSuccess("ollama");
         await recordConvergenceSignature("ollama", ollamaModel, ollamaClean, true);
