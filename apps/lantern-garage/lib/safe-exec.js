@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 /**
  * safe-exec — run allowlisted commands WITHOUT a shell.
@@ -18,7 +18,7 @@
  * guarantees that even an allowlisted-but-porous pattern can't escape to a shell.
  */
 
-const { execFileSync } = require("child_process");
+const { execFileSync } = require('child_process');
 
 // Any of these in a token => refuse. Covers command chaining, substitution,
 // redirection, globbing, history expansion, and escapes.
