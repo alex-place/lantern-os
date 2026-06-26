@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-23
-updated: 2026-06-23
+updated: 2026-06-26
 status: current
 supersedes: docs/ARCHITECTURE-AUDIT-2026-06-13.md
 ---
@@ -169,6 +169,7 @@ The CADD layer is built on top under [`caad/`](../caad/).
 |---|---|---|
 | **MCP server** | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | FastAPI + SSE; tools `queue_status`, `task_intake`, `dispatch_work`, `boot_check`, `list_skills`, `get_status` (`server.py:11-16`). Act/observe bridge for orchestrators. |
 | **Trading terminal** | `public/kalshi-terminal.html` + [`routes/trading.js`](../apps/lantern-garage/routes/trading.js) | Swipe-deck UI over 60+ REST endpoints; live data via `kalshi-collector` snapshot, not UI-direct calls. Act + first closed loop slice. |
+| **Explore feed** | `public/explore.html` + [`routes/explore.js`](../apps/lantern-garage/routes/explore.js) + [`lib/explore-feed.js`](../apps/lantern-garage/lib/explore-feed.js) | Single-pane content feed ranked by `rankCandidates(cards,"explore")` — a **2nd, non-LLM consumer of the PCSF leaderboard** (§5). Click/dismiss → `recordModelOutcome` reorders it. Reason + Converge. See [EXPLORE-FEED.md](EXPLORE-FEED.md). |
 | **Σ₀ / Ouro serving** | [`src/sigma0/`](../src/sigma0/) (`loop_lm.py`, `provider_node.py`, `quantized_cache.py`, `decode_canary.py`) | The local interchangeable model; served behind Ollama. Reason. |
 | **Self-improvement / training** | `scripts/ouro_*`, `src/training/`, `data/self-improvement/` | LoRA/adapter training jobs; experience capture. Converge. |
 | **Orchestration / autowork / fleet** | `lib/autowork-worktree.js`, `lib/swarm-orchestrator.js`, monoworkstream git hooks | Per-issue worktree-isolated agents; one PR lane per agent prefix. Act. |

@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-05-26
-updated: 2026-06-24
+updated: 2026-06-26
 ---
 
 # Keystone OS
@@ -98,6 +98,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 | Area | Status | Notes |
 |------|--------|-------|
 | **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** | ✅ Live | Member operator console — grounded technical chat, **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`), tool-wired, leaderboard-measured |
+| **[Explore Feed](docs/EXPLORE-FEED.md)** | ✅ Live (2026-06-26) | Single-pane, PCSF-ranked content stream (reads/watch/build/docs/beliefs) with filter chips; learns from clicks/dismisses on the same leaderboard that ranks model providers — no new recommender subsystem (#1211) |
 | **Dream Journal** | ✅ Live | Freeform chat, local storage, JSONL export, PWA mode |
 | **1.6 Trader Dashboard** | ✅ Live (2026-06-16) | Real-time market data, position management, convergence metrics |
 | **1.6 Creator Dashboard** | ✅ Live (2026-06-16) | Dream journal publishing, markdown editor, template system |
@@ -509,6 +510,7 @@ npm run dev --prefix apps/lantern-garage
 
 - **[docs/DREAM-JOURNAL-USER-GUIDE.md](docs/DREAM-JOURNAL-USER-GUIDE.md)** — How to use the Dream Journal
 - **[docs/DREAM-JOURNAL-API-ENDPOINTS.md](docs/DREAM-JOURNAL-API-ENDPOINTS.md)** — Full API reference
+- **[docs/EXPLORE-FEED.md](docs/EXPLORE-FEED.md)** — Explore page: PCSF-ranked single-pane content feed (as-built, API contract, limitations)
 - **[AUTONOMOUS-REPAIR-GUIDE.md](AUTONOMOUS-REPAIR-GUIDE.md)** — Health monitoring, auto-repair, deployment control
 
 ### For Product & Members
