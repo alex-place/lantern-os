@@ -20,6 +20,7 @@ const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { scoreReplyCollapse, antiCollapseSignal } = require("./collapse-canary");
+const { scoreReplyGroundedness, ungroundedSignal } = require("./groundedness-canary");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
@@ -973,6 +974,29 @@ async function handleStreamChat(req, url, res) {
             `[canary_collapse] proximity=${canary.proximity} action=${sig.action} ` +
             `source=${source} provider=${signature.provider} ` +
             `signals=${JSON.stringify(canary.signals)}`
+          );
+        }
+      }
+    } catch { /* canary must never break a reply */ }
+    // ── Σ₀ groundedness canary (42-state guardrail) ─────────────────────────
+    // The collapse canary above catches textual *degeneration*. It cannot see the
+    // other Σ₀ failure mode (SIGMA0-COLLAPSE-CERTIFICATE §2, the "42-state"): a
+    // fluent, non-repeating reply that asserts confident claims with no external
+    // anchor — internally coherent, externally adrift. Score that axis here, where
+    // the upstream groundingContext is already in scope, and stamp the risk onto the
+    // done signature so a confident-but-ungrounded reply can't pass as healthy.
+    // Passive observer: advisory only, never blocks a reply.
+    try {
+      if (fullReply) {
+        const g = scoreReplyGroundedness(fullReply, { groundingContext });
+        signature.sigma0_grounding = { risk: g.risk, anchored: g.anchored };
+        if (g.ungrounded) {
+          signature.ungrounded = true;
+          const usig = ungroundedSignal(g);
+          signature.ungroundedSignal = usig;
+          console.warn(
+            `[canary_ungrounded] risk=${g.risk} source=${source} ` +
+            `provider=${signature.provider} signals=${JSON.stringify(g.signals)}`
           );
         }
       }

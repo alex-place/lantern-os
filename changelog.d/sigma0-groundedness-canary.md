@@ -1,0 +1,7 @@
+### Keystone Chat: Σ₀ groundedness canary (42-state guardrail)
+
+- Every chat reply is now scored for the **42-state** — the Σ₀ failure mode the existing collapse canary couldn't see: a fluent, non-repeating answer that asserts confident claims with **zero external anchor** (internally coherent, externally adrift). This is the EXTERNAL REALITY RULE enforced in the serving loop, not just the docs.
+- New `lib/groundedness-canary.js` scores `risk = assertiveness × (1 − anchor)`: density of *checkable specifics* (numbers, dates, named entities) net of honest hedging, against whether anything external pinned the reply (upstream grounding context, in-text source links, or `file:line` citations). Honest "I'm not sure…" replies and anchored replies score low; confident-but-unsourced replies cross the threshold.
+- Wired **passively** beside the collapse canary in `stream-chat.js` (advisory only — never blocks a reply): stamps `sigma0_grounding`/`ungrounded` onto the done signature and logs `canary_ungrounded` on a crossing.
+- Surfaced in `dream-chat-ui.js` as a small **⚠ ungrounded** badge (suppressed when Σ₀ verify already grounded the reply), so a self-consistent-but-unverified answer can't pass as grounded.
+- 8 unit checks in `test/groundedness-canary.test.js` (confident-unanchored flags; same claims grounded/linked/file-cited don't; hedging and reflective prose don't false-positive).

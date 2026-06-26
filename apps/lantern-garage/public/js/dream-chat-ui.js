@@ -1198,6 +1198,15 @@ async function sendMessage() {
             doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
             doneOnline = evt.online !== false;
             if (Array.isArray(evt.actions) && evt.actions.length) doneActions = evt.actions;
+            // Σ₀ groundedness canary (42-state guardrail): the reply asserted confident
+            // claims with no external anchor. Flag it so the user knows it's self-
+            // consistent but unverified, rather than letting it pass as grounded.
+            if (evt.ungrounded) {
+              bubble.dataset.ungrounded = '1';
+              if (evt.sigma0_grounding && evt.sigma0_grounding.risk != null) {
+                bubble.dataset.ungroundedRisk = String(evt.sigma0_grounding.risk);
+              }
+            }
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -1288,6 +1297,19 @@ async function sendMessage() {
     badge.title = `Σ₀ verified — ${bubble.dataset.sigma0Claims} claim(s) grounded`;
     badge.style.cssText = 'font-size:10px;opacity:0.55;margin-left:6px;vertical-align:middle';
     badge.textContent = '✓ Σ₀';
+    bubble.appendChild(badge);
+  }
+
+  // Σ₀ groundedness canary: confident claims, no external anchor (the 42-state).
+  // Honest signal to the user — internally consistent but unverified. Suppressed
+  // when Σ₀ verify already grounded the reply.
+  if (bubble.dataset.ungrounded && !bubble.dataset.sigma0Corrected) {
+    const risk = bubble.dataset.ungroundedRisk;
+    const badge = document.createElement('span');
+    badge.title = 'Confident claims with no external source — self-consistent but unverified.'
+      + (risk ? ` (Σ₀ groundedness risk ${risk})` : '');
+    badge.style.cssText = 'font-size:10px;opacity:0.7;margin-left:6px;vertical-align:middle;color:#f5a623;cursor:help';
+    badge.textContent = '⚠ ungrounded';
     bubble.appendChild(badge);
   }
 
