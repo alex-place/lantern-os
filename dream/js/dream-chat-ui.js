@@ -696,6 +696,46 @@ function renderVisionAnswer(prompt, attachment) {
     .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
 }
 
+// ── Document generation ──────────────────────────────────────────────────────────
+// Detect a request to produce a document and return {prompt, format}, else null. Forms:
+// explicit (!doc / !pdf / /document <prompt>) and natural language ("make me a PDF/report/
+// brief about X"). Requires a document noun so ordinary asks don't trigger it.
+function parseDocRequest(text) {
+  const explicit = text.match(/^[!/](?:doc|document|pdf)\s+(.+)/i);
+  if (explicit) return { prompt: explicit[1].trim(), format: 'pdf' };
+  const nl = text.match(/\b(?:make|create|generate|write|draft|build|produce|prepare)\b[^.?!]*?\b(?:pdf|document|report|brief|memo|white\s?paper|one[- ]?pager|write[- ]?up)\b\s*(?:about|on|for|covering|titled|of|:)?\s*(.+)/i);
+  if (nl && nl[1] && nl[1].trim().length >= 3) return { prompt: nl[1].trim().replace(/[.?!]+$/, ''), format: 'pdf' };
+  return null;
+}
+
+// Generate a document via the server (model writes it → Markdown → PDF) and show a download link.
+function renderDocGen(prompt, format) {
+  const messages = document.getElementById('messages');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Writing &amp; rendering a document about <b>${esc(prompt)}</b>… (this takes a few seconds)</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  fetch('/api/document/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, format: format || 'pdf' }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.ok && d.url) {
+        const kb = d.bytes ? ' · ' + Math.round(d.bytes / 1024) + ' KB' : '';
+        bubble.innerHTML = `✓ Generated <b>${esc(d.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(d.format)}${kb})</span><br>`
+          + `<a href="${esc(d.url)}" download="${esc(d.filename)}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(d.filename)}</a>`;
+      } else {
+        bubble.innerHTML = `Couldn't generate the document: ${esc((d && d.error) || 'unavailable')}`;
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+    })
+    .catch(e => { bubble.innerHTML = `Document error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
+}
+
 // ── Video requests ──────────────────────────────────────────────────────────────
 // Detect a request to see a video and return the search query, else null. Forms:
 // explicit (!video / /video <query>) and natural language ("show me a youtube video
@@ -915,6 +955,17 @@ async function sendMessage() {
     input.style.height = 'auto';
     addUserBubble(text);
     renderYoutube(videoQuery);
+    return;
+  }
+
+  // Document request → generate a downloadable document (the model writes it, the server
+  // renders Markdown → PDF). Handles "make me a PDF/report/brief about X" and !doc/!pdf <prompt>.
+  const docReq = parseDocRequest(text);
+  if (docReq) {
+    input.value = '';
+    input.style.height = 'auto';
+    addUserBubble(text);
+    renderDocGen(docReq.prompt, docReq.format);
     return;
   }
 
