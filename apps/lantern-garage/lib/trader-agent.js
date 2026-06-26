@@ -18,7 +18,11 @@ class TraderAgent {
     this.pythonPath = path.join(__dirname, '../../../src/trading_agents');
     this.cache = {};
     this.cacheExpiry = config.cacheExpiry || 60000; // 60s default
-    this.pythonTimeout = config.pythonTimeout || 30000; // 30s timeout
+    this.pythonTimeout = config.pythonTimeout || 30000; // 30s timeout (scans)
+    // Fast-fail budget for interactive reads (market-status / zones / bars /
+    // watchlist) so a slow/broken data provider returns quickly instead of
+    // hanging the page for the full 30s (#1227).
+    this.fastTimeout = config.fastTimeout || parseInt(process.env.TRADER_PYTHON_FAST_TIMEOUT || '7000', 10);
     this.alpacaKey = process.env.ALPACA_API_KEY;
     this.alpacaSecret = process.env.ALPACA_SECRET_KEY;
     this.watchlistPath = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
@@ -137,7 +141,7 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_zones', { ticker });
+      const result = await this._callPython('get_zones', { ticker }, this.fastTimeout);
 
       this.cache[cacheKey] = {
         data: result,
@@ -147,10 +151,11 @@ class TraderAgent {
       return result;
     } catch (error) {
       console.error(`[TraderAgent] Zones for ${ticker} failed:`, error.message);
-      return {
+      return this._staleOr(cacheKey, {
         ticker,
-        error: error.message
-      };
+        available: false,
+        reason: this._shortReason(error),
+      });
     }
   }
 
@@ -178,22 +183,25 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_market_status', {});
+      const result = await this._callPython('get_market_status', {}, this.fastTimeout);
 
       this.cache[cacheKey] = {
-        data: result,
+        data: { ...result, available: true },
         time: Date.now()
       };
 
-      return result;
+      return this.cache[cacheKey].data;
     } catch (error) {
       console.error('[TraderAgent] Market status failed:', error.message);
-      return {
+      // Serve last-good (stale) if we have it; otherwise an honest "unavailable"
+      // status — NOT a 200-wrapped traceback and NOT regime "UNKNOWN" (#1226).
+      return this._staleOr(cacheKey, {
         market_open: false,
         vix: 0,
-        vix_regime: 'UNKNOWN',
-        error: error.message
-      };
+        vix_regime: 'UNAVAILABLE',
+        available: false,
+        reason: this._shortReason(error),
+      });
     }
   }
 
@@ -210,7 +218,7 @@ class TraderAgent {
     try {
       const result = await this._callPython('get_watchlist_prices', {
         tickers: this.watchlist
-      });
+      }, this.fastTimeout);
 
       this.cache[cacheKey] = {
         data: result,
@@ -220,7 +228,7 @@ class TraderAgent {
       return result;
     } catch (error) {
       console.error('[TraderAgent] Watchlist prices failed:', error.message);
-      return [];
+      return this._staleOr(cacheKey, []); // last-good prices if any, else empty (#1227)
     }
   }
 
@@ -238,7 +246,7 @@ class TraderAgent {
       const result = await this._callPython('get_positions', {
         alpaca_key: this.alpacaKey,
         alpaca_secret: this.alpacaSecret
-      });
+      }, this.fastTimeout);
 
       this.cache[cacheKey] = {
         data: result,
@@ -248,10 +256,13 @@ class TraderAgent {
       return result;
     } catch (error) {
       console.error('[TraderAgent] Get positions failed:', error.message);
-      return {
+      // Honest "not connected" — don't present 0 equity as live truth (#1230).
+      return this._staleOr(cacheKey, {
         positions: [],
-        account: { equity: 0, cash: 0, buying_power: 0 }
-      };
+        account: { equity: 0, cash: 0, buying_power: 0 },
+        available: false,
+        reason: this._shortReason(error),
+      });
     }
   }
 
@@ -269,7 +280,7 @@ class TraderAgent {
       const result = await this._callPython('get_bars', {
         ticker,
         timeframe
-      });
+      }, this.fastTimeout);
 
       this.cache[cacheKey] = {
         data: result,
@@ -279,7 +290,7 @@ class TraderAgent {
       return result;
     } catch (error) {
       console.error(`[TraderAgent] Get bars ${ticker} failed:`, error.message);
-      return { bars: [], ticker, timeframe, error: error.message };
+      return this._staleOr(cacheKey, { bars: [], ticker, timeframe, available: false, reason: this._shortReason(error) });
     }
   }
 
@@ -309,7 +320,7 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_bars_multi', { tickers, timeframe });
+      const result = await this._callPython('get_bars_multi', { tickers, timeframe }, this.fastTimeout);
 
       this.cache[cacheKey] = {
         data: result,
@@ -319,7 +330,7 @@ class TraderAgent {
       return result;
     } catch (error) {
       console.error('[TraderAgent] Get bars multi failed:', error.message);
-      return { bars: {}, timeframe, error: error.message };
+      return this._staleOr(cacheKey, { bars: {}, timeframe, available: false, reason: this._shortReason(error) });
     }
   }
 
@@ -338,6 +349,31 @@ class TraderAgent {
    * @param {object} args - Arguments to pass to the function
    * @returns {Promise<object>} Parsed JSON response from Python
    */
+  // Collapse a multi-line Python traceback into a single short reason so an
+  // endpoint never returns a raw traceback in its body (#1226). Prefer the last
+  // non-empty stderr line (the actual exception), strip our own wrapper noise.
+  _shortReason(error) {
+    let msg = (error && error.message) || String(error || 'unavailable');
+    msg = msg.replace(/^Python error \([^)]*\):\s*/, '');
+    const lines = msg.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const last = lines.length ? lines[lines.length - 1] : msg;
+    return last.slice(0, 160);
+  }
+
+  // Return the last successfully-cached value for a key (even if past its
+  // freshness window), tagged stale, so a transient provider failure degrades to
+  // last-good data instead of blanking the UI (#1227/#1230). Falls back otherwise.
+  _staleOr(cacheKey, fallback) {
+    const c = this.cache[cacheKey];
+    if (c && c.data != null) {
+      const age = Date.now() - c.time;
+      if (Array.isArray(c.data)) return c.data;
+      if (typeof c.data === 'object') return { ...c.data, stale: true, stale_age_ms: age };
+      return c.data;
+    }
+    return fallback;
+  }
+
   _callPython(action, args, timeoutMs) {
     return new Promise((resolve, reject) => {
       this._pyQueue.push({ action, args, timeoutMs, resolve, reject });

@@ -166,7 +166,17 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       return sendJson(res, { zones: {}, error: 'TraderAgent not initialized' }, 503);
     }
     try {
-      const scan = await traderAgent.scanMarket();
+      // Never block a page GET on a fresh 90s market scan (#1227). Serve the
+      // last-good cached scan instantly; warm/refresh the cache in the background.
+      // Cold cache → honest "not ready" now; data appears on a later poll.
+      const cacheEntry = traderAgent.cache && traderAgent.cache['market_scan'];
+      if (!cacheEntry || !cacheEntry.data) {
+        traderAgent.scanMarket().catch(() => {}); // background warm
+        return sendJson(res, { zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }, 200);
+      }
+      const scanFresh = (Date.now() - cacheEntry.time) < traderAgent.cacheExpiry;
+      if (!scanFresh) traderAgent.scanMarket().catch(() => {}); // refresh in background, serve stale now
+      const scan = cacheEntry.data;
       const signals = Array.isArray(scan.signals) ? scan.signals : [];
       if (!scan.error) {
         const logEntries = [
