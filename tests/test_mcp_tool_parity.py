@@ -22,10 +22,8 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
     monkeypatch.setenv("CHAT_TOOL_EXEC", "1")
     manifest = shared_tool_bridge.load_manifest()
     names = [tool["name"] for tool in manifest["tools"]]
-    assert names == [
-        "Read", "LS", "Glob", "Grep", "Bash", "PowerShell",
-        "Write", "Edit", "web_search", "web_fetch",
-    ]
+    expected_tools = [
+        "Read",
     assert all(tool["surface_availability"] == {"dream_chat": True, "mcp": True}
                for tool in manifest["tools"])
 
