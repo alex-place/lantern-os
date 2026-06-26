@@ -178,16 +178,19 @@ function markAssigned(repoRoot, issue) {
   } catch (_e) { /* best-effort */ }
 }
 
-// One-PR-per-lane guard: autonomous-work opens PRs on the claude/ lane. If that
-// lane already has an open PR, a new run would be blocked by the monoworkstream
-// rule, so pause this tick instead of wasting a 20-min run.
-function claudeLaneOccupied(repoRoot) {
+// One-PR-per-lane guard: autonomous-work opens PRs on the **auto/** lane
+// (autowork-worktree creates `auto/issue-*` branches; openDraftPr requires the
+// `auto/` prefix). The guard must check the AUTO lane, not claude — checking
+// `claude` was a bug: that lane is constantly occupied by other claude work
+// (automation, agents, manual PRs), so the fleet was perpetually false-paused
+// while its own `auto/` lane sat empty and it never dispatched.
+function autoLaneOccupied(repoRoot) {
   try {
     const queue = require("../routes/queue");
     if (typeof queue.loadPrLanes !== "function") return false;
     const data = queue.loadPrLanes(repoRoot);
     if (!data || !Array.isArray(data.lanes)) return false;
-    const lane = data.lanes.find((l) => l.prefix === "claude");
+    const lane = data.lanes.find((l) => l.prefix === "auto");
     return !!(lane && lane.pr);
   } catch { return false; }
 }
@@ -203,10 +206,10 @@ async function tick(ctx) {
     log("[auto-dispatch] paused — cloud is unreachable (chat degraded to local); retrying next tick");
     return;
   }
-  if (claudeLaneOccupied(ctx.repoRoot)) {
-    status.pauseReason = "claude lane already has an open PR (one PR per lane)";
+  if (autoLaneOccupied(ctx.repoRoot)) {
+    status.pauseReason = "the fleet's auto/ lane already has an open PR (one PR per lane)";
     saveState();
-    log("[auto-dispatch] paused — claude lane already has an open PR (one PR per lane); retrying next tick");
+    log("[auto-dispatch] paused — auto/ lane already has an open PR (one PR per lane); retrying next tick");
     return;
   }
   const issue = pickTopIssue(ctx.repoRoot);
