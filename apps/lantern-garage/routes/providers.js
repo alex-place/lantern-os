@@ -58,14 +58,46 @@ const PROVIDER_CONFIGS = {
   xai: { key: "XAI_API_KEY", model: "grok-3-mini" },
 };
 
-function _readWindowsUserEnv(key) {
+// Snapshot, at module load (server boot, before any request can lazily hydrate),
+// which provider keys the process ACTUALLY started with. This is the dispatch
+// baseline: the dispatcher reads process.env, so a key absent here was invisible
+// to early requests no matter what a later status check pulls in. Surfacing this
+// (vs. silently hydrating then reporting "connected") is the #1233 honesty fix.
+const _envAtStartup = {};
+for (const k of PROVIDER_KEY_ALLOWLIST) _envAtStartup[k] = !!process.env[k];
+
+// Probe the OS registry for ALL allowlisted keys in ONE PowerShell call (per-key
+// spawns were ~20 serial processes — slow enough to hang the status endpoint).
+// User scope preferred, then Machine — Start-DualServers.ps1 hydrates BOTH at
+// boot, so the lazy fallback must check both or a Machine-only key never loads
+// (a root cause of #1233). Snapshot cached with a TTL.
+const _REG_TTL_MS = 60_000;
+let _registrySnapshot = null;
+let _registryAt = 0;
+function _loadRegistrySnapshot() {
+  if (_registrySnapshot && Date.now() - _registryAt < _REG_TTL_MS) return _registrySnapshot;
+  const list = PROVIDER_KEY_ALLOWLIST.map((k) => `'${k}'`).join(",");
+  const ps = `$o=@{}; foreach($k in @(${list})){ $o[$k]=@{User=[Environment]::GetEnvironmentVariable($k,'User'); Machine=[Environment]::GetEnvironmentVariable($k,'Machine')} }; $o | ConvertTo-Json -Compress`;
+  const snap = {};
   try {
-    const val = execFileSync("powershell", [
-      "-NonInteractive", "-Command",
-      `[System.Environment]::GetEnvironmentVariable('${key}', 'User')`,
-    ], { timeout: 5_000, encoding: "utf8" }).trim();
-    return val || "";
-  } catch { return ""; }
+    const out = execFileSync("powershell", ["-NonInteractive", "-Command", ps], { timeout: 8_000, encoding: "utf8" });
+    const parsed = JSON.parse(out);
+    for (const k of PROVIDER_KEY_ALLOWLIST) {
+      const e = parsed[k] || {};
+      const u = (e.User || "").trim();
+      const m = (e.Machine || "").trim();
+      const value = u || m;
+      snap[k] = { present: !!value, scope: u ? "User" : (m ? "Machine" : null), value };
+    }
+  } catch {
+    for (const k of PROVIDER_KEY_ALLOWLIST) snap[k] = { present: false, scope: null, value: "" };
+  }
+  _registrySnapshot = snap;
+  _registryAt = Date.now();
+  return snap;
+}
+function _probeRegistry(key) {
+  return _loadRegistrySnapshot()[key] || { present: false, scope: null, value: "" };
 }
 
 let _keysSynced = false;
@@ -74,8 +106,8 @@ function _syncUserEnvKeys() {
   _keysSynced = true;
   for (const k of PROVIDER_KEY_ALLOWLIST) {
     if (!process.env[k]) {
-      const val = _readWindowsUserEnv(k);
-      if (val) process.env[k] = val;
+      const reg = _probeRegistry(k);
+      if (reg.value) process.env[k] = reg.value;
     }
   }
 }
@@ -130,17 +162,44 @@ module.exports = async function providerRoutes(req, res, url, deps) {
   if (req.method === "GET" && url.pathname === "/api/providers/status") {
     const providers = {};
     const chainsByType = {};
+    const warnings = [];
 
     for (const [provider, cfg] of Object.entries(PROVIDER_CONFIGS)) {
-      const keyVal = cfg.key ? process.env[cfg.key] : null;
-      const hasKeyVal = !!keyVal;
-
+      if (!cfg.key) { // ollama / keyless
+        providers[provider] = {
+          hasKey: false, available: true, model: cfg.model,
+          inProcessEnv: false, startedWithKey: false, inRegistry: false,
+          registryScope: null, mismatch: false, lastCheck: new Date().toISOString(),
+        };
+        continue;
+      }
+      // process.env is the DISPATCH SOURCE OF TRUTH. startedWithKey is what the
+      // process booted with; inRegistry is what the OS has. A key in the registry
+      // the process did NOT start with = the #1233 mismatch (early dispatch sees
+      // nothing even though the UI would otherwise say "connected").
+      const inProcessEnv = !!process.env[cfg.key];
+      const startedWithKey = !!_envAtStartup[cfg.key];
+      const reg = _probeRegistry(cfg.key);
+      const mismatch = reg.present && !startedWithKey;
       providers[provider] = {
-        hasKey: hasKeyVal,
-        available: hasKeyVal || provider === "ollama",
+        hasKey: inProcessEnv,                 // back-compat: reflects process.env
+        available: inProcessEnv,              // dispatch-ready only if the process can see the key
         model: cfg.model,
+        inProcessEnv,
+        startedWithKey,
+        inRegistry: reg.present,
+        registryScope: reg.scope,
+        mismatch,
         lastCheck: new Date().toISOString(),
       };
+      if (mismatch) {
+        warnings.push({
+          provider, key: cfg.key, registryScope: reg.scope, hydratedAtRuntime: inProcessEnv,
+          message: `${cfg.key} is set in ${reg.scope || "OS"} env but the running process did not start with it`
+            + (inProcessEnv ? " (hydrated on-demand; early requests before this check may have failed)."
+                            : " — the dispatcher will report \"all providers failed\". Restart via Start-DualServers.ps1 to hydrate at boot."),
+        });
+      }
     }
 
     for (const [taskType, chain] of Object.entries(PROVIDER_CHAINS)) {
@@ -157,7 +216,8 @@ module.exports = async function providerRoutes(req, res, url, deps) {
     sendJson(res, {
       providers,
       chains: chainsByType,
-      summary: { available, hasKeys, total: Object.keys(providers).length },
+      warnings,
+      summary: { available, hasKeys, total: Object.keys(providers).length, envConsistent: warnings.length === 0 },
     });
     return true;
   }
@@ -234,11 +294,18 @@ module.exports = async function providerRoutes(req, res, url, deps) {
 
   // ── GET /api/providers/keys ────────────────────────────────────────────
   if (req.method === "GET" && url.pathname === "/api/providers/keys") {
-    const keys = PROVIDER_KEY_ALLOWLIST.map(k => ({
-      env: k,
-      set: !!process.env[k],
-      masked: process.env[k] ? maskValue(process.env[k]) : null,
-    }));
+    const keys = PROVIDER_KEY_ALLOWLIST.map(k => {
+      const reg = _probeRegistry(k);
+      return {
+        env: k,
+        set: !!process.env[k],            // dispatch source of truth (process.env)
+        startedWith: !!_envAtStartup[k],  // booted with it?
+        inRegistry: reg.present,          // present in User/Machine env?
+        registryScope: reg.scope,
+        mismatch: reg.present && !_envAtStartup[k],
+        masked: process.env[k] ? maskValue(process.env[k]) : null,
+      };
+    });
     sendJson(res, { keys });
     return true;
   }
