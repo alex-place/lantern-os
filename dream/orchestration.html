@@ -102,6 +102,12 @@
     .tbadge-queued { background: color-mix(in srgb, #60a5fa 15%, transparent); color: #60a5fa; }
     .tbadge-running { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
     .tbadge-failed { background: color-mix(in srgb, #f87171 15%, transparent); color: #f87171; }
+    .tbadge-idle { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .tbadge-untested { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
+    .tbadge-done { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+    .train-updated { font-size: 0.66rem; color: var(--muted); }
+    .train-live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--green); margin-right:5px; animation: livePulse 1.6s ease-in-out infinite; vertical-align:middle; }
+    @keyframes livePulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
     .train-dispatch-btn {
       font-size: 0.74rem; font-weight: 700; padding: 5px 12px; border-radius: 7px;
       border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; white-space: nowrap;
@@ -478,6 +484,7 @@
     } catch { return null; }
   }
   function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
+  function setHtml(id, val) { const el = $(id); if (el) el.innerHTML = val; }
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -651,7 +658,12 @@
 
     const { providers = [], recentJobs = [] } = data;
     const automatable = providers.filter(p => p.automatable && p.quota_hours_per_week > 0).length;
-    setText("trainSummary", `${automatable} provider${automatable !== 1 ? "s" : ""} ready to auto-dispatch`);
+    const running = recentJobs.filter(j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued")).length;
+    const liveDot = running ? '<span class="train-live-dot"></span>' : "";
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setHtml("trainSummary", `${liveDot}${automatable} provider${automatable !== 1 ? "s" : ""} ready to auto-dispatch`
+      + (running ? ` · ${running} running` : "")
+      + ` <span class="train-updated">· updated ${now}</span>`);
 
     $("trainProviders").innerHTML = providers.map(p => {
       const icon = PROVIDER_ICONS[p.provider_id] || "🖥️";
@@ -661,14 +673,23 @@
       const quota = p.quota_hours_per_week > 0 ? `${p.quota_hours_per_week}h/wk` : "no free quota";
 
       const recent = recentJobs.find(j => j.provider === p.provider_id && j.type === "training_dispatch");
+      // Every provider gets a meaningful status — never blank. Active job > provider standing.
       let statusBadge = "", rowCls = p.automatable ? "auto" : "";
-      if (recent) {
-        const st = recent.status;
-        const cls = st === "running" ? "tbadge-running" : st === "queued" ? "tbadge-queued" : st === "failed" ? "tbadge-failed" : "";
-        const label = st === "failed" ? "error" : st;
-        if (cls) statusBadge = `<span class="train-badge ${cls}">${label}</span>`;
+      const st = recent && recent.status;
+      if (st === "running" || st === "queued") {
+        statusBadge = `<span class="train-badge ${st === "running" ? "tbadge-running" : "tbadge-queued"}">${st}</span>`;
         if (st === "running") rowCls = "running";
-        else if (st === "failed") rowCls = "failed";
+      } else if (st === "failed") {
+        statusBadge = `<span class="train-badge tbadge-failed">error · ${relTime(recent.polledAt || recent.dispatchedAt)}</span>`;
+        rowCls = "failed";
+      } else if (st === "done") {
+        statusBadge = `<span class="train-badge tbadge-done">done · ${relTime(recent.polledAt || recent.dispatchedAt)}</span>`;
+      } else if (p.state === "exhausted") {
+        statusBadge = `<span class="train-badge tbadge-failed">quota used</span>`;
+      } else if (p.last_dispatch_at) {
+        statusBadge = `<span class="train-badge tbadge-idle">idle · ${relTime(p.last_dispatch_at)}</span>`;
+      } else {
+        statusBadge = `<span class="train-badge tbadge-untested">not tested yet</span>`;
       }
 
       const canDispatch = p.quota_hours_per_week > 0 || p.provider_id === "paperspace";
@@ -758,9 +779,9 @@
   };
 
   // Poll all running jobs
-  window.gpuPollAll = async function() {
+  window.gpuPollAll = async function({ silent = false } = {}) {
     const btn = $("gpuPollBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Polling…"; }
+    if (btn && !silent) { btn.disabled = true; btn.textContent = "Polling…"; }
     try {
       const data = await fetchJson("/api/gpu-training/status");
       const seen = new Set();
@@ -781,9 +802,19 @@
       }
       await renderTrainingSection();
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll running jobs"; }
+      if (btn && !silent) { btn.disabled = false; btn.textContent = "↻ Poll running jobs"; }
     }
   };
+
+  // Live tick: when jobs are running, auto-poll them so the panel updates itself;
+  // otherwise just refresh status. Skips hidden tabs to avoid needless polling.
+  async function gpuTick() {
+    if (document.hidden) return;
+    const running = (_cache.gpuData?.recentJobs || []).some(
+      j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued"));
+    if (running) await gpuPollAll({ silent: true });
+    else await renderTrainingSection();
+  }
 
   // ── AI Provider Keys (editable) ───────────────────────────────────────────
   const LLM_PROVIDERS = [
@@ -1465,7 +1496,7 @@
     setInterval(refreshWorkBoard, 20000);
     setInterval(renderRepoLearn, 60000);
     setInterval(renderLocalModel, 30000);
-    setInterval(renderTrainingSection, 30000);
+    setInterval(gpuTick, 12000);
     setInterval(refreshProviderStatus, 60000);
     setInterval(updateStatus, 15000);
   });
