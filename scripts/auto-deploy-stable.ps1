@@ -129,7 +129,21 @@ try {
   $local  = (& git -C $STABLE rev-parse HEAD).Trim()
   $remote = (& git -C $STABLE rev-parse origin/master).Trim()
 
-  if (($local -eq $remote) -and -not $Force) { Log "up-to-date ($($local.Substring(0,8)))"; exit 0 }
+  if (($local -eq $remote) -and -not $Force) {
+    # Self-heal (2026-06-26): code is current, but if the server has DIED, restart it
+    # instead of logging "up-to-date" and leaving 4177 down. Previously a crashed-but-
+    # current server only recovered when the NEXT commit landed (the gap that left
+    # lantern-os.net down until a manual -Force). ServerPid/StartServer/HealthOk are
+    # defined above; we're inside the single-instance lock so there is no double-start.
+    if (-not (ServerPid)) {
+      Log "up-to-date ($($local.Substring(0,8))) but server NOT running -> self-heal restart"
+      StartServer
+      if (HealthOk) { Log "self-heal: server restarted OK on $PORT" } else { Log "self-heal FAILED: server still down on $PORT -- MANUAL ATTENTION" }
+    } else {
+      Log "up-to-date ($($local.Substring(0,8)))"
+    }
+    exit 0
+  }
 
   Log "deploy: $($local.Substring(0,8)) -> $($remote.Substring(0,8))"
 
