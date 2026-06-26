@@ -1,12 +1,12 @@
 /**
- * Model leaderboard routing (PCSF-preferred).
+ * Generalized PCSF leaderboard for multi-domain ranking.
  *
- * Makes the local Ollama model chain LEADERBOARD-DRIVEN instead of static:
- * the best-performing model for a task (by agent-performance compositeScore)
- * is tried first, so the local coder (OLLAMA_MODEL, default ouro:latest — the
- * Σ₀ Ouro looped coder served by ouro_serve.py on :11434) rises to the top of
- * "work / units / tasks" as it proves itself. Falls back to the static chain
- * when there's no signal yet.
+ * Supports multi-key candidate selection, time-decay outcome weighting, and
+ * domain-scoped (per-user/per-domain) leaderboard namespacing. Shared core
+ * used by feed exploration and model routing to rank candidates consistently.
+ *
+ * Domains: "feed" (explore-feed.js), "model-routing" (provider-routing.js).
+ * Each domain can configure its own cold-start priors and candidate sets.
  */
 
 const { getTopAgentsForTask, recordAgentCallFromConvergenceReceipt } = require("./agent-performance");
@@ -15,8 +15,90 @@ const { getTopAgentsForTask, recordAgentCallFromConvergenceReceipt } = require("
 // looped coder (ouro:latest on :11434). The legacy Qwen `lantern-sigma0-coder-v2`
 // is DEPRECATED (Ollama sunset #811/#823); ouro_serve still accepts that name for
 // back-compat, but new routing prefers ouro:latest. Override with OLLAMA_MODEL.
+
+/**
+ * Domain-scoped leaderboard state: {[domain]: {[scope]: {[key]: {score, decay, outcomes}}}}.
+ * domain = "feed" or "model-routing" (or custom).
+ * scope = per-user/per-domain namespace (e.g., userId, feedId, or "global").
+ * key = candidate identifier (model name, provider name, or custom key).
+ * Enables feed and routing to maintain separate rankings while sharing core logic.
+ */
+const domainLeaderboards = {};
+
+/**
+ * Initialize or get a domain leaderboard scope.
+ */
+function getDomainScope(domain, scope = "global") {
+  if (!domainLeaderboards[domain]) domainLeaderboards[domain] = {};
+  if (!domainLeaderboards[domain][scope]) domainLeaderboards[domain][scope] = {};
+  return domainLeaderboards[domain][scope];
+}
+
+/**
+ * Clear a domain scope (for testing or reset).
+ */
+function clearDomainScope(domain, scope = "global") {
+  if (domainLeaderboards[domain]) delete domainLeaderboards[domain][scope];
+}
+
 function preferredLocalModel() {
   return process.env.OLLAMA_MODEL || "ouro:latest";
+}
+
+/**
+ * Record an outcome with optional time-decay weighting.
+ * domain = "feed" or "model-routing" (or custom).
+ * scope = per-user/per-domain namespace (e.g., userId, feedId, or "global").
+ * key = candidate identifier.
+ * success = boolean outcome.
+ * latencyMs, costUsd = optional metrics for compositeScore.
+ * decayFactor = time-decay multiplier (0..1, default 1.0 = no decay).
+ */
+function recordOutcomeWithDecay(domain, scope, key, success, latencyMs = 0, costUsd = 0, decayFactor = 1.0) {
+  const domainScope = getDomainScope(domain, scope);
+  if (!domainScope[key]) {
+    domainScope[key] = { score: 0, decay: 1.0, outcomes: [] };
+  }
+  const entry = domainScope[key];
+  entry.outcomes.push({ success, latencyMs, costUsd, timestamp: Date.now() });
+  entry.decay = Math.max(0, Math.min(1, entry.decay * decayFactor));
+  // Recompute score: success count weighted by decay, minus cost.
+  const successes = entry.outcomes.filter((o) => o.success).length;
+  const totalCost = entry.outcomes.reduce((sum, o) => sum + (o.costUsd || 0), 0);
+  entry.score = Math.max(0, (successes * entry.decay) - (totalCost * 0.1));
+  return entry;
+}
+
+/**
+ * Rank candidates by domain-scoped leaderboard score.
+ * candidates = [{key, ...}, ...] or [{provider, model, key?}, ...].
+ * domain = "feed" or "model-routing".
+ * scope = per-user/per-domain namespace.
+ * opts = {coldStart, cloudSet, taskType} for cold-start priors and filtering.
+ * Returns candidates sorted best-first with {score, scored, decay} annotated.
+ */
+async function rankCandidatesByDomain(candidates, domain, scope = "global", opts = {}) {
+  const { coldStart = 0.5, cloudSet = null, taskType = "default" } = opts;
+  const domainScope = getDomainScope(domain, scope);
+
+  // Also check agent-performance leaderboard for fallback/bootstrap.
+  let agentScores = {};
+  try {
+    const ranked = await getTopAgentsForTask(taskType, 30, 1);
+    for (const r of ranked) agentScores[r.agentId] = r.compositeScore;
+  } catch { /* no signal */ }
+
+  return (Array.isArray(candidates) ? candidates : [])
+    .map((c, i) => {
+      const key = c.key || c.model || c.provider || String(c);
+      const domainEntry = domainScope[key];
+      const agentScore = agentScores[key];
+      const has = domainEntry || agentScore != null;
+      const score = domainEntry ? domainEntry.score : (agentScore != null ? agentScore : coldStart);
+      const decay = domainEntry ? domainEntry.decay : 1.0;
+      return { ...c, key, score, decay, scored: has, _i: i };
+    })
+    .sort((a, b) => (b.score - a.score) || (a._i - b._i));
 }
 
 /**
@@ -33,26 +115,14 @@ async function orderChainByLeaderboard(staticChain, taskType) {
   const workish = ["coding", "reasoning", "default", "repo", "task"].some((t) => String(taskType || "").includes(t));
   if (workish && !chain.includes(pref)) chain.unshift(pref);
 
-  let ranked = [];
-  try {
-    ranked = await getTopAgentsForTask(taskType, 7, 10); // [{agentId, compositeScore,...}]
-  } catch { /* no signal yet — keep static order */ }
-
-  if (!ranked.length) return chain;
-
-  const score = {};
-  for (const r of ranked) score[r.agentId] = r.compositeScore;
-
-  // Stable sort: leaderboard-scored models first (desc), unscored keep position.
-  return chain
-    .map((m, i) => ({ m, i, s: score[m] }))
-    .sort((a, b) => {
-      if (a.s != null && b.s != null) return b.s - a.s;
-      if (a.s != null) return -1;
-      if (b.s != null) return 1;
-      return a.i - b.i;
-    })
-    .map((x) => x.m);
+  // Use model-routing domain with global scope for backward compatibility.
+  const ranked = await rankCandidatesByDomain(
+    chain.map((m) => ({ key: m })),
+    "model-routing",
+    "global",
+    { taskType }
+  );
+  return ranked.map((r) => r.key);
 }
 
 /**
@@ -63,6 +133,9 @@ async function orderChainByLeaderboard(staticChain, taskType) {
  */
 function recordModelOutcome(model, taskType, success, latencyMs, costUsd = 0) {
   try {
+    // Record to domain leaderboard (model-routing, global scope).
+    recordOutcomeWithDecay("model-routing", "global", model, success, latencyMs, costUsd, 1.0);
+    // Also record to agent-performance for backward compatibility.
     return recordAgentCallFromConvergenceReceipt(
       { source: "chat", model },
       model,                      // agentId = the model/provider name
@@ -86,18 +159,30 @@ function recordModelOutcome(model, taskType, success, latencyMs, costUsd = 0) {
  */
 async function rankCandidates(candidates, taskType, opts = {}) {
   const { coldCloud = 0.6, coldLocal = 0.5, cloudSet = null } = opts;
-  let ranked = [];
-  try { ranked = await getTopAgentsForTask(taskType, 30, 1); } catch { /* no signal */ }
-  const score = {};
-  for (const r of ranked) score[r.agentId] = r.compositeScore;
-  const isCloud = (p) => (cloudSet ? cloudSet.has(String(p).toLowerCase()) : false);
-  return (Array.isArray(candidates) ? candidates : [])
-    .map((c, i) => {
-      const key = c.key || c.model || c.provider;
-      const has = score[key] != null;
-      return { ...c, key, score: has ? score[key] : (isCloud(c.provider) ? coldCloud : coldLocal), scored: has, _i: i };
-    })
-    .sort((a, b) => (b.score - a.score) || (a._i - b._i));
+  // Delegate to domain-scoped ranking with model-routing domain, global scope.
+  const ranked = await rankCandidatesByDomain(candidates, "model-routing", "global", {
+    coldStart: coldLocal,
+    cloudSet,
+    taskType,
+  });
+  // Adjust cold-start for cloud if cloudSet provided.
+  if (cloudSet) {
+    for (const r of ranked) {
+      if (!r.scored && cloudSet.has(String(r.provider).toLowerCase())) {
+        r.score = coldCloud;
+      }
+    }
+  }
+  return ranked;
 }
 
-module.exports = { orderChainByLeaderboard, recordModelOutcome, preferredLocalModel, rankCandidates };
+module.exports = {
+  orderChainByLeaderboard,
+  recordModelOutcome,
+  preferredLocalModel,
+  rankCandidates,
+  rankCandidatesByDomain,
+  recordOutcomeWithDecay,
+  getDomainScope,
+  clearDomainScope,
+};
