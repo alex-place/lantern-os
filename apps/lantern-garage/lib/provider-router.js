@@ -58,8 +58,12 @@ const PROVIDER_CHAINS = {
     { provider: "anthropic", models: ["claude-opus-4-8"] },
   ],
 
+  // Local model order here is the coarse fallback; lib/local-model-registry.js is
+  // the source of truth for which LOCAL model leads (VRAM-gated, Ouro-default /
+  // capability-first aware — see docs/SIGMA0-MODEL-ADAPTER.md). Ouro leads by
+  // decision (2026-06-26); Qwen is the opt-in capability lever behind it.
   coding: [
-    { provider: "ollama", models: ["qwen2.5-coder", "deepseek"] },
+    { provider: "ollama", models: ["ouro:latest", "qwen2.5-coder"] },
     { provider: "mistral", models: ["mistral-large-latest"] },
     { provider: "anthropic", models: ["claude-opus-4-8", "claude-sonnet-4-6"] },
     { provider: "openai", models: ["gpt-4-turbo", "gpt-4o-mini"] },

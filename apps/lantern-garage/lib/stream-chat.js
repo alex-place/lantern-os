@@ -1347,6 +1347,18 @@ async function handleStreamChat(req, url, res) {
     const cleaned = staticChain.filter((m) => m !== "lantern-csf-dream");
     if (cleaned.length) staticChain = cleaned;
   }
+  // Σ₀ local-model adapter (lib/local-model-registry.js): the registry is the
+  // source of truth for which LOCAL model LEADS this intent — VRAM-gated to the
+  // box and Ouro-default / capability-first aware. Its picks lead; any remaining
+  // static-chain models stay as fallbacks. Falls back to the static chain on any
+  // error so this is purely additive. See docs/SIGMA0-MODEL-ADAPTER.md.
+  try {
+    const regChain = require("./local-model-registry").selectChain(intent);
+    if (regChain && regChain.length) {
+      const lead = new Set(regChain);
+      staticChain = [...regChain, ...staticChain.filter((m) => !lead.has(m))];
+    }
+  } catch (_e) { /* keep static chain */ }
   let modelChain = staticChain;
   try { modelChain = await orderChainByLeaderboard(staticChain, intent); } catch { /* keep static */ }
   // Lead with the operator-pinned served model (OLLAMA_MODEL) when set, so the chat
@@ -1393,8 +1405,16 @@ async function handleStreamChat(req, url, res) {
   // Opt-in via LOOP_REASONER=1; applies to reasoning/coding intents. Emits
   // loop_n/confidence/exit_reason for the "Ouro Σ₀ CDF exit" panel the UI reads.
   // Falls through to normal streaming on any error.
+  // Σ₀ adapter: only wrap NON-self-converging local models in the API-level loop.
+  // Ouro (selfConverges=true) Q-exits INTERNALLY — wrapping it would double-loop;
+  // Qwen (selfConverges=false) is single-pass, so the loop is what makes it
+  // Σ₀-compliant (verify-gated convergence). Unknown models → false → wrapped
+  // (grounding by default). See lib/local-model-registry.js.
+  let _leadSelfConverges = false;
+  try { _leadSelfConverges = require("./local-model-registry").selfConverges(modelChain[0]); } catch (_e) {}
   if (process.env.LOOP_REASONER === "1" && !isKeystoneDebug && !isRpMode && !requestedProvider
-      && (intent === "coding" || intent === "reasoning")) {
+      && (intent === "coding" || intent === "reasoning")
+      && !_leadSelfConverges) {
     try {
       const http = require("http");
       const { loopedReason } = require("./loop-reasoner");
