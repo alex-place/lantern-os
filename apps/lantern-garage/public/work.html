@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .orch-main { max-width: 1100px; width: 100%; margin: 0 auto; padding: clamp(14px, 3vh, 26px) 16px 48px; }
+    .orch-main .panel { gap: 12px; padding: 16px 18px; cursor: default; margin-bottom: 16px; }
+    .orch-main .panel:hover { border-color: var(--border); background: var(--surface); transform: none; box-shadow: var(--shadow); }
+    .orch-main .panel > * { width: 100%; }
+    .panel h2 { margin: 0; font-size: 0.98rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 10px; flex-wrap: wrap; }
+    .panel-sub { font-size: 0.78rem; color: var(--muted); margin: -2px 0 8px; line-height: 1.5; }
+    .section-meta { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+    .btn-secondary {
+      width: auto !important; padding: 7px 13px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
+    .placeholder { color: var(--muted); font-size: 0.82rem; }
+
+    .research-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto auto; gap: 8px; align-items: center; }
+    .research-controls input, .research-controls select {
+      min-width: 0; padding: 8px 10px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg); color: var(--text); font-size: 0.8rem;
+    }
+    .research-list { display: flex; flex-direction: column; gap: 8px; }
+    .research-item { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 9px; }
+    .research-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+    .research-title { flex: 1 1 300px; font-size: 0.86rem; font-weight: 650; line-height: 1.4; }
+    .research-badge { padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--accent); font-size: 0.68rem; font-weight: 800; }
+    .research-meta { margin: 6px 0 9px; color: var(--muted); font-size: 0.72rem; }
+    .research-labels { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+    .research-label { padding: 1px 6px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); }
+    .research-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .research-action { padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 0.72rem; font-weight: 650; text-decoration: none; cursor: pointer; }
+    .research-action:hover { border-color: var(--accent); color: var(--accent); }
+    .research-action.primary { border-color: var(--accent); color: var(--accent); }
+    .research-action.delegate { border-color: #a855f7; color: #a855f7; }
+    .research-action.delegate:hover { background: color-mix(in srgb, #a855f7 12%, transparent); }
+    .research-state { padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.8rem; }
+    .research-state.error { border-color: #f87171; color: #f87171; }
+    @media (max-width: 720px) { .research-controls { grid-template-columns: 1fr 1fr; } .research-controls input { grid-column: 1 / -1; } }
+
+    /* Recently landed */
+    .landed-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; margin-bottom: 6px; }
+    .landed-title { font-size: 0.82rem; line-height: 1.35; }
+    .landed-title a { color: var(--text); text-decoration: none; }
+    .landed-title a:hover { color: var(--accent); text-decoration: underline; }
+    .landed-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+    .lane-chip { font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; }
+
+    /* Fleet delegation log */
+    .fleet-log { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; }
+    .fleet-step { display: grid; grid-template-columns: 18px 150px 1fr; align-items: baseline; gap: 8px; padding: 5px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; }
+    .fleet-step .fs-icon { text-align: center; }
+    .fleet-step .fs-phase { font-weight: 650; }
+    .fleet-step .fs-detail { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; }
+    .fleet-step.err { border-color: #f87171; }
+    .fleet-step.done-ok { border-left: 3px solid var(--green); }
+    .fleet-final { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-size: 0.82rem; }
+  </style>
+  <title>Work — Keystone OS</title>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">Keystone OS</span>
+  </a>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/trader-dashboard.html">Trader</a>
+    <a href="/operations.html">Ops Hub</a>
+    <a href="/orchestration.html">Orchestration</a>
+    <a href="/work.html" class="active">Work</a>
+    <a href="/explore.html">Explore</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
+  </div>
+</nav>
+
+<main class="orch-main" id="main-content">
+
+  <div style="margin-bottom:14px;">
+    <h1 style="margin:0 0 4px;font-size:1.3rem;">📥 Manual Work</h1>
+    <p class="panel-sub" style="margin:0;">Choose work deliberately. Pick an open issue, research it in Keystone Chat, copy a bounded coding-agent handoff, or hand it to the fleet. Nothing here is auto-dispatched — that's the
+      <a href="/orchestration.html" style="color:var(--accent);">Orchestration</a> page.</p>
+  </div>
+
+  <!-- ── Pull Work (manual issue selection) ── -->
+  <section class="panel" id="researchHandoffPanel">
+    <h2>📥 Pull Work <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
+    <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Keystone Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
+    <div class="research-controls">
+      <input id="researchSearch" type="search" placeholder="Search issue, title, or label" aria-label="Search open issues">
+      <select id="researchPriority" aria-label="Filter by priority">
+        <option value="all">All priorities</option>
+        <option value="p0">P0</option>
+        <option value="p1">P1</option>
+        <option value="p2">P2</option>
+        <option value="unlabeled">Unlabeled</option>
+      </select>
+      <select id="researchSort" aria-label="Sort issues">
+        <option value="priority">Priority + updated</option>
+        <option value="updated">Recently updated</option>
+      </select>
+      <button class="btn-secondary" id="researchRefresh" type="button">Refresh</button>
+    </div>
+    <div id="researchQueue" class="research-list"><div class="research-state">Loading open GitHub issues...</div></div>
+  </section>
+
+  <!-- ── Fleet delegation stream (from a Pull Work "Delegate" click) ── -->
+  <section class="panel" id="fleetRunPanel" hidden>
+    <h2>🛰️ Delegation Run <span class="section-meta" id="fleetRunMeta"></span></h2>
+    <p class="panel-sub">Live stream of the autonomous run for the issue you delegated — isolated worktree, draft PR, nothing auto-merged.</p>
+    <div id="fleetRunLog" class="fleet-log"></div>
+  </section>
+
+  <!-- ── Recently Landed (truth of "done") ── -->
+  <section class="panel" id="landedPanel">
+    <h2>✅ Recently Landed <span class="section-meta" id="landedMeta">merged PRs</span>
+      <button class="btn-secondary" onclick="renderLanded()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">What the group has actually shipped — most recent merges first, straight from GitHub. This is the truth of "done."</p>
+    <div id="landedBody"><div class="placeholder">Loading…</div></div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-brand"><span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS</span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/orchestration.html">Orchestration</a>
+    <a href="/work.html">Work</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+</footer>
+
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/orchestration-research.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  async function fetchJson(path, timeoutMs = 6000) {
+    try { const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) }); return r.ok ? await r.json() : null; }
+    catch { return null; }
+  }
+  function relTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso); const s = (Date.now() - d.getTime()) / 1000;
+    if (Number.isNaN(s)) return "";
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  }
+
+  // ── Pull Work (reuses the shared OrchestrationResearch helpers) ──────────────
+  const RESEARCH_HISTORY_KEY = "keystone-research-handoff-history";
+  let _researchItems = [];
+
+  function researchHistory(entry) {
+    try {
+      const current = JSON.parse(localStorage.getItem(RESEARCH_HISTORY_KEY) || "[]");
+      localStorage.setItem(RESEARCH_HISTORY_KEY, JSON.stringify(OrchestrationResearch.appendHistory(current, entry)));
+    } catch { /* local history is optional */ }
+  }
+  function fallbackResearchCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch { /* leave button */ }
+    ta.remove();
+  }
+  function copyResearchText(text, button, entry) {
+    const done = () => { const o = button.textContent; button.textContent = "Copied"; setTimeout(() => { button.textContent = o; }, 1400); researchHistory(entry); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackResearchCopy(text, done));
+    else fallbackResearchCopy(text, done);
+  }
+  function renderResearchQueue() {
+    const queue = $("researchQueue");
+    const visible = OrchestrationResearch.filterAndSort(_researchItems, {
+      query: $("researchSearch")?.value, priority: $("researchPriority")?.value, sort: $("researchSort")?.value,
+    });
+    setText("researchSummary", `${visible.length} of ${_researchItems.length} open, unclaimed issues`);
+    if (!visible.length) { queue.innerHTML = '<div class="research-state">No open issues match these filters.</div>'; return; }
+    queue.innerHTML = visible.map((item) => {
+      const labels = (item.labels || []).map((l) => `<span class="research-label">${escapeHtml(l)}</span>`).join("");
+      const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "unknown";
+      return `<article class="research-item" data-issue="${escapeHtml(item.issueNumber)}">
+        <div class="research-head">
+          <span class="research-badge">${escapeHtml(OrchestrationResearch.priorityLabel(item))}</span>
+          <div class="research-title">#${escapeHtml(item.issueNumber)} ${escapeHtml(item.title)}</div>
+        </div>
+        <div class="research-meta">ready for research · unclaimed · updated ${escapeHtml(updated)}
+          ${labels ? ` · <span class="research-labels">${labels}</span>` : ""}</div>
+        <div class="research-actions">
+          <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
+          <button class="research-action delegate" type="button" data-delegate="${escapeHtml(item.issueNumber)}" title="Hand this issue to the autonomous fleet — isolated worktree, draft PR">🛰️ Delegate to fleet</button>
+          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Keystone Chat</button>
+          <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
+          <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
+        </div>
+      </article>`;
+    }).join("");
+  }
+  async function loadResearchQueue() {
+    const queue = $("researchQueue");
+    queue.innerHTML = '<div class="research-state">Loading open GitHub issues...</div>';
+    try {
+      const response = await fetch("/api/queue/list?status=pending", { cache: "no-store", signal: AbortSignal.timeout(15000) });
+      const data = await response.json();
+      if (!response.ok || data.error) throw new Error(data.message || data.error || `HTTP ${response.status}`);
+      if (data.source !== "github" || !Array.isArray(data.items)) throw new Error("Queue response did not contain the GitHub issue backlog.");
+      _researchItems = data.items;
+      renderResearchQueue();
+    } catch (error) {
+      _researchItems = [];
+      setText("researchSummary", "GitHub queue unavailable");
+      queue.innerHTML = `<div class="research-state error">Could not load open GitHub issues: ${escapeHtml(error.message)}. Verify GitHub CLI authentication on this computer, then choose Refresh.</div>`;
+    }
+  }
+  const findResearchItem = (n) => _researchItems.find((i) => String(i.issueNumber) === String(n));
+  function bindResearchQueue() {
+    ["researchSearch", "researchPriority", "researchSort"].forEach((id) => {
+      $(id)?.addEventListener(id === "researchSearch" ? "input" : "change", renderResearchQueue);
+    });
+    $("researchRefresh")?.addEventListener("click", loadResearchQueue);
+    $("researchQueue")?.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      const n = button.dataset.delegate || button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
+      const item = findResearchItem(n);
+      if (!item) return;
+      if (button.dataset.delegate) { delegateToFleet(item, button); return; }
+      if (button.dataset.research) {
+        const prompt = OrchestrationResearch.buildResearchPrompt(item);
+        researchHistory({ issueNumber: item.issueNumber, target: "keystone-chat", timestamp: new Date().toISOString() });
+        window.open(`/dream-chat.html?seed=${encodeURIComponent(prompt)}`, "_blank", "noopener");
+        return;
+      }
+      const target = button.dataset.copyClaude ? "Claude Code" : "Codex";
+      copyResearchText(OrchestrationResearch.buildHandoff(item, target), button,
+        { issueNumber: item.issueNumber, target: target.toLowerCase().replace(/\s+/g, "-"), timestamp: new Date().toISOString() });
+    });
+  }
+
+  // ── Fleet delegation (live streamed run) ────────────────────────────────────
+  const FLEET_STEP_ICON = { start: "⏳", done: "✓", error: "✗" };
+  function fleetAppendStep(phase, status, extra) {
+    const log = $("fleetRunLog"); if (!log) return;
+    const id = "fstep-" + phase;
+    let row = document.getElementById(id);
+    if (!row) { row = document.createElement("div"); row.id = id; row.className = "fleet-step";
+      row.innerHTML = `<span class="fs-icon"></span><span class="fs-phase"></span><span class="fs-detail"></span>`; log.appendChild(row); }
+    row.classList.toggle("err", status === "error");
+    row.classList.toggle("done-ok", status === "done");
+    row.querySelector(".fs-icon").textContent = FLEET_STEP_ICON[status] || "•";
+    row.querySelector(".fs-phase").textContent = phase.replace(/_/g, " ");
+    const detail = extra.title || extra.error || extra.message || extra.branch || extra.files != null ? JSON.stringify(extra).slice(0, 200) : "";
+    row.querySelector(".fs-detail").textContent = detail;
+    log.scrollTop = log.scrollHeight;
+  }
+  async function delegateToFleet(item, button) {
+    const panel = $("fleetRunPanel"), log = $("fleetRunLog");
+    panel.hidden = false;
+    setText("fleetRunMeta", `#${item.issueNumber} — ${item.title}`.slice(0, 90));
+    log.innerHTML = "";
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    const origLabel = button.textContent;
+    button.disabled = true; button.textContent = "Delegating…";
+    fleetAppendStep("delegate", "start", { issue: item.issueNumber });
+    try {
+      const resp = await fetch("/api/convergence/autonomous-work/stream", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ issue: item.issueNumber }),
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+      const reader = resp.body.getReader(); const decoder = new TextDecoder(); let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const frames = buf.split("\n\n"); buf = frames.pop();
+        for (const frame of frames) {
+          let event = "message", data = "";
+          for (const line of frame.split("\n")) {
+            if (line.startsWith(":")) continue;
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data += line.slice(5).trim();
+          }
+          if (!data) continue;
+          let payload; try { payload = JSON.parse(data); } catch { continue; }
+          if (event === "step") fleetAppendStep(payload.phase, payload.status, payload);
+          else if (event === "error") fleetAppendStep("error", "error", payload);
+          else if (event === "done") {
+            const final = document.createElement("div"); final.className = "fleet-final";
+            if (payload.ok && payload.prUrl) {
+              final.innerHTML = `<span style="color:var(--green);font-weight:700;">✓ Delegated successfully</span> — draft PR opened: <a href="${escapeHtml(payload.prUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.prUrl)}</a>${payload.testsPassed != null ? ` · tests ${payload.testsPassed ? "passed" : "failed"}` : ""}`;
+              loadResearchQueue(); renderLanded();
+            } else {
+              final.innerHTML = `<span style="color:#f87171;font-weight:700;">Run stopped</span> at <b>${escapeHtml(payload.stoppedAt || "unknown")}</b>${payload.message ? ` — ${escapeHtml(payload.message)}` : ""}. Nothing was pushed.`;
+            }
+            log.appendChild(final); log.scrollTop = log.scrollHeight;
+          }
+        }
+      }
+    } catch (e) {
+      const final = document.createElement("div"); final.className = "fleet-final";
+      final.innerHTML = `<span style="color:#f87171;font-weight:700;">Delegation failed:</span> ${escapeHtml(e.message)}`;
+      log.appendChild(final);
+    } finally { button.disabled = false; button.textContent = origLabel; }
+  }
+
+  // ── Recently Landed ─────────────────────────────────────────────────────────
+  async function renderLanded() {
+    const el = $("landedBody");
+    const data = await fetchJson("/api/queue/recent-merges?limit=15", 20000);
+    if (!data || data.error) {
+      if (el) el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
+      setText("landedMeta", "gh unavailable"); return;
+    }
+    setText("landedMeta", `${data.count} recent merge${data.count === 1 ? "" : "s"}`);
+    if (!data.merges.length) { if (el) el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
+    if (el) el.innerHTML = data.merges.map((m) => `<div class="landed-row">
+      <span class="landed-title"><span class="lane-chip">${escapeHtml(m.lane)}</span> <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(m.number))} ${escapeHtml(m.title)}</a></span>
+      <span class="landed-meta">${escapeHtml(m.author)} · ${escapeHtml(relTime(m.mergedAt))}</span>
+    </div>`).join("");
+  }
+  window.renderLanded = renderLanded;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    bindResearchQueue();
+    loadResearchQueue();
+    renderLanded();
+    setInterval(loadResearchQueue, 60000);
+    setInterval(renderLanded, 60000);
+  });
+})();
+</script>
+
+<script src="/js/auth-gate.js" defer></script>
+</body>
+</html>

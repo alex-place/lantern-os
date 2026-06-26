@@ -102,6 +102,12 @@
     .tbadge-queued { background: color-mix(in srgb, #60a5fa 15%, transparent); color: #60a5fa; }
     .tbadge-running { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
     .tbadge-failed { background: color-mix(in srgb, #f87171 15%, transparent); color: #f87171; }
+    .tbadge-idle { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+    .tbadge-untested { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
+    .tbadge-done { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+    .train-updated { font-size: 0.66rem; color: var(--muted); }
+    .train-live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--green); margin-right:5px; animation: livePulse 1.6s ease-in-out infinite; vertical-align:middle; }
+    @keyframes livePulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
     .train-dispatch-btn {
       font-size: 0.74rem; font-weight: 700; padding: 5px 12px; border-radius: 7px;
       border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; white-space: nowrap;
@@ -231,6 +237,7 @@
     <a href="/trader-dashboard.html">Trader</a>
     <a href="/operations.html">Ops Hub</a>
     <a href="/orchestration.html" class="active">Orchestration</a>
+    <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
   </div>
   <div class="nav-actions">
@@ -286,34 +293,11 @@
     <div id="autoPullBody"><div class="placeholder">Loading…</div></div>
   </section>
 
-  <!-- ── Fleet Activity (live delegated runs) ── -->
-  <section class="panel" id="fleetRunPanel" hidden>
-    <h2>🛰️ Fleet Activity <span class="section-meta" id="fleetRunMeta"></span>
-      <button class="btn-secondary" onclick="document.getElementById('fleetRunPanel').hidden=true" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">Dismiss</button>
-    </h2>
-    <p class="panel-sub">Live stream of a delegated autonomous run — the fleet plans, patches, tests in an isolated worktree, then opens a draft PR in that lane. Every step is the real engine event, not a simulation.</p>
-    <div id="fleetRunLog" class="fleet-log"></div>
-  </section>
-
-  <section class="panel" id="researchHandoffPanel">
-    <h2>📥 Pull Work <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
-    <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Keystone Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
-    <div class="research-controls">
-      <input id="researchSearch" type="search" placeholder="Search issue, title, or label" aria-label="Search open issues">
-      <select id="researchPriority" aria-label="Filter by priority">
-        <option value="all">All priorities</option>
-        <option value="p0">P0</option>
-        <option value="p1">P1</option>
-        <option value="p2">P2</option>
-        <option value="unlabeled">Unlabeled</option>
-      </select>
-      <select id="researchSort" aria-label="Sort issues">
-        <option value="priority">Priority + updated</option>
-        <option value="updated">Recently updated</option>
-      </select>
-      <button class="btn-secondary" id="researchRefresh" type="button">Refresh</button>
-    </div>
-    <div id="researchQueue" class="research-list"><div class="research-state">Loading open GitHub issues...</div></div>
+  <!-- ── Pull Work moved to /work.html ── -->
+  <section class="panel" id="pullWorkLink">
+    <h2>📥 Manual Work <span class="section-meta">choose &amp; hand off issues</span></h2>
+    <p class="panel-sub">Picking issues by hand, researching them, copying coding-agent handoffs, and the "Recently Landed" shipped log now live on their own page — so this dashboard stays focused on the autonomous loop above.</p>
+    <a class="btn-secondary" href="/work.html" style="display:inline-block;">📥 Open Work page →</a>
   </section>
 
   <!-- ── Agent Slots (who's working right now) ── -->
@@ -325,14 +309,7 @@
     <div id="agentSlotsBody" class="slot-grid"><div class="placeholder">Loading roster…</div></div>
   </section>
 
-  <!-- ── Recently Landed (what we've shipped, real-time) ── -->
-  <section class="panel" id="landedPanel">
-    <h2>✅ Recently Landed <span class="section-meta" id="landedMeta">merged PRs</span>
-      <button class="btn-secondary" onclick="renderLanded()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">What the group has actually shipped — most recent merges first, straight from GitHub. This is the truth of "done."</p>
-    <div id="landedBody"><div class="placeholder">Loading…</div></div>
-  </section>
+  <!-- Recently Landed moved to /work.html; its count still feeds the Work Board "Landed" stat. -->
 
   <!-- ── Research Team: repo memory (grounds the fleet) ── -->
   <section class="panel" id="repoLearnPanel">
@@ -478,6 +455,7 @@
     } catch { return null; }
   }
   function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
+  function setHtml(id, val) { const el = $(id); if (el) el.innerHTML = val; }
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -651,7 +629,12 @@
 
     const { providers = [], recentJobs = [] } = data;
     const automatable = providers.filter(p => p.automatable && p.quota_hours_per_week > 0).length;
-    setText("trainSummary", `${automatable} provider${automatable !== 1 ? "s" : ""} ready to auto-dispatch`);
+    const running = recentJobs.filter(j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued")).length;
+    const liveDot = running ? '<span class="train-live-dot"></span>' : "";
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setHtml("trainSummary", `${liveDot}${automatable} provider${automatable !== 1 ? "s" : ""} ready to auto-dispatch`
+      + (running ? ` · ${running} running` : "")
+      + ` <span class="train-updated">· updated ${now}</span>`);
 
     $("trainProviders").innerHTML = providers.map(p => {
       const icon = PROVIDER_ICONS[p.provider_id] || "🖥️";
@@ -661,14 +644,23 @@
       const quota = p.quota_hours_per_week > 0 ? `${p.quota_hours_per_week}h/wk` : "no free quota";
 
       const recent = recentJobs.find(j => j.provider === p.provider_id && j.type === "training_dispatch");
+      // Every provider gets a meaningful status — never blank. Active job > provider standing.
       let statusBadge = "", rowCls = p.automatable ? "auto" : "";
-      if (recent) {
-        const st = recent.status;
-        const cls = st === "running" ? "tbadge-running" : st === "queued" ? "tbadge-queued" : st === "failed" ? "tbadge-failed" : "";
-        const label = st === "failed" ? "error" : st;
-        if (cls) statusBadge = `<span class="train-badge ${cls}">${label}</span>`;
+      const st = recent && recent.status;
+      if (st === "running" || st === "queued") {
+        statusBadge = `<span class="train-badge ${st === "running" ? "tbadge-running" : "tbadge-queued"}">${st}</span>`;
         if (st === "running") rowCls = "running";
-        else if (st === "failed") rowCls = "failed";
+      } else if (st === "failed") {
+        statusBadge = `<span class="train-badge tbadge-failed">error · ${relTime(recent.polledAt || recent.dispatchedAt)}</span>`;
+        rowCls = "failed";
+      } else if (st === "done") {
+        statusBadge = `<span class="train-badge tbadge-done">done · ${relTime(recent.polledAt || recent.dispatchedAt)}</span>`;
+      } else if (p.state === "exhausted") {
+        statusBadge = `<span class="train-badge tbadge-failed">quota used</span>`;
+      } else if (p.last_dispatch_at) {
+        statusBadge = `<span class="train-badge tbadge-idle">idle · ${relTime(p.last_dispatch_at)}</span>`;
+      } else {
+        statusBadge = `<span class="train-badge tbadge-untested">not tested yet</span>`;
       }
 
       const canDispatch = p.quota_hours_per_week > 0 || p.provider_id === "paperspace";
@@ -758,9 +750,9 @@
   };
 
   // Poll all running jobs
-  window.gpuPollAll = async function() {
+  window.gpuPollAll = async function({ silent = false } = {}) {
     const btn = $("gpuPollBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Polling…"; }
+    if (btn && !silent) { btn.disabled = true; btn.textContent = "Polling…"; }
     try {
       const data = await fetchJson("/api/gpu-training/status");
       const seen = new Set();
@@ -781,9 +773,19 @@
       }
       await renderTrainingSection();
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "↻ Poll running jobs"; }
+      if (btn && !silent) { btn.disabled = false; btn.textContent = "↻ Poll running jobs"; }
     }
   };
+
+  // Live tick: when jobs are running, auto-poll them so the panel updates itself;
+  // otherwise just refresh status. Skips hidden tabs to avoid needless polling.
+  async function gpuTick() {
+    if (document.hidden) return;
+    const running = (_cache.gpuData?.recentJobs || []).some(
+      j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued"));
+    if (running) await gpuPollAll({ silent: true });
+    else await renderTrainingSection();
+  }
 
   // ── AI Provider Keys (editable) ───────────────────────────────────────────
   const LLM_PROVIDERS = [
@@ -1249,19 +1251,21 @@
     }).join("");
   }
 
+  // The Recently-Landed panel moved to /work.html; here we only keep the Work Board
+  // "Landed" stat (bStatLanded) fed. The full merge list lives on the Work page.
   async function renderLanded() {
-    const el = $("landedBody");
+    const el = $("landedBody");  // null on this page now — guarded below
     const data = await fetchJson("/api/queue/recent-merges?limit=15", 20000);
     if (!data || data.error) {
-      el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
+      if (el) el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
       setText("landedMeta", "gh unavailable");
       setText("bStatLanded", "—");
       return;
     }
     setText("bStatLanded", data.count ?? 0);
     setText("landedMeta", `${data.count} recent merge${data.count === 1 ? "" : "s"}`);
-    if (!data.merges.length) { el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
-    el.innerHTML = data.merges.map(m => `<div class="landed-row">
+    if (!data.merges.length) { if (el) el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
+    if (el) el.innerHTML = data.merges.map(m => `<div class="landed-row">
       <span class="landed-title"><span class="lane-chip">${escapeHtml(m.lane)}</span> <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(m.number))} ${escapeHtml(m.title)}</a></span>
       <span class="landed-meta">${escapeHtml(m.author)} · ${escapeHtml(relTime(m.mergedAt))}</span>
     </div>`).join("");
@@ -1447,8 +1451,6 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
-    bindResearchQueue();
-    loadResearchQueue();
     refreshWorkBoard();
     renderRepoLearn();
     renderLocalModel();
@@ -1465,7 +1467,7 @@
     setInterval(refreshWorkBoard, 20000);
     setInterval(renderRepoLearn, 60000);
     setInterval(renderLocalModel, 30000);
-    setInterval(renderTrainingSection, 30000);
+    setInterval(gpuTick, 12000);
     setInterval(refreshProviderStatus, 60000);
     setInterval(updateStatus, 15000);
   });
