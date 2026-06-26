@@ -11,57 +11,12 @@ const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const DOCS_DIR = path.join(repoRoot, "data", "generated-docs");
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-// Compact, safe Markdown → HTML (covers what the model emits: headings, lists, tables,
-// bold/italic/code/links, blockquotes, code fences, hr, paragraphs). HTML is escaped.
+// Markdown → HTML. Reuses the repo's canonical block renderer (lib/markdown-render.js)
+// instead of a second hand-rolled parser (#1277), so generated documents pick up its
+// nested lists, task lists, recursive blockquotes, and safe inline escaping for free.
+const { renderBlock } = require("./markdown-render");
 function mdToHtml(md) {
-  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (s) => esc(s)
-    .replace(/`([^`]+)`/g, (m, c) => `<code>${c}</code>`)
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, t, u) => `<a href="${esc(u)}">${t}</a>`);
-  const lines = String(md).replace(/\r\n/g, "\n").split("\n");
-  const out = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (/^```/.test(line)) { // code fence
-      const buf = []; i++;
-      while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]);
-      i++; out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`); continue;
-    }
-    const h = line.match(/^(#{1,6})\s+(.+)$/);
-    if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
-    if (/^(---|\*\*\*|___)\s*$/.test(line)) { out.push("<hr>"); i++; continue; }
-    if (/^\|(.+)\|\s*$/.test(line) && i + 1 < lines.length && /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1])) {
-      const head = line.split("|").slice(1, -1).map((c) => `<th>${inline(c.trim())}</th>`).join("");
-      i += 2; const rows = [];
-      while (i < lines.length && /^\|(.+)\|\s*$/.test(lines[i])) {
-        rows.push("<tr>" + lines[i].split("|").slice(1, -1).map((c) => `<td>${inline(c.trim())}</td>`).join("") + "</tr>"); i++;
-      }
-      out.push(`<table><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table>`); continue;
-    }
-    if (/^>\s?/.test(line)) {
-      const buf = [];
-      while (i < lines.length && /^>\s?/.test(lines[i])) buf.push(lines[i++].replace(/^>\s?/, ""));
-      out.push(`<blockquote>${inline(buf.join(" "))}</blockquote>`); continue;
-    }
-    if (/^\s*[-*+]\s+/.test(line)) {
-      const buf = [];
-      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) buf.push(`<li>${inline(lines[i++].replace(/^\s*[-*+]\s+/, ""))}</li>`);
-      out.push(`<ul>${buf.join("")}</ul>`); continue;
-    }
-    if (/^\s*\d+\.\s+/.test(line)) {
-      const buf = [];
-      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) buf.push(`<li>${inline(lines[i++].replace(/^\s*\d+\.\s+/, ""))}</li>`);
-      out.push(`<ol>${buf.join("")}</ol>`); continue;
-    }
-    if (/^\s*$/.test(line)) { i++; continue; }
-    const buf = [line]; i++;
-    while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,6}\s|```|>\s?|\s*[-*+]\s|\s*\d+\.\s|\|)/.test(lines[i])) buf.push(lines[i++]);
-    out.push(`<p>${inline(buf.join(" "))}</p>`);
-  }
-  return out.join("\n");
+  return renderBlock(String(md).replace(/\r\n/g, "\n").split("\n")).join("\n");
 }
 
 function htmlDoc(title, bodyHtml) {

@@ -477,6 +477,7 @@ module.exports = {
   escapeHtml,
   safeUrl,
   inlineMarkdown,
+  renderBlock,
   renderMarkdownDocument,
   slugify,
 };
