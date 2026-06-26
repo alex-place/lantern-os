@@ -237,6 +237,7 @@
     <a href="/trader-dashboard.html">Trader</a>
     <a href="/operations.html">Ops Hub</a>
     <a href="/orchestration.html" class="active">Orchestration</a>
+    <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
   </div>
   <div class="nav-actions">
@@ -292,34 +293,11 @@
     <div id="autoPullBody"><div class="placeholder">Loading…</div></div>
   </section>
 
-  <!-- ── Fleet Activity (live delegated runs) ── -->
-  <section class="panel" id="fleetRunPanel" hidden>
-    <h2>🛰️ Fleet Activity <span class="section-meta" id="fleetRunMeta"></span>
-      <button class="btn-secondary" onclick="document.getElementById('fleetRunPanel').hidden=true" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">Dismiss</button>
-    </h2>
-    <p class="panel-sub">Live stream of a delegated autonomous run — the fleet plans, patches, tests in an isolated worktree, then opens a draft PR in that lane. Every step is the real engine event, not a simulation.</p>
-    <div id="fleetRunLog" class="fleet-log"></div>
-  </section>
-
-  <section class="panel" id="researchHandoffPanel">
-    <h2>📥 Pull Work <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
-    <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Keystone Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
-    <div class="research-controls">
-      <input id="researchSearch" type="search" placeholder="Search issue, title, or label" aria-label="Search open issues">
-      <select id="researchPriority" aria-label="Filter by priority">
-        <option value="all">All priorities</option>
-        <option value="p0">P0</option>
-        <option value="p1">P1</option>
-        <option value="p2">P2</option>
-        <option value="unlabeled">Unlabeled</option>
-      </select>
-      <select id="researchSort" aria-label="Sort issues">
-        <option value="priority">Priority + updated</option>
-        <option value="updated">Recently updated</option>
-      </select>
-      <button class="btn-secondary" id="researchRefresh" type="button">Refresh</button>
-    </div>
-    <div id="researchQueue" class="research-list"><div class="research-state">Loading open GitHub issues...</div></div>
+  <!-- ── Pull Work moved to /work.html ── -->
+  <section class="panel" id="pullWorkLink">
+    <h2>📥 Manual Work <span class="section-meta">choose &amp; hand off issues</span></h2>
+    <p class="panel-sub">Picking issues by hand, researching them, copying coding-agent handoffs, and the "Recently Landed" shipped log now live on their own page — so this dashboard stays focused on the autonomous loop above.</p>
+    <a class="btn-secondary" href="/work.html" style="display:inline-block;">📥 Open Work page →</a>
   </section>
 
   <!-- ── Agent Slots (who's working right now) ── -->
@@ -331,14 +309,7 @@
     <div id="agentSlotsBody" class="slot-grid"><div class="placeholder">Loading roster…</div></div>
   </section>
 
-  <!-- ── Recently Landed (what we've shipped, real-time) ── -->
-  <section class="panel" id="landedPanel">
-    <h2>✅ Recently Landed <span class="section-meta" id="landedMeta">merged PRs</span>
-      <button class="btn-secondary" onclick="renderLanded()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">What the group has actually shipped — most recent merges first, straight from GitHub. This is the truth of "done."</p>
-    <div id="landedBody"><div class="placeholder">Loading…</div></div>
-  </section>
+  <!-- Recently Landed moved to /work.html; its count still feeds the Work Board "Landed" stat. -->
 
   <!-- ── Research Team: repo memory (grounds the fleet) ── -->
   <section class="panel" id="repoLearnPanel">
@@ -1280,19 +1251,21 @@
     }).join("");
   }
 
+  // The Recently-Landed panel moved to /work.html; here we only keep the Work Board
+  // "Landed" stat (bStatLanded) fed. The full merge list lives on the Work page.
   async function renderLanded() {
-    const el = $("landedBody");
+    const el = $("landedBody");  // null on this page now — guarded below
     const data = await fetchJson("/api/queue/recent-merges?limit=15", 20000);
     if (!data || data.error) {
-      el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
+      if (el) el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
       setText("landedMeta", "gh unavailable");
       setText("bStatLanded", "—");
       return;
     }
     setText("bStatLanded", data.count ?? 0);
     setText("landedMeta", `${data.count} recent merge${data.count === 1 ? "" : "s"}`);
-    if (!data.merges.length) { el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
-    el.innerHTML = data.merges.map(m => `<div class="landed-row">
+    if (!data.merges.length) { if (el) el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
+    if (el) el.innerHTML = data.merges.map(m => `<div class="landed-row">
       <span class="landed-title"><span class="lane-chip">${escapeHtml(m.lane)}</span> <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(m.number))} ${escapeHtml(m.title)}</a></span>
       <span class="landed-meta">${escapeHtml(m.author)} · ${escapeHtml(relTime(m.mergedAt))}</span>
     </div>`).join("");
@@ -1478,8 +1451,6 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
-    bindResearchQueue();
-    loadResearchQueue();
     refreshWorkBoard();
     renderRepoLearn();
     renderLocalModel();
