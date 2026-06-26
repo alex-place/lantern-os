@@ -35,10 +35,13 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
     "busboy": "^1.6.0",
+    "docx": "^9.7.1",
+    "exceljs": "^4.4.0",
     "exif-parser": "^0.1.12",
-    "google-auth-library": "^9.15.0",
     "express-session": "^1.19.0",
+    "google-auth-library": "^9.15.0",
     "pdf-parse": "^1.1.1",
+    "pptxgenjs": "^4.0.1",
     "sharp": "^0.35.2",
     "tesseract.js": "^7.0.0"
   },

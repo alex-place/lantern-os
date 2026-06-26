@@ -698,13 +698,23 @@ function renderVisionAnswer(prompt, attachment) {
 
 // ── Document generation ──────────────────────────────────────────────────────────
 // Detect a request to produce a document and return {prompt, format}, else null. Forms:
-// explicit (!doc / !pdf / /document <prompt>) and natural language ("make me a PDF/report/
-// brief about X"). Requires a document noun so ordinary asks don't trigger it.
+// explicit (!doc / !pdf / !docx / !deck <prompt>) and natural language ("make me a
+// Word doc / spreadsheet / deck about X"). Requires a document noun so ordinary asks
+// don't trigger it. Format inferred from the noun: word→docx, excel→xlsx, deck→pptx.
+function docFormatOf(noun) {
+  const n = String(noun).toLowerCase();
+  if (/docx|word/.test(n)) return 'docx';
+  if (/xlsx|excel|spread\s?sheet|workbook/.test(n)) return 'xlsx';
+  if (/pptx|power\s?point|slide|deck|presentation/.test(n)) return 'pptx';
+  return 'pdf';
+}
+// One alternation of document nouns, ordered specific→general so the format is inferable.
+var DOC_NOUNS = 'docx|word\\s?document|word\\s?doc|word\\s?file|word(?!s)|xlsx|spread\\s?sheet|excel|workbook|pptx|power\\s?point|slide\\s?deck|slide\\s?show|slides?|deck|presentation|pdf|document|report|brief|memo|white\\s?paper|one[- ]?pager|write[- ]?up';
 function parseDocRequest(text) {
-  const explicit = text.match(/^[!/](?:doc|document|pdf)\s+(.+)/i);
-  if (explicit) return { prompt: explicit[1].trim(), format: 'pdf' };
-  const nl = text.match(/\b(?:make|create|generate|write|draft|build|produce|prepare)\b[^.?!]*?\b(?:pdf|document|report|brief|memo|white\s?paper|one[- ]?pager|write[- ]?up)\b\s*(?:about|on|for|covering|titled|of|:)?\s*(.+)/i);
-  if (nl && nl[1] && nl[1].trim().length >= 3) return { prompt: nl[1].trim().replace(/[.?!]+$/, ''), format: 'pdf' };
+  const explicit = text.match(new RegExp('^[!/](' + DOC_NOUNS + '|doc)\\s+(.+)', 'i'));
+  if (explicit) return { prompt: explicit[2].trim(), format: docFormatOf(explicit[1]) };
+  const nl = text.match(new RegExp('\\b(?:make|create|generate|write|draft|build|produce|prepare)\\b[^.?!]*?\\b(' + DOC_NOUNS + ')\\b\\s*(?:about|on|for|covering|titled|of|:)?\\s*(.+)', 'i'));
+  if (nl && nl[2] && nl[2].trim().length >= 3) return { prompt: nl[2].trim().replace(/[.?!]+$/, ''), format: docFormatOf(nl[1]) };
   return null;
 }
 

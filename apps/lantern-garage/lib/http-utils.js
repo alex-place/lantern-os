@@ -29,6 +29,9 @@ function sendFile(res, filePath) {
     ".json": "application/json; charset=utf-8",
     ".md": "text/markdown; charset=utf-8",
     ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   }[ext] || "application/octet-stream";
 
   fs.readFile(filePath, (error, data) => {

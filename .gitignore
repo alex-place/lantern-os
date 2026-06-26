@@ -361,3 +361,6 @@ data/csf_archives/*ingest*.manifest.json
 
 # #1198 distillation flywheel: verified cloud-escalation training pairs (repo diffs) — keep local; commit reviewed wins deliberately
 data/distill/
+
+# Generated documents (pdf/docx/xlsx/pptx output of /api/document/generate)
+data/generated-docs/

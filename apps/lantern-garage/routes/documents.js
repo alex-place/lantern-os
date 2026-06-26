@@ -108,9 +108,8 @@ module.exports = async function documentRoutes(req, res, url, deps) {
     const { DOCS_DIR } = require("../lib/document-builder");
     const fp = path.join(DOCS_DIR, file);
     if (!fs.existsSync(fp)) { sendJson(res, { error: "not found" }, 404); return true; }
-    const ext = path.extname(file).toLowerCase();
-    const ct = ext === ".pdf" ? "application/pdf" : ext === ".html" ? "text/html" : "text/markdown; charset=utf-8";
-    res.setHeader("Content-Type", ct);
+    // Content-Type is set by sendFile from the extension (incl. docx/xlsx/pptx);
+    // we only force the download disposition + filename here.
     res.setHeader("Content-Disposition", `attachment; filename="${file}"`);
     sendFile(res, fp);
     return true;
