@@ -28,7 +28,7 @@ const http = require("http");
 const https = require("https");
 const { tokenizeCommand, safeExec } = require("./safe-exec");
 const { resolveCommand } = require("./command-allowlist");
-const { webSearchMcp } = require("./web-search-client");
+const { webSearch } = require("./web-search-client");
 const { workspaceWrite, workspaceRead, workspaceList, getWorkspaceRoot } = require("./user-workspace");
 const { createDocument, listTemplates } = require("./doc-generator");
 const toolLogger = require("./tool-logger");
@@ -244,18 +244,17 @@ const REGISTRY = {
       const query = String(i.query || "").trim();
       if (!query) return "[error: query is required]";
       const maxResults = Math.max(1, Math.min(10, parseInt(i.max_results, 10) || 5));
-      const raw = await webSearchMcp(query, maxResults);
-      // Unwrap MCP envelope {content:[{type:'text',text:'<json>'}]} or a direct {results}.
-      let payload = raw;
-      if (raw && Array.isArray(raw.content)) {
-        const t = raw.content.find((c) => c && c.type === "text");
-        try { payload = t ? JSON.parse(t.text) : raw; } catch { payload = raw; }
+      // webSearch() bounds the MCP call (timeout + 1 retry) and falls back to a
+      // keyless direct DuckDuckGo search, so a slow/down MCP path doesn't make the
+      // tool time out and the model silently answer from memory (#1212).
+      const payload = await webSearch(query, maxResults);
+      if (!payload.success) {
+        // Explicit error so the model reports "search unavailable" instead of guessing.
+        return `[web_search error: ${payload.error || "search failed"} — search is unavailable right now; say so rather than answering from memory]`;
       }
-      if (raw && raw.isError) return `[web_search error: ${payload && payload.error ? payload.error : "search failed"}]`;
-      if (payload && payload.success === false) return `[web_search error: ${payload.error || "search failed"}]`;
-      const results = (payload && payload.results) || [];
+      const results = payload.results || [];
       if (!results.length) return `[no results for: ${query}]`;
-      const lines = [`web_search("${query}") — ${results.length} result(s):\n`];
+      const lines = [`web_search("${query}") — ${results.length} result(s)${payload.source && payload.source !== "mcp" ? ` (${payload.source} fallback)` : ""}:\n`];
       results.forEach((r, idx) => {
         lines.push(`[${idx + 1}] ${r.title || "(untitled)"}`);
         lines.push(`    url: ${r.url || ""}`);

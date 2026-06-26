@@ -13,7 +13,7 @@ const MCP_TIMEOUT = parseInt(process.env.MCP_CLIENT_TIMEOUT || "8000", 10);
  * @param {number} maxResults - Max results (default 5)
  * @returns {Promise<{success: boolean, results?: Array, error?: string}>}
  */
-async function webSearchMcp(query, maxResults = 5) {
+async function webSearchMcp(query, maxResults = 5, timeoutMs = MCP_TIMEOUT) {
   return new Promise((resolve) => {
     const payload = JSON.stringify({
       jsonrpc: "2.0",
@@ -35,7 +35,7 @@ async function webSearchMcp(query, maxResults = 5) {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(payload),
         },
-        timeout: MCP_TIMEOUT,
+        timeout: timeoutMs,
       },
       (res) => {
         let data = "";
@@ -138,8 +138,172 @@ function extractSearchQuery(message) {
   return query.split(/[.!?]/)[0].trim();
 }
 
+// Minimal HTML-entity decode for titles/snippets pulled from DDG HTML.
+function _decodeEntities(s) {
+  return String(s || "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, "/").replace(/&nbsp;/g, " ");
+}
+function _stripTags(s) { return _decodeEntities(String(s || "").replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim(); }
+
+const DIRECT_TIMEOUT = parseInt(process.env.WEB_SEARCH_DIRECT_TIMEOUT || "6000", 10);
+
+/**
+ * Keyless fallback search: hit DuckDuckGo's Instant Answer API directly (no MCP,
+ * no key). Used when the MCP search path is slow/down (#1212). The DDG HTML
+ * endpoint now serves a bot-challenge page (HTTP 202, no results), so we use the
+ * JSON API, which returns a topic Abstract + RelatedTopics reliably. Best for
+ * entity/factual queries; returns no results (honest failure) for queries with no
+ * instant answer, rather than fabricating.
+ * @returns {Promise<{success: boolean, results?: Array, error?: string, source: string}>}
+ */
+async function webSearchDirect(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT) {
+  const https = require("https");
+  return new Promise((resolve) => {
+    const q = encodeURIComponent(query);
+    const path = `/?q=${q}&format=json&no_html=1&no_redirect=1&skip_disambig=1&t=keystone`;
+    const req = https.request(
+      {
+        hostname: "api.duckduckgo.com",
+        path,
+        method: "GET",
+        headers: { "User-Agent": "KeystoneBot/1.0 (+local grounding)", "Accept": "application/json" },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; if (data.length > 800000) req.destroy(); });
+        res.on("end", () => {
+          try {
+            const j = JSON.parse(data);
+            const results = [];
+            const seen = new Set();
+            const push = (title, url, snippet) => {
+              title = _stripTags(title); url = String(url || "").trim();
+              if (!url || seen.has(url) || results.length >= maxResults) return;
+              seen.add(url);
+              results.push({ title: title || url, url, snippet: _stripTags(snippet || title) });
+            };
+            // 1) Topic abstract (e.g. the Wikipedia summary) — the strongest single result.
+            if (j.AbstractText && j.AbstractURL) push(j.Heading || j.AbstractSource || j.AbstractText, j.AbstractURL, j.AbstractText);
+            // 2) Direct external results (rare but high quality).
+            for (const r of (j.Results || [])) push(r.Text, r.FirstURL, r.Text);
+            // 3) Related topics — flatten one level of grouping.
+            const flat = [];
+            for (const t of (j.RelatedTopics || [])) {
+              if (t && Array.isArray(t.Topics)) flat.push(...t.Topics);
+              else if (t) flat.push(t);
+            }
+            for (const t of flat) if (t.FirstURL && t.Text) push(t.Text.split(" - ")[0], t.FirstURL, t.Text);
+            if (!results.length) { resolve({ success: false, error: "no instant-answer results (direct)", source: "direct" }); return; }
+            resolve({ success: true, results, source: "direct" });
+          } catch (e) {
+            resolve({ success: false, error: `direct parse error: ${e.message}`, source: "direct" });
+          }
+        });
+      }
+    );
+    req.on("error", (err) => resolve({ success: false, error: `direct: ${err.message}`, source: "direct" }));
+    req.on("timeout", () => { req.destroy(); resolve({ success: false, error: "direct timeout", source: "direct" }); });
+    req.end();
+  });
+}
+
+/**
+ * Keyless fallback #2: Wikipedia search API (no key, returns HTTP 200 JSON with
+ * real results for natural-language factual queries — where the DDG Instant Answer
+ * API returns nothing). Used after MCP and DDG both fail (#1212).
+ */
+async function webSearchWiki(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT) {
+  const https = require("https");
+  return new Promise((resolve) => {
+    const q = encodeURIComponent(query);
+    const path = `/w/api.php?action=query&list=search&srsearch=${q}&srlimit=${Math.min(10, maxResults)}&format=json`;
+    const req = https.request(
+      {
+        hostname: "en.wikipedia.org",
+        path,
+        method: "GET",
+        headers: { "User-Agent": "KeystoneBot/1.0 (+local grounding)", "Accept": "application/json" },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; if (data.length > 800000) req.destroy(); });
+        res.on("end", () => {
+          try {
+            const j = JSON.parse(data);
+            const hits = (j.query && j.query.search) || [];
+            const results = hits.slice(0, maxResults).map((h) => ({
+              title: h.title,
+              url: `https://en.wikipedia.org/wiki/${encodeURIComponent(String(h.title).replace(/ /g, "_"))}`,
+              snippet: _stripTags(h.snippet),
+            }));
+            if (!results.length) { resolve({ success: false, error: "no results (wiki)", source: "wiki" }); return; }
+            resolve({ success: true, results, source: "wiki" });
+          } catch (e) {
+            resolve({ success: false, error: `wiki parse error: ${e.message}`, source: "wiki" });
+          }
+        });
+      }
+    );
+    req.on("error", (err) => resolve({ success: false, error: `wiki: ${err.message}`, source: "wiki" }));
+    req.on("timeout", () => { req.destroy(); resolve({ success: false, error: "wiki timeout", source: "wiki" }); });
+    req.end();
+  });
+}
+
+// Normalize either MCP envelope or a direct result into {success, results, error}.
+function _unwrapSearch(raw) {
+  let payload = raw;
+  if (raw && Array.isArray(raw.content)) {
+    const t = raw.content.find((c) => c && c.type === "text");
+    try { payload = t ? JSON.parse(t.text) : raw; } catch { payload = raw; }
+  }
+  if (raw && raw.isError) return { success: false, error: (payload && payload.error) || "search failed" };
+  if (payload && payload.success === false) return { success: false, error: payload.error || "search failed" };
+  const results = (payload && payload.results) || [];
+  return { success: results.length > 0, results, error: results.length ? null : "no results" };
+}
+
+const MCP_ATTEMPT_TIMEOUT = parseInt(process.env.WEB_SEARCH_MCP_TIMEOUT || "6000", 10);
+
+/**
+ * Dependable web search for the chat tool loop (#1212): try the MCP path with a
+ * bounded per-call timeout + 1 retry, then fall back to a keyless direct DuckDuckGo
+ * search. Returns a normalized {success, results, error, source}. On total failure
+ * the caller gets an explicit error (so the model says "search unavailable" instead
+ * of silently answering from memory).
+ */
+async function webSearch(query, maxResults = 5, opts = {}) {
+  const mcpTimeout = opts.mcpTimeoutMs || MCP_ATTEMPT_TIMEOUT;
+  const retries = opts.retries == null ? 1 : opts.retries;
+  let lastErr = "search failed";
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const raw = await webSearchMcp(query, maxResults, mcpTimeout);
+      const norm = _unwrapSearch(raw);
+      if (norm.success) return { ...norm, source: "mcp" };
+      lastErr = norm.error || lastErr;
+    } catch (e) { lastErr = e.message || lastErr; }
+  }
+  // MCP slow/down/empty → keyless fallbacks: DDG instant answer, then Wikipedia.
+  for (const fb of [webSearchDirect, webSearchWiki]) {
+    try {
+      const r = await fb(query, maxResults);
+      if (r.success) return r;
+      lastErr = r.error || lastErr;
+    } catch (e) { lastErr = e.message || lastErr; }
+  }
+  return { success: false, results: [], error: lastErr, source: "none" };
+}
+
 module.exports = {
   webSearchMcp,
+  webSearchDirect,
+  webSearchWiki,
+  webSearch,
   formatGroundingContext,
   needsGrounding,
   extractSearchQuery,
