@@ -95,15 +95,11 @@ async function fetchActivity() {
   };
 }
 
-module.exports = async function githubActivityRoute(req, res, url, deps) {
-  const { sendJson } = deps;
-  if (url.pathname !== "/api/github/activity" || req.method !== "GET") return false;
-
+// Producer: cache-aware fetch of repo activity. Reused by the route below AND by
+// the Explore feed aggregator (lib/explore-feed.js).
+async function load() {
   const now = Date.now();
-  if (cache.data && now - cache.at < CACHE_TTL_MS) {
-    sendJson(res, cache.data, 200);
-    return true;
-  }
+  if (cache.data && now - cache.at < CACHE_TTL_MS) return cache.data;
 
   let activity;
   try {
@@ -120,6 +116,14 @@ module.exports = async function githubActivityRoute(req, res, url, deps) {
     fetchedAt: new Date(now).toISOString(),
   };
   cache = { at: now, data };
-  sendJson(res, data, 200);
+  return data;
+}
+
+module.exports = async function githubActivityRoute(req, res, url, deps) {
+  const { sendJson } = deps;
+  if (url.pathname !== "/api/github/activity" || req.method !== "GET") return false;
+  sendJson(res, await load(), 200);
   return true;
 };
+
+module.exports.load = load;

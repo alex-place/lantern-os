@@ -108,15 +108,12 @@ function ts(d) {
   return Number.isNaN(t) ? 0 : t;
 }
 
-module.exports = async function discoverFeedsRoute(req, res, url, deps) {
-  const { sendJson } = deps;
-  if (url.pathname !== "/api/feeds/discover" || req.method !== "GET") return false;
-
+// Producer: cache-aware fetch of the discover rail data. Reused by the route
+// below AND by the Explore feed aggregator (lib/explore-feed.js), so the single
+// pane and the legacy rail draw from one cache.
+async function load() {
   const now = Date.now();
-  if (cache.data && now - cache.at < CACHE_TTL_MS) {
-    sendJson(res, cache.data, 200);
-    return true;
-  }
+  if (cache.data && now - cache.at < CACHE_TTL_MS) return cache.data;
 
   const settled = await Promise.allSettled(SOURCES.map(fetchSource));
   let items = settled
@@ -137,6 +134,14 @@ module.exports = async function discoverFeedsRoute(req, res, url, deps) {
     fetchedAt: new Date(now).toISOString(),
   };
   cache = { at: now, data };
-  sendJson(res, data, 200);
+  return data;
+}
+
+module.exports = async function discoverFeedsRoute(req, res, url, deps) {
+  const { sendJson } = deps;
+  if (url.pathname !== "/api/feeds/discover" || req.method !== "GET") return false;
+  sendJson(res, await load(), 200);
   return true;
 };
+
+module.exports.load = load;

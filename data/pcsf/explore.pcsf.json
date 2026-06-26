@@ -1,0 +1,47 @@
+{
+  "pcsf_type": "explore",
+  "pcsf_version": "1.0.0",
+  "component": "explore-feed",
+  "description": "Explore feed candidate taxonomy. Declares the curated sources, topic tags, and card types that compose the single ranked content pane, plus the editorial cold-start order an anonymous/zero-signal user sees. The feed ranks these candidates through the SAME PCSF leaderboard used for model routing (rankCandidates(cards, 'explore', opts)); click=success, dwell=latency, dismiss=failure are recorded via recordModelOutcome(card.key, 'explore', ...). No new recommender subsystem — one mechanism, two consumers. See docs/research/explore-content-machine.md §8.",
+  "generated_at": "2026-06-26T00:00:00Z",
+  "state": "available",
+  "loop_stage": ["reason", "converge", "verify"],
+
+  "key_namespaces": {
+    "source:": "Leaderboard agentId scored per content origin (e.g. 'source:Simon Willison'). PRIMARY key for v1.0 — each card's key = 'source:' + card.source.",
+    "topic:": "Reserved for P1 per-topic personalization (e.g. 'topic:local-first').",
+    "type:": "Reserved for P1 per-card-type weighting (e.g. 'type:watch')."
+  },
+
+  "card_types": [
+    { "type": "read",   "icon": "📰", "label": "Read",   "from": "discover-feeds RSS + flourishing news" },
+    { "type": "watch",  "icon": "🎬", "label": "Watch",  "from": "lanternYT channel videos" },
+    { "type": "build",  "icon": "🛠️", "label": "Build",  "from": "GitHub releases + commits" },
+    { "type": "doc",    "icon": "📚", "label": "Docs",   "from": "Keystone knowledge index" },
+    { "type": "belief", "icon": "🌍", "label": "Beliefs","from": "flourishing-feeds fused world-model beliefs" }
+  ],
+
+  "sources": [
+    { "name": "Keystone Build", "key": "source:Keystone Build", "type": "build", "url": "https://github.com/alex-place/lantern-os" },
+    { "name": "Simon Willison", "key": "source:Simon Willison", "type": "read",  "url": "https://simonwillison.net/" },
+    { "name": "Hacker News",    "key": "source:Hacker News",    "type": "read",  "url": "https://news.ycombinator.com/" },
+    { "name": "MIT Tech Review","key": "source:MIT Tech Review","type": "read",  "url": "https://www.technologyreview.com/" },
+    { "name": "lanternYT",      "key": "source:lanternYT",      "type": "watch", "url": "https://www.youtube.com/@lantern1975" },
+    { "name": "Flourishing",    "key": "source:Flourishing",    "type": "belief","url": "/flourishing.html" },
+    { "name": "Knowledge Center","key": "source:Knowledge Center","type": "doc", "url": "/knowledgecenter.html" }
+  ],
+
+  "topics": ["ai", "local-first", "building", "research", "world-model", "keystone"],
+
+  "default_priority": [
+    "source:Keystone Build",
+    "source:Simon Willison",
+    "source:Hacker News",
+    "source:MIT Tech Review",
+    "source:lanternYT",
+    "source:Flourishing",
+    "source:Knowledge Center"
+  ],
+
+  "notes": "default_priority is the editorial cold-start ranking: a zero-signal user sees Keystone's own build activity first, then taste-maker reads, then watch/belief/doc. Once the leaderboard has 'explore' outcomes for a source key, rankCandidates reorders by learned compositeScore and this editorial order only breaks ties (then card freshness)."
+}

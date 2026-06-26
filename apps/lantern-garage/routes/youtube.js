@@ -81,15 +81,11 @@ function centreFeatured(videos) {
   return [...rest.slice(0, mid), { ...feat, featured: true }, ...rest.slice(mid)];
 }
 
-module.exports = async function youtubeRoute(req, res, url, deps) {
-  const { sendJson } = deps;
-  if (url.pathname !== "/api/youtube/lantern-videos" || req.method !== "GET") return false;
-
+// Producer: cache-aware fetch of the channel video list. Reused by the route
+// below AND by the Explore feed aggregator (lib/explore-feed.js).
+async function load() {
   const now = Date.now();
-  if (cache.data && now - cache.at < CACHE_TTL_MS) {
-    sendJson(res, cache.data, 200);
-    return true;
-  }
+  if (cache.data && now - cache.at < CACHE_TTL_MS) return cache.data;
 
   let videos;
   try {
@@ -110,6 +106,14 @@ module.exports = async function youtubeRoute(req, res, url, deps) {
     fetchedAt: new Date(now).toISOString(),
   };
   cache = { at: now, data };
-  sendJson(res, data, 200);
+  return data;
+}
+
+module.exports = async function youtubeRoute(req, res, url, deps) {
+  const { sendJson } = deps;
+  if (url.pathname !== "/api/youtube/lantern-videos" || req.method !== "GET") return false;
+  sendJson(res, await load(), 200);
   return true;
 };
+
+module.exports.load = load;
