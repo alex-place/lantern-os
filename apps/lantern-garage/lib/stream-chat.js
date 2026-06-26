@@ -1639,9 +1639,11 @@ async function handleStreamChat(req, url, res) {
           ];
           const MAX_TOOL_ITERS = 6;
           let toolCalls = 0;
+          const geminiTransport = require("./gemini-transport").geminiTransport;
           for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
             const turn = await geminiToolTurn({
-              apiKey: geminiKey, model: geminiModelName, contents, tools,
+              transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
+              model: geminiModelName, contents, tools,
               systemInstruction: systemPrompt, generationConfig,
               onToken: (t) => { fullReply += t; sendToken(t); },
             });
@@ -1694,7 +1696,10 @@ async function handleStreamChat(req, url, res) {
     try {
       // Grounding: Google Search enabled by default on gemini-3.x models (5K free/month)
       // Disable with GEMINI_GROUNDING=false if needed
-      const isGroundable = geminiModel.startsWith("gemini-3");
+      const { geminiTransport, useVertex } = require("./gemini-transport");
+      // Google Search grounding only on the AI Studio wire (Vertex uses a different
+      // grounding schema; keep Vertex calls plain so they just work + spend credits).
+      const isGroundable = geminiModel.startsWith("gemini-3") && !useVertex();
       const groundingEnabled = process.env.GEMINI_GROUNDING !== "false" && isGroundable;
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {
@@ -1705,14 +1710,15 @@ async function handleStreamChat(req, url, res) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];
       }
       const payload = JSON.stringify(geminiPayloadBase);
+      const _gt = await geminiTransport({ model: geminiModel, apiKey: geminiKey });
       await new Promise((resolve, reject) => {
         const req2 = https.request({
           agent: llmAgent,
-          hostname: "generativelanguage.googleapis.com",
-          path: `/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${geminiKey}`,
+          hostname: _gt.hostname,
+          path: _gt.path,
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            ..._gt.headers,
             "Content-Length": Buffer.byteLength(payload),
           },
         }, (upstream) => {

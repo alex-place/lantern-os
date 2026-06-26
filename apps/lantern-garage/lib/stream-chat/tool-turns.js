@@ -134,15 +134,17 @@ function openaiCompatibleToolTurn({ host, apiKey, model, messages, tools, decode
 }
 
 // ── Gemini — :streamGenerateContent with functionDeclarations ─────────────────
-function geminiToolTurn({ apiKey, model, contents, tools, systemInstruction, generationConfig, onToken }) {
+function geminiToolTurn({ transport, model, contents, tools, systemInstruction, generationConfig, onToken }) {
   return new Promise((resolve, reject) => {
     const body = { contents, tools, generationConfig };
     if (systemInstruction) body.systemInstruction = { parts: [{ text: systemInstruction }] };
     const payload = JSON.stringify(body);
+    // transport = { hostname, path, headers } from lib/gemini-transport (AI Studio
+    // key wire, or Vertex AI Bearer-token wire). Same SSE shape on both.
     const req = https.request({
-      agent: llmAgent, hostname: "generativelanguage.googleapis.com",
-      path: `/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`, method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+      agent: llmAgent, hostname: transport.hostname,
+      path: transport.path, method: "POST",
+      headers: { ...transport.headers, "Content-Length": Buffer.byteLength(payload) },
     }, (upstream) => {
       if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`gemini_status_${upstream.statusCode}`)); return; }
       let buf = "", text = "";
