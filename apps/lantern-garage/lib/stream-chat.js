@@ -1320,7 +1320,25 @@ async function handleStreamChat(req, url, res) {
   // provider) AND the router escalated to Anthropic, prefer Claude: skip the
   // Ollama/Gemini first-attempts so the chosen reasoning provider handles the
   // turn. OpenAI + the local fallback below still backstop a Claude failure.
-  const autoHintProvider = (!requestedProvider && primaryProviderHint) ? primaryProviderHint.provider : null;
+  let autoHintProvider = (!requestedProvider && primaryProviderHint) ? primaryProviderHint.provider : null;
+
+  // ── Coding goes CLOUD-FIRST (locked design 2026-06-26) ────────────────────
+  // The local Σ₀ coder (Ouro-1.4B on ollama) scores ~0/5 on HumanEval — it can't
+  // code. The old #1167 path sent coding intents local-first, so a broken local
+  // answer was served as the PRIMARY reply. Cloud coders (Claude/GPT) are the best
+  // tool for code, so a coding ask in Auto mode now LEADS with a cloud coder when a
+  // key exists. Ollama stays in the dispatch ladder as the OFFLINE backstop (it's
+  // appended last by buildBrainOrder), so a coding ask with no cloud reachable still
+  // gets answered locally. Setting the cloud hint also disables ollamaLocalFirst
+  // below (it requires !autoPrefersAnthropic). Escape hatch: CODING_LOCAL_FIRST=1
+  // restores the old coding-goes-local-first behavior.
+  const codingLocalFirst = process.env.CODING_LOCAL_FIRST === "1";
+  if (isCodingIntent && !requestedProvider && !codingLocalFirst &&
+      (!autoHintProvider || autoHintProvider === "ollama" || autoHintProvider === "local")) {
+    if (process.env.ANTHROPIC_API_KEY) autoHintProvider = "anthropic";
+    else if (process.env.OPENAI_API_KEY) autoHintProvider = "openai";
+    // no cloud key → leave the local hint; the offline coder backstop handles it
+  }
   const autoPrefersAnthropic = autoHintProvider === "anthropic";
 
   // ── Provider 0: Ollama LOCAL-FIRST (dream chat prefers local models) ──────
