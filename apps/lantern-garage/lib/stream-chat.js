@@ -36,6 +36,7 @@ const { generatePlan, generatePatch } = require("./self-edit-engine");
 const { selectProvider, selectKernelProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
 const { classifyIntent } = require("./intent-router");
+const { classifyIntentOuro } = require("./ouro-router");
 const serving = require("./serving-modes");
 const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
@@ -853,8 +854,22 @@ async function handleStreamChat(req, url, res) {
   // (below) sent it general/creative/meta chat too — hallucinated answers and,
   // under pressure, full mode collapse (repeated/garbled word-salad). Scope
   // local-first to intents the coder was actually trained for.
+  // ── Ouro intent router (Σ₀ Step 2, OURO_ROUTER=1) ─────────────────────────
+  // In AUTO mode (no explicit model) the local Ouro model classifies the message
+  // into a task type, which then drives isCodingIntent (→ cloud-first) and taskType
+  // (→ provider selection). Ouro never writes the answer — it only triages. Any
+  // failure returns null → we fall back to the keyword detectTaskType/convergance
+  // signals below. Explicit model picks skip Ouro entirely (no added latency).
+  let ouroRoute = null;
+  if (process.env.OURO_ROUTER === "1" && !requestedProvider && message) {
+    try { ouroRoute = await classifyIntentOuro(message); } catch { ouroRoute = null; }
+    console.warn(ouroRoute
+      ? `[ouro-router] taskType=${ouroRoute.taskType} conf=${ouroRoute.confidence} raw="${ouroRoute.raw}"`
+      : "[ouro-router] unavailable → keyword fallback");
+  }
+
   const CODING_INTENTS = new Set(["coding_change", "code_review"]);
-  const isCodingIntent = CODING_INTENTS.has(converganceDecision?.intent);
+  const isCodingIntent = ouroRoute ? ouroRoute.isCoding : CODING_INTENTS.has(converganceDecision?.intent);
 
   const routeDecision = classifyIntent(message);
 
@@ -1268,7 +1283,8 @@ async function handleStreamChat(req, url, res) {
     // leads with ollama, which is always "healthy" — so cloud was never reached for
     // any message on the main chat surface. Use the real per-message intent instead:
     // only the dream/journal-flavored intent gets the creative (local-first) chain.
-    let taskType = detectTaskType(message, { isCreative: converganceDecision?.intent === "dream_chat" && isRpMode });
+    // Ouro router (Auto mode) owns taskType when it classified; else keyword detect.
+    let taskType = ouroRoute ? ouroRoute.taskType : detectTaskType(message, { isCreative: converganceDecision?.intent === "dream_chat" && isRpMode });
     leaderboardTaskType = taskType; // align leaderboard recording with routing taxonomy (#1236)
 
     // ── Router gate (opt-in via ROUTER_GATE=1) ────────────────────────────────
