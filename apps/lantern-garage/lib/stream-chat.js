@@ -1782,9 +1782,16 @@ async function handleStreamChat(req, url, res) {
       return;
     } catch (err) {
       recordProviderFailure("gemini", err.message);
-      // On 429/quota, try next model in chain before emitting error
-      const is429 = err.message.includes("429") || err.message.includes("quota");
-      if (is429) { fullReply = ""; continue; } // retry with next model silently
+      // On transient errors (429/quota, 5xx "high demand", timeout) try the next
+      // model in the chain before emitting an error. A 503 on a middle model must
+      // not abort the chain before it reaches a working model (#1234).
+      const msg = err.message || "";
+      const isTransient =
+        msg.includes("429") ||
+        msg.includes("quota") ||
+        /gemini_status_5\d\d/.test(msg) || // 500/502/503/504 high-demand
+        msg.includes("gemini_timeout");
+      if (isTransient) { fullReply = ""; continue; } // retry with next model silently
       if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
