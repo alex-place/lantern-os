@@ -424,7 +424,7 @@ module.exports = async (req, res, url, deps) => {
       const GH_REPO = "alex-place/lantern-os";
       const {
         generatePlan, generatePatch, applyPatch, runTests,
-        gitAddFiles, gitCommit, gitPush, openDraftPr,
+        gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -442,15 +442,34 @@ module.exports = async (req, res, url, deps) => {
 
       try {
         const opts = JSON.parse(body || "{}");
-        const issueNumber = parseInt(opts.issue, 10);
+        let issueNumber = parseInt(opts.issue, 10);
+        const task = typeof opts.task === "string" ? opts.task.trim() : "";
         const dryRun = opts.dryRun === true;
         // Σ₀ autonomous: default to commit+push for fully-verified work (research + tests passed)
         // Can opt-out with { commit:false } or { push:false } for safety gates
         const autoPush = opts.push !== false;  // default true (changed from === true)
         const autoCommit = autoPush || opts.commit !== false;  // default true
 
+        // ── 0. create issue from a free-form task (suggest-then-confirm path) ──
+        // A free-form coding request has no issue number. We keep the pipeline
+        // issue-linked (every PR references a tracked issue), so file the task as
+        // a GitHub issue first, then work it exactly like an `!work #N` run.
+        if (!issueNumber && task) {
+          step("create_issue", "start");
+          try {
+            const created = createIssueFromTask(REPO_ROOT, task);
+            issueNumber = created.number;
+            step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
+          } catch (e) {
+            step("create_issue", "error", { error: String(e && e.message || e) });
+            send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
+            res.end();
+            return;
+          }
+        }
+
         if (!issueNumber) {
-          send("error", { error: "issue_number_required" });
+          send("error", { error: "issue_number_or_task_required" });
           res.end();
           return;
         }

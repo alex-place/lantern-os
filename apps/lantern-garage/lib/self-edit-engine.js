@@ -434,6 +434,46 @@ function gitAddFiles(repoRoot, files) {
 // GitHub repo slug for API calls. Override with GH_REPO env if the remote moves.
 const GH_REPO = process.env.GH_REPO || "alex-place/lantern-os";
 
+// Derive a concise, conventional issue title from a free-form task instruction.
+// First non-empty line, stripped of a leading bang-command / list marker, capped.
+function taskTitle(task) {
+  const firstLine = String(task || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0) || "";
+  const cleaned = firstLine
+    .replace(/^!?(?:work|autowork|edit)\b[:\s]*/i, "") // drop a trigger prefix if present
+    .replace(/^[-*\d.\s]+/, "")                        // drop list bullets / numbering
+    .trim();
+  // Default applied only as a final fallback — never run through the strip above,
+  // or "Autowork task" would itself match the trigger prefix and collapse to "task".
+  return (cleaned || "Autowork task").slice(0, 120);
+}
+
+// Create a GitHub issue from a free-form chat instruction, so the issue-linked
+// autowork pipeline (which keys off a real issue number) can work it. Returns
+// { number, url, title }. Used by the suggest-then-confirm "Run as autowork"
+// path — a free-form coding request first becomes a tracked issue, then a PR.
+function createIssueFromTask(repoRoot, task, opts = {}) {
+  const text = String(task || "").trim();
+  if (!text) throw new Error("task_required");
+  const title = taskTitle(text);
+  const body =
+    `${text}\n\n---\n_Filed automatically from Keystone OS chat (autowork “run as task”). ` +
+    `A linked draft PR follows._`;
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: "0", SKIP_MONOWORKSTREAM: "1" };
+  // `gh issue create` prints the new issue URL on stdout; parse the number from it.
+  const out = execFileSync(
+    "gh",
+    ["issue", "create", "--repo", GH_REPO, "--title", title, "--body", body.slice(0, 8000)],
+    { cwd: repoRoot, encoding: "utf8", timeout: 30000, windowsHide: true, env }
+  ).trim();
+  const url = (out.match(/https:\/\/github\.com\/[^\s]+\/issues\/(\d+)/) || [])[0] || out;
+  const number = parseInt((url.match(/\/issues\/(\d+)/) || [])[1], 10);
+  if (!number) throw new Error("issue_create_failed: " + out.slice(0, 200));
+  return { number, url, title };
+}
+
 function openDraftPr(repoRoot, branch, title, body) {
   if (!branch.startsWith("auto/")) throw new Error("invalid_branch_prefix");
   const safeTitle = String(title || "Auto PR").slice(0, 256);
@@ -1057,6 +1097,8 @@ module.exports = {
   gitAddFiles,
   gitCurrentBranch,
   openDraftPr,
+  createIssueFromTask,
+  taskTitle,
   runTests,
   generatePlan,
   extractJson,

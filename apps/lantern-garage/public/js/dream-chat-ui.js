@@ -441,6 +441,7 @@ function createAgentBubble(isError) {
 // Consumes the SSE stream and renders each phase as it happens, so the user can
 // watch plan → patch → tests → commit → push → PR in real time.
 const AUTOWORK_PHASES = [
+  ['create_issue','File issue'],
   ['fetch_issue', 'Fetch issue'],
   ['branch',      'Create branch'],
   ['research',    'Research (codebase + web)'],
@@ -455,23 +456,36 @@ const AUTOWORK_PHASES = [
   ['record',      'Log record'],
 ];
 
-async function runAutowork(issue, btn, base) {
+// `target` is either an issue number (number/numeric string — `!work #N`) or a
+// free-form task object `{ task: "fix the intent handler" }` from the chat
+// "Run as autowork" button. Task mode files a GitHub issue first (server-side),
+// then runs the identical issue-linked pipeline → linked draft PR.
+async function runAutowork(target, btn, base) {
   base = base || ((typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
   hideEmptyState();
   const messages = document.getElementById('messages');
+
+  const taskMode = target && typeof target === 'object' && typeof target.task === 'string';
+  const issue = taskMode ? null : target;
+  const reqBody = taskMode
+    ? { task: target.task, commit: true, push: true }
+    : { issue, commit: true, push: true };
+  const panelLabel = taskMode ? 'task' : ('#' + String(issue == null ? '' : issue));
 
   // Build the panel
   const row = document.createElement('div');
   row.className = 'msg-row agent';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  const stepRowsHtml = AUTOWORK_PHASES.map(([k, label]) =>
+  // The "File issue" step only applies to task mode; drop it for issue-number runs.
+  const phases = taskMode ? AUTOWORK_PHASES : AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
+  const stepRowsHtml = phases.map(([k, label]) =>
     `<div class="aw-step" data-phase="${k}" style="display:flex;align-items:center;gap:8px;padding:3px 0;opacity:0.4">
        <span class="aw-icon" style="width:16px;text-align:center">○</span>
        <span class="aw-label" style="font-size:12.5px">${label}</span>
        <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
      </div>`).join('');
   row.innerHTML =
-    `<div class="msg-label">Keystone · Autowork #${esc(issue)}</div>
+    `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>
      <div class="bubble" style="font-size:13px">
        <div class="aw-steps">${stepRowsHtml}</div>
        <div class="aw-diff" style="display:none;margin-top:8px"></div>
@@ -497,7 +511,7 @@ async function runAutowork(issue, btn, base) {
     const resp = await fetch(`${base}/api/convergence/autonomous-work/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ issue, commit: true, push: true }),
+      body: JSON.stringify(reqBody),
     });
     if (!resp.ok || !resp.body) throw new Error(`stream_unavailable_${resp.status}`);
 
@@ -513,6 +527,7 @@ async function runAutowork(issue, btn, base) {
         let extra = '';
         if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
         else if (d.phase === 'research' && d.status === 'done') extra = `${d.filesFound || 0} files · ${d.webSourcesFound || 0} web`;
+        else if (d.phase === 'create_issue' && d.status === 'done') extra = `#${d.issue}`;
         else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
         setStep(d.phase, d.status, extra);
       } else if (evName === 'diff') {
@@ -554,7 +569,7 @@ async function runAutowork(issue, btn, base) {
       btn.style.color = '#4ade80';
       fin.style.color = '#4ade80';
       fin.innerHTML = finalDone.prUrl
-        ? `✓ Auto-worked #${esc(issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
+        ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
         : `✓ ${esc(finalDone.message || 'Done')}`;
     } else {
       btn.textContent = '✗ Failed';
@@ -1099,6 +1114,7 @@ async function sendMessage(opts = {}) {
   let receivedDone = false;
   let doneActions = null;   // convergence-agent action chips, from the done event (Stage 3)
   let doneProvider = '';
+  let doneIntent = '';      // routed intent (coding_change, trading, …) — drives the autowork suggestion
   let doneModel = '';       // actual model id from the PCSF receipt (e.g. claude-haiku-4-5)
   let doneTimestamp = '';   // receipt generatedAt — the signature timestamp
   let doneOnline = true;    // false when no model answered (offline path)
@@ -1210,6 +1226,7 @@ async function sendMessage(opts = {}) {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel || evt.label) routeLabel = evt.routeLabel || evt.label;
             doneProvider = evt.source || evt.provider || (evt.receipt && evt.receipt.provider) || '';
+            doneIntent = evt.intent || (evt.receipt && evt.receipt.intent) || '';
             doneModel = evt.model || (evt.receipt && evt.receipt.model) || '';
             doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
             doneOnline = evt.online !== false;
@@ -1378,6 +1395,38 @@ async function sendMessage(opts = {}) {
       }
     }
     msg.appendChild(sig);
+  }
+
+  // ── Suggest-then-confirm: offer to run a coding turn as autowork → linked PR ──
+  // Coding-intent chats answer normally above; here we surface a one-click action
+  // that files an issue from the request and runs the autowork pipeline (cloud
+  // model → patch → tests → draft PR). No PR is opened unless the user clicks.
+  const CODING_INTENTS = ['coding_change', 'coding', 'technical_debug', 'code_review', 'code'];
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent)) {
+    const offer = document.createElement('div');
+    offer.className = 'autowork-offer';
+    offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const awBtn = document.createElement('button');
+    awBtn.type = 'button';
+    awBtn.className = 'autowork-run-btn';
+    awBtn.style.cssText = 'font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--accent,#5cc8ff);background:transparent;color:var(--accent,#5cc8ff);cursor:pointer';
+    awBtn.textContent = 'Run as autowork →';
+    awBtn.title = 'Files a GitHub issue for this request, then has a cloud model patch it, run tests, and open a linked draft PR.';
+    const hint = document.createElement('span');
+    hint.style.cssText = 'font-size:11px;opacity:0.55';
+    hint.textContent = 'opens a draft PR';
+    awBtn.addEventListener('click', () => {
+      awBtn.disabled = true;
+      awBtn.textContent = 'Running…';
+      const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+      runAutowork({ task: text }, awBtn, base).catch(err => {
+        console.error('[autowork]', err);
+        awBtn.textContent = '✗ Error';
+      });
+    });
+    offer.appendChild(awBtn);
+    offer.appendChild(hint);
+    msg.appendChild(offer);
   }
 
   // Degraded-mode notice (#740): the answer came from the local model as a silent
