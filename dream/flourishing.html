@@ -1,469 +1,462 @@
-﻿<!doctype html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
   <link rel="manifest" href="/manifest.json">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid flash of wrong theme (matches index.html) */
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/css/site.css">
-  <title>Dashboard</title>
+  <title>Bayesian World Model · Keystone OS</title>
   <style>
-    /* ── Hero ── */
-    .hero {
-      text-align: center;
-      padding: 56px 0 40px;
+    .page { max-width: 900px; }
+
+    /* ── Hero (matches index.html: chip + motto + title + tagline) ── */
+    .hero { position: relative; text-align: center; padding: 44px 0 26px; }
+    .hero-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 60px; height: 60px; margin: 0 auto 16px;
+      border-radius: 17px; font-size: 30px; line-height: 1;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
     }
-    .hero-icon {
-      font-size: 52px;
-      display: block;
-      margin-bottom: 16px;
+    .hero .motto {
+      font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--muted); margin: 0 0 12px;
     }
     .hero h1 {
-      font-size: clamp(1.9rem, 5vw, 2.8rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 12px;
-      line-height: 1.15;
+      font-size: clamp(1.9rem, 5.5vw, 2.8rem); font-weight: 800;
+      letter-spacing: -0.02em; margin: 0 0 12px; line-height: 1.12;
     }
     .hero h1 span { color: var(--accent); }
     .hero .tagline {
-      font-size: 1rem;
-      color: var(--muted);
-      max-width: 540px;
-      margin: 0 auto 32px;
-      line-height: 1.6;
+      font-size: 1rem; color: var(--text); max-width: 600px;
+      margin: 0 auto; line-height: 1.6;
     }
 
-    /* ── Section label ── */
-    .section-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 16px;
-      margin-top: 44px;
+    /* ── Toolbar ── */
+    .wm-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin: 4px 0 22px;
     }
-    .section-label:first-child { margin-top: 0; }
+    .wm-updated { font-size: 0.78rem; color: var(--muted); }
+    .wm-updated b { color: var(--text); font-weight: 600; }
+    .wm-refresh {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+      border-radius: 9999px; padding: 8px 16px;
+      transition: background 0.18s, border-color 0.18s, opacity 0.18s, transform .12s;
+    }
+    .wm-refresh:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, transparent); transform: scale(1.03); }
+    .wm-refresh:disabled { opacity: 0.5; cursor: default; }
 
-    /* ── Panels grid ── */
-    .panels {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 40px;
+    /* ── Panel — the index.html home-tile identity: accent bar + hover ── */
+    .wm-panel {
+      --tile: var(--accent);
+      position: relative; overflow: hidden;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px 22px 20px; box-shadow: var(--shadow);
+      transition: border-color .2s, box-shadow .2s, transform .15s;
     }
-    @media (max-width: 560px) { .panels { grid-template-columns: 1fr; } }
+    .wm-panel::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--tile); transform-origin: left;
+    }
+    .wm-panel:hover { border-color: var(--tile); box-shadow: var(--shadow-hover); }
+    .wm-panel + .wm-panel { margin-top: 16px; }
+    /* per-panel accent identity, mirroring index.html's color-coded tiles */
+    .acc-cyan    { --tile: #06b6d4; }
+    .acc-emerald { --tile: #10b981; }
+    .acc-violet  { --tile: #a78bfa; }
+    .acc-amber   { --tile: #f59e0b; }
 
-    .panel {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 22px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      cursor: pointer;
-      color: var(--text);
-      text-decoration: none;
-      box-shadow: var(--shadow);
-      transition: border-color 0.2s, background 0.2s, transform 0.15s, box-shadow 0.2s;
+    .panel-head { margin-bottom: 16px; }
+    .panel-head .panel-label {
+      display: block; color: var(--tile);
+      font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
     }
-    .panel:hover {
-      border-color: var(--accent);
-      background: var(--surface2);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-hover);
+    .panel-head h2 { font-size: 1.16rem; font-weight: 700; margin: 5px 0 0; color: var(--text); }
+    .panel-sub { font-size: 0.85rem; color: var(--muted); line-height: 1.55; margin: 7px 0 0; max-width: 660px; }
+
+    /* ── Bars (domains + beliefs) — adopt the panel's --tile accent ── */
+    .bar-row { display: flex; flex-direction: column; gap: 5px; }
+    .bar-row + .bar-row { margin-top: 16px; }
+    .bar-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .bar-name { color: var(--text); font-weight: 600; font-size: 0.92rem; }
+    .bar-name .cap { text-transform: capitalize; }
+    .bar-val { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.82rem; white-space: nowrap; }
+    .bar-val strong { color: var(--text); font-weight: 700; }
+    .bar-track {
+      position: relative; height: 9px; border-radius: 9999px;
+      background: color-mix(in srgb, var(--muted) 20%, transparent); overflow: hidden;
     }
-    .panel-icon { font-size: 28px; }
-    .panel-label {
-      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.09em;
-      text-transform: uppercase; color: var(--accent);
+    .bar-ci { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--tile) 28%, transparent); }
+    .bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px; background: var(--tile); }
+    .bar-meta { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+    .bar-meta a { color: var(--tile); text-decoration: none; font-weight: 600; }
+    .bar-meta a:hover { text-decoration: underline; }
+    .bar-meta .raw { color: var(--text); font-weight: 600; }
+
+    .badge {
+      display: inline-block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase; padding: 2px 7px; border-radius: 9999px; vertical-align: middle;
+      margin-left: 7px;
     }
-    .panel h2 { font-size: 1.05rem; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
-    .panel p { font-size: 0.84rem; color: var(--muted); line-height: 1.55; }
-    .panel-arrow {
-      margin-top: auto; padding-top: 10px;
-      font-size: 0.8rem; color: var(--accent); font-weight: 600;
+    .badge.proxy { color: var(--amber, #f59e0b); border: 1px solid color-mix(in srgb, var(--amber, #f59e0b) 45%, transparent); }
+
+    /* ── Domain group heading inside ledger ── */
+    .domain-group + .domain-group { margin-top: 26px; }
+    .domain-group h3 {
+      font-size: 0.95rem; font-weight: 700; color: var(--text);
+      text-transform: capitalize; margin-bottom: 4px;
+      display: flex; align-items: baseline; gap: 9px;
+    }
+    .domain-group h3 .score { font-size: 0.8rem; color: var(--tile); font-weight: 700; }
+    .domain-divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+    /* ── Question Machine ── */
+    .q-list { display: flex; flex-direction: column; gap: 10px; }
+    .q-item {
+      background: color-mix(in srgb, var(--tile) 5%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tile) 22%, transparent);
+      border-radius: 12px; padding: 14px 16px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .q-rank {
+      flex: none; width: 26px; height: 26px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 0.8rem; font-weight: 700;
+      color: var(--tile); background: color-mix(in srgb, var(--tile) 14%, transparent);
+    }
+    .q-body { flex: 1; min-width: 0; }
+    .q-title { font-size: 0.9rem; color: var(--text); font-weight: 600; }
+    .q-detail { font-size: 0.8rem; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+    .q-detail a { color: var(--tile); text-decoration: none; font-weight: 600; }
+    .q-detail a:hover { text-decoration: underline; }
+
+    /* ── Honesty / ungrounded (amber panel) ── */
+    .ungrounded { display: flex; gap: 12px; align-items: flex-start; }
+    .ungrounded .u-icon { font-size: 20px; line-height: 1; flex: none; }
+    .ungrounded h3 { font-size: 0.92rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .ungrounded p { font-size: 0.84rem; color: var(--muted); line-height: 1.55; }
+    .ungrounded .dom { color: var(--text); font-weight: 600; text-transform: capitalize; }
+
+    /* ── Methodology ── */
+    .method { font-size: 0.84rem; color: var(--muted); line-height: 1.65; }
+    .method b { color: var(--text); }
+    .method a { color: var(--tile); text-decoration: none; font-weight: 600; }
+    .method a:hover { text-decoration: underline; }
+    .method .formula {
+      display: block; margin: 12px 0; padding: 12px 14px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+      font-family: var(--mono, ui-monospace, monospace); font-size: 0.8rem; color: var(--text);
     }
 
-    /* ── Metrics grid ── */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-bottom: 44px;
-    }
-    .metric-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
-      box-shadow: var(--shadow);
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .metric-card:hover {
-      border-color: var(--accent);
-      box-shadow: var(--shadow-hover);
-    }
-    .metric-card-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; font-weight: 600; letter-spacing: 0.05em; }
-    .metric-card-value { font-size: 2.2rem; font-weight: 800; color: var(--accent); margin: 14px 0; }
-    .metric-card-note { font-size: 0.76rem; color: var(--muted); line-height: 1.4; }
-    .metric-card-note a { color: var(--accent); text-decoration: none; font-weight: 600; }
-    .metric-card-note a:hover { text-decoration: underline; }
-
-    /* ── Info section ── */
-    .info-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      margin-bottom: 40px;
-    }
-    .info-section h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-      color: var(--text);
-    }
-    .feature-list { margin: 0; }
-    .feature-item {
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.88rem;
-      line-height: 1.6;
-    }
-    .feature-item:last-child { border-bottom: none; }
-    .feature-item strong { color: var(--accent); font-weight: 700; }
-    .feature-item a { color: var(--accent); text-decoration: none; font-weight: 600; }
-    .feature-item a:hover { text-decoration: underline; }
-
-    /* ── Categories ── */
-    .category-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-      margin-bottom: 40px;
-    }
-    .category-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      box-shadow: var(--shadow);
-    }
-    .category-icon { font-size: 32px; margin-bottom: 12px; }
-    .category-card h3 {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: var(--text);
-    }
-    .category-subtitle {
-      font-size: 0.85rem;
-      color: var(--accent);
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
-    .category-card p {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.6;
-      margin-bottom: 16px;
-    }
+    /* ── States ── */
+    .wm-state { font-size: 0.9rem; color: var(--muted); padding: 22px; text-align: center; line-height: 1.6; }
+    .wm-state.error { color: var(--text); }
 
     /* ── Status bar ── */
     .status-bar {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       font-size: 0.75rem; color: var(--muted);
-      padding: 12px 0; border-top: 1px solid var(--border); margin-top: 40px;
+      padding: 16px 0; border-top: 1px solid var(--border); margin-top: 36px;
     }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-    .dot.online { background: var(--green); }
+    .status-bar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+    .status-bar .dot.online { background: var(--green); }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body>
 
 <!-- ── Site nav ── -->
 <nav class="site-nav">
-  <a class="nav-brand" href="/trader-dashboard.html">
+  <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
     Keystone OS
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
-    <a href="/three-doors-game.html">Explore</a>
-    <a href="/create.html">✏️ Create</a>
+    <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
   </div>
   <div class="nav-actions">
     <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" onclick="toggleTheme()">☀️</button>
   </div>
 </nav>
 
-<div class="page">
+<main class="page">
 
   <!-- ── Hero ── -->
   <div class="hero">
-    <span class="hero-icon">📊</span>
-    <h1>Your <span>Dashboard</span></h1>
-    <p class="tagline">Personal space, shared community, and reference data — all in one place. Private by default. Shared only when you choose.</p>
+    <span class="hero-chip" aria-hidden="true">🌍</span>
+    <p class="motto">Observe · Remember · Reason · Verify · Converge</p>
+    <h1>The <span>Bayesian World Model</span></h1>
+    <p class="tagline">Every belief here is a probability with an explicit uncertainty and a first-class source. Nothing is asserted without evidence — claim, evidence, confidence, and source travel together.</p>
   </div>
 
-  <!-- ── Cube Network ── -->
-  <p class="section-label" id="cubes">Your Spaces</p>
-  <div class="panels" id="cube-panels">
-    <div class="panel" onclick="location.href='/dream-chat.html'">
-      <span class="panel-icon">🔒</span>
-      <span class="panel-label">Private</span>
-      <h2>Personal Journal</h2>
-      <p>Your private space. Thoughts, reflections, and conversations. Never shared by default.</p>
-      <span class="panel-arrow" id="private-cube-status">Loading…</span>
-    </div>
-    <div class="panel" onclick="location.href='/flourishing'">
-      <span class="panel-icon">🌐</span>
-      <span class="panel-label">Shared</span>
-      <h2>Community Hub</h2>
-      <p>Shared with invited allies. Contains only approved claims and community-safe patterns.</p>
-      <span class="panel-arrow" id="shared-cube-status">Loading…</span>
-    </div>
-    <div class="panel">
-      <span class="panel-icon">👥</span>
-      <span class="panel-label">Network</span>
-      <h2>Allies</h2>
-      <p>People connected to your community hub. Each has their own private space.</p>
-      <span class="panel-arrow" id="allies-status">Loading…</span>
-    </div>
-    <div class="panel" onclick="location.href='/agent-status.html'">
-      <span class="panel-icon">📦</span>
-      <span class="panel-label">System</span>
-      <h2>Claim Packets</h2>
-      <p>Consented, signed packets ready for the shared hub. Review and approve before sharing.</p>
-      <span class="panel-arrow">Manage claims →</span>
-    </div>
+  <!-- ── Toolbar ── -->
+  <div class="wm-toolbar">
+    <div class="wm-updated" id="wm-updated">Loading the model…</div>
+    <button class="wm-refresh" id="wm-refresh" onclick="refreshModel()" disabled>↻ Refresh from sources</button>
   </div>
 
-  <!-- ── World News (live) ── -->
-  <p class="section-label" id="news">Reference Data — Live</p>
-  <div class="info-section">
-    <h3>Latest from primary sources <span id="newsUpdated" style="font-weight:400;font-size:0.75rem;color:var(--muted)"></span></h3>
-    <div class="feature-list" id="newsList">
-      <div class="feature-item" style="color:var(--muted)">Loading live headlines from UN News, WHO, Mongabay, and Our World in Data…</div>
+  <!-- ── Domain posteriors ── -->
+  <section class="wm-panel acc-cyan">
+    <div class="panel-head">
+      <span class="panel-label">Domain posteriors</span>
+      <h2>The model at a glance</h2>
+      <p class="panel-sub">Each domain score is a precision-weighted combination of its grounded beliefs — confident beliefs count more. The shaded band is the 1σ credible interval; the bar tip is the mean.</p>
     </div>
-  </div>
-
-  <!-- ── Live trackers ── -->
-  <p class="section-label" id="measurements">Key Indicators</p>
-  <div class="metrics-grid">
-    <div class="metric-card">
-      <div class="metric-card-label">Atmospheric CO₂</div>
-      <div class="metric-card-value" id="airQuality">342</div>
-      <div class="metric-card-note">ppm · <a href="https://gml.noaa.gov/ccgg/trends/" target="_blank">NOAA live tracking</a></div>
+    <div id="domains-card">
+      <div class="wm-state" id="domains-state">Loading domain posteriors…</div>
     </div>
+  </section>
 
-    <div class="metric-card">
-      <div class="metric-card-label">Mental Health Burden</div>
-      <div class="metric-card-value" id="mentalHealth">38%</div>
-      <div class="metric-card-note">people affected · <a href="https://www.who.int/teams/mental-health-and-substance-use" target="_blank">WHO data</a></div>
+  <!-- ── Beliefs ledger ── -->
+  <section class="wm-panel acc-emerald">
+    <div class="panel-head">
+      <span class="panel-label">Beliefs &amp; evidence</span>
+      <h2>Every belief, with its receipt</h2>
+      <p class="panel-sub">One row per grounded belief: the raw measurement (evidence), the normalized flourishing posterior (claim), its uncertainty (confidence), and a link to the exact feed it came from (source).</p>
     </div>
-
-    <div class="metric-card">
-      <div class="metric-card-label">Social Connection</div>
-      <div class="metric-card-value" id="socialConnection">42%</div>
-      <div class="metric-card-note">with strong ties · <a href="https://en.wikipedia.org/wiki/Social_capital" target="_blank">Social capital research</a></div>
+    <div id="beliefs-card">
+      <div class="wm-state" id="beliefs-state">Loading beliefs…</div>
     </div>
+  </section>
 
-    <div class="metric-card">
-      <div class="metric-card-label">Wildlife Populations</div>
-      <div class="metric-card-value" id="wildlife">−68%</div>
-      <div class="metric-card-note">since 1970 · <a href="https://en.wikipedia.org/wiki/Living_Planet_Index" target="_blank">Living Planet Index</a></div>
+  <!-- ── Question Machine ── -->
+  <section class="wm-panel acc-violet">
+    <div class="panel-head">
+      <span class="panel-label">Question Machine</span>
+      <h2>What to ground next</h2>
+      <p class="panel-sub">The loop ranks beliefs by <em>uncertainty × leverage</em> — how much grounding one belief deeper would tighten its whole domain. These are the next questions worth the model's effort.</p>
     </div>
-
-    <div class="metric-card">
-      <div class="metric-card-label">Wealth Inequality</div>
-      <div class="metric-card-value" id="inequality">0.68</div>
-      <div class="metric-card-note">Gini coefficient · <a href="https://data.worldbank.org/indicator/SI.POV.GINI" target="_blank">World Bank</a></div>
+    <div class="q-list" id="questions-list">
+      <div class="wm-state">Loading question ranking…</div>
     </div>
+  </section>
 
-    <div class="metric-card">
-      <div class="metric-card-label">Forest Coverage</div>
-      <div class="metric-card-value" id="biodiversity">30%</div>
-      <div class="metric-card-note">remaining · <a href="https://www.fao.org/forest-resources-assessment/en/" target="_blank">FAO assessment</a></div>
-    </div>
-  </div>
-
-  <div class="info-section">
-    <h3>More live trackers</h3>
-    <div class="feature-list">
-      <div class="feature-item">🌡️ <a href="https://climate.nasa.gov/vital-signs/" target="_blank"><strong>NASA Vital Signs</strong></a> — CO₂, global temperature, sea level, ice sheets, updated continuously</div>
-      <div class="feature-item">🛰️ <a href="https://atmosphere.copernicus.eu/" target="_blank"><strong>Copernicus Atmosphere</strong></a> — real-time air quality and emissions monitoring</div>
-      <div class="feature-item">🌲 <a href="https://www.globalforestwatch.org/" target="_blank"><strong>Global Forest Watch</strong></a> — near-real-time deforestation alerts</div>
-      <div class="feature-item">📊 <a href="https://ourworldindata.org/" target="_blank"><strong>Our World in Data</strong></a> — poverty, health, energy, and wellbeing trends with full datasets</div>
-      <div class="feature-item">🌊 <a href="https://coralreefwatch.noaa.gov/" target="_blank"><strong>NOAA Coral Reef Watch</strong></a> — live ocean heat-stress monitoring</div>
-      <div class="feature-item">🕊️ <a href="https://reliefweb.int/" target="_blank"><strong>ReliefWeb</strong></a> — live humanitarian situation reports from OCHA</div>
-    </div>
-  </div>
-
-  <!-- ── By Category ── -->
-  <p class="section-label" id="categories">How Different Groups Are Doing</p>
-  <div class="category-grid">
-    <div class="category-card">
-      <div class="category-icon">👥</div>
-      <h3>Humans</h3>
-      <div class="category-subtitle">Health Score: 53.6% · Mixed Progress</div>
-      <p>Life expectancy is rising in most countries. But mental health challenges are increasing in wealthy nations, and economic stress is widespread. Extreme poverty is declining globally—that's progress. The gap between rich and poor is growing, limiting real freedom even in free countries.</p>
-      <div class="feature-list">
-        <div class="feature-item">📈 <a href="https://www.healthdata.org/gbd" target="_blank"><strong>Global Burden of Disease 2021</strong></a> shows life expectancy gains in 80% of countries</div>
-        <div class="feature-item">⚖️ <a href="https://freedomhouse.org/report/freedom-world" target="_blank"><strong>Freedom House 2024</strong></a> reports democratic freedoms declining in some regions</div>
-        <div class="feature-item">🌱 <a href="https://en.wikipedia.org/wiki/Sustainable_Development_Goals" target="_blank"><strong>UN SDG Report</strong></a> shows uneven progress by region</div>
+  <!-- ── Honesty: not yet grounded ── -->
+  <section class="wm-panel acc-amber" id="ungrounded" hidden>
+    <div class="ungrounded">
+      <span class="u-icon">⚠️</span>
+      <div>
+        <h3>Known gaps — not live-grounded</h3>
+        <p id="ungrounded-text"></p>
       </div>
     </div>
+  </section>
 
-    <div class="category-card">
-      <div class="category-icon">🐘</div>
-      <h3>Animals & Wildlife</h3>
-      <div class="category-subtitle">Welfare Score: 42.7% · Urgent Challenge</div>
-      <p>Wild animal populations have declined dramatically since 1970. Habitat loss is the biggest driver. Farm animal welfare is improving in some countries due to welfare regulations. Conservation efforts are working—species populations can recover when we act. The challenge is scale and speed.</p>
-      <div class="feature-list">
-        <div class="feature-item">📉 <a href="https://en.wikipedia.org/wiki/Living_Planet_Index" target="_blank"><strong>Living Planet Report 2022</strong></a> shows 68% decline in vertebrate populations since 1970</div>
-        <div class="feature-item">🆘 <a href="https://en.wikipedia.org/wiki/IUCN_Red_List" target="_blank"><strong>IUCN Red List</strong></a> tracks 37,000+ threatened species</div>
-        <div class="feature-item">✅ <a href="https://en.wikipedia.org/wiki/Animal_welfare" target="_blank"><strong>Welfare science</strong></a> shows animals thrive with natural behaviors and space</div>
-      </div>
+  <!-- ── Methodology ── -->
+  <section class="wm-panel acc-cyan">
+    <div class="panel-head">
+      <span class="panel-label">Methodology &amp; provenance</span>
+      <h2>How a number gets here</h2>
     </div>
-
-    <div class="category-card">
-      <div class="category-icon">🌳</div>
-      <h3>Ecosystems & Nature</h3>
-      <div class="category-subtitle">Resilience Score: 52.3% · Reversible</div>
-      <p>Biodiversity is declining, but the decline is reversible. Forests are shrinking, but deforestation rates are slowing. Ocean acidification is accelerating, and some species are already adapting. The Earth's capacity to regenerate is being tested—but conservation works when implemented consistently.</p>
-      <div class="feature-list">
-        <div class="feature-item">🌡️ <a href="https://www.ipcc.ch/" target="_blank"><strong>IPCC 6th Assessment 2023</strong></a> confirms climate impacts accelerating but mitigation possible</div>
-        <div class="feature-item">🔁 <a href="https://doi.org/10.1038/nature25752" target="_blank"><strong>Nature 2018 meta-analysis</strong></a> shows conservation reverses biodiversity loss</div>
-        <div class="feature-item">🌲 <a href="https://www.fao.org/forest-resources-assessment/en/" target="_blank"><strong>FAO data</strong></a> shows deforestation rate slowing in recent years</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Research Findings ── -->
-  <p class="section-label" id="findings">What The Research Shows</p>
-  <div class="info-section">
-    <h3>Key Findings (All Peer-Reviewed)</h3>
-    <div class="feature-list">
-      <div class="feature-item">✓ <strong>Inequality harms both health and community</strong> (95% confidence) — <a href="https://en.wikipedia.org/wiki/The_Spirit_Level" target="_blank">Wilkinson & Pickett research</a> shows wealth gaps predict worse outcomes across almost all health metrics.</div>
-      <div class="feature-item">✓ <strong>Nature access improves mental health</strong> (85% confidence) — <a href="https://doi.org/10.1038/s41893-019-0308-0" target="_blank">Nature Reviews 2019</a> documents the physical and psychological benefits of green space.</div>
-      <div class="feature-item">✓ <strong>Conservation actually works</strong> (90% confidence) — <a href="https://doi.org/10.1038/nature25752" target="_blank">Nature 2018 meta-analysis</a> shows protected areas reverse species decline when managed well.</div>
-      <div class="feature-item">✓ <strong>Purpose predicts wellbeing</strong> (82% confidence) — <a href="https://en.wikipedia.org/wiki/Meaning_of_life" target="_blank">APA research</a> shows people with purpose live longer and are healthier.</div>
-      <div class="feature-item">✓ <strong>Extreme poverty is declining</strong> (88% confidence) — <a href="https://data.worldbank.org/indicator/SI.POV.GINI" target="_blank">World Bank data</a> shows extreme poverty has halved since 2000.</div>
-    </div>
-  </div>
+    <p class="method">
+      Posteriors come from real yearly public data. A raw indicator is mapped to a 0–1 flourishing
+      score by a chosen linear map between a "bad" floor and a "good" ceiling:
+      <span class="formula" id="method-formula">posterior = clamp01( (raw − floor) / (ceil − floor) )</span>
+      That mapping is a <b>value-laden choice, not an objective truth</b> — so each belief carries an
+      uncertainty that already includes a penalty for the choice. Domain scores combine beliefs by
+      inverse-variance (precision) weighting. <span id="method-note"></span>
+    </p>
+    <p class="method" style="margin-top:12px;">
+      Primary source: <a id="method-source" href="https://data.worldbank.org" target="_blank" rel="noopener">World Bank Open Data</a>
+      — keyless yearly world aggregates.
+    </p>
+  </section>
 
   <!-- ── Status ── -->
   <div class="status-bar">
     <span class="dot online"></span>
-    <strong>Dashboard Live</strong> · All data verified against peer-reviewed sources
-    <span style="margin-left: auto;">Updated <span id="lastRefresh">just now</span></span>
+    <strong>Grounded</strong> · every number on this page traces to a linked first-class source
+    <span style="margin-left: auto;">Model updated <span id="last-updated">—</span></span>
   </div>
 
-</div>
+</main>
 
 <!-- ── Footer ── -->
 <footer class="site-footer">
   <div class="footer-inner">
-    <span><strong>Keystone OS</strong> · <a href="/trader-dashboard.html">Home</a> · <a href="/dream-chat.html">Chat</a> · <a href="/three-doors-game.html">Explore</a></span>
-    <span style="margin-left: auto;">All sources linked. <a href="/knowledgecenter.html">Learn more</a></span>
+    <span><strong>Keystone OS</strong> · <a href="/">Home</a> · <a href="/dream-chat.html">Chat</a> · <a href="/explore.html">Explore</a></span>
+    <span style="margin-left: auto;">All numbers sourced. <a href="/knowledgecenter.html">Learn more</a></span>
   </div>
 </footer>
 
 <script src="/js/theme-toggle.js"></script>
 <script>
-  // ── Live world news from /api/flourishing/news (RSS, server-cached) ──
-  const TOPIC_ICONS = { humanity: "🌍", health: "🩺", ecosystems: "🌳", data: "📊" };
-  async function loadWorldNews() {
-    try {
-      const r = await fetch('/api/flourishing/news');
-      const data = await r.json();
-      const list = document.getElementById('newsList');
-      if (!data.items || !data.items.length) {
-        list.innerHTML = '<div class="feature-item" style="color:var(--muted)">Live feeds unreachable right now — the source links on this page always work.</div>';
-        return;
-      }
-      // Interleave sources so one feed doesn't dominate
-      const bySource = {};
-      data.items.forEach(i => (bySource[i.source] = bySource[i.source] || []).push(i));
-      const interleaved = [];
-      for (let round = 0; round < 4; round++) {
-        for (const src of Object.keys(bySource)) {
-          if (bySource[src][round]) interleaved.push(bySource[src][round]);
-        }
-      }
-      list.innerHTML = interleaved.slice(0, 12).map(i => {
-        const when = i.published ? new Date(i.published) : null;
-        const ago = when && !isNaN(when) ? timeAgo(when) : '';
-        return `<div class="feature-item">${TOPIC_ICONS[i.topic] || '📰'} <a href="${i.link}" target="_blank" rel="noopener"><strong>${escapeHtml(i.title)}</strong></a> <span style="color:var(--muted)">· ${i.source}${ago ? ' · ' + ago : ''}</span></div>`;
-      }).join('');
-      document.getElementById('newsUpdated').textContent = '· refreshed ' + timeAgo(new Date(data.updated_at));
-      document.getElementById('lastRefresh').textContent = 'just now';
-    } catch (e) { /* leave the loading message */ }
+  const PANEL_URL = '/api/flourishing/panel';
+  const pct = (x) => Math.round(x * 100);
+  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function fmtRaw(v) {
+    if (v == null || isNaN(v)) return '—';
+    const n = Number(v);
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
   }
-  function timeAgo(d) {
-    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
-    if (s < 90) return 'just now';
-    if (s < 3600) return Math.round(s / 60) + 'm ago';
-    if (s < 86400) return Math.round(s / 3600) + 'h ago';
-    return Math.round(s / 86400) + 'd ago';
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return isNaN(d) ? '—' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
-  function escapeHtml(s) { const div = document.createElement('div'); div.textContent = s; return div.innerHTML; }
-  loadWorldNews();
-  setInterval(loadWorldNews, 10 * 60 * 1000);
-
-  // ── Cube network status ──────────────────────────────────────────
-  async function loadCubeStatus() {
-    try {
-      const [localR, sharedR, alliesR] = await Promise.all([
-        fetch('/api/cubes/local').catch(() => null),
-        fetch('/api/cubes/shared').catch(() => null),
-        fetch('/api/cubes/allies').catch(() => null),
-      ]);
-      const local = localR?.ok ? await localR.json() : null;
-      const shared = sharedR?.ok ? await sharedR.json() : null;
-      const allies = alliesR?.ok ? await alliesR.json() : null;
-
-      const privateStatus = document.getElementById('private-cube-status');
-      const sharedStatus = document.getElementById('shared-cube-status');
-      const alliesStatus = document.getElementById('allies-status');
-
-      if (privateStatus) {
-        privateStatus.textContent = local
-          ? `${local.total_deltas || 0} entries · ${(local.recent_events || []).length} recent`
-          : 'Local only';
-      }
-      if (sharedStatus) {
-        sharedStatus.textContent = shared
-          ? `${shared.total_claims || 0} claims · ${shared.member_count || 1} member${(shared.member_count || 1) !== 1 ? 's' : ''}`
-          : 'Manual sync';
-      }
-      if (alliesStatus) {
-        const count = (allies?.allies || []).length;
-        alliesStatus.textContent = count > 0 ? `${count} connected` : 'Invite allies →';
-      }
-    } catch (e) { /* silent */ }
+  function barTrack(score, uncertainty) {
+    const p = pct(score), u = pct(uncertainty);
+    const lo = Math.max(0, p - u), hi = Math.min(100, p + u);
+    return `<div class="bar-track">
+      <span class="bar-ci" style="left:${lo}%;width:${hi - lo}%"></span>
+      <span class="bar-fill" style="width:${p}%"></span>
+    </div>`;
   }
-  loadCubeStatus();
 
-  // Smooth scroll for anchor links
-  document.querySelectorAll('a[href^="#"]').forEach(link => {
-    link.addEventListener('click', (e) => {
-      const target = document.querySelector(link.getAttribute('href'));
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+  function renderDomains(domains) {
+    const el = document.getElementById('domains-state');
+    const card = document.getElementById('domains-card');
+    if (!domains || !domains.length) {
+      el.textContent = 'No domain posteriors available.';
+      return;
+    }
+    card.innerHTML = domains.map(d => `
+      <div class="bar-row">
+        <div class="bar-top">
+          <span class="bar-name cap">${esc(d.domain)}</span>
+          <span class="bar-val"><strong>${pct(d.score)}%</strong> ±${pct(d.uncertainty)}% · ${d.n} feed${d.n === 1 ? '' : 's'}</span>
+        </div>
+        ${barTrack(d.score, d.uncertainty)}
+      </div>`).join('');
+  }
+
+  function renderBeliefs(beliefs, domains) {
+    const card = document.getElementById('beliefs-card');
+    if (!beliefs || !beliefs.length) {
+      document.getElementById('beliefs-state').textContent = 'No grounded beliefs available.';
+      return;
+    }
+    const domScore = {};
+    (domains || []).forEach(d => { domScore[d.domain] = d; });
+    // group beliefs by domain, preserving the domain order from `domains`
+    const order = (domains || []).map(d => d.domain);
+    const byDomain = {};
+    beliefs.forEach(b => (byDomain[b.domain] ||= []).push(b));
+    for (const k of Object.keys(byDomain)) if (!order.includes(k)) order.push(k);
+
+    card.innerHTML = order.filter(dom => byDomain[dom]).map(dom => {
+      const ds = domScore[dom];
+      const head = `<h3><span class="cap">${esc(dom)}</span>${ds ? `<span class="score">${pct(ds.score)}% ±${pct(ds.uncertainty)}%</span>` : ''}</h3>`;
+      const rows = byDomain[dom].map(b => `
+        <div class="bar-row">
+          <div class="bar-top">
+            <span class="bar-name">${esc(b.label)}${b.proxy ? '<span class="badge proxy" title="loosely stands in for the component — extra uncertainty">proxy</span>' : ''}</span>
+            <span class="bar-val"><strong>${pct(b.posterior)}%</strong> ±${pct(b.uncertainty)}%</span>
+          </div>
+          ${barTrack(b.posterior, b.uncertainty)}
+          <div class="bar-meta">
+            <span class="raw">${fmtRaw(b.raw)} ${esc(b.unit)}</span> (${esc(b.year)})
+            · <a href="${esc(b.source)}" target="_blank" rel="noopener">${esc(b.source_name || 'source')} ↗</a>
+          </div>
+        </div>`).join('');
+      return `<div class="domain-group">${head}<div class="domain-divider"></div>${rows}</div>`;
+    }).join('');
+  }
+
+  function renderQuestions(questions, beliefs) {
+    const list = document.getElementById('questions-list');
+    if (!questions || !questions.length) {
+      list.innerHTML = '<div class="wm-state">No open questions — every belief is at target precision.</div>';
+      return;
+    }
+    const byEntity = {};
+    (beliefs || []).forEach(b => { byEntity[b.entity] = b; });
+    list.innerHTML = questions.map((q, i) => {
+      const b = byEntity[q.entity];
+      const cur = b ? `currently <strong style="color:var(--text)">${pct(b.posterior)}%</strong> ` : '';
+      const label = b ? esc(b.label) : esc(q.entity);
+      const proxy = b && b.proxy ? ' (proxy indicator)' : '';
+      return `
+        <div class="q-item">
+          <div class="q-rank">${i + 1}</div>
+          <div class="q-body">
+            <div class="q-title">${label}</div>
+            <div class="q-detail">
+              ${cur}±${pct(q.uncertainty)}% via ${esc(q.channel)}${proxy}
+              · <a href="${esc(q.source)}" target="_blank" rel="noopener">source ↗</a>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderUngrounded(domains) {
+    const box = document.getElementById('ungrounded');
+    if (!domains || !domains.length) { box.hidden = true; return; }
+    const names = domains.map(d => `<span class="dom">${esc(d)}</span>`).join(', ');
+    document.getElementById('ungrounded-text').innerHTML =
+      `${names} — these domains have <b style="color:var(--text)">no live feed</b> and are literature-only in the source model. ` +
+      `They are deliberately excluded from the grounded scores above rather than filled with guesses.`;
+    box.hidden = false;
+  }
+
+  function setError(msg) {
+    document.getElementById('wm-updated').textContent = '';
+    ['domains-state', 'beliefs-state'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.add('error'); el.textContent = msg; }
     });
-  });
+    document.getElementById('questions-list').innerHTML = `<div class="wm-state error">${esc(msg)}</div>`;
+  }
+
+  async function loadModel(force) {
+    const btn = document.getElementById('wm-refresh');
+    try {
+      const r = await fetch(PANEL_URL + (force ? '?refresh=1' : ''), { cache: 'no-store', signal: AbortSignal.timeout(40000) });
+      if (!r.ok) { setError(`Live feeds returned HTTP ${r.status}. The model is grounded only — no cached fallback is shown.`); return; }
+      const p = await r.json();
+      if (!p || !p.ok) { setError('Live feeds are unreachable right now. Nothing is shown rather than stale guesses — try refreshing.'); return; }
+
+      renderDomains(p.domains);
+      renderBeliefs(p.beliefs, p.domains);
+      renderQuestions(p.questions, p.beliefs);
+      renderUngrounded(p.ungrounded_domains);
+
+      const upd = fmtDate(p.updated_at);
+      const sources = (p.sources || ['World Bank']).join(', ');
+      document.getElementById('wm-updated').innerHTML =
+        `Grounded from <b>${esc(sources)}</b> · ${(p.beliefs || []).length} beliefs · updated <b>${upd}</b>`;
+      document.getElementById('last-updated').textContent = upd;
+      if (p.note) document.getElementById('method-note').textContent = p.note;
+    } catch (e) {
+      setError('Could not reach the live feeds (timeout or network error). The model shows nothing rather than guessing.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '↻ Refresh from sources';
+    }
+  }
+
+  function refreshModel() {
+    const btn = document.getElementById('wm-refresh');
+    btn.disabled = true;
+    btn.textContent = '↻ Refreshing…';
+    document.getElementById('wm-updated').textContent = 'Re-polling sources…';
+    loadModel(true);
+  }
+
+  loadModel(false);
 </script>
 <script src="/js/auth-gate.js" defer></script>
 </body>

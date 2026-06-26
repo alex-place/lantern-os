@@ -235,10 +235,19 @@
 
     /* ── Flourishing world-model panel (grounded from real yearly feeds) ── */
     .flourish-panel {
+      --tile: var(--accent);
+      position: relative; overflow: hidden;
       max-width: 900px; width: 100%; margin: 0 auto;
       display: flex; flex-direction: column; gap: 11px;
-      padding: 16px 18px;
+      padding: 18px 18px 16px;
+      transition: border-color .2s, box-shadow .2s, transform .15s;
     }
+    /* match the home tiles: same top accent bar + hover treatment */
+    .flourish-panel::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--tile); transform-origin: left;
+    }
+    .flourish-panel:hover { border-color: var(--tile); box-shadow: var(--shadow-hover); }
     .flourish-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
     .flourish-head .panel-label { color: var(--accent); font-size: 0.62rem; }
     .flourish-head h2 { margin: 1px 0 0; font-size: 1.12rem; }
