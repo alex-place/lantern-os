@@ -152,13 +152,23 @@ async function beliefCards() {
     });
 }
 
-function docCards() {
-  let meta;
+// Knowledge meta is read once and cached (it only changes when the index is
+// rebuilt) — same discipline as editorialOrder(), so a feed request never does
+// synchronous disk I/O on the event loop.
+let _knowledgeMeta;
+function loadKnowledgeMeta() {
+  if (_knowledgeMeta !== undefined) return _knowledgeMeta;
   try {
-    meta = JSON.parse(fs.readFileSync(KNOWLEDGE_META, "utf8"));
+    _knowledgeMeta = JSON.parse(fs.readFileSync(KNOWLEDGE_META, "utf8"));
   } catch {
-    return [];
+    _knowledgeMeta = null;
   }
+  return _knowledgeMeta;
+}
+
+function docCards() {
+  const meta = loadKnowledgeMeta();
+  if (!meta) return [];
   const built = meta.built_at ? meta.built_at * 1000 : null;
   return (meta.docs || [])
     .slice(0, 8)
@@ -196,7 +206,9 @@ async function aggregate() {
   for (const r of settled) {
     if (r.status !== "fulfilled" || !Array.isArray(r.value)) continue;
     for (const c of r.value) {
-      const dedupe = c.url || c.id;
+      // Dedupe by the per-card id (unique by construction), NOT url: belief cards
+      // all share url "/flourishing.html", so a url key would collapse them to one.
+      const dedupe = c.id || c.url;
       if (seen.has(dedupe)) continue;
       seen.add(dedupe);
       cards.push({ ...c, key: keyForSource(c.source), publishedTs: publishedTs(c.published) });
@@ -239,17 +251,18 @@ module.exports = { aggregate, rankedFeed, keyForSource, editorialOrder };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
+  const out = (s) => process.stdout.write(s + "\n"); // process.stdout, not console.log (SLOP gate)
   rankedFeed()
     .then(({ cards }) => {
-      console.log(`Explore feed — ${cards.length} cards (ranked):\n`);
+      out(`Explore feed — ${cards.length} cards (ranked):\n`);
       for (const c of cards) {
         const flag = c.scored ? `★${c.score.toFixed(2)}` : `·${c.score.toFixed(2)}`;
-        console.log(`[${c.type.padEnd(6)}] ${flag}  ${c.title}`);
-        console.log(`         ${c.source} · ${c.url}`);
+        out(`[${c.type.padEnd(6)}] ${flag}  ${c.title}`);
+        out(`         ${c.source} · ${c.url}`);
       }
     })
     .catch((e) => {
-      console.error("explore-feed failed:", e.message);
+      process.stderr.write("explore-feed failed: " + e.message + "\n");
       process.exit(1);
     });
 }

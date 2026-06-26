@@ -838,6 +838,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ICON = { read: '📰', watch: '🎬', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
 
+  // Only http(s) and root-relative URLs are linkable. A card url is sourced from
+  // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
+  // href (esc() escapes quotes but not the scheme). Anything else renders inert.
+  const safeUrl = u => (/^https?:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '#';
+
   function shortDate(d) {
     if (!d) return '';
     const t = typeof d === 'number' ? (d > 1e12 ? d : d * 1000) : Date.parse(d);
@@ -862,7 +867,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let filter = 'all';
 
   function cardEl(c) {
-    const ext = /^https?:/i.test(c.url);
+    const href = safeUrl(c.url);
+    const ext = /^https?:/i.test(href);
     const el = document.createElement('div');
     el.className = 'feed-card';
     el.dataset.type = c.type;
@@ -871,7 +877,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.innerHTML =
       '<div class="fc-top"><span class="fc-type">' + (ICON[c.type] || '•') + ' ' + esc(c.type) + '</span>' +
         (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
-      '<a class="fc-title" href="' + esc(c.url) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
+      '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
         esc(c.title) + '</a>' +
       '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
       '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
@@ -925,138 +931,6 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(() => {
       if (statusEl) statusEl.textContent = 'Feed is offline right now — open All tools below.';
     });
-})();
-</script>
-
-<script>
-/* Legacy watch carousel — only runs if a #ytPlayer is present (kept for any page
-   that still embeds it; the single-pane feed above replaced the rails). */
-(function () {
-  const FEATURED_ID = '_bjDjkQsTs0';
-  const FALLBACK = {
-    featured: FEATURED_ID,
-    videos: [
-      { id: '20t9zSUXhhw', title: 'learning Mario [lantern gaming]' },
-      { id: '_bjDjkQsTs0', title: 'playing doom 1 half playthrough [lantern gaming]', featured: true },
-    ],
-  };
-  const player = document.getElementById('ytPlayer');
-  const car = document.getElementById('videoCarousel');
-  if (!player || !car) return;
-
-  const embed = (id, autoplay) =>
-    'https://www.youtube-nocookie.com/embed/' + id + '?rel=0' + (autoplay ? '&autoplay=1' : '');
-
-  function render(data) {
-    const featured = data.featured || FEATURED_ID;
-    const videos = (data.videos && data.videos.length) ? data.videos : FALLBACK.videos;
-    car.innerHTML = '';
-    videos.forEach(v => {
-      const isFeat = v.featured || v.id === featured;
-      const t = document.createElement('button');
-      t.type = 'button';
-      t.setAttribute('role', 'listitem');
-      t.className = 'video-thumb' + (isFeat ? ' active' : '');
-      t.setAttribute('aria-label', 'Play ' + (v.title || v.id));
-      t.innerHTML =
-        '<img loading="lazy" src="https://img.youtube.com/vi/' + v.id + '/hqdefault.jpg" alt="">' +
-        '<div class="vt-title">' + (isFeat ? '<span class="vt-badge">★ Canon</span> ' : '') +
-        (v.title || v.id) + '</div>';
-      t.addEventListener('click', () => {
-        player.src = embed(v.id, true);
-        car.querySelectorAll('.video-thumb').forEach(e => e.classList.remove('active'));
-        t.classList.add('active');
-      });
-      car.appendChild(t);
-    });
-    // load the featured video into the player and center its thumb
-    const featVid = videos.find(v => v.featured || v.id === featured) || videos[0];
-    if (featVid) player.src = embed(featVid.id, false);
-    const active = car.querySelector('.video-thumb.active') || car.querySelector('.video-thumb');
-    if (active) car.scrollLeft = Math.max(0, active.offsetLeft - (car.clientWidth - active.offsetWidth) / 2);
-  }
-
-  fetch('/api/youtube/lantern-videos', { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(render)
-    .catch(() => render(FALLBACK));
-})();
-</script>
-
-<script>
-/* Discover rail + GitHub activity — both server-side cached with baked
-   fallbacks, so the sections always render even if a feed/API is down. */
-(function () {
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-  function shortDate(d) {
-    if (!d) return '';
-    const t = Date.parse(d);
-    if (Number.isNaN(t)) return '';
-    try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
-    catch { return ''; }
-  }
-
-  // ── Discover rail ──
-  const grid = document.getElementById('discoverGrid');
-  const foot = document.getElementById('discoverFoot');
-  if (grid) {
-    fetch('/api/feeds/discover', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        const items = (data && data.items) || [];
-        grid.removeAttribute('aria-busy');
-        if (!items.length) { grid.innerHTML = '<div class="discover-loading">No reads available right now.</div>'; return; }
-        grid.innerHTML = items.map(it => {
-          const ext = /^https?:/i.test(it.link);
-          const meta = [it.source ? '<span class="dc-source">' + esc(it.source) + '</span>' : '',
-                        shortDate(it.date) ? '<span>' + esc(shortDate(it.date)) + '</span>' : ''].filter(Boolean).join('');
-          return '<a class="discover-card" href="' + esc(it.link) + '"' +
-            (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
-            '<span class="dc-title">' + esc(it.title) + '</span>' +
-            (meta ? '<span class="dc-meta">' + meta + '</span>' : '') + '</a>';
-        }).join('');
-        if (foot && data.sources && data.sources.length) {
-          foot.textContent = 'Sources: ' + data.sources.map(s => s.name).join(' · ');
-        }
-      })
-      .catch(() => { grid.removeAttribute('aria-busy'); grid.innerHTML = '<div class="discover-loading">Discovery feed is offline right now.</div>'; });
-  }
-
-  // ── GitHub activity ──
-  const ghStars = document.getElementById('ghStars');
-  const ghReleases = document.getElementById('ghReleases');
-  const ghCommits = document.getElementById('ghCommits');
-  if (ghReleases || ghCommits) {
-    fetch('/api/github/activity', { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        if (ghStars && typeof data.stars === 'number') ghStars.textContent = '★ ' + data.stars;
-        if (ghReleases) {
-          const rel = data.releases || [];
-          ghReleases.innerHTML = rel.length ? rel.map(r =>
-            '<a class="gh-item" href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="gh-tag">' + esc(r.tag) + '</span>' +
-            '<span class="gh-item-text">' + esc(r.name) +
-            (shortDate(r.date) ? '<span class="gh-item-date">' + esc(shortDate(r.date)) + '</span>' : '') +
-            '</span></a>').join('') : '<div class="gh-loading">No releases yet.</div>';
-        }
-        if (ghCommits) {
-          const com = data.commits || [];
-          ghCommits.innerHTML = com.length ? com.map(c =>
-            '<a class="gh-item" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer">' +
-            '<span class="gh-tag">' + esc(c.sha) + '</span>' +
-            '<span class="gh-item-text">' + esc(c.msg) +
-            (shortDate(c.date) ? '<span class="gh-item-date">' + esc(shortDate(c.date)) + '</span>' : '') +
-            '</span></a>').join('') : '<div class="gh-loading">No commits found.</div>';
-        }
-      })
-      .catch(() => {
-        if (ghReleases) ghReleases.innerHTML = '<div class="gh-loading">GitHub is unreachable right now.</div>';
-        if (ghCommits) ghCommits.innerHTML = '';
-      });
-  }
 })();
 </script>
 </body>
