@@ -31,3 +31,20 @@ describe("buildBrainOrder pinned-provider backstop", () => {
     expect(buildBrainOrder({ hintProvider: "anthropic" })[0]).toBe("anthropic");
   });
 });
+
+describe("KEYSTONE_PREFERRED_PROVIDER (Auto-mode lead bias)", () => {
+  afterEach(() => { delete process.env.KEYSTONE_PREFERRED_PROVIDER; });
+  test("preferred provider leads Auto mode, brain hint + chain backstop", () => {
+    process.env.KEYSTONE_PREFERRED_PROVIDER = "gemini";
+    expect(buildBrainOrder({ hintProvider: "anthropic" })).toEqual(["gemini", "anthropic", "openai", "xai", "ollama"]);
+  });
+  test("an explicit pin still overrides the preference", () => {
+    process.env.KEYSTONE_PREFERRED_PROVIDER = "gemini";
+    expect(buildBrainOrder({ requestedProvider: "claude" })[0]).toBe("anthropic");
+  });
+  test("preferred provider with no key is dropped, chain still answers", () => {
+    process.env.KEYSTONE_PREFERRED_PROVIDER = "gemini";
+    delete process.env.GEMINI_API_KEY;
+    expect(buildBrainOrder({ hintProvider: "anthropic" })[0]).toBe("anthropic");
+  });
+});

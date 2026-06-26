@@ -1,0 +1,1 @@
+feat(router): KEYSTONE_PREFERRED_PROVIDER biases the Auto-mode lead provider (e.g. set to "gemini" to spend Google credits first). It only leads — the brain/PCSF hint and the full backstop chain still follow, so a rate-limited/down preferred provider never dead-ends the turn. An explicit per-request pin still overrides it. Unset → unchanged.

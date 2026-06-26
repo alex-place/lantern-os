@@ -42,7 +42,12 @@ function buildBrainOrder({ requestedProvider, hintProvider }) {
   const seen = new Set();
   const order = [];
   const push = (p) => { const n = norm(p); if (n && DISPATCH.includes(n) && !seen.has(n)) { seen.add(n); order.push(n); } };
-  push(hintProvider);                  // the brain's pick leads
+  // Operator preference (KEYSTONE_PREFERRED_PROVIDER) leads Auto mode — e.g. set to
+  // "gemini" to spend Google credits first. Only biases the lead; the brain hint and
+  // the full backstop chain still follow, so a down/rate-limited preferred provider
+  // never dead-ends the turn. Empty/unset → unchanged (brain hint leads).
+  push(process.env.KEYSTONE_PREFERRED_PROVIDER);
+  push(hintProvider);                  // the brain's pick leads next
   for (const p of DISPATCH) push(p);   // stable backstop chain after it
   return order.filter(_dispatchHasKey);
 }
