@@ -45,7 +45,7 @@ class WeeklyTrainingOrchestrator:
     def __init__(self):
         self.run_id = f"weekly-{datetime.utcnow().isoformat()}"
         self.dispatched_jobs = []
-        self.benchmark_results = {}
+        self.benchmark_results = {"measured": False, "status": "not_run"}
 
     async def dispatch_all(self):
         """POST /api/gpu-training/dispatch-all to fan out to all automatable providers."""
@@ -199,6 +199,24 @@ class WeeklyTrainingOrchestrator:
                 "jobs_dispatched": len(self.dispatched_jobs),
             }
 
+            # External Reality Rule (#1188): only post benchmark numbers that were
+            # actually measured by the real HumanEval harness. Never post the
+            # not_measured / fabricated placeholder as if it were a result.
+            measured = bool(self.benchmark_results.get("measured")) if isinstance(self.benchmark_results, dict) else False
+            if measured:
+                benchmark_section = (
+                    "### Benchmark Results (HumanEval — measured)\n"
+                    "```json\n" + json.dumps(self.benchmark_results, indent=2) + "\n```"
+                )
+            else:
+                reason = self.benchmark_results.get("reason") if isinstance(self.benchmark_results, dict) else None
+                benchmark_section = (
+                    "### Benchmark Results (HumanEval)\n"
+                    "_Not measured this run — no real benchmark output"
+                    + (f" ({reason})" if reason else "")
+                    + ". No scores are reported rather than fabricated ones._"
+                )
+
             body = f"""## Weekly Training Update — {datetime.utcnow().strftime('%Y-%m-%d')}
 
 Training run: `{self.run_id}`
@@ -207,10 +225,7 @@ Training run: `{self.run_id}`
 - Providers trained: {summary['providers_trained']}
 - Total jobs dispatched: {summary['jobs_dispatched']}
 
-### Benchmark Results (HumanEval)
-```json
-{json.dumps(self.benchmark_results, indent=2)}
-```
+{benchmark_section}
 
 ### Provider Coverage
 {self._provider_coverage_table()}
