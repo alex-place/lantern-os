@@ -604,27 +604,37 @@ async function callLlm(system, user, providerHint = "auto", maxTokens = 4096) {
   const xaiKey = process.env.XAI_API_KEY;
   const messages = [{ role: "system", content: system }, { role: "user", content: user }];
 
+  // A provider that returns an empty/whitespace-only string is a FAILURE, not a
+  // success: Gemini safety-blocks, a finishReason cutoff, or the tiny local model
+  // all surface as "". Returning that stops the cascade and leaves the caller with
+  // `plan_parse_failed: empty response` — so treat empty as a throw and fall through.
+  const nonEmpty = async (label, p) => {
+    const out = await p;
+    if (!out || !String(out).trim()) throw new Error(`${label}_empty_response`);
+    return out;
+  };
+
   // When a specific provider is requested, try it directly (no cascade).
   if (providerHint !== "auto") {
-    if ((providerHint === "claude" || providerHint === "anthropic") && anthropicKey) return callClaude(system, user, maxTokens);
-    if (providerHint === "openai" && openaiKey) return callOpenAI(messages, maxTokens);
-    if (providerHint === "gemini" && geminiKey) return callGemini(system, user, maxTokens);
-    if ((providerHint === "grok" || providerHint === "xai") && xaiKey) return callGrok(messages, maxTokens);
-    if (providerHint === "ollama") return callOllama(messages);
+    if ((providerHint === "claude" || providerHint === "anthropic") && anthropicKey) return nonEmpty("claude", callClaude(system, user, maxTokens));
+    if (providerHint === "openai" && openaiKey) return nonEmpty("openai", callOpenAI(messages, maxTokens));
+    if (providerHint === "gemini" && geminiKey) return nonEmpty("gemini", callGemini(system, user, maxTokens));
+    if ((providerHint === "grok" || providerHint === "xai") && xaiKey) return nonEmpty("grok", callGrok(messages, maxTokens));
+    if (providerHint === "ollama") return nonEmpty("ollama", callOllama(messages));
     throw new Error("no_provider_available");
   }
 
   // Auto mode: try every provider that has a key, in cascade. Order favors
   // quality/cost and deprioritizes OpenAI (commonly the first to hit a quota
-  // cap); a provider that throws (quota, timeout, parse) falls through to the
-  // next rather than failing the whole run. Grok/XAI is included so a key the
-  // UI advertises as connected is actually usable here.
+  // cap); a provider that throws (quota, timeout, parse, OR an empty response)
+  // falls through to the next rather than failing the whole run. Grok/XAI is
+  // included so a key the UI advertises as connected is actually usable here.
   const queue = [
-    anthropicKey && (() => callClaude(system, user, maxTokens)),
-    geminiKey    && (() => callGemini(system, user, maxTokens)),
-    xaiKey       && (() => callGrok(messages, maxTokens)),
-    openaiKey    && (() => callOpenAI(messages, maxTokens)),
-    () => callOllama(messages),
+    anthropicKey && (() => nonEmpty("claude", callClaude(system, user, maxTokens))),
+    geminiKey    && (() => nonEmpty("gemini", callGemini(system, user, maxTokens))),
+    xaiKey       && (() => nonEmpty("grok",   callGrok(messages, maxTokens))),
+    openaiKey    && (() => nonEmpty("openai", callOpenAI(messages, maxTokens))),
+    () => nonEmpty("ollama", callOllama(messages)),
   ].filter(Boolean);
 
   const errs = [];

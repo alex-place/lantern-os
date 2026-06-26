@@ -605,8 +605,29 @@ module.exports = async (req, res, url, deps) => {
 
         // ── 4. plan (with research context as Σ₀ evidence) ───────────────
         step("plan", "start");
-        const plan = await generatePlan(
-          workRoot, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
+        let plan;
+        try {
+          plan = await generatePlan(
+            workRoot, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
+        } catch (planErr) {
+          // The most common real failure here is "no cloud model available" —
+          // every provider out of credits/quota, with the tiny local model
+          // returning empty. Surface that as an honest, actionable plan-step
+          // error instead of a generic exception blob (autowork needs a working
+          // cloud model; a 1.4B local model can't plan a code change).
+          const raw = String(planErr && planErr.message || planErr);
+          const noCloud = /all_providers_failed|empty response|credit|quota|billing|spending limit/i.test(raw);
+          const msg = noCloud
+            ? "Autowork needs a working cloud model, but every provider is unavailable " +
+              "(out of credits/quota) and the local model returned nothing. Add credits to a " +
+              "provider (Anthropic/OpenAI/Gemini/xAI) or set a usable key, then retry."
+            : `Plan generation failed: ${raw.slice(0, 300)}`;
+          step("plan", "error", { error: raw.slice(0, 500), noCloud });
+          receipt.stoppedAt = "plan_failed";
+          send("done", { ok: false, ...receipt, stoppedAt: "plan_failed", message: msg });
+          res.end();
+          return;
+        }
         step("plan", "done", {
           plan,
           confidence: {
