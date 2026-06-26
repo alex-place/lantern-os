@@ -1,0 +1,5 @@
+### Leaderboard: record terminal cloud failures + align recording taxonomy with routing
+
+- The PCSF leaderboard recorded cloud-provider **successes** (PR #1184) but never **failures**, so it could only learn relative latency among winners, not provider reliability. It now records a failure on a *terminal* provider failure — for Gemini only when the model chain is exhausted (not on a transient 429/5xx retry that later succeeds), and for Anthropic/OpenAI/xAI in their terminal catch (no within-block retry-then-success). 
+- Fixed the taxonomy mismatch: outcomes were recorded under the *intent* key (`dream_chat`/`technical_debug`) while routing queries the *detectTaskType* key (`coding`/`reasoning`/`default`), so per-task ranking never matched (PR #1186's `aggregate("all")` was masking it). Recording now uses the routing `taskType` for both success and failure (cloud + local).
+- Also closed a latent gap: the xAI success path reports provider `"grok"`, which was missing from the executable-cloud set, so **grok successes were silently never recorded** — added `"grok"` so xAI ranks at all, with failures recorded under the same key. Fixes #1236.

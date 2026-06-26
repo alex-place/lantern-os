@@ -855,6 +855,12 @@ async function handleStreamChat(req, url, res) {
 
   // ── Route label (sent in every done event; shown below each assistant bubble) ─
   const converganceIntent = converganceDecision?.intent || routeIntent || routeDecision.intent || "general";
+  // Leaderboard recording key. The PCSF leaderboard / chain ordering query by
+  // detectTaskType ("coding"/"reasoning"/"default"...), but outcomes used to be
+  // recorded under `intent` ("dream_chat"/"technical_debug"), so per-task ranking
+  // never matched. Hoisted here (before the sendDone closure) and assigned from
+  // detectTaskType below so success AND failure record under the routing taxonomy (#1236).
+  let leaderboardTaskType = "default";
   const ROUTE_LABEL_MAP = {
     code: "Keystone · code via convergence",
     strategy: "Keystone · strategy via convergence",
@@ -900,7 +906,9 @@ async function handleStreamChat(req, url, res) {
   let _turnStart = Date.now();
   // Cloud providers the streaming dispatch can actually run. Local (ollama/keystone-ft)
   // already records its own outcomes in-line; we only fill the cloud gap here.
-  const _EXECUTABLE_CLOUD = new Set(["anthropic", "gemini", "openai", "xai"]);
+  // Includes both "xai" and "grok": the xai success path reports provider "grok",
+  // so without it grok successes were silently never recorded to the leaderboard (#1236).
+  const _EXECUTABLE_CLOUD = new Set(["anthropic", "gemini", "openai", "xai", "grok"]);
 
   // Consistent sendDone with Σ₀ PCSF signature for all responses
   const sendDone = (source, extra = {}) => {
@@ -975,7 +983,7 @@ async function handleStreamChat(req, url, res) {
     try {
       const prov = extra.provider;
       if (prov && _EXECUTABLE_CLOUD.has(prov) && extra.online !== false && !degradedLocal && fullReply) {
-        recordModelOutcome(prov, intent, true, Date.now() - _turnStart);
+        recordModelOutcome(prov, leaderboardTaskType, true, Date.now() - _turnStart);
       }
     } catch { /* leaderboard must never break a reply */ }
     return sse.sendDone(res, source, { ...extra, ...signature, routeLabel: finalRouteLabel });
@@ -1211,6 +1219,7 @@ async function handleStreamChat(req, url, res) {
     // any message on the main chat surface. Use the real per-message intent instead:
     // only the dream/journal-flavored intent gets the creative (local-first) chain.
     let taskType = detectTaskType(message, { isCreative: converganceDecision?.intent === "dream_chat" && isRpMode });
+    leaderboardTaskType = taskType; // align leaderboard recording with routing taxonomy (#1236)
 
     // ── Router gate (opt-in via ROUTER_GATE=1) ────────────────────────────────
     // The dream-chat surface forces isCreative -> always "creative" (ollama-first).
@@ -1401,7 +1410,7 @@ async function handleStreamChat(req, url, res) {
         await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
           role: "lantern", text: cleanText.slice(0, maxConversationTextLength) }).catch(() => {});
         sendToken(cleanText);
-        try { recordProviderSuccess("ollama"); recordModelOutcome(loopModel, intent, true, 0); } catch (_e) {}
+        try { recordProviderSuccess("ollama"); recordModelOutcome(loopModel, leaderboardTaskType, true, 0); } catch (_e) {}
         sendDone("ollama", { agent: doneAgentName, online: true, cleanText, suggestions, model: loopModel,
           source: "ollama", loop_n: lr.loop_n, confidence: lr.confidence, exit_reason: lr.exit_reason });
         return;
@@ -1539,7 +1548,7 @@ async function handleStreamChat(req, url, res) {
             text: cleanText.slice(0, maxConversationTextLength),
           }).catch(() => {});
           recordProviderSuccess("ollama");
-          recordModelOutcome(ollamaModel, intent, true, Date.now() - _ollamaStart); // feed leaderboard
+          recordModelOutcome(ollamaModel, leaderboardTaskType, true, Date.now() - _ollamaStart); // feed leaderboard
           const ollamaReceipt = buildPcsfReceipt("ollama", ollamaModel, true);
           sendReceipt(ollamaReceipt);
           const meta = { agent: doneAgentName, online: true, cleanText, suggestions, model: ollamaModel, webSuggestions, receipt: ollamaReceipt };
@@ -1548,7 +1557,7 @@ async function handleStreamChat(req, url, res) {
           return;
         }
       } catch (err) {
-        recordModelOutcome(ollamaModel, intent, false, Date.now() - _ollamaStart); // leaderboard learns failures too
+        recordModelOutcome(ollamaModel, leaderboardTaskType, false, Date.now() - _ollamaStart); // leaderboard learns failures too
         fullReply = "";
         continue; // Try next model in chain
       }
@@ -1792,6 +1801,10 @@ async function handleStreamChat(req, url, res) {
         /gemini_status_5\d\d/.test(msg) || // 500/502/503/504 high-demand
         msg.includes("gemini_timeout");
       if (isTransient) { fullReply = ""; continue; } // retry with next model silently
+      // Terminal gemini failure (chain exhausted / non-transient): record to the
+      // leaderboard so PCSF learns provider reliability. Not reached on a
+      // transient retry that later succeeds (that path `continue`d above). (#1236)
+      try { recordModelOutcome("gemini", leaderboardTaskType, false, Date.now() - _turnStart); } catch { /* never break a reply */ }
       if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
@@ -1962,6 +1975,9 @@ async function handleStreamChat(req, url, res) {
       const errorCode = err.message.includes("anthropic_status_") ? err.message : "unknown";
       recordProviderFailure("anthropic", err.message);
       recordProviderFailureRouter("anthropic", errorCode); // Also log to provider-router
+      // Terminal anthropic failure for this turn (no within-block retry-then-success):
+      // record to the PCSF leaderboard so it learns provider reliability (#1236).
+      try { recordModelOutcome("anthropic", leaderboardTaskType, false, Date.now() - _turnStart); } catch { /* never break a reply */ }
       if (_hardPin) {
         sendError(humanError(err));
         await streamLocalFallback(err.message);
@@ -2096,6 +2112,7 @@ async function handleStreamChat(req, url, res) {
       const errorCode = err.message.includes("openai_status_") ? err.message : "unknown";
       recordProviderFailure("openai", err.message);
       recordProviderFailureRouter("openai", errorCode); // Also log to provider-router
+      try { recordModelOutcome("openai", leaderboardTaskType, false, Date.now() - _turnStart); } catch { /* never break a reply */ } // #1236
       if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
@@ -2202,6 +2219,8 @@ async function handleStreamChat(req, url, res) {
       return;
     } catch (err) {
       recordProviderFailure("xai", err.message);
+      // Record under "grok" to match the success key (sendDone reports provider "grok"). (#1236)
+      try { recordModelOutcome("grok", leaderboardTaskType, false, Date.now() - _turnStart); } catch { /* never break a reply */ }
       if (_hardPin) {
         sendError(humanError(err));
         sendFail(err.message);
