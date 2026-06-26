@@ -1,0 +1,6 @@
+### HumanEval for the Keystone chat itself (execution-grounded pass@1)
+
+- New `scripts/eval_humaneval_chat.py` — drives the **real chat pipeline** (`POST /api/dream/chat/stream`, exactly like the browser) through the canonical 164-problem HumanEval set and scores pass@1 by **executing** the generated function against the official unit tests. Code extraction + the sandbox are reused from `scripts/eval_humaneval_ouro.py` (one extractor, one sandbox — no duplication).
+- **Provider-parametric** — one harness measures the whole comparison: `--provider ollama` benchmarks the local Σ₀ coder via the chat's local-first routing + the local-model adapter (choose Ouro vs Qwen on the server); `--provider anthropic` runs cloud Claude through the **same** chat path → local↔cloud parity on one execution-grounded benchmark.
+- **Honest about what answered:** the summary records `served_sources` / `served_models` histograms from the `done` event, so a silent local→cloud fallback is visible, never hidden behind the headline %. Writes a `benchmark:"humaneval-chat"` row to the shared `data/eval/leaderboard.jsonl` plus per-problem detail.
+- Offline `--selftest` proves the extraction + scoring + SSE-parse path with no server, model, or dataset. The harness drives the coding route via `routeIntent="coding_change"` and parses the live `data:{"type":"token","text":...}` SSE schema.
