@@ -425,8 +425,8 @@ function createAgentBubble(isError) {
   thinking.setAttribute('aria-live', 'polite');
   thinking.setAttribute('aria-label', 'Thinking');
   thinking.innerHTML =
-    '<img src="/mandala.svg" alt="" class="thinking-spin" style="width:18px;height:18px;opacity:0.5;vertical-align:middle;margin-right:6px">' +
-    '<span class="thinking-label" style="font-size:12px;opacity:0.6;vertical-align:middle">Thinking…</span>';
+    '<img src="/mandala.svg" alt="" class="thinking-spin" style="width:44px;height:44px;opacity:0.85;vertical-align:middle;margin-right:12px">' +
+    '<span class="thinking-label" style="font-size:14px;opacity:0.7;vertical-align:middle">Thinking…</span>';
   bubble.appendChild(thinking);
   const cursor = document.createElement('span');
   cursor.className = 'stream-cursor';
