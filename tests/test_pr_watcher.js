@@ -55,4 +55,15 @@ ok("merge: pending check -> false", m._shouldMerge({ isDraft: false, mergeable: 
 ok("merge: StatusContext failure -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ context: "legacy", state: "FAILURE" }] }, reviewed, now).merge === false);
 ok("merge: disabled -> false", new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: false })._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === false);
 
+// ── protected-path gate: sensitive surfaces need a human, even when green (#1251) ──
+const greenPv = (files) => ({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green, files });
+ok("merge: no files -> true (back-compat)", m._shouldMerge(greenPv(undefined), reviewed, now).merge === true);
+ok("merge: docs-only -> true", m._shouldMerge(greenPv([{ path: "docs/README.md" }, { path: "apps/foo.js" }]), reviewed, now).merge === true);
+ok("merge: workflow change -> false", m._shouldMerge(greenPv([{ path: ".github/workflows/ci.yml" }]), reviewed, now).merge === false);
+ok("merge: auth change -> false", m._shouldMerge(greenPv([{ path: "apps/lantern-garage/lib/request-auth.js" }]), reviewed, now).merge === false);
+ok("merge: trading change -> false", m._shouldMerge(greenPv([{ path: "apps/lantern-garage/routes/trading.js" }]), reviewed, now).merge === false);
+ok("merge: .env change -> false", m._shouldMerge(greenPv([{ path: ".env.example" }]), reviewed, now).merge === false);
+ok("merge: protected reason names the file", m._shouldMerge(greenPv([{ path: ".github/workflows/ci.yml" }]), reviewed, now).reason === "protected_path:.github/workflows/ci.yml");
+ok("merge: GitHub `filename` field also works", m._shouldMerge(greenPv([{ filename: "src/migration/001.sql" }]), reviewed, now).merge === false);
+
 console.log(`\n${pass} checks passed`);
