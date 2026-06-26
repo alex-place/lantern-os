@@ -94,6 +94,20 @@ defense-in-depth model proven by [GitHub Agentic Workflows](https://github.blog/
 | #1254 | **Egress + secret sandboxing** — constrain agent runs to an egress allowlist + scoped secrets so they can't re-introduce PII or leak keys. Worktree isolation is half. | 🚧 Policy; implementation follow-up | `autowork-worktree.js` (isolation only) |
 | #1255 | **Spec → artifact separation** — keep agent intent in a reviewed plain-language spec; review the spec as code (à la `gh-aw`'s `.md` → `.lock.yml`). | 🚧 Pattern; `skills/SKILL.md` leans this way | — |
 
+### Read-Only Agents and Safe-Output Allowlist
+
+By default, fleet agents (e.g., `pr-watcher`, `autowork`) operate in a read-only
+mode. They are designed to analyze, observe, and report without making direct
+modifications to the repository or system state.
+
+Any write operations are strictly limited to a safe-output allowlist. This
+allowlist currently includes actions such as opening pull requests, adding
+comments, or applying labels. This policy ensures that agent actions are
+transparent, auditable, and confined to well-defined, non-destructive outputs.
+
+**Status:** This is a policy declaration. Enforcement mechanisms (e.g.,
+sandboxing, capability-based security) are a follow-up task.
+
 > The one deliberate divergence from `gh-aw`: it *never* auto-merges. We do, by
 > Alex's explicit choice — but the #1251 gate confines auto-merge to low-risk
 > surfaces so sensitive changes still land on a human's desk.
