@@ -13,6 +13,7 @@ const tradingNews = require('../lib/trading-news');
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
 const { TradingPriceFeed } = require('../lib/trader-price-feed');
 const { getStrategyFitness, logPerformance } = require('../lib/strategy-performance-logger');
+const tradeHistory = require('../lib/trading-history-logger');
 
 // Shared price feed instance (caches ticks for 1 min)
 let _priceFeed = null;
@@ -324,20 +325,23 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/orders
-  // Recent orders from Alpaca (via local cache or CSF)
+  // Real local paper-trade ledger — the SAME store that POST /api/trading/orders
+  // and /orders/place write to (tradingStore), so a placed order shows up here.
+  // Previously this read CSF memory, which surfaced a stale "shape-array" shape
+  // fixture and never reflected placed orders (#1228).
   if (url.pathname === '/api/trading/orders' && req.method === 'GET') {
     try {
-      // Query recent order records from CSF memory
-      const records = queryRecentTradingRecords(50, 'order');
-      const orders = records.map(r => ({
-        id: r.content.order_id || '',
-        symbol: r.content.symbol || '',
-        side: r.content.side || '',
-        qty: r.content.qty || 0,
-        type: (r.content.raw && r.content.raw.order_type) || 'market',
-        status: r.content.status || 'unknown',
-        filled_at: r.content.filled_at || '',
-        filled_avg: r.content.price || 0
+      const limitParam = parseInt(url.searchParams.get('limit') || '50', 10);
+      const stored = tradingStore.listOrders(limitParam > 0 ? { limit: limitParam } : {});
+      const orders = stored.slice().reverse().map((o) => ({
+        id: o.id || o.order_id || '',
+        symbol: o.symbol || o.ticker || '',
+        side: o.side || '',
+        qty: o.qty || 0,
+        type: o.type || o.order_type || 'market',
+        status: o.status || 'unknown',
+        filled_at: o.filled_at || o.submitted_at || '',
+        filled_avg: o.filled_avg || o.price || 0,
       }));
       sendJson(res, orders, 200);
     } catch (error) {
@@ -1387,10 +1391,27 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // POST /api/trading/ai-trader/signals/generate
-  // No equivalent on the AI trader's REST API — signal generation runs on
-  // its own background scanner, not on demand via HTTP.
+  // Trigger the LOCAL market scanner on demand (the honest "scan now" mapping —
+  // the external AI-trader microservice has no on-demand endpoint). Non-blocking:
+  // the scan (~90s) runs in the background and records any signals to the agent
+  // log, which the UI polls. No more 501 dead affordance (#1229).
   if (url.pathname === '/api/trading/ai-trader/signals/generate' && req.method === 'POST') {
-    sendJson(res, { error: 'Not implemented: AI trader has no on-demand signal generation endpoint' }, 501);
+    if (!traderAgent) {
+      return sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+    }
+    traderAgent.scanMarket().then((scan) => {
+      const signals = Array.isArray(scan && scan.signals) ? scan.signals : [];
+      const logs = signals.filter((s) => s && s.symbol).map((s) => ({
+        id: `scan_${scan.timestamp}_${s.symbol}`,
+        agent: s.agent || 'scanner',
+        action: s.direction || s.action || s.status || 'signal',
+        symbol: s.symbol,
+        confidence: s.confidence,
+        timestamp: scan.timestamp,
+      }));
+      if (logs.length) tradingMemory.recordNewSignals({ logs }).catch(() => {});
+    }).catch((e) => console.error('[Trading] ai-trader signals/generate scan failed:', e.message));
+    sendJson(res, { status: 'scan_triggered', message: 'Local market scan started; new signals will appear in the agent log shortly.' }, 202);
     return true;
   }
 
@@ -1407,24 +1428,44 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/ai-trader/trades
-  // No equivalent on the AI trader's REST API — it does not expose trade
-  // history over HTTP.
+  // Real local append-only trade history (trading-history-logger), consistent
+  // with the Kalshi history logger — not the absent external service (#1229).
   if (url.pathname === '/api/trading/ai-trader/trades' && req.method === 'GET') {
-    sendJson(res, { error: 'Not implemented: AI trader has no trade history endpoint' }, 501);
+    try {
+      const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+      const trades = tradeHistory.getTradeHistory({ limit: limit > 0 ? limit : 50 });
+      sendJson(res, { trades }, 200);
+    } catch (error) {
+      sendJson(res, { error: 'Failed to read trade history', details: error.message }, 500);
+    }
     return true;
   }
 
   // POST /api/trading/ai-trader/trades
-  // No equivalent on the AI trader's REST API.
+  // Append a trade to the local trade history.
   if (url.pathname === '/api/trading/ai-trader/trades' && req.method === 'POST') {
-    sendJson(res, { error: 'Not implemented: AI trader has no trade logging endpoint' }, 501);
+    try {
+      const body = await collectRequestBody(req);
+      const trade = body ? JSON.parse(body) : {};
+      if (!trade || !trade.entry_symbol) {
+        return sendJson(res, { error: 'entry_symbol is required' }, 400);
+      }
+      await tradeHistory.logTrade(trade);
+      sendJson(res, { recorded: true, trade }, 201);
+    } catch (error) {
+      sendJson(res, { error: 'Failed to log trade', details: error.message }, 400);
+    }
     return true;
   }
 
   // GET /api/trading/ai-trader/metrics
-  // No equivalent on the AI trader's REST API.
+  // Real metrics (win-rate, P&L, count) derived from the local trade history.
   if (url.pathname === '/api/trading/ai-trader/metrics' && req.method === 'GET') {
-    sendJson(res, { error: 'Not implemented: AI trader has no metrics endpoint' }, 501);
+    try {
+      sendJson(res, tradeHistory.getTradeStats(), 200);
+    } catch (error) {
+      sendJson(res, { error: 'Failed to compute metrics', details: error.message }, 500);
+    }
     return true;
   }
 
