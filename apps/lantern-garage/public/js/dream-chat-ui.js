@@ -901,8 +901,13 @@ function detectEmbedIntent(text) {
 }
 
 // ── Main send ─────────────────────────────────────────────────────────────────
-async function sendMessage() {
+async function sendMessage(opts = {}) {
   const input = document.getElementById('input');
+  // "Ground this" retry path: re-run a specific message with forced web grounding
+  // (groundedness canary loop). overrideText comes from the button, not the input
+  // box — so we must not read or clear the box on this path.
+  const overrideText = (opts && typeof opts.text === 'string') ? opts.text : null;
+  const forceGround = !!(opts && opts.forceGround);
   // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
   // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
   // they're folded in here so there is exactly one sendMessage, no monkey-patching.
@@ -919,7 +924,7 @@ async function sendMessage() {
   } catch (_) { /* gate is best-effort; the server enforces limits regardless */ }
   // Normalize the legacy !convergance command → canonical !convergence.
   if (/^!convergance(?:\s+(?:sync|loop|run))?\s*$/i.test(String(input.value || "").trim())) input.value = "!convergence";
-  const text = input.value.trim();
+  const text = (overrideText != null ? overrideText : input.value).trim();
   if (!text || isSending) return;
 
   // Image attachment → vision: the user uploaded an image via "+" to ask about it. The image
@@ -1069,9 +1074,9 @@ async function sendMessage() {
   const abortTimer = setTimeout(() => ac.abort(), 90000);
   showStopButton(() => { userStopped = true; ac.abort(); });
 
-  addUserBubble(text);
-  input.value = '';
-  input.style.height = 'auto';
+  addUserBubble(forceGround && overrideText != null ? text + '  ↻ grounding' : text);
+  // Don't clear the input box on a "Ground this" retry — the user didn't type this.
+  if (overrideText == null) { input.value = ''; input.style.height = 'auto'; }
   history.push({ role: 'user', text });
   writeCubeDelta('chat_message', [], 'conversation:' + Date.now());
 
@@ -1123,6 +1128,8 @@ async function sendMessage() {
         attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
+        // "Ground this" retry: force the server's web-search grounding branch.
+        forceGround: forceGround || undefined,
         // Scope this turn to the active chat session so it persists into the Chats
         // drawer (#773). dream-chat.js owns the id and mirrors it to localStorage;
         // without it, turns log untagged and never form a saved session.
@@ -1311,6 +1318,22 @@ async function sendMessage() {
     badge.style.cssText = 'font-size:10px;opacity:0.7;margin-left:6px;vertical-align:middle;color:#f5a623;cursor:help';
     badge.textContent = '⚠ ungrounded';
     bubble.appendChild(badge);
+    // Actionable half: offer a one-click retry that re-runs THIS question with forced
+    // web grounding — detect → actually ground, the 42-state loop closed in the UI.
+    // Suppressed when we're online-less (web search can't reach reality) or when this
+    // turn was already a forced-grounding retry (don't invite an endless re-ground).
+    if (doneOnline !== false && !forceGround) {
+      const reground = document.createElement('button');
+      reground.type = 'button';
+      reground.textContent = '🌐 Ground this';
+      reground.title = 'Re-answer this question with a live web search for sources.';
+      reground.style.cssText = 'font-size:10px;margin-left:8px;vertical-align:middle;color:var(--accent);background:none;border:1px solid currentColor;border-radius:4px;padding:1px 6px;cursor:pointer;opacity:0.85';
+      reground.addEventListener('click', () => {
+        reground.disabled = true;
+        sendMessage({ text, forceGround: true });
+      });
+      bubble.appendChild(reground);
+    }
   }
 
   // Signature line: always show a human-readable label + time. Raw provider/model id

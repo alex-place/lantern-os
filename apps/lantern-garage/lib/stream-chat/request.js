@@ -38,6 +38,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     surface: "",
     sessionId: null,
     attachments: [],
+    forceGround: false,
   };
 
   if (req.method === "GET") {
@@ -48,6 +49,9 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.routeIntent = String(url.searchParams.get("routeIntent") || "").trim();
     parsed.surface = String(url.searchParams.get("surface") || "").trim().toLowerCase();
     parsed.sessionId = String(url.searchParams.get("sessionId") || "").trim().slice(0, 64) || null;
+    // "Ground this" retry: force the web-search grounding branch for a reply the
+    // groundedness canary flagged as confident-but-unanchored (the 42-state).
+    parsed.forceGround = ["1", "true"].includes(String(url.searchParams.get("forceGround") || "").toLowerCase());
     return parsed;
   }
 
@@ -71,6 +75,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.surface = String(body.surface || "").trim().toLowerCase();
     parsed.sessionId = String(body.sessionId || "").trim().slice(0, 64) || null;
     parsed.attachments = sanitizeAttachments(body.attachments);
+    parsed.forceGround = body.forceGround === true || body.forceGround === "1";
   } catch {
     // Body was present but unparseable (malformed JSON, bad encoding). Flag it so the
     // handler surfaces an honest "couldn't read your message" instead of routing an
