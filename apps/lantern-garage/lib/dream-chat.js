@@ -2,7 +2,6 @@ const https = require("https");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { handleThreeDoorsServer } = require("./three-doors-chat");
 const { readMcpResourceSync } = require("./mcp-resource-client");
 const { formatCSFContextForPrompt } = require("./csf-memory");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
@@ -604,60 +603,6 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   const text = String(message || "").trim();
   const webSuggestions = generateWebSuggestions(message);
 
-  // ── Kingdome of Hearts game intercept ──
-  // Python ThreeDoorsEngine (scripted state machine, offline-capable)
-  const threeDoors = handleThreeDoorsServer(text);
-  if (threeDoors) {
-    const _path = require("path");
-    const _repoRoot = _path.resolve(__dirname, "..", "..");
-    const { spawn } = require("child_process");
-    const py = process.platform === "win32" ? "python" : "python3";
-    const userId = threeDoors.userId || "web-anon";
-    const choiceMatch = text.toLowerCase().match(/(?:door|choose|pick)\s+([abc])/) || text.toLowerCase().match(/^[abc]$/);
-    const choice = choiceMatch ? choiceMatch[1] : "";
-    const action = choice ? "choose" : "start";
-    const script = `import sys,json; from three_doors_engine import ThreeDoorsEngine; req=json.loads(sys.stdin.read()); e=ThreeDoorsEngine(req['userId']); result=e.to_api_response(e.start_game()) if req['action']=='start' else (lambda s: e.to_api_response(s) if s else {"error":"invalid_choice"})(e.choose_door(req['choice'])); print(json.dumps(result))`;
-    try {
-      const result = await new Promise((resolve, reject) => {
-        const proc = spawn(py, ["-c", script], { cwd: _repoRoot, env: { ...process.env, PYTHONPATH: _path.join(_repoRoot, "src") } });
-        let out = "", err = "";
-        let timedOut = false;
-        
-        const timeout = setTimeout(() => {
-          timedOut = true;
-          proc.kill();
-          reject(new Error("Python subprocess timeout (30s)"));
-        }, 30000);
-        
-        proc.stdout.on("data", (c) => (out += c));
-        proc.stderr.on("data", (c) => (err += c));
-        proc.on("close", (code) => {
-          clearTimeout(timeout);
-          if (timedOut) return;
-          if (code !== 0) reject(new Error(err || `exit ${code}`));
-          else resolve(out.trim());
-        });
-        proc.on("error", (e) => {
-          clearTimeout(timeout);
-          reject(e);
-        });
-        proc.stdin.write(JSON.stringify({ userId, action, choice }));
-        proc.stdin.end();
-      });
-      const data = JSON.parse(result);
-      if (data.error) {
-        return { reply: `Kingdome of Hearts: ${data.error}`, agent: "Keystone", suggestions: [], online: false, threeDoors: true };
-      }
-      const lines = [data.text, ""];
-      if (data.fox_present) lines.push("🦊 The fox is with you.");
-      lines.push("", "**Choose a door:**");
-      for (const d of data.doors) lines.push(`**${d.label}.** ${d.name} — ${d.description}`);
-      if (data.image_prompt) lines.push("", `🎨 *Image prompt:* ${data.image_prompt}`);
-      return { reply: lines.join("\n"), agent: "Keystone", suggestions: data.doors.map(d => d.name), online: true, source: "python_engine", threeDoors: true, scene_key: data.scene_key, image_prompt: data.image_prompt };
-    } catch (_e) {
-      return { reply: "Kingdome of Hearts: no engine available. Ensure Python is installed and src/three_doors_engine.py exists.", agent: "Keystone", suggestions: [], online: false, threeDoors: true };
-    }
-  }
 
   let agent;
   if (requestedAgent) {

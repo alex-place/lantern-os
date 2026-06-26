@@ -48,40 +48,6 @@ const CAPABILITY_REGISTRY = [
     description: "Strategic planning, architecture, high-level decisions, and roadmap work.",
   },
   {
-    id: "lantern",
-    name: "Keystone",
-    intents: ["dream_analysis"],
-    triggers: [
-      /\b(dream|reflect|reflection|journal|memory|remember|thought)\b/i,
-      /\b(feeling|feel|emotion|mood|heart|soul|spirit)\b/i,
-      /\b(meaning|symbol|metaphor|story|narrative)\b/i,
-      /\b(write|share|express|explore|discover)\b/i,
-    ],
-    surface: "dream_chat",
-    converges: false,
-    blocking: false,
-    input_contract: { message: "string", recent_dreams: "object[]" },
-    output_contract: { reflection: "string", suggestions: "string[]" },
-    description: "Dream journal, reflection, introspection, and emotional processing.",
-  },
-  {
-    id: "three_doors",
-    name: "Three-Doors Kingdome",
-    intents: ["rp_game"],
-    triggers: [
-      /^!(three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i,
-      /\b(play|start|open|enter|continue)\s+(the\s+)?three.?doors?\b/i,
-      /\bthree.?doors?\s+(game|rp|role.?play|scene|journey)\b/i,
-      /\b(role.?play|rp)\b/i,
-    ],
-    surface: "three_doors",
-    converges: false,
-    blocking: false,
-    input_contract: { message: "string", game_state: "object" },
-    output_contract: { scene: "string", choices: "string[]" },
-    description: "Three-Doors game state, roleplay, scenes, and choice routing.",
-  },
-  {
     id: "csf",
     name: "CSF & Memory",
     intents: ["memory_export"],
@@ -161,10 +127,12 @@ function classifyIntent(message) {
 }
 
 function fallbackRoute(reason) {
+  // Dream persona deleted (2026-06-26): an unmatched message answers as the plain
+  // technical Keystone agent on the direct provider path — never a poetic/dream voice.
   return {
-    intent: "dream_analysis",
-    agent: "lantern",
-    surface: "dream_chat",
+    intent: "general",
+    agent: "keystone",
+    surface: "chat",
     confidence: 0,
     reason,
     requires_convergence: false,

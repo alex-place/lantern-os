@@ -1,0 +1,8 @@
+### Chat: delete the dream persona — Keystone is always a technical agent
+
+- Chat **never** routes through the Python convergence/persona engine anymore (it answered in a dream voice — "…carries a wish. What are you protecting?" — and reported `provider:"unknown"`). All chat goes to the direct provider dispatch with the technical `ROUTER_PROMPT` (cloud coders lead, local is the offline backstop). Re-enable with `CONVERGENCE_CHAT=1`.
+- `intent-router.js`: removed the `lantern` (dream) and `three_doors` capabilities; `fallbackRoute()` now answers as the technical `keystone` agent instead of the dream `lantern` persona.
+- `ROUTER_PROMPT` stripped of dream/journal framing; the recent-journal "Background" block is no longer injected into chat prompts (it seeded poetic filler in weak local models).
+- **Three-Doors / Kingdome of Hearts + Wish Door removed entirely** (~3,300 lines): the game pages (`three-doors-game.html`, `three-doors.html`, `wish-door.html`), all game JS (`public/js/three-doors-*.js`, `wish-door.js`), the route modules (`three-doors-convergence`, `three-doors-image-pool`, deregistered from `server.js`), the lib engine/chat (`lib/three-doors-{engine,chat}.js`), and the `dream.js` doors/metrics endpoints + the `dream-chat.js` game intercept. The Explore "Dreams & Stories" section and the dream-chat "Play game" chip are gone; stale nav links repointed to `/explore.html`.
+- Thinking indicator upgraded to a **larger mandala spinner** (44px).
+- Verified end-to-end on a clean boot: coding + general chat return clean technical answers (`source:"ollama"`, no dream voice), and all removed pages/routes/endpoints return 404.
