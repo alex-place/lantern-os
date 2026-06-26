@@ -762,6 +762,13 @@ function tryParseLoose(text) {
     .replace(/(^|[^:"'\\])\/\/[^\n\r]*/g, "$1")  // // line comments (not http://)
     .replace(/,(\s*[}\]])/g, "$1");              // trailing commas
   try { return JSON.parse(cleaned); } catch {}
+  // Smart/typographic quotes: some models emit JSON with “curly” double quotes
+  // (or ‘curly’ singles) for the structural delimiters, which JSON.parse rejects
+  // — a real autowork failure (plan_parse_failed). Normalize to straight quotes.
+  const dequoted = cleaned
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[‘’‚‛]/g, "'");
+  try { return JSON.parse(dequoted); } catch {}
   return undefined;
 }
 
