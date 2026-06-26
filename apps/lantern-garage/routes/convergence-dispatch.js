@@ -385,7 +385,7 @@ module.exports = async (req, res, url, deps) => {
       const GH_REPO = "alex-place/lantern-os";
       const {
         generatePlan, generatePatch, applyPatch, runTests,
-        gitAddFiles, gitCommit, gitPush, openDraftPr,
+        gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -403,15 +403,34 @@ module.exports = async (req, res, url, deps) => {
 
       try {
         const opts = JSON.parse(body || "{}");
-        const issueNumber = parseInt(opts.issue, 10);
+        let issueNumber = parseInt(opts.issue, 10);
+        const task = typeof opts.task === "string" ? opts.task.trim() : "";
         const dryRun = opts.dryRun === true;
         // Σ₀ autonomous: default to commit+push for fully-verified work (research + tests passed)
         // Can opt-out with { commit:false } or { push:false } for safety gates
         const autoPush = opts.push !== false;  // default true (changed from === true)
         const autoCommit = autoPush || opts.commit !== false;  // default true
 
+        // ── 0. create issue from a free-form task (suggest-then-confirm path) ──
+        // A free-form coding request has no issue number. We keep the pipeline
+        // issue-linked (every PR references a tracked issue), so file the task as
+        // a GitHub issue first, then work it exactly like an `!work #N` run.
+        if (!issueNumber && task) {
+          step("create_issue", "start");
+          try {
+            const created = createIssueFromTask(REPO_ROOT, task);
+            issueNumber = created.number;
+            step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
+          } catch (e) {
+            step("create_issue", "error", { error: String(e && e.message || e) });
+            send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
+            res.end();
+            return;
+          }
+        }
+
         if (!issueNumber) {
-          send("error", { error: "issue_number_required" });
+          send("error", { error: "issue_number_or_task_required" });
           res.end();
           return;
         }
@@ -547,8 +566,29 @@ module.exports = async (req, res, url, deps) => {
 
         // ── 4. plan (with research context as Σ₀ evidence) ───────────────
         step("plan", "start");
-        const plan = await generatePlan(
-          workRoot, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
+        let plan;
+        try {
+          plan = await generatePlan(
+            workRoot, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
+        } catch (planErr) {
+          // The most common real failure here is "no cloud model available" —
+          // every provider out of credits/quota, with the tiny local model
+          // returning empty. Surface that as an honest, actionable plan-step
+          // error instead of a generic exception blob (autowork needs a working
+          // cloud model; a 1.4B local model can't plan a code change).
+          const raw = String(planErr && planErr.message || planErr);
+          const noCloud = /all_providers_failed|empty response|credit|quota|billing|spending limit/i.test(raw);
+          const msg = noCloud
+            ? "Autowork needs a working cloud model, but every provider is unavailable " +
+              "(out of credits/quota) and the local model returned nothing. Add credits to a " +
+              "provider (Anthropic/OpenAI/Gemini/xAI) or set a usable key, then retry."
+            : `Plan generation failed: ${raw.slice(0, 300)}`;
+          step("plan", "error", { error: raw.slice(0, 500), noCloud });
+          receipt.stoppedAt = "plan_failed";
+          send("done", { ok: false, ...receipt, stoppedAt: "plan_failed", message: msg });
+          res.end();
+          return;
+        }
         step("plan", "done", {
           plan,
           confidence: {

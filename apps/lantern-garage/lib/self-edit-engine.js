@@ -434,6 +434,46 @@ function gitAddFiles(repoRoot, files) {
 // GitHub repo slug for API calls. Override with GH_REPO env if the remote moves.
 const GH_REPO = process.env.GH_REPO || "alex-place/lantern-os";
 
+// Derive a concise, conventional issue title from a free-form task instruction.
+// First non-empty line, stripped of a leading bang-command / list marker, capped.
+function taskTitle(task) {
+  const firstLine = String(task || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0) || "";
+  const cleaned = firstLine
+    .replace(/^!?(?:work|autowork|edit)\b[:\s]*/i, "") // drop a trigger prefix if present
+    .replace(/^[-*\d.\s]+/, "")                        // drop list bullets / numbering
+    .trim();
+  // Default applied only as a final fallback — never run through the strip above,
+  // or "Autowork task" would itself match the trigger prefix and collapse to "task".
+  return (cleaned || "Autowork task").slice(0, 120);
+}
+
+// Create a GitHub issue from a free-form chat instruction, so the issue-linked
+// autowork pipeline (which keys off a real issue number) can work it. Returns
+// { number, url, title }. Used by the suggest-then-confirm "Run as autowork"
+// path — a free-form coding request first becomes a tracked issue, then a PR.
+function createIssueFromTask(repoRoot, task, opts = {}) {
+  const text = String(task || "").trim();
+  if (!text) throw new Error("task_required");
+  const title = taskTitle(text);
+  const body =
+    `${text}\n\n---\n_Filed automatically from Keystone OS chat (autowork “run as task”). ` +
+    `A linked draft PR follows._`;
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: "0", SKIP_MONOWORKSTREAM: "1" };
+  // `gh issue create` prints the new issue URL on stdout; parse the number from it.
+  const out = execFileSync(
+    "gh",
+    ["issue", "create", "--repo", GH_REPO, "--title", title, "--body", body.slice(0, 8000)],
+    { cwd: repoRoot, encoding: "utf8", timeout: 30000, windowsHide: true, env }
+  ).trim();
+  const url = (out.match(/https:\/\/github\.com\/[^\s]+\/issues\/(\d+)/) || [])[0] || out;
+  const number = parseInt((url.match(/\/issues\/(\d+)/) || [])[1], 10);
+  if (!number) throw new Error("issue_create_failed: " + out.slice(0, 200));
+  return { number, url, title };
+}
+
 function openDraftPr(repoRoot, branch, title, body) {
   if (!branch.startsWith("auto/")) throw new Error("invalid_branch_prefix");
   const safeTitle = String(title || "Auto PR").slice(0, 256);
@@ -562,29 +602,44 @@ async function callLlm(system, user, providerHint = "auto", maxTokens = 4096) {
   const openaiKey = process.env.OPENAI_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const xaiKey = process.env.XAI_API_KEY;
+  // Vertex AI (Gemini on a funded GCP project) — paid quota, real rate limits,
+  // unlike the free-tier GEMINI_API_KEY (20 req/min). Auth is ADC, not an API key.
+  const vertexProject = process.env.VERTEX_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
   const messages = [{ role: "system", content: system }, { role: "user", content: user }];
+
+  // A provider that returns an empty/whitespace-only string is a FAILURE, not a
+  // success: Gemini safety-blocks, a finishReason cutoff, or the tiny local model
+  // all surface as "". Returning that stops the cascade and leaves the caller with
+  // `plan_parse_failed: empty response` — so treat empty as a throw and fall through.
+  const nonEmpty = async (label, p) => {
+    const out = await p;
+    if (!out || !String(out).trim()) throw new Error(`${label}_empty_response`);
+    return out;
+  };
 
   // When a specific provider is requested, try it directly (no cascade).
   if (providerHint !== "auto") {
-    if ((providerHint === "claude" || providerHint === "anthropic") && anthropicKey) return callClaude(system, user, maxTokens);
-    if (providerHint === "openai" && openaiKey) return callOpenAI(messages, maxTokens);
-    if (providerHint === "gemini" && geminiKey) return callGemini(system, user, maxTokens);
-    if ((providerHint === "grok" || providerHint === "xai") && xaiKey) return callGrok(messages, maxTokens);
-    if (providerHint === "ollama") return callOllama(messages);
+    if ((providerHint === "vertex" || providerHint === "vertex-gemini") && vertexProject) return nonEmpty("vertex", callVertex(system, user, maxTokens));
+    if ((providerHint === "claude" || providerHint === "anthropic") && anthropicKey) return nonEmpty("claude", callClaude(system, user, maxTokens));
+    if (providerHint === "openai" && openaiKey) return nonEmpty("openai", callOpenAI(messages, maxTokens));
+    if (providerHint === "gemini" && geminiKey) return nonEmpty("gemini", callGemini(system, user, maxTokens));
+    if ((providerHint === "grok" || providerHint === "xai") && xaiKey) return nonEmpty("grok", callGrok(messages, maxTokens));
+    if (providerHint === "ollama") return nonEmpty("ollama", callOllama(messages));
     throw new Error("no_provider_available");
   }
 
-  // Auto mode: try every provider that has a key, in cascade. Order favors
-  // quality/cost and deprioritizes OpenAI (commonly the first to hit a quota
-  // cap); a provider that throws (quota, timeout, parse) falls through to the
-  // next rather than failing the whole run. Grok/XAI is included so a key the
-  // UI advertises as connected is actually usable here.
+  // Auto mode: try every provider that has a key, in cascade. Vertex (Gemini on a
+  // funded GCP project) leads — it has real paid quota, unlike the free-tier
+  // GEMINI_API_KEY (20 req/min) which can't even finish one autowork run. A
+  // provider that throws (quota, timeout, parse, OR an empty response) falls
+  // through to the next rather than failing the whole run.
   const queue = [
-    anthropicKey && (() => callClaude(system, user, maxTokens)),
-    geminiKey    && (() => callGemini(system, user, maxTokens)),
-    xaiKey       && (() => callGrok(messages, maxTokens)),
-    openaiKey    && (() => callOpenAI(messages, maxTokens)),
-    () => callOllama(messages),
+    vertexProject && (() => nonEmpty("vertex", callVertex(system, user, maxTokens))),
+    anthropicKey && (() => nonEmpty("claude", callClaude(system, user, maxTokens))),
+    geminiKey    && (() => nonEmpty("gemini", callGemini(system, user, maxTokens))),
+    xaiKey       && (() => nonEmpty("grok",   callGrok(messages, maxTokens))),
+    openaiKey    && (() => nonEmpty("openai", callOpenAI(messages, maxTokens))),
+    () => nonEmpty("ollama", callOllama(messages)),
   ].filter(Boolean);
 
   const errs = [];
@@ -648,6 +703,70 @@ function callGrok(messages, maxTokens = 4096) {
     });
     req.on("error", reject);
     req.setTimeout(30000, () => { req.destroy(); reject(new Error("grok_timeout")); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+// ── Vertex AI (Gemini on a funded GCP project) ────────────────────────────
+// Auth is Application Default Credentials, NOT an API key. We mint a short-lived
+// OAuth access token via the gcloud CLI and cache it (~50 min; tokens last ~60).
+// This routes through the project's paid quota (real rate limits), unlike the
+// free-tier GEMINI_API_KEY that caps at 20 req/min and can't finish one run.
+let _vertexTok = { token: null, exp: 0 };
+function vertexAccessToken() {
+  const now = Date.now();
+  if (_vertexTok.token && now < _vertexTok.exp) return _vertexTok.token;
+  // gcloud is gcloud.cmd on Windows; Node won't execFile a .cmd without a shell.
+  // The command is a CONSTANT string (no user input), passed as the whole command
+  // with shell:true — that avoids DEP0190 (which fires for an args array + shell).
+  const bin = process.platform === "win32" ? "gcloud.cmd" : "gcloud";
+  const run = (sub) => execFileSync(`${bin} ${sub}`, { encoding: "utf8", timeout: 20000, windowsHide: true, shell: true });
+  let out = "";
+  try { out = run("auth application-default print-access-token"); }
+  catch (e1) {
+    try { out = run("auth print-access-token"); }
+    catch (e2) { throw new Error("vertex_token_failed: " + String(e2.stderr || e2.message || e1.message || "").slice(0, 200)); }
+  }
+  const token = String(out).trim();
+  if (!token) throw new Error("vertex_token_empty");
+  _vertexTok = { token, exp: now + 50 * 60 * 1000 };
+  return token;
+}
+
+function callVertex(system, user, maxTokens = 4096) {
+  const project = process.env.VERTEX_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+  const location = process.env.VERTEX_LOCATION || "us-central1";
+  const model = process.env.VERTEX_MODEL || "gemini-2.5-flash";
+  if (!project) return Promise.reject(new Error("vertex_no_project"));
+  let token;
+  try { token = vertexAccessToken(); } catch (e) { return Promise.reject(e); }
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: user }] }],
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+  });
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: `${location}-aiplatform.googleapis.com`,
+      path: `/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`,
+      method: "POST",
+      agent: llmAgent,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "Content-Length": Buffer.byteLength(payload) },
+    }, (res) => {
+      let data = "";
+      res.on("data", (c) => (data += c));
+      res.on("end", () => {
+        try {
+          const j = JSON.parse(data);
+          if (j.error) return reject(new Error(`vertex[${j.error.status || j.error.code || "?"}]: ${String(j.error.message || "vertex_error").slice(0, 200)}`));
+          const text = j.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+          resolve(text);
+        } catch { reject(new Error("vertex_parse_error")); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(60000, () => { req.destroy(); reject(new Error("vertex_timeout")); });
     req.write(payload);
     req.end();
   });
@@ -1050,6 +1169,8 @@ module.exports = {
   gitAddFiles,
   gitCurrentBranch,
   openDraftPr,
+  createIssueFromTask,
+  taskTitle,
   runTests,
   generatePlan,
   extractJson,

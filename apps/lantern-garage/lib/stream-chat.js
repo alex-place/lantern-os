@@ -786,6 +786,19 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
+  // ── Attached files (the "+" work tool, #1273) ─────────────────────────────
+  // Text files the user attached to THIS turn (sanitized in request.js: bounded
+  // count + size). Fold their content into the grounding context so every provider
+  // branch sees it. Without this the attachment is parsed and then dropped — the
+  // model never sees the file, despite the UI re-sending it each turn.
+  if (Array.isArray(parsed.attachments) && parsed.attachments.length) {
+    const attachBlock = parsed.attachments
+      .map((a) => `--- Attached file: ${a.name} ---\n${a.text}`)
+      .join("\n\n");
+    const block = `Files the user attached to this message (provided context — answer about them directly):\n${attachBlock}`;
+    groundingContext = groundingContext ? `${groundingContext}\n\n${block}` : block;
+  }
+
   // CSF long-term memory + door state (query-time relevance filtered)
   const csfContext = formatCSFContextForPrompt(message);
   const csfBlock = csfContext ? `\n\nLong-term memory (CSF):\n${csfContext}` : "";

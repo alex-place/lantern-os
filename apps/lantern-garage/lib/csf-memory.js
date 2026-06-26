@@ -10,6 +10,7 @@ const DREAM_JOURNAL_PATH = path.join(repoRoot, "data", "dream_journal");
 const TESSERACT_MANIFEST = path.join(repoRoot, "data", "tesseract", "manifest.json");
 const DOOR_STATE_PATH = path.join(DREAM_JOURNAL_PATH, "door_state.json");
 const RAG_HOUSE_PATH = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");
+const CONVERSATION_LOG_PATH = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
 
 let _cache = { memories: null, ingest: null, ts: 0 };
 const CACHE_TTL_MS = 10_000;
@@ -244,6 +245,52 @@ function buildCSFContext() {
   return { memories, ingest, doors: loadDoorState() };
 }
 
+// Cross-session chat memory: recall the most relevant PAST chat turns (across ALL sessions)
+// for the current message, so the chat "remembers what we discussed" beyond the live history
+// window. Reuses the existing conversation-store log (data/conversations/garage-conversations.jsonl)
+// — NOT a new memory system. In-process, fail-safe.
+// Common words that carry no topical signal — excluded from the distinctiveness check
+// so two turns aren't "recalled as memory" just for sharing "what", "this", "about"…
+const CONVO_STOPWORDS = new Set([
+  "the", "and", "for", "you", "your", "are", "was", "were", "can", "could", "would",
+  "this", "that", "these", "those", "what", "when", "where", "which", "with", "have",
+  "has", "had", "but", "not", "any", "all", "out", "get", "got", "did", "does", "about",
+  "from", "into", "than", "then", "them", "they", "how", "why", "who", "our", "his", "her",
+]);
+
+function queryConversationMemory(message, limit = 4) {
+  if (!message) return [];
+  const text = _readText(CONVERSATION_LOG_PATH);
+  if (!text) return [];
+  const lines = text.trim().split("\n").filter(Boolean);
+  const window = lines.slice(-600); // bounded scan; the log is rotated at ~5MB
+  const cur = String(message).trim().toLowerCase();
+  // Distinctive (non-stopword, len>3) query terms — recall requires real overlap on
+  // these, not a high ratio of incidental common words (#1276 confabulation guard).
+  const sigWords = [...new Set(cur.split(/\s+/).filter((w) => w.length > 3 && !CONVO_STOPWORDS.has(w)))];
+  const seen = new Set();
+  const scored = [];
+  for (const line of window) {
+    let e;
+    try { e = JSON.parse(line); } catch { continue; }
+    const t = e && typeof e.text === "string" ? e.text.trim() : "";
+    if (!t || e.role === "system" || e.role === "note") continue;
+    if (t.toLowerCase() === cur) continue;          // never recall the current question itself
+    const score = relevanceScore(t, message);
+    if (score < 0.5) continue;                        // require strong topical overlap
+    // Require ≥2 distinctive shared terms (or, for a very short query, all of them).
+    const lowerT = t.toLowerCase();
+    const sigHits = sigWords.filter((w) => lowerT.includes(w)).length;
+    const need = Math.min(2, sigWords.length);
+    if (need === 0 || sigHits < need) continue;       // no distinctive overlap → skip
+    const key = t.slice(0, 80).toLowerCase();
+    if (seen.has(key)) continue;                      // de-dup near-identical turns
+    seen.add(key);
+    scored.push({ role: e.role, text: t, score, at: e.recordedAt || "" });
+  }
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
 // New: query-time relevance-filtered context — compact, ~500-1500 chars max
 function formatCSFContextForPrompt(message) {
   const parts = [];
@@ -268,6 +315,19 @@ function formatCSFContextForPrompt(message) {
     if (dreams.length > 0) {
       const dreamText = dreams.map(e => `- ${e.text.slice(0, 100)}`).join("\n");
       parts.push(`Recent dreams:\n${dreamText}`);
+    }
+
+    // Cross-session chat memory — possibly-relevant excerpts from earlier conversations,
+    // surfaced by keyword overlap (not semantic understanding), so treat them as POSSIBLY
+    // relevant context, not established fact (#1276). They are real logged turns, so you may
+    // use and reference them when they clearly fit the question — but if an excerpt doesn't
+    // actually match what's being asked, ignore it rather than forcing a connection.
+    const convo = queryConversationMemory(message, 4);
+    if (convo.length > 0) {
+      const convoText = convo
+        .map(c => `- ${c.role === "lantern" ? "You (Keystone) previously said" : "The user previously said"}: ${c.text.slice(0, 220)}`)
+        .join("\n");
+      parts.push(`Possibly-relevant excerpts from this user's earlier conversations with you (retrieved by keyword overlap, persisted across sessions). Use the ones that genuinely fit the current question and answer from them directly; disregard any that don't actually match:\n${convoText}`);
     }
   }
 
@@ -336,6 +396,7 @@ module.exports = {
   queryDreamEntries,
   queryRagHouse,
   queryResearchLibrary,
+  queryConversationMemory,
   loadDoorState,
   saveDoorState,
   saveDoorChoice,

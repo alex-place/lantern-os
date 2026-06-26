@@ -85,6 +85,64 @@ module.exports = async function filesUploadRoutes(req, res, url, deps) {
     return true;
   }
 
+  // POST /api/files/extract — SYNC: decode a base64/text file, extract its text, and RETURN it
+  // for immediate chat use (the "+" work tool). Bounds the returned text; logs the upload so it
+  // is also persisted. Accepts any file type; falls back to UTF-8 bytes for plain-text formats.
+  if (url.pathname === "/api/files/extract" && req.method === "POST") {
+    try {
+      const raw = await collectRequestBody(req);
+      const body = JSON.parse(raw || "{}");
+      const fileName = String(body.fileName || body.name || "upload.txt").slice(0, 200).replace(/[\\/]+/g, "_");
+      const mimeType = String(body.mimeType || "application/octet-stream").slice(0, 120);
+      let content = String(body.content || "");
+      const dataUrl = content.match(/^data:[^;,]*;base64,(.*)$/s); // accept data: URLs
+      if (dataUrl) content = dataUrl[1];
+      if (!content) { sendJson(res, { ok: false, error: "content required" }, 400); return true; }
+
+      const uploadDir = path.join(repoRoot, "data", "file-uploads");
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const filePath = path.join(uploadDir, `${fileId}_${fileName}`);
+      const buffer = body.isBase64 === false ? Buffer.from(content, "utf8") : Buffer.from(content, "base64");
+      // Cap at ~12MB to avoid OOM on a hostile/huge upload.
+      if (buffer.length > 12 * 1024 * 1024) { sendJson(res, { ok: false, error: "file too large (max 12MB)" }, 413); return true; }
+      fs.writeFileSync(filePath, buffer);
+
+      const { extractDocumentContent } = require("../lib/document-extractor");
+      let text = "", extractError = null;
+      try {
+        const extracted = await extractDocumentContent(filePath, mimeType);
+        text = extracted && extracted.content ? String(extracted.content) : "";
+        extractError = extracted && extracted.error ? extracted.error : null;
+      } catch (e) { extractError = e.message; }
+
+      // Fallback: extractor handles pdf/txt/md/json/csv/images; for other text-like files
+      // (code, logs, .ts, .yaml…) use the raw bytes when they look like printable UTF-8.
+      if (!text) {
+        const asText = buffer.toString("utf8");
+        const printable = asText.length ? asText.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "").length / asText.length : 0;
+        if (printable > 0.85) text = asText;
+      }
+
+      const MAX = 24000;
+      const truncated = text.length > MAX;
+      const outText = truncated ? text.slice(0, MAX) : text;
+
+      const entry = { fileId, fileName, mimeType, size: buffer.length, chars: text.length,
+        uploadedAt: new Date().toISOString(), extracted: !!text, via: "chat-attach" };
+      try { await appendJsonlQueued(path.join(uploadDir, "uploads.jsonl"), entry); } catch { /* non-fatal */ }
+
+      sendJson(res, {
+        ok: true, fileId, name: fileName, mimeType, size: buffer.length,
+        chars: text.length, truncated, text: outText, excerpt: outText.slice(0, 280),
+        note: text ? null : (extractError || "No extractable text (binary or unsupported type)."),
+      });
+    } catch (error) {
+      sendJson(res, { ok: false, error: error.message }, 400);
+    }
+    return true;
+  }
+
   return false;
 };
 

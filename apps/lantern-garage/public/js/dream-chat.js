@@ -254,7 +254,13 @@
         row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Keystone"}${time ? " · " + time : ""}</div><div class="bubble">${escapeHtml(entry.text)}</div>`;
         fragment.appendChild(row);
       }
-      messagesEl.appendChild(fragment);
+      // History is OLDER than anything already on screen. This fetch is async, so
+      // a live message may have rendered first — notably the ?q= hand-off from the
+      // index page, which auto-sends on load before this resolves. Appending here
+      // would drop old history BELOW the new message (new message stuck at the top).
+      // Insert above existing rows so the trail stays chronological: history on top,
+      // newest message always at the bottom.
+      messagesEl.insertBefore(fragment, messagesEl.firstChild);
       scrollToBottom();
     } catch { /* non-critical — fresh session is fine */ }
   }
@@ -271,6 +277,8 @@
     // conversation half-visible after "New chat".
     messagesEl.querySelectorAll(".msg-row, .message").forEach((n) => n.remove());
     if (emptyState) emptyState.style.display = "";
+    // Drop any persisted file attachments — a new chat starts with a clean slate.
+    if (window.clearPendingAttachments) window.clearPendingAttachments();
     inputEl.value = "";
     try { inputEl.focus(); } catch { /* no-op */ }
   }

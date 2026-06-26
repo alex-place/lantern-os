@@ -7,6 +7,7 @@
 const path = require("path");
 const fs = require("fs");
 const https = require("https");
+const feeds = require("../lib/flourishing-feeds");
 
 // ── Live world-news feed (RSS, no API keys) ──
 const NEWS_FEEDS = [
@@ -142,6 +143,37 @@ module.exports = async function flourishingRoutes(req, res, url, deps) {
 
   if (url.pathname === "/api/flourishing/adoption/stats") {
     sendJson(res, { ok: true, source: snap ? "snapshot" : "empty", ...(snap?.adoption ?? { verified_nodes: 0, active_nodes: 0, total_nodes: 0 }) });
+    return true;
+  }
+
+  // ── Live grounding from real yearly feeds (World Bank world aggregates) ──
+  // The beliefs here are GROUNDED, not seeded: each carries a posterior, an
+  // uncertainty, a source URL, and the data year. The Question Machine ranks
+  // which belief to ground next (uncertainty × leverage). `?refresh=1` bypasses
+  // the 24h cache (the data is annual, so polling more often is pointless).
+  if (url.pathname === "/api/flourishing/feeds" || url.pathname === "/api/flourishing/panel") {
+    try {
+      const force = url.searchParams.get("refresh") === "1";
+      const p = await feeds.panel(force);
+      sendJson(res, p);
+    } catch (e) {
+      sendJson(res, { ok: false, error: String(e && e.message || e), domains: [], questions: [], beliefs: [] });
+    }
+    return true;
+  }
+
+  // ── Cross-domain correlations — REAL patterns, not "this fraction isn't 0.5".
+  // Pearson-correlates flourishing-relevant indicator pairs ACROSS ~200 real
+  // countries (aggregates filtered). Replaces the source dashboard's trivial outliers.
+  if (url.pathname === "/api/flourishing/correlations") {
+    try {
+      const force = url.searchParams.get("refresh") === "1";
+      const items = await feeds.correlations(force);
+      sendJson(res, { ok: items.length > 0, count: items.length, correlations: items,
+        note: "Pearson r across real countries (World Bank, most-recent year). Correlation, not causation." });
+    } catch (e) {
+      sendJson(res, { ok: false, error: String(e && e.message || e), correlations: [] });
+    }
     return true;
   }
 

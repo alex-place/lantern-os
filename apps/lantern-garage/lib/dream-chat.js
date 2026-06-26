@@ -10,6 +10,21 @@ const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, reco
 const { detectTaskType } = require("./task-detector");
 const { TokenAudit } = require("./token-audit");
 const serving = require("./serving-modes");
+const { formatGrounding: _oracleGrounding } = require("./convergence-oracle");
+
+// ── Convergence Oracle grounding ────────────────────────────────────────────
+// Wire the oracle into every question: each gets a time-banded observer slice — the KNOWNs
+// become evidence, the UNKNOWNs honest caveats, and the boundary pins (the singularity, the
+// ultimate fate) are never bluffed. Runs IN-PROCESS (Node port of src/convergence/oracle.py;
+// the server cannot spawn python). Fail-safe: any error yields "".
+function oracleGround(question) {
+  try {
+    const q = String(question || "").trim();
+    return q ? _oracleGrounding(q) : "";
+  } catch (_) {
+    return "";
+  }
+}
 
 // Extract key topics from user message and generate 3 web search suggestion links
 function generateWebSuggestions(userMessage) {
@@ -766,7 +781,11 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     }
   }
 
-  const userPrompt = `${groundingContext ? groundingContext + "\n\n" : ""}${tradingContext ? "Trading data:\n" + tradingContext + "\n\n" : ""}${text}`;
+  // Convergence Oracle — ground every question in its cosmic-time observer slice (fail-safe).
+  let oracleContext = "";
+  try { oracleContext = await oracleGround(text); } catch (_) { oracleContext = ""; }
+
+  const userPrompt = `${oracleContext ? oracleContext + "\n\n" : ""}${groundingContext ? groundingContext + "\n\n" : ""}${tradingContext ? "Trading data:\n" + tradingContext + "\n\n" : ""}${text}`;
 
   let rp = String(requestedProvider || "").toLowerCase().trim();
 

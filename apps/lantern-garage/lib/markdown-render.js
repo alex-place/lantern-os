@@ -411,33 +411,15 @@ function renderMarkdownDocument(markdown, sourcePath) {
       .md-lead { padding: 4px 2px 14px; margin-bottom: 16px; }
     }
 
-    /* ── Large-screen "newspaper panels" ──────────────────────────────────
-       Column COUNT follows each section's content depth (.md-cols-N, assigned at
-       render time in groupSections) rather than the viewport width: 2 columns is
-       the default and only a genuinely deep section earns a 3rd, so shallow
-       sections never fragment into thin stubs. The 22rem column-width floor also
-       lets the browser drop to fewer columns when a panel is too narrow. Page
-       width is capped at 1280px so the 2-column measure stays readable instead of
-       stretching across ultrawide displays. Headings + wide blocks span all
-       columns like newspaper figures. */
+    /* ── Large-screen reading width ───────────────────────────────────────
+       Single-column reading (like GitHub): each H2 panel spans the full panel
+       width as one column rather than splitting into newspaper columns. The page
+       is capped at a comfortable measure so line length stays readable instead of
+       stretching across wide displays. (The .md-cols-N classes from groupSections
+       are now inert — kept so the grouping code needs no change.) */
     @media (min-width: 1100px) {
-      .md-page { max-width: 1280px; }
-      .md-panel { padding: 26px 34px 10px; column-gap: 48px; }
-      .md-panel.md-cols-2 { columns: 22rem 2; }
-      .md-panel.md-cols-3 { columns: 22rem 3; }
-      /* .md-cols-1 stays a single column — a short section has nothing to balance */
-      .md-panel > h2,
-      .md-panel > pre,
-      .md-panel > table,
-      .md-panel > blockquote,
-      .md-panel > hr { column-span: all; }
-      .md-panel > ul,
-      .md-panel > ol,
-      .md-panel li,
-      .md-panel > figure,
-      .md-panel > img { break-inside: avoid; }
-      .md-panel > h3,
-      .md-panel > h4 { break-after: avoid; }
+      .md-page { max-width: 1080px; }
+      .md-panel { padding: 26px 34px 10px; }
     }
   </style>
 </head>
@@ -495,6 +477,7 @@ module.exports = {
   escapeHtml,
   safeUrl,
   inlineMarkdown,
+  renderBlock,
   renderMarkdownDocument,
   slugify,
 };

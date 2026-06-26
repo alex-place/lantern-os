@@ -441,6 +441,7 @@ function createAgentBubble(isError) {
 // Consumes the SSE stream and renders each phase as it happens, so the user can
 // watch plan → patch → tests → commit → push → PR in real time.
 const AUTOWORK_PHASES = [
+  ['create_issue','File issue'],
   ['fetch_issue', 'Fetch issue'],
   ['branch',      'Create branch'],
   ['research',    'Research (codebase + web)'],
@@ -455,23 +456,36 @@ const AUTOWORK_PHASES = [
   ['record',      'Log record'],
 ];
 
-async function runAutowork(issue, btn, base) {
+// `target` is either an issue number (number/numeric string — `!work #N`) or a
+// free-form task object `{ task: "fix the intent handler" }` from the chat
+// "Run as autowork" button. Task mode files a GitHub issue first (server-side),
+// then runs the identical issue-linked pipeline → linked draft PR.
+async function runAutowork(target, btn, base) {
   base = base || ((typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
   hideEmptyState();
   const messages = document.getElementById('messages');
+
+  const taskMode = target && typeof target === 'object' && typeof target.task === 'string';
+  const issue = taskMode ? null : target;
+  const reqBody = taskMode
+    ? { task: target.task, commit: true, push: true }
+    : { issue, commit: true, push: true };
+  const panelLabel = taskMode ? 'task' : ('#' + String(issue == null ? '' : issue));
 
   // Build the panel
   const row = document.createElement('div');
   row.className = 'msg-row agent';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  const stepRowsHtml = AUTOWORK_PHASES.map(([k, label]) =>
+  // The "File issue" step only applies to task mode; drop it for issue-number runs.
+  const phases = taskMode ? AUTOWORK_PHASES : AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
+  const stepRowsHtml = phases.map(([k, label]) =>
     `<div class="aw-step" data-phase="${k}" style="display:flex;align-items:center;gap:8px;padding:3px 0;opacity:0.4">
        <span class="aw-icon" style="width:16px;text-align:center">○</span>
        <span class="aw-label" style="font-size:12.5px">${label}</span>
        <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
      </div>`).join('');
   row.innerHTML =
-    `<div class="msg-label">Keystone · Autowork #${esc(issue)}</div>
+    `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>
      <div class="bubble" style="font-size:13px">
        <div class="aw-steps">${stepRowsHtml}</div>
        <div class="aw-diff" style="display:none;margin-top:8px"></div>
@@ -497,7 +511,7 @@ async function runAutowork(issue, btn, base) {
     const resp = await fetch(`${base}/api/convergence/autonomous-work/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ issue, commit: true, push: true }),
+      body: JSON.stringify(reqBody),
     });
     if (!resp.ok || !resp.body) throw new Error(`stream_unavailable_${resp.status}`);
 
@@ -513,6 +527,7 @@ async function runAutowork(issue, btn, base) {
         let extra = '';
         if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
         else if (d.phase === 'research' && d.status === 'done') extra = `${d.filesFound || 0} files · ${d.webSourcesFound || 0} web`;
+        else if (d.phase === 'create_issue' && d.status === 'done') extra = `#${d.issue}`;
         else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
         setStep(d.phase, d.status, extra);
       } else if (evName === 'diff') {
@@ -554,7 +569,7 @@ async function runAutowork(issue, btn, base) {
       btn.style.color = '#4ade80';
       fin.style.color = '#4ade80';
       fin.innerHTML = finalDone.prUrl
-        ? `✓ Auto-worked #${esc(issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
+        ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
         : `✓ ${esc(finalDone.message || 'Done')}`;
     } else {
       btn.textContent = '✗ Failed';
@@ -589,51 +604,157 @@ function parseImageRequest(text) {
   return null;
 }
 
-// Render a real image from the web for `prompt`. Keyless text-to-image (Pollinations)
-// with a real-photo fallback (LoremFlickr); each source has a load timeout so a slow
-// or down service falls through instead of hanging. The browser loads the external
-// image directly (no server round-trip), so it works despite local TLS interception.
+// Render a generated image for `prompt`. Tries OpenAI (DALL·E / gpt-image-1) FIRST via the
+// server (the key stays server-side; the saved image serves from /images/… so it dodges local
+// TLS interception). On any failure — no key, billing limit, content refusal, timeout — it
+// falls back to a keyless text-to-image source (Pollinations) and then real photos (LoremFlickr),
+// loaded directly by the browser, so an image still appears.
 function renderWebImage(prompt) {
   const messages = document.getElementById('messages');
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const row = document.createElement('div');
   row.className = 'msg-row agent';
-  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Finding an image of <b>${esc(prompt)}</b>…</div>`;
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Generating an image of <b>${esc(prompt)}</b>…</div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
 
-  const seed = Math.floor(Math.random() * 1e6);
-  const keywords = encodeURIComponent(prompt.split(/\s+/).slice(0, 3).join(','));
-  const sources = [
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
-    `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
-  ];
-
-  let i = 0;
-  (function tryNext() {
-    if (i >= sources.length) {
-      bubble.innerHTML = `Sorry — couldn't reach an image service for <b>${esc(prompt)}</b> right now. Please try again.`;
-      if (typeof scrollToBottom === 'function') scrollToBottom();
-      return;
-    }
-    const url = sources[i++];
+  const show = (url, label) => {
     const img = new Image();
-    let settled = false;
-    const to = setTimeout(() => { if (!settled) { settled = true; img.onload = img.onerror = null; tryNext(); } }, 15000);
     img.onload = () => {
-      if (settled) return;
-      settled = true; clearTimeout(to);
-      bubble.innerHTML = `Here's an image of <b>${esc(prompt)}</b>:`;
+      bubble.innerHTML = label;
       img.style.cssText = 'max-width:100%;border-radius:8px;margin:6px 0;display:block';
       img.alt = prompt;
       bubble.appendChild(img);
       if (typeof scrollToBottom === 'function') scrollToBottom();
     };
-    img.onerror = () => { if (!settled) { settled = true; clearTimeout(to); tryNext(); } };
+    img.onerror = () => keylessFallback();   // local/openai image failed to load → keyless
     img.referrerPolicy = 'no-referrer';
     img.src = url;
-  })();
+  };
+
+  // Keyless fallback: Pollinations (text-to-image) then LoremFlickr (real photos), browser-loaded.
+  function keylessFallback() {
+    const seed = Math.floor(Math.random() * 1e6);
+    const keywords = encodeURIComponent(prompt.split(/\s+/).slice(0, 3).join(','));
+    const sources = [
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
+      `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
+    ];
+    let i = 0;
+    (function tryNext() {
+      if (i >= sources.length) {
+        bubble.innerHTML = `Sorry — couldn't reach an image service for <b>${esc(prompt)}</b> right now. Please try again.`;
+        if (typeof scrollToBottom === 'function') scrollToBottom();
+        return;
+      }
+      const url = sources[i++];
+      const img = new Image();
+      let settled = false;
+      const to = setTimeout(() => { if (!settled) { settled = true; img.onload = img.onerror = null; tryNext(); } }, 15000);
+      img.onload = () => {
+        if (settled) return;
+        settled = true; clearTimeout(to);
+        bubble.innerHTML = `Here's an image of <b>${esc(prompt)}</b>:`;
+        img.style.cssText = 'max-width:100%;border-radius:8px;margin:6px 0;display:block';
+        img.alt = prompt;
+        bubble.appendChild(img);
+        if (typeof scrollToBottom === 'function') scrollToBottom();
+      };
+      img.onerror = () => { if (!settled) { settled = true; clearTimeout(to); tryNext(); } };
+      img.referrerPolicy = 'no-referrer';
+      img.src = url;
+    })();
+  }
+
+  // OpenAI first (server-side). 80s budget; on timeout/failure, fall back to keyless.
+  let done = false;
+  const to = setTimeout(() => { if (!done) { done = true; keylessFallback(); } }, 80000);
+  fetch('/api/image/ai-generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (done) return; done = true; clearTimeout(to);
+      if (d && d.ok && d.url) show(d.url, `Here's an image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· ${esc(d.model || 'openai')}</span>:`);
+      else keylessFallback();
+    })
+    .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
+}
+
+// Vision: send an uploaded image to a vision model (Claude / GPT-4o, server-side) and render
+// the answer. Used when the user attaches an image via "+" and asks about it.
+function renderVisionAnswer(prompt, attachment) {
+  const messages = document.getElementById('messages');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Looking at <b>${esc(attachment.name)}</b>…</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  fetch('/api/vision/analyze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, image: attachment.image, mimeType: attachment.mimeType }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.ok && d.text) {
+        bubble.innerHTML = (typeof renderMarkdown === 'function' ? renderMarkdown(d.text) : esc(d.text))
+          + `<div style="opacity:.5;font-size:11px;margin-top:4px">👁 vision · ${esc(d.model || 'vision')}</div>`;
+      } else {
+        bubble.innerHTML = `Couldn't analyze <b>${esc(attachment.name)}</b>: ${esc((d && d.error) || 'vision unavailable')}`;
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+    })
+    .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
+}
+
+// ── Document generation ──────────────────────────────────────────────────────────
+// Detect a request to produce a document and return {prompt, format}, else null. Forms:
+// explicit (!doc / !pdf / /document <prompt>) and natural language ("make me a PDF/report/
+// brief about X"). Requires a document noun so ordinary asks don't trigger it.
+function parseDocRequest(text) {
+  const explicit = text.match(/^[!/](?:doc|document|pdf)\s+(.+)/i);
+  if (explicit) return { prompt: explicit[1].trim(), format: 'pdf' };
+  // NL form: the document noun must be the verb's DIRECT OBJECT — an optional article
+  // plus at most two adjectives — so an incidental mention like "write a function that
+  // generates a pdf report" does NOT hijack a coding request into doc generation (#1274).
+  // A short polite lead-in ("can you", "please", "I'd like you to") is still allowed.
+  // The negative lookahead drops compound-noun coding asks where the document word is a
+  // modifier, e.g. "generate a document loader class" / "build a report parser".
+  const nl = text.match(/^\s*(?:(?:can|could|would|will)\s+you\s+|please\s+|i\s*(?:'?d\s+like|need|want)\s+(?:you\s+to\s+)?)?(?:make|create|generate|write|draft|build|produce|prepare)\s+(?:me\s+)?(?:a|an|the|some)?\s*(?:\w+\s+){0,2}?(pdf|document|report|brief|memo|white\s?paper|one[-\s]?pager|write[-\s]?up)\b(?!\s+(?:loader|class|parser|function|method|handler|component|module|model|schema|object|store|service|endpoint|api|builder|generator|factory|controller|repo|repository|database|interface)s?\b)\s*(?:about|on|for|covering|titled|of|regarding|:)?\s*(.+)/i);
+  if (nl && nl[2] && nl[2].trim().length >= 3) return { prompt: nl[2].trim().replace(/[.?!]+$/, ''), format: 'pdf' };
+  return null;
+}
+
+// Generate a document via the server (model writes it → Markdown → PDF) and show a download link.
+function renderDocGen(prompt, format) {
+  const messages = document.getElementById('messages');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Writing &amp; rendering a document about <b>${esc(prompt)}</b>… (this takes a few seconds)</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  fetch('/api/document/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, format: format || 'pdf' }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.ok && d.url) {
+        const kb = d.bytes ? ' · ' + Math.round(d.bytes / 1024) + ' KB' : '';
+        bubble.innerHTML = `✓ Generated <b>${esc(d.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(d.format)}${kb})</span><br>`
+          + `<a href="${esc(d.url)}" download="${esc(d.filename)}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(d.filename)}</a>`;
+      } else {
+        bubble.innerHTML = `Couldn't generate the document: ${esc((d && d.error) || 'unavailable')}`;
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+    })
+    .catch(e => { bubble.innerHTML = `Document error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
 }
 
 // ── Video requests ──────────────────────────────────────────────────────────────
@@ -822,6 +943,18 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text || isSending) return;
 
+  // Image attachment → vision: the user uploaded an image via "+" to ask about it. The image
+  // is sent to a vision model (Claude / GPT-4o) so the chat can actually SEE it. Sticky, so
+  // follow-up questions about the same image keep working until the chip is removed.
+  const visionAttach = (window.pendingAttachments || []).find(a => a && a.image);
+  if (visionAttach && text) {
+    input.value = '';
+    input.style.height = 'auto';
+    addUserBubble(text);
+    renderVisionAnswer(text, visionAttach);
+    return;
+  }
+
   // Image request → return a visible image from the web (deterministic, no LLM —
   // the desk model can't draw and just declines). Handles "draw me a picture of X"
   // and the explicit !image / /image <prompt> commands.
@@ -843,6 +976,17 @@ async function sendMessage() {
     input.style.height = 'auto';
     addUserBubble(text);
     renderYoutube(videoQuery);
+    return;
+  }
+
+  // Document request → generate a downloadable document (the model writes it, the server
+  // renders Markdown → PDF). Handles "make me a PDF/report/brief about X" and !doc/!pdf <prompt>.
+  const docReq = parseDocRequest(text);
+  if (docReq) {
+    input.value = '';
+    input.style.height = 'auto';
+    addUserBubble(text);
+    renderDocGen(docReq.prompt, docReq.format);
     return;
   }
 
@@ -962,6 +1106,7 @@ async function sendMessage() {
   let receivedDone = false;
   let doneActions = null;   // convergence-agent action chips, from the done event (Stage 3)
   let doneProvider = '';
+  let doneIntent = '';      // routed intent (coding_change, trading, …) — drives the autowork suggestion
   let doneModel = '';       // actual model id from the PCSF receipt (e.g. claude-haiku-4-5)
   let doneTimestamp = '';   // receipt generatedAt — the signature timestamp
   let doneOnline = true;    // false when no model answered (offline path)
@@ -988,6 +1133,8 @@ async function sendMessage() {
 
   try {
     const provider = requestedProvider;
+    // Files attached via the "+" work tool — sent with this one turn, then cleared.
+    const sentAttachments = (window.pendingAttachments || []).filter(a => a && a.text).map(a => ({ name: a.name, text: a.text }));
     const resp = await fetch('/api/dream/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -995,6 +1142,7 @@ async function sendMessage() {
         message: text,
         user: 'dream-chat',
         provider,
+        attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
         // Scope this turn to the active chat session so it persists into the Chats
@@ -1004,6 +1152,9 @@ async function sendMessage() {
       }),
       signal: ac.signal,
     });
+    // Attachments PERSIST across turns (work-tool semantics): the file content is re-sent each
+    // turn so you can keep discussing/editing it. The chip stays visible; clear via the chip ×
+    // or by starting a new chat. (Without this, a follow-up loses the file — only turn 1 has it.)
 
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
@@ -1065,6 +1216,7 @@ async function sendMessage() {
             if (evt.cleanText) fullText = evt.cleanText;
             if (evt.routeLabel || evt.label) routeLabel = evt.routeLabel || evt.label;
             doneProvider = evt.source || evt.provider || (evt.receipt && evt.receipt.provider) || '';
+            doneIntent = evt.intent || (evt.receipt && evt.receipt.intent) || '';
             doneModel = evt.model || (evt.receipt && evt.receipt.model) || '';
             doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
             doneOnline = evt.online !== false;
@@ -1195,6 +1347,38 @@ async function sendMessage() {
       }
     }
     msg.appendChild(sig);
+  }
+
+  // ── Suggest-then-confirm: offer to run a coding turn as autowork → linked PR ──
+  // Coding-intent chats answer normally above; here we surface a one-click action
+  // that files an issue from the request and runs the autowork pipeline (cloud
+  // model → patch → tests → draft PR). No PR is opened unless the user clicks.
+  const CODING_INTENTS = ['coding_change', 'coding', 'technical_debug', 'code_review', 'code'];
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent)) {
+    const offer = document.createElement('div');
+    offer.className = 'autowork-offer';
+    offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const awBtn = document.createElement('button');
+    awBtn.type = 'button';
+    awBtn.className = 'autowork-run-btn';
+    awBtn.style.cssText = 'font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--accent,#5cc8ff);background:transparent;color:var(--accent,#5cc8ff);cursor:pointer';
+    awBtn.textContent = 'Run as autowork →';
+    awBtn.title = 'Files a GitHub issue for this request, then has a cloud model patch it, run tests, and open a linked draft PR.';
+    const hint = document.createElement('span');
+    hint.style.cssText = 'font-size:11px;opacity:0.55';
+    hint.textContent = 'opens a draft PR';
+    awBtn.addEventListener('click', () => {
+      awBtn.disabled = true;
+      awBtn.textContent = 'Running…';
+      const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+      runAutowork({ task: text }, awBtn, base).catch(err => {
+        console.error('[autowork]', err);
+        awBtn.textContent = '✗ Error';
+      });
+    });
+    offer.appendChild(awBtn);
+    offer.appendChild(hint);
+    msg.appendChild(offer);
   }
 
   // Degraded-mode notice (#740): the answer came from the local model as a silent
