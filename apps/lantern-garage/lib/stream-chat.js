@@ -303,7 +303,18 @@ async function handleStreamChat(req, url, res) {
     normalizeDreamerUser,
     collectRequestBody,
   });
-  let { message, user, requestedAgent, requestedProvider, history, mcpFlag, routeIntent } = parsed;
+  let { message, user, requestedAgent, requestedProvider, requestedModel, history, mcpFlag, routeIntent } = parsed;
+
+  // Per-request model override (#1127, ADR-0008). Only honored when the user has
+  // explicitly pinned a provider AND the model is allow-listed for it — never in
+  // auto mode (where the router picks the provider, so a model id from a different
+  // family would be meaningless / could be sent to the wrong API). Falls back to
+  // each branch's own default when empty.
+  const { isSelectableModel } = require("./provider-models");
+  const modelOverride =
+    requestedProvider && isSelectableModel(requestedProvider, requestedModel)
+      ? requestedModel
+      : "";
 
   // Surface mode: dream-chat (default) or three-doors.
   // The game page declares itself via body.surface; bang commands can also flip it below.
@@ -1315,6 +1326,10 @@ async function handleStreamChat(req, url, res) {
   const staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
   let modelChain = staticChain;
   try { modelChain = await orderChainByLeaderboard(staticChain, intent); } catch { /* keep static */ }
+  if (modelOverride && requestedProvider === "ollama") {
+    // User-pinned local model (#1127): try it first, keep the rest as fallback.
+    modelChain = [modelOverride, ...modelChain.filter((m) => m !== modelOverride)];
+  }
 
   // ── Tier 0: cheap Knowledge Center answer before any model ($0, no LLM) ──
   // Only short-circuit informational queries with a confident KB hit. Coding,
@@ -1517,7 +1532,9 @@ async function handleStreamChat(req, url, res) {
       "gemini-3.5-flash",
       "gemini-3.1-flash-lite",
     ];
-    for (const geminiModel of (requestedProvider && requestedProvider.startsWith("gemini-")
+    for (const geminiModel of (modelOverride
+      ? [modelOverride] // user-pinned model (#1127)
+      : requestedProvider && requestedProvider.startsWith("gemini-")
       ? [requestedProvider]
       : GEMINI_MODEL_CHAIN)) {
     try {
@@ -1628,6 +1645,7 @@ async function handleStreamChat(req, url, res) {
       } else {
         claudeModel = process.env.ANTHROPIC_MODEL || claudeModel;
       }
+      if (modelOverride) claudeModel = modelOverride; // user-pinned model (#1127)
       // Prompt caching: the system block (Keystone/RP instructions + dream/CSF
       // context) is the stable prefix reused across turns in a session. Marking
       // it with cache_control caches it for 5 min; subsequent turns read it at
@@ -1730,7 +1748,7 @@ async function handleStreamChat(req, url, res) {
     try {
       // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
       const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
-        model: modelFor("openai"),
+        model: modelOverride || modelFor("openai"), // user-pinned model (#1127)
         stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
       }));
@@ -1785,7 +1803,7 @@ async function handleStreamChat(req, url, res) {
       }).catch(() => {});
       recordProviderSuccess("openai");
       recordProviderSuccessRouter("openai");
-      const openaiModelName = modelFor("openai");
+      const openaiModelName = modelOverride || modelFor("openai"); // user-pinned model (#1127)
       await recordConvergenceSignature("openai", openaiModelName, openaiClean, true);
       const openaiReceipt = buildPcsfReceipt("openai", openaiModelName, true);
       sendReceipt(openaiReceipt);
@@ -1808,7 +1826,7 @@ async function handleStreamChat(req, url, res) {
   const xaiKey = process.env.XAI_API_KEY;
   if (xaiKey && message && (!requestedProvider || requestedProvider === "grok" || requestedProvider === "xai")) {
     try {
-      const xaiModel = modelFor("xai");
+      const xaiModel = modelOverride || modelFor("xai"); // user-pinned model (#1127)
       // xAI/Grok is OpenAI-compatible → FAST-mode decode params (issue #729).
       const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
         model: xaiModel, stream: true,

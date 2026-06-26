@@ -307,6 +307,13 @@
         </select>
       </div>
 
+      <div class="form-group" id="model-group" hidden>
+        <label class="form-label">Model</label>
+        <select id="model-select" class="form-input">
+          <option value="">Default</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label class="form-label">API Keys</label>
         <div class="setting-card">
@@ -360,6 +367,39 @@
     </div>
   </div>
 </div>
+
+
+<script>
+  // Provider → model dropdown (#1127, ADR-0008). Models come from the server
+  // allow-list (GET /api/providers/models) so the picker can never drift from
+  // what the chat stream will actually accept. The selected model is read back
+  // in js/dream-chat-ui.js and sent as `model` in the chat request body.
+  (function wireModelPicker() {
+    let MODELS = {};
+    const providerSel = document.getElementById('provider-select');
+    const modelSel = document.getElementById('model-select');
+    const modelGroup = document.getElementById('model-group');
+    if (!providerSel || !modelSel || !modelGroup) return;
+
+    function renderModels() {
+      const list = MODELS[providerSel.value] || [];
+      const saved = localStorage.getItem('lantern_model_' + providerSel.value) || '';
+      modelSel.innerHTML = '<option value="">Default</option>' +
+        list.map((m) => `<option value="${m}"${m === saved ? ' selected' : ''}>${m}</option>`).join('');
+      modelGroup.hidden = list.length === 0;
+    }
+
+    providerSel.addEventListener('change', renderModels);
+    modelSel.addEventListener('change', () => {
+      localStorage.setItem('lantern_model_' + providerSel.value, modelSel.value);
+    });
+
+    fetch('/api/providers/models', { signal: AbortSignal.timeout(3000) })
+      .then((r) => r.json())
+      .then((d) => { MODELS = (d && d.models) || {}; renderModels(); })
+      .catch(() => { modelGroup.hidden = true; });
+  })();
+</script>
 
 
 <script>

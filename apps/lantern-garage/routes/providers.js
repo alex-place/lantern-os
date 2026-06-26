@@ -5,6 +5,7 @@
  * POST /api/providers/set-key          — persist a key to .env.local
  * DELETE /api/providers/set-key        — remove a key from .env.local
  * GET  /api/providers/status           — quick summary of which providers have keys
+ * GET  /api/providers/models           — selectable models per provider (#1127)
  */
 
 const fs = require("fs");
@@ -12,7 +13,7 @@ const path = require("path");
 const https = require("https");
 const { sendJson } = require("../lib/http-utils");
 const { refreshProviderCache, getProviderState } = require("../lib/provider-cache");
-const { modelFor } = require("../lib/provider-models");
+const { modelFor, SELECTABLE_MODELS } = require("../lib/provider-models");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const ENV_LOCAL = path.join(REPO_ROOT, ".env.local");
@@ -159,6 +160,13 @@ async function testXai(key) {
 
 module.exports = async (req, res, url) => {
   const p = url.pathname;
+
+  // GET /api/providers/models — selectable models per UI provider (dropdown
+  // source of truth + the same allow-list the chat stream validates against). #1127
+  if (p === "/api/providers/models" && req.method === "GET") {
+    sendJson(res, { ok: true, models: SELECTABLE_MODELS });
+    return true;
+  }
 
   // GET /api/providers/status
   if (p === "/api/providers/status" && req.method === "GET") {

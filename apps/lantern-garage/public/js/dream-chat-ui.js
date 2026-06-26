@@ -838,6 +838,8 @@ async function sendMessage() {
   let receivedDone = false;
   let doneProvider = '';
   const requestedProvider = document.getElementById('provider-select')?.value || '';
+  // User-pinned model for the chosen provider (#1127); '' = server default.
+  const requestedModel = document.getElementById('model-select')?.value || '';
 
   try {
     const provider = requestedProvider;
@@ -848,6 +850,7 @@ async function sendMessage() {
         message: text,
         user: 'dream-chat',
         provider,
+        model: requestedModel,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
         // Scope this turn to the active chat session so it persists into the Chats

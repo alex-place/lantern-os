@@ -36,4 +36,29 @@ function modelFor(provider) {
   return (key && process.env[key] && process.env[key].trim()) || DEFAULTS[provider];
 }
 
-module.exports = { DEFAULTS, ENV_VAR, modelFor };
+// User-selectable models per UI provider id — the single source of truth for both
+// the dream-chat model dropdown (served via GET /api/providers/models) and the
+// server-side allow-list that validates a per-request `model` override (#1127,
+// ADR-0008). Keys are the UI provider values used in the chat request body
+// (`claude`, `openai`, `gemini`, `grok`, `ollama`), NOT the env-var provider keys
+// above — keep them aligned with dream-chat's provider <select>. The first entry
+// in each list is the recommended default surfaced to the user.
+const SELECTABLE_MODELS = {
+  claude: ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-8"],
+  openai: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
+  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
+  grok: ["grok-3-mini", "grok-3"],
+  ollama: ["ouro:latest", "qwen2.5-coder", "mistral"],
+};
+
+/** List the user-selectable models for a UI provider id ([] if none / unknown). */
+function selectableModels(provider) {
+  return SELECTABLE_MODELS[provider] || [];
+}
+
+/** True only if `model` is an explicitly allow-listed model for `provider`. */
+function isSelectableModel(provider, model) {
+  return !!model && selectableModels(provider).includes(model);
+}
+
+module.exports = { DEFAULTS, ENV_VAR, modelFor, SELECTABLE_MODELS, selectableModels, isSelectableModel };
