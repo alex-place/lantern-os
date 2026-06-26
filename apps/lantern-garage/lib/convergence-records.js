@@ -33,6 +33,8 @@ function _id() {
  * @param {string[]} [o.applied_evidence] verification-evidence hashes already folded
  *        into confidence (#764 G9). Empty at emit time; the Python Verify stage fills
  *        it so replaying the same test/NIS reading can't ratchet confidence to 1.0.
+ * @param {string[]} [o.grounding_signals] ExternalGroundingSensor ids (empty at emit time)
+ * @param {number|null} [o.allowed_max_confidence] confidence ceiling when grounding is weak
  */
 async function emitConvergenceRecord({
   hypothesis,
@@ -44,6 +46,8 @@ async function emitConvergenceRecord({
   verification_notes = null,
   source = null,
   applied_evidence = [],
+  grounding_signals = [],
+  allowed_max_confidence = null,
 } = {}) {
   try {
     const record = {
@@ -58,6 +62,10 @@ async function emitConvergenceRecord({
       verification_notes: verification_notes == null ? null : String(verification_notes),
       source: source == null ? null : String(source),
       applied_evidence: Array.isArray(applied_evidence) ? applied_evidence.map(String) : [],
+      // Σ₀ grounding fields — mirror the Python ConvergenceRecord dataclass
+      // (src/convergence/objects.py). Empty/null at emit; filled during Verify.
+      grounding_signals: Array.isArray(grounding_signals) ? grounding_signals.map(String) : [],
+      allowed_max_confidence: allowed_max_confidence == null ? null : Number(allowed_max_confidence),
     };
     await appendJsonlQueued(RECORDS_PATH, record, { rotate: true }); // #872
     return record;

@@ -11,6 +11,7 @@ RECORD_KEYS = {
     "confidence", "reasoner", "timestamp", "verified", "verification_notes",
     "source",
     "applied_evidence",  # #764 G9
+    "grounding_signals", "allowed_max_confidence",  # Σ₀ grounding fields
 }
 
 

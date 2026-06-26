@@ -23,6 +23,8 @@ JS_EMITTED = {
     "verification_notes": None,
     "source": "dream-chat/lantern",
     "applied_evidence": [],  # #764 G9 — folded-evidence hashes (empty at emit time)
+    "grounding_signals": [],  # Σ₀ grounding — ExternalGroundingSensor ids (empty at emit)
+    "allowed_max_confidence": None,  # Σ₀ grounding — confidence ceiling (null at emit)
 }
 
 EMITTER_KEYS = {
@@ -30,6 +32,7 @@ EMITTER_KEYS = {
     "confidence", "reasoner", "timestamp", "verified", "verification_notes",
     "source",
     "applied_evidence",  # #764 G9
+    "grounding_signals", "allowed_max_confidence",  # Σ₀ grounding fields
 }
 
 
