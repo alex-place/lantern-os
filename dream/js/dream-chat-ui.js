@@ -988,6 +988,8 @@ async function sendMessage() {
 
   try {
     const provider = requestedProvider;
+    // Files attached via the "+" work tool — sent with this one turn, then cleared.
+    const sentAttachments = (window.pendingAttachments || []).filter(a => a && a.text).map(a => ({ name: a.name, text: a.text }));
     const resp = await fetch('/api/dream/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -995,6 +997,7 @@ async function sendMessage() {
         message: text,
         user: 'dream-chat',
         provider,
+        attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
         // Scope this turn to the active chat session so it persists into the Chats
@@ -1004,6 +1007,7 @@ async function sendMessage() {
       }),
       signal: ac.signal,
     });
+    if (sentAttachments.length && window.clearPendingAttachments) window.clearPendingAttachments();
 
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
 
