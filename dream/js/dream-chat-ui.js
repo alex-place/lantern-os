@@ -589,51 +589,83 @@ function parseImageRequest(text) {
   return null;
 }
 
-// Render a real image from the web for `prompt`. Keyless text-to-image (Pollinations)
-// with a real-photo fallback (LoremFlickr); each source has a load timeout so a slow
-// or down service falls through instead of hanging. The browser loads the external
-// image directly (no server round-trip), so it works despite local TLS interception.
+// Render a generated image for `prompt`. Tries OpenAI (DALL·E / gpt-image-1) FIRST via the
+// server (the key stays server-side; the saved image serves from /images/… so it dodges local
+// TLS interception). On any failure — no key, billing limit, content refusal, timeout — it
+// falls back to a keyless text-to-image source (Pollinations) and then real photos (LoremFlickr),
+// loaded directly by the browser, so an image still appears.
 function renderWebImage(prompt) {
   const messages = document.getElementById('messages');
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const row = document.createElement('div');
   row.className = 'msg-row agent';
-  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Finding an image of <b>${esc(prompt)}</b>…</div>`;
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Generating an image of <b>${esc(prompt)}</b>…</div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
 
-  const seed = Math.floor(Math.random() * 1e6);
-  const keywords = encodeURIComponent(prompt.split(/\s+/).slice(0, 3).join(','));
-  const sources = [
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
-    `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
-  ];
-
-  let i = 0;
-  (function tryNext() {
-    if (i >= sources.length) {
-      bubble.innerHTML = `Sorry — couldn't reach an image service for <b>${esc(prompt)}</b> right now. Please try again.`;
-      if (typeof scrollToBottom === 'function') scrollToBottom();
-      return;
-    }
-    const url = sources[i++];
+  const show = (url, label) => {
     const img = new Image();
-    let settled = false;
-    const to = setTimeout(() => { if (!settled) { settled = true; img.onload = img.onerror = null; tryNext(); } }, 15000);
     img.onload = () => {
-      if (settled) return;
-      settled = true; clearTimeout(to);
-      bubble.innerHTML = `Here's an image of <b>${esc(prompt)}</b>:`;
+      bubble.innerHTML = label;
       img.style.cssText = 'max-width:100%;border-radius:8px;margin:6px 0;display:block';
       img.alt = prompt;
       bubble.appendChild(img);
       if (typeof scrollToBottom === 'function') scrollToBottom();
     };
-    img.onerror = () => { if (!settled) { settled = true; clearTimeout(to); tryNext(); } };
+    img.onerror = () => keylessFallback();   // local/openai image failed to load → keyless
     img.referrerPolicy = 'no-referrer';
     img.src = url;
-  })();
+  };
+
+  // Keyless fallback: Pollinations (text-to-image) then LoremFlickr (real photos), browser-loaded.
+  function keylessFallback() {
+    const seed = Math.floor(Math.random() * 1e6);
+    const keywords = encodeURIComponent(prompt.split(/\s+/).slice(0, 3).join(','));
+    const sources = [
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
+      `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
+    ];
+    let i = 0;
+    (function tryNext() {
+      if (i >= sources.length) {
+        bubble.innerHTML = `Sorry — couldn't reach an image service for <b>${esc(prompt)}</b> right now. Please try again.`;
+        if (typeof scrollToBottom === 'function') scrollToBottom();
+        return;
+      }
+      const url = sources[i++];
+      const img = new Image();
+      let settled = false;
+      const to = setTimeout(() => { if (!settled) { settled = true; img.onload = img.onerror = null; tryNext(); } }, 15000);
+      img.onload = () => {
+        if (settled) return;
+        settled = true; clearTimeout(to);
+        bubble.innerHTML = `Here's an image of <b>${esc(prompt)}</b>:`;
+        img.style.cssText = 'max-width:100%;border-radius:8px;margin:6px 0;display:block';
+        img.alt = prompt;
+        bubble.appendChild(img);
+        if (typeof scrollToBottom === 'function') scrollToBottom();
+      };
+      img.onerror = () => { if (!settled) { settled = true; clearTimeout(to); tryNext(); } };
+      img.referrerPolicy = 'no-referrer';
+      img.src = url;
+    })();
+  }
+
+  // OpenAI first (server-side). 80s budget; on timeout/failure, fall back to keyless.
+  let done = false;
+  const to = setTimeout(() => { if (!done) { done = true; keylessFallback(); } }, 80000);
+  fetch('/api/image/ai-generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (done) return; done = true; clearTimeout(to);
+      if (d && d.ok && d.url) show(d.url, `Here's an image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· ${esc(d.model || 'openai')}</span>:`);
+      else keylessFallback();
+    })
+    .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
 }
 
 // ── Video requests ──────────────────────────────────────────────────────────────
