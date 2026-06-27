@@ -299,9 +299,15 @@
       { freq: "92.3", title: "Into Each Life Some Rain Must Fall", artist: "The Ink Spots & Ella Fitzgerald", year: 1944,
         src: "/radio/into-each-life.mp3",
         lore: "Bill Kenny and Ella trade verses on the weather of the heart. Decca 23356, 1944 — heartbreak you can slow-dance to." },
+      { freq: "92.9", title: "Pennsylvania 6-5000", artist: "Glenn Miller & His Orchestra", year: 1940,
+        src: "/radio/pennsylvania-6-5000.mp3",
+        lore: "Glenn Miller's swing tribute to a Manhattan phone number — the whole band shouting \"Pennsylvania six-five-oh-oh-oh!\" 1940, pure pre-war jukebox joy." },
       { freq: "93.5", title: "In the Blue Evening", artist: "Tommy Dorsey & Frank Sinatra", year: 1943,
         src: "/radio/sinatra-blue-evening.mp3",
         lore: "A young Frank Sinatra out front of the Tommy Dorsey band, 1943 — the bobby-sox idol before the wasteland, crooning into the blue." },
+      { freq: "94.1", title: "Don't Sit Under the Apple Tree", artist: "Glenn Miller & His Orchestra", year: 1942,
+        src: "/radio/dont-sit-under-the-apple-tree.mp3",
+        lore: "Glenn Miller, Tex Beneke and the Modernaires lay down the home-front promise — \"with anyone else but me.\" 1942, sweethearts shipping out." },
       { freq: "94.7", title: "Dream a Little Dream of Me", artist: "Lawrence \"Piano Roll\" Cook", year: 1950,
         src: "/radio/dream-a-little-dream.mp3",
         lore: "The 1931 standard rendered on a player-piano roll by Lawrence Cook — phantom fingers, no pianist in the room. The old world dreaming itself." },
@@ -314,12 +320,18 @@
       { freq: "97.7", title: "I Got the Sun in the Morning", artist: "Dean Martin & Nat Brandwynne's Orchestra", year: 1946,
         src: "/radio/dean-martin-sun.mp3",
         lore: "Dean Martin swings Irving Berlin's \"I got the sun in the morning and the moon at night\" — 1946, all easy postwar optimism." },
+      { freq: "98.1", title: "Heartaches", artist: "Airlane Trio & Ted Martin", year: 1947,
+        src: "/radio/heartaches.mp3",
+        lore: "The 1931 torch song a 1947 reissue turned into a surprise smash — heartaches by the number, drifting up from Galaxy News Radio territory." },
       { freq: "98.7", title: "Civilization (Bongo, Bongo, Bongo)", artist: "Danny Kaye & The Andrews Sisters", year: 1947,
         src: "/radio/civilization.mp3",
         lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." },
       { freq: "99.3", title: "A Wonderful Guy", artist: "Joe Loss & His Orchestra", year: 1949,
         src: "/radio/a-wonderful-guy.mp3",
         lore: "Nellie Forbush's giddy declaration from South Pacific — \"I'm in love with a wonderful guy.\" Joe Loss's British dance-band take, 1949." },
+      { freq: "100.1", title: "Sentimental Journey", artist: "Paul Fenoulhet & The Skyrockets", year: 1945,
+        src: "/radio/sentimental-journey.mp3",
+        lore: "\"Gonna take a sentimental journey, gonna set my heart at ease.\" The 1945 homecoming anthem — the war was ending and everyone was going home." },
       { freq: "100.7", title: "Butcher Pete (Part 1)", artist: "Roy Brown & His Mighty-Mighty Men", year: 1949,
         src: "/radio/butcher-pete.mp3",
         lore: "Roy Brown's jump-blues about a butcher \"hackin' all over town\" — a 1949 double-entendre romp later spun on Fallout 4's Diamond City Radio." },
@@ -329,6 +341,9 @@
       { freq: "102.3", title: "Diane", artist: "Buddy Lucas & His Band of Tomorrow", year: 1951,
         src: "/radio/diane.mp3",
         lore: "Rapée & Pollack's 1928 waltz reborn as a honking 1951 R&B instrumental by Buddy Lucas's Band of Tomorrow — smoky, slow, after-hours." },
+      { freq: "103.1", title: "Blue Moon", artist: "Page Cavanaugh Trio", year: 1948,
+        src: "/radio/blue-moon.mp3",
+        lore: "Rodgers & Hart's lonesome standard smoothed into a 1948 cocktail-trio reverie — \"you saw me standing alone.\"" },
       { freq: "103.9", title: "A String of Pearls", artist: "Glenn Miller & His Orchestra", year: 1941,
         src: "/radio/a-string-of-pearls.mp3",
         lore: "Jerry Gray's glide for the Miller band — November 1941, a month before everything changed. Pure ballroom shimmer." },
@@ -338,6 +353,9 @@
       { freq: "105.1", title: "Pistol Packin' Mama", artist: "Bing Crosby & The Andrews Sisters", year: 1943,
         src: "/radio/pistol-packin-mama.mp3",
         lore: "Lay that pistol down, babe. Crosby and the Andrews Sisters, Decca 23277, 1943 — a jukebox staple in every diner still standing." },
+      { freq: "105.9", title: "I'll Be Seeing You", artist: "Geraldo & His Orchestra", year: 1944,
+        src: "/radio/ill-be-seeing-you.mp3",
+        lore: "Kahal & Fain's parting standard — \"I'll be seeing you in all the old familiar places.\" 1944, the song that meant goodbye for a generation." },
       { freq: "107.1", title: "Anything Goes", artist: "Jack Payne & His Band", year: 1935,
         src: "/radio/anything-goes.mp3",
         lore: "Cole Porter's catalog of a world gone topsy-turvy — \"the world's gone mad today.\" Jack Payne's 1935 band still sounds like a prophecy." }
@@ -508,7 +526,7 @@
     });
 
     // ── Audio element events ───────────────────────────────────────────────
-    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; });
+    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; startVU(); });
     audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; });
     audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); });
     audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); });
@@ -569,7 +587,7 @@
     var vuModeEl = document.getElementById('vuMode');
     var VU_NAMES = ['BARS', 'SCOPE', 'MIRROR'];
     function setVuLabel() { vuModeEl.textContent = VU_NAMES[prefs.viz] || 'BARS'; }
-    canvas.addEventListener('click', function () { prefs.viz = (prefs.viz+1) % VU_NAMES.length; setVuLabel(); savePrefs(); });
+    canvas.addEventListener('click', function () { prefs.viz = (prefs.viz+1) % VU_NAMES.length; setVuLabel(); savePrefs(); if (audio.paused) drawVU(); });
 
     function ensureAudioGraph() {
       if (vuReady) return;
@@ -588,11 +606,19 @@
       } catch (e) { /* no analyser — meter stays idle */ }
     }
 
+    // Perf: the animation loop runs ONLY while audio is playing AND the tab is
+    // visible. Paused or backgrounded, it draws a single idle frame and stops —
+    // no requestAnimationFrame churn, no canvas work, no battery drain. It
+    // restarts on play / when the tab becomes visible again.
+    var rafId = null;
+    function shouldAnimate() { return vuReady && !audio.paused && !document.hidden; }
+    function startVU() { if (rafId == null) rafId = requestAnimationFrame(drawVU); }
     function drawVU() {
-      requestAnimationFrame(drawVU);
+      rafId = null;
+      if (shouldAnimate()) rafId = requestAnimationFrame(drawVU);   // keep looping only while live
       var w = canvas.width, h = canvas.height;
       cx.clearRect(0, 0, w, h);
-      var live = vuReady && !audio.paused;
+      var live = vuReady && !audio.paused && !document.hidden;
       var mode = prefs.viz || 0;
 
       if (mode === 1 && live) {           // oscilloscope
@@ -626,7 +652,8 @@
         }
       }
     }
-    drawVU();
+    drawVU();   // paint the initial idle frame; the loop (re)starts on play / tab-visible
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) startVU(); });
 
     // ── Boot ───────────────────────────────────────────────────────────────
     applyVolume(); applyShuffle(); applyRepeat(); setVuLabel();

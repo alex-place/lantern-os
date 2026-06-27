@@ -16,8 +16,8 @@ lookup / docs / resume / code / trade / **media**). Nothing here touches Memory/
 
 ## Shipped (this PR)
 
-### Song list — 6 → 19 tracks
-Added 13 period tracks (all Great 78 Project / Internet Archive, served locally):
+### Song list — 6 → 25 tracks
+Added 19 period tracks (all Great 78 Project / Internet Archive, served locally):
 
 | Freq | Title | Artist | Year |
 |------|-------|--------|------|
@@ -34,6 +34,12 @@ Added 13 period tracks (all Great 78 Project / Internet Archive, served locally)
 | 95.5 | All of Me | Dean Martin & Nat Brandwynne's Orchestra | 1946 |
 | 97.7 | I Got the Sun in the Morning | Dean Martin & Nat Brandwynne's Orchestra | 1946 |
 | 91.5 | A Dream Is a Wish Your Heart Makes | Perry Como | 1950 |
+| 92.9 | Pennsylvania 6-5000 | Glenn Miller & His Orchestra | 1940 |
+| 94.1 | Don't Sit Under the Apple Tree | Glenn Miller & His Orchestra | 1942 |
+| 98.1 | Heartaches | Airlane Trio & Ted Martin | 1947 |
+| 100.1 | Sentimental Journey | Paul Fenoulhet & The Skyrockets | 1945 |
+| 103.1 | Blue Moon | Page Cavanaugh Trio | 1948 |
+| 105.9 | I'll Be Seeing You | Geraldo & His Orchestra | 1944 |
 
 Crooner note: these are authentic 1940s sides — Sinatra's Dorsey/James-era recordings, Dean Martin's pre-fame Brandwynne sessions, Como's early Victor side. The iconic Fallout: New Vegas Dean Martin cut, *Ain't That a Kick in the Head* (1960), is **not** in the public-domain Great 78 set, so it isn't included.
 
@@ -61,6 +67,10 @@ Continuous playback: a finished song now rolls straight into the next and the di
 - **Visualizer modes** — click the VU meter to cycle bars → oscilloscope → mirrored.
 - **Sleep timer** — off / 15 / 30 / 60 min, fades out and stops.
 
+### Performance
+- **Compact audio** — all tracks re-encoded to **96 kbps mono** (78rpm sources are mono and band-limited, so this is transparent). Cut the on-disk/served footprint from ~96 MB (19 tracks) to ~62 MB (25 tracks) — smaller downloads, faster track starts.
+- **Idle visualizer** — the `requestAnimationFrame` loop now runs *only* while audio is playing **and** the tab is visible (Page Visibility API). Paused or backgrounded, it draws one idle frame and stops — no rAF churn, no canvas work, no battery drain. Restarts on play / tab-visible.
+
 ---
 
 ## Backlog (next)
@@ -72,7 +82,7 @@ Continuous playback: a finished song now rolls straight into the next and the di
 - [ ] **Buffer-ahead** the next track's `<audio preload>` so auto-advance is gapless.
 
 ### P2 — content + reach
-- [ ] **More tracks** to ~24 — the Great 78 fetcher (`scratchpad/fetch_tracks.py` pattern) makes this a metadata-curation job. Wishlist: real Glenn Miller "In the Mood", "Maybe" (Ink Spots), "Crazy He Calls Me", "Uranium Fever", "Atom Bomb Baby" — none currently in the georgeblood collection under a clean transfer; revisit periodically.
+- [ ] **More tracks** — the Great 78 fetcher (`scratchpad/fetch_tracks.py` pattern) makes this a metadata-curation job. Still-wanted (not found under a clean georgeblood transfer yet): real Glenn Miller "In the Mood", Ink Spots "Maybe", Billie Holiday "Crazy He Calls Me", Roy Brown "Mighty Mighty Man", "Uranium Fever", "Atom Bomb Baby"; revisit periodically. Note many standards on georgeblood are British/dance-band covers rather than the iconic US original — verify the ID3 artist, not just the title.
 - [ ] **Genre/era sub-dials** — group stations (swing / crooners / R&B / novelty) into tunable bands.
 - [ ] **Surface it in Explore** as a richer card (it's already linked); consider an inline mini-player embed.
 
@@ -83,7 +93,7 @@ Continuous playback: a finished song now rolls straight into the next and the di
 - [ ] **Waveform seek bar** — render the track's peaks behind the seek slider.
 
 ### Known gaps / risks
-- **Repo size**: 14 mp3s ≈ 69 MB committed raw (no LFS — the LFS endpoint is unprovisioned). Past ~24 tracks, consider a CSF audio shard or a CDN.
+- **Repo size**: 25 mp3s ≈ 62 MB committed raw at 96 kbps mono (no LFS — the LFS endpoint is unprovisioned). Re-encoding bought headroom, but git history still keeps the older heavier blobs from #1324/#1325. Past ~35–40 tracks, move audio to a CSF shard or a CDN rather than growing history further.
 - **Licensing**: framed as Great 78 Project / Internet Archive archival transfers (matching the existing footer), not asserted as cleared for any use.
 - **Autoplay policy**: first play requires a user gesture (handled — the click *is* the gesture).
 
