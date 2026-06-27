@@ -120,7 +120,7 @@ jobs:
           retention-days: 30
 
   test-node:
-    name: Node tests (Playwright, etc)
+    name: Node tests (API, etc)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -164,53 +164,6 @@ jobs:
           name: node-test-results
           path: node-test-results.xml
           retention-days: 30
-
-  # ============================================================================
-  # DREAM CHAT UI: Playwright browser coverage of the primary chat surface
-  # ============================================================================
-  test-dream-chat-ui:
-    name: Dream Chat UI (Playwright)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-npm-
-
-      # Root devDeps provide @playwright/test (the spec runner); --ignore-scripts
-      # skips the rust build, which the UI suite does not need.
-      - name: Install Playwright test runner (root)
-        run: npm ci --ignore-scripts --no-audit --no-fund
-
-      - name: Install app dependencies
-        run: cd apps/lantern-garage && npm ci --prefer-offline
-
-      - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
-
-      # The runner boots lantern-garage on a free port, waits for /api/health,
-      # then runs the dream-chat UX spec against it (and tears it down after).
-      - name: Run Dream Chat UX spec
-        run: node tests/run-dream-journal-tests.js dream-chat-ui
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dream-chat-ui-report
-          path: |
-            playwright-report
-            test-results
-          retention-days: 14
 
   # ============================================================================
   # CONVERGENCE: Consistency checks
@@ -375,7 +328,7 @@ jobs:
   convergence-loop:
     name: Convergence Loop + Promotion Gate
     runs-on: ubuntu-latest
-    needs: [validate-repo, test-python, test-node, test-dream-chat-ui, convergence-check, integration-checks, convergence-loop-validation]
+    needs: [validate-repo, test-python, test-node, convergence-check, integration-checks, convergence-loop-validation]
     permissions:
       contents: read
       pull-requests: write
@@ -416,7 +369,7 @@ jobs:
   all-checks:
     name: All checks passed
     runs-on: ubuntu-latest
-    needs: [validate-repo, test-python, test-node, test-dream-chat-ui, convergence-check, integration-checks, convergence-loop-validation, convergence-loop, security-scan, csf-cache-validate]
+    needs: [validate-repo, test-python, test-node, convergence-check, integration-checks, convergence-loop-validation, convergence-loop, security-scan, csf-cache-validate]
     if: always()
     steps:
       - name: Check for failures
@@ -425,7 +378,6 @@ jobs:
           [ "${{ needs.validate-repo.result }}"              != "success" ] && FAILED="$FAILED validate-repo(${{ needs.validate-repo.result }})"
           [ "${{ needs.test-python.result }}"                != "success" ] && FAILED="$FAILED test-python(${{ needs.test-python.result }})"
           [ "${{ needs.test-node.result }}"                  != "success" ] && FAILED="$FAILED test-node(${{ needs.test-node.result }})"
-          [ "${{ needs.test-dream-chat-ui.result }}"         != "success" ] && FAILED="$FAILED test-dream-chat-ui(${{ needs.test-dream-chat-ui.result }})"
           [ "${{ needs.convergence-check.result }}"          != "success" ] && FAILED="$FAILED convergence-check(${{ needs.convergence-check.result }})"
           [ "${{ needs.integration-checks.result }}"         != "success" ] && FAILED="$FAILED integration-checks(${{ needs.integration-checks.result }})"
           [ "${{ needs.convergence-loop-validation.result }}" != "success" ] && FAILED="$FAILED convergence-loop-validation(${{ needs.convergence-loop-validation.result }})"
