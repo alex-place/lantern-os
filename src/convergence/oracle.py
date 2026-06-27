@@ -165,8 +165,11 @@ class ConvergenceOracle:
             (("nucleosynthesis", "helium", "abundance", "antimatter", "baryogenesis"), "Nucleosynthesis (BBN)"),
             (("cmb", "microwave background", "recombination", "transparent"), "Recombination / CMB"),
             (("first star", "reionization", "population iii", "first galax"), "First stars → reionization"),
-            (("how old", "age of the universe", "dark energy", "dark matter", "now", "today",
-              "current"), "Stelliferous era (NOW)"),
+            # NOW band: real cosmology anchors only. The bare words "now"/"today"/"current"
+            # were dropped to stay in sync with the Node oracle (#1275); un-anchored
+            # questions still fall through to the NOW fallback below, so slice_for's
+            # output is unchanged — this only keeps the keyword lists identical.
+            (("how old", "age of the universe", "dark energy", "dark matter"), "Stelliferous era (NOW)"),
             (("proton decay", "white dwarf", "remnant", "stars stop", "star formation end"),
              "Degenerate era"),
             (("black hole", "hawking", "evaporat"), "Black hole era"),

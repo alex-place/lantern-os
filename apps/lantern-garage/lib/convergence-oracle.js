@@ -75,7 +75,11 @@ const KEYMAP = [
   [["nucleosynthesis", "helium", "abundance", "antimatter", "baryogenesis"], "Nucleosynthesis (BBN)"],
   [["cmb", "microwave background", "recombination", "transparent"], "Recombination / CMB"],
   [["first star", "reionization", "population iii", "first galax"], "First stars → reionization"],
-  [["how old", "age of the universe", "dark energy", "dark matter", "now", "today", "current"], NOW],
+  // NOW band: real cosmology anchors only. The bare words "now"/"today"/"current"
+  // were removed (#1275) — they are not cosmology keywords and matched everyday
+  // requests ("fix this bug now", "my schedule today"), grounding them in dark
+  // energy. The no-match case already returns no grounding (#1268, sliceFor→null).
+  [["how old", "age of the universe", "dark energy", "dark matter"], NOW],
   [["proton decay", "white dwarf", "remnant", "stars stop", "star formation end"], "Degenerate era"],
   [["black hole", "hawking", "evaporat"], "Black hole era"],
   [["heat death", "end of the universe", "ultimate fate", "fate of the universe", "fate of everything",
