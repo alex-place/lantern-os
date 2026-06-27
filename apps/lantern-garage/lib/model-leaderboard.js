@@ -45,6 +45,26 @@ function preferredLocalModel() {
   return process.env.OLLAMA_MODEL || "ouro:latest";
 }
 
+// ── Bounded scoring constants ────────────────────────────────────────────────
+// compositeScore is a WIN RATE in [0,1], never an unbounded accumulator. A
+// repeatedly-engaged source converges to 1.0 instead of climbing forever (the
+// source:Flourishing→10000 bug, #1315 follow-up).
+//
+// PRIOR_* implement Laplace smoothing toward the 0.5 cold prior: with no
+// evidence the score IS 0.5 (matches the cold-start prior in rankCandidates), so
+// a single click/dwell nudges a source up rather than saturating it to 1.0, and a
+// single dismiss nudges down rather than nuking it to 0.0.
+const PRIOR_MEAN = 0.5;   // the cold prior every unscored candidate starts at
+const PRIOR_WEIGHT = 1;   // pseudo-observations of that prior (smoothing strength)
+// Per-call average cost (USD) is subtracted so cheaper candidates rank above
+// equally-reliable expensive ones. Bounded because it multiplies the per-call
+// MEAN cost, not a running SUM (the old `totalCost * 0.1` grew without limit).
+// Local models ($0) pay nothing; cloud pays a small, bounded penalty.
+const COST_PENALTY = 0.5;
+// Raw outcomes are kept only as a bounded debug tail — the score is derived from
+// O(1) running aggregates, so the array never needs to grow with traffic.
+const MAX_OUTCOMES = 50;
+
 /**
  * Record an outcome with optional time-decay weighting.
  * domain = "feed" or "model-routing" (or custom).
@@ -52,20 +72,40 @@ function preferredLocalModel() {
  * key = candidate identifier.
  * success = boolean outcome.
  * latencyMs, costUsd = optional metrics for compositeScore.
- * decayFactor = time-decay multiplier (0..1, default 1.0 = no decay).
+ * decayFactor = recency retention (0..1, default 1.0). 1.0 = a plain win rate over
+ *   all outcomes; <1 exponentially down-weights older outcomes (recency-weighted).
+ *
+ * Score is a Laplace-smoothed, decay-weighted win rate in [0,1] minus a bounded
+ * per-call cost penalty — NOT a raw success count. Bounded by construction:
+ * successes/total can never exceed 1, so repeated wins converge to 1.0.
  */
 function recordOutcomeWithDecay(domain, scope, key, success, latencyMs = 0, costUsd = 0, decayFactor = 1.0) {
   const domainScope = getDomainScope(domain, scope);
   if (!domainScope[key]) {
-    domainScope[key] = { score: 0, decay: 1.0, outcomes: [] };
+    // wSuccess/wTotal/wCost are decay-weighted running aggregates; score is the
+    // bounded win rate derived from them on every update.
+    domainScope[key] = { score: PRIOR_MEAN, decay: 1.0, wSuccess: 0, wTotal: 0, wCost: 0, outcomes: [] };
   }
   const entry = domainScope[key];
-  entry.outcomes.push({ success, latencyMs, costUsd, timestamp: Date.now() });
+
+  // retain ∈ [0,1]: how much prior evidence survives this update. With retain=1
+  // (the default) wTotal is the plain outcome count; with retain<1 older outcomes
+  // decay geometrically. Either way winRate = wSuccess/wTotal stays in [0,1].
+  const retain = Math.max(0, Math.min(1, decayFactor));
+  entry.wSuccess = entry.wSuccess * retain + (success ? 1 : 0);
+  entry.wTotal = entry.wTotal * retain + 1;
+  entry.wCost = entry.wCost * retain + Math.max(0, costUsd || 0);
   entry.decay = Math.max(0, Math.min(1, entry.decay * decayFactor));
-  // Recompute score: success count weighted by decay, minus cost.
-  const successes = entry.outcomes.filter((o) => o.success).length;
-  const totalCost = entry.outcomes.reduce((sum, o) => sum + (o.costUsd || 0), 0);
-  entry.score = Math.max(0, (successes * entry.decay) - (totalCost * 0.1));
+
+  // Laplace-smoothed win rate toward the 0.5 cold prior, minus a bounded per-call
+  // cost penalty. Clamped to [0,1] so the score can never run away.
+  const winRate = (entry.wSuccess + PRIOR_MEAN * PRIOR_WEIGHT) / (entry.wTotal + PRIOR_WEIGHT);
+  const avgCost = entry.wTotal > 0 ? entry.wCost / entry.wTotal : 0;
+  entry.score = Math.max(0, Math.min(1, winRate - avgCost * COST_PENALTY));
+
+  // Bounded debug tail only — trim oldest so memory never grows with traffic.
+  entry.outcomes.push({ success, latencyMs, costUsd, timestamp: Date.now() });
+  if (entry.outcomes.length > MAX_OUTCOMES) entry.outcomes.splice(0, entry.outcomes.length - MAX_OUTCOMES);
   return entry;
 }
 
@@ -85,7 +125,18 @@ async function rankCandidatesByDomain(candidates, domain, scope = "global", opts
   let agentScores = {};
   try {
     const ranked = await getTopAgentsForTask(taskType, 30, 1);
-    for (const r of ranked) agentScores[r.agentId] = r.compositeScore;
+    // Use the bounded successRate (∈ [0,1]) as the cold/restart fallback prior,
+    // NOT the raw compositeScore. compositeScore is an unbounded latency/cost-
+    // weighted metric — a fast, free, always-successful source scores
+    // (1.0 * 10) / (0.1 * 0.01) = 10000 — on a completely different scale from the
+    // in-memory win rate and the 0.5 cold prior. Sorting them in the same
+    // comparison let one agent-performance row blow the feed out (the live
+    // source:Flourishing=10000). successRate is the same [0,1] win-rate scale, so
+    // the fallback ranks comparably. Clamp defensively.
+    for (const r of ranked) {
+      const s = typeof r.successRate === "number" ? r.successRate : r.compositeScore;
+      agentScores[r.agentId] = Math.max(0, Math.min(1, s));
+    }
   } catch { /* no signal */ }
 
   return (Array.isArray(candidates) ? candidates : [])
