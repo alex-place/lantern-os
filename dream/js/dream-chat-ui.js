@@ -1,3 +1,53 @@
+// ── Deterministic tool-flow persistence (#1268) ──────────────────────────────
+// Image/video/vision/doc-gen requests are handled entirely client-side (no LLM
+// call), so they never hit /api/dream/chat — which means they never reached the
+// server's appendConversationEntry either. A reload or session-switch replayed
+// from server storage and these turns just vanished. POST them directly to the
+// existing /api/conversations endpoint so they survive like normal chat turns.
+function persistToolTurn(role, text, meta) {
+  if (!text) return;
+  try {
+    const sessionId = localStorage.getItem('lantern_chat_session') || null;
+    fetch('/api/conversations', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role, text, surface: 'garage', sessionId, ...(meta ? { meta } : {}) }),
+    }).catch(() => {}); // best-effort — a failed persist must never break the live reply
+  } catch { /* best-effort */ }
+}
+
+// ── Tool-turn replay (#1270) ─────────────────────────────────────────────────
+// Rebuild the rich bubble content (generated image, YouTube embed, document
+// download) from a persisted meta.tool payload, so reloading or switching back to
+// a session restores the actual element — not just its text description. The
+// markup here mirrors the live renderers (renderWebImage / renderYoutube /
+// renderDocGen). Returns inner-HTML for the .bubble, or null to fall back to text.
+function renderToolReplay(tool) {
+  if (!tool || !tool.kind) return null;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  if (tool.kind === 'image' && tool.url) {
+    const caption = tool.label
+      || (`Image of <b>${esc(tool.prompt || '')}</b>` + (tool.note ? ` <span style="opacity:.55;font-size:11px">· ${esc(tool.note)}</span>` : '') + ':');
+    return `${caption}<img src="${esc(tool.url)}" alt="${esc(tool.prompt || 'image')}" referrerpolicy="no-referrer" `
+      + `style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`;
+  }
+  if (tool.kind === 'youtube' && (tool.query || tool.url)) {
+    const q = encodeURIComponent(tool.query || '');
+    const embed = `https://www.youtube-nocookie.com/embed?listType=search&list=${q}`;
+    const searchUrl = tool.url || `https://www.youtube.com/results?search_query=${q}`;
+    return `Here are videos for <b>${esc(tool.query || '')}</b>:`
+      + `<iframe src="${esc(embed)}" width="100%" height="240" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" `
+      + `allow="encrypted-media;picture-in-picture" allowfullscreen loading="lazy"></iframe>`
+      + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
+  }
+  if (tool.kind === 'document' && tool.url) {
+    const kb = tool.bytes ? ' · ' + Math.round(tool.bytes / 1024) + ' KB' : '';
+    return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
+      + `<a href="${esc(tool.url)}" download="${esc(tool.filename || '')}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(tool.filename || 'file')}</a>`;
+  }
+  return null;
+}
+window.renderToolReplay = renderToolReplay;
+
 // ── Personal Cube Integration ────────────────────────────────────────────────
 let personalContext = null;
 
@@ -599,7 +649,7 @@ async function runAutowork(target, btn, base) {
 function parseImageRequest(text) {
   const explicit = text.match(/^[!/]image\s+(.+)/i);
   if (explicit) return explicit[1].trim();
-  const nl = text.match(/\b(?:draw|paint|sketch|generate|create|make|render|show)\b[^.?!]*?\b(?:image|picture|photo|drawing|illustration|art|painting)\b\s*(?:of|showing|with|featuring|:)?\s*(.+)/i);
+  const nl = text.match(/\b(?:draw|paint|sketch|generate|create|make|render|show|find|get|give)\b[^.?!]*?\b(?:image|picture|photo|drawing|illustration|art|painting)\b\s*(?:of|showing|with|featuring|:)?\s*(.+)/i);
   if (nl && nl[1] && nl[1].trim().length >= 2) return nl[1].trim().replace(/[.?!]+$/, '');
   return null;
 }
@@ -619,7 +669,7 @@ function renderWebImage(prompt) {
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
 
-  const show = (url, label) => {
+  const show = (url, label, sourceNote) => {
     const img = new Image();
     img.onload = () => {
       bubble.innerHTML = label;
@@ -627,39 +677,48 @@ function renderWebImage(prompt) {
       img.alt = prompt;
       bubble.appendChild(img);
       if (typeof scrollToBottom === 'function') scrollToBottom();
+      persistToolTurn('lantern', `Image of "${prompt}"${sourceNote ? ` (${sourceNote})` : ''}: ${url}`, { agent: 'Keystone', provider: 'image-tool', model: sourceNote || 'openai', tool: { kind: 'image', url, prompt, label, note: sourceNote || '' } });
     };
     img.onerror = () => keylessFallback();   // local/openai image failed to load → keyless
     img.referrerPolicy = 'no-referrer';
     img.src = url;
   };
 
-  // Keyless fallback: Pollinations (text-to-image) then LoremFlickr (real photos), browser-loaded.
+  // Keyless fallback: Pollinations (text-to-image, AI-generated) then LoremFlickr (a real
+  // stock photo someone took — found, not generated). The label always names which one
+  // actually loaded, so "generated" vs "found" is never ambiguous to the user (#1268).
   function keylessFallback() {
     const seed = Math.floor(Math.random() * 1e6);
     const keywords = encodeURIComponent(prompt.split(/\s+/).slice(0, 3).join(','));
     const sources = [
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
-      `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
+      { url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
+        label: `Here's an AI-generated image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· generated via Pollinations</span>:`,
+        note: 'generated via Pollinations' },
+      { url: `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
+        label: `Couldn't generate an image, so here's a real stock photo matching <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· found via LoremFlickr, not AI-generated</span>:`,
+        note: 'found via LoremFlickr, not AI-generated' },
     ];
     let i = 0;
     (function tryNext() {
       if (i >= sources.length) {
         bubble.innerHTML = `Sorry — couldn't reach an image service for <b>${esc(prompt)}</b> right now. Please try again.`;
         if (typeof scrollToBottom === 'function') scrollToBottom();
+        persistToolTurn('lantern', `Couldn't find or generate an image for "${prompt}" — no image service reachable.`, { agent: 'Keystone', provider: 'image-tool' });
         return;
       }
-      const url = sources[i++];
+      const { url, label, note } = sources[i++];
       const img = new Image();
       let settled = false;
       const to = setTimeout(() => { if (!settled) { settled = true; img.onload = img.onerror = null; tryNext(); } }, 15000);
       img.onload = () => {
         if (settled) return;
         settled = true; clearTimeout(to);
-        bubble.innerHTML = `Here's an image of <b>${esc(prompt)}</b>:`;
+        bubble.innerHTML = label;
         img.style.cssText = 'max-width:100%;border-radius:8px;margin:6px 0;display:block';
         img.alt = prompt;
         bubble.appendChild(img);
         if (typeof scrollToBottom === 'function') scrollToBottom();
+        persistToolTurn('lantern', `Image of "${prompt}" (${note}): ${url}`, { agent: 'Keystone', provider: 'image-tool', model: note, tool: { kind: 'image', url, prompt, label, note } });
       };
       img.onerror = () => { if (!settled) { settled = true; clearTimeout(to); tryNext(); } };
       img.referrerPolicy = 'no-referrer';
@@ -677,7 +736,7 @@ function renderWebImage(prompt) {
     .then(r => r.json())
     .then(d => {
       if (done) return; done = true; clearTimeout(to);
-      if (d && d.ok && d.url) show(d.url, `Here's an image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· ${esc(d.model || 'openai')}</span>:`);
+      if (d && d.ok && d.url) show(d.url, `Here's an image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· ${esc(d.model || 'openai')}</span>:`, `generated via ${d.model || 'openai'}`);
       else keylessFallback();
     })
     .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
@@ -703,12 +762,15 @@ function renderVisionAnswer(prompt, attachment) {
       if (d && d.ok && d.text) {
         bubble.innerHTML = (typeof renderMarkdown === 'function' ? renderMarkdown(d.text) : esc(d.text))
           + `<div style="opacity:.5;font-size:11px;margin-top:4px">👁 vision · ${esc(d.model || 'vision')}</div>`;
+        persistToolTurn('lantern', d.text, { agent: 'Keystone', provider: 'vision', model: d.model || 'vision' });
       } else {
+        const errMsg = `Couldn't analyze ${attachment.name}: ${(d && d.error) || 'vision unavailable'}`;
         bubble.innerHTML = `Couldn't analyze <b>${esc(attachment.name)}</b>: ${esc((d && d.error) || 'vision unavailable')}`;
+        persistToolTurn('lantern', errMsg, { agent: 'Keystone', provider: 'vision' });
       }
       if (typeof scrollToBottom === 'function') scrollToBottom();
     })
-    .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
+    .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); persistToolTurn('lantern', `Vision error analyzing ${attachment.name}: ${e.message}`, { agent: 'Keystone', provider: 'vision' }); });
 }
 
 // ── Document generation ──────────────────────────────────────────────────────────
@@ -753,12 +815,14 @@ function renderDocGen(prompt, format) {
         const kb = d.bytes ? ' · ' + Math.round(d.bytes / 1024) + ' KB' : '';
         bubble.innerHTML = `✓ Generated <b>${esc(d.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(d.format)}${kb})</span><br>`
           + `<a href="${esc(d.url)}" download="${esc(d.filename)}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(d.filename)}</a>`;
+        persistToolTurn('lantern', `Generated document "${d.title || 'document'}" (${d.format}${kb}): ${d.url}`, { agent: 'Keystone', provider: 'document-generator', model: d.format, tool: { kind: 'document', url: d.url, title: d.title || 'document', filename: d.filename, format: d.format, bytes: d.bytes } });
       } else {
         bubble.innerHTML = `Couldn't generate the document: ${esc((d && d.error) || 'unavailable')}`;
+        persistToolTurn('lantern', `Couldn't generate the document for "${prompt}": ${(d && d.error) || 'unavailable'}`, { agent: 'Keystone', provider: 'document-generator' });
       }
       if (typeof scrollToBottom === 'function') scrollToBottom();
     })
-    .catch(e => { bubble.innerHTML = `Document error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
+    .catch(e => { bubble.innerHTML = `Document error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); persistToolTurn('lantern', `Document generation error for "${prompt}": ${e.message}`, { agent: 'Keystone', provider: 'document-generator' }); });
 }
 
 // ── Video requests ──────────────────────────────────────────────────────────────
@@ -798,6 +862,7 @@ function renderYoutube(query) {
     `<a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a></div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
+  persistToolTurn('lantern', `YouTube results for "${query}": ${searchUrl}`, { agent: 'Keystone', provider: 'youtube-search', tool: { kind: 'youtube', query, url: searchUrl } });
 }
 
 // ── Explore embed helpers ─────────────────────────────────────────────────────
@@ -960,6 +1025,7 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
+    persistToolTurn('operator', text);
     renderVisionAnswer(text, visionAttach);
     return;
   }
@@ -972,6 +1038,7 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
+    persistToolTurn('operator', text);
     renderWebImage(imagePrompt);
     return;
   }
@@ -984,6 +1051,7 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
+    persistToolTurn('operator', text);
     renderYoutube(videoQuery);
     return;
   }
@@ -995,6 +1063,7 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
+    persistToolTurn('operator', text);
     renderDocGen(docReq.prompt, docReq.format);
     return;
   }
