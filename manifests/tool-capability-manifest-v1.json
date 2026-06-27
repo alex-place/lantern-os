@@ -222,15 +222,17 @@
     },
     {
       "name": "web_search",
-      "description": "Search the web for current information. Returns ranked results (title, url, snippet).",
+      "description": "Search the web for real-time information. Returns top results with title, URL, and snippet. Each result is cited per the Σ₀ External Reality Rule.",
       "input_schema": {
         "type": "object",
         "properties": {
           "query": {
-            "type": "string"
+            "type": "string",
+            "description": "The search query"
           },
           "max_results": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Max results to return (1–10, default 5)"
           }
         },
         "required": [
@@ -249,12 +251,17 @@
     },
     {
       "name": "web_fetch",
-      "description": "Fetch a web page and return its readable text (truncated). http(s) only; internal hosts are blocked.",
+      "description": "Fetch the text content of a public URL. HTML is stripped to readable plain text. Use for reading web pages, documentation, or articles. No internal/private IPs allowed.",
       "input_schema": {
         "type": "object",
         "properties": {
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "The public https:// or http:// URL to fetch"
+          },
+          "max_chars": {
+            "type": "integer",
+            "description": "Max characters of content to return (default 3000)"
           }
         },
         "required": [
@@ -263,6 +270,157 @@
       },
       "policy": "read",
       "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "workspace_write",
+      "description": "Write a file to the user workspace (~/.keystone/workspace/). Creates intermediate directories. Never writes to the repo.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "file_path": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path",
+          "content"
+        ]
+      },
+      "policy": "mutating",
+      "operator_required": true,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "workspace_read",
+      "description": "Read a file from the user workspace (~/.keystone/workspace/). Use for user-owned artifacts: resumes, exports, generated docs.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "file_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "workspace_list",
+      "description": "List files in the user workspace (~/.keystone/workspace/) under an optional subdirectory.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "create_document",
+      "description": "Create a formatted document (markdown, plaintext) in the user workspace. Returns the workspace-relative path.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Workspace-relative path, e.g. 'resume-2026.md'"
+          },
+          "content": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "text"
+            ],
+            "description": "File format hint (default: markdown)"
+          }
+        },
+        "required": [
+          "filename",
+          "content"
+        ]
+      },
+      "policy": "mutating",
+      "operator_required": true,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "local_eval_keystone_run",
+      "description": "Run the Keystone eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Unique run label (alphanumeric, dash, dot, max 64 chars)"
+          },
+          "base": {
+            "type": "string",
+            "description": "Ollama API base URL (loopback only, default: http://127.0.0.1:11434)"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model name passed to eval harness (default: ouro:latest)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max prompts to evaluate (default: all; max: 65)"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Per-prompt timeout in seconds (default: 60; max: 300)"
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "policy": "shell",
+      "operator_required": true,
       "surface_availability": {
         "dream_chat": true,
         "mcp": true
