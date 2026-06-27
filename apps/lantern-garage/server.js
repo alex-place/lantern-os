@@ -8,6 +8,9 @@ const { spawn } = require("child_process");
 // yet, startup otherwise dies with a raw "Cannot find module 'x'" stack trace
 // (e.g. busboy via routes/pdfs.js). Surface an actionable message instead.
 (function preflightDependencies() {
+  // Escape hatch for worktree/CI runs where node_modules is junctioned from another
+  // checkout and a `file:` workspace self-dep (lantern-os) isn't symlinked. Opt-in only.
+  if (process.env.SKIP_DEP_PREFLIGHT === "1") return;
   let pkg;
   try {
     pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
@@ -185,6 +188,7 @@ const routes = [
   require("./routes/features"),
   require("./routes/admin-flags"),     // Admin feature flags + per-page nav visibility
   require("./routes/personal-cube"),
+  require("./routes/grounding"),       // Mesh grounding resolver: /api/grounding/resolve + /api/mesh/ground (gated by MESH_GROUNDING=1)
   require("./routes/pr-review"),
   require("./routes/auto-merge"),
   require("./routes/creators"),        // creator profiles + intake form

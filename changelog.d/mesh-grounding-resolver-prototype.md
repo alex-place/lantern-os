@@ -24,6 +24,28 @@ answer at all. NOT wired into the chat path yet — engine + tests first, pendin
   decisions, the mesh ring, cheap-first short-circuit, corroboration bounds, per-source
   timeouts (a hung ring/peer never blocks), and the data-not-agency / confidence-clamp guards.
 
-Loop stage: **Remember + Verify**. Next: ADR (Proposed) for the topology, then wire the
-rings to the real local memory / Knowledge Center / web / a read-only `/api/mesh/ground`
-peer endpoint.
+**Wired to real sources + live-tested** (after reviewing the existing mesh subsystem +
+ADRs 0002/0004/0005, which it passes — a Remember/Verify helper, not a new subsystem):
+
+- `lib/grounding-rings.js` — adapts the EXISTING retrievers into rings: `local-memory`
+  (csf-memory.queryConversationMemory/queryMemories, relevance score → confidence),
+  `knowledge-center` (queryRagHouse/queryResearchLibrary), `web`
+  (web-search-client, gated by needsGrounding, calibrated 0.45 prior so a lone web hit
+  abstains), and `mesh` (meshPeerSource over peer mirrors via an http/https `httpPostJson`).
+  `localServeRings()` = local rings only (a node never re-federates when serving a peer).
+- `routes/grounding.js` (registered in server.js, **gated by `MESH_GROUNDING=1`**, off by
+  default): `GET /api/grounding/resolve` (full resolution + the model's prompt block) and
+  the read-only federation primitive `POST /api/mesh/ground` (serves local evidence; shared
+  -secret gate via `MESH_GROUND_SECRET`; data-not-agency).
+- `server.js`: registered the route; added an opt-in `SKIP_DEP_PREFLIGHT=1` escape hatch for
+  worktree/CI runs with a junctioned `node_modules`.
+- Test: `test/grounding-rings.test.js` (7 cases, retrievers stubbed). Verified LIVE on a
+  worktree server: answer-with-citations (local memory), honest abstain (no grounding), the
+  federation self-loop over real HTTP (`mirror:self`, corroboration boosting confidence to
+  0.82, bounded), and the raw `/api/mesh/ground` primitive.
+
+Loop stage: **Remember + Verify**. Still gated pending a Proposed ADR: the **mesh peer ring**
+(cross-node fetch) stays behind the peer registry + ADR approval — `mesh-members.json` has no
+per-node URLs and `cloud-mirrors.json` is "one canonical surface", so multi-mirror federation
+needs Alex's topology decision. The chat-prompt splice (local rings into dream-chat.js /
+stream-chat.js behind `MESH_GROUNDING=1`) is specced and is the next increment.
