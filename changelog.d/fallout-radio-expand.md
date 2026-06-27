@@ -1,0 +1,6 @@
+### Keystone Radio — bigger dial, refined CRT, real transport
+
+- The `/fallout-radio.html` tube-radio player ([101.5 FM "Founder's Frequency"](/fallout-radio.html#101.5)) grew from 6 to **14 stations** — added 8 period 78rpm transfers from the Internet Archive Great 78 Project (Roy Brown's *Butcher Pete*, Glenn Miller's *A String of Pearls*, *Stormy Weather*, *It's a Sin to Tell a Lie*, *A Wonderful Guy*, *Anything Goes*, *Dream a Little Dream of Me*, *Diane*), served locally from `/radio/`.
+- **Refined CRT**: bulged-glass curvature, corner vignette + diagonal glare, a rolling horizontal-hold scanline, animated phosphor grain, a power-on bloom on first play, and RGB chromatic aberration on the now-playing title. All motion honors `prefers-reduced-motion`.
+- **New transport + features**: deep-link by frequency (`#101.5`), persistent prefs (station/volume/mute/shuffle/repeat/visualizer in `localStorage`), full keyboard control, shuffle + 3-state repeat, mute, a synthesized tuning-static burst between stations (DX toggle), OS/lock-screen Media Session controls, a now-playing marquee, loading/`SIGNAL LOST` states with auto-skip, three click-to-cycle visualizer modes (bars / oscilloscope / mirrored), and a sleep timer (15/30/60 min fade-out).
+- Roadmap recorded in [docs/fallout-radio-backlog.md](docs/fallout-radio-backlog.md).
