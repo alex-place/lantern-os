@@ -208,6 +208,32 @@
       "why": "Game Boy emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · final-fantasy-adventure-usa (emulator: gbcolor)",
       "embed": { "provider": "archive.org", "src": "https://archive.org/embed/final-fantasy-adventure-usa", "height": 480, "interactive": true }
+    },
+    {
+      "slug": "nosferatu",
+      "title": "Nosferatu (1922)",
+      "kind": "watch",
+      "url": "https://archive.org/details/nosferatu_eine_symphonie_des_grauens",
+      "source": "Internet Archive",
+      "published": "1922-03-04",
+      "topics": ["watch", "lore", "film"],
+      "lore": "Murnau filmed Dracula without the rights, renamed the Count 'Orlok', and Stoker's widow sued the studio to ashes — a court ordered every print destroyed. The handful that survived made the first vampire of cinema immortal.",
+      "why": "Public-domain silent film, streamable in-page from the Internet Archive",
+      "evidence_source": "archive.org · nosferatu_eine_symphonie_des_grauens (Public Domain)",
+      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/nosferatu_eine_symphonie_des_grauens", "height": 460, "interactive": true }
+    },
+    {
+      "slug": "steamboat-willie",
+      "title": "Steamboat Willie (1928)",
+      "kind": "watch",
+      "url": "https://archive.org/details/steamboat-willie-1928-by-walt-disney_202407",
+      "source": "Internet Archive",
+      "published": "1928-11-18",
+      "topics": ["watch", "lore", "animation"],
+      "lore": "Mickey Mouse's debut, and the first cartoon with synchronized sound — Walt Disney whistling at the wheel of a steamboat. Disney's copyright held it for 95 years; on January 1, 2024 this version finally entered the public domain.",
+      "why": "Entered the US public domain on Jan 1, 2024 — streamable in-page from the Internet Archive",
+      "evidence_source": "archive.org · steamboat-willie-1928-by-walt-disney_202407 (Public Domain, 2024)",
+      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/steamboat-willie-1928-by-walt-disney_202407", "height": 420, "interactive": true }
     }
   ]
 }
