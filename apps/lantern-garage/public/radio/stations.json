@@ -380,16 +380,6 @@
 "iaf": "I've Got You Under My Skin - Artie Shaw And His Orchestra.mp3"
 },
 {
-"freq": "92.5",
-"title": "Georgia on My Mind",
-"artist": "Artie Shaw and His Orchestra",
-"year": 1942,
-"src": "/radio/georgia-on-my-mind-orchestra.mp3",
-"lore": "Artie Shaw and His Orchestra — a 1942 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_georgia-on-my-mind_artie-shaw-and-his-orchestra-carmichael_gbia0011398b",
-"iaf": "Georgia on My Mind - Artie Shaw and His Orchestra.mp3"
-},
-{
 "freq": "92.7",
 "title": "Stardust",
 "artist": "Artie Shaw and His Orchestra",
@@ -398,16 +388,6 @@
 "lore": "Artie Shaw and His Orchestra — a 1942 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_stardust_artie-shaw-and-his-orchestra-parish-carmichael_gbia0011398a",
 "iaf": "Stardust - Artie Shaw and His Orchestra - Parish.mp3"
-},
-{
-"freq": "93.1",
-"title": "(I Don't Stand) A Ghost of a Chance",
-"artist": "Artie Shaw and his Orchestra",
-"year": 1946,
-"src": "/radio/i-don-t-stand-a-ghost-of-a-chance-orchestra.mp3",
-"lore": "Artie Shaw and his Orchestra — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_i-dont-stand-a-ghost-of-a-chance_artie-shaw-and-his-orchestra-hal-stevens-crosby_gbia0010705b",
-"iaf": "(I Don't Stand) A Ghost of  - Artie Shaw and his Orchestra.mp3"
 },
 {
 "freq": "93.3",
@@ -730,16 +710,6 @@
 "iaf": "Try a Little Tenderness - Bing Crosby.mp3"
 },
 {
-"freq": "102.1",
-"title": "I Don't Stand A Ghost Of A Chance",
-"artist": "Bing Crosby",
-"year": 1945,
-"src": "/radio/i-don-t-stand-a-ghost-of-a-chance-crosby.mp3",
-"lore": "Bing Crosby — a 1945 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_i-dont-stand-a-ghost-of-a-chance_bing-crosby-victor-young-ned-washington-ernie-and_gbia0000786b",
-"iaf": "I Don't Stand A Ghost Of A Chance - Bing Crosby.mp3"
-},
-{
 "freq": "102.5",
 "title": "Make Believe",
 "artist": "Bing Crosby and Bix Beiderbecke",
@@ -778,16 +748,6 @@
 "lore": "Buddy Rich and his V-Disc Speed Demons — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_thats-rich_buddy-rich-and-his-v-disc-speed-demons-ella-fitzgerald-buddy-rich-charl_gbia0382438a",
 "iaf": "THAT'S RICH - Buddy Rich and his V-Disc Speed Demons.mp3"
-},
-{
-"freq": "103.5",
-"title": "I Can't Get Started",
-"artist": "Bunny Berigan and his Boys",
-"year": 1936,
-"src": "/radio/i-can-t-get-started-boys.mp3",
-"lore": "Bunny Berigan and his Boys — a 1936 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_i-cant-get-started_bunny-berigan-and-his-boys-bunny-berigan-i-gershwin-duke-artie_gbia0061958b",
-"iaf": "I Can't Get Started - Bunny Berigan and his Boys.mp3"
 },
 {
 "freq": "103.7",
@@ -830,16 +790,6 @@
 "iaf": "CAFE SOCIETY BLUES - COUNT BASIE and his ALL AMERICAN RHYTHM SECTION.mp3"
 },
 {
-"freq": "104.9",
-"title": "(I don't stand) A GHOST OF A CHANCE (with you)",
-"artist": "Cab Calloway & His Orch.",
-"year": 1944,
-"src": "/radio/i-don-t-stand-a-ghost-of-a-chance-with-you-orch.mp3",
-"lore": "Cab Calloway & His Orch. — a 1944 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_i-dont-stand-a-ghost-of-a-chance-with-you_cab-calloway-his-orch-chu-berry-c_gbia0150084a",
-"iaf": "(I don't stand) A GHOST OF A CH - CAB CALLOWAY & HIS ORCH..mp3"
-},
-{
 "freq": "105.3",
 "title": "Willow Weep For Me",
 "artist": "Cab Calloway & His Orch.",
@@ -848,16 +798,6 @@
 "lore": "Cab Calloway & His Orch. — a 1944 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_willow-weep-for-me_cab-calloway-his-orch-hilton-jefferson-ronell-gibson_gbia0150084b",
 "iaf": "WILLOW WEEP FOR ME - CAB CALLOWAY & HIS ORCH..mp3"
-},
-{
-"freq": "105.5",
-"title": "(I Don't Stand) A GHOST OF A CHANCE (With You)",
-"artist": "Cab Calloway & His Orchestra",
-"year": 1943,
-"src": "/radio/i-don-t-stand-a-ghost-of-a-chance-with-you-orchestra.mp3",
-"lore": "Cab Calloway & His Orchestra — a 1943 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_i-dont-stand-a-ghost-of-a-chance-with-you_cab-calloway-his-orchestra-chu-berry-cros_gbia3030523a",
-"iaf": "I Don't Stand) A GHOST OF  - CAB CALLOWAY & HIS ORCHESTRA.mp3"
 },
 {
 "freq": "105.7",
@@ -878,16 +818,6 @@
 "lore": "Cab Calloway And His Cotton Club Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_zaz-zuh-zaz_cab-calloway-and-his-cotton-club-orchestra-white-calloway_gbia7025331b",
 "iaf": "ZAZ ZUH ZAZ - CAB CALLOWAY AND HIS COTTON CLUB ORCHESTRA.mp3"
-},
-{
-"freq": "106.3",
-"title": "Johnny Fedora And Alice Blue Bonnet",
-"artist": "Charles Wolcott And His Orchestra",
-"year": null,
-"src": "/radio/johnny-fedora-and-alice-blue-bonnet-orchestra.mp3",
-"lore": "Charles Wolcott And His Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_johnny-fedora-and-alice-blue-bonnet_charles-wolcott-and-his-orchestra-peggy-lee-gil_gbia3015163b",
-"iaf": "JOHNNY FEDORA AND ALIC - CHARLES WOLCOTT AND HIS ORCHESTRA.mp3"
 },
 {
 "freq": "106.5",
@@ -1040,26 +970,6 @@
 "iaf": "I'll SEE YOU IN MY DREAMS - DEAN HUDSON AND HIS ORCH..mp3"
 },
 {
-"freq": "89.9",
-"title": "All Of Me",
-"artist": "Dean Martin",
-"year": null,
-"src": "/radio/all-of-me-martin.mp3",
-"lore": "Dean Martin — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_all-of-me_dean-martin-nat-brandywine-and-his-orchestra-simons-marks_gbia0561435b",
-"iaf": "ALL OF ME - DEAN MARTIN - NAT BRANDYWINE and his Orchestra.mp3"
-},
-{
-"freq": "90.1",
-"title": "I Got The Sun In The Morning",
-"artist": "Dean Martin",
-"year": 1946,
-"src": "/radio/i-got-the-sun-in-the-morning-martin.mp3",
-"lore": "Dean Martin — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_i-got-the-sun-in-the-morning_dean-martin-nat-brandywine-and-his-orchestra-irving-be_gbia0487676a",
-"iaf": "I GOT THE SUN IN THE MORNING - DEAN MARTIN.mp3"
-},
-{
 "freq": "90.3",
 "title": "Which Way Did My Heart Go",
 "artist": "Dean Martin",
@@ -1098,16 +1008,6 @@
 "lore": "Dick Haymes — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_a-million-dreams-ago_harry-james-and-his-orchestra-dick-haymes-allon-flynn-frank-ma_gbia0063671",
 "iaf": "01 - Maybe - Harry James And His Orchestra - Dick Haymes.mp3"
-},
-{
-"freq": "91.3",
-"title": "Body And Soul",
-"artist": "Dinah Shore",
-"year": null,
-"src": "/radio/body-and-soul-shore.mp3",
-"lore": "Dinah Shore — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_body-and-soul_dinah-shore-henry-lavine-and-his-dixieland-octet-of-ncbs-chamber-mus_gbia7009332b",
-"iaf": "BODY AND SOUL - DINAH SHORE - Henry Lavine and his Dixieland Octet of NCB's Chamber Music Society of Lower Basin Street.mp3"
 },
 {
 "freq": "91.7",
@@ -1370,16 +1270,6 @@
 "iaf": "It Shouldn't Happen to a Dream - Duke Ellington and his Orchestra.mp3"
 },
 {
-"freq": "98.9",
-"title": "Beale Street Blues",
-"artist": "Eddie Lang - Joe Venuti and Their All-Star Orchestra",
-"year": 1936,
-"src": "/radio/beale-street-blues-orchestra.mp3",
-"lore": "Eddie Lang - Joe Venuti and Their All-Star Orchestra — a 1936 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_beale-street-blues_eddie-lang-joe-venuti-and-their-all-star-orchestra-w-c-handy_gbia0092045a",
-"iaf": "Beale Street Blues - Eddie Lang - Joe Venuti and Their All-Star Orchestra.mp3"
-},
-{
 "freq": "99.1",
 "title": "I Don't Stand a Ghost of a Chance",
 "artist": "Ernie Andrews",
@@ -1530,16 +1420,6 @@
 "iaf": "Blue Orchids - Glenn Miller and his Orchestra.mp3"
 },
 {
-"freq": "103.3",
-"title": "Flight Of The Bumblebee",
-"artist": "HARRY JAMES And His Orchestra",
-"year": null,
-"src": "/radio/flight-of-the-bumblebee-orchestra.mp3",
-"lore": "HARRY JAMES And His Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_flight-of-the-bumblebee_harry-james-and-his-orchestra_gbia0383785b",
-"iaf": "FLIGHT OF THE BUMBLEBEE - HARRY JAMES And His Orchestra.mp3"
-},
-{
 "freq": "103.5",
 "title": "HARRY JAMES his Trumpet and his famous Orchestra",
 "artist": "HARRY JAMES and his ORCHESTRA",
@@ -1550,16 +1430,6 @@
 "iaf": "01 - ALICE BLUE GOWN - HARRY JAMES and his ORCHESTRA.mp3"
 },
 {
-"freq": "103.7",
-"title": "FLIGHT OF THE BUMBLE BEE (Vuelo del Moscón)",
-"artist": "HARRY JAMES and his ORCHESTRA",
-"year": 1940,
-"src": "/radio/flight-of-the-bumble-bee-vuelo-del-mosc-n-orchestra.mp3",
-"lore": "HARRY JAMES and his ORCHESTRA — a 1940 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_flight-of-the-bumble-bee-vuelo-del-moscn_harry-james-and-his-orchestra-rimsky-ko_gbia0196117a",
-"iaf": "FLIGHT OF THE BUMBLE BEE ( - HARRY JAMES and his ORCHESTRA.mp3"
-},
-{
 "freq": "104.1",
 "title": "Flight Of The Bumble Bee",
 "artist": "Harry James",
@@ -1568,16 +1438,6 @@
 "lore": "Harry James — a 1940 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_flight-of-the-bumble-bee_harry-james-harry-james-and-his-orchestra_gbia0128191b",
 "iaf": "FLIGHT OF THE BUMBLE BEE - Harry James - Harry James and his Orchestra.mp3"
-},
-{
-"freq": "104.3",
-"title": "From The Bottom Of My Heart",
-"artist": "Harry James & His Orchestra",
-"year": 1945,
-"src": "/radio/from-the-bottom-of-my-heart-orchestra.mp3",
-"lore": "Harry James & His Orchestra — a 1945 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_from-the-bottom-of-my-heart_harry-james-his-orchestra-frank-sinatra-hays-gibson-bec_gbia3030423b",
-"iaf": "FROM THE BOTTOM OF MY HEART - HARRY JAMES & HIS ORCHESTRA.mp3"
 },
 {
 "freq": "104.7",
@@ -1608,16 +1468,6 @@
 "lore": "Harry James and his Orchestra — a 1940 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_a-million-dreams-ago-despues-de-un-million-de-ensuenos_harry-james-and-his-orches_gbia0062461b",
 "iaf": "A Million Dreams Ago (Desp - Harry James and his Orchestra.mp3"
-},
-{
-"freq": "105.5",
-"title": "Flight of the Bumble Bee",
-"artist": "Harry James and his Orchestra",
-"year": 1940,
-"src": "/radio/flight-of-the-bumble-bee-orchestra.mp3",
-"lore": "Harry James and his Orchestra — a 1940 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_flight-of-the-bumble-bee_harry-james-and-his-orchestra_gbia0011246b",
-"iaf": "Flight of the Bumble Bee - Harry James and his Orchestra.mp3"
 },
 {
 "freq": "105.7",
@@ -1700,16 +1550,6 @@
 "iaf": "I've Got A Crush On You - Ira and George Gershwin.mp3"
 },
 {
-"freq": "107.7",
-"title": "A-Tisket, A-Tisket",
-"artist": "Jack Hylton And His Orchestra",
-"year": 1938,
-"src": "/radio/a-tisket-a-tisket-orchestra.mp3",
-"lore": "Jack Hylton And His Orchestra — a 1938 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_a-tisket-a-tisket_jack-hylton-and-his-orchestra-ella-fitzgerald-al-feldman_gbia7008800b",
-"iaf": "A-TISKET, A-TISKET - JACK HYLTON AND HIS ORCHESTRA.mp3"
-},
-{
 "freq": "107.9",
 "title": "Dirty Dog",
 "artist": "Jack Teagarden and the Whoopie Makers",
@@ -1748,16 +1588,6 @@
 "lore": "Jack Teagarden's Orchestra — a 1931 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_loveless-love-master-2_jack-teagardens-orchestra-jack-teagarden-sterling-bose-j_gbia0023165",
 "iaf": "01 - Loveless Love - Master #1 - Jack Teagarden's Orchestra.mp3"
-},
-{
-"freq": "88.7",
-"title": "Penthouse Serenade (When We're Alone)",
-"artist": "Jason",
-"year": 1946,
-"src": "/radio/penthouse-serenade-when-we-re-alone-jason.mp3",
-"lore": "Jason — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_penthouse-serenade-when-were-alone_jason-burton-sarah-vaughan-teddy-wilson-octet_gbia0000976b",
-"iaf": "Penthouse Serenade (When We're Alone) - Jason.mp3"
 },
 {
 "freq": "88.9",
@@ -1818,26 +1648,6 @@
 "lore": "Kay Kyser and his Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_bye-bye-blues_kay-kyser-and-his-orchestra-berlin_gbia0278317",
 "iaf": "01 - ALWAYS - Kay Kyser and his Orchestra - Berlin.mp3"
-},
-{
-"freq": "90.3",
-"title": "F. S. T",
-"artist": "King Cole Trio",
-"year": 1945,
-"src": "/radio/f-s-t-trio.mp3",
-"lore": "King Cole Trio — a 1945 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_f-s-t_king-cole-trio-nat-cole_gbia0015117a",
-"iaf": "F. S. T. - King Cole Trio - Nat Cole.mp3"
-},
-{
-"freq": "90.5",
-"title": "None legible",
-"artist": "King Cole Trio",
-"year": 1945,
-"src": "/radio/none-legible-trio.mp3",
-"lore": "King Cole Trio — a 1945 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_none-legible_king-cole-trio-nat-cole-cole-moore-miller_gbia0080289b",
-"iaf": "None legible - King Cole Trio - Nat Cole.mp3"
 },
 {
 "freq": "90.7",
@@ -1970,16 +1780,6 @@
 "iaf": "IT'S A RAINY DAY - LENA HORNE - Moore - PHIL MOORE.mp3"
 },
 {
-"freq": "94.5",
-"title": "Sometimes I Feel Like A Motherless Child",
-"artist": "Lena Horne",
-"year": 1947,
-"src": "/radio/sometimes-i-feel-like-a-motherless-child-horne.mp3",
-"lore": "Lena Horne — a 1947 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_sometimes-i-feel-like-a-motherless-child_lena-horne-phil-moore-moore_gbia8000135d",
-"iaf": "SOMETIMES I FEEL LIKE A MOTHERLESS CHILD - LENA HORNE.mp3"
-},
-{
 "freq": "94.9",
 "title": "Follow I Will Follow Thee",
 "artist": "Les Barnett",
@@ -1988,16 +1788,6 @@
 "lore": "Les Barnett — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_follow-i-will-follow-thee_les-barnett-margaret-w-brown-howard-l-brown_gbia0035293b",
 "iaf": "Follow I Will Follow Thee - Les Barnett - Margaret W. Brown.mp3"
-},
-{
-"freq": "95.1",
-"title": "None legible",
-"artist": "Les Brown",
-"year": null,
-"src": "/radio/none-legible-brown.mp3",
-"lore": "Les Brown — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_none-legible_les-brown_gbia0347225b",
-"iaf": "None legible - Les Brown.mp3"
 },
 {
 "freq": "95.3",
@@ -2260,16 +2050,6 @@
 "iaf": "BIBBIDY-BOBBIDY-BOO  - PERRY COMO and THE FONTAINE SISTERS.mp3"
 },
 {
-"freq": "102.5",
-"title": "BIBBIDY-BOBBIDY-BOO (The Magic Song)",
-"artist": "PERRY COMO and THE FONTANE SISTERS",
-"year": null,
-"src": "/radio/bibbidy-bobbidy-boo-the-magic-song-sisters-2.mp3",
-"lore": "PERRY COMO and THE FONTANE SISTERS — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_bibbidy-bobbidy-boo-the-magic-song_perry-como-and-the-fontane-sisters-mitchell-ay_gbia7005259b",
-"iaf": "BIBBIDY-BOBBIDY-BOO ( - PERRY COMO and THE FONTANE SISTERS.mp3"
-},
-{
 "freq": "102.7",
 "title": "Johnny Fedora And Alice Blue Bonnet",
 "artist": "Peggy Lee",
@@ -2278,16 +2058,6 @@
 "lore": "Peggy Lee — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_johnny-fedora-and-alice-blue-bonnet_peggy-lee-charles-wolcott-and-his-orchestra-gil_gbia0284419b",
 "iaf": "JOHNNY FEDORA AND ALICE BLUE BONNET - PEGGY LEE.mp3"
-},
-{
-"freq": "102.9",
-"title": "A Dream Is A Wish Your Heart Makes",
-"artist": "Perry Como",
-"year": null,
-"src": "/radio/a-dream-is-a-wish-your-heart-makes-como.mp3",
-"lore": "Perry Como — a 78rpm side preserved by the Internet Archive Great 78 Project.",
-"ia": "78_a-dream-is-a-wish-your-heart-makes_perry-como-mitchell-ayres-and-his-orchestra-davi_gbia7009330a",
-"iaf": "A DREAM IS A WISH YOUR HEART MAKES - PERRY COMO.mp3"
 },
 {
 "freq": "103.3",
@@ -2380,16 +2150,6 @@
 "iaf": "01 - April in Paris - Al Sack & His Orchestra.mp3"
 },
 {
-"freq": "105.7",
-"title": "Little Girl Blue",
-"artist": "Rogers",
-"year": 1946,
-"src": "/radio/little-girl-blue-rogers.mp3",
-"lore": "Rogers — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_whispering_lena-horne-rogers-hart-phil-moore_gbia8000013",
-"iaf": "01 - LITTLE GIRL BLUE - LENA HORNE - Rogers - Hart.mp3"
-},
-{
 "freq": "106.1",
 "title": "Good Rocking Tonight",
 "artist": "Roy Brown",
@@ -2398,16 +2158,6 @@
 "lore": "Roy Brown — a 1947 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_good-rocking-tonight_roy-brown-bob-ogden-orch_gbia0064214a",
 "iaf": "Good Rocking Tonight - Roy Brown - Bob Ogden & Orch..mp3"
-},
-{
-"freq": "106.3",
-"title": "Butcher Pete",
-"artist": "Roy Brown And His Mighty-Mighty Men",
-"year": 1949,
-"src": "/radio/butcher-pete-men.mp3",
-"lore": "Roy Brown And His Mighty-Mighty Men — a 1949 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_butcher-pete_roy-brown-and-his-mighty-mighty-men-roy-brown-brown-bernard_gbia0340989b",
-"iaf": "BUTCHER PETE - ROY BROWN AND HIS MIGHTY-MIGHTY MEN.mp3"
 },
 {
 "freq": "106.5",
@@ -2468,16 +2218,6 @@
 "lore": "Sarah Vaughan — a 1947 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_sometimes-i-feel-like-a-motherless-child_sarah-vaughan-ted-dale-burleigh_gbia0087852b",
 "iaf": "Sometimes I Feel Like a Motherless Child - Sarah Vaughan.mp3"
-},
-{
-"freq": "107.9",
-"title": "I've Got a Crush on You",
-"artist": "Sarah Vaughan",
-"year": 1948,
-"src": "/radio/i-ve-got-a-crush-on-you-vaughan.mp3",
-"lore": "Sarah Vaughan — a 1948 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_ive-got-a-crush-on-you_sarah-vaughan-george-treadwells-orchestra-ira-and-george-g_gbia0039437a",
-"iaf": "I've Got a Crush on You - Sarah Vaughan - George Treadwell's Orchestra.mp3"
 },
 {
 "freq": "87.9",
@@ -2548,16 +2288,6 @@
 "lore": "Spike Jones & His City Slickers — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_old-macdonald-had-a-farm_spike-jones-his-city-slickers-dr-haratio-q-bird-bath-p_gbia0340557b",
 "iaf": "OLD MACDONALD HAD A FARM - SPIKE JONES & HIS CITY SLICKERS.mp3"
-},
-{
-"freq": "89.7",
-"title": "Nutcracker Suite (Land Of The Sugar Plum Fairy)",
-"artist": "Spike Jones & His City Slickers",
-"year": 1947,
-"src": "/radio/nutcracker-suite-land-of-the-sugar-plum-fairy-slickers.mp3",
-"lore": "Spike Jones & His City Slickers — a 1947 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_nutcracker-suite-land-of-the-sugar-plum-fairy_spike-jones-his-city-slickers-fos_gbia7011732b",
-"iaf": "NUTCRACKER SUITE (LAND O - SPIKE JONES & HIS CITY SLICKERS.mp3"
 },
 {
 "freq": "89.9",
@@ -2888,16 +2618,6 @@
 "lore": "Tommy Dorsey and his Orchestra — a 1936 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_thatss-a-plenty-eso-basta_tommy-dorsey-and-his-orchestra-lew-pollack_gbia0157977b",
 "iaf": "THATS'S A PLENTY (Eso Basta) - Tommy Dorsey and his Orchestra.mp3"
-},
-{
-"freq": "98.9",
-"title": "In The Blue Evening",
-"artist": "Tommy Dorsey and his Orchestra",
-"year": 1943,
-"src": "/radio/in-the-blue-evening-orchestra.mp3",
-"lore": "Tommy Dorsey and his Orchestra — a 1943 78rpm side, preserved by the Internet Archive Great 78 Project.",
-"ia": "78_in-the-blue-evening_tommy-dorsey-and-his-orchestra-frank-sinatra_gbia0545774a",
-"iaf": "IN THE BLUE EVENING - Tommy Dorsey and his Orchestra.mp3"
 },
 {
 "freq": "99.1",

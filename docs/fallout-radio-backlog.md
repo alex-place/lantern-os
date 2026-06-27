@@ -25,11 +25,12 @@ partial fetch still works. Add tracks by appending manifest rows + re-running th
 
 ## Shipped
 
-### Song list — 25 → 300+ tracks
-Expanded into a full offline jukebox: **276 more** Great 78 Project sides (creator-based harvest
+### Song list — 25 → 273 tracks
+Expanded into a full offline jukebox: Great 78 Project sides (creator-based harvest
 across ~58 era greats — Sinatra, Crosby, the Andrews Sisters, Glenn Miller, the Ink Spots, Ella,
 Billie Holiday, Ellington, Goodman, Nat King Cole, Louis Jordan, Fats Waller, Spike Jones, Roy
-Brown, Doris Day, Lena Horne, Sarah Vaughan, and more), curated into `stations.json` (301 total).
+Brown, Doris Day, Lena Horne, Sarah Vaughan, and more), curated + **de-duplicated** into
+`stations.json` (**273 total** — same-song repeats and library/canonical overlaps removed).
 A **search box** in the dial filters by song / artist. The 25 hand-curated canonical tracks below
 keep their lore and frequencies.
 
@@ -72,7 +73,7 @@ Continuous playback: a finished song now rolls straight into the next and the di
 - All motion respects `prefers-reduced-motion`.
 
 ### Features
-- **Search the dial** — a filter box matches the 300-song list by song / artist / freq / year (live count, e.g. `2 / 301`).
+- **Search the dial** — a filter box matches the full song list by song / artist / freq / year (live count, e.g. `2 / 273`).
 - **Deep-link by frequency** — `fallout-radio.html#101.5` tunes straight to that station on load.
 - **Persistence** — last station, volume, mute, shuffle/repeat restored from `localStorage`.
 - **Keyboard transport** — Space, ←/→ (seek), ↑/↓ (volume), `[`/`]` (prev/next), `M`, `S`, `R`.
