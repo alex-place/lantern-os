@@ -172,7 +172,8 @@ async function runA11yTests() {
   const htmlFiles = [
     path.join(PUBLIC_DIR, 'index.html'),
     path.join(PUBLIC_DIR, 'dream-chat.html'),
-    path.join(PUBLIC_DIR, 'operations.html')
+    path.join(PUBLIC_DIR, 'operations.html'),
+    path.join(PUBLIC_DIR, 'explore.html')
   ].filter(f => fs.existsSync(f));
 
   let totalPassed = 0;
