@@ -215,6 +215,40 @@
     .feed-card.is-embed .fc-why { padding: 0 14px 12px; }
     .feed-card.is-embed .fc-dismiss { opacity: 0.55; }
 
+    /* ── Single-active embed player: fullscreen control + click-to-play poster ── */
+    .fc-embed-bar .fc-fullscreen {
+      border: none; background: transparent; color: var(--muted);
+      font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 5px;
+      border-radius: 6px; transition: background 0.15s, color 0.15s;
+    }
+    .fc-embed-bar .fc-fullscreen:hover { background: var(--surface2); color: var(--text); }
+    .fc-embed-bar .fc-fullscreen:focus-visible { outline: 2px solid var(--accent); }
+    .feed-card.is-embed .fc-poster {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; width: 100%; border: 0; cursor: pointer; font: inherit; color: #fff;
+      padding: 30px 16px;
+      background: radial-gradient(circle at 50% 38%,
+        color-mix(in srgb, var(--accent) 20%, #000) 0%, #000 78%);
+    }
+    .feed-card.is-embed .fc-poster .fc-play {
+      width: 58px; height: 58px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 23px; padding-left: 4px;
+      background: color-mix(in srgb, var(--accent) 88%, #000);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+      transition: transform 0.15s ease;
+    }
+    .feed-card.is-embed .fc-poster:hover .fc-play,
+    .feed-card.is-embed .fc-poster:focus-visible .fc-play { transform: scale(1.09); }
+    .feed-card.is-embed .fc-poster .fc-playlabel {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      opacity: 0.92;
+    }
+    .feed-card.is-embed.is-playing .fc-embed-bar {
+      background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 36%, var(--surface)) 0%, var(--surface) 100%);
+    }
+
     /* ── Slim quick-links row — replaces the old static panel grid. ── */
     .quick-links {
       display: flex; flex-wrap: wrap; justify-content: center;
@@ -823,29 +857,60 @@ document.addEventListener('DOMContentLoaded', () => {
   const seen = new Set();            // stable card ids already shown (dedup across pages)
   let loading = false, totalShown = 0, cycles = 0;
 
-  // Dwell = the engagement signal for embeds (they have no click-through). When a
-  // panel sits ≥50% on-screen for 4s, that's a real "watched it" outcome → record
-  // a success once. Scroll past and it never scores → it sinks (engagement or
-  // discarded). One-shot per key per page load.
-  const dwellDone = new Set();
-  const dwellObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
+  // ── Single-active embed player (YouTube / TikTok-style) ──
+  // Game / film / radio iframes are heavy: a live frame keeps emulating or
+  // playing audio forever. With an endless scroll that means many run at once —
+  // overlapping sound, no keyboard focus, a melted CPU. So an embed renders as a
+  // POSTER until you press Play. Activating one tears DOWN every other active
+  // iframe (only ONE plays at a time), focuses it so the keyboard drives the
+  // game, and exposes fullscreen. Scrolling an active embed fully off-screen
+  // unloads it (no audio from off-screen panels). Activation = the engagement
+  // signal (a real "played it", stronger than passive dwell).
+  let activeEmbed = null;
+
+  // Stop an active embed once it scrolls fully out of view. Re-entry needs another
+  // Play click — never auto-blasts audio.
+  const playObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      const el = entry.target;
-      const key = el.dataset.key;
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-        if (el._dwellTimer || !key || dwellDone.has(key)) return;
-        el._dwellTimer = setTimeout(() => {
-          el._dwellTimer = null;
-          if (dwellDone.has(key)) return;
-          dwellDone.add(key);
-          record(key, 'dwell', 4000);
-          dwellObserver.unobserve(el);
-        }, 4000);
-      } else if (el._dwellTimer) {
-        clearTimeout(el._dwellTimer); el._dwellTimer = null;
-      }
+      if (!entry.isIntersecting && entry.target === activeEmbed) deactivateEmbed(entry.target);
     });
-  }, { threshold: [0, 0.5, 1] }) : null;
+  }, { threshold: 0 }) : null;
+
+  function deactivateEmbed(el) {
+    if (!el) return;
+    const frame = el.querySelector('.fc-frame');
+    if (frame && el._posterHTML != null) frame.innerHTML = el._posterHTML; // unload → stops audio/emulation
+    el.classList.remove('is-playing');
+    if (playObserver) playObserver.unobserve(el);
+    if (activeEmbed === el) activeEmbed = null;
+  }
+
+  function activateEmbed(el) {
+    const e = el._embed; if (!e) return;
+    if (activeEmbed && activeEmbed !== el) deactivateEmbed(activeEmbed); // enforce single active
+    const frame = el.querySelector('.fc-frame');
+    frame.innerHTML =
+      '<iframe src="' + esc(e.src) + '" style="height:' + e.h + 'px" ' +
+        'title="' + esc(e.title) + '" allow="autoplay; fullscreen; gamepad" ' +
+        'referrerpolicy="no-referrer" ' +
+        'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>';
+    el.classList.add('is-playing');
+    activeEmbed = el;
+    record(e.key, 'click', 0);                       // activation = engagement
+    const iframe = frame.querySelector('iframe');
+    const focusIt = () => { try { iframe.focus(); } catch (_) {} };
+    iframe.addEventListener('load', focusIt);
+    setTimeout(focusIt, 60);
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (playObserver) playObserver.observe(el);      // stop it when scrolled away
+  }
+
+  function toggleFullscreen(el) {
+    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); return; }
+    const node = el.querySelector('.fc-frame iframe') || el.querySelector('.fc-frame') || el;
+    const req = node.requestFullscreen || node.webkitRequestFullscreen || node.msRequestFullscreen;
+    if (req) { try { req.call(node); } catch (_) {} }
+  }
 
   function cardEl(c) {
     const el = document.createElement('div');
@@ -855,29 +920,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const embedSrc = (c.embed && c.embed.src) ? safeEmbedSrc(c.embed.src) : '';
 
     if (embedSrc) {
-      // Open-archive game / listening panel — framed inline with a small window
-      // chrome. The iframe is sandboxed; archive.org runs on its own origin.
+      // Open-archive game / film / listening panel. The heavy iframe does NOT
+      // load until the user presses Play — it renders as a poster and the
+      // single-active player (activateEmbed) injects + focuses the frame, tearing
+      // down whatever was playing before. archive.org runs in its own sandbox.
       el.className = 'feed-card is-embed';
       const h = Math.max(120, Math.min(720, (+c.embed.height) || 360));
       const openHref = safeUrl(c.url);
+      const verb = (c.topics || []).includes('listen') ? 'Listen'
+        : (c.topics || []).some(t => t === 'watch' || t === 'film') ? 'Watch' : 'Play';
+      el._embed = { src: embedSrc, h: h, title: c.title || '', key: c.key };
+      el._posterHTML =
+        '<button type="button" class="fc-poster" aria-label="' + esc(verb + ' — ' + (c.title || '')) + '" ' +
+          'style="min-height:' + Math.min(h, 240) + 'px">' +
+          '<span class="fc-play" aria-hidden="true">▶</span>' +
+          '<span class="fc-playlabel">' + verb + '</span>' +
+        '</button>';
       el.innerHTML =
         '<div class="fc-embed-bar">' +
           '<span class="fc-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
           '<span class="fc-embed-title">' + (ICON[c.type] || '🕹️') + ' ' + esc(c.title) + '</span>' +
           '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
+          '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" title="Fullscreen">⛶</button>' +
           '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
         '</div>' +
-        '<div class="fc-frame"><iframe src="' + esc(embedSrc) + '" style="height:' + h + 'px" ' +
-          'loading="lazy" title="' + esc(c.title) + '" ' +
-          'allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer" ' +
-          'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe></div>' +
+        '<div class="fc-frame">' + el._posterHTML + '</div>' +
         (c.lore ? '<div class="fc-foot"><p class="fc-lore">' + esc(c.lore) + '</p></div>' : '') +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') +
           (openHref !== '#' ? ' · <a class="fc-open" href="' + esc(openHref) + '" target="_blank" rel="noopener noreferrer">open ↗</a>' : '') +
         '</div>';
+      // Delegate on the frame so the poster still works after deactivate re-renders it.
+      el.querySelector('.fc-frame').addEventListener('click', (ev) => {
+        if (ev.target.closest('.fc-poster')) activateEmbed(el);
+      });
+      el.querySelector('.fc-fullscreen').addEventListener('click', (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        if (!el.classList.contains('is-playing')) activateEmbed(el);
+        toggleFullscreen(el);
+      });
       const open = el.querySelector('.fc-open');
       if (open) open.addEventListener('click', () => record(c.key, 'click', 0));
-      if (dwellObserver) dwellObserver.observe(el);
     } else {
       el.className = 'feed-card';
       const href = safeUrl(c.url);
@@ -896,8 +978,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       record(c.key, 'dismiss', 0);
-      if (el._dwellTimer) { clearTimeout(el._dwellTimer); el._dwellTimer = null; }
-      if (dwellObserver) dwellObserver.unobserve(el);
+      if (el.classList.contains('is-playing')) deactivateEmbed(el);
       el.style.opacity = '0';
       setTimeout(() => el.remove(), 150);
     });
@@ -976,7 +1057,8 @@ document.addEventListener('DOMContentLoaded', () => {
     filterEpoch++;
     loading = false; totalShown = 0; cycles = 0;
     seen.clear();
-    if (dwellObserver) dwellObserver.disconnect();
+    if (activeEmbed) deactivateEmbed(activeEmbed);   // stop any playing game/film/radio
+    if (playObserver) playObserver.disconnect();
     stream.innerHTML = '';
     if (io) { io.unobserve(sentinel); io.observe(sentinel); }
     loadPage();
