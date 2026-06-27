@@ -1,7 +1,23 @@
 const fs = require("fs");
 const path = require("path");
 
+// True once the response has begun (headers flushed) or finished. Writing to a
+// response past this point throws ERR_HTTP_HEADERS_SENT. Because several of our
+// senders run inside async callbacks (fs.stat in sendFile, awaited route
+// handlers), that throw is uncaught and crashes the whole process. A double
+// send is always a caller bug, but it must never take the server down — so the
+// helpers below bail out instead of throwing. (Root-caused #stock-trader: a
+// route that did `return sendJson(...)` returned undefined, the router treated
+// the request as unhandled, and the static catch-all sent a second response.)
+function responseClosed(res) {
+  return res.headersSent || res.writableEnded;
+}
+
 function sendJson(res, data, status = 200) {
+  if (responseClosed(res)) {
+    console.warn(`[http-utils] sendJson skipped: response already sent (status ${status})`);
+    return;
+  }
   const body = JSON.stringify(data, null, 2);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -45,6 +61,13 @@ function sendFile(res, filePath, req) {
   }[ext] || "application/octet-stream";
 
   fs.stat(filePath, (error, stat) => {
+    // The response may already be closed if a prior handler responded and the
+    // request still fell through to the static catch-all — guard every write in
+    // this async callback so a late stat never throws ERR_HTTP_HEADERS_SENT.
+    if (responseClosed(res)) {
+      console.warn(`[http-utils] sendFile skipped: response already sent for ${filePath}`);
+      return;
+    }
     if (error || !stat.isFile()) {
       sendJson(res, { error: "not_found" }, 404);
       return;
@@ -97,6 +120,10 @@ function sendFile(res, filePath, req) {
 }
 
 function sendHtml(res, html, status = 200) {
+  if (responseClosed(res)) {
+    console.warn(`[http-utils] sendHtml skipped: response already sent (status ${status})`);
+    return;
+  }
   res.writeHead(status, {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",

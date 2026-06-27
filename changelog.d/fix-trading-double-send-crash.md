@@ -1,0 +1,5 @@
+### Fix: trading endpoints could crash the entire server (stock-trader.html)
+
+- Several `/api/trading/*` handlers did `return sendJson(...)`. Since `sendJson` returns `undefined`, the router treated the request as **unhandled** and walked the chain down to the static catch-all (`surfaces.js`), which called `sendFile` on the already-sent response. The async 404 then threw `ERR_HTTP_HEADERS_SENT` from inside an `fs.stat` callback — uncaught — taking down the **whole** Node process (not just trading). The cold-cache `zones` "warming" branch hit this on essentially every server restart, which is why loading `stock-trader.html` / the trader dashboard could knock the server offline.
+- Root fix in `routes/trading.js`: the affected handlers now `sendJson(...); return true;` so the request terminates instead of falling through.
+- Defensive fix in `lib/http-utils.js`: `sendJson`/`sendHtml`/`sendFile` now bail out (with a warning) when the response is already sent, so any future stray double-send can never crash the process again.

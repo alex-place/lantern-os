@@ -164,7 +164,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Market zones (support/resistance) from local trader agent
   if (url.pathname === '/api/trading/zones' && req.method === 'GET') {
     if (!traderAgent) {
-      return sendJson(res, { zones: {}, error: 'TraderAgent not initialized' }, 503);
+      sendJson(res, { zones: {}, error: 'TraderAgent not initialized' }, 503);
+      return true;
     }
     try {
       // Never block a page GET on a fresh 90s market scan (#1227). Serve the
@@ -173,7 +174,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       const cacheEntry = traderAgent.cache && traderAgent.cache['market_scan'];
       if (!cacheEntry || !cacheEntry.data) {
         traderAgent.scanMarket().catch(() => {}); // background warm
-        return sendJson(res, { zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }, 200);
+        sendJson(res, { zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }, 200);
+        return true;
       }
       const scanFresh = (Date.now() - cacheEntry.time) < traderAgent.cacheExpiry;
       if (!scanFresh) traderAgent.scanMarket().catch(() => {}); // refresh in background, serve stale now
@@ -240,7 +242,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Live prices for monitored tickers
   if (url.pathname === '/api/trading/watchlist-prices' && req.method === 'GET') {
     if (!traderAgent) {
-      return sendJson(res, [], 503);
+      sendJson(res, [], 503);
+      return true;
     }
     try {
       const prices = await traderAgent.getWatchlistPrices();
@@ -257,7 +260,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // draw the candlestick/line charts on the trader dashboard.
   if (url.pathname === '/api/trading/bars-multi' && req.method === 'GET') {
     if (!traderAgent) {
-      return sendJson(res, { bars: {} }, 503);
+      sendJson(res, { bars: {} }, 503);
+      return true;
     }
     const ALLOWED_TIMEFRAMES = new Set(['1m', '5m', '15m', '1h', '4h', '1d']);
     const timeframeParam = url.searchParams.get('timeframe') || '5m';
@@ -276,7 +280,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Open positions from Alpaca
   if (url.pathname === '/api/trading/positions' && req.method === 'GET') {
     if (!traderAgent) {
-      return sendJson(res, { positions: [], account: {} }, 503);
+      sendJson(res, { positions: [], account: {} }, 503);
+      return true;
     }
     try {
       const positions = await traderAgent.getPositions();
@@ -292,7 +297,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Market status (VIX, SPY trend, market hours)
   if (url.pathname === '/api/trading/market-status' && req.method === 'GET') {
     if (!traderAgent) {
-      return sendJson(res, { market_open: false }, 503);
+      sendJson(res, { market_open: false }, 503);
+      return true;
     }
     try {
       const status = await traderAgent.getMarketStatus();
@@ -414,20 +420,24 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // local TraderAgent → cli.py → Alpaca paper account.
   if (url.pathname === '/api/trading/orders/place' && req.method === 'POST') {
     if (!traderAgent) {
-      return sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+      sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+      return true;
     }
     try {
       const body = await collectRequestBody(req);
       const payload = body ? JSON.parse(body) : {};
       const { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit } = payload;
       if (!ticker || !['buy', 'sell'].includes(String(side || '').toLowerCase()) || !qty || Number(qty) <= 0) {
-        return sendJson(res, { status: 'error', error: 'ticker, side (buy/sell), and positive qty are required' }, 400);
+        sendJson(res, { status: 'error', error: 'ticker, side (buy/sell), and positive qty are required' }, 400);
+        return true;
       }
       if (stopLoss != null && Number(stopLoss) <= 0) {
-        return sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
+        sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
+        return true;
       }
       if (takeProfit != null && Number(takeProfit) <= 0) {
-        return sendJson(res, { status: 'error', error: 'takeProfit must be a positive number' }, 400);
+        sendJson(res, { status: 'error', error: 'takeProfit must be a positive number' }, 400);
+        return true;
       }
       const result = await traderAgent.placeOrder({ ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit });
       if (result && result.status === 'placed') {
@@ -452,7 +462,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // GET /api/trading/watchlist
   if (url.pathname === '/api/trading/watchlist' && req.method === 'GET') {
     if (!traderAgent) {
-      return sendJson(res, { watchlist: [] }, 503);
+      sendJson(res, { watchlist: [] }, 503);
+      return true;
     }
     sendJson(res, { watchlist: traderAgent.watchlist }, 200);
     return true;
@@ -462,7 +473,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Body: { ticker } — add a ticker to the persisted watchlist
   if (url.pathname === '/api/trading/watchlist' && req.method === 'POST') {
     if (!traderAgent) {
-      return sendJson(res, { watchlist: [], error: 'TraderAgent not initialized' }, 503);
+      sendJson(res, { watchlist: [], error: 'TraderAgent not initialized' }, 503);
+      return true;
     }
     try {
       const body = await collectRequestBody(req);
@@ -480,7 +492,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     const watchlistMatch = url.pathname.match(/^\/api\/trading\/watchlist\/([A-Za-z]{1,10})$/);
     if (watchlistMatch) {
       if (!traderAgent) {
-        return sendJson(res, { watchlist: [], error: 'TraderAgent not initialized' }, 503);
+        sendJson(res, { watchlist: [], error: 'TraderAgent not initialized' }, 503);
+        return true;
       }
       const watchlist = traderAgent.removeTicker(watchlistMatch[1]);
       sendJson(res, { watchlist }, 200);
@@ -1397,7 +1410,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // log, which the UI polls. No more 501 dead affordance (#1229).
   if (url.pathname === '/api/trading/ai-trader/signals/generate' && req.method === 'POST') {
     if (!traderAgent) {
-      return sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+      sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+      return true;
     }
     traderAgent.scanMarket().then((scan) => {
       const signals = Array.isArray(scan && scan.signals) ? scan.signals : [];
@@ -1448,7 +1462,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       const body = await collectRequestBody(req);
       const trade = body ? JSON.parse(body) : {};
       if (!trade || !trade.entry_symbol) {
-        return sendJson(res, { error: 'entry_symbol is required' }, 400);
+        sendJson(res, { error: 'entry_symbol is required' }, 400);
+        return true;
       }
       await tradeHistory.logTrade(trade);
       sendJson(res, { recorded: true, trade }, 201);
