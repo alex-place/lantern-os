@@ -205,6 +205,20 @@ async function handleStreamChat(req, url, res) {
   let { message, user, requestedAgent, requestedProvider, history, mcpFlag, routeIntent } = parsed;
   const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : [];
   // "Ground this" retry (groundedness canary loop): force the web-search grounding
+  // Prepend attachment content to the user's message if available.
+  if (attachments.length > 0) {
+    let attachmentBlock = "";
+    for (const attachment of attachments) {
+      if (attachment.filename && attachment.content) {
+        attachmentBlock += `--- ATTACHMENT: ${attachment.filename} ---\n`;
+        attachmentBlock += `${attachment.content}\n`;
+        attachmentBlock += `--- END ATTACHMENT ---\n\n`;
+      }
+    }
+    if (attachmentBlock) {
+      message = attachmentBlock + "User message: " + message;
+    }
+  }
   // branch even when the heuristic wouldn't have fired for this message.
   const forceGround = !!parsed.forceGround;
 
