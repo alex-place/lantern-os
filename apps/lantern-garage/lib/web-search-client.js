@@ -147,6 +147,27 @@ function _decodeEntities(s) {
 }
 function _stripTags(s) { return _decodeEntities(String(s || "").replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim(); }
 
+// Wikimedia/DDG-friendly User-Agent. Wikimedia's User-Agent policy
+// (https://meta.wikimedia.org/wiki/User-Agent_policy) requires a descriptive
+// agent string with a means of contact; a generic UA gets rate-limited or blocked
+// more aggressively.
+const GROUNDING_UA = "KeystoneOS-grounding/1.0 (+https://lantern-os.net; founder@lantern-os.net)";
+
+// Guard a keyless fallback response: returns a clean, honest error string for any
+// non-2xx status (so a 429 rate-limit body like "You are making too many requests…"
+// is reported as such instead of crashing JSON.parse with a cryptic "Unexpected
+// token" — #web-search-429). Returns null when the response is OK to parse.
+function _httpFallbackError(source, res, body) {
+  const code = res.statusCode || 0;
+  if (code >= 200 && code < 300) return null;
+  if (code === 429) {
+    const retry = res.headers && res.headers["retry-after"];
+    return `${source} rate-limited (HTTP 429${retry ? `, retry-after ${retry}s` : ""})`;
+  }
+  const snippet = String(body || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  return `${source} HTTP ${code}${snippet ? ` — ${snippet}` : ""}`;
+}
+
 const DIRECT_TIMEOUT = parseInt(process.env.WEB_SEARCH_DIRECT_TIMEOUT || "6000", 10);
 
 /**
@@ -168,13 +189,15 @@ async function webSearchDirect(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT
         hostname: "api.duckduckgo.com",
         path,
         method: "GET",
-        headers: { "User-Agent": "KeystoneBot/1.0 (+local grounding)", "Accept": "application/json" },
+        headers: { "User-Agent": GROUNDING_UA, "Accept": "application/json" },
         timeout: timeoutMs,
       },
       (res) => {
         let data = "";
         res.on("data", (chunk) => { data += chunk; if (data.length > 800000) req.destroy(); });
         res.on("end", () => {
+          const httpErr = _httpFallbackError("direct", res, data);
+          if (httpErr) { resolve({ success: false, error: httpErr, source: "direct" }); return; }
           try {
             const j = JSON.parse(data);
             const results = [];
@@ -199,7 +222,8 @@ async function webSearchDirect(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT
             if (!results.length) { resolve({ success: false, error: "no instant-answer results (direct)", source: "direct" }); return; }
             resolve({ success: true, results, source: "direct" });
           } catch (e) {
-            resolve({ success: false, error: `direct parse error: ${e.message}`, source: "direct" });
+            const snippet = String(data || "").replace(/\s+/g, " ").trim().slice(0, 80);
+            resolve({ success: false, error: `direct non-JSON response${snippet ? ` — ${snippet}` : ""}`, source: "direct" });
           }
         });
       }
@@ -225,13 +249,15 @@ async function webSearchWiki(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT) 
         hostname: "en.wikipedia.org",
         path,
         method: "GET",
-        headers: { "User-Agent": "KeystoneBot/1.0 (+local grounding)", "Accept": "application/json" },
+        headers: { "User-Agent": GROUNDING_UA, "Accept": "application/json" },
         timeout: timeoutMs,
       },
       (res) => {
         let data = "";
         res.on("data", (chunk) => { data += chunk; if (data.length > 800000) req.destroy(); });
         res.on("end", () => {
+          const httpErr = _httpFallbackError("wiki", res, data);
+          if (httpErr) { resolve({ success: false, error: httpErr, source: "wiki" }); return; }
           try {
             const j = JSON.parse(data);
             const hits = (j.query && j.query.search) || [];
@@ -243,7 +269,8 @@ async function webSearchWiki(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT) 
             if (!results.length) { resolve({ success: false, error: "no results (wiki)", source: "wiki" }); return; }
             resolve({ success: true, results, source: "wiki" });
           } catch (e) {
-            resolve({ success: false, error: `wiki parse error: ${e.message}`, source: "wiki" });
+            const snippet = String(data || "").replace(/\s+/g, " ").trim().slice(0, 80);
+            resolve({ success: false, error: `wiki non-JSON response${snippet ? ` — ${snippet}` : ""}`, source: "wiki" });
           }
         });
       }
@@ -304,6 +331,7 @@ module.exports = {
   webSearchDirect,
   webSearchWiki,
   webSearch,
+  _httpFallbackError,
   formatGroundingContext,
   needsGrounding,
   extractSearchQuery,

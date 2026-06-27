@@ -1,0 +1,2 @@
+### Fixed
+- Chat web search no longer reports the cryptic `wiki parse error: Unexpected token 'Y', "You are ma"...` when a keyless fallback is rate-limited. The DuckDuckGo and Wikipedia fallbacks now check the HTTP status before parsing: an HTTP 429 surfaces as a clean `rate-limited (HTTP 429)` (with `Retry-After` when present) and other non-2xx responses as `HTTP <code>` with a body snippet, instead of crashing `JSON.parse` on a non-JSON body. Also sends a Wikimedia-policy-compliant `User-Agent` (with contact info) to reduce 429s in the first place.
