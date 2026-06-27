@@ -323,6 +323,17 @@ jobs:
           EOF
 
   # ============================================================================
+  # ASSET OPTIMIZATION: Enforce lossless PNG optimization
+  # ============================================================================
+  validate-png-optimization:
+    name: Validate PNG Optimization
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install oxipng
+        run: sudo apt-get update && sudo apt
+  # ============================================================================
   # CONVERGENCE: Run full convergence loop, upload artifact, gate PRs
   # ============================================================================
   convergence-loop:
