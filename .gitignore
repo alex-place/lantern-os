@@ -387,3 +387,11 @@ data/convergence-test.jsonl
 data/convergence/canary-events.jsonl
 /steptoe_*.txt
 /steptoe_*.html
+
+# Keystone Radio — the bulk offline audio library (250+ tracks) is fetched
+# locally via `python scripts/fetch_radio_audio.py` from the committed manifest
+# (apps/lantern-garage/public/radio/stations.json), NOT committed (hundreds of MB).
+# The canonical tracks committed before this rule stay tracked; new fetched mp3s
+# are ignored. stations.json itself is committed (it's the playlist).
+/apps/lantern-garage/public/radio/*.mp3
+/apps/lantern-garage/public/radio/*.dl

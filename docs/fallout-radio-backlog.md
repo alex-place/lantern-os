@@ -5,19 +5,36 @@
 **Tracks:** public-domain 78rpm transfers from the Internet Archive [Great 78 Project](https://archive.org/details/georgeblood), served locally from `/radio/`.
 
 A single self-contained HTML page: a phosphor-green Pip-Boy / tube-radio MP3 player. No build step,
-no framework, no server route — drop an `.mp3` in `/radio/` and add a row to the `STATIONS`
-array at the bottom of the file. It carries its own CRT theme on purpose (a radio is its own
+no framework, no server route. It carries its own CRT theme on purpose (a radio is its own
 device, so it ignores the site light/dark theme).
 
 Loop stage: **Act** (media playback is a first-class capability of the personal-AI cockpit —
 lookup / docs / resume / code / trade / **media**). Nothing here touches Memory/Reason/Verify.
 
+### Library architecture (300+ offline tracks, lean repo)
+The playlist is a committed manifest — [`apps/lantern-garage/public/radio/stations.json`](../apps/lantern-garage/public/radio/stations.json)
+(small JSON: title/artist/year/freq/lore/src + the Internet-Archive `ia`/`iaf` source for each). The
+player `fetch()`es it on load (with the inline 25 as an offline fallback). The **audio files are NOT
+committed** — at 300+ tracks that's hundreds of MB. They are gitignored and populated locally, once
+per machine, by **[`scripts/fetch_radio_audio.py`](../scripts/fetch_radio_audio.py)**, which downloads
+each Great 78 transfer and re-encodes it to 64 kbps mono. After the fetch, the radio plays fully
+**offline**. Missing files degrade gracefully (the player shows `SIGNAL LOST` and auto-skips), so a
+partial fetch still works. Add tracks by appending manifest rows + re-running the fetch.
+
 ---
 
-## Shipped (this PR)
+## Shipped
 
-### Song list — 6 → 25 tracks
-Added 19 period tracks (all Great 78 Project / Internet Archive, served locally):
+### Song list — 25 → 300+ tracks
+Expanded into a full offline jukebox: **276 more** Great 78 Project sides (creator-based harvest
+across ~58 era greats — Sinatra, Crosby, the Andrews Sisters, Glenn Miller, the Ink Spots, Ella,
+Billie Holiday, Ellington, Goodman, Nat King Cole, Louis Jordan, Fats Waller, Spike Jones, Roy
+Brown, Doris Day, Lena Horne, Sarah Vaughan, and more), curated into `stations.json` (301 total).
+A **search box** in the dial filters by song / artist. The 25 hand-curated canonical tracks below
+keep their lore and frequencies.
+
+### Song list — the canonical 25
+Hand-curated core (Great 78 Project / Internet Archive), committed to git so they work out of the box:
 
 | Freq | Title | Artist | Year |
 |------|-------|--------|------|
@@ -55,6 +72,7 @@ Continuous playback: a finished song now rolls straight into the next and the di
 - All motion respects `prefers-reduced-motion`.
 
 ### Features
+- **Search the dial** — a filter box matches the 300-song list by song / artist / freq / year (live count, e.g. `2 / 301`).
 - **Deep-link by frequency** — `fallout-radio.html#101.5` tunes straight to that station on load.
 - **Persistence** — last station, volume, mute, shuffle/repeat restored from `localStorage`.
 - **Keyboard transport** — Space, ←/→ (seek), ↑/↓ (volume), `[`/`]` (prev/next), `M`, `S`, `R`.
@@ -93,14 +111,18 @@ Continuous playback: a finished song now rolls straight into the next and the di
 - [ ] **Waveform seek bar** — render the track's peaks behind the seek slider.
 
 ### Known gaps / risks
-- **Repo size**: 25 mp3s ≈ 62 MB committed raw at 96 kbps mono (no LFS — the LFS endpoint is unprovisioned). Re-encoding bought headroom, but git history still keeps the older heavier blobs from #1324/#1325. Past ~35–40 tracks, move audio to a CSF shard or a CDN rather than growing history further.
+- **Repo size — solved**: the bulk audio (300+ tracks, hundreds of MB) is no longer committed. It's gitignored and fetched locally from the committed manifest (`scripts/fetch_radio_audio.py`). The 25 canonical tracks committed earlier stay tracked; everything new is fetched, so the library can grow without touching git size.
+- **Offline = fetch-once**: each new machine / worktree runs the fetch script once (online) to populate `/radio/`. After that it's fully offline. lantern-os.net (the stable worktree) needs the fetch run there once the manifest deploys.
+- **Library curation**: the 276 harvested tracks are creator-based Great 78 pulls — mostly the named artist, but some are session/B-side oddities (volume over hand-curation). The 25 canonical core stays hand-picked.
 - **Licensing**: framed as Great 78 Project / Internet Archive archival transfers (matching the existing footer), not asserted as cleared for any use.
 - **Autoplay policy**: first play requires a user gesture (handled — the click *is* the gesture).
 
 ---
 
 ## How to add a track
-1. Find a transfer on the [Great 78 Project](https://archive.org/details/georgeblood) (`collection:georgeblood`).
-2. Download its `VBR MP3` derivative into `apps/lantern-garage/public/radio/<slug>.mp3`.
-3. Add one row to the `STATIONS` array at the bottom of `fallout-radio.html` (freq, title, artist, year, src, lore).
-4. That's it — render, transport, deep-link, and Media Session all pick it up automatically.
+1. Find a transfer on the [Great 78 Project](https://archive.org/details/georgeblood) (`collection:georgeblood`); note its item `identifier` and the `VBR MP3` filename.
+2. Append a row to `apps/lantern-garage/public/radio/stations.json`: `{ "freq", "title", "artist", "year", "src": "/radio/<slug>.mp3", "lore", "ia": "<identifier>", "iaf": "<filename>" }`.
+3. Run `python scripts/fetch_radio_audio.py` — it downloads + re-encodes any missing tracks to 64 kbps mono.
+4. That's it — the player loads the manifest, and render / search / transport / deep-link / Media Session pick it up automatically.
+
+(A canonical track you want committed to git can skip `ia`/`iaf`, drop its mp3 into `/radio/`, and `git add -f` it.)
