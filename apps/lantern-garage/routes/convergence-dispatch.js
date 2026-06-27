@@ -696,6 +696,11 @@ module.exports = async (req, res, url, deps) => {
           diffText = gen.diffText;
           const affected = (gen.files || []).map((f) => (f.newFile || f.oldFile || "").replace(/^[ab]\//, ""));
           send("diff", { diffText, files: affected, attempt });
+          // The patch was generated successfully (a parseable diff exists). Mark the
+          // 'patch' phase done now — the apply step that follows is tracked separately.
+          // Without this the panel's "Generate patch" row stays stuck on ◐ forever,
+          // since the loop only ever emits patch start/retry/error, never done.
+          step("patch", "done", { files: affected, attempt });
 
           if (dryRun) {
             receipt.stoppedAt = "dry_run";
