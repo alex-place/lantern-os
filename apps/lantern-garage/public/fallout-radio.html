@@ -293,15 +293,27 @@
       { freq: "90.9", title: "Stormy Weather", artist: "Cliff Lang & His All-Star Orchestra", year: 1946,
         src: "/radio/stormy-weather.mp3",
         lore: "Arlen & Koehler's torch standard — \"don't know why there's no sun up in the sky.\" A 1946 dance-band reading of a Cotton Club classic." },
+      { freq: "91.5", title: "A Dream Is a Wish Your Heart Makes", artist: "Perry Como", year: 1950,
+        src: "/radio/perry-como-dream.mp3",
+        lore: "Perry Como's velvet read of the Cinderella waltz — \"a dream is a wish your heart makes when you're fast asleep.\" 1950, the year it became the country's lullaby." },
       { freq: "92.3", title: "Into Each Life Some Rain Must Fall", artist: "The Ink Spots & Ella Fitzgerald", year: 1944,
         src: "/radio/into-each-life.mp3",
         lore: "Bill Kenny and Ella trade verses on the weather of the heart. Decca 23356, 1944 — heartbreak you can slow-dance to." },
+      { freq: "93.5", title: "In the Blue Evening", artist: "Tommy Dorsey & Frank Sinatra", year: 1943,
+        src: "/radio/sinatra-blue-evening.mp3",
+        lore: "A young Frank Sinatra out front of the Tommy Dorsey band, 1943 — the bobby-sox idol before the wasteland, crooning into the blue." },
       { freq: "94.7", title: "Dream a Little Dream of Me", artist: "Lawrence \"Piano Roll\" Cook", year: 1950,
         src: "/radio/dream-a-little-dream.mp3",
         lore: "The 1931 standard rendered on a player-piano roll by Lawrence Cook — phantom fingers, no pianist in the room. The old world dreaming itself." },
+      { freq: "95.5", title: "All of Me", artist: "Dean Martin & Nat Brandwynne's Orchestra", year: 1946,
+        src: "/radio/dean-martin-all-of-me.mp3",
+        lore: "Before the Rat Pack, before Vegas — a young Dino with Nat Brandwynne's orchestra, c.1946, asking you to take all of him. The New Vegas sound, a decade early." },
       { freq: "96.5", title: "It's a Sin to Tell a Lie", artist: "Frank \"Big Boy\" Goodie et son Orchestre", year: 1939,
         src: "/radio/its-a-sin-to-tell-a-lie.mp3",
         lore: "Billy Mayhew's standard cut in Paris by expatriate hornman Frank \"Big Boy\" Goodie — Hot Club swing with a wagging finger, 1939." },
+      { freq: "97.7", title: "I Got the Sun in the Morning", artist: "Dean Martin & Nat Brandwynne's Orchestra", year: 1946,
+        src: "/radio/dean-martin-sun.mp3",
+        lore: "Dean Martin swings Irving Berlin's \"I got the sun in the morning and the moon at night\" — 1946, all easy postwar optimism." },
       { freq: "98.7", title: "Civilization (Bongo, Bongo, Bongo)", artist: "Danny Kaye & The Andrews Sisters", year: 1947,
         src: "/radio/civilization.mp3",
         lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." },
@@ -320,6 +332,9 @@
       { freq: "103.9", title: "A String of Pearls", artist: "Glenn Miller & His Orchestra", year: 1941,
         src: "/radio/a-string-of-pearls.mp3",
         lore: "Jerry Gray's glide for the Miller band — November 1941, a month before everything changed. Pure ballroom shimmer." },
+      { freq: "104.5", title: "From the Bottom of My Heart", artist: "Harry James & Frank Sinatra", year: 1945,
+        src: "/radio/sinatra-bottom-of-my-heart.mp3",
+        lore: "Sinatra fronting the Harry James orchestra — \"From the Bottom of My Heart,\" 1945. The voice that would outlive the bombs." },
       { freq: "105.1", title: "Pistol Packin' Mama", artist: "Bing Crosby & The Andrews Sisters", year: 1943,
         src: "/radio/pistol-packin-mama.mp3",
         lore: "Lay that pistol down, babe. Crosby and the Andrews Sisters, Decca 23277, 1943 — a jukebox staple in every diner still standing." },
@@ -505,8 +520,7 @@
     });
     audio.addEventListener('ended', function () {
       if (prefs.repeat === 'one') { audio.currentTime = 0; play(); return; }
-      if (!prefs.shuffle && prefs.repeat === 'off' && current === STATIONS.length-1) { audio.pause(); return; } // end of dial
-      tune(nextIndex(), true);
+      tune(nextIndex(), true);   // continuous: roll straight into the next song (wraps past the end of the dial — a radio never stops)
     });
     // A dead/missing track shouldn't freeze the dial: flag SIGNAL LOST, skip on.
     audio.addEventListener('error', function () {

@@ -16,8 +16,8 @@ lookup / docs / resume / code / trade / **media**). Nothing here touches Memory/
 
 ## Shipped (this PR)
 
-### Song list — 6 → 14 tracks
-Added 8 period tracks (all Great 78 Project / Internet Archive, served locally):
+### Song list — 6 → 19 tracks
+Added 13 period tracks (all Great 78 Project / Internet Archive, served locally):
 
 | Freq | Title | Artist | Year |
 |------|-------|--------|------|
@@ -29,6 +29,15 @@ Added 8 period tracks (all Great 78 Project / Internet Archive, served locally):
 | 107.1 | Anything Goes | Jack Payne & His Band | 1935 |
 | 94.7 | Dream a Little Dream of Me | Lawrence "Piano Roll" Cook | c.1950 |
 | 102.3 | Diane | Buddy Lucas & His Band of Tomorrow | 1951 |
+| 93.5 | In the Blue Evening | Tommy Dorsey & Frank Sinatra | 1943 |
+| 104.5 | From the Bottom of My Heart | Harry James & Frank Sinatra | 1945 |
+| 95.5 | All of Me | Dean Martin & Nat Brandwynne's Orchestra | 1946 |
+| 97.7 | I Got the Sun in the Morning | Dean Martin & Nat Brandwynne's Orchestra | 1946 |
+| 91.5 | A Dream Is a Wish Your Heart Makes | Perry Como | 1950 |
+
+Crooner note: these are authentic 1940s sides — Sinatra's Dorsey/James-era recordings, Dean Martin's pre-fame Brandwynne sessions, Como's early Victor side. The iconic Fallout: New Vegas Dean Martin cut, *Ain't That a Kick in the Head* (1960), is **not** in the public-domain Great 78 set, so it isn't included.
+
+Continuous playback: a finished song now rolls straight into the next and the dial wraps past the end (a radio never stops); `repeat: one` loops the current track.
 
 ### CRT refinement
 - **Screen curvature** — bulged glass via layered inset shadows + corner vignette.
