@@ -57,54 +57,16 @@
   }
   .attach-btn:hover { background: var(--surface2, rgba(255,255,255,.06)); color: var(--text, #e5e7eb); }
   .attach-btn[aria-expanded="true"] { color: var(--accent, #06b6d4); }
-  .attach-menu {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 8px;
-    width: 280px;
-    background: var(--surface, #16161e);
-    border: 1px solid var(--border, rgba(255,255,255,.12));
-    border-radius: 14px;
-    padding: 6px;
-    box-shadow: 0 12px 32px rgba(0,0,0,.35);
-    display: none;
-    z-index: 50;
+  /* Recording state for the 🎙️ mic button — without a visible style the mic engages
+     silently and feels broken. Pulse it red so it's obvious it's listening. */
+  .attach-btn.listening {
+    color: #fff;
+    background: #ef4444;
+    animation: micPulse 1.2s ease-in-out infinite;
   }
-  .attach-menu.open { display: block; }
-  .attach-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    background: none;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font: inherit;
-    font-size: 14px;
-    color: var(--text, #e5e7eb);
-    text-align: left;
-    cursor: pointer;
-    transition: background .15s;
-  }
-  .attach-item:hover:not(:disabled) { background: var(--surface2, rgba(255,255,255,.06)); }
-  .attach-item:disabled { color: var(--muted, #9aa0aa); opacity: .55; cursor: default; }
-  .attach-item .attach-ico { font-size: 17px; width: 22px; text-align: center; }
-  .attach-soon {
-    margin-left: auto;
-    font-size: 10px;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    color: var(--muted, #9aa0aa);
-    border: 1px solid var(--border, rgba(255,255,255,.14));
-    border-radius: 999px;
-    padding: 1px 7px;
-  }
-  .attach-help {
-    margin: 6px 8px 4px;
-    font-size: 11.5px;
-    line-height: 1.45;
-    color: var(--muted, #9aa0aa);
+  @keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .55); }
+    50%      { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
   }
   /* Pending attachment chips (the "+" work tool) shown above the input */
   .attach-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px; margin: 0 0 6px; }
@@ -235,31 +197,9 @@
 
     <!-- Input area -->
     <div class="input-container">
-      <!-- Attachment menu — imports flow into the Knowledge Center -->
-      <div id="attach-menu" class="attach-menu" role="menu" aria-label="Add attachment">
-        <button type="button" class="attach-item" role="menuitem" onclick="lanternAttach.pickAny()">
-          <span class="attach-ico">📎</span> Upload a file — work on it here
-        </button>
-        <button type="button" class="attach-item" role="menuitem" onclick="lanternAttach.pickPdf()">
-          <span class="attach-ico">📄</span> Upload PDF → Knowledge Center
-        </button>
-        <button type="button" class="attach-item" disabled aria-disabled="true">
-          <span class="attach-ico">🖼️</span> Upload Image <span class="attach-soon">soon</span>
-        </button>
-        <button type="button" class="attach-item" role="menuitem" onclick="lanternAttach.improveDoc()">
-          <span class="attach-ico">📝</span> Improve a document (.docx)
-        </button>
-        <button type="button" class="attach-item" role="menuitem" onclick="location.href='/document-studio.html'">
-          <span class="attach-ico">📐</span> Document Studio — edit turn by turn
-        </button>
-        <button type="button" class="attach-item" disabled aria-disabled="true">
-          <span class="attach-ico">✎</span> Paste Research <span class="attach-soon">soon</span>
-        </button>
-        <p class="attach-help">Upload any file to work on it right here in chat, or send PDFs/Docs to your Knowledge Center.</p>
-      </div>
       <div id="attach-chips" class="attach-chips" aria-live="polite"></div>
       <div class="input-wrapper">
-        <button id="attach-btn" class="attach-btn" type="button" aria-label="Add attachment" aria-haspopup="true" aria-expanded="false" onclick="lanternAttach.toggle()" title="Add to Knowledge Center">+</button>
+        <button id="attach-btn" class="attach-btn" type="button" aria-label="Upload a file" onclick="lanternAttach.pickAny()" title="Upload a file">+</button>
         <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text)">🎙️</button>
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
@@ -643,12 +583,15 @@
   const menu = document.getElementById('attach-menu');
   const btn = document.getElementById('attach-btn');
   const fileInput = document.getElementById('attach-pdf-input');
-  if (!menu || !btn || !fileInput) return;
+  if (!btn || !fileInput) return;  // menu was removed — "+" opens the file picker directly now
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-  function closeMenu() { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
-  function openMenu() { menu.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+  // The attach popup was removed — the "+" button now opens the file picker directly
+  // (lanternAttach.pickAny). These remain as no-ops so the rest of the IIFE and any
+  // cached callers don't break.
+  function closeMenu() { if (menu) { menu.classList.remove('open'); } if (btn) btn.setAttribute('aria-expanded', 'false'); }
+  function openMenu() { if (menu) { menu.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); } }
 
   function sysBubble(html) {
     const messages = document.getElementById('messages');
@@ -782,7 +725,7 @@
   window.clearPendingAttachments = function () { window.pendingAttachments = []; renderChips(); };
 
   window.lanternAttach = {
-    toggle() { menu.classList.contains('open') ? closeMenu() : openMenu(); },
+    toggle() { if (menu) { menu.classList.contains('open') ? closeMenu() : openMenu(); } else { this.pickAny(); } },
     pickAny() { closeMenu(); if (anyInput) anyInput.click(); },
     removeAttachment(i) { window.pendingAttachments.splice(i, 1); renderChips(); },
     pickPdf() { closeMenu(); fileInput.click(); },
@@ -817,7 +760,7 @@
 
   fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadPdfs(fileInput.files); });
   if (anyInput) anyInput.addEventListener('change', () => { if (anyInput.files && anyInput.files.length) handleAnyFiles(anyInput.files); });
-  document.addEventListener('click', (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); });
+  document.addEventListener('click', (e) => { if (menu && !menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 })();
 </script>
