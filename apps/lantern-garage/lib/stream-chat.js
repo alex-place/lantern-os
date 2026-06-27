@@ -1221,6 +1221,9 @@ async function handleStreamChat(req, url, res) {
     if (msg.includes("all_providers_failed")) {
       return "All providers failed. This can happen when keys are invalid, rate-limited, or the network is slow. Check Settings or try again.";
     }
+    if (msg.includes("_empty_response")) {
+      return "The model returned an empty response (often a safety block or a soft rate-limit). Try again or switch providers in Settings.";
+    }
     return msg;
   }
 
@@ -1301,6 +1304,14 @@ async function handleStreamChat(req, url, res) {
   );
 
   let fullReply = "";
+
+  // A cloud provider can answer HTTP 200 with ZERO streamed tokens — a safety block,
+  // a soft rate-limit, or a grounding misfire. That is NOT a success: finalizing it
+  // records a false leaderboard win (so the empty provider stays the auto-lead) AND
+  // short-circuits the cascade, leaving the user a generic "AI unavailable" even
+  // though the other providers have keys. Detect it and throw so the per-provider
+  // catch cascades to the next brain pick — mirroring the local/ollama path.
+  const isEmptyReply = (s) => !String(s || "").replace(/\s+/g, "").length;
 
   // converganceDecision already computed above (before systemPrompt)
 
@@ -1939,6 +1950,8 @@ async function handleStreamChat(req, url, res) {
         req2.write(payload);
         req2.end();
       });
+      // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
+      if (isEmptyReply(fullReply)) throw new Error("gemini_empty_response");
       let { cleanText: geminiClean, suggestions: geminiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       // Σ₀ verify pass
       let geminiSigma0 = null;
@@ -2121,6 +2134,8 @@ async function handleStreamChat(req, url, res) {
         req2.write(payload);
         req2.end();
       });
+      // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
+      if (isEmptyReply(fullReply)) throw new Error("anthropic_empty_response");
       let { cleanText: anthropicClean, suggestions: anthropicDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       // Σ₀ verify pass — ground claims against codebase, web, Gemini
       let anthropicSigma0 = null;
@@ -2271,6 +2286,8 @@ async function handleStreamChat(req, url, res) {
         req2.write(payload);
         req2.end();
       });
+      // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
+      if (isEmptyReply(fullReply)) throw new Error("openai_empty_response");
       const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       await logConversation({
         recordedAt: new Date().toISOString(),
@@ -2387,6 +2404,8 @@ async function handleStreamChat(req, url, res) {
         req2.setTimeout(15000, () => { req2.destroy(); reject(new Error("xai_timeout")); });
         req2.write(payload); req2.end();
       });
+      // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
+      if (isEmptyReply(fullReply)) throw new Error("xai_empty_response");
       const { cleanText: xaiClean, suggestions: xaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModel, agent: doneAgentName } }).catch(() => {});
       recordProviderSuccess("xai");
