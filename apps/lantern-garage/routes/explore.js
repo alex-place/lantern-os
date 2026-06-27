@@ -15,7 +15,7 @@
  * docs/research/explore-content-machine.md §8.
  */
 
-const { rankedFeed } = require("../lib/explore-feed");
+const { rankedFeed, pagedFeed } = require("../lib/explore-feed");
 const { recordModelOutcome } = require("../lib/model-leaderboard");
 
 const SUCCESS_EVENTS = new Set(["click", "dwell", "like", "open"]);
@@ -31,6 +31,30 @@ module.exports = async function exploreRoute(req, res, url, deps) {
       sendJson(res, feed, 200);
     } catch (e) {
       // Never blank the page — surface the error but keep a stable shape.
+      sendJson(res, { cards: [], count: 0, error: e.message }, 200);
+    }
+    return true;
+  }
+
+  // ── POST /api/explore/feed/page ──
+  // Endless-scroll pagination. Body: { seen:[id...], limit?, type? }. Each call
+  // re-ranks live (so engagement recorded since the last page steers this one),
+  // drops the seen cards, and cycles when the catalog is exhausted (TikTok-style
+  // infinite feed). See lib/explore-feed.js pagedFeed().
+  if (url.pathname === "/api/explore/feed/page" && req.method === "POST") {
+    let body;
+    try {
+      body = JSON.parse((await collectRequestBody(req)) || "{}");
+    } catch {
+      sendJson(res, { cards: [], count: 0, error: "invalid JSON body" }, 200);
+      return true;
+    }
+    const seen = Array.isArray(body.seen) ? body.seen.slice(0, 1000).map(String) : [];
+    const type = body.type && body.type !== "all" ? String(body.type) : null;
+    try {
+      const feed = await pagedFeed({ seen, limit: body.limit, type });
+      sendJson(res, feed, 200);
+    } catch (e) {
       sendJson(res, { cards: [], count: 0, error: e.message }, 200);
     }
     return true;

@@ -139,6 +139,31 @@
     .feed-card .fc-dismiss:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
     .feed-status { max-width: 920px; margin: 0 auto; color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
 
+    /* ── Infinite-scroll loading sentinel (endless feed) ── */
+    .feed-sentinel {
+      max-width: 920px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 28px;
+      padding: 22px 0 40px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .feed-sentinel::before {
+      content: '';
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .feed-sentinel.is-loading::before { opacity: 1; animation: feed-spin 0.7s linear infinite; }
+    @keyframes feed-spin { to { transform: rotate(360deg); } }
+
     /* ── Embed cards (#1217) — open-archive games + listening, rendered inline.
        Full-width "panels" with a small retro window chrome (a nod to the CSF/XP
        door) so an emulated DOS game or a public-domain record reads as a thing
@@ -794,8 +819,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { /* non-blocking */ }
   }
 
-  let allCards = [];
   let filter = 'all';
+  const seen = new Set();            // stable card ids already shown (dedup across pages)
+  let loading = false, totalShown = 0, cycles = 0;
 
   // Dwell = the engagement signal for embeds (they have no click-through). When a
   // panel sits ≥50% on-screen for 4s, that's a real "watched it" outcome → record
@@ -878,48 +904,104 @@ document.addEventListener('DOMContentLoaded', () => {
     return el;
   }
 
-  function render() {
-    // Drop observers on the outgoing cards so we never track detached nodes.
+  // ── Endless scroll (TikTok / YouTube-Shorts-style) ──
+  // The feed never loads all at once. Each page is a FRESH server re-rank that
+  // already reflects the dwell/click/dismiss recorded on the cards above it — so
+  // your engagement steers what loads next. When the bounded catalog is
+  // exhausted the server cycles, so the scroll never ends. We append (never
+  // rebuild) and dedupe by stable card id; a bottom sentinel pulls the next page
+  // as it nears the viewport. /api/explore/feed/page → lib/explore-feed pagedFeed.
+  let filterEpoch = 0;        // bumped on filter change to cancel in-flight pages
+  const PAGE = 9;
+  const MAX_CYCLES = 2;       // after looping the catalog this many times, stop auto-loading
+
+  // Sentinel below the stream — when it nears view, pull the next page.
+  const sentinel = document.createElement('div');
+  sentinel.className = 'feed-sentinel';
+  sentinel.setAttribute('aria-hidden', 'true');
+  stream.after(sentinel);
+
+  function appendCards(cards) {
+    const frag = document.createDocumentFragment();
+    cards.forEach(c => { seen.add(c.id || c.key); frag.appendChild(cardEl(c)); });
+    stream.appendChild(frag);
+    totalShown += cards.length;
+  }
+
+  async function loadPage() {
+    if (loading) return;
+    loading = true;
+    const epoch = filterEpoch;
+    sentinel.classList.add('is-loading');
+    if (statusEl && !totalShown) statusEl.textContent = 'Loading your feed…';
+    try {
+      const r = await fetch('/api/explore/feed/page', {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seen: [...seen], limit: PAGE, type: filter === 'all' ? null : filter }),
+      });
+      const data = r.ok ? await r.json() : null;
+      if (epoch !== filterEpoch) return;                 // a filter change superseded this page
+      const cards = (data && data.cards) || [];
+      if (data && data.cycled) { cycles++; seen.clear(); } // endless: re-serve a fresh cycle
+      if (!cards.length) {
+        if (io) io.unobserve(sentinel);
+        if (statusEl) statusEl.textContent = totalShown ? '' : 'No content available right now.';
+        return;
+      }
+      appendCards(cards);
+      if (cycles >= MAX_CYCLES) {                          // looped the catalog enough — stop pulling
+        if (io) io.unobserve(sentinel);
+        if (statusEl) statusEl.textContent = totalShown + " loaded · you're all caught up";
+      } else if (statusEl) {
+        statusEl.textContent = (filter === 'all'
+          ? totalShown + ' loaded · ranked by your engagement'
+          : totalShown + ' ' + filter) + ' — keep scrolling';
+      }
+    } catch (e) {
+      if (statusEl) statusEl.textContent = totalShown ? '' : 'Feed is offline right now — use the quick links below.';
+    } finally {
+      if (epoch === filterEpoch) loading = false;
+      sentinel.classList.remove('is-loading');
+    }
+  }
+
+  const io = ('IntersectionObserver' in window)
+    ? new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) loadPage();
+      }, { rootMargin: '700px 0px' })
+    : null;
+
+  function reset() {
+    filterEpoch++;
+    loading = false; totalShown = 0; cycles = 0;
+    seen.clear();
     if (dwellObserver) dwellObserver.disconnect();
     stream.innerHTML = '';
-    const shown = filter === 'all' ? allCards : allCards.filter(c => c.type === filter);
-    if (!shown.length) {
-      stream.innerHTML = '<div class="feed-status">No cards for this filter right now.</div>';
-      return;
-    }
-    const frag = document.createDocumentFragment();
-    shown.forEach(c => frag.appendChild(cardEl(c)));
-    stream.appendChild(frag);
+    if (io) { io.unobserve(sentinel); io.observe(sentinel); }
+    loadPage();
   }
 
   if (chips) {
     chips.addEventListener('click', (e) => {
       const btn = e.target.closest('.feed-chip');
-      if (!btn) return;
+      if (!btn || btn.dataset.type === filter) return;
       filter = btn.dataset.type;
       chips.querySelectorAll('.feed-chip').forEach(b => {
         const on = b === btn;
         b.classList.toggle('active', on);
         b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      render();
+      reset();
     });
   }
 
-  fetch('/api/explore/feed', { cache: 'no-store' })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(data => {
-      allCards = (data && data.cards) || [];
-      if (statusEl) {
-        statusEl.textContent = allCards.length
-          ? allCards.length + ' cards · ranked by your engagement (editorial order until you click)'
-          : 'No content available right now.';
-      }
-      render();
-    })
-    .catch(() => {
-      if (statusEl) statusEl.textContent = 'Feed is offline right now — use the quick links below.';
-    });
+  // Kick off, then keep the sentinel observed. Fallback for no IntersectionObserver.
+  loadPage();
+  if (io) io.observe(sentinel);
+  else window.addEventListener('scroll', () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 700) loadPage();
+  }, { passive: true });
 })();
 </script>
 </body>

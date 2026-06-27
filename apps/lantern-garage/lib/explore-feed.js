@@ -358,7 +358,71 @@ async function rankedFeed(opts = {}) {
   return { cards: cardsOut, count: cardsOut.length, generatedAt: new Date().toISOString() };
 }
 
-module.exports = { aggregate, rankedFeed, diversityRerank, keyForSource, editorialOrder };
+// ── Endless paginated feed (Act) — TikTok / Shorts-style ──────────────────────
+//
+// Infinite scroll with per-batch live re-ranking. Each page is a FRESH
+// rankedFeed() (PCSF + diversity), so engagement recorded since the previous
+// page already steers this one: dwell/click on games floats game sources up,
+// dismiss sinks them — the next batch reflects it. We drop the cards already
+// shown (`seen`, by stable card id), reserve a couple of EXPLORATION slots for
+// cold / not-yet-scored cards pulled from deeper in the pool (the #1220
+// exploration sub-item — keeps the feed learning your taste instead of
+// bubbling), and when the bounded catalog is exhausted we CYCLE (re-serve a
+// freshly-ranked set) so the scroll never ends.
+const DEFAULT_PAGE = 9;
+
+// Build one page: the top unseen cards for exploitation, plus a few exploration
+// cards drawn from deeper in the pool (preferring cold/unscored), interleaved.
+function pickPage(pool, limit, exploreRatio) {
+  if (pool.length <= limit) return pool.slice();
+  const exploreSlots = Math.min(
+    pool.length - limit,
+    Math.max(1, Math.round(limit * exploreRatio)),
+  );
+  const exploitSlots = Math.max(1, limit - exploreSlots);
+  const page = pool.slice(0, exploitSlots);
+  const rest = pool.slice(exploitSlots);
+  // Prefer genuinely cold (unscored) cards for discovery; else any deeper card.
+  const cold = rest.filter((c) => !c.scored);
+  const bag = cold.length >= exploreSlots ? cold : rest;
+  const chosen = [];
+  const used = new Set();
+  while (chosen.length < exploreSlots && used.size < bag.length) {
+    const i = Math.floor(Math.random() * bag.length); // jitter so cycles vary
+    if (used.has(i)) continue;
+    used.add(i);
+    chosen.push(bag[i]);
+  }
+  // Interleave the exploration cards at spread positions.
+  const step = Math.max(1, Math.floor(page.length / (chosen.length + 1)));
+  chosen.forEach((c, k) => page.splice(Math.min(page.length, (k + 1) * step + k), 0, c));
+  return page.slice(0, limit);
+}
+
+async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, exploreRatio = 0.22 } = {}) {
+  limit = Math.max(1, Math.min(30, Number(limit) || DEFAULT_PAGE));
+  const { cards } = await rankedFeed();
+  const all = type ? cards.filter((c) => c.type === type) : cards;
+  const seenSet = new Set(Array.isArray(seen) ? seen : []);
+  let pool = all.filter((c) => !seenSet.has(c.id));
+  let cycled = false;
+  if (pool.length === 0 && all.length > 0) {
+    cycled = true; // catalog exhausted → endless cycle (re-serve a fresh rank)
+    pool = all.slice();
+  }
+  const page = pickPage(pool, limit, exploreRatio);
+  return {
+    cards: page,
+    count: page.length,
+    cycled,
+    remaining: Math.max(0, pool.length - page.length),
+    catalog: all.length,
+    endless: true,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
