@@ -11,6 +11,11 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+// Keyless Node-native price/bar source. Replaces the per-call Python→Alpaca
+// subprocess for charts/prices, which paid ~8.7s of import cost per call (and
+// failed entirely without Alpaca keys), so the charts never loaded. Order
+// placement + broker account still go through Python/Alpaca below.
+const yahoo = require('./market-data-yahoo');
 
 class TraderAgent {
   constructor(config = {}) {
@@ -216,9 +221,7 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_watchlist_prices', {
-        tickers: this.watchlist
-      }, this.fastTimeout);
+      const result = await yahoo.getQuotes(this.watchlist);
 
       this.cache[cacheKey] = {
         data: result,
@@ -277,10 +280,7 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_bars', {
-        ticker,
-        timeframe
-      }, this.fastTimeout);
+      const result = await yahoo.getBars(ticker, timeframe);
 
       this.cache[cacheKey] = {
         data: result,
@@ -320,7 +320,7 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_bars_multi', { tickers, timeframe }, this.fastTimeout);
+      const result = await yahoo.getBarsMulti(tickers, timeframe);
 
       this.cache[cacheKey] = {
         data: result,

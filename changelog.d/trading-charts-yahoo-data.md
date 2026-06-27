@@ -1,0 +1,5 @@
+### Fix: trader dashboard charts now actually load (and load fast)
+
+- The ticker charts on `stock-trader.html` / `trader-dashboard.html` were blank. Prices and OHLCV bars came from a Python subprocess (`cli.py` → Alpaca) that spent **~8.7s just on `import agents`** (it builds an Alpaca client at import time and throws without keys), so every call blew the 7s budget and returned nothing — no prices, no bars, no charts. Polling those 8.7s spawns every few seconds was also the dashboard's main performance sink.
+- New keyless, Node-native provider `lib/market-data-yahoo.js` fetches the same data (latest price + previous close, and OHLCV bars for all timeframes incl. crypto) from Yahoo's public chart endpoint in ~200-600ms, with a short server-side TTL cache. `lib/trader-agent.js` now routes `getWatchlistPrices` / `getBars` / `getBarsMulti` through it. Order placement + broker account still use Alpaca.
+- Result: `watchlist-prices` ~7.3s→~1.2s, `bars-multi` ~16s→~2.3s, ~45ms on cache hits; all 16 ticker cards render real line/candle charts with no API key required. Verified in headless Chromium: 16/16 chart canvases draw, 0 console errors.
