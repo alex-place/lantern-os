@@ -44,8 +44,18 @@ ADRs 0002/0004/0005, which it passes — a Remember/Verify helper, not a new sub
   federation self-loop over real HTTP (`mirror:self`, corroboration boosting confidence to
   0.82, bounded), and the raw `/api/mesh/ground` primitive.
 
+**Chat splice wired + tested** (behind `MESH_GROUNDING=1`, off by default): both paths now
+ground from local memory + Knowledge Center — `dream-chat.js` (non-stream, prepended to the
+user prompt) and `stream-chat.js` (both system-prompt sites: ROUTER_PROMPT + RP/journal).
+**Additive-only**: it injects the *cited evidence* block only when the resolver actually
+grounds; it never forces "I don't know" into an ordinary chat turn (honest IDK stays the
+system prompt's job, so a memory-thin turn isn't crippled). Web ring omitted (the chat does
+its own web grounding); mesh peer ring omitted (ADR-gated). Verified live on a worktree
+server: a memory-matching turn fired `[mesh-grounding] grounded turn: 1 source(s), conf 0.50`
+and injected the block; an unrelated turn injected nothing. (The model *using* the evidence
+in its reply needs a provider key — the keyless run proves the injection wiring.)
+
 Loop stage: **Remember + Verify**. Still gated pending a Proposed ADR: the **mesh peer ring**
 (cross-node fetch) stays behind the peer registry + ADR approval — `mesh-members.json` has no
 per-node URLs and `cloud-mirrors.json` is "one canonical surface", so multi-mirror federation
-needs Alex's topology decision. The chat-prompt splice (local rings into dream-chat.js /
-stream-chat.js behind `MESH_GROUNDING=1`) is specced and is the next increment.
+needs Alex's topology decision.

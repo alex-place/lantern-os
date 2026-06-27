@@ -10,6 +10,8 @@ const { detectTaskType } = require("./task-detector");
 const { TokenAudit } = require("./token-audit");
 const serving = require("./serving-modes");
 const { formatGrounding: _oracleGrounding } = require("./convergence-oracle");
+const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
+const { defaultRings } = require("./grounding-rings");
 
 // ── Convergence Oracle grounding ────────────────────────────────────────────
 // Wire the oracle into every question: each gets a time-banded observer slice — the KNOWNs
@@ -733,7 +735,24 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   let oracleContext = "";
   try { oracleContext = await oracleGround(text); } catch (_) { oracleContext = ""; }
 
-  const userPrompt = `${oracleContext ? oracleContext + "\n\n" : ""}${groundingContext ? groundingContext + "\n\n" : ""}${tradingContext ? "Trading data:\n" + tradingContext + "\n\n" : ""}${text}`;
+  // Mesh grounding (MESH_GROUNDING=1, off by default) — local memory + Knowledge Center rings.
+  // ADDITIVE ONLY: inject the cited evidence block when the resolver actually GROUNDS; never
+  // inject its abstain ("say I don't know") into a normal chat turn — honest IDK is already the
+  // job of the system prompt, and forcing it on every memory-thin turn would cripple the chat.
+  // Web ring is omitted (the chat does its own web grounding above); the mesh peer ring is
+  // omitted (ADR-gated). Fail-safe: any error → "".
+  let meshGroundContext = "";
+  if (process.env.MESH_GROUNDING === "1") {
+    try {
+      const _gr = await resolveGrounding(text, { rings: defaultRings({ mesh: false, web: false }) });
+      if (_gr.grounded) {
+        meshGroundContext = formatGroundingForPrompt(_gr);
+        console.warn(`[mesh-grounding] grounded turn: ${_gr.sources.length} source(s), conf ${_gr.confidence.toFixed(2)}`);
+      }
+    } catch (_) { meshGroundContext = ""; }
+  }
+
+  const userPrompt = `${meshGroundContext ? meshGroundContext + "\n\n" : ""}${oracleContext ? oracleContext + "\n\n" : ""}${groundingContext ? groundingContext + "\n\n" : ""}${tradingContext ? "Trading data:\n" + tradingContext + "\n\n" : ""}${text}`;
 
   let rp = String(requestedProvider || "").toLowerCase().trim();
 
