@@ -19,8 +19,7 @@ const { emitConvergenceRecord } = require("./convergence-records");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
-const { scoreReplyCollapse, antiCollapseSignal } = require("./collapse-canary");
-const { scoreReplyGroundedness, ungroundedSignal } = require("./groundedness-canary");
+const { runCanaries } = require("./canary");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
@@ -977,49 +976,36 @@ async function handleStreamChat(req, url, res) {
     if (SIGMA0_VERIFY && fullReply && message) {
       verifyResponse(fullReply, message, agent.id || agent.name || "keystone").catch(() => {});
     }
-    // ── Σ₀ collapse canary (#1010) ──────────────────────────────────────────
-    // Passive observer on the live serving path: score the completed reply for
-    // loop-collapse / phrase-echo / lexical contraction. Stamp proximity onto the
-    // done signature so the cert can't read "healthy" while output is collapsing;
-    // on a crossing, emit a logged canary signal. No behavior change when healthy.
+    // ── Σ₀ canaries: TWO orthogonal axes, ONE harness (lib/canary.js) ───────
+    // Passive observers on the live serving path, run per completed reply:
+    //   collapse (#1010)     — textual degeneration: loop / phrase-echo / contraction
+    //   groundedness (#1260) — the "42-state": fluent but confident-and-unanchored
+    // They partially anticorrelate, so they stay TWO sub-scores (a 42-state reply
+    // reads healthy on the collapse axis). The harness stamps both onto the done
+    // signature, warns on a crossing, and appends to one canary event stream.
+    // No behavior change when healthy; scoring never mutates a reply.
     try {
       if (fullReply) {
-        const canary = scoreReplyCollapse(fullReply);
-        signature.sigma0_proximity = canary.proximity;
-        if (canary.collapsed) {
-          const sig = antiCollapseSignal(canary);
-          signature.canary = sig;
+        const { collapse, grounded, signaturePatch } = runCanaries(fullReply, {
+          groundingContext,
+          context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
+        });
+        Object.assign(signature, signaturePatch);
+        if (collapse.collapsed) {
           console.warn(
-            `[canary_collapse] proximity=${canary.proximity} action=${sig.action} ` +
+            `[canary_collapse] proximity=${collapse.proximity} action=${signaturePatch.canary.action} ` +
             `source=${source} provider=${signature.provider} ` +
-            `signals=${JSON.stringify(canary.signals)}`
+            `signals=${JSON.stringify(collapse.signals)}`
           );
         }
-      }
-    } catch { /* canary must never break a reply */ }
-    // ── Σ₀ groundedness canary (42-state guardrail) ─────────────────────────
-    // The collapse canary above catches textual *degeneration*. It cannot see the
-    // other Σ₀ failure mode (SIGMA0-COLLAPSE-CERTIFICATE §2, the "42-state"): a
-    // fluent, non-repeating reply that asserts confident claims with no external
-    // anchor — internally coherent, externally adrift. Score that axis here, where
-    // the upstream groundingContext is already in scope, and stamp the risk onto the
-    // done signature so a confident-but-ungrounded reply can't pass as healthy.
-    // Passive observer: advisory only, never blocks a reply.
-    try {
-      if (fullReply) {
-        const g = scoreReplyGroundedness(fullReply, { groundingContext });
-        signature.sigma0_grounding = { risk: g.risk, anchored: g.anchored };
-        if (g.ungrounded) {
-          signature.ungrounded = true;
-          const usig = ungroundedSignal(g);
-          signature.ungroundedSignal = usig;
+        if (grounded.ungrounded) {
           console.warn(
-            `[canary_ungrounded] risk=${g.risk} source=${source} ` +
-            `provider=${signature.provider} signals=${JSON.stringify(g.signals)}`
+            `[canary_ungrounded] risk=${grounded.risk} source=${source} ` +
+            `provider=${signature.provider} signals=${JSON.stringify(grounded.signals)}`
           );
         }
       }
-    } catch { /* canary must never break a reply */ }
+    } catch { /* canaries must never break a reply */ }
     // ── #911 live coding emitter: log Python candidates offline ─────────────
     if (fullReply && message) { _emitCodingCandidate(message, fullReply); }
     // ── #919 finding #2: auto-draft claim packet for grounded replies ────────

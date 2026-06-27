@@ -28,18 +28,13 @@
 //
 // High risk = high assertiveness AND no anchor = the 42-state signature.
 
+const { tokenize, splitUnits } = require("./canary-util");
+
 const MIN_TOKENS = 16; // below this there isn't enough signal — don't cry ungrounded
 
-function tokenize(text) {
-  const m = String(text || "").toLowerCase().match(/[\p{L}\p{N}']+/gu);
-  return m || [];
-}
-
+// case-preserving sentence units (entity capitalization must survive)
 function splitSentences(text) {
-  return String(text || "")
-    .split(/[\n.!?]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 8);
+  return splitUnits(text, { lower: false });
 }
 
 // A sentence asserts a *checkable* fact when it carries a verifiable specific —

@@ -16,23 +16,13 @@
 //   - typeTokenRatio  : unique tokens / total tokens (lexical contraction; low = bad)
 //   - longestRunRatio : longest immediate token-repeat run / total tokens
 
+const { tokenize, splitUnits } = require("./canary-util");
+
 const MIN_TOKENS = 12; // below this there isn't enough signal — don't cry collapse
 
-function tokenize(text) {
-  const m = String(text || "").toLowerCase().match(/[\p{L}\p{N}']+/gu);
-  return m || [];
-}
-
-function splitUnits(text) {
-  // sentence/line units for literal self-repeat detection
-  return String(text || "")
-    .split(/[\n.!?]+/)
-    .map((s) => s.trim().toLowerCase())
-    .filter((s) => s.length >= 8);
-}
-
 function selfRepeatRatio(text) {
-  const units = splitUnits(text);
+  // literal self-repeat: case-folded sentence/line units
+  const units = splitUnits(text, { lower: true });
   if (units.length < 2) return 0;
   const seen = new Set();
   let dup = 0;

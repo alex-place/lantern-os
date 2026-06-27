@@ -1,0 +1,8 @@
+### Keystone Chat: consolidate the two Σ₀ canaries into one harness (keep both axes)
+
+- The collapse canary (#1010, textual degeneration) and groundedness canary (#1260, the 42-state) were two separate modules with two ad-hoc integration blocks in `stream-chat.js` and dead-identical text plumbing. They are now unified behind **one harness** (`lib/canary.js`) — without merging their scores.
+- **Why two axes stay two:** they partially anticorrelate. A fluent, confident, unanchored "42-state" reply scores *healthy* on the collapse axis, so a single blended number would let each failure mode hide inside the other. The harness returns two sub-scores; only the plumbing is shared.
+- `runCanaries(reply, {groundingContext, context})` runs both axes, stamps the same `sigma0_proximity` / `sigma0_grounding` / `canary` / `ungrounded` fields onto the done signature (no behavior change), warns on a crossing, and — new — appends to **one append-only event stream** (`data/convergence/canary-events.jsonl`, via the file-queue). Previously the canaries only `console.warn`'d and never actually logged events.
+- Shared tokenizer/sentence-splitter extracted to `lib/canary-util.js`; `collapse-canary.js` and `groundedness-canary.js` keep their existing public exports, so their unit tests are unchanged.
+- `stream-chat.js`: two try/catch blocks → one harness call (still wrapped so a canary can never break a reply).
+- Unit checks: new `test/canary.test.js` (5 — healthy trips neither; a loop trips collapse only; a 42-state trips groundedness only *while collapse reads healthy*; grounding context lowers risk through the harness; the event writer returns a no-throw promise). Existing `collapse-canary.test.js` and `groundedness-canary.test.js` still pass after the de-dup.
