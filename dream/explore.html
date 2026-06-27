@@ -89,6 +89,26 @@
       text-decoration: none;
       transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
+    /* Lead image — bleeds to the card edges, clipped by the card's radius. */
+    .feed-card .fc-thumb {
+      width: calc(100% + 32px);
+      height: 172px;
+      object-fit: cover;
+      display: block;
+      margin: -16px -16px 1px;
+      background: var(--surface2);
+    }
+    /* Preview excerpt (reads) / good-news frame (beliefs) — clamped to 3 lines. */
+    .feed-card .fc-summary {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .feed-card:hover, .feed-card:focus-within {
       transform: translateY(-2px);
       border-color: var(--accent);
