@@ -91,31 +91,6 @@
     }
     /* Lead image — bleeds to the card edges, clipped by the card's radius. */
     .feed-card .fc-thumb {
-      width: calc(100% + 32px);
-      height: 172px;
-      object-fit: cover;
-      display: block;
-      margin: -16px -16px 1px;
-      background: var(--surface2);
-    }
-    /* Preview excerpt (reads) / good-news frame (beliefs) — clamped to 3 lines. */
-    .feed-card .fc-summary {
-      font-size: 0.85rem;
-      color: var(--muted);
-      line-height: 1.5;
-      margin: 0;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .feed-card:hover, .feed-card:focus-within {
-      transform: translateY(-2px);
-      border-color: var(--accent);
-      box-shadow: var(--shadow-hover);
-    }
-    /* Lead image — bleeds to the card edges, clipped by the card's radius. */
-    .feed-card .fc-thumb {
       width: calc(100% + 36px);
       height: 172px;
       object-fit: cover;
@@ -123,6 +98,30 @@
       margin: -18px -18px 1px;
       background: var(--surface2);
     }
+    /* Generated lead thumbnail for cards with no (or a broken) source image —
+       docs, image-less reads, beliefs. A type-tinted gradient block with the type
+       glyph, so EVERY card has a consistent lead visual instead of reading as a
+       bare, thumbnail-less "?" tile. */
+    .feed-card .fc-thumb-ph {
+      width: calc(100% + 36px);
+      height: 150px;
+      margin: -18px -18px 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid var(--border);
+      background:
+        radial-gradient(circle at 32% 28%,
+          color-mix(in srgb, var(--tile) 40%, var(--surface)) 0%,
+          color-mix(in srgb, var(--tile) 14%, var(--surface)) 55%,
+          var(--surface) 100%);
+    }
+    .feed-card .fc-thumb-ph .fc-ph-icon {
+      font-size: 46px;
+      line-height: 1;
+      opacity: 0.92;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
+    }
     /* Preview excerpt (reads) / good-news frame (beliefs) — clamped to 3 lines. */
     .feed-card .fc-summary {
       font-size: 0.85rem;
@@ -133,6 +132,36 @@
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    /* Per-type accent identity + top accent-bar wipe-in on hover — mirrors the
+       index.html home tiles, so Explore reads as the same product surface. */
+    .feed-card { --tile: var(--accent); }
+    .feed-card[data-type="watch"]  { --tile: #a78bfa; }
+    .feed-card[data-type="build"]  { --tile: #10b981; }
+    .feed-card[data-type="doc"]    { --tile: #f59e0b; }
+    .feed-card[data-type="belief"] { --tile: #22c55e; }
+    .feed-card[data-type="read"]   { --tile: #06b6d4; }
+    .feed-card[data-type="embed"]  { --tile: #06b6d4; }
+    .feed-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--tile);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.25s ease;
+      z-index: 2;
+    }
+    .feed-card.is-embed::before { display: none; }
+    .feed-card:hover::before,
+    .feed-card:focus-within::before { transform: scaleX(1); }
+    .feed-card:hover, .feed-card:focus-within {
+      transform: translateY(-2px);
+      border-color: var(--tile);
+      box-shadow: var(--shadow-hover);
     }
     .feed-card .fc-top {
       display: flex;
@@ -143,7 +172,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .feed-card .fc-type { color: var(--accent); }
+    .feed-card .fc-type { color: var(--tile); }
     .feed-card .fc-date { color: var(--muted); margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .feed-card .fc-title {
       font-size: 1.06rem;
@@ -158,21 +187,25 @@
       color: var(--muted);
       line-height: 1.4;
     }
-    .feed-card .fc-why .fc-src { color: var(--accent); font-weight: 700; }
+    .feed-card .fc-why .fc-src { color: var(--tile); font-weight: 700; }
+    /* WCAG 2.5.8 (Target Size, AA) — interactive controls are ≥24×24 CSS px. */
     .feed-card .fc-dismiss {
       position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 22px;
-      height: 22px;
+      top: 6px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
       border: none;
       border-radius: 6px;
       background: transparent;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 15px;
       line-height: 1;
       cursor: pointer;
       opacity: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       transition: opacity 0.15s, background 0.15s, color 0.15s;
     }
     .feed-card:hover .fc-dismiss, .feed-card:focus-within .fc-dismiss { opacity: 1; }
@@ -254,16 +287,31 @@
       font-style: italic; margin: 0; flex: 1;
     }
     .feed-card.is-embed .fc-why { padding: 0 14px 12px; }
-    .feed-card.is-embed .fc-dismiss { opacity: 0.55; }
 
     /* ── Single-active embed player: fullscreen control + click-to-play poster ── */
+    /* The embed controls (⛶ fullscreen + ✕ dismiss) live INLINE in the title bar,
+       grouped and spaced away from the source label. The base .fc-dismiss is
+       position:absolute (pinned to the card corner), which made the ✕ overlap the
+       ⛶ button — reset it to static here so the group lays out in flow. */
+    .fc-embed-bar .fc-embed-ctl {
+      display: flex; align-items: center; gap: 4px; margin-left: 12px;
+    }
+    .feed-card.is-embed .fc-dismiss {
+      position: static; opacity: 0.75;
+      width: 30px; height: 30px; font-size: 15px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .feed-card.is-embed .fc-dismiss:hover { opacity: 1; }
     .fc-embed-bar .fc-fullscreen {
       border: none; background: transparent; color: var(--muted);
-      font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 5px;
-      border-radius: 6px; transition: background 0.15s, color 0.15s;
+      font-size: 16px; line-height: 1; cursor: pointer;
+      width: 30px; height: 30px; border-radius: 6px;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
     }
     .fc-embed-bar .fc-fullscreen:hover { background: var(--surface2); color: var(--text); }
     .fc-embed-bar .fc-fullscreen:focus-visible { outline: 2px solid var(--accent); }
+    .fc-embed-bar .fc-fullscreen[aria-pressed="true"] { color: var(--accent); background: var(--surface2); }
     .feed-card.is-embed .fc-poster {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 12px; width: 100%; border: 0; cursor: pointer; font: inherit; color: #fff;
@@ -284,6 +332,9 @@
     .feed-card.is-embed .fc-poster .fc-playlabel {
       font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
       opacity: 0.92;
+    }
+    .feed-card.is-embed .fc-poster:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: -4px;
     }
     .feed-card.is-embed.is-playing .fc-embed-bar {
       background: linear-gradient(180deg,
@@ -731,7 +782,8 @@
 
     /* ── Accessibility: High Contrast ── */
     @media (prefers-contrast: more) {
-      .panel {
+      .panel,
+      .feed-card {
         border-width: 2px;
       }
       .panel:focus-visible {
@@ -740,7 +792,12 @@
       .discover-card:focus-visible,
       .video-thumb:focus-visible,
       .tier-card:focus-visible,
-      .gh-item:focus-visible {
+      .gh-item:focus-visible,
+      .feed-chip:focus-visible,
+      .feed-card:focus-within,
+      .fc-embed-bar .fc-fullscreen:focus-visible,
+      .feed-card .fc-dismiss:focus-visible,
+      .feed-card.is-embed .fc-poster:focus-visible {
         outline-width: 3px;
       }
     }
@@ -750,15 +807,18 @@
       .panel,
       .discover-card,
       .video-thumb,
-      .tier-card {
+      .tier-card,
+      .feed-card {
         border: 2px solid CanvasText;
       }
       .panel::before,
       .discover-card::before,
       .video-thumb::before,
-      .tier-card::before {
+      .tier-card::before,
+      .feed-card::before {
         background: CanvasText;
       }
+      .feed-card .fc-thumb-ph { border: 1px solid CanvasText; }
     }
   </style>
 </head>
@@ -779,18 +839,22 @@
 
   <main id="main-content">
 
-    <!-- ── Single ranked content pane (#1217) — /api/explore/feed ── -->
-    <div class="feed-chips" id="feedChips" role="tablist" aria-label="Filter feed by type">
-      <button type="button" class="feed-chip active" data-type="all" role="tab" aria-selected="true">All</button>
-      <button type="button" class="feed-chip" data-type="embed" role="tab" aria-selected="false">🕹️ Play</button>
-      <button type="button" class="feed-chip" data-type="read" role="tab" aria-selected="false">📰 Read</button>
-      <button type="button" class="feed-chip" data-type="watch" role="tab" aria-selected="false">🎬 Watch</button>
-      <button type="button" class="feed-chip" data-type="build" role="tab" aria-selected="false">🛠️ Build</button>
-      <button type="button" class="feed-chip" data-type="doc" role="tab" aria-selected="false">📚 Docs</button>
-      <button type="button" class="feed-chip" data-type="belief" role="tab" aria-selected="false">🌍 Beliefs</button>
+    <!-- ── Single ranked content pane (#1217) — /api/explore/feed ──
+         Filters are toggle buttons (aria-pressed), NOT an ARIA tablist: there are
+         no separate tabpanels and the feed stays in place, so the tab pattern would
+         have promised keyboard semantics (arrow-key roving, tabpanel) we don't
+         implement. A labelled button group is the honest, accessible model. -->
+    <div class="feed-chips" id="feedChips" role="group" aria-label="Filter feed by type">
+      <button type="button" class="feed-chip active" data-type="all" aria-pressed="true">All</button>
+      <button type="button" class="feed-chip" data-type="embed" aria-pressed="false"><span aria-hidden="true">🕹️</span> Play</button>
+      <button type="button" class="feed-chip" data-type="read" aria-pressed="false"><span aria-hidden="true">📰</span> Read</button>
+      <button type="button" class="feed-chip" data-type="watch" aria-pressed="false"><span aria-hidden="true">🎬</span> Watch</button>
+      <button type="button" class="feed-chip" data-type="build" aria-pressed="false"><span aria-hidden="true">🛠️</span> Build</button>
+      <button type="button" class="feed-chip" data-type="doc" aria-pressed="false"><span aria-hidden="true">📚</span> Docs</button>
+      <button type="button" class="feed-chip" data-type="belief" aria-pressed="false"><span aria-hidden="true">🌍</span> Beliefs</button>
     </div>
-    <div class="feed-status" id="feedStatus" aria-live="polite">Loading your feed…</div>
-    <div class="feed-stream" id="feedStream" aria-label="Ranked content feed"></div>
+    <div class="feed-status" id="feedStatus" role="status" aria-live="polite">Loading your feed…</div>
+    <div class="feed-stream" id="feedStream" role="feed" aria-busy="true" aria-label="Ranked content feed"></div>
 
     <!-- ── Single slim quick-links row — the feed is the page; everything else
          is a text link, not an engagement-less panel (#1217 single-pane). ── -->
@@ -956,10 +1020,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (req) { try { req.call(node); } catch (_) {} }
   }
 
-  function cardEl(c) {
+  // Keep the ⛶ button's aria-pressed in sync with real fullscreen state — including
+  // when the user exits via Esc / the browser chrome (not just our button).
+  document.addEventListener('fullscreenchange', () => {
+    stream.querySelectorAll('.fc-fullscreen[aria-pressed="true"]')
+      .forEach(b => b.setAttribute('aria-pressed', 'false'));
+    const fsEl = document.fullscreenElement;
+    const card = fsEl && fsEl.closest ? fsEl.closest('.feed-card.is-embed') : null;
+    const btn = card && card.querySelector('.fc-fullscreen');
+    if (btn) btn.setAttribute('aria-pressed', 'true');
+  });
+
+  // Generated lead thumbnail for cards with no (or a broken) source image. The
+  // type glyph is decorative (aria-hidden) — the card already exposes its type via
+  // the fc-type eyebrow and its title via the article label.
+  function placeholderThumb(type) {
+    const ph = document.createElement('div');
+    ph.className = 'fc-thumb-ph';
+    ph.setAttribute('aria-hidden', 'true');
+    ph.innerHTML = '<span class="fc-ph-icon">' + (ICON[type] || '◈') + '</span>';
+    return ph;
+  }
+
+  function cardEl(c, posinset) {
     const el = document.createElement('div');
     el.dataset.type = c.type;
     el.dataset.key = c.key || '';
+    // ARIA feed pattern: each card is an article with an accessible name (the
+    // title) and a position. The feed is endless, so set size is unknown (-1).
+    el.setAttribute('role', 'article');
+    if (c.title) el.setAttribute('aria-label', String(c.title));
+    if (posinset) { el.setAttribute('aria-posinset', String(posinset)); el.setAttribute('aria-setsize', '-1'); }
     const why = c.evidence && c.evidence.why ? c.evidence.why : '';
     const embedSrc = (c.embed && c.embed.src) ? safeEmbedSrc(c.embed.src) : '';
 
@@ -983,10 +1074,12 @@ document.addEventListener('DOMContentLoaded', () => {
       el.innerHTML =
         '<div class="fc-embed-bar">' +
           '<span class="fc-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
-          '<span class="fc-embed-title">' + (ICON[c.type] || '🕹️') + ' ' + esc(c.title) + '</span>' +
+          '<span class="fc-embed-title"><span aria-hidden="true">' + (ICON[c.type] || '🕹️') + '</span> ' + esc(c.title) + '</span>' +
           '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
-          '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" title="Fullscreen">⛶</button>' +
-          '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
+          '<span class="fc-embed-ctl">' +
+            '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" aria-pressed="false" title="Fullscreen">⛶</button>' +
+            '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
+          '</span>' +
         '</div>' +
         '<div class="fc-frame">' + el._posterHTML + '</div>' +
         (c.lore ? '<div class="fc-foot"><p class="fc-lore">' + esc(c.lore) + '</p></div>' : '') +
@@ -1012,19 +1105,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const img = safeImg(c.image || '');
       const summary = c.summary ? esc(c.summary) : '';
       el.innerHTML =
-        (img ? '<img class="fc-thumb" src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '') +
-        '<div class="fc-top"><span class="fc-type">' + (ICON[c.type] || '•') + ' ' + esc(c.type) + '</span>' +
+        '<div class="fc-top"><span class="fc-type"><span aria-hidden="true">' + (ICON[c.type] || '•') + '</span> ' + esc(c.type) + '</span>' +
           (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
         '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
           esc(c.title) + '</a>' +
         (summary ? '<p class="fc-summary">' + summary + '</p>' : '') +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
         '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
+      // Lead thumbnail: the source image when we have one, otherwise a generated
+      // type-tinted placeholder — so every card carries a lead visual (docs and
+      // image-less reads no longer render as bare "?" tiles). Prepended as a node
+      // so a broken hotlink can swap to the SAME placeholder on error rather than
+      // leaving a broken-image glyph or an empty gap.
+      if (img) {
+        const thumb = document.createElement('img');
+        thumb.className = 'fc-thumb';
+        thumb.src = img; thumb.alt = '';
+        thumb.loading = 'lazy'; thumb.referrerPolicy = 'no-referrer';
+        thumb.addEventListener('error', () => thumb.replaceWith(placeholderThumb(c.type)));
+        el.insertBefore(thumb, el.firstChild);
+      } else {
+        el.insertBefore(placeholderThumb(c.type), el.firstChild);
+      }
       el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
-      // A thumbnail that 404s (or a hotlink the source blocks) should vanish
-      // cleanly, never leave a broken-image glyph.
-      const thumb = el.querySelector('.fc-thumb');
-      if (thumb) thumb.addEventListener('error', () => thumb.remove());
     }
 
     el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
@@ -1056,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function appendCards(cards) {
     const frag = document.createDocumentFragment();
-    cards.forEach(c => { seen.add(c.id || c.key); frag.appendChild(cardEl(c)); });
+    cards.forEach((c, i) => { seen.add(c.id || c.key); frag.appendChild(cardEl(c, totalShown + i + 1)); });
     stream.appendChild(frag);
     totalShown += cards.length;
   }
@@ -1066,6 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loading = true;
     const epoch = filterEpoch;
     sentinel.classList.add('is-loading');
+    stream.setAttribute('aria-busy', 'true');
     if (statusEl && !totalShown) statusEl.textContent = 'Loading your feed…';
     try {
       const r = await fetch('/api/explore/feed/page', {
@@ -1096,6 +1200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       if (epoch === filterEpoch) loading = false;
       sentinel.classList.remove('is-loading');
+      stream.setAttribute('aria-busy', 'false');
     }
   }
 
@@ -1124,7 +1229,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chips.querySelectorAll('.feed-chip').forEach(b => {
         const on = b === btn;
         b.classList.toggle('active', on);
-        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
       reset();
     });
