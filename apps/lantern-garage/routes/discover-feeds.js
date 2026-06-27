@@ -74,7 +74,56 @@ function tag(block, name) {
   return m ? m[1] : "";
 }
 
-// Parse both RSS (<item>) and Atom (<entry>); return [{title,link,date}].
+// Flatten feed HTML (often entity-encoded, e.g. "&lt;p&gt;…") into clean text.
+// decodeEntities() strips real tags BEFORE decoding entities, so encoded markup
+// survives it — here we decode angle-brackets FIRST, then strip, so excerpts are
+// prose, not "<blockquote cite=…>".
+function htmlToText(s) {
+  return (s || "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/<(?:script|style)[\s\S]*?<\/(?:script|style)>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;|&rsquo;|&lsquo;/g, "'")
+    .replace(/&ldquo;|&rdquo;/g, '"')
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Trim a plain-text excerpt to a clean length (word-boundary, ellipsis).
+function clip(s, n) {
+  s = (s || "").trim();
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > n * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "…";
+}
+
+// Best-effort lead image: media:thumbnail/content, an image enclosure, or the
+// first <img> inside the content. Returns "" when the feed carries no image —
+// the card simply renders text-only, never a broken thumbnail.
+function firstImage(block) {
+  let m =
+    block.match(/<media:(?:thumbnail|content)[^>]*\burl="([^"]+)"/i) ||
+    block.match(/<enclosure[^>]*\burl="([^"]+)"[^>]*\btype="image\//i) ||
+    block.match(/<enclosure[^>]*\btype="image\/[^"]*"[^>]*\burl="([^"]+)"/i) ||
+    block.match(/<img[^>]*\bsrc="([^"]+)"/i);
+  const u = m ? m[1] : "";
+  return /^https?:\/\//i.test(u) ? u : "";
+}
+
+// Parse both RSS (<item>) and Atom (<entry>); return
+// [{title,link,date,summary,image}]. summary+image enrich the feed card so it
+// reads as a real preview, not just a headline.
 function parseFeed(xml) {
   const out = [];
   const isAtom = /<entry[\s>]/i.test(xml) && !/<item[\s>]/i.test(xml);
@@ -89,7 +138,16 @@ function parseFeed(xml) {
       link = decodeEntities(tag(b, "link"));
     }
     const date = decodeEntities(tag(b, isAtom ? "updated" : "pubDate")) || decodeEntities(tag(b, "published"));
-    if (title && link) out.push({ title, link, date: date || null });
+    const rawSummary = isAtom
+      ? tag(b, "summary") || tag(b, "content")
+      : tag(b, "description") || tag(b, "content:encoded");
+    let summaryText = htmlToText(rawSummary);
+    // HN's RSS "description" is link metadata ("Article URL: … Comments URL: …"),
+    // not prose — drop it rather than show a noisy excerpt.
+    if (/Comments URL:|Article URL:/i.test(summaryText)) summaryText = "";
+    const summary = clip(summaryText, 200);
+    const image = firstImage(b);
+    if (title && link) out.push({ title, link, date: date || null, summary, image });
   }
   return out;
 }
@@ -145,3 +203,8 @@ module.exports = async function discoverFeedsRoute(req, res, url, deps) {
 };
 
 module.exports.load = load;
+// Exported for unit tests (pure, network-free): feed parsing + excerpt/image extraction.
+module.exports.parseFeed = parseFeed;
+module.exports.htmlToText = htmlToText;
+module.exports.clip = clip;
+module.exports.firstImage = firstImage;

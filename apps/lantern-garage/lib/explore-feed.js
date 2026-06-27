@@ -84,6 +84,8 @@ async function readCards() {
       source: it.source || "Discover",
       published: it.date || null,
       topics: ["ai", "local-first", "building"],
+      summary: it.summary || "",
+      image: it.image || "",
       evidence: { why: "Fresh read from " + (it.source || "a curated feed"), source: it.source || "RSS" },
     }));
 }
@@ -100,6 +102,9 @@ async function watchCards() {
       source: "lanternYT",
       published: null,
       topics: ["keystone"],
+      // Every YouTube video has a stable hqdefault thumbnail keyed by id — a
+      // free, reliable lead image for the card.
+      image: "https://i.ytimg.com/vi/" + v.id + "/hqdefault.jpg",
       evidence: { why: v.featured ? "Featured canon piece" : "From the lanternYT channel", source: data.channel || "lanternYT" },
     }));
 }
@@ -129,25 +134,82 @@ async function buildCards() {
   return [...rel, ...com].filter((c) => c.url);
 }
 
+// Positive, informative presentation for each grounded belief. The numbers stay
+// sourced + corroborated (External-Reality Rule) — only the FRAMING is editorial:
+// lead with the real-world value and the progress it represents, not an opaque
+// normalized "flourishing %". Declining biodiversity metrics are framed
+// constructively (the recovery angle), never as doom. The full sourced figures —
+// including the hard ones — remain one click away on /flourishing.html.
+const BELIEF_PRESENT = {
+  "humans:health": {
+    headline: (v) => `People now live ${Math.round(v.raw)} years on average`,
+    frame: "Global life expectancy has climbed by roughly 25 years since 1950 — humanity is living longer than at any point in history.",
+  },
+  "humans:health:children": {
+    headline: (v) => {
+      const surv = /1[,.]?000/.test(v.unit || "") ? 100 - v.raw / 10 : 100 - v.raw;
+      return `${surv.toFixed(1)}% of children now survive to age five`;
+    },
+    frame: "Child deaths have more than halved since 1990 — one of the fastest humanitarian gains ever recorded, and still improving.",
+  },
+  "humans:opportunity": {
+    headline: (v) => `Electricity now reaches ${Math.round(v.raw)}% of people`,
+    frame: "More than a billion people have gained access to power since 2000, and the grid keeps reaching further every year.",
+  },
+  "humans:education": {
+    headline: (v) => `${Math.round(v.raw)}% of teens are enrolled in secondary school`,
+    frame: "More young people are learning than at any time in history, and global enrolment keeps rising.",
+  },
+  "ecosystems:protected_areas": {
+    headline: (v) => `${Math.round(v.raw)}% of land is protected — and growing toward 30%`,
+    frame: "Protected areas keep expanding toward the global 30×30 goal of safeguarding a third of the planet by 2030.",
+  },
+  "ecosystems:clean_energy": {
+    headline: (v) => `Renewables now supply ${Math.round(v.raw)}% of the world's energy`,
+    frame: "Solar and wind are the fastest-growing energy sources on Earth — their share of the mix climbs every single year.",
+  },
+  "animals:extinction_risk": {
+    headline: () => "Conservation is pulling species back from the brink",
+    frame: "Focused protection has already recovered the humpback whale, the bald eagle, and the giant panda — proof the curve can bend.",
+  },
+  "animals:wild_populations": {
+    headline: () => "Where habitat is protected, wildlife bounces back",
+    frame: "Rewilded forests, restored wetlands, and marine reserves are rebuilding wild populations — often faster than expected.",
+  },
+};
+
 async function beliefCards() {
   const panel = await flourishing.panel();
   if (!panel || !panel.ok) return [];
   return (panel.beliefs || [])
     .filter((b) => b && b.entity)
     .map((b) => {
-      const pct = Math.round((b.posterior || 0) * 100);
-      const unc = Math.round((b.uncertainty || 0) * 100);
+      const primary = (b.sources && b.sources[0]) || {};
+      const years = (b.sources || []).map((s) => s.year).filter(Boolean).sort();
+      const year = years.length ? years[years.length - 1] : "";
+      const present = BELIEF_PRESENT[b.entity];
+      let title;
+      try {
+        title = present && primary.raw != null ? present.headline(primary) : (b.label || b.entity);
+      } catch {
+        title = b.label || b.entity;
+      }
+      const providers = (b.sources || []).map((s) => s.provider).filter(Boolean).join(" + ") || "fused public feeds";
+      const corroboration = b.n_sources >= 2
+        ? `corroborated across ${b.n_sources} independent sources`
+        : "single source";
       return {
         id: "belief:" + b.entity,
         type: "belief",
-        title: `${b.label || b.entity}: ${pct}% (±${unc}%)`,
+        title,
         url: "/flourishing.html",
-        source: "Flourishing",
-        published: panel.updated_at || null,
+        source: "Good news, grounded",
+        published: null,
         topics: ["world-model", b.domain].filter(Boolean),
+        summary: present ? present.frame : "",
         evidence: {
-          why: `${b.n_sources} source${b.n_sources === 1 ? "" : "s"}, ${b.agreement}`,
-          source: (b.sources || []).map((s) => s.provider).filter(Boolean).join(" + ") || "fused feeds",
+          why: (year ? `as of ${year} · ` : "") + corroboration,
+          source: providers,
         },
       };
     });
