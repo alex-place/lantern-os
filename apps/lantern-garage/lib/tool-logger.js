@@ -22,8 +22,17 @@ const fs = require("fs");
 const path = require("path");
 const { appendFile } = require("fs").promises;
 
-const REPO = path.resolve(__dirname, "..", "..");
+// Repo root is THREE levels up from apps/lantern-garage/lib/. An earlier
+// off-by-one used two "..", resolving to apps/ and scattering logs into a stray
+// apps/data/tool-logs tree (see PR #1296). Writes target the canonical root.
+const REPO = path.resolve(__dirname, "..", "..", "..");
 const LOGS_DIR = path.join(REPO, "data", "tool-logs");
+
+// Transitional read-only fallback: deployments that ran the off-by-one version
+// have history under the old apps/data/tool-logs path. Reads fall back to it so
+// the tool-history UI doesn't go blank after this fix; writes always target the
+// canonical LOGS_DIR above. Safe to drop once no deployment holds legacy logs.
+const LEGACY_LOGS_DIR = path.resolve(__dirname, "..", "..", "data", "tool-logs");
 
 // Ensure logs directory exists
 function _ensureLogsDir() {
@@ -32,13 +41,31 @@ function _ensureLogsDir() {
   }
 }
 
+/** Today's date as YYYY-MM-DD (UTC). */
+function _today() {
+  return new Date().toISOString().split("T")[0];
+}
+
 /**
- * Get today's log file path (YYYY-MM-DD.jsonl)
+ * Get today's log file path for WRITING (always the canonical LOGS_DIR).
  */
 function _getTodayLogPath() {
-  const now = new Date();
-  const date = now.toISOString().split("T")[0]; // YYYY-MM-DD
-  return path.join(LOGS_DIR, `${date}.jsonl`);
+  return path.join(LOGS_DIR, `${_today()}.jsonl`);
+}
+
+/**
+ * Resolve the file path for READING a given date's log. Prefers the canonical
+ * LOGS_DIR; falls back to the legacy apps/data location only if that's where the
+ * day's log actually lives (transitional). Returns the canonical path when
+ * neither exists so callers can treat it as "no entries".
+ */
+function _resolveReadPath(date) {
+  const fileName = `${date || _today()}.jsonl`;
+  const primary = path.join(LOGS_DIR, fileName);
+  if (fs.existsSync(primary)) return primary;
+  const legacy = path.join(LEGACY_LOGS_DIR, fileName);
+  if (fs.existsSync(legacy)) return legacy;
+  return primary;
 }
 
 /**
@@ -119,13 +146,8 @@ async function query(options = {}) {
 
   const { tool, status, limit = 1000, date } = options;
 
-  // Determine which log file(s) to read
-  let logPath;
-  if (date) {
-    logPath = path.join(LOGS_DIR, `${date}.jsonl`);
-  } else {
-    logPath = _getTodayLogPath();
-  }
+  // Determine which log file to read (canonical path, with legacy fallback)
+  const logPath = _resolveReadPath(date);
 
   if (!fs.existsSync(logPath)) {
     return [];

@@ -53,8 +53,16 @@ src/csf_rust/target/
 
 # ─── Runtime state ────────────────────────────────────────────────────────────
 data/pcsf/*.json
-apps/data/conversations/garage-conversations.jsonl
 data/metrics/three-doors-events.jsonl
+
+# Tool-execution logs (observability output of lib/tool-logger.js). Runtime-only.
+data/tool-logs/
+
+# Stray apps/data/ runtime tree. A tool-logger.js off-by-one (REPO resolved to
+# apps/ instead of the repo root) scattered runtime data here, and the
+# WIP-committing automation kept re-committing it. Canonical runtime data lives
+# in the repo-root data/. Ignore the whole stray tree so it can never re-commit.
+apps/data/
 
 # Research Convergence Loop runtime output (memories, records, reports, queue)
 data/research/*.jsonl

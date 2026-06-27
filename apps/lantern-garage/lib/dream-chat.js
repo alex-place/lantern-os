@@ -67,7 +67,10 @@ function generateWebSuggestions(userMessage) {
 // ------------------------------------------------------------------
 function _loadPersonasFromFile() {
   try {
-    const personasPath = path.resolve(__dirname, "../../data/contexts/personas.json");
+    // Repo root is three levels up from apps/lantern-garage/lib/. Two "../" lands
+    // in apps/, reading a stale stray copy (apps/data/contexts/personas.json);
+    // the canonical personas file is the repo-root data/contexts/personas.json.
+    const personasPath = path.resolve(__dirname, "../../../data/contexts/personas.json");
     const fileContent = fs.readFileSync(personasPath, "utf8");
     const data = JSON.parse(fileContent);
     return (data.personas || []).map((p) => ({
