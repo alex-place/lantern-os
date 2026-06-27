@@ -139,6 +139,72 @@
     .feed-card .fc-dismiss:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
     .feed-status { max-width: 920px; margin: 0 auto; color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
 
+    /* ── Embed cards (#1217) — open-archive games + listening, rendered inline.
+       Full-width "panels" with a small retro window chrome (a nod to the CSF/XP
+       door) so an emulated DOS game or a public-domain record reads as a thing
+       you operate, not a link you leave for. ── */
+    .feed-card.is-embed {
+      grid-column: 1 / -1;
+      padding: 0;
+      overflow: hidden;
+      border-width: 2px;
+    }
+    .feed-card.is-embed:hover, .feed-card.is-embed:focus-within { transform: none; }
+    .fc-embed-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      background: linear-gradient(180deg,
+        color-mix(in srgb, var(--accent) 22%, var(--surface)) 0%,
+        var(--surface) 100%);
+      border-bottom: 1.5px solid var(--border);
+    }
+    .fc-embed-bar .fc-dots { display: flex; gap: 5px; }
+    .fc-embed-bar .fc-dots i {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--border); display: inline-block;
+    }
+    .fc-embed-bar .fc-dots i:nth-child(1) { background: #ff5f57; }
+    .fc-embed-bar .fc-dots i:nth-child(2) { background: #febc2e; }
+    .fc-embed-bar .fc-dots i:nth-child(3) { background: #28c840; }
+    .fc-embed-bar .fc-embed-title {
+      font-size: 0.85rem; font-weight: 700; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fc-embed-bar .fc-embed-src {
+      margin-left: auto; font-size: 0.62rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent);
+      white-space: nowrap;
+    }
+    .feed-card.is-embed .fc-frame { background: #000; line-height: 0; }
+    .feed-card.is-embed iframe { width: 100%; border: 0; display: block; }
+    .feed-card.is-embed .fc-foot {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 11px 14px 13px;
+    }
+    .feed-card.is-embed .fc-lore {
+      font-size: 0.82rem; line-height: 1.5; color: var(--muted);
+      font-style: italic; margin: 0; flex: 1;
+    }
+    .feed-card.is-embed .fc-why { padding: 0 14px 12px; }
+    .feed-card.is-embed .fc-dismiss { opacity: 0.55; }
+
+    /* ── Slim quick-links row — replaces the old static panel grid. ── */
+    .quick-links {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 6px 18px;
+      max-width: 920px; margin: 40px auto 0;
+      padding: 18px 16px 4px;
+      border-top: 1px solid var(--border);
+    }
+    .quick-links a {
+      font-size: 0.8rem; font-weight: 600; color: var(--muted);
+      text-decoration: none; transition: color 0.15s;
+    }
+    .quick-links a:hover { color: var(--accent); }
+    .quick-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
     .all-tools {
       max-width: 920px;
       margin: 48px auto 0;
@@ -616,6 +682,7 @@
     <!-- ── Single ranked content pane (#1217) — /api/explore/feed ── -->
     <div class="feed-chips" id="feedChips" role="tablist" aria-label="Filter feed by type">
       <button type="button" class="feed-chip active" data-type="all" role="tab" aria-selected="true">All</button>
+      <button type="button" class="feed-chip" data-type="embed" role="tab" aria-selected="false">🕹️ Play</button>
       <button type="button" class="feed-chip" data-type="read" role="tab" aria-selected="false">📰 Read</button>
       <button type="button" class="feed-chip" data-type="watch" role="tab" aria-selected="false">🎬 Watch</button>
       <button type="button" class="feed-chip" data-type="build" role="tab" aria-selected="false">🛠️ Build</button>
@@ -625,138 +692,18 @@
     <div class="feed-status" id="feedStatus" aria-live="polite">Loading your feed…</div>
     <div class="feed-stream" id="feedStream" aria-label="Ranked content feed"></div>
 
-    <!-- ── All tools & sections (demoted — nothing lost) ── -->
-    <details class="all-tools">
-      <summary>All tools &amp; sections</summary>
-
-    <!-- ── Work & Operations ── -->
-    <section class="explore-section" aria-labelledby="section-work">
-      <h2 id="section-work" class="explore-section-title">⚙️ Work & Operations</h2>
-      <div class="explore-panels">
-        <a class="panel" href="/operations.html" role="article" aria-label="Agent Operations: Monitor active agents and manage convergence-loop tasks">
-          <span class="panel-icon" aria-hidden="true">🤖</span>
-          <span class="panel-label">Operations</span>
-          <h3>Agent Operations</h3>
-          <p>Monitor active agents, view the dispatch queue, and manage convergence-loop tasks. Real-time status on memory processing and reasoning chains.</p>
-          <span class="panel-arrow" aria-hidden="true">View Operations →</span>
-        </a>
-
-        <a class="panel" href="/orchestration.html" role="article" aria-label="Work Dashboard: Track autonomous tasks and convergence records">
-          <span class="panel-icon" aria-hidden="true">📋</span>
-          <span class="panel-label">Tasks</span>
-          <h3>Work Dashboard</h3>
-          <p>Track autonomous tasks, streaming work sessions, and convergence records. See what's queued, in progress, and verified complete.</p>
-          <span class="panel-arrow" aria-hidden="true">Open Dashboard →</span>
-        </a>
-      </div>
-    </section>
-
-    <!-- ── Knowledge & Reference ── -->
-    <section class="explore-section" aria-labelledby="section-knowledge">
-      <h2 id="section-knowledge" class="explore-section-title">📚 Knowledge & Reference</h2>
-      <div class="explore-panels">
-        <a class="panel" href="/knowledgecenter.html#library" role="article" aria-label="Reference Library: Browse cross-industry knowledge base and master documents">
-          <span class="panel-icon" aria-hidden="true">📚</span>
-          <span class="panel-label">Library</span>
-          <h3>Reference Library</h3>
-          <p>Browse and read reference PDFs in-page — a cross-industry grounding knowledge base (aviation, maritime, medicine, energy, and more) plus the Comet-Leap master documents. Thumbnails, search, and an in-page viewer.</p>
-          <span class="panel-arrow" aria-hidden="true">Open Library →</span>
-        </a>
-
-        <a class="panel" href="/knowledgecenter.html" role="article" aria-label="Knowledge Center: Guides and reference for Keystone OS">
-          <span class="panel-icon" aria-hidden="true">📖</span>
-          <span class="panel-label">Docs</span>
-          <h3>Knowledge Center</h3>
-          <p>Guides, live tools, research, and reference for Keystone OS — getting started, theory, data &amp; memory, and project docs all in one place.</p>
-          <span class="panel-arrow" aria-hidden="true">Open Knowledge Center →</span>
-        </a>
-      </div>
-    </section>
-
-    <!-- ── Support (Patreon tiers — grounded in lib/patreon-auth.js tier map) ── -->
-    <div class="explore-section">
-      <p class="explore-section-title">♥ Support — <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon ↗</a></p>
-      <div class="explore-info-box" style="max-width:920px">
-        <h2 style="margin-top:0">Keep Keystone local, private &amp; free</h2>
-        <p>Keystone OS is built in the open by one person. Patreon support funds development — and unlocks a member role on the platform.</p>
-        <div class="support-tiers">
-          <a class="tier-card" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">
-            <span class="tier-name">Wanderer</span>
-            <span class="tier-price">$5<span>/mo</span></span>
-            <span class="tier-perk">Unlocks the Supporter role</span>
-          </a>
-          <a class="tier-card" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">
-            <span class="tier-name">Deep Dreamer</span>
-            <span class="tier-price">$20<span>/mo</span></span>
-            <span class="tier-perk">Unlocks the Deep Dreamer role</span>
-          </a>
-          <a class="tier-card" href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">
-            <span class="tier-name">Synthesasia Guild</span>
-            <span class="tier-price">$200<span>/mo</span></span>
-            <span class="tier-perk">Unlocks the Guild (admin) role</span>
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Community & Support ── -->
-    <section class="explore-section" aria-labelledby="section-community">
-      <h2 id="section-community" class="explore-section-title">🌍 Community & Support</h2>
-      <div class="explore-panels">
-        <a class="panel" href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer" role="article" aria-label="GitHub Repository: Star the project and contribute (opens in new window)">
-          <span class="panel-icon" aria-hidden="true">⭐</span>
-          <span class="panel-label">Open Source</span>
-          <h3>GitHub Repository</h3>
-          <p>Star the project, report issues, or contribute improvements. Keystone OS is built in the open — join the community of dreamers and builders.</p>
-          <span class="panel-arrow" aria-hidden="true">Visit GitHub ↗</span>
-        </a>
-
-        <a class="panel" href="/knowledgecenter.html" role="article" aria-label="Help & Documentation: Guides and FAQ for Keystone OS">
-          <span class="panel-icon" aria-hidden="true">❓</span>
-          <span class="panel-label">Help</span>
-          <h3>Help & Documentation</h3>
-          <p>Learn how to use every feature of Keystone OS. Guides, FAQ, troubleshooting, and best practices for journaling and trading.</p>
-          <span class="panel-arrow" aria-hidden="true">Get Help →</span>
-        </a>
-      </div>
-    </section>
-
-    <!-- ── Settings & Configuration ── -->
-    <section class="explore-section" aria-labelledby="section-settings">
-      <h2 id="section-settings" class="explore-section-title">⚡ Settings & Configuration</h2>
-      <div class="explore-panels">
-        <a class="panel" href="/api-keys-settings.html" role="article" aria-label="API Keys & Providers: Configure AI providers and manage API keys">
-          <span class="panel-icon" aria-hidden="true">🔑</span>
-          <span class="panel-label">Settings</span>
-          <h3>API Keys & Providers</h3>
-          <p>Configure AI providers (Claude, OpenAI, Gemini) and manage your API keys. All optional — Keystone OS runs locally with or without keys.</p>
-          <span class="panel-arrow" aria-hidden="true">Manage Keys →</span>
-        </a>
-
-        <a class="panel" href="/dashboard.html" role="article" aria-label="System Dashboard: View real-time system health and status">
-          <span class="panel-icon" aria-hidden="true">📊</span>
-          <span class="panel-label">Status</span>
-          <h3>System Dashboard</h3>
-          <p>View real-time system health: kernel readiness, memory queries, convergence-record status, and validation results.</p>
-          <span class="panel-arrow" aria-hidden="true">Open Dashboard →</span>
-        </a>
-      </div>
-    </section>
-
-    <!-- ── Informational Section ── -->
-    <div class="explore-section">
-      <div class="explore-info-box">
-        <h2>About This Navigation</h2>
-        <p>
-          Keystone OS is organized around three core experiences: <strong>Dream Chat</strong> for journaling and reflection, <strong>Keystone Trader</strong> for market intelligence and trading, and <strong>Content Creator</strong> for sharing your work.
-        </p>
-        <p>
-          This page provides access to advanced features, community resources, and system tools. Everything runs locally on your device — no cloud sync, no account required, complete privacy.
-        </p>
-      </div>
-    </div>
-
-    </details>
+    <!-- ── Single slim quick-links row — the feed is the page; everything else
+         is a text link, not an engagement-less panel (#1217 single-pane). ── -->
+    <nav class="quick-links" aria-label="Jump to Keystone tools">
+      <a href="/operations.html">Operations</a>
+      <a href="/orchestration.html">Work board</a>
+      <a href="/knowledgecenter.html#library">Library</a>
+      <a href="/knowledgecenter.html">Knowledge Center</a>
+      <a href="/api-keys-settings.html">Settings</a>
+      <a href="/dashboard.html">Status</a>
+      <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+      <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">♥ Patreon ↗</a>
+    </nav>
 
   </main>
 
@@ -814,12 +761,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ICON = { read: '📰', watch: '🎬', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
+  const ICON = { embed: '🕹️', read: '📰', watch: '🎬', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
 
   // Only http(s) and root-relative URLs are linkable. A card url is sourced from
   // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
   // href (esc() escapes quotes but not the scheme). Anything else renders inert.
   const safeUrl = u => (/^https?:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '#';
+
+  // An embed src may only be a root-relative path (our own /t-rex/) or an https
+  // archive.org/youtube embed URL. Anything else is dropped — never framed.
+  const EMBED_HOSTS = /^https:\/\/(archive\.org|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
+  const safeEmbedSrc = u => (/^\/[^/]/.test(u) || EMBED_HOSTS.test(u)) ? u : '';
 
   function shortDate(d) {
     if (!d) return '';
@@ -844,25 +796,81 @@ document.addEventListener('DOMContentLoaded', () => {
   let allCards = [];
   let filter = 'all';
 
+  // Dwell = the engagement signal for embeds (they have no click-through). When a
+  // panel sits ≥50% on-screen for 4s, that's a real "watched it" outcome → record
+  // a success once. Scroll past and it never scores → it sinks (engagement or
+  // discarded). One-shot per key per page load.
+  const dwellDone = new Set();
+  const dwellObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const el = entry.target;
+      const key = el.dataset.key;
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+        if (el._dwellTimer || !key || dwellDone.has(key)) return;
+        el._dwellTimer = setTimeout(() => {
+          el._dwellTimer = null;
+          if (dwellDone.has(key)) return;
+          dwellDone.add(key);
+          record(key, 'dwell', 4000);
+          dwellObserver.unobserve(el);
+        }, 4000);
+      } else if (el._dwellTimer) {
+        clearTimeout(el._dwellTimer); el._dwellTimer = null;
+      }
+    });
+  }, { threshold: [0, 0.5, 1] }) : null;
+
   function cardEl(c) {
-    const href = safeUrl(c.url);
-    const ext = /^https?:/i.test(href);
     const el = document.createElement('div');
-    el.className = 'feed-card';
     el.dataset.type = c.type;
-    const date = shortDate(c.published);
+    el.dataset.key = c.key || '';
     const why = c.evidence && c.evidence.why ? c.evidence.why : '';
-    el.innerHTML =
-      '<div class="fc-top"><span class="fc-type">' + (ICON[c.type] || '•') + ' ' + esc(c.type) + '</span>' +
-        (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
-      '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
-        esc(c.title) + '</a>' +
-      '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
-      '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
-    el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
+    const embedSrc = (c.embed && c.embed.src) ? safeEmbedSrc(c.embed.src) : '';
+
+    if (embedSrc) {
+      // Open-archive game / listening panel — framed inline with a small window
+      // chrome. The iframe is sandboxed; archive.org runs on its own origin.
+      el.className = 'feed-card is-embed';
+      const h = Math.max(120, Math.min(720, (+c.embed.height) || 360));
+      const openHref = safeUrl(c.url);
+      el.innerHTML =
+        '<div class="fc-embed-bar">' +
+          '<span class="fc-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
+          '<span class="fc-embed-title">' + (ICON[c.type] || '🕹️') + ' ' + esc(c.title) + '</span>' +
+          '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
+          '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
+        '</div>' +
+        '<div class="fc-frame"><iframe src="' + esc(embedSrc) + '" style="height:' + h + 'px" ' +
+          'loading="lazy" title="' + esc(c.title) + '" ' +
+          'allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer" ' +
+          'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe></div>' +
+        (c.lore ? '<div class="fc-foot"><p class="fc-lore">' + esc(c.lore) + '</p></div>' : '') +
+        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') +
+          (openHref !== '#' ? ' · <a class="fc-open" href="' + esc(openHref) + '" target="_blank" rel="noopener noreferrer">open ↗</a>' : '') +
+        '</div>';
+      const open = el.querySelector('.fc-open');
+      if (open) open.addEventListener('click', () => record(c.key, 'click', 0));
+      if (dwellObserver) dwellObserver.observe(el);
+    } else {
+      el.className = 'feed-card';
+      const href = safeUrl(c.url);
+      const ext = /^https?:/i.test(href);
+      const date = shortDate(c.published);
+      el.innerHTML =
+        '<div class="fc-top"><span class="fc-type">' + (ICON[c.type] || '•') + ' ' + esc(c.type) + '</span>' +
+          (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
+        '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
+          esc(c.title) + '</a>' +
+        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+        '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
+      el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
+    }
+
     el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       record(c.key, 'dismiss', 0);
+      if (el._dwellTimer) { clearTimeout(el._dwellTimer); el._dwellTimer = null; }
+      if (dwellObserver) dwellObserver.unobserve(el);
       el.style.opacity = '0';
       setTimeout(() => el.remove(), 150);
     });
@@ -870,6 +878,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function render() {
+    // Drop observers on the outgoing cards so we never track detached nodes.
+    if (dwellObserver) dwellObserver.disconnect();
     stream.innerHTML = '';
     const shown = filter === 'all' ? allCards : allCards.filter(c => c.type === filter);
     if (!shown.length) {
@@ -907,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
       render();
     })
     .catch(() => {
-      if (statusEl) statusEl.textContent = 'Feed is offline right now — open All tools below.';
+      if (statusEl) statusEl.textContent = 'Feed is offline right now — use the quick links below.';
     });
 })();
 </script>
