@@ -132,6 +132,11 @@ class PrWatcher {
     if (pv.isDraft) return { merge: false, reason: "draft" };
     // Only merge a commit we've actually reviewed (ties merge to the review gate).
     if (!entry || entry.reviewedSha !== entry.headSha) return { merge: false, reason: "not_reviewed" };
+    // …and only if that review APPROVED it. Without this, a PR the reviewer flagged
+    // REQUEST_CHANGES (or just COMMENT) still merged on green checks — the exact hole
+    // that let a broken auto-generated PR land. Review must GATE the merge, not just
+    // happen. Older state entries predate reviewVerdict → treat missing as not-approved.
+    if (entry.reviewVerdict !== "APPROVE") return { merge: false, reason: `not_approved:${entry.reviewVerdict || "none"}` };
     if (now - (entry.shaSeenAt || 0) < this.idleMs) return { merge: false, reason: "not_idle" };
 
     // Protected-path gate: a PR touching a sensitive surface needs a human, even if
@@ -171,6 +176,25 @@ class PrWatcher {
     const text = j.reply || j.response;
     if (!text || !String(text).trim()) return { ok: false, error: "no_review_text" };
     return { ok: true, text: String(text) };
+  }
+
+  /**
+   * Extract the reviewer's verdict from the review text. The review prompt asks the
+   * model to END with APPROVE / REQUEST_CHANGES / COMMENT, so the LAST verdict token
+   * wins ("I'd approve, but actually REQUEST_CHANGES" → REQUEST_CHANGES). Word-bounded
+   * so "disapprove" never counts as an approval. Defaults to COMMENT (does NOT merge)
+   * when no clear verdict is present — fail closed.
+   */
+  static _parseVerdict(text) {
+    const t = String(text || "").toUpperCase();
+    const lastOf = (re) => { const g = new RegExp(re, "gi"); let m, last = -1; while ((m = g.exec(t)) !== null) last = m.index; return last; };
+    const req = Math.max(lastOf("REQUEST[_ ]CHANGES"), lastOf("REQUESTING CHANGES"));
+    const app = lastOf("\\bAPPROVED?\\b");
+    const com = lastOf("\\bCOMMENT\\b");
+    const ranked = [["REQUEST_CHANGES", req], ["APPROVE", app], ["COMMENT", com]]
+      .filter(([, i]) => i >= 0)
+      .sort((a, b) => b[1] - a[1]);
+    return ranked.length ? ranked[0][0] : "COMMENT";
   }
 
   // ── internals ──────────────────────────────────────────────────────────────
@@ -307,12 +331,14 @@ class PrWatcher {
 
     // Cross-instance idempotency: if another fleet host already posted a review for
     // THIS exact commit, don't duplicate it (and skip the diff fetch + chat).
-    if (await this._reviewExistsRemotely(number, reviewSha)) {
+    const remoteReview = await this._reviewExistsRemotely(number, reviewSha);
+    if (remoteReview) {
       entry.reviewedSha = reviewSha;
+      entry.reviewVerdict = PrWatcher._parseVerdict(remoteReview);  // adopt the other host's verdict
       entry.reviewedAt = Date.now();
       this._saveState();
-      console.log(`[PR Watcher] PR #${number}@${String(reviewSha).slice(0, 7)} already reviewed by another host — skipping`);
-      return { ok: true, skipped: true };
+      console.log(`[PR Watcher] PR #${number}@${String(reviewSha).slice(0, 7)} already reviewed by another host (verdict ${entry.reviewVerdict}) — skipping`);
+      return { ok: true, skipped: true, verdict: entry.reviewVerdict };
     }
 
     console.log(`[PR Watcher] Fetching diff for PR #${number}`);
@@ -386,21 +412,26 @@ class PrWatcher {
 
     // Mark THIS commit reviewed — a later comment won't re-trigger; only a new push will.
     entry.reviewedSha = reviewSha;
+    entry.reviewVerdict = PrWatcher._parseVerdict(review.text);  // gates auto-merge
     entry.reviewedAt = Date.now();
     entry.lastAttemptAt = Date.now();
     this._saveState();
-    return { ok: true, number, reviewText: review.text };
+    console.log(`[PR Watcher] PR #${number} reviewed → verdict ${entry.reviewVerdict}`);
+    return { ok: true, number, reviewText: review.text, verdict: entry.reviewVerdict };
   }
 
-  /** True if a Fleet Auto-Review comment for this exact SHA already exists (any host). */
+  /** The existing Fleet Auto-Review comment body for this exact SHA (any host), or
+   *  null if none. Returning the body (not just a bool) lets the adopting host read
+   *  the verdict so it can still gate auto-merge without re-reviewing. */
   async _reviewExistsRemotely(number, sha) {
-    if (!sha) return false;
+    if (!sha) return null;
     try {
       const data = await this._ghJson("pr", "view", String(number), "--json", "comments");
       const marker = `fleet-auto-review:${sha}`;
-      return (data.comments || []).some((c) => (c.body || "").includes(marker));
+      const hit = (data.comments || []).find((c) => (c.body || "").includes(marker));
+      return hit ? (hit.body || "") : null;
     } catch {
-      return false; // best-effort; fall through to normal (SHA-gated) review
+      return null; // best-effort; fall through to normal (SHA-gated) review
     }
   }
 

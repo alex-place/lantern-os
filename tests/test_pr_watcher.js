@@ -41,7 +41,7 @@ ok("new commit eligible after idle", w._shouldReview({ headSha: "B", reviewedSha
 
 // ── _shouldMerge: reviewed + idle + mergeable + checks-green (minus ignore list) ──
 const m = new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: true, mergeIgnoreChecks: ["Python tests"] });
-const reviewed = { headSha: "A", reviewedSha: "A", shaSeenAt: now - 2000 };
+const reviewed = { headSha: "A", reviewedSha: "A", reviewVerdict: "APPROVE", shaSeenAt: now - 2000 };
 const green = [{ name: "CI", status: "COMPLETED", conclusion: "SUCCESS" }];
 
 ok("merge: ready -> true", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === true);
@@ -54,6 +54,22 @@ ok("merge: ignored check failure -> true", m._shouldMerge({ isDraft: false, merg
 ok("merge: pending check -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "CI", status: "IN_PROGRESS" }] }, reviewed, now).merge === false);
 ok("merge: StatusContext failure -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ context: "legacy", state: "FAILURE" }] }, reviewed, now).merge === false);
 ok("merge: disabled -> false", new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: false })._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === false);
+
+// ── verdict gate: review must APPROVE, not merely happen (the #1302 hole) ──
+const greenPvBase = { isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green };
+ok("merge: REQUEST_CHANGES verdict -> false", m._shouldMerge(greenPvBase, { headSha: "A", reviewedSha: "A", reviewVerdict: "REQUEST_CHANGES", shaSeenAt: now - 2000 }, now).merge === false);
+ok("merge: COMMENT verdict -> false", m._shouldMerge(greenPvBase, { headSha: "A", reviewedSha: "A", reviewVerdict: "COMMENT", shaSeenAt: now - 2000 }, now).merge === false);
+ok("merge: missing verdict (legacy state) -> false", m._shouldMerge(greenPvBase, { headSha: "A", reviewedSha: "A", shaSeenAt: now - 2000 }, now).merge === false);
+ok("merge: not_approved reason names the verdict", m._shouldMerge(greenPvBase, { headSha: "A", reviewedSha: "A", reviewVerdict: "REQUEST_CHANGES", shaSeenAt: now - 2000 }, now).reason === "not_approved:REQUEST_CHANGES");
+
+// ── _parseVerdict: last verdict token wins; fail closed to COMMENT ──
+ok("verdict: trailing APPROVE", PrWatcher._parseVerdict("Looks good.\n\nVerdict: APPROVE") === "APPROVE");
+ok("verdict: APPROVED past tense", PrWatcher._parseVerdict("APPROVED — ship it") === "APPROVE");
+ok("verdict: REQUEST_CHANGES wins when it follows approve talk", PrWatcher._parseVerdict("I'd approve, but actually REQUEST_CHANGES") === "REQUEST_CHANGES");
+ok("verdict: REQUEST CHANGES (spaced)", PrWatcher._parseVerdict("Verdict: REQUEST CHANGES") === "REQUEST_CHANGES");
+ok("verdict: bare COMMENT", PrWatcher._parseVerdict("Some notes. COMMENT") === "COMMENT");
+ok("verdict: disapprove never counts as approve", PrWatcher._parseVerdict("I disapprove of this approach") === "COMMENT");
+ok("verdict: empty -> COMMENT (fail closed)", PrWatcher._parseVerdict("") === "COMMENT");
 
 // ── protected-path gate: sensitive surfaces need a human, even when green (#1251) ──
 const greenPv = (files) => ({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green, files });
