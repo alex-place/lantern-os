@@ -33,7 +33,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.105.0",
     "busboy": "^1.6.0",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
