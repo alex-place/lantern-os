@@ -1,53 +1,3 @@
-// ── Deterministic tool-flow persistence (#1268) ──────────────────────────────
-// Image/video/vision/doc-gen requests are handled entirely client-side (no LLM
-// call), so they never hit /api/dream/chat — which means they never reached the
-// server's appendConversationEntry either. A reload or session-switch replayed
-// from server storage and these turns just vanished. POST them directly to the
-// existing /api/conversations endpoint so they survive like normal chat turns.
-function persistToolTurn(role, text, meta) {
-  if (!text) return;
-  try {
-    const sessionId = localStorage.getItem('lantern_chat_session') || null;
-    fetch('/api/conversations', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, text, surface: 'garage', sessionId, ...(meta ? { meta } : {}) }),
-    }).catch(() => {}); // best-effort — a failed persist must never break the live reply
-  } catch { /* best-effort */ }
-}
-
-// ── Tool-turn replay (#1270) ─────────────────────────────────────────────────
-// Rebuild the rich bubble content (generated image, YouTube embed, document
-// download) from a persisted meta.tool payload, so reloading or switching back to
-// a session restores the actual element — not just its text description. The
-// markup here mirrors the live renderers (renderWebImage / renderYoutube /
-// renderDocGen). Returns inner-HTML for the .bubble, or null to fall back to text.
-function renderToolReplay(tool) {
-  if (!tool || !tool.kind) return null;
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  if (tool.kind === 'image' && tool.url) {
-    const caption = tool.label
-      || (`Image of <b>${esc(tool.prompt || '')}</b>` + (tool.note ? ` <span style="opacity:.55;font-size:11px">· ${esc(tool.note)}</span>` : '') + ':');
-    return `${caption}<img src="${esc(tool.url)}" alt="${esc(tool.prompt || 'image')}" referrerpolicy="no-referrer" `
-      + `style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`;
-  }
-  if (tool.kind === 'youtube' && (tool.query || tool.url)) {
-    const q = encodeURIComponent(tool.query || '');
-    const embed = `https://www.youtube-nocookie.com/embed?listType=search&list=${q}`;
-    const searchUrl = tool.url || `https://www.youtube.com/results?search_query=${q}`;
-    return `Here are videos for <b>${esc(tool.query || '')}</b>:`
-      + `<iframe src="${esc(embed)}" width="100%" height="240" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" `
-      + `allow="encrypted-media;picture-in-picture" allowfullscreen loading="lazy"></iframe>`
-      + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
-  }
-  if (tool.kind === 'document' && tool.url) {
-    const kb = tool.bytes ? ' · ' + Math.round(tool.bytes / 1024) + ' KB' : '';
-    return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
-      + `<a href="${esc(tool.url)}" download="${esc(tool.filename || '')}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(tool.filename || 'file')}</a>`;
-  }
-  return null;
-}
-window.renderToolReplay = renderToolReplay;
-
 // ── Personal Cube Integration ────────────────────────────────────────────────
 let personalContext = null;
 
@@ -487,96 +437,6 @@ function createAgentBubble(isError) {
   return { msg, bubble, cursor, thinking };
 }
 
-// ── Chat command registry (Claude-Code-style "!"/"/" commands) ─────────────────
-// Single source of truth for: the command palette (type ! or / to autocomplete),
-// the !help listing, and slash-parity normalization. Only commands that actually
-// work in the live path are listed, so the palette never advertises a dead one.
-const COMMANDS = [
-  { name: 'help',        group: 'Chat',    usage: '!help',             desc: 'List every chat command' },
-  { name: 'ask',         group: 'Chat',    usage: '!ask <question>',   desc: 'Force a web-grounded, cited answer' },
-  { name: 'search',      group: 'Chat',    usage: '!search <query>',   desc: 'Web search and summarize', aliases: ['web-search'] },
-  { name: 'issues',      group: 'Build',   usage: '!issues',           desc: 'Browse open issues — one click runs autowork', aliases: ['backlog'] },
-  { name: 'work',        group: 'Build',   usage: '!work #123',        desc: 'Run keystone autowork on an issue → linked PR', aliases: ['edit'] },
-  { name: 'convergence', group: 'Build',   usage: '!convergence',      desc: 'Run the convergence loop + fleet/version status', aliases: ['convergance', 'converge'] },
-  { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
-  { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
-  { name: 'swarm',       group: 'Build',   usage: '!swarm <task>',     desc: 'Multi-agent swarm (council/consensus) on a task' },
-  { name: 'videos',      group: 'Explore', usage: '!videos',           desc: 'Fresh videos feed', aliases: ['watch'] },
-  { name: 'discover',    group: 'Explore', usage: '!discover',         desc: 'Discover reads/news feed', aliases: ['news', 'reads', 'feed'] },
-  { name: 'build',       group: 'Explore', usage: '!build',            desc: 'Repo build activity (releases + commits)', aliases: ['github', 'releases', 'commits'] },
-  { name: 'support',     group: 'Explore', usage: '!support',          desc: 'Patreon support tiers', aliases: ['patreon', 'tiers', 'donate'] },
-];
-function commandMatches(token) {
-  const t = String(token || '').toLowerCase();
-  return COMMANDS.filter(c => c.name.startsWith(t) || (c.aliases || []).some(a => a.startsWith(t)));
-}
-function findCommand(token) {
-  const t = String(token || '').toLowerCase();
-  return COMMANDS.find(c => c.name === t || (c.aliases || []).includes(t)) || null;
-}
-
-// ── !help and !issues renderers (command palette wires these too) ──────────────
-function renderHelp() {
-  hideEmptyState();
-  const messages = document.getElementById('messages');
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  const groups = {};
-  COMMANDS.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
-  const sections = Object.keys(groups).map(g => {
-    const rows = groups[g].map(c =>
-      `<div style="display:flex;gap:10px;padding:3px 0;align-items:baseline">
-         <code style="color:var(--accent);min-width:150px;font-size:12.5px">${esc(c.usage)}</code>
-         <span style="font-size:12.5px;opacity:0.85">${esc(c.desc)}</span>
-       </div>`).join('');
-    return `<div style="margin-top:8px"><div style="font-weight:700;font-size:11px;text-transform:uppercase;opacity:0.5;letter-spacing:0.04em">${esc(g)}</div>${rows}</div>`;
-  }).join('');
-  const row = document.createElement('div');
-  row.className = 'msg-row agent';
-  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px"><b>Commands</b> · type <code>!</code> or <code>/</code> in the box for autocomplete${sections}</div>`;
-  messages.appendChild(row);
-  if (typeof scrollToBottom === 'function') scrollToBottom();
-}
-async function renderIssues() {
-  hideEmptyState();
-  const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
-  const messages = document.getElementById('messages');
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-  const row = document.createElement('div');
-  row.className = 'msg-row agent';
-  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Loading open issues…</div>`;
-  messages.appendChild(row);
-  if (typeof scrollToBottom === 'function') scrollToBottom();
-  const bubble = row.querySelector('.bubble');
-  const ghLink = '<a href="https://github.com/alex-place/lantern-os/issues" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Open on GitHub →</a>';
-  try {
-    const r = await fetch(`${base}/api/dream/issues?limit=20`, { cache: 'no-store' });
-    const d = await r.json();
-    if (!d.ok || !Array.isArray(d.issues) || !d.issues.length) {
-      bubble.innerHTML = `No open issues to show${d && d.error ? ` (${esc(d.error)})` : ''}. ${ghLink}`;
-      return;
-    }
-    const rows = d.issues.map(i => {
-      const labels = (i.labels || []).slice(0, 3).map(l =>
-        `<span style="font-size:10px;background:var(--surface2);padding:1px 6px;border-radius:8px;opacity:0.8">${esc(l)}</span>`).join(' ');
-      return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border)">
-        <a href="https://github.com/alex-place/lantern-os/issues/${i.number}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-weight:600;font-size:12px;text-decoration:none">#${i.number}</a>
-        <span style="flex:1;font-size:12.5px">${esc(i.title)} ${labels}</span>
-        <button class="aw-work-btn" data-issue="${i.number}" style="font-size:11px;padding:3px 10px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap">Work this →</button>
-      </div>`;
-    }).join('');
-    bubble.innerHTML = `<b>Open issues</b> · ${d.issues.length} · ${ghLink}${rows}`;
-    bubble.querySelectorAll('.aw-work-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const n = parseInt(btn.getAttribute('data-issue'), 10);
-        btn.disabled = true; btn.textContent = 'Working…'; btn.style.opacity = '0.6';
-        runAutowork(n, btn, base).catch(e => console.error('[autowork]', e));
-      });
-    });
-  } catch (e) {
-    bubble.innerHTML = `Couldn’t load issues (${esc(e.message)}). ${ghLink}`;
-  }
-}
-
 // ── Autowork live-step panel (issue #527 / autonomous-work/stream) ─────────────
 // Consumes the SSE stream and renders each phase as it happens, so the user can
 // watch plan → patch → tests → commit → push → PR in real time.
@@ -739,7 +599,7 @@ async function runAutowork(target, btn, base) {
 function parseImageRequest(text) {
   const explicit = text.match(/^[!/]image\s+(.+)/i);
   if (explicit) return explicit[1].trim();
-  const nl = text.match(/\b(?:draw|paint|sketch|generate|create|make|render|show|find|get|give)\b[^.?!]*?\b(?:image|picture|photo|drawing|illustration|art|painting)\b\s*(?:of|showing|with|featuring|:)?\s*(.+)/i);
+  const nl = text.match(/\b(?:draw|paint|sketch|generate|create|make|render|show)\b[^.?!]*?\b(?:image|picture|photo|drawing|illustration|art|painting)\b\s*(?:of|showing|with|featuring|:)?\s*(.+)/i);
   if (nl && nl[1] && nl[1].trim().length >= 2) return nl[1].trim().replace(/[.?!]+$/, '');
   return null;
 }
@@ -759,7 +619,7 @@ function renderWebImage(prompt) {
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
 
-  const show = (url, label, sourceNote) => {
+  const show = (url, label) => {
     const img = new Image();
     img.onload = () => {
       bubble.innerHTML = label;
@@ -767,48 +627,39 @@ function renderWebImage(prompt) {
       img.alt = prompt;
       bubble.appendChild(img);
       if (typeof scrollToBottom === 'function') scrollToBottom();
-      persistToolTurn('lantern', `Image of "${prompt}"${sourceNote ? ` (${sourceNote})` : ''}: ${url}`, { agent: 'Keystone', provider: 'image-tool', model: sourceNote || 'openai', tool: { kind: 'image', url, prompt, label, note: sourceNote || '' } });
     };
     img.onerror = () => keylessFallback();   // local/openai image failed to load → keyless
     img.referrerPolicy = 'no-referrer';
     img.src = url;
   };
 
-  // Keyless fallback: Pollinations (text-to-image, AI-generated) then LoremFlickr (a real
-  // stock photo someone took — found, not generated). The label always names which one
-  // actually loaded, so "generated" vs "found" is never ambiguous to the user (#1268).
+  // Keyless fallback: Pollinations (text-to-image) then LoremFlickr (real photos), browser-loaded.
   function keylessFallback() {
     const seed = Math.floor(Math.random() * 1e6);
     const keywords = encodeURIComponent(prompt.split(/\s+/).slice(0, 3).join(','));
     const sources = [
-      { url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
-        label: `Here's an AI-generated image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· generated via Pollinations</span>:`,
-        note: 'generated via Pollinations' },
-      { url: `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
-        label: `Couldn't generate an image, so here's a real stock photo matching <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· found via LoremFlickr, not AI-generated</span>:`,
-        note: 'found via LoremFlickr, not AI-generated' },
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&nologo=true&seed=${seed}`,
+      `https://loremflickr.com/768/512/${keywords}?lock=${seed}`,
     ];
     let i = 0;
     (function tryNext() {
       if (i >= sources.length) {
         bubble.innerHTML = `Sorry — couldn't reach an image service for <b>${esc(prompt)}</b> right now. Please try again.`;
         if (typeof scrollToBottom === 'function') scrollToBottom();
-        persistToolTurn('lantern', `Couldn't find or generate an image for "${prompt}" — no image service reachable.`, { agent: 'Keystone', provider: 'image-tool' });
         return;
       }
-      const { url, label, note } = sources[i++];
+      const url = sources[i++];
       const img = new Image();
       let settled = false;
       const to = setTimeout(() => { if (!settled) { settled = true; img.onload = img.onerror = null; tryNext(); } }, 15000);
       img.onload = () => {
         if (settled) return;
         settled = true; clearTimeout(to);
-        bubble.innerHTML = label;
+        bubble.innerHTML = `Here's an image of <b>${esc(prompt)}</b>:`;
         img.style.cssText = 'max-width:100%;border-radius:8px;margin:6px 0;display:block';
         img.alt = prompt;
         bubble.appendChild(img);
         if (typeof scrollToBottom === 'function') scrollToBottom();
-        persistToolTurn('lantern', `Image of "${prompt}" (${note}): ${url}`, { agent: 'Keystone', provider: 'image-tool', model: note, tool: { kind: 'image', url, prompt, label, note } });
       };
       img.onerror = () => { if (!settled) { settled = true; clearTimeout(to); tryNext(); } };
       img.referrerPolicy = 'no-referrer';
@@ -826,7 +677,7 @@ function renderWebImage(prompt) {
     .then(r => r.json())
     .then(d => {
       if (done) return; done = true; clearTimeout(to);
-      if (d && d.ok && d.url) show(d.url, `Here's an image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· ${esc(d.model || 'openai')}</span>:`, `generated via ${d.model || 'openai'}`);
+      if (d && d.ok && d.url) show(d.url, `Here's an image of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· ${esc(d.model || 'openai')}</span>:`);
       else keylessFallback();
     })
     .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
@@ -852,15 +703,12 @@ function renderVisionAnswer(prompt, attachment) {
       if (d && d.ok && d.text) {
         bubble.innerHTML = (typeof renderMarkdown === 'function' ? renderMarkdown(d.text) : esc(d.text))
           + `<div style="opacity:.5;font-size:11px;margin-top:4px">👁 vision · ${esc(d.model || 'vision')}</div>`;
-        persistToolTurn('lantern', d.text, { agent: 'Keystone', provider: 'vision', model: d.model || 'vision' });
       } else {
-        const errMsg = `Couldn't analyze ${attachment.name}: ${(d && d.error) || 'vision unavailable'}`;
         bubble.innerHTML = `Couldn't analyze <b>${esc(attachment.name)}</b>: ${esc((d && d.error) || 'vision unavailable')}`;
-        persistToolTurn('lantern', errMsg, { agent: 'Keystone', provider: 'vision' });
       }
       if (typeof scrollToBottom === 'function') scrollToBottom();
     })
-    .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); persistToolTurn('lantern', `Vision error analyzing ${attachment.name}: ${e.message}`, { agent: 'Keystone', provider: 'vision' }); });
+    .catch(e => { bubble.innerHTML = `Vision error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
 }
 
 // ── Document generation ──────────────────────────────────────────────────────────
@@ -905,14 +753,12 @@ function renderDocGen(prompt, format) {
         const kb = d.bytes ? ' · ' + Math.round(d.bytes / 1024) + ' KB' : '';
         bubble.innerHTML = `✓ Generated <b>${esc(d.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(d.format)}${kb})</span><br>`
           + `<a href="${esc(d.url)}" download="${esc(d.filename)}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(d.filename)}</a>`;
-        persistToolTurn('lantern', `Generated document "${d.title || 'document'}" (${d.format}${kb}): ${d.url}`, { agent: 'Keystone', provider: 'document-generator', model: d.format, tool: { kind: 'document', url: d.url, title: d.title || 'document', filename: d.filename, format: d.format, bytes: d.bytes } });
       } else {
         bubble.innerHTML = `Couldn't generate the document: ${esc((d && d.error) || 'unavailable')}`;
-        persistToolTurn('lantern', `Couldn't generate the document for "${prompt}": ${(d && d.error) || 'unavailable'}`, { agent: 'Keystone', provider: 'document-generator' });
       }
       if (typeof scrollToBottom === 'function') scrollToBottom();
     })
-    .catch(e => { bubble.innerHTML = `Document error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); persistToolTurn('lantern', `Document generation error for "${prompt}": ${e.message}`, { agent: 'Keystone', provider: 'document-generator' }); });
+    .catch(e => { bubble.innerHTML = `Document error: ${esc(e.message)}`; if (typeof scrollToBottom === 'function') scrollToBottom(); });
 }
 
 // ── Video requests ──────────────────────────────────────────────────────────────
@@ -952,7 +798,6 @@ function renderYoutube(query) {
     `<a href="${searchUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a></div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
-  persistToolTurn('lantern', `YouTube results for "${query}": ${searchUrl}`, { agent: 'Keystone', provider: 'youtube-search', tool: { kind: 'youtube', query, url: searchUrl } });
 }
 
 // ── Explore embed helpers ─────────────────────────────────────────────────────
@@ -1102,13 +947,6 @@ async function sendMessage(opts = {}) {
       }
     }
   } catch (_) { /* gate is best-effort; the server enforces limits regardless */ }
-  // Slash-command parity: /work, /convergence, /issues … → canonical "!" form,
-  // matching Claude Code's "/" convention. Only rewrites a leading "/<token>" when
-  // <token> is a known command, so ordinary text starting with "/" is left alone.
-  if (overrideText == null) {
-    const _sm = String(input.value || '').match(/^\/([a-z][\w-]*)/i);
-    if (_sm && findCommand(_sm[1])) input.value = '!' + input.value.slice(1);
-  }
   // Normalize the legacy !convergance command → canonical !convergence.
   if (/^!convergance(?:\s+(?:sync|loop|run))?\s*$/i.test(String(input.value || "").trim())) input.value = "!convergence";
   const text = (overrideText != null ? overrideText : input.value).trim();
@@ -1122,7 +960,6 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
-    persistToolTurn('operator', text);
     renderVisionAnswer(text, visionAttach);
     return;
   }
@@ -1135,7 +972,6 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
-    persistToolTurn('operator', text);
     renderWebImage(imagePrompt);
     return;
   }
@@ -1148,7 +984,6 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
-    persistToolTurn('operator', text);
     renderYoutube(videoQuery);
     return;
   }
@@ -1160,7 +995,6 @@ async function sendMessage(opts = {}) {
     input.value = '';
     input.style.height = 'auto';
     addUserBubble(text);
-    persistToolTurn('operator', text);
     renderDocGen(docReq.prompt, docReq.format);
     return;
   }
@@ -1230,23 +1064,6 @@ async function sendMessage(opts = {}) {
   // (!ask + work/status intents now flow through the single /api/dream/chat/stream
   // endpoint; the server short-circuits them to the convergence agent and streams the
   // answer + `actions`, rendered below from the done event. Stage 3 of the unification.)
-
-  // !help / !commands — list every available command (Claude-Code-style)
-  if (/^!(?:help|commands?)\b/i.test(text)) {
-    input.value = '';
-    addUserBubble(text);
-    renderHelp();
-    return;
-  }
-
-  // !issues / !backlog — browse the open backlog; each row has a "Work this →"
-  // button that fires the existing autowork pipeline (issue → linked PR).
-  if (/^!(?:issues?|backlog)\b/i.test(text)) {
-    input.value = '';
-    addUserBubble(text);
-    renderIssues().catch(e => console.error('[issues]', e));
-    return;
-  }
 
   // !work / !edit <issue#> — observable autonomous workspace (Sigma-0, issue #527)
   const workMatch = text.match(/^!(?:work|edit)\s+#?(\d+)/i);
@@ -1677,76 +1494,6 @@ document.getElementById('input').addEventListener('input', e => {
   e.target.style.height = 'auto';
   e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
 });
-
-// ── Command palette (type ! or / for Claude-Code-style autocomplete) ───────────
-// A floating menu over the composer that filters COMMANDS as you type a leading
-// "!"/"/". Arrows to move, Enter/Tab to pick, Esc to dismiss. Only opens while the
-// whole line is a bare command token (no space/args yet), so it never gets in the
-// way of normal typing. Keydown is captured so it beats the inline Enter→send.
-(function initCommandPalette() {
-  const input = document.getElementById('input');
-  if (!input) return;
-  const menu = document.createElement('div');
-  menu.id = 'cmd-palette';
-  menu.setAttribute('role', 'listbox');
-  menu.style.cssText = 'position:fixed;display:none;z-index:120;max-height:300px;overflow-y:auto;' +
-    'background:var(--surface,#1a1a1a);border:1px solid var(--border,#333);border-radius:10px;' +
-    'box-shadow:0 10px 30px rgba(0,0,0,0.45);padding:4px';
-  document.body.appendChild(menu);
-  let items = [];
-  let active = 0;
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-
-  function close() { menu.style.display = 'none'; items = []; }
-  function render() {
-    if (!items.length) { close(); return; }
-    if (active >= items.length) active = 0;
-    menu.innerHTML = items.map((c, i) =>
-      `<div class="cmd-row" data-i="${i}" role="option" aria-selected="${i === active}" style="display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-radius:7px;cursor:pointer;${i === active ? 'background:var(--surface2,#2a2a2a)' : ''}">
-         <code style="color:var(--accent);font-size:12.5px;min-width:130px">${esc(c.usage)}</code>
-         <span style="font-size:12px;opacity:0.75">${esc(c.desc)}</span>
-       </div>`).join('');
-    const r = input.getBoundingClientRect();
-    menu.style.left = r.left + 'px';
-    menu.style.width = Math.max(300, r.width) + 'px';
-    menu.style.bottom = (window.innerHeight - r.top + 6) + 'px';
-    menu.style.display = 'block';
-    menu.querySelectorAll('.cmd-row').forEach(el => {
-      el.addEventListener('mousedown', (e) => { e.preventDefault(); choose(parseInt(el.getAttribute('data-i'), 10)); });
-    });
-  }
-  function choose(i) {
-    const c = items[i];
-    if (!c) return;
-    close();
-    if (/[<#]/.test(c.usage)) {
-      // Command takes an argument — prefill and let the user type it.
-      input.value = '!' + c.name + ' ';
-      input.focus();
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    } else {
-      // No-arg command — fire it immediately.
-      input.value = '!' + c.name;
-      if (typeof sendMessage === 'function') sendMessage();
-    }
-  }
-  function update() {
-    const m = String(input.value || '').match(/^[!\/]([a-z-]*)$/i);
-    if (!m) { close(); return; }
-    items = commandMatches(m[1]);
-    active = 0;
-    render();
-  }
-  input.addEventListener('input', update);
-  input.addEventListener('keydown', (e) => {
-    if (menu.style.display === 'none' || !items.length) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); active = (active + 1) % items.length; render(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); active = (active - 1 + items.length) % items.length; render(); }
-    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); choose(active); }
-    else if (e.key === 'Escape') { e.preventDefault(); close(); }
-  }, true);
-  input.addEventListener('blur', () => setTimeout(close, 120));
-})();
 
 // ── Handoff prefill (?seed=) ──────────────────────────────────────────────────
 // Lets other surfaces (e.g. /orchestration.html) hand a task into Keystone chat.
