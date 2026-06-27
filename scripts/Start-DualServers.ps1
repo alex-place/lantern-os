@@ -66,14 +66,41 @@ foreach ($scope in 'Machine','User') {
     foreach ($k in $vars.Keys) { try { Set-Item -Path ("env:" + $k) -Value $vars[$k] -ErrorAction SilentlyContinue } catch {} }
 }
 
-# --- Stop any existing web servers + their child services (keep cloudflared) --
-Write-Host "Stopping existing :4177/:4178 servers and child services..." -ForegroundColor Yellow
+# Neither server should spawn its own cloudflared: the cloudflared Windows service
+# (LanternCloudflareTunnel) is the real tunnel to :4177, and dev (:4178) is loopback-only.
+# Without this, both boots run `cloudflared tunnel run` against the Unix creds path in
+# ~/.cloudflared/config.yml that doesn't exist on Windows -> a failed spawn + log spam on
+# every start. Inherited by both Start-Process children below.
+$env:LANTERN_CLOUDFLARE_TUNNEL = 'false'
+
+# Absolute entry paths so each instance is identifiable by its command line -- this is
+# what lets the reap below (and the stable auto-deploy) clean leaked ZOMBIES, not just
+# the current port owner.
+$StableEntry = Join-Path $StableRoot 'apps\lantern-garage\server.js'
+$DevEntry    = Join-Path $DevRoot    'apps\lantern-garage\server-dev.js'
+
+# --- Stop existing servers: tree-kill the port owners + reap leaked zombies --
+# The old flow only Stop-Process'd the port LISTENER, which (a) orphaned the child
+# services (MCP 8771/8772, trading 5050, discord) and (b) missed ZOMBIES -- a server
+# alive but no longer listening (its setInterval collectors keep the event loop up).
+# Those leaked instances then contend for the singleton child-service ports and churn
+# the next boot (the lantern-os.net 502 failure mode). taskkill /T takes the children
+# too; the entry-path sweep catches zombies for BOTH worktrees.
+Write-Host "Stopping existing :4177/:4178 servers + child services (tree-kill + zombie reap)..." -ForegroundColor Yellow
+$toKill = @()
 foreach ($port in 4177,4178,8771,8772,5050) {
     Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique |
-        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+        ForEach-Object { $toKill += [int]$_.OwningProcess }
 }
-Start-Sleep -Milliseconds 1000
+foreach ($entry in @($StableEntry, $DevEntry)) {
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and ($_.CommandLine -like "*$entry*") } |
+        ForEach-Object { $toKill += [int]$_.ProcessId }
+}
+foreach ($procId in ($toKill | Sort-Object -Unique)) {
+    & taskkill /PID $procId /T /F 2>&1 | Out-Null
+}
+Start-Sleep -Milliseconds 1200
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
 # --- Check for Python (MCP server needs it) --
@@ -86,7 +113,7 @@ if (-not $pythonExists) {
 # --- :4177 stable / public (PORT=4177 -> binds 0.0.0.0 for the Cloudflare tunnel)
 Write-Host "Starting stable :4177 from $StableRoot ..." -ForegroundColor Blue
 $env:PORT = "4177"
-$stable = Start-Process -FilePath "node" -ArgumentList "apps/lantern-garage/server.js" `
+$stable = Start-Process -FilePath "node" -ArgumentList $StableEntry `
     -WorkingDirectory $StableRoot -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $LogDir "stable-4177.out.log") `
     -RedirectStandardError  (Join-Path $LogDir "stable-4177.err.log")
@@ -94,7 +121,7 @@ $stable = Start-Process -FilePath "node" -ArgumentList "apps/lantern-garage/serv
 # --- :4178 dev / local (server-dev.js forces port 4178 and binds 127.0.0.1) --
 Write-Host "Starting dev :4178 from $DevRoot ..." -ForegroundColor Green
 Remove-Item env:PORT -ErrorAction SilentlyContinue   # server-dev.js sets its own port/host
-$dev = Start-Process -FilePath "node" -ArgumentList "apps/lantern-garage/server-dev.js" `
+$dev = Start-Process -FilePath "node" -ArgumentList $DevEntry `
     -WorkingDirectory $DevRoot -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $LogDir "dev-4178.out.log") `
     -RedirectStandardError  (Join-Path $LogDir "dev-4178.err.log")
