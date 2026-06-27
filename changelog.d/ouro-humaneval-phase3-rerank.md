@@ -1,0 +1,6 @@
+### Ouro HumanEval Phase 3 — test-time reranking harness (issue #1292)
+
+- **New `scripts/humaneval_rerank.py`** — picks the best of N sampled candidates using only *safe, ground-truthed* signals: the prompt's own `>>>` doctest example assertions plus self-consistency across samples. It deliberately never uses model-generated tests (those bias selection and lower pass@1, arXiv:2501.12793); the hidden HumanEval suite scores only the finally-selected candidate, never selects it.
+- **`scripts/eval_humaneval_ouro.py`** gains `--samples N` / `--temperature` / `--top-p`: with `N>1` it samples N candidates and reranks; `N=1` is the unchanged greedy pass@1. Greedy and reranked land as **separate** leaderboard rows (`method = "greedy"` / `"rerank@N"`), never conflated.
+- **`tests/test_humaneval_rerank.py`** — 12 GPU-free unit tests covering doctest extraction (two-line + inline-assertion shapes; skips `print(...)`/non-literals), example-pass scoring, sandbox safety (no-parse/None handling), the full rerank decision (more-passes wins, self-consistency tie-break, no-example source fallback), and integration with the eval's `make_candidate`. All pass.
+- The selection *logic* is fully verified on CPU; the actual reranked pass@1 measurement is a GPU run (`--full --samples 10`). This is the last on-Ouro lever per the issue's Phase-1/Phase-2 negative results.

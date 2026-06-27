@@ -12,13 +12,26 @@ So this measures the model Lantern actually serves in FAST mode.
     .venv-train/Scripts/python scripts/eval_humaneval_ouro.py --limit 20      # quick real estimate
     .venv-train/Scripts/python scripts/eval_humaneval_ouro.py --full          # all 164 (slow)
 
+Phase 3 — test-time reranking (issue #1292): with --samples N>1 the harness
+samples N candidates per problem (temperature) and picks the best via the
+prompt's OWN `>>>` example assertions + self-consistency (scripts/humaneval_rerank.py)
+— never self-generated tests (those lower pass@1, arXiv:2501.12793). The hidden
+test suite still only scores the SELECTED candidate (the honest pass@1). Greedy
+and reranked land as SEPARATE leaderboard rows (method = "greedy" / "rerank@N"),
+never conflated.
+
+    ...eval_humaneval_ouro.py --full --samples 10 --temperature 0.8 --label ouro-rerank10
+
 Outputs:
-    data/eval/humaneval/<label>-<ts>.jsonl    per-problem detail
-    data/eval/leaderboard.jsonl               one summary row {benchmark:humaneval, pass@1, n, ...}
+    data/eval/humaneval/<label>-<ts>.jsonl    per-problem detail (+ rerank info)
+    data/eval/leaderboard.jsonl               one summary row {benchmark, method, pass@1, n, ...}
 """
 import argparse, json, os, re, subprocess, sys, time, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Phase 3 (issue #1292): the reranker is stdlib-only and GPU-free, safe to import here.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from humaneval_rerank import rerank as rerank_candidates  # noqa: E402
 os.environ.setdefault("HF_HOME", "D:/hf-cache")
 # canonical HumanEval completion stops: ONLY true top-level boundaries (column 0).
 # NB: do NOT stop on "\n#" or "\nprint(" — the model writes comments/prints INSIDE the
@@ -191,6 +204,15 @@ def main():
     ap.add_argument("--limit", type=int, default=20, help="number of problems (from the start)")
     ap.add_argument("--full", action="store_true", help="run all 164")
     ap.add_argument("--max-new", type=int, default=300)
+    # Phase 3 (issue #1292): test-time reranking. --samples>1 samples N candidates
+    # and picks the best via in-prompt example assertions + self-consistency
+    # (humaneval_rerank). --samples 1 is the unchanged greedy pass@1.
+    ap.add_argument("--samples", type=int, default=1,
+                    help="N sampled candidates/problem; >1 enables Phase-3 reranking")
+    ap.add_argument("--temperature", type=float, default=0.8)
+    ap.add_argument("--top-p", type=float, default=0.95)
+    ap.add_argument("--rerank-timeout", type=int, default=6,
+                    help="per-candidate in-prompt-example check timeout, seconds")
     ap.add_argument("--ts", default=str(int(time.time())))
     a = ap.parse_args()
 
@@ -227,23 +249,48 @@ def main():
         # canonical completion: feed the raw signature+docstring, let the model continue the code
         ids = tok(ex["prompt"], return_tensors="pt").input_ids.to(model.device)
         attn = torch.ones_like(ids)
-        with torch.no_grad():
-            # eos_token_id=None: Ouro uses token 0 (endoftext) as a separator BEFORE
-            # the generated body, not after — so disabling eos-stopping lets the
-            # model emit the body; stop_strings catch the end of the function.
-            out = model.generate(ids, attention_mask=attn, max_new_tokens=a.max_new, do_sample=False,
-                                 repetition_penalty=1.1, pad_token_id=tok.pad_token_id,
-                                 eos_token_id=None,
-                                 stop_strings=STOP, tokenizer=tok)
-        # skip_special_tokens strips the leading endoftext separator token
-        text = tok.decode(out[0, ids.shape[1]:], skip_special_tokens=True)
-        # strip chat-role prefix emitted by models overtrained on conversation data
-        text = re.sub(r'^assistant\s*[:\n]\s*', '', text, flags=re.IGNORECASE)
-        cand = make_candidate(text, ex["entry_point"], ex["prompt"])
+        rinfo = None
+        if a.samples > 1:
+            # Phase 3 (issue #1292): sample N, then rerank by the prompt's own
+            # `>>>` example assertions + self-consistency — NOT self-generated
+            # tests (those lower pass@1, arXiv:2501.12793). The hidden suite below
+            # only scores the selected candidate; it never selects it.
+            with torch.no_grad():
+                out = model.generate(ids, attention_mask=attn, max_new_tokens=a.max_new,
+                                     do_sample=True, temperature=a.temperature, top_p=a.top_p,
+                                     num_return_sequences=a.samples,
+                                     repetition_penalty=1.1, pad_token_id=tok.pad_token_id,
+                                     eos_token_id=None, stop_strings=STOP, tokenizer=tok)
+            texts = []
+            for s in range(out.shape[0]):
+                t = tok.decode(out[s, ids.shape[1]:], skip_special_tokens=True)
+                texts.append(re.sub(r'^assistant\s*[:\n]\s*', '', t, flags=re.IGNORECASE))
+            cands = [make_candidate(t, ex["entry_point"], ex["prompt"]) for t in texts]
+            cand, rinfo = rerank_candidates(cands, ex["prompt"], ex["entry_point"], timeout=a.rerank_timeout)
+            sel = rinfo.get("selected_index")
+            text = texts[sel] if isinstance(sel, int) and sel < len(texts) else (texts[0] if texts else "")
+        else:
+            with torch.no_grad():
+                # eos_token_id=None: Ouro uses token 0 (endoftext) as a separator BEFORE
+                # the generated body, not after — so disabling eos-stopping lets the
+                # model emit the body; stop_strings catch the end of the function.
+                out = model.generate(ids, attention_mask=attn, max_new_tokens=a.max_new, do_sample=False,
+                                     repetition_penalty=1.1, pad_token_id=tok.pad_token_id,
+                                     eos_token_id=None,
+                                     stop_strings=STOP, tokenizer=tok)
+            # skip_special_tokens strips the leading endoftext separator token
+            text = tok.decode(out[0, ids.shape[1]:], skip_special_tokens=True)
+            # strip chat-role prefix emitted by models overtrained on conversation data
+            text = re.sub(r'^assistant\s*[:\n]\s*', '', text, flags=re.IGNORECASE)
+            cand = make_candidate(text, ex["entry_point"], ex["prompt"])
         ok, note = run_test(cand, ex["test"], ex["entry_point"])
         n_ok += int(ok)
         row = {"task_id": ex["task_id"], "entry_point": ex["entry_point"],
                "ok": ok, "note": note, "completion": text[:600]}
+        if rinfo is not None:
+            row["rerank"] = {k: rinfo[k] for k in
+                             ("method", "n_examples", "n_candidates", "best_example_passes", "selected_index")
+                             if k in rinfo}
         detail.append(row)
         # write each result immediately so a pipeline timeout doesn't lose all data
         with open(detail_path, "a", encoding="utf-8") as f:
@@ -267,6 +314,11 @@ def main():
         # reconciled schema — "benchmark" key shared across all eval scripts (#776)
         "benchmark": "humaneval",
         "ts": a.ts, "label": a.label, "engine": "ouro-fast-cached",
+        # Phase 3 (issue #1292): method disambiguates greedy vs reranked rows so
+        # the two are NEVER conflated on the leaderboard (separate appended rows).
+        "method": (f"rerank@{a.samples}" if a.samples > 1 else "greedy"),
+        "n_samples": a.samples,
+        "temperature": (a.temperature if a.samples > 1 else None),
         "base_model": a.base_model, "adapter": bool(a.adapter),
         "n": n, "subset": (not a.full), "pass@1": round(n_ok / n, 3) if n else 0.0,
         "accuracy": round(n_ok / n, 3) if n else 0.0,  # alias for cross-benchmark summary
@@ -277,7 +329,7 @@ def main():
     with open(os.path.join(ROOT, "data", "eval", "leaderboard.jsonl"), "a", encoding="utf-8") as f:
         f.write(json.dumps(summary, ensure_ascii=False) + "\n")
     tag = "HumanEval" + ("" if a.full else f"[first {n}]")
-    print(f"\nVERDICT {tag} pass@1 = {summary['pass@1']*100:.1f}%  ({n_ok}/{n})  "
+    print(f"\nVERDICT {tag} [{summary['method']}] pass@1 = {summary['pass@1']*100:.1f}%  ({n_ok}/{n})  "
           f"{summary['sec_per_problem']}s/problem", flush=True)
     print(json.dumps(summary))
 
