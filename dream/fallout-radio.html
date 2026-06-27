@@ -75,7 +75,14 @@
     .dial { background: #08130d; border: 1px solid #12271a; border-radius: 12px; padding: 8px; min-height: 240px; }
     .dial h2 { margin: 4px 6px 8px; font-size: .62rem; letter-spacing: .22em; color: var(--ph-dim); font-weight: 700; display:flex; justify-content:space-between; align-items:baseline; }
     .dial h2 .count { color: var(--ph-faint); letter-spacing:.1em; }
-    .stationscroll { max-height: 420px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1c3b27 transparent; }
+    .dialsearch {
+      width: 100%; margin: 0 0 8px; padding: 7px 9px; font: inherit; font-size: .72rem;
+      color: var(--ph); background: #06120c; border: 1px solid #15301f; border-radius: 7px;
+      letter-spacing: .04em; -webkit-appearance: none;
+    }
+    .dialsearch::placeholder { color: #3c6b4f; }
+    .dialsearch:focus-visible { outline: 2px solid var(--ph); outline-offset: 1px; border-color: var(--ph-dim); }
+    .stationscroll { max-height: 460px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1c3b27 transparent; }
     .stationscroll::-webkit-scrollbar { width: 6px; }
     .stationscroll::-webkit-scrollbar-thumb { background: #1c3b27; border-radius: 4px; }
     .station {
@@ -225,6 +232,7 @@
     <div class="deckwrap">
       <nav class="dial" aria-label="Stations">
         <h2><span>▚ TUNE THE DIAL</span><span class="count" id="dialCount"></span></h2>
+        <input id="stationSearch" class="dialsearch" type="search" placeholder="search song or artist…" aria-label="Filter stations" autocomplete="off" spellcheck="false">
         <div class="stationscroll" id="stationList"></div>
       </nav>
 
@@ -387,19 +395,41 @@
     function fmt(t) { if (!isFinite(t)) return "0:00"; var m = Math.floor(t/60), s = Math.floor(t%60); return m + ":" + (s<10?"0":"") + s; }
     function findByFreq(f) { for (var i=0;i<STATIONS.length;i++) if (STATIONS[i].freq===f) return i; return -1; }
 
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
     function render() {
+      listEl.innerHTML = '';
       document.getElementById('dialCount').textContent = STATIONS.length + ' STATIONS';
+      var frag = document.createDocumentFragment();
       STATIONS.forEach(function (s, i) {
         var b = document.createElement('button');
         b.type = 'button'; b.className = 'station'; b.setAttribute('aria-current', 'false');
         b.innerHTML =
-          '<span class="sfreq">' + s.freq + ' FM <span class="eq">♪</span></span>' +
-          '<span class="stitle">' + s.title + '</span>' +
-          '<span class="sart">' + s.artist + ' · ' + s.year + '</span>';
+          '<span class="sfreq">' + esc(s.freq || '·') + ' FM <span class="eq">♪</span></span>' +
+          '<span class="stitle">' + esc(s.title) + '</span>' +
+          '<span class="sart">' + esc(s.artist) + (s.year ? ' · ' + esc(s.year) : '') + '</span>';
         b.addEventListener('click', function () { tune(i, true); });
-        listEl.appendChild(b);
+        frag.appendChild(b);
       });
+      listEl.appendChild(frag);
+      if (searchEl && searchEl.value) filterStations();
     }
+
+    // Filter the (long) station list by title / artist / freq / year. Indices stay
+    // aligned with STATIONS, so tune()/aria-current keep working under a filter.
+    var searchEl = document.getElementById('stationSearch');
+    function filterStations() {
+      var q = (searchEl.value || '').trim().toLowerCase();
+      var shown = 0;
+      Array.prototype.forEach.call(listEl.children, function (b, i) {
+        var s = STATIONS[i]; if (!s) return;
+        var hit = !q || ((s.title + ' ' + s.artist + ' ' + (s.freq||'') + ' ' + (s.year||'')).toLowerCase().indexOf(q) >= 0);
+        b.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      });
+      document.getElementById('dialCount').textContent = q ? (shown + ' / ' + STATIONS.length) : (STATIONS.length + ' STATIONS');
+    }
+    if (searchEl) searchEl.addEventListener('input', filterStations);
 
     function tune(i, autoplay) {
       var s = STATIONS[i]; if (!s) return;
@@ -701,16 +731,25 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) startVU(); });
 
     // ── Boot ───────────────────────────────────────────────────────────────
-    applyVolume(); applyRepeat(); applyWarmth(); applyCrackle(); setVuLabel();
-    render();
-
-    // Deep-link: #101.5 (or any freq) tunes straight there; else the Founder's
-    // Frequency. The user presses play (browser autoplay policy).
     function freqFromHash() { var h = (location.hash || '').replace(/^#/, '').trim(); return findByFreq(h); }
-    var start = freqFromHash();
-    if (start < 0) start = findByFreq(DEFAULT_FREQ);
-    if (start < 0) start = 0;
-    tune(start, false);
+    function boot() {
+      applyVolume(); applyRepeat(); applyWarmth(); applyCrackle(); setVuLabel();
+      render();
+      // Deep-link: #101.5 (or any freq) tunes straight there; else the Founder's
+      // Frequency. The user presses play (browser autoplay policy).
+      var start = freqFromHash();
+      if (start < 0) start = findByFreq(DEFAULT_FREQ);
+      if (start < 0) start = 0;
+      tune(start, false);
+    }
+
+    // Load the full playlist manifest (the big offline library, 250+ songs). The
+    // inline STATIONS above is a built-in fallback so the radio still works if the
+    // manifest is missing (e.g. before the fetch script has run).
+    fetch('/radio/stations.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (list) { if (list && list.length) STATIONS = list; boot(); })
+      .catch(function () { boot(); });
 
     // Honor later #freq changes (e.g. someone pastes a deep link while open).
     window.addEventListener('hashchange', function () {
