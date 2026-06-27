@@ -1,0 +1,3 @@
+### Ops: stable auto-deploy disables the redundant self-spawned cloudflared explicitly
+
+- `scripts/auto-deploy-stable.ps1` `StartServer` now sets `LANTERN_CLOUDFLARE_TUNNEL=false` in the spawned server's process env, so the stable server never runs its own `cloudflared tunnel run` against the Unix creds path that doesn't exist on Windows (failed spawn + log spam every boot). The cloudflared **Windows service** (`LanternCloudflareTunnel`) is the real tunnel. Previously this relied on the untracked `.env.local`; setting it in the deploy makes it robust if that file is lost, and matches `Start-DualServers.ps1`.

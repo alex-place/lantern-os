@@ -131,6 +131,12 @@ function StartServer {
     $val = [System.Environment]::GetEnvironmentVariable($key, 'User')
     if ($val) { [System.Environment]::SetEnvironmentVariable($key, $val, 'Process') }
   }
+  # This machine's public tunnel is the cloudflared Windows service (LanternCloudflareTunnel);
+  # the server must NOT spawn its own cloudflared (it would `tunnel run` against a Unix creds
+  # path in ~/.cloudflared/config.yml that doesn't exist on Windows -> failed spawn + log spam
+  # every boot). Set explicitly here so it holds even if .env.local is lost (belt-and-suspenders;
+  # matches Start-DualServers.ps1).
+  [System.Environment]::SetEnvironmentVariable('LANTERN_CLOUDFLARE_TUNNEL', 'false', 'Process')
   # Launch with the ABSOLUTE entry path (not relative) so StopServer/ReapZombies can
   # identify this instance later. WorkingDirectory stays $STABLE, so __dirname and
   # process.cwd() are unchanged -- behaviour is identical to the relative invocation.
