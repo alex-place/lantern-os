@@ -156,6 +156,58 @@
       "why": "Game Boy emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · sml_gb_2a (emulator: gbcolor)",
       "embed": { "provider": "archive.org", "src": "https://archive.org/embed/sml_gb_2a", "height": 480, "interactive": true }
+    },
+    {
+      "slug": "punch-out",
+      "title": "Mike Tyson's Punch-Out!! (1987)",
+      "kind": "game",
+      "url": "https://archive.org/details/mike-tysons-punch-out-japan-usa",
+      "source": "Internet Archive",
+      "published": "1987-10-18",
+      "topics": ["game", "lore", "nintendo"],
+      "lore": "Little Mac, five-foot-seven of pure pattern-recognition, punching up through a roster of giants. Nintendo licensed the heavyweight champion himself for the final bout — when the contract lapsed it quietly became plain 'Punch-Out!!' and Iron Mike became legend.",
+      "why": "NES emulator, playable in-browser at the Internet Archive",
+      "evidence_source": "archive.org · mike-tysons-punch-out-japan-usa (emulator: nes)",
+      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/mike-tysons-punch-out-japan-usa", "height": 480, "interactive": true }
+    },
+    {
+      "slug": "super-mario-world",
+      "title": "Super Mario World (1991)",
+      "kind": "game",
+      "url": "https://archive.org/details/super-mario-world-usa_202406",
+      "source": "Internet Archive",
+      "published": "1991-08-23",
+      "topics": ["game", "lore", "nintendo"],
+      "lore": "The Super Nintendo's launch showcase. A green dinosaur named Yoshi, a cape that let Mario fly, and a Dinosaur Land map hiding 96 exits — the game that taught a whole generation what 'secret level' meant.",
+      "why": "SNES emulator, playable in-browser at the Internet Archive",
+      "evidence_source": "archive.org · super-mario-world-usa_202406 (emulator: snes)",
+      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/super-mario-world-usa_202406", "height": 480, "interactive": true }
+    },
+    {
+      "slug": "super-mario-64",
+      "title": "Super Mario 64 (1996)",
+      "kind": "game",
+      "url": "https://archive.org/details/super-mario-64_n64",
+      "source": "Internet Archive",
+      "published": "1996-06-23",
+      "topics": ["game", "lore", "nintendo"],
+      "lore": "The leap into three dimensions. A castle, a triple-jump, and a camera you suddenly had to think about — in 1996 Nintendo reinvented what a platformer even was, on a cartridge. (Give the N64 emulator a moment to boot.)",
+      "why": "Nintendo 64 emulator, playable in-browser at the Internet Archive",
+      "evidence_source": "archive.org · super-mario-64_n64 (emulator: n64)",
+      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/super-mario-64_n64", "height": 520, "interactive": true }
+    },
+    {
+      "slug": "final-fantasy-adventure",
+      "title": "Final Fantasy Adventure (1991)",
+      "kind": "game",
+      "url": "https://archive.org/details/final-fantasy-adventure-usa",
+      "source": "Internet Archive",
+      "published": "1991-11-01",
+      "topics": ["game", "lore", "nintendo"],
+      "lore": "Square's Game Boy action-RPG — released as Final Fantasy Gaiden in Japan, it grew into the whole Mana series. Real-time sword-and-magic adventure in four shades of grey. (The numbered Final Fantasy titles are lending-restricted on the Archive; this is the openly-playable Square FF.)",
+      "why": "Game Boy emulator, playable in-browser at the Internet Archive",
+      "evidence_source": "archive.org · final-fantasy-adventure-usa (emulator: gbcolor)",
+      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/final-fantasy-adventure-usa", "height": 480, "interactive": true }
     }
   ]
 }

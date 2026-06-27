@@ -262,6 +262,67 @@ async function aggregate() {
   return cards;
 }
 
+// ── Diversity rerank (Converge) ──────────────────────────────────────────────
+
+// Issue #1220: keep the algorithmic feed honest and non-collapsing. PCSF scores
+// every card by its SOURCE key, so all cards from one engaged source inherit the
+// SAME score and wall the top of the feed — e.g. eight "Flourishing" belief
+// cards in a row (all 3.0) before you see a single game, read, or build. A pure
+// score sort has no notion of "I've already shown three of these."
+//
+// This greedy pass re-orders the scored list with a multiplicative diversity
+// decay: each time a source (or type) is placed, the remaining cards from that
+// source/type are weighted down, so a strong source still LEADS but then yields
+// the next slot to something different and reappears later. It's order-preserving
+// within a source (the input is already score→editorial→freshness sorted, so the
+// first of a tie wins) and fully deterministic — same input, same order.
+//
+// EXPLORE_DIVERSITY=0 disables it (pure score sort), matching the PCSF_ROUTING
+// kill-switch convention.
+//
+// The base weight is the card's RANK in the incoming (score→editorial→freshness)
+// order mapped to [0,1] — NOT its raw score. Using rank makes the pass
+// scale-invariant: a runaway leaderboard score (we've seen source:Flourishing
+// hit 10000) competes with diversity on ORDER, not magnitude, so no anomalous
+// score can wall the feed. Diversity is then an additive demotion per prior card
+// already placed from the same source / type.
+const SOURCE_PENALTY = 0.40; // demotion per prior card already shown from the same source
+const TYPE_PENALTY = 0.12;   // milder — types are broad buckets, some clustering reads fine
+
+function diversityRerank(scored) {
+  if (process.env.EXPLORE_DIVERSITY === "0" || !Array.isArray(scored) || scored.length < 3) {
+    return Array.isArray(scored) ? scored : [];
+  }
+  const n = scored.length;
+  const base = new Map();
+  scored.forEach((c, i) => base.set(c, n === 1 ? 1 : 1 - i / (n - 1)));
+
+  const remaining = scored.slice();
+  const out = [];
+  const srcCount = Object.create(null);
+  const typeCount = Object.create(null);
+  const sourceOf = (c) => String(c.source || c.key || "");
+  const typeOf = (c) => String(c.type || "");
+  while (remaining.length) {
+    let bestIdx = 0;
+    let bestEff = -Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const c = remaining[i];
+      const eff = base.get(c)
+        - SOURCE_PENALTY * (srcCount[sourceOf(c)] || 0)
+        - TYPE_PENALTY * (typeCount[typeOf(c)] || 0);
+      // `remaining` stays in rank order, so a genuine tie keeps the
+      // better-ranked card first — stable and explainable.
+      if (eff > bestEff + 1e-9) { bestEff = eff; bestIdx = i; }
+    }
+    const [picked] = remaining.splice(bestIdx, 1);
+    out.push(picked);
+    srcCount[sourceOf(picked)] = (srcCount[sourceOf(picked)] || 0) + 1;
+    typeCount[typeOf(picked)] = (typeCount[typeOf(picked)] || 0) + 1;
+  }
+  return out;
+}
+
 // ── Rank (Reason) ────────────────────────────────────────────────────────────
 
 // Order the merged cards through the PCSF leaderboard. Unscored cards (cold
@@ -289,10 +350,15 @@ async function rankedFeed(opts = {}) {
     return (b.publishedTs || 0) - (a.publishedTs || 0);
   });
 
-  return { cards: ranked, count: ranked.length, generatedAt: new Date().toISOString() };
+  // Diversity pass (#1220): break source/type walls so no single source
+  // dominates the top of the batch. Pure score order is preserved within a
+  // source; the kill-switch (EXPLORE_DIVERSITY=0) returns the raw sort.
+  const cardsOut = diversityRerank(ranked);
+
+  return { cards: cardsOut, count: cardsOut.length, generatedAt: new Date().toISOString() };
 }
 
-module.exports = { aggregate, rankedFeed, keyForSource, editorialOrder };
+module.exports = { aggregate, rankedFeed, diversityRerank, keyForSource, editorialOrder };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
