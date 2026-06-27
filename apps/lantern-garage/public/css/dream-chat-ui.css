@@ -90,6 +90,12 @@
   background: var(--surface2);
   color: var(--text);
 }
+/* Agent replies append the route signature and the "Read aloud" button as siblings
+   of .message-content. Since .message is a flex ROW, without this they get laid out
+   in wide horizontal columns beside the bubble (dead clickable space). Stack them
+   vertically under the bubble instead, left-aligned and compact. */
+.message.agent { flex-direction: column; align-items: flex-start; }
+.message.agent > .read-aloud-btn { margin-top: 2px; }
 
 /* Input area */
 .input-container {
