@@ -1,6 +1,6 @@
 {
   "name": "lantern-os",
-  "version": "1.7.80",
+  "version": "1.7.81",
   "private": true,
   "main": "index.js",
   "description": "Lantern OS ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Dream Journal",
@@ -14,7 +14,9 @@
     "research-nightly": "node scripts/open-video-research.js --nightly",
     "research-calibrate": "node scripts/open-video-research.js --calibrate",
     "test:ui": "node tests/ui-test.js",
-    "creator-intelligence": "node scripts/creator-intelligence-loop.js --forever"
+    "creator-intelligence": "node scripts/creator-intelligence-loop.js --forever",
+    "lint:consolidate": "node scripts/consolidation-lint.js",
+    "lint:consolidate:json": "node scripts/consolidation-lint.js --json"
   },
   "engines": {
     "node": ">=20"

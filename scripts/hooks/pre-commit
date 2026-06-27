@@ -158,4 +158,16 @@ if [ "$slop_fail" -gt 0 ]; then
   exit 1
 fi
 
+# ── Consolidation gate: top-down squeeze on the staged set ──────────────────
+# Blocks only newly-introduced HIGH issues (exact dup of an existing file,
+# stray temp/scratch artifact, exec on interpolated input). Pre-existing repo
+# debt is never gated here — run `node scripts/consolidation-lint.js` to see it.
+# Reached only when SKIP_MONOWORKSTREAM != 1 (early-exit above), so the same
+# bypass applies.
+if command -v node >/dev/null 2>&1 && [ -f scripts/consolidation-lint.js ]; then
+  if ! node scripts/consolidation-lint.js --staged; then
+    exit 1
+  fi
+fi
+
 exit 0

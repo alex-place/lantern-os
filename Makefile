@@ -1,4 +1,9 @@
-.PHONY: test test-dream build-dream up-dream down-dream logs-dream pull-dream-model check-node convergence quickstart
+.PHONY: test test-dream build-dream up-dream down-dream logs-dream pull-dream-model check-node convergence quickstart squeeze
+
+# Top-down "squeeze & consolidate" scan: duplicates, stray artifacts,
+# un-modernised code, and forbidden-subsystem sprawl across the whole tree.
+squeeze:
+	node scripts/consolidation-lint.js
 
 test:
 	python -m pytest tests -q
