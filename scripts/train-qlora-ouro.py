@@ -45,6 +45,7 @@ def main():
     ap.add_argument("--out", default="D:/lantern-train/ouro-sigma0-adapters")
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--max-steps", type=int, default=-1, help="override epochs (smoke test); -1 = use epochs")
+    ap.add_argument("--resume", default=None, help="resume training: 'auto' finds latest checkpoint in --out, or pass a checkpoint dir path")
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank; alpha=2*r (handoff recipe: 32)")
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
@@ -172,10 +173,11 @@ def main():
             per_device_train_batch_size=1,
             gradient_accumulation_steps=8, learning_rate=a.lr,
             bf16=use_bf16, fp16=not use_bf16, max_grad_norm=1.0, warmup_ratio=0.03,
-            logging_steps=10, save_strategy="steps", save_steps=150, save_total_limit=2,
+            logging_steps=10, save_strategy="steps", save_steps=150, save_total_limit=12,
             optim="paged_adamw_8bit",
             gradient_checkpointing=True, report_to="none"))
-    trainer.train()
+    resume_arg = True if a.resume == "auto" else (a.resume or None)
+    trainer.train(resume_from_checkpoint=resume_arg)
 
     final = os.path.join(a.out, "final")
     model.save_pretrained(final); tok.save_pretrained(final)

@@ -17,7 +17,11 @@ function normalizeConversationEntry(input) {
   }
 
   const role = String(input.role || "operator").trim().toLowerCase();
-  const allowedRoles = new Set(["operator", "lantern", "system", "note"]);
+  // "session-title" is a metadata overlay turn: a user-assigned chat name that
+  // lives in the same append-only log (latest wins). It never renders as a chat
+  // turn (loadConversationHistory filters to operator/lantern) and is excluded
+  // from a session's turn count — see /api/conversations/sessions.
+  const allowedRoles = new Set(["operator", "lantern", "system", "note", "session-title"]);
   const text = String(input.text || "").trim();
   const surface = String(input.surface || "garage").trim().slice(0, 80) || "garage";
   const sessionId = input.sessionId ? String(input.sessionId).trim().slice(0, 64) : null;
@@ -29,6 +33,38 @@ function normalizeConversationEntry(input) {
     throw new Error("conversation_text_required");
   }
 
+  // #1268: optional PCSF signature (provider/model/agent) so a *replayed* turn can show
+  // the same "Keystone · provider/model" signature the live SSE 'done' event carries.
+  // Entirely additive — entries without it (the vast majority, today) replay exactly as
+  // before; omitted/non-string fields are simply dropped rather than rejecting the entry.
+  let meta;
+  if (input.meta && typeof input.meta === "object" && !Array.isArray(input.meta)) {
+    const m = {};
+    for (const k of ["provider", "model", "agent"]) {
+      if (typeof input.meta[k] === "string" && input.meta[k].trim()) m[k] = input.meta[k].trim().slice(0, 120);
+    }
+    // #1270: a structured tool payload so a *replayed* tool turn rebuilds the same
+    // rich element (generated image, YouTube embed, document download) instead of
+    // showing only its plain-text description. Bounded + whitelisted by kind/field.
+    const t = input.meta.tool;
+    if (t && typeof t === "object" && !Array.isArray(t)) {
+      const allowedKinds = new Set(["image", "youtube", "document"]);
+      const kind = typeof t.kind === "string" ? t.kind.trim().toLowerCase() : "";
+      if (allowedKinds.has(kind)) {
+        const tool = { kind };
+        for (const k of ["url", "label"]) {
+          if (typeof t[k] === "string" && t[k].trim()) tool[k] = t[k].trim().slice(0, 2000);
+        }
+        for (const k of ["prompt", "query", "title", "filename", "format", "note"]) {
+          if (typeof t[k] === "string" && t[k].trim()) tool[k] = t[k].trim().slice(0, 500);
+        }
+        if (typeof t.bytes === "number" && isFinite(t.bytes)) tool.bytes = Math.max(0, Math.floor(t.bytes));
+        m.tool = tool;
+      }
+    }
+    if (Object.keys(m).length) meta = m;
+  }
+
   return {
     recordedAt: new Date().toISOString(),
     surface,
@@ -36,6 +72,7 @@ function normalizeConversationEntry(input) {
     // #770: redact high-confidence PII / secrets at rest so a log leak exposes far less.
     text: redactPII(text.slice(0, maxConversationTextLength)),
     sessionId,
+    ...(meta ? { meta } : {}),
   };
 }
 

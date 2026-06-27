@@ -29,6 +29,32 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
     return true;
   }
 
+  // ── Open issues for the in-chat backlog browser (!issues / /issues) ──────────
+  // Powers the chat command that lists the backlog with one-click "Work this →"
+  // (which fires the existing autowork pipeline). Shell-free gh call (#873); fails
+  // soft so the command degrades to a link instead of erroring when gh is absent
+  // (e.g. cloud) or unauthenticated.
+  if (url.pathname === "/api/dream/issues" && req.method === "GET") {
+    const { safeExec } = require("../lib/safe-exec");
+    const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20));
+    try {
+      const out = safeExec(
+        ["gh", "issue", "list", "--repo", "alex-place/lantern-os", "--state", "open",
+          "--limit", String(limit), "--json", "number,title,labels"],
+        { timeout: 15000 }
+      );
+      const issues = JSON.parse(out).map((i) => ({
+        number: i.number,
+        title: i.title,
+        labels: (i.labels || []).map((l) => l.name),
+      }));
+      sendJson(res, { ok: true, issues });
+    } catch (e) {
+      sendJson(res, { ok: false, error: (e && e.message) || String(e), issues: [] });
+    }
+    return true;
+  }
+
   // ── CSF search endpoint ───────────────────────────────────────────────
   if (url.pathname === "/api/csf/search" && req.method === "GET") {
     const query = (url.searchParams.get("q") || "").trim();

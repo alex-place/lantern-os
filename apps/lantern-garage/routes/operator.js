@@ -59,8 +59,17 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
   if (url.pathname === "/api/conversations/sessions" && req.method === "GET") {
     const rows = readConversationLog(2000); // newest window, all sessions
     const byId = new Map();
+    const customTitles = new Map(); // sessionId -> latest user-assigned name
     for (const r of rows) {
       if (!r || !r.sessionId) continue; // skip legacy untagged turns
+      // A "session-title" turn is a rename overlay, not a chat turn: latest one
+      // wins (rows are chronological) and it never counts toward turnCount.
+      if (r.role === "session-title") {
+        const name = String(r.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+        if (name) customTitles.set(r.sessionId, name);
+        else customTitles.delete(r.sessionId); // empty rename clears back to derived title
+        continue;
+      }
       let s = byId.get(r.sessionId);
       if (!s) { s = { sessionId: r.sessionId, title: "", lastActivity: "", turnCount: 0 }; byId.set(r.sessionId, s); }
       s.turnCount += 1;
@@ -70,7 +79,7 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
       if (!s.title && r.role === "operator" && r.text) s.title = String(r.text).replace(/\s+/g, " ").trim().slice(0, 80);
     }
     const sessions = [...byId.values()]
-      .map((s) => ({ ...s, title: s.title || "(untitled session)" }))
+      .map((s) => ({ ...s, title: customTitles.get(s.sessionId) || s.title || "(untitled session)" }))
       .sort((a, b) => (b.lastActivity || "").localeCompare(a.lastActivity || ""))
       .slice(0, 50);
     sendJson(res, { sessions, operator: isOperatorRequest(req) });

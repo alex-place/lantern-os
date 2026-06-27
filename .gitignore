@@ -53,15 +53,16 @@ src/csf_rust/target/
 
 # ─── Runtime state ────────────────────────────────────────────────────────────
 data/pcsf/*.json
-apps/data/conversations/garage-conversations.jsonl
 data/metrics/three-doors-events.jsonl
 
-# Relocated runtime data from apps/data/ to root data/ (issue #1271)
-apps/data/tool-logs/
-apps/data/convergence/
-apps/data/dreamer/notebooks/
-apps/data/contexts/personas.json
+# Tool-execution logs (observability output of lib/tool-logger.js). Runtime-only.
+data/tool-logs/
 
+# Stray apps/data/ runtime tree. A tool-logger.js off-by-one (REPO resolved to
+# apps/ instead of the repo root) scattered runtime data here, and the
+# WIP-committing automation kept re-committing it. Canonical runtime data lives
+# in the repo-root data/. Ignore the whole stray tree so it can never re-commit.
+apps/data/
 
 # Research Convergence Loop runtime output (memories, records, reports, queue)
 data/research/*.jsonl
@@ -371,3 +372,18 @@ data/distill/
 
 # Generated documents (pdf/docx/xlsx/pptx output of /api/document/generate)
 data/generated-docs/
+
+# Runtime tool-execution logs (lib/tool-logger.js writes a dated daily JSONL).
+# Local observability only — never commit: they grow to tens of MB/day and tool
+# traces have historically leaked API keys. The logger currently lands them under
+# apps/data/ (its REPO root resolves one level short — see tool-logger.js:25), so
+# ignore both the intended and the actual location.
+data/tool-logs/
+apps/data/tool-logs/
+
+# Ephemeral runtime state / scratch the automation can sweep into a commit (#1027).
+data/agent-work-queue/auto-dispatch-state.json
+data/convergence-test.jsonl
+data/convergence/canary-events.jsonl
+/steptoe_*.txt
+/steptoe_*.html

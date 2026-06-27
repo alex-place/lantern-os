@@ -22,13 +22,26 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
     monkeypatch.setenv("CHAT_TOOL_EXEC", "1")
     manifest = shared_tool_bridge.load_manifest()
     names = [tool["name"] for tool in manifest["tools"]]
-    expected_tools = [
-        "Read",
+    assert names == [
+        "Read", "LS", "Glob", "Grep", "Bash", "PowerShell",
+        "Write", "Edit", "web_search", "web_fetch",
+        "workspace_write", "workspace_read", "workspace_list",
+        "create_document", "local_eval_keystone_run",
+    ]
     assert all(tool["surface_availability"] == {"dream_chat": True, "mcp": True}
                for tool in manifest["tools"])
 
+    # Read is a filesystem (read-policy) tool, not guest_safe, so a non-operator is
+    # denied before execution (#1213): even read-only file tools can't be run by a
+    # public-server guest. Operator context is required to actually execute it.
+    guest_read = shared_tool_bridge.execute_tool(
+        "Read", {"file_path": "package.json", "limit": 2}, operator=False, enabled=True
+    )
+    assert guest_read["status"] == "denied"
+    assert guest_read["reason_code"] == "operator_required"
+
     read = shared_tool_bridge.execute_tool(
-        "Read", {"file_path": "package.json", "limit": 2}, enabled=True
+        "Read", {"file_path": "package.json", "limit": 2}, operator=True, enabled=True
     )
     assert read["status"] == "executed"
     assert read["receipt"]["schema_version"] == manifest["receipt_schema_version"]
@@ -43,7 +56,7 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
     assert denied["reason_code"] == "operator_required"
 
     unsafe = shared_tool_bridge.execute_tool(
-        "Read", {"file_path": "../package.json"}, enabled=True
+        "Read", {"file_path": "../package.json"}, operator=True, enabled=True
     )
     assert unsafe["status"] == "blocked"
     assert unsafe["reason_code"] == "unsafe_path"
@@ -66,7 +79,7 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
         lambda: (_ for _ in ()).throw(shared_tool_bridge.SharedToolBridgeError("missing")),
     )
     fallback = shared_tool_bridge.load_manifest()
-    assert len(fallback["tools"]) == 10
+    assert len(fallback["tools"]) == 15
     assert fallback["execution"]["reason"] == "node_bridge_unavailable"
     unavailable = shared_tool_bridge.execute_tool("Read", {"file_path": "package.json"})
     assert unavailable["status"] == "unavailable"
@@ -107,6 +120,10 @@ def test_mcp_discovery_uses_runtime_manifest(monkeypatch):
     assert "Read" not in (MCP_DIR / "shared_tool_bridge.py").read_text(encoding="utf-8")
 
     monkeypatch.setattr(server, "HOOKS_AVAILABLE", False)
+    # MCP_SHARED_TOOL_OPERATOR=0 (set above) => guest context. Under #1213 even a
+    # read-policy filesystem tool like Read is denied for a non-operator, so the
+    # public MCP surface can't enumerate or read local files. Only guest_safe web
+    # tools run without operator; Read/Write/Bash all return operator_required.
     read_call = server._handle_jsonrpc({
         "jsonrpc": "2.0",
         "id": "read",
@@ -114,7 +131,8 @@ def test_mcp_discovery_uses_runtime_manifest(monkeypatch):
         "params": {"name": "Read", "arguments": {"file_path": "package.json", "limit": 2}},
     })
     read_result = json.loads(read_call["result"]["content"][0]["text"])
-    assert read_result["status"] == "executed"
+    assert read_result["status"] == "denied"
+    assert read_result["reason_code"] == "operator_required"
 
     denied_call = server._handle_jsonrpc({
         "jsonrpc": "2.0",

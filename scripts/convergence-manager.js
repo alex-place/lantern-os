@@ -42,7 +42,7 @@ const REQUIRED = [
 const ALLOWED_TOP = new Set([
   "apps", "archive", "assets", "caad", "changelog.d", "config", "content", "csf", "data", "dev", "docs",
   "dual-boot", "experiments", "integrations", "lantern-discord", "logs", "lore", "manifests",
-  "merge-patches", "models", "patches", "private-ip", "rag", "references", "reports",
+  "merge-patches", "models", "notebooks", "patches", "private-ip", "rag", "references", "reports",
   "research", "safezone-debug",
   "scripts", "services", "skills", "src", "surfaces", "test-results", "tests",
   "training_data", ".claude", ".github", ".windsurf",

@@ -217,7 +217,10 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     // Call serving_modes.py to get authoritative params (same Python used by inference)
     let modeDetail = null;
     try {
-      const pyRoot = path.join(deps.repoRoot, "src");
+      // Forward-slash the path before embedding it in a Python string literal —
+      // a raw Windows path (e.g. "...\Users\...") makes Python parse "\U" as the
+      // start of a \UXXXXXXXX unicode escape and throw a SyntaxError (#1268).
+      const pyRoot = path.join(deps.repoRoot, "src").replace(/\\/g, "/");
       const raw = _exec(
         `python -c "import sys; sys.path.insert(0,'${pyRoot}'); from serving_modes import get_serving_mode, get_decode_params, describe_mode; import json; m=get_serving_mode(); print(json.dumps({'mode':m.name,'description':m.description,'max_latency_ms':m.max_latency_ms,'decode_params':get_decode_params(m)}))"`,
         { encoding: "utf-8", timeout: 5000 }
