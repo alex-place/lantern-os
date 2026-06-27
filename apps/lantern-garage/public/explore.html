@@ -79,10 +79,11 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding: 16px 16px 14px;
+      gap: 9px;
+      padding: 18px 18px 16px;
+      overflow: hidden;
       border: 1.5px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       background: var(--surface);
       color: inherit;
       text-decoration: none;
@@ -92,6 +93,26 @@
       transform: translateY(-2px);
       border-color: var(--accent);
       box-shadow: var(--shadow-hover);
+    }
+    /* Lead image — bleeds to the card edges, clipped by the card's radius. */
+    .feed-card .fc-thumb {
+      width: calc(100% + 36px);
+      height: 172px;
+      object-fit: cover;
+      display: block;
+      margin: -18px -18px 1px;
+      background: var(--surface2);
+    }
+    /* Preview excerpt (reads) / good-news frame (beliefs) — clamped to 3 lines. */
+    .feed-card .fc-summary {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .feed-card .fc-top {
       display: flex;
@@ -105,9 +126,9 @@
     .feed-card .fc-type { color: var(--accent); }
     .feed-card .fc-date { color: var(--muted); margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .feed-card .fc-title {
-      font-size: 0.98rem;
+      font-size: 1.06rem;
       font-weight: 700;
-      line-height: 1.35;
+      line-height: 1.32;
       color: var(--text);
       text-decoration: none;
     }
@@ -828,6 +849,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // href (esc() escapes quotes but not the scheme). Anything else renders inert.
   const safeUrl = u => (/^https?:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '#';
 
+  // Lead-image src guard — only https or root-relative URLs render as an <img>.
+  const safeImg = u => (/^https:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '';
+
   // An embed src may only be a root-relative path (our own /t-rex/) or an https
   // archive.org/youtube embed URL. Anything else is dropped — never framed.
   const EMBED_HOSTS = /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
@@ -965,14 +989,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const href = safeUrl(c.url);
       const ext = /^https?:/i.test(href);
       const date = shortDate(c.published);
+      const img = safeImg(c.image || '');
+      const summary = c.summary ? esc(c.summary) : '';
       el.innerHTML =
+        (img ? '<img class="fc-thumb" src="' + esc(img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '') +
         '<div class="fc-top"><span class="fc-type">' + (ICON[c.type] || '•') + ' ' + esc(c.type) + '</span>' +
           (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
         '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
           esc(c.title) + '</a>' +
+        (summary ? '<p class="fc-summary">' + summary + '</p>' : '') +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
         '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
       el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
+      // A thumbnail that 404s (or a hotlink the source blocks) should vanish
+      // cleanly, never leave a broken-image glyph.
+      const thumb = el.querySelector('.fc-thumb');
+      if (thumb) thumb.addEventListener('error', () => thumb.remove());
     }
 
     el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
