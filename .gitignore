@@ -56,6 +56,13 @@ data/pcsf/*.json
 apps/data/conversations/garage-conversations.jsonl
 data/metrics/three-doors-events.jsonl
 
+# Relocated runtime data from apps/data/ to root data/ (issue #1271)
+apps/data/tool-logs/
+apps/data/convergence/
+apps/data/dreamer/notebooks/
+apps/data/contexts/personas.json
+
+
 # Research Convergence Loop runtime output (memories, records, reports, queue)
 data/research/*.jsonl
 data/research/reports/

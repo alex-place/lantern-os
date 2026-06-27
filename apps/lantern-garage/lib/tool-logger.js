@@ -22,7 +22,7 @@ const fs = require("fs");
 const path = require("path");
 const { appendFile } = require("fs").promises;
 
-const REPO = path.resolve(__dirname, "..", "..");
+const REPO = path.resolve(__dirname, "..", "..", "..");
 const LOGS_DIR = path.join(REPO, "data", "tool-logs");
 
 // Ensure logs directory exists
