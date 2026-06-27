@@ -1,0 +1,57 @@
+name: Optimize PNG Images
+
+on:
+  push:
+    branches:
+      - main # Adjust if your primary branch is different (e.g., master)
+    paths:
+      - 'data/images/**/*.png'
+
+jobs:
+  optimize-pngs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install oxipng
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y oxipng
+
+      - name: Optimize PNG images
+        id: optimize
+        run: |
+          echo "Looking for PNG images to optimize in data/images..."
+          # Find all PNG files in data/images and run oxipng on them
+          # -o 6: Optimization level (0-6, 6 is slow but best compression)
+          # -s 1: Strategy (0-2, 1 is default, good balance)
+          # --strip safe: Strip only unsafe chunks
+          # --keep-chunks all: Keep all known chunks
+          # --fix: Fix errors
+          # --force: Overwrite existing files
+          find data/images -name "*.png" -print0 | xargs -0 -r oxipng -o 6 -s 1 --strip safe --keep-chunks all --fix --force
+
+          # Check if any files were modified by oxipng
+          if ! git diff --exit-code --quiet; then
+            echo "::notice file=optimize-images.yml::PNG images were optimized."
+            echo "files_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice file=optimize-images.yml::No PNG images needed optimization."
+            echo "files_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push changes
+        if: steps.optimize.outputs.files_changed == 'true'
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          
+          # Stage only the data/images directory to avoid committing unrelated changes
+          git add data/images
+          
+          # Commit with a standard message
+          git commit -m "chore: Optimize PNG images with oxipng"
+          
+          # Push the changes back to the current branch
+          git push
