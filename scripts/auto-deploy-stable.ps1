@@ -28,6 +28,12 @@ param([switch]$Force, [switch]$DryRun)
 $ErrorActionPreference = 'Continue'
 $STABLE = 'C:\dev\lantern-os-stable'
 $PORT   = 4177
+# Absolute path to the stable entry script. StartServer launches `node` with THIS path
+# (not the relative 'apps/...') so every stable instance is uniquely identifiable by its
+# command line -- the dev worktree and other checkouts have different absolute paths. That
+# identity is what lets us reap leaked ZOMBIES (alive but no longer listening), the root
+# cause of the lantern-os.net 502 churn (2026-06-27).
+$ENTRY  = Join-Path $STABLE 'apps\lantern-garage\server.js'
 $LOG    = 'C:\dev\auto-deploy-stable.log'
 $LOCK   = 'C:\dev\auto-deploy-stable.lock'
 $REPO   = 'alex-place/lantern-os'
@@ -66,9 +72,51 @@ function ServerPid {
   $c = Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($c) { return [int]$c.OwningProcess } else { return $null }
 }
+# All node PIDs running THIS stable worktree's server.js (matched by the absolute $ENTRY
+# path, so the dev worktree / other checkouts are never touched), PLUS whoever currently
+# owns $PORT (covers a legacy instance launched before this script passed the absolute
+# path). De-duplicated.
+function StableServerPids {
+  $pids = @()
+  $own = ServerPid; if ($own) { $pids += [int]$own }
+  try {
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+      Where-Object { $_.CommandLine -and ($_.CommandLine -like "*$ENTRY*") } |
+      ForEach-Object { $pids += [int]$_.ProcessId }
+  } catch { }
+  return @($pids | Sort-Object -Unique)
+}
 function StopServer {
-  $p = ServerPid
-  if ($p) { Log "stopping server tree PID $p"; & taskkill /PID $p /T /F 2>&1 | Out-Null; Start-Sleep -Seconds 2 }
+  # Reap the WHOLE stable fleet -- the live $PORT owner AND any leaked zombies. Leaving a
+  # zombie alive (alive but not listening, e.g. after a partial shutdown that left the
+  # collectors' setInterval timers running) was the root cause of the 502 churn: its
+  # orphaned child services (MCP 8771/8772, trading 5050, discord) contended with the
+  # freshly-started server, and a zombie still holding $PORT made the next boot EADDRINUSE
+  # straight out (server.js exits on EADDRINUSE -- there is no port fallback). 2026-06-27.
+  $targets = StableServerPids
+  foreach ($p in $targets) { Log "stopping stable server tree PID $p"; & taskkill /PID $p /T /F 2>&1 | Out-Null }
+  if (@($targets).Count -gt 0) { Start-Sleep -Seconds 2 }
+}
+# Reap leaked zombies WITHOUT touching the live $PORT owner -- used on the healthy
+# up-to-date path so duplicates can't accumulate over time (the slow leak that built up
+# to this outage). Age-gated so a server that is still booting (not yet listening) is
+# left alone.
+function ReapZombies {
+  $own = ServerPid
+  $reaped = 0
+  try {
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+      Where-Object { $_.CommandLine -and ($_.CommandLine -like "*$ENTRY*") -and ([int]$_.ProcessId -ne $own) } |
+      ForEach-Object {
+        $ageSec = ((Get-Date) - $_.CreationDate).TotalSeconds
+        if ($ageSec -ge 45) {
+          Log ("reaping leaked stable zombie PID {0} (age {1}s, not on {2})" -f $_.ProcessId, [int]$ageSec, $PORT)
+          & taskkill /PID $_.ProcessId /T /F 2>&1 | Out-Null
+          $reaped++
+        }
+      }
+  } catch { }
+  if ($reaped -gt 0) { Start-Sleep -Seconds 1 }
 }
 function StartServer {
   # Hydrate User-scope API keys/config into this process so the spawned node inherits
@@ -83,7 +131,10 @@ function StartServer {
     $val = [System.Environment]::GetEnvironmentVariable($key, 'User')
     if ($val) { [System.Environment]::SetEnvironmentVariable($key, $val, 'Process') }
   }
-  Start-Process -FilePath 'node' -ArgumentList 'apps/lantern-garage/server.js' -WorkingDirectory $STABLE -WindowStyle Hidden
+  # Launch with the ABSOLUTE entry path (not relative) so StopServer/ReapZombies can
+  # identify this instance later. WorkingDirectory stays $STABLE, so __dirname and
+  # process.cwd() are unchanged -- behaviour is identical to the relative invocation.
+  Start-Process -FilePath 'node' -ArgumentList $ENTRY -WorkingDirectory $STABLE -WindowStyle Hidden
 }
 function HealthOk {
   for ($i = 0; $i -lt 25; $i++) {
@@ -136,10 +187,12 @@ try {
     # lantern-os.net down until a manual -Force). ServerPid/StartServer/HealthOk are
     # defined above; we're inside the single-instance lock so there is no double-start.
     if (-not (ServerPid)) {
-      Log "up-to-date ($($local.Substring(0,8))) but server NOT running -> self-heal restart"
+      Log "up-to-date ($($local.Substring(0,8))) but server NOT running -> reap zombies + self-heal restart"
+      ReapZombies   # clear any leaked instance still holding child-service ports before we boot a fresh one
       StartServer
       if (HealthOk) { Log "self-heal: server restarted OK on $PORT" } else { Log "self-heal FAILED: server still down on $PORT -- MANUAL ATTENTION" }
     } else {
+      ReapZombies   # healthy: sweep up any leaked zombie siblings so duplicates can't accumulate (never touches the live owner)
       Log "up-to-date ($($local.Substring(0,8)))"
     }
     exit 0
@@ -235,6 +288,7 @@ try {
     if ($depsChanged) { NpmCi }
     Log "server not running -> starting $($remote.Substring(0,8))"
     if ($DryRun) { Log "DRY-RUN: would start server"; exit 0 }
+    ReapZombies   # clear leaked zombies first so child-service ports / $PORT are free for the fresh boot
     StartServer
     if (HealthOk) { Log "server started OK on $PORT" } else { Log "server FAILED to come up on $PORT -- MANUAL ATTENTION" }
     exit 0
