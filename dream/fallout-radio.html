@@ -10,11 +10,20 @@
       Keystone Radio — a retro Pip-Boy / tube-radio MP3 player.
       Its own phosphor-green CRT theme (a radio is its own device, so it ignores
       the site light/dark theme on purpose). A TRUE <audio> player: custom
-      transport (play/pause, prev/next, seek, volume), auto-advance, and a real
-      Web-Audio VU meter that reacts to the waveform. Songs are public-domain
-      recordings served locally from /radio/ — the same 1940s canon that
-      plays on Fallout's in-game radio. Add a track: drop an mp3 in that folder
-      and add a row to the STATIONS array at the bottom. No other change needed.
+      transport (play/pause, prev/next, seek, volume, mute), shuffle + repeat,
+      keyboard control, deep-linking by frequency (#101.5), persistent prefs,
+      a synthesized "tuning static" burst between stations, OS media-session
+      controls, a sleep timer, and a real Web-Audio visualizer (bars /
+      oscilloscope / mirrored — click the meter to cycle).
+
+      The CRT is layered glass: curvature, vignette, glare, a rolling scanline,
+      animated phosphor grain, and a power-on bloom. All motion honors
+      prefers-reduced-motion.
+
+      Songs are 78rpm transfers from the Internet Archive (Great 78 Project),
+      served locally from /radio/. Add a track: drop an mp3 in that folder and
+      add a row to the STATIONS array at the bottom. No other change needed.
+      Backlog + roadmap: docs/fallout-radio-backlog.md
     */
     :root {
       --ph: #2bff88; --ph-dim: #1aa657; --ph-faint: #0e5630;
@@ -63,7 +72,11 @@
     @media (max-width: 620px) { .deckwrap { grid-template-columns: 1fr; } }
 
     .dial { background: #08130d; border: 1px solid #12271a; border-radius: 12px; padding: 8px; min-height: 240px; }
-    .dial h2 { margin: 4px 6px 8px; font-size: .62rem; letter-spacing: .22em; color: var(--ph-dim); font-weight: 700; }
+    .dial h2 { margin: 4px 6px 8px; font-size: .62rem; letter-spacing: .22em; color: var(--ph-dim); font-weight: 700; display:flex; justify-content:space-between; align-items:baseline; }
+    .dial h2 .count { color: var(--ph-faint); letter-spacing:.1em; }
+    .stationscroll { max-height: 420px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1c3b27 transparent; }
+    .stationscroll::-webkit-scrollbar { width: 6px; }
+    .stationscroll::-webkit-scrollbar-thumb { background: #1c3b27; border-radius: 4px; }
     .station {
       display: block; width: 100%; text-align: left; cursor: pointer;
       background: transparent; color: var(--ph); border: 1px solid transparent;
@@ -79,19 +92,74 @@
     .station .eq { display:inline-block; width:7px; color: var(--ph); opacity:0; }
     .station[aria-current="true"] .eq { opacity: 1; }
 
+    /* ── The CRT glass ────────────────────────────────────────────────────── */
     .screen {
       background: radial-gradient(120% 100% at 50% 0%, #0a2417 0%, var(--screen) 70%);
-      border: 1px solid #143a26; border-radius: 12px; padding: 14px; position: relative; overflow: hidden;
-      box-shadow: inset 0 0 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(43,255,136,.05);
+      border: 1px solid #143a26; border-radius: 14px / 20px;   /* elliptical = bulged glass */
+      padding: 16px; position: relative; overflow: hidden;
+      box-shadow:
+        inset 0 0 60px rgba(0,0,0,.55),                 /* edge fall-off (curvature) */
+        inset 0 0 14px rgba(43,255,136,.05),
+        0 0 0 1px rgba(0,0,0,.5);
     }
-    .screen::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(43,255,136,.05) 0 1px, transparent 1px 3px); }
-    .nowlbl { font-size: .6rem; letter-spacing: .26em; color: var(--ph-dim); }
-    .nowtitle { font-size: 1.18rem; font-weight: 800; line-height: 1.2; margin: 6px 0 2px; text-shadow: 0 0 10px rgba(43,255,136,.45); min-height: 1.4em; }
+    /* fine scanlines */
+    .screen::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 4;
+      background: repeating-linear-gradient(to bottom, rgba(43,255,136,.045) 0 1px, transparent 1px 3px);
+    }
+    /* corner vignette + soft glare, layered as one element */
+    .screen::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+      background:
+        linear-gradient(133deg, rgba(190,255,220,.07) 0%, rgba(190,255,220,.02) 22%, transparent 46%),
+        radial-gradient(125% 125% at 50% 48%, transparent 56%, rgba(0,0,0,.5) 100%);
+    }
+    .screen > * { position: relative; z-index: 6; }
+    /* animated phosphor grain */
+    .crt-noise {
+      position: absolute; inset: -40%; z-index: 3; pointer-events: none; opacity: .05;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      animation: grain 0.6s steps(4) infinite;
+    }
+    @keyframes grain {
+      0%{transform:translate(0,0)} 25%{transform:translate(-3%,2%)}
+      50%{transform:translate(2%,-3%)} 75%{transform:translate(-2%,-2%)} 100%{transform:translate(3%,3%)}
+    }
+    /* rolling horizontal-hold scanline band */
+    .crt-roll {
+      position: absolute; left: 0; right: 0; height: 16%; z-index: 4; pointer-events: none;
+      background: linear-gradient(to bottom, transparent, rgba(43,255,136,.06) 45%, rgba(140,255,190,.08) 50%, transparent);
+      animation: roll 7.5s linear infinite;
+    }
+    @keyframes roll { 0%{top:-18%} 100%{top:100%} }
+    /* power-on bloom (added on first play, removed after) */
+    .crt-power {
+      position: absolute; inset: 0; z-index: 7; pointer-events: none; opacity: 0; background: #cfffe4;
+    }
+    .screen.powering .crt-power { animation: powerOn .55s ease-out; }
+    @keyframes powerOn {
+      0%   { opacity: 0; transform: scaleY(.004) scaleX(1); }
+      6%   { opacity: .9; transform: scaleY(.006) scaleX(1.2); }
+      30%  { opacity: .85; transform: scaleY(1) scaleX(1); }
+      100% { opacity: 0; transform: scaleY(1) scaleX(1); }
+    }
+
+    .nowlbl { font-size: .6rem; letter-spacing: .26em; color: var(--ph-dim); display:flex; gap:8px; align-items:center; }
+    .nowlbl .tuning { color: var(--amber); opacity:0; transition: opacity .15s; }
+    .screen.is-tuning .nowlbl .tuning { opacity:1; }
+    .nowtitle-wrap { overflow:hidden; white-space:nowrap; margin: 6px 0 2px; min-height: 1.4em; }
+    .nowtitle {
+      display:inline-block; font-size: 1.18rem; font-weight: 800; line-height: 1.2;
+      text-shadow: -1px 0 rgba(255,46,86,.45), 1px 0 rgba(48,132,255,.45), 0 0 10px rgba(43,255,136,.45);
+    }
+    .nowtitle.scroll { animation: marquee 12s linear infinite; }
+    @keyframes marquee { 0%,8%{transform:translateX(0)} 92%,100%{transform:translateX(calc(-100% + 16ch))} }
     .nowmeta { font-size: .74rem; color: var(--ph-dim); }
     .nowlore { font-size: .72rem; line-height: 1.5; color: #6fdca0; opacity: .85; margin: 10px 0 0; font-style: italic; min-height: 2.8em; }
 
-    /* Real VU meter (canvas) */
-    .vu { width: 100%; height: 40px; margin: 12px 0 6px; display: block; image-rendering: pixelated; }
+    /* Visualizer (canvas) */
+    .vu { width: 100%; height: 44px; margin: 12px 0 4px; display: block; image-rendering: pixelated; cursor: pointer; }
+    .vumode { font-size:.54rem; letter-spacing:.18em; color: var(--ph-faint); text-align:right; margin-top:-2px; }
 
     /* Transport */
     .transport { margin-top: 8px; border-top: 1px dashed #1c3b27; padding-top: 10px; }
@@ -110,15 +178,39 @@
     .range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--ph); box-shadow: 0 0 8px rgba(43,255,136,.6); }
     .range::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--ph); box-shadow: 0 0 8px rgba(43,255,136,.6); }
     .range:focus-visible { outline: 2px solid var(--ph); outline-offset: 3px; }
-    .volrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-    .volrow .vlbl { font-size: .6rem; letter-spacing: .2em; color: var(--ph-dim); }
-    .volrow .range { margin: 0; max-width: 160px; }
+
+    /* Mode toggle row */
+    .modes { display:flex; align-items:center; gap:6px; margin-top:10px; flex-wrap:wrap; }
+    .vlbl { font-size: .6rem; letter-spacing: .2em; color: var(--ph-dim); }
+    .modes .range { margin: 0; max-width: 130px; }
+    .tog {
+      background:#0c1f14; color:var(--ph-dim); border:1px solid #1c3b27; border-radius:7px;
+      height:30px; padding:0 9px; font:inherit; font-size:.62rem; letter-spacing:.12em; cursor:pointer;
+      display:inline-flex; align-items:center; gap:5px; transition: background .12s, color .12s, box-shadow .12s;
+    }
+    .tog:hover { background:#103021; }
+    .tog:focus-visible { outline: 2px solid var(--ph); outline-offset: 2px; }
+    .tog[aria-pressed="true"] { color:var(--ph); border-color:var(--ph-dim); background:#0f2a1b; box-shadow: inset 0 0 10px rgba(43,255,136,.14); }
+    .tog.amber[aria-pressed="true"] { color:var(--amber); border-color:#5a3d10; background:#160d02; box-shadow: inset 0 0 10px rgba(255,181,59,.14); }
+    .spacer { margin-left:auto; }
+    .sleepsel {
+      background:#0c1f14; color:var(--ph-dim); border:1px solid #1c3b27; border-radius:7px;
+      height:30px; padding:0 6px; font:inherit; font-size:.62rem; letter-spacing:.1em; cursor:pointer;
+    }
+    .sleepsel:focus-visible { outline: 2px solid var(--ph); outline-offset: 2px; }
+
+    .keys { margin-top:8px; font-size:.56rem; letter-spacing:.06em; color: var(--ph-faint); line-height:1.6; }
+    .keys b { color: var(--ph-dim); font-weight:700; }
 
     .footer { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #1c3b27; font-size: .64rem; line-height: 1.6; color: var(--ph-dim); display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; }
     .footer a { color: var(--ph); text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
     .footer .note { color: #4f9c70; }
-    @media (prefers-reduced-motion: reduce) { .radio::after { animation: none; } .onair i { animation: none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .radio::after, .onair i, .crt-noise, .crt-roll, .nowtitle.scroll { animation: none; }
+      .crt-noise { opacity: .03; }
+    }
   </style>
 </head>
 <body>
@@ -131,69 +223,115 @@
 
     <div class="deckwrap">
       <nav class="dial" aria-label="Stations">
-        <h2>▚ TUNE THE DIAL</h2>
-        <div id="stationList"></div>
+        <h2><span>▚ TUNE THE DIAL</span><span class="count" id="dialCount"></span></h2>
+        <div class="stationscroll" id="stationList"></div>
       </nav>
 
-      <section class="screen" aria-live="polite">
-        <div class="nowlbl">NOW PLAYING</div>
-        <div class="nowtitle" id="nowTitle">— press play —</div>
+      <section class="screen" id="screen" aria-live="polite">
+        <span class="crt-noise" aria-hidden="true"></span>
+        <span class="crt-roll" aria-hidden="true"></span>
+        <span class="crt-power" aria-hidden="true"></span>
+
+        <div class="nowlbl">NOW PLAYING <span class="tuning" id="tuningLbl">◦ TUNING…</span></div>
+        <div class="nowtitle-wrap"><span class="nowtitle" id="nowTitle">— press play —</span></div>
         <div class="nowmeta" id="nowMeta"></div>
 
-        <canvas class="vu" id="vu" width="320" height="40" aria-hidden="true"></canvas>
+        <canvas class="vu" id="vu" width="320" height="44" title="Click to change visualizer" aria-hidden="true"></canvas>
+        <div class="vumode" id="vuMode">BARS</div>
 
         <div class="transport">
           <input class="range" id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
           <div class="tbtns">
-            <button class="tbtn" id="prev" type="button" title="Previous" aria-label="Previous track">⏮</button>
-            <button class="tbtn play" id="play" type="button" title="Play / pause" aria-label="Play or pause">▶</button>
-            <button class="tbtn" id="next" type="button" title="Next" aria-label="Next track">⏭</button>
+            <button class="tbtn" id="prev" type="button" title="Previous (])" aria-label="Previous track">⏮</button>
+            <button class="tbtn play" id="play" type="button" title="Play / pause (space)" aria-label="Play or pause">▶</button>
+            <button class="tbtn" id="next" type="button" title="Next ([)" aria-label="Next track">⏭</button>
             <span class="ttime" id="time">0:00 / 0:00</span>
           </div>
-          <div class="volrow">
+
+          <div class="modes">
             <span class="vlbl">VOL</span>
             <input class="range" id="vol" type="range" min="0" max="100" value="85" aria-label="Volume">
+            <button class="tog spacer" id="shuffle" type="button" aria-pressed="false" title="Shuffle (S)">🔀 SHUF</button>
+            <button class="tog" id="repeat" type="button" aria-pressed="false" title="Repeat off / all / one (R)">🔁 REP</button>
+            <button class="tog" id="mute" type="button" aria-pressed="false" title="Mute (M)">🔊 VOL</button>
+            <button class="tog amber" id="static" type="button" aria-pressed="true" title="Tuning static between stations">📻 DX</button>
+            <select class="sleepsel" id="sleep" aria-label="Sleep timer" title="Sleep timer">
+              <option value="0">SLEEP: OFF</option>
+              <option value="15">15 MIN</option>
+              <option value="30">30 MIN</option>
+              <option value="60">60 MIN</option>
+            </select>
           </div>
         </div>
 
         <p class="nowlore" id="nowLore">Static hums. The dial waits. Pick a frequency and let the old world sing.</p>
+        <div class="keys" aria-hidden="true">
+          <b>SPACE</b> play/pause · <b>← →</b> seek · <b>↑ ↓</b> volume · <b>[ ]</b> next/prev · <b>M</b> mute · <b>S</b> shuffle · <b>R</b> repeat
+        </div>
       </section>
     </div>
 
     <div class="footer">
-      <span class="note">Public-domain recordings (Internet Archive / Great 78 Project), served locally — the era that plays on Fallout's radio.</span>
+      <span class="note">78rpm transfers from the Internet Archive (Great 78 Project), served locally — the era that plays on Fallout's radio.</span>
       <span><a href="/explore.html">‹ back to Explore</a></span>
     </div>
   </main>
 
-  <audio id="audio" preload="metadata"></audio>
+  <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 
   <script>
-    /* Playlist — public-domain mp3s served locally from /radio/.
-       Add a song: drop the mp3 in that folder, add a row here. */
+    /* Playlist — 78rpm transfers served locally from /radio/.
+       Add a song: drop the mp3 in that folder, add a row here. Ordered low→high
+       on the dial; 101.5 (the Founder's Frequency) is the default cue. */
     var STATIONS = [
-      { freq: "101.5", title: "I Don't Want to Set the World on Fire", artist: "The Ink Spots", year: 1941,
-        src: "/radio/set-the-world-on-fire.mp3",
-        lore: "Fallout's signature lullaby for the end of everything. The Ink Spots, Decca Studios, August 1941." },
-      { freq: "98.7", title: "Civilization (Bongo, Bongo, Bongo)", artist: "Danny Kaye & The Andrews Sisters", year: 1947,
-        src: "/radio/civilization.mp3",
-        lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." },
-      { freq: "105.1", title: "Pistol Packin' Mama", artist: "Bing Crosby & The Andrews Sisters", year: 1943,
-        src: "/radio/pistol-packin-mama.mp3",
-        lore: "Lay that pistol down, babe. Crosby and the Andrews Sisters, Decca 23277, 1943 — a jukebox staple in every diner still standing." },
-      { freq: "92.3", title: "Into Each Life Some Rain Must Fall", artist: "The Ink Spots & Ella Fitzgerald", year: 1944,
-        src: "/radio/into-each-life.mp3",
-        lore: "Bill Kenny and Ella trade verses on the weather of the heart. Decca 23356, 1944 — heartbreak you can slow-dance to." },
+      { freq: "88.1", title: "Rum and Coca-Cola", artist: "Louis Prima & His Orchestra", year: 1944,
+        src: "/radio/rum-and-coca-cola.mp3",
+        lore: "Working for the Yankee dollar. Louis Prima's 1944 read of the Calypso hit — wartime swing with a wink." },
       { freq: "89.5", title: "(I've Got Spurs That) Jingle Jangle Jingle", artist: "Mal Hallett & His Orchestra", year: 1942,
         src: "/radio/jingle-jangle-jingle.mp3",
         lore: "A free, fancy, footloose cowboy tune from 1942 — later beamed across the Mojave on New Vegas radio." },
-      { freq: "88.1", title: "Rum and Coca-Cola", artist: "Louis Prima & His Orchestra", year: 1944,
-        src: "/radio/rum-and-coca-cola.mp3",
-        lore: "Working for the Yankee dollar. Louis Prima's 1944 read of the Calypso hit — wartime swing with a wink." }
+      { freq: "90.9", title: "Stormy Weather", artist: "Cliff Lang & His All-Star Orchestra", year: 1946,
+        src: "/radio/stormy-weather.mp3",
+        lore: "Arlen & Koehler's torch standard — \"don't know why there's no sun up in the sky.\" A 1946 dance-band reading of a Cotton Club classic." },
+      { freq: "92.3", title: "Into Each Life Some Rain Must Fall", artist: "The Ink Spots & Ella Fitzgerald", year: 1944,
+        src: "/radio/into-each-life.mp3",
+        lore: "Bill Kenny and Ella trade verses on the weather of the heart. Decca 23356, 1944 — heartbreak you can slow-dance to." },
+      { freq: "94.7", title: "Dream a Little Dream of Me", artist: "Lawrence \"Piano Roll\" Cook", year: 1950,
+        src: "/radio/dream-a-little-dream.mp3",
+        lore: "The 1931 standard rendered on a player-piano roll by Lawrence Cook — phantom fingers, no pianist in the room. The old world dreaming itself." },
+      { freq: "96.5", title: "It's a Sin to Tell a Lie", artist: "Frank \"Big Boy\" Goodie et son Orchestre", year: 1939,
+        src: "/radio/its-a-sin-to-tell-a-lie.mp3",
+        lore: "Billy Mayhew's standard cut in Paris by expatriate hornman Frank \"Big Boy\" Goodie — Hot Club swing with a wagging finger, 1939." },
+      { freq: "98.7", title: "Civilization (Bongo, Bongo, Bongo)", artist: "Danny Kaye & The Andrews Sisters", year: 1947,
+        src: "/radio/civilization.mp3",
+        lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." },
+      { freq: "99.3", title: "A Wonderful Guy", artist: "Joe Loss & His Orchestra", year: 1949,
+        src: "/radio/a-wonderful-guy.mp3",
+        lore: "Nellie Forbush's giddy declaration from South Pacific — \"I'm in love with a wonderful guy.\" Joe Loss's British dance-band take, 1949." },
+      { freq: "100.7", title: "Butcher Pete (Part 1)", artist: "Roy Brown & His Mighty-Mighty Men", year: 1949,
+        src: "/radio/butcher-pete.mp3",
+        lore: "Roy Brown's jump-blues about a butcher \"hackin' all over town\" — a 1949 double-entendre romp later spun on Fallout 4's Diamond City Radio." },
+      { freq: "101.5", title: "I Don't Want to Set the World on Fire", artist: "The Ink Spots", year: 1941,
+        src: "/radio/set-the-world-on-fire.mp3",
+        lore: "Fallout's signature lullaby for the end of everything. The Ink Spots, Decca Studios, August 1941." },
+      { freq: "102.3", title: "Diane", artist: "Buddy Lucas & His Band of Tomorrow", year: 1951,
+        src: "/radio/diane.mp3",
+        lore: "Rapée & Pollack's 1928 waltz reborn as a honking 1951 R&B instrumental by Buddy Lucas's Band of Tomorrow — smoky, slow, after-hours." },
+      { freq: "103.9", title: "A String of Pearls", artist: "Glenn Miller & His Orchestra", year: 1941,
+        src: "/radio/a-string-of-pearls.mp3",
+        lore: "Jerry Gray's glide for the Miller band — November 1941, a month before everything changed. Pure ballroom shimmer." },
+      { freq: "105.1", title: "Pistol Packin' Mama", artist: "Bing Crosby & The Andrews Sisters", year: 1943,
+        src: "/radio/pistol-packin-mama.mp3",
+        lore: "Lay that pistol down, babe. Crosby and the Andrews Sisters, Decca 23277, 1943 — a jukebox staple in every diner still standing." },
+      { freq: "107.1", title: "Anything Goes", artist: "Jack Payne & His Band", year: 1935,
+        src: "/radio/anything-goes.mp3",
+        lore: "Cole Porter's catalog of a world gone topsy-turvy — \"the world's gone mad today.\" Jack Payne's 1935 band still sounds like a prophecy." }
     ];
+    var DEFAULT_FREQ = "101.5";
 
     var audio = document.getElementById('audio');
     var listEl = document.getElementById('stationList');
+    var screenEl = document.getElementById('screen');
     var nowTitle = document.getElementById('nowTitle');
     var nowMeta = document.getElementById('nowMeta');
     var nowLore = document.getElementById('nowLore');
@@ -204,11 +342,19 @@
     var onair = document.getElementById('onair');
     var onairLbl = document.getElementById('onairLbl');
     var current = -1;
-    var scrubbing = false;   // true while the user drags the seek slider
+    var scrubbing = false;     // true while the user drags the seek slider
+
+    // ── Persistent prefs ───────────────────────────────────────────────────
+    var PREFS_KEY = 'keystone-radio.v1';
+    var prefs = { vol: 85, muted: false, shuffle: false, repeat: 'off', viz: 0 };
+    try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (e) {}
+    function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) {} }
 
     function fmt(t) { if (!isFinite(t)) return "0:00"; var m = Math.floor(t/60), s = Math.floor(t%60); return m + ":" + (s<10?"0":"") + s; }
+    function findByFreq(f) { for (var i=0;i<STATIONS.length;i++) if (STATIONS[i].freq===f) return i; return -1; }
 
     function render() {
+      document.getElementById('dialCount').textContent = STATIONS.length + ' STATIONS';
       STATIONS.forEach(function (s, i) {
         var b = document.createElement('button');
         b.type = 'button'; b.className = 'station'; b.setAttribute('aria-current', 'false');
@@ -223,28 +369,48 @@
 
     function tune(i, autoplay) {
       var s = STATIONS[i]; if (!s) return;
+      var changed = (i !== current);
       current = i;
       audio.src = s.src;
       nowTitle.textContent = s.title;
       nowMeta.textContent = s.artist + " · " + s.year;
       nowLore.textContent = s.lore || "";
+      applyMarquee();
       Array.prototype.forEach.call(listEl.children, function (b, j) {
         b.setAttribute('aria-current', j === i ? 'true' : 'false');
+        if (j === i) b.scrollIntoView({ block: 'nearest' });
       });
       try { history.replaceState(null, '', '#' + s.freq); } catch (e) {}
+      updateMediaSession(s);
+      if (changed && autoplay) tuningStatic();   // dial-turn squelch
       if (autoplay) play();
     }
 
+    // Long titles scroll; short ones sit still.
+    function applyMarquee() {
+      nowTitle.classList.remove('scroll');
+      requestAnimationFrame(function () {            // measure after layout settles
+        var wrap = nowTitle.parentElement;
+        if (nowTitle.scrollWidth > wrap.clientWidth + 4) nowTitle.classList.add('scroll');
+      });
+    }
+
     function play() {
-      if (current < 0) { tune(0, false); }
+      if (current < 0) { var d = findByFreq(DEFAULT_FREQ); tune(d < 0 ? 0 : d, false); }
       ensureAudioGraph();
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      if (!powered) { powered = true; screenEl.classList.add('powering'); setTimeout(function(){ screenEl.classList.remove('powering'); }, 600); }
       audio.play().catch(function(){ /* autoplay blocked until a gesture; the click IS the gesture */ });
     }
 
     playBtn.addEventListener('click', function () { if (audio.paused) play(); else audio.pause(); });
-    document.getElementById('prev').addEventListener('click', function () { tune((current<=0?STATIONS.length-1:current-1), true); });
-    document.getElementById('next').addEventListener('click', function () { tune((current+1)%STATIONS.length, true); });
+    document.getElementById('prev').addEventListener('click', function () { tune(prevIndex(), true); });
+    document.getElementById('next').addEventListener('click', function () { tune(nextIndex(), true); });
+
+    function randomOther() { var n; do { n = Math.floor(Math.random()*STATIONS.length); } while (STATIONS.length>1 && n===current); return n; }
+    function nextIndex() { return prefs.shuffle ? randomOther() : (current+1) % STATIONS.length; }
+    function prevIndex() { return prefs.shuffle ? randomOther() : (current<=0 ? STATIONS.length-1 : current-1); }
+
     // While dragging, only preview the target time; don't seek the audio yet and
     // don't let timeupdate yank the thumb back. Commit on release ('change').
     seek.addEventListener('input', function () {
@@ -255,22 +421,142 @@
       if (audio.duration) audio.currentTime = (seek.value / 1000) * audio.duration;
       scrubbing = false;
     });
-    volEl.addEventListener('input', function () { audio.volume = volEl.value/100; });
-    audio.volume = volEl.value/100;
 
+    // ── Volume + mute ──────────────────────────────────────────────────────
+    var muteBtn = document.getElementById('mute');
+    function applyVolume() {
+      audio.muted = prefs.muted;
+      audio.volume = prefs.vol / 100;
+      volEl.value = prefs.vol;
+      muteBtn.setAttribute('aria-pressed', prefs.muted ? 'true' : 'false');
+      muteBtn.textContent = (prefs.muted || prefs.vol === 0) ? '🔇 MUTE' : '🔊 VOL';
+    }
+    volEl.addEventListener('input', function () { prefs.vol = +volEl.value; prefs.muted = false; applyVolume(); savePrefs(); });
+    muteBtn.addEventListener('click', function () { prefs.muted = !prefs.muted; applyVolume(); savePrefs(); });
+
+    // ── Shuffle + repeat ───────────────────────────────────────────────────
+    var shufBtn = document.getElementById('shuffle'), repBtn = document.getElementById('repeat');
+    function applyShuffle() { shufBtn.setAttribute('aria-pressed', prefs.shuffle ? 'true' : 'false'); }
+    function applyRepeat() {
+      repBtn.setAttribute('aria-pressed', prefs.repeat === 'off' ? 'false' : 'true');
+      repBtn.textContent = prefs.repeat === 'one' ? '🔂 ONE' : (prefs.repeat === 'all' ? '🔁 ALL' : '🔁 REP');
+    }
+    shufBtn.addEventListener('click', function () { prefs.shuffle = !prefs.shuffle; applyShuffle(); savePrefs(); });
+    repBtn.addEventListener('click', function () {
+      prefs.repeat = prefs.repeat === 'off' ? 'all' : (prefs.repeat === 'all' ? 'one' : 'off');
+      applyRepeat(); savePrefs();
+    });
+
+    // ── Tuning static (DX) ─────────────────────────────────────────────────
+    var staticBtn = document.getElementById('static');
+    var dxOn = true;
+    staticBtn.addEventListener('click', function () { dxOn = !dxOn; staticBtn.setAttribute('aria-pressed', dxOn ? 'true' : 'false'); });
+    function tuningStatic() {
+      if (!dxOn) return;
+      ensureAudioGraph();
+      if (!audioCtx) return;
+      try {
+        screenEl.classList.add('is-tuning');
+        var dur = 0.5, sr = audioCtx.sampleRate;
+        var buf = audioCtx.createBuffer(1, Math.floor(sr*dur), sr);
+        var d = buf.getChannelData(0);
+        for (var i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * 0.6;
+        var noise = audioCtx.createBufferSource(); noise.buffer = buf;
+        var bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 0.7;
+        var g = audioCtx.createGain();
+        var t = audioCtx.currentTime;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.22, t+0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+        noise.connect(bp); bp.connect(g);
+        g.connect(audioCtx.destination);
+        if (analyser) g.connect(analyser);   // let the meter twitch with the hiss
+        noise.start(t); noise.stop(t+dur);
+        setTimeout(function(){ screenEl.classList.remove('is-tuning'); }, dur*1000);
+      } catch (e) {}
+    }
+
+    // ── Sleep timer ────────────────────────────────────────────────────────
+    var sleepSel = document.getElementById('sleep'), sleepT = null, fadeT = null;
+    sleepSel.addEventListener('change', function () {
+      if (sleepT) clearTimeout(sleepT); if (fadeT) clearInterval(fadeT);
+      var mins = +sleepSel.value;
+      if (!mins) return;
+      sleepT = setTimeout(function () {
+        var v = prefs.vol;
+        fadeT = setInterval(function () {
+          v -= 4;
+          if (v <= 0) { clearInterval(fadeT); audio.pause(); audio.volume = prefs.vol/100; sleepSel.value = '0'; }
+          else audio.volume = (v/100) * (prefs.muted ? 0 : 1);
+        }, 350);
+      }, mins*60*1000);
+    });
+
+    // ── Audio element events ───────────────────────────────────────────────
     audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; });
     audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; });
+    audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); });
+    audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); });
+    audio.addEventListener('canplay',  function () { screenEl.classList.remove('is-tuning'); });
     audio.addEventListener('timeupdate', function () {
       if (scrubbing) return;   // don't fight the user's drag
       if (audio.duration) seek.value = Math.round((audio.currentTime/audio.duration)*1000);
       timeEl.textContent = fmt(audio.currentTime) + " / " + fmt(audio.duration);
     });
-    audio.addEventListener('ended', function () { tune((current+1)%STATIONS.length, true); }); // auto-advance
+    audio.addEventListener('ended', function () {
+      if (prefs.repeat === 'one') { audio.currentTime = 0; play(); return; }
+      if (!prefs.shuffle && prefs.repeat === 'off' && current === STATIONS.length-1) { audio.pause(); return; } // end of dial
+      tune(nextIndex(), true);
+    });
+    // A dead/missing track shouldn't freeze the dial: flag SIGNAL LOST, skip on.
+    audio.addEventListener('error', function () {
+      if (current < 0) return;
+      nowTitle.textContent = '— SIGNAL LOST —';
+      nowMeta.textContent = (STATIONS[current] ? STATIONS[current].freq + ' FM is off the air' : '');
+      screenEl.classList.remove('is-tuning');
+      setTimeout(function () { if (STATIONS.length > 1) tune(nextIndex(), true); }, 1400);
+    });
 
-    /* Real VU meter via Web Audio — local same-origin mp3s are CORS-clean, so
-       the analyser is not tainted. Falls back silently if Web Audio is absent. */
-    var audioCtx, analyser, freqData, vuReady = false;
+    // ── Media Session (OS / lock-screen controls) ──────────────────────────
+    function updateMediaSession(s) {
+      if (!('mediaSession' in navigator)) return;
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: s.title, artist: s.artist, album: 'Keystone Radio · ' + s.freq + ' FM'
+        });
+        navigator.mediaSession.setActionHandler('play', play);
+        navigator.mediaSession.setActionHandler('pause', function(){ audio.pause(); });
+        navigator.mediaSession.setActionHandler('previoustrack', function(){ tune(prevIndex(), true); });
+        navigator.mediaSession.setActionHandler('nexttrack', function(){ tune(nextIndex(), true); });
+      } catch (e) {}
+    }
+
+    // ── Keyboard transport ─────────────────────────────────────────────────
+    document.addEventListener('keydown', function (e) {
+      if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+      switch (e.key) {
+        case ' ': case 'k': e.preventDefault(); if (audio.paused) play(); else audio.pause(); break;
+        case 'ArrowRight': if (audio.duration) audio.currentTime = Math.min(audio.duration, audio.currentTime+5); break;
+        case 'ArrowLeft':  if (audio.duration) audio.currentTime = Math.max(0, audio.currentTime-5); break;
+        case 'ArrowUp':   e.preventDefault(); prefs.vol = Math.min(100, prefs.vol+5); prefs.muted=false; applyVolume(); savePrefs(); break;
+        case 'ArrowDown': e.preventDefault(); prefs.vol = Math.max(0, prefs.vol-5); applyVolume(); savePrefs(); break;
+        case ']': tune(prevIndex(), true); break;
+        case '[': tune(nextIndex(), true); break;
+        case 'm': case 'M': muteBtn.click(); break;
+        case 's': case 'S': shufBtn.click(); break;
+        case 'r': case 'R': repBtn.click(); break;
+      }
+    });
+
+    // ── Real visualizer via Web Audio — local same-origin mp3s are CORS-clean,
+    //    so the analyser is not tainted. Falls back silently if Web Audio is absent.
+    var audioCtx, analyser, freqData, timeData, vuReady = false, powered = false;
     var canvas = document.getElementById('vu'), cx = canvas.getContext('2d');
+    var vuModeEl = document.getElementById('vuMode');
+    var VU_NAMES = ['BARS', 'SCOPE', 'MIRROR'];
+    function setVuLabel() { vuModeEl.textContent = VU_NAMES[prefs.viz] || 'BARS'; }
+    canvas.addEventListener('click', function () { prefs.viz = (prefs.viz+1) % VU_NAMES.length; setVuLabel(); savePrefs(); });
+
     function ensureAudioGraph() {
       if (vuReady) return;
       try {
@@ -279,32 +565,72 @@
         audioCtx = new AC();
         var srcNode = audioCtx.createMediaElementSource(audio);
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
+        analyser.fftSize = 1024;
         freqData = new Uint8Array(analyser.frequencyBinCount);
+        timeData = new Uint8Array(analyser.fftSize);
         srcNode.connect(analyser);
         analyser.connect(audioCtx.destination);
         vuReady = true;
-        drawVU();
       } catch (e) { /* no analyser — meter stays idle */ }
     }
+
     function drawVU() {
       requestAnimationFrame(drawVU);
       var w = canvas.width, h = canvas.height;
       cx.clearRect(0, 0, w, h);
-      var bars = 24, gap = 2, bw = (w - gap*(bars-1)) / bars;
       var live = vuReady && !audio.paused;
+      var mode = prefs.viz || 0;
+
+      if (mode === 1 && live) {           // oscilloscope
+        analyser.getByteTimeDomainData(timeData);
+        cx.lineWidth = 2; cx.strokeStyle = 'rgba(43,255,136,.9)'; cx.beginPath();
+        var step = w / timeData.length;
+        for (var i=0;i<timeData.length;i++) {
+          var y = (timeData[i]/255) * h;
+          if (i===0) cx.moveTo(0, y); else cx.lineTo(i*step, y);
+        }
+        cx.stroke();
+        cx.strokeStyle = 'rgba(43,255,136,.18)'; cx.beginPath(); cx.moveTo(0,h/2); cx.lineTo(w,h/2); cx.stroke();
+        return;
+      }
+
+      // BARS (0) and MIRROR (2)
       if (live) analyser.getByteFrequencyData(freqData);
-      for (var i = 0; i < bars; i++) {
-        var v = live ? (freqData[i] / 255) : 0.06 + 0.02*Math.sin(i);
-        var bh = Math.max(2, v * h);
+      var bars = 28, gap = 2, bw = (w - gap*(bars-1)) / bars;
+      var bins = vuReady ? analyser.frequencyBinCount : bars;
+      for (var b = 0; b < bars; b++) {
+        var idx = Math.floor(b/bars * Math.min(bins, 220));     // emphasize the audible low/mid
+        var v = live ? (freqData[idx] / 255) : 0.06 + 0.02*Math.sin(b*0.6);
+        var bh = Math.max(2, v * (mode === 2 ? h/2 : h));
         cx.fillStyle = 'rgba(43,255,136,' + (0.35 + 0.6*v) + ')';
-        cx.fillRect(i*(bw+gap), h - bh, bw, bh);
+        if (mode === 2) {                 // mirrored from the centre
+          cx.fillRect(b*(bw+gap), h/2 - bh, bw, bh);
+          cx.fillStyle = 'rgba(43,255,136,' + (0.18 + 0.4*v) + ')';
+          cx.fillRect(b*(bw+gap), h/2, bw, bh);
+        } else {
+          cx.fillRect(b*(bw+gap), h - bh, bw, bh);
+        }
       }
     }
     drawVU();
 
+    // ── Boot ───────────────────────────────────────────────────────────────
+    applyVolume(); applyShuffle(); applyRepeat(); setVuLabel();
     render();
-    tune(0, false); // cue the hero track; user presses play (browser autoplay policy)
+
+    // Deep-link: #101.5 (or any freq) tunes straight there; else the Founder's
+    // Frequency. The user presses play (browser autoplay policy).
+    function freqFromHash() { var h = (location.hash || '').replace(/^#/, '').trim(); return findByFreq(h); }
+    var start = freqFromHash();
+    if (start < 0) start = findByFreq(DEFAULT_FREQ);
+    if (start < 0) start = 0;
+    tune(start, false);
+
+    // Honor later #freq changes (e.g. someone pastes a deep link while open).
+    window.addEventListener('hashchange', function () {
+      var i = freqFromHash();
+      if (i >= 0 && i !== current) tune(i, true);
+    });
   </script>
 </body>
 </html>
