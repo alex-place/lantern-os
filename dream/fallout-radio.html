@@ -10,9 +10,10 @@
       Keystone Radio — a retro Pip-Boy / tube-radio MP3 player.
       Its own phosphor-green CRT theme (a radio is its own device, so it ignores
       the site light/dark theme on purpose). A TRUE <audio> player: custom
-      transport (play/pause, prev/next, seek, volume, mute), shuffle + repeat,
-      keyboard control, deep-linking by frequency (#101.5), persistent prefs,
-      a synthesized "tuning static" burst between stations, OS media-session
+      transport (play/pause, prev/next, seek, volume, mute), repeat, and
+      period-radio options — always-on tuning static (DX), an always-shuffled
+      dial, a warm AM/tube tone, and 78rpm shellac crackle. Keyboard control,
+      deep-linking by frequency (#101.5), persistent prefs, OS media-session
       controls, a sleep timer, and a real Web-Audio visualizer (bars /
       oscilloscope / mirrored — click the meter to cycle).
 
@@ -251,10 +252,10 @@
           <div class="modes">
             <span class="vlbl">VOL</span>
             <input class="range" id="vol" type="range" min="0" max="100" value="85" aria-label="Volume">
-            <button class="tog spacer" id="shuffle" type="button" aria-pressed="false" title="Shuffle (S)">🔀 SHUF</button>
+            <button class="tog spacer" id="mute" type="button" aria-pressed="false" title="Mute (M)">🔊 VOL</button>
             <button class="tog" id="repeat" type="button" aria-pressed="false" title="Repeat off / all / one (R)">🔁 REP</button>
-            <button class="tog" id="mute" type="button" aria-pressed="false" title="Mute (M)">🔊 VOL</button>
-            <button class="tog amber" id="static" type="button" aria-pressed="true" title="Tuning static between stations">📻 DX</button>
+            <button class="tog amber" id="warmth" type="button" aria-pressed="false" title="Warm AM/tube tone — roll off the highs (W)">🎚 WARM</button>
+            <button class="tog amber" id="crackle" type="button" aria-pressed="false" title="78rpm shellac surface noise (C)">💿 78RPM</button>
             <select class="sleepsel" id="sleep" aria-label="Sleep timer" title="Sleep timer">
               <option value="0">SLEEP: OFF</option>
               <option value="15">15 MIN</option>
@@ -266,7 +267,7 @@
 
         <p class="nowlore" id="nowLore">Static hums. The dial waits. Pick a frequency and let the old world sing.</p>
         <div class="keys" aria-hidden="true">
-          <b>SPACE</b> play/pause · <b>← →</b> seek · <b>↑ ↓</b> volume · <b>[ ]</b> next/prev · <b>M</b> mute · <b>S</b> shuffle · <b>R</b> repeat
+          <b>SPACE</b> play/pause · <b>← →</b> seek · <b>↑ ↓</b> volume · <b>[ ]</b> next/prev · <b>M</b> mute · <b>R</b> repeat · <b>W</b> warm · <b>C</b> crackle
         </div>
       </section>
     </div>
@@ -379,7 +380,7 @@
 
     // ── Persistent prefs ───────────────────────────────────────────────────
     var PREFS_KEY = 'keystone-radio.v1';
-    var prefs = { vol: 85, muted: false, shuffle: false, repeat: 'off', viz: 0 };
+    var prefs = { vol: 85, muted: false, repeat: 'off', viz: 0, warmth: false, crackle: false };
     try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (e) {}
     function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) {} }
 
@@ -441,8 +442,9 @@
     document.getElementById('next').addEventListener('click', function () { tune(nextIndex(), true); });
 
     function randomOther() { var n; do { n = Math.floor(Math.random()*STATIONS.length); } while (STATIONS.length>1 && n===current); return n; }
-    function nextIndex() { return prefs.shuffle ? randomOther() : (current+1) % STATIONS.length; }
-    function prevIndex() { return prefs.shuffle ? randomOther() : (current<=0 ? STATIONS.length-1 : current-1); }
+    // Always-shuffle: the dial wanders — next/prev both pick a fresh random station.
+    function nextIndex() { return randomOther(); }
+    function prevIndex() { return randomOther(); }
 
     // While dragging, only preview the target time; don't seek the audio yet and
     // don't let timeupdate yank the thumb back. Commit on release ('change').
@@ -467,25 +469,37 @@
     volEl.addEventListener('input', function () { prefs.vol = +volEl.value; prefs.muted = false; applyVolume(); savePrefs(); });
     muteBtn.addEventListener('click', function () { prefs.muted = !prefs.muted; applyVolume(); savePrefs(); });
 
-    // ── Shuffle + repeat ───────────────────────────────────────────────────
-    var shufBtn = document.getElementById('shuffle'), repBtn = document.getElementById('repeat');
-    function applyShuffle() { shufBtn.setAttribute('aria-pressed', prefs.shuffle ? 'true' : 'false'); }
+    // ── Repeat ─────────────────────────────────────────────────────────────
+    var repBtn = document.getElementById('repeat');
     function applyRepeat() {
       repBtn.setAttribute('aria-pressed', prefs.repeat === 'off' ? 'false' : 'true');
       repBtn.textContent = prefs.repeat === 'one' ? '🔂 ONE' : (prefs.repeat === 'all' ? '🔁 ALL' : '🔁 REP');
     }
-    shufBtn.addEventListener('click', function () { prefs.shuffle = !prefs.shuffle; applyShuffle(); savePrefs(); });
     repBtn.addEventListener('click', function () {
       prefs.repeat = prefs.repeat === 'off' ? 'all' : (prefs.repeat === 'all' ? 'one' : 'off');
       applyRepeat(); savePrefs();
     });
 
-    // ── Tuning static (DX) ─────────────────────────────────────────────────
-    var staticBtn = document.getElementById('static');
-    var dxOn = true;
-    staticBtn.addEventListener('click', function () { dxOn = !dxOn; staticBtn.setAttribute('aria-pressed', dxOn ? 'true' : 'false'); });
+    // ── Period tone options — WARM (AM/tube rolloff) + 78RPM (shellac crackle) ──
+    // Both are things you'd only want on a time-period set: WARM rolls the highs
+    // off like a tube radio's tone knob; 78RPM lays a faint shellac surface-noise
+    // bed under the music (gated to playback). They hook the Web-Audio graph, so
+    // they take effect once it's built (on first play) and update live thereafter.
+    var warmBtn = document.getElementById('warmth'), crackBtn = document.getElementById('crackle');
+    var WARM_HZ = 3200, FLAT_HZ = 20000;
+    function applyWarmth() {
+      if (toneNode) toneNode.frequency.value = prefs.warmth ? WARM_HZ : FLAT_HZ;
+      warmBtn.setAttribute('aria-pressed', prefs.warmth ? 'true' : 'false');
+    }
+    function applyCrackle() {
+      if (crackleGain) crackleGain.gain.value = (prefs.crackle && !audio.paused) ? 0.6 : 0;
+      crackBtn.setAttribute('aria-pressed', prefs.crackle ? 'true' : 'false');
+    }
+    warmBtn.addEventListener('click', function () { prefs.warmth = !prefs.warmth; applyWarmth(); savePrefs(); });
+    crackBtn.addEventListener('click', function () { prefs.crackle = !prefs.crackle; ensureAudioGraph(); applyCrackle(); savePrefs(); });
+
+    // ── Tuning static (DX) — always on; the dial-turn squelch is part of the device ──
     function tuningStatic() {
-      if (!dxOn) return;
       ensureAudioGraph();
       if (!audioCtx) return;
       try {
@@ -526,8 +540,8 @@
     });
 
     // ── Audio element events ───────────────────────────────────────────────
-    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; startVU(); });
-    audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; });
+    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; startVU(); applyCrackle(); });
+    audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; applyCrackle(); });
     audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); });
     audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); });
     audio.addEventListener('canplay',  function () { screenEl.classList.remove('is-tuning'); });
@@ -575,14 +589,16 @@
         case ']': tune(prevIndex(), true); break;
         case '[': tune(nextIndex(), true); break;
         case 'm': case 'M': muteBtn.click(); break;
-        case 's': case 'S': shufBtn.click(); break;
         case 'r': case 'R': repBtn.click(); break;
+        case 'w': case 'W': warmBtn.click(); break;
+        case 'c': case 'C': crackBtn.click(); break;
       }
     });
 
     // ── Real visualizer via Web Audio — local same-origin mp3s are CORS-clean,
     //    so the analyser is not tainted. Falls back silently if Web Audio is absent.
     var audioCtx, analyser, freqData, timeData, vuReady = false, powered = false;
+    var toneNode, crackleSrc, crackleGain;   // WARM tone filter + 78rpm crackle bed
     var canvas = document.getElementById('vu'), cx = canvas.getContext('2d');
     var vuModeEl = document.getElementById('vuMode');
     var VU_NAMES = ['BARS', 'SCOPE', 'MIRROR'];
@@ -596,14 +612,43 @@
         if (!AC) return;
         audioCtx = new AC();
         var srcNode = audioCtx.createMediaElementSource(audio);
+        // WARM tone: a lowpass the music always flows through; flat (20k) when off,
+        // rolled back to ~3.2k when on for that AM/tube warmth.
+        toneNode = audioCtx.createBiquadFilter();
+        toneNode.type = 'lowpass';
+        toneNode.frequency.value = prefs.warmth ? WARM_HZ : FLAT_HZ;
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 1024;
         freqData = new Uint8Array(analyser.frequencyBinCount);
         timeData = new Uint8Array(analyser.fftSize);
-        srcNode.connect(analyser);
+        srcNode.connect(toneNode);
+        toneNode.connect(analyser);
         analyser.connect(audioCtx.destination);
+        buildCrackle();
+        applyWarmth(); applyCrackle();
         vuReady = true;
       } catch (e) { /* no analyser — meter stays idle */ }
+    }
+
+    // 78rpm shellac bed: a looping low hiss with sparse pops, thinned by a
+    // highpass so it reads as needle-on-shellac, not white noise. Built once;
+    // its gain is what applyCrackle() opens/closes (and playback gates).
+    function buildCrackle() {
+      if (!audioCtx || crackleSrc) return;
+      try {
+        var sr = audioCtx.sampleRate, len = Math.floor(sr * 3), buf = audioCtx.createBuffer(1, len, sr);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) {
+          var v = (Math.random() * 2 - 1) * 0.05;            // steady surface hiss
+          if (Math.random() < 0.0009) v += (Math.random() * 2 - 1) * 0.7;  // sparse shellac pops
+          d[i] = v;
+        }
+        crackleSrc = audioCtx.createBufferSource(); crackleSrc.buffer = buf; crackleSrc.loop = true;
+        var hp = audioCtx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+        crackleGain = audioCtx.createGain(); crackleGain.gain.value = 0;
+        crackleSrc.connect(hp); hp.connect(crackleGain); crackleGain.connect(audioCtx.destination);
+        crackleSrc.start();
+      } catch (e) { /* no crackle — silent fallback */ }
     }
 
     // Perf: the animation loop runs ONLY while audio is playing AND the tab is
@@ -656,7 +701,7 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) startVU(); });
 
     // ── Boot ───────────────────────────────────────────────────────────────
-    applyVolume(); applyShuffle(); applyRepeat(); setVuLabel();
+    applyVolume(); applyRepeat(); applyWarmth(); applyCrackle(); setVuLabel();
     render();
 
     // Deep-link: #101.5 (or any freq) tunes straight there; else the Founder's
