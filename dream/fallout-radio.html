@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a140e">
+  <title>Keystone Radio — Founder's Frequency</title>
+  <style>
+    /*
+      Keystone Radio — a retro Pip-Boy / tube-radio MP3 player.
+      Self-contained: its own phosphor-green CRT theme (a radio is its own
+      device, so it ignores the site light/dark theme on purpose). The audio
+      engine is the Internet Archive's /embed/ player per station — all songs
+      are public-domain recordings (Great 78 Project), the same canon that
+      plays on Fallout's in-game radio. Tune a station on the dial; the deck
+      below plays it. Add stations by editing the STATIONS array at the bottom.
+    */
+    :root {
+      --ph: #2bff88;          /* phosphor green */
+      --ph-dim: #1aa657;
+      --ph-faint: #0e5630;
+      --amber: #ffb53b;
+      --screen: #06140d;
+      --case: #0a140e;
+      --case-edge: #06100a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background:
+        radial-gradient(120% 80% at 50% 0%, #0e1d14 0%, #060d09 70%, #040805 100%);
+      color: var(--ph);
+      font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace;
+      min-height: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 22px 14px 40px;
+      letter-spacing: 0.02em;
+      -webkit-font-smoothing: none;
+    }
+
+    /* The device shell */
+    .radio {
+      width: 100%;
+      max-width: 780px;
+      background: linear-gradient(180deg, #0d1a12, #07120c);
+      border: 2px solid #15301f;
+      border-radius: 18px;
+      box-shadow:
+        0 0 0 2px #050a07,
+        0 30px 60px rgba(0,0,0,.6),
+        inset 0 1px 0 rgba(80,255,160,.08);
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* faint scanlines + flicker across the whole device */
+    .radio::after {
+      content: "";
+      position: absolute; inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.13) 2px 3px);
+      mix-blend-mode: multiply;
+      animation: flicker 6s infinite steps(60);
+    }
+    @keyframes flicker { 0%,97%{opacity:.5} 98%{opacity:.36} 100%{opacity:.5} }
+
+    /* Top brand bar */
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 6px 12px;
+      border-bottom: 1px dashed #1c3b27;
+      margin-bottom: 12px;
+    }
+    .brand .logo {
+      font-weight: 800; font-size: 1.05rem; letter-spacing: .14em;
+      text-shadow: 0 0 8px rgba(43,255,136,.5);
+    }
+    .brand .call { color: var(--ph-dim); font-size: .72rem; letter-spacing:.18em; }
+    .onair {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+      font-size: .66rem; letter-spacing: .2em; color: var(--amber);
+      border: 1px solid #5a3d10; border-radius: 999px; padding: 4px 10px;
+      background: #160d02;
+    }
+    .onair i {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--amber);
+      box-shadow: 0 0 8px var(--amber); animation: blink 1.4s infinite steps(2);
+    }
+    @keyframes blink { 50% { opacity: .25; } }
+
+    .deckwrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 14px; }
+    @media (max-width: 620px) { .deckwrap { grid-template-columns: 1fr; } }
+
+    /* Station dial (left) */
+    .dial {
+      background: #08130d; border: 1px solid #12271a; border-radius: 12px;
+      padding: 8px; min-height: 240px;
+    }
+    .dial h2 {
+      margin: 4px 6px 8px; font-size: .62rem; letter-spacing: .22em;
+      color: var(--ph-dim); font-weight: 700;
+    }
+    .station {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      background: transparent; color: var(--ph); border: 1px solid transparent;
+      border-left: 2px solid #14301f; border-radius: 6px;
+      padding: 8px 9px; margin-bottom: 5px; font: inherit;
+      transition: background .12s, border-color .12s;
+    }
+    .station:hover { background: #0c1f14; border-color: #1c3b27; }
+    .station:focus-visible { outline: 2px solid var(--ph); outline-offset: 2px; }
+    .station[aria-current="true"] {
+      background: #0f2a1b; border-left-color: var(--ph);
+      box-shadow: inset 0 0 14px rgba(43,255,136,.12);
+    }
+    .station .sfreq { color: var(--amber); font-size: .66rem; letter-spacing: .12em; }
+    .station .stitle { display:block; font-size: .82rem; font-weight: 700; margin-top: 2px; }
+    .station .sart { display:block; font-size: .68rem; color: var(--ph-dim); margin-top: 1px; }
+
+    /* CRT display (right) */
+    .screen {
+      background:
+        radial-gradient(120% 100% at 50% 0%, #0a2417 0%, var(--screen) 70%);
+      border: 1px solid #143a26; border-radius: 12px;
+      padding: 14px; position: relative; overflow: hidden;
+      box-shadow: inset 0 0 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(43,255,136,.05);
+    }
+    .screen::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(43,255,136,.05) 0 1px, transparent 1px 3px);
+    }
+    .nowlbl { font-size: .6rem; letter-spacing: .26em; color: var(--ph-dim); }
+    .nowtitle {
+      font-size: 1.18rem; font-weight: 800; line-height: 1.2; margin: 6px 0 2px;
+      text-shadow: 0 0 10px rgba(43,255,136,.45);
+      min-height: 1.4em;
+    }
+    .nowmeta { font-size: .74rem; color: var(--ph-dim); }
+    .nowlore {
+      font-size: .72rem; line-height: 1.5; color: #6fdca0; opacity: .85;
+      margin: 10px 0 0; font-style: italic; min-height: 2.8em;
+    }
+
+    /* VU meter */
+    .vu { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin: 12px 0 4px; }
+    .vu i {
+      flex: 1; background: linear-gradient(0deg, var(--ph-faint), var(--ph));
+      border-radius: 1px; height: 20%; transform-origin: bottom;
+      animation: vu 900ms ease-in-out infinite;
+    }
+    .vu i:nth-child(2){animation-duration:700ms} .vu i:nth-child(3){animation-duration:1100ms}
+    .vu i:nth-child(4){animation-duration:600ms} .vu i:nth-child(5){animation-duration:1300ms}
+    .vu i:nth-child(6){animation-duration:800ms} .vu i:nth-child(7){animation-duration:1000ms}
+    .vu i:nth-child(8){animation-duration:650ms} .vu i:nth-child(9){animation-duration:1200ms}
+    .vu i:nth-child(10){animation-duration:750ms}
+    .vu.paused i { animation-play-state: paused; height: 12%; opacity: .5; }
+    @keyframes vu { 0%,100%{height:15%} 50%{height:95%} }
+    @media (prefers-reduced-motion: reduce) { .vu i { animation: none; height: 40%; } }
+
+    /* The actual audio engine — Internet Archive embed, styled as a tape deck */
+    .deck {
+      margin-top: 12px; border-top: 1px dashed #1c3b27; padding-top: 10px;
+    }
+    .deck .decklbl { font-size: .58rem; letter-spacing: .24em; color: var(--ph-dim); margin-bottom: 6px; }
+    .deck iframe {
+      width: 100%; height: 46px; border: 0; display: block; border-radius: 8px;
+      background: #02110a;
+    }
+
+    .footer {
+      margin-top: 14px; padding-top: 10px; border-top: 1px dashed #1c3b27;
+      font-size: .64rem; line-height: 1.6; color: var(--ph-dim);
+      display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between;
+    }
+    .footer a { color: var(--ph); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    .footer .note { color: #4f9c70; }
+  </style>
+</head>
+<body>
+  <main class="radio" aria-label="Keystone Radio retro player">
+    <div class="brand">
+      <span class="logo">KEYSTONE&nbsp;RADIO</span>
+      <span class="call">◦ FOUNDER'S FREQUENCY ◦ 101.5 FM</span>
+      <span class="onair"><i></i> ON AIR</span>
+    </div>
+
+    <div class="deckwrap">
+      <!-- Tuning dial / station list -->
+      <nav class="dial" aria-label="Stations">
+        <h2>▚ TUNE THE DIAL</h2>
+        <div id="stationList"></div>
+      </nav>
+
+      <!-- CRT display + deck -->
+      <section class="screen" aria-live="polite">
+        <div class="nowlbl">NOW BROADCASTING</div>
+        <div class="nowtitle" id="nowTitle">— select a station —</div>
+        <div class="nowmeta" id="nowMeta"></div>
+        <div class="vu paused" id="vu" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <p class="nowlore" id="nowLore">Static hums. The dial waits. Pick a frequency and let the old world sing.</p>
+
+        <div class="deck">
+          <div class="decklbl">▶ DECK — press play below</div>
+          <iframe id="deck" title="Audio player" loading="lazy"
+            allow="autoplay"
+            sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <span class="note">Public-domain recordings via the Internet Archive (Great 78 Project) — the same era that plays on Fallout's radio.</span>
+      <span><a href="/explore.html">‹ back to Explore</a></span>
+    </div>
+  </main>
+
+  <script>
+    /* Stations — public-domain recordings, played via the Internet Archive
+       /embed/ engine (needs only the item identifier). Add a row to extend the
+       dial; no other change needed. Verified identifiers, 2026-06-27. */
+    var STATIONS = [
+      { freq: "101.5", title: "I Don't Want to Set the World on Fire", artist: "The Ink Spots", year: 1941,
+        id: "78_i-dont-want-to-set-the-world-on-fire_ink-spots-seiler-marcus-benjemen-durham_gbia0011964a",
+        lore: "Fallout's signature lullaby for the end of everything. The Ink Spots, Decca Studios, August 1941." },
+      { freq: "98.7", title: "Civilization (Bongo, Bongo, Bongo)", artist: "Danny Kaye & The Andrews Sisters", year: 1947,
+        id: "78_civilization-bongo-bongo-bongo_danny-kaye-andrews-sisters-vic-schoen-and-his-or_gbia0204692a",
+        lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." },
+      { freq: "105.1", title: "Pistol Packin' Mama", artist: "Bing Crosby & The Andrews Sisters", year: 1943,
+        id: "78_pistol-packin-mama_bing-crosby-and-the-andrews-sisters-vic-schoen-and-his-orchestr_gbia0016985a",
+        lore: "Lay that pistol down. Crosby and the Andrews Sisters, 1943 — a jukebox staple in every surviving diner." },
+      { freq: "92.3", title: "The Voice — Radio Years", artist: "Frank Sinatra", year: 1948,
+        id: "FrankSinatraRadioCollectionPart2",
+        lore: "218 broadcasts of Sinatra in his prime, transmitted across two decades and now in the public domain." },
+      { freq: "88.1", title: "Jazz Classics", artist: "Armstrong · Ellington · Fitzgerald", year: 1935,
+        id: "JazzClassics",
+        lore: "Tight Like This, The Mooche, Basin Street Blues — the early sides that never stopped swinging." }
+    ];
+
+    var listEl = document.getElementById('stationList');
+    var deck = document.getElementById('deck');
+    var vu = document.getElementById('vu');
+    var nowTitle = document.getElementById('nowTitle');
+    var nowMeta = document.getElementById('nowMeta');
+    var nowLore = document.getElementById('nowLore');
+
+    function tune(i) {
+      var s = STATIONS[i];
+      if (!s) return;
+      // load the Internet Archive embed engine for this station
+      deck.src = "https://archive.org/embed/" + encodeURIComponent(s.id);
+      nowTitle.textContent = s.title;
+      nowMeta.textContent = s.artist + " · " + s.year;
+      nowLore.textContent = s.lore || "";
+      vu.classList.remove('paused');   // the dial is live; press play in the deck
+      Array.prototype.forEach.call(listEl.children, function (b, j) {
+        b.setAttribute('aria-current', j === i ? 'true' : 'false');
+      });
+      try { history.replaceState(null, '', '#' + s.freq); } catch (e) {}
+    }
+
+    STATIONS.forEach(function (s, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'station';
+      b.setAttribute('aria-current', 'false');
+      b.innerHTML =
+        '<span class="sfreq">' + s.freq + ' FM</span>' +
+        '<span class="stitle">' + s.title + '</span>' +
+        '<span class="sart">' + s.artist + ' · ' + s.year + '</span>';
+      b.addEventListener('click', function () { tune(i); });
+      listEl.appendChild(b);
+    });
+
+    // Tune to the hero track on load (engine loads; user presses play).
+    tune(0);
+  </script>
+</body>
+</html>
