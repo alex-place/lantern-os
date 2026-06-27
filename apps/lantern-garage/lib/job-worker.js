@@ -468,12 +468,14 @@ async function processCaptionJob(job, repoRoot, ctx) {
   };
 }
 
-// Ensure a variant cut-list meets the ExportValidator minimum duration (15s)
+// Ensure a variant cut-list meets the ExportValidator minimum duration (5s)
 // when the source has the footage — extend the last segment toward the source
 // end, then the first segment toward the start. Prevents a valid-but-short
 // variant from being blocked purely on length. If the source itself is shorter
 // than the floor, segments are returned unchanged (cannot make a longer Short).
-const EXPORT_MIN_DURATION_SEC = 15;
+// Kept in sync with ExportValidator DEFAULTS.minDuration in
+// src/creator-intelligence/scoring/export-validator.js.
+const EXPORT_MIN_DURATION_SEC = 5;
 function topUpSegmentsToMinDuration(segments, sourceDur, minSec = EXPORT_MIN_DURATION_SEC) {
   if (!Array.isArray(segments) || !segments.length || !sourceDur || sourceDur < minSec) return segments;
   const segs = segments.map((s) => ({ ...s }));

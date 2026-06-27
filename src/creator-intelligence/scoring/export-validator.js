@@ -14,7 +14,9 @@ const DEFAULTS = {
   targetWidth: 1080,
   targetHeight: 1920,
   minFps: 30,
-  minDuration: 15,
+  // Short-form floor. 5s lets the editor ship genuine 5–6s highlight shorts
+  // (e.g. from a short reference clip) instead of blocking anything under 15s.
+  minDuration: 5,
   maxDuration: 60,
   videoCodecAllow: ["h264"],
   requireAudio: true,

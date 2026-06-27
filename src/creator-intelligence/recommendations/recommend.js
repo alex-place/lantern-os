@@ -40,7 +40,7 @@ function forVideo(analysis = {}) {
     recs.push({
       kind: "duration",
       basis: "per_video",
-      message: `Source is ${duration.toFixed(0)}s. Short-form target is 15-60s; trim to the top highlights.`,
+      message: `Source is ${duration.toFixed(0)}s. Short-form target is 5-60s; trim to the top highlights.`,
     });
   }
 

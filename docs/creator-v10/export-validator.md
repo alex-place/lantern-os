@@ -25,7 +25,7 @@ This is the one V10 component that is fully implementable and honest on day one,
   "ok": false,
   "checks": [
     { "name": "resolution", "ok": true,  "expected": "1080x1920", "actual": "1080x1920" },
-    { "name": "duration",   "ok": false, "expected": "15-60s",     "actual": "72.4s" },
+    { "name": "duration",   "ok": false, "expected": "5-60s",      "actual": "72.4s" },
     { "name": "audio",      "ok": true,  "actual": "aac stereo" }
   ],
   "blockedReasons": ["duration 72.4s exceeds 60s limit"],
@@ -47,7 +47,7 @@ This is the one V10 component that is fully implementable and honest on day one,
 const { validateExport } = require("../../src/creator-intelligence"); // re-exported
 const result = await validateExport(outputPath, {
   targetWidth: 1080, targetHeight: 1920, minFps: 30,
-  minDuration: 15, maxDuration: 60, videoCodecAllow: ["h264"],
+  minDuration: 5, maxDuration: 60, videoCodecAllow: ["h264"],
   requireAudio: true, captionsExpected: true
 });
 if (!result.ok) { /* block + show result.blockedReasons */ }
