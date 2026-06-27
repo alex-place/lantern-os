@@ -8,6 +8,7 @@
   "models": [
     {
       "provider_id": "anthropic",
+      "supports_native_pdf": true,
       "default_model": "claude-haiku-4-5-20251001",
       "override_env": "ANTHROPIC_MODEL",
       "max_tokens": 1024,
