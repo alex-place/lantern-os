@@ -8,176 +8,117 @@
   <style>
     /*
       Keystone Radio — a retro Pip-Boy / tube-radio MP3 player.
-      Self-contained: its own phosphor-green CRT theme (a radio is its own
-      device, so it ignores the site light/dark theme on purpose). The audio
-      engine is the Internet Archive's /embed/ player per station — all songs
-      are public-domain recordings (Great 78 Project), the same canon that
-      plays on Fallout's in-game radio. Tune a station on the dial; the deck
-      below plays it. Add stations by editing the STATIONS array at the bottom.
+      Its own phosphor-green CRT theme (a radio is its own device, so it ignores
+      the site light/dark theme on purpose). A TRUE <audio> player: custom
+      transport (play/pause, prev/next, seek, volume), auto-advance, and a real
+      Web-Audio VU meter that reacts to the waveform. Songs are public-domain
+      recordings served locally from /radio/ — the same 1940s canon that
+      plays on Fallout's in-game radio. Add a track: drop an mp3 in that folder
+      and add a row to the STATIONS array at the bottom. No other change needed.
     */
     :root {
-      --ph: #2bff88;          /* phosphor green */
-      --ph-dim: #1aa657;
-      --ph-faint: #0e5630;
-      --amber: #ffb53b;
-      --screen: #06140d;
-      --case: #0a140e;
-      --case-edge: #06100a;
+      --ph: #2bff88; --ph-dim: #1aa657; --ph-faint: #0e5630;
+      --amber: #ffb53b; --screen: #06140d;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
     body {
-      background:
-        radial-gradient(120% 80% at 50% 0%, #0e1d14 0%, #060d09 70%, #040805 100%);
+      background: radial-gradient(120% 80% at 50% 0%, #0e1d14 0%, #060d09 70%, #040805 100%);
       color: var(--ph);
       font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace;
-      min-height: 100%;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: 22px 14px 40px;
-      letter-spacing: 0.02em;
-      -webkit-font-smoothing: none;
+      min-height: 100%; display: flex; align-items: flex-start; justify-content: center;
+      padding: 22px 14px 40px; letter-spacing: 0.02em; -webkit-font-smoothing: none;
     }
-
-    /* The device shell */
     .radio {
-      width: 100%;
-      max-width: 780px;
+      width: 100%; max-width: 780px;
       background: linear-gradient(180deg, #0d1a12, #07120c);
-      border: 2px solid #15301f;
-      border-radius: 18px;
-      box-shadow:
-        0 0 0 2px #050a07,
-        0 30px 60px rgba(0,0,0,.6),
-        inset 0 1px 0 rgba(80,255,160,.08);
-      padding: 16px;
-      position: relative;
-      overflow: hidden;
+      border: 2px solid #15301f; border-radius: 18px;
+      box-shadow: 0 0 0 2px #050a07, 0 30px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(80,255,160,.08);
+      padding: 16px; position: relative; overflow: hidden;
     }
-    /* faint scanlines + flicker across the whole device */
     .radio::after {
-      content: "";
-      position: absolute; inset: 0;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.13) 2px 3px);
-      mix-blend-mode: multiply;
-      animation: flicker 6s infinite steps(60);
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.13) 2px 3px);
+      mix-blend-mode: multiply; animation: flicker 6s infinite steps(60);
     }
     @keyframes flicker { 0%,97%{opacity:.5} 98%{opacity:.36} 100%{opacity:.5} }
 
-    /* Top brand bar */
     .brand {
-      display: flex; align-items: center; gap: 10px;
-      padding: 4px 6px 12px;
-      border-bottom: 1px dashed #1c3b27;
-      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px;
+      border-bottom: 1px dashed #1c3b27; margin-bottom: 12px;
     }
-    .brand .logo {
-      font-weight: 800; font-size: 1.05rem; letter-spacing: .14em;
-      text-shadow: 0 0 8px rgba(43,255,136,.5);
-    }
-    .brand .call { color: var(--ph-dim); font-size: .72rem; letter-spacing:.18em; }
+    .brand .logo { font-weight: 800; font-size: 1.05rem; letter-spacing: .14em; text-shadow: 0 0 8px rgba(43,255,136,.5); }
+    .brand .call { color: var(--ph-dim); font-size: .72rem; letter-spacing: .18em; }
     .onair {
       margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
       font-size: .66rem; letter-spacing: .2em; color: var(--amber);
-      border: 1px solid #5a3d10; border-radius: 999px; padding: 4px 10px;
-      background: #160d02;
+      border: 1px solid #5a3d10; border-radius: 999px; padding: 4px 10px; background: #160d02;
     }
-    .onair i {
-      width: 8px; height: 8px; border-radius: 50%; background: var(--amber);
-      box-shadow: 0 0 8px var(--amber); animation: blink 1.4s infinite steps(2);
-    }
+    .onair.off { color: #4a5a50; border-color: #233028; background: #0b140e; }
+    .onair i { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: blink 1.4s infinite steps(2); }
+    .onair.off i { background: #324339; box-shadow: none; animation: none; }
     @keyframes blink { 50% { opacity: .25; } }
 
     .deckwrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 14px; }
     @media (max-width: 620px) { .deckwrap { grid-template-columns: 1fr; } }
 
-    /* Station dial (left) */
-    .dial {
-      background: #08130d; border: 1px solid #12271a; border-radius: 12px;
-      padding: 8px; min-height: 240px;
-    }
-    .dial h2 {
-      margin: 4px 6px 8px; font-size: .62rem; letter-spacing: .22em;
-      color: var(--ph-dim); font-weight: 700;
-    }
+    .dial { background: #08130d; border: 1px solid #12271a; border-radius: 12px; padding: 8px; min-height: 240px; }
+    .dial h2 { margin: 4px 6px 8px; font-size: .62rem; letter-spacing: .22em; color: var(--ph-dim); font-weight: 700; }
     .station {
       display: block; width: 100%; text-align: left; cursor: pointer;
       background: transparent; color: var(--ph); border: 1px solid transparent;
-      border-left: 2px solid #14301f; border-radius: 6px;
-      padding: 8px 9px; margin-bottom: 5px; font: inherit;
-      transition: background .12s, border-color .12s;
+      border-left: 2px solid #14301f; border-radius: 6px; padding: 8px 9px; margin-bottom: 5px;
+      font: inherit; transition: background .12s, border-color .12s;
     }
     .station:hover { background: #0c1f14; border-color: #1c3b27; }
     .station:focus-visible { outline: 2px solid var(--ph); outline-offset: 2px; }
-    .station[aria-current="true"] {
-      background: #0f2a1b; border-left-color: var(--ph);
-      box-shadow: inset 0 0 14px rgba(43,255,136,.12);
-    }
+    .station[aria-current="true"] { background: #0f2a1b; border-left-color: var(--ph); box-shadow: inset 0 0 14px rgba(43,255,136,.12); }
     .station .sfreq { color: var(--amber); font-size: .66rem; letter-spacing: .12em; }
     .station .stitle { display:block; font-size: .82rem; font-weight: 700; margin-top: 2px; }
     .station .sart { display:block; font-size: .68rem; color: var(--ph-dim); margin-top: 1px; }
+    .station .eq { display:inline-block; width:7px; color: var(--ph); opacity:0; }
+    .station[aria-current="true"] .eq { opacity: 1; }
 
-    /* CRT display (right) */
     .screen {
-      background:
-        radial-gradient(120% 100% at 50% 0%, #0a2417 0%, var(--screen) 70%);
-      border: 1px solid #143a26; border-radius: 12px;
-      padding: 14px; position: relative; overflow: hidden;
+      background: radial-gradient(120% 100% at 50% 0%, #0a2417 0%, var(--screen) 70%);
+      border: 1px solid #143a26; border-radius: 12px; padding: 14px; position: relative; overflow: hidden;
       box-shadow: inset 0 0 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(43,255,136,.05);
     }
-    .screen::before {
-      content: ""; position: absolute; inset: 0; pointer-events: none;
-      background: repeating-linear-gradient(to bottom, rgba(43,255,136,.05) 0 1px, transparent 1px 3px);
-    }
+    .screen::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(43,255,136,.05) 0 1px, transparent 1px 3px); }
     .nowlbl { font-size: .6rem; letter-spacing: .26em; color: var(--ph-dim); }
-    .nowtitle {
-      font-size: 1.18rem; font-weight: 800; line-height: 1.2; margin: 6px 0 2px;
-      text-shadow: 0 0 10px rgba(43,255,136,.45);
-      min-height: 1.4em;
-    }
+    .nowtitle { font-size: 1.18rem; font-weight: 800; line-height: 1.2; margin: 6px 0 2px; text-shadow: 0 0 10px rgba(43,255,136,.45); min-height: 1.4em; }
     .nowmeta { font-size: .74rem; color: var(--ph-dim); }
-    .nowlore {
-      font-size: .72rem; line-height: 1.5; color: #6fdca0; opacity: .85;
-      margin: 10px 0 0; font-style: italic; min-height: 2.8em;
-    }
+    .nowlore { font-size: .72rem; line-height: 1.5; color: #6fdca0; opacity: .85; margin: 10px 0 0; font-style: italic; min-height: 2.8em; }
 
-    /* VU meter */
-    .vu { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin: 12px 0 4px; }
-    .vu i {
-      flex: 1; background: linear-gradient(0deg, var(--ph-faint), var(--ph));
-      border-radius: 1px; height: 20%; transform-origin: bottom;
-      animation: vu 900ms ease-in-out infinite;
-    }
-    .vu i:nth-child(2){animation-duration:700ms} .vu i:nth-child(3){animation-duration:1100ms}
-    .vu i:nth-child(4){animation-duration:600ms} .vu i:nth-child(5){animation-duration:1300ms}
-    .vu i:nth-child(6){animation-duration:800ms} .vu i:nth-child(7){animation-duration:1000ms}
-    .vu i:nth-child(8){animation-duration:650ms} .vu i:nth-child(9){animation-duration:1200ms}
-    .vu i:nth-child(10){animation-duration:750ms}
-    .vu.paused i { animation-play-state: paused; height: 12%; opacity: .5; }
-    @keyframes vu { 0%,100%{height:15%} 50%{height:95%} }
-    @media (prefers-reduced-motion: reduce) { .vu i { animation: none; height: 40%; } }
+    /* Real VU meter (canvas) */
+    .vu { width: 100%; height: 40px; margin: 12px 0 6px; display: block; image-rendering: pixelated; }
 
-    /* The actual audio engine — Internet Archive embed, styled as a tape deck */
-    .deck {
-      margin-top: 12px; border-top: 1px dashed #1c3b27; padding-top: 10px;
+    /* Transport */
+    .transport { margin-top: 8px; border-top: 1px dashed #1c3b27; padding-top: 10px; }
+    .tbtns { display: flex; align-items: center; gap: 8px; }
+    .tbtn {
+      background: #0c1f14; color: var(--ph); border: 1px solid #1c3b27; border-radius: 8px;
+      width: 40px; height: 34px; font-size: 1rem; cursor: pointer; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center; transition: background .12s, box-shadow .12s;
     }
-    .deck .decklbl { font-size: .58rem; letter-spacing: .24em; color: var(--ph-dim); margin-bottom: 6px; }
-    .deck iframe {
-      width: 100%; height: 46px; border: 0; display: block; border-radius: 8px;
-      background: #02110a;
-    }
+    .tbtn:hover { background: #103021; }
+    .tbtn:focus-visible { outline: 2px solid var(--ph); outline-offset: 2px; }
+    .tbtn.play { width: 52px; background: #103a26; box-shadow: inset 0 0 12px rgba(43,255,136,.18); }
+    .ttime { margin-left: auto; font-size: .68rem; color: var(--ph-dim); font-variant-numeric: tabular-nums; }
 
-    .footer {
-      margin-top: 14px; padding-top: 10px; border-top: 1px dashed #1c3b27;
-      font-size: .64rem; line-height: 1.6; color: var(--ph-dim);
-      display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between;
-    }
+    .range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 4px; background: #0d2417; outline: none; margin: 10px 0 4px; cursor: pointer; }
+    .range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--ph); box-shadow: 0 0 8px rgba(43,255,136,.6); }
+    .range::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--ph); box-shadow: 0 0 8px rgba(43,255,136,.6); }
+    .range:focus-visible { outline: 2px solid var(--ph); outline-offset: 3px; }
+    .volrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .volrow .vlbl { font-size: .6rem; letter-spacing: .2em; color: var(--ph-dim); }
+    .volrow .range { margin: 0; max-width: 160px; }
+
+    .footer { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #1c3b27; font-size: .64rem; line-height: 1.6; color: var(--ph-dim); display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; }
     .footer a { color: var(--ph); text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
     .footer .note { color: #4f9c70; }
+    @media (prefers-reduced-motion: reduce) { .radio::after { animation: none; } .onair i { animation: none; } }
   </style>
 </head>
 <body>
@@ -185,100 +126,162 @@
     <div class="brand">
       <span class="logo">KEYSTONE&nbsp;RADIO</span>
       <span class="call">◦ FOUNDER'S FREQUENCY ◦ 101.5 FM</span>
-      <span class="onair"><i></i> ON AIR</span>
+      <span class="onair off" id="onair"><i></i> <span id="onairLbl">STANDBY</span></span>
     </div>
 
     <div class="deckwrap">
-      <!-- Tuning dial / station list -->
       <nav class="dial" aria-label="Stations">
         <h2>▚ TUNE THE DIAL</h2>
         <div id="stationList"></div>
       </nav>
 
-      <!-- CRT display + deck -->
       <section class="screen" aria-live="polite">
-        <div class="nowlbl">NOW BROADCASTING</div>
-        <div class="nowtitle" id="nowTitle">— select a station —</div>
+        <div class="nowlbl">NOW PLAYING</div>
+        <div class="nowtitle" id="nowTitle">— press play —</div>
         <div class="nowmeta" id="nowMeta"></div>
-        <div class="vu paused" id="vu" aria-hidden="true">
-          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-        </div>
-        <p class="nowlore" id="nowLore">Static hums. The dial waits. Pick a frequency and let the old world sing.</p>
 
-        <div class="deck">
-          <div class="decklbl">▶ DECK — press play below</div>
-          <iframe id="deck" title="Audio player" loading="lazy"
-            allow="autoplay"
-            sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+        <canvas class="vu" id="vu" width="320" height="40" aria-hidden="true"></canvas>
+
+        <div class="transport">
+          <input class="range" id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+          <div class="tbtns">
+            <button class="tbtn" id="prev" type="button" title="Previous" aria-label="Previous track">⏮</button>
+            <button class="tbtn play" id="play" type="button" title="Play / pause" aria-label="Play or pause">▶</button>
+            <button class="tbtn" id="next" type="button" title="Next" aria-label="Next track">⏭</button>
+            <span class="ttime" id="time">0:00 / 0:00</span>
+          </div>
+          <div class="volrow">
+            <span class="vlbl">VOL</span>
+            <input class="range" id="vol" type="range" min="0" max="100" value="85" aria-label="Volume">
+          </div>
         </div>
+
+        <p class="nowlore" id="nowLore">Static hums. The dial waits. Pick a frequency and let the old world sing.</p>
       </section>
     </div>
 
     <div class="footer">
-      <span class="note">Public-domain recordings via the Internet Archive (Great 78 Project) — the same era that plays on Fallout's radio.</span>
+      <span class="note">Public-domain recordings (Internet Archive / Great 78 Project), served locally — the era that plays on Fallout's radio.</span>
       <span><a href="/explore.html">‹ back to Explore</a></span>
     </div>
   </main>
 
+  <audio id="audio" preload="metadata"></audio>
+
   <script>
-    /* Stations — public-domain recordings, played via the Internet Archive
-       /embed/ engine (needs only the item identifier). Add a row to extend the
-       dial; no other change needed. Verified identifiers, 2026-06-27. */
+    /* Playlist — public-domain mp3s served locally from /radio/.
+       Add a song: drop the mp3 in that folder, add a row here. */
     var STATIONS = [
       { freq: "101.5", title: "I Don't Want to Set the World on Fire", artist: "The Ink Spots", year: 1941,
-        id: "78_i-dont-want-to-set-the-world-on-fire_ink-spots-seiler-marcus-benjemen-durham_gbia0011964a",
+        src: "/radio/set-the-world-on-fire.mp3",
         lore: "Fallout's signature lullaby for the end of everything. The Ink Spots, Decca Studios, August 1941." },
       { freq: "98.7", title: "Civilization (Bongo, Bongo, Bongo)", artist: "Danny Kaye & The Andrews Sisters", year: 1947,
-        id: "78_civilization-bongo-bongo-bongo_danny-kaye-andrews-sisters-vic-schoen-and-his-or_gbia0204692a",
-        lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." },
-      { freq: "105.1", title: "Pistol Packin' Mama", artist: "Bing Crosby & The Andrews Sisters", year: 1943,
-        id: "78_pistol-packin-mama_bing-crosby-and-the-andrews-sisters-vic-schoen-and-his-orchestr_gbia0016985a",
-        lore: "Lay that pistol down. Crosby and the Andrews Sisters, 1943 — a jukebox staple in every surviving diner." },
-      { freq: "92.3", title: "The Voice — Radio Years", artist: "Frank Sinatra", year: 1948,
-        id: "FrankSinatraRadioCollectionPart2",
-        lore: "218 broadcasts of Sinatra in his prime, transmitted across two decades and now in the public domain." },
-      { freq: "88.1", title: "Jazz Classics", artist: "Armstrong · Ellington · Fitzgerald", year: 1935,
-        id: "JazzClassics",
-        lore: "Tight Like This, The Mooche, Basin Street Blues — the early sides that never stopped swinging." }
+        src: "/radio/civilization.mp3",
+        lore: "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor." }
     ];
 
+    var audio = document.getElementById('audio');
     var listEl = document.getElementById('stationList');
-    var deck = document.getElementById('deck');
-    var vu = document.getElementById('vu');
     var nowTitle = document.getElementById('nowTitle');
     var nowMeta = document.getElementById('nowMeta');
     var nowLore = document.getElementById('nowLore');
+    var playBtn = document.getElementById('play');
+    var seek = document.getElementById('seek');
+    var timeEl = document.getElementById('time');
+    var volEl = document.getElementById('vol');
+    var onair = document.getElementById('onair');
+    var onairLbl = document.getElementById('onairLbl');
+    var current = -1;
 
-    function tune(i) {
-      var s = STATIONS[i];
-      if (!s) return;
-      // load the Internet Archive embed engine for this station
-      deck.src = "https://archive.org/embed/" + encodeURIComponent(s.id);
+    function fmt(t) { if (!isFinite(t)) return "0:00"; var m = Math.floor(t/60), s = Math.floor(t%60); return m + ":" + (s<10?"0":"") + s; }
+
+    function render() {
+      STATIONS.forEach(function (s, i) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'station'; b.setAttribute('aria-current', 'false');
+        b.innerHTML =
+          '<span class="sfreq">' + s.freq + ' FM <span class="eq">♪</span></span>' +
+          '<span class="stitle">' + s.title + '</span>' +
+          '<span class="sart">' + s.artist + ' · ' + s.year + '</span>';
+        b.addEventListener('click', function () { tune(i, true); });
+        listEl.appendChild(b);
+      });
+    }
+
+    function tune(i, autoplay) {
+      var s = STATIONS[i]; if (!s) return;
+      current = i;
+      audio.src = s.src;
       nowTitle.textContent = s.title;
       nowMeta.textContent = s.artist + " · " + s.year;
       nowLore.textContent = s.lore || "";
-      vu.classList.remove('paused');   // the dial is live; press play in the deck
       Array.prototype.forEach.call(listEl.children, function (b, j) {
         b.setAttribute('aria-current', j === i ? 'true' : 'false');
       });
       try { history.replaceState(null, '', '#' + s.freq); } catch (e) {}
+      if (autoplay) play();
     }
 
-    STATIONS.forEach(function (s, i) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'station';
-      b.setAttribute('aria-current', 'false');
-      b.innerHTML =
-        '<span class="sfreq">' + s.freq + ' FM</span>' +
-        '<span class="stitle">' + s.title + '</span>' +
-        '<span class="sart">' + s.artist + ' · ' + s.year + '</span>';
-      b.addEventListener('click', function () { tune(i); });
-      listEl.appendChild(b);
-    });
+    function play() {
+      if (current < 0) { tune(0, false); }
+      ensureAudioGraph();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      audio.play().catch(function(){ /* autoplay blocked until a gesture; the click IS the gesture */ });
+    }
 
-    // Tune to the hero track on load (engine loads; user presses play).
-    tune(0);
+    playBtn.addEventListener('click', function () { if (audio.paused) play(); else audio.pause(); });
+    document.getElementById('prev').addEventListener('click', function () { tune((current<=0?STATIONS.length-1:current-1), true); });
+    document.getElementById('next').addEventListener('click', function () { tune((current+1)%STATIONS.length, true); });
+    seek.addEventListener('input', function () { if (audio.duration) audio.currentTime = (seek.value/1000) * audio.duration; });
+    volEl.addEventListener('input', function () { audio.volume = volEl.value/100; });
+    audio.volume = volEl.value/100;
+
+    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; });
+    audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; });
+    audio.addEventListener('timeupdate', function () {
+      if (audio.duration) seek.value = Math.round((audio.currentTime/audio.duration)*1000);
+      timeEl.textContent = fmt(audio.currentTime) + " / " + fmt(audio.duration);
+    });
+    audio.addEventListener('ended', function () { tune((current+1)%STATIONS.length, true); }); // auto-advance
+
+    /* Real VU meter via Web Audio — local same-origin mp3s are CORS-clean, so
+       the analyser is not tainted. Falls back silently if Web Audio is absent. */
+    var audioCtx, analyser, freqData, vuReady = false;
+    var canvas = document.getElementById('vu'), cx = canvas.getContext('2d');
+    function ensureAudioGraph() {
+      if (vuReady) return;
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+        var srcNode = audioCtx.createMediaElementSource(audio);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        freqData = new Uint8Array(analyser.frequencyBinCount);
+        srcNode.connect(analyser);
+        analyser.connect(audioCtx.destination);
+        vuReady = true;
+        drawVU();
+      } catch (e) { /* no analyser — meter stays idle */ }
+    }
+    function drawVU() {
+      requestAnimationFrame(drawVU);
+      var w = canvas.width, h = canvas.height;
+      cx.clearRect(0, 0, w, h);
+      var bars = 24, gap = 2, bw = (w - gap*(bars-1)) / bars;
+      var live = vuReady && !audio.paused;
+      if (live) analyser.getByteFrequencyData(freqData);
+      for (var i = 0; i < bars; i++) {
+        var v = live ? (freqData[i] / 255) : 0.06 + 0.02*Math.sin(i);
+        var bh = Math.max(2, v * h);
+        cx.fillStyle = 'rgba(43,255,136,' + (0.35 + 0.6*v) + ')';
+        cx.fillRect(i*(bw+gap), h - bh, bw, bh);
+      }
+    }
+    drawVU();
+
+    render();
+    tune(0, false); // cue the hero track; user presses play (browser autoplay policy)
   </script>
 </body>
 </html>
