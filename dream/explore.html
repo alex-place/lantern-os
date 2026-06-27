@@ -770,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // An embed src may only be a root-relative path (our own /t-rex/) or an https
   // archive.org/youtube embed URL. Anything else is dropped — never framed.
-  const EMBED_HOSTS = /^https:\/\/(archive\.org|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
+  const EMBED_HOSTS = /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
   const safeEmbedSrc = u => (/^\/[^/]/.test(u) || EMBED_HOSTS.test(u)) ? u : '';
 
   function shortDate(d) {
