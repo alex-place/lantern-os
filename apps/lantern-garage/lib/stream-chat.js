@@ -629,6 +629,73 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
+    // !review #<PR> — pull a pull request's diff and review it in the chat. Lets the
+    // user work through draft/autowork PRs ("is this change good?") without leaving
+    // Keystone. Diff fetched shell-free via gh (#873); reviewed by the live model.
+    if (cmd.name === "review") {
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+      const prNum = (String(cmd.args || "").match(/#?(\d+)/) || [])[1];
+      if (!prNum) {
+        sendToken("Usage: `!review #<PR number>` — e.g. `!review #1302`.");
+        sendDone("review", { agent: "Keystone", online: true });
+        res.end();
+        return;
+      }
+      sendToken(`🔍 Reviewing PR #${prNum}…\n\n`);
+      (async () => {
+        try {
+          const { safeExec } = require("./safe-exec");
+          const { callLlm } = require("./self-edit-engine");
+          const REPO = ["--repo", "alex-place/lantern-os"];
+          let meta = {};
+          try {
+            meta = JSON.parse(safeExec(
+              ["gh", "pr", "view", prNum, ...REPO, "--json", "title,additions,deletions,files,isDraft,state"],
+              { timeout: 15000 }
+            ));
+          } catch (_) { /* meta is best-effort */ }
+          const diff = safeExec(["gh", "pr", "diff", prNum, ...REPO],
+            { timeout: 25000, maxBuffer: 8 * 1024 * 1024 });
+          if (!diff || !diff.trim()) {
+            sendToken(`PR #${prNum} has no diff (closed, empty, or not found). [Open on GitHub](https://github.com/alex-place/lantern-os/pull/${prNum})`);
+            sendDone("review", { agent: "Keystone", online: true });
+            res.end();
+            return;
+          }
+          const MAX = 16000;
+          const clipped = diff.length > MAX ? diff.slice(0, MAX) + "\n…(diff truncated for review)" : diff;
+          const fileList = (meta.files || []).map((f) => f.path).join(", ");
+          const reviewSystem =
+            "You are a senior engineer reviewing a pull request for the Keystone OS repo " +
+            "(Node.js app under apps/lantern-garage/, Python under src/). Decide if the change is " +
+            "correct, complete, and safe to merge. Be concise and concrete. Use this exact shape:\n" +
+            "- **Verdict**: ✅ merge / ⚠️ needs changes / ❌ reject — one line why.\n" +
+            "- **What it does**: 1–2 sentences.\n" +
+            "- **Issues**: concrete problems (real bugs, wrong or nonexistent file paths for this repo, " +
+            "missing pieces, security). Cite the file. Say 'None found' if clean.\n" +
+            "- **Suggestions**: optional.\n" +
+            "Ground every claim in the diff shown — never invent code that isn't there. If a changed file " +
+            "path looks wrong for this repo's layout, flag it explicitly.";
+          const reviewUser =
+            `PR #${prNum}: ${meta.title || "(unknown title)"}\n` +
+            `State: ${meta.state || "?"}${meta.isDraft ? " (draft)" : ""} · Files: ${fileList || "(unknown)"}\n\n` +
+            `Diff (+${meta.additions == null ? "?" : meta.additions}/-${meta.deletions == null ? "?" : meta.deletions}):\n\n${clipped}`;
+          const review = await callLlm(reviewSystem, reviewUser, "auto", 1800);
+          const link = `https://github.com/alex-place/lantern-os/pull/${prNum}`;
+          sendToken(`**[PR #${prNum}](${link})** — ${meta.title || ""}\n\n${(review || "").trim() || "(no review returned)"}`);
+          sendDone("review", { agent: "Keystone", online: true, provider: "review" });
+          res.end();
+        } catch (err) {
+          sse.sendError(res, `Review failed: ${err.message}`);
+          sendDone("failed", { error: err.message });
+          res.end();
+        }
+      })();
+      return;
+    }
+
     // Three Doors variants: start fresh game if no history, else strip command and continue
     if (cmd.name === "three-doors" || cmd.name === "threedoors" || cmd.name === "three_doors"
         || cmd.name === "converge" || cmd.name === "convergance"

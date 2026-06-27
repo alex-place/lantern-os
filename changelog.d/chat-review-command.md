@@ -1,0 +1,2 @@
+### Added
+- **`!review #<PR>` chat command.** Pull any pull request's diff and get a grounded review right in the Keystone chat — verdict (✅ merge / ⚠️ needs changes / ❌ reject), what it does, concrete issues (real bugs, wrong/nonexistent file paths, missing pieces), and suggestions. Lets you work through draft/autowork PRs without leaving the chat. The diff is fetched shell-free via `gh` (#873-compliant) and reviewed by the live model; registered in the command palette and `!help`.

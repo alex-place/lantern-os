@@ -497,6 +497,7 @@ const COMMANDS = [
   { name: 'search',      group: 'Chat',    usage: '!search <query>',   desc: 'Web search and summarize', aliases: ['web-search'] },
   { name: 'issues',      group: 'Build',   usage: '!issues',           desc: 'Browse open issues — one click runs autowork', aliases: ['backlog'] },
   { name: 'work',        group: 'Build',   usage: '!work #123',        desc: 'Run keystone autowork on an issue → linked PR', aliases: ['edit'] },
+  { name: 'review',      group: 'Build',   usage: '!review #123',      desc: 'Review a pull request’s diff right in the chat' },
   { name: 'convergence', group: 'Build',   usage: '!convergence',      desc: 'Run the convergence loop + fleet/version status', aliases: ['convergance', 'converge'] },
   { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
   { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
