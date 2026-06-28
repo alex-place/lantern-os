@@ -6,6 +6,7 @@
   const emptyState = document.getElementById("empty-state");
   const providerSelect = document.getElementById("provider-select");
   const mcpToggle = document.getElementById("mcp-toggle");
+  const computeMeter = document.getElementById("compute-meter");
   let directModeEnabled = false;
   let keystoneMcpEnabled = false; // legacy compat
   let originalAgents = [];
