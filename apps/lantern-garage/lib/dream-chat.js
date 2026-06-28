@@ -11,6 +11,7 @@ const { TokenAudit } = require("./token-audit");
 const serving = require("./serving-modes");
 const { formatGrounding: _oracleGrounding } = require("./convergence-oracle");
 const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
+const { emitConvergenceRecord } = require("./convergence-record");
 const { defaultRings } = require("./grounding-rings");
 
 // ── Convergence Oracle grounding ────────────────────────────────────────────
