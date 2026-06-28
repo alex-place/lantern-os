@@ -119,6 +119,7 @@ function readJsonl(relativePath, limit = 20) {
     });
 }
 
+// The async JSONL append queue.
 module.exports = {
   enqueueFileWrite,
   appendJsonlQueued,
