@@ -183,6 +183,13 @@ module.exports = async (req, res, url, deps) => {
         const REPO_ROOT = path.resolve(__dirname, "../../..");
         const GH_REPO = "alex-place/lantern-os";
 
+        // Step logging (parity with the stream route): the FLEET path emits no SSE,
+        // but every step is still appended to data/autowork-runs/<date>.jsonl so the
+        // autonomous loop's runs are reviewable. runId is set once the issue # is known.
+        const { logStep, newRunId, researchIssue } = require("../lib/autowork-research");
+        let runId = null;
+        const step = (phase, status, extra = {}) => logStep(runId, issueNumber, phase, status, extra);
+
         // Task-mode (parity with the stream route): a free-form { task } and no
         // issue number → file a real GitHub issue first, then work it like an
         // `!work #N` run. Keeps every PR issue-linked.
@@ -208,6 +215,8 @@ module.exports = async (req, res, url, deps) => {
           sendJson(res, { ok: false, error: "issue_number_or_task_required" }, 400);
           return;
         }
+        runId = newRunId(issueNumber);
+        step("start", "start", { issue: issueNumber, mode: "fleet" });
 
         // Code-mutating git ops run in `workRoot` (an isolated worktree), not the
         // live serving checkout (REPO_ROOT). Torn down in `finally`. (Declared above
@@ -267,17 +276,46 @@ module.exports = async (req, res, url, deps) => {
           }, 409);
           return;
         }
+        step("branch", "done", { branch: branchName });
+
+        // Step 0.5: research / grounding — the FLEET path used to call generatePlan
+        // with EMPTY scope + context (the model patched blind, the #1 source of
+        // hunk-not-located aborts). Now it grounds in ranked repo files + real web
+        // evidence, identical to the stream route, and logs each sub-step.
+        let scopeFiles = [], researchContext = null;
+        try {
+          const research = await researchIssue({
+            workRoot,
+            issueNumber,
+            issueTitle: issueDetails.title,
+            issueBody: issueDetails.body,
+            runId,
+            onStep: step,
+          });
+          scopeFiles = research.scopeFiles;
+          researchContext = research.researchContext;
+        } catch (e) {
+          // Grounding is best-effort — a failure shouldn't abort the run, but log it.
+          step("research", "error", { error: String(e && e.message || e) });
+        }
 
         // Step 1: Generate plan — guard the model call so an out-of-credits/quota
         // failure across all providers returns an actionable 502 (not a generic 500
         // that leaks err.stack). Mirrors the stream route's no-cloud handling.
+        step("plan", "start");
         let plan;
         try {
-          plan = await generatePlan(workRoot, issueDetails.title + "\n\n" + issueDetails.body, [], []);
+          plan = await generatePlan(
+            workRoot,
+            issueDetails.title + "\n\n" + issueDetails.body,
+            scopeFiles.slice(0, 5),
+            researchContext ? [researchContext] : []);
         } catch (planErr) {
           const raw = String(planErr && planErr.message || planErr);
           const noCloud = /all_providers_failed|empty response|credit|quota|billing|spending limit/i.test(raw);
           if (noCloud) {
+            step("plan", "error", { error: "no_cloud_model" });
+            step("done", "error", { stoppedAt: "no_cloud_model" });
             sendJson(res, {
               ok: false,
               error: "no_cloud_model",
@@ -289,6 +327,7 @@ module.exports = async (req, res, url, deps) => {
           }
           throw planErr; // unexpected — bubble to the outer catch
         }
+        step("plan", "done", { steps: Array.isArray(plan.steps) ? plan.steps.length : undefined, testsToRun: Array.isArray(plan.testsToRun) ? plan.testsToRun.length : 0 });
 
         // Steps 2-3: generate patch → apply, with a feedback retry loop. LLM diffs
         // routinely miss exact hunk context/counts; on failure we feed the apply
@@ -299,6 +338,7 @@ module.exports = async (req, res, url, deps) => {
         const MAX_PATCH_ATTEMPTS = 3;
         let diffText = "", applyStats = null, changedFiles = [], feedback = null, applied = false;
         for (let attempt = 1; attempt <= MAX_PATCH_ATTEMPTS; attempt++) {
+          step("patch", attempt === 1 ? "start" : "retry", { attempt, of: MAX_PATCH_ATTEMPTS });
           let gen;
           try {
             gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
@@ -327,6 +367,7 @@ module.exports = async (req, res, url, deps) => {
             const syntaxErrors = ph.placeholder ? [] : patchSyntaxErrors(changedFiles, workRoot);
             if (!ph.placeholder && syntaxErrors.length === 0) {
               applied = true;
+              step("patch", "done", { attempt, files: changedFiles });
               break;
             }
             await new Promise((resolve) =>
@@ -358,6 +399,8 @@ module.exports = async (req, res, url, deps) => {
         if (!applied) {
           await new Promise((resolve) =>
             execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+          step("patch", "error", { attempts: MAX_PATCH_ATTEMPTS, error: "patch_did_not_apply" });
+          step("done", "error", { stoppedAt: "patch_did_not_apply" });
           sendJson(res, {
             ok: false,
             error: "patch_did_not_apply",
@@ -370,14 +413,17 @@ module.exports = async (req, res, url, deps) => {
 
         // Step 4: Run tests from the plan. Empty test set = UNVERIFIED, not "passed".
         const plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        step("test", "start", { count: plannedTests.length });
         const testResults = runTests(workRoot, plannedTests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsRan = plannedTests.length;
         const allTestsOk = testResults.every((r) => r.ok);
         const testsVerified = testsRan > 0 && allTestsOk;
+        step("test", "done", { testsRan, allTestsOk, testsVerified });
 
         if (testsRan > 0 && !allTestsOk) {
           // Rollback on test failure — stage nothing
           execFile("git", ["checkout", "--", "."], { cwd: workRoot });
+          step("done", "error", { stoppedAt: "tests_failed" });
           sendJson(res, {
             ok: false,
             error: "tests_failed",
@@ -388,6 +434,7 @@ module.exports = async (req, res, url, deps) => {
         }
 
         // Step 5: Commit — stage ONLY the files the patch changed (never git add -A)
+        step("commit", "start", { files: changedFiles.length });
         gitAddFiles(workRoot, changedFiles);
         // #933: don't bake a "[unverified]" marker into the commit/PR title (it
         // double-stacks with the issue's own conventional prefix). Strip any
@@ -402,8 +449,12 @@ module.exports = async (req, res, url, deps) => {
             (err, stdout) => resolve(err ? null : stdout.trim()));
         });
 
+        step("commit", "done", { commitSha });
+
         // Step 6: Push
+        step("push", "start", { branch: branchName });
         gitPush(workRoot, branchName);
+        step("push", "done", { branch: branchName });
 
         // harvest emitter (#911): log verified coding successes offline
         if (testsVerified) {
@@ -426,7 +477,10 @@ module.exports = async (req, res, url, deps) => {
             ? `✅ ${testsRan} test(s) passed.`
             : `⚠️ No automated tests ran for this change — **requires human review before merge**.`) +
           `\n\nFiles changed: ${changedFiles.join(", ")}`;
+        step("pr", "start", { branch: branchName });
         const prUrl = openDraftPr(workRoot, branchName, commitTitle, prBody);
+        step("pr", "done", { prUrl });
+        step("done", "ok", { prUrl, testsVerified, changedFiles: changedFiles.length });
 
         sendJson(res, {
           ok: true,
@@ -444,6 +498,7 @@ module.exports = async (req, res, url, deps) => {
         });
       } catch (err) {
         // Don't leak err.stack in the response body (parity with the stream route).
+        try { require("../lib/autowork-research").logStep(null, null, "done", "error", { error: err.message }); } catch (_e) { /* ignore */ }
         sendJson(res, { ok: false, error: err.message }, 500);
       } finally {
         // Always tear down the worktree — the branch (and any push) survives.
@@ -471,7 +526,15 @@ module.exports = async (req, res, url, deps) => {
         "X-Accel-Buffering": "no",
       });
       const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      const step = (phase, status, extra = {}) => send("step", { phase, status, ...extra });
+      const { logStep, newRunId } = require("../lib/autowork-research");
+      // One run id for the whole pipeline so every step lands in the same review log.
+      let _runId = null;
+      // Stream the step over SSE AND append it to data/autowork-runs/<date>.jsonl so
+      // each autowork step is reviewable after the run, not only live.
+      const step = (phase, status, extra = {}) => {
+        send("step", { phase, status, ...extra });
+        logStep(_runId, receipt.issue, phase, status, extra);
+      };
 
       // SSE heartbeat — the plan/patch steps make LLM calls that emit NO bytes for
       // 30-60s. Idle stream-proxies (the Cloudflare tunnel on lantern-os.net, any
@@ -551,6 +614,8 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
         receipt.issue = issueNumber;
+        _runId = newRunId(issueNumber);
+        receipt.runId = _runId;
 
         // ── 1. fetch issue ───────────────────────────────────────────────
         step("fetch_issue", "start", { issue: issueNumber });
@@ -602,82 +667,21 @@ module.exports = async (req, res, url, deps) => {
         step("branch", "done", { branch: branchName, worktree: workRoot });
 
         // ── 3. research (Σ₀: ground in codebase + external reality + web) ──
+        // Shared, ranked, logged grounding (lib/autowork-research). Fixes the old
+        // "always 20 generic files / 0 web sources" bug: keywords are stopword-
+        // filtered + identifier-ranked, files are relevance-ranked, web grounding
+        // uses the dependable MCP→DDG→Wikipedia client, and every sub-step is
+        // streamed AND appended to data/autowork-runs/<date>.jsonl for review.
         step("research", "start", { issue: issueNumber });
-
-        // Analyze issue description for keywords
+        const { researchIssue } = require("../lib/autowork-research");
         const issueFullText = `${issueDetails.title}\n\n${issueDetails.body}`;
-        const keywords = (issueFullText.match(/\b[a-z-]{4,20}\b/gi) || [])
-          .filter((w, i, a) => a.indexOf(w) === i).slice(0, 10);
-        step("research", "keywords", { keywords });
-
-        // Web search for external grounding (verify claims against web reality)
-        let webEvidence = [];
-        try {
-          const https = require("https");
-          const searchQuery = keywords.slice(0, 3).join(" ");
-          const webSearchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&format=json`;
-
-          const webResult = await new Promise((resolve) => {
-            https.get(webSearchUrl, { timeout: 5000 }, (res) => {
-              let data = "";
-              res.on("data", (chunk) => (data += chunk));
-              res.on("end", () => {
-                try {
-                  const json = JSON.parse(data);
-                  const results = (json.Results || []).slice(0, 3).map((r) => ({
-                    title: r.Title,
-                    url: r.FirstURL,
-                    snippet: r.Text
-                  }));
-                  resolve(results);
-                } catch (e) {
-                  resolve([]);
-                }
-              });
-            }).on("error", () => resolve([]));
-          });
-          webEvidence = webResult;
-          step("research", "web_search", { results: webEvidence.length, sources: webEvidence.map(w => w.url) });
-        } catch (e) {
-          // Web search optional; continue if it fails
-          step("research", "web_search", { skipped: true, reason: e.message });
-        }
-
-        // Find relevant files in codebase. Use `git grep` via execFileSync (no shell)
-        // — cross-platform (the old `grep -r ... 2>/dev/null | head` silently failed
-        // on Windows/cmd.exe, returning 0 files so the LLM patched blind → hallucinations).
-        const fs = require("fs");
-        const { execFileSync } = require("child_process");
-        const scopeFiles = [];
-        for (const kw of keywords.slice(0, 5)) {
-          if (scopeFiles.length >= 20) break;
-          if (!kw || kw.length < 4) continue;
-          try {
-            const out = execFileSync(
-              "git",
-              ["grep", "-l", "-i", "-e", kw, "--", "*.js", "*.json", "*.md", "*.py", "*.html"],
-              { cwd: workRoot, encoding: "utf-8", timeout: 8000, maxBuffer: 10 * 1024 * 1024, windowsHide: true }
-            ).split("\n").filter(Boolean);
-            for (const filePath of out) {
-              if (filePath && !scopeFiles.includes(filePath)) scopeFiles.push(filePath);
-              if (scopeFiles.length >= 20) break;
-            }
-          } catch (e) {
-            // git grep exits non-zero when a keyword has no matches — that's fine.
-          }
-        }
-
-        const researchContext = {
-          keywords,
-          scopeFiles: scopeFiles.slice(0, 5),
-          issueState: issueDetails.state,
-          webEvidence: webEvidence.slice(0, 3),
-          timestamp: new Date().toISOString(),
-        };
-        step("research", "done", {
-          filesFound: scopeFiles.length,
-          webSourcesFound: webEvidence.length,
-          context: researchContext
+        const { scopeFiles, researchContext } = await researchIssue({
+          workRoot,
+          issueNumber,
+          issueTitle: issueDetails.title,
+          issueBody: issueDetails.body,
+          runId: receipt.runId,
+          onStep: step,
         });
 
         // ── 4. plan (with research context as Σ₀ evidence) ───────────────
