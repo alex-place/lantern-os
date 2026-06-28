@@ -805,9 +805,22 @@ async function runAutowork(target, btn, base) {
   } catch (e) {
     btn.textContent = '✗ Error';
     btn.style.color = '#f87171';
+    // The SSE connection dropped mid-run (long plan/patch steps can outlast an idle
+    // proxy). Flip the still-spinning active step to an error glyph and stop the
+    // mandala — otherwise the panel spins forever with no explanation.
+    const activeStep = row.querySelector('.aw-step.is-active');
+    if (activeStep) {
+      activeStep.classList.remove('is-active');
+      activeStep.classList.add('is-error');
+      const ai = activeStep.querySelector('.aw-ico');
+      if (ai) { ai.textContent = '✗'; ai.style.color = '#f87171'; }
+    }
+    const isNet = /network|failed to fetch|load failed/i.test(e && e.message || '');
+    const msg = isNet ? 'Lost connection to the server mid-run (the run may still be finishing on the server — check the issue for a new PR).' : (e && e.message) || 'unknown error';
+    setActivity('Connection lost', msg, false);
     const fin = row.querySelector('.aw-final');
     fin.style.color = '#f87171';
-    fin.textContent = `✗ Auto-work error: ${e.message}`;
+    fin.textContent = `✗ ${msg}`;
     if (typeof scrollToBottom === 'function') scrollToBottom();
   }
 }
