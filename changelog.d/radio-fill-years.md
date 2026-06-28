@@ -1,0 +1,4 @@
+### Keystone Radio — filled in 25 missing recording years
+
+- Researched and filled **25** of the previously-undated tracks in `radio/stations.json` (57 → 32 with no year), each grounded in a documented source: the Louis Armstrong Hot Five side (1926), Bing Crosby & Bix Beiderbecke's "Make Believe" (1928), Benny Goodman's Trio "That's a Plenty" (1928), Red & Miff's Stompers "Black Bottom Stomp" (1927), Jack Teagarden "Loveless Love" (1931), Count Basie (1939/1940), Duke Ellington "All God's Chillun Got Rhythm" (1937), Cab Calloway "When You're Smiling" (1936), Lena Horne "Frankie and Johnny" (1947), Lee Wiley's Rodgers & Hart sides (1940), Perry Como "Bibbidi-Bobbidi-Boo" (1949), Spike Jones (1942/1950), Doris Day (1953/1956/1958), and more.
+- The remaining 32 are genuinely undated at the Internet Archive source and are obscure performers or undatable medley/transcription sides — left blank (and shown cleanly) rather than guessed, per the project's evidence rule.
