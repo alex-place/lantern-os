@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.83] - 2026-06-28
+- feat(repo-map): add `src/keystone/repo_map.py` — a symbol-graph repo-map that closes our biggest gap vs Cursor/Codex/Aider (#1409). It extracts the symbols each source file defines and references, builds a directed graph (edges follow symbol references), and ranks files by a hand-rolled **PageRank** so the load-bearing files float to the top of the context slice. `build_repo_map()` supports `focus_files` personalization and `max_files` capping; `render_repo_map()` emits a compact prompt block. Dependency-light first cut: stdlib-only (regex symbol extraction for py/js/ts; tree-sitter precision is a planned follow-up). Approach ported clean-room from Aider (Apache-2.0) — recorded in new `THIRD-PARTY-NOTICES.md` with the OSS porting policy (permissive-only; no GPL/AGPL) per #1412. Covered by `tests/test_keystone_repo_map.py` (9 tests, all passing).
+
 ## [1.7.82] - 2026-06-27
 - cleanup(lib): remove the two empty `caption-placement.js` / `creator-perf-optimizer.js` stub files (1 byte each) that a stale-base merge (`d320ce6a`) resurrected after #1308 had deleted them, finally completing #1300. Both were unreferenced dead code (the only remaining mentions were a prose `_note` in `research/gaming_layout_priors.json`, now corrected, and the auto-generated `src/convergence/codebase_index.json`). No runtime code `require`s either module; both server entrypoints still pass `node --check`.
 
