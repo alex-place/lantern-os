@@ -5,7 +5,7 @@
  * domain-scoped (per-user/per-domain) leaderboard namespacing. Shared core
  * used by feed exploration and model routing to rank candidates consistently.
  *
- * Domains: "feed" (explore-feed.js), "model-routing" (provider-routing.js).
+ * Domains: "feed" (explore-feed.js), "model-routing" (provider-routing.js), "user-preference".
  * Each domain can configure its own cold-start priors and candidate sets.
  */
 
@@ -227,6 +227,14 @@ async function rankCandidates(candidates, taskType, opts = {}) {
   return ranked;
 }
 
+/**
+ * Retrieve a user's preference score for a specific model.
+ * @param {string} userId - The ID of the user.
+ * @param {string} modelKey - The identifier for the model.
+ * @returns {number} The preference score for the model, or PRIOR_MEAN if not found.
+ */
+function getUserPreferenceScore(userId, modelKey) {
+  const domainScope = getDomainScope("user-preference", userId);
 module.exports = {
   orderChainByLeaderboard,
   recordModelOutcome,
