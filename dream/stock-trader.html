@@ -493,14 +493,18 @@ function regimeBadgeInfo(ticker, state){
   const regime = marketRegime(ticker);
   if(_lastRegime[ticker] !== regime.state){
     _lastRegime[ticker] = regime.state;
-    console.debug('[marketState]', {
-      symbol: ticker, state: regime.state,
-      priceChangePercent: regime.priceChangePercent,
-      volumeRatio: regime.volumeRatio,
-      atrPercent: regime.atrPercent,
-      trendStrength: regime.trendStrength,
-      momentum: regime.momentum,
-    });
+    // Gated behind a debug flag (#1231): every regime flip across ~16 polled tickers
+    // otherwise floods the console. Enable with localStorage.setItem('debugMarketState','1').
+    if (localStorage.getItem('debugMarketState') === '1') {
+      console.debug('[marketState]', {
+        symbol: ticker, state: regime.state,
+        priceChangePercent: regime.priceChangePercent,
+        volumeRatio: regime.volumeRatio,
+        atrPercent: regime.atrPercent,
+        trendStrength: regime.trendStrength,
+        momentum: regime.momentum,
+      });
+    }
   }
   return { text: regime.state.toUpperCase(), cls: regime.state !== 'quiet' ? ' regime-'+regime.state : '' };
 }
