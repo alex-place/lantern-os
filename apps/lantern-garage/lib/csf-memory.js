@@ -51,14 +51,52 @@ function readIngestDocs(limit = 3) {
     });
 }
 
+// Helper: Common English stopwords for filtering
+const stopwords = new Set([
+  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+  "and", "or", "but", "if", "then", "else", "when", "where", "why", "how",
+  "to", "of", "in", "on", "at", "for", "with", "by", "from", "up", "down",
+  "out", "off", "over", "under", "again", "further", "then", "once", "here",
+  "there", "what", "who", "whom", "this", "that", "these", "those", "am",
+  "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your",
+  "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she",
+  "her", "hers", "herself", "it", "its", "itself", "they", "them", "their",
+  "theirs", "themselves", "do", "does", "did", "doing",
+  "because", "as", "until", "while", "about", "against", "between", "into",
+  "through", "during", "before", "after", "above", "below",
+  "all", "any", "both", "each", "few", "more", "most", "other", "some",
+  "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too",
+  "very", "s", "t", "can", "will", "just", "don", "should", "now", "d", "ll",
+  "m", "o", "re", "ve", "y", "ain", "aren", "couldn", "didn", "doesn", "hadn",
+  "hasn", "haven", "isn", "ma", "mightn", "mustn", "needn", "shan", "shouldn",
+  "wasn", "weren", "won", "wouldn"
+]);
+
+// Helper: Tokenizes text, removes stopwords and short words
+function getFilteredTokens(text) {
+  if (!text) return [];
+  return text.toLowerCase()
+    .split(/[\s.,;!?"'(){}[\]-]+/) // Split by common delimiters
+    .filter(word => word.length > 2 && !stopwords.has(word));
+}
+
 // Keyword relevance scoring — returns 0-1 score for how relevant a text is to the query
 function relevanceScore(text, query) {
   if (!text || !query) return 0;
-  const lower = text.toLowerCase();
-  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-  if (words.length === 0) return 0;
-  const hits = words.filter(w => lower.includes(w)).length;
-  return hits / words.length;
+
+  const queryTokens = getFilteredTokens(query);
+  if (queryTokens.length === 0) return 0;
+
+  const textTokens = getFilteredTokens(text);
+  if (textTokens.length === 0) return 0;
+
+  let hits = 0;
+  for (const qToken of queryTokens) {
+    if (textTokens.includes(qToken)) {
+      hits++;
+    }
+  }
+  return hits / queryTokens.length;
 }
 
 // Query-filtered memory: only return records relevant to the user's message
