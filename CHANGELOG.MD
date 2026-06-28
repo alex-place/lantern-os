@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.84] - 2026-06-27
+- style(chat): render the "Keystone · debug route" reply signature in black. The route signature shares one class (`.msg-route-sig`, accent-colored) across all routes; added a `.route-debug` modifier (applied in both render paths when the label matches `debug route`) and a `.msg-route-sig.route-debug { color: #000 }` rule so only the debug-route label turns black — the normal "Keystone · chat" signature keeps its accent color. Verified in dev preview: computed color is `rgb(0,0,0)` for the debug sig, accent for the normal sig.
+
 ## [1.7.82] - 2026-06-27
 - cleanup(lib): remove the two empty `caption-placement.js` / `creator-perf-optimizer.js` stub files (1 byte each) that a stale-base merge (`d320ce6a`) resurrected after #1308 had deleted them, finally completing #1300. Both were unreferenced dead code (the only remaining mentions were a prose `_note` in `research/gaming_layout_priors.json`, now corrected, and the auto-generated `src/convergence/codebase_index.json`). No runtime code `require`s either module; both server entrypoints still pass `node --check`.
 
