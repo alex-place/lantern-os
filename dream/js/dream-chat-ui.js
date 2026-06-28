@@ -635,10 +635,13 @@ async function runAutowork(target, btn, base) {
   // The "File issue" step only applies to task mode; drop it for issue-number runs.
   const phases = taskMode ? AUTOWORK_PHASES : AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
   const stepRowsHtml = phases.map(([k, label]) =>
-    `<div class="aw-step" data-phase="${k}" style="display:flex;align-items:center;gap:8px;padding:3px 0;opacity:0.4">
-       <span class="aw-icon" style="width:16px;text-align:center">○</span>
-       <span class="aw-label" style="font-size:12.5px">${label}</span>
-       <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
+    `<div class="aw-step" data-phase="${k}" style="padding:3px 0;opacity:0.4">
+       <div style="display:flex;align-items:center;gap:8px">
+         <span class="aw-icon" style="width:16px;text-align:center">○</span>
+         <span class="aw-label" style="font-size:12.5px">${label}</span>
+         <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
+       </div>
+       <div class="aw-detail" style="display:none;font-size:11px;opacity:0.75;margin:2px 0 0 24px;line-height:1.4"></div>
      </div>`).join('');
   row.innerHTML =
     `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>
@@ -650,17 +653,26 @@ async function runAutowork(target, btn, base) {
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
 
-  const setStep = (phase, status, extra) => {
+  const setStep = (phase, status, extra, detail) => {
     const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
     if (!el) return;
     el.style.opacity = '1';
     const icon = el.querySelector('.aw-icon');
     const ex = el.querySelector('.aw-extra');
+    const det = el.querySelector('.aw-detail');
     if (status === 'start')        { icon.textContent = '◐'; icon.style.color = 'var(--accent)'; }
     else if (status === 'done')    { icon.textContent = '✓'; icon.style.color = '#4ade80'; }
     else if (status === 'error')   { icon.textContent = '✗'; icon.style.color = '#f87171'; }
+    else if (status === 'retry')   { icon.textContent = '↻'; icon.style.color = '#facc15'; }
     else if (status === 'skipped') { icon.textContent = '⊘'; icon.style.color = '#facc15'; }
     if (extra) ex.textContent = extra;
+    // Surface WHY a step retried/failed, in plain language, right under the row —
+    // so a failure is never an unexplained red ✗ (the #1484-follow-up transparency fix).
+    if (det && detail) {
+      det.textContent = detail;
+      det.style.display = 'block';
+      det.style.color = (status === 'error') ? '#f87171' : (status === 'retry') ? '#facc15' : 'inherit';
+    }
   };
 
   try {
@@ -685,7 +697,8 @@ async function runAutowork(target, btn, base) {
         else if (d.phase === 'research' && d.status === 'done') extra = `${d.filesFound || 0} files · ${d.webSourcesFound || 0} web`;
         else if (d.phase === 'create_issue' && d.status === 'done') extra = `#${d.issue}`;
         else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
-        setStep(d.phase, d.status, extra);
+        else if (d.status === 'retry') extra = `retry ${d.attempt || ''}`.trim();
+        setStep(d.phase, d.status, extra, d.detail);
       } else if (evName === 'diff') {
         const diffEl = row.querySelector('.aw-diff');
         const files = (d.files || []).join(', ');
