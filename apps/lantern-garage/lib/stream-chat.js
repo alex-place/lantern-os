@@ -1669,7 +1669,16 @@ async function handleStreamChat(req, url, res) {
           }, (upstream) => {
             if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`ollama_status_${upstream.statusCode}`)); return; }
             let buf = "";
+            // Mid-stream collapse guard (#1342): the post-hoc canary detects runaway
+            // word-salad but only AFTER the bad text already streamed to the user. Here
+            // we score the reply as it grows (reusing the same scoreReplyCollapse signal)
+            // and HARD-STOP the local stream once degeneration is unambiguous — high
+            // threshold so healthy prose is never cut — with an honest truncation notice.
+            const { scoreReplyCollapse } = require("./collapse-canary");
+            const COLLAPSE_BLOCK = parseFloat(process.env.COLLAPSE_BLOCK_PROXIMITY || "0.85");
+            let _lastCanaryLen = 0, _collapseTripped = false;
             upstream.on("data", (chunk) => {
+              if (_collapseTripped) return;
               buf += chunk.toString();
               const lines = buf.split("\n");
               buf = lines.pop();
@@ -1680,8 +1689,20 @@ async function handleStreamChat(req, url, res) {
                   if (parsed.message?.content) { fullReply += parsed.message.content; sendToken(parsed.message.content); }
                 } catch {}
               }
+              if (!_collapseTripped && fullReply.length >= 400 && fullReply.length - _lastCanaryLen >= 240) {
+                _lastCanaryLen = fullReply.length;
+                const sc = scoreReplyCollapse(fullReply, { threshold: COLLAPSE_BLOCK });
+                if (sc.collapsed) {
+                  _collapseTripped = true;
+                  console.warn(`[canary_collapse_block] proximity=${sc.proximity} provider=ollama signals=${JSON.stringify(sc.signals)}`);
+                  sendToken("\n\n⚠️ _(stopped — the local model began repeating itself; reply truncated. Try rephrasing or switch to a cloud model.)_");
+                  try { upstream.destroy(); } catch (_e) {}
+                  try { req2.destroy(); } catch (_e) {}
+                  resolve();
+                }
+              }
             });
-            upstream.on("end", () => resolve());
+            upstream.on("end", () => { if (!_collapseTripped) resolve(); });
             upstream.on("error", reject);
           });
           req2.on("error", reject);

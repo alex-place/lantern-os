@@ -697,7 +697,10 @@ async function runAutowork(target, btn, base) {
       } else if (evName === 'error') {
         const fin = row.querySelector('.aw-final');
         fin.style.color = '#f87171';
-        fin.textContent = `✗ ${d.error || 'error'}`;
+        // Grounded failure (#1348): show the cause, with the raw provider/stage detail
+        // tucked into an expandable line so it's actionable but not noisy.
+        fin.innerHTML = `✗ ${esc(d.error || 'error')}`
+          + (d.detail ? `<details style="margin-top:4px"><summary style="cursor:pointer;opacity:.7;font-size:11px">detail</summary><pre style="white-space:pre-wrap;font-size:11px;opacity:.8;margin:4px 0">${esc(d.detail)}</pre></details>` : '');
       } else if (evName === 'done') {
         finalDone = d;
       }

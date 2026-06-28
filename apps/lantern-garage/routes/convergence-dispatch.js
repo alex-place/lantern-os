@@ -16,6 +16,29 @@ const { appendConversationEntry } = require("../lib/conversation-store");
 const autoDispatch = require("../lib/auto-dispatch");
 const maxConversationTextLength = 2000;
 
+// Turn a raw autowork failure into a grounded, actionable message instead of a bare
+// "network error" (#1348): name the likely cause (provider/quota/timeout/network) so
+// the user can tell an outage from out-of-credits from a real code fault.
+function describeAutoworkError(err, stage) {
+  const raw = String((err && err.message) || err || "unknown error");
+  const at = stage ? ` (at the ${stage} stage)` : "";
+  let hint;
+  if (/all_providers_failed|out of credits|insufficient_quota|quota|billing|spending limit|credit/i.test(raw)) {
+    hint = "every cloud provider is unavailable (out of credits/quota). Add credits or a working key (Anthropic/OpenAI/Gemini/xAI/Vertex), then retry.";
+  } else if (/no_provider_configured|no.?key|_no_key|missing.*key/i.test(raw)) {
+    hint = "no model provider is configured. Set an API key (or Vertex ADC) and retry.";
+  } else if (/timeout|timed out|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(raw)) {
+    hint = "the model call timed out. The provider may be slow or unreachable — retry, or check provider status.";
+  } else if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|socket hang up|network|fetch failed/i.test(raw)) {
+    hint = "a network call failed (DNS/connection). Check connectivity or the provider endpoint.";
+  } else if (/_status_(4\d\d|5\d\d)|HTTP \d{3}|status \d{3}/i.test(raw)) {
+    hint = "the provider returned an HTTP error — see the status code below.";
+  } else {
+    hint = "unexpected failure — see the detail below; likely a code fault rather than a provider outage.";
+  }
+  return { error: `Autowork failed${at}: ${hint}`, detail: raw.slice(0, 500), stage: stage || null };
+}
+
 module.exports = async (req, res, url, deps) => {
   const router = getRouter();
   const pathname = url.pathname;
@@ -1016,8 +1039,10 @@ module.exports = async (req, res, url, deps) => {
         });
         res.end();
       } catch (err) {
-        send("error", { error: err.message });
-        send("done", { ok: false, ...receipt, stoppedAt: receipt.stoppedAt || "exception" });
+        const stage = receipt.stoppedAt || (receipt.steps && receipt.steps[receipt.steps.length - 1]) || null;
+        const g = describeAutoworkError(err, stage);
+        send("error", g);
+        send("done", { ok: false, ...receipt, stoppedAt: receipt.stoppedAt || "exception", message: g.error, errorDetail: g.detail });
         res.end();
       } finally {
         clearInterval(heartbeat);
