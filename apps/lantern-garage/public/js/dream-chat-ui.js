@@ -461,6 +461,13 @@ function addUserBubble(text) {
   container.scrollTop = container.scrollHeight;
 }
 
+// ── Document generation requests ──────────────────────────────────────────────
+// Client-side regex to detect requests for document generation.
+function parseDocRequest(text) {
+  // Anchor the regex to the start of the message to prevent incidental matches
+  // within coding requests.
+  const m = text.match(/^(?:generate|create|make|write)\s+(?:a\s
+
 function createAgentBubble(isError) {
   const container = document.getElementById('messages');
   const msg = document.createElement('div');
