@@ -1087,6 +1087,7 @@
         const isDegraded = /degraded/i.test(routeLabel);
         const sig = document.createElement("div");
         sig.className = isDegraded ? "msg-route-sig degraded" : "msg-route-sig";
+        if (/debug route/i.test(routeLabel)) sig.classList.add("route-debug");
         sig.setAttribute("aria-label", `Active route: ${routeLabel}`);
         if (isDegraded) {
           sig.setAttribute("role", "status");
