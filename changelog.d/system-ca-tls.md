@@ -1,0 +1,1 @@
+- security(tls): on Windows hosts behind AV/corporate TLS interception, the OS root certificate store is now loaded at startup (via `win-ca`) so Node's TLS verification SUCCEEDS through the same root the OS trusts — instead of the previous `rejectUnauthorized:false` workaround (a MITM risk CodeQL flagged). No-op off Windows; opt out with `LANTERN_SKIP_SYSTEM_CA=1` (#1376).
