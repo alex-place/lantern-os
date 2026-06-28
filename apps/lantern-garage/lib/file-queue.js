@@ -1,3 +1,4 @@
+// Async per-path serialized JSONL/file write queue — prevents concurrent-append corruption.
 const fs = require("fs");
 const path = require("path");
 
