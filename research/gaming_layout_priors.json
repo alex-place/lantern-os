@@ -10,7 +10,7 @@
   "safe_gameplay_zone": { "x": 0.15, "y": 0.35, "width": 0.70, "height": 0.50 },
   "caption_avoid_zones": ["crosshair_center", "minimap_corner", "inventory_bottom"],
   "composition": {
-    "_note": "Composition formula (public short-form conventions, NOT scraped from specific creators). Priority is absolute: gameplay is the immovable centre; the facecam is secondary and orbits the gameplay; captions are tertiary and orbit BOTH. Implemented by caption-placement.bestCaptionPlacement().",
+    "_note": "Composition formula (public short-form conventions, NOT scraped from specific creators). Priority is absolute: gameplay is the immovable centre; the facecam is secondary and orbits the gameplay; captions are tertiary and orbit BOTH.",
     "priority": ["gameplay_center", "facecam", "captions"],
     "facecam_orbit": {
       "top": "captions_lower",
