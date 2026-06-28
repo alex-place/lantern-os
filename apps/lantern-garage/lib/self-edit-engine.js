@@ -141,6 +141,15 @@ function validateDiff(diffText, repoRoot) {
   return files;
 }
 
+/**
+ * Detects if a patch looks like a placeholder or scaffolding rather than a full implementation.
+ * It checks for distinct occurrences of strong non-implementation markers in added lines.
+ * Returns true if two or more distinct markers are found.
+ */
+function looksLikePlaceholderPatch(parsedFiles) {
+  const addedLines = [];
+  for (const file of parsedFiles) {
+    for (const
 // ── Diff application ────────────────────────────────────────────────────
 
 // Split a hunk into its "before" (context + removed) and "after" (context +
