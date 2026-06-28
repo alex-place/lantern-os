@@ -73,6 +73,25 @@ class TaskSpec:
     prompts: Dict[str, str] = field(default_factory=dict)
     reasons: Dict[str, str] = field(default_factory=dict)
 
+# Define a new Task for affordability reasoning
+AFFORDABILITY_REASONING_TASK = TaskSpec(
+    name="affordability_reasoning",
+    needs=["monthly_income", "monthly_expenses", "savings", "debt", "affordability_threshold"],
+    prompts={
+        "monthly_income": "What is your average monthly income (after tax)?",
+        "monthly_expenses": "What are your total average monthly expenses (rent, utilities, food, etc.)?",
+        "savings": "What is your total current savings amount?",
+        "debt": "What is your total current debt amount (credit cards, loans, etc.)?",
+        "affordability_threshold": "What percentage of your income are you comfortable allocating to a new financial commitment?",
+    },
+    reasons={
+        "monthly_income": "To assess your overall financial capacity.",
+        "monthly_expenses": "To understand your recurring financial obligations.",
+        "savings": "To evaluate your financial buffer and ability to cover unexpected costs.",
+        "debt": "To understand your existing financial liabilities.",
+        "affordability_threshold": "To determine your comfort level for new financial commitments.",
+    }
+)
 
 @dataclass
 class PendingAction:
