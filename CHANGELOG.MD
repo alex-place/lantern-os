@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.83] - 2026-06-27
+- fix(chat): in-chat autowork ("autowork issue 1255") can now read the issue. The operator command allowlist (`lib/command-allowlist.js`) permitted `gh pr {list,create,view}` but no `gh issue` commands, so the chat tool-exec loop's `gh issue view <N>` was blocked (`command_not_allowlisted`) — leaving the model blind to the issue body and guessing at nonexistent paths (e.g. `LS fleet`). Allowlist the read-only `gh issue view` and `gh issue list` (mutations like `gh issue edit/close` stay blocked). Verified through the real dev-preview chat: "autowork issue 1255" now executes `gh issue view 1255 --json body` (tool-log status `executed`, no error) and renders the "Run as autowork →" handoff. Also reconcile the stale workspace version pin in `apps/lantern-garage/package-lock.json` (`1.7.74` → current) that was failing the dev-server dependency preflight.
+
 ## [1.7.82] - 2026-06-27
 - cleanup(lib): remove the two empty `caption-placement.js` / `creator-perf-optimizer.js` stub files (1 byte each) that a stale-base merge (`d320ce6a`) resurrected after #1308 had deleted them, finally completing #1300. Both were unreferenced dead code (the only remaining mentions were a prose `_note` in `research/gaming_layout_priors.json`, now corrected, and the auto-generated `src/convergence/codebase_index.json`). No runtime code `require`s either module; both server entrypoints still pass `node --check`.
 
