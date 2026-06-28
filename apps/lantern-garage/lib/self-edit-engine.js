@@ -453,6 +453,69 @@ function taskTitle(task) {
   return (cleaned || "Autowork task").slice(0, 120);
 }
 
+// A task message that *references an existing issue* must NOT be filed as a new
+// one — otherwise meta-commands like "autowork the oldest issue" or "work issue
+// #1342" get filed verbatim as junk issues (#1344/#1346) and the pipeline patches
+// the wrong target. Resolve such references to an OPEN issue number, else null so
+// the caller falls back to createIssueFromTask for genuinely novel requests.
+function resolveExistingIssue(repoRoot, task) {
+  const text = String(task || "").trim();
+  if (!text) return null;
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
+
+  // Verify a candidate number is a real OPEN issue; return it (or null).
+  const openIssue = (n) => {
+    if (!n || !Number.isFinite(n)) return null;
+    try {
+      const out = execFileSync(
+        "gh",
+        ["issue", "view", String(n), "--repo", GH_REPO, "--json", "number,state"],
+        { cwd: repoRoot, encoding: "utf8", timeout: 10000, windowsHide: true, env }
+      );
+      const j = JSON.parse(out);
+      return String(j.state).toUpperCase() === "OPEN" ? j.number : null;
+    } catch (_e) {
+      return null;
+    }
+  };
+
+  // 1) Explicit reference: "#1342", "issue 1342", "issue #1342".
+  const m = text.match(/(?:#|\bissues?\s+#?)(\d{1,7})\b/i);
+  if (m) {
+    const hit = openIssue(parseInt(m[1], 10));
+    if (hit) return hit;
+  }
+
+  // 2) Superlative reference: "the oldest [open] issue" / "newest|latest issue".
+  //    Only when the message is clearly *about* picking an existing issue, not a
+  //    coding task that happens to contain the word "issue".
+  const sup = text.match(/\b(oldest|newest|latest)\b[^.\n]*\bissues?\b/i);
+  if (sup) {
+    const direction = /oldest/i.test(sup[1]) ? "asc" : "desc";
+    try {
+      const out = execFileSync(
+        "gh",
+        ["issue", "list", "--repo", GH_REPO, "--state", "open", "--limit", "100",
+          "--json", "number,createdAt"],
+        { cwd: repoRoot, encoding: "utf8", timeout: 15000, windowsHide: true, env }
+      );
+      const rows = JSON.parse(out);
+      if (Array.isArray(rows) && rows.length) {
+        rows.sort((a, b) =>
+          direction === "asc"
+            ? String(a.createdAt).localeCompare(String(b.createdAt))
+            : String(b.createdAt).localeCompare(String(a.createdAt))
+        );
+        return rows[0].number;
+      }
+    } catch (_e) {
+      /* fall through to null */
+    }
+  }
+
+  return null;
+}
+
 // Create a GitHub issue from a free-form chat instruction, so the issue-linked
 // autowork pipeline (which keys off a real issue number) can work it. Returns
 // { number, url, title }. Used by the suggest-then-confirm "Run as autowork"
@@ -1180,6 +1243,7 @@ module.exports = {
   gitCurrentBranch,
   openDraftPr,
   createIssueFromTask,
+  resolveExistingIssue,
   taskTitle,
   runTests,
   generatePlan,

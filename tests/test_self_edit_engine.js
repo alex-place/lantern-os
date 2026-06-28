@@ -15,6 +15,7 @@ const {
   isAllowedTest,
   requireSafePaths,
   extractJson,
+  resolveExistingIssue,
 } = require("../apps/lantern-garage/lib/self-edit-engine");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -227,6 +228,36 @@ function run() {
   test("throws on genuinely empty / non-JSON input", () => {
     assert.throws(() => extractJson(""), /empty response/);
     assert.throws(() => extractJson("the model refused to answer"), /no valid JSON/);
+  });
+
+  // ── resolveExistingIssue (#1347): meta-commands must not be filed as junk ──
+  // Hermetic cases only: genuine coding tasks have no #N / "oldest|newest issue"
+  // reference, so they short-circuit to null WITHOUT touching `gh`. This locks in
+  // the safety property that a real coding request is never mis-resolved onto an
+  // unrelated existing issue (the false-positive direction). Live resolution of
+  // "#N" / "the oldest issue" is exercised against real `gh` in manual/dev runs.
+  test("resolveExistingIssue: null for empty / whitespace task", () => {
+    assert.strictEqual(resolveExistingIssue(repoRoot, ""), null);
+    assert.strictEqual(resolveExistingIssue(repoRoot, "   \n  "), null);
+  });
+
+  test("resolveExistingIssue: null for a genuine coding task (no issue ref)", () => {
+    assert.strictEqual(
+      resolveExistingIssue(repoRoot, "Add a dark-mode toggle to the settings page"),
+      null
+    );
+    assert.strictEqual(
+      resolveExistingIssue(repoRoot, "fix the parseDocRequest handler that hijacks pdf requests"),
+      null
+    );
+  });
+
+  test("resolveExistingIssue: 'issues' as a plain word does not trigger resolution", () => {
+    // "report issues" is not a reference to a specific or superlative issue.
+    assert.strictEqual(
+      resolveExistingIssue(repoRoot, "make the error banner report issues more clearly"),
+      null
+    );
   });
 
   // ── Summary ───────────────────────────────────────────────────────────

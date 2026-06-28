@@ -176,7 +176,7 @@ module.exports = async (req, res, url, deps) => {
         const task = typeof opts.task === "string" ? opts.task.trim() : "";
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue } = require("../lib/self-edit-engine");
         const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
@@ -187,12 +187,20 @@ module.exports = async (req, res, url, deps) => {
         // issue number → file a real GitHub issue first, then work it like an
         // `!work #N` run. Keeps every PR issue-linked.
         if (!issueNumber && task) {
-          try {
-            const created = createIssueFromTask(REPO_ROOT, task);
-            issueNumber = created.number;
-          } catch (e) {
-            sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
-            return;
+          // A meta-command that references an existing issue ("autowork the oldest
+          // issue", "work issue #1342") must target that issue, not be filed as a
+          // new one. Resolve first; only file a fresh issue for novel requests.
+          const existing = resolveExistingIssue(REPO_ROOT, task);
+          if (existing) {
+            issueNumber = existing;
+          } else {
+            try {
+              const created = createIssueFromTask(REPO_ROOT, task);
+              issueNumber = created.number;
+            } catch (e) {
+              sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
+              return;
+            }
           }
         }
 
@@ -459,7 +467,7 @@ module.exports = async (req, res, url, deps) => {
       const GH_REPO = "alex-place/lantern-os";
       const {
         generatePlan, generatePatch, applyPatch, runTests,
-        gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask,
+        gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -490,16 +498,26 @@ module.exports = async (req, res, url, deps) => {
         // issue-linked (every PR references a tracked issue), so file the task as
         // a GitHub issue first, then work it exactly like an `!work #N` run.
         if (!issueNumber && task) {
-          step("create_issue", "start");
-          try {
-            const created = createIssueFromTask(REPO_ROOT, task);
-            issueNumber = created.number;
-            step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
-          } catch (e) {
-            step("create_issue", "error", { error: String(e && e.message || e) });
-            send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
-            res.end();
-            return;
+          // A meta-command that references an existing issue ("autowork the oldest
+          // issue", "work issue #1342") must target that issue, not be filed as a
+          // new one (which produced junk issues #1344/#1346). Resolve first; only
+          // file a fresh issue for genuinely novel coding requests.
+          const existing = resolveExistingIssue(REPO_ROOT, task);
+          if (existing) {
+            issueNumber = existing;
+            step("create_issue", "done", { issue: issueNumber, resolved: true });
+          } else {
+            step("create_issue", "start");
+            try {
+              const created = createIssueFromTask(REPO_ROOT, task);
+              issueNumber = created.number;
+              step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
+            } catch (e) {
+              step("create_issue", "error", { error: String(e && e.message || e) });
+              send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
+              res.end();
+              return;
+            }
           }
         }
 
