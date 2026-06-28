@@ -43,7 +43,7 @@ const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 // Extracted helper modules (split out of this file for smaller-context editing):
-const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
+const { compactHistory, compactToolLoopMessages, buildProviderMessages } = require("./stream-chat/history");
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
 const { buildBrainOrder } = require("./stream-chat/provider-order");
@@ -1734,7 +1734,9 @@ async function handleStreamChat(req, url, res) {
                   result: result.ok ? result.result : (result.error || null) });
                 convo.push({ role: "assistant", content: lastTurn });
                 convo.push({ role: "user", content: `The ${tc.name} tool returned:\n${String(out).slice(0, 1500)}\n\nIf you need another tool, reply with exactly one <tool_call>…</tool_call>. Otherwise answer my original request in plain text.` });
-                const followText = await streamOllamaFollow(convo);
+                // Micro-compact stale tool results so a long loop doesn't crowd the
+                // local 8K window (keeps the 2 newest verbatim; #1391).
+                const followText = await streamOllamaFollow(compactToolLoopMessages(convo, { keepRecentResults: 2 }));
                 const nextTc = toolRunner.parseToolCall(followText);
                 if (nextTc) { tc = nextTc; lastTurn = followText; } // markup already streamed; keep going
                 else { if (followText.trim()) fullReply += "\n\n" + followText; tc = null; }
