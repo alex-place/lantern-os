@@ -1,0 +1,4 @@
+### Keystone Radio — per-track volume leveling
+
+- The 78rpm transfers spanned a **~30 dB** loudness range (−42 to −12 LUFS), so the dial lurched from a whisper to a blast as it rolled. Each track now carries a `gain` (dB) in `radio/stations.json` and the player applies it at playback via a Web-Audio GainNode (plus a safety brick-wall limiter), leveling every station to a consistent loudness. This is **lossless** — the mp3s are never re-encoded — and clip-safe (a track's true peak is never pushed past −1 dBFS).
+- New tool `scripts/normalize_radio_levels.py` measures each locally-present mp3 with ffmpeg's EBU R128 analysis and writes its `gain` to the manifest (target −16 LUFS). It's re-runnable and skips entries with no local audio (the player treats a missing `gain` as 0 dB), so it's safe on a partially-fetched library; `fetch_radio_audio.py` now points to it after a fetch. The 25 committed canonical tracks are leveled out-of-the-box.

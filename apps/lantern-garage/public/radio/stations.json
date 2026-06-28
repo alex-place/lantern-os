@@ -45,7 +45,8 @@
 "artist": "Louis Prima & His Orchestra",
 "year": 1944,
 "src": "/radio/rum-and-coca-cola.mp3",
-"lore": "Working for the Yankee dollar. Louis Prima's 1944 read of the Calypso hit — wartime swing with a wink."
+"lore": "Working for the Yankee dollar. Louis Prima's 1944 read of the Calypso hit — wartime swing with a wink.",
+"gain": 4.2
 },
 {
 "freq": "88.3",
@@ -283,7 +284,8 @@
 "artist": "Mal Hallett & His Orchestra",
 "year": 1942,
 "src": "/radio/jingle-jangle-jingle.mp3",
-"lore": "A free, fancy, footloose cowboy tune from 1942 — later beamed across the Mojave on New Vegas radio."
+"lore": "A free, fancy, footloose cowboy tune from 1942 — later beamed across the Mojave on New Vegas radio.",
+"gain": 0.3
 },
 {
 "freq": "89.7",
@@ -481,7 +483,8 @@
 "artist": "Cliff Lang & His All-Star Orchestra",
 "year": 1946,
 "src": "/radio/stormy-weather.mp3",
-"lore": "Arlen & Koehler's torch standard — \"don't know why there's no sun up in the sky.\" A 1946 dance-band reading of a Cotton Club classic."
+"lore": "Arlen & Koehler's torch standard — \"don't know why there's no sun up in the sky.\" A 1946 dance-band reading of a Cotton Club classic.",
+"gain": 2.8
 },
 {
 "freq": "91.1",
@@ -559,7 +562,8 @@
 "artist": "Perry Como",
 "year": 1950,
 "src": "/radio/perry-como-dream.mp3",
-"lore": "Perry Como's velvet read of the Cinderella waltz — \"a dream is a wish your heart makes when you're fast asleep.\" 1950, the year it became the country's lullaby."
+"lore": "Perry Como's velvet read of the Cinderella waltz — \"a dream is a wish your heart makes when you're fast asleep.\" 1950, the year it became the country's lullaby.",
+"gain": -1.8
 },
 {
 "freq": "91.7",
@@ -687,7 +691,8 @@
 "artist": "The Ink Spots & Ella Fitzgerald",
 "year": 1944,
 "src": "/radio/into-each-life.mp3",
-"lore": "Bill Kenny and Ella trade verses on the weather of the heart. Decca 23356, 1944 — heartbreak you can slow-dance to."
+"lore": "Bill Kenny and Ella trade verses on the weather of the heart. Decca 23356, 1944 — heartbreak you can slow-dance to.",
+"gain": 4.4
 },
 {
 "freq": "92.5",
@@ -765,7 +770,8 @@
 "artist": "Glenn Miller & His Orchestra",
 "year": 1940,
 "src": "/radio/pennsylvania-6-5000.mp3",
-"lore": "Glenn Miller's swing tribute to a Manhattan phone number — the whole band shouting \"Pennsylvania six-five-oh-oh-oh!\" 1940, pure pre-war jukebox joy."
+"lore": "Glenn Miller's swing tribute to a Manhattan phone number — the whole band shouting \"Pennsylvania six-five-oh-oh-oh!\" 1940, pure pre-war jukebox joy.",
+"gain": 3.1
 },
 {
 "freq": "93.1",
@@ -843,7 +849,8 @@
 "artist": "Tommy Dorsey & Frank Sinatra",
 "year": 1943,
 "src": "/radio/sinatra-blue-evening.mp3",
-"lore": "A young Frank Sinatra out front of the Tommy Dorsey band, 1943 — the bobby-sox idol before the wasteland, crooning into the blue."
+"lore": "A young Frank Sinatra out front of the Tommy Dorsey band, 1943 — the bobby-sox idol before the wasteland, crooning into the blue.",
+"gain": 8.4
 },
 {
 "freq": "93.7",
@@ -931,7 +938,8 @@
 "artist": "Glenn Miller & His Orchestra",
 "year": 1942,
 "src": "/radio/dont-sit-under-the-apple-tree.mp3",
-"lore": "Glenn Miller, Tex Beneke and the Modernaires lay down the home-front promise — \"with anyone else but me.\" 1942, sweethearts shipping out."
+"lore": "Glenn Miller, Tex Beneke and the Modernaires lay down the home-front promise — \"with anyone else but me.\" 1942, sweethearts shipping out.",
+"gain": 8.7
 },
 {
 "freq": "94.3",
@@ -1009,7 +1017,8 @@
 "artist": "Lawrence \"Piano Roll\" Cook",
 "year": 1950,
 "src": "/radio/dream-a-little-dream.mp3",
-"lore": "The 1931 standard rendered on a player-piano roll by Lawrence Cook — phantom fingers, no pianist in the room. The old world dreaming itself."
+"lore": "The 1931 standard rendered on a player-piano roll by Lawrence Cook — phantom fingers, no pianist in the room. The old world dreaming itself.",
+"gain": 8.6
 },
 {
 "freq": "94.9",
@@ -1127,7 +1136,8 @@
 "artist": "Dean Martin & Nat Brandwynne's Orchestra",
 "year": 1946,
 "src": "/radio/dean-martin-all-of-me.mp3",
-"lore": "Before the Rat Pack, before Vegas — a young Dino with Nat Brandwynne's orchestra, c.1946, asking you to take all of him. The New Vegas sound, a decade early."
+"lore": "Before the Rat Pack, before Vegas — a young Dino with Nat Brandwynne's orchestra, c.1946, asking you to take all of him. The New Vegas sound, a decade early.",
+"gain": 12.0
 },
 {
 "freq": "95.7",
@@ -1295,7 +1305,8 @@
 "artist": "Frank \"Big Boy\" Goodie et son Orchestre",
 "year": 1939,
 "src": "/radio/its-a-sin-to-tell-a-lie.mp3",
-"lore": "Billy Mayhew's standard cut in Paris by expatriate hornman Frank \"Big Boy\" Goodie — Hot Club swing with a wagging finger, 1939."
+"lore": "Billy Mayhew's standard cut in Paris by expatriate hornman Frank \"Big Boy\" Goodie — Hot Club swing with a wagging finger, 1939.",
+"gain": 6.7
 },
 {
 "freq": "96.7",
@@ -1503,7 +1514,8 @@
 "artist": "Dean Martin & Nat Brandwynne's Orchestra",
 "year": 1946,
 "src": "/radio/dean-martin-sun.mp3",
-"lore": "Dean Martin swings Irving Berlin's \"I got the sun in the morning and the moon at night\" — 1946, all easy postwar optimism."
+"lore": "Dean Martin swings Irving Berlin's \"I got the sun in the morning and the moon at night\" — 1946, all easy postwar optimism.",
+"gain": 9.8
 },
 {
 "freq": "97.9",
@@ -1551,7 +1563,8 @@
 "artist": "Airlane Trio & Ted Martin",
 "year": 1947,
 "src": "/radio/heartaches.mp3",
-"lore": "The 1931 torch song a 1947 reissue turned into a surprise smash — heartaches by the number, drifting up from Galaxy News Radio territory."
+"lore": "The 1931 torch song a 1947 reissue turned into a surprise smash — heartaches by the number, drifting up from Galaxy News Radio territory.",
+"gain": 1.5
 },
 {
 "freq": "98.3",
@@ -1639,7 +1652,8 @@
 "artist": "Danny Kaye & The Andrews Sisters",
 "year": 1947,
 "src": "/radio/civilization.mp3",
-"lore": "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor."
+"lore": "\"Bongo, bongo, bongo, I don't want to leave the Congo\" — postwar irony that aged into wasteland gallows humor.",
+"gain": -0.2
 },
 {
 "freq": "98.9",
@@ -1707,7 +1721,8 @@
 "artist": "Joe Loss & His Orchestra",
 "year": 1949,
 "src": "/radio/a-wonderful-guy.mp3",
-"lore": "Nellie Forbush's giddy declaration from South Pacific — \"I'm in love with a wonderful guy.\" Joe Loss's British dance-band take, 1949."
+"lore": "Nellie Forbush's giddy declaration from South Pacific — \"I'm in love with a wonderful guy.\" Joe Loss's British dance-band take, 1949.",
+"gain": 7.7
 },
 {
 "freq": "99.5",
@@ -1835,7 +1850,8 @@
 "artist": "Paul Fenoulhet & The Skyrockets",
 "year": 1945,
 "src": "/radio/sentimental-journey.mp3",
-"lore": "\"Gonna take a sentimental journey, gonna set my heart at ease.\" The 1945 homecoming anthem — the war was ending and everyone was going home."
+"lore": "\"Gonna take a sentimental journey, gonna set my heart at ease.\" The 1945 homecoming anthem — the war was ending and everyone was going home.",
+"gain": 6.2
 },
 {
 "freq": "100.3",
@@ -1923,7 +1939,8 @@
 "artist": "Roy Brown & His Mighty-Mighty Men",
 "year": 1949,
 "src": "/radio/butcher-pete.mp3",
-"lore": "Roy Brown's jump-blues about a butcher \"hackin' all over town\" — a 1949 double-entendre romp later spun on Fallout 4's Diamond City Radio."
+"lore": "Roy Brown's jump-blues about a butcher \"hackin' all over town\" — a 1949 double-entendre romp later spun on Fallout 4's Diamond City Radio.",
+"gain": 8.9
 },
 {
 "freq": "100.9",
@@ -2021,7 +2038,8 @@
 "artist": "The Ink Spots",
 "year": 1941,
 "src": "/radio/set-the-world-on-fire.mp3",
-"lore": "Fallout's signature lullaby for the end of everything. The Ink Spots, Decca Studios, August 1941."
+"lore": "Fallout's signature lullaby for the end of everything. The Ink Spots, Decca Studios, August 1941.",
+"gain": 0.5
 },
 {
 "freq": "101.7",
@@ -2109,7 +2127,8 @@
 "artist": "Buddy Lucas & His Band of Tomorrow",
 "year": 1951,
 "src": "/radio/diane.mp3",
-"lore": "Rapée & Pollack's 1928 waltz reborn as a honking 1951 R&B instrumental by Buddy Lucas's Band of Tomorrow — smoky, slow, after-hours."
+"lore": "Rapée & Pollack's 1928 waltz reborn as a honking 1951 R&B instrumental by Buddy Lucas's Band of Tomorrow — smoky, slow, after-hours.",
+"gain": 2.8
 },
 {
 "freq": "102.5",
@@ -2187,7 +2206,8 @@
 "artist": "Page Cavanaugh Trio",
 "year": 1948,
 "src": "/radio/blue-moon.mp3",
-"lore": "Rodgers & Hart's lonesome standard smoothed into a 1948 cocktail-trio reverie — \"you saw me standing alone.\""
+"lore": "Rodgers & Hart's lonesome standard smoothed into a 1948 cocktail-trio reverie — \"you saw me standing alone.\"",
+"gain": 2.6
 },
 {
 "freq": "103.3",
@@ -2255,7 +2275,8 @@
 "artist": "Glenn Miller & His Orchestra",
 "year": 1941,
 "src": "/radio/a-string-of-pearls.mp3",
-"lore": "Jerry Gray's glide for the Miller band — November 1941, a month before everything changed. Pure ballroom shimmer."
+"lore": "Jerry Gray's glide for the Miller band — November 1941, a month before everything changed. Pure ballroom shimmer.",
+"gain": 1.2
 },
 {
 "freq": "104.1",
@@ -2313,7 +2334,8 @@
 "artist": "Harry James & Frank Sinatra",
 "year": 1945,
 "src": "/radio/sinatra-bottom-of-my-heart.mp3",
-"lore": "Sinatra fronting the Harry James orchestra — \"From the Bottom of My Heart,\" 1945. The voice that would outlive the bombs."
+"lore": "Sinatra fronting the Harry James orchestra — \"From the Bottom of My Heart,\" 1945. The voice that would outlive the bombs.",
+"gain": 11.3
 },
 {
 "freq": "104.7",
@@ -2371,7 +2393,8 @@
 "artist": "Bing Crosby & The Andrews Sisters",
 "year": 1943,
 "src": "/radio/pistol-packin-mama.mp3",
-"lore": "Lay that pistol down, babe. Crosby and the Andrews Sisters, Decca 23277, 1943 — a jukebox staple in every diner still standing."
+"lore": "Lay that pistol down, babe. Crosby and the Andrews Sisters, Decca 23277, 1943 — a jukebox staple in every diner still standing.",
+"gain": -4.4
 },
 {
 "freq": "105.3",
@@ -2439,7 +2462,8 @@
 "artist": "Geraldo & His Orchestra",
 "year": 1944,
 "src": "/radio/ill-be-seeing-you.mp3",
-"lore": "Kahal & Fain's parting standard — \"I'll be seeing you in all the old familiar places.\" 1944, the song that meant goodbye for a generation."
+"lore": "Kahal & Fain's parting standard — \"I'll be seeing you in all the old familiar places.\" 1944, the song that meant goodbye for a generation.",
+"gain": 6.2
 },
 {
 "freq": "106.1",
@@ -2577,7 +2601,8 @@
 "artist": "Jack Payne & His Band",
 "year": 1935,
 "src": "/radio/anything-goes.mp3",
-"lore": "Cole Porter's catalog of a world gone topsy-turvy — \"the world's gone mad today.\" Jack Payne's 1935 band still sounds like a prophecy."
+"lore": "Cole Porter's catalog of a world gone topsy-turvy — \"the world's gone mad today.\" Jack Payne's 1935 band still sounds like a prophecy.",
+"gain": 4.4
 },
 {
 "freq": "107.3",
