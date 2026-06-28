@@ -31,6 +31,40 @@ def test_extract_symbols_js():
     assert "helper" in referenced
 
 
+def test_js_local_vars_are_not_captured_as_defs():
+    # Local const/let/var inside a function body must NOT be treated as defs —
+    # that was the v1 noise bug. Only top-level / exported declarations count.
+    text = (
+        "export function handler() {\n"
+        "  const data = load();\n"      # local -> ignored
+        "  let entry = data[0];\n"        # local -> ignored
+        "  return entry;\n"
+        "}\n"
+        "const TOP_LEVEL = 1;\n"          # column 0 -> captured
+        "export const Widget = 2;\n"      # exported -> captured
+    )
+    defined, _ = extract_symbols(text, ".js")
+    assert "handler" in defined
+    assert "TOP_LEVEL" in defined
+    assert "Widget" in defined
+    assert "data" not in defined
+    assert "entry" not in defined
+
+
+def test_idf_downweights_ambiguous_symbols():
+    # A symbol defined in many files yields weaker edges than a unique one.
+    nodes = ["caller", "a", "b", "uniq"]
+    # `caller` references a symbol defined by both a and b (ambiguous) plus one
+    # defined only by uniq. With IDF weighting uniq should out-rank a and b.
+    edges = {
+        "caller": {"a": 0.5, "b": 0.5, "uniq": 1.0},
+        "a": {}, "b": {}, "uniq": {},
+    }
+    ranks = pagerank(nodes, edges)
+    assert ranks["uniq"] > ranks["a"]
+    assert ranks["uniq"] > ranks["b"]
+
+
 def test_pagerank_sums_to_one_and_rewards_inbound():
     nodes = ["a", "b", "c"]
     # a and b both point at c; c points nowhere

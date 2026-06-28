@@ -31,10 +31,21 @@ _DEF_PATTERNS: dict[str, list[re.Pattern]] = {
         re.compile(r"^\s*def\s+([A-Za-z_]\w*)"),
         re.compile(r"^\s*class\s+([A-Za-z_]\w*)"),
     ],
+    # JS/TS: anchor at column 0 (no leading whitespace) OR require an `export`
+    # keyword. This captures top-level / exported API while excluding the local
+    # `const`/`let`/`var` assignments inside function bodies that otherwise
+    # flood the graph with name-collision noise (e.g. `const data = ...`).
     ".js": [
+        # function/class declarations: indented is fine (methods, nested) — they
+        # are genuine named definitions, not collision-prone locals.
         re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)"),
         re.compile(r"^\s*(?:export\s+)?class\s+([A-Za-z_$][\w$]*)"),
-        re.compile(r"^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*="),
+        # const/let/var: only top-level (column 0) OR explicitly exported. This
+        # is the key noise filter — local `const data = ...` inside a function
+        # body is indented and not exported, so it is correctly ignored.
+        re.compile(r"^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*="),
+        re.compile(r"^\s*export\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*="),
+        re.compile(r"^(?:module\.)?exports\.([A-Za-z_$][\w$]*)\s*="),
     ],
 }
 # JS patterns apply to the whole TS/JSX family too.
@@ -179,10 +190,18 @@ def build_repo_map(
     edges: dict[str, dict[str, float]] = {rel: {} for rel in nodes}
     for rel, referenced in refs.items():
         for sym in referenced:
-            for target in definer.get(sym, ()):  # noqa: B007
+            targets = definer.get(sym, ())
+            if not targets:
+                continue
+            # IDF-style down-weighting: a symbol defined in many files is
+            # ambiguous (e.g. a common helper name), so each edge it implies
+            # carries less weight. A symbol defined in exactly one file is a
+            # strong, unambiguous dependency signal (weight 1.0).
+            weight = 1.0 / len(targets)
+            for target in targets:
                 if target == rel:
                     continue  # ignore self-references
-                edges[rel][target] = edges[rel].get(target, 0.0) + 1.0
+                edges[rel][target] = edges[rel].get(target, 0.0) + weight
 
     scores = pagerank(nodes, edges)
 
