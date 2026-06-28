@@ -596,21 +596,56 @@ async function renderIssues() {
 // ── Autowork live-step panel (issue #527 / autonomous-work/stream) ─────────────
 // Consumes the SSE stream and renders each phase as it happens, so the user can
 // watch plan → patch → tests → commit → push → PR in real time.
+// [key, label, description] — the description tells the user what each step is
+// actually doing (the panel used to show a bare label + a red ✗ on failure).
 const AUTOWORK_PHASES = [
-  ['create_issue','File issue'],
-  ['fetch_issue', 'Fetch issue'],
-  ['branch',      'Create branch'],
-  ['research',    'Research (codebase + web)'],
-  ['plan',        'Generate plan'],
-  ['patch',       'Generate patch'],
-  ['apply',       'Apply changes'],
-  ['tests',       'Run tests'],
-  ['commit',      'Commit'],
-  ['push',        'Push'],
-  ['pr',          'Open PR'],
-  ['convergence', 'Convergence record'],
-  ['record',      'Log record'],
+  ['create_issue','File issue',         'filing a tracked GitHub issue for the task'],
+  ['fetch_issue', 'Fetch issue',        'reading the issue title + body'],
+  ['branch',      'Create branch',      'isolating the work in a fresh git worktree'],
+  ['research',    'Research',           'scanning the codebase + web for relevant context'],
+  ['plan',        'Generate plan',      'deciding which files to change and how'],
+  ['patch',       'Generate patch',     'writing the code diff'],
+  ['apply',       'Apply changes',      'applying the diff to the worktree'],
+  ['tests',       'Run tests',          'verifying the change against the planned tests'],
+  ['commit',      'Commit',             'committing the verified change'],
+  ['push',        'Push',               'pushing the branch to GitHub'],
+  ['pr',          'Open PR',            'opening a draft pull request'],
+  ['convergence', 'Convergence record', 'recording the hypothesis + evidence + confidence'],
+  ['record',      'Log record',         'appending the run to the convergence log'],
 ];
+
+// Inject the autowork panel styles once: compact rows (white-space:normal kills the
+// chat bubble's pre-wrap that was blowing each step up to ~130px tall), the mandala
+// spinner for the active step, and a responsive layout that drops descriptions on
+// narrow screens.
+function ensureAutoworkStyles() {
+  if (document.getElementById('aw-styles')) return;
+  const st = document.createElement('style');
+  st.id = 'aw-styles';
+  st.textContent = [
+    '.aw-panel{white-space:normal;font-size:13px}',
+    '.aw-activity{display:flex;align-items:center;gap:9px;padding:8px 10px;margin-bottom:8px;border:1px solid var(--border,#222);border-radius:10px;background:var(--surface2,rgba(127,127,127,.06))}',
+    '.aw-activity img{width:22px;height:22px;flex:none}',
+    '.aw-act-text{font-size:12.5px;line-height:1.35;min-width:0}',
+    '.aw-act-text b{font-weight:700}.aw-act-text span{opacity:.65}',
+    '.aw-spin{animation:aw-spin 2.4s linear infinite}',
+    '@keyframes aw-spin{to{transform:rotate(360deg)}}',
+    '.aw-steps{white-space:normal;display:flex;flex-direction:column;gap:1px}',
+    '.aw-step{display:flex;align-items:flex-start;gap:8px;padding:3px 4px;border-radius:6px;opacity:.45;transition:opacity .15s,background .15s}',
+    '.aw-step.is-active{opacity:1;background:var(--surface2,rgba(92,200,255,.08))}',
+    '.aw-step.is-done,.aw-step.is-error,.aw-step.is-retry{opacity:1}',
+    '.aw-ico{width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1}',
+    '.aw-ico img{width:16px;height:16px}',
+    '.aw-body{flex:1;min-width:0}',
+    '.aw-row1{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}',
+    '.aw-label{font-size:12.5px;font-weight:600}',
+    '.aw-desc{font-size:11.5px;opacity:.6}',
+    '.aw-extra{font-size:11px;opacity:.7;margin-left:auto;white-space:nowrap}',
+    '.aw-detail{font-size:11.5px;opacity:.85;line-height:1.4;margin-top:2px}',
+    '@media (max-width:520px){.aw-desc{display:none}.aw-extra{margin-left:0}}',
+  ].join('\n');
+  document.head.appendChild(st);
+}
 
 // `target` is either an issue number (number/numeric string — `!work #N`) or a
 // free-form task object `{ task: "fix the intent handler" }` from the chat
@@ -632,46 +667,53 @@ async function runAutowork(target, btn, base) {
   const row = document.createElement('div');
   row.className = 'msg-row agent';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  ensureAutoworkStyles();
   // The "File issue" step only applies to task mode; drop it for issue-number runs.
   const phases = taskMode ? AUTOWORK_PHASES : AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
-  const stepRowsHtml = phases.map(([k, label]) =>
-    `<div class="aw-step" data-phase="${k}" style="padding:3px 0;opacity:0.4">
-       <div style="display:flex;align-items:center;gap:8px">
-         <span class="aw-icon" style="width:16px;text-align:center">○</span>
-         <span class="aw-label" style="font-size:12.5px">${label}</span>
-         <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
-       </div>
-       <div class="aw-detail" style="display:none;font-size:11px;opacity:0.75;margin:2px 0 0 24px;line-height:1.4"></div>
-     </div>`).join('');
+  const PHASE_INFO = Object.fromEntries(AUTOWORK_PHASES.map((p) => [p[0], { label: p[1], desc: p[2] }]));
+  const stepRowsHtml = phases.map(([k, label, desc]) =>
+    `<div class="aw-step" data-phase="${k}"><div class="aw-ico">○</div><div class="aw-body">`
+    + `<div class="aw-row1"><span class="aw-label">${esc(label)}</span><span class="aw-desc">${esc(desc)}</span><span class="aw-extra"></span></div>`
+    + `<div class="aw-detail" style="display:none"></div></div></div>`).join('');
+  // Activity line = a live, streamed-feel header: the mandala spins while a step runs
+  // and the text names what's happening right now (addresses "shows little/no info").
   row.innerHTML =
-    `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>
-     <div class="bubble" style="font-size:13px">
-       <div class="aw-steps">${stepRowsHtml}</div>
-       <div class="aw-diff" style="display:none;margin-top:8px"></div>
-       <div class="aw-final" style="margin-top:8px;font-weight:600"></div>
-     </div>`;
+    `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>`
+    + `<div class="bubble aw-panel">`
+    + `<div class="aw-activity"><img src="/mandala.svg" class="aw-spin" alt=""><div class="aw-act-text"><b>Starting autowork…</b> <span>${esc(taskMode ? 'filing the task as an issue' : 'on issue ' + panelLabel)}</span></div></div>`
+    + `<div class="aw-steps">${stepRowsHtml}</div>`
+    + `<div class="aw-diff" style="display:none;margin-top:8px"></div>`
+    + `<div class="aw-final" style="margin-top:8px;font-weight:600"></div>`
+    + `</div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
+
+  const actImg = row.querySelector('.aw-activity img');
+  const actText = row.querySelector('.aw-act-text');
+  const setActivity = (label, desc, spinning) => {
+    if (actText) actText.innerHTML = '<b>' + esc(label) + '</b>' + (desc ? ' <span>— ' + esc(desc) + '</span>' : '');
+    if (actImg) actImg.classList.toggle('aw-spin', spinning !== false);
+  };
 
   const setStep = (phase, status, extra, detail) => {
     const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
     if (!el) return;
-    el.style.opacity = '1';
-    const icon = el.querySelector('.aw-icon');
-    const ex = el.querySelector('.aw-extra');
-    const det = el.querySelector('.aw-detail');
-    if (status === 'start')        { icon.textContent = '◐'; icon.style.color = 'var(--accent)'; }
-    else if (status === 'done')    { icon.textContent = '✓'; icon.style.color = '#4ade80'; }
-    else if (status === 'error')   { icon.textContent = '✗'; icon.style.color = '#f87171'; }
-    else if (status === 'retry')   { icon.textContent = '↻'; icon.style.color = '#facc15'; }
-    else if (status === 'skipped') { icon.textContent = '⊘'; icon.style.color = '#facc15'; }
-    if (extra) ex.textContent = extra;
+    el.classList.remove('is-active', 'is-done', 'is-error', 'is-retry');
+    const ico = el.querySelector('.aw-ico');
+    ico.style.color = '';
+    if (status === 'start')        { el.classList.add('is-active'); ico.innerHTML = '<img src="/mandala.svg" class="aw-spin" alt="">'; }
+    else if (status === 'done')    { el.classList.add('is-done');  ico.textContent = '✓'; ico.style.color = '#4ade80'; }
+    else if (status === 'error')   { el.classList.add('is-error'); ico.textContent = '✗'; ico.style.color = '#f87171'; }
+    else if (status === 'retry')   { el.classList.add('is-retry'); ico.textContent = '↻'; ico.style.color = '#facc15'; }
+    else if (status === 'skipped') { ico.textContent = '⊘'; ico.style.color = '#facc15'; el.style.opacity = '1'; }
+    if (extra) el.querySelector('.aw-extra').textContent = extra;
     // Surface WHY a step retried/failed, in plain language, right under the row —
-    // so a failure is never an unexplained red ✗ (the #1484-follow-up transparency fix).
-    if (det && detail) {
+    // so a failure is never an unexplained red ✗ (the transparency fix).
+    if (detail) {
+      const det = el.querySelector('.aw-detail');
       det.textContent = detail;
       det.style.display = 'block';
-      det.style.color = (status === 'error') ? '#f87171' : (status === 'retry') ? '#facc15' : 'inherit';
+      det.style.color = (status === 'error') ? '#f87171' : (status === 'retry') ? '#facc15' : '';
     }
   };
 
@@ -699,6 +741,11 @@ async function runAutowork(target, btn, base) {
         else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
         else if (d.status === 'retry') extra = `retry ${d.attempt || ''}`.trim();
         setStep(d.phase, d.status, extra, d.detail);
+        // Keep the live activity header in sync with the current step.
+        const info = PHASE_INFO[d.phase] || { label: d.phase, desc: '' };
+        if (d.status === 'start')      setActivity(info.label + '…', info.desc, true);
+        else if (d.status === 'retry') setActivity(info.label + ' — retrying', d.detail || '', true);
+        else if (d.status === 'error') setActivity(info.label + ' failed', d.detail || '', false);
       } else if (evName === 'diff') {
         const diffEl = row.querySelector('.aw-diff');
         const files = (d.files || []).join(', ');
@@ -743,6 +790,8 @@ async function runAutowork(target, btn, base) {
       fin.innerHTML = finalDone.prUrl
         ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
         : `✓ ${esc(finalDone.message || 'Done')}`;
+      setActivity('Complete', finalDone.prUrl ? 'opened a pull request' : 'autonomous work finished', false);
+      if (actImg) actImg.src = '/mandala.svg'; // steady (no spin)
     } else {
       btn.textContent = '✗ Failed';
       btn.style.color = '#f87171';
@@ -750,6 +799,7 @@ async function runAutowork(target, btn, base) {
         fin.style.color = '#f87171';
         fin.textContent = `✗ ${esc((finalDone && finalDone.message) || 'Auto-work failed')}`;
       }
+      setActivity('Stopped', (finalDone && finalDone.message) || 'see the failed step above', false);
     }
     if (typeof scrollToBottom === 'function') scrollToBottom();
   } catch (e) {
