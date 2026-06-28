@@ -70,7 +70,7 @@
 },
 {
 "freq": "88.3",
-"title": "Loveless Love - Master No. 2",
+"title": "Loveless Love (Take 2)",
 "artist": "Jack Teagarden's Orchestra",
 "year": null,
 "src": "/radio/loveless-love-master-no-2-orchestra.mp3",
@@ -110,7 +110,7 @@
 },
 {
 "freq": "88.5",
-"title": "Loveless Love - Master #1; Loveless Love - Master #2",
+"title": "Loveless Love (Takes 1 & 2)",
 "artist": "Jack Teagarden's Orchestra",
 "year": 1931,
 "src": "/radio/loveless-love-master-1-loveless-love-master-2-orchestr.mp3",
@@ -120,7 +120,7 @@
 },
 {
 "freq": "88.5",
-"title": "St. Louis Blues\"; \"Basin Street Blues",
+"title": "St. Louis Blues / Basin Street Blues",
 "artist": "Spencer Williams",
 "year": 1947,
 "src": "/radio/st-louis-blues-basin-street-blues-williams.mp3",
@@ -141,7 +141,7 @@
 {
 "freq": "88.7",
 "title": "The World Is Mad",
-"artist": "Count Basie'S Orchestra",
+"artist": "Count Basie's Orchestra",
 "year": null,
 "src": "/radio/the-world-is-mad-orchestra.mp3",
 "lore": "Count Basie'S Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
@@ -180,8 +180,8 @@
 },
 {
 "freq": "88.9",
-"title": "Make Believe; Always",
-"artist": "Jerome Kern and Hammerstein II",
+"title": "Make Believe",
+"artist": "Glenn Miller & His Orchestra",
 "year": 1947,
 "src": "/radio/make-believe-always-ii.mp3",
 "lore": "Jerome Kern and Hammerstein II — a 1947 78rpm side, preserved by the Internet Archive Great 78 Project.",
@@ -210,7 +210,7 @@
 },
 {
 "freq": "89.1",
-"title": "Who'S Who At The Zoo",
+"title": "Who's Who At The Zoo",
 "artist": "DICK BROWN and JOAN LAZER",
 "year": null,
 "src": "/radio/who-s-who-at-the-zoo-lazer.mp3",
@@ -250,7 +250,7 @@
 },
 {
 "freq": "89.3",
-"title": "DOWN IN NASHVILLE, TENNESSEE (Chick-A-Ling-Bone)",
+"title": "Down in Nashville, Tennessee (Chick-A-Ling-Bone)",
 "artist": "DINAH SHORE and The Mellowmen",
 "year": 1951,
 "src": "/radio/down-in-nashville-tennessee-chick-a-ling-bone-mellowme.mp3",
@@ -370,7 +370,7 @@
 },
 {
 "freq": "90.1",
-"title": "Always; Bye Bye Blues; Shine On Harvest Moon",
+"title": "Always / Bye Bye Blues / Shine On Harvest Moon",
 "artist": "Kay Kyser and his Orchestra",
 "year": null,
 "src": "/radio/always-bye-bye-blues-shine-on-harvest-moon-orchestra.mp3",
@@ -440,7 +440,7 @@
 },
 {
 "freq": "90.5",
-"title": "MOLASSES, MOLASSES (It's Icky-Sticky Goo)",
+"title": "Molasses, Molasses (It's Icky-Sticky Goo)",
 "artist": "Spike Jones And His City Slickers",
 "year": 1950,
 "src": "/radio/molasses-molasses-it-s-icky-sticky-goo-slickers.mp3",
@@ -460,7 +460,7 @@
 },
 {
 "freq": "90.7",
-"title": "The Night Is Young And You'Re So Beautiful",
+"title": "The Night Is Young And You're So Beautiful",
 "artist": "Dean Martin",
 "year": 1948,
 "src": "/radio/the-night-is-young-and-you-re-so-beautiful-martin.mp3",
@@ -472,7 +472,7 @@
 "freq": "90.7",
 "title": "Jazzin' Babies Blues",
 "artist": "King Oliver's Jazz Band",
-"year": null,
+"year": 1923,
 "src": "/radio/jazzin-babies-blues-band.mp3",
 "lore": "King Oliver's Jazz Band — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_jazzin-babies-blues_king-olivers-jazz-band-king-oliver-louis-armstrong-johnny-dod_gbia0009390a",
@@ -509,7 +509,7 @@
 },
 {
 "freq": "91.1",
-"title": "Maybe; A Million Dreams Ago; How High Is the Moon?; It's the Last Time I'll Fall in Love; Orchids for Remembrance; The Moon Won't Talk",
+"title": "Maybe (medley)",
 "artist": "Dick Haymes",
 "year": null,
 "src": "/radio/maybe-a-million-dreams-ago-how-high-is-the-moon-it-s-t.mp3",
@@ -550,8 +550,8 @@
 },
 {
 "freq": "91.3",
-"title": "I Never Cried So Much; Please Don'T Talk About Me When I'M Gone",
-"artist": "1 - Gracie Fields",
+"title": "I Never Cried So Much / Please Don't Talk About Me When I'm Gone",
+"artist": "Gracie Fields",
 "year": null,
 "src": "/radio/i-never-cried-so-much-please-don-t-talk-about-me-when-.mp3",
 "lore": "1 - Gracie Fields — a 78rpm side preserved by the Internet Archive Great 78 Project.",
@@ -570,7 +570,7 @@
 },
 {
 "freq": "91.3",
-"title": "You'Re So Desirable",
+"title": "You're So Desirable",
 "artist": "Teddy Wilson And His Orchestra",
 "year": 1946,
 "src": "/radio/you-re-so-desirable-orchestra.mp3",
@@ -611,7 +611,7 @@
 "freq": "91.7",
 "title": "Lonesome Blues",
 "artist": "LOUIS ARMSTRONG and HIS HOT FIVE",
-"year": null,
+"year": 1926,
 "src": "/radio/lonesome-blues-five.mp3",
 "lore": "LOUIS ARMSTRONG and HIS HOT FIVE — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_lonesome-blues_louis-armstrong-and-his-hot-five-clarence-bacbock-louie-lil-louis-ar_gbia0190859b",
@@ -649,7 +649,7 @@
 },
 {
 "freq": "91.9",
-"title": "You'Re Lucky To Me",
+"title": "You're Lucky To Me",
 "artist": "LOUIS ARMSTRONG and HIS ORCHESTRA",
 "year": 1931,
 "src": "/radio/you-re-lucky-to-me-orchestra.mp3",
@@ -808,7 +808,7 @@
 },
 {
 "freq": "93.1",
-"title": "You'Re Getting To Be A Habit With Me",
+"title": "You're Getting To Be A Habit With Me",
 "artist": "Dinah Shore And Tony Martin",
 "year": 1955,
 "src": "/radio/you-re-getting-to-be-a-habit-with-me-martin.mp3",
@@ -908,7 +908,7 @@
 },
 {
 "freq": "93.7",
-"title": "Jimmy Unkown",
+"title": "Jimmy Unknown",
 "artist": "Doris Day",
 "year": null,
 "src": "/radio/jimmy-unkown-day.mp3",
@@ -997,7 +997,7 @@
 },
 {
 "freq": "94.3",
-"title": "Love'S Little Island",
+"title": "Love's Little Island",
 "artist": "Doris Day",
 "year": null,
 "src": "/radio/love-s-little-island-day.mp3",
@@ -1007,7 +1007,7 @@
 },
 {
 "freq": "94.3",
-"title": "It'S A Rainy Day",
+"title": "It's A Rainy Day",
 "artist": "Lena Horne",
 "year": 1947,
 "src": "/radio/it-s-a-rainy-day-horne.mp3",
@@ -1076,7 +1076,7 @@
 },
 {
 "freq": "94.9",
-"title": "THE DEADWOOD STAGE (Whip-Crack-Away!)",
+"title": "The Deadwood Stage (Whip-Crack-Away!)",
 "artist": "Doris Day",
 "year": null,
 "src": "/radio/the-deadwood-stage-whip-crack-away-day.mp3",
@@ -1096,7 +1096,7 @@
 },
 {
 "freq": "94.9",
-"title": "Your Feet'S Too Big",
+"title": "Your Feet's Too Big",
 "artist": "The Malcolm Mitchell Trio",
 "year": 1951,
 "src": "/radio/your-feet-s-too-big-trio.mp3",
@@ -1106,7 +1106,7 @@
 },
 {
 "freq": "95.1",
-"title": "You'Re Too Lovely To Last",
+"title": "You're Too Lovely To Last",
 "artist": "BILLIE HOLIDAY and her ORCH.",
 "year": 1923,
 "src": "/radio/you-re-too-lovely-to-last-orch.mp3",
@@ -1116,7 +1116,7 @@
 },
 {
 "freq": "95.1",
-"title": "Teacher'S Pet",
+"title": "Teacher's Pet",
 "artist": "Doris Day",
 "year": null,
 "src": "/radio/teacher-s-pet-day.mp3",
@@ -1136,7 +1136,7 @@
 },
 {
 "freq": "95.3",
-"title": "(Mix The Lot, - What Have You Got) MAGNOLIA",
+"title": "Magnolia",
 "artist": "BING CROSBY and the RHYTHM BOYS",
 "year": 1927,
 "src": "/radio/mix-the-lot-what-have-you-got-magnolia-boys.mp3",
@@ -1146,7 +1146,7 @@
 },
 {
 "freq": "95.3",
-"title": "I'Ve Gotta Sing Away These Blues",
+"title": "I've Gotta Sing Away These Blues",
 "artist": "Doris Day",
 "year": 1956,
 "src": "/radio/i-ve-gotta-sing-away-these-blues-day.mp3",
@@ -1205,7 +1205,7 @@
 },
 {
 "freq": "95.7",
-"title": "Some Peaceful Evening; Okay For Baby; Lili Marlene; There Are No Wings On A Foxhole",
+"title": "Some Peaceful Evening (medley)",
 "artist": "Les Brown and his Orchestra",
 "year": null,
 "src": "/radio/some-peaceful-evening-okay-for-baby-lili-marlene-there.mp3",
@@ -1226,7 +1226,7 @@
 {
 "freq": "95.9",
 "title": "Don't Forget to Mess Around",
-"artist": "Barbarin",
+"artist": "Louis Armstrong & His Hot Five",
 "year": null,
 "src": "/radio/don-t-forget-to-mess-around-barbarin.mp3",
 "lore": "Barbarin — a 78rpm side preserved by the Internet Archive Great 78 Project.",
@@ -1265,7 +1265,7 @@
 },
 {
 "freq": "96.1",
-"title": "He'S Right On Time",
+"title": "He's Right On Time",
 "artist": "Bells Over Jordan Male Group of St. Louis",
 "year": null,
 "src": "/radio/he-s-right-on-time-louis.mp3",
@@ -1316,7 +1316,7 @@
 },
 {
 "freq": "96.3",
-"title": "I'Ll Be So Glad",
+"title": "I'll Be So Glad",
 "artist": "Bells Over Jordan Male Group of St. Louis",
 "year": null,
 "src": "/radio/i-ll-be-so-glad-louis.mp3",
@@ -1338,7 +1338,7 @@
 "freq": "96.3",
 "title": "Cake Walkin' Babies",
 "artist": "Louis Armstrong",
-"year": null,
+"year": 1925,
 "src": "/radio/cake-walkin-babies-armstrong.mp3",
 "lore": "Louis Armstrong — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_cake-walkin-babies_louis-armstrong-clarence-williams-blue-five-sidney-bechet-clare_gbia0093330a",
@@ -1395,7 +1395,7 @@
 },
 {
 "freq": "96.7",
-"title": "Ten Days With Baby; The Girl I Left Behind Me; Limehouse Blues; Miss You",
+"title": "Ten Days With Baby (medley)",
 "artist": "Tobias",
 "year": null,
 "src": "/radio/ten-days-with-baby-the-girl-i-left-behind-me-limehouse.mp3",
@@ -1417,7 +1417,7 @@
 "freq": "96.9",
 "title": "Saturday Night Function",
 "artist": "Duke Ellington and His Cotton Club Orchestra",
-"year": null,
+"year": 1929,
 "src": "/radio/saturday-night-function-orchestra.mp3",
 "lore": "Duke Ellington and His Cotton Club Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_saturday-night-function_duke-ellington-and-his-cotton-club-orchestra-ellington-biga_gbia0077003b",
@@ -1467,7 +1467,7 @@
 "freq": "97.1",
 "title": "Come Back Sweet Papa",
 "artist": "Louis Armstrong and His Hot Five",
-"year": null,
+"year": 1926,
 "src": "/radio/come-back-sweet-papa-five.mp3",
 "lore": "Louis Armstrong and His Hot Five — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_come-back-sweet-papa_louis-armstrong-and-his-hot-five-barbarin-russell-louis-armstr_gbia0093326b",
@@ -1545,7 +1545,7 @@
 },
 {
 "freq": "97.5",
-"title": "Put 'Em Down Blues",
+"title": "Put 'em Down Blues",
 "artist": "Louis Armstrong and His Hot Seven",
 "year": 1956,
 "src": "/radio/put-em-down-blues-seven.mp3",
@@ -1644,8 +1644,8 @@
 {
 "freq": "98.3",
 "title": "Irish Black Bottom",
-"artist": "Louis Armstrong'S Hot Five",
-"year": null,
+"artist": "Louis Armstrong's Hot Five",
+"year": 1926,
 "src": "/radio/irish-black-bottom-five.mp3",
 "lore": "Louis Armstrong'S Hot Five — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_irish-black-bottom_louis-armstrongs-hot-five-louis-armstrong-johnny-dodds-kid-ory_gbia0190849a",
@@ -1696,7 +1696,7 @@
 "freq": "98.5",
 "title": "Jazz Lips",
 "artist": "Louis Armstrong's Hot Five",
-"year": null,
+"year": 1926,
 "src": "/radio/jazz-lips-five.mp3",
 "lore": "Louis Armstrong's Hot Five — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_jazz-lips_louis-armstrongs-hot-five-louis-armstrong-johnny-dodds-kid-ory-lil-hardi_gbia0093330b",
@@ -1704,7 +1704,7 @@
 },
 {
 "freq": "98.5",
-"title": "THATS'S A PLENTY (Eso Basta)",
+"title": "THATS's A PLENTY (Eso Basta)",
 "artist": "Tommy Dorsey and his Orchestra",
 "year": 1936,
 "src": "/radio/thats-s-a-plenty-eso-basta-orchestra.mp3",
@@ -1723,7 +1723,7 @@
 },
 {
 "freq": "98.9",
-"title": "I Would If I Could But I Can'T",
+"title": "I Would If I Could But I Can't",
 "artist": "Bill Darnel",
 "year": 1954,
 "src": "/radio/i-would-if-i-could-but-i-can-t-darnel.mp3",
@@ -1735,7 +1735,7 @@
 "freq": "98.9",
 "title": "Sunset Cafe Stomp",
 "artist": "Louis Armstrong's Hot Five",
-"year": null,
+"year": 1926,
 "src": "/radio/sunset-cafe-stomp-five.mp3",
 "lore": "Louis Armstrong's Hot Five — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_sunset-cafe-stomp_louis-armstrongs-hot-five-venable-louis-armstrong-johnny-dodds-k_gbia0093324b",
@@ -1872,7 +1872,7 @@
 },
 {
 "freq": "99.9",
-"title": "I Can'T Get Started",
+"title": "I Can't Get Started",
 "artist": "Billie Holiday & Her Orchestra",
 "year": 1934,
 "src": "/radio/i-can-t-get-started-orchestra.mp3",
@@ -1921,7 +1921,7 @@
 },
 {
 "freq": "100.3",
-"title": "I'Ve Got A Date With A Dream",
+"title": "I've Got A Date With A Dream",
 "artist": "Billie Holiday & Her Orchestra",
 "year": 1934,
 "src": "/radio/i-ve-got-a-date-with-a-dream-orchestra.mp3",
@@ -1941,7 +1941,7 @@
 },
 {
 "freq": "100.3",
-"title": "After You'Ve Gone",
+"title": "After You've Gone",
 "artist": "MIFF MOLE and his LITTLE MOLERS",
 "year": 1937,
 "src": "/radio/after-you-ve-gone-molers.mp3",
@@ -1961,7 +1961,7 @@
 },
 {
 "freq": "100.5",
-"title": "Don'T Know If I'M Comin' Or Goin'",
+"title": "Don't Know If I'm Comin' Or Goin'",
 "artist": "Billie Holiday And Her Orchestra",
 "year": 1945,
 "src": "/radio/don-t-know-if-i-m-comin-or-goin-orchestra.mp3",
@@ -1971,7 +1971,7 @@
 },
 {
 "freq": "100.5",
-"title": "Ill Wind; Moanin' Low; Don'T You Know I Care; The Day After Forever",
+"title": "Ill Wind (medley)",
 "artist": "Ginny Simms",
 "year": null,
 "src": "/radio/ill-wind-moanin-low-don-t-you-know-i-care-the-day-afte.mp3",
@@ -1981,7 +1981,7 @@
 },
 {
 "freq": "100.5",
-"title": "The Children'S Prayer\"; \"Angels",
+"title": "The Children's Prayer / Angels",
 "artist": "Mary Dean",
 "year": null,
 "src": "/radio/the-children-s-prayer-angels-dean.mp3",
@@ -1991,7 +1991,7 @@
 },
 {
 "freq": "100.5",
-"title": "Don'T Worry 'Bout That Mule",
+"title": "Don't Worry 'Bout That Mule",
 "artist": "Woody Herman and his Orchestra",
 "year": 1946,
 "src": "/radio/don-t-worry-bout-that-mule-orchestra.mp3",
@@ -2010,7 +2010,7 @@
 },
 {
 "freq": "100.9",
-"title": "YOU CAN'T BE MINE (And Someone Else's Too)",
+"title": "YOU CAN't BE MINE (And Someone Else's Too)",
 "artist": "Billie Holiday And Her Orchestra",
 "year": 1945,
 "src": "/radio/you-can-t-be-mine-and-someone-else-s-too-orchestra.mp3",
@@ -2090,7 +2090,7 @@
 },
 {
 "freq": "101.3",
-"title": "Lee Wiley; Rodgers And Hart Album",
+"title": "I've Got Five Dollars",
 "artist": "Miss Lee Wiley",
 "year": 1940,
 "src": "/radio/lee-wiley-rodgers-and-hart-album-wiley.mp3",
@@ -2129,7 +2129,7 @@
 },
 {
 "freq": "101.7",
-"title": "Ain'T It The Truth",
+"title": "Ain't It The Truth",
 "artist": "Noël CHIBOUST et sa Grande Formation",
 "year": null,
 "src": "/radio/ain-t-it-the-truth-formation.mp3",
@@ -2179,7 +2179,7 @@
 },
 {
 "freq": "102.1",
-"title": "BIBBIDY-BOBBIDY-BOO (The Magic Song)",
+"title": "Bibbidy-Bobbidy-Boo (The Magic Song)",
 "artist": "PERRY COMO and THE FONTAINE SISTERS",
 "year": null,
 "src": "/radio/bibbidy-bobbidy-boo-the-magic-song-sisters.mp3",
@@ -2299,7 +2299,7 @@
 },
 {
 "freq": "103.3",
-"title": "That'S Rich",
+"title": "That's Rich",
 "artist": "Buddy Rich and his V-Disc Speed Demons",
 "year": 1946,
 "src": "/radio/that-s-rich-demons.mp3",
@@ -2339,7 +2339,7 @@
 },
 {
 "freq": "103.7",
-"title": "Baby, It'S Cold Outside",
+"title": "Baby, It's Cold Outside",
 "artist": "CAB CALLOWAY and EUGENIE BAIRD",
 "year": 1949,
 "src": "/radio/baby-it-s-cold-outside-baird.mp3",
@@ -2368,7 +2368,7 @@
 },
 {
 "freq": "104.1",
-"title": "When You'Re Smiling",
+"title": "When You're Smiling",
 "artist": "CAB CALLOWAY and HIS ORCHESTRA",
 "year": null,
 "src": "/radio/when-you-re-smiling-orchestra.mp3",
@@ -2507,7 +2507,7 @@
 {
 "freq": "105.3",
 "title": "Black Bottom Stomp",
-"artist": "Red & Miff'S Stompers",
+"artist": "Red & Miff's Stompers",
 "year": null,
 "src": "/radio/black-bottom-stomp-stompers.mp3",
 "lore": "Red & Miff'S Stompers — a 78rpm side preserved by the Internet Archive Great 78 Project.",
@@ -2539,7 +2539,7 @@
 "freq": "105.7",
 "title": "Harlem Camp Meeting",
 "artist": "Cab Calloway And His Cotton Club Orchestra",
-"year": null,
+"year": 1933,
 "src": "/radio/harlem-camp-meeting-orchestra.mp3",
 "lore": "Cab Calloway And His Cotton Club Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_harlem-camp-meeting_cab-calloway-and-his-cotton-club-orchestra-h-white_gbia7025331a",
@@ -2568,7 +2568,7 @@
 "freq": "106.1",
 "title": "Zaz Zuh Zaz",
 "artist": "Cab Calloway And His Cotton Club Orchestra",
-"year": null,
+"year": 1933,
 "src": "/radio/zaz-zuh-zaz-orchestra.mp3",
 "lore": "Cab Calloway And His Cotton Club Orchestra — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_zaz-zuh-zaz_cab-calloway-and-his-cotton-club-orchestra-white-calloway_gbia7025331b",
@@ -2647,7 +2647,7 @@
 },
 {
 "freq": "106.7",
-"title": "(I Don'T Stand) A Ghost Of A Chance",
+"title": "(I Don't Stand) A Ghost Of A Chance",
 "artist": "Charlie Ventura Sextet",
 "year": 1949,
 "src": "/radio/i-don-t-stand-a-ghost-of-a-chance-sextet.mp3",
@@ -2677,9 +2677,9 @@
 },
 {
 "freq": "106.9",
-"title": "Classicas In Blue",
-"artist": "Coburn",
-"year": null,
+"title": "Little Girl Blue",
+"artist": "Lena Horne",
+"year": 1946,
 "src": "/radio/classicas-in-blue-coburn.mp3",
 "lore": "Coburn — a 78rpm side preserved by the Internet Archive Great 78 Project.",
 "ia": "78_whispering_lena-horne-cole-porter-phil-moore_gbia8002430",
@@ -2716,8 +2716,8 @@
 },
 {
 "freq": "107.3",
-"title": "Little Girl Blue",
-"artist": "Coburn",
+"title": "Whispering",
+"artist": "Lena Horne",
 "year": 1946,
 "src": "/radio/little-girl-blue-coburn.mp3",
 "lore": "Coburn — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",

@@ -252,7 +252,7 @@
       background: radial-gradient(130% 100% at 50% 0%, #0c2114 0%, #061308 68%, #040c06 100%);
       box-shadow:
         inset 0 0 0 1px #0c3b22, inset 0 0 70px rgba(0,0,0,.6), inset 0 0 18px rgba(43,255,136,.06),
-        0 0 0 6px var(--bezel), 0 0 0 7px #20302600;          /* inner bezel ring */
+        0 0 0 6px var(--bezel), 0 0 0 7px #26342b;            /* inner bezel ring + machined edge */
       overflow: hidden;
     }
     .pip-display::before {                                    /* display scanlines + faint flicker */
@@ -288,7 +288,9 @@
 
     /* panels get Pip-Boy bracket corners + sit on the green field */
     .pipboy .dial { background: rgba(4,14,8,.5); border-color: #123e26; }
-    .pipboy .screen { border-radius: 9px; }
+    /* the screen keeps its own CRT ::before/::after (scanlines + vignette), so it
+       can't take the .bracket corners — it gets a brighter phosphor frame instead. */
+    .pipboy .screen { border-radius: 9px; border-color: #1d5234; box-shadow: inset 0 0 60px rgba(0,0,0,.55), inset 0 0 14px rgba(43,255,136,.07), 0 0 0 1px rgba(43,255,136,.08); }
     .bracket { position: relative; }
     .bracket::before, .bracket::after {
       content: ""; position: absolute; width: 13px; height: 13px; pointer-events: none; z-index: 10;
@@ -345,7 +347,7 @@
         <div class="stationscroll" id="stationList"></div>
       </nav>
 
-      <section class="screen bracket" id="screen" aria-live="polite">
+      <section class="screen" id="screen" aria-live="polite">
         <span class="crt-noise" aria-hidden="true"></span>
         <span class="crt-roll" aria-hidden="true"></span>
         <span class="crt-power" aria-hidden="true"></span>
@@ -557,7 +559,7 @@
       applyLevel();   // per-track loudness leveling for the new station
       var hf = document.getElementById('hudFreq'); if (hf) hf.textContent = s.freq;   // HUD readout
       nowTitle.textContent = s.title;
-      nowMeta.textContent = s.artist + " · " + s.year;
+      nowMeta.textContent = s.artist + (s.year ? " · " + s.year : "");   // no "· null" for undated sides
       nowLore.textContent = s.lore || "";
       applyMarquee();
       Array.prototype.forEach.call(listEl.children, function (b, j) {
@@ -704,10 +706,14 @@
     });
 
     // ── Audio element events ───────────────────────────────────────────────
-    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; startVU(); applyCrackle(); });
+    // ON AIR reflects ACTUAL broadcast, not intent: 'play' only means we asked to
+    // play (it fires instantly even for a dead 404 station), so it shows TUNING…;
+    // the light only goes ON AIR on 'playing' (audio actually flowing). This stops
+    // the indicator from claiming ON AIR while a missing station is off the air.
+    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.add('off'); onairLbl.textContent = 'TUNING…'; startVU(); applyCrackle(); });
     audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; applyCrackle(); });
-    audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); });
-    audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); });
+    audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); onair.classList.add('off'); onairLbl.textContent = 'TUNING…'; });
+    audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; });
     audio.addEventListener('canplay',  function () { screenEl.classList.remove('is-tuning'); });
     audio.addEventListener('timeupdate', function () {
       if (scrubbing) return;   // don't fight the user's drag
@@ -724,6 +730,7 @@
       nowTitle.textContent = '— SIGNAL LOST —';
       nowMeta.textContent = (STATIONS[current] ? STATIONS[current].freq + ' FM is off the air' : '');
       screenEl.classList.remove('is-tuning');
+      onair.classList.add('off'); onairLbl.textContent = 'NO SIGNAL';   // never claim ON AIR for a dead station
       setTimeout(function () { if (STATIONS.length > 1) tune(nextIndex(), true); }, 1400);
     });
 
