@@ -23,6 +23,7 @@
 
 const https = require("https");
 const http = require("http");
+const { llmAgent } = require("./insecure-tls"); // win32 TLS workaround — same agent the main chat path uses, so cloud calls don't fail cert verification on Windows
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 
 // ── Expanded provider roster ──
@@ -259,6 +260,9 @@ function callProvider(providerId, model, systemPrompt, message, history) {
       hostname, port, path: config.path(model),
       method: "POST",
       headers: buildHeaders(providerId, apiKey, payload),
+      // Cloud (https) calls reuse the shared llmAgent so win32 cert-verification
+      // failures don't take down every provider; ollama (local http) needs no agent.
+      ...(useHttps && llmAgent ? { agent: llmAgent } : {}),
     };
 
     const client = useHttps ? https : http;
@@ -287,7 +291,11 @@ function callProvider(providerId, model, systemPrompt, message, history) {
       res.on("error", reject);
     });
     req.on("error", (e) => reject(new Error(`${providerId}_connect_${e.code || "error"}`)));
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error(`${providerId}_timeout`)); });
+    // Local models (ollama) are far slower than cloud — a 15s cap fails EVERY local
+    // call. Give ollama a generous window (OLLAMA_TIMEOUT_MS, default 120s); cloud
+    // stays tight at 15s.
+    const timeoutMs = isOllama ? (parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000) : 15000;
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error(`${providerId}_timeout`)); });
     req.write(payload);
     req.end();
   });

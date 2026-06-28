@@ -291,6 +291,54 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
+    if (cmd.name === "agents" || cmd.name === "agent") {
+      // Orchestrator–worker sub-agents (#1392): decompose → isolated workers → synthesize.
+      // Emits the TYPE-based SSE the dream-chat UI parser consumes ({type:"token",text},
+      // {type:"done",...}) via the shared sse helper — not the raw event:-name format.
+      const task = cmd.args.trim() || message.replace(/^!\S+\s*/, "").trim();
+      sse.writeStreamHeaders(res);
+      if (!task) {
+        sse.sendToken(res, "Usage: !agents <task> — splits the task across isolated sub-agents and synthesizes the result.\n");
+        sse.sendDone(res, "failed", { error: "no_task", online: false });
+        return;
+      }
+      const { runOrchestrator } = require("./orchestrator-agents");
+      const agent = selectAgent(task);
+      const systemPrompt = `${agent.systemPrompt}\n\nTone: thoughtful, unhurried, human. Never clinical. Never sycophantic.`;
+      const workerId = `agents-${Date.now()}`;
+      sse.sendToken(res, `🔀 **Orchestrator** — decomposing the task into sub-agents…\n\n`);
+      runOrchestrator(task, {
+        systemPrompt,
+        workerId,
+        provider: process.env.KEYSTONE_AGENTS_PROVIDER || requestedProvider || undefined,
+        onPhase: (phase, info) => {
+          if (phase === "workers") {
+            const names = (info.workers || []).map((w) => `\`${w.name}\``).join(", ");
+            sse.sendToken(res, `Dispatching **${info.count}** isolated sub-agent${info.count === 1 ? "" : "s"}: ${names}\n\n`);
+          } else if (phase === "synthesize") {
+            sse.sendToken(res, `\nSynthesizing sub-agent results…\n\n`);
+          }
+        },
+        onWorkerStart: (name, role) => sse.sendToken(res, `→ \`${name}\` (${role}) working…\n`),
+        onWorkerDone: (name, ok) => sse.sendToken(res, `${ok ? "✓" : "✗"} \`${name}\` ${ok ? "done" : "failed"}\n`),
+      })
+        .then(({ synthesis, workers }) => {
+          sse.sendToken(res, `\n---\n\n`);
+          for (const word of String(synthesis.text).split(" ")) sse.sendToken(res, word + " ");
+          sse.sendDone(res, "keystone", {
+            agent: "Keystone",
+            provider: synthesis.provider || "orchestrator",
+            online: !!String(synthesis.text || "").trim(),
+            orchestrator: { workerId, workers: workers.map((w) => ({ name: w.name, role: w.role, ok: w.ok })) },
+          });
+        })
+        .catch((err) => {
+          sse.sendError(res, `Sub-agents failed: ${err.message}`);
+          sse.sendDone(res, "failed", { error: err.message, online: false });
+        });
+      return;
+    }
+
     if (cmd.name === "search" || cmd.name === "web-search") {
       const searchQuery = cmd.args.trim() || message.replace(/!\w+\s*/, "").trim();
       if (!searchQuery) {
