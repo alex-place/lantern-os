@@ -62,4 +62,25 @@ function prefersAnthropic(opts) {
   return resolveCodingRoute(opts) === "anthropic";
 }
 
-module.exports = { resolveCodingRoute, prefersAnthropic };
+/**
+ * Whether the kernel coding path should lead local-first (verify-gated).
+ *
+ * Per ADR-0009 Rule 4, local is an acceptable *verified* backstop: the kernel
+ * runs local-first but only serves the result if it passes verification,
+ * escalating to cloud otherwise (#1207 / #1197). This centralizes the
+ * `KEYSTONE_LOCAL_FIRST` read so the flag lives in one place. Default: true
+ * (local-first verify-gated); set `KEYSTONE_LOCAL_FIRST=0` to force cloud
+ * (e.g. when no capable local coder is served). `rolloverMode === "default"`
+ * also forces local-first, matching the prior inline behavior.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.rolloverMode]
+ * @param {object} [opts.env=process.env]
+ * @returns {boolean}
+ */
+function kernelCodingLocalFirst({ rolloverMode, env } = {}) {
+  env = env || process.env;
+  return rolloverMode === "default" || env.KEYSTONE_LOCAL_FIRST !== "0";
+}
+
+module.exports = { resolveCodingRoute, prefersAnthropic, kernelCodingLocalFirst };

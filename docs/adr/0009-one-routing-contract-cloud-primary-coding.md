@@ -1,10 +1,10 @@
 ---
 adr: 0009
 title: One routing contract — cloud-primary for coding, local as verified backstop
-status: Proposed
+status: Accepted
 date: 2026-06-28
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (2026-06-28)
 supersedes: none
 superseded-by: none
 ---
@@ -13,7 +13,24 @@ superseded-by: none
 
 ## Status
 
-Proposed — awaiting approval from Alex Place.
+Accepted — approved by Alex Place on 2026-06-28.
+
+### Note on the kernel verify-gated path (added on acceptance)
+
+Reviewing the call sites on acceptance clarified that the kernel coding path
+(`lib/stream-chat.js` ~line 378, `KEYSTONE_LOCAL_FIRST`, policy #1207) runs
+local-first **but verify-gated** (`requireVerified`): a local coding result is
+only served if it passes verification, otherwise it escalates to the cloud
+teacher (#1197). This is **not** in conflict with this ADR — it is the concrete
+implementation of **Rule 4** (local is the *verified* backstop). What the
+contract forbids is serving *unverified* local output for coding (the #1167 bug),
+which #1197 already eliminated. `CONVERGENCE_CHAT` (off by default) and
+`LOCAL_CAPABILITY_FIRST` (selects *which* local model, not cloud-vs-local) are
+retained as documented escape hatches / orthogonal knobs, not contradictions.
+
+The routing flags are therefore centralized in `lib/route-contract.js` as the
+single home (`resolveCodingRoute`, `kernelCodingLocalFirst`); changing any live
+*default* remains gated on real-chat-UI verification per the user-path rule.
 
 ## Context
 

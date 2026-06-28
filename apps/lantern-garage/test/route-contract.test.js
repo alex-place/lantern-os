@@ -14,7 +14,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const { resolveCodingRoute, prefersAnthropic } = require("../lib/route-contract");
+const { resolveCodingRoute, prefersAnthropic, kernelCodingLocalFirst } = require("../lib/route-contract");
 
 const ENV_ANTHROPIC = { ANTHROPIC_API_KEY: "k" };
 const ENV_OPENAI = { OPENAI_API_KEY: "k" };
@@ -109,6 +109,21 @@ test("null hint with no key resolves to null (not undefined)", () => {
     env: ENV_NONE,
   });
   assert.equal(out, null);
+});
+
+test("kernelCodingLocalFirst: default true (local-first verify-gated)", () => {
+  assert.equal(kernelCodingLocalFirst({ env: {} }), true);
+});
+
+test("kernelCodingLocalFirst: KEYSTONE_LOCAL_FIRST=0 forces cloud", () => {
+  assert.equal(kernelCodingLocalFirst({ env: { KEYSTONE_LOCAL_FIRST: "0" } }), false);
+});
+
+test("kernelCodingLocalFirst: rolloverMode 'default' forces local-first even with =0", () => {
+  assert.equal(
+    kernelCodingLocalFirst({ rolloverMode: "default", env: { KEYSTONE_LOCAL_FIRST: "0" } }),
+    true,
+  );
 });
 
 test("prefersAnthropic mirrors the resolved route", () => {
