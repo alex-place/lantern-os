@@ -47,6 +47,7 @@ class Fact:
     value: Optional[str] = None
     confidence: float = 0.0
     source: str = "unknown"
+    evidence: Optional[str] = None  # Detailed evidence/sources for verified claims
     approved: bool = False
     updated: str = ""
 
@@ -72,6 +73,13 @@ class TaskSpec:
     needs: List[str]
     prompts: Dict[str, str] = field(default_factory=dict)
     reasons: Dict[str, str] = field(default_factory=dict)
+
+
+# A task to verify a claim, requiring the claim text as input.
+VERIFY_CLAIM_TASK = TaskSpec(
+    name="Verify",
+    needs=["claim_text"],
+    prompts={"claim_text": "What claim do you want to verify?"})
 
 
 @dataclass
