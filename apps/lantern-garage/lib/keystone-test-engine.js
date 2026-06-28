@@ -97,6 +97,14 @@ async function _stageRemember(requirement) {
       ? fs.readFileSync(WORK_PATH, "utf8").trim().split("\n").filter(Boolean).slice(-10).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
       : [];
     evidence.recent_work_records = workLines.length;
+
+    // Conceptual integration point for AntiEntropyMemory fact retrieval:
+    // In a real implementation, this stage would query the AntiEntropyMemory
+    // system (e.g., via a local API call or by executing a Python script)
+    // to retrieve relevant personal facts, beliefs, or past experiences
+    // that might inform the current requirement.
+    // For example: `const personalFact = await callPythonMemorySystem("get_personal_fact", { key: "my_preferences" });`
+    // The retrieved facts would then be added to the `evidence` object.
     evidence.recent_accepted = workLines.filter(r => r.accepted).length;
   } catch { evidence.work_log_error = true; }
   return { stage: "remember", status: "pass", evidence, confidence: 75 };

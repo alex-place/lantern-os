@@ -4,16 +4,17 @@ Unit tests for Anti-Entropy Memory System
 
 import sys
 import os
+import tempfile
 import pytest
 
 # Add the apps directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'apps'))
 
 from superfleet_memory.anti_entropy_memory import AntiEntropyMemory
-
+from datetime import datetime
 
 class TestAntiEntropyMemory:
-
+    
     @pytest.fixture
     def memory(self):
         """Create a fresh memory system for each test."""
@@ -74,6 +75,14 @@ class TestAntiEntropyMemory:
 
         belief = memory.get_belief("test_belief")
         assert len(belief["update_history"]) >= 1
+
+    def test_get_personal_fact(self, memory):
+        """Test retrieving a personal fact."""
+        memory.update_belief("favorite_color", value="blue", confidence=0.99)
+        fact = memory.get_personal_fact("favorite_color")
+        assert fact is not None
+        assert fact["value"] == "blue"
+        assert fact["confidence"] == 0.99
 
     # ========== Procedural Memory Tests ==========
 
@@ -141,6 +150,39 @@ class TestAntiEntropyMemory:
         assert stats["total_beliefs"] == 1
         assert stats["total_skills"] == 1
 
+    def test_memory_persistence(self):
+        """Test that memories are saved to disk and loaded correctly."""
+        temp_file = None
+        try:
+            # Create a temporary file for memory persistence
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                temp_file = tmp.name
+
+            # 1. Create a memory instance, add data, and save
+            memory1 = AntiEntropyMemory(memory_file=temp_file)
+            memory1.log_dream("I flew to the moon", lucidity=0.8)
+            memory1.update_belief("moon_is_cheese", value=0.1, confidence=0.9)
+            memory1.record_skill("space_travel", success_rate=0.01)
+            memory1.update_narrative("My journey began with a dream.")
+            
+            # Explicitly save, though methods should call it
+            memory1._save_memory()
+
+            # 2. Create a new memory instance, loading from the same file
+            memory2 = AntiEntropyMemory(memory_file=temp_file)
+
+            # 3. Assert that the data is loaded correctly
+            assert len(memory2.episodic) == 1
+            assert memory2.episodic[0]["data"]["content"] == "I flew to the moon"
+            assert "moon_is_cheese" in memory2.semantic
+            assert memory2.semantic["moon_is_cheese"]["value"] == 0.1
+            assert "space_travel" in memory2.procedural
+            assert "My journey began with a dream." in memory2.narrative_identity["story"]
+
+        finally:
+            # Clean up the temporary file
+            if temp_file and os.path.exists(temp_file):
+                os.remove(temp_file)
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -4,7 +4,9 @@ Anti-Entropy 4-Layer Memory System
 Episodic + Semantic + Procedural + Meta/Narrative layers with cryptographic audit.
 """
 
+import os
 from typing import Dict, List, Optional
+import json
 from datetime import datetime
 from .anti_entropy_audit import CryptographicAuditChain
 
@@ -20,7 +22,8 @@ class AntiEntropyMemory:
     - Meta/Narrative: Identity, coherence, wisdom
     """
 
-    def __init__(self):
+    def __init__(self, memory_file: str = "memory.json"):
+        self.memory_file = memory_file
         self.audit = CryptographicAuditChain()
 
         # Layer 1: Episodic Memory (dreams, events)
@@ -39,6 +42,40 @@ class AntiEntropyMemory:
             "coherence_score": 1.0,
             "paradigm": "default"
         }
+        self._load_memory()
+
+    def _load_memory(self):
+        """Loads memory from the persistence file."""
+        if os.path.exists(self.memory_file):
+            with open(self.memory_file, 'r') as f:
+                data = json.load(f)
+                self.episodic = data.get("episodic", [])
+                self.semantic = data.get("semantic", {})
+                self.procedural = data.get("procedural", {})
+                self.narrative_identity = data.get("narrative_identity", self.narrative_identity)
+                
+                # Re-initialize audit chain from loaded data
+                audit_chain_data = data.get("audit_chain", [])
+                self.audit = CryptographicAuditChain() # Reset to empty
+                for entry in audit_chain_data:
+                    # Directly append, assuming loaded chain is valid
+                    self.audit.chain.append(entry)
+        else:
+            # If no file, ensure audit chain is initialized with a genesis block
+            self.audit = CryptographicAuditChain()
+            self._save_memory() # Save initial empty state
+
+    def _save_memory(self):
+        """Saves current memory state to the persistence file."""
+        data = {
+            "audit_chain": self.audit.export_chain(),
+            "episodic": self.episodic,
+            "semantic": self.semantic,
+            "procedural": self.procedural,
+            "narrative_identity": self.narrative_identity,
+        }
+        with open(self.memory_file, 'w') as f:
+            json.dump(data, f, indent=2)
 
     # ========== EPISODIC MEMORY ==========
 
@@ -55,6 +92,7 @@ class AntiEntropyMemory:
             }
         )
         self.episodic.append(entry)
+        self._save_memory()
         return entry
 
     def log_event(self, description: str, event_type: str,
@@ -69,6 +107,7 @@ class AntiEntropyMemory:
             }
         )
         self.episodic.append(entry)
+        self._save_memory()
         return entry
 
     # ========== SEMANTIC MEMORY ==========
@@ -92,6 +131,11 @@ class AntiEntropyMemory:
             "last_updated": entry["timestamp"],
             "update_history": self.semantic.get(key, {}).get("update_history", []) + [entry]
         }
+        self._save_memory()
+        return entry
+
+    def get_personal_fact(self, fact_key: str) -> Optional[Dict]:
+        """Retrieves a specific personal fact (semantic memory entry) by its key."""
         return entry
 
     def get_belief(self, key: str) -> Optional[Dict]:
@@ -123,6 +167,7 @@ class AntiEntropyMemory:
             "success_rate": success_rate,
             "uses": uses,
             "last_used": entry["timestamp"]
+        self._save_memory()
         }
         return entry
 
@@ -147,6 +192,7 @@ class AntiEntropyMemory:
 
         if paradigm:
             self.narrative_identity["paradigm"] = paradigm
+        self._save_memory()
 
         return entry
 
