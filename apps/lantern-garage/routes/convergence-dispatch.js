@@ -732,7 +732,10 @@ module.exports = async (req, res, url, deps) => {
         step("research", "start", { issue: issueNumber });
         const { researchIssue } = require("../lib/autowork-research");
         const issueFullText = `${issueDetails.title}\n\n${issueDetails.body}`;
-        const { scopeFiles, researchContext } = await researchIssue({
+        // webEvidence is consumed by the convergence-record step below; destructuring
+        // it here is required — without it that step throws "webEvidence is not defined"
+        // and autowork crashes AFTER opening the PR (surfacing as an opaque failure).
+        const { scopeFiles, researchContext, webEvidence = [] } = await researchIssue({
           workRoot,
           issueNumber,
           issueTitle: issueDetails.title,
