@@ -1022,7 +1022,10 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
       try {
         const payload = JSON.stringify({
           contents: [{ role: "user", parts: [{ text: `${agent.systemPrompt}\n\n${userPrompt}` }] }],
-          generationConfig: { maxOutputTokens: 256, temperature: 0.7 },
+          // gemini-2.5 spends part of the output budget on internal "thinking" tokens,
+          // so 256 truncated real replies to a bare preamble (no PR-review verdict). 2048
+          // leaves room for a complete answer after thinking. #1376
+          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
           // Web-search grounding only on the AI-Studio wire — the Vertex tool schema
           // differs by model and a mismatch 400s the whole call.
           ...(geminiOnVertex ? {} : { tools: [{ google_search_retrieval: {} }] }),
