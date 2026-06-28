@@ -1,3 +1,4 @@
+// Conversation log append/read store (JSONL).
 const path = require("path");
 const { appendJsonlQueued, readJsonl, rotateJsonlIfNeeded } = require("./file-queue");
 const { redactPII } = require("./redact");
