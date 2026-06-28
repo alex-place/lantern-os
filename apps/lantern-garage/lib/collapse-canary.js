@@ -91,9 +91,11 @@ function scoreReplyCollapse(text, opts = {}) {
       0.1 * Math.min(1, signals.longestRunRatio * 5)
   );
 
+  const shouldStopGeneration = opts.ouroAdapt && proximity >= threshold;
   return {
     proximity: Number(proximity.toFixed(4)),
     collapsed: proximity >= threshold,
+    shouldStopGeneration,
     signals,
   };
 }
