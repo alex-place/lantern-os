@@ -41,6 +41,12 @@ class MeshPeer:
     messages_url: Optional[str] = None
     donated_resources: Dict[str, Any] = field(default_factory=dict)
     status: str = "offline"  # offline, online, busy
+    # GPU compute donation capabilities
+    gpu_count: Optional[int] = None
+    gpu_memory_gb: Optional[float] = None
+    compute_tier: Optional[str] = None # e.g., "A100", "V100", "RTX3090"
+    training_capacity: Optional[int] = None # Number of concurrent training jobs
+    evaluation_capacity: Optional[int] = None # Number of concurrent evaluation jobs
     last_seen: Optional[str] = None
     registered_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     founder_controlled: bool = False  # True for the canonical founder node
@@ -76,6 +82,12 @@ class MeshBridge:
         name: str,
         mcp_url: str,
         messages_url: Optional[str] = None,
+        receipts_endpoint: Optional[str] = None,
+        gpu_count: Optional[int] = None,
+        gpu_memory_gb: Optional[float] = None,
+        compute_tier: Optional[str] = None,
+        training_capacity: Optional[int] = None,
+        evaluation_capacity: Optional[int] = None,
         donated_resources: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Register a new peer node (or re-register an existing one).
@@ -95,6 +107,12 @@ class MeshBridge:
                 existing.status = "online"
                 existing.name = name
                 if donated_resources is not None:
+                    # Update GPU-related fields if provided
+                    existing.gpu_count = gpu_count if gpu_count is not None else existing.gpu_count
+                    existing.gpu_memory_gb = gpu_memory_gb if gpu_memory_gb is not None else existing.gpu_memory_gb
+                    existing.compute_tier = compute_tier if compute_tier is not None else existing.compute_tier
+                    existing.training_capacity = training_capacity if training_capacity is not None else existing.training_capacity
+                    existing.evaluation_capacity = evaluation_capacity if evaluation_capacity is not None else existing.evaluation_capacity
                     existing.donated_resources = donated_resources
                 logger.info("Mesh peer re-registered (updated): %s (%s)", name, existing.peer_id)
                 return existing.to_dict()
@@ -105,9 +123,15 @@ class MeshBridge:
                 name=name,
                 mcp_url=mcp_url,
                 messages_url=messages_url or mcp_url.replace("/sse", "/messages"),
+                receipts_endpoint=receipts_endpoint,
                 donated_resources=donated_resources or {},
                 status="online",
                 last_seen=datetime.now(timezone.utc).isoformat(),
+                gpu_count=gpu_count,
+                gpu_memory_gb=gpu_memory_gb,
+                compute_tier=compute_tier,
+                training_capacity=training_capacity,
+                evaluation_capacity=evaluation_capacity,
                 founder_controlled=False,
             )
             self._peers[peer_id] = peer
@@ -131,6 +155,12 @@ class MeshBridge:
             peer = self._peers.get(peer_id)
             if not peer:
                 return None
+            # Explicitly update GPU-related fields if they are in the resources dict
+            peer.gpu_count = resources.pop("gpu_count", peer.gpu_count)
+            peer.gpu_memory_gb = resources.pop("gpu_memory_gb", peer.gpu_memory_gb)
+            peer.compute_tier = resources.pop("compute_tier", peer.compute_tier)
+            peer.training_capacity = resources.pop("training_capacity", peer.training_capacity)
+            peer.evaluation_capacity = resources.pop("evaluation_capacity", peer.evaluation_capacity)
             peer.donated_resources = {**peer.donated_resources, **resources}
             peer.last_seen = datetime.now(timezone.utc).isoformat()
             logger.info("Mesh peer %s updated donation: %s", peer_id, resources)
@@ -179,6 +209,12 @@ class MeshBridge:
                     "name": p.name,
                     "mcp_url": p.mcp_url,
                     "resources": p.donated_resources,
+                    "gpu_count": p.gpu_count,
+                    "gpu_memory_gb": p.gpu_memory_gb,
+                    "compute_tier": p.compute_tier,
+                    "training_capacity": p.training_capacity,
+                    "evaluation_capacity": p.evaluation_capacity,
+                    "receipts_endpoint": p.receipts_endpoint,
                     "status": p.status,
                 }
                 for p in self._peers.values()
