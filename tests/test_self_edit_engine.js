@@ -6,6 +6,7 @@
 const assert = require("assert");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const {
   isPathSafe,
   sanitizeBranchName,
@@ -17,6 +18,7 @@ const {
   extractJson,
   resolveExistingIssue,
   looksLikePlaceholderPatch,
+  patchSyntaxErrors,
 } = require("../apps/lantern-garage/lib/self-edit-engine");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -318,6 +320,54 @@ function run() {
       "+  return realImplementation();",
     ].join("\n");
     assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
+  });
+
+  // ── patchSyntaxErrors (#1359): reject patches that leave a file unparseable ──
+  test("patchSyntaxErrors: flags a JS file with a syntax error, passes a valid one", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-syn-"));
+    try {
+      fs.writeFileSync(path.join(dir, "good.js"), "function ok(a){ return a + 1; }\nmodule.exports = ok;\n");
+      // The exact #1359 break: a function declaration with no body, then a `const`.
+      fs.writeFileSync(path.join(dir, "bad.js"), "function parseImageRequest(text)\nconst FALLBACKS = [];\n");
+      const errs = patchSyntaxErrors(["good.js", "bad.js"], dir);
+      const files = errs.map((e) => e.file);
+      assert.ok(files.includes("bad.js"), "expected bad.js to be flagged");
+      assert.ok(!files.includes("good.js"), "good.js must not be flagged");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("patchSyntaxErrors: ignores non-source files and empty input", () => {
+    assert.deepStrictEqual(patchSyntaxErrors([], process.cwd()), []);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-syn2-"));
+    try {
+      // .json / .md aren't parse-checked here — must not be flagged even if malformed.
+      fs.writeFileSync(path.join(dir, "data.json"), "{ not valid json (((");
+      fs.writeFileSync(path.join(dir, "notes.md"), "# heading with ``` unbalanced");
+      assert.deepStrictEqual(patchSyntaxErrors(["data.json", "notes.md"], dir), []);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("patchSyntaxErrors: flags a broken Python file (skipped if no python)", () => {
+    let pyBin = null;
+    for (const bin of [process.env.PYTHON_PATH, process.platform === "win32" ? "python" : "python3"].filter(Boolean)) {
+      try { require("child_process").execFileSync(bin, ["--version"], { stdio: "pipe" }); pyBin = bin; break; } catch { /* try next */ }
+    }
+    if (!pyBin) return; // no python on PATH → skip (the JS case already covers the gate)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-syn-py-"));
+    try {
+      fs.writeFileSync(path.join(dir, "good.py"), "def f(x):\n    return x + 1\n");
+      fs.writeFileSync(path.join(dir, "bad.py"), "def f(x):\n    return x +\n");
+      const errs = patchSyntaxErrors(["good.py", "bad.py"], dir);
+      const files = errs.map((e) => e.file);
+      assert.ok(files.includes("bad.py"), "expected bad.py to be flagged");
+      assert.ok(!files.includes("good.py"), "good.py must not be flagged");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   // ── Summary ───────────────────────────────────────────────────────────
