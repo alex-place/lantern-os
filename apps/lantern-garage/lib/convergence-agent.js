@@ -190,7 +190,7 @@ const GH = "https://github.com/" + GH_REPO;
  * Build a GROUNDED answer for the "work" category from live open issues.
  * Falls back to the template answer if no issues could be fetched.
  */
-async function groundWork(matched) {
+async function _worker_issue_analyzer(matched) {
   const issues = await getOpenIssues(8);
   if (!issues.length) {
     return { answer: matched.answer, actions: matched.actions, grounded: false };
@@ -215,7 +215,7 @@ async function groundWork(matched) {
 /**
  * Build a GROUNDED answer for the "convergence" category from live router stats.
  */
-function groundConvergence(matched) {
+function _worker_router_stats(matched) {
   const stats = getRouterStats();
   if (!stats) {
     return { answer: matched.answer, actions: matched.actions, grounded: false };
@@ -247,28 +247,65 @@ async function respond(message) {
     };
   }
 
-  const matched = classify(message) || DEFAULT_RESPONSE;
-  let answer = matched.answer;
-  let actions = matched.actions;
-  let grounded = false;
+  const matchedIntent = classify(message) || DEFAULT_RESPONSE;
 
-  if (matched.category === "work") {
-    const g = await groundWork(matched);
-    answer = g.answer; actions = g.actions; grounded = g.grounded;
-  } else if (matched.category === "convergence") {
-    const g = groundConvergence(matched);
-    answer = g.answer; actions = g.actions; grounded = g.grounded;
-  }
+  // Orchestrator phase: decompose, dispatch, synthesize
+  const orchestrationResult = await _orchestrate_task(message, matchedIntent);
 
   return {
-    agent: matched.persona,
-    category: matched.category,
-    answer,
-    actions,
-    confidence: scoreConfidence(message, matched),
-    source: grounded ? "convergence_agent:live" : "convergence_agent:template",
-    grounded,
+    agent: matchedIntent.persona, // Persona from initial classification
+    category: matchedIntent.category, // Category from initial classification
+    answer: orchestrationResult.answer,
+    actions: orchestrationResult.actions,
+    confidence: scoreConfidence(message, matchedIntent), // Confidence from initial classification
+    source: orchestrationResult.source,
+    grounded: orchestrationResult.grounded,
   };
+}
+
+/**
+ * Orchestrates tasks by decomposing the goal, dispatching to specialist workers,
+ * and synthesizing their results.
+ * @param {string} message - The original user message.
+ * @param {object} matchedIntent - The initial classification of the message.
+ * @returns {Promise<object>} { answer, actions, grounded, source }
+ */
+async function _orchestrate_task(message, matchedIntent) {
+  let answer = matchedIntent.answer;
+  let actions = matchedIntent.actions;
+  let grounded = false;
+  let source = "convergence_agent:template";
+
+  // Task decomposition and worker dispatch
+  switch (matchedIntent.category) {
+    case "work":
+      // Decompose: Analyze issues, suggest actions
+      const issueAnalysisResult = await _worker_issue_analyzer(matchedIntent);
+      answer = issueAnalysisResult.answer;
+      actions = issueAnalysisResult.actions;
+      grounded = issueAnalysisResult.grounded;
+      source = grounded ? "convergence_agent:live" : "convergence_agent:template";
+      break;
+    case "convergence":
+      // Decompose: Fetch router stats
+      const routerStatsResult = _worker_router_stats(matchedIntent);
+      answer = routerStatsResult.answer;
+      actions = routerStatsResult.actions;
+      grounded = routerStatsResult.grounded;
+      source = grounded ? "convergence_agent:live" : "convergence_agent:template";
+      break;
+    // Future: Add cases for other specialized workers (e.g., code generation, testing, planning)
+    // case "code_generation":
+    //   const codeResult = await _worker_code_generator(message);
+    //   // Synthesize results
+    //   break;
+    default:
+      // No specific worker for this category, use default intent.
+      break;
+  }
+
+  // Result synthesis (already handled by updating answer/actions above)
+  return { answer, actions, grounded, source };
 }
 
 module.exports = { respond, classify, scoreConfidence, getOpenIssues, KNOWLEDGE };
