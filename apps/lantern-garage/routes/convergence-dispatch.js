@@ -14,6 +14,8 @@ const convergenceAgent = require("../lib/convergence-agent");
 const { sendJson, collectRequestBody } = require("../lib/http-utils");
 const { appendConversationEntry } = require("../lib/conversation-store");
 const autoDispatch = require("../lib/auto-dispatch");
+const fs = require('fs');
+const path = require('path');
 const maxConversationTextLength = 2000;
 
 // Turn a raw autowork failure into a grounded, actionable message instead of a bare
@@ -124,6 +126,60 @@ module.exports = async (req, res, url, deps) => {
         sendJson(res, { error: e.message }, 400);
       }
     });
+    return true;
+  }
+
+  // GET /api/convergence/runs/:runId/steps — Agent execution logs for time-travel debugging
+  if (pathname.startsWith("/api/convergence/runs/") && pathname.endsWith("/steps") && req.method === "GET") {
+    try {
+      const parts = pathname.split('/');
+      const runId = parts[parts.length - 2]; // e.g., /api/convergence/runs/RUN_ID/steps
+
+      if (!runId) {
+        sendJson(res, { ok: false, error: "runId_required", message: "A runId is required to retrieve steps." }, 400);
+        return true;
+      }
+
+      const logFilePath = path.join(__dirname, '../../data/agent-fleet/tesseract-convergence.jsonl');
+
+      if (!fs.existsSync(logFilePath)) {
+        sendJson(res, { ok: true, runId, steps: [], total: 0, message: "Log file not found for this run." }, 200);
+        return true;
+      }
+
+      const fileContent = fs.readFileSync(logFilePath, 'utf8');
+      const allSteps = fileContent.split('\n')
+        .filter(line => line.trim() !== '')
+        .map(line => {
+          try {
+            return JSON.parse(line);
+          } catch (e) {
+            console.error(`Error parsing JSONL line in ${logFilePath}: ${e.message} - Line: ${line}`);
+            return null;
+          }
+        })
+        .filter(entry => entry !== null && entry.runId === runId);
+
+      // Sort by timestamp (assuming 'timestamp' or 'recordedAt' field)
+      const sortedSteps = allSteps.sort((a, b) => {
+        const tsA = a.timestamp || a.recordedAt;
+        const tsB = b.timestamp || b.recordedAt;
+        return new Date(tsA).getTime() - new Date(tsB).getTime();
+      });
+
+      // Pagination
+      const urlParams = new URLSearchParams(url.search);
+      const offset = parseInt(urlParams.get('offset') || '0', 10);
+      const limit = parseInt(urlParams.get('limit') || '100', 10);
+
+      const paginatedSteps = sortedSteps.slice(offset, offset + limit);
+
+      sendJson(res, { ok: true, runId, steps: paginatedSteps, total: sortedSteps.length, offset, limit }, 200);
+
+    } catch (err) {
+      console.error("Error retrieving convergence run steps:", err);
+      sendJson(res, { ok: false, error: "internal_server_error", message: err.message }, 500);
+    }
     return true;
   }
 
