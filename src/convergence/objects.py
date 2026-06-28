@@ -49,6 +49,7 @@ class Memory:
     source: str  # which tool/agent/observation produced this?
     confidence: float  # 0.0-1.0: how much do we trust this?
     content: Dict[str, Any]  # the actual data
+    last_accessed: datetime = field(default_factory=datetime.now) # for confidence decay
     evidence_ids: List[str] = field(default_factory=list)  # which memories support this?
 
     def to_jsonl(self) -> str:
