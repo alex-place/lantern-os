@@ -76,6 +76,19 @@ class DashboardAPI {
   }
 
   /**
+   * Verifies a given claim using the verification-as-a-service endpoint.
+   * @param {object} claim - The claim object to be verified.
+   * @returns {Promise<object>} A promise that resolves to the verification result.
+   */
+  async verifyClaim(claim) {
+    return this._fetchWithRetry('/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(claim),
+    });
+  }
+
+  /**
    * Invalidate cache for a specific endpoint
    */
   invalidateCache(endpoint) {
@@ -123,7 +136,7 @@ class DashboardAPI {
   /**
    * Internal: Fetch with exponential backoff retry
    */
-  async _fetchWithRetry(endpoint) {
+  async _fetchWithRetry(endpoint, fetchOptions = {}) {
     let lastError = null;
 
     for (let attempt = 0; attempt < this._retryConfig.maxRetries; attempt++) {
@@ -135,7 +148,7 @@ class DashboardAPI {
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
-          const response = await fetch(url, { signal: controller.signal });
+          const response = await fetch(url, { signal: controller.signal, ...fetchOptions });
           clearTimeout(timeoutId);
 
           if (!response.ok) {
