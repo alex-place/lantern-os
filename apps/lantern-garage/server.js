@@ -1,3 +1,8 @@
+// Trust the OS cert store on Windows so TLS verification SUCCEEDS behind AV/corporate
+// interception (verification stays ON — no rejectUnauthorized bypass). Must run before
+// any outbound HTTPS. No-op off Windows. #1376
+require("./lib/system-ca").trustSystemCAs();
+
 const http = require("http");
 const net = require("net");
 const fs = require("fs");
