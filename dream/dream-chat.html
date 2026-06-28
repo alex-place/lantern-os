@@ -142,6 +142,7 @@
         <span class="sep" style="margin: 0 4px;">·</span>
         <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
       </div>
+      <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" onclick="if(window.issueReporter)window.issueReporter.open()" title="Report an issue (screenshot → GitHub)">📷</button>
     </nav>
 
     <!-- Chat area -->
@@ -311,6 +312,50 @@
   </div>
 </div>
 
+<!-- Screenshot → GitHub issue modal -->
+<div class="modal-overlay" id="issue-modal" role="dialog" aria-modal="true" aria-labelledby="issue-title" onclick="if(event.target===event.currentTarget) window.issueReporter.close()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="issue-title">📷 Report an issue</h2>
+      <button class="modal-close" aria-label="Close" onclick="window.issueReporter.close()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone writes the report from this</span></label>
+        <div id="issue-dropzone" tabindex="0" style="border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2)">
+          <img id="issue-shot-preview" alt="Screenshot preview" style="display:none;width:100%;border-radius:8px;max-height:38vh;object-fit:contain">
+          <div id="issue-dropzone-empty">
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
+              <button type="button" id="issue-capture-btn" class="form-input" style="width:auto;cursor:pointer;background:var(--surface)" onclick="event.stopPropagation();window.issueReporter.retake()">📷 Capture this page</button>
+              <button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface)" onclick="event.stopPropagation();window.issueReporter.pickFile()">⬆ Upload image</button>
+            </div>
+            <div style="font-size:12px;color:var(--muted)">the page is captured automatically — or press <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> then <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a region</div>
+          </div>
+        </div>
+        <div id="issue-shot-clear" style="display:none;text-align:right;margin-top:6px">
+          <button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:4px 10px" onclick="window.issueReporter.retake()">↻ Retake</button>
+          <button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:4px 10px;margin-left:6px" onclick="window.issueReporter.clearShot()">✕ Remove</button>
+        </div>
+        <input type="file" id="issue-file-input" accept="image/*" style="display:none">
+      </div>
+      <!-- Keystone writes the title + description from the screenshot; the user
+           just reviews this read-only summary before filing. No manual fields. -->
+      <div class="form-group" id="issue-summary-group" style="display:none">
+        <label class="form-label">Keystone's report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>
+        <div id="issue-summary" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface2)">
+          <div id="issue-summary-title" style="font-weight:600;font-size:14px;color:var(--text)"></div>
+          <div id="issue-summary-body" style="color:var(--muted);font-size:13px;margin-top:6px;white-space:pre-wrap;line-height:1.5"></div>
+        </div>
+      </div>
+      <div id="issue-status" style="font-size:13px;color:var(--muted);min-height:18px" aria-live="polite"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="form-input" style="width:auto;cursor:pointer;background:var(--surface2)" onclick="window.issueReporter.close()">Cancel</button>
+        <button id="issue-submit-btn" class="form-input" style="width:auto;cursor:pointer;background:var(--accent,#06b6d4);color:#04121a;font-weight:600;opacity:.5" onclick="window.issueReporter.submit()" disabled>File issue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <script>
   /**
@@ -460,6 +505,8 @@
 <script src="js/dream-chat.js?v=20260626-tools"></script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/dream-chat-ui.js?v=20260626-tools"></script>
+<script src="/vendor/html2canvas/html2canvas.min.js"></script>
+<script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>
 <script src="js/convergance-sync.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>

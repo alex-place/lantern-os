@@ -1588,7 +1588,17 @@ async function sendMessage(opts = {}) {
   // that files an issue from the request and runs the autowork pipeline (cloud
   // model → patch → tests → draft PR). No PR is opened unless the user clicks.
   const CODING_INTENTS = ['coding_change', 'coding', 'technical_debug', 'code_review', 'code'];
-  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent)) {
+  // #1344: a pure read/lookup ("find/show/view/read/summarize issue/PR #N") is keyword-
+  // classified as "code" (it mentions "issue"/"github"), which used to surface the
+  // autowork offer — and clicking it filed a REAL GitHub issue with the raw query as
+  // title+body, then ran a doomed patch pipeline (nothing to change). Suppress the offer
+  // for lookups that carry no change-verb, so "find issue #1342" just answers (now via
+  // the github_issue tool) instead of offering to open a PR.
+  const _looksLikeLookup =
+    /\b(find|show|view|read|open|get|look\s*up|summar|explain|describe|what'?s?|tell me about|details? (on|of|about))\b/i.test(text) &&
+    /\b(issue|pr|pull request|ticket|bug report)\b\s*#?\d+/i.test(text) &&
+    !/\b(fix|implement|add|change|edit|patch|refactor|rewrite|update the code|resolve|close|work on|build|create a)\b/i.test(text);
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup) {
     const offer = document.createElement('div');
     offer.className = 'autowork-offer';
     offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
