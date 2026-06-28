@@ -1,3 +1,4 @@
+// Provides an async JSONL append queue that serializes writes to prevent concurrent-write corruption.
 const fs = require("fs");
 const path = require("path");
 
