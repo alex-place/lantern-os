@@ -171,13 +171,13 @@ module.exports = async function claimsRoutes(req, res, url, deps) {
     return true;
   }
 
-  // ── POST /api/claims/:id/approve — operator approves for export ─────
+  // ── POST /api/claims/:id/approve — approves for export ─────
   if (url.pathname.match(/^\/api\/claims\/[^/]+\/approve$/) && req.method === "POST") {
     try {
       const id = url.pathname.match(/^\/api\/claims\/([^/]+)\/approve$/)[1];
       const raw = await collectRequestBody(req);
       const body = JSON.parse(raw || "{}");
-      const reviewer = body.reviewer || "local_operator";
+      const reviewer = body.reviewer || "co-pilot";
 
       const result = await approvePacket(repoRoot, id, reviewer);
       if (!result.ok) {
