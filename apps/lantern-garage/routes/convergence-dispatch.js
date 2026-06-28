@@ -565,6 +565,46 @@ module.exports = async (req, res, url, deps) => {
     return true;
   }
 
+  // GET /api/convergence/autonomous-work/status?runId=… — re-attach to a run whose
+  // SSE dropped. The run keeps executing server-side and logs to
+  // data/autowork-runs/<date>.jsonl; this reads the latest record for the runId so the
+  // chat can recover the outcome (incl. the PR url) instead of dying on a "network
+  // error". Returns { found, latestPhase, latestStatus, done, ok, prUrl, message }.
+  if (pathname === "/api/convergence/autonomous-work/status" && req.method === "GET") {
+    const runId = url.searchParams.get("runId");
+    if (!runId) { sendJson(res, { ok: false, error: "runId required" }, 400); return true; }
+    try {
+      const fsx = require("fs"); const px = require("path");
+      const dir = px.join(__dirname, "..", "..", "..", "data", "autowork-runs");
+      // Scan today + yesterday (a run can straddle midnight).
+      const days = [0, 1].map((d) => { const t = new Date(Date.now() - d * 86400000); return t.toISOString().slice(0, 10); });
+      let records = [];
+      for (const day of days) {
+        const fp = px.join(dir, `${day}.jsonl`);
+        if (!fsx.existsSync(fp)) continue;
+        for (const line of fsx.readFileSync(fp, "utf8").split("\n")) {
+          if (!line.trim() || line.indexOf(runId) === -1) continue;
+          try { const r = JSON.parse(line); if (r.runId === runId) records.push(r); } catch { /* skip */ }
+        }
+      }
+      if (!records.length) { sendJson(res, { ok: true, found: false }, 200); return true; }
+      const latest = records[records.length - 1];
+      const result = records.filter((r) => r.phase === "result").pop();
+      const doneRec = result || records.filter((r) => r.phase === "done").pop();
+      sendJson(res, {
+        ok: true, found: true, runId,
+        latestPhase: latest.phase, latestStatus: latest.status, latestTs: latest.ts,
+        done: !!doneRec,
+        succeeded: result ? result.status === "ok" : null,
+        prUrl: (result && result.prUrl) || null,
+        message: (result && result.message) || null,
+      }, 200);
+    } catch (e) {
+      sendJson(res, { ok: false, error: e.message }, 200);
+    }
+    return true;
+  }
+
   // POST /api/convergence/autonomous-work/stream — Observable autonomous work (SSE)
   // Σ₀ Honest Autonomous Chat (epic #527, task A1): emit every step as it happens.
   // No hidden agency — by default the run STOPS after tests (changes applied to the
@@ -591,6 +631,14 @@ module.exports = async (req, res, url, deps) => {
       const step = (phase, status, extra = {}) => {
         send("step", { phase, status, ...extra });
         logStep(_runId, receipt.issue, phase, status, extra);
+      };
+      // Terminal result, logged to data/autowork-runs/<date>.jsonl so a client whose
+      // SSE dropped mid-run can recover the outcome via /autonomous-work/status — the
+      // run keeps executing server-side after a disconnect, so this is how the chat
+      // re-attaches to a finished run (incl. the PR url) instead of showing a dead
+      // "network error". Best-effort; never throws into the pipeline.
+      const finishLog = (ok, extra = {}) => {
+        try { logStep(_runId, receipt.issue, "result", ok ? "ok" : "failed", extra); } catch (_e) { /* ignore */ }
       };
 
       // SSE heartbeat — the plan/patch steps make LLM calls that emit NO bytes for
@@ -673,6 +721,9 @@ module.exports = async (req, res, url, deps) => {
         receipt.issue = issueNumber;
         _runId = newRunId(issueNumber);
         receipt.runId = _runId;
+        // Tell the client the run id so it can re-attach via /autonomous-work/status
+        // if the SSE drops mid-run.
+        send("run", { runId: _runId, issue: issueNumber });
 
         // ── 1. fetch issue ───────────────────────────────────────────────
         step("fetch_issue", "start", { issue: issueNumber });
@@ -1098,12 +1149,14 @@ module.exports = async (req, res, url, deps) => {
           },
           message: `✓ Σ₀ autonomous work complete. Issue #${issueNumber} → ${prUrl} (confidence: ${(convergenceRecord.confidence.overall * 100).toFixed(0)}%)`
         });
+        finishLog(true, { prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}` });
         res.end();
       } catch (err) {
         const stage = receipt.stoppedAt || (receipt.steps && receipt.steps[receipt.steps.length - 1]) || null;
         const g = describeAutoworkError(err, stage);
         send("error", g);
         send("done", { ok: false, ...receipt, stoppedAt: receipt.stoppedAt || "exception", message: g.error, errorDetail: g.detail });
+        finishLog(false, { message: g.error, stage });
         res.end();
       } finally {
         clearInterval(heartbeat);
