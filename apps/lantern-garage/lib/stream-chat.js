@@ -349,6 +349,11 @@ async function handleStreamChat(req, url, res) {
 
   // --- Main chat logic starts here ---
 
+  // Set up SSE headers and functions for the main stream
+  sse.writeStreamHeaders(res);
+  const sendToken = (token) => sse.sendToken(res, token);
+  const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+
   // Determine if grounding is needed and perform it
   let groundingResults = null;
   let groundingContext = "";
