@@ -16,17 +16,19 @@
 const https = require('https');
 
 // Per-timeframe Yahoo {interval, range}. `agg` aggregates N base bars into one
-// (Yahoo has no native 4h, so we roll up 4×60m). Ranges are chosen to yield
-// ~100+ bars after trimming.
+// (Yahoo has no native 4h, so we roll up 4×60m). Ranges are widened well past
+// the visible window so charts have deep history to pan/zoom into — the client
+// shows a modest default window and reveals more bars as you zoom in. Ranges
+// respect Yahoo's per-interval history limits (1m≤7d, 5m/15m≤60d, 60m≤730d).
 const TF = {
-  '1m':  { interval: '1m',  range: '1d',  agg: 1 },
-  '5m':  { interval: '5m',  range: '5d',  agg: 1 },
-  '15m': { interval: '15m', range: '5d',  agg: 1 },
-  '1h':  { interval: '60m', range: '1mo', agg: 1 },
-  '4h':  { interval: '60m', range: '3mo', agg: 4 },
-  '1d':  { interval: '1d',  range: '6mo', agg: 1 },
+  '1m':  { interval: '1m',  range: '5d',  agg: 1 },
+  '5m':  { interval: '5m',  range: '1mo', agg: 1 },
+  '15m': { interval: '15m', range: '1mo', agg: 1 },
+  '1h':  { interval: '60m', range: '6mo', agg: 1 },
+  '4h':  { interval: '60m', range: '1y',  agg: 4 },
+  '1d':  { interval: '1d',  range: '2y',  agg: 1 },
 };
-const MAX_BARS = 120;          // trim each series to keep charts light
+const MAX_BARS = 500;          // deep history for zoom/pan (client windows it)
 const QUOTE_TTL = 20000;       // 20s — card prices
 const BARS_TTL = 45000;        // 45s — chart bars
 const FETCH_CONCURRENCY = 6;
@@ -123,6 +125,15 @@ function parseBars(result, agg) {
       open: +o, high: +h, low: +l, close: +c,
       volume: q.volume && q.volume[i] != null ? +q.volume[i] : 0,
     });
+  }
+  // Drop Yahoo's synthetic trailing placeholder — at session end it appends a
+  // zero-volume bar whose O==H==L==C (the latest price), which renders as a
+  // misleading flat doji and skews the candle/line tail. Strip it for accuracy.
+  if (bars.length > 1) {
+    const t = bars[bars.length - 1];
+    if ((t.volume || 0) === 0 && t.open === t.high && t.high === t.low && t.low === t.close) {
+      bars.pop();
+    }
   }
   const rolled = aggregate(bars, agg);
   return rolled.slice(-MAX_BARS);

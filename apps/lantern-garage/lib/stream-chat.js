@@ -2127,6 +2127,7 @@ async function handleStreamChat(req, url, res) {
             return;
           }
           let buf = "";
+          let liveCollapseChecked = false; // one cut, not a re-trigger loop
           upstream.on("data", (chunk) => {
             buf += chunk.toString();
             const lines = buf.split("\n");
@@ -2140,6 +2141,26 @@ async function handleStreamChat(req, url, res) {
                 if (evt.type === "content_block_delta" && evt.delta?.text) {
                   fullReply += evt.delta.text;
                   sendToken(evt.delta.text);
+                  // #1342: the collapse canary used to be advisory-only — it scored the
+                  // FULL reply only after every token had already streamed to the user,
+                  // so a degenerating reply (repetition/n-gram echo/lexical collapse) was
+                  // always seen in full before anything could act on it. Check periodically
+                  // WHILE streaming and cut the request short the first time proximity is
+                  // unambiguously high (0.65, stricter than the 0.5 advisory default, so a
+                  // verbose-but-healthy reply is never mistaken for collapse).
+                  if (!liveCollapseChecked && fullReply.length > 400 && fullReply.length % 120 < evt.delta.text.length) {
+                    const live = scoreReplyCollapse(fullReply, { threshold: 0.65 });
+                    if (live.collapsed) {
+                      liveCollapseChecked = true;
+                      console.warn(`[canary_collapse_live] cutting anthropic stream short — proximity=${live.proximity}`);
+                      const notice = "\n\n*(cut short — the response started repeating itself)*";
+                      fullReply += notice;
+                      sendToken(notice);
+                      upstream.destroy();
+                      resolve();
+                      return;
+                    }
+                  }
                 }
               } catch { /* skip malformed */ }
             }

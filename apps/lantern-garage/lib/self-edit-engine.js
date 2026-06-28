@@ -492,6 +492,41 @@ function looksLikePlaceholderPatch(diffText) {
   return { placeholder: uniq.length >= 2, signals: uniq };
 }
 
+// Verify gate (#1359): a clean-applying, non-placeholder patch can still leave a
+// changed file UNPARSEABLE. If that file isn't exercised by the planned tests (a
+// browser script like dream-chat-ui.js, a one-off tool script), the test gate
+// won't catch it and a syntax-broken patch opens a bad PR — exactly how an autowork
+// run shipped `function parseImageRequest(text)` with no body. Parse-check each
+// changed JS/Python source by extension (no execution, no side effects); returns
+// [{file,error}] for the ones that fail (empty = all parse). A missing checker
+// binary is skipped, never reported as a false failure.
+function patchSyntaxErrors(changedFiles, repoRoot) {
+  const PY = process.env.PYTHON_PATH || (process.platform === "win32" ? "python" : "python3");
+  const errors = [];
+  for (const rel of changedFiles || []) {
+    const abs = path.join(repoRoot, rel);
+    let cmd, args;
+    if (/\.(?:c|m)?js$/i.test(rel)) {
+      cmd = process.execPath;                 // `node --check`: parse-only, no execution
+      args = ["--check", abs];
+    } else if (/\.py$/i.test(rel)) {
+      cmd = PY;                               // `ast.parse`: syntax-only, writes no .pyc
+      args = ["-c", "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])", abs];
+    } else {
+      continue;                               // only languages we can cheaply parse-check
+    }
+    try {
+      execFileSync(cmd, args, { cwd: repoRoot, timeout: 20000, windowsHide: true, stdio: "pipe" });
+    } catch (e) {
+      if (e && e.code === "ENOENT") continue;  // checker binary unavailable → don't block
+      const msg = String(e.stderr || e.stdout || e.message || "")
+        .replace(/\r/g, "").trim().split("\n").filter(Boolean).slice(-3).join(" ").slice(0, 300);
+      errors.push({ file: rel, error: msg || "failed to parse" });
+    }
+  }
+  return errors;
+}
+
 // A task message that *references an existing issue* must NOT be filed as a new
 // one — otherwise meta-commands like "autowork the oldest issue" or "work issue
 // #1342" get filed verbatim as junk issues (#1344/#1346) and the pipeline patches
@@ -1306,6 +1341,7 @@ module.exports = {
   createIssueFromTask,
   resolveExistingIssue,
   looksLikePlaceholderPatch,
+  patchSyntaxErrors,
   taskTitle,
   runTests,
   generatePlan,

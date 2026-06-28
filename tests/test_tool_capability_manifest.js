@@ -30,7 +30,7 @@ async function main() {
   assert.strictEqual(direct.schema_version, 1);
   assert.deepStrictEqual(
     direct.tools.map((tool) => tool.name),
-    ["Read", "LS", "Glob", "Grep", "Bash", "PowerShell", "Write", "Edit", "web_search", "web_fetch"]
+    ["Read", "LS", "Glob", "Grep", "Bash", "PowerShell", "Write", "Edit", "web_search", "github_issue", "web_fetch", "workspace_write", "workspace_read", "workspace_list", "create_document", "local_eval_keystone_run"]
   );
   for (const tool of direct.tools) {
     assert.strictEqual(tool.surface_availability.dream_chat, true);
@@ -50,8 +50,12 @@ async function main() {
   assert.strictEqual(handled, true);
   assert.deepStrictEqual(routePayload, toolRunner.capabilityManifest());
 
+  // Read is operator-gated since the #1213 guest-safe hardening (guests get web-only
+  // tools), so the execute-path assertions must run as operator — otherwise the call is
+  // denied (operator_required) before the behavior under test is reached.
   const read = await toolRunner.runTool("Read", { file_path: "package.json", limit: 2 }, {
     executionEnabled: true,
+    operator: true,
   });
   assert.strictEqual(read.status, "executed");
   assert.strictEqual(read.receipt.schema_version, 1);
@@ -65,6 +69,7 @@ async function main() {
 
   const unsafePath = await toolRunner.runTool("Read", { file_path: "../package.json" }, {
     executionEnabled: true,
+    operator: true,
   });
   assert.strictEqual(unsafePath.status, "blocked");
   assert.strictEqual(unsafePath.reason_code, "unsafe_path");
