@@ -64,7 +64,13 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     // which previously dropped the whole body to defaults — an empty message that then
     // mis-surfaced as "all providers failed / cloud unreachable". Strip it first.
     if (typeof rawBody === "string" && rawBody.charCodeAt(0) === 0xfeff) rawBody = rawBody.slice(1);
-    const body = JSON.parse(rawBody || "{}");
+    // Empty / whitespace-only body is distinct from malformed JSON — flag it as its own
+    // parseError instead of silently dropping to defaults (the test contract, #1009). #1358
+    if (!rawBody || !String(rawBody).trim()) {
+      parsed.parseError = "empty_body";
+      return parsed;
+    }
+    const body = JSON.parse(rawBody);
     parsed.mcpFlag = !!body.mcp;
     parsed.message = String(body.message || "").slice(0, 4000).trim();
     parsed.user = normalizeDreamerUser(body.user || "dreamer");
@@ -80,7 +86,8 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     // Body was present but unparseable (malformed JSON, bad encoding). Flag it so the
     // handler surfaces an honest "couldn't read your message" instead of routing an
     // empty message to the providers and blaming them. Σ₀: surface why, don't swallow.
-    parsed.bodyError = true;
+    // The contract (test_stream_chat_request_helper.js) is parseError="malformed_json". #1358
+    parsed.parseError = "malformed_json";
   }
 
   return parsed;

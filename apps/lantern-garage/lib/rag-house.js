@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { readJsonl } = require("./file-queue");
+const { RepoIndexer } = require("../../lib/repo-indexer");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const flatRagHousePath = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");

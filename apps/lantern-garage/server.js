@@ -158,6 +158,7 @@ const routes = [
   require("./routes/web-images"),
   require("./routes/youtube"),
   require("./routes/github-activity"), // Explore: latest releases + commits (cached)
+  require("./routes/github-issue"),    // Chat screenshot reporter → files a GitHub issue
   require("./routes/discover-feeds"),  // Explore: curated discovery rail (RSS/Atom, cached)
   require("./routes/explore"),         // Explore: single-pane PCSF-ranked feed + interaction logging (#1211)
   require("./routes/convergence-dispatch"),

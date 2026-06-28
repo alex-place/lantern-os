@@ -250,6 +250,31 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "github_issue",
+      "description": "Look up a specific GitHub issue or pull request by number in this project's repo, returning its title, state, labels, and body. Use this whenever the user asks to find, show, view, read, or summarize an issue or PR by number (e.g. \"find issue #1342\", \"what's PR 1200 about\"). Do NOT grep the repo for issue numbers — issues live on GitHub, not in the files.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "description": "The issue or PR number (without the # prefix)"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "web_fetch",
       "description": "Fetch the text content of a public URL. HTML is stripped to readable plain text. Use for reading web pages, documentation, or articles. No internal/private IPs allowed.",
       "input_schema": {

@@ -15,7 +15,7 @@
  * docs/research/explore-content-machine.md §8.
  */
 
-const { rankedFeed, pagedFeed } = require("../lib/explore-feed");
+const { rankedFeed, pagedFeed, embedCards } = require("../lib/explore-feed");
 const { recordModelOutcome } = require("../lib/model-leaderboard");
 
 const SUCCESS_EVENTS = new Set(["click", "dwell", "like", "open"]);
@@ -32,6 +32,21 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     } catch (e) {
       // Never blank the page — surface the error but keep a stable shape.
       sendJson(res, { cards: [], count: 0, error: e.message }, 200);
+    }
+    return true;
+  }
+
+  // ── GET /api/explore/embeds ──
+  // The raw interactive-embed catalog (games / radio / films) straight from
+  // data/explore/embeds.json — the SAME source the feed ranks. Lets dream-chat
+  // summon any embed inline by name ("play fallout radio") without a second
+  // content list to keep in sync. Static + cheap; no ranking, no pagination.
+  if (url.pathname === "/api/explore/embeds" && req.method === "GET") {
+    try {
+      const embeds = embedCards();
+      sendJson(res, { ok: true, embeds, count: embeds.length }, 200);
+    } catch (e) {
+      sendJson(res, { ok: false, embeds: [], error: e.message }, 200);
     }
     return true;
   }

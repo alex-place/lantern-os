@@ -12,7 +12,9 @@
       the site light/dark theme on purpose). A TRUE <audio> player: custom
       transport (play/pause, prev/next, seek, volume, mute), repeat, and
       period-radio options — always-on tuning static (DX), an always-shuffled
-      dial, a warm AM/tube tone, and 78rpm shellac crackle. Keyboard control,
+      dial, a warm AM/tube tone, and 78rpm shellac crackle. Per-track loudness
+      leveling (the manifest's `gain` dB, applied by a Web-Audio GainNode +
+      safety limiter) keeps the dial at an even volume. Keyboard control,
       deep-linking by frequency (#101.5), persistent prefs, OS media-session
       controls, a sleep timer, and a real Web-Audio visualizer (bars /
       oscilloscope / mirrored — click the meter to cycle).
@@ -22,8 +24,9 @@
       prefers-reduced-motion.
 
       Songs are 78rpm transfers from the Internet Archive (Great 78 Project),
-      served locally from /radio/. Add a track: drop an mp3 in that folder and
-      add a row to the STATIONS array at the bottom. No other change needed.
+      served locally from /radio/. Add a track: drop an mp3 in that folder, add
+      a row to the STATIONS array at the bottom, then run
+      `python scripts/normalize_radio_levels.py` to level its volume.
       Backlog + roadmap: docs/fallout-radio-backlog.md
     */
     :root {
@@ -436,6 +439,7 @@
       var changed = (i !== current);
       current = i;
       audio.src = s.src;
+      applyLevel();   // per-track loudness leveling for the new station
       nowTitle.textContent = s.title;
       nowMeta.textContent = s.artist + " · " + s.year;
       nowLore.textContent = s.lore || "";
@@ -524,6 +528,18 @@
     function applyCrackle() {
       if (crackleGain) crackleGain.gain.value = (prefs.crackle && !audio.paused) ? 0.6 : 0;
       crackBtn.setAttribute('aria-pressed', prefs.crackle ? 'true' : 'false');
+    }
+    // Per-track loudness leveling: apply the current station's manifest `gain` (dB)
+    // so the dial plays at a consistent loudness — the 78rpm transfers span ~30 dB,
+    // so a quiet side is barely audible next to a hot one. Missing gain => 0 dB
+    // (unity). A short ramp avoids a click when the gain jumps on tune.
+    function applyLevel() {
+      if (!levelNode) return;
+      var s = STATIONS[current];
+      var db = (s && typeof s.gain === 'number') ? s.gain : 0;
+      var lin = Math.pow(10, db / 20);
+      try { levelNode.gain.setTargetAtTime(lin, audioCtx.currentTime, 0.02); }
+      catch (e) { levelNode.gain.value = lin; }
     }
     warmBtn.addEventListener('click', function () { prefs.warmth = !prefs.warmth; applyWarmth(); savePrefs(); });
     crackBtn.addEventListener('click', function () { prefs.crackle = !prefs.crackle; ensureAudioGraph(); applyCrackle(); savePrefs(); });
@@ -629,6 +645,7 @@
     //    so the analyser is not tainted. Falls back silently if Web Audio is absent.
     var audioCtx, analyser, freqData, timeData, vuReady = false, powered = false;
     var toneNode, crackleSrc, crackleGain;   // WARM tone filter + 78rpm crackle bed
+    var levelNode, limiterNode;              // per-track loudness leveling + safety limiter
     var canvas = document.getElementById('vu'), cx = canvas.getContext('2d');
     var vuModeEl = document.getElementById('vuMode');
     var VU_NAMES = ['BARS', 'SCOPE', 'MIRROR'];
@@ -642,6 +659,9 @@
         if (!AC) return;
         audioCtx = new AC();
         var srcNode = audioCtx.createMediaElementSource(audio);
+        // Per-track loudness leveling: a gain the music always flows through,
+        // set from the current station's manifest `gain` (dB) by applyLevel().
+        levelNode = audioCtx.createGain();
         // WARM tone: a lowpass the music always flows through; flat (20k) when off,
         // rolled back to ~3.2k when on for that AM/tube warmth.
         toneNode = audioCtx.createBiquadFilter();
@@ -651,11 +671,19 @@
         analyser.fftSize = 1024;
         freqData = new Uint8Array(analyser.frequencyBinCount);
         timeData = new Uint8Array(analyser.fftSize);
-        srcNode.connect(toneNode);
+        // Safety brick-wall limiter on the music bus: catches the peaks when a
+        // quiet side is boosted, and tames any track that has no `gain` yet, so
+        // nothing ever blasts. (The crackle bed stays out of it, on its own path.)
+        limiterNode = audioCtx.createDynamicsCompressor();
+        limiterNode.threshold.value = -2; limiterNode.knee.value = 0;
+        limiterNode.ratio.value = 20; limiterNode.attack.value = 0.003; limiterNode.release.value = 0.25;
+        srcNode.connect(levelNode);
+        levelNode.connect(toneNode);
         toneNode.connect(analyser);
-        analyser.connect(audioCtx.destination);
+        analyser.connect(limiterNode);
+        limiterNode.connect(audioCtx.destination);
         buildCrackle();
-        applyWarmth(); applyCrackle();
+        applyWarmth(); applyCrackle(); applyLevel();
         vuReady = true;
       } catch (e) { /* no analyser — meter stays idle */ }
     }

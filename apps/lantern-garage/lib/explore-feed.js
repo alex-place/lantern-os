@@ -484,7 +484,7 @@ async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, explore
   };
 }
 
-module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder };
+module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder, embedCards };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
