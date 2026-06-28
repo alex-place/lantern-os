@@ -729,10 +729,12 @@ async function runAutowork(target, btn, base) {
     const decoder = new TextDecoder();
     let buf = '';
     let finalDone = null;
+    let awRunId = null;   // captured from the 'run' event → lets us re-attach if the SSE drops
 
     const handleEvent = (evName, data) => {
       let d = {};
       try { d = JSON.parse(data); } catch { return; }
+      if (evName === 'run') { awRunId = d.runId; return; }
       if (evName === 'step') {
         let extra = '';
         if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
@@ -816,9 +818,44 @@ async function runAutowork(target, btn, base) {
       if (ai) { ai.textContent = '✗'; ai.style.color = '#f87171'; }
     }
     const isNet = /network|failed to fetch|load failed/i.test(e && e.message || '');
+    const fin = row.querySelector('.aw-final');
+    // Recovery: the run keeps executing server-side after a disconnect. If we captured
+    // a runId, poll the status endpoint — the chat re-attaches to the finished run
+    // (incl. the PR url) instead of giving up on a "network error".
+    if (isNet && awRunId) {
+      setActivity('Reconnecting…', 'connection dropped — the run is still going on the server; waiting for it to finish', true);
+      fin.style.color = '';
+      fin.textContent = '';
+      let recovered = false;
+      for (let i = 0; i < 48; i++) {   // ~4 min at 5s
+        await new Promise(r => setTimeout(r, 5000));
+        let s = null;
+        try { s = await (await fetch(`${base}/api/convergence/autonomous-work/status?runId=${encodeURIComponent(awRunId)}`)).json(); } catch (_e) { continue; }
+        if (s && s.found && s.latestPhase) setActivity('Reconnecting…', `server is at: ${s.latestPhase} (${s.latestStatus || ''})`, true);
+        if (s && s.done) {
+          recovered = true;
+          if (s.succeeded && s.prUrl) {
+            setActivity('Complete', 'recovered after a dropped connection', false);
+            fin.style.color = '#4ade80';
+            fin.innerHTML = `✓ Auto-worked #${esc(s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : (issue || ''))} — <a href="${esc(s.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a> <span style="opacity:.6;font-size:11px">(reconnected)</span>`;
+          } else {
+            setActivity('Stopped', s.message || 'run ended', false);
+            fin.style.color = '#f87171';
+            fin.textContent = `✗ ${esc(s.message || ('run ended at ' + (s.latestPhase || 'an unknown step')))}`;
+          }
+          break;
+        }
+      }
+      if (!recovered) {
+        setActivity('Connection lost', 'could not confirm the result — check the issue on GitHub for a new PR', false);
+        fin.style.color = '#f87171';
+        fin.textContent = '✗ Lost connection mid-run and timed out waiting to reconnect. The run may still finish on the server — check the issue for a new PR.';
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+      return;
+    }
     const msg = isNet ? 'Lost connection to the server mid-run (the run may still be finishing on the server — check the issue for a new PR).' : (e && e.message) || 'unknown error';
     setActivity('Connection lost', msg, false);
-    const fin = row.querySelector('.aw-final');
     fin.style.color = '#f87171';
     fin.textContent = `✗ ${msg}`;
     if (typeof scrollToBottom === 'function') scrollToBottom();
