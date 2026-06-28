@@ -477,11 +477,33 @@ function createIssueFromTask(repoRoot, task) {
   return { number, url, title };
 }
 
+// Owner of the `origin` remote that gitPush() actually pushes to — the PR `head` must
+// name THAT repo. Using GH_REPO's owner (the base) makes GitHub look for the branch on
+// the base repo and return 422 when it was pushed to a fork. Override with
+// AUTOWORK_HEAD_OWNER; falls back to the base owner (assume same-repo). #1358
+function pushRemoteOwner(repoRoot) {
+  if (process.env.AUTOWORK_HEAD_OWNER) return process.env.AUTOWORK_HEAD_OWNER;
+  try {
+    const url = execFileSync("git", ["remote", "get-url", "origin"],
+      { cwd: repoRoot, encoding: "utf8", timeout: 5000, windowsHide: true }).trim();
+    const m = url.match(/[/:]([^/]+)\/[^/]+?(?:\.git)?$/); // https://host/<owner>/<repo>.git | git@host:<owner>/<repo>.git
+    if (m && m[1]) return m[1];
+  } catch { /* no origin / no git */ }
+  return GH_REPO.split("/")[0];
+}
+
 function openDraftPr(repoRoot, branch, title, body) {
   if (!branch.startsWith("auto/")) throw new Error("invalid_branch_prefix");
   const safeTitle = String(title || "Auto PR").slice(0, 256);
   const safeBody = String(body || "").slice(0, 4000);
   const env = { ...process.env, GIT_TERMINAL_PROMPT: "0", SKIP_MONOWORKSTREAM: "1" };
+  // Cross-fork PR (gitPush sent the branch to a fork) requires head=<fork-owner>:<branch>;
+  // a same-repo push can use the bare branch. The list-PRs filter always wants
+  // <owner>:<branch>. #1358
+  const baseOwner = GH_REPO.split("/")[0];
+  const headOwner = pushRemoteOwner(repoRoot);
+  const headRef = headOwner && headOwner !== baseOwner ? `${headOwner}:${branch}` : branch;
+  const headFilter = `${headOwner || baseOwner}:${branch}`;
   // `gh pr create` is broken on this repo — use the REST API via `gh api`.
   // execFileSync with an args array avoids all shell-quoting issues with title/body.
   try {
@@ -491,7 +513,7 @@ function openDraftPr(repoRoot, branch, title, body) {
         "api", `repos/${GH_REPO}/pulls`,
         "--method", "POST",
         "-f", `title=${safeTitle}`,
-        "-f", `head=${branch}`,
+        "-f", `head=${headRef}`,
         "-f", "base=master",
         "-f", `body=${safeBody}`,
         "-F", "draft=true",
@@ -507,10 +529,9 @@ function openDraftPr(repoRoot, branch, title, body) {
   } catch (e) {
     // PR already exists (422) — query the open PR for this head branch and reuse its URL.
     try {
-      const owner = GH_REPO.split("/")[0];
       const existing = execFileSync(
         "gh",
-        ["api", `repos/${GH_REPO}/pulls?head=${owner}:${branch}&state=open`, "--jq", ".[0].html_url"],
+        ["api", `repos/${GH_REPO}/pulls?head=${headFilter}&state=open`, "--jq", ".[0].html_url"],
         { cwd: repoRoot, encoding: "utf8", timeout: 15000, env }
       ).trim();
       if (existing.startsWith("https://")) return existing;
@@ -1179,6 +1200,7 @@ module.exports = {
   gitAddFiles,
   gitCurrentBranch,
   openDraftPr,
+  pushRemoteOwner,
   createIssueFromTask,
   taskTitle,
   runTests,

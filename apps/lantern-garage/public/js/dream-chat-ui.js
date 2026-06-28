@@ -1556,6 +1556,8 @@ async function sendMessage(opts = {}) {
     const time = isNaN(t) ? '' : t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     // Human-readable label: "Keystone · chat" or the agent route label.
     const displayLabel = routeLabel || 'Keystone · chat';
+    // Debug-route replies get a black signature (see .msg-route-sig.route-debug).
+    if (/debug route/i.test(displayLabel)) sig.classList.add('route-debug');
     if (doneOnline === false) {
       // Offline path: make it explicit for the user.
       sig.textContent = `${displayLabel} · offline${time ? ' · ' + time : ''}`;
