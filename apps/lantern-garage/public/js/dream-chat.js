@@ -49,6 +49,7 @@
     if (/\b(buy|sell|trade|trading|position|portfolio|market|ticker|stock|kalshi|prediction market|should i (buy|sell|hold))\b/i.test(lower)) return "trading";
     if (/\b(remember (this|that)|save (this|that)|log (this|that)|add to (my )?(journal|memory|notes?))\b/i.test(lower)) return "memory";
     if (/\b(show me a? ?(video|clip|youtube)|play a? ?video|find a? ?video)\b/i.test(lower)) return "media";
+    if (/\b(apply for|job application|resume|cover letter|career|job search)\b/i.test(lower)) return "job_application";
     return "general";
   }
 
@@ -57,6 +58,7 @@
     trading: "📈 Trading context",
     memory: "💾 Saving to journal",
     media: "🎬 Media search",
+    job_application: "📝 Job application assistant",
   };
 
   // Agent is contextual — Keystone is default, others triggered by name in message

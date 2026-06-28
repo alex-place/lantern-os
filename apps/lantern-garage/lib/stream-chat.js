@@ -50,6 +50,8 @@ const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require(
 const { buildBrainOrder } = require("./stream-chat/provider-order");
 const { appendJsonlQueued } = require("./file-queue");
 const { emitClaimDraft } = require("./claim-drafter");
+const { jobApplicationTool } = require("../tools/job-application");
+const { recordJobApplication } = require("./job-application-store");
 
 const repoRoot = path.resolve(__dirname, "../../../");
 const OURO_HARVEST_LIVE = path.resolve(repoRoot, "data/ouro-harvest-live.jsonl");
@@ -459,6 +461,67 @@ async function handleStreamChat(req, url, res) {
         res.end();
       }
 
+      return;
+    }
+
+    // Handle job application intent
+    if (routeIntent === "job_application") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "X-Accel-Buffering": "no",
+      });
+      const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
+      const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
+
+      sendToken(`📝 Processing job application request...\n\n`);
+      logConversation({ role: "assistant", text: "Processing job application request...", meta: { tool: "job_application" } });
+
+      try {
+        const result = await jobApplicationTool.invoke(message);
+        if (result.success) {
+          sendToken(`✅ Application processed successfully!\n\n`);
+          sendToken(`**Job Title:** ${result.jobTitle || "N/A"}\n`);
+          sendToken(`**Company:** ${result.company || "N/A"}\n`);
+          sendToken(`**Application URL:** ${result.applicationUrl || "N/A"}\n`);
+          if (result.notes) {
+            sendToken(`**Notes:** ${result.notes}\n`);
+          }
+          sendToken(`\nI've recorded this application for you.\n`);
+
+          // Record the application details
+          await recordJobApplication({
+            user: user,
+            sessionId: sessionId,
+            jobTitle: result.jobTitle,
+            company: result.company,
+            applicationUrl: result.applicationUrl,
+            notes: result.notes,
+            timestamp: new Date().toISOString(),
+          });
+
+          sendDone("job_application", {
+            agent: "JobApplication",
+            online: true,
+            status: "success",
+            jobTitle: result.jobTitle,
+            company: result.company,
+            applicationUrl: result.applicationUrl,
+          });
+          logConversation({ role: "assistant", text: `Application for ${result.jobTitle} at ${result.company} processed.`, meta: { tool: "job_application", ...result } });
+        } else {
+          sendToken(`❌ Job application processing failed: ${result.error || "unknown error"}\n`);
+          sendDone("job_application", { agent: "JobApplication", online: false, error: result.error });
+          logConversation({ role: "assistant", text: `Job application processing failed: ${result.error}`, meta: { tool: "job_application", error: result.error } });
+        }
+      } catch (e) {
+        sendToken(`Error during job application processing: ${e.message}\n`);
+        sendDone("job_application", { agent: "JobApplication", online: false, error: e.message });
+        logConversation({ role: "assistant", text: `Error during job application processing: ${e.message}`, meta: { tool: "job_application", error: e.message } });
+      }
+      res.end();
       return;
     }
 
