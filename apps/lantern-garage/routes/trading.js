@@ -53,7 +53,7 @@ function callAITrader(path, method = 'GET', body = null) {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      timeout: 10000
+      timeout: 2000 // 2-second hang limit for verification
     };
 
     const req = http.request(options, (res) => {
@@ -96,7 +96,7 @@ function callDashboard(path) {
       path,
       method: 'GET',
       headers: { 'Accept': 'application/json' },
-      timeout: 10000
+      timeout: 2000 // 2-second hang limit for verification
     };
 
     const req = http.request(options, (res) => {
