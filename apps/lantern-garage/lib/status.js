@@ -3,35 +3,81 @@ const path = require("path");
 const { readJson, readText } = require("./file-queue");
 const { getPowerShellCommand } = require("./powershell");
 
+// --- Constants for file paths and server configuration ---
+// The root directory of the repository, used for resolving relative paths.
 const repoRoot = path.resolve(__dirname, "..", "..");
+// Path to the cloud mirrors manifest file.
 const cloudMirrorsPath = path.join(repoRoot, "manifests", "cloud-mirrors.json");
+// The port the Lantern Garage server listens on, defaulting to 4177.
 const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177);
+// The host the Lantern Garage server binds to, defaulting to 0.0.0.0 if PORT is set, otherwise 127.0.0.1.
 const host = process.env.LANTERN_GARAGE_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
 
+/**
+ * Retrieves the current readiness status from local manifest files.
+ * It attempts to read from `DUAL-BOOT-PREP-LATEST.json` first, then
+ * `latest-readiness.json`, providing a fallback to an empty object.
+ *
+ * @returns {object} An object containing readiness information, such as
+ *                   `readyForPrep`, `readyForInstall`, `pass`, `warn`, `fail`, `held`, and `summary`.
+ */
 function getReadiness() {
   return readJson("manifests/validation/DUAL-BOOT-PREP-LATEST.json", null)
     || readJson("data/dual-boot/latest-readiness.json", {})
     || {};
 }
 
-// #672: mutable tunnel state, stamped by server.js when cloudflaredProcess events fire.
+// --- Cloudflare Tunnel State Management ---
+// #672: This object holds the mutable state of the Cloudflare Tunnel.
+// It is updated by `server.js` when `cloudflaredProcess` events fire,
+// reflecting the tunnel's lifecycle and operational status.
 const _tunnelState = {
-  enabled: false,
-  status: "not_started",   // "not_started" | "starting" | "running" | "exited" | "error" | "disabled"
-  exitCode: null,
-  lastError: null,
-  startedAt: null,
-  exitedAt: null,
+  enabled: false, // Whether the tunnel is configured to run.
+  status: "not_started", // Current operational status: "not_started" | "starting" | "running" | "exited" | "error" | "disabled"
+  exitCode: null, // The exit code if the tunnel process exited.
+  lastError: null, // The last error message encountered.
+  startedAt: null, // Timestamp when the tunnel was last started.
+  exitedAt: null, // Timestamp when the tunnel last exited.
 };
 
+/**
+ * Updates the internal Cloudflare Tunnel state with a partial patch.
+ * This function is typically called by `server.js` in response to
+ * `cloudflared` process events (start, exit, error).
+ *
+ * @param {object} patch - An object containing properties to update in `_tunnelState`.
+ *                         Example: `{ status: "running", startedAt: new Date().toISOString() }`
+ */
 function setTunnelState(patch) {
   Object.assign(_tunnelState, patch);
 }
 
+/**
+ * Retrieves a snapshot of the current Cloudflare Tunnel state.
+ * Returns a shallow copy to prevent direct external modification of the internal state.
+ *
+ * @returns {object} A copy of the current tunnel state, including `enabled`, `status`,
+ *                   `exitCode`, `lastError`, `startedAt`, and `exitedAt`.
+ */
 function getTunnelState() {
   return { ..._tunnelState };
 }
 
+/**
+ * Aggregates various status information from different local data sources
+ * to provide a comprehensive overview of the Lantern Garage application's health and state.
+ *
+ * This includes data from:
+ * - Arc Reactor status (`data/arc-reactor/status.json`)
+ * - Local cash wallet (`data/wallet/local-cash-wallet.json`)
+ * - Local controls validation (`manifests/validation/LOCAL-CONTROLS-LATEST.json`)
+ * - Dual-boot readiness (`getReadiness()`)
+ * - V1 readiness test report (`reports/V1-READINESS-TEST-2026-05-26.md`)
+ * - Live Cloudflare Tunnel state (`getTunnelState()`)
+ * - API key presence (environment variables)
+ *
+ * @returns {object} A structured object containing the aggregated status.
+ */
 function getStatus() {
   const arc = readJson("data/arc-reactor/status.json", {});
   const wallet = readJson("data/wallet/local-cash-wallet.json", {});
@@ -85,6 +131,15 @@ function getStatus() {
   };
 }
 
+/**
+ * Gathers the status of the "Mining Lab" setup, checking for the presence
+ * of specific files and templates required for mining operations.
+ *
+ * @returns {object} An object indicating:
+ *                   - `ready`: A boolean indicating if all required files are present.
+ *                   - `mode`: The operational mode of the mining lab.
+ *                   - `files`: An array of objects, each detailing a file's path and existence.
+ */
 function getMiningLabStatus() {
   const files = [
     "docs/ARC-REACTOR-MINING-LAB.md",
