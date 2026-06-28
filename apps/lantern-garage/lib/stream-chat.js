@@ -16,6 +16,7 @@ const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
 const { emitConvergenceRecord } = require("./convergence-records");
+const { resolveCodingRoute } = require("./route-contract");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
@@ -1452,13 +1453,14 @@ async function handleStreamChat(req, url, res) {
   // gets answered locally. Setting the cloud hint also disables ollamaLocalFirst
   // below (it requires !autoPrefersAnthropic). Escape hatch: CODING_LOCAL_FIRST=1
   // restores the old coding-goes-local-first behavior.
-  const codingLocalFirst = process.env.CODING_LOCAL_FIRST === "1";
-  if (isCodingIntent && !requestedProvider && !codingLocalFirst &&
-      (!autoHintProvider || autoHintProvider === "ollama" || autoHintProvider === "local")) {
-    if (process.env.ANTHROPIC_API_KEY) autoHintProvider = "anthropic";
-    else if (process.env.OPENAI_API_KEY) autoHintProvider = "openai";
-    // no cloud key → leave the local hint; the offline coder backstop handles it
-  }
+  // The coding-route rule now lives in the one routing contract (ADR-0009,
+  // lib/route-contract.js) so it is stated and tested in exactly one place.
+  // This call is behavior-preserving with the previous inline block.
+  autoHintProvider = resolveCodingRoute({
+    requestedProvider,
+    isCodingIntent,
+    autoHintProvider,
+  });
   const autoPrefersAnthropic = autoHintProvider === "anthropic";
 
   // ── Provider 0: Ollama LOCAL-FIRST (dream chat prefers local models) ──────

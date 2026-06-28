@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.84] - 2026-06-28
+- feat(routing): unify the coding-route policy into one contract (ADR-0009, #1408). The decision of who leads a coding turn was smeared across four env vars (`KEYSTONE_LOCAL_FIRST`, `CODING_LOCAL_FIRST`, `CONVERGENCE_CHAT`, `LOCAL_CAPABILITY_FIRST`) and two subsystems. New `apps/lantern-garage/lib/route-contract.js` (`resolveCodingRoute()`) is the single, pure, testable source of truth: **coding is cloud-primary when a cloud key is reachable; local is the offline/verified backstop; explicit user choice wins; the router only classifies.** Grounded in evidence — the local coder scores ~0/5 on HumanEval (#1263), the local chat path crashes (#1366/#1369/#1374) and collapses (#1342). `lib/stream-chat.js` now delegates its coding-route block to the resolver (behavior-preserving). ADR-0009 is **Proposed — awaiting Alex's approval** before the redundant env vars are deprecated. 10 unit tests (`test/route-contract.test.js`).
+
 ## [1.7.82] - 2026-06-27
 - cleanup(lib): remove the two empty `caption-placement.js` / `creator-perf-optimizer.js` stub files (1 byte each) that a stale-base merge (`d320ce6a`) resurrected after #1308 had deleted them, finally completing #1300. Both were unreferenced dead code (the only remaining mentions were a prose `_note` in `research/gaming_layout_priors.json`, now corrected, and the auto-generated `src/convergence/codebase_index.json`). No runtime code `require`s either module; both server entrypoints still pass `node --check`.
 
