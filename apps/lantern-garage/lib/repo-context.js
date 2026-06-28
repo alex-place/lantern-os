@@ -55,6 +55,11 @@ const CODE_FILE_RE = /\.(js|mjs|cjs|ts|tsx|jsx|py)$/;
 const SYMBOL_INDEX_TTL = 5 * 60_000;
 let _symbolIndex = null;        // { ts, map: Map<file, Set<symbol>> }
 
+/**
+ * @typedef {object} EvidencePacket
+ * @property {string} file - The relative path to the file.
+ * @property {number} score
+
 // Pure: extract declared symbol names from source text (JS + Python). Regex-level
 // (no full parse) — fast and good enough to rank files by what they define.
 function extractSymbols(content) {
