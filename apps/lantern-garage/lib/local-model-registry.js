@@ -49,7 +49,6 @@
  * rank-order / Ouro-first: LOCAL_CAPABILITY_FIRST=0).
  */
 
-const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
@@ -66,6 +65,8 @@ const DEFAULTS = [
   {
     id: "ouro:latest",
     endpoint: DEFAULT_ENDPOINT,
+    isLocal: true,
+    isResearch: true, // Recurrent-depth
     selfConverges: true,          // native recurrent depth + Q-exit (arXiv 2510.25741)
     toolCalling: false,           // stock Σ₀ has no tool training (see memory)
     vramGB: 3,
