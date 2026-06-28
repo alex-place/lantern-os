@@ -8,6 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const localModelRegistry = require("../lib/local-model-registry");
 const { execFileSync } = require("child_process");
 const { loadClaudeSessionUsage } = require("../lib/claude-session-usage");
 
@@ -222,6 +223,8 @@ module.exports = async function providerRoutes(req, res, url, deps) {
     return true;
   }
 
+  // ── GET /api/providers/:provider/models ────────────────────────────────
+  if (req.
   // ── GET /api/providers/reliance ────────────────────────────────────────
   // Consolidated "who is actually doing the AI work" view. Merges cloud-Claude
   // reliance (from Claude Code transcripts) with chat-model outcomes (from
