@@ -28,6 +28,7 @@ const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding
 const { defaultRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
+const { runTool, parseToolCall } = require("./tool-runner");
 const { generateDoorSceneImage } = require("./image-generation");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
