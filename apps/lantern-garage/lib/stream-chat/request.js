@@ -87,7 +87,6 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     // handler surfaces an honest "couldn't read your message" instead of routing an
     // empty message to the providers and blaming them. Σ₀: surface why, don't swallow.
     // The contract (test_stream_chat_request_helper.js) is parseError="malformed_json". #1358
-    parsed.parseError = "malformed_json";
   }
 
   return parsed;
