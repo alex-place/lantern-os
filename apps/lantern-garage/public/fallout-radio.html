@@ -32,6 +32,8 @@
     :root {
       --ph: #2bff88; --ph-dim: #1aa657; --ph-faint: #0e5630;
       --amber: #ffb53b; --screen: #06140d;
+      --case-hi: #2c3b30; --case-mid: #1c271f; --case-lo: #131c16; --case-edge: #070b08;
+      --bezel: #0c140f; --rivet: #3a4d40;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
@@ -218,28 +220,132 @@
     .footer a:hover { text-decoration: underline; }
     .footer .note { color: #4f9c70; }
 
+    /* ════════════════════════════════════════════════════════════════════════
+       UNOFFICIAL PIP-BOY SKIN — the whole UI is one green CRT set into a chunky
+       hand-terminal case (beveled metal, corner screws, top module tabs, a
+       bottom status HUD). Layered as overrides on top of the base CRT styles.
+       ════════════════════════════════════════════════════════════════════════ */
+    /* the case */
+    .radio.pipboy {
+      max-width: 880px;
+      background: linear-gradient(180deg, var(--case-hi) 0%, var(--case-mid) 55%, var(--case-lo) 100%);
+      border: 1px solid var(--case-edge); border-radius: 30px;
+      box-shadow:
+        inset 0 2px 0 rgba(150,220,175,.14),
+        inset 0 -5px 12px rgba(0,0,0,.55),
+        0 0 0 2px var(--case-edge), 0 26px 70px rgba(0,0,0,.72);
+      padding: 26px 26px 18px;
+    }
+    .radio.pipboy::after { content: none; }                 /* kill the case-wide scanline */
+    .radio.pipboy::before {                                  /* four recessed case screws */
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+      background:
+        radial-gradient(circle at 18px 18px,                 #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px),
+        radial-gradient(circle at calc(100% - 18px) 18px,    #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px),
+        radial-gradient(circle at 18px calc(100% - 18px),    #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px),
+        radial-gradient(circle at calc(100% - 18px) calc(100% - 18px), #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px);
+    }
+
+    /* the single green display the whole UI sits on */
+    .pip-display {
+      position: relative; border-radius: 16px; padding: 13px 14px 12px;
+      background: radial-gradient(130% 100% at 50% 0%, #0c2114 0%, #061308 68%, #040c06 100%);
+      box-shadow:
+        inset 0 0 0 1px #0c3b22, inset 0 0 70px rgba(0,0,0,.6), inset 0 0 18px rgba(43,255,136,.06),
+        0 0 0 6px var(--bezel), 0 0 0 7px #20302600;          /* inner bezel ring */
+      overflow: hidden;
+    }
+    .pip-display::before {                                    /* display scanlines + faint flicker */
+      content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(43,255,136,.05) 0 1px, transparent 1px 3px);
+      animation: flicker 6s infinite steps(60);
+    }
+    .pip-display::after {                                     /* screen curvature vignette */
+      content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+      background: radial-gradient(128% 128% at 50% 44%, transparent 58%, rgba(0,0,0,.5) 100%);
+    }
+    .pip-display > * { position: relative; z-index: 9; }
+
+    /* top module tabs — STAT · INV · DATA · RADIO */
+    .pip-tabs { display: flex; gap: 2px; border-bottom: 2px solid #123e26; }
+    .pip-tab {
+      flex: 1; text-align: center; padding: 7px 4px 6px; font-size: .74rem; font-weight: 800;
+      letter-spacing: .24em; color: var(--ph-faint); border-bottom: 2px solid transparent;
+      margin-bottom: -2px; text-shadow: 0 0 6px rgba(43,255,136,.2); user-select: none;
+    }
+    .pip-tab.on {
+      color: var(--ph); border-bottom-color: var(--ph);
+      background: linear-gradient(180deg, rgba(43,255,136,.12), transparent);
+      text-shadow: 0 0 12px rgba(43,255,136,.6);
+    }
+    .pip-sub {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 4px 11px; font-size: .64rem; letter-spacing: .16em; color: var(--ph-dim);
+    }
+    .pip-sub .brandname { font-weight: 800; color: var(--ph); letter-spacing: .14em; text-shadow: 0 0 8px rgba(43,255,136,.45); }
+    .pip-sub .model { color: var(--ph-faint); }
+    .pip-sub .onair { margin-left: auto; }
+
+    /* panels get Pip-Boy bracket corners + sit on the green field */
+    .pipboy .dial { background: rgba(4,14,8,.5); border-color: #123e26; }
+    .pipboy .screen { border-radius: 9px; }
+    .bracket { position: relative; }
+    .bracket::before, .bracket::after {
+      content: ""; position: absolute; width: 13px; height: 13px; pointer-events: none; z-index: 10;
+      border: 2px solid var(--ph-dim); opacity: .8;
+    }
+    .bracket::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+    .bracket::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+    /* greener, more terminal-like section headers + title */
+    .pipboy .dial h2 { color: var(--ph); }
+    .pipboy .nowlbl { color: var(--ph); }
+    .pipboy .nowtitle { text-shadow: 0 0 12px rgba(43,255,136,.6), 0 0 3px rgba(43,255,136,.45); }
+    .pipboy .station[aria-current="true"] { box-shadow: inset 0 0 16px rgba(43,255,136,.18); }
+    .pipboy .station[aria-current="true"] .stitle::before { content: "▶ "; color: var(--ph); }
+
+    /* bottom status HUD — SIG · FREQ · VOL · STATIONS */
+    .pip-hud {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 12px; padding: 8px 11px;
+      border: 1px solid #123e26; border-radius: 8px;
+      background: linear-gradient(180deg, rgba(43,255,136,.06), transparent);
+      font-size: .62rem; letter-spacing: .14em; color: var(--ph-dim);
+    }
+    .pip-hud b { color: var(--ph-faint); font-weight: 700; margin-right: 6px; }
+    .pip-hud i { color: var(--ph); font-style: normal; text-shadow: 0 0 7px rgba(43,255,136,.4); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+    .pip-hud .grow { margin-left: auto; }
+
+    @media (max-width: 620px) { .radio.pipboy { padding: 18px 16px 14px; } .pip-tab { letter-spacing: .12em; font-size: .66rem; } }
+
     @media (prefers-reduced-motion: reduce) {
-      .radio::after, .onair i, .crt-noise, .crt-roll, .nowtitle.scroll { animation: none; }
+      .radio::after, .onair i, .crt-noise, .crt-roll, .nowtitle.scroll, .pip-display::before { animation: none; }
       .crt-noise { opacity: .03; }
     }
   </style>
 </head>
 <body>
-  <main class="radio" aria-label="Keystone Radio retro player">
-    <div class="brand">
-      <span class="logo">KEYSTONE&nbsp;RADIO</span>
-      <span class="call">◦ FOUNDER'S FREQUENCY ◦ 101.5 FM</span>
+  <main class="radio pipboy" aria-label="Keystone Radio — unofficial Pip-Boy player">
+   <div class="pip-display">
+    <div class="pip-tabs" aria-label="Pip-Boy modules">
+      <span class="pip-tab" aria-disabled="true" title="module offline">STAT</span>
+      <span class="pip-tab" aria-disabled="true" title="module offline">INV</span>
+      <span class="pip-tab" aria-disabled="true" title="module offline">DATA</span>
+      <span class="pip-tab on" aria-current="page">RADIO</span>
+    </div>
+    <div class="pip-sub">
+      <span class="brandname">KEYSTONE&nbsp;RADIO</span>
+      <span class="model">RobCo&nbsp;UOS&nbsp;·&nbsp;MODEL&nbsp;KR-101.5</span>
       <span class="onair off" id="onair"><i></i> <span id="onairLbl">STANDBY</span></span>
     </div>
 
     <div class="deckwrap">
-      <nav class="dial" aria-label="Stations">
+      <nav class="dial bracket" aria-label="Stations">
         <h2><span>▚ TUNE THE DIAL</span><span class="count" id="dialCount"></span></h2>
         <input id="stationSearch" class="dialsearch" type="search" placeholder="search song or artist…" aria-label="Filter stations" autocomplete="off" spellcheck="false">
         <div class="stationscroll" id="stationList"></div>
       </nav>
 
-      <section class="screen" id="screen" aria-live="polite">
+      <section class="screen bracket" id="screen" aria-live="polite">
         <span class="crt-noise" aria-hidden="true"></span>
         <span class="crt-roll" aria-hidden="true"></span>
         <span class="crt-power" aria-hidden="true"></span>
@@ -283,8 +389,16 @@
       </section>
     </div>
 
+    <div class="pip-hud" aria-hidden="true">
+      <span><b>SIG</b><i id="hudSig">▮▮▮▮▮▯</i></span>
+      <span><b>FREQ</b><i id="hudFreq">101.5</i>&nbsp;FM</span>
+      <span class="grow"><b>VOL</b><i id="hudVol">▮▮▮▮▮▮▮▯▯▯</i></span>
+      <span><b>STATIONS</b><i id="hudCount">—</i></span>
+    </div>
+   </div>
+
     <div class="footer">
-      <span class="note">78rpm transfers from the Internet Archive (Great 78 Project), served locally — the era that plays on Fallout's radio.</span>
+      <span class="note">78rpm transfers from the Internet Archive (Great 78 Project), served locally — an unofficial Pip-Boy tuned to the era that plays on Fallout's radio.</span>
       <span><a href="/explore.html">‹ back to Explore</a></span>
     </div>
   </main>
@@ -403,6 +517,7 @@
     function render() {
       listEl.innerHTML = '';
       document.getElementById('dialCount').textContent = STATIONS.length + ' STATIONS';
+      var hc = document.getElementById('hudCount'); if (hc) hc.textContent = STATIONS.length;
       var frag = document.createDocumentFragment();
       STATIONS.forEach(function (s, i) {
         var b = document.createElement('button');
@@ -440,6 +555,7 @@
       current = i;
       audio.src = s.src;
       applyLevel();   // per-track loudness leveling for the new station
+      var hf = document.getElementById('hudFreq'); if (hf) hf.textContent = s.freq;   // HUD readout
       nowTitle.textContent = s.title;
       nowMeta.textContent = s.artist + " · " + s.year;
       nowLore.textContent = s.lore || "";
@@ -499,6 +615,8 @@
       volEl.value = prefs.vol;
       muteBtn.setAttribute('aria-pressed', prefs.muted ? 'true' : 'false');
       muteBtn.textContent = (prefs.muted || prefs.vol === 0) ? '🔇 MUTE' : '🔊 VOL';
+      var hv = document.getElementById('hudVol');   // HUD volume meter
+      if (hv) { var n = 10, f = prefs.muted ? 0 : Math.round(prefs.vol / 100 * n); hv.textContent = '▮'.repeat(f) + '▯'.repeat(n - f); }
     }
     volEl.addEventListener('input', function () { prefs.vol = +volEl.value; prefs.muted = false; applyVolume(); savePrefs(); });
     muteBtn.addEventListener('click', function () { prefs.muted = !prefs.muted; applyVolume(); savePrefs(); });
