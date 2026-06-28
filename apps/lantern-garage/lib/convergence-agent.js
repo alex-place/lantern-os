@@ -114,6 +114,13 @@ const KNOWLEDGE = [
     ],
   },
   {
+    category: "decision",
+    persona: "lantern",
+    keywords: ["decision", "hypothesis", "grade", "outcome", "bet", "predict", "forecast", "calibrate"],
+    answer:
+      "The Decision Log helps you track personal hypotheses and grade their
+  },
+  {
     category: "convergence",
     persona: "xenon",
     keywords: ["converge", "convergence", "router", "route", "pattern", "signal", "detect", "token", "efficiency"],
