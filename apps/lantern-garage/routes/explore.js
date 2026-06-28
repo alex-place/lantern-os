@@ -100,6 +100,9 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     }
     const key = String(body.key || body.cardKey || "").trim();
     const event = String(body.event || "").trim().toLowerCase();
+    const sessionId = String(body.sessionId || "").trim();
+    const cardRank = Number.isFinite(+body.cardRank) ? Math.max(0, +body.cardRank) : null;
+    const feedTimestamp = String(body.feedTimestamp || "").trim();
     if (!key || !key.startsWith("source:")) {
       sendJson(res, { ok: false, error: "key required (source:<name>)" }, 400);
       return true;
@@ -111,7 +114,7 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     const success = SUCCESS_EVENTS.has(event);
     const dwellMs = Number.isFinite(+body.dwellMs) ? Math.max(0, +body.dwellMs) : 0;
     // Always log for CTR; only engagement/dismiss/skip shape the leaderboard.
-    logInteraction({ ts: new Date().toISOString(), key, event, success, dwellMs });
+    logInteraction({ ts: new Date().toISOString(), key, event, success, dwellMs, sessionId, cardRank, feedTimestamp });
     if (event !== "impression") {
       try {
         await recordModelOutcome(key, "explore", success, dwellMs, 0);
