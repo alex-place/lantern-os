@@ -44,6 +44,20 @@ function renderToolReplay(tool) {
     return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
       + `<a href="${esc(tool.url)}" download="${esc(tool.filename || '')}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(tool.filename || 'file')}</a>`;
   }
+  if (tool.kind === 'embed' && tool.src) {
+    // Same allowlist as the live summoner — a persisted row must not become a
+    // framing sink if the store is ever tampered with.
+    const okSrc = /^\/[^/]/.test(tool.src) || /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i.test(tool.src);
+    if (!okSrc) return null;
+    const icon = tool.embedKind === 'listen' ? '📻' : tool.embedKind === 'watch' ? '🎬' : '🕹️';
+    const verb = tool.embedKind === 'watch' ? 'Now showing' : 'Now playing';
+    const h = Math.max(160, Math.min(640, Number(tool.height) || 360));
+    return `<div class="chat-embed" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;overflow:hidden;max-width:480px">`
+      + `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:12.5px"><span aria-hidden="true">${icon}</span><span>${verb} — ${esc(tool.title || 'embed')}</span></div>`
+      + `<iframe src="${esc(tool.src)}" style="width:100%;height:${h}px;border:0;display:block" title="${esc(tool.title || 'embed')}" allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>`
+      + (tool.lore ? `<div style="padding:6px 10px;font-size:11px;opacity:0.6;border-top:1px solid var(--border,#2a2a3a)">${esc(tool.lore)}</div>` : '')
+      + `</div>`;
+  }
   return null;
 }
 window.renderToolReplay = renderToolReplay;
@@ -502,6 +516,7 @@ const COMMANDS = [
   { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
   { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
   { name: 'swarm',       group: 'Build',   usage: '!swarm <task>',     desc: 'Multi-agent swarm (council/consensus) on a task' },
+  { name: 'radio',       group: 'Explore', usage: '!radio',            desc: 'Summon Keystone Radio inline (also: “play fallout radio”)', aliases: ['play'] },
   { name: 'videos',      group: 'Explore', usage: '!videos',           desc: 'Fresh videos feed', aliases: ['watch'] },
   { name: 'discover',    group: 'Explore', usage: '!discover',         desc: 'Discover reads/news feed', aliases: ['news', 'reads', 'feed'] },
   { name: 'build',       group: 'Explore', usage: '!build',            desc: 'Repo build activity (releases + commits)', aliases: ['github', 'releases', 'commits'] },
@@ -1081,6 +1096,193 @@ function detectEmbedIntent(text) {
   return null;
 }
 
+// ── On-demand Explore embeds (summon games / radio / films into chat) ─────────
+// "play fallout radio", "play pac-man", "watch nosferatu" — summon any Explore
+// embed straight into the conversation as a sandboxed iframe, no LLM cost. Same
+// content source as the Explore feed (data/explore/embeds.json via
+// /api/explore/embeds) and the same allowlist + sandbox as explore.html's player,
+// so there's one catalog to maintain. Loop stage: Act (media/interaction is a
+// first-class cockpit capability). See keystone-radio-feature / explore-embed-feed.
+
+// An embed src may only be a root-relative path (our own /fallout-radio.html) or an
+// https archive.org / github.io / youtube / vimeo URL — parity with explore.html's
+// safeEmbedSrc. Anything else is never framed (defense vs a poisoned catalog row).
+const CHAT_EMBED_HOSTS = /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
+function safeEmbedSrc(u) {
+  const s = String(u || '');
+  return (/^\/[^/]/.test(s) || CHAT_EMBED_HOSTS.test(s)) ? s : '';
+}
+
+// Launch verbs that signal "open this thing now". A single embed token (e.g. "radio")
+// only summons when one of these is present; a multi-word name ("fallout radio") fires
+// on its own. Keeps "I love the radio" from blasting audio at you.
+const SUMMON_VERBS = /\b(play|summon|open|launch|start|run|boot|listen(?:\s+to)?|tune\s+(?:in|into|to)?|put\s+on|turn\s+on|fire\s+up|load|cue\s+up|watch)\b/i;
+
+// The flagship stays summonable even before /api/explore/embeds is deployed (a new
+// route 404s on a stale server). kind: listen|game|watch drives the verb + icon.
+const EMBED_SEED = [
+  {
+    slug: 'keystone-radio', title: 'Keystone Radio', kind: 'listen',
+    src: '/fallout-radio.html', height: 620, source: 'Keystone Radio',
+    url: '/fallout-radio.html',
+    lore: 'A retro Pip-Boy tuner spinning public-domain 1940s radio — the songs that play at the end of the world. Press play; tune the dial.',
+    aliases: ['fallout radio', 'keystone radio', 'pip-boy radio', 'radio'],
+  },
+];
+
+let _embedCatalog = null;    // hydrated [{slug,title,kind,src,height,_terms}]
+let _embedCatalogP = null;   // in-flight hydrate promise
+
+// Derive match phrases (≥2 words OK) + distinctive single tokens from an embed's
+// slug, title, src filename, and curated aliases. A multi-word phrase is specific
+// enough to fire on its own; a lone token needs a launch verb.
+function embedSummonTerms(e) {
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const srcBase = norm((String(e.src || '').split('/').pop() || '').replace(/\.[a-z0-9]+$/i, '')); // "/fallout-radio.html" → "fallout radio"
+  const phrases = new Set();
+  [norm(e.slug), norm(e.title), srcBase, ...(e.aliases || []).map(norm)].forEach(p => { if (p) phrases.add(p); });
+  // Years / platform tags pollute titles ("Prince of Persia (1990)", "...usa nes") — never match on those.
+  const STOP = new Set(['the','of','and','for','usa','japan','europe','rev','nes','snes','gb','gbc','n64','dos','msdos','arcade','game','play','listen','watch']);
+  const tokens = new Set();
+  // Drop real publish years (1900s–2019, which appear in titles like "(1990)") but
+  // keep names that just look year-ish, e.g. the game "2048".
+  phrases.forEach(p => p.split(' ').forEach(t => {
+    if (t.length >= 4 && !STOP.has(t) && !/^(19\d\d|20[01]\d)$/.test(t)) tokens.add(t);
+  }));
+  (e.aliases || []).forEach(a => { const n = norm(a); if (n && !n.includes(' ') && n.length >= 3) tokens.add(n); }); // short single-word aliases ("2048")
+  return { phrases: [...phrases].filter(p => p.length >= 3), tokens: [...tokens] };
+}
+
+// Pull the full catalog once (radio seed first so it always wins), enriching with
+// games/films from the server. Best-effort: offline → seed only, radio still works.
+function hydrateEmbedCatalog() {
+  if (_embedCatalog) return Promise.resolve(_embedCatalog);
+  if (_embedCatalogP) return _embedCatalogP;
+  _embedCatalogP = (async () => {
+    const list = EMBED_SEED.map(e => ({ ...e }));
+    try {
+      const r = await fetch(`${embedBase()}/api/explore/embeds`, { cache: 'no-store' });
+      if (r.ok) {
+        const d = await r.json();
+        for (const row of (Array.isArray(d.embeds) ? d.embeds : [])) {
+          const src = row && row.embed && row.embed.src;
+          const slug = row && (row.slug || String(row.id || '').replace(/^embed:/, ''));
+          if (!src || !slug || !safeEmbedSrc(src)) continue;
+          if (list.some(e => e.slug === slug)) continue;          // seed (flagship) wins
+          const topics = Array.isArray(row.topics) ? row.topics : [];
+          const kind = topics.includes('listen') ? 'listen'
+            : topics.some(t => t === 'watch' || t === 'film') ? 'watch' : 'game';
+          list.push({
+            slug, title: row.title || slug, kind, src,
+            height: Number(row.embed.height) || 360,
+            source: row.source || '', lore: row.lore || '', url: row.url || src, aliases: [],
+          });
+        }
+      }
+    } catch { /* offline → seed only */ }
+    _embedCatalog = list.map(e => ({ ...e, _terms: embedSummonTerms(e) }));
+    return _embedCatalog;
+  })();
+  return _embedCatalogP;
+}
+
+// Return the embed the user is asking to summon, or null. Synchronous against the
+// hydrated catalog (kicked off at load); falls back to the seed so the radio always
+// resolves even on the very first message.
+function detectEmbedSummon(text) {
+  const s = String(text || '').trim();
+  if (!s || s[0] === '!' || s[0] === '/') return null;            // "!"/"/" commands handled elsewhere
+  const flat = s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = ' ' + flat + ' ';
+  const hasVerb = SUMMON_VERBS.test(s);
+  const catalog = _embedCatalog || EMBED_SEED.map(e => ({ ...e, _terms: embedSummonTerms(e) }));
+  let best = null;
+  const consider = (embed, len) => { if (!best || len > best.len) best = { embed, len }; };
+  for (const e of catalog) {
+    const terms = e._terms || embedSummonTerms(e);
+    // (a) The whole message IS the name ("fallout radio", "pac man", "radio") → fire,
+    //     no verb needed. Exact match wins big so it beats any in-sentence token match.
+    for (const p of terms.phrases) { if (flat === p) consider(e, p.length + 1000); }
+    // (b) A launch verb + a name (phrase or distinctive token) anywhere in the message
+    //     ("play fallout radio", "put on the radio", "watch nosferatu"). Requiring the
+    //     verb keeps "tell me about pac-man" / "i love the radio" from summoning.
+    if (hasVerb) {
+      for (const p of terms.phrases) { if (p.includes(' ') && norm.includes(' ' + p + ' ')) consider(e, p.length); }
+      for (const t of terms.tokens) { if (norm.includes(' ' + t + ' ')) consider(e, t.length); }
+    }
+  }
+  return best ? best.embed : null;
+}
+
+// Single active summoned embed — tearing down the previous one means two radios
+// never play over each other when you summon again.
+let activeChatEmbed = null;
+
+// Frame an embed inline in the chat. Mirrors explore.html's player: safeEmbedSrc
+// allowlist, the same sandbox attrs, a stop (unloads → silences) + fullscreen.
+function renderChatEmbed(embed, userText) {
+  addUserBubble(userText);
+  persistToolTurn('operator', userText);
+  const messages = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  const src = safeEmbedSrc(embed.src);
+  if (!src) {
+    row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Couldn't summon <b>${embedEsc(embed.title)}</b> — that embed isn't framable.</div>`;
+    messages.appendChild(row);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    return;
+  }
+  if (activeChatEmbed && activeChatEmbed.stop) { try { activeChatEmbed.stop(); } catch {} activeChatEmbed = null; }
+  const icon = embed.kind === 'listen' ? '📻' : embed.kind === 'watch' ? '🎬' : '🕹️';
+  const verb = embed.kind === 'watch' ? 'Now showing' : 'Now playing';
+  const h = Math.max(160, Math.min(640, Number(embed.height) || 360));
+  row.innerHTML =
+    `<div class="msg-label">Keystone</div>` +
+    `<div class="bubble" style="font-size:13px">` +
+      `<div class="chat-embed" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;overflow:hidden;max-width:480px">` +
+        `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:12.5px">` +
+          `<span aria-hidden="true">${icon}</span><span style="flex:1">${verb} — ${embedEsc(embed.title)}</span>` +
+          `<button type="button" class="ce-fs" title="Fullscreen" aria-label="Fullscreen" style="background:none;border:0;color:inherit;cursor:pointer;font-size:14px;line-height:1">⛶</button>` +
+          `<button type="button" class="ce-stop" title="Stop" aria-label="Stop" style="background:none;border:0;color:inherit;cursor:pointer;font-size:14px;line-height:1">✕</button>` +
+        `</div>` +
+        `<div class="ce-frame">` +
+          `<iframe src="${embedEsc(src)}" style="width:100%;height:${h}px;border:0;display:block" title="${embedEsc(embed.title)}" ` +
+            `allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer" ` +
+            `sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>` +
+        `</div>` +
+        (embed.lore ? `<div style="padding:6px 10px;font-size:11px;opacity:0.6;border-top:1px solid var(--border,#2a2a3a)">${embedEsc(embed.lore)}</div>` : '') +
+      `</div>` +
+    `</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+
+  const frame = row.querySelector('.ce-frame');
+  const iframe = row.querySelector('iframe');
+  const stop = () => { if (frame) frame.innerHTML = `<div style="padding:16px 10px;font-size:12px;opacity:0.6">⏹ Stopped — summon it again to play.</div>`; };
+  activeChatEmbed = { iframe, stop };
+  const stopBtn = row.querySelector('.ce-stop');
+  if (stopBtn) stopBtn.addEventListener('click', () => { stop(); if (activeChatEmbed && activeChatEmbed.iframe === iframe) activeChatEmbed = null; });
+  const fsBtn = row.querySelector('.ce-fs');
+  if (fsBtn) fsBtn.addEventListener('click', () => {
+    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); return; }
+    const node = row.querySelector('.ce-frame iframe') || row.querySelector('.ce-frame');
+    const req = node && (node.requestFullscreen || node.webkitRequestFullscreen || node.msRequestFullscreen);
+    if (req) { try { req.call(node); } catch {} }
+  });
+  try { iframe.focus(); } catch {}
+
+  // Persist so a reload / session-switch restores the live embed (renderToolReplay 'embed').
+  persistToolTurn('lantern', `${verb} — ${embed.title}: ${embed.url || src}`, {
+    agent: 'Keystone', provider: 'explore-embed',
+    tool: { kind: 'embed', src, title: embed.title, height: h, embedKind: embed.kind, lore: embed.lore || '', url: embed.url || src },
+  });
+}
+
+// Warm the catalog at load so games/films resolve on the first message (the radio
+// resolves from the seed regardless).
+hydrateEmbedCatalog();
+
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage(opts = {}) {
   const input = document.getElementById('input');
@@ -1163,6 +1365,37 @@ async function sendMessage(opts = {}) {
     addUserBubble(text);
     persistToolTurn('operator', text);
     renderDocGen(docReq.prompt, docReq.format);
+    return;
+  }
+
+  // !radio summons Keystone Radio; !play <name> summons any Explore embed by name.
+  // (Slash forms /radio and /play work too — /radio normalizes via the command list.)
+  const summonCmd = text.match(/^[!/](radio|play)\b\s*(.*)$/i);
+  if (summonCmd) {
+    input.value = '';
+    input.style.height = 'auto';
+    const arg = summonCmd[2].trim();
+    const picked = arg ? detectEmbedSummon('play ' + arg)
+                       : (_embedCatalog || EMBED_SEED)[0];   // bare !radio/!play → flagship radio
+    if (picked) { renderChatEmbed(picked, text); return; }
+    addUserBubble(text);
+    const m = document.getElementById('messages');
+    const r = document.createElement('div');
+    r.className = 'msg-row agent';
+    r.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Couldn't find an embed called <b>${embedEsc(arg)}</b>. Try “play fallout radio”, or browse <a href="/explore.html" style="color:var(--accent)">Explore →</a>.</div>`;
+    m.appendChild(r);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    return;
+  }
+
+  // Natural-language embed summon → frame a game / radio / film inline ("play fallout
+  // radio", "play pac-man", "watch nosferatu"). Deterministic, no LLM. Runs AFTER
+  // image/video/doc so a genuine "show me a video of X" still routes to YouTube.
+  const summonEmbed = detectEmbedSummon(text);
+  if (summonEmbed) {
+    input.value = '';
+    input.style.height = 'auto';
+    renderChatEmbed(summonEmbed, text);
     return;
   }
 
