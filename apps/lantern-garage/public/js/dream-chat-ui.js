@@ -421,6 +421,11 @@ function hideStopButton() {
   if (sendBtn) sendBtn.style.display = '';
 }
 
+// Helper for escaping HTML in generated content
+const _esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// New function: parseImageRequest
+function parseImageRequest(text)
 const FALLBACKS = [
   "No AI providers are set up. Add an API key in Settings (⚙) to get started.",
   "All providers offline. Check Settings to add an API key or start a local model.",
