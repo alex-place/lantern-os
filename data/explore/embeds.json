@@ -2,6 +2,19 @@
   "_comment": "Curated embed seed for the Explore feed (Observe stage). Each entry becomes one full-width 'embed' card rendered as a lazy iframe. Sourced from open archives (Internet Archive / Musopen, public-domain or freely-streamable) and local Keystone games. Every card carries [why, source] per the Σ₀ Verify rule. To add/replace content, edit this file — no code change. Per-card key = 'source:embed:<slug>' so each panel earns or loses its slot independently (engagement or discarded). Verified live 2026-06-27.",
   "embeds": [
     {
+      "slug": "keystone-brainrot",
+      "title": "Keystone OS — Brainrot Short",
+      "kind": "watch",
+      "url": "/brainrot.html",
+      "source": "Keystone Studio",
+      "published": "2026-06-27",
+      "topics": ["watch", "meme", "lore"],
+      "lore": "Skibidi, Tung Tung Tung Sahur, and a one-way trip to Ohio — a 36-second brainrot ad that smuggles the whole Observe→Converge loop past your dopamine receptors. The drum that wakes you for Sahur, reframed as the AI that actually remembers.",
+      "why": "Keystone's own short — original art (no copyrighted meme assets), built in-house and served locally",
+      "evidence_source": "Keystone (local) · /brainrot.html · original CSS/JS animation",
+      "embed": { "provider": "local", "src": "/brainrot.html", "height": 720, "interactive": true }
+    },
+    {
       "slug": "t-rex",
       "title": "T-Rex Runner",
       "kind": "game",

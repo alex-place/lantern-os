@@ -16,6 +16,7 @@ const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
 const { emitConvergenceRecord } = require("./convergence-records");
+const { resolveCodingRoute } = require("./route-contract");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
@@ -43,7 +44,7 @@ const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 // Extracted helper modules (split out of this file for smaller-context editing):
-const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
+const { compactHistory, compactToolLoopMessages, buildProviderMessages } = require("./stream-chat/history");
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
 const { buildBrainOrder } = require("./stream-chat/provider-order");
@@ -287,6 +288,54 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
           res.end();
+        });
+      return;
+    }
+
+    if (cmd.name === "agents" || cmd.name === "agent") {
+      // Orchestrator–worker sub-agents (#1392): decompose → isolated workers → synthesize.
+      // Emits the TYPE-based SSE the dream-chat UI parser consumes ({type:"token",text},
+      // {type:"done",...}) via the shared sse helper — not the raw event:-name format.
+      const task = cmd.args.trim() || message.replace(/^!\S+\s*/, "").trim();
+      sse.writeStreamHeaders(res);
+      if (!task) {
+        sse.sendToken(res, "Usage: !agents <task> — splits the task across isolated sub-agents and synthesizes the result.\n");
+        sse.sendDone(res, "failed", { error: "no_task", online: false });
+        return;
+      }
+      const { runOrchestrator } = require("./orchestrator-agents");
+      const agent = selectAgent(task);
+      const systemPrompt = `${agent.systemPrompt}\n\nTone: thoughtful, unhurried, human. Never clinical. Never sycophantic.`;
+      const workerId = `agents-${Date.now()}`;
+      sse.sendToken(res, `🔀 **Orchestrator** — decomposing the task into sub-agents…\n\n`);
+      runOrchestrator(task, {
+        systemPrompt,
+        workerId,
+        provider: process.env.KEYSTONE_AGENTS_PROVIDER || requestedProvider || undefined,
+        onPhase: (phase, info) => {
+          if (phase === "workers") {
+            const names = (info.workers || []).map((w) => `\`${w.name}\``).join(", ");
+            sse.sendToken(res, `Dispatching **${info.count}** isolated sub-agent${info.count === 1 ? "" : "s"}: ${names}\n\n`);
+          } else if (phase === "synthesize") {
+            sse.sendToken(res, `\nSynthesizing sub-agent results…\n\n`);
+          }
+        },
+        onWorkerStart: (name, role) => sse.sendToken(res, `→ \`${name}\` (${role}) working…\n`),
+        onWorkerDone: (name, ok) => sse.sendToken(res, `${ok ? "✓" : "✗"} \`${name}\` ${ok ? "done" : "failed"}\n`),
+      })
+        .then(({ synthesis, workers }) => {
+          sse.sendToken(res, `\n---\n\n`);
+          for (const word of String(synthesis.text).split(" ")) sse.sendToken(res, word + " ");
+          sse.sendDone(res, "keystone", {
+            agent: "Keystone",
+            provider: synthesis.provider || "orchestrator",
+            online: !!String(synthesis.text || "").trim(),
+            orchestrator: { workerId, workers: workers.map((w) => ({ name: w.name, role: w.role, ok: w.ok })) },
+          });
+        })
+        .catch((err) => {
+          sse.sendError(res, `Sub-agents failed: ${err.message}`);
+          sse.sendDone(res, "failed", { error: err.message, online: false });
         });
       return;
     }
@@ -1452,13 +1501,14 @@ async function handleStreamChat(req, url, res) {
   // gets answered locally. Setting the cloud hint also disables ollamaLocalFirst
   // below (it requires !autoPrefersAnthropic). Escape hatch: CODING_LOCAL_FIRST=1
   // restores the old coding-goes-local-first behavior.
-  const codingLocalFirst = process.env.CODING_LOCAL_FIRST === "1";
-  if (isCodingIntent && !requestedProvider && !codingLocalFirst &&
-      (!autoHintProvider || autoHintProvider === "ollama" || autoHintProvider === "local")) {
-    if (process.env.ANTHROPIC_API_KEY) autoHintProvider = "anthropic";
-    else if (process.env.OPENAI_API_KEY) autoHintProvider = "openai";
-    // no cloud key → leave the local hint; the offline coder backstop handles it
-  }
+  // The coding-route rule now lives in the one routing contract (ADR-0009,
+  // lib/route-contract.js) so it is stated and tested in exactly one place.
+  // This call is behavior-preserving with the previous inline block.
+  autoHintProvider = resolveCodingRoute({
+    requestedProvider,
+    isCodingIntent,
+    autoHintProvider,
+  });
   const autoPrefersAnthropic = autoHintProvider === "anthropic";
 
   // ── Provider 0: Ollama LOCAL-FIRST (dream chat prefers local models) ──────
@@ -1734,7 +1784,9 @@ async function handleStreamChat(req, url, res) {
                   result: result.ok ? result.result : (result.error || null) });
                 convo.push({ role: "assistant", content: lastTurn });
                 convo.push({ role: "user", content: `The ${tc.name} tool returned:\n${String(out).slice(0, 1500)}\n\nIf you need another tool, reply with exactly one <tool_call>…</tool_call>. Otherwise answer my original request in plain text.` });
-                const followText = await streamOllamaFollow(convo);
+                // Micro-compact stale tool results so a long loop doesn't crowd the
+                // local 8K window (keeps the 2 newest verbatim; #1391).
+                const followText = await streamOllamaFollow(compactToolLoopMessages(convo, { keepRecentResults: 2 }));
                 const nextTc = toolRunner.parseToolCall(followText);
                 if (nextTc) { tc = nextTc; lastTurn = followText; } // markup already streamed; keep going
                 else { if (followText.trim()) fullReply += "\n\n" + followText; tc = null; }
@@ -2127,6 +2179,7 @@ async function handleStreamChat(req, url, res) {
             return;
           }
           let buf = "";
+          let liveCollapseChecked = false; // one cut, not a re-trigger loop
           upstream.on("data", (chunk) => {
             buf += chunk.toString();
             const lines = buf.split("\n");
@@ -2140,6 +2193,26 @@ async function handleStreamChat(req, url, res) {
                 if (evt.type === "content_block_delta" && evt.delta?.text) {
                   fullReply += evt.delta.text;
                   sendToken(evt.delta.text);
+                  // #1342: the collapse canary used to be advisory-only — it scored the
+                  // FULL reply only after every token had already streamed to the user,
+                  // so a degenerating reply (repetition/n-gram echo/lexical collapse) was
+                  // always seen in full before anything could act on it. Check periodically
+                  // WHILE streaming and cut the request short the first time proximity is
+                  // unambiguously high (0.65, stricter than the 0.5 advisory default, so a
+                  // verbose-but-healthy reply is never mistaken for collapse).
+                  if (!liveCollapseChecked && fullReply.length > 400 && fullReply.length % 120 < evt.delta.text.length) {
+                    const live = scoreReplyCollapse(fullReply, { threshold: 0.65 });
+                    if (live.collapsed) {
+                      liveCollapseChecked = true;
+                      console.warn(`[canary_collapse_live] cutting anthropic stream short — proximity=${live.proximity}`);
+                      const notice = "\n\n*(cut short — the response started repeating itself)*";
+                      fullReply += notice;
+                      sendToken(notice);
+                      upstream.destroy();
+                      resolve();
+                      return;
+                    }
+                  }
                 }
               } catch { /* skip malformed */ }
             }

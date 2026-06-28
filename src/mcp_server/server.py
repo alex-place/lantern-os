@@ -1670,9 +1670,40 @@ async def root():
 
 # ── Main ──
 
+def _port_is_free(host: str, port: int) -> bool:
+    """True if (host, port) can be bound right now — i.e. no other listener owns it.
+
+    Used as a singleton guard. We bind WITHOUT SO_REUSEADDR on purpose: the goal is
+    to DETECT an existing MCP listener and defer to it, not to steal the port.
+    """
+    import socket as _socket
+    sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
 if __name__ == "__main__":
     port = int(os.getenv("MCP_SERVER_PORT", "8771"))
     host = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
+    # ── Singleton guard ──────────────────────────────────────────────────────
+    # This script is spawned by EVERY garage server.js — the stable production
+    # server and any dev / `node --watch` checkout. Without a guard, a second
+    # checkout races for 8771: the loser's uvicorn used to crash with a traceback,
+    # and `node --watch` restarts orphaned the python grandchild (the `python`
+    # launcher re-execs into the real interpreter, so it kept 8771 and kept
+    # spawning tool-runner bridges). Strays piled up on a RAM-tight box. Defer
+    # cleanly to whoever already owns the port so only ONE MCP ever runs.
+    if not _port_is_free(host, port):
+        logger.warning(
+            "MCP port %s:%s already in use — another MCP server is already live. "
+            "Exiting cleanly (singleton guard); not starting a duplicate.", host, port,
+        )
+        sys.exit(0)
     logger.info("Lantern OS MCP Server starting on http://%s:%s", host, port)
     logger.info("Tools available: %s", list(TOOLS_REGISTRY.keys()))
     logger.info("Mesh mode: founder control + opt-in peer donations")

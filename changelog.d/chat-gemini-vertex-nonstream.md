@@ -1,0 +1,4 @@
+### Fix: non-stream chat reaches Gemini via Vertex AI (providers credit-depleted)
+
+- The non-streaming `/api/dream/chat` path (`lib/dream-chat.js`) called Gemini only on the **AI-Studio** wire (`generativelanguage.googleapis.com?key=…`), which is credit-depleted along with every other API-key provider (OpenAI 429, Gemini 429, xAI 403, Anthropic 400). Result: `no_provider_configured` / HTTP 503 for all non-stream chat — including the **PR auto-review + auto-merge fleet**, which posts to this endpoint.
+- Routed the Gemini block through `lib/gemini-transport.js` (already used by the stream path), so it uses **Vertex AI** (ADC, bills the Cloud project) when `GEMINI_USE_VERTEX=1`. Vertex still has credit, so chat + fleet reviews work again. Web-search grounding is sent only on the AI-Studio wire (the Vertex tool schema differs and a mismatch 400s the call). Fixes the live-site chat outage and unblocks the automerger.

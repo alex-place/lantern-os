@@ -1,0 +1,3 @@
+### Keystone Radio — dial sorted low→high by frequency
+
+- Sorted the radio playlist (`radio/stations.json`) ascending by frequency, so the **TUNE THE DIAL** list now reads monotonically up the band (87.9 → 107.9 FM) as the player was always designed to ("Ordered low→high on the dial"). Previously the manifest listed the 25 hand-curated tracks first, then the Great 78 Project library ordered alphabetically by artist, so the dial jumped back down the band partway through. Pure reorder — no songs added, removed, or re-tuned; `101.5` stays the Founder's Frequency (*I Don't Want to Set the World on Fire*). The sort is stable, so where multiple songs share a frequency the curated track stays first (deep-links/`findByFreq` still resolve the canonical song).

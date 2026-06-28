@@ -9,7 +9,7 @@
  * stage needs before it picks a local backend:
  *
  *   1. "Which local model should LEAD for this task — and does it fit the box?"
- *      (VRAM-gated; 8GB / one-process-at-a-time is the real constraint here.)
+ *      (VRAM-gated; the box is auto-detected — 8GB laptop or 24GB workstation.)
  *   2. "Does that model self-converge?" — i.e. does it loop / Q-exit INTERNALLY
  *      (Ouro), or must the Core wrap it in lib/loop-reasoner.js to be Σ₀-compliant
  *      (verify-gated convergence)? A non-self-converging model (e.g. Qwen) is only
@@ -26,7 +26,7 @@
  *   selfConverges bool     true  = native looped/Q-exit reasoning (Ouro family);
  *                          false = single-pass → Core wraps it in loopedReason()
  *   toolCalling   bool     trained for tool_use / function calling
- *   vramGB        number   approx VRAM at the served quant (the 8GB-box gate)
+ *   vramGB        number   approx VRAM at the served quant (the box-fit gate)
  *   ctxTokens     int      usable context window
  *   taskTypes     string[] task intents this model is eligible to LEAD
  *   rank          number   default preference within a task (lower = earlier)
@@ -36,15 +36,22 @@
  * Source of truth: built-in DEFAULTS below, overlaid (by id) with
  * data/models/local-registry.json when present — operator-editable, TTL-cached.
  *
- * Decision (2026-06-26): Ouro-1.4B stays the Σ₀-native DEFAULT (Q-exit is the
- * collapse-certificate thesis). Qwen2.5-Coder-7B is registered as the opt-in
- * high-capability local backend, selected when LOCAL_CAPABILITY_FIRST=1 (and it
- * fits the VRAM budget). Web-grounded "best that fits 8GB" — see
- * docs/SIGMA0-MODEL-ADAPTER.md for the comparison + sources.
+ * Decision (2026-06-28, #1387 / docs/research/2026-06-28-keystone-chat-frontier-stack.md):
+ * selection is CAPABILITY-GATED by the DETECTED box. Non-kernel tasks
+ * (coding/reasoning/default) lead with the highest-capability model that *fits
+ * the VRAM budget* — so a ≥24GB box leads with the frontier Qwen-3.6-27B coder,
+ * an 8GB box leads with Qwen2.5-Coder-7B, and when nothing local fits/serves the
+ * provider chain falls back to cloud (Claude). The kernel path stays strict
+ * rank-order (Ouro / keystone-ft) — the Σ₀ Convergence Core is unchanged.
+ * Ouro-1.4B stays a registered entry (recurrent-depth research front, #1292) but
+ * is no longer the universal coding default. VRAM is auto-detected via nvidia-smi
+ * (override: VRAM_BUDGET_GB; disable detection: VRAM_AUTODETECT=0; force
+ * rank-order / Ouro-first: LOCAL_CAPABILITY_FIRST=0).
  */
 
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
 const DEFAULT_ENDPOINT = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const REGISTRY_JSON_PATH = path.resolve(__dirname, "..", "..", "..", "data", "models", "local-registry.json");
@@ -64,9 +71,9 @@ const DEFAULTS = [
     vramGB: 3,
     ctxTokens: 8192,
     taskTypes: ["kernel", "reasoning", "coding", "default"],
-    rank: 0,                      // Σ₀-native DEFAULT everywhere it's eligible
+    rank: 0,                      // kernel lead; rank-order escape via LOCAL_CAPABILITY_FIRST=0
     capabilityScore: 0.4,
-    note: "Σ₀-native default — Ouro-1.4B looped coder; Q-exit IS the thesis.",
+    note: "Recurrent-depth research front (#1292). No tools; no longer the universal coding default (capability-gated). Force Ouro-first with LOCAL_CAPABILITY_FIRST=0.",
   },
   {
     id: "keystone-ft",
@@ -88,9 +95,21 @@ const DEFAULTS = [
     vramGB: 5,                    // Q4_K_M ~4.7GB — fits the 8GB box
     ctxTokens: 32768,
     taskTypes: ["coding", "default"],
-    rank: 1,                      // behind Ouro by default; leads under capability-first
+    rank: 1,
     capabilityScore: 0.8,         // strongest code model in the 8GB tier (2026)
-    note: "Opt-in capability lever: Qwen2.5-Coder-7B (Q4). Set LOCAL_CAPABILITY_FIRST=1.",
+    note: "8GB-tier default coder: Qwen2.5-Coder-7B (Q4). Leads coding on an 8GB box; sits behind the 27B frontier on a ≥24GB box.",
+  },
+  {
+    id: "qwen3.6-27b",
+    endpoint: DEFAULT_ENDPOINT,
+    selfConverges: false,         // single-pass → wrapped by loopedReason()
+    toolCalling: true,            // native qwen3_coder tool format
+    vramGB: 18,                   // dense 27B @ Q4 ~17GB — needs a ≥24GB box; gated out of 8GB
+    ctxTokens: 262144,
+    taskTypes: ["coding", "reasoning", "default"],
+    rank: 0,
+    capabilityScore: 0.92,        // SWE-bench Verified 77.2% — consumer-frontier local (2026)
+    note: "Local FRONTIER coder (Qwen 3.6-27B dense). Leads only on a ≥24GB box. PENDING #1388: confirm exact served tag + measured VRAM.",
   },
   {
     id: "lantern-csf-dream",
@@ -107,15 +126,59 @@ const DEFAULTS = [
 ];
 
 let _cache = { at: 0, entries: null };
+let _detectedVramGB; // undefined = unprobed; number|null once probed (memoized)
 
-function _vramBudgetGB() {
-  const v = parseFloat(process.env.VRAM_BUDGET_GB || "");
-  return Number.isFinite(v) && v > 0 ? v : 8; // the box: 8GB, one model process
+/**
+ * Largest single-GPU VRAM in GB via nvidia-smi, or null if unavailable. One model
+ * process / box → size to the biggest single card, not the sum. Fixed argv +
+ * execFileSync (no shell, no interpolation) → injection-safe. Memoized; cleared
+ * by _resetCache().
+ */
+function _detectVramGB() {
+  if (_detectedVramGB !== undefined) return _detectedVramGB;
+  try {
+    const out = execFileSync(
+      "nvidia-smi",
+      ["--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+      { encoding: "utf8", timeout: 2000, stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const mibs = out
+      .split(/\r?\n/)
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    _detectedVramGB = mibs.length ? Math.round((Math.max(...mibs) / 1024) * 10) / 10 : null;
+  } catch {
+    _detectedVramGB = null; // no NVIDIA GPU / nvidia-smi absent → caller falls back
+  }
+  return _detectedVramGB;
 }
 
-function _capabilityFirst(override) {
+/**
+ * The box's VRAM budget in GB. Order: explicit env override (VRAM_BUDGET_GB) →
+ * auto-detect (nvidia-smi) → the safe 8GB fallback. Disable detection with
+ * VRAM_AUTODETECT=0 (forces the 8GB fallback — used by tests for determinism).
+ */
+function _vramBudgetGB() {
+  const v = parseFloat(process.env.VRAM_BUDGET_GB || "");
+  if (Number.isFinite(v) && v > 0) return v; // explicit override always wins
+  if (process.env.VRAM_AUTODETECT !== "0") {
+    const d = _detectVramGB();
+    if (Number.isFinite(d) && d > 0) return d;
+  }
+  return 8; // safe fallback: the 8GB box
+}
+
+/**
+ * Explicit capability-first preference from opts/env, or null if unspecified
+ * (→ selectChain defaults BY TASK: capability-gated for non-kernel, rank-order
+ * for kernel). LOCAL_CAPABILITY_FIRST=0 forces rank-order (Ouro-first research /
+ * escape mode); =1 forces capability-first everywhere.
+ */
+function _capabilityFirstPref(override) {
   if (typeof override === "boolean") return override;
-  return process.env.LOCAL_CAPABILITY_FIRST === "1";
+  if (process.env.LOCAL_CAPABILITY_FIRST === "1") return true;
+  if (process.env.LOCAL_CAPABILITY_FIRST === "0") return false;
+  return null;
 }
 
 /** Merge the JSON overlay (by id) onto the built-in defaults. TTL-cached. */
@@ -139,9 +202,10 @@ function loadRegistry() {
   return entries;
 }
 
-/** Reset the TTL cache (tests / after an operator edit). */
+/** Reset the TTL cache + memoized VRAM probe (tests / after an operator edit). */
 function _resetCache() {
   _cache = { at: 0, entries: null };
+  _detectedVramGB = undefined;
 }
 
 /** Find an entry by served name. Exact match first, then prefix (e.g. an id of
@@ -171,19 +235,26 @@ function toolCalling(modelId) {
 
 /**
  * Ordered list of local model ids eligible to LEAD this task, gated by VRAM.
- * Default order = `rank` asc (Ouro-native first). With capabilityFirst, order =
- * `capabilityScore` desc (best raw-task model that still fits the box).
+ *
+ * Default ordering is CAPABILITY-GATED for non-kernel tasks: among the models
+ * that fit the (auto-detected) box, the highest capabilityScore leads — so the
+ * frontier 27B coder leads a 24GB box and Qwen2.5-Coder-7B leads an 8GB box. The
+ * kernel stays strict rank-order (Ouro / keystone-ft). An explicit
+ * opts.capabilityFirst or LOCAL_CAPABILITY_FIRST env overrides the per-task
+ * default (=0 → rank-order / Ouro-first).
  *
  * @param {string} taskType  intent: kernel|coding|reasoning|creative|csf|default
  * @param {object} [opts]
- *   vramBudgetGB    {number}  override the box budget (default env VRAM_BUDGET_GB||8)
- *   capabilityFirst {boolean} override LOCAL_CAPABILITY_FIRST
+ *   vramBudgetGB    {number}  override the box budget (default: detected / 8GB)
+ *   capabilityFirst {boolean} override the per-task default ordering
  *   includeAll      {boolean} ignore the VRAM gate (introspection/tests)
  * @returns {string[]} model ids, best-first
  */
 function selectChain(taskType = "default", opts = {}) {
   const budget = Number.isFinite(opts.vramBudgetGB) ? opts.vramBudgetGB : _vramBudgetGB();
-  const capFirst = _capabilityFirst(opts.capabilityFirst);
+  const pref = _capabilityFirstPref(opts.capabilityFirst);
+  // No explicit preference → capability-gated for non-kernel, rank-order for kernel.
+  const capFirst = pref === null ? !STRICT_TASKS.has(taskType) : pref;
   const reg = loadRegistry();
 
   // "default"-tagged models are general fallbacks for open-ended chat — but the
@@ -220,6 +291,7 @@ module.exports = {
   selectBest,
   _resetCache,
   _vramBudgetGB,
+  _detectVramGB,
   DEFAULTS,
   REGISTRY_JSON_PATH,
 };

@@ -23,6 +23,7 @@
   ],
 
   "sources": [
+    { "name": "Keystone Studio","key": "source:embed:keystone-brainrot", "type": "embed", "url": "/brainrot.html" },
     { "name": "Keystone Arcade","key": "source:embed:t-rex",     "type": "embed", "url": "/t-rex/index.html" },
     { "name": "Internet Archive","key": "source:embed:prince-of-persia", "type": "embed", "url": "https://archive.org/details/msdos_Prince_of_Persia_1990" },
     { "name": "Internet Archive","key": "source:embed:oregon-trail",     "type": "embed", "url": "https://archive.org/details/msdos_Oregon_Trail_The_1990" },
@@ -53,6 +54,7 @@
   "topics": ["ai", "local-first", "building", "research", "world-model", "keystone", "game", "listen", "lore"],
 
   "default_priority": [
+    "source:embed:keystone-brainrot",
     "source:embed:t-rex",
     "source:embed:super-mario-world",
     "source:embed:pac-man",

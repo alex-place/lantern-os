@@ -58,6 +58,9 @@ data/metrics/three-doors-events.jsonl
 # Tool-execution logs (observability output of lib/tool-logger.js). Runtime-only.
 data/tool-logs/
 
+# Autowork per-run step logs (lib/autowork-research.js). Runtime observability only.
+data/autowork-runs/
+
 # Stray apps/data/ runtime tree. A tool-logger.js off-by-one (REPO resolved to
 # apps/ instead of the repo root) scattered runtime data here, and the
 # WIP-committing automation kept re-committing it. Canonical runtime data lives

@@ -23,7 +23,7 @@ const { promisify } = require("util");
 const execAsync = promisify(exec);
 
 const { searchRepoFiles, readFileContent } = require("./repo-context");
-const { applyPatch, validatePatch, parsePatch } = require("./patch-engine");
+const { applyPatch, validatePatch, parsePatch, looksLikeSearchReplace, parseSearchReplace } = require("./patch-engine");
 const { appendJsonlQueued } = require("./file-queue");
 
 const KEYSTONE_SYSTEM_PROMPT = `You are Keystone Code Kernel inside Lantern OS.
@@ -114,6 +114,15 @@ function targetsOf(patchText) {
       if (!block.trim().startsWith("newfile")) continue;
       const fp = block.split("\n").find((l) => l && !l.startsWith("newfile"));
       if (fp) targets.add(fp.trim());
+    }
+  }
+  // SEARCH/REPLACE edits aren't unified diffs — pull their target files so the
+  // pre-image snapshot (give-up revert) covers them too.
+  if (looksLikeSearchReplace(patchText)) {
+    try {
+      for (const b of parseSearchReplace(patchText)) if (b.file) targets.add(b.file);
+    } catch (_) {
+      /* best-effort */
     }
   }
   return [...targets];
