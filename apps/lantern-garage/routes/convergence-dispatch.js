@@ -39,6 +39,40 @@ function describeAutoworkError(err, stage) {
   return { error: `Autowork failed${at}: ${hint}`, detail: raw.slice(0, 500), stage: stage || null };
 }
 
+// Plain-language reason for a patch-apply failure — so autowork steps say WHY they
+// failed instead of just flashing a red ✗ (the user couldn't tell a valid failure
+// from a bug). Turns the applier's stats into one human-readable line.
+function humanizeApplyFailure(stats) {
+  const errs = (stats && stats.errors) || [];
+  if (!errs.length) return "the diff didn't change any files — its paths/hunks didn't match the repo (the model likely targeted the wrong file or stale line numbers).";
+  const hunk = errs.find((e) => /hunk_not_located|patch does not apply|does not exist/i.test(e.error || ""));
+  if (hunk) {
+    const m = String(hunk.error).match(/near line (\d+)/i);
+    return `the generated patch didn't match ${hunk.file}${m ? ` around line ${m[1]}` : ""} — its context lines weren't found in the real file (stale/hallucinated context).`;
+  }
+  return errs.map((e) => `${e.file}: ${e.error}`).join("; ").slice(0, 240);
+}
+
+// Line-numbered current content of the files a failed diff TARGETED, appended to the
+// retry feedback so the model anchors on real lines instead of re-hallucinating
+// context — the concrete fix for the repeating "hunk_not_located" apply failures.
+function targetedFileContext(workRoot, stats) {
+  const fs = require("fs"); const path = require("path");
+  const files = [...new Set([...(stats.changed || []), ...(stats.created || []),
+    ...((stats.errors || []).map((e) => e.file))].filter(Boolean))];
+  let out = "";
+  for (const fp of files.slice(0, 3)) {
+    try {
+      const full = path.join(workRoot, fp);
+      if (!fs.existsSync(full)) { out += `\n--- ${fp} (this file does NOT exist — do not patch it) ---\n`; continue; }
+      const numbered = fs.readFileSync(full, "utf8").split("\n").slice(0, 400)
+        .map((l, i) => `${i + 1}: ${l}`).join("\n");
+      out += `\n--- ${fp} (CURRENT content, line-numbered — copy context lines VERBATIM from here) ---\n${numbered}\n`;
+    } catch { /* skip unreadable */ }
+  }
+  return out;
+}
+
 module.exports = async (req, res, url, deps) => {
   const router = getRouter();
   const pathname = url.pathname;
@@ -758,7 +792,10 @@ module.exports = async (req, res, url, deps) => {
             feedback = { priorDiff: "", errors:
               `patch generation failed: ${genErr.message}. Output ONLY a valid unified diff `
               + `(--- a/path / +++ b/path / @@ hunks with exact context) — no prose, no fences.` };
-            step("patch", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error", { attempt, error: genErr.message });
+            step("patch", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
+              { attempt, error: genErr.message,
+                detail: `the model didn't return a valid diff (${genErr.message})`
+                  + (attempt < MAX_PATCH_ATTEMPTS ? ` — retrying (${attempt}/${MAX_PATCH_ATTEMPTS})` : " — gave up after all attempts") });
             if (attempt < MAX_PATCH_ATTEMPTS) continue;
             break;
           }
@@ -814,26 +851,40 @@ module.exports = async (req, res, url, deps) => {
                   + "\nReturn a corrected diff where every changed file parses.",
             };
             step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
-              ph.placeholder ? { placeholder: ph.signals, attempt } : { syntaxErrors, attempt });
+              ph.placeholder
+                ? { placeholder: ph.signals, attempt,
+                    detail: "the patch was placeholder scaffolding, not a real implementation"
+                      + (attempt < MAX_PATCH_ATTEMPTS ? " — asking for the actual code" : " — gave up") }
+                : { syntaxErrors, attempt,
+                    detail: `the patch left ${syntaxErrors.map((s) => s.file).join(", ")} unparseable`
+                      + (attempt < MAX_PATCH_ATTEMPTS ? " — asking for a valid fix" : " — gave up") });
             continue;
           }
 
-          // Failed — roll the tree back clean and carry the errors into the next try.
+          // Failed — roll the tree back clean and carry the errors into the next try,
+          // now WITH the real line-numbered content of the targeted files so the model
+          // copies exact context instead of re-hallucinating it.
           await new Promise((resolve) =>
             execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+          const applyDetail = humanizeApplyFailure(stats);
           feedback = {
             priorDiff: diffText,
-            errors: (stats.errors && stats.errors.length)
+            errors: ((stats.errors && stats.errors.length)
               ? stats.errors.map((e) => `${e.file}: ${e.error}`).join("\n")
-              : "the diff changed no files (paths/hunks did not match the repo)",
+              : "the diff changed no files (paths/hunks did not match the repo)")
+              + targetedFileContext(workRoot, stats),
           };
-          step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error", { stats, attempt });
+          step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
+            { stats, attempt,
+              detail: applyDetail + (attempt < MAX_PATCH_ATTEMPTS
+                ? ` Retrying with the file's real content (${attempt}/${MAX_PATCH_ATTEMPTS}).`
+                : " Gave up after all attempts.") });
         }
 
         if (!applied) {
           receipt.applied = false;
           receipt.stoppedAt = "patch_did_not_apply";
-          send("done", { ok: false, ...receipt, message: `Generated patch produced no usable code changes after ${MAX_PATCH_ATTEMPTS} attempts (hunks failed or empty). Aborted — nothing committed.` });
+          send("done", { ok: false, ...receipt, message: `Couldn't apply a working patch after ${MAX_PATCH_ATTEMPTS} attempts — ${humanizeApplyFailure(stats)} Nothing was committed.` });
           res.end();
           return;
         }
@@ -848,7 +899,13 @@ module.exports = async (req, res, url, deps) => {
         const ranTests = tests.length > 0; // #933: zero tests is NOT a pass
         const testsPassed = testResults.every((r) => r.ok);
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
-        step("tests", "done", { testResults, passed: testsPassed, ran: tests.length });
+        const _failedTest = testResults.find((r) => !r.ok) || {};
+        step("tests", "done", { testResults, passed: testsPassed, ran: tests.length,
+          detail: tests.length === 0
+            ? "no tests were specified for this change"
+            : (testsPassed
+                ? `${tests.length} test command(s) passed`
+                : `failed: ${_failedTest.command || tests[0]} — ${String(_failedTest.output || "").split("\n").filter(Boolean).slice(-1)[0] || "see output"}`.slice(0, 240)) });
 
         // Σ₀ fast-layer plasticity (#1011): record this run's test gate as an external
         // grounding event — predicted = the research-based confidence we carried into
@@ -874,8 +931,9 @@ module.exports = async (req, res, url, deps) => {
             execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
           receipt.applied = false;
           receipt.stoppedAt = "tests_failed";
-          step("rollback", "done", { reason: "tests_failed" });
-          send("done", { ok: false, ...receipt, message: "Tests failed — changes rolled back." });
+          const _tail = String(_failedTest.output || "").split("\n").filter(Boolean).slice(-3).join(" | ").slice(0, 300);
+          step("rollback", "done", { reason: "tests_failed", detail: `rolled back — ${_failedTest.command || tests[0]} failed` });
+          send("done", { ok: false, ...receipt, message: `Tests failed (${_failedTest.command || tests[0]}) — changes rolled back.${_tail ? " " + _tail : ""}` });
           res.end();
           return;
         }
