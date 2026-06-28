@@ -453,6 +453,45 @@ function taskTitle(task) {
   return (cleaned || "Autowork task").slice(0, 120);
 }
 
+// Strong markers of a placeholder / non-implementation patch — phrases a weak
+// model emits when it has no real spec (e.g. from a junk "autowork the oldest
+// issue" title) and that essentially never appear in a genuine fix. Deliberately
+// excludes lone "TODO"/"FIXME" (too common in real code) — only unambiguous
+// "I didn't actually implement this" tells.
+const PLACEHOLDER_MARKERS = [
+  /placeholder for /i,
+  /simulate(?:d|s)? (?:async )?work/i,
+  /in a real (?:scenario|implementation|app|world)/i,
+  /your (?:actual )?(?:logic|code|implementation) here/i,
+  /(?:implementation|logic|code) goes here/i,
+  /replace this (?:with|stub)/i,
+  /assuming an internal state/i,
+  /this would (?:fetch|call|do|process|handle|return)/i,
+  /\bdummy (?:data|value|function|impl)/i,
+  /not (?:yet )?implemented/i,
+  /real implementation would/i,
+];
+
+// Detect a patch that is obvious placeholder scaffolding rather than a real
+// implementation. Returns { placeholder, signals }. Conservative on purpose:
+// trips only on >=2 DISTINCT strong markers among ADDED lines, so a single
+// stray "TODO"-ish comment in an otherwise-real fix never blocks. Scans only
+// added (`+`) lines — context/removed lines are irrelevant.
+function looksLikePlaceholderPatch(diffText) {
+  const added = String(diffText || "")
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
+    .map((l) => l.slice(1));
+  const text = added.join("\n");
+  const signals = [];
+  for (const re of PLACEHOLDER_MARKERS) {
+    const m = text.match(re);
+    if (m) signals.push(m[0].trim().toLowerCase());
+  }
+  const uniq = [...new Set(signals)];
+  return { placeholder: uniq.length >= 2, signals: uniq };
+}
+
 // A task message that *references an existing issue* must NOT be filed as a new
 // one — otherwise meta-commands like "autowork the oldest issue" or "work issue
 // #1342" get filed verbatim as junk issues (#1344/#1346) and the pipeline patches
@@ -1244,6 +1283,7 @@ module.exports = {
   openDraftPr,
   createIssueFromTask,
   resolveExistingIssue,
+  looksLikePlaceholderPatch,
   taskTitle,
   runTests,
   generatePlan,

@@ -176,7 +176,7 @@ module.exports = async (req, res, url, deps) => {
         const task = typeof opts.task === "string" ? opts.task.trim() : "";
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue, looksLikePlaceholderPatch } = require("../lib/self-edit-engine");
         const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
@@ -318,8 +318,25 @@ module.exports = async (req, res, url, deps) => {
           // otherwise a hallucinated/failed patch could let unrelated data-file churn
           // be committed as the "fix".
           if (changedFiles.length > 0 && !(applyStats.errors && applyStats.errors.length > 0)) {
-            applied = true;
-            break;
+            // Verify gate (#1354): reject clean-applying-but-placeholder patches and
+            // feed the signal back into the retry loop (see the stream route for the
+            // rationale — a placeholder that passes tests would open a bad PR).
+            const ph = looksLikePlaceholderPatch(diffText);
+            if (!ph.placeholder) {
+              applied = true;
+              break;
+            }
+            await new Promise((resolve) =>
+              execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+            feedback = {
+              priorDiff: diffText,
+              errors:
+                "the patch is placeholder / non-implementation scaffolding (markers: "
+                + ph.signals.join("; ")
+                + "). Implement the ACTUAL logic the issue requires — no stubs, no "
+                + "\"placeholder\"/\"simulate\"/\"in a real scenario\" comments, no console.log-only bodies.",
+            };
+            continue;
           }
           // Failed — roll the tree back clean and carry the errors into the next try.
           await new Promise((resolve) =>
@@ -468,6 +485,7 @@ module.exports = async (req, res, url, deps) => {
       const {
         generatePlan, generatePatch, applyPatch, runTests,
         gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue,
+        looksLikePlaceholderPatch,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -736,8 +754,29 @@ module.exports = async (req, res, url, deps) => {
           // Otherwise a hallucinated/failed patch could let unrelated data-file churn
           // be committed as the "fix" (the data-file fraud pattern).
           if (changedFiles.length > 0 && !(stats.errors && stats.errors.length > 0)) {
-            applied = true;
-            break;
+            // Verify gate (#1354): a clean-applying patch can still be placeholder
+            // scaffolding (`// Placeholder for the actual logic`, "simulate async
+            // work", …) — the kind a weak model emits with no real spec. Reject it,
+            // roll back, and feed the signal into the retry loop so it implements
+            // real logic. (A placeholder that happened to pass tests would otherwise
+            // open a bad PR.)
+            const ph = looksLikePlaceholderPatch(diffText);
+            if (!ph.placeholder) {
+              applied = true;
+              break;
+            }
+            await new Promise((resolve) =>
+              execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+            feedback = {
+              priorDiff: diffText,
+              errors:
+                "the patch is placeholder / non-implementation scaffolding (markers: "
+                + ph.signals.join("; ")
+                + "). Implement the ACTUAL logic the issue requires — no stubs, no "
+                + "\"placeholder\"/\"simulate\"/\"in a real scenario\" comments, no console.log-only bodies.",
+            };
+            step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error", { placeholder: ph.signals, attempt });
+            continue;
           }
 
           // Failed — roll the tree back clean and carry the errors into the next try.

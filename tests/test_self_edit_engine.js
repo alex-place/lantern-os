@@ -16,6 +16,7 @@ const {
   requireSafePaths,
   extractJson,
   resolveExistingIssue,
+  looksLikePlaceholderPatch,
 } = require("../apps/lantern-garage/lib/self-edit-engine");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -258,6 +259,65 @@ function run() {
       resolveExistingIssue(repoRoot, "make the error banner report issues more clearly"),
       null
     );
+  });
+
+  // ── looksLikePlaceholderPatch (#1354): reject non-implementation patches ──
+  test("placeholder: flags the auto-dispatch.js scaffolding from the live report", () => {
+    // The actual hallucinated diff an autowork run produced for a junk meta-command.
+    const diff = [
+      "--- /dev/null",
+      "+++ b/apps/lantern-garage/lib/auto-dispatch.js",
+      "@@ -0,0 +1,12 @@",
+      "+let isEnabled = false; // Assuming an internal state for enabled/disabled",
+      "+async function performDispatch() {",
+      "+  // Placeholder for the actual dispatch logic",
+      "+  // Simulate async work",
+      "+  await new Promise(resolve => setTimeout(resolve, 1000));",
+      "+  // In a real scenario, this would fetch and process one issue.",
+      "+  console.log('Performing auto-dispatch...');",
+      "+}",
+    ].join("\n");
+    const r = looksLikePlaceholderPatch(diff);
+    assert.strictEqual(r.placeholder, true);
+    assert.ok(r.signals.length >= 2, `expected >=2 markers, got ${r.signals.length}`);
+  });
+
+  test("placeholder: a single stray marker does NOT trip (false-positive guard)", () => {
+    const diff = [
+      "--- a/lib/x.js",
+      "+++ b/lib/x.js",
+      "@@ -1,1 +1,2 @@",
+      " function x(a, b) {",
+      "+  return a + b; // replace this with a real reducer later",
+      " }",
+    ].join("\n");
+    assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
+  });
+
+  test("placeholder: a genuine implementation is not flagged", () => {
+    const diff = [
+      "--- a/lib/sum.js",
+      "+++ b/lib/sum.js",
+      "@@ -0,0 +1,4 @@",
+      "+function sum(nums) {",
+      "+  return nums.reduce((acc, n) => acc + n, 0);",
+      "+}",
+      "+module.exports = { sum };",
+    ].join("\n");
+    assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
+  });
+
+  test("placeholder: only ADDED lines count, not context/removed", () => {
+    // Markers that already exist in the file (context lines) must not trip it.
+    const diff = [
+      "--- a/lib/y.js",
+      "+++ b/lib/y.js",
+      "@@ -1,3 +1,3 @@",
+      "   // Placeholder for the actual logic",
+      "-  // in a real scenario this would fetch",
+      "+  return realImplementation();",
+    ].join("\n");
+    assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
   });
 
   // ── Summary ───────────────────────────────────────────────────────────
