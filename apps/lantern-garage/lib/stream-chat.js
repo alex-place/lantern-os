@@ -424,6 +424,9 @@ async function handleStreamChat(req, url, res) {
               landedBy, verified, escalated: escalations.length > 0,
               provider: used.provider, model: used.model, repoRoot,
             });
+            if (distillationRow) {
+              sendToken(`\n✨ Distillation pair captured for future training.\n`);
+            }
           } catch (_e) { /* logging must never break the stream */ }
           sendDone("keystone", {
             agent: "Keystone", provider: used.provider, model: used.model, rolloverMode,
