@@ -125,10 +125,23 @@
   .fs-body .zone-ladder{position:absolute;inset:0;height:auto;margin:0}
   .fs-header .order-ticket{padding:0;gap:6px}
   .fs-header .order-ticket button{flex:0 0 auto;min-width:56px}
-  /* Order ticket modal */
-  .ot-bg{position:fixed;inset:0;background:rgba(5,6,8,.85);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px}
+  /* Order ticket — right-docked panel (not a screen-locking modal). The
+     container sits under the header on the right edge and is click-through
+     (pointer-events:none) so the rest of the terminal stays interactive while
+     the ticket is open; only the panel itself captures input. */
+  .ot-bg{position:fixed;top:52px;right:0;bottom:0;z-index:1100;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
   .ot-bg.hidden{display:none}
-  .ot-modal{background:var(--bg1);border:1px solid var(--border);border-radius:6px;width:100%;max-width:340px;font-family:var(--mono)}
+  .ot-modal{pointer-events:auto;background:var(--bg1);border-left:1px solid var(--border);
+    width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
+    box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
+  @keyframes otSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  /* While the ticket is docked, give the chart area room on the right so the
+     panel never overlaps the cards / fullscreen chart — the grid reflows into
+     the narrower space (TradingView-style). */
+  .main,.footer{transition:margin-right .18s ease}
+  body.ot-open .main,body.ot-open .footer{margin-right:340px}
+  body.ot-open .fs-bg{padding-right:340px}
+  @media (max-width:760px){ body.ot-open .main,body.ot-open .footer{margin-right:0} .ot-modal{max-width:100vw} }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
   .ot-close{cursor:pointer;font-size:11px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
@@ -521,16 +534,106 @@ function zlLine(topPct, color, label, textColor){
     background:rgba(10,12,15,.8);padding:1px 3px;border-radius:2px;white-space:nowrap;">${label}</div>`;
 }
 
-// Format a bar timestamp ("2026-06-12 19:55:00+00:00") for the time axis.
-// `multiDay` (true when the visible bars span more than one calendar day,
-// e.g. a 5m chart whose 100 bars stretch across two trading sessions)
-// prefixes the date so labels don't look identical to a same-day timeframe.
-function formatBarTime(ts, tf, multiDay){
-  const d = new Date(String(ts).replace(' ','T'));
-  if(isNaN(d.getTime())) return '';
-  if(tf==='1d' || tf==='4h') return (d.getMonth()+1)+'/'+d.getDate();
-  if(multiDay) return (d.getMonth()+1)+'/'+d.getDate()+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
-  return d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+// ── Axis tick helpers ────────────────────────────────────────────────────────
+// Price axis: "nice number" ticks (1/2/2.5/5 ×10ⁿ steps) so gridlines land on
+// round values, with the tick count scaled to the plot height (zooming the
+// price scale in shrinks the range → finer step → more, smaller-increment
+// gridlines, instead of just relabelling four fixed lines).
+function niceTicks(min, max, targetCount){
+  const range = max - min;
+  if(!(range > 0) || !isFinite(range)) return { ticks:[min], step: Math.abs(min)||1 };
+  const rawStep = range / Math.max(1, targetCount);
+  const mag  = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  const ticks = [];
+  for(let v = Math.ceil(min/step)*step; v <= max + step*1e-6; v += step) ticks.push(v);
+  return { ticks, step };
+}
+// Decimals needed to render `step` exactly (2.5→1, 0.25→2, 5→0), capped at 6.
+function decimalsFor(step){
+  if(!isFinite(step) || step <= 0) return 2;
+  let d = 0, s = step;
+  while(d < 6 && Math.abs(Math.round(s) - s) > 1e-9){ s *= 10; d++; }
+  return d;
+}
+
+// Time axis: tick at the FIRST visible bar of each new time bucket (hour, day,
+// month, …). Bucketing-by-bar (rather than by wall-clock) keeps labels on real
+// bars and skips overnight/weekend gaps cleanly, and the bucket granularity is
+// chosen so the number of labels fits the available width — so labels are real
+// round times appropriate to the timeframe, never arbitrary fractions of the
+// range. Returns [{ idx, label }].
+const _dayNum = d => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+const TIME_LEVELS = [
+  { id:'m1',   key:d=>Math.floor(d.getTime()/6e4),    kind:'time' },
+  { id:'m5',   key:d=>Math.floor(d.getTime()/3e5),    kind:'time' },
+  { id:'m15',  key:d=>Math.floor(d.getTime()/9e5),    kind:'time' },
+  { id:'m30',  key:d=>Math.floor(d.getTime()/1.8e6),  kind:'time' },
+  { id:'h1',   key:d=>Math.floor(d.getTime()/3.6e6),  kind:'time' },
+  { id:'h2',   key:d=>Math.floor(d.getTime()/7.2e6),  kind:'time' },
+  { id:'h4',   key:d=>Math.floor(d.getTime()/1.44e7), kind:'time' },
+  { id:'day',  key:d=>_dayNum(d),                      kind:'day'  },
+  { id:'week', key:d=>Math.floor(_dayNum(d)/7),        kind:'day'  },
+  { id:'month',key:d=>d.getFullYear()*12+d.getMonth(), kind:'month'},
+  { id:'year', key:d=>d.getFullYear(),                 kind:'year' },
+];
+const _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function _fmtTick(d, kind, showDate){
+  if(kind === 'year')  return String(d.getFullYear());
+  if(kind === 'month') return _MONTHS[d.getMonth()] + (d.getMonth()===0 ? " '"+String(d.getFullYear()).slice(2) : '');
+  if(kind === 'day')   return (d.getMonth()+1)+'/'+d.getDate();
+  const hhmm = d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
+  return showDate ? (d.getMonth()+1)+'/'+d.getDate()+' '+hhmm : hhmm;
+}
+function timeAxisTicks(bars, maxTicks){
+  const n = bars.length;
+  if(n < 2) return [];
+  const dates = bars.map(b => new Date(String(b.timestamp).replace(' ','T')));
+  if(dates.some(d => isNaN(d.getTime()))) return [];
+  // Pick the finest bucket level whose label count fits the width.
+  let level = TIME_LEVELS[TIME_LEVELS.length-1];
+  for(const lv of TIME_LEVELS){
+    let count = 1;
+    for(let i=1;i<n;i++) if(lv.key(dates[i]) !== lv.key(dates[i-1])) count++;
+    if(count <= maxTicks){ level = lv; break; }
+  }
+  // One tick at the first bar that ENTERS each new bucket — i.e. a real boundary
+  // (top of the hour/day/…). The leftmost visible bar is NOT force-labelled
+  // unless it happens to start a bucket, so panning/zooming never produces a
+  // ragged mid-bucket time like "11:25". Prefix the date when the day rolls over.
+  const ticks = [];
+  let prevKey = level.key(dates[0]);
+  let prevDay = _dayNum(dates[0]);
+  for(let i=1;i<n;i++){
+    const k = level.key(dates[i]);
+    const day = _dayNum(dates[i]);
+    const dayRolled = level.kind === 'time' && day !== prevDay;
+    prevDay = day;
+    // For intraday levels, the first bar of a session (e.g. 09:30) is a bucket
+    // boundary but NOT a round clock time — label it with the DATE only, like
+    // TradingView, instead of a ragged "09:30". Round in-day boundaries (10:00,
+    // 11:00, …) get a plain time.
+    if(dayRolled){
+      prevKey = k;
+      ticks.push({ idx:i, label:_fmtTick(dates[i], 'day', false) });
+    } else if(k !== prevKey){
+      prevKey = k;
+      ticks.push({ idx:i, label:_fmtTick(dates[i], level.kind, false) });
+    }
+  }
+  // Guard against an empty axis if the window sits entirely inside one bucket.
+  if(ticks.length === 0){
+    ticks.push({ idx:n-1, label:_fmtTick(dates[n-1], level.kind==='time'?'day':level.kind, false) });
+  }
+  // Thin if a level still overshoots (keeps first/last, evenly spaced).
+  if(ticks.length > maxTicks){
+    const keep = [], stride = Math.ceil(ticks.length / maxTicks);
+    for(let i=0;i<ticks.length;i+=stride) keep.push(ticks[i]);
+    if(keep[keep.length-1] !== ticks[ticks.length-1]) keep.push(ticks[ticks.length-1]);
+    return keep;
+  }
+  return ticks;
 }
 
 // ── Candlestick / line chart renderer ────────────────────────────────────────
@@ -553,12 +656,19 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*ph;
 
-  // Price axis: faint gridlines across the plot + labels in the right gutter
+  // Price axis: nice-number gridlines across the plot + labels in the right
+  // gutter. Tick count scales with plot height (~one per 38px) so even the small
+  // cards get 3-5 gridlines, and the fullscreen / price-zoomed chart get more —
+  // the count naturally grows/shrinks as the price scale is zoomed. Labels show
+  // at least cents (2 dp), e.g. 380.50 / 381.00, and more decimals only when the
+  // step is sub-cent.
   ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
-  const PRICE_TICKS = 4;
-  for(let i=0;i<=PRICE_TICKS;i++){
-    const price = rMin + rng*i/PRICE_TICKS;
+  const priceTargetTicks = Math.max(4, Math.min(16, Math.round(ph / 30)));
+  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, priceTargetTicks);
+  const priceDec = Math.max(2, decimalsFor(priceStep));
+  for(const price of priceTicks){
+    if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
     ctx.strokeStyle = CHART_GRID_COLOR;
     ctx.beginPath();
@@ -567,32 +677,48 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.stroke();
     ctx.fillStyle = CHART_AXIS_COLOR;
     ctx.textAlign = 'left';
-    ctx.textBaseline = i===0 ? 'top' : (i===PRICE_TICKS ? 'bottom' : 'middle');
-    ctx.fillText(fmt(price, price>=100?2:4), pw+4, yy);
+    const edge = yy < 8 ? 'top' : (yy > ph-8 ? 'bottom' : 'middle');
+    ctx.textBaseline = edge;
+    ctx.fillText(fmt(price, priceDec), pw+4, yy);
   }
 
   if(bars && bars.length >= 2){
     const n = bars.length, slotW = pw/n;
 
-    // Time axis: a few evenly-spaced bar timestamps along the bottom. The
-    // first/last ticks are edge-aligned (left/right) instead of centered so
-    // their labels stay within the plot area and never bleed into the price
-    // gutter on the right or get clipped on the left.
+    // Time axis: ticks at the first bar of each round time bucket (hour/day/…),
+    // with the bucket granularity chosen to fit the width (~one label per 84px).
+    // Labels are real clock times/dates for the active timeframe, edge-clamped
+    // so the first/last never bleed into the gutter or get clipped, plus a faint
+    // vertical gridline per tick.
     ctx.fillStyle = CHART_AXIS_COLOR;
     ctx.textBaseline = 'bottom';
-    const TIME_TICKS = 4;
-    const firstD = new Date(String(bars[0].timestamp).replace(' ','T'));
-    const lastD  = new Date(String(bars[n-1].timestamp).replace(' ','T'));
-    const multiDay = !isNaN(firstD.getTime()) && !isNaN(lastD.getTime()) && firstD.toDateString() !== lastD.toDateString();
-    for(let i=0;i<=TIME_TICKS;i++){
-      const idx = Math.min(n-1, Math.round(i*(n-1)/TIME_TICKS));
-      const label = formatBarTime(bars[idx].timestamp, timeframe, multiDay);
-      if(!label) continue;
-      if(i===0){ ctx.textAlign='left'; ctx.fillText(label, 2, h-2); }
-      else if(i===TIME_TICKS){ ctx.textAlign='right'; ctx.fillText(label, pw-2, h-2); }
-      else { ctx.textAlign='center'; ctx.fillText(label, idx*slotW + slotW/2, h-2); }
+    const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 84)));
+    const timeTicks = timeAxisTicks(bars, timeMaxTicks);
+    let lastLabelX = -1e9;
+    const MIN_LABEL_GAP = 52;   // px — keep labels (e.g. a date + the next hour) from colliding
+    for(const t of timeTicks){
+      if(!t.label) continue;
+      const cx = t.idx*slotW + slotW/2;
+      if(cx - lastLabelX < MIN_LABEL_GAP) continue;
+      lastLabelX = cx;
+      ctx.strokeStyle = CHART_GRID_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(Math.round(cx)+0.5, 0);
+      ctx.lineTo(Math.round(cx)+0.5, ph);
+      ctx.stroke();
+      let tx = cx, align = 'center';
+      if(cx < 24){ tx = 2; align = 'left'; }
+      else if(cx > pw-24){ tx = pw-2; align = 'right'; }
+      ctx.textAlign = align;
+      ctx.fillText(t.label, tx, h-2);
     }
 
+    // Clip price series to the plot box so a zoomed-in price scale can push
+    // bars past the top/bottom without painting over the axes.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, pw, ph);
+    ctx.clip();
     if(type==='candle'){
       for(let i=0;i<n;i++){
         const b = bars[i];
@@ -629,6 +755,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       ctx.lineWidth = 1.3;
       ctx.stroke();
     }
+    ctx.restore();
   }
 }
 
@@ -690,39 +817,54 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   const zones = (d.zones||[]).slice(0,12);
   const view  = getChartView(viewKey);
 
-  // Horizontal zoom/pan: slice to the visible bar window. visibleBars===null
-  // means "show everything" (the default, auto-fit view).
-  let viewBars = bars;
-  if(bars.length > 0 && view.visibleBars != null){
-    const vb = Math.max(MIN_VISIBLE_BARS, Math.min(view.visibleBars, bars.length));
-    const maxOffset = Math.max(0, bars.length - vb);
-    const offset = Math.min(Math.max(0, view.barOffset||0), maxOffset);
-    view.visibleBars = vb;
-    view.barOffset   = offset;
-    viewBars = bars.slice(bars.length-offset-vb, bars.length-offset);
+  // Default visible window: the backend now ships deep history (up to 500 bars)
+  // for zoom/pan, but showing all of it at once makes a card unreadable and
+  // candles sub-pixel. So on first render seed a modest window — wider for the
+  // fullscreen chart ("zoomed-in version"), tighter for the small cards — that
+  // the user can still zoom out to reveal the full history.
+  if(bars.length > 0 && view.visibleBars == null){
+    const isFs = viewKey === 'overlay-fs';
+    view.visibleBars = Math.min(bars.length, isFs ? 180 : 70);
+    view.barOffset = 0;
   }
 
-  // Determine display range — a manual yMin/yMax (from vertical zoom/pan)
-  // takes over completely; otherwise auto-fit to price/zones/visible bars.
+  // Horizontal zoom/pan: slice to the visible bar window. visibleBars/barOffset
+  // are kept as floats while zooming (so small wheel/drag deltas accumulate
+  // smoothly) and only rounded to whole bars here at slice time.
+  let viewBars = bars;
+  if(bars.length > 0 && view.visibleBars != null){
+    const vbF = Math.max(MIN_VISIBLE_BARS, Math.min(view.visibleBars, bars.length));
+    const maxOffset = Math.max(0, bars.length - vbF);
+    const offF = Math.min(Math.max(0, view.barOffset||0), maxOffset);
+    view.visibleBars = vbF;
+    view.barOffset   = offF;
+    const vb  = Math.round(vbF);
+    const off = Math.round(offF);
+    const end = Math.max(vb, bars.length - off);
+    viewBars = bars.slice(Math.max(0, end - vb), end);
+  }
+
+  // Determine display range — a manual yMin/yMax (from price-axis zoom/pan)
+  // takes over completely; otherwise auto-FIT tightly to the visible bars, like
+  // TradingView. Fitting to the visible high/low (not currentPrice ± 3%) keeps
+  // candles filling the pane and makes the price axis step down to cents as you
+  // zoom into a narrower price range, instead of being stuck on coarse 0.5s.
   let rMin, rMax;
   if(view.yMin != null && view.yMax != null){
     rMin = view.yMin; rMax = view.yMax;
   } else {
-    rMin = currentPrice * 0.97; rMax = currentPrice * 1.03;
-    if(pos){
-      if(pos.stop)  { rMin=Math.min(rMin,pos.stop*0.998);  rMax=Math.max(rMax,pos.stop*1.002);  }
-      if(pos.tp)    { rMin=Math.min(rMin,pos.tp*0.998);    rMax=Math.max(rMax,pos.tp*1.002);    }
-      if(pos.entry) { rMin=Math.min(rMin,pos.entry*0.998); rMax=Math.max(rMax,pos.entry*1.002); }
+    let lo = Infinity, hi = -Infinity;
+    for(const b of viewBars){ if(b.low < lo) lo = b.low; if(b.high > hi) hi = b.high; }
+    // Always keep the live price in view; include entry so an open trade's
+    // basis is visible. (Stop/TP/zones are clamped to the edges in the overlay
+    // rather than allowed to blow the range out — matches TradingView.)
+    if(currentPrice > 0){ lo = Math.min(lo, currentPrice); hi = Math.max(hi, currentPrice); }
+    if(pos && pos.entry){ lo = Math.min(lo, pos.entry); hi = Math.max(hi, pos.entry); }
+    if(!isFinite(lo) || !isFinite(hi) || hi <= lo){
+      const c = currentPrice || hi || 1; lo = c * 0.999; hi = c * 1.001;
     }
-    // Expand to include nearby zones
-    for(const z of zones){
-      if(z.mid){ if(z.mid>rMax*0.998) rMax=z.mid*1.002; if(z.mid<rMin*1.002) rMin=z.mid*0.998; }
-    }
-    // Expand to include the visible chart range
-    for(const b of viewBars){
-      if(b.high>rMax) rMax=b.high*1.002;
-      if(b.low <rMin) rMin=b.low *0.998;
-    }
+    const pad = (hi - lo) * 0.08 || hi * 0.001;   // breathing room top/bottom
+    rMin = lo - pad; rMax = hi + pad;
   }
   const rng = rMax - rMin; if(rng<=0) return;
   view.lastRMin = rMin; view.lastRMax = rMax;
@@ -946,12 +1088,17 @@ function openOrderTicket(ticker, side){
   });
 
   document.getElementById('otBg').classList.remove('hidden');
+  document.body.classList.add('ot-open');
   renderOrderTicket();
+  // The chart area just got narrower — re-fit visible charts to the new width.
+  requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 
 function closeOrderTicket(){
   document.getElementById('otBg').classList.add('hidden');
+  document.body.classList.remove('ot-open');
   otTicker = null;
+  requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 
 function setOtSide(side){
@@ -1147,9 +1294,64 @@ function _ladderTarget(ladderEl){
   return { dataTicker, viewKey: overlay.id, canvas };
 }
 
-// Wheel over the right price gutter zooms the price (vertical) scale; wheel
-// anywhere else over the chart zooms the time (horizontal) scale. Both keep
-// the value under the cursor fixed in place.
+// ── Smooth zoom (centered, animated, TradingView-style) ──────────────────────
+// Zoom works on GOAL values (gVis/gOff for the time window, gYMin/gYMax for the
+// price range); a per-chart rAF loop eases the LIVE values toward those goals,
+// so a discrete wheel notch glides instead of snapping. All zoom is centered on
+// the window (not the cursor). factor>1 → zoom out, <1 → zoom in.
+function zoomTimeGoal(view, n, factor){
+  if(n < 2) return;
+  const curVis = view.gVis != null ? view.gVis : (view.visibleBars || n);
+  const curOff = view.gOff != null ? view.gOff : (view.barOffset || 0);
+  const center = (n - curOff - curVis) + curVis/2;          // centered
+  const nv = Math.max(MIN_VISIBLE_BARS, Math.min(n, curVis*factor));
+  const ns = Math.max(0, Math.min(n-nv, center - nv/2));
+  view.gVis = nv;
+  view.gOff = Math.max(0, n - nv - ns);
+}
+function zoomPriceGoal(view, factor){
+  if(view.lastRMin == null || view.lastRMax == null) return;
+  if(view.yMin == null){ view.yMin = view.lastRMin; view.yMax = view.lastRMax; } // start from current auto-fit
+  const min = view.gYMin != null ? view.gYMin : view.yMin;
+  const max = view.gYMax != null ? view.gYMax : view.yMax;
+  const mid = (min + max) / 2;
+  const rng = Math.max(0.02, (max - min) * factor);          // floor 2¢ → cents reachable
+  view.gYMin = mid - rng/2;
+  view.gYMax = mid + rng/2;
+}
+// One easing step toward the goals; re-schedules itself until it arrives.
+function zoomTick(viewKey, dataTicker){
+  const v = getChartView(viewKey); if(!v){ return; }
+  v._raf = null;
+  const k = 0.32; let done = true;
+  if(v.gVis != null){
+    v.visibleBars = (v.visibleBars==null?v.gVis:v.visibleBars) + (v.gVis-(v.visibleBars==null?v.gVis:v.visibleBars))*k;
+    if(Math.abs(v.gVis - v.visibleBars) > 0.4) done = false; else v.visibleBars = v.gVis;
+  }
+  if(v.gOff != null){
+    const cur = v.barOffset || 0;
+    v.barOffset = cur + (v.gOff - cur)*k;
+    if(Math.abs(v.gOff - v.barOffset) > 0.4) done = false; else v.barOffset = v.gOff;
+  }
+  if(v.gYMin != null){
+    v.yMin += (v.gYMin - v.yMin)*k;
+    v.yMax += (v.gYMax - v.yMax)*k;
+    const tol = Math.max(0.0005, (v.gYMax - v.gYMin)*0.004);
+    if(Math.abs(v.gYMax - v.yMax) > tol || Math.abs(v.gYMin - v.yMin) > tol) done = false;
+    else { v.yMin = v.gYMin; v.yMax = v.gYMax; }
+  }
+  renderTicker(dataTicker);
+  if(!done) v._raf = requestAnimationFrame(()=>zoomTick(viewKey, dataTicker));
+}
+function kickZoom(viewKey, dataTicker){
+  const v = getChartView(viewKey);
+  if(v._raf) return;                  // a loop is already running; it'll chase the updated goal
+  zoomTick(viewKey, dataTicker);      // immediate first step, then it self-schedules
+}
+
+// Wheel over the right price gutter zooms the price scale; wheel anywhere else
+// zooms the time scale. The factor is exponential in the scroll delta and the
+// result is eased in, so it feels smooth on both a wheel and a trackpad.
 document.addEventListener('wheel', function(e){
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
@@ -1163,47 +1365,18 @@ document.addEventListener('wheel', function(e){
   e.preventDefault();
 
   const view = getChartView(viewKey);
-  const factor = e.deltaY < 0 ? 0.85 : 1/0.85; // scroll up = zoom in
-
-  if(x >= w-AXIS_W){
-    // Vertical zoom on the price axis — taller/shorter candles
-    const ph = h-AXIS_H;
-    if(ph<=0 || view.lastRMin==null || view.lastRMax==null) return;
-    const rng = view.lastRMax - view.lastRMin;
-    const yFrac = Math.max(0,Math.min(1,y/ph));
-    const priceAtCursor = view.lastRMax - yFrac*rng;
-    const currentPrice = getCurrentPrice(dataTicker) || priceAtCursor;
-    const minRng = Math.max(currentPrice*0.001, 0.01);
-    const maxRng = Math.max(currentPrice*2, minRng*10);
-    const newRng = Math.max(minRng, Math.min(maxRng, rng*factor));
-    const newMax = priceAtCursor + yFrac*newRng;
-    view.yMin = newMax - newRng;
-    view.yMax = newMax;
-  } else {
-    // Horizontal zoom on the time axis (or main plot area) — wider/thinner
-    // candles, showing fewer/more bars of price history
-    const bars = barsData[dataTicker] || [];
-    const pw = w-AXIS_W;
-    const n = bars.length;
-    if(n < 2 || pw<=0) return;
-    const oldVisible = Math.min(n, view.visibleBars || n);
-    const oldOffset  = Math.min(Math.max(0, view.barOffset||0), n-oldVisible);
-    const xFrac = Math.max(0,Math.min(1,x/pw));
-    const oldStart  = n - oldOffset - oldVisible;
-    const cursorIdx = oldStart + xFrac*oldVisible;
-
-    const newVisible = Math.max(MIN_VISIBLE_BARS, Math.min(n, Math.round(oldVisible*factor)));
-    const newStart = Math.max(0, Math.min(n-newVisible, cursorIdx - xFrac*newVisible));
-
-    view.visibleBars = newVisible;
-    view.barOffset   = n - newVisible - newStart;
-  }
-
-  renderTicker(dataTicker);
+  const factor = Math.exp(e.deltaY * 0.0012);   // deltaY>0 (down) → zoom out
+  if(x >= w-AXIS_W) zoomPriceGoal(view, factor);
+  else              zoomTimeGoal(view, (barsData[dataTicker]||[]).length, factor);
+  kickZoom(viewKey, dataTicker);
 }, {passive:false});
 
-// Drag inside the plot area pans the view: horizontally across bars (once
-// horizontally zoomed) and vertically across the price range.
+// Drag behaviour, TradingView-style:
+//   • drag the price gutter (right)  → zoom the price scale (vertical)
+//   • drag the time strip (bottom)   → zoom the time scale (horizontal)
+//   • drag the plot body             → pan across bars and price
+// Zoom drags apply an exponential factor to the pixels moved since the last
+// mousemove, so they're smooth and direction-intuitive (drag up / right = in).
 let _chartDrag = null;
 document.addEventListener('mousedown', function(e){
   if(e.button !== 0) return;
@@ -1215,20 +1388,30 @@ document.addEventListener('mousedown', function(e){
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX-rect.left, y = e.clientY-rect.top;
   const w = rect.width, h = rect.height;
-  if(x<0||x>w||y<0||y>h || x>=w-AXIS_W || y>=h-AXIS_H) return; // axes handle zoom/reset, not pan
+  if(x<0||x>w||y<0||y>h) return;
 
   const view = getChartView(viewKey);
+  // A drag tracks the mouse directly, so stop any in-flight zoom easing and pin
+  // the goals to the current live values.
+  if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+  view.gVis = view.visibleBars; view.gOff = view.barOffset;
+  view.gYMin = view.yMin; view.gYMax = view.yMax;
   const bars = barsData[dataTicker] || [];
+  let mode = 'pan';
+  if(x >= w-AXIS_W) mode = 'zoomY';
+  else if(y >= h-AXIS_H) mode = 'zoomX';
+
   const visibleBars = Math.min(bars.length, view.visibleBars || bars.length) || 1;
   _chartDrag = {
-    ladder, dataTicker, viewKey,
+    ladder, dataTicker, viewKey, mode,
+    lastX: e.clientX, lastY: e.clientY,
     startX: e.clientX, startY: e.clientY,
     pw: w-AXIS_W, ph: h-AXIS_H,
     n: bars.length, visibleBars,
     startOffset: Math.min(Math.max(0,view.barOffset||0), Math.max(0,bars.length-visibleBars)),
     startYMin: view.lastRMin, startYMax: view.lastRMax
   };
-  ladder.style.cursor = 'grabbing';
+  ladder.style.cursor = mode==='zoomY' ? 'ns-resize' : mode==='zoomX' ? 'ew-resize' : 'grabbing';
   e.preventDefault();
 });
 
@@ -1236,20 +1419,34 @@ document.addEventListener('mousemove', function(e){
   if(_chartDrag){
     const drag = _chartDrag;
     const view = getChartView(drag.viewKey);
-    const dx = e.clientX-drag.startX, dy = e.clientY-drag.startY;
 
-    if(drag.n > drag.visibleBars && drag.pw>0){
-      const slotW = drag.pw/drag.visibleBars;
-      const maxOffset = drag.n-drag.visibleBars;
-      view.visibleBars = drag.visibleBars;
-      view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + Math.round(dx/slotW)));
+    if(drag.mode === 'zoomY'){
+      const dy = e.clientY - drag.lastY;            // down → zoom out
+      zoomPriceGoal(view, Math.exp(dy * 0.006));
+      view.yMin = view.gYMin; view.yMax = view.gYMax;   // immediate, tracks the mouse
+    } else if(drag.mode === 'zoomX'){
+      const dx = e.clientX - drag.lastX;            // right → zoom in
+      zoomTimeGoal(view, drag.n, Math.exp(-dx * 0.006));
+      view.visibleBars = view.gVis; view.barOffset = view.gOff;
+    } else {
+      // Pan: horizontally across bars, vertically across the price range.
+      const dx = e.clientX-drag.startX, dy = e.clientY-drag.startY;
+      if(drag.n > drag.visibleBars && drag.pw>0){
+        const slotW = drag.pw/drag.visibleBars;
+        const maxOffset = drag.n-drag.visibleBars;
+        view.visibleBars = drag.visibleBars;
+        view.barOffset = Math.max(0, Math.min(maxOffset, drag.startOffset + dx/slotW));
+        view.gVis = view.visibleBars; view.gOff = view.barOffset;
+      }
+      if(drag.startYMin!=null && drag.startYMax!=null && drag.ph>0){
+        const rng = drag.startYMax-drag.startYMin;
+        const delta = (dy/drag.ph)*rng;
+        view.yMin = drag.startYMin + delta;
+        view.yMax = drag.startYMax + delta;
+        view.gYMin = view.yMin; view.gYMax = view.yMax;
+      }
     }
-    if(drag.startYMin!=null && drag.startYMax!=null && drag.ph>0){
-      const rng = drag.startYMax-drag.startYMin;
-      const delta = (dy/drag.ph)*rng;
-      view.yMin = drag.startYMin + delta;
-      view.yMax = drag.startYMax + delta;
-    }
+    drag.lastX = e.clientX; drag.lastY = e.clientY;
     renderTicker(drag.dataTicker);
     return;
   }
@@ -1272,8 +1469,7 @@ document.addEventListener('mouseup', function(){
   _chartDrag = null;
 });
 
-// Double-click the bottom time-axis strip resets zoom/pan to the default
-// auto-fit view.
+// Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
 document.addEventListener('dblclick', function(e){
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
@@ -1281,10 +1477,15 @@ document.addEventListener('dblclick', function(e){
   if(!target) return;
   const { dataTicker, viewKey, canvas } = target;
   const rect = canvas.getBoundingClientRect();
-  const y = e.clientY-rect.top, h = rect.height;
-  if(y < 0 || y > h || y < h-AXIS_H) return;
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
   e.preventDefault();
-  delete chartView[viewKey];
+  const view = chartView[viewKey];
+  if(view){
+    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+    view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
+    view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+  }
   renderTicker(dataTicker);
 });
 

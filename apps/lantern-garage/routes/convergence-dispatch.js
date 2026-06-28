@@ -176,7 +176,7 @@ module.exports = async (req, res, url, deps) => {
         const task = typeof opts.task === "string" ? opts.task.trim() : "";
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue, looksLikePlaceholderPatch, patchSyntaxErrors } = require("../lib/self-edit-engine");
         const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
@@ -187,12 +187,20 @@ module.exports = async (req, res, url, deps) => {
         // issue number → file a real GitHub issue first, then work it like an
         // `!work #N` run. Keeps every PR issue-linked.
         if (!issueNumber && task) {
-          try {
-            const created = createIssueFromTask(REPO_ROOT, task);
-            issueNumber = created.number;
-          } catch (e) {
-            sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
-            return;
+          // A meta-command that references an existing issue ("autowork the oldest
+          // issue", "work issue #1342") must target that issue, not be filed as a
+          // new one. Resolve first; only file a fresh issue for novel requests.
+          const existing = resolveExistingIssue(REPO_ROOT, task);
+          if (existing) {
+            issueNumber = existing;
+          } else {
+            try {
+              const created = createIssueFromTask(REPO_ROOT, task);
+              issueNumber = created.number;
+            } catch (e) {
+              sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
+              return;
+            }
           }
         }
 
@@ -310,8 +318,31 @@ module.exports = async (req, res, url, deps) => {
           // otherwise a hallucinated/failed patch could let unrelated data-file churn
           // be committed as the "fix".
           if (changedFiles.length > 0 && !(applyStats.errors && applyStats.errors.length > 0)) {
-            applied = true;
-            break;
+            // Verify gate (#1354 placeholder, #1359 syntax): a clean-applying patch can
+            // still be (a) placeholder scaffolding or (b) syntactically broken in a file
+            // the planned tests never load (e.g. a browser script). Reject either, roll
+            // back, and feed the signal into the retry loop — a bad patch that "passes"
+            // tests only because nothing exercised it would otherwise open a broken PR.
+            const ph = looksLikePlaceholderPatch(diffText);
+            const syntaxErrors = ph.placeholder ? [] : patchSyntaxErrors(changedFiles, workRoot);
+            if (!ph.placeholder && syntaxErrors.length === 0) {
+              applied = true;
+              break;
+            }
+            await new Promise((resolve) =>
+              execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+            feedback = {
+              priorDiff: diffText,
+              errors: ph.placeholder
+                ? "the patch is placeholder / non-implementation scaffolding (markers: "
+                  + ph.signals.join("; ")
+                  + "). Implement the ACTUAL logic the issue requires — no stubs, no "
+                  + "\"placeholder\"/\"simulate\"/\"in a real scenario\" comments, no console.log-only bodies."
+                : "the patch leaves files unparseable and must not be committed:\n"
+                  + syntaxErrors.map((s) => `${s.file}: ${s.error}`).join("\n")
+                  + "\nReturn a corrected diff where every changed file parses.",
+            };
+            continue;
           }
           // Failed — roll the tree back clean and carry the errors into the next try.
           await new Promise((resolve) =>
@@ -459,7 +490,8 @@ module.exports = async (req, res, url, deps) => {
       const GH_REPO = "alex-place/lantern-os";
       const {
         generatePlan, generatePatch, applyPatch, runTests,
-        gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask,
+        gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue,
+        looksLikePlaceholderPatch, patchSyntaxErrors,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -490,16 +522,26 @@ module.exports = async (req, res, url, deps) => {
         // issue-linked (every PR references a tracked issue), so file the task as
         // a GitHub issue first, then work it exactly like an `!work #N` run.
         if (!issueNumber && task) {
-          step("create_issue", "start");
-          try {
-            const created = createIssueFromTask(REPO_ROOT, task);
-            issueNumber = created.number;
-            step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
-          } catch (e) {
-            step("create_issue", "error", { error: String(e && e.message || e) });
-            send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
-            res.end();
-            return;
+          // A meta-command that references an existing issue ("autowork the oldest
+          // issue", "work issue #1342") must target that issue, not be filed as a
+          // new one (which produced junk issues #1344/#1346). Resolve first; only
+          // file a fresh issue for genuinely novel coding requests.
+          const existing = resolveExistingIssue(REPO_ROOT, task);
+          if (existing) {
+            issueNumber = existing;
+            step("create_issue", "done", { issue: issueNumber, resolved: true });
+          } else {
+            step("create_issue", "start");
+            try {
+              const created = createIssueFromTask(REPO_ROOT, task);
+              issueNumber = created.number;
+              step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
+            } catch (e) {
+              step("create_issue", "error", { error: String(e && e.message || e) });
+              send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
+              res.end();
+              return;
+            }
           }
         }
 
@@ -718,8 +760,35 @@ module.exports = async (req, res, url, deps) => {
           // Otherwise a hallucinated/failed patch could let unrelated data-file churn
           // be committed as the "fix" (the data-file fraud pattern).
           if (changedFiles.length > 0 && !(stats.errors && stats.errors.length > 0)) {
-            applied = true;
-            break;
+            // Verify gate (#1354 placeholder, #1359 syntax): a clean-applying patch can
+            // still be placeholder scaffolding (`// Placeholder for the actual logic`,
+            // "simulate async work", …) OR leave a file unparseable in a source the
+            // planned tests never load (a browser script, a one-off tool). Reject either,
+            // roll back, and feed the signal into the retry loop so it returns real,
+            // parseable code. (A bad patch that "passes" tests only because nothing
+            // exercised it would otherwise open a bad PR.)
+            const ph = looksLikePlaceholderPatch(diffText);
+            const syntaxErrors = ph.placeholder ? [] : patchSyntaxErrors(changedFiles, workRoot);
+            if (!ph.placeholder && syntaxErrors.length === 0) {
+              applied = true;
+              break;
+            }
+            await new Promise((resolve) =>
+              execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+            feedback = {
+              priorDiff: diffText,
+              errors: ph.placeholder
+                ? "the patch is placeholder / non-implementation scaffolding (markers: "
+                  + ph.signals.join("; ")
+                  + "). Implement the ACTUAL logic the issue requires — no stubs, no "
+                  + "\"placeholder\"/\"simulate\"/\"in a real scenario\" comments, no console.log-only bodies."
+                : "the patch leaves files unparseable and must not be committed:\n"
+                  + syntaxErrors.map((s) => `${s.file}: ${s.error}`).join("\n")
+                  + "\nReturn a corrected diff where every changed file parses.",
+            };
+            step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
+              ph.placeholder ? { placeholder: ph.signals, attempt } : { syntaxErrors, attempt });
+            continue;
           }
 
           // Failed — roll the tree back clean and carry the errors into the next try.

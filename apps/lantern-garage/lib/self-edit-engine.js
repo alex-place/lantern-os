@@ -453,6 +453,143 @@ function taskTitle(task) {
   return (cleaned || "Autowork task").slice(0, 120);
 }
 
+// Strong markers of a placeholder / non-implementation patch — phrases a weak
+// model emits when it has no real spec (e.g. from a junk "autowork the oldest
+// issue" title) and that essentially never appear in a genuine fix. Deliberately
+// excludes lone "TODO"/"FIXME" (too common in real code) — only unambiguous
+// "I didn't actually implement this" tells.
+const PLACEHOLDER_MARKERS = [
+  /placeholder for /i,
+  /simulate(?:d|s)? (?:async )?work/i,
+  /in a real (?:scenario|implementation|app|world)/i,
+  /your (?:actual )?(?:logic|code|implementation) here/i,
+  /(?:implementation|logic|code) goes here/i,
+  /replace this (?:with|stub)/i,
+  /assuming an internal state/i,
+  /this would (?:fetch|call|do|process|handle|return)/i,
+  /\bdummy (?:data|value|function|impl)/i,
+  /not (?:yet )?implemented/i,
+  /real implementation would/i,
+];
+
+// Detect a patch that is obvious placeholder scaffolding rather than a real
+// implementation. Returns { placeholder, signals }. Conservative on purpose:
+// trips only on >=2 DISTINCT strong markers among ADDED lines, so a single
+// stray "TODO"-ish comment in an otherwise-real fix never blocks. Scans only
+// added (`+`) lines — context/removed lines are irrelevant.
+function looksLikePlaceholderPatch(diffText) {
+  const added = String(diffText || "")
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
+    .map((l) => l.slice(1));
+  const text = added.join("\n");
+  const signals = [];
+  for (const re of PLACEHOLDER_MARKERS) {
+    const m = text.match(re);
+    if (m) signals.push(m[0].trim().toLowerCase());
+  }
+  const uniq = [...new Set(signals)];
+  return { placeholder: uniq.length >= 2, signals: uniq };
+}
+
+// Verify gate (#1359): a clean-applying, non-placeholder patch can still leave a
+// changed file UNPARSEABLE. If that file isn't exercised by the planned tests (a
+// browser script like dream-chat-ui.js, a one-off tool script), the test gate
+// won't catch it and a syntax-broken patch opens a bad PR — exactly how an autowork
+// run shipped `function parseImageRequest(text)` with no body. Parse-check each
+// changed JS/Python source by extension (no execution, no side effects); returns
+// [{file,error}] for the ones that fail (empty = all parse). A missing checker
+// binary is skipped, never reported as a false failure.
+function patchSyntaxErrors(changedFiles, repoRoot) {
+  const PY = process.env.PYTHON_PATH || (process.platform === "win32" ? "python" : "python3");
+  const errors = [];
+  for (const rel of changedFiles || []) {
+    const abs = path.join(repoRoot, rel);
+    let cmd, args;
+    if (/\.(?:c|m)?js$/i.test(rel)) {
+      cmd = process.execPath;                 // `node --check`: parse-only, no execution
+      args = ["--check", abs];
+    } else if (/\.py$/i.test(rel)) {
+      cmd = PY;                               // `ast.parse`: syntax-only, writes no .pyc
+      args = ["-c", "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])", abs];
+    } else {
+      continue;                               // only languages we can cheaply parse-check
+    }
+    try {
+      execFileSync(cmd, args, { cwd: repoRoot, timeout: 20000, windowsHide: true, stdio: "pipe" });
+    } catch (e) {
+      if (e && e.code === "ENOENT") continue;  // checker binary unavailable → don't block
+      const msg = String(e.stderr || e.stdout || e.message || "")
+        .replace(/\r/g, "").trim().split("\n").filter(Boolean).slice(-3).join(" ").slice(0, 300);
+      errors.push({ file: rel, error: msg || "failed to parse" });
+    }
+  }
+  return errors;
+}
+
+// A task message that *references an existing issue* must NOT be filed as a new
+// one — otherwise meta-commands like "autowork the oldest issue" or "work issue
+// #1342" get filed verbatim as junk issues (#1344/#1346) and the pipeline patches
+// the wrong target. Resolve such references to an OPEN issue number, else null so
+// the caller falls back to createIssueFromTask for genuinely novel requests.
+function resolveExistingIssue(repoRoot, task) {
+  const text = String(task || "").trim();
+  if (!text) return null;
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: "0" };
+
+  // Verify a candidate number is a real OPEN issue; return it (or null).
+  const openIssue = (n) => {
+    if (!n || !Number.isFinite(n)) return null;
+    try {
+      const out = execFileSync(
+        "gh",
+        ["issue", "view", String(n), "--repo", GH_REPO, "--json", "number,state"],
+        { cwd: repoRoot, encoding: "utf8", timeout: 10000, windowsHide: true, env }
+      );
+      const j = JSON.parse(out);
+      return String(j.state).toUpperCase() === "OPEN" ? j.number : null;
+    } catch (_e) {
+      return null;
+    }
+  };
+
+  // 1) Explicit reference: "#1342", "issue 1342", "issue #1342".
+  const m = text.match(/(?:#|\bissues?\s+#?)(\d{1,7})\b/i);
+  if (m) {
+    const hit = openIssue(parseInt(m[1], 10));
+    if (hit) return hit;
+  }
+
+  // 2) Superlative reference: "the oldest [open] issue" / "newest|latest issue".
+  //    Only when the message is clearly *about* picking an existing issue, not a
+  //    coding task that happens to contain the word "issue".
+  const sup = text.match(/\b(oldest|newest|latest)\b[^.\n]*\bissues?\b/i);
+  if (sup) {
+    const direction = /oldest/i.test(sup[1]) ? "asc" : "desc";
+    try {
+      const out = execFileSync(
+        "gh",
+        ["issue", "list", "--repo", GH_REPO, "--state", "open", "--limit", "100",
+          "--json", "number,createdAt"],
+        { cwd: repoRoot, encoding: "utf8", timeout: 15000, windowsHide: true, env }
+      );
+      const rows = JSON.parse(out);
+      if (Array.isArray(rows) && rows.length) {
+        rows.sort((a, b) =>
+          direction === "asc"
+            ? String(a.createdAt).localeCompare(String(b.createdAt))
+            : String(b.createdAt).localeCompare(String(a.createdAt))
+        );
+        return rows[0].number;
+      }
+    } catch (_e) {
+      /* fall through to null */
+    }
+  }
+
+  return null;
+}
+
 // Create a GitHub issue from a free-form chat instruction, so the issue-linked
 // autowork pipeline (which keys off a real issue number) can work it. Returns
 // { number, url, title }. Used by the suggest-then-confirm "Run as autowork"
@@ -477,11 +614,33 @@ function createIssueFromTask(repoRoot, task) {
   return { number, url, title };
 }
 
+// Owner of the `origin` remote that gitPush() actually pushes to — the PR `head` must
+// name THAT repo. Using GH_REPO's owner (the base) makes GitHub look for the branch on
+// the base repo and return 422 when it was pushed to a fork. Override with
+// AUTOWORK_HEAD_OWNER; falls back to the base owner (assume same-repo). #1358
+function pushRemoteOwner(repoRoot) {
+  if (process.env.AUTOWORK_HEAD_OWNER) return process.env.AUTOWORK_HEAD_OWNER;
+  try {
+    const url = execFileSync("git", ["remote", "get-url", "origin"],
+      { cwd: repoRoot, encoding: "utf8", timeout: 5000, windowsHide: true }).trim();
+    const m = url.match(/[/:]([^/]+)\/[^/]+?(?:\.git)?$/); // https://host/<owner>/<repo>.git | git@host:<owner>/<repo>.git
+    if (m && m[1]) return m[1];
+  } catch { /* no origin / no git */ }
+  return GH_REPO.split("/")[0];
+}
+
 function openDraftPr(repoRoot, branch, title, body) {
   if (!branch.startsWith("auto/")) throw new Error("invalid_branch_prefix");
   const safeTitle = String(title || "Auto PR").slice(0, 256);
   const safeBody = String(body || "").slice(0, 4000);
   const env = { ...process.env, GIT_TERMINAL_PROMPT: "0", SKIP_MONOWORKSTREAM: "1" };
+  // Cross-fork PR (gitPush sent the branch to a fork) requires head=<fork-owner>:<branch>;
+  // a same-repo push can use the bare branch. The list-PRs filter always wants
+  // <owner>:<branch>. #1358
+  const baseOwner = GH_REPO.split("/")[0];
+  const headOwner = pushRemoteOwner(repoRoot);
+  const headRef = headOwner && headOwner !== baseOwner ? `${headOwner}:${branch}` : branch;
+  const headFilter = `${headOwner || baseOwner}:${branch}`;
   // `gh pr create` is broken on this repo — use the REST API via `gh api`.
   // execFileSync with an args array avoids all shell-quoting issues with title/body.
   try {
@@ -491,7 +650,7 @@ function openDraftPr(repoRoot, branch, title, body) {
         "api", `repos/${GH_REPO}/pulls`,
         "--method", "POST",
         "-f", `title=${safeTitle}`,
-        "-f", `head=${branch}`,
+        "-f", `head=${headRef}`,
         "-f", "base=master",
         "-f", `body=${safeBody}`,
         "-F", "draft=true",
@@ -507,10 +666,9 @@ function openDraftPr(repoRoot, branch, title, body) {
   } catch (e) {
     // PR already exists (422) — query the open PR for this head branch and reuse its URL.
     try {
-      const owner = GH_REPO.split("/")[0];
       const existing = execFileSync(
         "gh",
-        ["api", `repos/${GH_REPO}/pulls?head=${owner}:${branch}&state=open`, "--jq", ".[0].html_url"],
+        ["api", `repos/${GH_REPO}/pulls?head=${headFilter}&state=open`, "--jq", ".[0].html_url"],
         { cwd: repoRoot, encoding: "utf8", timeout: 15000, env }
       ).trim();
       if (existing.startsWith("https://")) return existing;
@@ -1179,7 +1337,11 @@ module.exports = {
   gitAddFiles,
   gitCurrentBranch,
   openDraftPr,
+  pushRemoteOwner,
   createIssueFromTask,
+  resolveExistingIssue,
+  looksLikePlaceholderPatch,
+  patchSyntaxErrors,
   taskTitle,
   runTests,
   generatePlan,

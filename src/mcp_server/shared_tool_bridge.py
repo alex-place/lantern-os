@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, MutableMapping
 
@@ -18,6 +19,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BRIDGE_PATH = REPO_ROOT / "scripts" / "tool-runner-bridge.js"
 GENERATED_MANIFEST_PATH = REPO_ROOT / "manifests" / "tool-capability-manifest-v1.json"
 BRIDGE_TIMEOUT_SECONDS = 35
+
+# ── Bridge spawn throttle ────────────────────────────────────────────────────
+# Each tool execution shells out to a fresh `node tool-runner-bridge.js call`.
+# The MCP server handles every tools/call on uvicorn's threadpool (default ~40
+# workers), so a burst of concurrent tool calls used to fan out to ~40 node
+# cold-starts at once (~40 MB each → ~1.6 GB spike) — enough to OOM a 12 GB box.
+# Cap the number of bridges that run concurrently; excess calls queue on the
+# semaphore instead of spawning more processes. Tune with MCP_BRIDGE_MAX_CONCURRENCY.
+try:
+    _MAX_BRIDGE_CONCURRENCY = max(1, int(os.getenv("MCP_BRIDGE_MAX_CONCURRENCY", "6")))
+except ValueError:
+    _MAX_BRIDGE_CONCURRENCY = 6
+_BRIDGE_SEMAPHORE = threading.Semaphore(_MAX_BRIDGE_CONCURRENCY)
+# Bound how long a single call waits for a free slot so a stuck batch can't pin
+# the whole threadpool forever (timeout + headroom for the run itself).
+_BRIDGE_ACQUIRE_TIMEOUT = BRIDGE_TIMEOUT_SECONDS + 15
 
 
 class SharedToolBridgeError(RuntimeError):
@@ -33,30 +50,37 @@ def _node_binary() -> str:
 
 
 def _invoke(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    # Throttle concurrent node spawns so a burst of tool calls can't fan out into
+    # dozens of simultaneous processes (RAM spike / OOM on a small box).
+    if not _BRIDGE_SEMAPHORE.acquire(timeout=_BRIDGE_ACQUIRE_TIMEOUT):
+        raise SharedToolBridgeError("node_bridge_overloaded: bridge concurrency cap reached")
     try:
-        completed = subprocess.run(
-            [_node_binary(), str(BRIDGE_PATH), command],
-            cwd=str(REPO_ROOT),
-            input=json.dumps(payload),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=BRIDGE_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise SharedToolBridgeError(f"node_bridge_unavailable: {exc}") from exc
+        try:
+            completed = subprocess.run(
+                [_node_binary(), str(BRIDGE_PATH), command],
+                cwd=str(REPO_ROOT),
+                input=json.dumps(payload),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=BRIDGE_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise SharedToolBridgeError(f"node_bridge_unavailable: {exc}") from exc
 
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "unknown bridge error").strip()
-        raise SharedToolBridgeError(f"node_bridge_failed: {detail[:1000]}")
-    try:
-        response = json.loads(completed.stdout)
-    except json.JSONDecodeError as exc:
-        raise SharedToolBridgeError("node_bridge_invalid_json") from exc
-    if not isinstance(response, dict):
-        raise SharedToolBridgeError("node_bridge_invalid_response")
-    return response
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "unknown bridge error").strip()
+            raise SharedToolBridgeError(f"node_bridge_failed: {detail[:1000]}")
+        try:
+            response = json.loads(completed.stdout)
+        except json.JSONDecodeError as exc:
+            raise SharedToolBridgeError("node_bridge_invalid_json") from exc
+        if not isinstance(response, dict):
+            raise SharedToolBridgeError("node_bridge_invalid_response")
+        return response
+    finally:
+        _BRIDGE_SEMAPHORE.release()
 
 
 def execution_enabled() -> bool:

@@ -1,0 +1,4 @@
+### Fix: PR auto-review fleet pins a funded provider + larger Gemini reply budget
+
+- The pr-watcher posted reviews with no provider and `forceAgent` (a field the route ignores). A diff-bearing review is classified "coding" and routed to the local Σ₀ coder / preferred provider — credit-depleted AI-Studio Gemini on this host — so every review failed `no_provider_configured`. It now sends `agent: "keystone"` (the field the route reads) and `provider` (default `gemini`, overridable via `PR_WATCHER_PROVIDER`), which resolves to Vertex AI via gemini-transport and skips the coding-route trap.
+- Raised the non-stream Gemini `maxOutputTokens` from 256 → 2048: gemini-2.5 spends part of the budget on internal "thinking" tokens, which truncated replies to a bare preamble with no verdict (so reviews defaulted to COMMENT and never merged).
