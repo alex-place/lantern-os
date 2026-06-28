@@ -760,17 +760,27 @@ function parseImageRequest(text) {
   return null;
 }
 
+// True when the user wants a REAL photo of a specific subject ("find/show me a photo
+// of X") rather than an AI illustration ("draw/paint X"). Drives whether we try a real
+// image search (Wikimedia Commons) before the generate chain (#1343). The "draw/paint/
+// sketch/generate/create/render" verbs mean generate and take priority if both appear.
+function imageWantsRealPhoto(text) {
+  if (/^[!/]image\b/i.test(text)) return false; // explicit command → generate
+  if (/\b(?:draw|paint|sketch|generate|create|render|illustrate)\b/i.test(text)) return false;
+  return /\b(?:find|show|get|give|search|look\s+up|fetch)\b[^.?!]*?\b(?:image|picture|photo|pic|photograph)\b/i.test(text);
+}
+
 // Render a generated image for `prompt`. Tries OpenAI (DALL·E / gpt-image-1) FIRST via the
 // server (the key stays server-side; the saved image serves from /images/… so it dodges local
 // TLS interception). On any failure — no key, billing limit, content refusal, timeout — it
 // falls back to a keyless text-to-image source (Pollinations) and then real photos (LoremFlickr),
 // loaded directly by the browser, so an image still appears.
-function renderWebImage(prompt) {
+function renderWebImage(prompt, wantRealPhoto) {
   const messages = document.getElementById('messages');
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const row = document.createElement('div');
   row.className = 'msg-row agent';
-  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Generating an image of <b>${esc(prompt)}</b>…</div>`;
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">${wantRealPhoto ? 'Searching for a photo of' : 'Generating an image of'} <b>${esc(prompt)}</b>…</div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
@@ -832,7 +842,28 @@ function renderWebImage(prompt) {
     })();
   }
 
+  // Real-photo intent (#1343): try a real image search (Wikimedia Commons, keyless) for
+  // a specific subject BEFORE generating. If it finds an actual photo, show that and stop;
+  // otherwise fall through to the generate chain so an image still appears.
+  if (wantRealPhoto) {
+    fetch('/api/image-search?q=' + encodeURIComponent(prompt))
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.url) {
+          show(d.url,
+            `Here's a real photo of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· found via ${esc(d.source || 'web search')}, not AI-generated</span>:`,
+            `found via ${d.source || 'web search'}`);
+        } else {
+          generateChain();
+        }
+      })
+      .catch(() => generateChain());
+    return;
+  }
+  generateChain();
+
   // OpenAI first (server-side). 80s budget; on timeout/failure, fall back to keyless.
+  function generateChain() {
   let done = false;
   const to = setTimeout(() => { if (!done) { done = true; keylessFallback(); } }, 80000);
   fetch('/api/image/ai-generate', {
@@ -846,6 +877,7 @@ function renderWebImage(prompt) {
       else keylessFallback();
     })
     .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
+  }
 }
 
 // Vision: send an uploaded image to a vision model (Claude / GPT-4o, server-side) and render
@@ -893,10 +925,18 @@ function docFormatOf(noun) {
 }
 // One alternation of document nouns, ordered specific→general so the format is inferable.
 var DOC_NOUNS = 'docx|word\\s?document|word\\s?doc|word\\s?file|word(?!s)|xlsx|spread\\s?sheet|excel|workbook|pptx|power\\s?point|slide\\s?deck|slide\\s?show|slides?|deck|presentation|pdf|document|report|brief|memo|white\\s?paper|one[- ]?pager|write[- ]?up';
+// Coding-intent markers: if present, an incidental "pdf/report/document" mention is
+// part of a code task ("write a function that generates a pdf report") and must NOT
+// be hijacked into document generation (#1274).
+var CODING_INTENT_RE = /\b(function|method|class|code|script|program|module|library|package|api|endpoint|route|component|app(?:lication)?|repo(?:sitory)?|bug|refactor|debug|compile|unit test|test case|algorithm|variable|parameter|return|import|export|css|html|sql|query|regex|json|yaml)\b/i;
+
 function parseDocRequest(text) {
   const explicit = text.match(new RegExp('^[!/](' + DOC_NOUNS + '|doc)\\s+(.+)', 'i'));
   if (explicit) return { prompt: explicit[2].trim(), format: docFormatOf(explicit[1]) };
-  const nl = text.match(new RegExp('\\b(?:make|create|generate|write|draft|build|produce|prepare)\\b[^.?!]*?\\b(' + DOC_NOUNS + ')\\b\\s*(?:about|on|for|covering|titled|of|:)?\\s*(.+)', 'i'));
+  // A genuine document request leads with the verb (optionally behind a polite prefix),
+  // not buried mid-sentence, and doesn't read as a coding task.
+  if (CODING_INTENT_RE.test(text)) return null;
+  const nl = text.match(new RegExp('^(?:please\\s+|can\\s+you\\s+|could\\s+you\\s+|i\\s+(?:need|want)\\s+(?:you\\s+to\\s+|a\\s+)?)?(?:make|create|generate|write|draft|build|produce|prepare)\\b[^.?!]*?\\b(' + DOC_NOUNS + ')\\b\\s*(?:about|on|for|covering|titled|of|:)?\\s*(.+)', 'i'));
   if (nl && nl[2] && nl[2].trim().length >= 3) return { prompt: nl[2].trim().replace(/[.?!]+$/, ''), format: docFormatOf(nl[1]) };
   return null;
 }
@@ -1339,7 +1379,7 @@ async function sendMessage(opts = {}) {
     input.style.height = 'auto';
     addUserBubble(text);
     persistToolTurn('operator', text);
-    renderWebImage(imagePrompt);
+    renderWebImage(imagePrompt, imageWantsRealPhoto(text));
     return;
   }
 
@@ -1789,8 +1829,6 @@ async function sendMessage(opts = {}) {
     const time = isNaN(t) ? '' : t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     // Human-readable label: "Keystone · chat" or the agent route label.
     const displayLabel = routeLabel || 'Keystone · chat';
-    // Debug-route replies get a black signature (see .msg-route-sig.route-debug).
-    if (/debug route/i.test(displayLabel)) sig.classList.add('route-debug');
     if (doneOnline === false) {
       // Offline path: make it explicit for the user.
       sig.textContent = `${displayLabel} · offline${time ? ' · ' + time : ''}`;
@@ -1821,17 +1859,7 @@ async function sendMessage(opts = {}) {
   // that files an issue from the request and runs the autowork pipeline (cloud
   // model → patch → tests → draft PR). No PR is opened unless the user clicks.
   const CODING_INTENTS = ['coding_change', 'coding', 'technical_debug', 'code_review', 'code'];
-  // #1344: a pure read/lookup ("find/show/view/read/summarize issue/PR #N") is keyword-
-  // classified as "code" (it mentions "issue"/"github"), which used to surface the
-  // autowork offer — and clicking it filed a REAL GitHub issue with the raw query as
-  // title+body, then ran a doomed patch pipeline (nothing to change). Suppress the offer
-  // for lookups that carry no change-verb, so "find issue #1342" just answers (now via
-  // the github_issue tool) instead of offering to open a PR.
-  const _looksLikeLookup =
-    /\b(find|show|view|read|open|get|look\s*up|summar|explain|describe|what'?s?|tell me about|details? (on|of|about))\b/i.test(text) &&
-    /\b(issue|pr|pull request|ticket|bug report)\b\s*#?\d+/i.test(text) &&
-    !/\b(fix|implement|add|change|edit|patch|refactor|rewrite|update the code|resolve|close|work on|build|create a)\b/i.test(text);
-  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup) {
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent)) {
     const offer = document.createElement('div');
     offer.className = 'autowork-offer';
     offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
