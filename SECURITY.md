@@ -92,7 +92,9 @@ defense-in-depth model proven by [GitHub Agentic Workflows](https://github.blog/
 | #1252 | **Untrusted external text** — issue/PR/web content is data to analyze, never instructions to obey (prompt-injection guard). Reinforces the Σ₀ External Reality Rule. | ✅ In review prompt | `PrWatcher._reviewPr` message preamble |
 | #1253 | **Read-only by default; writes via a safe-output allowlist** — agents emit pre-approved output types (open-PR, comment, label), not ambient write. | 🚧 Policy; enforcement follow-up | — |
 | #1254 | **Egress + secret sandboxing** — constrain agent runs to an egress allowlist + scoped secrets so they can't re-introduce PII or leak keys. Worktree isolation is half. | 🚧 Policy; implementation follow-up | `autowork-worktree.js` (isolation only) |
-| #1255 | **Spec → artifact separation** — keep agent intent in a reviewed plain-language spec; review the spec as code (à la `gh-aw`'s `.md` → `.lock.yml`). | 🚧 Pattern; `skills/SKILL.md` leans this way | — |
+| #1255 | **Egress Allowlisting** — Agent runs must be confined to an explicit allowlist of external network endpoints. All other outbound network traffic must be blocked. | 🚧 Policy; implementation follow-up | `autowork-runtime` |
+| #1256 | **Scoped Secrets** — Agents must only be granted access to secrets explicitly scoped to their specific task and lifetime. No ambient or global secret access. | 🚧 Policy; implementation follow-up | `autowork-runtime` |
+| #1257 | **Spec → artifact separation** — keep agent intent in a reviewed plain-language spec; review the spec as code (à la `gh-aw`'s `.md` → `.lock.yml`). | 🚧 Pattern; `skills/SKILL.md` leans this way | — |
 
 > The one deliberate divergence from `gh-aw`: it *never* auto-merges. We do, by
 > Alex's explicit choice — but the #1251 gate confines auto-merge to low-risk
