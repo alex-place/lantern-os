@@ -172,11 +172,11 @@ module.exports = async (req, res, url, deps) => {
       let workRoot = null, cleanupWorktree = null;
       try {
         const opts = JSON.parse(body || "{}");
-        let issueNumber = parseInt(opts.issue, 10);
+        let issueNumber = parseInt(opts.issue, 10); // From explicit { issue: N }
         const task = typeof opts.task === "string" ? opts.task.trim() : "";
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveIssueFromTask } = require("../lib/self-edit-engine");
         const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
@@ -184,17 +184,30 @@ module.exports = async (req, res, url, deps) => {
         const GH_REPO = "alex-place/lantern-os";
 
         // Task-mode (parity with the stream route): a free-form { task } and no
-        // issue number → file a real GitHub issue first, then work it like an
-        // `!work #N` run. Keeps every PR issue-linked.
+        // issue number → first attempt to resolve an existing issue, then file a
+        // new one if none found. Keeps every PR issue-linked.
+        let resolvedIssueDetails = null;
+
+        if (task) {
+          const resolved = await resolveIssueFromTask(task, REPO_ROOT, GH_REPO);
+          if (resolved && resolved.issueNumber && resolved.issueDetails && String(resolved.issueDetails.state).toUpperCase() === "OPEN") {
+            issueNumber = resolved.issueNumber;
+            resolvedIssueDetails = resolved.issueDetails;
+          }
+        }
+
         if (!issueNumber && task) {
           try {
             const created = createIssueFromTask(REPO_ROOT, task);
             issueNumber = created.number;
+            // For newly created issues, we don't have full details yet, they'll be fetched below.
           } catch (e) {
             sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
             return;
           }
         }
+
+
 
         if (!issueNumber) {
           sendJson(res, { ok: false, error: "issue_number_or_task_required" }, 400);
