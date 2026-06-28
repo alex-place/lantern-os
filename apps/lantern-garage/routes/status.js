@@ -104,6 +104,9 @@ function getGitVersion(repoRoot) {
   }
 }
 
+// Main entry point for status-related API routes.
+// Handles various telemetry, health, and system information requests.
+// @param {object} deps - Dependencies for the route handler.
 module.exports = async function statusRoutes(req, res, url, deps) {
   const { sendJson, readJson, readJsonl, getStatus, getReadiness, getMiningLabStatus,
     getActionCapabilities, getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus } = deps;
