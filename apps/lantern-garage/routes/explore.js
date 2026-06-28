@@ -15,11 +15,25 @@
  * docs/research/explore-content-machine.md §8.
  */
 
+const fs = require("fs");
+const path = require("path");
 const { rankedFeed, pagedFeed, embedCards } = require("../lib/explore-feed");
 const { recordModelOutcome } = require("../lib/model-leaderboard");
 
 const SUCCESS_EVENTS = new Set(["click", "dwell", "like", "open"]);
-const VALID_EVENTS = new Set([...SUCCESS_EVENTS, "dismiss", "skip"]);
+// "impression" is the CTR denominator (#1221): a card was actually seen. It is logged
+// for metrics but NOT fed to the leaderboard — an impression is not a failure, and
+// scoring it as one would tank every surfaced source's rank.
+const VALID_EVENTS = new Set([...SUCCESS_EVENTS, "dismiss", "skip", "impression"]);
+
+// Append-only interaction log — the reproducible source for /api/explore/metrics.
+const INTERACTION_LOG = path.join(__dirname, "..", "..", "..", "data", "explore", "interactions.jsonl");
+function logInteraction(entry) {
+  try {
+    fs.mkdirSync(path.dirname(INTERACTION_LOG), { recursive: true });
+    fs.appendFile(INTERACTION_LOG, JSON.stringify(entry) + "\n", () => {});
+  } catch (_e) { /* metrics logging is best-effort, never blocks the response */ }
+}
 
 module.exports = async function exploreRoute(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
@@ -96,13 +110,54 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     }
     const success = SUCCESS_EVENTS.has(event);
     const dwellMs = Number.isFinite(+body.dwellMs) ? Math.max(0, +body.dwellMs) : 0;
-    try {
-      await recordModelOutcome(key, "explore", success, dwellMs, 0);
-    } catch (e) {
-      sendJson(res, { ok: false, error: e.message }, 200);
-      return true;
+    // Always log for CTR; only engagement/dismiss/skip shape the leaderboard.
+    logInteraction({ ts: new Date().toISOString(), key, event, success, dwellMs });
+    if (event !== "impression") {
+      try {
+        await recordModelOutcome(key, "explore", success, dwellMs, 0);
+      } catch (e) {
+        sendJson(res, { ok: false, error: e.message }, 200);
+        return true;
+      }
     }
     sendJson(res, { ok: true, key, event, success }, 200);
+    return true;
+  }
+
+  // ── GET /api/explore/metrics — the dogfood convergence signal (#1221) ──
+  // CTR = engagements / impressions, plus exploration share (how widely the feed is
+  // sampled) and dismiss rate. Reproducible purely from the interaction log.
+  if (url.pathname === "/api/explore/metrics" && req.method === "GET") {
+    const windowDays = Math.min(90, Math.max(1, parseInt(url.searchParams.get("days"), 10) || 7));
+    const cutoff = Date.now() - windowDays * 86400000;
+    let impressions = 0, engagements = 0, dismisses = 0;
+    const impressedKeys = new Set(), engagedKeys = new Set();
+    try {
+      const raw = fs.existsSync(INTERACTION_LOG) ? fs.readFileSync(INTERACTION_LOG, "utf8") : "";
+      for (const line of raw.split("\n")) {
+        if (!line.trim()) continue;
+        let e; try { e = JSON.parse(line); } catch { continue; }
+        if (e.ts && Date.parse(e.ts) < cutoff) continue;
+        if (e.event === "impression") { impressions++; if (e.key) impressedKeys.add(e.key); }
+        else if (e.event === "dismiss" || e.event === "skip") { dismisses++; }
+        else if (SUCCESS_EVENTS.has(e.event)) { engagements++; if (e.key) engagedKeys.add(e.key); }
+      }
+    } catch (_e) { /* fall through to zeros */ }
+    const ctr = impressions ? engagements / impressions : 0;
+    const explorationShare = impressedKeys.size ? engagedKeys.size / impressedKeys.size : 0;
+    const dismissRate = impressions ? dismisses / impressions : 0;
+    sendJson(res, {
+      ok: true,
+      windowDays,
+      impressions,
+      engagements,
+      dismisses,
+      uniqueSeen: impressedKeys.size,
+      uniqueEngaged: engagedKeys.size,
+      ctr: Math.round(ctr * 1000) / 1000,
+      explorationShare: Math.round(explorationShare * 1000) / 1000,
+      dismissRate: Math.round(dismissRate * 1000) / 1000,
+    }, 200);
     return true;
   }
 

@@ -865,7 +865,6 @@
       <a href="/knowledgecenter.html#library">Library</a>
       <a href="/knowledgecenter.html">Knowledge Center</a>
       <a href="/api-keys-settings.html">Settings</a>
-      <a href="/dashboard.html">Status</a>
       <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
       <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer">♥ Patreon ↗</a>
     </nav>
@@ -960,6 +959,20 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ key, event, dwellMs }) });
     } catch (e) { /* non-blocking */ }
   }
+
+  // Impression logging (#1221): the CTR denominator. Fire one 'impression' per card
+  // the first time it actually scrolls into view (not merely rendered off-screen),
+  // then stop observing it. Click/dwell/dismiss (the numerator) are logged elsewhere,
+  // so /api/explore/metrics can compute a real CTR = engagements / impressions.
+  const impressed = new Set();
+  const impressionObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const key = entry.target.dataset.key;
+      if (key && !impressed.has(key)) { impressed.add(key); record(key, 'impression', 0); }
+      impressionObserver.unobserve(entry.target);
+    });
+  }, { threshold: 0.5 }) : null;
 
   let filter = 'all';
   const seen = new Set();            // stable card ids already shown (dedup across pages)
@@ -1159,8 +1172,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function appendCards(cards) {
     const frag = document.createDocumentFragment();
-    cards.forEach((c, i) => { seen.add(c.id || c.key); frag.appendChild(cardEl(c, totalShown + i + 1)); });
+    const els = [];
+    cards.forEach((c, i) => { seen.add(c.id || c.key); const el = cardEl(c, totalShown + i + 1); els.push(el); frag.appendChild(el); });
     stream.appendChild(frag);
+    if (impressionObserver) els.forEach((el) => { if (el.dataset.key) impressionObserver.observe(el); });
     totalShown += cards.length;
   }
 
