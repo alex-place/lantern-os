@@ -1,0 +1,126 @@
+{
+  "model": "ByteDance/Ouro-1.4B",
+  "n_ut": 4,
+  "corpora": {
+    "README.md (prose)": {
+      "n_predicted": 10075,
+      "n_ut": 4,
+      "pareto": {
+        "0.2": {
+          "mean_depth": 2.27,
+          "recurrent_compute_used": 0.568,
+          "compute_saved": 0.432,
+          "greedy_argmax_agreement": 0.95,
+          "selfspec_acceptance": 0.95,
+          "mean_kl_full_vs_qexit": 0.0211
+        },
+        "0.4": {
+          "mean_depth": 2.88,
+          "recurrent_compute_used": 0.72,
+          "compute_saved": 0.28,
+          "greedy_argmax_agreement": 0.9759,
+          "selfspec_acceptance": 0.9759,
+          "mean_kl_full_vs_qexit": 0.0084
+        },
+        "0.6": {
+          "mean_depth": 3.519,
+          "recurrent_compute_used": 0.88,
+          "compute_saved": 0.12,
+          "greedy_argmax_agreement": 0.9984,
+          "selfspec_acceptance": 0.9984,
+          "mean_kl_full_vs_qexit": 0.001
+        },
+        "0.8": {
+          "mean_depth": 4.0,
+          "recurrent_compute_used": 1.0,
+          "compute_saved": 0.0,
+          "greedy_argmax_agreement": 1.0,
+          "selfspec_acceptance": 1.0,
+          "mean_kl_full_vs_qexit": 0.0
+        },
+        "0.95": {
+          "mean_depth": 4.0,
+          "recurrent_compute_used": 1.0,
+          "compute_saved": 0.0,
+          "greedy_argmax_agreement": 1.0,
+          "selfspec_acceptance": 1.0,
+          "mean_kl_full_vs_qexit": 0.0
+        },
+        "1.0": {
+          "mean_depth": 4.0,
+          "recurrent_compute_used": 1.0,
+          "compute_saved": 0.0,
+          "greedy_argmax_agreement": 1.0,
+          "selfspec_acceptance": 1.0,
+          "mean_kl_full_vs_qexit": 0.0
+        }
+      },
+      "selfspec_best": {
+        "q": "0.2",
+        "acceptance": 0.95,
+        "mean_depth_accepted": 2.27,
+        "lossless_speedup": 1.697
+      }
+    },
+    "csf_pack.py (code)": {
+      "n_predicted": 5182,
+      "n_ut": 4,
+      "pareto": {
+        "0.2": {
+          "mean_depth": 2.508,
+          "recurrent_compute_used": 0.627,
+          "compute_saved": 0.373,
+          "greedy_argmax_agreement": 0.9556,
+          "selfspec_acceptance": 0.9556,
+          "mean_kl_full_vs_qexit": 0.0261
+        },
+        "0.4": {
+          "mean_depth": 3.067,
+          "recurrent_compute_used": 0.767,
+          "compute_saved": 0.233,
+          "greedy_argmax_agreement": 0.9799,
+          "selfspec_acceptance": 0.9799,
+          "mean_kl_full_vs_qexit": 0.0094
+        },
+        "0.6": {
+          "mean_depth": 3.61,
+          "recurrent_compute_used": 0.902,
+          "compute_saved": 0.098,
+          "greedy_argmax_agreement": 0.9979,
+          "selfspec_acceptance": 0.9979,
+          "mean_kl_full_vs_qexit": 0.0015
+        },
+        "0.8": {
+          "mean_depth": 4.0,
+          "recurrent_compute_used": 1.0,
+          "compute_saved": 0.0,
+          "greedy_argmax_agreement": 1.0,
+          "selfspec_acceptance": 1.0,
+          "mean_kl_full_vs_qexit": 0.0
+        },
+        "0.95": {
+          "mean_depth": 4.0,
+          "recurrent_compute_used": 1.0,
+          "compute_saved": 0.0,
+          "greedy_argmax_agreement": 1.0,
+          "selfspec_acceptance": 1.0,
+          "mean_kl_full_vs_qexit": 0.0
+        },
+        "1.0": {
+          "mean_depth": 4.0,
+          "recurrent_compute_used": 1.0,
+          "compute_saved": 0.0,
+          "greedy_argmax_agreement": 1.0,
+          "selfspec_acceptance": 1.0,
+          "mean_kl_full_vs_qexit": 0.0
+        }
+      },
+      "selfspec_best": {
+        "q": "0.2",
+        "acceptance": 0.9556,
+        "mean_depth_accepted": 2.508,
+        "lossless_speedup": 1.554
+      }
+    }
+  }
+}

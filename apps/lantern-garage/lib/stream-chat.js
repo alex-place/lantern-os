@@ -2256,11 +2256,18 @@ async function handleStreamChat(req, url, res) {
     }
     try {
       // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
-      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
+      const _openaiPayload = serving.applyOpenAIDecodeParams({
         model: modelFor("openai"),
         stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
-      }));
+      });
+      // Σ₀ groundedness surprise (#1260, opt-in GROUNDEDNESS_SURPRISE=1): request per-token
+      // logprobs so the model-internal uncertainty signal can sharpen the groundedness canary
+      // (lib/token-surprise.js). Default off → byte-identical request, zero behavior change.
+      const _surpriseOn = process.env.GROUNDEDNESS_SURPRISE === "1";
+      const _openaiLogprobs = _surpriseOn ? [] : null;
+      if (_surpriseOn) _openaiPayload.logprobs = true;
+      const payload = JSON.stringify(_openaiPayload);
 
       await new Promise((resolve, reject) => {
         const req2 = https.request({
@@ -2292,6 +2299,10 @@ async function handleStreamChat(req, url, res) {
                 const evt = JSON.parse(raw);
                 const token = evt.choices?.[0]?.delta?.content || "";
                 if (token) { fullReply += token; sendToken(token); }
+                if (_openaiLogprobs) {
+                  const _lp = evt.choices?.[0]?.logprobs?.content;
+                  if (Array.isArray(_lp)) _openaiLogprobs.push(..._lp);
+                }
               } catch { /* skip malformed */ }
             }
           });
@@ -2306,6 +2317,18 @@ async function handleStreamChat(req, url, res) {
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("openai_empty_response");
       const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      // Σ₀ canaries on the OpenAI cascade, incl. model-internal surprise when captured (#1260).
+      // Passive: logs a surprise-aware groundedness event; never mutates the reply.
+      if (_surpriseOn && _openaiLogprobs && _openaiLogprobs.length) {
+        try {
+          const { fromOpenAILogprobs, surpriseField } = require("./token-surprise");
+          runCanaries(openaiClean, {
+            groundingContext,
+            tokenSurprise: surpriseField(fromOpenAILogprobs(_openaiLogprobs)),
+            context: { source, provider: "openai", agent: doneAgentName, surface: "dream-chat" },
+          });
+        } catch { /* canaries must never break a reply */ }
+      }
       await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
