@@ -347,6 +347,15 @@ async function handleStreamChat(req, url, res) {
         "X-Accel-Buffering": "no",
       });
 
+  // --- Main chat logic starts here ---
+
+  // Determine if grounding is needed and perform it
+  let groundingResults = null;
+  let groundingContext = "";
+  let webSearchResults = null;
+  let searchQuery = null;
+
+  const isGroundingNeeded = isGroundingDue(message, history, forceGround, _lastGroundingTickMs);
       const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
       const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
 
