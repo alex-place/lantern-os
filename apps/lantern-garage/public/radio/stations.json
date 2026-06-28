@@ -318,6 +318,17 @@
 "iaf": "June Night - Jimmy Dorsey - Dick Stabile.mp3"
 },
 {
+"freq": "89.7",
+"title": "Peg O' My Heart",
+"artist": "The Harmonicats",
+"year": 1947,
+"src": "/radio/peg-o-my-heart.mp3",
+"lore": "Jerry Murad's Harmonicats turned a 1913 waltz into a 1947 harmonica phenomenon — the little mouth-organ record that sold a million copies.",
+"ia": "78_peg-o-my-heart_the-harmonicats-fisher-bryan_gbia0078556a",
+"iaf": "Peg O' My Heart - The Harmonicats - Fisher.mp3",
+"gain": 0.9
+},
+{
 "freq": "89.9",
 "title": "Eep, Ipe, Wanna Piece of Pie",
 "artist": "\"Fats\" Waller and His Rhythm",
@@ -525,6 +536,17 @@
 "lore": "Teddy Wilson And His Orchestra — a 1935 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_sugar_teddy-wilson-and-his-orchestra-billie-holiday-pinkard-mitchell-alexander_gbia7018988b",
 "iaf": "SUGAR - TEDDY WILSON AND HIS ORCHESTRA - BILLIE HOLIDAY.mp3"
+},
+{
+"freq": "91.1",
+"title": "To Each His Own",
+"artist": "Eddy Howard & His Orchestra",
+"year": 1946,
+"src": "/radio/to-each-his-own.mp3",
+"lore": "Eddy Howard's velvet baritone on the Livingston & Evans ballad — one of a half-dozen competing 1946 versions, and the one that topped the charts.",
+"ia": "78_to-each-his-own_eddy-howard-livingston-evans_gbia0285502a",
+"iaf": "TO EACH HIS OWN - EDDY HOWARD - Livingston.mp3",
+"gain": 10.2
 },
 {
 "freq": "91.3",
@@ -765,6 +787,17 @@
 "iaf": "Melody of Love - The Ink Spots - Charles Fuqua.mp3"
 },
 {
+"freq": "92.7",
+"title": "In the Mood",
+"artist": "Van Alexander & His Swingtime Band",
+"year": 1939,
+"src": "/radio/in-the-mood.mp3",
+"lore": "Joe Garland's riff that defined the swing era — cut here by Van Alexander's band in 1939, the same year Glenn Miller made it immortal.",
+"ia": "78_in-the-mood-caprichosa_van-alexander-and-his-swingtime-band-joe-garland_gbia0275219a",
+"iaf": "IN THE MOOD (Caprichosa) - VAN ALEXANDER and his SWINGTIME BAND.mp3",
+"gain": 7.3
+},
+{
 "freq": "92.9",
 "title": "Pennsylvania 6-5000",
 "artist": "Glenn Miller & His Orchestra",
@@ -842,6 +875,17 @@
 "lore": "The Ink Spots — a 1954 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_there-is-something-missing_the-ink-spots-the-ink-spots-charles-fuqua-jimmy-holmes-h_gbia0380580a",
 "iaf": "THERE IS SOMETHING MISSING - THE INK SPOTS.mp3"
+},
+{
+"freq": "93.3",
+"title": "Dear Hearts and Gentle People",
+"artist": "Patti Page",
+"year": 1949,
+"src": "/radio/dear-hearts-and-gentle-people.mp3",
+"lore": "Patti Page's sweet 1949 hymn to small-town folks — Bob Hilliard & Sammy Fain's postcard from a gentler America.",
+"ia": "78_dear-hearts-and-gentle-people_patti-page-ray-wards-modulators-hilliard-styne_gbia3045875a",
+"iaf": "DEAR HEARTS AND GENTLE PEOPLE - PATTI PAGE.mp3",
+"gain": 8.2
 },
 {
 "freq": "93.5",
@@ -1260,6 +1304,17 @@
 "iaf": "HURRICANE - THE SIX HOTTENTOTS - Red Nichols.mp3"
 },
 {
+"freq": "96.1",
+"title": "Mad About the Boy",
+"artist": "Maxine Sullivan & The New Friends of Rhythm",
+"year": 1946,
+"src": "/radio/mad-about-the-boy.mp3",
+"lore": "Maxine Sullivan's cool, understated swing on Noël Coward's torch song, 1946 — harp, clarinet and strings from the New Friends of Rhythm.",
+"ia": "78_mad-about-the-boy_maxine-sullivan-the-new-friends-of-rhythm-noel-coward-sylvan-shul_gbia0389196a",
+"iaf": "MAD ABOUT THE BOY - MAXINE SULLIVAN - The New Friends of Rhythm.mp3",
+"gain": 8.6
+},
+{
 "freq": "96.3",
 "title": "I'Ll Be So Glad",
 "artist": "Bells Over Jordan Male Group of St. Louis",
@@ -1605,6 +1660,17 @@
 "lore": "Tommy Dorsey and His Orchestra — a 1941 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_marcheta_tommy-dorsey-and-his-orchestra-victor-l.-schertzinger_gbia0011422a",
 "iaf": "Marcheta - Tommy Dorsey and His Orchestra.mp3"
+},
+{
+"freq": "98.3",
+"title": "The Gypsy",
+"artist": "Phil Brito",
+"year": 1946,
+"src": "/radio/the-gypsy.mp3",
+"lore": "Billy Reid's fortune-teller ballad — \"in a quaint caravan there's a lady they call the Gypsy.\" Phil Brito's 1946 croon, Walter Gross conducting.",
+"ia": "78_the-gypsy_phil-brito-walter-gross-and-his-orchestra-billy-reid_gbia0175774a",
+"iaf": "THE GYPSY - PHIL BRITO - Walter Gross and his Orchestra.mp3",
+"gain": 2.2
 },
 {
 "freq": "98.5",
@@ -2181,6 +2247,17 @@
 "iaf": "JOHNNY FEDORA AND ALICE BLUE BONNET - PEGGY LEE.mp3"
 },
 {
+"freq": "102.7",
+"title": "Cool Water",
+"artist": "Foy Willing & the Riders of the Purple Sage",
+"year": 1946,
+"src": "/radio/cool-water.mp3",
+"lore": "Bob Nolan's desert mirage — \"keep a-movin', Dan, don't you listen to him, Dan.\" Foy Willing's Riders of the Purple Sage, 1946. Pure Mojave.",
+"ia": "78_cool-water_foy-willing-and-the-riders-of-the-purple-sage-bob-molan_gbia0069567a",
+"iaf": "Cool Water - Foy Willing and the Riders of the Purple Sage.mp3",
+"gain": 8.5
+},
+{
 "freq": "102.9",
 "title": "Atchinson, Topeka & Santa Fe",
 "artist": "Bob Crosby and Orchestra",
@@ -2199,6 +2276,17 @@
 "lore": "Glenn Miller and his Orchestra — a 1949 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_blue-orchids_glenn-miller-and-his-orchestra-ray-eberle-hoagy-carmichael_gbia0011324a",
 "iaf": "Blue Orchids - Glenn Miller and his Orchestra.mp3"
+},
+{
+"freq": "102.9",
+"title": "Tumbling Tumbleweeds",
+"artist": "Foy Willing & the Riders of the Purple Sage",
+"year": 1946,
+"src": "/radio/tumbling-tumbleweeds.mp3",
+"lore": "Bob Nolan's drifting western standard — \"see them tumbling down.\" Foy Willing's 1946 harmony ride across the open range.",
+"ia": "78_tumbling-tumbleweeds_foy-willing-and-the-riders-of-the-purple-sage-bob-nolan_gbia0008701a",
+"iaf": "Tumbling Tumbleweeds - Foy Willing and The Riders of The Purple Sage.mp3",
+"gain": -1.4
 },
 {
 "freq": "103.1",
@@ -2427,6 +2515,17 @@
 "iaf": "BLACK BOTTOM STOMP - RED & MIFF'S STOMPERS.mp3"
 },
 {
+"freq": "105.3",
+"title": "Now Is the Hour",
+"artist": "Ray Bloch & His Orchestra",
+"year": 1947,
+"src": "/radio/now-is-the-hour.mp3",
+"lore": "A Māori farewell turned 1947 pop standard — \"now is the hour when we must say goodbye.\" Ray Bloch's orchestra sees you off.",
+"ia": "78_now-is-the-hour_ray-bloch-and-his-orchestra-the-three-blocks-kaihan-scott-stewart_gbia0323072a",
+"iaf": "NOW IS THE HOUR - RAY BLOCH and his Orchestra.mp3",
+"gain": 10.1
+},
+{
 "freq": "105.5",
 "title": "Velvet Moods",
 "artist": "Rodgers & Hart",
@@ -2534,6 +2633,17 @@
 "lore": "Sarah Vaughan — a 1946 78rpm side, preserved by the Internet Archive Great 78 Project.",
 "ia": "78_i-can-make-you-love-me_sarah-vaughan-russell-de-rose-tad-dameron_gbia0072124a",
 "iaf": "I Can Make You Love Me - Sarah Vaughan - Russell.mp3"
+},
+{
+"freq": "106.5",
+"title": "On a Slow Boat to China",
+"artist": "Freddy Martin & His Orchestra",
+"year": 1948,
+"src": "/radio/on-a-slow-boat-to-china.mp3",
+"lore": "Frank Loesser's romantic kidnapping fantasy — \"I'd love to get you on a slow boat to China.\" Freddy Martin's sweet-band hit, 1948.",
+"ia": "78_on-a-slow-boat-to-china_freddy-martin-and-his-orchestra-glenn-hughes-and-the-martin_gbia7000327a",
+"iaf": "On a slow boat to China - FREDDY MARTIN AND HIS ORCHESTRA.mp3",
+"gain": 8.4
 },
 {
 "freq": "106.7",

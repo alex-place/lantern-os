@@ -1,4 +1,5 @@
 const http = require("http");
+const net = require("net");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -311,53 +312,99 @@ if (discordToken && discordGuildId) {
   console.log("[Discord Bot] Skipped (set DISCORD_BOT_TOKEN + LANTERN_DISCORD_GUILD_ID in .env.local to enable)");
 }
 
-// ── MCP Server (no-auth, port 8771) ──
-let mcpServer = null;
-const mcpServerScript = path.join(repoRoot, "src", "mcp_server", "server.py");
-const enableMcpServer = process.env.LANTERN_MCP_SERVER !== "false";
-if (enableMcpServer && fs.existsSync(mcpServerScript)) {
-  const pythonExe = process.platform === "win32" ? "python" : "python3";
-  mcpServer = spawn(pythonExe, [mcpServerScript], {
-    stdio: "inherit",
-    cwd: repoRoot,
-    env: { ...process.env, LANTERN_MCP_PORT: "8771" },
-  });
-  mcpServer.on("error", (err) => {
-    console.error(`[MCP Server] Failed to start: ${err.message}`);
-  });
-  mcpServer.on("exit", (code) => {
-    console.log(`[MCP Server] exited with code ${code}`);
-  });
-  console.log(`[MCP Server] Starting on port 8771...`);
-} else if (enableMcpServer) {
-  console.warn(`[MCP Server] Script not found: ${mcpServerScript}`);
-} else {
-  console.log("[MCP Server] Disabled (set LANTERN_MCP_SERVER=true to enable)");
+// ── MCP child lifecycle (singleton + no-orphan) ─────────────────────────────
+// This same server.js runs as the stable production server AND from any dev /
+// `node --watch` checkout. Each used to UNCONDITIONALLY spawn its own MCP
+// (server.py:8771, server_oauth.py:8772). Two checkouts at once raced for the
+// port, and `node --watch` restarts orphaned the python *grandchild*: on Windows
+// `python` re-execs into the real interpreter, so a SIGTERM to the direct child
+// left the grandchild bound to 8771 and still spawning tool-runner bridges.
+// Strays piled up on a RAM-tight box (memory: stable-4177-orphan-leak-502).
+//
+//   • probe the port first → DEFER to whoever already owns it (singleton)
+//   • track every child and TREE-kill it on shutdown → never orphan a grandchild
+const mcpChildren = [];
+
+function probeMcpPort(port, cb) {
+  // Quick "is something already listening here?" check (no payload sent).
+  const socket = new net.Socket();
+  let settled = false;
+  const finish = (inUse) => {
+    if (settled) return;
+    settled = true;
+    socket.destroy();
+    cb(inUse);
+  };
+  socket.setTimeout(500);
+  socket.once("connect", () => finish(true));
+  socket.once("timeout", () => finish(false));
+  socket.once("error", () => finish(false));
+  try {
+    socket.connect(port, "127.0.0.1");
+  } catch {
+    finish(false);
+  }
 }
 
-// ── MCP OAuth2 Server (OAuth2 protected, port 8772) ──
-let mcpOAuthServer = null;
-const mcpOAuthServerScript = path.join(repoRoot, "src", "mcp_server", "server_oauth.py");
-const enableMcpOAuth = process.env.LANTERN_MCP_OAUTH !== "false";
-if (enableMcpOAuth && fs.existsSync(mcpOAuthServerScript)) {
-  const pythonExe = process.platform === "win32" ? "python" : "python3";
-  mcpOAuthServer = spawn(pythonExe, [mcpOAuthServerScript], {
-    stdio: "inherit",
-    cwd: repoRoot,
-    env: { ...process.env, LANTERN_MCP_OAUTH_PORT: "8772" },
-  });
-  mcpOAuthServer.on("error", (err) => {
-    console.error(`[MCP OAuth Server] Failed to start: ${err.message}`);
-  });
-  mcpOAuthServer.on("exit", (code) => {
-    console.log(`[MCP OAuth Server] exited with code ${code}`);
-  });
-  console.log(`[MCP OAuth Server] Starting on port 8772...`);
-} else if (enableMcpOAuth) {
-  console.warn(`[MCP OAuth Server] Script not found: ${mcpOAuthServerScript}`);
-} else {
-  console.log("[MCP OAuth Server] Disabled (set LANTERN_MCP_OAUTH=true to enable)");
+function killMcpChild(child) {
+  if (!child || child.killed || child.exitCode !== null) return;
+  try {
+    if (process.platform === "win32") {
+      // Tree-kill: `python` re-execs into the real interpreter, so killing only
+      // the direct child orphans the grandchild that holds 8771. /T kills the tree.
+      spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    } else {
+      child.kill("SIGTERM");
+    }
+  } catch {
+    try { child.kill("SIGKILL"); } catch { /* already gone */ }
+  }
 }
+
+function startMcpChild({ label, script, port, portEnvKey, enabled }) {
+  if (!enabled) {
+    console.log(`[${label}] Disabled (set ${portEnvKey === "LANTERN_MCP_PORT" ? "LANTERN_MCP_SERVER" : "LANTERN_MCP_OAUTH"}=true to enable)`);
+    return;
+  }
+  if (!fs.existsSync(script)) {
+    console.warn(`[${label}] Script not found: ${script}`);
+    return;
+  }
+  probeMcpPort(port, (inUse) => {
+    if (inUse) {
+      console.log(`[${label}] Port ${port} already serving an MCP — reusing it (singleton); not spawning a duplicate.`);
+      return;
+    }
+    const pythonExe = process.platform === "win32" ? "python" : "python3";
+    const child = spawn(pythonExe, [script], {
+      stdio: "inherit",
+      cwd: repoRoot,
+      env: { ...process.env, [portEnvKey]: String(port) },
+    });
+    mcpChildren.push(child);
+    child.on("error", (err) => console.error(`[${label}] Failed to start: ${err.message}`));
+    child.on("exit", (code) => console.log(`[${label}] exited with code ${code}`));
+    console.log(`[${label}] Starting on port ${port}...`);
+  });
+}
+
+// ── MCP Server (no-auth, port 8771) ──
+startMcpChild({
+  label: "MCP Server",
+  script: path.join(repoRoot, "src", "mcp_server", "server.py"),
+  port: 8771,
+  portEnvKey: "LANTERN_MCP_PORT",
+  enabled: process.env.LANTERN_MCP_SERVER !== "false",
+});
+
+// ── MCP OAuth2 Server (OAuth2 protected, port 8772) ──
+startMcpChild({
+  label: "MCP OAuth Server",
+  script: path.join(repoRoot, "src", "mcp_server", "server_oauth.py"),
+  port: 8772,
+  portEnvKey: "LANTERN_MCP_OAUTH_PORT",
+  enabled: process.env.LANTERN_MCP_OAUTH !== "false",
+});
 
 // ── Trading Microservice (Lantern OS Native) ──
 // Set LANTERN_DISABLE_TRADING=1 to skip the trading microservice + AI trader.
@@ -461,12 +508,9 @@ function shutdown(signal) {
   if (discordBot && !discordBot.killed) {
     discordBot.kill("SIGTERM");
   }
-  if (mcpServer && !mcpServer.killed) {
-    mcpServer.kill("SIGTERM");
-  }
-  if (mcpOAuthServer && !mcpOAuthServer.killed) {
-    mcpOAuthServer.kill("SIGTERM");
-  }
+  // Tree-kill MCP children FIRST (before server.close, which can hang on open
+  // SSE) so the python grandchild can't be left orphaned holding 8771.
+  for (const child of mcpChildren) killMcpChild(child);
   if (tradingService && !tradingService.killed) {
     tradingService.kill("SIGTERM");
   }
