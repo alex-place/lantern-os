@@ -75,6 +75,14 @@ def alpaca_to_completion(row) -> str | None:
     return fn.strip()
 
 
+def magicoder_to_completion(row) -> str | None:
+    """Convert Magicoder OSS-Instruct row to a completion string (keep only Python code outputs)."""
+    out = row.get('response', '')
+    if 'def ' not in out:
+        return None
+    m = re.search(r'```(?:python)?\s*(.*?)```', out, re.S)
+    if m:
+        out
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(ROOT, 'data/training/opencode-completion.jsonl'))
