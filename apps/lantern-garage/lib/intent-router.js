@@ -15,9 +15,10 @@ const CAPABILITY_REGISTRY = [
     id: "keystone",
     name: "Keystone (Code Coordinator)",
     intents: ["code"],
-    triggers: [
-      /\b(code|repo|github|pull request|pr|branch|commit|push|merge|deploy)\b/i,
+    triggers: [ // Code-related keywords for Keystone
+      /\b(code|repo|repository|github|pull request|pr|branch|commit|push|merge|deploy)\b/i,
       /\b(implement|integrate|wire|refactor|bug|fix|debug|error|trace|review|lint|test)\b/i,
+      /\b(changes|change|modify|modification|patch|update)\b/i,
       /\b(router|route|endpoint|api|server|client|ui|handler)\b/i,
       /\b(function|class|var|const|return|throw|import|export)\b/i,
       /\b(crash|fail|broke|broken|issue|problem|exception)\b/i,
