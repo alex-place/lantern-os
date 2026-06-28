@@ -26,6 +26,15 @@
 param([switch]$Force, [switch]$DryRun)
 
 $ErrorActionPreference = 'Continue'
+# Never let a broken LFS endpoint wedge the deploy. The repo declares *.png/.pdf/.zip
+# etc. as `filter=lfs ... required=true`, but the LFS endpoint is unprovisioned, so when
+# master adds an LFS-tracked binary (e.g. data/issue-screenshots/*.png from the issue
+# automation) `git reset --hard origin/master` runs the smudge filter, it fails, and
+# required=true ABORTS the whole reset -> HEAD never reaches master, the dead server is
+# never restarted, and lantern-os.net stays down (2026-06-28 outage). Skipping smudge
+# checks out the LFS *pointer* instead (a few non-critical images render broken), which is
+# strictly better than the site being down. Inherited by every child `git` call below.
+$env:GIT_LFS_SKIP_SMUDGE = '1'
 $STABLE = 'C:\dev\lantern-os-stable'
 $PORT   = 4177
 # Absolute path to the stable entry script. StartServer launches `node` with THIS path
