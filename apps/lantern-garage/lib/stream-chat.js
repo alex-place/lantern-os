@@ -50,6 +50,7 @@ const { buildBrainOrder } = require("./stream-chat/provider-order");
 const { appendJsonlQueued } = require("./file-queue");
 const { emitClaimDraft } = require("./claim-drafter");
 
+const { handleLearnCommand } = require("./learning-tutor");
 const repoRoot = path.resolve(__dirname, "../../../");
 const OURO_HARVEST_LIVE = path.resolve(repoRoot, "data/ouro-harvest-live.jsonl");
 
