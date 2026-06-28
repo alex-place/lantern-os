@@ -22,7 +22,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "busboy": "^1.6.0"
+    "busboy": "^1.6.0",
+    "win-ca": "^3.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",
