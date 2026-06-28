@@ -14,6 +14,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
+const { loadArchiveIndex, loadPublicationDates } = require("./pdfs");
+
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const RUNS_PATH = path.join(REPO_ROOT, "data", "keystone-test-runs.jsonl");
 const WORK_PATH = path.join(REPO_ROOT, "data", "convergence-autonomous-work.jsonl");
@@ -99,6 +101,29 @@ async function _stageRemember(requirement) {
     evidence.recent_work_records = workLines.length;
     evidence.recent_accepted = workLines.filter(r => r.accepted).length;
   } catch { evidence.work_log_error = true; }
+
+  // Integrate ingested PDF metadata
+  try {
+    const archiveIndex = await loadArchiveIndex();
+    evidence.ingested_pdfs_count = archiveIndex.length;
+    if (archiveIndex.length > 0) {
+      // Assuming each item in archiveIndex has a 'filename' property
+      evidence.ingested_pdfs_sample_filenames = archiveIndex.slice(0, 3).map(item => item.filename);
+    }
+
+    const pubDates = await loadPublicationDates();
+    const uniqueYears = new Set();
+    for (const dateStr of Object.values(pubDates)) {
+      const year = new Date(dateStr).getFullYear();
+      if (!isNaN(year)) {
+        uniqueYears.add(year);
+      }
+    }
+    evidence.ingested_pdfs_unique_pub_years_count = uniqueYears.size;
+    if (uniqueYears.size > 0) {
+      evidence.ingested_pdfs_sample_pub_years = Array.from(uniqueYears).sort().slice(0, 3);
+    }
+  } catch (err) { evidence.ingested_pdfs_metadata_error = err.message; }
   return { stage: "remember", status: "pass", evidence, confidence: 75 };
 }
 
