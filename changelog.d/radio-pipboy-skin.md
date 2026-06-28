@@ -1,0 +1,3 @@
+### Keystone Radio — unofficial Pip-Boy skin
+
+- Reskinned the radio (`fallout-radio.html`) to read as an unofficial hand-terminal: the whole UI now sits on a single phosphor-green CRT **display** set into a chunky beveled case (corner screws, inner bezel ring), with a top **module tab strip** (STAT · INV · DATA · **RADIO**, RADIO lit), bracket-cornered panels, and a bottom **status HUD** (SIG · FREQ · VOL · STATIONS) that updates live as you tune and change volume. Pure CSS/markup layered over the existing CRT effects — all playback, the dial, search, the visualizer, leveling, and keyboard control are unchanged. Honors `prefers-reduced-motion`; responsive (stacks cleanly at mobile width). It's a homage, not a reproduction — no trademarked assets.

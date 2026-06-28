@@ -110,4 +110,43 @@ ok("observe: looping reply → collapse axis trips + emits a logged signal (acce
   assert.ok(r.signaturePatch.canary && r.signaturePatch.canary.action, "logged signal present");
 });
 
+// ── #1342: run-on / rambling-collapse detection ─────────────────────
+// The repetition signals above miss a lexically-diverse but topically-incoherent
+// run-on (the real failure mode observed: hundreds of comma-less words with no
+// sentence boundaries). The longestSegmentTokens signal catches it; code blocks and
+// bullet lists must NOT trip it (they break on newlines).
+ok("run-on rambling (no sentence boundaries) → collapsed", () => {
+  const rambling = "a flamingo looks like a tall bird standing upright with thin legs sticking " +
+    "out far behind while holding up its roundish head above its slim neck which curves slightly " +
+    "downward towards its chest area covered mostly white except around eyes nostrils mouth beak " +
+    "bill feet wings tail tip those parts turn bright reddish orange due pigments absorbed diet " +
+    "especially shrimp crabs shellfish mollusks fish eggs insects larvae worms small crustaceans " +
+    "planktonic organisms zooplankton tiny plants animals microscopic bacteria viruses fungi";
+  const r = scoreReplyCollapse(rambling);
+  assert.ok(r.collapsed, `run-on should collapse, got proximity=${r.proximity} seg=${r.signals.longestSegmentTokens}`);
+  assert.ok(r.signals.longestSegmentTokens >= 70, `expected long unbroken segment, got ${r.signals.longestSegmentTokens}`);
+});
+
+ok("code block with long lines → NOT collapsed (breaks on newlines)", () => {
+  const code = "Here is the parser:\n\n```python\ndef parse_csv(path):\n    rows = []\n    with open(path) as f:\n        for line in f:\n            rows.append(line.strip().split(\",\"))\n    return rows\n```\n\nThis reads each line and splits on commas to build a list of rows.";
+  const r = scoreReplyCollapse(code);
+  assert.ok(!r.collapsed, `code should not collapse, got proximity=${r.proximity} seg=${r.signals.longestSegmentTokens}`);
+});
+
+ok("bullet list without periods → NOT collapsed (breaks on newlines)", () => {
+  const list = "Key points about black holes:\n- The event horizon is the boundary of no return\n" +
+    "- Hawking radiation causes black holes to evaporate slowly over time\n" +
+    "- Supermassive black holes sit at the centers of most large galaxies\n" +
+    "- Stellar black holes form when massive stars exhaust their fuel and collapse";
+  const r = scoreReplyCollapse(list);
+  assert.ok(!r.collapsed, `list should not collapse, got proximity=${r.proximity} seg=${r.signals.longestSegmentTokens}`);
+});
+
+ok("run-on → antiCollapseSignal recommends truncate_output", () => {
+  const rambling = Array(90).fill("word").map((w, i) => w + i).join(" "); // 90-token unbroken run
+  const r = scoreReplyCollapse(rambling);
+  const sig = antiCollapseSignal(r);
+  assert.strictEqual(sig.action, "truncate_output", `expected truncate_output, got ${sig.action}`);
+});
+
 console.log(`\nPASS — ${n} collapse-canary checks`);

@@ -57,6 +57,36 @@ function compactHistory(history) {
   });
 }
 
+// Micro-compaction for the IN-TURN tool loop (REMEMBER stage). A long agentic turn
+// pushes one "The <name> tool returned:\n<output>" user message per tool call
+// (stream-chat.js local Ollama loop). Over several iterations these stale results
+// crowd a small local context window (8K) and can derail a weak local model into
+// repetition/timeout (the local-fallback crash class, #1369). This keeps the most
+// recent `keepRecentResults` tool results verbatim (the model needs the latest to
+// continue) and collapses older ones to a one-line stub. Pure + non-destructive
+// (returns a new array); a NO-OP when there are <= keepRecentResults results, so a
+// normal short tool turn is unchanged.
+const TOOL_RESULT_PREFIX = /^The (.+?) tool returned:\n/;
+
+function compactToolLoopMessages(messages, { keepRecentResults = 2 } = {}) {
+  if (!Array.isArray(messages)) return messages;
+  const resultIdx = [];
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m && m.role === "user" && typeof m.content === "string" && TOOL_RESULT_PREFIX.test(m.content)) {
+      resultIdx.push(i);
+    }
+  }
+  if (resultIdx.length <= keepRecentResults) return messages.slice();
+  const toStub = new Set(resultIdx.slice(0, resultIdx.length - keepRecentResults));
+  return messages.map((m, i) => {
+    if (!toStub.has(i)) return m;
+    const name = (m.content.match(TOOL_RESULT_PREFIX) || [])[1] || "tool";
+    const body = m.content.replace(TOOL_RESULT_PREFIX, "");
+    return { ...m, content: `The ${name} tool returned: [${body.length} chars elided to save context]` };
+  });
+}
+
 // Build the provider messages array from compacted history + current message.
 // Single source of truth — all providers call this instead of inlining history.map.
 function buildProviderMessages(systemPrompt, compacted, currentMessage) {
@@ -74,5 +104,6 @@ module.exports = {
   LOW_FIDELITY_WORD_LIMIT,
   logTruncationMetric,
   compactHistory,
+  compactToolLoopMessages,
   buildProviderMessages,
 };

@@ -441,7 +441,14 @@ class PrWatcher {
         message,
         user: "pr-watcher",
         conversationId: "pr-review-fleet",
-        forceAgent: "keystone",
+        // The route reads `agent` (not `forceAgent`) → keep the Keystone reviewer persona.
+        agent: "keystone",
+        // Pin a working provider. The default (no provider) path classifies a diff-bearing
+        // review as "coding" and routes to the local Σ₀ coder / preferred provider, which on
+        // this host is the credit-depleted AI-Studio Gemini → no_provider_configured. Gemini
+        // resolves to Vertex AI (ADC, still funded) via gemini-transport. Override with
+        // PR_WATCHER_PROVIDER. #1376
+        provider: process.env.PR_WATCHER_PROVIDER || "gemini",
       });
 
       const req = http.request(

@@ -23,6 +23,11 @@ function validatePatch(patchText) {
     };
   }
 
+  // SEARCH/REPLACE blocks are a valid edit payload (applied by applySearchReplace).
+  if (looksLikeSearchReplace(patchText)) {
+    return { valid: true, type: "search-replace" };
+  }
+
   const lines = patchText.split("\n");
   let hasFileHeader = false;
   let hasHunkHeader = false;
@@ -131,11 +136,177 @@ function parsePatch(patchText) {
   return changes;
 }
 
+// ── Search/Replace edit format ────────────────────────────────────────────────
+// Content-matched edits — line-number-INDEPENDENT, so they survive the line-drift
+// that breaks the unified-diff "manual" fallback below. This is the format the
+// 2026 harness literature credits for large reliability gains (models emit it more
+// accurately than unified diffs). Each block is:
+//
+//   path/to/file.js
+//   <<<<<<< SEARCH
+//   exact lines to find
+//   =======
+//   lines to replace them with
+//   >>>>>>> REPLACE
+//
+// An empty SEARCH (or a file that does not exist yet) creates the file from the
+// REPLACE body. See #1389 / docs/research/2026-06-28-keystone-chat-frontier-stack.md.
+
+const SR_HEAD = /^<{5,}\s*SEARCH\s*$/;
+const SR_DIV = /^={5,}\s*$/;
+const SR_TAIL = /^>{5,}\s*REPLACE\s*$/;
+
+/** Quick detector: does this text use the SEARCH/REPLACE format (vs a unified diff)? */
+function looksLikeSearchReplace(text) {
+  if (typeof text !== "string") return false;
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  return lines.some((l) => SR_HEAD.test(l.trim())) && lines.some((l) => SR_TAIL.test(l.trim()));
+}
+
+/** Extract a file path from a header-ish line, or null if it isn't one. Tolerates
+ *  `path` backticks, a trailing colon, and a "File:"/"path:" prefix; rejects prose
+ *  (anything with internal whitespace that isn't a recognised path). */
+function _pathFrom(line) {
+  let t = String(line).trim();
+  if (!t) return null;
+  const m = t.match(/^(?:file|path)\s*:\s*(.+)$/i);
+  if (m) t = m[1].trim();
+  t = t.replace(/^`+/, "").replace(/`+$/, "").replace(/:$/, "").trim();
+  if (!t || /\s/.test(t)) return null;
+  return t.includes("/") || /\.[A-Za-z0-9]+$/.test(t) ? t : null;
+}
+
+/** Parse SEARCH/REPLACE blocks into [{file, search, replace}]. The file path is
+ *  the most recent path-like line above each block. */
+function parseSearchReplace(text) {
+  const out = [];
+  const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+  let i = 0;
+  let lastPath = null;
+  while (i < lines.length) {
+    if (SR_HEAD.test(lines[i].trim())) {
+      const file = lastPath;
+      i++;
+      const search = [];
+      while (i < lines.length && !SR_DIV.test(lines[i].trim())) search.push(lines[i++]);
+      i++; // skip =======
+      const replace = [];
+      while (i < lines.length && !SR_TAIL.test(lines[i].trim())) replace.push(lines[i++]);
+      i++; // skip >>>>>>> REPLACE
+      out.push({ file, search: search.join("\n"), replace: replace.join("\n") });
+    } else {
+      const p = _pathFrom(lines[i]);
+      if (p) lastPath = p;
+      i++;
+    }
+  }
+  return out;
+}
+
+/** Resolve a repo-relative path and guarantee it stays inside the sandbox (no
+ *  traversal / absolute escape). Returns the absolute path, or null if unsafe. */
+function _resolveSafe(repoPath, file) {
+  const clean = String(file).replace(/^[ab]\//, "").replace(/\\/g, "/").replace(/^\/+/, "");
+  const root = path.resolve(repoPath);
+  const full = path.resolve(root, clean);
+  if (full !== root && !full.startsWith(root + path.sep)) return null;
+  return full;
+}
+
+/** Find the first index where `needle` lines appear consecutively in `hay`. Exact
+ *  first; if `trimmed`, compares lines ignoring leading/trailing whitespace (the
+ *  fuzz that lets a block land despite indentation drift). -1 if absent. */
+function _indexOfLines(hay, needle, trimmed) {
+  if (!needle.length || needle.length > hay.length) return -1;
+  const eq = trimmed ? (a, b) => a.trim() === b.trim() : (a, b) => a === b;
+  for (let i = 0; i + needle.length <= hay.length; i++) {
+    let ok = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (!eq(hay[i + j], needle[j])) { ok = false; break; }
+    }
+    if (ok) return i;
+  }
+  return -1;
+}
+
+/** Apply one SEARCH→REPLACE to a string. Preserves EOL style + trailing newline.
+ *  Empty SEARCH prepends REPLACE. Returns {ok, content} or {ok:false, reason}. */
+function applySearchReplaceToContent(content, search, replace) {
+  const eol = /\r\n/.test(content) ? "\r\n" : "\n";
+  const norm = content.replace(/\r\n/g, "\n");
+  const trailingNL = norm === "" || /\n$/.test(norm);
+  const fileLines = norm.split("\n");
+  if (norm.endsWith("\n")) fileLines.pop();
+
+  const searchLines = search.replace(/\r\n/g, "\n").split("\n");
+  if (searchLines.length && searchLines[searchLines.length - 1] === "") searchLines.pop();
+  const replaceLines = replace.replace(/\r\n/g, "\n").split("\n");
+  if (replaceLines.length && replaceLines[replaceLines.length - 1] === "") replaceLines.pop();
+
+  if (searchLines.length === 0) {
+    const merged = [...replaceLines, ...fileLines];
+    return { ok: true, content: merged.join(eol) + (trailingNL ? eol : "") };
+  }
+  let at = _indexOfLines(fileLines, searchLines, false);
+  if (at === -1) at = _indexOfLines(fileLines, searchLines, true);
+  if (at === -1) return { ok: false, reason: "search-block-not-found" };
+  const merged = [...fileLines.slice(0, at), ...replaceLines, ...fileLines.slice(at + searchLines.length)];
+  return { ok: true, content: merged.join(eol) + (trailingNL ? eol : "") };
+}
+
+/** Apply SEARCH/REPLACE blocks to the repo. Same result shape as applyPatch:
+ *  {success, method, filesChanged, changed, errors}. Blocks apply in order, so a
+ *  later block sees an earlier block's write to the same file. */
+async function applySearchReplace(patchText, repoPath = REPO_ROOT) {
+  const blocks = parseSearchReplace(patchText);
+  if (!blocks.length) return { success: false, error: "No SEARCH/REPLACE blocks found", changed: [], errors: [] };
+
+  const changed = [];
+  const errors = [];
+  for (const b of blocks) {
+    if (!b.file) { errors.push({ file: null, error: "block missing a file-path header" }); continue; }
+    const full = _resolveSafe(repoPath, b.file);
+    if (!full) { errors.push({ file: b.file, error: "path escapes repo sandbox" }); continue; }
+
+    let existed = true;
+    let content = "";
+    try { content = await fs.readFile(full, "utf-8"); } catch { existed = false; }
+    const searchEmpty = b.search.replace(/\r\n/g, "\n").trim() === "";
+
+    let outContent;
+    if (!existed) {
+      if (!searchEmpty) { errors.push({ file: b.file, error: "file not found for non-empty SEARCH" }); continue; }
+      outContent = b.replace.replace(/\r\n/g, "\n").replace(/\n*$/, "") + "\n"; // create from REPLACE
+    } else {
+      const r = applySearchReplaceToContent(content, b.search, b.replace);
+      if (!r.ok) { errors.push({ file: b.file, error: r.reason, search: b.search.slice(0, 200) }); continue; }
+      outContent = r.content;
+    }
+    try {
+      await fs.mkdir(path.dirname(full), { recursive: true });
+      await fs.writeFile(full, outContent, "utf-8");
+      changed.push({ path: b.file, status: existed ? "M" : "A" });
+    } catch (e) {
+      errors.push({ file: b.file, error: e.message });
+    }
+  }
+  return {
+    success: errors.length === 0 && changed.length > 0,
+    method: "search-replace",
+    filesChanged: changed.length,
+    changed,
+    errors,
+  };
+}
+
 /**
  * Apply patch to repository.
- * Uses `git apply` for reliability, falls back to manual application.
+ * Auto-detects the SEARCH/REPLACE format (content-matched, line-drift-proof) and
+ * dispatches to it; otherwise uses `git apply` for unified diffs, falling back to
+ * manual application.
  */
 async function applyPatch(patchText, repoPath = REPO_ROOT) {
+  if (looksLikeSearchReplace(patchText)) return applySearchReplace(patchText, repoPath);
   const validation = validatePatch(patchText);
   if (!validation.valid && validation.type !== "newfile") {
     return {
@@ -308,4 +479,8 @@ module.exports = {
   validatePatch,
   parsePatch,
   applyPatch,
+  looksLikeSearchReplace,
+  parseSearchReplace,
+  applySearchReplace,
+  applySearchReplaceToContent,
 };

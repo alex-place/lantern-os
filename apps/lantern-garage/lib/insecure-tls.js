@@ -19,7 +19,14 @@ const INSECURE_TLS =
   process.env.LANTERN_INSECURE_TLS === "1" ||
   (process.platform === "win32" && process.env.LANTERN_INSECURE_TLS !== "0");
 
-// Always use Node's default global agent (TLS verification ON).
-const llmAgent = undefined;
+// `undefined` => Node uses its default global agent (TLS verification ON).
+// On win32 (INSECURE_TLS), use an agent with verification disabled — the scoped,
+// documented #869 workaround for local AV/TLS interception. A CodeQL autofix
+// (a714d6ae) silently flattened this to `undefined`, which broke ALL cloud-provider
+// calls on Windows (no_provider_configured → chat 503 → #1376). The inline
+// suppression keeps the autofix bot from re-reverting the deliberate gate.
+const llmAgent = INSECURE_TLS
+  ? new https.Agent({ rejectUnauthorized: false }) // codeql[js/disabling-certificate-validation]
+  : undefined;
 
 module.exports = { INSECURE_TLS, llmAgent };

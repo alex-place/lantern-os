@@ -297,6 +297,48 @@ const REGISTRY = {
     },
   },
 
+  // #1344: a first-class issue/PR lookup. Before this, "find issue #1342" had no tool —
+  // the model fell back to Grep on repo files (issues don't live in the repo), found
+  // nothing, and gave up, even though the live-context block already injects the top-8
+  // open issues by title only. This fetches ONE specific issue/PR by number, with body,
+  // via the same `gh` path keystone-context.js already uses (the reliable one). Read-only
+  // + scoped to the configured repo (a public repo) → guest_safe like web_fetch.
+  github_issue: {
+    policy: "read",
+    guest_safe: true,
+    desc: "Look up a specific GitHub issue or pull request by number in this project's repo, returning its title, state, labels, and body. Use this whenever the user asks to find, show, view, read, or summarize an issue or PR by number (e.g. \"find issue #1342\", \"what's PR 1200 about\"). Do NOT grep the repo for issue numbers — issues live on GitHub, not in the files.",
+    schema: {
+      type: "object",
+      properties: {
+        number: { type: "integer", description: "The issue or PR number (without the # prefix)" },
+      },
+      required: ["number"],
+    },
+    async run(i) {
+      const n = parseInt(String(i.number == null ? "" : i.number).replace(/^#/, ""), 10);
+      if (!Number.isInteger(n) || n <= 0) return "[github_issue error: a positive issue/PR number is required]";
+      const { execFile } = require("child_process");
+      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      const ghView = (kind) => new Promise((resolve) => {
+        execFile("gh", [kind, "view", String(n), "--repo", repo, "--json",
+          "number,title,state,labels,body,url"],
+          { cwd: REPO, timeout: 10000, windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
+          (err, stdout) => resolve(err ? null : stdout));
+      });
+      // `gh issue view` errors on a PR number and vice-versa, so try issue then PR.
+      let raw = await ghView("issue");
+      let kind = "issue";
+      if (!raw) { raw = await ghView("pr"); kind = "pull request"; }
+      if (!raw) return `[github_issue: #${n} not found in ${repo} (or gh CLI unavailable)]`;
+      let d;
+      try { d = JSON.parse(raw); } catch { return `[github_issue: could not parse gh output for #${n}]`; }
+      const labels = (d.labels || []).map((l) => l.name).filter(Boolean).join(", ") || "none";
+      const body = String(d.body || "").trim();
+      const excerpt = body.length > 4000 ? body.slice(0, 4000) + "\n…[truncated]" : (body || "(no description)");
+      return `${kind} #${d.number} — ${d.title}\nstate: ${d.state} · labels: ${labels}\nurl: ${d.url}\n\n${excerpt}`;
+    },
+  },
+
   web_fetch: {
     policy: "read",
     guest_safe: true, // web-only (SSRF-guarded): safe for non-operators on the public server (#1213)
@@ -315,7 +357,14 @@ const REGISTRY = {
       const maxChars = Math.max(200, Math.min(MAX_OUT, parseInt(i.max_chars, 10) || 3000));
       let html;
       try { html = await _httpGet(url); }
-      catch (e) { return `[web_fetch error: ${e.message}]`; }
+      catch (e) {
+        // Let coded block errors (private_host_blocked, etc.) propagate so runTool maps
+        // them to status "blocked" + reason_code — consistent with Read/Bash. Swallowing
+        // them into a plain string mis-reported a blocked SSRF attempt as "executed" (the
+        // guard still worked — no request reached the private host — but the status lied).
+        if (e && e.reason) throw e;
+        return `[web_fetch error: ${e.message}]`;
+      }
       const text = _htmlToText(html || "");
       const excerpt = text.length > maxChars ? text.slice(0, maxChars) + "\n…[truncated]" : text;
       return `web_fetch(${url})\n\n${excerpt}`;
