@@ -302,16 +302,34 @@
       display: inline-flex; align-items: center; justify-content: center;
     }
     .feed-card.is-embed .fc-dismiss:hover { opacity: 1; }
-    .fc-embed-bar .fc-fullscreen {
+    .fc-embed-bar .fc-fullscreen,
+    .fc-embed-bar .fc-mute {
       border: none; background: transparent; color: var(--muted);
       font-size: 16px; line-height: 1; cursor: pointer;
       width: 30px; height: 30px; border-radius: 6px;
       display: inline-flex; align-items: center; justify-content: center;
       transition: background 0.15s, color 0.15s;
     }
-    .fc-embed-bar .fc-fullscreen:hover { background: var(--surface2); color: var(--text); }
-    .fc-embed-bar .fc-fullscreen:focus-visible { outline: 2px solid var(--accent); }
+    .fc-embed-bar .fc-fullscreen:hover,
+    .fc-embed-bar .fc-mute:hover { background: var(--surface2); color: var(--text); }
+    .fc-embed-bar .fc-fullscreen:focus-visible,
+    .fc-embed-bar .fc-mute:focus-visible { outline: 2px solid var(--accent); }
     .fc-embed-bar .fc-fullscreen[aria-pressed="true"] { color: var(--accent); background: var(--surface2); }
+    /* muted state — dim + accent so it reads as "audio off" */
+    .fc-embed-bar .fc-mute[aria-pressed="true"] { color: var(--accent); background: var(--surface2); }
+    /* #1447: when an embed is fullscreen we put the same-origin .fc-frame wrapper
+       (not the cross-origin iframe) into fullscreen, then force the iframe to fill
+       it — the iframe's inline height:Npx otherwise leaves it a small band on a
+       black backdrop, which read as "fullscreen didn't work". */
+    .fc-frame:fullscreen,
+    .fc-frame:-webkit-full-screen {
+      width: 100vw; height: 100vh; background: #000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fc-frame:fullscreen iframe,
+    .fc-frame:-webkit-full-screen iframe {
+      width: 100% !important; height: 100% !important; flex: 1 1 auto;
+    }
     .feed-card.is-embed .fc-poster {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 12px; width: 100%; border: 0; cursor: pointer; font: inherit; color: #fff;
@@ -1006,13 +1024,34 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeEmbed === el) activeEmbed = null;
   }
 
+  // #1447: cross-origin iframes can't have their audio controlled from the parent,
+  // but YouTube/Vimeo honor a URL mute flag. For those we rebuild the src muted;
+  // archive.org / github.io games have no such flag (audio is in-frame only), so the
+  // button is disabled there rather than pretending to work.
+  function embedCanMute(src) {
+    try {
+      const h = new URL(src, location.href).hostname;
+      return /(^|\.)youtube(-nocookie)?\.com$/i.test(h) || /(^|\.)vimeo\.com$/i.test(h);
+    } catch (_) { return false; }
+  }
+  function withMute(src, muted) {
+    if (!muted) return src;
+    try {
+      const u = new URL(src, location.href);
+      if (/(^|\.)youtube(-nocookie)?\.com$/i.test(u.hostname)) u.searchParams.set('mute', '1');
+      else if (/(^|\.)vimeo\.com$/i.test(u.hostname)) { u.searchParams.set('muted', '1'); u.searchParams.set('volume', '0'); }
+      else return src;
+      return u.toString();
+    } catch (_) { return src; }
+  }
+
   function activateEmbed(el) {
     const e = el._embed; if (!e) return;
     if (activeEmbed && activeEmbed !== el) deactivateEmbed(activeEmbed); // enforce single active
     const frame = el.querySelector('.fc-frame');
     frame.innerHTML =
-      '<iframe src="' + esc(e.src) + '" style="height:' + e.h + 'px" ' +
-        'title="' + esc(e.title) + '" allow="autoplay; fullscreen; gamepad" ' +
+      '<iframe src="' + esc(withMute(e.src, el._muted)) + '" style="height:' + e.h + 'px" ' +
+        'title="' + esc(e.title) + '" allow="autoplay; fullscreen; gamepad" allowfullscreen ' +
         'referrerpolicy="no-referrer" ' +
         'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>';
     el.classList.add('is-playing');
@@ -1027,10 +1066,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function toggleFullscreen(el) {
-    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); return; }
-    const node = el.querySelector('.fc-frame iframe') || el.querySelector('.fc-frame') || el;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+      return;
+    }
+    // #1447: fullscreen the same-origin .fc-frame WRAPPER, not the cross-origin
+    // iframe — the wrapper always has the fullscreen permission, and CSS forces
+    // the iframe inside to fill it. Fall back to the card, never to the poster div.
+    const node = el.querySelector('.fc-frame') || el;
     const req = node.requestFullscreen || node.webkitRequestFullscreen || node.msRequestFullscreen;
-    if (req) { try { req.call(node); } catch (_) {} }
+    if (!req) { console.warn('[explore] fullscreen API unavailable'); return; }
+    try {
+      const p = req.call(node);
+      // requestFullscreen returns a Promise; a sync try/catch never saw its
+      // rejection, so failures used to be silent. Surface them now.
+      if (p && p.catch) p.catch((e) => console.warn('[explore] fullscreen request blocked:', e && e.message));
+    } catch (e) {
+      console.warn('[explore] fullscreen error:', e && e.message);
+    }
   }
 
   // Keep the ⛶ button's aria-pressed in sync with real fullscreen state — including
@@ -1090,6 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<span class="fc-embed-title"><span aria-hidden="true">' + (ICON[c.type] || '🕹️') + '</span> ' + esc(c.title) + '</span>' +
           '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
           '<span class="fc-embed-ctl">' +
+            '<button type="button" class="fc-mute" aria-label="Mute audio" aria-pressed="false" title="Mute audio">🔊</button>' +
             '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" aria-pressed="false" title="Fullscreen">⛶</button>' +
             '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
           '</span>' +
@@ -1108,6 +1163,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!el.classList.contains('is-playing')) activateEmbed(el);
         toggleFullscreen(el);
       });
+      // #1447: per-embed mute toggle. Cross-origin audio is only controllable on
+      // YouTube/Vimeo (URL flag); disable + explain elsewhere rather than fake it.
+      const muteBtn = el.querySelector('.fc-mute');
+      if (muteBtn) {
+        el._muted = false;
+        if (!embedCanMute(embedSrc)) {
+          muteBtn.disabled = true;
+          muteBtn.title = 'Audio control unavailable for this embed';
+          muteBtn.setAttribute('aria-label', 'Audio control unavailable for this embed');
+          muteBtn.style.opacity = '0.4';
+          muteBtn.style.cursor = 'default';
+        } else {
+          muteBtn.addEventListener('click', (ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            el._muted = !el._muted;
+            muteBtn.setAttribute('aria-pressed', el._muted ? 'true' : 'false');
+            muteBtn.textContent = el._muted ? '🔇' : '🔊';
+            const lbl = el._muted ? 'Unmute audio' : 'Mute audio';
+            muteBtn.setAttribute('aria-label', lbl);
+            muteBtn.title = lbl;
+            if (el.classList.contains('is-playing')) activateEmbed(el); // reload with new mute state
+          });
+        }
+      }
       const open = el.querySelector('.fc-open');
       if (open) open.addEventListener('click', () => record(c.key, 'click', 0));
     } else {
