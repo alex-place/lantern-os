@@ -44,7 +44,7 @@ const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 // Extracted helper modules (split out of this file for smaller-context editing):
-const { compactHistory, compactToolLoopMessages, buildProviderMessages } = require("./stream-chat/history");
+const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
 const { buildBrainOrder } = require("./stream-chat/provider-order");
@@ -260,15 +260,11 @@ async function handleStreamChat(req, url, res) {
       }
       swarmMessage = parts.join(" ") || "Hello swarm";
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "X-Accel-Buffering": "no",
-      });
-      const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
-      const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
+      // Use the shared SSE helpers so the product chat (which reads {type:"token",
+      // text:…}) actually renders these. The old raw {token} format was dropped.
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
 
       sendToken(`Keystone routing…\n\n`);
       const agent = selectAgent(swarmMessage);
@@ -278,64 +274,19 @@ async function handleStreamChat(req, url, res) {
         .then((result) => {
           const words = result.text.split(" ");
           for (const word of words) sendToken(word + " ");
+          const council = result.council || null;
+          if (council && Array.isArray(council.dissent) && council.dissent.length) {
+            sendToken(`\n\n**Where the council disagreed (${council.dissent.length}):**\n`);
+            for (const d of council.dissent) sendToken(`- ${d}\n`);
+          }
           const meta = { agent: "Keystone", provider: result.provider, online: true, swarm: { provider: result.provider, model: result.model, mode, job } };
           if (result.consensus) meta.swarm.consensus = result.consensus;
-          if (result.council) meta.swarm.council = result.council;
+          if (council) meta.swarm.council = council;
           sendDone("keystone", meta);
-          res.end();
         })
         .catch((err) => {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
-          res.end();
-        });
-      return;
-    }
-
-    if (cmd.name === "agents" || cmd.name === "agent") {
-      // Orchestrator–worker sub-agents (#1392): decompose → isolated workers → synthesize.
-      // Emits the TYPE-based SSE the dream-chat UI parser consumes ({type:"token",text},
-      // {type:"done",...}) via the shared sse helper — not the raw event:-name format.
-      const task = cmd.args.trim() || message.replace(/^!\S+\s*/, "").trim();
-      sse.writeStreamHeaders(res);
-      if (!task) {
-        sse.sendToken(res, "Usage: !agents <task> — splits the task across isolated sub-agents and synthesizes the result.\n");
-        sse.sendDone(res, "failed", { error: "no_task", online: false });
-        return;
-      }
-      const { runOrchestrator } = require("./orchestrator-agents");
-      const agent = selectAgent(task);
-      const systemPrompt = `${agent.systemPrompt}\n\nTone: thoughtful, unhurried, human. Never clinical. Never sycophantic.`;
-      const workerId = `agents-${Date.now()}`;
-      sse.sendToken(res, `🔀 **Orchestrator** — decomposing the task into sub-agents…\n\n`);
-      runOrchestrator(task, {
-        systemPrompt,
-        workerId,
-        provider: process.env.KEYSTONE_AGENTS_PROVIDER || requestedProvider || undefined,
-        onPhase: (phase, info) => {
-          if (phase === "workers") {
-            const names = (info.workers || []).map((w) => `\`${w.name}\``).join(", ");
-            sse.sendToken(res, `Dispatching **${info.count}** isolated sub-agent${info.count === 1 ? "" : "s"}: ${names}\n\n`);
-          } else if (phase === "synthesize") {
-            sse.sendToken(res, `\nSynthesizing sub-agent results…\n\n`);
-          }
-        },
-        onWorkerStart: (name, role) => sse.sendToken(res, `→ \`${name}\` (${role}) working…\n`),
-        onWorkerDone: (name, ok) => sse.sendToken(res, `${ok ? "✓" : "✗"} \`${name}\` ${ok ? "done" : "failed"}\n`),
-      })
-        .then(({ synthesis, workers }) => {
-          sse.sendToken(res, `\n---\n\n`);
-          for (const word of String(synthesis.text).split(" ")) sse.sendToken(res, word + " ");
-          sse.sendDone(res, "keystone", {
-            agent: "Keystone",
-            provider: synthesis.provider || "orchestrator",
-            online: !!String(synthesis.text || "").trim(),
-            orchestrator: { workerId, workers: workers.map((w) => ({ name: w.name, role: w.role, ok: w.ok })) },
-          });
-        })
-        .catch((err) => {
-          sse.sendError(res, `Sub-agents failed: ${err.message}`);
-          sse.sendDone(res, "failed", { error: err.message, online: false });
         });
       return;
     }
@@ -586,6 +537,7 @@ async function handleStreamChat(req, url, res) {
           if (cm) conf = Math.max(0, Math.min(1, parseFloat(cm[1])));
           const answer = String(result.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(result.text);
           const members = (result.council && result.council.members) || [];
+          const dissent = (result.council && result.council.dissent) || [];
           let recordId = null;
           try {
             const rec = await emitConvergenceRecord({
@@ -595,18 +547,22 @@ async function handleStreamChat(req, url, res) {
               evidence_ids: members.map((m) => m.provider),
               reasoner: "convergance-council",
               verified: true,
-              verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+              verification_notes: `Σ₀ council convergence over ${members.length} member(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}` + (dissent.length ? `; dissent: ${dissent.join(" | ")}` : "; dissent: none"),
               source: `council/${result.provider}/${result.model}`,
             });
             recordId = rec && rec.id;
           } catch (_e) { /* record emit is best-effort */ }
           for (const w of answer.split(" ")) sendToken(w + " ");
+          if (dissent.length) {
+            sendToken(`\n\n**Where the council disagreed (${dissent.length}):**\n`);
+            for (const d of dissent) sendToken(`- ${d}\n`);
+          }
           sendDone("keystone", {
             agent: "Keystone",
             provider: result.provider,
             online: true,
             routeLabel: "Convergence · Σ₀ council",
-            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), recordId },
+            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), dissent, recordId },
           });
           return;
         } catch (err) {
@@ -1784,9 +1740,7 @@ async function handleStreamChat(req, url, res) {
                   result: result.ok ? result.result : (result.error || null) });
                 convo.push({ role: "assistant", content: lastTurn });
                 convo.push({ role: "user", content: `The ${tc.name} tool returned:\n${String(out).slice(0, 1500)}\n\nIf you need another tool, reply with exactly one <tool_call>…</tool_call>. Otherwise answer my original request in plain text.` });
-                // Micro-compact stale tool results so a long loop doesn't crowd the
-                // local 8K window (keeps the 2 newest verbatim; #1391).
-                const followText = await streamOllamaFollow(compactToolLoopMessages(convo, { keepRecentResults: 2 }));
+                const followText = await streamOllamaFollow(convo);
                 const nextTc = toolRunner.parseToolCall(followText);
                 if (nextTc) { tc = nextTc; lastTurn = followText; } // markup already streamed; keep going
                 else { if (followText.trim()) fullReply += "\n\n" + followText; tc = null; }
@@ -2179,7 +2133,6 @@ async function handleStreamChat(req, url, res) {
             return;
           }
           let buf = "";
-          let liveCollapseChecked = false; // one cut, not a re-trigger loop
           upstream.on("data", (chunk) => {
             buf += chunk.toString();
             const lines = buf.split("\n");
@@ -2193,26 +2146,6 @@ async function handleStreamChat(req, url, res) {
                 if (evt.type === "content_block_delta" && evt.delta?.text) {
                   fullReply += evt.delta.text;
                   sendToken(evt.delta.text);
-                  // #1342: the collapse canary used to be advisory-only — it scored the
-                  // FULL reply only after every token had already streamed to the user,
-                  // so a degenerating reply (repetition/n-gram echo/lexical collapse) was
-                  // always seen in full before anything could act on it. Check periodically
-                  // WHILE streaming and cut the request short the first time proximity is
-                  // unambiguously high (0.65, stricter than the 0.5 advisory default, so a
-                  // verbose-but-healthy reply is never mistaken for collapse).
-                  if (!liveCollapseChecked && fullReply.length > 400 && fullReply.length % 120 < evt.delta.text.length) {
-                    const live = scoreReplyCollapse(fullReply, { threshold: 0.65 });
-                    if (live.collapsed) {
-                      liveCollapseChecked = true;
-                      console.warn(`[canary_collapse_live] cutting anthropic stream short — proximity=${live.proximity}`);
-                      const notice = "\n\n*(cut short — the response started repeating itself)*";
-                      fullReply += notice;
-                      sendToken(notice);
-                      upstream.destroy();
-                      resolve();
-                      return;
-                    }
-                  }
                 }
               } catch { /* skip malformed */ }
             }
@@ -2329,18 +2262,11 @@ async function handleStreamChat(req, url, res) {
     }
     try {
       // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
-      const _openaiPayload = serving.applyOpenAIDecodeParams({
+      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
         model: modelFor("openai"),
         stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
-      });
-      // Σ₀ groundedness surprise (#1260, opt-in GROUNDEDNESS_SURPRISE=1): request per-token
-      // logprobs so the model-internal uncertainty signal can sharpen the groundedness canary
-      // (lib/token-surprise.js). Default off → byte-identical request, zero behavior change.
-      const _surpriseOn = process.env.GROUNDEDNESS_SURPRISE === "1";
-      const _openaiLogprobs = _surpriseOn ? [] : null;
-      if (_surpriseOn) _openaiPayload.logprobs = true;
-      const payload = JSON.stringify(_openaiPayload);
+      }));
 
       await new Promise((resolve, reject) => {
         const req2 = https.request({
@@ -2372,10 +2298,6 @@ async function handleStreamChat(req, url, res) {
                 const evt = JSON.parse(raw);
                 const token = evt.choices?.[0]?.delta?.content || "";
                 if (token) { fullReply += token; sendToken(token); }
-                if (_openaiLogprobs) {
-                  const _lp = evt.choices?.[0]?.logprobs?.content;
-                  if (Array.isArray(_lp)) _openaiLogprobs.push(..._lp);
-                }
               } catch { /* skip malformed */ }
             }
           });
@@ -2390,18 +2312,6 @@ async function handleStreamChat(req, url, res) {
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("openai_empty_response");
       const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-      // Σ₀ canaries on the OpenAI cascade, incl. model-internal surprise when captured (#1260).
-      // Passive: logs a surprise-aware groundedness event; never mutates the reply.
-      if (_surpriseOn && _openaiLogprobs && _openaiLogprobs.length) {
-        try {
-          const { fromOpenAILogprobs, surpriseField } = require("./token-surprise");
-          runCanaries(openaiClean, {
-            groundingContext,
-            tokenSurprise: surpriseField(fromOpenAILogprobs(_openaiLogprobs)),
-            context: { source, provider: "openai", agent: doneAgentName, surface: "dream-chat" },
-          });
-        } catch { /* canaries must never break a reply */ }
-      }
       await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
