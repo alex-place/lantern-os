@@ -91,7 +91,14 @@ def git_apply_and_test(repo_dir, test_cmd):
                             capture_output=True, text=True)
         if ap.returncode != 0:
             return {"applied": False, "passed": False, "output": ap.stderr[:MAX_FEEDBACK]}
-        tr = subprocess.run(test_cmd, cwd=repo_dir, shell=False, capture_output=True, text=True)
+        # A string test_cmd (the SWE-bench form, e.g. "python -m pytest …") needs shell=True; a list
+        # runs shell-free. Either way, an OS error (bad interpreter, missing file) becomes a failed
+        # verdict, not an exception that aborts the whole self-correction loop.
+        try:
+            tr = subprocess.run(test_cmd, cwd=repo_dir, shell=isinstance(test_cmd, str),
+                                capture_output=True, text=True)
+        except OSError as e:
+            return {"applied": True, "passed": False, "output": f"test command failed to run: {e}"}
         ok = tr.returncode == 0
         # leave the tree clean for the next attempt
         subprocess.run(["git", "checkout", "--", "."], cwd=repo_dir, capture_output=True)

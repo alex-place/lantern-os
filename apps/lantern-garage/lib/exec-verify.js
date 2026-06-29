@@ -56,6 +56,12 @@ function verifyExec(opts = {}) {
       const out = execFileSync(runner.cmd, [file], {
         timeout: timeoutMs, stdio: ["ignore", "pipe", "pipe"],
         encoding: "utf8", windowsHide: true,
+        cwd: dir,                  // run in the isolated temp dir, not the server's working dir
+        maxBuffer: 512 * 1024,     // cap runaway output (and make the overflow path explicit, not a fake "timeout")
+        // SECURITY: do NOT inherit the server env — it holds API keys (ANTHROPIC/OPENAI/DISCORD…).
+        // Model-proposed code must not be able to read or exfiltrate them. Pass a minimal env;
+        // PATH + SystemRoot are what node/python need to launch on Windows + POSIX.
+        env: { PATH: process.env.PATH || "", SystemRoot: process.env.SystemRoot || "", TMP: dir, TEMP: dir },
       });
       return { ran: true, passed: true, output: String(out).slice(0, MAX_OUTPUT) };
     } catch (e) {
@@ -63,11 +69,15 @@ function verifyExec(opts = {}) {
       if (e.code === "ENOENT") {
         return { ran: false, passed: false, output: `runner not found: ${runner.cmd}` };
       }
-      // Non-zero exit (the test threw) or timeout → ran, but did NOT pass. A hanging solution is
-      // treated as failing so the self-correction loop retries instead of stalling.
-      const timedOut = e.killed || e.signal === "SIGTERM" || /ETIMEDOUT/.test(String(e.code));
+      // Non-zero exit (the test threw), timeout, or output overflow → ran, but did NOT pass. A
+      // hanging or runaway solution is treated as failing so the loop retries instead of stalling.
+      // Overflow is distinguished from timeout so the failure fed back is accurate ("print less",
+      // not "run faster").
+      const overflow = e.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
+      const timedOut = !overflow && (e.killed || e.signal === "SIGTERM" || /ETIMEDOUT/.test(String(e.code)));
       const text = String(e.stderr || "") + String(e.stdout || "") || e.message || "";
-      return { ran: true, passed: false, output: (timedOut ? "timeout\n" : "") + text.slice(0, MAX_OUTPUT) };
+      const prefix = overflow ? "output-limit-exceeded\n" : timedOut ? "timeout\n" : "";
+      return { ran: true, passed: false, output: prefix + text.slice(0, MAX_OUTPUT) };
     }
   } finally {
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
