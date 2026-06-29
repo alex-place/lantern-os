@@ -278,7 +278,28 @@
       white-space: nowrap;
     }
     .feed-card.is-embed .fc-frame { background: #000; line-height: 0; }
-    .feed-card.is-embed iframe { width: 100%; border: 0; display: block; }
+    .feed-card.is-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+    /* Cover art behind the Play button — a real poster (archive art / generated
+       cover) instead of a black void, dimmed so the play affordance stays legible. */
+    .feed-card.is-embed .fc-poster { position: relative; }
+    .feed-card.is-embed .fc-poster-img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; opacity: 0.5; z-index: 0; pointer-events: none;
+    }
+    .feed-card.is-embed .fc-poster .fc-play,
+    .feed-card.is-embed .fc-poster .fc-playlabel { position: relative; z-index: 1; }
+
+    /* Fullscreen: letterbox the iframe to its real aspect (--arw/--arh) instead of
+       stretching. Inline aspect-ratio/max-width on the frame is overridden here. */
+    .feed-card.is-embed .fc-frame:fullscreen {
+      display: flex; align-items: center; justify-content: center;
+      background: #000; width: 100% !important; max-width: none !important; aspect-ratio: auto !important;
+    }
+    .feed-card.is-embed .fc-frame:fullscreen iframe {
+      width: auto; height: 100%; max-width: 100%;
+      aspect-ratio: var(--arw, 16) / var(--arh, 9);
+    }
     .feed-card.is-embed .fc-foot {
       display: flex; align-items: flex-start; gap: 10px;
       padding: 11px 14px 13px;
@@ -303,38 +324,21 @@
       display: inline-flex; align-items: center; justify-content: center;
     }
     .feed-card.is-embed .fc-dismiss:hover { opacity: 1; }
-    .fc-embed-bar .fc-fullscreen,
-    .fc-embed-bar .fc-mute {
+    .fc-embed-bar .fc-fullscreen {
       border: none; background: transparent; color: var(--muted);
       font-size: 16px; line-height: 1; cursor: pointer;
       width: 30px; height: 30px; border-radius: 6px;
       display: inline-flex; align-items: center; justify-content: center;
       transition: background 0.15s, color 0.15s;
     }
-    .fc-embed-bar .fc-fullscreen:hover,
-    .fc-embed-bar .fc-mute:hover { background: var(--surface2); color: var(--text); }
-    .fc-embed-bar .fc-fullscreen:focus-visible,
-    .fc-embed-bar .fc-mute:focus-visible { outline: 2px solid var(--accent); }
+    .fc-embed-bar .fc-fullscreen:hover { background: var(--surface2); color: var(--text); }
+    .fc-embed-bar .fc-fullscreen:focus-visible { outline: 2px solid var(--accent); }
     .fc-embed-bar .fc-fullscreen[aria-pressed="true"] { color: var(--accent); background: var(--surface2); }
-    /* muted state — dim + accent so it reads as "audio off" */
-    .fc-embed-bar .fc-mute[aria-pressed="true"] { color: var(--accent); background: var(--surface2); }
-    /* #1447: when an embed is fullscreen we put the same-origin .fc-frame wrapper
-       (not the cross-origin iframe) into fullscreen, then force the iframe to fill
-       it — the iframe's inline height:Npx otherwise leaves it a small band on a
-       black backdrop, which read as "fullscreen didn't work". */
-    .fc-frame:fullscreen,
-    .fc-frame:-webkit-full-screen {
-      width: 100vw; height: 100vh; background: #000;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .fc-frame:fullscreen iframe,
-    .fc-frame:-webkit-full-screen iframe {
-      width: 100% !important; height: 100% !important; flex: 1 1 auto;
-    }
     .feed-card.is-embed .fc-poster {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 12px; width: 100%; border: 0; cursor: pointer; font: inherit; color: #fff;
-      padding: 30px 16px;
+      gap: 12px; width: 100%; height: 100%; box-sizing: border-box;
+      border: 0; cursor: pointer; font: inherit; color: #fff;
+      padding: 30px 16px; overflow: hidden;
       background: radial-gradient(circle at 50% 38%,
         color-mix(in srgb, var(--accent) 20%, #000) 0%, #000 78%);
     }
@@ -1026,34 +1030,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeEmbed === el) activeEmbed = null;
   }
 
-  // #1447: cross-origin iframes can't have their audio controlled from the parent,
-  // but YouTube/Vimeo honor a URL mute flag. For those we rebuild the src muted;
-  // archive.org / github.io games have no such flag (audio is in-frame only), so the
-  // button is disabled there rather than pretending to work.
-  function embedCanMute(src) {
-    try {
-      const h = new URL(src, location.href).hostname;
-      return /(^|\.)youtube(-nocookie)?\.com$/i.test(h) || /(^|\.)vimeo\.com$/i.test(h);
-    } catch (_) { return false; }
-  }
-  function withMute(src, muted) {
-    if (!muted) return src;
-    try {
-      const u = new URL(src, location.href);
-      if (/(^|\.)youtube(-nocookie)?\.com$/i.test(u.hostname)) u.searchParams.set('mute', '1');
-      else if (/(^|\.)vimeo\.com$/i.test(u.hostname)) { u.searchParams.set('muted', '1'); u.searchParams.set('volume', '0'); }
-      else return src;
-      return u.toString();
-    } catch (_) { return src; }
-  }
-
   function activateEmbed(el) {
     const e = el._embed; if (!e) return;
     if (activeEmbed && activeEmbed !== el) deactivateEmbed(activeEmbed); // enforce single active
     const frame = el.querySelector('.fc-frame');
+    // Fill the aspect-sized frame (w>0) or the fixed-height bar (audio, w=0).
+    const iframeStyle = e.w > 0 ? 'width:100%;height:100%;display:block' : 'width:100%;height:' + e.h + 'px;display:block';
     frame.innerHTML =
-      '<iframe src="' + esc(withMute(e.src, el._muted)) + '" style="height:' + e.h + 'px" ' +
-        'title="' + esc(e.title) + '" allow="autoplay; fullscreen; gamepad" allowfullscreen ' +
+      '<iframe src="' + esc(e.src) + '" style="' + iframeStyle + '" ' +
+        'title="' + esc(e.title) + '" allow="autoplay; fullscreen; gamepad" ' +
         'referrerpolicy="no-referrer" ' +
         'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>';
     el.classList.add('is-playing');
@@ -1068,25 +1053,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function toggleFullscreen(el) {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-      const exit = document.exitFullscreen || document.webkitExitFullscreen;
-      if (exit) exit.call(document);
-      return;
-    }
-    // #1447: fullscreen the same-origin .fc-frame WRAPPER, not the cross-origin
-    // iframe — the wrapper always has the fullscreen permission, and CSS forces
-    // the iframe inside to fill it. Fall back to the card, never to the poster div.
+    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); return; }
+    // Fullscreen the FRAME (not the bare iframe) so the :fullscreen CSS can
+    // letterbox the iframe to its real aspect (--arw/--arh) instead of stretching.
     const node = el.querySelector('.fc-frame') || el;
     const req = node.requestFullscreen || node.webkitRequestFullscreen || node.msRequestFullscreen;
-    if (!req) { console.warn('[explore] fullscreen API unavailable'); return; }
-    try {
-      const p = req.call(node);
-      // requestFullscreen returns a Promise; a sync try/catch never saw its
-      // rejection, so failures used to be silent. Surface them now.
-      if (p && p.catch) p.catch((e) => console.warn('[explore] fullscreen request blocked:', e && e.message));
-    } catch (e) {
-      console.warn('[explore] fullscreen error:', e && e.message);
-    }
+    if (req) { try { req.call(node); } catch (_) {} }
   }
 
   // Keep the ⛶ button's aria-pressed in sync with real fullscreen state — including
@@ -1130,13 +1102,21 @@ document.addEventListener('DOMContentLoaded', () => {
       // down whatever was playing before. archive.org runs in its own sandbox.
       el.className = 'feed-card is-embed';
       const h = Math.max(120, Math.min(720, (+c.embed.height) || 360));
+      // Preferred resolution → the frame's real aspect, so the inline player and
+      // fullscreen FIT the embed (4:3 game, portrait 2048, wide audio bar) instead
+      // of squishing one fixed-height box. w=0 ⇒ full-bleed (audio).
+      const w = Math.max(0, (+c.embed.width) || 0);
+      const frameStyle = w > 0
+        ? 'style="aspect-ratio:' + w + '/' + h + ';max-width:' + w + 'px;width:100%;margin-inline:auto;--arw:' + w + ';--arh:' + h + '"'
+        : 'style="height:' + h + 'px"';
+      const cover = safeImg(c.image || '');
       const openHref = safeUrl(c.url);
       const verb = (c.topics || []).includes('listen') ? 'Listen'
         : (c.topics || []).some(t => t === 'watch' || t === 'film') ? 'Watch' : 'Play';
-      el._embed = { src: embedSrc, h: h, title: c.title || '', key: c.key };
+      el._embed = { src: embedSrc, h: h, w: w, title: c.title || '', key: c.key };
       el._posterHTML =
-        '<button type="button" class="fc-poster" aria-label="' + esc(verb + ' — ' + (c.title || '')) + '" ' +
-          'style="min-height:' + Math.min(h, 240) + 'px">' +
+        '<button type="button" class="fc-poster" aria-label="' + esc(verb + ' — ' + (c.title || '')) + '">' +
+          (cover ? '<img class="fc-poster-img" src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '') +
           '<span class="fc-play" aria-hidden="true">▶</span>' +
           '<span class="fc-playlabel">' + verb + '</span>' +
         '</button>';
@@ -1146,12 +1126,11 @@ document.addEventListener('DOMContentLoaded', () => {
           '<span class="fc-embed-title"><span aria-hidden="true">' + (ICON[c.type] || '🕹️') + '</span> ' + esc(c.title) + '</span>' +
           '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
           '<span class="fc-embed-ctl">' +
-            '<button type="button" class="fc-mute" aria-label="Mute audio" aria-pressed="false" title="Mute audio">🔊</button>' +
             '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" aria-pressed="false" title="Fullscreen">⛶</button>' +
             '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
           '</span>' +
         '</div>' +
-        '<div class="fc-frame">' + el._posterHTML + '</div>' +
+        '<div class="fc-frame" ' + frameStyle + '>' + el._posterHTML + '</div>' +
         (c.lore ? '<div class="fc-foot"><p class="fc-lore">' + esc(c.lore) + '</p></div>' : '') +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') +
           (openHref !== '#' ? ' · <a class="fc-open" href="' + esc(openHref) + '" target="_blank" rel="noopener noreferrer">open ↗</a>' : '') +
@@ -1165,30 +1144,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!el.classList.contains('is-playing')) activateEmbed(el);
         toggleFullscreen(el);
       });
-      // #1447: per-embed mute toggle. Cross-origin audio is only controllable on
-      // YouTube/Vimeo (URL flag); disable + explain elsewhere rather than fake it.
-      const muteBtn = el.querySelector('.fc-mute');
-      if (muteBtn) {
-        el._muted = false;
-        if (!embedCanMute(embedSrc)) {
-          muteBtn.disabled = true;
-          muteBtn.title = 'Audio control unavailable for this embed';
-          muteBtn.setAttribute('aria-label', 'Audio control unavailable for this embed');
-          muteBtn.style.opacity = '0.4';
-          muteBtn.style.cursor = 'default';
-        } else {
-          muteBtn.addEventListener('click', (ev) => {
-            ev.preventDefault(); ev.stopPropagation();
-            el._muted = !el._muted;
-            muteBtn.setAttribute('aria-pressed', el._muted ? 'true' : 'false');
-            muteBtn.textContent = el._muted ? '🔇' : '🔊';
-            const lbl = el._muted ? 'Unmute audio' : 'Mute audio';
-            muteBtn.setAttribute('aria-label', lbl);
-            muteBtn.title = lbl;
-            if (el.classList.contains('is-playing')) activateEmbed(el); // reload with new mute state
-          });
-        }
-      }
       const open = el.querySelector('.fc-open');
       if (open) open.addEventListener('click', () => record(c.key, 'click', 0));
     } else {
@@ -1216,7 +1171,13 @@ document.addEventListener('DOMContentLoaded', () => {
         thumb.className = 'fc-thumb';
         thumb.src = img; thumb.alt = '';
         thumb.loading = 'lazy'; thumb.referrerPolicy = 'no-referrer';
-        thumb.addEventListener('error', () => thumb.replaceWith(placeholderThumb(c.type)));
+        // A broken external cover (archive art / GitHub OG / OWID chart) swaps to
+        // the same-origin generated thumbnail; if THAT fails, the glyph block.
+        const fb = safeImg(c.imageFallback || '');
+        thumb.addEventListener('error', () => {
+          if (fb && thumb.src.indexOf('/api/explore/thumb.svg') === -1) { thumb.src = fb; }
+          else thumb.replaceWith(placeholderThumb(c.type));
+        });
         el.insertBefore(thumb, el.firstChild);
       } else {
         el.insertBefore(placeholderThumb(c.type), el.firstChild);
