@@ -56,6 +56,85 @@ async function extractPdfText(filePath) {
   }
 }
 
+// Extract text from a Word .docx (mammoth → raw text; preserves paragraphs)
+async function extractDocxText(filePath) {
+  try {
+    const mammoth = require('mammoth');
+    const { value, messages } = await mammoth.extractRawText({ path: filePath });
+    const text = (value || '').trim();
+    return {
+      method: 'mammoth',
+      content: text,
+      confidence: text ? 0.95 : 0,
+      error: text ? null : 'No extractable text in .docx',
+      warnings: (messages || []).map(m => m.message).slice(0, 5),
+    };
+  } catch (err) {
+    return { method: 'error', content: '', confidence: 0, error: `DOCX extraction failed: ${err.message}` };
+  }
+}
+
+// Extract text from an Excel .xlsx/.xls (exceljs → tab-separated rows per sheet)
+async function extractSpreadsheetText(filePath) {
+  try {
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(filePath);
+    const parts = [];
+    wb.eachSheet(sheet => {
+      const rows = [];
+      sheet.eachRow({ includeEmpty: false }, row => {
+        const cells = (row.values || []).slice(1).map(v => {
+          if (v == null) return '';
+          if (typeof v === 'object') return v.text != null ? v.text : (v.result != null ? v.result : (v.hyperlink || ''));
+          return String(v);
+        });
+        rows.push(cells.join('\t'));
+      });
+      if (rows.length) parts.push(`# Sheet: ${sheet.name}\n${rows.join('\n')}`);
+    });
+    const text = parts.join('\n\n').trim();
+    return {
+      method: 'exceljs',
+      content: text,
+      confidence: text ? 0.9 : 0,
+      error: text ? null : 'No cells with content',
+    };
+  } catch (err) {
+    return { method: 'error', content: '', confidence: 0, error: `XLSX extraction failed: ${err.message}` };
+  }
+}
+
+// Extract text from a PowerPoint .pptx (jszip → strip <a:t> runs from each slide)
+async function extractPptxText(filePath) {
+  try {
+    const JSZip = require('jszip');
+    const buffer = fs.readFileSync(filePath);
+    const zip = await JSZip.loadAsync(buffer);
+    const slideNames = Object.keys(zip.files)
+      .filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+      .sort((a, b) => (parseInt(a.match(/(\d+)/)[1], 10) - parseInt(b.match(/(\d+)/)[1], 10)));
+    const parts = [];
+    for (let i = 0; i < slideNames.length; i++) {
+      const xml = await zip.file(slideNames[i]).async('string');
+      const runs = (xml.match(/<a:t>([\s\S]*?)<\/a:t>/g) || [])
+        .map(t => t.replace(/<\/?a:t>/g, ''))
+        .map(s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'"))
+        .filter(Boolean);
+      if (runs.length) parts.push(`# Slide ${i + 1}\n${runs.join('\n')}`);
+    }
+    const text = parts.join('\n\n').trim();
+    return {
+      method: 'pptx-jszip',
+      content: text,
+      confidence: text ? 0.85 : 0,
+      error: text ? null : 'No extractable text in .pptx',
+    };
+  } catch (err) {
+    return { method: 'error', content: '', confidence: 0, error: `PPTX extraction failed: ${err.message}` };
+  }
+}
+
 // OCR fallback for scanned PDFs/images
 async function ocrImage(imagePath) {
   try {
@@ -134,11 +213,25 @@ async function extractDocumentContent(filePath, mimeType = null) {
       return await extractPdfText(filePath);
     }
 
+    if (ext === '.docx') {
+      return await extractDocxText(filePath);
+    }
+
+    if (ext === '.xlsx' || ext === '.xlsm') {
+      return await extractSpreadsheetText(filePath);
+    }
+
+    if (ext === '.pptx') {
+      return await extractPptxText(filePath);
+    }
+
     if (['.png', '.jpg', '.jpeg', '.tiff', '.gif', '.webp'].includes(ext)) {
       return await ocrImage(filePath);
     }
 
-    if (['.txt', '.md', '.json', '.csv'].includes(ext)) {
+    // Plain-text-like formats read straight off disk.
+    if (['.txt', '.md', '.markdown', '.json', '.csv', '.tsv', '.log', '.xml',
+         '.html', '.htm', '.yaml', '.yml', '.rtf'].includes(ext)) {
       const content = fs.readFileSync(filePath, 'utf8');
       return {
         method: 'fs',
@@ -167,6 +260,9 @@ module.exports = {
   extractDocumentContent,
   extractFileMetadata,
   extractPdfText,
+  extractDocxText,
+  extractSpreadsheetText,
+  extractPptxText,
   ocrImage,
   ocrPdfPages
 };
