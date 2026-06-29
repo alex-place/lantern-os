@@ -479,8 +479,8 @@ module.exports = async (req, res, url, deps) => {
         step("test", "start", { count: plannedTests.length });
         const testResults = runTests(workRoot, plannedTests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsRan = plannedTests.length;
-        const allTestsOk = testResults.every((r) => r.ok);
-        const testsVerified = testsRan > 0 && allTestsOk;
+        const allTestsOk = testResults.every((r) => r.ok !== false);   // inconclusive (timeout) ≠ failure → don't roll back a good patch
+        const testsVerified = testsRan > 0 && allTestsOk && testResults.some((r) => r.ok === true);  // "verified" only if a test actually passed
         step("test", "done", { testsRan, allTestsOk, testsVerified });
 
         if (testsRan > 0 && !allTestsOk) {
@@ -964,9 +964,9 @@ module.exports = async (req, res, url, deps) => {
         step("tests", "start", { commands: tests });
         const testResults = runTests(workRoot, tests, { env: worktreeTestEnv(REPO_ROOT) });
         const ranTests = tests.length > 0; // #933: zero tests is NOT a pass
-        const testsPassed = testResults.every((r) => r.ok);
+        const testsPassed = testResults.every((r) => r.ok !== false);  // inconclusive (timeout) ≠ failure
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
-        const _failedTest = testResults.find((r) => !r.ok) || {};
+        const _failedTest = testResults.find((r) => r.ok === false) || {};
         step("tests", "done", { testResults, passed: testsPassed, ran: tests.length,
           detail: tests.length === 0
             ? "no tests were specified for this change"

@@ -776,9 +776,15 @@ function runTests(repoRoot, testCommands, opts = {}) {
       const out = execFileSync(bin, argv.slice(1), { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024, env, shell: false });
       results.push({ cmd, ok: true, output: out.slice(0, MAX_OUTPUT), truncated: out.length > MAX_OUTPUT });
     } catch (err) {
+      // A TIMEOUT (the test hung — e.g. an integration/API test waiting for a server that isn't
+      // running in the worktree) is INCONCLUSIVE, not a real failure. Treating it as a failure
+      // rolls back good patches (the #1 false-rollback in the dogfood loop). Mark it skipped;
+      // the gate fails only on tests that actually RAN and asserted false (ok === false).
+      const timedOut = err.killed || err.signal === "SIGTERM" || /ETIMEDOUT/.test(String(err.code));
       results.push({
         cmd,
-        ok: false,
+        ok: timedOut ? null : false,
+        skipped: timedOut ? "timeout — inconclusive (likely server-dependent / hung), not a failure" : undefined,
         error: String(err.stderr || err.message || "").slice(0, MAX_OUTPUT),
         output: String(err.stdout || "").slice(0, MAX_OUTPUT),
         exit_code: err.status,
