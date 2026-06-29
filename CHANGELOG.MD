@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.104] - 2026-06-29
+- chore(merge): consolidate the two PR auto-mergers into one. Deleted the duplicate cloud zipper (`.github/workflows/auto-merge.yml`); the single canonical merger is now `apps/lantern-garage/lib/pr-watcher.js`. Fixed the wedge that kept nothing merging — every PR inherited master's chronically-red checks and the `All checks passed` aggregate could never be green — so the merger now always ignores that aggregate roll-up (re-evaluating the constituents itself) and self-heals its ignore-list by auto-detecting the checks currently red on the base branch (`_baseFailingChecks`). Added an anti-sprawl **mono-merger rule** to `scripts/consolidation-lint.js` (`duplicate-merger`, HIGH) that flags any second file that lands PRs via `gh pr merge`, and re-pointed the `auto-merge` label exemption in `monoworkstream-gate.yml` at the in-process merger.
+
 ## [1.7.103] - 2026-06-29
 - feat(research): wide web-search view + escalating-fidelity grounding loop. Autowork research now fans out angled sub-queries and escalates low→high fidelity (`lib/wide-search.js`) instead of a single narrow query, returning up to 5 cited sources plus a synthesized grounded summary and confidence. ON by default for the fleet (`AUTOWORK_WIDE_SEARCH=0` falls back to the dependable single-query client; per-call `wide` overrides). The narrow path (MCP → DDG → Wikipedia) is kept as the cheap fallback. Every wide-search sub-step is logged under the research phase so runs stay reviewable. Merged master (1.7.102) — kept the #1521 file-issue-only routing and #1525 explore thumbnails that landed in parallel.
 
