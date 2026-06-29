@@ -104,7 +104,7 @@
 <body>
 <div id="drop-overlay" aria-hidden="true">
   📄 Drop to process
-  <span class="drop-sub">.docx — improve &amp; rewrite &nbsp;·&nbsp; .pdf — add to Knowledge Center</span>
+  <span class="drop-sub">.docx — improve &amp; rewrite &nbsp;·&nbsp; any file — attached to chat</span>
 </div>
 <div class="app">
   <!-- #773 Chat sidebar: new chat, session list (resume/switch/delete), profile/settings footer -->
@@ -531,44 +531,61 @@
     if (!files.length) return;
     function handle() {
       if (!window.lanternAttach) { setTimeout(handle, 80); return; }
+      // .docx keeps the "improve & rewrite" flow; every other file (pdf, images,
+      // text, code…) is attached so the LLM can read it directly. No detours.
       const docx = files.find(f => f.name.toLowerCase().endsWith('.docx'));
-      const pdf  = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
       if (docx) lanternAttach.dropDocx(docx);
-      else if (pdf) lanternAttach.dropPdf(pdf);
+      const rest = files.filter(f => !f.name.toLowerCase().endsWith('.docx'));
+      if (rest.length) lanternAttach.addFiles(rest);
     }
     handle();
   });
 
-  /* Auto-process a file forwarded from the home chat bar via sessionStorage.
-       ?autoprocess=docx → pendingDocx (improve & rewrite the document)
-       ?autoprocess=pdf  → pendingPdf  (add to the Knowledge Center) */
-  (function () {
-    const params = new URLSearchParams(location.search);
-    const kind = params.get('autoprocess');
-    if (kind !== 'docx' && kind !== 'pdf') return;
-    const key = kind === 'docx' ? 'pendingDocx' : 'pendingPdf';
-    const stored = sessionStorage.getItem(key);
-    if (!stored) return;
-    sessionStorage.removeItem(key);
-    let meta;
-    try { meta = JSON.parse(stored); } catch { return; }
-    const { name, data, instruction } = meta;
-    const [header, b64] = data.split(',');
-    const fallbackMime = kind === 'docx'
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : 'application/pdf';
-    const mime = (header.match(/:(.*?);/) || [])[1] || fallbackMime;
+  // base64 data: URL → File
+  function dataUrlToFile(name, data, fallbackMime) {
+    const [header, b64] = String(data).split(',');
+    const mime = (header.match(/:(.*?);/) || [])[1] || fallbackMime || 'application/octet-stream';
     const bytes = atob(b64);
     const buf = new Uint8Array(bytes.length);
     for (let i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
-    const file = new File([buf], name, { type: mime });
-    function tryProcess() {
-      if (!window.lanternAttach) { setTimeout(tryProcess, 80); return; }
-      if (kind === 'docx') lanternAttach.dropDocx(file, instruction || undefined);
-      else lanternAttach.dropPdf(file);
+    return new File([buf], name, { type: mime });
+  }
+
+  /* Files forwarded from the home chat bar via sessionStorage.
+       ?autoprocess=docx → pendingDocx   (improve & rewrite the document)
+       pendingAttach     → addFiles      (attach so the LLM can read them) */
+  (function () {
+    const params = new URLSearchParams(location.search);
+    if (params.get('autoprocess') === 'docx') {
+      const stored = sessionStorage.getItem('pendingDocx');
+      if (stored) {
+        sessionStorage.removeItem('pendingDocx');
+        try {
+          const { name, data, instruction } = JSON.parse(stored);
+          const file = dataUrlToFile(name, data, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+          const run = () => { if (!window.lanternAttach) return setTimeout(run, 80); lanternAttach.dropDocx(file, instruction || undefined); };
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
+        } catch { /* ignore malformed payload */ }
+      }
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryProcess);
-    else tryProcess();
+
+    let payload;
+    try { payload = JSON.parse(sessionStorage.getItem('pendingAttach') || 'null'); } catch { payload = null; }
+    if (!payload || !Array.isArray(payload.files) || !payload.files.length) return;
+    sessionStorage.removeItem('pendingAttach');
+    const files = payload.files.map(it => dataUrlToFile(it.name, it.data)).filter(Boolean);
+    function run() {
+      if (!window.lanternAttach) { setTimeout(run, 80); return; }
+      lanternAttach.addFiles(files);
+      // Prefill (never auto-submit) the question typed on the home bar, so the
+      // user can review the attachment chip and send when ready.
+      if (payload.q) {
+        const el = document.getElementById('input');
+        if (el) { el.value = payload.q; el.dispatchEvent(new Event('input', { bubbles: true })); el.focus(); }
+      }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
   })();
 })();
 </script>
@@ -738,38 +755,36 @@
   // Called by sendMessage after a turn is sent, so attachments apply to exactly one turn.
   window.clearPendingAttachments = function () { window.pendingAttachments = []; renderChips(); };
 
+  // Default rewrite instruction when the user hasn't typed one (no blocking prompt).
+  const DEFAULT_DOCX_INSTRUCTION = 'Polish and modernize: fix formatting, tighten wording, and strengthen the bullets — without inventing facts.';
+
   window.lanternAttach = {
     toggle() { if (menu) { menu.classList.contains('open') ? closeMenu() : openMenu(); } else { this.pickAny(); } },
     pickAny() { closeMenu(); if (anyInput) anyInput.click(); },
+    addFiles(files) { if (files && files.length) handleAnyFiles(files); },
     removeAttachment(i) { window.pendingAttachments.splice(i, 1); renderChips(); },
     pickPdf() { closeMenu(); fileInput.click(); },
     improveDoc() { closeMenu(); docxInput.click(); },
     dropDocx(file, presetInstruction) {
-      const typed = (document.getElementById('input') || {}).value || '';
-      const instruction = presetInstruction || typed.trim()
-        || window.prompt(
-            'What should I do with "' + file.name + '"?\n(e.g. "polish and tighten", "tailor to a software engineering role")',
-            'Polish and modernize: fix formatting, tighten wording, and strengthen the bullets — without inventing facts.');
-      if (instruction == null) return;
-      if (!presetInstruction && typed.trim()) {
-        const el = document.getElementById('input');
-        if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
-      }
+      const el = document.getElementById('input');
+      const typed = (el || {}).value || '';
+      const instruction = presetInstruction || typed.trim() || DEFAULT_DOCX_INSTRUCTION;
+      if (!presetInstruction && typed.trim() && el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
       processDocx(file, instruction);
     },
-    dropPdf(file) { uploadPdfs([file]); },
+    // PDFs (and any other file) attach as LLM-readable context — no Knowledge Center detour.
+    dropPdf(file) { this.addFiles([file]); },
   };
 
   docxInput.addEventListener('change', () => {
     const f = docxInput.files && docxInput.files[0];
     if (!f) return;
-    const typed = (document.getElementById('input') || {}).value || '';
-    const instruction = (typed.trim())
-      || window.prompt('What should I change in "' + f.name + '"?\n(e.g. "polish and tighten", "tailor to a software engineering role", "add my recent work")',
-                       'Polish and modernize: fix formatting, tighten wording, and strengthen the bullets — without inventing facts.');
-    if (instruction == null) { docxInput.value = ''; return; }
-    if (typed.trim()) { const el = document.getElementById('input'); if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); } }
+    const el = document.getElementById('input');
+    const typed = (el || {}).value || '';
+    const instruction = typed.trim() || DEFAULT_DOCX_INSTRUCTION;
+    if (typed.trim() && el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
     processDocx(f, instruction);
+    docxInput.value = '';
   });
 
   fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadPdfs(fileInput.files); });

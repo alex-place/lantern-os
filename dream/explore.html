@@ -137,6 +137,7 @@
        index.html home tiles, so Explore reads as the same product surface. */
     .feed-card { --tile: var(--accent); }
     .feed-card[data-type="watch"]  { --tile: #a78bfa; }
+    .feed-card[data-type="listen"] { --tile: #f472b6; }
     .feed-card[data-type="build"]  { --tile: #10b981; }
     .feed-card[data-type="doc"]    { --tile: #f59e0b; }
     .feed-card[data-type="belief"] { --tile: #22c55e; }
@@ -867,6 +868,7 @@
       <button type="button" class="feed-chip" data-type="embed" aria-pressed="false"><span aria-hidden="true">🕹️</span> Play</button>
       <button type="button" class="feed-chip" data-type="read" aria-pressed="false"><span aria-hidden="true">📰</span> Read</button>
       <button type="button" class="feed-chip" data-type="watch" aria-pressed="false"><span aria-hidden="true">🎬</span> Watch</button>
+      <button type="button" class="feed-chip" data-type="listen" aria-pressed="false"><span aria-hidden="true">🎵</span> Listen</button>
       <button type="button" class="feed-chip" data-type="build" aria-pressed="false"><span aria-hidden="true">🛠️</span> Build</button>
       <button type="button" class="feed-chip" data-type="doc" aria-pressed="false"><span aria-hidden="true">📚</span> Docs</button>
       <button type="button" class="feed-chip" data-type="belief" aria-pressed="false"><span aria-hidden="true">🌍</span> Beliefs</button>
@@ -943,7 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ICON = { embed: '🕹️', read: '📰', watch: '🎬', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
+  const ICON = { embed: '🕹️', read: '📰', watch: '🎬', listen: '🎵', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
 
   // Only http(s) and root-relative URLs are linkable. A card url is sourced from
   // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
@@ -1277,7 +1279,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data && data.cycled) { cycles++; seen.clear(); } // endless: re-serve a fresh cycle
       if (!cards.length) {
         if (io) io.unobserve(sentinel);
-        if (statusEl) statusEl.textContent = totalShown ? '' : 'No content available right now.';
+        // Small filtered category fully shown → say "caught up", don't blank or
+        // re-stack duplicates (the server no longer cycles a single-page catalog).
+        if (statusEl) statusEl.textContent = totalShown
+          ? (totalShown + (filter === 'all' ? '' : ' ' + filter) + " · that's everything")
+          : 'No content available right now.';
         return;
       }
       appendCards(cards);

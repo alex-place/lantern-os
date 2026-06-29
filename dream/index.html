@@ -282,7 +282,7 @@
 <body>
 
 <!-- ── Whole-screen file drop overlay ── -->
-<div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">.pdf → Knowledge Center &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
+<div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">files → attached to chat &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
 
 <!-- ── Site nav ── -->
 <nav class="site-nav">
@@ -330,7 +330,7 @@
     </select>
     <button type="submit">Chat ✦</button>
   </form>
-  <input type="file" id="home-file-input" accept=".pdf,.docx" multiple style="display:none">
+  <input type="file" id="home-file-input" multiple style="display:none">
   <div class="home-file-chip" id="home-file-chip">
     <span id="home-file-chip-name">📄 file.docx</span>
     <button type="button" onclick="clearHomeDocx()" aria-label="Remove file">✕</button>
@@ -682,27 +682,31 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   /* Route picked/dropped files: .docx → chip (improve flow on submit),
-     .pdf → forward to the chat's Knowledge Center upload. Mirrors the
-     dream-chat.html drop handler so both pages behave the same. */
-  function forwardPdf(file) {
-    const reader = new FileReader();
-    reader.onload = function () {
+     everything else (.pdf, images, text, code…) → forward to the chat as an
+     attachment so the LLM can read it directly. Mirrors dream-chat.html. */
+  function forwardAttach(files) {
+    const q = (document.getElementById('home-chat-input').value || '').trim();
+    Promise.all(files.map(f => new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res({ name: f.name, data: r.result });
+      r.onerror = () => res(null);
+      r.readAsDataURL(f);
+    }))).then(items => {
       try {
-        sessionStorage.setItem('pendingPdf', JSON.stringify({ name: file.name, data: reader.result }));
+        sessionStorage.setItem('pendingAttach', JSON.stringify({ q, files: items.filter(Boolean) }));
       } catch { /* storage full — chat will fall back to its own picker */ }
-      window.location.href = '/dream-chat.html?autoprocess=pdf';
-    };
-    reader.readAsDataURL(file);
+      const qs = pinnedProviderQS(); // '&provider=…' or ''
+      window.location.href = '/dream-chat.html' + (qs ? ('?' + qs.slice(1)) : '');
+    });
   }
 
   function handleHomeFiles(fileList) {
     const files = [...(fileList || [])];
     if (!files.length) return;
     const docx = files.find(f => f.name.toLowerCase().endsWith('.docx'));
-    const pdf  = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
+    const rest = files.filter(f => !f.name.toLowerCase().endsWith('.docx'));
     if (docx) setDocxChip(docx);
-    else if (pdf) forwardPdf(pdf);
-    else document.getElementById('home-chat-input').placeholder = 'Please choose a PDF or Word (.docx) file…';
+    if (rest.length) forwardAttach(rest);
   }
 
   /* "+" attach button → native file picker */
