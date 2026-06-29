@@ -320,13 +320,9 @@
     <button type="button" class="home-attach-btn" id="home-attach-btn" onclick="homeAttachPick()" aria-label="Attach a file (PDF or Word .docx)" title="Attach a file — PDF or .docx">+</button>
     <input id="home-chat-input" type="text" placeholder="Ask Keystone anything…" autocomplete="off" aria-label="Chat message">
     <select id="home-provider-pin" aria-label="Pin AI provider" title="Pin which AI provider answers (Auto = best-ranked)">
+      <!-- Auto is the only static option; the live providers are loaded
+           dynamically from /api/providers/status by buildProviderPin(). -->
       <option value="">Auto</option>
-      <option value="claude">Claude</option>
-      <option value="openai">ChatGPT</option>
-      <option value="gemini">Gemini</option>
-      <option value="grok">Grok</option>
-      <option value="ollama">Local Σ₀</option>
-      <option value="keystone-ft">Keystone FT</option>
     </select>
     <button type="submit">Chat ✦</button>
   </form>
@@ -610,48 +606,72 @@ document.addEventListener('DOMContentLoaded', () => {
   // the pin survives reloads.
   const providerPin = document.getElementById('home-provider-pin');
   if (providerPin) {
-    try { providerPin.value = localStorage.getItem('keystone.providerPin') || ''; } catch {}
     providerPin.addEventListener('change', () => {
       try { localStorage.setItem('keystone.providerPin', providerPin.value); } catch {}
     });
 
-    // Gate the pin to providers the running server can actually dispatch to.
-    // The dropdown advertised Claude/ChatGPT/Grok/Local even when their keys are
-    // absent (or out of credits), so pinning one silently routed to a failing
-    // path. /api/providers/status reports per-provider `available` from
-    // process.env — we grey out the dead ones and tag them "(offline)" so the
-    // user sees the truth before navigating to the chat. Auto is never gated.
-    (async function gateProviderPin() {
-      // dropdown value → providers/status provider bucket
-      const PIN_TO_PROVIDER = {
-        claude: 'anthropic', openai: 'openai', gemini: 'gemini',
-        grok: 'xai', ollama: 'ollama', 'keystone-ft': 'ollama',
-      };
-      let status;
+    // Build the pin dropdown dynamically from the providers the running server
+    // can actually dispatch to, instead of advertising a hardcoded list and
+    // greying the dead ones out. /api/providers/status reports per-provider
+    // `available` (from process.env) + the default `model`. We list only the
+    // live providers; Auto (the live PCSF-ranked pick) is always present and is
+    // the default. Option VALUES stay in the vocabulary dream-chat understands
+    // (claude/openai/gemini/grok/ollama/keystone-ft) since they forward via
+    // ?provider= and are matched against #provider-select there.
+    //
+    // catalog: dropdown value → { label, bucket } where bucket is the
+    // /api/providers/status key. keystone-ft is the local fine-tune, served
+    // through ollama, so it shares the ollama bucket.
+    const PROVIDER_CATALOG = [
+      { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
+      { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
+      { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
+      { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
+      { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama'    },
+      { value: 'keystone-ft', label: 'Keystone FT', bucket: 'ollama'    },
+    ];
+
+    function addPinOption(entry, model) {
+      const opt = document.createElement('option');
+      opt.value = entry.value;
+      opt.textContent = entry.label;
+      // Surface the concrete model id on hover (skip the placeholder "auto").
+      if (model && model !== 'auto') opt.title = model;
+      providerPin.appendChild(opt);
+    }
+
+    function restorePin(available) {
+      let saved = '';
+      try { saved = localStorage.getItem('keystone.providerPin') || ''; } catch {}
+      // Keep the saved pin only if it's still a live option; otherwise a
+      // previously-pinned-but-now-offline provider would dispatch-fail, so we
+      // fall back to Auto and clear it.
+      if (saved && available.has(saved)) {
+        providerPin.value = saved;
+      } else {
+        providerPin.value = '';
+        if (saved) { try { localStorage.setItem('keystone.providerPin', ''); } catch {} }
+      }
+    }
+
+    (async function buildProviderPin() {
+      let providers = null;
       try {
         const r = await fetch('/api/providers/status', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-        if (!r.ok) return;
-        status = await r.json();
-      } catch { return; }
-      const providers = status && status.providers;
-      if (!providers) return;
-      let pinnedWentOffline = false;
-      for (const opt of providerPin.options) {
-        if (!opt.value) continue; // Auto
-        const bucket = PIN_TO_PROVIDER[opt.value];
-        const available = bucket && providers[bucket] && providers[bucket].available;
-        if (!available) {
-          opt.disabled = true;
-          if (!/\(offline\)$/.test(opt.textContent)) opt.textContent += ' (offline)';
-          if (providerPin.value === opt.value) pinnedWentOffline = true;
-        }
+        if (r.ok) providers = (await r.json()).providers;
+      } catch { /* status unreachable — fall back to the full catalog below */ }
+
+      const available = new Set(['']); // Auto is always available
+      for (const entry of PROVIDER_CATALOG) {
+        // If status is unreachable we can't tell what's live, so show the whole
+        // catalog (better a pin that may fall back than an Auto-only dropdown).
+        const p = providers && providers[entry.bucket];
+        const isLive = providers ? !!(p && p.available) : true;
+        if (!isLive) continue;
+        addPinOption(entry, p && p.model);
+        available.add(entry.value);
       }
-      // A previously-pinned provider that is now offline would dispatch-fail —
-      // fall back to Auto so the next chat actually gets an answer.
-      if (pinnedWentOffline) {
-        providerPin.value = '';
-        try { localStorage.setItem('keystone.providerPin', ''); } catch {}
-      }
+      restorePin(available);
     })();
   }
   function pinnedProviderQS() {
