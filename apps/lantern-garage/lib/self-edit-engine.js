@@ -527,6 +527,20 @@ function patchSyntaxErrors(changedFiles, repoRoot) {
   return errors;
 }
 
+// An explicit "just file an issue" request — the user wants a ticket LOGGED, not
+// code written this turn. Routing it through the patch pipeline only manufactures
+// slop (#1517 → a placeholder .md committed as the "fix"). Match a file/open/log
+// verb + issue/ticket/bug, UNLESS the same message also asks to implement it
+// (fix/build/add/…) — then keep the full pipeline. (#1521)
+function isFileIssueOnlyRequest(task) {
+  const t = String(task || "").trim().toLowerCase();
+  if (!t) return false;
+  const fileVerb = /\b(file|open|log|create|raise|submit)\b[\w\s]*\b(issue|ticket|bug)\b/.test(t);
+  if (!fileVerb) return false;
+  const implementVerb = /\b(fix|implement|build|add|write|refactor|patch|code|resolve|solve)\b/.test(t);
+  return !implementVerb;
+}
+
 // A task message that *references an existing issue* must NOT be filed as a new
 // one — otherwise meta-commands like "autowork the oldest issue" or "work issue
 // #1342" get filed verbatim as junk issues (#1344/#1346) and the pipeline patches
@@ -1340,6 +1354,7 @@ module.exports = {
   pushRemoteOwner,
   createIssueFromTask,
   resolveExistingIssue,
+  isFileIssueOnlyRequest,
   looksLikePlaceholderPatch,
   patchSyntaxErrors,
   taskTitle,
