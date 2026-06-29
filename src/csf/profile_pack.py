@@ -61,8 +61,15 @@ def _collect_blobs(user: str) -> tuple[dict, list[dict]]:
     return blobs, sources
 
 
-def pack_profile(user: str, out_path: str | None = None, compress: bool = True) -> dict:
-    """Compact all of a user's CSF data + KB grounding into one .csf. Returns the profile manifest."""
+def pack_profile(user: str, out_path: str | None = None, compress: bool = True,
+                 codec: str | None = "omni") -> dict:
+    """Compact all of a user's CSF data + KB grounding into one .csf. Returns the profile manifest.
+
+    Profiles are a COLD archive (rebuilt only when a user's data changes), text/JSONL-heavy,
+    so the default is the max-ratio "omni" best-fit codec (CSF-FORMAT-SPECIFICATION §2.7.1) —
+    measured ~+16% over zstd-19 on JSONL-shaped data, at higher encode cost that's irrelevant
+    off the hot path. Pass codec="zstd" to trade ratio for encode speed.
+    """
     blobs, sources = _collect_blobs(user)
 
     # Ground in the base Knowledge Center index (embed it + record a reference).
@@ -89,7 +96,7 @@ def pack_profile(user: str, out_path: str | None = None, compress: bool = True) 
 
     out = out_path or str(REPO / "data" / "profiles" / f"{user}.csf")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
-    csf_pack.pack_blobs(blobs, out, compress=compress,
+    csf_pack.pack_blobs(blobs, out, compress=compress, codec=codec if compress else None,
                         extra_meta={"profile": {"user": user, "grounded": grounding["knowledge_index"] is not None}})
     profile["archive"] = out
     profile["archive_bytes"] = Path(out).stat().st_size
