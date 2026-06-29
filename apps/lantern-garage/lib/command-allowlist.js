@@ -45,6 +45,9 @@ const ALLOWED = [
   { match: /^gh pr list[\w\s./:@,="'-]*$/, cmd: null },
   { match: /^gh pr create[\w\s./:@,="'-]*$/, cmd: null },
   { match: /^gh pr view[\w\s./:@,="'-]*$/, cmd: null },
+  { match: /^gh issue list[\w\s./:@,="'-]*$/, cmd: null },
+  { match: /^gh issue create[\w\s./:@,="'-]*$/, cmd: null },
+  { match: /^gh issue view[\w\s./:@,="'-]*$/, cmd: null },
   // Read-only issue lookups — lets in-chat autowork ("autowork issue 1255")
   // fetch the real issue body/title instead of guessing at paths. No mutation.
   { match: /^gh issue view[\w\s./:@,="'-]*$/, cmd: null },
