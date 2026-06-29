@@ -233,8 +233,11 @@ function docCards() {
   const meta = loadKnowledgeMeta();
   if (!meta) return [];
   const built = meta.built_at ? meta.built_at * 1000 : null;
+  // Surface the whole indexed library (45+ docs), not a slice of 8 — the Docs
+  // filter looked nearly empty otherwise. Diversity rerank keeps them from walling
+  // the unfiltered feed; the Docs chip then shows the full set.
   return (meta.docs || [])
-    .slice(0, 8)
+    .slice(0, 80)
     .map((doc) => {
       const base = String(doc).split("/").pop().replace(/\.md$/i, "").replace(/[-_]/g, " ");
       return {
@@ -267,12 +270,25 @@ function loadEmbedSeed() {
   return _embeds;
 }
 
+// An embed's chip CATEGORY is derived from its topics, not lumped under one
+// "embed" bucket: a public-domain film belongs under Watch, jazz/classical/radio
+// under Listen, and everything else (games) stays Play. Without this every film
+// and record hid under "Play" and never appeared when you filtered Watch/Listen
+// (#explore-categories). The card still renders as an inline player — the embed
+// path keys off `embed.src`, not `type` — so films play in-page under Watch.
+function embedType(topics) {
+  const t = (Array.isArray(topics) ? topics : []).map((x) => String(x).toLowerCase());
+  if (t.some((x) => x === "listen" || x === "radio" || x === "music")) return "listen";
+  if (t.some((x) => x === "watch" || x === "film" || x === "animation")) return "watch";
+  return "embed";
+}
+
 function embedCards() {
   return loadEmbedSeed()
     .filter((e) => e && e.slug && e.embed && e.embed.src)
     .map((e) => ({
       id: "embed:" + e.slug,
-      type: "embed",
+      type: embedType(e.topics),
       title: e.title || e.slug,
       url: e.url || e.embed.src,
       source: e.source || "Internet Archive",
@@ -468,8 +484,14 @@ async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, explore
   const seenSet = new Set(Array.isArray(seen) ? seen : []);
   let pool = all.filter((c) => !seenSet.has(c.id));
   let cycled = false;
-  if (pool.length === 0 && all.length > 0) {
-    cycled = true; // catalog exhausted → endless cycle (re-serve a fresh rank)
+  // Only cycle (re-serve the catalog) when it is genuinely bigger than one page.
+  // A small filtered category — Watch's 3 videos, Build's 5 — fits in the first
+  // page; cycling it immediately re-served the SAME cards right below, so a
+  // filter looked broken (3 unique videos rendered 3× back-to-back). When the
+  // whole filtered catalog has been shown once, return empty so the UI says
+  // "caught up" instead of stacking duplicates.
+  if (pool.length === 0 && all.length > limit) {
+    cycled = true; // large catalog exhausted → endless cycle (re-serve a fresh rank)
     pool = all.slice();
   }
   const page = pickPage(pool, limit, exploreRatio);
@@ -484,7 +506,7 @@ async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, explore
   };
 }
 
-module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder };
+module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder, embedCards };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {

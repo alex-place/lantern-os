@@ -84,13 +84,13 @@
       "title": "2048",
       "kind": "game",
       "url": "https://github.com/gabrielecirulli/2048",
-      "source": "Open Source · GitHub",
+      "source": "Keystone Arcade",
       "published": "2014-03-09",
-      "topics": ["game", "open-source", "github"],
+      "topics": ["game", "open-source", "puzzle"],
       "lore": "Gabriele Cirulli built it in a single weekend and dropped it on GitHub under the MIT license. The internet lost the next month sliding tiles; it's been forked ten thousand times since.",
-      "why": "MIT-licensed open-source game, served from its own GitHub Pages",
-      "evidence_source": "github.com/gabrielecirulli/2048 (MIT)",
-      "embed": { "provider": "github.io", "src": "https://gabrielecirulli.github.io/2048/", "height": 540, "interactive": true }
+      "why": "MIT-licensed open-source game, served locally — no cross-origin frame",
+      "evidence_source": "gabrielecirulli/2048 (MIT) · local /games/2048/",
+      "embed": { "provider": "local", "src": "/games/2048/index.html", "height": 540, "interactive": true }
     },
     {
       "slug": "night-of-the-living-dead",
