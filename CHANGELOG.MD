@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.107] - 2026-06-29
+- chore(quality): add two site-hygiene linters. `scripts/lint-throwaway-pages.mjs` flags (or `--delete`s) throwaway/standalone test/demo/scratch HTML pages by name pattern + in-file harness markers, enforcing the standing "no throwaway pages" rule (`npm run lint:pages` / `make lint-pages`). `scripts/find-orphan-pages.mjs` builds a static link graph over `public/` and BFS's from `index.html` to report pages not reachable from the nav (`npm run audit:orphans`). Both are report-only by default and non-zero-exit on findings so they can gate CI.
+
 ## [1.7.106] - 2026-06-29
 - feat(radio): mobile/small-width layout + best-effort autoplay for Keystone Radio (`fallout-radio.html`). On phones the two-column deck collapses to one and the player (now-playing, visualizer, transport, volume, tone toggles, lore) now rides **above** the station dial instead of being buried under 300+ stations (`order: -1`); the dial scrolls in place capped at `44vh`, transport hit-areas grow, the keyboard-hint line hides on touch, and a `≤400px` breakpoint tightens the case/tabs for small phones (no horizontal overflow down to 320px). The dial also auto-tunes on load: it attempts playback immediately and, when the browser blocks unsolicited audio, arms a one-shot that starts on the listener's first interaction anywhere on the page — guarded by a `userPaused` flag so it never overrides a deliberate pause. Gestures on a real control are left for that control to handle.
 
