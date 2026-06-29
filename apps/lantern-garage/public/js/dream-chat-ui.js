@@ -1818,6 +1818,11 @@ async function sendMessage(opts = {}) {
             if (evt.council && evt.council.verdict) {
               bubble.dataset.councilVerdict = String(evt.council.verdict);
               if (evt.council.delta != null) bubble.dataset.councilDelta = String(evt.council.delta);
+              if (evt.council.recommend) bubble.dataset.councilRecommend = String(evt.council.recommend);
+              // refuted-by-execution carries the failing test output — "wrong, with proof".
+              if (evt.council.execFailed && evt.council.execOutput) {
+                bubble.dataset.councilExecOutput = String(evt.council.execOutput);
+              }
             }
             receivedDone = true;
           }
@@ -1961,6 +1966,35 @@ async function sendMessage(opts = {}) {
       + m[1] + ';opacity:' + m[2];
     badge.textContent = m[0];
     bubble.appendChild(badge);
+
+    // Refuted by a real execution check: the code ran and failed its own asserts. Surface
+    // the failure output ("wrong, with proof") and a one-click retry that re-asks WITH that
+    // proof attached, so the model self-corrects — the refuted → retry loop, closed in the UI.
+    if (v === 'refuted' && bubble.dataset.councilExecOutput) {
+      const out = bubble.dataset.councilExecOutput;
+      const det = document.createElement('details');
+      det.style.cssText = 'margin:6px 0 0;font-size:11px';
+      const sum = document.createElement('summary');
+      sum.textContent = '✗ test failed — show output';
+      sum.style.cssText = 'cursor:pointer;color:#f87171;list-style:none;user-select:none';
+      det.appendChild(sum);
+      const pre = document.createElement('pre');
+      pre.textContent = out;
+      pre.style.cssText = 'margin:6px 0 0;padding:8px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:pre-wrap;overflow-x:auto;color:var(--text,#ddd)';
+      det.appendChild(pre);
+      bubble.appendChild(det);
+
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = '🔧 Fix & retry';
+      retry.title = 'Re-ask with the failing test output attached so the model corrects its code.';
+      retry.style.cssText = 'display:block;margin:6px 0 0;font-size:11px;color:var(--accent);background:none;border:1px solid currentColor;border-radius:4px;padding:2px 8px;cursor:pointer;opacity:0.9';
+      retry.addEventListener('click', () => {
+        retry.disabled = true;
+        sendMessage({ text: text + '\n\n[Your previous code failed this check:\n' + out + '\n]\nFix it so the test passes.' });
+      });
+      bubble.appendChild(retry);
+    }
   }
 
   // Signature line: always show a human-readable label + time. Raw provider/model id

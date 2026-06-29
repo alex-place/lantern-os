@@ -22,6 +22,7 @@ const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
 const { councilReview } = require("./council-review");
+const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
@@ -81,6 +82,32 @@ function _emitCodingCandidate(instruction, reply) {
   } catch { /* emitter must never break a reply */ }
 }
 
+// ── Σ₀ council execution check: extract runnable {code, test} from a coding reply ──
+// "Correctness costs an external check." When a reply proposes a Python function AND a
+// check (assert / a test fn that throws), we can RUN it — the ground-truth signal the
+// council folds as the dominant anchor (passed → grounded, failed → refuted/retry).
+// Returns null when there's nothing to verify (no code, or code with no check), so the
+// council falls back to its text-Δ gate exactly as before. Python-only for now: it's the
+// language the live harvest already targets, and `python` is the runner most likely present.
+const _PY_FENCE_RE = /```python\s*([\s\S]*?)```/i;
+function _extractRunnable(reply) {
+  const fence = (reply || "").match(_PY_FENCE_RE);
+  if (!fence) return null;
+  const code = fence[1].trim();
+  if (!code) return null;
+  // A check must exist somewhere or there is nothing to execute against. If the asserts
+  // live inside the fenced block they already run with `code`; otherwise pull top-level
+  // asserts from the surrounding prose so the function is exercised.
+  const hasInlineCheck = /\bassert\b/.test(code);
+  let test = "";
+  if (!hasInlineCheck) {
+    const outside = (reply.slice(fence.index + fence[0].length).match(_ASSERT_RE) || []);
+    if (!outside.length) return null; // no check anywhere → not verifiable
+    test = outside.join("\n");
+  }
+  return { language: "python", code, test };
+}
+
 // Per-request grounding (web search + live GitHub project context) is best-effort
 // enrichment that runs BEFORE the model is called. If the network or the `gh` CLI
 // is slow/hung, an unbounded await there stalls the ENTIRE chat reply (no tokens,
@@ -88,6 +115,12 @@ function _emitCodingCandidate(instruction, reply) {
 // can never hang the response: on timeout, resolve to a fallback and proceed; the
 // underlying call finishes (and self-times-out) in the background.
 const GROUNDING_TIMEOUT_MS = parseInt(process.env.GROUNDING_TIMEOUT_MS, 10) || 4000;
+
+// Σ₀ council execution check. OFF by default — it runs model-authored code in a sandbox,
+// which is an operator-gated security decision (SECURITY.md). Set COUNCIL_EXEC_VERIFY=1 to
+// let a coding reply's own asserts decide grounded-vs-refuted on real execution.
+const COUNCIL_EXEC_VERIFY = process.env.COUNCIL_EXEC_VERIFY === "1";
+const COUNCIL_EXEC_TIMEOUT_MS = parseInt(process.env.COUNCIL_EXEC_TIMEOUT_MS, 10) || 8000;
 function withTimeout(promise, ms, fallback) {
   return Promise.race([
     Promise.resolve(promise).catch(() => fallback),
@@ -1100,12 +1133,30 @@ async function handleStreamChat(req, url, res) {
         // the operator-escalation backtest accrues data, and stamp the verdict for the UI.
         // Passive — never mutates the reply.
         try {
+          // Execution check (the dominant anchor): if the reply proposes runnable Python +
+          // a check, RUN it in a bounded sandbox so the verdict is grounded in a real test
+          // rather than text Δ. Gated behind COUNCIL_EXEC_VERIFY because it executes
+          // model-authored code; shell-free + temp-isolated + timed (lib/exec-verify.js).
+          let execVerdict;
+          if (COUNCIL_EXEC_VERIFY) {
+            const runnable = _extractRunnable(fullReply);
+            if (runnable) {
+              execVerdict = verifyExec({ ...runnable, timeoutMs: COUNCIL_EXEC_TIMEOUT_MS });
+            }
+          }
           const c = councilReview(fullReply, {
             groundingContext,
+            execVerdict,
             dissent: Array.isArray(signature.dissent) ? signature.dissent : [],
             context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
           });
           signature.council = { verdict: c.verdict, delta: c.delta, recommend: c.recommend, groundedBy: c.groundedBy };
+          // When a real test RAN and FAILED, hand the failure text to the UI so the user
+          // sees "wrong, with proof" and can retry against it (refuted → self-correct).
+          if (execVerdict && execVerdict.ran && !execVerdict.passed) {
+            signature.council.execFailed = true;
+            signature.council.execOutput = String(execVerdict.output || "").slice(0, 600);
+          }
         } catch { /* council must never break a reply */ }
         if (collapse.collapsed) {
           console.warn(
