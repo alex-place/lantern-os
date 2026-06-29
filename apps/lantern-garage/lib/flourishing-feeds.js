@@ -44,6 +44,13 @@ const BELIEFS = [
     { provider: "World Bank", kind: "wb", id: "SE.SEC.ENRR", floor: 0, ceil: 100, unit: "% gross", u: 0.15 },
     { provider: "Our World in Data", kind: "owid", id: "gross-enrolment-ratio-in-secondary-education", floor: 0, ceil: 100, unit: "% gross", u: 0.15 },
   ]},
+  { entity: "humans:connectivity", domain: "humans", label: "Internet access", sources: [
+    { provider: "World Bank", kind: "wb", id: "IT.NET.USER.ZS", floor: 0, ceil: 100, unit: "% online", u: 0.12 },
+    { provider: "Our World in Data", kind: "owid", id: "share-of-individuals-using-the-internet", floor: 0, ceil: 100, unit: "% online", u: 0.12 },
+  ]},
+  { entity: "humans:poverty", domain: "humans", label: "Freedom from extreme poverty", sources: [
+    { provider: "Our World in Data", kind: "owid", id: "share-of-population-in-extreme-poverty", floor: 40, ceil: 0, unit: "% in poverty", u: 0.14 },
+  ]},
   { entity: "ecosystems:protected_areas", domain: "ecosystems", label: "Protected areas (vs 30×30 target)", proxy: true, sources: [
     { provider: "World Bank", kind: "wb", id: "ER.PTD.TOTL.ZS", floor: 0, ceil: 30, unit: "% of territory", u: 0.18 },
     { provider: "Our World in Data", kind: "owid", id: "terrestrial-protected-areas", floor: 0, ceil: 30, unit: "% of land", u: 0.20 },

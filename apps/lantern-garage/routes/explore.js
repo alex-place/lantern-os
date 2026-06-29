@@ -19,6 +19,7 @@ const fs = require("fs");
 const path = require("path");
 const { rankedFeed, pagedFeed, embedCards } = require("../lib/explore-feed");
 const { recordModelOutcome } = require("../lib/model-leaderboard");
+const { renderThumb } = require("../lib/explore-thumb");
 
 const SUCCESS_EVENTS = new Set(["click", "dwell", "like", "open"]);
 // "impression" is the CTR denominator (#1221): a card was actually seen. It is logged
@@ -62,6 +63,25 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     } catch (e) {
       sendJson(res, { ok: false, embeds: [], error: e.message }, 200);
     }
+    return true;
+  }
+
+  // ── GET /api/explore/thumb.svg — generated lead thumbnail ──
+  // A themed SVG cover for cards with no natural image (docs, builds, beliefs,
+  // image-less reads, local games) and the onerror fallback for external covers,
+  // so every card shows a real thumbnail. Params: type, title, source.
+  if (url.pathname === "/api/explore/thumb.svg" && req.method === "GET") {
+    const svg = renderThumb({
+      type: (url.searchParams.get("type") || "").toLowerCase(),
+      title: (url.searchParams.get("title") || "").slice(0, 200),
+      source: (url.searchParams.get("source") || "").slice(0, 60),
+    });
+    res.writeHead(200, {
+      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=86400",
+      "X-Content-Type-Options": "nosniff",
+    });
+    res.end(svg);
     return true;
   }
 

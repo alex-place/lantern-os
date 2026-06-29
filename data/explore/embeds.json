@@ -2,30 +2,27 @@
   "_comment": "Curated embed seed for the Explore feed (Observe stage). Each entry becomes one full-width 'embed' card rendered as a lazy iframe. Sourced from open archives (Internet Archive / Musopen, public-domain or freely-streamable) and local Keystone games. Every card carries [why, source] per the Σ₀ Verify rule. To add/replace content, edit this file — no code change. Per-card key = 'source:embed:<slug>' so each panel earns or loses its slot independently (engagement or discarded). Verified live 2026-06-27.",
   "embeds": [
     {
-      "slug": "keystone-brainrot",
-      "title": "Keystone OS — Brainrot Short",
-      "kind": "watch",
-      "url": "/brainrot.html",
-      "source": "Keystone Studio",
-      "published": "2026-06-27",
-      "topics": ["watch", "meme", "lore"],
-      "lore": "Skibidi, Tung Tung Tung Sahur, and a one-way trip to Ohio — a 36-second brainrot ad that smuggles the whole Observe→Converge loop past your dopamine receptors. The drum that wakes you for Sahur, reframed as the AI that actually remembers.",
-      "why": "Keystone's own short — original art (no copyrighted meme assets), built in-house and served locally",
-      "evidence_source": "Keystone (local) · /brainrot.html · original CSS/JS animation",
-      "embed": { "provider": "local", "src": "/brainrot.html", "height": 720, "interactive": true }
-    },
-    {
       "slug": "t-rex",
       "title": "T-Rex Runner",
       "kind": "game",
       "url": "/t-rex/index.html",
       "source": "Keystone Arcade",
       "published": "2026-06-27",
-      "topics": ["game", "play", "offline"],
+      "topics": [
+        "game",
+        "play",
+        "offline"
+      ],
       "lore": "A dinosaur outruns the void of a dead connection. The original offline myth — born the moment the network dies.",
       "why": "The Chrome offline classic, served locally — no network required",
       "evidence_source": "wayou/t-rex-runner (BSD) · local /t-rex/",
-      "embed": { "provider": "local", "src": "/t-rex/index.html", "height": 320, "interactive": true }
+      "embed": {
+        "provider": "local",
+        "src": "/t-rex/index.html",
+        "height": 300,
+        "interactive": true,
+        "width": 600
+      }
     },
     {
       "slug": "prince-of-persia",
@@ -34,11 +31,21 @@
       "url": "https://archive.org/details/msdos_Prince_of_Persia_1990",
       "source": "Internet Archive",
       "published": "1990-01-01",
-      "topics": ["game", "lore", "dos"],
+      "topics": [
+        "game",
+        "lore",
+        "dos"
+      ],
       "lore": "Jordan Mechner rotoscoped his brother's run frame-by-frame into a desert palace. You have sixty minutes to cross it and reach her.",
       "why": "Emulated in-browser by the Internet Archive's MS-DOS library",
       "evidence_source": "archive.org · msdos_Prince_of_Persia_1990",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/msdos_Prince_of_Persia_1990", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/msdos_Prince_of_Persia_1990",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "oregon-trail",
@@ -47,11 +54,21 @@
       "url": "https://archive.org/details/msdos_Oregon_Trail_The_1990",
       "source": "Internet Archive",
       "published": "1990-01-01",
-      "topics": ["game", "lore", "dos"],
+      "topics": [
+        "game",
+        "lore",
+        "dos"
+      ],
       "lore": "Ford the river or caulk the wagon. A whole generation learned mortality to a green CRT glow — 'you have died of dysentery.'",
       "why": "Emulated in-browser by the Internet Archive's MS-DOS library",
       "evidence_source": "archive.org · msdos_Oregon_Trail_The_1990",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/msdos_Oregon_Trail_The_1990", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/msdos_Oregon_Trail_The_1990",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "sinatra",
@@ -60,11 +77,21 @@
       "url": "https://archive.org/details/FrankSinatraRadioCollectionPart2",
       "source": "Internet Archive",
       "published": "1964-01-01",
-      "topics": ["listen", "lore", "jazz"],
+      "topics": [
+        "listen",
+        "lore",
+        "jazz"
+      ],
       "lore": "218 radio broadcasts of The Voice, transmitted across two decades and now in the public domain. Put it on; let the room change.",
       "why": "Public Domain Mark 1.0 — 218 streamable broadcasts",
       "evidence_source": "archive.org · FrankSinatraRadioCollectionPart2 (Public Domain)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/FrankSinatraRadioCollectionPart2", "height": 240, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/FrankSinatraRadioCollectionPart2",
+        "height": 180,
+        "interactive": true,
+        "width": 0
+      }
     },
     {
       "slug": "mozart",
@@ -73,11 +100,21 @@
       "url": "https://archive.org/details/Mozart_Symphony_40",
       "source": "Internet Archive",
       "published": "2001-12-02",
-      "topics": ["listen", "lore", "classical"],
+      "topics": [
+        "listen",
+        "lore",
+        "classical"
+      ],
       "lore": "The G-minor symphony — restless, modern before its time. Musopen recorded it copyright-free so it could play anywhere, forever.",
       "why": "Musopen copyright-free recording (Columbia University Orchestra)",
       "evidence_source": "archive.org · Mozart_Symphony_40 (Musopen)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/Mozart_Symphony_40", "height": 240, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/Mozart_Symphony_40",
+        "height": 180,
+        "interactive": true,
+        "width": 0
+      }
     },
     {
       "slug": "pac-man",
@@ -86,11 +123,21 @@
       "url": "https://archive.org/details/msdos_Pac-Man_1983",
       "source": "Internet Archive",
       "published": "1983-01-01",
-      "topics": ["game", "lore", "arcade"],
+      "topics": [
+        "game",
+        "lore",
+        "arcade"
+      ],
       "lore": "Namco, 1983. A yellow circle, four ghosts, and a maze that taught the whole world the words 'high score.'",
       "why": "Emulated in-browser by the Internet Archive's MS-DOS library",
       "evidence_source": "archive.org · msdos_Pac-Man_1983",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/msdos_Pac-Man_1983", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/msdos_Pac-Man_1983",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "2048",
@@ -99,11 +146,21 @@
       "url": "https://github.com/gabrielecirulli/2048",
       "source": "Keystone Arcade",
       "published": "2014-03-09",
-      "topics": ["game", "open-source", "puzzle"],
+      "topics": [
+        "game",
+        "open-source",
+        "puzzle"
+      ],
       "lore": "Gabriele Cirulli built it in a single weekend and dropped it on GitHub under the MIT license. The internet lost the next month sliding tiles; it's been forked ten thousand times since.",
       "why": "MIT-licensed open-source game, served locally — no cross-origin frame",
       "evidence_source": "gabrielecirulli/2048 (MIT) · local /games/2048/",
-      "embed": { "provider": "local", "src": "/games/2048/index.html", "height": 540, "interactive": true }
+      "embed": {
+        "provider": "local",
+        "src": "/games/2048/index.html",
+        "height": 600,
+        "interactive": true,
+        "width": 520
+      }
     },
     {
       "slug": "night-of-the-living-dead",
@@ -112,11 +169,21 @@
       "url": "https://archive.org/details/night-of-the-living-dead-1968-english",
       "source": "Internet Archive",
       "published": "1968-10-01",
-      "topics": ["watch", "lore", "film"],
+      "topics": [
+        "watch",
+        "lore",
+        "film"
+      ],
       "lore": "Romero shot it for $114,000 in rural Pennsylvania. A missing copyright notice dropped the print into the public domain, where it quietly became everyone's nightmare.",
       "why": "Public-domain film, streamable in-page from the Internet Archive",
       "evidence_source": "archive.org · night-of-the-living-dead-1968-english (Public Domain)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/night-of-the-living-dead-1968-english", "height": 420, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/night-of-the-living-dead-1968-english",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "jazz-classics",
@@ -125,11 +192,21 @@
       "url": "https://archive.org/details/JazzClassics",
       "source": "Internet Archive",
       "published": "1930-01-01",
-      "topics": ["listen", "lore", "jazz"],
+      "topics": [
+        "listen",
+        "lore",
+        "jazz"
+      ],
       "lore": "Tight Like This, The Mooche, Basin Street Blues — the early recordings that aged into the public domain and never once stopped swinging.",
       "why": "Public-domain jazz, streamable in-page from the Internet Archive",
       "evidence_source": "archive.org · JazzClassics (Public Domain)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/JazzClassics", "height": 240, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/JazzClassics",
+        "height": 180,
+        "interactive": true,
+        "width": 0
+      }
     },
     {
       "slug": "sonic-1",
@@ -138,11 +215,21 @@
       "url": "https://archive.org/details/Sonic_The_Hedgehog_W_REV01_h3C",
       "source": "Internet Archive",
       "published": "1991-06-23",
-      "topics": ["game", "lore", "genesis"],
+      "topics": [
+        "game",
+        "lore",
+        "genesis"
+      ],
       "lore": "Sega's answer to Mario: a blue hedgehog with attitude and somewhere to be. Built to show off what the Genesis could do at full speed in 1991 — press Enter, then arrows + A/S/D.",
       "why": "Sega Genesis emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · Sonic_The_Hedgehog_W_REV01_h3C (emulator: genesis)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/Sonic_The_Hedgehog_W_REV01_h3C", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/Sonic_The_Hedgehog_W_REV01_h3C",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "mario-bros",
@@ -151,11 +238,21 @@
       "url": "https://archive.org/details/mariobros_nes",
       "source": "Internet Archive",
       "published": "1983-01-01",
-      "topics": ["game", "lore", "nintendo"],
+      "topics": [
+        "game",
+        "lore",
+        "nintendo"
+      ],
       "lore": "The 1983 game that first put 'Mario' in a title and handed him his brother Luigi. The original arcade cabinet isn't on the open internet, so this is the faithful NES port — same pipes, same POW block.",
       "why": "Playable NES emulator at the Internet Archive (arcade original is not openly available)",
       "evidence_source": "archive.org · mariobros_nes (emulator: nes; arcade original unavailable)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/mariobros_nes", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/mariobros_nes",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "super-mario-land",
@@ -164,11 +261,21 @@
       "url": "https://archive.org/details/sml_gb_2a",
       "source": "Internet Archive",
       "published": "1989-04-21",
-      "topics": ["game", "lore", "gameboy"],
+      "topics": [
+        "game",
+        "lore",
+        "gameboy"
+      ],
       "lore": "Mario's first handheld outing — a small, strange kingdom called Sarasaland that shipped alongside the original Game Boy and sold eighteen million copies on the strength of curiosity alone.",
       "why": "Game Boy emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · sml_gb_2a (emulator: gbcolor)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/sml_gb_2a", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/sml_gb_2a",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "punch-out",
@@ -177,11 +284,21 @@
       "url": "https://archive.org/details/mike-tysons-punch-out-japan-usa",
       "source": "Internet Archive",
       "published": "1987-10-18",
-      "topics": ["game", "lore", "nintendo"],
+      "topics": [
+        "game",
+        "lore",
+        "nintendo"
+      ],
       "lore": "Little Mac, five-foot-seven of pure pattern-recognition, punching up through a roster of giants. Nintendo licensed the heavyweight champion himself for the final bout — when the contract lapsed it quietly became plain 'Punch-Out!!' and Iron Mike became legend.",
       "why": "NES emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · mike-tysons-punch-out-japan-usa (emulator: nes)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/mike-tysons-punch-out-japan-usa", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/mike-tysons-punch-out-japan-usa",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "super-mario-world",
@@ -190,11 +307,21 @@
       "url": "https://archive.org/details/super-mario-world-usa_202406",
       "source": "Internet Archive",
       "published": "1991-08-23",
-      "topics": ["game", "lore", "nintendo"],
+      "topics": [
+        "game",
+        "lore",
+        "nintendo"
+      ],
       "lore": "The Super Nintendo's launch showcase. A green dinosaur named Yoshi, a cape that let Mario fly, and a Dinosaur Land map hiding 96 exits — the game that taught a whole generation what 'secret level' meant.",
       "why": "SNES emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · super-mario-world-usa_202406 (emulator: snes)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/super-mario-world-usa_202406", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/super-mario-world-usa_202406",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "super-mario-64",
@@ -203,11 +330,21 @@
       "url": "https://archive.org/details/super-mario-64_n64",
       "source": "Internet Archive",
       "published": "1996-06-23",
-      "topics": ["game", "lore", "nintendo"],
+      "topics": [
+        "game",
+        "lore",
+        "nintendo"
+      ],
       "lore": "The leap into three dimensions. A castle, a triple-jump, and a camera you suddenly had to think about — in 1996 Nintendo reinvented what a platformer even was, on a cartridge. (Give the N64 emulator a moment to boot.)",
       "why": "Nintendo 64 emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · super-mario-64_n64 (emulator: n64)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/super-mario-64_n64", "height": 520, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/super-mario-64_n64",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "final-fantasy-adventure",
@@ -216,11 +353,21 @@
       "url": "https://archive.org/details/final-fantasy-adventure-usa",
       "source": "Internet Archive",
       "published": "1991-11-01",
-      "topics": ["game", "lore", "nintendo"],
+      "topics": [
+        "game",
+        "lore",
+        "nintendo"
+      ],
       "lore": "Square's Game Boy action-RPG — released as Final Fantasy Gaiden in Japan, it grew into the whole Mana series. Real-time sword-and-magic adventure in four shades of grey. (The numbered Final Fantasy titles are lending-restricted on the Archive; this is the openly-playable Square FF.)",
       "why": "Game Boy emulator, playable in-browser at the Internet Archive",
       "evidence_source": "archive.org · final-fantasy-adventure-usa (emulator: gbcolor)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/final-fantasy-adventure-usa", "height": 480, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/final-fantasy-adventure-usa",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "nosferatu",
@@ -229,11 +376,21 @@
       "url": "https://archive.org/details/nosferatu_eine_symphonie_des_grauens",
       "source": "Internet Archive",
       "published": "1922-03-04",
-      "topics": ["watch", "lore", "film"],
+      "topics": [
+        "watch",
+        "lore",
+        "film"
+      ],
       "lore": "Murnau filmed Dracula without the rights, renamed the Count 'Orlok', and Stoker's widow sued the studio to ashes — a court ordered every print destroyed. The handful that survived made the first vampire of cinema immortal.",
       "why": "Public-domain silent film, streamable in-page from the Internet Archive",
       "evidence_source": "archive.org · nosferatu_eine_symphonie_des_grauens (Public Domain)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/nosferatu_eine_symphonie_des_grauens", "height": 460, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/nosferatu_eine_symphonie_des_grauens",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "steamboat-willie",
@@ -242,11 +399,21 @@
       "url": "https://archive.org/details/steamboat-willie-1928-by-walt-disney_202407",
       "source": "Internet Archive",
       "published": "1928-11-18",
-      "topics": ["watch", "lore", "animation"],
+      "topics": [
+        "watch",
+        "lore",
+        "animation"
+      ],
       "lore": "Mickey Mouse's debut, and the first cartoon with synchronized sound — Walt Disney whistling at the wheel of a steamboat. Disney's copyright held it for 95 years; on January 1, 2024 this version finally entered the public domain.",
       "why": "Entered the US public domain on Jan 1, 2024 — streamable in-page from the Internet Archive",
       "evidence_source": "archive.org · steamboat-willie-1928-by-walt-disney_202407 (Public Domain, 2024)",
-      "embed": { "provider": "archive.org", "src": "https://archive.org/embed/steamboat-willie-1928-by-walt-disney_202407", "height": 420, "interactive": true }
+      "embed": {
+        "provider": "archive.org",
+        "src": "https://archive.org/embed/steamboat-willie-1928-by-walt-disney_202407",
+        "height": 480,
+        "interactive": true,
+        "width": 640
+      }
     },
     {
       "slug": "keystone-radio",
@@ -255,11 +422,21 @@
       "url": "/fallout-radio.html",
       "source": "Keystone Radio",
       "published": "2026-06-27",
-      "topics": ["listen", "radio", "lore"],
+      "topics": [
+        "listen",
+        "radio",
+        "lore"
+      ],
       "lore": "A retro Pip-Boy tuner spinning public-domain 1940s radio — Ink Spots, Bing Crosby, Ella, the songs that play at the end of the world. Press play; tune the dial.",
       "why": "Keystone's own retro player — six public-domain Fallout-era recordings, served locally",
       "evidence_source": "Keystone (local) · /fallout-radio.html · public-domain 78s",
-      "embed": { "provider": "local", "src": "/fallout-radio.html", "height": 660, "interactive": true }
+      "embed": {
+        "provider": "local",
+        "src": "/fallout-radio.html",
+        "height": 360,
+        "interactive": true,
+        "width": 0
+      }
     }
   ]
 }
