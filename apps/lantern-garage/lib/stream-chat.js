@@ -550,6 +550,39 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
+    // Grounded self-assessment: !report-card produces an honest letter-grade
+    // scorecard of Keystone OS. Evidence is gathered deterministically (git, real
+    // counts, eval numbers, boot probe) so the model can only SYNTHESIZE grades
+    // from real measurements — it can't invent a receipt. Strengthens Verify.
+    if (cmd.name === "report-card" || cmd.name === "report_card" || cmd.name === "reportcard") {
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+
+      sendToken(`📋 Gathering grounded evidence…\n\n`);
+      try {
+        const { gatherEvidence, formatEvidenceForPrompt, REPORT_CARD_SYSTEM_PROMPT } = require("./report-card");
+        const { callLlm } = require("./self-edit-engine");
+        const evidence = gatherEvidence(repoRoot);
+        const userMsg = `${formatEvidenceForPrompt(evidence)}\n\nProduce the report card now, grading only from the evidence above.`;
+        // Synthesize via callLlm's auto cascade (Vertex leads — the funded path; #1285),
+        // not swarmOrchestrate, whose direct API-key providers are credit-starved here.
+        const text = await callLlm(REPORT_CARD_SYSTEM_PROMPT, userMsg, requestedProvider || "auto", 4096);
+        if (!text || !text.trim()) {
+          sendToken(`Could not generate a report card — no provider returned a result.\n`);
+          sendDone("failed", { agent: "ReportCard", error: "empty_result" });
+        } else {
+          for (const word of text.split(" ")) sendToken(word + " ");
+          sendDone("report_card", { agent: "ReportCard", online: true });
+        }
+      } catch (e) {
+        sendToken(`Report card failed: ${e.message}\n`);
+        sendDone("failed", { agent: "ReportCard", error: e.message });
+      }
+      res.end();
+      return;
+    }
+
     if (cmd.name === "converge" || cmd.name === "convergance") {
       // Σ₀ convergence (real, not a length vote): run a multi-provider COUNCIL —
       // creative + critic + a Sonnet synthesizer — then EMIT a Convergence Record so
