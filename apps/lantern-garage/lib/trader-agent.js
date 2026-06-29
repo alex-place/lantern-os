@@ -9,6 +9,7 @@
  */
 
 const { spawn } = require('child_process');
+const { resolvePython } = require('./resolve-python');
 const path = require('path');
 const fs = require('fs');
 // Keyless Node-native price/bar source. Replaces the per-call Python→Alpaca
@@ -428,7 +429,15 @@ class TraderAgent {
         proc.kill('SIGTERM');
       }, effectiveTimeout);
 
-      const proc = spawn('python', [pythonScript, action, JSON.stringify(args)], {
+      // OH-1 (#1548): resolve a real interpreter, not a bare `python` that ENOENTs on
+      // boxes with only the `py` launcher / a venv — that ENOENT is what crash-looped.
+      const _py = resolvePython();
+      if (!_py) {
+        clearTimeout(timeout);
+        reject(new Error('No python interpreter found (set PYTHON_PATH). Trader disabled.'));
+        return;
+      }
+      const proc = spawn(_py.cmd, [..._py.prefixArgs, pythonScript, action, JSON.stringify(args)], {
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: effectiveTimeout

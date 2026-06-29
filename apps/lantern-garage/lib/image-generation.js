@@ -1,5 +1,6 @@
 const { spawn } = require("child_process");
 const path = require("path");
+const { resolvePython } = require("./resolve-python");
 
 const repoRoot = path.resolve(__dirname, "../../../");
 
@@ -16,7 +17,9 @@ function buildThreeDoorsImagePrompt({ cleanText, doors, symbolMesh }) {
 function generateDoorSceneImage({ cleanText, doors, symbolMesh, entryId }) {
   return new Promise((resolve) => {
     const prompt = buildThreeDoorsImagePrompt({ cleanText, doors, symbolMesh });
-    const py = spawn("python", [
+    const _py = resolvePython();
+    if (!_py) { resolve({ ok: false, error: "no python interpreter (set PYTHON_PATH)" }); return; }
+    const py = spawn(_py.cmd, [..._py.prefixArgs,
       "scripts/generate-with-trained-lora.py",
       "--prompt", prompt,
       "--adapter", process.env.LANTERN_IMAGE_LORA || "models/csf-image/checkpoints/lantern-door-lora-final.safetensors",

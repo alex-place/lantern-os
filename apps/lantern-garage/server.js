@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { resolvePython } = require("./lib/resolve-python");
 
 // ── Dependency preflight ───────────────────────────────────────────────────
 // When `git pull` adds a dependency to package.json but `npm install` hasn't run
@@ -85,6 +86,10 @@ const maxDreamerTextLength = 2000;
 const jobQueue = new JobQueue(repoRoot);
 const jobWorker = new JobWorker(jobQueue, repoRoot);
 jobWorker.start(2000); // Poll every 2 seconds for new jobs
+
+// Expose the live JobQueue singleton to in-process chat tools (lib/tool-runner)
+// so the Creator video tools enqueue onto the same instance JobWorker polls.
+require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
 
 // PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and (when
 // PR_WATCHER_AUTOMERGE=1) auto-merges reviewed + green + conflict-free PRs.
@@ -290,8 +295,8 @@ const discordGuildId = process.env.LANTERN_DISCORD_GUILD_ID;
 if (discordToken && discordGuildId) {
   const botScript = path.join(repoRoot, "src", "discord_lounge_bot", "bot_v2.py");
   if (fs.existsSync(botScript)) {
-    const pythonExe = process.platform === "win32" ? "python" : "python3";
-    discordBot = spawn(pythonExe, [botScript], {
+    const _py = resolvePython() || { cmd: process.platform === "win32" ? "python" : "python3", prefixArgs: [] };
+    discordBot = spawn(_py.cmd, [..._py.prefixArgs, botScript], {
       stdio: "inherit",
       cwd: repoRoot,
       env: { ...process.env, DISCORD_BOT_TOKEN: discordToken, LANTERN_DISCORD_GUILD_ID: discordGuildId },
@@ -315,8 +320,8 @@ let mcpServer = null;
 const mcpServerScript = path.join(repoRoot, "src", "mcp_server", "server.py");
 const enableMcpServer = process.env.LANTERN_MCP_SERVER !== "false";
 if (enableMcpServer && fs.existsSync(mcpServerScript)) {
-  const pythonExe = process.platform === "win32" ? "python" : "python3";
-  mcpServer = spawn(pythonExe, [mcpServerScript], {
+  const _py = resolvePython() || { cmd: process.platform === "win32" ? "python" : "python3", prefixArgs: [] };
+  mcpServer = spawn(_py.cmd, [..._py.prefixArgs, mcpServerScript], {
     stdio: "inherit",
     cwd: repoRoot,
     env: { ...process.env, LANTERN_MCP_PORT: "8771" },
@@ -339,8 +344,8 @@ let mcpOAuthServer = null;
 const mcpOAuthServerScript = path.join(repoRoot, "src", "mcp_server", "server_oauth.py");
 const enableMcpOAuth = process.env.LANTERN_MCP_OAUTH !== "false";
 if (enableMcpOAuth && fs.existsSync(mcpOAuthServerScript)) {
-  const pythonExe = process.platform === "win32" ? "python" : "python3";
-  mcpOAuthServer = spawn(pythonExe, [mcpOAuthServerScript], {
+  const _py = resolvePython() || { cmd: process.platform === "win32" ? "python" : "python3", prefixArgs: [] };
+  mcpOAuthServer = spawn(_py.cmd, [..._py.prefixArgs, mcpOAuthServerScript], {
     stdio: "inherit",
     cwd: repoRoot,
     env: { ...process.env, LANTERN_MCP_OAUTH_PORT: "8772" },
@@ -534,11 +539,11 @@ server.listen(port, host, () => {
   const cryptoObserverScript = path.join(repoRoot, "experiments", "crypto_live_trader.py");
   let cryptoObserverProcess = null;
   if (enableCryptoObserver && fs.existsSync(cryptoObserverScript)) {
-    const pythonExe = process.platform === "win32" ? "python" : "python3";
+    const _py = resolvePython() || { cmd: process.platform === "win32" ? "python" : "python3", prefixArgs: [] };
     const logDir = path.join(repoRoot, "logs");
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
     const observerLogFd = fs.openSync(path.join(logDir, "crypto-observer.log"), "a");
-    cryptoObserverProcess = spawn(pythonExe, [cryptoObserverScript, "--interval", "10", "--edge", "0.06"], {
+    cryptoObserverProcess = spawn(_py.cmd, [..._py.prefixArgs, cryptoObserverScript, "--interval", "10", "--edge", "0.06"], {
       cwd: repoRoot,
       stdio: ["ignore", observerLogFd, observerLogFd],
     });
@@ -638,7 +643,9 @@ server.listen(port, host, () => {
     } catch { /* doesn't exist yet */ }
     if (!stale) { console.log("[Tesseract] Archive fresh — skipping auto-pack"); return; }
     console.log("[Tesseract] Packing research archive in background…");
-    execFile("python", [script, "pack"], { cwd: repoRoot, timeout: 300_000 }, (err, stdout) => {
+    const _py = resolvePython();
+    if (!_py) { console.warn("[Tesseract] Skipped pack: no python interpreter (set PYTHON_PATH)"); return; }
+    execFile(_py.cmd, [..._py.prefixArgs, script, "pack"], { cwd: repoRoot, timeout: 300_000 }, (err, stdout) => {
       if (err) { console.error("[Tesseract] Pack failed:", err.message); return; }
       const last = stdout.trim().split("\n").pop();
       console.log("[Tesseract]", last);

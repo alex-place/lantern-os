@@ -31,6 +31,7 @@ const { route: converganceRoute, buildBehaviorPreamble } = require("./converganc
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
 const { generateDoorSceneImage } = require("./image-generation");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
+const { resolvePython } = require("./resolve-python");
 const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
 // #1012 boiling-frog defense: ms epoch of the last mandatory external-grounding tick.
 // Module-level so the cadence spans requests for this server process.
@@ -514,7 +515,8 @@ async function handleStreamChat(req, url, res) {
       sendToken(`Door types: ${doorTypes}\n`);
       sendToken(`Style: Abstract, dreamlike, not cartoonish\n\n`);
       
-      const py = spawn("python", ["scripts/generate-door-images.py", "generate"], { cwd: repoRoot });
+      const _py = resolvePython() || { cmd: process.platform === "win32" ? "python" : "python3", prefixArgs: [] };
+      const py = spawn(_py.cmd, [..._py.prefixArgs, "scripts/generate-door-images.py", "generate"], { cwd: repoRoot });
       let stdout = "";
       let stderr = "";
       
