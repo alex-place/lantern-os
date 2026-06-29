@@ -40,6 +40,7 @@
     "express-session": "^1.19.0",
     "google-auth-library": "^9.15.0",
     "lantern-os": "file:../..",
+    "mammoth": "^1.12.0",
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
     "sharp": "^0.35.2",
