@@ -478,7 +478,8 @@ const PLACEHOLDER_MARKERS = [
 // stray "TODO"-ish comment in an otherwise-real fix never blocks. Scans only
 // added (`+`) lines — context/removed lines are irrelevant.
 function looksLikePlaceholderPatch(diffText) {
-  const added = String(diffText || "")
+  const raw = String(diffText || "");
+  const added = raw
     .split(/\r?\n/)
     .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
     .map((l) => l.slice(1));
@@ -489,7 +490,24 @@ function looksLikePlaceholderPatch(diffText) {
     if (m) signals.push(m[0].trim().toLowerCase());
   }
   const uniq = [...new Set(signals)];
-  return { placeholder: uniq.length >= 2, signals: uniq };
+
+  // Doc-only slop (#1520): a "patch" whose changes are ENTIRELY markdown/text docs
+  // under issues/ or workspace/, or a file with "placeholder" in its name, is a weak
+  // model dumping the issue text instead of writing code (e.g. autowork once committed
+  // `issues/placeholder-feature-issue.md` as the whole fix). Those paths are never a
+  // real fix target, so a patch touching ONLY them is non-implementation slop. Narrow
+  // by design: legitimate doc edits (changelog.d/*.md, docs/*, README) are untouched.
+  const touched = (raw.match(/^\+\+\+ b\/(.+)$/gm) || [])
+    .map((l) => l.replace(/^\+\+\+ b\//, "").trim())
+    .filter((p) => p && p !== "/dev/null");
+  const docOnlySlop = touched.length > 0 && touched.every((p) => {
+    const f = p.replace(/\\/g, "/");
+    return /\.(md|markdown|txt|rst)$/i.test(f)
+      && (/(^|\/)(issues|workspace)\//i.test(f) || /placeholder/i.test(f));
+  });
+
+  const out = docOnlySlop ? [...uniq, "doc-only slop (issues//workspace//*placeholder*)"] : uniq;
+  return { placeholder: uniq.length >= 2 || docOnlySlop, signals: out };
 }
 
 // Verify gate (#1359): a clean-applying, non-placeholder patch can still leave a
