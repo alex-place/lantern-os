@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify shareholder index exists
         run: |
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check required Lantern manifests
         run: |
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify HTML surface links
         shell: python
@@ -86,7 +86,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install pytest and bot test dependencies
         run: |
@@ -95,21 +95,16 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest tests -q --timeout=30 \
-            --ignore=tests/test_anti_entropy_memory.py \
-            --ignore=tests/test_audit_chain.py \
-            --ignore=tests/test_discord_bot.py \
-            --ignore=tests/test_discord_voice_gate.py \
-            --ignore=tests/test_convergence_io_engine.py \
-            --ignore=tests/test_p4_integration_full_loops.py \
-            --ignore=tests/test_three_doors_engine.py
+          # Full suite — no excludes (anti-entropy/audit-chain pass; discord suites
+          # self-skip via importorskip when their deps are absent).
+          python -m pytest tests -q --timeout=30
 
   workflow-shape:
     name: CI parallel shape guard
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify CI has parallel lanes and final summary gate
         shell: python
@@ -136,7 +131,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify cloud convergence output
         shell: pwsh

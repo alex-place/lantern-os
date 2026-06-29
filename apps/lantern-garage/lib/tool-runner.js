@@ -32,6 +32,8 @@ const { webSearch } = require("./web-search-client");
 const { workspaceWrite, workspaceRead, workspaceList, getWorkspaceRoot } = require("./user-workspace");
 const { createDocument, listTemplates } = require("./doc-generator");
 const toolLogger = require("./tool-logger");
+const entryStore = require("./entry-store");
+const { getCreatorRuntime } = require("./creator-runtime");
 
 const REPO = path.resolve(__dirname, "..", "..", "..");
 // User workspace: outside the repo, for user artifacts (resumes, exports, generated docs).
@@ -178,7 +180,30 @@ function _htmlToText(html) {
     .replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim();
 }
 
-// ── canonical registry (names/schemas == training == Claude Code) ───────────────
+// ── Creator Suite helpers (video tools) ─────────────────────────────────────────
+// These let dream-chat drive the same pipeline as create.html: list projects,
+// kick off highlight analysis, and poll a job — all on the server's LIVE JobQueue
+// singleton (via creator-runtime) so the JobWorker actually processes them.
+function _creatorCtx() {
+  const { jobQueue, repoRoot } = getCreatorRuntime();
+  if (!jobQueue || !repoRoot) {
+    throw _codedError("creator runtime unavailable (server not initialized)", "creator_runtime_unavailable");
+  }
+  return { jobQueue, repoRoot };
+}
+
+// Thumbnails are served by routes/media at /media/<path>; renderMarkdown in the
+// chat (safeUrl allows site-absolute paths) renders `![alt](/media/…)` inline.
+// Return a markdown image for an entry that has a thumbnail, else null.
+function _thumbMarkdown(entry) {
+  const t = entry && entry.thumbnail;
+  if (!t) return null;
+  const rel = String(t).replace(/\\/g, "/"); // Windows store → URL separators
+  const url = rel.startsWith("/") ? rel : "/media/" + rel.replace(/^\/+/, "");
+  const alt = String(entry.title || "thumbnail").replace(/[\[\]]/g, "");
+  return `![${alt}](${encodeURI(url)})`;
+}
+
 const REGISTRY = {
   Read: {
     policy: "read", desc: "Read a file from the filesystem (repo-relative).",
@@ -297,6 +322,48 @@ const REGISTRY = {
     },
   },
 
+  // #1344: a first-class issue/PR lookup. Before this, "find issue #1342" had no tool —
+  // the model fell back to Grep on repo files (issues don't live in the repo), found
+  // nothing, and gave up, even though the live-context block already injects the top-8
+  // open issues by title only. This fetches ONE specific issue/PR by number, with body,
+  // via the same `gh` path keystone-context.js already uses (the reliable one). Read-only
+  // + scoped to the configured repo (a public repo) → guest_safe like web_fetch.
+  github_issue: {
+    policy: "read",
+    guest_safe: true,
+    desc: "Look up a specific GitHub issue or pull request by number in this project's repo, returning its title, state, labels, and body. Use this whenever the user asks to find, show, view, read, or summarize an issue or PR by number (e.g. \"find issue #1342\", \"what's PR 1200 about\"). Do NOT grep the repo for issue numbers — issues live on GitHub, not in the files.",
+    schema: {
+      type: "object",
+      properties: {
+        number: { type: "integer", description: "The issue or PR number (without the # prefix)" },
+      },
+      required: ["number"],
+    },
+    async run(i) {
+      const n = parseInt(String(i.number == null ? "" : i.number).replace(/^#/, ""), 10);
+      if (!Number.isInteger(n) || n <= 0) return "[github_issue error: a positive issue/PR number is required]";
+      const { execFile } = require("child_process");
+      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      const ghView = (kind) => new Promise((resolve) => {
+        execFile("gh", [kind, "view", String(n), "--repo", repo, "--json",
+          "number,title,state,labels,body,url"],
+          { cwd: REPO, timeout: 10000, windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
+          (err, stdout) => resolve(err ? null : stdout));
+      });
+      // `gh issue view` errors on a PR number and vice-versa, so try issue then PR.
+      let raw = await ghView("issue");
+      let kind = "issue";
+      if (!raw) { raw = await ghView("pr"); kind = "pull request"; }
+      if (!raw) return `[github_issue: #${n} not found in ${repo} (or gh CLI unavailable)]`;
+      let d;
+      try { d = JSON.parse(raw); } catch { return `[github_issue: could not parse gh output for #${n}]`; }
+      const labels = (d.labels || []).map((l) => l.name).filter(Boolean).join(", ") || "none";
+      const body = String(d.body || "").trim();
+      const excerpt = body.length > 4000 ? body.slice(0, 4000) + "\n…[truncated]" : (body || "(no description)");
+      return `${kind} #${d.number} — ${d.title}\nstate: ${d.state} · labels: ${labels}\nurl: ${d.url}\n\n${excerpt}`;
+    },
+  },
+
   web_fetch: {
     policy: "read",
     guest_safe: true, // web-only (SSRF-guarded): safe for non-operators on the public server (#1213)
@@ -315,7 +382,14 @@ const REGISTRY = {
       const maxChars = Math.max(200, Math.min(MAX_OUT, parseInt(i.max_chars, 10) || 3000));
       let html;
       try { html = await _httpGet(url); }
-      catch (e) { return `[web_fetch error: ${e.message}]`; }
+      catch (e) {
+        // Let coded block errors (private_host_blocked, etc.) propagate so runTool maps
+        // them to status "blocked" + reason_code — consistent with Read/Bash. Swallowing
+        // them into a plain string mis-reported a blocked SSRF attempt as "executed" (the
+        // guard still worked — no request reached the private host — but the status lied).
+        if (e && e.reason) throw e;
+        return `[web_fetch error: ${e.message}]`;
+      }
       const text = _htmlToText(html || "");
       const excerpt = text.length > maxChars ? text.slice(0, maxChars) + "\n…[truncated]" : text;
       return `web_fetch(${url})\n\n${excerpt}`;
@@ -609,6 +683,105 @@ const REGISTRY = {
         accuracy_by_difficulty: leaderboardRow ? leaderboardRow.accuracy_by_difficulty || null : null,
         ts: new Date().toISOString(),
       }, null, 2);
+    },
+  },
+
+  // ── Creator Suite: short-form video pipeline in chat (mirrors create.html) ──
+  list_creator_projects: {
+    policy: "read", desc: "List the user's Creator video projects as a markdown gallery (title, status, thumbnail image, id). Relay the markdown to the user so the thumbnails render; use the `id` for analyze_video.",
+    schema: { type: "object", properties: { limit: { type: "integer", description: "max projects (default 20)" } } },
+    run(i) {
+      const { repoRoot } = _creatorCtx();
+      const entries = entryStore.listEntries(repoRoot) || [];
+      const sorted = [...entries].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      const limit = Math.max(1, Math.min(50, parseInt(i.limit, 10) || 20));
+      const shown = sorted.slice(0, limit);
+      if (!shown.length) return "No Creator projects yet. Upload a video on /create.html or pass a filePath to analyze_video to start one.";
+      // Markdown so the chat renders each thumbnail inline (renderMarkdown → <img>).
+      const blocks = shown.map((e, n) => {
+        const title = e.title || "Untitled";
+        const status = e.status || "uploaded";
+        const thumb = _thumbMarkdown(e);
+        return `${n + 1}. **${title}** — status: ${status} · \`${e.id}\`\n` +
+          (thumb ? thumb : "_(no thumbnail yet — run analyze_video)_");
+      });
+      const header = `Found ${shown.length}${entries.length > shown.length ? " of " + entries.length : ""} Creator project${shown.length === 1 ? "" : "s"} (most recent first):`;
+      return header + "\n\n" + blocks.join("\n\n");
+    },
+  },
+
+  analyze_video: {
+    policy: "action", desc: "Start highlight analysis (motion/scene/audio) on a Creator project. Pass entryId of an existing project, OR filePath (repo-relative video) to create one. Returns a jobId — poll it with creator_job_status.",
+    schema: { type: "object", properties: {
+      entryId: { type: "string", description: "existing project id (from list_creator_projects)" },
+      filePath: { type: "string", description: "repo-relative path to an uploaded video; creates a new project" },
+      title: { type: "string", description: "title for a new project (optional)" },
+    } },
+    run(i) {
+      const { jobQueue, repoRoot } = _creatorCtx();
+      let entryId = (i.entryId || "").trim() || null;
+      let entry = null;
+
+      if (entryId) {
+        entry = entryStore.getEntry(repoRoot, entryId);
+        if (!entry) return JSON.stringify({ error: `project not found: ${entryId}` });
+      } else if (i.filePath) {
+        const abs = _safe(i.filePath); // repo-sandboxed
+        if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+          return JSON.stringify({ error: `video file not found: ${i.filePath}` });
+        }
+        const base = path.basename(i.filePath).replace(/\.[^.]+$/, "").replace(/[_\-]+/g, " ").trim();
+        entry = entryStore.createEntry(repoRoot, {
+          title: (i.title || "").trim() || (base ? base.replace(/\b\w/g, (c) => c.toUpperCase()) : "Video Project"),
+          type: "video",
+          filePath: String(i.filePath).replace(/\\/g, "/"),
+        });
+        entryId = entry.id;
+      } else {
+        return JSON.stringify({ error: "provide entryId or filePath" });
+      }
+
+      const videoPath = entry.filePath;
+      if (!videoPath) return JSON.stringify({ error: `project ${entryId} has no source video` });
+      if (!fs.existsSync(path.join(repoRoot, videoPath))) {
+        return JSON.stringify({ error: `source video missing on disk: ${videoPath}` });
+      }
+
+      const job = jobQueue.enqueue("analyze", { videoPath, entryId, options: {} });
+      return JSON.stringify({
+        ok: true, jobId: job.id, entryId, status: job.status,
+        message: "Analysis queued. Poll creator_job_status with this jobId.",
+      }, null, 2);
+    },
+  },
+
+  creator_job_status: {
+    policy: "read", desc: "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + the project thumbnail (markdown image — relay it so it renders inline).",
+    schema: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
+    run(i) {
+      const { jobQueue, repoRoot } = _creatorCtx();
+      const job = jobQueue.getJob((i.jobId || "").trim());
+      if (!job) return JSON.stringify({ error: `job not found: ${i.jobId}` });
+      const ls = job.liveStats || {};
+      const out = {
+        jobId: job.id, type: job.type, status: job.status,
+        progress: job.progress, message: job.progressMessage,
+        etaSeconds: job.etaSeconds, error: job.error || null,
+      };
+      if (ls.highlightsFound != null) out.highlightsFound = ls.highlightsFound;
+      if (ls.topScore != null) out.topScore = ls.topScore;
+      if (job.status === "complete" && job.result && job.result.timeline) {
+        const hl = job.result.timeline.highlights;
+        out.highlights = Array.isArray(hl) ? hl.length : 0;
+        if (job.input && job.input.entryId) {
+          out.openProject = `/entry.html?id=${job.input.entryId}`;
+          // Surface the (possibly render-derived) thumbnail so chat shows the result visually.
+          const entry = entryStore.getEntry(repoRoot, job.input.entryId);
+          const thumb = _thumbMarkdown(entry);
+          if (thumb) out.thumbnail = thumb;
+        }
+      }
+      return JSON.stringify(out, null, 2);
     },
   },
 };

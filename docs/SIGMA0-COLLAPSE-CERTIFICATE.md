@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-06-20
+updated: 2026-06-29
 ---
 
 # Σ₀ — The Collapse Certificate
@@ -141,6 +141,16 @@ lines before relying on any claim here.
 > weakening assertions. `pytest tests/test_cio_sde.py` → **39 passed, 0 failed** (was
 > 30 passed / 8 failed). "Machine-checked" here means closed-form algebra + sweep + pytest,
 > **not** a Lean/Mathlib formal proof.
+>
+> **Maintenance log — 2026-06-29 (external-reality reconcile).** Verification pass against the
+> repo, no claims changed: `pytest tests/test_cio_sde.py` → **42 passed, 0 xfail** (matches
+> every live status line); `data/sigma0_regime_sweep_report.json` →
+> `collapse_prone_trials_total=900`, `headline_conditional_prevention_rate=1.0`; and the cited
+> symbols all resolve — `collapse_certificate`, `AntiCollapseOperator`, `stability_gates`,
+> `dichotomy_certificate` in `src/cio_sde/collapse.py`, `SurpriseMonitor` in
+> `src/cio_sde/surprise.py`. Nothing had drifted since the 2026-06-26 closures (both halves of
+> [#768] remain closed in-regime; §3 PROVEN for all `A`). Frontmatter `updated:` bumped
+> 2026-06-20 → 2026-06-29 to reflect this check; no frontier changes.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**

@@ -1,0 +1,1 @@
+- docs(agents): AGENTS.md now states the porting/licensing rule (permissive-only; GPL/AGPL/LGPL must not be ported) and points to THIRD-PARTY-NOTICES.md, completing the attribution convention (#1412).

@@ -233,7 +233,7 @@ module.exports = async (req, res, url, deps) => {
         const task = typeof opts.task === "string" ? opts.task.trim() : "";
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue, looksLikePlaceholderPatch, patchSyntaxErrors } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue, isFileIssueOnlyRequest, looksLikePlaceholderPatch, patchSyntaxErrors } = require("../lib/self-edit-engine");
         const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
@@ -261,6 +261,12 @@ module.exports = async (req, res, url, deps) => {
             try {
               const created = createIssueFromTask(REPO_ROOT, task);
               issueNumber = created.number;
+              // "file an issue" with no implement verb → log the ticket and STOP.
+              // Running the patch pipeline on it only manufactures slop (#1521).
+              if (isFileIssueOnlyRequest(task)) {
+                sendJson(res, { ok: true, fileIssueOnly: true, issue: created.number, url: created.url, title: created.title, message: `Filed issue #${created.number}: ${created.title}` });
+                return;
+              }
             } catch (e) {
               sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
               return;
@@ -473,8 +479,8 @@ module.exports = async (req, res, url, deps) => {
         step("test", "start", { count: plannedTests.length });
         const testResults = runTests(workRoot, plannedTests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsRan = plannedTests.length;
-        const allTestsOk = testResults.every((r) => r.ok);
-        const testsVerified = testsRan > 0 && allTestsOk;
+        const allTestsOk = testResults.every((r) => r.ok !== false);   // inconclusive (timeout) ≠ failure → don't roll back a good patch
+        const testsVerified = testsRan > 0 && allTestsOk && testResults.some((r) => r.ok === true);  // "verified" only if a test actually passed
         step("test", "done", { testsRan, allTestsOk, testsVerified });
 
         if (testsRan > 0 && !allTestsOk) {
@@ -537,7 +543,28 @@ module.exports = async (req, res, url, deps) => {
         step("pr", "start", { branch: branchName });
         const prUrl = openDraftPr(workRoot, branchName, commitTitle, prBody);
         step("pr", "done", { prUrl });
-        step("done", "ok", { prUrl, testsVerified, changedFiles: changedFiles.length });
+
+        // Σ₀ council: score this self-coding decision so its Δ accrues against the PR's eventual
+        // outcome (merged / reverted) — the join council_outcome_backtest.py needs. councilReview's
+        // opts.context tags the council record with {surface, issue, pr}; the record already carries
+        // delta + an `outcome` slot the backtest labeller fills. Best-effort: a scoring error must
+        // never break the pipeline. execVerdict is passed ONLY on a real pass — an inconclusive
+        // (timeout) test must not force a `refuted` verdict, so it falls through to the text Δ.
+        let councilDelta = null, councilVerdict = null;
+        try {
+          const { councilReview } = require("../lib/council-review");
+          const prNumber = prUrl ? (Number((String(prUrl).match(/\/pull\/(\d+)/) || [])[1]) || null) : null;
+          const planText = (plan && (plan.summary || plan.reasoning)) || (plan ? JSON.stringify(plan) : "");
+          const review = councilReview(String(planText).slice(0, 6000), {
+            execVerdict: testsVerified ? { ran: true, passed: true } : undefined,
+            context: { surface: "autowork", issue: issueNumber, pr: prNumber },
+          });
+          councilDelta = review.delta;
+          councilVerdict = review.verdict;
+          step("council", "done", { delta: councilDelta, verdict: councilVerdict, pr: prNumber });
+        } catch (_e) { /* council scoring is best-effort */ }
+
+        step("done", "ok", { prUrl, testsVerified, councilDelta, councilVerdict, changedFiles: changedFiles.length });
 
         sendJson(res, {
           ok: true,
@@ -550,6 +577,8 @@ module.exports = async (req, res, url, deps) => {
           testsRan,
           testsVerified,
           verified: testsVerified,
+          councilDelta,
+          councilVerdict,
           steps: ["fetched_issue", "generated_plan", "applied_patch", "ran_tests", "committed", "pushed", "opened_pr"],
           testResults
         });
@@ -659,7 +688,7 @@ module.exports = async (req, res, url, deps) => {
       const {
         generatePlan, generatePatch, applyPatch, runTests,
         gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue,
-        looksLikePlaceholderPatch, patchSyntaxErrors,
+        isFileIssueOnlyRequest, looksLikePlaceholderPatch, patchSyntaxErrors,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -704,6 +733,13 @@ module.exports = async (req, res, url, deps) => {
               const created = createIssueFromTask(REPO_ROOT, task);
               issueNumber = created.number;
               step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
+              // "file an issue" with no implement verb → log the ticket and STOP.
+              // Running the patch pipeline on it only manufactures slop (#1521).
+              if (isFileIssueOnlyRequest(task)) {
+                send("done", { ok: true, fileIssueOnly: true, issue: created.number, url: created.url, title: created.title, message: `Filed issue #${created.number}: ${created.title}` });
+                res.end();
+                return;
+              }
             } catch (e) {
               step("create_issue", "error", { error: String(e && e.message || e) });
               send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });
@@ -951,9 +987,9 @@ module.exports = async (req, res, url, deps) => {
         step("tests", "start", { commands: tests });
         const testResults = runTests(workRoot, tests, { env: worktreeTestEnv(REPO_ROOT) });
         const ranTests = tests.length > 0; // #933: zero tests is NOT a pass
-        const testsPassed = testResults.every((r) => r.ok);
+        const testsPassed = testResults.every((r) => r.ok !== false);  // inconclusive (timeout) ≠ failure
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
-        const _failedTest = testResults.find((r) => !r.ok) || {};
+        const _failedTest = testResults.find((r) => r.ok === false) || {};
         step("tests", "done", { testResults, passed: testsPassed, ran: tests.length,
           detail: tests.length === 0
             ? "no tests were specified for this change"

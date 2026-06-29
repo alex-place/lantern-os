@@ -20,7 +20,7 @@
 
   var NAV_LINKS = [
     { href: "/dream-chat.html", label: "Chat" },
-    { href: "/trader-dashboard.html", label: "Trader" },
+    { href: "/stock-trader.html", label: "Trader" },
     { href: "/create.html", label: "Create" },
     { href: "/explore.html", label: "Explore" },
     { href: "/knowledgecenter.html", label: "Help" },
@@ -39,7 +39,7 @@
       '  <div class="nav-links">\n    ' +
       links +
       "\n" +
-      '    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>\n' +
+      '    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>\n' +
       "  </div>\n" +
       '  <div class="nav-actions">\n' +
       '    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>\n' +
@@ -104,7 +104,10 @@
     var here = location.pathname.replace(/\/index\.html$/, "/");
     document.querySelectorAll("nav.site-nav .nav-links a").forEach(function (a) {
       var href = a.getAttribute("href") || "";
-      if (href && href.charAt(0) === "/" && href === here) a.classList.add("active");
+      if (href && href.charAt(0) === "/" && href === here) {
+        a.classList.add("active");
+        a.setAttribute("aria-current", "page"); // expose the active page to AT
+      }
     });
 
     // theme-toggle.js may have run before this nav existed; sync the glyph.

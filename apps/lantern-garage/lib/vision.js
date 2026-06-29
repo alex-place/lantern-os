@@ -1,6 +1,6 @@
 // Vision (image understanding) — analyze an image with a provider-native vision model.
-// Both Claude and GPT-4o are multimodal; Claude is primary here because its key works in this
-// environment (OpenAI is currently billing-limited), with gpt-4o-mini as the ready fallback.
+// Both Claude, GPT-4o-mini, and Gemini are multimodal. Claude is primary here, with gpt-4o-mini
+// as the first fallback, and gemini-2.5-flash as the second fallback.
 // Node fetch, key stays server-side, fail-safe by contract: { ok:false, error } on any failure.
 //
 // Pairs with the file-upload work tool: an image attachment routes here so the chat can SEE it.

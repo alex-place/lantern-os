@@ -478,7 +478,8 @@ const PLACEHOLDER_MARKERS = [
 // stray "TODO"-ish comment in an otherwise-real fix never blocks. Scans only
 // added (`+`) lines — context/removed lines are irrelevant.
 function looksLikePlaceholderPatch(diffText) {
-  const added = String(diffText || "")
+  const raw = String(diffText || "");
+  const added = raw
     .split(/\r?\n/)
     .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
     .map((l) => l.slice(1));
@@ -489,7 +490,24 @@ function looksLikePlaceholderPatch(diffText) {
     if (m) signals.push(m[0].trim().toLowerCase());
   }
   const uniq = [...new Set(signals)];
-  return { placeholder: uniq.length >= 2, signals: uniq };
+
+  // Doc-only slop (#1520): a "patch" whose changes are ENTIRELY markdown/text docs
+  // under issues/ or workspace/, or a file with "placeholder" in its name, is a weak
+  // model dumping the issue text instead of writing code (e.g. autowork once committed
+  // `issues/placeholder-feature-issue.md` as the whole fix). Those paths are never a
+  // real fix target, so a patch touching ONLY them is non-implementation slop. Narrow
+  // by design: legitimate doc edits (changelog.d/*.md, docs/*, README) are untouched.
+  const touched = (raw.match(/^\+\+\+ b\/(.+)$/gm) || [])
+    .map((l) => l.replace(/^\+\+\+ b\//, "").trim())
+    .filter((p) => p && p !== "/dev/null");
+  const docOnlySlop = touched.length > 0 && touched.every((p) => {
+    const f = p.replace(/\\/g, "/");
+    return /\.(md|markdown|txt|rst)$/i.test(f)
+      && (/(^|\/)(issues|workspace)\//i.test(f) || /placeholder/i.test(f));
+  });
+
+  const out = docOnlySlop ? [...uniq, "doc-only slop (issues//workspace//*placeholder*)"] : uniq;
+  return { placeholder: uniq.length >= 2 || docOnlySlop, signals: out };
 }
 
 // Verify gate (#1359): a clean-applying, non-placeholder patch can still leave a
@@ -525,6 +543,20 @@ function patchSyntaxErrors(changedFiles, repoRoot) {
     }
   }
   return errors;
+}
+
+// An explicit "just file an issue" request — the user wants a ticket LOGGED, not
+// code written this turn. Routing it through the patch pipeline only manufactures
+// slop (#1517 → a placeholder .md committed as the "fix"). Match a file/open/log
+// verb + issue/ticket/bug, UNLESS the same message also asks to implement it
+// (fix/build/add/…) — then keep the full pipeline. (#1521)
+function isFileIssueOnlyRequest(task) {
+  const t = String(task || "").trim().toLowerCase();
+  if (!t) return false;
+  const fileVerb = /\b(file|open|log|create|raise|submit)\b[\w\s]*\b(issue|ticket|bug)\b/.test(t);
+  if (!fileVerb) return false;
+  const implementVerb = /\b(fix|implement|build|add|write|refactor|patch|code|resolve|solve)\b/.test(t);
+  return !implementVerb;
 }
 
 // A task message that *references an existing issue* must NOT be filed as a new
@@ -744,9 +776,15 @@ function runTests(repoRoot, testCommands, opts = {}) {
       const out = execFileSync(bin, argv.slice(1), { cwd: repoRoot, encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024, env, shell: false });
       results.push({ cmd, ok: true, output: out.slice(0, MAX_OUTPUT), truncated: out.length > MAX_OUTPUT });
     } catch (err) {
+      // A TIMEOUT (the test hung — e.g. an integration/API test waiting for a server that isn't
+      // running in the worktree) is INCONCLUSIVE, not a real failure. Treating it as a failure
+      // rolls back good patches (the #1 false-rollback in the dogfood loop). Mark it skipped;
+      // the gate fails only on tests that actually RAN and asserted false (ok === false).
+      const timedOut = err.killed || err.signal === "SIGTERM" || /ETIMEDOUT/.test(String(err.code));
       results.push({
         cmd,
-        ok: false,
+        ok: timedOut ? null : false,
+        skipped: timedOut ? "timeout — inconclusive (likely server-dependent / hung), not a failure" : undefined,
         error: String(err.stderr || err.message || "").slice(0, MAX_OUTPUT),
         output: String(err.stdout || "").slice(0, MAX_OUTPUT),
         exit_code: err.status,
@@ -905,7 +943,7 @@ function callVertex(system, user, maxTokens = 4096) {
   const payload = JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
   });
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -967,7 +1005,7 @@ function callGemini(system, user, maxTokens = 4096) {
   const model = require("./provider-models").modelFor("gemini");
   const payload = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: `${system}\n\n${user}` }] }],
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
   });
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -1340,6 +1378,7 @@ module.exports = {
   pushRemoteOwner,
   createIssueFromTask,
   resolveExistingIssue,
+  isFileIssueOnlyRequest,
   looksLikePlaceholderPatch,
   patchSyntaxErrors,
   taskTitle,

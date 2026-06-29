@@ -1,0 +1,1 @@
+fix(chat): greetings & identity questions no longer short-circuit to a Knowledge Center doc section. "Hello, who are you?" was scoring a spurious KB near-hit against an arbitrary doc (CLAUDE.md#Node.js) and rendering that section's raw text — an empty ```bash fence — instead of an actual model reply. Social/identity messages now bypass the $0 KB short-circuit and go to the model.

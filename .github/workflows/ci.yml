@@ -28,7 +28,7 @@ jobs:
     name: Validate repo structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check required files
         run: |
@@ -82,9 +82,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -102,17 +102,13 @@ jobs:
 
       - name: Run pytest
         run: |
-          python -m pytest tests -q --tb=short --timeout=30 --junitxml=pytest-results.xml \
-            --ignore=tests/test_anti_entropy_memory.py \
-            --ignore=tests/test_audit_chain.py \
-            --ignore=tests/test_discord_bot.py \
-            --ignore=tests/test_discord_voice_gate.py \
-            --ignore=tests/test_convergence_io_engine.py \
-            --ignore=tests/test_p4_integration_full_loops.py \
-            --ignore=tests/test_three_doors_engine.py
+          # Full suite — no excludes. The anti-entropy + audit-chain suites pass,
+          # and the discord suites self-skip via importorskip when discord/dpytest
+          # are absent (they are installed above), so the run is clean unfiltered.
+          python -m pytest tests -q --tb=short --timeout=30 --junitxml=pytest-results.xml
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: pytest-results
@@ -123,9 +119,9 @@ jobs:
     name: Node tests (API, etc)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -158,7 +154,7 @@ jobs:
           node tests/test_dream_journal_keystone.js
 
       - name: Upload Node test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: node-test-results
@@ -172,7 +168,7 @@ jobs:
     name: Convergence validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify repo contract
         run: |
@@ -200,7 +196,7 @@ jobs:
     name: Integration & cloud readiness
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check cloud mirrors config
         run: |
@@ -222,7 +218,7 @@ jobs:
     needs: [validate-repo, integration-checks]
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate convergence batch framework
         run: |
@@ -256,9 +252,9 @@ jobs:
     name: Security scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -281,7 +277,7 @@ jobs:
         run: pip-audit --format=json --output=pip-audit-results.json || true
 
       - name: Upload security scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: security-scan-results
@@ -297,9 +293,9 @@ jobs:
     name: CSF cache validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -333,9 +329,9 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -343,7 +339,7 @@ jobs:
         run: python src/convergence_io_engine.py loop > convergence-report.json
 
       - name: Upload convergence report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: convergence-report
           path: convergence-report.json

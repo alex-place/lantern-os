@@ -32,7 +32,7 @@ const PROTECTED_PAGES = {
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
   "/trading.html":        { file: "trading.html",           entitlement: "trade" },
   "/trading-news.html":   { file: "trading-news.html",      entitlement: "trade" },
-  "/trader-dashboard.html":{ file: "trader-dashboard.html", entitlement: "trade" },
+  "/stock-trader.html":   { file: "stock-trader.html",      entitlement: "trade" },
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },

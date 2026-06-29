@@ -1,7 +1,17 @@
 # Theorem C3 — Σ₀⁻¹ prevents permanent freeze (all A)
 
+> **Reconcile note — 2026-06-29.** When this doc was written (commit 04:34, 2026-06-26) the
+> Theorem-1 *contraction* half of [#768] was still open, so the scope notes below say it
+> "remains" / "stays open." It was **closed later the same day** (commit 11:24) via the
+> spectral dichotomy — see [SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md).
+> **All of [#768] is now closed in-regime.** The honest *distinction* this doc draws still
+> stands — C3 itself proves only anti-*freeze* (the rescue), not contraction (the drift) —
+> but read every "the contraction half remains open" below as "is closed separately, in the
+> dichotomy doc." `collapse.py` line numbers cited here have also been refreshed to the
+> current file (the file grew; symbols unchanged). `pytest tests/test_cio_sde.py` → **42 passed**.
+
 **Status: PROVEN (all A), computationally machine-checked.**
-Verified against the repo 2026-06-26. The original proof closed the **normal/symmetric**
+Verified against the repo 2026-06-26 (reconciled 2026-06-29). The original proof closed the **normal/symmetric**
 case; **§7 (L2′)** then removed the alignment hypothesis L1 — the one place normality was
 used — so the no-permanent-freeze conclusion now holds for **non-normal `A` too**. Gating
 artifacts all landed and pass:
@@ -13,7 +23,7 @@ artifacts all landed and pass:
 - tests: `tests/test_cio_sde.py::{test_l4_floor_lifts_anisotropy,
   test_l4_floor_scale_equivariant, test_g13_no_zero_rank_bump, test_c3_no_consecutive_freeze,
   test_c3_nonnormal_covariance_lift}` (all green), atop the L4/G13 code fixes in
-  `src/cio_sde/collapse.py` (`_cov_floor` @507, `_near_null_basis` @479).
+  `src/cio_sde/collapse.py` (`_cov_floor` @639, `_near_null_basis` @611).
 
 This proves the §3 sufficiency claim of the
 [Collapse Certificate](SIGMA0-COLLAPSE-CERTIFICATE.md).
@@ -23,8 +33,10 @@ This proves the §3 sufficiency claim of the
    non-normal `A` is **Theorem 1's contraction** — whether an ungrounded system collapses
    onto the manifold *at all* vs. diverges (the §1 cross-term, [#768]). C3 says the
    *rescue* operator can't let the freeze gate latch; it says nothing about *whether* the
-   bad dynamics contract. [#768] is therefore now **split**: the anti-freeze half is
-   closed (here); the Theorem-1 contraction half remains.
+   bad dynamics contract. [#768] was **split** into these two halves: the anti-freeze half is
+   closed here; the Theorem-1 contraction half is closed separately in
+   [SIGMA0-T1-NONNORMAL-DICHOTOMY.md](SIGMA0-T1-NONNORMAL-DICHOTOMY.md) (the spectral
+   dichotomy, same day). Both halves closed ⟹ **#768 closed in-regime**.
 2. **"Machine-checked" = closed-form algebra + numerical sweep + pytest, NOT a Lean/Mathlib
    formal proof.** The chain is *feasible* in Lean; that has not been done.
 3. **C3 governs the operator's *action*.** In the live engine Σ₀⁻¹ is observe-only by
@@ -81,13 +93,13 @@ triggered = cond_grad ∧ cond_rank ∧ cond_flat ∧ cond_ctrl
 `a(Σ) = std(λ)/mean(λ)` over `λ = eig(½(Σ+Σᵀ))` (`_anisotropy`, `collapse.py:87–91`).
 When `triggered`, the integrator (`engine.forward_step`) overwrites `x_next = x*` and
 discards the diffusion term — that overwrite, repeated forever, **is** the permanent
-freeze. Σ₀⁻¹ (`AntiCollapseOperator`, `collapse.py:438–492`) adds, in one step,
+freeze. Σ₀⁻¹ (`AntiCollapseOperator`, `collapse.py:570`) adds, in one step,
 `Σ⁺ = Σ + b·P_N` with `b = strength·p` and `P_N = V_null V_nullᵀ` (rank `k`), where
 
 ```
-p = proximity(...) = min(p_grad, p_rank, p_flat, p_ctrl)        (collapse.py:476)
+p = proximity(...) = min(p_grad, p_rank, p_flat, p_ctrl)        (collapse.py:594)
 p_i = _below(value_i, threshold_i) = clip(1 − value_i/threshold_i, 0, 1)
-V_null = eigenvectors of A_s with |λ| < eig_eps                  (collapse.py:484)
+V_null = banded near-null basis of A_s, 1 ≤ m ≤ d−1             (_near_null_basis, collapse.py:611)
 ```
 
 L2's threshold is `Δ = (ε_a + a)·μ·d / (√(k(d−k)) − ε_a·k)`, `μ = mean(λ(Σ)) > 0`.

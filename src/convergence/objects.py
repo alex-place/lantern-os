@@ -197,3 +197,47 @@ class ConvergenceRecord:
             "grounding_signals": self.grounding_signals,
             "allowed_max_confidence": self.allowed_max_confidence,
         })
+
+
+@dataclass
+class ConvergenceRecord:
+    """A snapshot of the system's health and convergence status.
+
+    This record captures the "grade card" of the system, including scores for
+    various axes (OH, CAP, SCOPE), an overall grade, and contextual information.
+    It serves as a canonical shape for all future grade cards.
+    """
+    timestamp: datetime = field(default_factory=datetime.now)
+    # Overall Health (OH) axis score: 0.0-1.0, higher is better.
+    # Measures system stability, resource utilization, error rates.
+    oh_score: float = 0.0
+    # Capability (CAP) axis score: 0.0-1.0, higher is better.
+    # Measures task completion rates, correctness, performance on benchmarks.
+    cap_score: float = 0.0
+    # Scope (SCOPE) axis score: 0.0-1.0, higher is better.
+    # Measures breadth of covered functionality, test coverage, feature completeness.
+    scope_score: float = 0.0
+    # Overall letter grade (e.g., "A", "B", "C", "F")
+    overall_grade: str = "F"
+    # Paths to evidence files supporting the scores (e.g., test reports, logs)
+    evidence_paths: List[str] = field(default_factory=list)
+    # Confidence in the accuracy of this record (0.0-1.0)
+    confidence: float = 1.0
+    # Source or reasoner that generated this record
+    source: str = "TesseractEngine"
+    # Additional metadata or details
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_jsonl(self) -> str:
+        """Serialize to JSONL format."""
+        return json.dumps({
+            "timestamp": self.timestamp.isoformat(),
+            "oh_score": self.oh_score,
+            "cap_score": self.cap_score,
+            "scope_score": self.scope_score,
+            "overall_grade": self.overall_grade,
+            "evidence_paths": self.evidence_paths,
+            "confidence": self.confidence,
+            "source": self.source,
+            "metadata": self.metadata,
+        })

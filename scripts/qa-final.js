@@ -19,7 +19,6 @@ const ALL_PAGES = [
   '/changelog.html',
   '/courtney.html',
   '/create.html',
-  '/dashboard.html',
   '/dream-chat.html',
   '/dream-chat-v1.html',
   '/dream-chat-orion.html',

@@ -13,7 +13,7 @@ coefficient of variation of the eigenvalues of the symmetrized covariance:
 $$a(\Sigma) \;=\; \frac{\operatorname{std}(\lambda)}{\operatorname{mean}(\lambda)}, \qquad \lambda = \operatorname{eig}\!\big(\tfrac12(\Sigma+\Sigma^\top)\big).$$
 
 The collapse trigger's flat leg fires when `a(Σ) < ε_a`, `ε_a = anisotropy_eps = 5e-2`
-(`collapse.py:68,138`). The Σ₀⁻¹ operator (`excite`, `collapse.py:316–319`) adds, in one
+(`collapse.py:68,138`). The Σ₀⁻¹ operator (`excite`, `collapse.py:658`) adds, in one
 step, `Σ⁺ = Σ + b·P_N` with `b = strength·p ≥ 0` and `P_N = V_null V_nullᵀ` a rank-`k`
 orthogonal projector.
 

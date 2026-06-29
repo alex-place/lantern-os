@@ -188,7 +188,6 @@ class CreatorDashboardAudit {
     const pages = [
       '/',
       '/create.html',
-      '/dashboard.html',
       '/dream-chat.html',
       '/entry.html',
       '/settings/providers.html',

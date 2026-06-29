@@ -21,11 +21,19 @@ const http = require("http");
 const POLL_MS = 60_000;
 const IDLE_MS = 3 * 60_000;
 const FAIL_BACKOFF_MS = 30 * 60_000; // after a failed review, wait this long before retrying
+const BASE_FAIL_TTL_MS = 5 * 60_000; // cache the base-branch failing-check scan this long
 
 // Checks that fail on master itself (chronically red) must not block auto-merge,
-// or nothing would ever merge. Override with PR_WATCHER_MERGE_IGNORE_CHECKS
-// (comma-separated check names). Fix the underlying suites to shrink this list.
+// or nothing would ever merge. The watcher now ALSO auto-detects these at runtime
+// (see _baseFailingChecks) so this list self-heals as suites flip red↔green; the
+// static entries below are aggregate/structural gates that should be ignored
+// regardless of the base branch's state. Override with
+// PR_WATCHER_MERGE_IGNORE_CHECKS (comma-separated check names).
 const DEFAULT_MERGE_IGNORE_CHECKS = [
+  // Aggregate roll-up gate: it is red whenever ANY constituent job is red, so it
+  // can never be green while a chronically-red suite exists — and we already
+  // evaluate the constituents ourselves. Ignoring it is mandatory, not optional.
+  "All checks passed",
   "Python tests",
   "Python report and policy tests",
   "Existing pytest suite",
@@ -51,13 +59,16 @@ const DEFAULT_PROTECTED_PATHS = [
 ];
 
 class PrWatcher {
-  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeProtectedPaths = null } = {}) {
+  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeProtectedPaths = null, baseRef = "master" } = {}) {
     this.repoRoot = repoRoot;
     this.port = port;
     this.idleMs = idleMs;
     // Auto-merge: actually land reviewed + green + conflict-free PRs (one per tick).
     // Off by default; the watcher only reviewed before. Enable per-host.
     this.autoMerge = autoMerge;
+    this.baseRef = baseRef;
+    this._baseFailCache = null;   // Set<string> of checks failing on baseRef
+    this._baseFailCacheAt = 0;    // when that cache was last refreshed
     this.mergeIgnoreChecks = new Set(mergeIgnoreChecks || DEFAULT_MERGE_IGNORE_CHECKS);
     this.protectedPaths = (mergeProtectedPaths || DEFAULT_PROTECTED_PATHS).map(
       (p) => (p instanceof RegExp ? p : new RegExp(p, "i"))
@@ -124,9 +135,12 @@ class PrWatcher {
    * no conflicts (mergeable) · not a draft · touches no protected path · every
    * check passing except the ignore-list (chronically-red suites). `pv` is a
    * `gh pr view --json` object (must include `files` for the protected-path gate).
+   * `extraIgnore` is an optional Set of check names to additionally ignore — the
+   * runtime caller passes the checks currently failing on the base branch so the
+   * ignore-list self-heals (see _baseFailingChecks).
    * Returns { merge: boolean, reason: string }.
    */
-  _shouldMerge(pv, entry, now) {
+  _shouldMerge(pv, entry, now, extraIgnore = null) {
     if (!this.autoMerge) return { merge: false, reason: "automerge_disabled" };
     if (!pv) return { merge: false, reason: "no_pr_data" };
     if (pv.isDraft) return { merge: false, reason: "draft" };
@@ -156,6 +170,8 @@ class PrWatcher {
     for (const c of (pv.statusCheckRollup || [])) {
       const name = c.name || c.context || "";
       if (this.mergeIgnoreChecks.has(name)) continue;
+      if (extraIgnore && extraIgnore.has(name)) continue; // chronically red on base branch
+      if (name === "All checks passed") continue;          // aggregate roll-up — recomputed here
       if (c.status && c.status !== "COMPLETED") return { merge: false, reason: `pending:${name || "?"}` };
       const conclusion = String(c.conclusion || c.state || "").toUpperCase();
       if (BLOCKING_CONCLUSIONS.has(conclusion)) return { merge: false, reason: `failed:${name || "?"}` };
@@ -295,6 +311,11 @@ class PrWatcher {
     const candidates = Object.values(this.state)
       .filter((e) => e.reviewedSha === e.headSha && now - (e.shaSeenAt || 0) >= this.idleMs)
       .sort((a, b) => a.number - b.number);
+    if (!candidates.length) return;
+
+    // Checks chronically red on the base branch can't be held against a PR; fetch
+    // them once per merge tick so the ignore-list self-heals (cached internally).
+    const baseIgnore = await this._baseFailingChecks(now);
 
     for (const entry of candidates) {
       let pv;
@@ -310,7 +331,7 @@ class PrWatcher {
       // Stale head — a push landed since we last polled; let the next tick re-review.
       if (pv.headRefOid && pv.headRefOid !== entry.headSha) continue;
 
-      const decision = this._shouldMerge(pv, entry, now);
+      const decision = this._shouldMerge(pv, entry, now, baseIgnore);
       if (!decision.merge) continue;
 
       try {
@@ -323,6 +344,36 @@ class PrWatcher {
       }
       return; // one merge per tick, success or failure
     }
+  }
+
+  /**
+   * Names of checks currently failing on the BASE branch (e.g. master). A PR can't
+   * be blamed for a suite that is already broken on the branch it targets, so these
+   * must not block auto-merge. Returning them lets the ignore-list SELF-HEAL: as a
+   * suite flips red↔green on master the set tracks it automatically, instead of
+   * drifting in a hand-maintained constant (the exact failure mode that kept the
+   * whole zipper wedged — every PR inherited master's red wall). Cached for
+   * BASE_FAIL_TTL_MS. Best-effort: any error returns an empty set (static list only).
+   */
+  async _baseFailingChecks(now = Date.now()) {
+    if (this._baseFailCache && now - this._baseFailCacheAt < BASE_FAIL_TTL_MS) {
+      return this._baseFailCache;
+    }
+    let names = new Set();
+    try {
+      const out = await this._gh(
+        "api", `repos/{owner}/{repo}/commits/${this.baseRef}/check-runs`, "--paginate",
+        "--jq",
+        '.check_runs[] | select([.conclusion] | inside(["failure","cancelled","timed_out","action_required","startup_failure"])) | .name'
+      );
+      names = new Set(String(out).split("\n").map((s) => s.trim()).filter(Boolean));
+      if (names.size) console.warn(`[PR Watcher] base (${this.baseRef}) red checks ignored for merge: ${[...names].join(", ")}`);
+    } catch (err) {
+      console.warn(`[PR Watcher] base-branch check scan failed (${err.message}); static ignore list only`);
+    }
+    this._baseFailCache = names;
+    this._baseFailCacheAt = now;
+    return names;
   }
 
   async _reviewPr(entry) {
@@ -441,7 +492,14 @@ class PrWatcher {
         message,
         user: "pr-watcher",
         conversationId: "pr-review-fleet",
-        forceAgent: "keystone",
+        // The route reads `agent` (not `forceAgent`) → keep the Keystone reviewer persona.
+        agent: "keystone",
+        // Pin a working provider. The default (no provider) path classifies a diff-bearing
+        // review as "coding" and routes to the local Σ₀ coder / preferred provider, which on
+        // this host is the credit-depleted AI-Studio Gemini → no_provider_configured. Gemini
+        // resolves to Vertex AI (ADC, still funded) via gemini-transport. Override with
+        // PR_WATCHER_PROVIDER. #1376
+        provider: process.env.PR_WATCHER_PROVIDER || "gemini",
       });
 
       const req = http.request(

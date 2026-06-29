@@ -369,7 +369,8 @@ function renderMarkdown(text) {
   // link (see lanternImgFallback) instead of vanishing — so an image-only answer
   // never renders as a blank bubble. Must run before the link rule so ![..](..)
   // isn't read as a text link.
-  h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
+  // URL accepts http(s) OR a site-absolute /path (e.g. /media/… thumbnails); safeUrl gates both.
+  h = h.replace(/!\[([^\]\n]*)\]\(((?:https?:\/\/|\/)[^\s)"]+)\)/g, (_, alt, url) =>
     _put(`<img src="${safeUrl(url)}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
 
   // YouTube links → privacy-friendly inline embed.
@@ -377,7 +378,7 @@ function renderMarkdown(text) {
     _put(`<iframe src="https://www.youtube-nocookie.com/embed/${vid}" width="100%" height="220" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`));
 
   // Markdown links [label](url) → new-tab anchors.
-  h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) =>
+  h = h.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|\/)[^\s)"]+)\)/g, (_, label, url) =>
     _put(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
 
   h = h.replace(
@@ -1196,12 +1197,12 @@ function embedSupport() {
     ['Synthesasia Guild', '$200', 'Guild (admin) role'],
   ];
   const cards = tiers.map(([n, p, perk]) =>
-    `<a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="flex:1 1 110px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit">
+    `<a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer" style="flex:1 1 110px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit">
        <div style="font-weight:700;font-size:12.5px">${n}</div>
        <div style="font-size:1.2rem;font-weight:800">${p}<span style="font-size:.7rem;opacity:.6">/mo</span></div>
        <div style="font-size:10.5px;opacity:.65">${perk}</div>
      </a>`).join('');
-  return `<div style="font-weight:600;margin:12px 0 6px">♥ Support — <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon</a></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cards}</div>`;
+  return `<div style="font-weight:600;margin:12px 0 6px">♥ Support — <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon</a></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cards}</div>`;
 }
 async function renderExploreEmbed(kind, userText) {
   addUserBubble(userText);
@@ -1813,6 +1814,16 @@ async function sendMessage(opts = {}) {
                 bubble.dataset.ungroundedRisk = String(evt.sigma0_grounding.risk);
               }
             }
+            // Σ₀ council: the unified 4-way answerability verdict + disagreement Δ.
+            if (evt.council && evt.council.verdict) {
+              bubble.dataset.councilVerdict = String(evt.council.verdict);
+              if (evt.council.delta != null) bubble.dataset.councilDelta = String(evt.council.delta);
+              if (evt.council.recommend) bubble.dataset.councilRecommend = String(evt.council.recommend);
+              // refuted-by-execution carries the failing test output — "wrong, with proof".
+              if (evt.council.execFailed && evt.council.execOutput) {
+                bubble.dataset.councilExecOutput = String(evt.council.execOutput);
+              }
+            }
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -1935,6 +1946,57 @@ async function sendMessage(opts = {}) {
     }
   }
 
+  // Σ₀ council: the unified 4-way answerability verdict (grounded / seam-open / pin / refuted)
+  // + the disagreement Δ. A subtle chip beside the reply; grounded is the quiet healthy case.
+  if (bubble.dataset.councilVerdict) {
+    const v = bubble.dataset.councilVerdict;
+    const d = bubble.dataset.councilDelta;
+    const MAP = {
+      grounded:  ['✓ Σ₀ grounded',  '#6ee7b7', '0.5'],
+      seam_open: ['⚠ Σ₀ seam-open', '#f5a623', '0.85'],
+      pin:       ['? Σ₀ pin',       '#9ca3af', '0.7'],
+      refuted:   ['✗ Σ₀ refuted',   '#f87171', '0.9'],
+    };
+    const m = MAP[v] || ['Σ₀ ' + v, '#9ca3af', '0.6'];
+    const badge = document.createElement('span');
+    badge.title = 'Σ₀ council verdict: ' + v + (d ? ' (disagreement Δ ' + d + ')' : '')
+      + ' — grounded = trust it; seam-open = unverified, go check; pin = no knowable answer; '
+      + 'refuted = failed a real check.';
+    badge.style.cssText = 'font-size:10px;margin-left:6px;vertical-align:middle;cursor:help;color:'
+      + m[1] + ';opacity:' + m[2];
+    badge.textContent = m[0];
+    bubble.appendChild(badge);
+
+    // Refuted by a real execution check: the code ran and failed its own asserts. Surface
+    // the failure output ("wrong, with proof") and a one-click retry that re-asks WITH that
+    // proof attached, so the model self-corrects — the refuted → retry loop, closed in the UI.
+    if (v === 'refuted' && bubble.dataset.councilExecOutput) {
+      const out = bubble.dataset.councilExecOutput;
+      const det = document.createElement('details');
+      det.style.cssText = 'margin:6px 0 0;font-size:11px';
+      const sum = document.createElement('summary');
+      sum.textContent = '✗ test failed — show output';
+      sum.style.cssText = 'cursor:pointer;color:#f87171;list-style:none;user-select:none';
+      det.appendChild(sum);
+      const pre = document.createElement('pre');
+      pre.textContent = out;
+      pre.style.cssText = 'margin:6px 0 0;padding:8px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:pre-wrap;overflow-x:auto;color:var(--text,#ddd)';
+      det.appendChild(pre);
+      bubble.appendChild(det);
+
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = '🔧 Fix & retry';
+      retry.title = 'Re-ask with the failing test output attached so the model corrects its code.';
+      retry.style.cssText = 'display:block;margin:6px 0 0;font-size:11px;color:var(--accent);background:none;border:1px solid currentColor;border-radius:4px;padding:2px 8px;cursor:pointer;opacity:0.9';
+      retry.addEventListener('click', () => {
+        retry.disabled = true;
+        sendMessage({ text: text + '\n\n[Your previous code failed this check:\n' + out + '\n]\nFix it so the test passes.' });
+      });
+      bubble.appendChild(retry);
+    }
+  }
+
   // Signature line: always show a human-readable label + time. Raw provider/model id
   // goes in a collapsed <details> so curious users can inspect it without it cluttering
   // every reply for normal users. (#1141)
@@ -1975,7 +2037,17 @@ async function sendMessage(opts = {}) {
   // that files an issue from the request and runs the autowork pipeline (cloud
   // model → patch → tests → draft PR). No PR is opened unless the user clicks.
   const CODING_INTENTS = ['coding_change', 'coding', 'technical_debug', 'code_review', 'code'];
-  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent)) {
+  // #1344: a pure read/lookup ("find/show/view/read/summarize issue/PR #N") is keyword-
+  // classified as "code" (it mentions "issue"/"github"), which used to surface the
+  // autowork offer — and clicking it filed a REAL GitHub issue with the raw query as
+  // title+body, then ran a doomed patch pipeline (nothing to change). Suppress the offer
+  // for lookups that carry no change-verb, so "find issue #1342" just answers (now via
+  // the github_issue tool) instead of offering to open a PR.
+  const _looksLikeLookup =
+    /\b(find|show|view|read|open|get|look\s*up|summar|explain|describe|what'?s?|tell me about|details? (on|of|about))\b/i.test(text) &&
+    /\b(issue|pr|pull request|ticket|bug report)\b\s*#?\d+/i.test(text) &&
+    !/\b(fix|implement|add|change|edit|patch|refactor|rewrite|update the code|resolve|close|work on|build|create a)\b/i.test(text);
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup) {
     const offer = document.createElement('div');
     offer.className = 'autowork-offer';
     offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';

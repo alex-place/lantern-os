@@ -30,35 +30,45 @@ function sendJson(res, data, status = 200) {
   res.end(body);
 }
 
+// Static content-type map. Extracted + exported so the MIME contract is unit-
+// testable (regression: .webp/.mp4 must NOT fall back to octet-stream, or the
+// browser refuses to decode <img>/<video> under nosniff).
+const CONTENT_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".json": "application/json; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Audio/video — required so <audio>/<video> can decode (octet-stream +
+  // nosniff makes the browser refuse the media). Keystone Radio needs .mp3.
+  ".mp3": "audio/mpeg",
+  ".m4a": "audio/mp4",
+  ".ogg": "audio/ogg",
+  ".oga": "audio/ogg",
+  ".wav": "audio/wav",
+  ".flac": "audio/flac",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+};
+
+function contentTypeForPath(filePath) {
+  const ext = path.extname(String(filePath)).toLowerCase();
+  return CONTENT_TYPES[ext] || "application/octet-stream";
+}
+
 function sendFile(res, filePath, req) {
-  const ext = path.extname(filePath).toLowerCase();
-  const type = {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".ico": "image/x-icon",
-    ".json": "application/json; charset=utf-8",
-    ".md": "text/markdown; charset=utf-8",
-    ".pdf": "application/pdf",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    // Audio/video — required so <audio>/<video> can decode (octet-stream +
-    // nosniff makes the browser refuse the media). Keystone Radio needs .mp3.
-    ".mp3": "audio/mpeg",
-    ".m4a": "audio/mp4",
-    ".ogg": "audio/ogg",
-    ".oga": "audio/ogg",
-    ".wav": "audio/wav",
-    ".flac": "audio/flac",
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-  }[ext] || "application/octet-stream";
+  const type = contentTypeForPath(filePath);
 
   fs.stat(filePath, (error, stat) => {
     // The response may already be closed if a prior handler responded and the
@@ -171,4 +181,6 @@ module.exports = {
   sendFile,
   sendHtml,
   collectRequestBody,
+  contentTypeForPath,
+  CONTENT_TYPES,
 };

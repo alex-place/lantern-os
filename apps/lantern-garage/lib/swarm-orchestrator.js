@@ -193,7 +193,7 @@ function buildPayload(providerId, model, systemPrompt, message, history) {
   if (providerId === "gemini") {
     return JSON.stringify({
       contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + message }] }],
-      generationConfig: { maxOutputTokens: 1024 },
+      generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
     });
   }
   if (providerId === "anthropic") {
@@ -376,34 +376,123 @@ async function swarmConsensus(job, systemPrompt, message, history, n = 3) {
 }
 
 /**
- * Council mode: assign roles to providers, run all, then synthesize.
- * Returns all responses + a synthesized version.
+ * Council mode: a real two-round debate, not a single blind pass.
+ *
+ *   Round 1 — each council member answers under a distinct LENS (perspective).
+ *             Lenses are role-prompts, so a council still convenes even when only
+ *             one provider is available (providers are assigned round-robin).
+ *   Round 2 — a synthesizer provider READS every member's answer, then produces
+ *             (a) one grounded answer and (b) an explicit DISSENT record of where
+ *             the members disagreed. Dissent is preserved, not silently dropped.
+ *
+ * Returns { provider, model, text, council:{ members, dissent[], synthesizer } }.
  */
 async function swarmCouncil(job, systemPrompt, message, history) {
-  const candidates = (JOB_ASSIGNMENTS[job] || JOB_ASSIGNMENTS.chat)
-    .filter(pid => isProviderAvailable(pid))
-    .slice(0, 3);
+  const available = (JOB_ASSIGNMENTS[job] || JOB_ASSIGNMENTS.chat)
+    .filter(pid => isProviderAvailable(pid));
 
-  if (candidates.length === 0) throw new Error("no_provider_configured");
+  if (available.length === 0) throw new Error("no_provider_configured");
 
-  const roles = ["creative", "critic", "synthesizer"];
-  const results = await Promise.allSettled(
-    candidates.map(async (pid, idx) => {
-      const role = roles[idx] || "synthesizer";
-      const rolePrompt = systemPrompt + "\n\n[" + COUNCIL_ROLES[role].promptSuffix + "]";
-      return callProvider(pid, pickModel(pid, job), rolePrompt, message, history);
-    })
-  );
+  // Task-aware lenses: analytical jobs argue correctness/risk/alternative;
+  // everything else uses the creative/critic pairing.
+  const lenses = (job === "reasoning" || job === "coding")
+    ? [
+        { role: "correctness", suffix: "Focus on correctness and rigor. Reason step by step." },
+        { role: "risk",        suffix: "Be skeptical. Surface flaws, edge cases, and failure modes." },
+        { role: "alternative", suffix: "Propose a genuinely different approach the others may miss." },
+      ]
+    : [
+        { role: "creative", suffix: COUNCIL_ROLES.creative.promptSuffix },
+        { role: "critic",   suffix: COUNCIL_ROLES.critic.promptSuffix },
+      ];
 
-  const successes = results.filter(r => r.status === "fulfilled").map(r => r.value);
-  if (successes.length === 0) throw new Error("all_providers_failed");
-
-  // If we have a synthesizer response, return it as primary; otherwise stitch
-  const primary = successes.find(s => s.provider === candidates[2]) || successes[successes.length - 1];
-  primary.council = {
-    members: successes.map((s, i) => ({ provider: s.provider, role: roles[i], text: s.text })),
+  // ── Round 1: members deliberate, each under its own lens ──
+  // Distinct providers run in parallel; lenses sharing a provider run sequentially
+  // so we don't fire concurrent same-key requests (which rate-limit / collide).
+  const reusesProvider = available.length < lenses.length;
+  const runMember = (lens, i) => {
+    const pid = available[i % available.length];
+    const rolePrompt = systemPrompt + "\n\n[Council role — " + lens.role + ": " + lens.suffix + "]";
+    return callProvider(pid, pickModel(pid, job), rolePrompt, message, history)
+      .then(r => ({ ...r, role: lens.role }))
+      .catch(err => { recordProviderFailure(pid, err.message); return null; });
   };
-  return primary;
+  let members;
+  if (reusesProvider) {
+    members = [];
+    for (let i = 0; i < lenses.length; i++) {
+      const m = await runMember(lenses[i], i);
+      if (m) members.push(m);
+    }
+  } else {
+    members = (await Promise.all(lenses.map(runMember))).filter(Boolean);
+  }
+  if (members.length === 0) throw new Error("all_providers_failed");
+
+  // Resilience: some "available" providers may have a key but be dead (quota/rate
+  // limit). If that left lenses unfilled, re-run them on a provider that DID answer
+  // so the council still convenes with multiple perspectives instead of collapsing
+  // to one voice. Sequential to avoid concurrent same-key collisions.
+  if (members.length < lenses.length) {
+    const working = [...new Set(members.map(m => m.provider))];
+    const filled = new Set(members.map(m => m.role));
+    let w = 0;
+    for (const lens of lenses) {
+      if (filled.has(lens.role)) continue;
+      const pid = working[w++ % working.length];
+      const rolePrompt = systemPrompt + "\n\n[Council role — " + lens.role + ": " + lens.suffix + "]";
+      try {
+        const r = await callProvider(pid, pickModel(pid, job), rolePrompt, message, history);
+        members.push({ ...r, role: lens.role });
+      } catch (_e) { /* best-effort; council proceeds with what it has */ }
+    }
+  }
+
+  // ── Round 2: synthesizer reads the whole council, then synthesizes + records dissent ──
+  const synthPid = available[available.length - 1]; // job assignment puts the synthesizer last
+  const memberDigest = members
+    .map(m => `### Council member — ${m.role} (via ${m.provider})\n${m.text}`)
+    .join("\n\n");
+  const synthSystem = systemPrompt +
+    "\n\n[You are the council SYNTHESIZER. Read every member answer below, then respond in this exact order: " +
+    "(1) the single best, well-grounded answer; (2) keep any CONFIDENCE line the instructions above asked for, immediately after the answer; " +
+    "(3) as the very last block, a section headed exactly 'DISSENT:' with one bullet per substantive disagreement " +
+    "formatted 'role vs role — what they disagreed on'. If the members fully agree, write 'DISSENT: none'.]";
+  const synthMessage = `Original question:\n${message}\n\nCouncil member answers:\n${memberDigest}`;
+
+  let synth;
+  try {
+    synth = await callProvider(synthPid, pickModel(synthPid, job), synthSystem, synthMessage, []);
+  } catch (_e) {
+    // Synthesizer unreachable → fall back to the longest member answer (no dissent).
+    members.sort((a, b) => b.text.length - a.text.length);
+    synth = { provider: members[0].provider, model: members[0].model, text: members[0].text };
+  }
+
+  // Split the DISSENT section out so callers (UI + ConvergenceRecord) can surface it.
+  let answer = String(synth.text);
+  let dissent = [];
+  const dm = answer.match(/\n*DISSENT:\s*([\s\S]*)$/i);
+  if (dm) {
+    answer = answer.slice(0, dm.index).trim();
+    const body = dm[1].trim();
+    if (body && !/^none[.!]?$/i.test(body)) {
+      dissent = body.split("\n")
+        .map(l => l.replace(/^[-*•\d.\)\s]+/, "").trim())
+        .filter(Boolean);
+    }
+  }
+
+  return {
+    provider: synth.provider,
+    model: synth.model,
+    text: answer || String(synth.text),
+    council: {
+      members: members.map(m => ({ provider: m.provider, role: m.role, text: m.text })),
+      dissent,
+      synthesizer: `${synth.provider}/${synth.model}`,
+    },
+  };
 }
 
 /**

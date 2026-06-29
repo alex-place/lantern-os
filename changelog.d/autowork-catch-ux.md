@@ -1,0 +1,1 @@
+- ui(autowork): when the SSE connection drops mid-run (long plan/patch steps can outlast an idle proxy), the panel no longer spins forever — the active step flips to ✗, the mandala stops, and the message explains "lost connection mid-run (the run may still be finishing on the server — check the issue for a new PR)" instead of a bare "network error". Surfaced while testing #1503.

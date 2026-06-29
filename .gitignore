@@ -19,6 +19,9 @@ private/**
 data/dreamer/notebooks/*.jsonl
 data/dream_journal/*.jsonl
 
+# Flourishing feeds cache — runtime-derived World Bank snapshot (local only)
+data/flourishing-cache.json
+
 # Discord subscriber data
 data/discord/subscribers.json
 
@@ -57,6 +60,19 @@ data/metrics/three-doors-events.jsonl
 
 # Tool-execution logs (observability output of lib/tool-logger.js). Runtime-only.
 data/tool-logs/
+
+# Autowork per-run step logs (lib/autowork-research.js). Runtime observability only.
+data/autowork-runs/
+
+# Agent work-queue per-issue snapshots (lib dispatch runtime). The tracked
+# queue.jsonl / pending.jsonl ledgers stay; the transient per-issue JSON the
+# dispatcher writes/deletes as it claims work is pure runtime state.
+data/agent-work-queue/**/issue-*.json
+
+# Σ₀ council review records (lib/council-review.js append-only log). Runtime
+# observability feeding experiments/council_escalation_backtest.py — like
+# tool-logs/ and autowork-runs/, it must never be committed.
+data/convergence/council-reviews.jsonl
 
 # Stray apps/data/ runtime tree. A tool-logger.js off-by-one (REPO resolved to
 # apps/ instead of the repo root) scattered runtime data here, and the
@@ -395,3 +411,12 @@ data/convergence/canary-events.jsonl
 # are ignored. stations.json itself is committed (it's the playlist).
 /apps/lantern-garage/public/radio/*.mp3
 /apps/lantern-garage/public/radio/*.dl
+
+# Gallery image bytes live outside git (manifest.json is the tracked source of truth)
+apps/lantern-garage/public/assets/content/**/*.webp
+
+# Gage showcase media also lives in R2 (served from media.lantern-os.net/gage)
+apps/lantern-garage/public/assets/gage/**/*.mp4
+apps/lantern-garage/public/assets/gage/**/*.webp
+apps/lantern-garage/public/assets/gage/**/*.png
+apps/lantern-garage/public/assets/gage/**/*.gif

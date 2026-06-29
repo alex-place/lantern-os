@@ -5,10 +5,10 @@ name: Monoworkstream Gate
 # Exempt: gh-pages (deploy), master (long-lived).
 #
 # ZIPPER EXEMPTION: PRs labeled `auto-merge` are excluded from the per-lane count.
-# They form a managed queue that auto-merge.yml zippers in (lowest-numbered ready
-# PR first), so an intentional stack of staged PRs may share one lane — the
-# auto-merger serialises the actual merges. Un-managed (unlabeled) extra PRs in a
-# lane are still blocked.
+# They form a managed queue that the single in-process zipper merger
+# (apps/lantern-garage/lib/pr-watcher.js) lands lowest-numbered-ready-first, so an
+# intentional stack of staged PRs may share one lane — the merger serialises the
+# actual merges. Un-managed (unlabeled) extra PRs in a lane are still blocked.
 # See AGENTS.md / CLAUDE.md for complete monoworkstream rules and branch naming.
 
 on:
@@ -28,7 +28,7 @@ jobs:
     name: Single-workstream check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Enforce per-agent lane (max 1 open PR per agent prefix)
         env:
@@ -36,7 +36,7 @@ jobs:
         run: |
           # Group open PRs targeting master by agent lane and fail only if a single
           # lane has more than one open PR. Exempt: gh-pages (deploy branch) and
-          # PRs labeled `auto-merge` (the managed zipper queue — see header).
+          # PRs labeled `auto-merge` (the in-process merger's managed queue — see header).
           # Branches without a recognised agent prefix share the "human" lane.
           offenders=$(gh pr list --state open --json number,title,headRefName,baseRefName,labels --jq '
             [ .[]

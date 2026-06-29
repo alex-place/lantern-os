@@ -1,6 +1,16 @@
 # Hardening the Lantern reasoning loop against collapse — CSF-native, defense-in-depth
 
-**Status:** research + plan (epic [#764]). Bug claims in §3 are **code-verified** against current `master`.
+**Status:** research + plan (epic [#764]). Bug claims in §3 were **code-verified** against `master` when written.
+
+> **Reconcile note — 2026-06-29.** Several items below have since **landed** (verified against the
+> [Collapse Certificate](SIGMA0-COLLAPSE-CERTIFICATE.md) and the C3 proof): the three §3 bugs
+> ([#765] PCSF breaker, [#766] instrument→actuator loop, [#767] memory laundering) are **resolved
+> and closed**; red-team gap **G13** (§5) is **closed** (banded near-null aiming — `_near_null_basis`,
+> test `test_g13_no_zero_rank_bump`); the Tier-A #768 Lyapunov-SDP / pseudospectral gates landed as
+> `stability_gates()`; and Σ₀⁻¹ now **has a sufficiency theorem** for all `A`
+> ([Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md)), so the §2/§6 "measured, no theorem" line is
+> superseded for the anti-*freeze* claim (contraction stays grounding-dependent). Item-level markers
+> below are annotated inline; the plan is otherwise kept as the working ledger.
 **Source:** a CSF-grounded analysis (mine → dedup → 3-lens adversarial verify → red-team → synthesize) over the existing CSF corpus: `Convergence-Core-Research-Program-v1.0/v1.1.pdf`, `CSF-Whitepaper-v0.3.pdf`, `CSF-FORMAT-SPECIFICATION.md`, `src/csf/*`, `src/convergence_io/*`, `src/cio_sde/*`, `src/convergence/*`.
 
 ## 1. Honest frame
@@ -36,9 +46,10 @@ Every mechanism below is labeled **proven** (a theorem holds in-regime) or **heu
 
 Only **Theorem 1 (normal regime)** and the **small-gain bound (exact for normal A)** are proven. The Tier A wideners below extend the *proven region* — they do not make the system globally uncollapsible.
 
-## 3. Verified bugs (fix first)
+## 3. Verified bugs (fix first) — ALL RESOLVED (2026-06-29)
 
-Code-verified against `master`:
+Code-verified against `master` when filed; all three are now **fixed and closed** (see the
+Collapse Certificate's "Anti-collapse hardening" block). Line numbers are as-filed.
 
 - **`pcsf.py:57` — live `AttributeError`.** `record_success` reads/writes undeclared `latency_p50_ms` (field is `latency_ema_ms`, L35) → first success of every provider raises, silently routing healthy providers to fallbacks. → [#765]
 - **`loop_lm.py` — instrument↔actuator decoupling (G10).** `generate()` is greedy `argmax` (L116) + fixed `rep_penalty`, with **zero** `SurpriseMonitor`/`record_state`/`proximity` wiring. The collapse canary watches an abstract state the decoder never feeds. → [#766]
@@ -81,16 +92,19 @@ Ordered **proven-region wideners → grounding reinforcements → heuristic guar
 - **G9 — deterministic-reverification ratchet → closed.** Each confidence fold in the Verify stage is keyed on `(record_id, evidence_hash)` and recorded in `ConvergenceRecord.applied_evidence`; re-folding identical evidence is an idempotent no-op, so replaying one passing test/NIS reading can no longer ratchet confidence → 1.0. Independent corroborations still count (distinct `evidence_key`). The field is serialized on both the Python (`to_jsonl`) and Node (`convergence-records.js`) sides, preserving the cross-language contract. (`src/convergence/verify.py`, `src/convergence/objects.py`)
 - **G11 — provider monoculture → closed.** `HotSwapRegistry` enforces a `provider_diversity_cap` (default 0.6): greedy "best health, lowest cost" selection is diverted to the best *different-provider* candidate whenever a single provider would otherwise exceed the cap of the fleet. The cap never blocks a swap that has no alternative (always-eligible-node invariant preserved). (`src/convergence_io/hot_swap.py`)
 
-**Still open** (deferred to a follow-up PR — both live in the proven-region certificate math under `src/cio_sde/` and need the torch test harness + care not to weaken the certificate's honesty guarantees):
+**Still open** (deferred to a follow-up PR — lives in the proven-region certificate math under `src/cio_sde/` and needs the torch test harness + care not to weaken the certificate's honesty guarantees; G13 below is now closed, leaving G1):
 
 - **G1** observation-channel poisoning — NIS trusts unauthenticated `y` → confident-wrong fixed point; add an innovation-whiteness test + external-leaf requirement. (`src/cio_sde/surprise.py`)
-- **G13** `eig_eps` threshold-edge evasion — modes parked just above ε read "structured" while Σ₀⁻¹ injects zero; use banded near-null classification. (`src/cio_sde/collapse.py`)
+- ~~**G13** `eig_eps` threshold-edge evasion~~ — **CLOSED (2026-06-29).** Banded near-null aiming
+  shipped (`_near_null_basis`, clamped `1 ≤ m ≤ d−1`); modes parked just above ε now yield a
+  rank-≥1 bump when `cond_rank` fires. Regression: `test_g13_no_zero_rank_bump`. So **G1 is the lone
+  remaining open red-team gap** below.
 
 The remaining red-team gaps (G2–G6, G8, G10, G12, G14) were folded into the #765/#766/#767 fixes or remain lower-priority; see the epic [#764] for the full ledger.
 
 ## 6. What stays heuristic (honesty discipline)
 
-The Σ₀ four-condition trigger, Σ₀⁻¹ persistent excitation (measured, no sufficiency theorem), Σ₀ᴿ reconstruction, the Kalman NIS canary (sound χ² math, but a heuristic *predictor* that trusts its input — see G1/G10), and the full-spectrum `max Re λ(A)` screen (necessary, not sufficient) all resist collapse **empirically or by construction but are not theorems.** Do not claim otherwise.
+The Σ₀ four-condition trigger, Σ₀⁻¹ persistent excitation (now PROVEN no-permanent-*freeze* for all `A` — [Theorem C3](SIGMA0-C3-NONCOLLAPSE-NORMAL.md); the broader state re-excitation remains measured), Σ₀ᴿ reconstruction, the Kalman NIS canary (sound χ² math, but a heuristic *predictor* that trusts its input — see G1/G10), and the full-spectrum `max Re λ(A)` screen (necessary, not sufficient) all resist collapse **empirically or by construction but are not theorems.** Do not claim otherwise.
 
 ## 7. Top 3 to build first
 

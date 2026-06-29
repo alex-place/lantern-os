@@ -97,6 +97,16 @@
   .btn-buy:hover{background:rgba(0,212,170,.22)}
   .btn-sell{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.3)}
   .btn-sell:hover{background:rgba(255,95,109,.22)}
+  /* Σ₀-grounded signal emphasis (#1578): a side is highlighted only when the
+     card's dir matches AND conf ≥ the kalshi-suggest MIN_CONVICTION floor (65%).
+     Otherwise (flat / quiet / low-confidence) BOTH buttons mute — no emphasis
+     without a grounded suggestion (External Reality Rule). */
+  .order-ticket button.sig-on{transition:background .15s,box-shadow .15s}
+  .btn-buy.sig-on{background:rgba(0,212,170,.30);border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset,0 0 10px rgba(0,212,170,.25)}
+  .btn-sell.sig-on{background:rgba(255,95,109,.30);border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset,0 0 10px rgba(255,95,109,.25)}
+  .order-ticket button.sig-off{opacity:.4;filter:grayscale(.5)}
+  .order-ticket button.sig-off:hover{opacity:.6}
+  @media (prefers-reduced-motion: reduce){ .order-ticket button{transition:none} }
   /* Chart canvas + overlay — canvas covers the full ladder and draws its own
      right-side price axis (52px) + bottom time axis (16px); the HTML overlay
      (zone bands, S/R labels, price/entry/stop/tp lines) is inset to match
@@ -224,7 +234,6 @@
   </div>
   <div class="pulse"></div>
   <a href="/trading-news.html" class="nav-link">News →</a>
-  <a href="/trader-dashboard.html" class="nav-link" style="margin-left:8px">← Hub</a>
 </div>
 
 <!-- Sidebar -->
@@ -950,6 +959,34 @@ function renderTicker(ticker){
   }
 }
 
+// ── Σ₀-grounded BUY/SELL emphasis (#1578) ───────────────────────────────────
+// Reuse the canonical conviction floor from lib/kalshi-suggest.js (MIN_CONVICTION)
+// — "only act if ≥65% confidence". A side is grounded only when the card's own
+// dir matches AND conf clears the floor; otherwise neither side is emphasized.
+const MIN_CONVICTION = 65;
+function groundedSide(dir, conf){
+  if((conf||0) < MIN_CONVICTION) return null;       // low-confidence → mute both
+  if(dir === 'BULLISH') return 'buy';
+  if(dir === 'BEARISH') return 'sell';
+  return null;                                       // flat / NEUTRAL → mute both
+}
+// Build the class + grounding-tooltip for a card's two order buttons.
+function emphasisAttrs(dir, conf){
+  const side = groundedSide(dir, conf);
+  const c = conf || 0;
+  // [signal, evidence, confidence] — truthful mute reason per the External Reality Rule
+  const why = side
+    ? `${dir} · ${c}% conviction ≥ ${MIN_CONVICTION}% floor`
+    : (c < MIN_CONVICTION
+        ? `no grounded signal — ${c}% conviction < ${MIN_CONVICTION}% floor`
+        : `no grounded signal — direction ${dir||'NEUTRAL'} (flat)`);
+  return {
+    buy:  side==='buy'  ? `btn-buy sig-on`  : `btn-buy sig-off`,
+    sell: side==='sell' ? `btn-sell sig-on` : `btn-sell sig-off`,
+    title: why,
+  };
+}
+
 // ── Build one ticker card ───────────────────────────────────────────────────
 function buildCard(ticker, d){
   const state = tickerState(d);
@@ -974,6 +1011,7 @@ function buildCard(ticker, d){
   }
 
   const badge = regimeBadgeInfo(ticker, state);
+  const emph = emphasisAttrs(dir, conf);
 
   return `
 <div class="card state-${state}" id="card-${ticker}">
@@ -992,8 +1030,8 @@ function buildCard(ticker, d){
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
   </div>
   <div class="order-ticket">
-    <button class="btn-buy" onclick="openOrderTicket('${ticker}','buy')">BUY</button>
-    <button class="btn-sell" onclick="openOrderTicket('${ticker}','sell')">SELL</button>
+    <button class="${emph.buy}" id="buy-${ticker}" title="${emph.title}" onclick="openOrderTicket('${ticker}','buy')">BUY</button>
+    <button class="${emph.sell}" id="sell-${ticker}" title="${emph.title}" onclick="openOrderTicket('${ticker}','sell')">SELL</button>
   </div>
 </div>`;
 }
@@ -1038,6 +1076,13 @@ function updateCardMeta(ticker, d){
     }
     metaEl.innerHTML = confHtml + watchHtml;
   }
+
+  // Σ₀-grounded button emphasis tracks the live signal (#1578).
+  const emph = emphasisAttrs(dir, conf);
+  const buyEl = document.getElementById('buy-'+ticker);
+  const sellEl = document.getElementById('sell-'+ticker);
+  if(buyEl){ buyEl.className = emph.buy; buyEl.title = emph.title; }
+  if(sellEl){ sellEl.className = emph.sell; sellEl.title = emph.title; }
 }
 
 // ── Render all cards ─────────────────────────────────────────────────────────

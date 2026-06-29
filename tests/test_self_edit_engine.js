@@ -6,6 +6,7 @@
 const assert = require("assert");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const {
   isPathSafe,
   sanitizeBranchName,
@@ -15,6 +16,9 @@ const {
   isAllowedTest,
   requireSafePaths,
   extractJson,
+  resolveExistingIssue,
+  looksLikePlaceholderPatch,
+  patchSyntaxErrors,
 } = require("../apps/lantern-garage/lib/self-edit-engine");
 
 const repoRoot = path.resolve(__dirname, "..");
@@ -227,6 +231,143 @@ function run() {
   test("throws on genuinely empty / non-JSON input", () => {
     assert.throws(() => extractJson(""), /empty response/);
     assert.throws(() => extractJson("the model refused to answer"), /no valid JSON/);
+  });
+
+  // ── resolveExistingIssue (#1347): meta-commands must not be filed as junk ──
+  // Hermetic cases only: genuine coding tasks have no #N / "oldest|newest issue"
+  // reference, so they short-circuit to null WITHOUT touching `gh`. This locks in
+  // the safety property that a real coding request is never mis-resolved onto an
+  // unrelated existing issue (the false-positive direction). Live resolution of
+  // "#N" / "the oldest issue" is exercised against real `gh` in manual/dev runs.
+  test("resolveExistingIssue: null for empty / whitespace task", () => {
+    assert.strictEqual(resolveExistingIssue(repoRoot, ""), null);
+    assert.strictEqual(resolveExistingIssue(repoRoot, "   \n  "), null);
+  });
+
+  test("resolveExistingIssue: null for a genuine coding task (no issue ref)", () => {
+    assert.strictEqual(
+      resolveExistingIssue(repoRoot, "Add a dark-mode toggle to the settings page"),
+      null
+    );
+    assert.strictEqual(
+      resolveExistingIssue(repoRoot, "fix the parseDocRequest handler that hijacks pdf requests"),
+      null
+    );
+  });
+
+  test("resolveExistingIssue: 'issues' as a plain word does not trigger resolution", () => {
+    // "report issues" is not a reference to a specific or superlative issue.
+    assert.strictEqual(
+      resolveExistingIssue(repoRoot, "make the error banner report issues more clearly"),
+      null
+    );
+  });
+
+  // ── looksLikePlaceholderPatch (#1354): reject non-implementation patches ──
+  test("placeholder: flags the auto-dispatch.js scaffolding from the live report", () => {
+    // The actual hallucinated diff an autowork run produced for a junk meta-command.
+    const diff = [
+      "--- /dev/null",
+      "+++ b/apps/lantern-garage/lib/auto-dispatch.js",
+      "@@ -0,0 +1,12 @@",
+      "+let isEnabled = false; // Assuming an internal state for enabled/disabled",
+      "+async function performDispatch() {",
+      "+  // Placeholder for the actual dispatch logic",
+      "+  // Simulate async work",
+      "+  await new Promise(resolve => setTimeout(resolve, 1000));",
+      "+  // In a real scenario, this would fetch and process one issue.",
+      "+  console.log('Performing auto-dispatch...');",
+      "+}",
+    ].join("\n");
+    const r = looksLikePlaceholderPatch(diff);
+    assert.strictEqual(r.placeholder, true);
+    assert.ok(r.signals.length >= 2, `expected >=2 markers, got ${r.signals.length}`);
+  });
+
+  test("placeholder: a single stray marker does NOT trip (false-positive guard)", () => {
+    const diff = [
+      "--- a/lib/x.js",
+      "+++ b/lib/x.js",
+      "@@ -1,1 +1,2 @@",
+      " function x(a, b) {",
+      "+  return a + b; // replace this with a real reducer later",
+      " }",
+    ].join("\n");
+    assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
+  });
+
+  test("placeholder: a genuine implementation is not flagged", () => {
+    const diff = [
+      "--- a/lib/sum.js",
+      "+++ b/lib/sum.js",
+      "@@ -0,0 +1,4 @@",
+      "+function sum(nums) {",
+      "+  return nums.reduce((acc, n) => acc + n, 0);",
+      "+}",
+      "+module.exports = { sum };",
+    ].join("\n");
+    assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
+  });
+
+  test("placeholder: only ADDED lines count, not context/removed", () => {
+    // Markers that already exist in the file (context lines) must not trip it.
+    const diff = [
+      "--- a/lib/y.js",
+      "+++ b/lib/y.js",
+      "@@ -1,3 +1,3 @@",
+      "   // Placeholder for the actual logic",
+      "-  // in a real scenario this would fetch",
+      "+  return realImplementation();",
+    ].join("\n");
+    assert.strictEqual(looksLikePlaceholderPatch(diff).placeholder, false);
+  });
+
+  // ── patchSyntaxErrors (#1359): reject patches that leave a file unparseable ──
+  test("patchSyntaxErrors: flags a JS file with a syntax error, passes a valid one", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-syn-"));
+    try {
+      fs.writeFileSync(path.join(dir, "good.js"), "function ok(a){ return a + 1; }\nmodule.exports = ok;\n");
+      // The exact #1359 break: a function declaration with no body, then a `const`.
+      fs.writeFileSync(path.join(dir, "bad.js"), "function parseImageRequest(text)\nconst FALLBACKS = [];\n");
+      const errs = patchSyntaxErrors(["good.js", "bad.js"], dir);
+      const files = errs.map((e) => e.file);
+      assert.ok(files.includes("bad.js"), "expected bad.js to be flagged");
+      assert.ok(!files.includes("good.js"), "good.js must not be flagged");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("patchSyntaxErrors: ignores non-source files and empty input", () => {
+    assert.deepStrictEqual(patchSyntaxErrors([], process.cwd()), []);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-syn2-"));
+    try {
+      // .json / .md aren't parse-checked here — must not be flagged even if malformed.
+      fs.writeFileSync(path.join(dir, "data.json"), "{ not valid json (((");
+      fs.writeFileSync(path.join(dir, "notes.md"), "# heading with ``` unbalanced");
+      assert.deepStrictEqual(patchSyntaxErrors(["data.json", "notes.md"], dir), []);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("patchSyntaxErrors: flags a broken Python file (skipped if no python)", () => {
+    let pyBin = null;
+    for (const bin of [process.env.PYTHON_PATH, process.platform === "win32" ? "python" : "python3"].filter(Boolean)) {
+      try { require("child_process").execFileSync(bin, ["--version"], { stdio: "pipe" }); pyBin = bin; break; } catch { /* try next */ }
+    }
+    if (!pyBin) return; // no python on PATH → skip (the JS case already covers the gate)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-syn-py-"));
+    try {
+      fs.writeFileSync(path.join(dir, "good.py"), "def f(x):\n    return x + 1\n");
+      fs.writeFileSync(path.join(dir, "bad.py"), "def f(x):\n    return x +\n");
+      const errs = patchSyntaxErrors(["good.py", "bad.py"], dir);
+      const files = errs.map((e) => e.file);
+      assert.ok(files.includes("bad.py"), "expected bad.py to be flagged");
+      assert.ok(!files.includes("good.py"), "good.py must not be flagged");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   // ── Summary ───────────────────────────────────────────────────────────

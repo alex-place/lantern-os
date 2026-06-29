@@ -265,8 +265,13 @@
             `</details></div>`;
         }
         // #1270: a persisted tool turn (image / youtube / document) rebuilds its
-        // rich element from meta.tool; everything else replays as escaped text.
-        let bubbleHtml = escapeHtml(entry.text);
+        // rich element from meta.tool. Agent text replays through renderMarkdown
+        // (same renderer as the live SSE finalize) so markdown — bold, links,
+        // code, and /media thumbnails — survives reload instead of showing raw
+        // `![..](..)`. User text stays escaped (no markdown for user input).
+        let bubbleHtml = isUser
+          ? escapeHtml(entry.text)
+          : (typeof window.renderMarkdown === "function" ? window.renderMarkdown(entry.text) : escapeHtml(entry.text));
         if (!isUser && entry.meta && entry.meta.tool && typeof window.renderToolReplay === "function") {
           const rich = window.renderToolReplay(entry.meta.tool);
           if (rich) bubbleHtml = rich;
@@ -1087,6 +1092,7 @@
         const isDegraded = /degraded/i.test(routeLabel);
         const sig = document.createElement("div");
         sig.className = isDegraded ? "msg-route-sig degraded" : "msg-route-sig";
+        if (/debug route/i.test(routeLabel)) sig.classList.add("route-debug");
         sig.setAttribute("aria-label", `Active route: ${routeLabel}`);
         if (isDegraded) {
           sig.setAttribute("role", "status");

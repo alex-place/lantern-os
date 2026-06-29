@@ -27,6 +27,7 @@ from data_sources import get_compas_summary
 from seed_data import ALL_SEED_MEASUREMENTS
 from agent_system import (
     AutonomousAgentSystem,
+    AITraderAgent,
     ViolationDetectionAgent,
     CryptographicVerificationAgent,
     ByzantineConsensusAgent,
@@ -70,6 +71,9 @@ ENABLE_MESH_SYNC = os.environ.get('ENABLE_MESH_SYNC', '').lower() in {
     '1', 'true', 'yes', 'on'
 }
 ENABLE_LIVE_SENSORS = os.environ.get('ENABLE_LIVE_SENSORS', '').lower() in {
+    '1', 'true', 'yes', 'on'
+}
+ENABLE_AI_TRADER = os.environ.get('ENABLE_AI_TRADER', '').lower() in {
     '1', 'true', 'yes', 'on'
 }
 def _request_bearer_or_header(header_name):
@@ -218,6 +222,25 @@ autonomous_system = AutonomousAgentSystem(
     peer_urls=_PEER_URLS,
     node_id=NODE_ID,
 )
+
+# Initialize AI Trader Agent if enabled
+if ENABLE_AI_TRADER:
+    try:
+        # Attempt to find a suitable Python interpreter
+        python_bin = os.environ.get('PYTHON_BIN')
+        if not python_bin:
+            import shutil
+            python_bin = shutil.which('python3') or shutil.which('python')
+            if not python_bin:
+                raise RuntimeError("No Python interpreter found. Set PYTHON_BIN environment variable.")
+
+        ai_trader_agent = AITraderAgent(python_bin=python_bin)
+        autonomous_system.add_agent(ai_trader_agent)
+        print(f"[OK] AI Trader Agent initialized and added to autonomous system using interpreter: {python_bin}")
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize AI Trader Agent: {e}")
+else:
+    print("[INFO] AI Trader Agent is disabled. Set ENABLE_AI_TRADER=true to enable.")
 
 # ---------------------------------------------------------------------------
 # World model â€” Bayesian belief tracking + sensor framework

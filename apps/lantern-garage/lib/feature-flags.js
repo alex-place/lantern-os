@@ -36,7 +36,7 @@ const STORE_PATH = path.join(STORE_DIR, "feature-flags.json");
  */
 const NAV_PAGES = [
   { path: "/dream-chat.html",        label: "Chat" },
-  { path: "/trader-dashboard.html",  label: "Trader" },
+  { path: "/stock-trader.html",  label: "Trader" },
   { path: "/create.html",            label: "Create" },
   { path: "/explore.html",           label: "Explore" },
   { path: "/knowledgecenter.html",   label: "Help" },

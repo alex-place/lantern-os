@@ -55,6 +55,18 @@ ok("merge: pending check -> false", m._shouldMerge({ isDraft: false, mergeable: 
 ok("merge: StatusContext failure -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ context: "legacy", state: "FAILURE" }] }, reviewed, now).merge === false);
 ok("merge: disabled -> false", new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: false })._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === false);
 
+// ── ignore-list self-heal: aggregate gate + base-branch reds never block ──
+// The "All checks passed" roll-up is red whenever any constituent is red, so it
+// must never block (we recompute the constituents ourselves) — even when it is NOT
+// in the configured ignore set. This is the wedge that kept every PR un-mergeable.
+ok("merge: 'All checks passed' aggregate ignored -> true",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "All checks passed", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now).merge === true);
+// extraIgnore (the checks failing on the base branch) self-heals the list at runtime.
+ok("merge: base-red check via extraIgnore -> true",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Lint & validate", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now, new Set(["Lint & validate"])).merge === true);
+ok("merge: base-GREEN check still blocks (not in extraIgnore) -> false",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Lint & validate", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now, new Set()).merge === false);
+
 // ── verdict gate: review must APPROVE, not merely happen (the #1302 hole) ──
 const greenPvBase = { isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green };
 ok("merge: REQUEST_CHANGES verdict -> false", m._shouldMerge(greenPvBase, { headSha: "A", reviewedSha: "A", reviewVerdict: "REQUEST_CHANGES", shaSeenAt: now - 2000 }, now).merge === false);

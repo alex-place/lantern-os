@@ -78,7 +78,7 @@ const KNOWLEDGE = [
     answer:
       "Trading runs through the Kalshi terminal and trader dashboard. Live positions, signals and win-rate stats are served from the collector snapshot — no UI-direct exchange calls.",
     actions: [
-      { label: "Open Trader", href: "/trader-dashboard.html" },
+      { label: "Open Trader", href: "/stock-trader.html" },
       { label: "Kalshi terminal", href: "/kalshi-terminal.html" },
     ],
   },
@@ -142,7 +142,7 @@ const KNOWLEDGE = [
       "Lantern OS is a local-first OS cockpit: a Dream Journal chat, a Kalshi trading terminal, a Creator workspace, and a convergence router that routes work to the right persona deterministically.",
     actions: [
       { label: "What work is there?", command: "!ask what work needs to be done" },
-      { label: "Open Trader", href: "/trader-dashboard.html" },
+      { label: "Open Trader", href: "/stock-trader.html" },
       { label: "Open Create", href: "/create.html" },
     ],
   },
@@ -156,7 +156,7 @@ const DEFAULT_RESPONSE = {
     "I route locally and deterministically. Ask about work, trading, creating, the convergence router, or play the Kingdome game.",
   actions: [
     { label: "What work is there?", command: "!ask what work needs to be done" },
-    { label: "Open Trader", href: "/trader-dashboard.html" },
+    { label: "Open Trader", href: "/stock-trader.html" },
     { label: "Open Create", href: "/create.html" },
     { label: "Play Kingdome", command: "!explore" },
   ],

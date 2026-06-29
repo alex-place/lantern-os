@@ -29,6 +29,9 @@ pull-dream-model:
 check-node:
 	cd apps/lantern-garage && npm run check
 
+lint-pages:
+	node scripts/lint-throwaway-pages.mjs
+
 convergence:
 	pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/Invoke-LanternConvergenceLoop.ps1 -Root . -Output manifests/evidence/convergence-local.json -CloudVirtualization
 

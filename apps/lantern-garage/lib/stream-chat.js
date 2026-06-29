@@ -22,6 +22,7 @@ const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
 const { councilReview } = require("./council-review");
+const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
@@ -81,6 +82,32 @@ function _emitCodingCandidate(instruction, reply) {
   } catch { /* emitter must never break a reply */ }
 }
 
+// ── Σ₀ council execution check: extract runnable {code, test} from a coding reply ──
+// "Correctness costs an external check." When a reply proposes a Python function AND a
+// check (assert / a test fn that throws), we can RUN it — the ground-truth signal the
+// council folds as the dominant anchor (passed → grounded, failed → refuted/retry).
+// Returns null when there's nothing to verify (no code, or code with no check), so the
+// council falls back to its text-Δ gate exactly as before. Python-only for now: it's the
+// language the live harvest already targets, and `python` is the runner most likely present.
+const _PY_FENCE_RE = /```python\s*([\s\S]*?)```/i;
+function _extractRunnable(reply) {
+  const fence = (reply || "").match(_PY_FENCE_RE);
+  if (!fence) return null;
+  const code = fence[1].trim();
+  if (!code) return null;
+  // A check must exist somewhere or there is nothing to execute against. If the asserts
+  // live inside the fenced block they already run with `code`; otherwise pull top-level
+  // asserts from the surrounding prose so the function is exercised.
+  const hasInlineCheck = /\bassert\b/.test(code);
+  let test = "";
+  if (!hasInlineCheck) {
+    const outside = (reply.slice(fence.index + fence[0].length).match(_ASSERT_RE) || []);
+    if (!outside.length) return null; // no check anywhere → not verifiable
+    test = outside.join("\n");
+  }
+  return { language: "python", code, test };
+}
+
 // Per-request grounding (web search + live GitHub project context) is best-effort
 // enrichment that runs BEFORE the model is called. If the network or the `gh` CLI
 // is slow/hung, an unbounded await there stalls the ENTIRE chat reply (no tokens,
@@ -88,6 +115,12 @@ function _emitCodingCandidate(instruction, reply) {
 // can never hang the response: on timeout, resolve to a fallback and proceed; the
 // underlying call finishes (and self-times-out) in the background.
 const GROUNDING_TIMEOUT_MS = parseInt(process.env.GROUNDING_TIMEOUT_MS, 10) || 4000;
+
+// Σ₀ council execution check. OFF by default — it runs model-authored code in a sandbox,
+// which is an operator-gated security decision (SECURITY.md). Set COUNCIL_EXEC_VERIFY=1 to
+// let a coding reply's own asserts decide grounded-vs-refuted on real execution.
+const COUNCIL_EXEC_VERIFY = process.env.COUNCIL_EXEC_VERIFY === "1";
+const COUNCIL_EXEC_TIMEOUT_MS = parseInt(process.env.COUNCIL_EXEC_TIMEOUT_MS, 10) || 8000;
 function withTimeout(promise, ms, fallback) {
   return Promise.race([
     Promise.resolve(promise).catch(() => fallback),
@@ -213,9 +246,9 @@ async function handleStreamChat(req, url, res) {
   if (attachments.length > 0) {
     let attachmentBlock = "";
     for (const attachment of attachments) {
-      if (attachment.filename && attachment.content) {
-        attachmentBlock += `--- ATTACHMENT: ${attachment.filename} ---\n`;
-        attachmentBlock += `${attachment.content}\n`;
+      if (attachment.name && attachment.text) {
+        attachmentBlock += `--- ATTACHMENT: ${attachment.name} ---\n`;
+        attachmentBlock += `${attachment.text}\n`;
         attachmentBlock += `--- END ATTACHMENT ---\n\n`;
       }
     }
@@ -289,39 +322,6 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
         });
-      return;
-    }
-
-    // Grounded self-assessment: !report-card produces an honest letter-grade
-    // scorecard of Keystone OS. Evidence is gathered deterministically (git, real
-    // counts, eval numbers, boot probe) so the model can only SYNTHESIZE grades
-    // from real measurements — it can't invent a receipt. Strengthens Verify.
-    if (cmd.name === "report-card" || cmd.name === "report_card" || cmd.name === "reportcard") {
-      sse.writeStreamHeaders(res);
-      const sendToken = (token) => sse.sendToken(res, token);
-      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
-
-      sendToken(`📋 Gathering grounded evidence…\n\n`);
-      try {
-        const { gatherEvidence, formatEvidenceForPrompt, REPORT_CARD_SYSTEM_PROMPT } = require("./report-card");
-        const { callLlm } = require("./self-edit-engine");
-        const evidence = gatherEvidence(repoRoot);
-        const userMsg = `${formatEvidenceForPrompt(evidence)}\n\nProduce the report card now, grading only from the evidence above.`;
-        // Synthesize via callLlm's auto cascade (Vertex leads — the funded path; #1285),
-        // not swarmOrchestrate, whose direct API-key providers are credit-starved here.
-        const text = await callLlm(REPORT_CARD_SYSTEM_PROMPT, userMsg, requestedProvider || "auto", 4096);
-        if (!text || !text.trim()) {
-          sendToken(`Could not generate a report card — no provider returned a result.\n`);
-          sendDone("failed", { agent: "ReportCard", error: "empty_result" });
-        } else {
-          for (const word of text.split(" ")) sendToken(word + " ");
-          sendDone("report_card", { agent: "ReportCard", online: true });
-        }
-      } catch (e) {
-        sendToken(`Report card failed: ${e.message}\n`);
-        sendDone("failed", { agent: "ReportCard", error: e.message });
-      }
-      res.end();
       return;
     }
 
@@ -1133,12 +1133,30 @@ async function handleStreamChat(req, url, res) {
         // the operator-escalation backtest accrues data, and stamp the verdict for the UI.
         // Passive — never mutates the reply.
         try {
+          // Execution check (the dominant anchor): if the reply proposes runnable Python +
+          // a check, RUN it in a bounded sandbox so the verdict is grounded in a real test
+          // rather than text Δ. Gated behind COUNCIL_EXEC_VERIFY because it executes
+          // model-authored code; shell-free + temp-isolated + timed (lib/exec-verify.js).
+          let execVerdict;
+          if (COUNCIL_EXEC_VERIFY) {
+            const runnable = _extractRunnable(fullReply);
+            if (runnable) {
+              execVerdict = verifyExec({ ...runnable, timeoutMs: COUNCIL_EXEC_TIMEOUT_MS });
+            }
+          }
           const c = councilReview(fullReply, {
             groundingContext,
+            execVerdict,
             dissent: Array.isArray(signature.dissent) ? signature.dissent : [],
             context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
           });
           signature.council = { verdict: c.verdict, delta: c.delta, recommend: c.recommend, groundedBy: c.groundedBy };
+          // When a real test RAN and FAILED, hand the failure text to the UI so the user
+          // sees "wrong, with proof" and can retry against it (refuted → self-correct).
+          if (execVerdict && execVerdict.ran && !execVerdict.passed) {
+            signature.council.execFailed = true;
+            signature.council.execOutput = String(execVerdict.output || "").slice(0, 600);
+          }
         } catch { /* council must never break a reply */ }
         if (collapse.collapsed) {
           console.warn(
@@ -1603,7 +1621,16 @@ async function handleStreamChat(req, url, res) {
   // or "who are you" scored a spurious near-hit against an arbitrary doc (e.g.
   // CLAUDE.md#Node.js) and rendered that section's raw text (an empty ```bash
   // fence) instead of an actual reply. These belong to the model, not the KB.
-  const isGreetingOrChitchat = /^\s*(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening)|how (are|r) (you|u)|who are you|what'?s up|thanks?|thank you|ok(ay)?|cool|nice|lol)\b[\s!.?,]*$/i.test(message.trim());
+  // Identity/social questions ("who are you", "how are you") are about the
+  // assistant itself, never a doc, so they match anywhere in a short message
+  // (covers "Hello, who are you?"); pure greetings/thanks only count when the
+  // whole short message is the pleasantry.
+  const _msgT = message.trim();
+  const _wordCount = _msgT.split(/\s+/).length;
+  const _isIdentityOrSocial = /\b(who (are|r) (you|u|ya)|what (are|r) (you|u)|how (are|r) (you|u|ya)|what'?s up)\b/i.test(_msgT);
+  const _isPureGreeting = /^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening)|thanks?|thank you|ty|np|ok(ay)?|cool|nice|lol)\b[\s!.?,]*$/i.test(_msgT)
+    || (/^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening))\b/i.test(_msgT) && _wordCount <= 6);
+  const isGreetingOrChitchat = _isIdentityOrSocial || _isPureGreeting;
   if (kbAnswer && kbAnswer.hit && !isKeystoneDebug && !isRpMode && !requestedProvider && !wantsLiveData
       && !isGreetingOrChitchat
       && !routeDecision.requires_convergence
@@ -1721,11 +1748,11 @@ async function handleStreamChat(req, url, res) {
           }, (upstream) => {
             if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`ollama_status_${upstream.statusCode}`)); return; }
             let buf = "";
-            // Mid-stream collapse guard (#1342): the local model can spiral into
-            // runaway word-salad repetition. The post-hoc canary only WARNS after the
-            // bad text already reached the user; here we score the reply as it grows
-            // and HARD-STOP the stream once degeneration is unambiguous (high threshold
-            // so healthy prose is never cut), appending an honest truncation notice.
+            // Mid-stream collapse guard (#1342): the post-hoc canary detects runaway
+            // word-salad but only AFTER the bad text already streamed to the user. Here
+            // we score the reply as it grows (reusing the same scoreReplyCollapse signal)
+            // and HARD-STOP the local stream once degeneration is unambiguous — high
+            // threshold so healthy prose is never cut — with an honest truncation notice.
             const { scoreReplyCollapse } = require("./collapse-canary");
             const COLLAPSE_BLOCK = parseFloat(process.env.COLLAPSE_BLOCK_PROXIMITY || "0.85");
             let _lastCanaryLen = 0, _collapseTripped = false;
@@ -1741,7 +1768,6 @@ async function handleStreamChat(req, url, res) {
                   if (parsed.message?.content) { fullReply += parsed.message.content; sendToken(parsed.message.content); }
                 } catch {}
               }
-              // Check on growth checkpoints once there's enough text to judge.
               if (!_collapseTripped && fullReply.length >= 400 && fullReply.length - _lastCanaryLen >= 240) {
                 _lastCanaryLen = fullReply.length;
                 const sc = scoreReplyCollapse(fullReply, { threshold: COLLAPSE_BLOCK });
@@ -2207,6 +2233,7 @@ async function handleStreamChat(req, url, res) {
             return;
           }
           let buf = "";
+          let liveCollapseChecked = false; // one cut, not a re-trigger loop
           upstream.on("data", (chunk) => {
             buf += chunk.toString();
             const lines = buf.split("\n");
@@ -2220,6 +2247,26 @@ async function handleStreamChat(req, url, res) {
                 if (evt.type === "content_block_delta" && evt.delta?.text) {
                   fullReply += evt.delta.text;
                   sendToken(evt.delta.text);
+                  // #1342: the collapse canary used to be advisory-only — it scored the
+                  // FULL reply only after every token had already streamed to the user,
+                  // so a degenerating reply (repetition/n-gram echo/lexical collapse) was
+                  // always seen in full before anything could act on it. Check periodically
+                  // WHILE streaming and cut the request short the first time proximity is
+                  // unambiguously high (0.65, stricter than the 0.5 advisory default, so a
+                  // verbose-but-healthy reply is never mistaken for collapse).
+                  if (!liveCollapseChecked && fullReply.length > 400 && fullReply.length % 120 < evt.delta.text.length) {
+                    const live = scoreReplyCollapse(fullReply, { threshold: 0.65 });
+                    if (live.collapsed) {
+                      liveCollapseChecked = true;
+                      console.warn(`[canary_collapse_live] cutting anthropic stream short — proximity=${live.proximity}`);
+                      const notice = "\n\n*(cut short — the response started repeating itself)*";
+                      fullReply += notice;
+                      sendToken(notice);
+                      upstream.destroy();
+                      resolve();
+                      return;
+                    }
+                  }
                 }
               } catch { /* skip malformed */ }
             }

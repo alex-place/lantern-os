@@ -12,7 +12,9 @@
       the site light/dark theme on purpose). A TRUE <audio> player: custom
       transport (play/pause, prev/next, seek, volume, mute), repeat, and
       period-radio options — always-on tuning static (DX), an always-shuffled
-      dial, a warm AM/tube tone, and 78rpm shellac crackle. Keyboard control,
+      dial, a warm AM/tube tone, and 78rpm shellac crackle. Per-track loudness
+      leveling (the manifest's `gain` dB, applied by a Web-Audio GainNode +
+      safety limiter) keeps the dial at an even volume. Keyboard control,
       deep-linking by frequency (#101.5), persistent prefs, OS media-session
       controls, a sleep timer, and a real Web-Audio visualizer (bars /
       oscilloscope / mirrored — click the meter to cycle).
@@ -22,13 +24,16 @@
       prefers-reduced-motion.
 
       Songs are 78rpm transfers from the Internet Archive (Great 78 Project),
-      served locally from /radio/. Add a track: drop an mp3 in that folder and
-      add a row to the STATIONS array at the bottom. No other change needed.
+      served locally from /radio/. Add a track: drop an mp3 in that folder, add
+      a row to the STATIONS array at the bottom, then run
+      `python scripts/normalize_radio_levels.py` to level its volume.
       Backlog + roadmap: docs/fallout-radio-backlog.md
     */
     :root {
       --ph: #2bff88; --ph-dim: #1aa657; --ph-faint: #0e5630;
       --amber: #ffb53b; --screen: #06140d;
+      --case-hi: #2c3b30; --case-mid: #1c271f; --case-lo: #131c16; --case-edge: #070b08;
+      --bezel: #0c140f; --rivet: #3a4d40;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
@@ -215,22 +220,156 @@
     .footer a:hover { text-decoration: underline; }
     .footer .note { color: #4f9c70; }
 
+    /* ════════════════════════════════════════════════════════════════════════
+       UNOFFICIAL PIP-BOY SKIN — the whole UI is one green CRT set into a chunky
+       hand-terminal case (beveled metal, corner screws, top module tabs, a
+       bottom status HUD). Layered as overrides on top of the base CRT styles.
+       ════════════════════════════════════════════════════════════════════════ */
+    /* the case */
+    .radio.pipboy {
+      max-width: 880px;
+      background: linear-gradient(180deg, var(--case-hi) 0%, var(--case-mid) 55%, var(--case-lo) 100%);
+      border: 1px solid var(--case-edge); border-radius: 30px;
+      box-shadow:
+        inset 0 2px 0 rgba(150,220,175,.14),
+        inset 0 -5px 12px rgba(0,0,0,.55),
+        0 0 0 2px var(--case-edge), 0 26px 70px rgba(0,0,0,.72);
+      padding: 26px 26px 18px;
+    }
+    .radio.pipboy::after { content: none; }                 /* kill the case-wide scanline */
+    .radio.pipboy::before {                                  /* four recessed case screws */
+      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+      background:
+        radial-gradient(circle at 18px 18px,                 #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px),
+        radial-gradient(circle at calc(100% - 18px) 18px,    #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px),
+        radial-gradient(circle at 18px calc(100% - 18px),    #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px),
+        radial-gradient(circle at calc(100% - 18px) calc(100% - 18px), #060906 0 3px, var(--rivet) 3px 5.5px, transparent 6.5px);
+    }
+
+    /* the single green display the whole UI sits on */
+    .pip-display {
+      position: relative; border-radius: 16px; padding: 13px 14px 12px;
+      background: radial-gradient(130% 100% at 50% 0%, #0c2114 0%, #061308 68%, #040c06 100%);
+      box-shadow:
+        inset 0 0 0 1px #0c3b22, inset 0 0 70px rgba(0,0,0,.6), inset 0 0 18px rgba(43,255,136,.06),
+        0 0 0 6px var(--bezel), 0 0 0 7px #26342b;            /* inner bezel ring + machined edge */
+      overflow: hidden;
+    }
+    .pip-display::before {                                    /* display scanlines + faint flicker */
+      content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(43,255,136,.05) 0 1px, transparent 1px 3px);
+      animation: flicker 6s infinite steps(60);
+    }
+    .pip-display::after {                                     /* screen curvature vignette */
+      content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none;
+      background: radial-gradient(128% 128% at 50% 44%, transparent 58%, rgba(0,0,0,.5) 100%);
+    }
+    .pip-display > * { position: relative; z-index: 9; }
+
+    /* top module tabs — STAT · INV · DATA · RADIO */
+    .pip-tabs { display: flex; gap: 2px; border-bottom: 2px solid #123e26; }
+    .pip-tab {
+      flex: 1; text-align: center; padding: 7px 4px 6px; font-size: .74rem; font-weight: 800;
+      letter-spacing: .24em; color: var(--ph-faint); border-bottom: 2px solid transparent;
+      margin-bottom: -2px; text-shadow: 0 0 6px rgba(43,255,136,.2); user-select: none;
+    }
+    .pip-tab.on {
+      color: var(--ph); border-bottom-color: var(--ph);
+      background: linear-gradient(180deg, rgba(43,255,136,.12), transparent);
+      text-shadow: 0 0 12px rgba(43,255,136,.6);
+    }
+    .pip-sub {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 4px 11px; font-size: .64rem; letter-spacing: .16em; color: var(--ph-dim);
+    }
+    .pip-sub .brandname { font-weight: 800; color: var(--ph); letter-spacing: .14em; text-shadow: 0 0 8px rgba(43,255,136,.45); }
+    .pip-sub .model { color: var(--ph-faint); }
+    .pip-sub .onair { margin-left: auto; }
+
+    /* panels get Pip-Boy bracket corners + sit on the green field */
+    .pipboy .dial { background: rgba(4,14,8,.5); border-color: #123e26; }
+    /* the screen keeps its own CRT ::before/::after (scanlines + vignette), so it
+       can't take the .bracket corners — it gets a brighter phosphor frame instead. */
+    .pipboy .screen { border-radius: 9px; border-color: #1d5234; box-shadow: inset 0 0 60px rgba(0,0,0,.55), inset 0 0 14px rgba(43,255,136,.07), 0 0 0 1px rgba(43,255,136,.08); }
+    .bracket { position: relative; }
+    .bracket::before, .bracket::after {
+      content: ""; position: absolute; width: 13px; height: 13px; pointer-events: none; z-index: 10;
+      border: 2px solid var(--ph-dim); opacity: .8;
+    }
+    .bracket::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+    .bracket::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+    /* greener, more terminal-like section headers + title */
+    .pipboy .dial h2 { color: var(--ph); }
+    .pipboy .nowlbl { color: var(--ph); }
+    .pipboy .nowtitle { text-shadow: 0 0 12px rgba(43,255,136,.6), 0 0 3px rgba(43,255,136,.45); }
+    .pipboy .station[aria-current="true"] { box-shadow: inset 0 0 16px rgba(43,255,136,.18); }
+    .pipboy .station[aria-current="true"] .stitle::before { content: "▶ "; color: var(--ph); }
+
+    /* bottom status HUD — SIG · FREQ · VOL · STATIONS */
+    .pip-hud {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 12px; padding: 8px 11px;
+      border: 1px solid #123e26; border-radius: 8px;
+      background: linear-gradient(180deg, rgba(43,255,136,.06), transparent);
+      font-size: .62rem; letter-spacing: .14em; color: var(--ph-dim);
+    }
+    .pip-hud b { color: var(--ph-faint); font-weight: 700; margin-right: 6px; }
+    .pip-hud i { color: var(--ph); font-style: normal; text-shadow: 0 0 7px rgba(43,255,136,.4); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+    .pip-hud .grow { margin-left: auto; }
+
+    /* ── Small-width / mobile layout ──────────────────────────────────────────
+       On a phone the two-column deck collapses to one. Source order is dial→screen,
+       which would bury the player under 300+ stations — so flip it: the player
+       (now-playing + transport) rides on top, the dial scrolls below it. Touch
+       targets grow, the keyboard-only help line hides, and the rows that wrap
+       (modes, HUD) breathe a little. */
+    @media (max-width: 620px) {
+      .radio.pipboy { padding: 18px 14px 14px; }
+      .pip-tab { letter-spacing: .12em; font-size: .66rem; }
+      .pip-sub { gap: 6px 10px; }
+      .deckwrap { gap: 12px; }
+      .deckwrap .screen { order: -1; }          /* player first, dial below */
+      .dial { min-height: 0; padding: 7px; }
+      .stationscroll { max-height: 44vh; }       /* keep the long list from owning the page */
+      .nowtitle { font-size: 1.04rem; }
+      .nowlore { min-height: 0; }
+      .tbtn { width: 44px; height: 40px; }       /* bigger transport hit-areas */
+      .tbtn.play { width: 58px; }
+      .tog { height: 34px; }
+      .modes .range { max-width: none; flex: 1 1 120px; }   /* volume fills its row */
+      .keys { display: none; }                   /* keyboard hints are moot on touch */
+      .pip-hud { gap: 10px 14px; }
+    }
+    @media (max-width: 400px) {
+      .radio.pipboy { padding: 14px 10px 12px; border-radius: 22px; }
+      .pip-tab { letter-spacing: .06em; font-size: .6rem; padding: 6px 2px 5px; }
+      .nowtitle { font-size: .96rem; }
+      .tbtns { gap: 6px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .radio::after, .onair i, .crt-noise, .crt-roll, .nowtitle.scroll { animation: none; }
+      .radio::after, .onair i, .crt-noise, .crt-roll, .nowtitle.scroll, .pip-display::before { animation: none; }
       .crt-noise { opacity: .03; }
     }
   </style>
 </head>
 <body>
-  <main class="radio" aria-label="Keystone Radio retro player">
-    <div class="brand">
-      <span class="logo">KEYSTONE&nbsp;RADIO</span>
-      <span class="call">◦ FOUNDER'S FREQUENCY ◦ 101.5 FM</span>
+  <main class="radio pipboy" aria-label="Keystone Radio — unofficial Pip-Boy player">
+   <div class="pip-display">
+    <div class="pip-tabs" aria-label="Pip-Boy modules">
+      <span class="pip-tab" aria-disabled="true" title="module offline">STAT</span>
+      <span class="pip-tab" aria-disabled="true" title="module offline">INV</span>
+      <span class="pip-tab" aria-disabled="true" title="module offline">DATA</span>
+      <span class="pip-tab on" aria-current="page">RADIO</span>
+    </div>
+    <div class="pip-sub">
+      <span class="brandname">KEYSTONE&nbsp;RADIO</span>
+      <span class="model">RobCo&nbsp;UOS&nbsp;·&nbsp;MODEL&nbsp;KR-101.5</span>
       <span class="onair off" id="onair"><i></i> <span id="onairLbl">STANDBY</span></span>
     </div>
 
     <div class="deckwrap">
-      <nav class="dial" aria-label="Stations">
+      <nav class="dial bracket" aria-label="Stations">
         <h2><span>▚ TUNE THE DIAL</span><span class="count" id="dialCount"></span></h2>
         <input id="stationSearch" class="dialsearch" type="search" placeholder="search song or artist…" aria-label="Filter stations" autocomplete="off" spellcheck="false">
         <div class="stationscroll" id="stationList"></div>
@@ -280,8 +419,16 @@
       </section>
     </div>
 
+    <div class="pip-hud" aria-hidden="true">
+      <span><b>SIG</b><i id="hudSig">▮▮▮▮▮▯</i></span>
+      <span><b>FREQ</b><i id="hudFreq">101.5</i>&nbsp;FM</span>
+      <span class="grow"><b>VOL</b><i id="hudVol">▮▮▮▮▮▮▮▯▯▯</i></span>
+      <span><b>STATIONS</b><i id="hudCount">—</i></span>
+    </div>
+   </div>
+
     <div class="footer">
-      <span class="note">78rpm transfers from the Internet Archive (Great 78 Project), served locally — the era that plays on Fallout's radio.</span>
+      <span class="note">78rpm transfers from the Internet Archive (Great 78 Project), served locally — an unofficial Pip-Boy tuned to the era that plays on Fallout's radio.</span>
       <span><a href="/explore.html">‹ back to Explore</a></span>
     </div>
   </main>
@@ -400,6 +547,7 @@
     function render() {
       listEl.innerHTML = '';
       document.getElementById('dialCount').textContent = STATIONS.length + ' STATIONS';
+      var hc = document.getElementById('hudCount'); if (hc) hc.textContent = STATIONS.length;
       var frag = document.createDocumentFragment();
       STATIONS.forEach(function (s, i) {
         var b = document.createElement('button');
@@ -436,8 +584,10 @@
       var changed = (i !== current);
       current = i;
       audio.src = s.src;
+      applyLevel();   // per-track loudness leveling for the new station
+      var hf = document.getElementById('hudFreq'); if (hf) hf.textContent = s.freq;   // HUD readout
       nowTitle.textContent = s.title;
-      nowMeta.textContent = s.artist + " · " + s.year;
+      nowMeta.textContent = s.artist + (s.year ? " · " + s.year : "");   // no "· null" for undated sides
       nowLore.textContent = s.lore || "";
       applyMarquee();
       Array.prototype.forEach.call(listEl.children, function (b, j) {
@@ -467,7 +617,8 @@
       audio.play().catch(function(){ /* autoplay blocked until a gesture; the click IS the gesture */ });
     }
 
-    playBtn.addEventListener('click', function () { if (audio.paused) play(); else audio.pause(); });
+    var userPaused = false;   // set when the listener explicitly stops the dial
+    playBtn.addEventListener('click', function () { if (audio.paused) { userPaused = false; play(); } else { userPaused = true; audio.pause(); } });
     document.getElementById('prev').addEventListener('click', function () { tune(prevIndex(), true); });
     document.getElementById('next').addEventListener('click', function () { tune(nextIndex(), true); });
 
@@ -495,6 +646,8 @@
       volEl.value = prefs.vol;
       muteBtn.setAttribute('aria-pressed', prefs.muted ? 'true' : 'false');
       muteBtn.textContent = (prefs.muted || prefs.vol === 0) ? '🔇 MUTE' : '🔊 VOL';
+      var hv = document.getElementById('hudVol');   // HUD volume meter
+      if (hv) { var n = 10, f = prefs.muted ? 0 : Math.round(prefs.vol / 100 * n); hv.textContent = '▮'.repeat(f) + '▯'.repeat(n - f); }
     }
     volEl.addEventListener('input', function () { prefs.vol = +volEl.value; prefs.muted = false; applyVolume(); savePrefs(); });
     muteBtn.addEventListener('click', function () { prefs.muted = !prefs.muted; applyVolume(); savePrefs(); });
@@ -524,6 +677,18 @@
     function applyCrackle() {
       if (crackleGain) crackleGain.gain.value = (prefs.crackle && !audio.paused) ? 0.6 : 0;
       crackBtn.setAttribute('aria-pressed', prefs.crackle ? 'true' : 'false');
+    }
+    // Per-track loudness leveling: apply the current station's manifest `gain` (dB)
+    // so the dial plays at a consistent loudness — the 78rpm transfers span ~30 dB,
+    // so a quiet side is barely audible next to a hot one. Missing gain => 0 dB
+    // (unity). A short ramp avoids a click when the gain jumps on tune.
+    function applyLevel() {
+      if (!levelNode) return;
+      var s = STATIONS[current];
+      var db = (s && typeof s.gain === 'number') ? s.gain : 0;
+      var lin = Math.pow(10, db / 20);
+      try { levelNode.gain.setTargetAtTime(lin, audioCtx.currentTime, 0.02); }
+      catch (e) { levelNode.gain.value = lin; }
     }
     warmBtn.addEventListener('click', function () { prefs.warmth = !prefs.warmth; applyWarmth(); savePrefs(); });
     crackBtn.addEventListener('click', function () { prefs.crackle = !prefs.crackle; ensureAudioGraph(); applyCrackle(); savePrefs(); });
@@ -570,10 +735,14 @@
     });
 
     // ── Audio element events ───────────────────────────────────────────────
-    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; startVU(); applyCrackle(); });
+    // ON AIR reflects ACTUAL broadcast, not intent: 'play' only means we asked to
+    // play (it fires instantly even for a dead 404 station), so it shows TUNING…;
+    // the light only goes ON AIR on 'playing' (audio actually flowing). This stops
+    // the indicator from claiming ON AIR while a missing station is off the air.
+    audio.addEventListener('play',  function () { playBtn.textContent = '❚❚'; onair.classList.add('off'); onairLbl.textContent = 'TUNING…'; startVU(); applyCrackle(); });
     audio.addEventListener('pause', function () { playBtn.textContent = '▶'; onair.classList.add('off'); onairLbl.textContent = 'STANDBY'; applyCrackle(); });
-    audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); });
-    audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); });
+    audio.addEventListener('waiting',  function () { screenEl.classList.add('is-tuning'); onair.classList.add('off'); onairLbl.textContent = 'TUNING…'; });
+    audio.addEventListener('playing',  function () { screenEl.classList.remove('is-tuning'); onair.classList.remove('off'); onairLbl.textContent = 'ON AIR'; });
     audio.addEventListener('canplay',  function () { screenEl.classList.remove('is-tuning'); });
     audio.addEventListener('timeupdate', function () {
       if (scrubbing) return;   // don't fight the user's drag
@@ -590,6 +759,7 @@
       nowTitle.textContent = '— SIGNAL LOST —';
       nowMeta.textContent = (STATIONS[current] ? STATIONS[current].freq + ' FM is off the air' : '');
       screenEl.classList.remove('is-tuning');
+      onair.classList.add('off'); onairLbl.textContent = 'NO SIGNAL';   // never claim ON AIR for a dead station
       setTimeout(function () { if (STATIONS.length > 1) tune(nextIndex(), true); }, 1400);
     });
 
@@ -611,7 +781,7 @@
     document.addEventListener('keydown', function (e) {
       if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       switch (e.key) {
-        case ' ': case 'k': e.preventDefault(); if (audio.paused) play(); else audio.pause(); break;
+        case ' ': case 'k': e.preventDefault(); if (audio.paused) { userPaused = false; play(); } else { userPaused = true; audio.pause(); } break;
         case 'ArrowRight': if (audio.duration) audio.currentTime = Math.min(audio.duration, audio.currentTime+5); break;
         case 'ArrowLeft':  if (audio.duration) audio.currentTime = Math.max(0, audio.currentTime-5); break;
         case 'ArrowUp':   e.preventDefault(); prefs.vol = Math.min(100, prefs.vol+5); prefs.muted=false; applyVolume(); savePrefs(); break;
@@ -629,6 +799,7 @@
     //    so the analyser is not tainted. Falls back silently if Web Audio is absent.
     var audioCtx, analyser, freqData, timeData, vuReady = false, powered = false;
     var toneNode, crackleSrc, crackleGain;   // WARM tone filter + 78rpm crackle bed
+    var levelNode, limiterNode;              // per-track loudness leveling + safety limiter
     var canvas = document.getElementById('vu'), cx = canvas.getContext('2d');
     var vuModeEl = document.getElementById('vuMode');
     var VU_NAMES = ['BARS', 'SCOPE', 'MIRROR'];
@@ -642,6 +813,9 @@
         if (!AC) return;
         audioCtx = new AC();
         var srcNode = audioCtx.createMediaElementSource(audio);
+        // Per-track loudness leveling: a gain the music always flows through,
+        // set from the current station's manifest `gain` (dB) by applyLevel().
+        levelNode = audioCtx.createGain();
         // WARM tone: a lowpass the music always flows through; flat (20k) when off,
         // rolled back to ~3.2k when on for that AM/tube warmth.
         toneNode = audioCtx.createBiquadFilter();
@@ -651,11 +825,19 @@
         analyser.fftSize = 1024;
         freqData = new Uint8Array(analyser.frequencyBinCount);
         timeData = new Uint8Array(analyser.fftSize);
-        srcNode.connect(toneNode);
+        // Safety brick-wall limiter on the music bus: catches the peaks when a
+        // quiet side is boosted, and tames any track that has no `gain` yet, so
+        // nothing ever blasts. (The crackle bed stays out of it, on its own path.)
+        limiterNode = audioCtx.createDynamicsCompressor();
+        limiterNode.threshold.value = -2; limiterNode.knee.value = 0;
+        limiterNode.ratio.value = 20; limiterNode.attack.value = 0.003; limiterNode.release.value = 0.25;
+        srcNode.connect(levelNode);
+        levelNode.connect(toneNode);
         toneNode.connect(analyser);
-        analyser.connect(audioCtx.destination);
+        analyser.connect(limiterNode);
+        limiterNode.connect(audioCtx.destination);
         buildCrackle();
-        applyWarmth(); applyCrackle();
+        applyWarmth(); applyCrackle(); applyLevel();
         vuReady = true;
       } catch (e) { /* no analyser — meter stays idle */ }
     }
@@ -741,6 +923,30 @@
       if (start < 0) start = findByFreq(DEFAULT_FREQ);
       if (start < 0) start = 0;
       tune(start, false);
+      tryAutoplay();
+    }
+
+    // Autoplay: a radio should come on by itself. We attempt playback immediately,
+    // but browsers block unsolicited audio until a user gesture — so if we're still
+    // paused a moment later, arm a one-shot that starts the dial on the listener's
+    // first interaction anywhere on the page (unless they've already hit pause).
+    // Gestures that land on a real control are left for that control to handle, so
+    // we don't fight the station the user just tapped.
+    function tryAutoplay() {
+      play();
+      setTimeout(function () {
+        if (!audio.paused || userPaused) return;
+        var onGesture = function (e) {
+          document.removeEventListener('pointerdown', onGesture, true);
+          document.removeEventListener('keydown', onGesture, true);
+          document.removeEventListener('touchstart', onGesture, true);
+          if (e && e.target && e.target.closest && e.target.closest('button, .station, input, select, a')) return;
+          if (audio.paused && !userPaused) play();
+        };
+        document.addEventListener('pointerdown', onGesture, true);
+        document.addEventListener('keydown', onGesture, true);
+        document.addEventListener('touchstart', onGesture, true);
+      }, 250);
     }
 
     // Load the full playlist manifest (the big offline library, 250+ songs). The

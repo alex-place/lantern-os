@@ -51,14 +51,65 @@ function readIngestDocs(limit = 3) {
     });
 }
 
+// Helper: Common English stopwords for filtering
+const stopwords = new Set([
+  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+  "and", "or", "but", "if", "then", "else", "when", "where", "why", "how",
+  "to", "of", "in", "on", "at", "for", "with", "by", "from", "up", "down",
+  "out", "off", "over", "under", "again", "further", "then", "once", "here",
+  "there", "what", "who", "whom", "this", "that", "these", "those", "am",
+  "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your",
+  "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she",
+  "her", "hers", "herself", "it", "its", "itself", "they", "them", "their",
+  "theirs", "themselves", "do", "does", "did", "doing",
+  "because", "as", "until", "while", "about", "against", "between", "into",
+  "through", "during", "before", "after", "above", "below",
+  "all", "any", "both", "each", "few", "more", "most", "other", "some",
+  "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too",
+  "very", "s", "t", "can", "will", "just", "don", "should", "now", "d", "ll",
+  "m", "o", "re", "ve", "y", "ain", "aren", "couldn", "didn", "doesn", "hadn",
+  "hasn", "haven", "isn", "ma", "mightn", "mustn", "needn", "shan", "shouldn",
+  "wasn", "weren", "won", "wouldn"
+]);
+
+// Helper: Tokenizes text, removes stopwords and short words
+function getFilteredTokens(text) {
+  if (!text) return [];
+  return text.toLowerCase()
+    .split(/[\s.,;!?"'(){}[\]-]+/) // Split by common delimiters
+    .filter(word => word.length > 2 && !stopwords.has(word));
+}
+
 // Keyword relevance scoring — returns 0-1 score for how relevant a text is to the query
 function relevanceScore(text, query) {
   if (!text || !query) return 0;
-  const lower = text.toLowerCase();
-  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-  if (words.length === 0) return 0;
-  const hits = words.filter(w => lower.includes(w)).length;
-  return hits / words.length;
+
+  const queryTokens = getFilteredTokens(query);
+  if (queryTokens.length === 0) return 0;
+
+  const textTokens = getFilteredTokens(text);
+  if (textTokens.length === 0) return 0;
+
+  let hits = 0;
+  for (const qToken of queryTokens) {
+    if (textTokens.includes(qToken)) {
+      hits++;
+    }
+  }
+  return hits / queryTokens.length;
+}
+
+// Count of DISTINCT non-stopword tokens shared between query and text. The ratio
+// from relevanceScore alone lets a SINGLE coincidental content word clear a
+// threshold on a short query — the #1276 confabulation case — so cross-session
+// recall additionally requires an absolute count of distinctive hits.
+function distinctiveHitCount(text, query) {
+  const q = new Set(getFilteredTokens(query));
+  if (q.size === 0) return 0;
+  const t = new Set(getFilteredTokens(text));
+  let hits = 0;
+  for (const tok of q) if (t.has(tok)) hits++;
+  return hits;
 }
 
 // Query-filtered memory: only return records relevant to the user's message
@@ -264,6 +315,10 @@ function queryConversationMemory(message, limit = 4) {
     const t = e && typeof e.text === "string" ? e.text.trim() : "";
     if (!t || e.role === "system" || e.role === "note") continue;
     if (t.toLowerCase() === cur) continue;          // never recall the current question itself
+    // #1276: a ratio alone lets one coincidental content word clear the bar on a
+    // short query → confabulation. Require >=2 DISTINCT token hits AND a real ratio
+    // before recalling a past turn as memory.
+    if (distinctiveHitCount(t, message) < 2) continue;
     const score = relevanceScore(t, message);
     if (score < 0.4) continue;                        // require real topical overlap
     const key = t.slice(0, 80).toLowerCase();
@@ -300,16 +355,17 @@ function formatCSFContextForPrompt(message) {
       parts.push(`Recent dreams:\n${dreamText}`);
     }
 
-    // Cross-session chat memory — what we actually discussed before, recalled by relevance.
-    // This is what makes the chat "remember" across separate sessions. The framing is assertive:
-    // these are REAL recalled turns, so the model references them instead of disowning them as
-    // "inferred" (which the anti-fabrication system prompt otherwise causes).
+    // Cross-session chat memory — past turns recalled by keyword overlap. #1276: selection
+    // is heuristic (token overlap), so the framing must NOT force the model to vouch for a
+    // possibly-coincidental match as authoritative memory (that drove confabulation). Present
+    // it as prior context the model MAY use when clearly on-topic, and explicitly allow it to
+    // flag/discount a recall that looks coincidental.
     const convo = queryConversationMemory(message, 4);
     if (convo.length > 0) {
       const convoText = convo
         .map(c => `- ${c.role === "lantern" ? "You (Keystone) previously said" : "The user previously said"}: ${c.text.slice(0, 220)}`)
         .join("\n");
-      parts.push(`Recalled memory — verbatim excerpts from THIS user's earlier conversations with you (persisted across sessions). These ARE real prior turns: rely on them, and when the user asks what you discussed, answer directly from them. Do NOT claim you "have no record" or that the details were "inferred" — you genuinely remember this:\n${convoText}`);
+      parts.push(`Possibly-relevant excerpts from this user's earlier conversations with you, recalled by keyword overlap (persisted across sessions). Treat them as prior context, not verified fact: if they are clearly on-topic you may rely on and reference them; if a match looks coincidental or you are unsure, say so rather than vouching for the details:\n${convoText}`);
     }
   }
 
@@ -370,6 +426,8 @@ function formatCSFContextForPrompt(message) {
 }
 
 module.exports = {
+  relevanceScore,
+  distinctiveHitCount,
   readMemoryRecords,
   readIngestDocs,
   queryMemories,

@@ -1,0 +1,1 @@
+fix(site): repair the 17 dead site-wide Patreon support links (`patreon.com/lanternos` → `patreon.com/c/lanterndreamjournal`) and gate the home provider pin to dispatch-available providers via `/api/providers/status` (offline options disabled + tagged, pinned-but-offline falls back to Auto).
