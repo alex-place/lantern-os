@@ -92,6 +92,10 @@ const jobQueue = new JobQueue(repoRoot);
 const jobWorker = new JobWorker(jobQueue, repoRoot);
 jobWorker.start(2000); // Poll every 2 seconds for new jobs
 
+// Expose the live JobQueue singleton to in-process chat tools (lib/tool-runner)
+// so the Creator video tools enqueue onto the same instance JobWorker polls.
+require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
+
 // PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and (when
 // PR_WATCHER_AUTOMERGE=1) auto-merges reviewed + green + conflict-free PRs.
 const prWatcher = new PrWatcher({
