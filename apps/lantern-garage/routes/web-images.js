@@ -78,7 +78,10 @@ module.exports = function webImageRoutes(req, res, url, deps) {
     return true;
   }
 
-  // Search for images (returns direct URLs, no proxy)
+  // Real image SEARCH (#1343): return an actual photo of a specific subject, not a
+  // random stock photo. Wikimedia Commons is keyless and reliable for real subjects
+  // (landmarks, public figures, products), so it leads; if it has nothing, we report
+  // empty so the caller can fall back to its generate chain.
   if (req.method === "GET" && url.pathname === "/api/image-search") {
     const query = url.searchParams.get("q");
 
@@ -87,54 +90,51 @@ module.exports = function webImageRoutes(req, res, url, deps) {
       return true;
     }
 
-    // Return URLs to popular image sources
-    const sources = [
-      {
-        title: "Unsplash",
-        url: `https://unsplash.com/napi/search/photos?query=${encodeURIComponent(query)}&per_page=1`,
-        format: (data) => {
-          const results = JSON.parse(data);
-          return results.results?.[0]?.urls?.regular || null;
-        },
-      },
-      {
-        title: "Pixabay",
-        url: `https://pixabay.com/api/?key=DEMO&q=${encodeURIComponent(query)}&per_page=1`,
-        format: (data) => {
-          const results = JSON.parse(data);
-          return results.hits?.[0]?.webformatURL || null;
-        },
-      },
-    ];
+    // Wikimedia Commons file search: generator=search over the File namespace (6),
+    // returning a thumbnail URL for the top hit. No API key required.
+    const wmUrl =
+      "https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=imageinfo" +
+      "&iiprop=url&iiurlwidth=768&generator=search&gsrnamespace=6&gsrlimit=3" +
+      "&gsrsearch=" + encodeURIComponent(query);
 
-    const result = {};
-    let completed = 0;
+    const reqOpts = {
+      headers: {
+        // Wikimedia's User-Agent policy requires a descriptive UA or requests 403.
+        "User-Agent": "LanternOS/1.0 (https://lantern-os.net; keystone image search)",
+        Accept: "application/json",
+      },
+      timeout: 6000,
+    };
 
-    sources.forEach((source) => {
-      https
-        .get(source.url, { timeout: 5000 }, (apiRes) => {
-          let data = "";
-          apiRes.on("data", (chunk) => {
-            data += chunk;
-          });
-          apiRes.on("end", () => {
-            try {
-              const imageUrl = source.format(data);
-              if (imageUrl) result[source.title] = imageUrl;
-            } catch {}
-            completed++;
-            if (completed === sources.length) {
-              sendJson(res, result);
+    https
+      .get(wmUrl, reqOpts, (apiRes) => {
+        let data = "";
+        apiRes.on("data", (chunk) => (data += chunk));
+        apiRes.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            const pages = json?.query?.pages ? Object.values(json.query.pages) : [];
+            // Prefer the best-ranked hit that actually has a raster thumbnail.
+            const sorted = pages.sort((a, b) => (a.index || 0) - (b.index || 0));
+            for (const p of sorted) {
+              const info = p.imageinfo && p.imageinfo[0];
+              const u = info && (info.thumburl || info.url);
+              if (u && /\.(jpe?g|png|gif|webp)$/i.test(u)) {
+                sendJson(res, { url: u, source: "Wikimedia Commons", title: p.title || query });
+                return;
+              }
             }
-          });
-        })
-        .on("error", () => {
-          completed++;
-          if (completed === sources.length) {
-            sendJson(res, result);
+            sendJson(res, {}); // no real photo found → caller falls back
+          } catch {
+            sendJson(res, {});
           }
         });
-    });
+      })
+      .on("error", () => sendJson(res, {}))
+      .on("timeout", function () {
+        this.destroy();
+        sendJson(res, {});
+      });
 
     return true;
   }

@@ -233,7 +233,7 @@ module.exports = async (req, res, url, deps) => {
         const task = typeof opts.task === "string" ? opts.task.trim() : "";
 
         // Import self-edit functions
-        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue, looksLikePlaceholderPatch, patchSyntaxErrors } = require("../lib/self-edit-engine");
+        const { generatePlan, generatePatch, applyPatch, runTests, gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue, isFileIssueOnlyRequest, looksLikePlaceholderPatch, patchSyntaxErrors } = require("../lib/self-edit-engine");
         const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
         const { execFile } = require("child_process");
         const path = require("path");
@@ -261,6 +261,12 @@ module.exports = async (req, res, url, deps) => {
             try {
               const created = createIssueFromTask(REPO_ROOT, task);
               issueNumber = created.number;
+              // "file an issue" with no implement verb → log the ticket and STOP.
+              // Running the patch pipeline on it only manufactures slop (#1521).
+              if (isFileIssueOnlyRequest(task)) {
+                sendJson(res, { ok: true, fileIssueOnly: true, issue: created.number, url: created.url, title: created.title, message: `Filed issue #${created.number}: ${created.title}` });
+                return;
+              }
             } catch (e) {
               sendJson(res, { ok: false, error: "issue_create_failed", message: `Could not file an issue for the task: ${e && e.message}` }, 502);
               return;
@@ -659,7 +665,7 @@ module.exports = async (req, res, url, deps) => {
       const {
         generatePlan, generatePatch, applyPatch, runTests,
         gitAddFiles, gitCommit, gitPush, openDraftPr, createIssueFromTask, resolveExistingIssue,
-        looksLikePlaceholderPatch, patchSyntaxErrors,
+        isFileIssueOnlyRequest, looksLikePlaceholderPatch, patchSyntaxErrors,
       } = require("../lib/self-edit-engine");
       const { createIssueWorktree, worktreeTestEnv } = require("../lib/autowork-worktree");
 
@@ -704,6 +710,13 @@ module.exports = async (req, res, url, deps) => {
               const created = createIssueFromTask(REPO_ROOT, task);
               issueNumber = created.number;
               step("create_issue", "done", { issue: issueNumber, url: created.url, title: created.title });
+              // "file an issue" with no implement verb → log the ticket and STOP.
+              // Running the patch pipeline on it only manufactures slop (#1521).
+              if (isFileIssueOnlyRequest(task)) {
+                send("done", { ok: true, fileIssueOnly: true, issue: created.number, url: created.url, title: created.title, message: `Filed issue #${created.number}: ${created.title}` });
+                res.end();
+                return;
+              }
             } catch (e) {
               step("create_issue", "error", { error: String(e && e.message || e) });
               send("done", { ok: false, ...receipt, stoppedAt: "create_issue", message: `Could not file an issue for the task: ${e && e.message}` });

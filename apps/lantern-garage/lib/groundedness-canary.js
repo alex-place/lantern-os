@@ -29,8 +29,14 @@
 // High risk = high assertiveness AND no anchor = the 42-state signature.
 
 const { tokenize, splitUnits } = require("./canary-util");
+const { toUncertainty } = require("./token-surprise");
 
 const MIN_TOKENS = 16; // below this there isn't enough signal — don't cry ungrounded
+
+// How much model-internal surprise may sharpen the 42-state risk (raise-only).
+// 0.5 = a confident, fully-unanchored, maximally-uncertain reply gets up to +50% risk —
+// enough to push a borderline case over threshold, never enough to dominate the text signal.
+const SURPRISE_ALPHA = 0.5;
 
 // case-preserving sentence units (entity capitalization must survive)
 function splitSentences(text) {
@@ -97,6 +103,10 @@ function inTextAnchor(text) {
  * @param {string} [opts.groundingContext]  external grounding that fired upstream
  *        (web search / KB / repo). Non-empty = strong external anchor.
  * @param {number} [opts.threshold=0.5]
+ * @param {number|object|Array} [opts.tokenSurprise]  OPTIONAL model-internal surprise:
+ *        an uncertainty scalar [0,1], a surpriseField summary, or a [{bits}] array
+ *        (see ./token-surprise.js). Present only when the provider exposes per-token
+ *        logprobs (local / OpenAI-style); absent (cloud) → behaves exactly as before.
  * @returns {{risk:number, ungrounded:boolean, anchored:boolean, signals:object, reason?:string}}
  */
 function scoreReplyGroundedness(text, opts = {}) {
@@ -111,6 +121,7 @@ function scoreReplyGroundedness(text, opts = {}) {
     externalGrounding: false,
     inTextAnchor: 0,
     anchor: 0,
+    modelUncertainty: 0,
   };
 
   if (tokens.length < MIN_TOKENS) {
@@ -128,7 +139,16 @@ function scoreReplyGroundedness(text, opts = {}) {
   signals.inTextAnchor = inTextAnchor(text);
   signals.anchor = Math.max(ext ? 0.85 : 0, signals.inTextAnchor);
 
-  const risk = Math.min(1, signals.assertiveness * (1 - signals.anchor));
+  // Optional model-internal corroboration. High token-surprise on a confident,
+  // unanchored reply = the model was uncertain about the very specifics it asserted
+  // (semantic-entropy hallucination signal). RAISE-ONLY, and only inside the 42-state
+  // corner (assertive × unanchored): it never fabricates risk in a hedged/anchored/
+  // reflective reply (base risk ≈ 0 there → sharpen has nothing to multiply), and an
+  // absent signal (cloud, no logprobs) leaves the score byte-identical to before.
+  signals.modelUncertainty = opts.tokenSurprise != null ? toUncertainty(opts.tokenSurprise) : 0;
+  const sharpen = 1 + SURPRISE_ALPHA * signals.modelUncertainty * (1 - signals.anchor);
+
+  const risk = Math.min(1, signals.assertiveness * (1 - signals.anchor) * sharpen);
 
   return {
     risk: Number(risk.toFixed(4)),

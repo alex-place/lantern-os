@@ -622,6 +622,11 @@
   align-self: flex-start;
   letter-spacing: 0.04em;
 }
+/* Debug-route replies render their signature in black (per request) so the
+   "Keystone · debug route" label reads distinctly from the gold chat route. */
+.msg-route-sig.route-debug {
+  color: #000;
+}
 .msg-row.agent .msg-route-sig,
 .msg-row.agent .msg-footer,
 .msg-row.agent .msg-label {

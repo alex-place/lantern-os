@@ -1,0 +1,1 @@
+- chat/trader(console): stock-trader.html no longer floods the browser console with `[marketState]` debug logs on every regime flip across the ~16 polled tickers — the log is now gated behind `localStorage.setItem('debugMarketState','1')` (off by default). Surfaced by the #1231 verification pass.

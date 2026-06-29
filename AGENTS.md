@@ -336,6 +336,10 @@ All agent commits are subject to **four automated quality checks** via git pre-c
 | **Auto-Update Safety** | Version bump → migration scripts, backwards compatibility | `SKIP_UPDATE_CHECK=1` |
 | **AGENTS.md** | Agent commit → update this file with metadata, runbook, capabilities | `SKIP_AGENT_CHECK=1` |
 
+### Porting third-party code (licensing — Critical)
+
+Only **permissive** OSS (Apache-2.0 / MIT / BSD-family) may be ported into Keystone. **GPL / AGPL / LGPL code MUST NOT be ported** — copyleft would relicense the whole project; re-implement clean-room from the docs instead. Every port (vendored verbatim under `vendor/<name>/` with the upstream `LICENSE` preserved, or a clean-room re-implementation credited in the file's docstring) must be recorded in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). See that file for the full convention (#1412).
+
 ### Agent Documentation (for `claude/*`, `gemini/*`, etc. branches)
 
 When committing to an agent branch, update AGENTS.md with:

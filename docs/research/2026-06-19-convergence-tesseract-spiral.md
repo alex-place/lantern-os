@@ -9,6 +9,8 @@ updated: 2026-06-20
 **Date:** 2026-06-19
 **Type:** Research paper (proposal + first prototype)
 **Status:** Draft. Contribution is inference-time math + a falsifiable experiment harness. No pretraining claim; no model selected; one code path added (`mode="converge"` in [`src/sigma0/loop_lm.py`](../../src/sigma0/loop_lm.py)).
+
+> **⛔ E2 RUN AND REFUTED 2026-06-28.** Measured on the real Ouro-1.4B: the latent loop does **not** contract within its 4 trained steps (per-step `‖Δh‖/‖h‖` still ~0.18–0.22 at the final step), so `mode="converge"` exit never fires at ε=0.05 and the contraction-spiral premise collapses to a relabel of Q-exit — exactly as §6 warned. The usable adaptive-depth signal is the **trained Q-exit gate**, not latent contraction. Evidence + the salvage: [`2026-06-28-csf-tesseract-novelty-and-e1-kill.md`](2026-06-28-csf-tesseract-novelty-and-e1-kill.md).
 **Grounding contract:** External Reality Rule. Every load-bearing claim is tagged **[implemented]**, **[proven (conditional)]**, or **[hypothesis — to be measured]**. Metaphor is labeled as metaphor.
 
 Related canon: [`OURO-LOOPLM.md`](../OURO-LOOPLM.md) · [`SIGMA0-OURO-CODER.md`](../SIGMA0-OURO-CODER.md) · [`SIGMA0-COLLAPSE-CERTIFICATE.md`](../SIGMA0-COLLAPSE-CERTIFICATE.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md) · [`2026-06-19-kernel-model-frontier.md`](2026-06-19-kernel-model-frontier.md) · [`TESSERACT-CSF-SINGULARITY.md`](../TESSERACT-CSF-SINGULARITY.md) (this spiral is the **motion face** of the 3¹² lattice)

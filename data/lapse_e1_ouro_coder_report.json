@@ -1,0 +1,182 @@
+{
+  "experiment": "lapse-tesseract E1 \u2014 converged-depth Ouro coder vs CSF-Omni",
+  "model": "ByteDance/Ouro-1.4B",
+  "n_ut_steps": 4,
+  "model_bytes_on_disk": 2869336434,
+  "n_params": 1434652673,
+  "ctx": 1024,
+  "eps": 0.05,
+  "corpora": [
+    {
+      "name": "cube-delta (3^12 lattice storage face)",
+      "baselines_bytes": {
+        "zlib-9": 5094,
+        "bz2-9": 4755,
+        "lzma-9e": 3804,
+        "zstd-19": 3942,
+        "brotli-11": 3762,
+        "csf-omni": 3686
+      },
+      "ouro": {
+        "raw_bytes": 66960,
+        "n_tokens_total": 28297,
+        "n_predicted": 28297,
+        "bytes_per_token": 2.366,
+        "tok_roundtrip_exact": true,
+        "n_windows": 28,
+        "ctx": 1024,
+        "full_depth": {
+          "total_bits": 32838.0,
+          "model_bytes": 4105,
+          "bits_per_token": 1.1605,
+          "bits_per_byte": 0.4904,
+          "ratio_raw_vs_input": 16.31
+        },
+        "converge_depth": {
+          "eps": 0.05,
+          "total_bits": 32838.0,
+          "model_bytes": 4105,
+          "bits_per_token": 1.1605,
+          "bits_per_byte": 0.4904,
+          "ratio_raw_vs_input": 16.31,
+          "mean_depth": 4.0,
+          "max_depth": 4,
+          "depth_histogram": {
+            "1": 0,
+            "2": 0,
+            "3": 1,
+            "4": 28296
+          },
+          "compute_saved_vs_full": 0.0
+        },
+        "E2_depth_vs_bits_pearson": -0.015,
+        "seconds": 14.5
+      },
+      "verdict": {
+        "ouro_raw_bytes": 4105,
+        "ouro_adjusted_bytes": 2869340539,
+        "csf_omni_bytes": 3686,
+        "best_baseline_bytes": 3686,
+        "raw_beats_csf_omni": false,
+        "raw_beats_best_codec": false,
+        "adjusted_beats_csf_omni": false
+      }
+    },
+    {
+      "name": "jsonl memory log (tight-band-2026-06-19.jsonl)",
+      "baselines_bytes": {
+        "zlib-9": 19164,
+        "bz2-9": 10856,
+        "lzma-9e": 9436,
+        "zstd-19": 9832,
+        "brotli-11": 8729,
+        "csf-omni": 8736
+      },
+      "ouro": {
+        "raw_bytes": 262144,
+        "n_tokens_total": 108776,
+        "n_predicted": 108776,
+        "bytes_per_token": 2.41,
+        "tok_roundtrip_exact": true,
+        "n_windows": 107,
+        "ctx": 1024,
+        "full_depth": {
+          "total_bits": 217934.9,
+          "model_bytes": 27242,
+          "bits_per_token": 2.0035,
+          "bits_per_byte": 0.8314,
+          "ratio_raw_vs_input": 9.62
+        },
+        "converge_depth": {
+          "eps": 0.05,
+          "total_bits": 217935.1,
+          "model_bytes": 27242,
+          "bits_per_token": 2.0035,
+          "bits_per_byte": 0.8314,
+          "ratio_raw_vs_input": 9.62,
+          "mean_depth": 4.0,
+          "max_depth": 4,
+          "depth_histogram": {
+            "1": 0,
+            "2": 0,
+            "3": 5,
+            "4": 108771
+          },
+          "compute_saved_vs_full": 0.0
+        },
+        "E2_depth_vs_bits_pearson": -0.0235,
+        "seconds": 56.3
+      },
+      "verdict": {
+        "ouro_raw_bytes": 27242,
+        "ouro_adjusted_bytes": 2869363676,
+        "csf_omni_bytes": 8736,
+        "best_baseline_bytes": 8729,
+        "raw_beats_csf_omni": false,
+        "raw_beats_best_codec": false,
+        "adjusted_beats_csf_omni": false
+      }
+    },
+    {
+      "name": "README.md (prose)",
+      "baselines_bytes": {
+        "zlib-9": 10384,
+        "bz2-9": 9764,
+        "lzma-9e": 9864,
+        "zstd-19": 10083,
+        "brotli-11": 8758,
+        "csf-omni": 8765
+      },
+      "ouro": {
+        "raw_bytes": 29832,
+        "n_tokens_total": 10075,
+        "n_predicted": 10075,
+        "bytes_per_token": 2.961,
+        "tok_roundtrip_exact": true,
+        "n_windows": 10,
+        "ctx": 1024,
+        "full_depth": {
+          "total_bits": 26025.2,
+          "model_bytes": 3254,
+          "bits_per_token": 2.5831,
+          "bits_per_byte": 0.8724,
+          "ratio_raw_vs_input": 9.17
+        },
+        "converge_depth": {
+          "eps": 0.05,
+          "total_bits": 26025.2,
+          "model_bytes": 3254,
+          "bits_per_token": 2.5831,
+          "bits_per_byte": 0.8724,
+          "ratio_raw_vs_input": 9.17,
+          "mean_depth": 4.0,
+          "max_depth": 4,
+          "depth_histogram": {
+            "1": 0,
+            "2": 0,
+            "3": 0,
+            "4": 10075
+          },
+          "compute_saved_vs_full": 0.0
+        },
+        "E2_depth_vs_bits_pearson": null,
+        "seconds": 4.8
+      },
+      "verdict": {
+        "ouro_raw_bytes": 3254,
+        "ouro_adjusted_bytes": 2869339688,
+        "csf_omni_bytes": 8765,
+        "best_baseline_bytes": 8758,
+        "raw_beats_csf_omni": true,
+        "raw_beats_best_codec": true,
+        "adjusted_beats_csf_omni": false
+      }
+    }
+  ],
+  "E1_verdict": {
+    "raw_rate_beats_csf_omni_on_any_corpus": true,
+    "adjusted_rate_beats_csf_omni_on_any_corpus": false,
+    "kill_criterion": "E1 KILLED unless the coder strictly beats CSF-Omni verified bytes on >=1 corpus",
+    "note": "RAW assumes the model is resident/shared (not charged). ADJUSTED counts model bytes."
+  }
+}

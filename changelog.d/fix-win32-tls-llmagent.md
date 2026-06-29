@@ -1,0 +1,4 @@
+### Fix: restore the win32 TLS workaround (cloud providers reachable on Windows again)
+
+- A CodeQL autofix (`a714d6ae`) silently flattened `lib/insecure-tls.js` to `llmAgent = undefined`, so the scoped, documented #869 win32 workaround stopped applying. On Windows boxes with local AV/TLS interception, **every** cloud-provider HTTPS call then failed cert verification → the server reported `no_provider_configured` and chat returned 503. This also broke the PR auto-review/merge fleet (reviews need a live provider).
+- Restored the conditional agent (`INSECURE_TLS ? new https.Agent({ rejectUnauthorized: false }) : undefined`) with an inline `codeql[js/disabling-certificate-validation]` suppression so the autofix bot can't re-revert the deliberate gate. Behaviour is unchanged off win32 (verification stays ON). Fixes #1376; supersedes the non-functional #1378.
