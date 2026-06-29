@@ -20,7 +20,7 @@
 
   var NAV_LINKS = [
     { href: "/dream-chat.html", label: "Chat" },
-    { href: "/trader-dashboard.html", label: "Trader" },
+    { href: "/stock-trader.html", label: "Trader" },
     { href: "/create.html", label: "Create" },
     { href: "/explore.html", label: "Explore" },
     { href: "/knowledgecenter.html", label: "Help" },
