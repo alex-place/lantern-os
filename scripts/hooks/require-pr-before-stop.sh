@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # Stop hook — DON'T STOP until finished work is on a PR. ("like Keystone would.")
 #
-# WHY: The repo rule is that work lands as a PR on the remote — not as local commits,
-# pushed-but-PR-less branches, or uncommitted edits that sprawl and never get tracked.
-# At stop time this gate blocks (decision:block) on any of THREE un-PR'd states:
+# WHY: The repo rule is that work lands as a PR on the remote — not as local commits or
+# pushed-but-PR-less branches. At stop time this gate blocks (decision:block) on the two
+# states that RELIABLY mean "my finished work isn't on a PR yet":
 #
 #   1. UNPUSHED COMMITS — commits on HEAD that are on no remote. Push + open/append a PR.
 #   2. PUSHED, NO PR — a lane branch with commits beyond origin/master but no OPEN PR.
 #      Pushing isn't finishing; the work must be a PR. Open one (gh pr create / gh api).
-#   3. UNCOMMITTED SESSION CODE — tracked source files YOU touched this session (delta vs
-#      the SessionStart baseline, so ambient data/ churn is ignored). Commit them to a PR.
+#
+# Uncommitted *working-tree* edits are intentionally NOT a hard gate: this shared checkout's
+# background automation continuously dirties tracked source files (server.js, libs, …), so
+# blocking on them produces false positives that cite files the agent never touched. The
+# companion stop-warn-uncommitted.sh handles that as a SOFT, session-delta reminder instead.
 #
 # SAFETY (never traps):
 #   • Loop guard — stop_hook_active means it blocks at most ONCE per stop cycle, so an
 #     offline push / genuinely-unfinishable state gets one forceful nudge, never a loop.
 #   • Fail-open — gh/network errors never block (can't open a PR offline → don't trap).
-#   • Protected branches (master/main/dev/gh-pages) skip the PR/uncommitted gates.
-#   • Session baseline — only NEW tracked source edits count, not the tree's standing churn.
+#   • Protected branches (master/main/dev/gh-pages) skip the PR gate.
 #
 # WIRING: "Stop": [{ "hooks": [{ "type": "command",
 #            "command": "bash scripts/hooks/require-pr-before-stop.sh" }]}]
@@ -78,20 +80,8 @@ if [ "${ahead:-0}" -gt 0 ]; then
   fi
 fi
 
-# ── Gate 3: uncommitted source code YOU touched this session (delta vs baseline) ─────
-gitdir="$(git rev-parse --git-dir 2>/dev/null || true)"
-baseline="${gitdir}/uncommitted-baseline.txt"
-if [ -n "$gitdir" ] && [ -f "$baseline" ]; then
-  current="$(git status --porcelain=v1 --untracked-files=no 2>/dev/null | sort)"
-  new="$(comm -13 "$baseline" <(printf '%s\n' "$current") 2>/dev/null \
-    | sed 's/^...//; s/^.* -> //' \
-    | grep -E '\.(js|mjs|cjs|jsx|ts|tsx|py|rs|html|css)$' \
-    | grep -E '^(apps/|src/|scripts/|services/|caad/|csf/)' || true)"
-  if [ -n "$new" ]; then
-    list="$(printf '%s' "$new" | tr '\n' ' ')"
-    block "Don't stop yet — uncommitted code you changed this session is not on a PR: ${list}. Commit ONLY these files (git add <paths>, never -A) on your lane branch and open/append a PR. If you intend to discard them, say so explicitly."
-  fi
-fi
+# Uncommitted working-tree edits are handled by stop-warn-uncommitted.sh (soft reminder),
+# NOT here — see header. Hard-gating them false-positives on this checkout's ambient churn.
 
 # Nothing un-PR'd. Soft stash reminder only.
 [ "${stashes:-0}" != "0" ] && echo "⚠️  ${stashes} git stash(es) parked locally — land or drop them (reminder only)." >&2
