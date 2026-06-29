@@ -1814,6 +1814,11 @@ async function sendMessage(opts = {}) {
                 bubble.dataset.ungroundedRisk = String(evt.sigma0_grounding.risk);
               }
             }
+            // Σ₀ council: the unified 4-way answerability verdict + disagreement Δ.
+            if (evt.council && evt.council.verdict) {
+              bubble.dataset.councilVerdict = String(evt.council.verdict);
+              if (evt.council.delta != null) bubble.dataset.councilDelta = String(evt.council.delta);
+            }
             receivedDone = true;
           }
         } catch { /* skip malformed line */ }
@@ -1934,6 +1939,28 @@ async function sendMessage(opts = {}) {
       });
       bubble.appendChild(reground);
     }
+  }
+
+  // Σ₀ council: the unified 4-way answerability verdict (grounded / seam-open / pin / refuted)
+  // + the disagreement Δ. A subtle chip beside the reply; grounded is the quiet healthy case.
+  if (bubble.dataset.councilVerdict) {
+    const v = bubble.dataset.councilVerdict;
+    const d = bubble.dataset.councilDelta;
+    const MAP = {
+      grounded:  ['✓ Σ₀ grounded',  '#6ee7b7', '0.5'],
+      seam_open: ['⚠ Σ₀ seam-open', '#f5a623', '0.85'],
+      pin:       ['? Σ₀ pin',       '#9ca3af', '0.7'],
+      refuted:   ['✗ Σ₀ refuted',   '#f87171', '0.9'],
+    };
+    const m = MAP[v] || ['Σ₀ ' + v, '#9ca3af', '0.6'];
+    const badge = document.createElement('span');
+    badge.title = 'Σ₀ council verdict: ' + v + (d ? ' (disagreement Δ ' + d + ')' : '')
+      + ' — grounded = trust it; seam-open = unverified, go check; pin = no knowable answer; '
+      + 'refuted = failed a real check.';
+    badge.style.cssText = 'font-size:10px;margin-left:6px;vertical-align:middle;cursor:help;color:'
+      + m[1] + ';opacity:' + m[2];
+    badge.textContent = m[0];
+    bubble.appendChild(badge);
   }
 
   // Signature line: always show a human-readable label + time. Raw provider/model id

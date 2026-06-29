@@ -21,6 +21,7 @@ const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
+const { councilReview } = require("./council-review");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
@@ -1094,6 +1095,18 @@ async function handleStreamChat(req, url, res) {
           context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
         });
         Object.assign(signature, signaturePatch);
+        // Σ₀ council: fold both canary axes (+ any reason-face dissent) into one Δ and the
+        // 4-way answerability gate (grounded/seam_open/pin/refuted), log a council record so
+        // the operator-escalation backtest accrues data, and stamp the verdict for the UI.
+        // Passive — never mutates the reply.
+        try {
+          const c = councilReview(fullReply, {
+            groundingContext,
+            dissent: Array.isArray(signature.dissent) ? signature.dissent : [],
+            context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
+          });
+          signature.council = { verdict: c.verdict, delta: c.delta, recommend: c.recommend, groundedBy: c.groundedBy };
+        } catch { /* council must never break a reply */ }
         if (collapse.collapsed) {
           console.warn(
             `[canary_collapse] proximity=${collapse.proximity} action=${signaturePatch.canary.action} ` +
@@ -1872,7 +1885,7 @@ async function handleStreamChat(req, url, res) {
         const tools = toolRunner.geminiTools({ operator });
         if (tools[0] && tools[0].functionDeclarations.length) {
           const geminiModelName = modelFor("gemini");
-          const generationConfig = { maxOutputTokens: isRpMode ? 2048 : 4096, temperature: isRpMode ? 0.88 : 0.7 }; // #1210: room for multi-call tool reasoning + answer
+          const generationConfig = { maxOutputTokens: isRpMode ? 2048 : 4096, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } }; // #1210 room for tools + answer; thinkingBudget:0 stops 2.5-flash buffering a long silent thinking phase that starves the SSE reader (vertex_empty_response)
           const contents = [
             ...compacted.map((h) => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.text }] })),
             { role: "user", parts: [{ text: message }] },
@@ -1944,7 +1957,7 @@ async function handleStreamChat(req, url, res) {
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {
         contents: [{ role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] }],
-        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7 },
+        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } },
       };
       if (groundingEnabled) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];

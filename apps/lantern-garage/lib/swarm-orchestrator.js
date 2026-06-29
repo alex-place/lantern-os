@@ -193,7 +193,7 @@ function buildPayload(providerId, model, systemPrompt, message, history) {
   if (providerId === "gemini") {
     return JSON.stringify({
       contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n" + message }] }],
-      generationConfig: { maxOutputTokens: 1024 },
+      generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
     });
   }
   if (providerId === "anthropic") {

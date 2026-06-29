@@ -1,0 +1,5 @@
+### Vertex unblocked — gemini-2.5-flash thinkingBudget:0 (fixes vertex_empty_response)
+
+- gemini-2.5-flash defaults to THINKING mode: thinking tokens eat the `maxOutputTokens` budget (non-streaming → MAX_TOKENS, empty answer) and buffer a long silent phase that starves the SSE reader (streaming) — surfacing as `vertex_empty_response` and killing autowork patch generation despite available credits. Proven A/B: thinking-on@128tok → MAX_TOKENS/empty; `thinkingBudget:0`@128tok → STOP with a complete answer.
+- Add `generationConfig.thinkingConfig.thinkingBudget: 0` to every gemini body — chat (`stream-chat.js`), the autowork patch path (`self-edit-engine.js`, Vertex + AI-Studio), and the swarm-council (`swarm-orchestrator.js`). Faster, cheaper, no empty responses. Enable Vertex billing with `GEMINI_USE_VERTEX=1` + `VERTEX_PROJECT`.
+- Also lands the Σ₀ council chat-UI integration (verified live): `councilReview` runs per reply, logs a council record, and the verdict renders as a `✓ Σ₀ grounded` / `⚠ Σ₀ seam-open` / `pin` / `refuted` badge (`stream-chat.js` + `dream-chat-ui.js`).

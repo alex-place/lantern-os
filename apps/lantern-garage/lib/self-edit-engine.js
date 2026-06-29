@@ -937,7 +937,7 @@ function callVertex(system, user, maxTokens = 4096) {
   const payload = JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
   });
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -999,7 +999,7 @@ function callGemini(system, user, maxTokens = 4096) {
   const model = require("./provider-models").modelFor("gemini");
   const payload = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: `${system}\n\n${user}` }] }],
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } },
   });
   return new Promise((resolve, reject) => {
     const req = https.request({
