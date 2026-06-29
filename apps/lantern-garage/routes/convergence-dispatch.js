@@ -543,7 +543,28 @@ module.exports = async (req, res, url, deps) => {
         step("pr", "start", { branch: branchName });
         const prUrl = openDraftPr(workRoot, branchName, commitTitle, prBody);
         step("pr", "done", { prUrl });
-        step("done", "ok", { prUrl, testsVerified, changedFiles: changedFiles.length });
+
+        // Σ₀ council: score this self-coding decision so its Δ accrues against the PR's eventual
+        // outcome (merged / reverted) — the join council_outcome_backtest.py needs. councilReview's
+        // opts.context tags the council record with {surface, issue, pr}; the record already carries
+        // delta + an `outcome` slot the backtest labeller fills. Best-effort: a scoring error must
+        // never break the pipeline. execVerdict is passed ONLY on a real pass — an inconclusive
+        // (timeout) test must not force a `refuted` verdict, so it falls through to the text Δ.
+        let councilDelta = null, councilVerdict = null;
+        try {
+          const { councilReview } = require("../lib/council-review");
+          const prNumber = prUrl ? (Number((String(prUrl).match(/\/pull\/(\d+)/) || [])[1]) || null) : null;
+          const planText = (plan && (plan.summary || plan.reasoning)) || (plan ? JSON.stringify(plan) : "");
+          const review = councilReview(String(planText).slice(0, 6000), {
+            execVerdict: testsVerified ? { ran: true, passed: true } : undefined,
+            context: { surface: "autowork", issue: issueNumber, pr: prNumber },
+          });
+          councilDelta = review.delta;
+          councilVerdict = review.verdict;
+          step("council", "done", { delta: councilDelta, verdict: councilVerdict, pr: prNumber });
+        } catch (_e) { /* council scoring is best-effort */ }
+
+        step("done", "ok", { prUrl, testsVerified, councilDelta, councilVerdict, changedFiles: changedFiles.length });
 
         sendJson(res, {
           ok: true,
@@ -556,6 +577,8 @@ module.exports = async (req, res, url, deps) => {
           testsRan,
           testsVerified,
           verified: testsVerified,
+          councilDelta,
+          councilVerdict,
           steps: ["fetched_issue", "generated_plan", "applied_patch", "ran_tests", "committed", "pushed", "opened_pr"],
           testResults
         });
