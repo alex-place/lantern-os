@@ -296,7 +296,7 @@
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
-    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
+    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -612,6 +612,45 @@ document.addEventListener('DOMContentLoaded', () => {
     providerPin.addEventListener('change', () => {
       try { localStorage.setItem('keystone.providerPin', providerPin.value); } catch {}
     });
+
+    // Gate the pin to providers the running server can actually dispatch to.
+    // The dropdown advertised Claude/ChatGPT/Grok/Local even when their keys are
+    // absent (or out of credits), so pinning one silently routed to a failing
+    // path. /api/providers/status reports per-provider `available` from
+    // process.env — we grey out the dead ones and tag them "(offline)" so the
+    // user sees the truth before navigating to the chat. Auto is never gated.
+    (async function gateProviderPin() {
+      // dropdown value → providers/status provider bucket
+      const PIN_TO_PROVIDER = {
+        claude: 'anthropic', openai: 'openai', gemini: 'gemini',
+        grok: 'xai', ollama: 'ollama', 'keystone-ft': 'ollama',
+      };
+      let status;
+      try {
+        const r = await fetch('/api/providers/status', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (!r.ok) return;
+        status = await r.json();
+      } catch { return; }
+      const providers = status && status.providers;
+      if (!providers) return;
+      let pinnedWentOffline = false;
+      for (const opt of providerPin.options) {
+        if (!opt.value) continue; // Auto
+        const bucket = PIN_TO_PROVIDER[opt.value];
+        const available = bucket && providers[bucket] && providers[bucket].available;
+        if (!available) {
+          opt.disabled = true;
+          if (!/\(offline\)$/.test(opt.textContent)) opt.textContent += ' (offline)';
+          if (providerPin.value === opt.value) pinnedWentOffline = true;
+        }
+      }
+      // A previously-pinned provider that is now offline would dispatch-fail —
+      // fall back to Auto so the next chat actually gets an answer.
+      if (pinnedWentOffline) {
+        providerPin.value = '';
+        try { localStorage.setItem('keystone.providerPin', ''); } catch {}
+      }
+    })();
   }
   function pinnedProviderQS() {
     const v = providerPin && providerPin.value;
