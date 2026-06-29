@@ -26,7 +26,7 @@
   .header{grid-column:1/-1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
   .sidebar{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;padding:8px 0}
   .main{overflow-y:auto;padding:12px;background:var(--bg0)}
-  .footer{grid-column:1/-1;background:var(--bg1);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 260px;gap:8px;padding:8px;max-height:196px;box-sizing:border-box}
+  .footer{grid-column:1/-1;background:var(--bg1);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 260px 1.2fr;gap:8px;padding:8px;max-height:196px;box-sizing:border-box}
   /* ── Header ── */
   .logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green);letter-spacing:.08em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
@@ -201,6 +201,13 @@
   /* Market status */
   .mkt-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:10px}
   .mkt-label{color:var(--tv-text-secondary)}.mkt-val{color:var(--tv-text-primary)}
+  /* Market news (#1582) — surfaces the existing /api/trading/news/recent feed */
+  .news-item{display:block;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);text-decoration:none}
+  .news-item:hover .news-head{color:var(--blue)}
+  .news-head{font-family:var(--sans);font-size:11px;color:var(--text0);line-height:1.35;display:block}
+  .news-meta{font-family:var(--mono);font-size:8px;color:var(--text2);letter-spacing:.05em;text-transform:uppercase;margin-top:2px}
+  .news-meta .news-impact{color:var(--amber)}
+  .news-empty{font-family:var(--mono);font-size:9px;color:var(--text2)}
 </style>
 </head>
 <body>
@@ -263,6 +270,10 @@
   <div class="fpanel">
     <div class="panel-title">Market Status</div>
     <div id="mktStatus"></div>
+  </div>
+  <div class="fpanel">
+    <div class="panel-title">Market News</div>
+    <div id="marketNews"></div>
   </div>
 </div>
 
@@ -1725,6 +1736,47 @@ async function loadOrders(){
   }catch(e){}
 }
 
+// ── Market news (#1582) ───────────────────────────────────────────────────────
+// Surfaces the existing local-first Yahoo-RSS feed (lib/news-collector.js →
+// /api/trading/news/recent). Each item carries [source, timestamp, url]; the
+// panel degrades gracefully to a notice when the feed is empty or offline.
+function newsEsc(s){ const d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
+function relTime(iso){
+  const t = Date.parse(iso); if(!Number.isFinite(t)) return '';
+  const mins = Math.round((Date.now()-t)/60000);
+  if(mins < 1) return 'now';
+  if(mins < 60) return mins+'m ago';
+  const hrs = Math.round(mins/60);
+  if(hrs < 24) return hrs+'h ago';
+  return Math.round(hrs/24)+'d ago';
+}
+async function loadMarketNews(){
+  const el = document.getElementById('marketNews');
+  if(!el) return;
+  try{
+    const r = await fetch('/api/trading/news/recent?limit=12');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const items = Array.isArray(d.records) ? d.records : [];
+    if(!items.length){ el.innerHTML = '<div class="news-empty">No market news yet</div>'; return; }
+    el.innerHTML = items.map(n => {
+      const head = newsEsc(n.headline || n.title || 'Untitled');
+      const src  = newsEsc(n.source || 'Yahoo Finance');
+      const when = relTime(n.published || n.date || n.recorded_at);
+      const syms = Array.isArray(n.symbols) && n.symbols.length ? ' · '+newsEsc(n.symbols.slice(0,3).join(' ')) : '';
+      const hot  = (n.impact_score||n.impact||0) >= 75 ? ' <span class="news-impact">●</span>' : '';
+      const url  = n.url ? newsEsc(n.url) : '';
+      const meta = `${src}${when?' · '+when:''}${syms}${hot}`;
+      const inner = `<span class="news-head">${head}</span><span class="news-meta">${meta}</span>`;
+      return url
+        ? `<a class="news-item" href="${url}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+        : `<div class="news-item">${inner}</div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML = '<div class="news-empty">News feed offline</div>';
+  }
+}
+
 // ── Full refresh (every 30s) ──────────────────────────────────────────────────
 async function fullRefresh(){
   await Promise.all([loadZones(), loadWatchlistPrices(), loadPortfolio(), loadMarketStatus()]);
@@ -1738,11 +1790,13 @@ function startDashboard(){
   loadBars();
   loadAgentLog();
   loadOrders();
+  loadMarketNews();
   setInterval(fullRefresh,         30000);
   setInterval(loadWatchlistPrices,  5000);
   setInterval(loadBars,            15000);
   setInterval(loadAgentLog,         5000);
   setInterval(loadOrders,          60000);
+  setInterval(loadMarketNews,     120000);
 }
 document.addEventListener('DOMContentLoaded', startDashboard);
 
