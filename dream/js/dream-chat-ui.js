@@ -369,7 +369,8 @@ function renderMarkdown(text) {
   // link (see lanternImgFallback) instead of vanishing — so an image-only answer
   // never renders as a blank bubble. Must run before the link rule so ![..](..)
   // isn't read as a text link.
-  h = h.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)"]+)\)/g, (_, alt, url) =>
+  // URL accepts http(s) OR a site-absolute /path (e.g. /media/… thumbnails); safeUrl gates both.
+  h = h.replace(/!\[([^\]\n]*)\]\(((?:https?:\/\/|\/)[^\s)"]+)\)/g, (_, alt, url) =>
     _put(`<img src="${safeUrl(url)}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy" referrerpolicy="no-referrer" onerror="lanternImgFallback(this)" style="max-width:100%;border-radius:8px;margin:6px 0;display:block">`));
 
   // YouTube links → privacy-friendly inline embed.
@@ -377,7 +378,7 @@ function renderMarkdown(text) {
     _put(`<iframe src="https://www.youtube-nocookie.com/embed/${vid}" width="100%" height="220" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`));
 
   // Markdown links [label](url) → new-tab anchors.
-  h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"]+)\)/g, (_, label, url) =>
+  h = h.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|\/)[^\s)"]+)\)/g, (_, label, url) =>
     _put(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
 
   h = h.replace(
