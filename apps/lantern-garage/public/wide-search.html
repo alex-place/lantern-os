@@ -1,0 +1,316 @@
+﻿<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <title>Wide Search — Keystone OS</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .ws-page { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
+    .ws-hero { text-align: center; padding: 28px 0 20px; }
+    .ws-hero h1 { font-size: clamp(1.7rem, 5vw, 2.4rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+    .ws-hero h1 span { color: var(--accent); }
+    .ws-hero p { color: var(--muted); max-width: 600px; margin: 0 auto; line-height: 1.55; font-size: 0.92rem; }
+
+    .ws-bar { display: flex; gap: 10px; margin: 22px 0 8px; }
+    .ws-bar input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px; color: var(--text); font-size: 1rem;
+    }
+    .ws-bar input:focus { outline: none; border-color: var(--accent); }
+    .ws-bar button {
+      background: var(--accent); color: #04141a; border: none; border-radius: 12px;
+      padding: 0 22px; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+    }
+    .ws-bar button:disabled { opacity: 0.5; cursor: default; }
+    .ws-opts { display: flex; gap: 16px; justify-content: center; color: var(--muted); font-size: 0.78rem; margin-bottom: 8px; }
+    .ws-opts label { display: inline-flex; align-items: center; gap: 6px; }
+    .ws-opts input { width: 56px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 3px 6px; color: var(--text); }
+
+    /* Fidelity ladder */
+    .ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 24px 0; }
+    .rung {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 14px 12px; position: relative; opacity: 0.45; transition: all 0.25s;
+    }
+    .rung.active { opacity: 1; border-color: var(--accent); box-shadow: var(--shadow-hover); }
+    .rung.done { opacity: 1; border-color: var(--green); }
+    .rung .num { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+    .rung.done .num { color: var(--green); }
+    .rung h4 { font-size: 0.92rem; font-weight: 700; margin: 4px 0 2px; }
+    .rung .desc { font-size: 0.74rem; color: var(--muted); line-height: 1.4; }
+    .rung .badge { display:inline-block; margin-top: 8px; font-size: 0.66rem; font-weight: 600; padding: 2px 8px; border-radius: 8px; background: var(--accent-dim); color: var(--accent); }
+    .rung .spin { position: absolute; top: 12px; right: 12px; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+    .rung.active .spin { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .section-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin: 28px 0 12px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 0.76rem; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; color: var(--muted); }
+    .chip.live { border-color: var(--accent); color: var(--text); }
+
+    .answer { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; line-height: 1.65; font-size: 0.95rem; }
+    .answer sup { color: var(--accent); font-weight: 700; }
+    .answer h1, .answer h2, .answer h3 { font-size: 1.05rem; margin: 14px 0 6px; }
+    .answer code { background: var(--accent-dim); padding: 1px 5px; border-radius: 5px; font-size: 0.85em; }
+
+    .src { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .src:last-child { border-bottom: none; }
+    .src .n { flex: 0 0 26px; height: 26px; border-radius: 8px; background: var(--accent-dim); color: var(--accent); font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; }
+    .src .body { flex: 1; min-width: 0; }
+    .src a { color: var(--text); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+    .src a:hover { color: var(--accent); }
+    .src .url { font-size: 0.72rem; color: var(--green); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .src .snip { font-size: 0.8rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+    .src .via { font-size: 0.66rem; color: var(--muted); opacity: 0.7; margin-top: 4px; }
+
+    .meta-row { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.78rem; margin-top: 10px; }
+    .meta-row b { color: var(--text); }
+    .log { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); max-height: 160px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+    .log div { padding: 1px 0; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-brand" href="/trader-dashboard.html">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
+    Keystone OS
+  </a>
+  <div class="nav-links">
+    <a href="/trader-dashboard.html">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/wide-search.html" class="active">Wide Search</a>
+    <a href="/knowledgecenter.html">Help</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☀</button>
+  </div>
+</nav>
+
+<div class="ws-page">
+  <div class="ws-hero">
+    <div style="font-size: 42px; margin-bottom: 10px;">🔭</div>
+    <h1>Wide <span>Web Search</span></h1>
+    <p>One Σ₀ pass, widened: fan out many searches, prune with the cheap model first,
+       then escalate the survivors to a stronger model for a grounded answer with citations.</p>
+  </div>
+
+  <div class="ws-bar">
+    <input id="q" type="text" placeholder="Ask anything — e.g. how do recurrent-depth language models compare to wider models?" autofocus>
+    <button id="go">Search</button>
+  </div>
+  <div class="ws-opts">
+    <label>breadth <input id="breadth" type="number" min="2" max="10" value="6"></label>
+    <label>per query <input id="perQuery" type="number" min="2" max="8" value="4"></label>
+  </div>
+
+  <div class="ladder">
+    <div class="rung" data-stage="observe"><div class="spin"></div>
+      <div class="num">01 · Observe</div><h4>Wide fan-out</h4>
+      <div class="desc">Expand into angled sub-queries, search them all.</div>
+      <div class="badge hidden" id="b-observe"></div></div>
+    <div class="rung" data-stage="low"><div class="spin"></div>
+      <div class="num">02 · Reason · low</div><h4>Cheap prune</h4>
+      <div class="desc">Local model drops junk, keeps relevant sources, drafts.</div>
+      <div class="badge hidden" id="b-low"></div></div>
+    <div class="rung" data-stage="high"><div class="spin"></div>
+      <div class="num">03 · Reason · high</div><h4>Strong synthesis</h4>
+      <div class="desc">Stronger model writes the grounded answer with [n] cites.</div>
+      <div class="badge hidden" id="b-high"></div></div>
+    <div class="rung" data-stage="converge"><div class="spin"></div>
+      <div class="num">04 · Verify</div><h4>Converge</h4>
+      <div class="desc">Every claim mapped to a source; confidence scored.</div>
+      <div class="badge hidden" id="b-converge"></div></div>
+  </div>
+
+  <div id="subq-wrap" class="hidden">
+    <p class="section-label">Sub-queries fanned out</p>
+    <div class="chips" id="subq"></div>
+  </div>
+
+  <div id="answer-wrap" class="hidden">
+    <p class="section-label">Grounded answer</p>
+    <div class="answer" id="answer"></div>
+    <div class="meta-row" id="meta"></div>
+  </div>
+
+  <div id="src-wrap" class="hidden">
+    <p class="section-label">Sources</p>
+    <div id="sources"></div>
+  </div>
+
+  <p class="section-label" style="margin-top:28px;">Loop trace</p>
+  <div class="log" id="log"></div>
+</div>
+
+<script src="/js/auth-gate.js" defer></script>
+<script>
+  function toggleTheme() {
+    const el = document.documentElement;
+    el.dataset.theme = el.dataset.theme === 'dark' ? 'light' : 'dark';
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const rung = (s) => document.querySelector(`.rung[data-stage="${s}"]`);
+  // map engine stage/status → ladder rung
+  function rungFor(stage, status) {
+    if (stage === 'observe') return 'observe';
+    if (stage === 'reason' && status.startsWith('low')) return 'low';
+    if (stage === 'reason' && status.startsWith('high')) return 'high';
+    if (stage === 'verify' || stage === 'converge') return 'converge';
+    return null;
+  }
+  function setRung(name, state) {
+    const r = rung(name);
+    if (!r) return;
+    r.classList.remove('active', 'done');
+    if (state) r.classList.add(state);
+  }
+  function badge(name, text) {
+    const b = $('b-' + name);
+    if (!b) return;
+    b.textContent = text; b.classList.remove('hidden');
+  }
+  function logline(t) {
+    const d = document.createElement('div');
+    d.textContent = t;
+    $('log').appendChild(d);
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+
+  // Minimal, safe markdown → HTML (escape first, then a few inline rules + [n]→sup).
+  function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+  function mdToHtml(md) {
+    let h = esc(md);
+    h = h.replace(/^### (.*)$/gm, '<h3>$1</h3>')
+         .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+         .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+         .replace(/`([^`]+)`/g, '<code>$1</code>')
+         .replace(/\[(\d+)\]/g, '<sup>[$1]</sup>')
+         .replace(/^[-*] (.*)$/gm, '• $1')
+         .replace(/\n{2,}/g, '</p><p>')
+         .replace(/\n/g, '<br>');
+    return '<p>' + h + '</p>';
+  }
+
+  // Consume the SSE stream with a streaming fetch reader rather than EventSource:
+  // the fan-out has multi-second idle gaps, and EventSource treats those as a
+  // dropped connection and auto-reconnects (restarting the whole search). A fetch
+  // reader has no idle-reconnect and degrades gracefully if a proxy buffers.
+  let ctrl = null;
+  async function run() {
+    const q = $('q').value.trim();
+    if (!q) return;
+    if (ctrl) { ctrl.abort(); ctrl = null; }
+
+    // reset
+    ['observe','low','high','converge'].forEach(n => { setRung(n, null); $('b-'+n).classList.add('hidden'); });
+    $('subq-wrap').classList.add('hidden'); $('subq').innerHTML = '';
+    $('answer-wrap').classList.add('hidden'); $('src-wrap').classList.add('hidden');
+    $('log').innerHTML = '';
+    $('go').disabled = true; $('go').textContent = 'Searching…';
+
+    const breadth = $('breadth').value, perQuery = $('perQuery').value;
+    const url = `/api/research/wide-search?q=${encodeURIComponent(q)}&breadth=${breadth}&perQuery=${perQuery}`;
+    ctrl = new AbortController();
+
+    const dispatch = (m) => {
+      if (m.type === 'step') handleStep(m);
+      else if (m.type === 'result') showResult(m);
+      else if (m.type === 'error') logline('✗ ' + m.error);
+      // 'done' handled by stream end
+    };
+
+    try {
+      const resp = await fetch(url, { signal: ctrl.signal });
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        // SSE frames are separated by a blank line; each frame has one or more
+        // `data:` lines. Heartbeats (`: ping`) are ignored by the JSON parse.
+        let nl;
+        while ((nl = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, nl); buf = buf.slice(nl + 2);
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            try { dispatch(JSON.parse(line.slice(5).trim())); } catch { /* ignore */ }
+          }
+        }
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') logline('✗ connection lost: ' + e.message);
+    } finally {
+      finish();
+    }
+  }
+
+  function handleStep(m) {
+    const target = rungFor(m.stage, m.status);
+    if (target) {
+      // mark prior rungs done
+      const order = ['observe','low','high','converge'];
+      const idx = order.indexOf(target);
+      order.forEach((n,i) => { if (i < idx) setRung(n,'done'); });
+      setRung(target, 'active');
+    }
+    if (m.stage === 'observe' && m.status === 'subqueries' && Array.isArray(m.subqueries)) {
+      $('subq-wrap').classList.remove('hidden');
+      $('subq').innerHTML = m.subqueries.map(s => `<span class="chip">${esc(s)}</span>`).join('');
+    }
+    if (m.status === 'subquery_done') {
+      const chips = [...document.querySelectorAll('#subq .chip')];
+      const c = chips.find(x => x.textContent === m.query);
+      if (c) { c.classList.add('live'); c.textContent = `${m.query} · ${m.results}`; }
+    }
+    if (m.status === 'pool') badge('observe', `${m.totalSources} sources`);
+    if (m.status === 'low_pass_done') { setRung('low','done'); badge('low', `${m.kept} kept · ${m.provider}${m.modelRan?'':' (fallback)'}`); }
+    if (m.status === 'high_pass_done') { setRung('high','done'); badge('high', `${m.provider}${m.modelRan?'':' (no strong model)'}`); }
+
+    const extra = m.subqueries ? ` (${m.subqueries.length})`
+      : m.totalSources != null ? ` (${m.totalSources})`
+      : m.results != null ? ` ${m.query} → ${m.results}`
+      : m.kept != null ? ` (kept ${m.kept})` : '';
+    logline(`• ${m.stage}/${m.status}${extra}`);
+  }
+
+  function showResult(r) {
+    setRung('converge','done'); badge('converge', `conf ${r.confidence}`);
+    $('answer-wrap').classList.remove('hidden');
+    $('answer').innerHTML = mdToHtml(r.answer || '');
+    $('meta').innerHTML =
+      `<span>confidence <b>${r.confidence}</b></span>` +
+      `<span>pool <b>${r.poolSize||0}</b> → kept <b>${(r.sources||[]).length}</b></span>` +
+      `<span>ladder <b>${r.tiers.low}${r.tiers.lowRan?'':'*'}</b> → <b>${r.tiers.high}${r.tiers.highRan?'':'*'}</b></span>` +
+      `<span><b>${r.ms}</b>ms</span>`;
+    if ((r.sources||[]).length) {
+      $('src-wrap').classList.remove('hidden');
+      $('sources').innerHTML = r.sources.map(s => `
+        <div class="src"><div class="n">${s.n}</div><div class="body">
+          <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>
+          <div class="url">${esc(s.url)}</div>
+          ${s.snippet ? `<div class="snip">${esc(s.snippet)}</div>` : ''}
+          ${s.via && s.via.length ? `<div class="via">via: ${esc(s.via.join(' · '))}</div>` : ''}
+        </div></div>`).join('');
+    }
+  }
+
+  function finish() {
+    ctrl = null;
+    $('go').disabled = false; $('go').textContent = 'Search';
+  }
+
+  $('go').addEventListener('click', run);
+  $('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+</script>
+</body>
+</html>
