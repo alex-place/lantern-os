@@ -1,0 +1,143 @@
+{
+  "model": "ByteDance/Ouro-1.4B",
+  "n_ut": 4,
+  "eps_default": 0.05,
+  "corpora": {
+    "cube-delta": {
+      "n_predicted": 28297,
+      "contraction_per_step": {
+        "t1->t2": {
+          "mean": 0.4768,
+          "p10": 0.2917,
+          "median": 0.3799,
+          "p90": 0.7716,
+          "min": 0.0641
+        },
+        "t2->t3": {
+          "mean": 0.3127,
+          "p10": 0.1724,
+          "median": 0.2473,
+          "p90": 0.499,
+          "min": 0.0456
+        },
+        "t3->t4": {
+          "mean": 0.1843,
+          "p10": 0.0923,
+          "median": 0.1542,
+          "p90": 0.3409,
+          "min": 0.0224
+        }
+      },
+      "eps_sweep": {
+        "0.02": {
+          "mean_depth": 4.0,
+          "frac_early_exit": 0.0,
+          "corr_depth_vs_bits": null
+        },
+        "0.05": {
+          "mean_depth": 4.0,
+          "frac_early_exit": 0.0,
+          "corr_depth_vs_bits": -0.015
+        },
+        "0.08": {
+          "mean_depth": 3.997,
+          "frac_early_exit": 0.002,
+          "corr_depth_vs_bits": -0.1914
+        },
+        "0.1": {
+          "mean_depth": 3.994,
+          "frac_early_exit": 0.005,
+          "corr_depth_vs_bits": -0.2026
+        },
+        "0.15": {
+          "mean_depth": 3.942,
+          "frac_early_exit": 0.055,
+          "corr_depth_vs_bits": -0.2951
+        },
+        "0.2": {
+          "mean_depth": 3.754,
+          "frac_early_exit": 0.226,
+          "corr_depth_vs_bits": -0.193
+        },
+        "0.3": {
+          "mean_depth": 3.168,
+          "frac_early_exit": 0.71,
+          "corr_depth_vs_bits": -0.0772
+        },
+        "0.5": {
+          "mean_depth": 2.328,
+          "frac_early_exit": 0.909,
+          "corr_depth_vs_bits": 0.2117
+        }
+      }
+    },
+    "README.md": {
+      "n_predicted": 10075,
+      "contraction_per_step": {
+        "t1->t2": {
+          "mean": 0.8921,
+          "p10": 0.3767,
+          "median": 0.7014,
+          "p90": 1.7602,
+          "min": 0.0641
+        },
+        "t2->t3": {
+          "mean": 0.5286,
+          "p10": 0.2042,
+          "median": 0.3514,
+          "p90": 1.2376,
+          "min": 0.0816
+        },
+        "t3->t4": {
+          "mean": 0.2158,
+          "p10": 0.1053,
+          "median": 0.1745,
+          "p90": 0.3727,
+          "min": 0.0318
+        }
+      },
+      "eps_sweep": {
+        "0.02": {
+          "mean_depth": 4.0,
+          "frac_early_exit": 0.0,
+          "corr_depth_vs_bits": null
+        },
+        "0.05": {
+          "mean_depth": 4.0,
+          "frac_early_exit": 0.0,
+          "corr_depth_vs_bits": null
+        },
+        "0.08": {
+          "mean_depth": 3.998,
+          "frac_early_exit": 0.001,
+          "corr_depth_vs_bits": -0.1234
+        },
+        "0.1": {
+          "mean_depth": 3.998,
+          "frac_early_exit": 0.001,
+          "corr_depth_vs_bits": -0.1236
+        },
+        "0.15": {
+          "mean_depth": 3.986,
+          "frac_early_exit": 0.013,
+          "corr_depth_vs_bits": -0.0697
+        },
+        "0.2": {
+          "mean_depth": 3.909,
+          "frac_early_exit": 0.09,
+          "corr_depth_vs_bits": 0.0024
+        },
+        "0.3": {
+          "mean_depth": 3.607,
+          "frac_early_exit": 0.378,
+          "corr_depth_vs_bits": 0.1388
+        },
+        "0.5": {
+          "mean_depth": 2.977,
+          "frac_early_exit": 0.704,
+          "corr_depth_vs_bits": 0.4191
+        }
+      }
+    }
+  }
+}

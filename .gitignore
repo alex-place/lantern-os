@@ -19,6 +19,9 @@ private/**
 data/dreamer/notebooks/*.jsonl
 data/dream_journal/*.jsonl
 
+# Flourishing feeds cache — runtime-derived World Bank snapshot (local only)
+data/flourishing-cache.json
+
 # Discord subscriber data
 data/discord/subscribers.json
 
@@ -57,6 +60,9 @@ data/metrics/three-doors-events.jsonl
 
 # Tool-execution logs (observability output of lib/tool-logger.js). Runtime-only.
 data/tool-logs/
+
+# Autowork per-run step logs (lib/autowork-research.js). Runtime observability only.
+data/autowork-runs/
 
 # Stray apps/data/ runtime tree. A tool-logger.js off-by-one (REPO resolved to
 # apps/ instead of the repo root) scattered runtime data here, and the

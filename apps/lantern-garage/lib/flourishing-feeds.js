@@ -16,6 +16,8 @@
 // Verify (provenance + corroboration) → Converge (fused domain posteriors).
 
 const https = require("https");
+const fs = require("fs");
+const path = require("path");
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -240,7 +242,7 @@ async function correlations(force = false) {
       direction: r >= 0 ? "positive" : "negative" });
   }
   items.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
-  if (items.length) corrCache = { at: Date.now(), items };
+  if (items.length) { corrCache = { at: Date.now(), items }; saveCache(); }
   return items;
 }
 
@@ -248,11 +250,31 @@ async function correlations(force = false) {
 const TTL_MS = 24 * 60 * 60 * 1000;
 let cache = { at: 0, beliefs: [] };
 
+// Disk persistence: the in-memory caches above are lost on every server restart,
+// and the stable host auto-redeploys often — so without this the FIRST visitor
+// after each restart pays the full live World Bank fetch (the 25s/45s the home
+// page budgets for). Persisting both caches lets a restart reuse a still-fresh
+// (≤24h) snapshot, so cold loads stay fast. Data is annual; staleness is bounded
+// by the same TTL the in-memory check uses.
+const CACHE_FILE = path.resolve(__dirname, "../../../data/flourishing-cache.json");
+function saveCache() {
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify({ cache, corrCache }));
+  } catch (_) { /* runtime cache only — never fatal */ }
+}
+(function hydrateCache() {
+  try {
+    const disk = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8"));
+    if (disk?.cache?.beliefs?.length) cache = disk.cache;
+    if (disk?.corrCache?.items?.length) corrCache = disk.corrCache;
+  } catch (_) { /* no/stale/corrupt cache file — recompute on first call */ }
+})();
+
 async function pollFeeds(force = false) {
   if (!force && Date.now() - cache.at < TTL_MS && cache.beliefs.length) return cache.beliefs;
   const results = [];
   for (const b of BELIEFS) { const fused = await fuseBelief(b); if (fused) results.push(fused); }
-  if (results.length) cache = { at: Date.now(), beliefs: results };
+  if (results.length) { cache = { at: Date.now(), beliefs: results }; saveCache(); }
   return cache.beliefs;
 }
 

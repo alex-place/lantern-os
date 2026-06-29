@@ -16,7 +16,6 @@ const REPORT_DIR = './reports';
 const CRITICAL_PAGES = [
   '/',
   '/create.html',
-  '/dashboard.html',
   '/dream-chat.html',
   '/entry.html',
   '/settings/providers.html',

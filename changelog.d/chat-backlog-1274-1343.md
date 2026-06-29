@@ -1,0 +1,2 @@
+- chat(doc-routing): `parseDocRequest` no longer hijacks coding requests that merely mention "pdf/report/document/memo" — it now skips when the message reads as a code task and requires a leading document verb, so "write a function that generates a pdf report" goes to the coding flow (#1274).
+- chat(images): "find/show me a photo of X" now does a real keyless image search (Wikimedia Commons) and returns an actual photo of the subject before falling back to AI generation; "draw/paint/generate X" still generates (#1343).

@@ -1,0 +1,2 @@
+- autowork(verify): a failed run now reports a grounded cause (provider / quota / timeout / network / code-fault) and the stage it failed at, with the raw detail in an expandable line — instead of a bare "network error" (#1348).
+- chat(collapse): the local model stream is now HARD-STOPPED mid-generation with an honest truncation notice once the collapse canary's proximity crosses a high block threshold, rather than only logging a warning after the degenerate text already reached the user (#1342).

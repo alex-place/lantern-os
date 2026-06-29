@@ -260,15 +260,11 @@ async function handleStreamChat(req, url, res) {
       }
       swarmMessage = parts.join(" ") || "Hello swarm";
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "X-Accel-Buffering": "no",
-      });
-      const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
-      const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
+      // Use the shared SSE helpers so the product chat (which reads {type:"token",
+      // text:…}) actually renders these. The old raw {token} format was dropped.
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
 
       sendToken(`Keystone routing…\n\n`);
       const agent = selectAgent(swarmMessage);
@@ -278,16 +274,19 @@ async function handleStreamChat(req, url, res) {
         .then((result) => {
           const words = result.text.split(" ");
           for (const word of words) sendToken(word + " ");
+          const council = result.council || null;
+          if (council && Array.isArray(council.dissent) && council.dissent.length) {
+            sendToken(`\n\n**Where the council disagreed (${council.dissent.length}):**\n`);
+            for (const d of council.dissent) sendToken(`- ${d}\n`);
+          }
           const meta = { agent: "Keystone", provider: result.provider, online: true, swarm: { provider: result.provider, model: result.model, mode, job } };
           if (result.consensus) meta.swarm.consensus = result.consensus;
-          if (result.council) meta.swarm.council = result.council;
+          if (council) meta.swarm.council = council;
           sendDone("keystone", meta);
-          res.end();
         })
         .catch((err) => {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
-          res.end();
         });
       return;
     }
@@ -538,6 +537,7 @@ async function handleStreamChat(req, url, res) {
           if (cm) conf = Math.max(0, Math.min(1, parseFloat(cm[1])));
           const answer = String(result.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(result.text);
           const members = (result.council && result.council.members) || [];
+          const dissent = (result.council && result.council.dissent) || [];
           let recordId = null;
           try {
             const rec = await emitConvergenceRecord({
@@ -547,18 +547,22 @@ async function handleStreamChat(req, url, res) {
               evidence_ids: members.map((m) => m.provider),
               reasoner: "convergance-council",
               verified: true,
-              verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+              verification_notes: `Σ₀ council convergence over ${members.length} member(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}` + (dissent.length ? `; dissent: ${dissent.join(" | ")}` : "; dissent: none"),
               source: `council/${result.provider}/${result.model}`,
             });
             recordId = rec && rec.id;
           } catch (_e) { /* record emit is best-effort */ }
           for (const w of answer.split(" ")) sendToken(w + " ");
+          if (dissent.length) {
+            sendToken(`\n\n**Where the council disagreed (${dissent.length}):**\n`);
+            for (const d of dissent) sendToken(`- ${d}\n`);
+          }
           sendDone("keystone", {
             agent: "Keystone",
             provider: result.provider,
             online: true,
             routeLabel: "Convergence · Σ₀ council",
-            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), recordId },
+            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), dissent, recordId },
           });
           return;
         } catch (err) {
@@ -1665,7 +1669,16 @@ async function handleStreamChat(req, url, res) {
           }, (upstream) => {
             if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`ollama_status_${upstream.statusCode}`)); return; }
             let buf = "";
+            // Mid-stream collapse guard (#1342): the post-hoc canary detects runaway
+            // word-salad but only AFTER the bad text already streamed to the user. Here
+            // we score the reply as it grows (reusing the same scoreReplyCollapse signal)
+            // and HARD-STOP the local stream once degeneration is unambiguous — high
+            // threshold so healthy prose is never cut — with an honest truncation notice.
+            const { scoreReplyCollapse } = require("./collapse-canary");
+            const COLLAPSE_BLOCK = parseFloat(process.env.COLLAPSE_BLOCK_PROXIMITY || "0.85");
+            let _lastCanaryLen = 0, _collapseTripped = false;
             upstream.on("data", (chunk) => {
+              if (_collapseTripped) return;
               buf += chunk.toString();
               const lines = buf.split("\n");
               buf = lines.pop();
@@ -1676,8 +1689,20 @@ async function handleStreamChat(req, url, res) {
                   if (parsed.message?.content) { fullReply += parsed.message.content; sendToken(parsed.message.content); }
                 } catch {}
               }
+              if (!_collapseTripped && fullReply.length >= 400 && fullReply.length - _lastCanaryLen >= 240) {
+                _lastCanaryLen = fullReply.length;
+                const sc = scoreReplyCollapse(fullReply, { threshold: COLLAPSE_BLOCK });
+                if (sc.collapsed) {
+                  _collapseTripped = true;
+                  console.warn(`[canary_collapse_block] proximity=${sc.proximity} provider=ollama signals=${JSON.stringify(sc.signals)}`);
+                  sendToken("\n\n⚠️ _(stopped — the local model began repeating itself; reply truncated. Try rephrasing or switch to a cloud model.)_");
+                  try { upstream.destroy(); } catch (_e) {}
+                  try { req2.destroy(); } catch (_e) {}
+                  resolve();
+                }
+              }
             });
-            upstream.on("end", () => resolve());
+            upstream.on("end", () => { if (!_collapseTripped) resolve(); });
             upstream.on("error", reject);
           });
           req2.on("error", reject);

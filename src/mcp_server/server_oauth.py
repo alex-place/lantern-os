@@ -730,9 +730,34 @@ async def messages_endpoint(
 
 # ── Main ──
 
+def _port_is_free(host: str, port: int) -> bool:
+    """True if (host, port) can be bound right now — no other listener owns it.
+
+    Singleton guard: bind WITHOUT SO_REUSEADDR so we DETECT an existing listener
+    and defer to it rather than stealing the port.
+    """
+    import socket as _socket
+    sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
 if __name__ == "__main__":
     port = int(os.getenv("MCP_OAUTH_PORT", "8772"))
     host = os.getenv("MCP_OAUTH_HOST", "127.0.0.1")
+    # Singleton guard — every garage server.js spawns this OAuth MCP too; defer
+    # cleanly to whoever already owns 8772 so duplicate checkouts don't pile up.
+    if not _port_is_free(host, port):
+        logger.warning(
+            "MCP OAuth port %s:%s already in use — another OAuth MCP is live. "
+            "Exiting cleanly (singleton guard); not starting a duplicate.", host, port,
+        )
+        sys.exit(0)
     logger.info("Lantern OS MCP OAuth Server starting on http://%s:%s", host, port)
     logger.info("Tools available: %s", list(TOOLS_REGISTRY.keys()))
     logger.info("OAuth discovery: http://%s:%s/.well-known/oauth-authorization-server", host, port)

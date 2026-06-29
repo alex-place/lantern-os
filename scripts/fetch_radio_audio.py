@@ -97,6 +97,9 @@ def main():
           % (counts["ok"], counts["have"], counts["fail"], counts["nofetch"]))
     if counts["fail"]:
         print("(failed tracks just show as SIGNAL LOST in the player and auto-skip; re-run to retry)")
+    if counts["ok"]:
+        print("Tip: run `python scripts/normalize_radio_levels.py` to loudness-level the new tracks "
+              "(the 78rpm transfers span ~30 dB; the player applies the per-track gain it writes).")
 
 
 if __name__ == "__main__":

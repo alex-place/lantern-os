@@ -93,5 +93,49 @@ check("ungroundedSignal emits a canary event + action", () => {
   assert.ok(sig.risk >= 0.5);
 });
 
+// ── model-internal surprise (token-surprise.js) sharpening — #1260 enhancement ──
+// Backward-compat: no tokenSurprise → identical score, modelUncertainty 0.
+check("no tokenSurprise: behavior identical, modelUncertainty=0", () => {
+  const a = scoreReplyGroundedness(CONFIDENT_UNANCHORED);
+  assert.strictEqual(a.signals.modelUncertainty, 0);
+  assert.strictEqual(a.risk, confident.risk); // unchanged from the text-only baseline
+});
+
+// A BORDERLINE confident+unanchored reply (2/5 assertive, risk ~0.4 < threshold) that the
+// model was internally UNSURE about (high surprise) tips over into the 42-state.
+const BORDERLINE =
+  "The system works well in practice. The Treaty was signed in 1648. " +
+  "It changed many things over time. Cardinal Mazarin led the talks. " +
+  "The approach is generally sound and reliable.";
+const borderlineBase = scoreReplyGroundedness(BORDERLINE);
+check("borderline reply alone: not flagged", () => {
+  assert.strictEqual(borderlineBase.ungrounded, false, `risk=${borderlineBase.risk}`);
+  assert.ok(borderlineBase.risk < 0.5);
+});
+check("borderline + high model uncertainty: sharpened over threshold", () => {
+  const s = scoreReplyGroundedness(BORDERLINE, { tokenSurprise: 0.9 });
+  assert.ok(s.risk > borderlineBase.risk, `expected raise, ${s.risk} vs ${borderlineBase.risk}`);
+  assert.strictEqual(s.ungrounded, true, `risk=${s.risk}`);
+  assert.ok(s.signals.modelUncertainty > 0.8);
+});
+// RAISE-ONLY: internal confidence (low surprise) never LOWERS the text-only risk.
+check("borderline + low model uncertainty: risk unchanged (raise-only)", () => {
+  const s = scoreReplyGroundedness(BORDERLINE, { tokenSurprise: 0.0 });
+  assert.strictEqual(s.risk, borderlineBase.risk);
+});
+// Surprise must NOT override an anchor — an anchored reply stays grounded even if the
+// model was internally unsure (the source is what matters, per the External Reality Rule).
+check("anchored reply + high model uncertainty: still not flagged", () => {
+  const s = scoreReplyGroundedness(
+    BORDERLINE + " See [src](https://example.org/x).", { tokenSurprise: 0.95 });
+  assert.strictEqual(s.anchored, true);
+  assert.strictEqual(s.ungrounded, false, `risk=${s.risk}`);
+});
+// Surprise must NOT manufacture risk from a reflective/non-assertive reply.
+check("reflective reply + high model uncertainty: still healthy", () => {
+  const s = scoreReplyGroundedness(HEALTHY, { tokenSurprise: 0.95 });
+  assert.strictEqual(s.ungrounded, false, `risk=${s.risk}`);
+});
+
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nall groundedness-canary checks passed");

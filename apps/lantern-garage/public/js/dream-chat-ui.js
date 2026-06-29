@@ -1196,12 +1196,12 @@ function embedSupport() {
     ['Synthesasia Guild', '$200', 'Guild (admin) role'],
   ];
   const cards = tiers.map(([n, p, perk]) =>
-    `<a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="flex:1 1 110px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit">
+    `<a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer" style="flex:1 1 110px;text-align:center;padding:10px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit">
        <div style="font-weight:700;font-size:12.5px">${n}</div>
        <div style="font-size:1.2rem;font-weight:800">${p}<span style="font-size:.7rem;opacity:.6">/mo</span></div>
        <div style="font-size:10.5px;opacity:.65">${perk}</div>
      </a>`).join('');
-  return `<div style="font-weight:600;margin:12px 0 6px">♥ Support — <a href="https://www.patreon.com/lanternos" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon</a></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cards}</div>`;
+  return `<div style="font-weight:600;margin:12px 0 6px">♥ Support — <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer" style="color:inherit">Patreon</a></div><div style="display:flex;gap:8px;flex-wrap:wrap">${cards}</div>`;
 }
 async function renderExploreEmbed(kind, userText) {
   addUserBubble(userText);
