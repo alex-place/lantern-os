@@ -59,10 +59,10 @@ anti-collapse operator $\Sigma_0^{-1}$ (empirically shown, not proven, to suppre
 collapse), and an early-warning signal. We read the construction as a small, honest
 warning about recursively self-improving systems: absent external grounding, the
 linearized dynamics admit only collapse or divergence. Theorem~1 is machine-checked
-($31$ passing, \#506 resolved) for the symmetric case, with $9$ further tests for the
-non-normal gates (\texttt{test\_stability\_gates.py}). The other components are heuristics,
-labelled as such; one referenced demonstration is not currently reproducible (its
-scripts are absent from the repository); the AI-safety reading is the keeper and
+($42$ passing in \texttt{test\_cio\_sde.py}; \#506 resolved) for the symmetric case, with $14$
+further tests for the non-normal gates (\texttt{test\_stability\_gates.py}). The other components
+are heuristics, labelled as such; the referenced router demonstration is now reproducible (its
+driver scripts are committed --- see \S6 of the Markdown certificate); the AI-safety reading is the keeper and
 stands on its own.
 \end{abstract}
 
@@ -415,9 +415,10 @@ arXiv:2406.07515).
   \texttt{ReconstructionOperator}, \texttt{stability\_gates}/\texttt{StabilityGates} (\#768).
 \item \texttt{src/cio\_sde/surprise.py} --- \texttt{SurpriseMonitor} and the Kalman
   measurement update (the missing inference step).
-\item \texttt{tests/test\_cio\_sde.py} --- 31 passing (\#506 resolved); Theorem~1
-  exercised in the symmetric case only.
-\item \texttt{tests/test\_stability\_gates.py} --- 9 passing: the \#768 numerical-range
+\item \texttt{tests/test\_cio\_sde.py} --- 42 passing (\#506 resolved); Theorem~1
+  exercised in the symmetric case only (the non-normal contraction dichotomy and the C3
+  anti-freeze lemmas add their own tests here).
+\item \texttt{tests/test\_stability\_gates.py} --- 14 passing: the \#768 numerical-range
   $+$ Lyapunov gates, a 400-matrix red-team (no false-positive certificate), and
   matrix-exponential checks of the proven transient bounds.
 \item Runnable, deterministic experiments present in the repo:
