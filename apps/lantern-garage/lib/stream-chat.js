@@ -246,9 +246,9 @@ async function handleStreamChat(req, url, res) {
   if (attachments.length > 0) {
     let attachmentBlock = "";
     for (const attachment of attachments) {
-      if (attachment.filename && attachment.content) {
-        attachmentBlock += `--- ATTACHMENT: ${attachment.filename} ---\n`;
-        attachmentBlock += `${attachment.content}\n`;
+      if (attachment.name && attachment.text) {
+        attachmentBlock += `--- ATTACHMENT: ${attachment.name} ---\n`;
+        attachmentBlock += `${attachment.text}\n`;
         attachmentBlock += `--- END ATTACHMENT ---\n\n`;
       }
     }
