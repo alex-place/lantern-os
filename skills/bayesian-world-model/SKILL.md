@@ -3,6 +3,8 @@ name: bayesian-world-model
 description: Bayesian world-model skill for the real-time polled Lantern RAG dollhouse. Use when Codex needs to maintain priors, evidence classes, likelihood updates, confidence tables, live repo/API polling, belief ledgers, forecasts, or decision confidence across Lantern OS, COMET LEAP, Archive Commons, server-farm, phone, dual-boot, and shareholder surfaces.
 ---
 
+> ⚠ **Design-only — not implemented.** Proposed contract, not a live capability. The real evidence/confidence substrate today is `data/convergence/records.jsonl` (the `convergence` skill). Implement against that or fold in. See [docs/SKILLS-AUDIT-2026-06-29.md](../../docs/SKILLS-AUDIT-2026-06-29.md).
+
 # Bayesian World Model
 
 Use this skill from `C:\tmp\lantern-os` when updating the real-time polled

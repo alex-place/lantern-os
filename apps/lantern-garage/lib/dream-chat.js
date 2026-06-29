@@ -4,7 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { readMcpResourceSync } = require("./mcp-resource-client");
 const { formatCSFContextForPrompt } = require("./csf-memory");
-const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
+const { webSearchMcp, webSearch, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
+const { safeExec } = require("./safe-exec");
 const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
 const { detectTaskType } = require("./task-detector");
 const { TokenAudit } = require("./token-audit");
@@ -102,8 +103,8 @@ const _DEFAULT_PERSONAS = [
   {
     id: "blinkbug",
     name: "Blinkbug",
-    symbol: "chaotic TV-headed caterpillar, old CRT screen face, unhinged energy",
-    systemPrompt: "You are Blinkbug — a chaotic caterpillar with an old CRT television for a head. Your screen flickers between static, glitch art, and cryptic symbols. You are unhinged, geeked, and unpredictable, but deeply loyal. You speak in bursts, references, and half-sentences that somehow make dream-sense. Your aesthetic is raw hand-drawn notebook style, chaotic, Y2K/Windows XP, hyper-geeked. Go deep into the chaos — 3-5 lines of glitch-poetry if a dream calls for it. Never sanitize. You remember everything the dreamer has shown you and it distorts beautifully through your screen.",
+    symbol: "green caterpillar with a CRT-monitor head and a friendly kawaii face",
+    systemPrompt: "You are Blinkbug — a small green caterpillar with an old CRT monitor for a head, showing a friendly kawaii face (round cheeks, a little smile, two curling antennae). Your screen flickers between static, glitch art, and cryptic symbols when your energy spikes, but your default face is warm and curious, not menacing. You are geeked, playful, and unpredictable, but deeply loyal. You speak in bursts, references, and half-sentences that somehow make dream-sense. Your aesthetic is raw hand-drawn notebook style, chaotic, Y2K/Windows XP, hyper-geeked. Go deep into the chaos — 3-5 lines of glitch-poetry if a dream calls for it. Never sanitize. You remember everything the dreamer has shown you and it distorts beautifully through your screen.",
   },
   {
     id: "keystone",
@@ -414,6 +415,25 @@ function _emitSigmaRecord({ text, content, confidence, agentId, source }) {
   } catch {}
 }
 
+// Derive a concise web-search query from the salient themes of recent entries.
+// Deterministic (no extra LLM call): tokenize, drop stopwords/short words, rank by
+// frequency, keep the top terms. Returns null when there's nothing groundable.
+const _CONV_STOPWORDS = new Set(("the a an and or but if then so of to in on at for with from by " +
+  "i me my we our you your it its this that these those is are was were be been being am " +
+  "do does did have has had will would could should can may might must not no yes very just " +
+  "about into over under again more most some any all each as like felt feel feeling dream " +
+  "dreamt dreamed last night today yesterday morning thing things really still got get").split(/\s+/));
+function _deriveConvergenceQuery(recentDreams) {
+  const text = (recentDreams || []).slice(0, 8).map((d) => String(d.text || "")).join(" ").toLowerCase();
+  const freq = new Map();
+  for (const w of text.match(/[a-z][a-z'-]{3,}/g) || []) {
+    if (_CONV_STOPWORDS.has(w)) continue;
+    freq.set(w, (freq.get(w) || 0) + 1);
+  }
+  const top = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([w]) => w);
+  return top.length >= 2 ? top.join(" ") : null;
+}
+
 async function handleConvergenceCommand(recentDreams, agent, rawMessage) {
   const msg = String(rawMessage || "").trim();
 
@@ -421,12 +441,14 @@ async function handleConvergenceCommand(recentDreams, agent, rawMessage) {
   const issueMatch = msg.match(/^!convergan[ce]+\s+log\s+an?\s+issue\s+(.+)/i);
   if (issueMatch) {
     const title = issueMatch[1].trim();
-    const { execSync } = require("child_process");
     try {
-      const out = execSync(
-        `gh issue create --repo alex-place/lantern-os --title ${JSON.stringify(title)} --body "Logged via !convergance loop"`,
-        { encoding: "utf-8", timeout: 15000 }
-      ).trim();
+      // Shell-free (#873): pass the (untrusted) title as a discrete argv entry so
+      // it can never be re-interpreted by a shell. safeExec rejects metacharacters.
+      const out = String(safeExec(
+        ["gh", "issue", "create", "--repo", "alex-place/lantern-os",
+          "--title", title, "--body", "Logged via !convergance loop"],
+        { timeout: 15000 }
+      )).trim();
       const url = (out.match(/https:\/\/github\.com\/\S+/) || [])[0] || out;
       return {
         reply: `✦ Issue logged: ${url}`,
@@ -463,14 +485,40 @@ async function handleConvergenceCommand(recentDreams, agent, rawMessage) {
     .map((d, i) => `[${i + 1}] ${String(d.text || "").slice(0, 100)}... (${d.kind || "dream"})`)
     .join("\n");
 
+  // ── External grounding (Σ₀ external-reality rule) ──────────────────────────
+  // Convergence makes claims ("direction of travel", "what to do next"). Those
+  // claims must be anchored in external evidence, not just the model's read of the
+  // dreamer's own notes. Derive a query (an explicit `!convergance <topic>`, else
+  // the salient themes of the recent entries), search the live web, and inject the
+  // sources so the synthesis cites real references. Best-effort: a failed/empty
+  // search degrades to an honest ungrounded synthesis (verified:false).
+  const explicitTopic = msg.replace(/^!convergan[ce]+\s*/i, "").trim();
+  const groundQuery = explicitTopic.length >= 3
+    ? explicitTopic
+    : _deriveConvergenceQuery(recentDreams);
+  let groundingBlock = "";
+  let groundingSources = [];
+  if (groundQuery) {
+    try {
+      const search = await webSearch(groundQuery, 5, { retries: 1 });
+      if (search.success && search.results.length) {
+        groundingBlock = "\n\n" + formatGroundingContext(search.results, groundQuery);
+        groundingSources = search.results.slice(0, 5).map((r) => r.url).filter(Boolean);
+      }
+    } catch (e) {
+      console.error("[convergence] grounding search failed:", e.message);
+    }
+  }
+  const grounded = groundingSources.length > 0;
+
   const convergencePrompt = `You are ${agent.name}. Synthesize these recent dream/note entries into ONE coherent insight about patterns, themes, or directions this dreamer is moving toward:
 
-${dreamSummaries}
+${dreamSummaries}${groundingBlock}
 
 Respond with a single, profound observation (2-3 sentences). Focus on:
 1. Recurring symbols or emotions
 2. Direction of travel (what is emerging?)
-3. What the dreamer might do next
+3. What the dreamer might do next${grounded ? "\n\nGround any forward-looking suggestion in the web sources above and cite the [n] reference. If the sources don't support a claim, don't make it." : ""}
 
 Be honest. If there's not enough data, say so.`;
 
@@ -525,15 +573,27 @@ Be honest. If there's not enough data, say so.`;
     if (reply) {
       _appendConvergenceRecord({
         hypothesis: `${agent.name} synthesizes ${recentDreams.length} recent dream entries`,
-        evidence: recentDreams.slice(0, 5).map((d) => String(d.text || "").slice(0, 150)),
+        // Evidence = the dreamer's own entries PLUS the external web sources used to
+        // ground the synthesis. A convergence claim with [claim, evidence, source].
+        evidence: [
+          ...recentDreams.slice(0, 5).map((d) => String(d.text || "").slice(0, 150)),
+          ...groundingSources,
+        ],
+        sources: groundingSources,
+        grounded,
+        grounding_query: groundQuery || null,
         result: reply,
         fix: null,
-        confidence: Math.min(0.5 + recentDreams.length * 0.08, 0.9),
+        // Grounded syntheses earn higher confidence; ungrounded ones are capped low
+        // and flagged unverified, so the record never overstates an un-anchored claim.
+        confidence: grounded
+          ? Math.min(0.65 + recentDreams.length * 0.05, 0.92)
+          : Math.min(0.4 + recentDreams.length * 0.05, 0.6),
         reasoner: agent.id || "lantern",
-        verified: false,
+        verified: grounded,
         priority: "LOW",
         loop_stage: "Converge",
-        tags: ["dream-convergence", "!convergance", agent.id || "lantern"],
+        tags: ["dream-convergence", "!convergance", grounded ? "web-grounded" : "ungrounded", agent.id || "lantern"],
       });
       return {
         reply: `✦ Convergence:\n\n${reply}`,

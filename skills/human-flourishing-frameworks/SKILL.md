@@ -3,6 +3,8 @@ name: human-flourishing-frameworks
 description: Integrate the Human Flourishing Frameworks (HFF) into Lantern OS. Use when observing outcomes, modeling causes, optimizing flourishing across beings, connecting sensors, querying the Bayesian world model, running PBFT consensus, or auditing autonomous agent decisions.
 ---
 
+> ⚠ **Design-only / partial.** Only partially backed (`routes/flourishing.js`). Keep only if the flourishing feed is a kept surface under the subsystem-register ADR (#1557). See [docs/SKILLS-AUDIT-2026-06-29.md](../../docs/SKILLS-AUDIT-2026-06-29.md).
+
 # Human Flourishing Frameworks
 
 A system that observes outcomes, models causes, and optimizes for the most flourishing across all beings.

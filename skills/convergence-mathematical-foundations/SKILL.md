@@ -3,6 +3,8 @@ name: convergence-mathematical-foundations
 description: Mathematical foundations for the Superfleet & Lantern OS — Bayesian Epistemology, Free Energy Principle / Active Inference, Precision Weighting, Anti-Entropy Memory, Lakatosian Research Programmes, and Narrative Identity. Use when reasoning about belief revision, coherence, prediction error, programme health, or long-term system stability.
 ---
 
+> ℹ **Reference doc, not an executable skill.** Pure epistemology / Free-Energy theory — keep for grounding reasoning, but it is not a runnable capability. See [docs/SKILLS-AUDIT-2026-06-29.md](../../docs/SKILLS-AUDIT-2026-06-29.md).
+
 # Mathematical Foundations for the Superfleet & Lantern OS
 
 ## 1. Bayesian Epistemology

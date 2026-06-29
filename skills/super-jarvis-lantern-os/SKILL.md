@@ -3,6 +3,8 @@ name: super-jarvis-lantern-os
 description: "Single canonical Lantern OS skill. Use for all Lantern OS work: repo inspection, PDF/report generation, RAG dollhouse memory, COMET LEAP / COMETSHOT / Founder / Patient A updates, Bayesian confidence, Clean Storm sprints, Tony Garage, wallet/cash ledgers, archive/commons intake, shareholder packets, dual boot/device/server-farm boundaries, MCP/tool verification, per-user license wallet setup, and v1 readiness. Legacy subskill folders remain as references, but this file is the one operator entrypoint."
 ---
 
+> ⚠ **Design-only — superseded.** The "one skill that does everything" is superseded by the Convergence Core as the real orchestrator (one loop, four objects). Kept as a routing design reference only — not a live capability, and not the operator entrypoint. Several subskills it references were deleted 2026-06-29. See [docs/SKILLS-AUDIT-2026-06-29.md](../../docs/SKILLS-AUDIT-2026-06-29.md).
+
 # Super Jarvis Lantern OS - Unified Skill
 
 Use this as the **only canonical operator skill** from `C:\tmp\lantern-os`.
