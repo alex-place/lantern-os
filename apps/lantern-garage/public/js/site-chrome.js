@@ -39,7 +39,7 @@
       '  <div class="nav-links">\n    ' +
       links +
       "\n" +
-      '    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>\n' +
+      '    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>\n' +
       "  </div>\n" +
       '  <div class="nav-actions">\n' +
       '    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>\n' +
