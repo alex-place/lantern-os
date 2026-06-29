@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.7.86] - 2026-06-29
+## [1.7.108] - 2026-06-29
 - fix(boot): resolve a real Python interpreter for all child processes (OH-1, #1548) and cut dead pages (SCOPE-2, #1558). Bare `spawn('python')` / `win32 ? 'python' : 'python3'` ENOENT'd on boxes where only the `py` launcher or a venv is on PATH — which crash-looped the AI trader on boot. New `apps/lantern-garage/lib/resolve-python.js` probes `PYTHON_PATH`/`$PYTHON` → active venv (`.venv`/`.venv-train`) → `python3` → `python` → `py -3`, caches the result, and returns `null` (→ one actionable "disabled" log) when nothing works instead of spawning into an ENOENT storm. Wired every boot/spawn site: `server.js` (Discord bot, MCP, MCP-OAuth, crypto-observer, tesseract-pack), `trader-agent.js` (the crash-loop source), `image-generation.js`, `stream-chat.js`. Verified it resolves to the local `.venv-train` interpreter; unit test `test/resolve-python.test.js`. Separately deleted 7 orphaned, fully-unreferenced public pages (`creator-intake`, `document-studio`, `keystone-work`, `kalshi-{crypto-deck,dashboard,optimal-window,realtime-positions}`) after confirming zero code/HTML refs — `npm run audit:orphans` 19→12.
 
 ## [1.7.85] - 2026-06-29
