@@ -481,7 +481,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // /version.json can 500 in some checkouts; fall back to the git
     // endpoint's semver (already fetched below) before giving up.
     const g = git?.version;
-    const v = version?.version || g?.semver || 'unknown';
+    // Prefer the live git semver (reflects the running commit) over the static
+    // /version.json file, which is committed and routinely lags the real build.
+    const v = g?.semver || version?.version || 'unknown';
     const branch = g?.branch || '';
     const shortCommit = g?.commit ? g.commit.slice(0, 7) : '—';
     const commitDate = g?.date ? fmtDate(g.date) : '';

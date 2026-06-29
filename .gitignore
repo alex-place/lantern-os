@@ -19,6 +19,9 @@ private/**
 data/dreamer/notebooks/*.jsonl
 data/dream_journal/*.jsonl
 
+# Flourishing feeds cache — runtime-derived World Bank snapshot (local only)
+data/flourishing-cache.json
+
 # Discord subscriber data
 data/discord/subscribers.json
 

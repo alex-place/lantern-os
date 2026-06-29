@@ -104,7 +104,10 @@
     var here = location.pathname.replace(/\/index\.html$/, "/");
     document.querySelectorAll("nav.site-nav .nav-links a").forEach(function (a) {
       var href = a.getAttribute("href") || "";
-      if (href && href.charAt(0) === "/" && href === here) a.classList.add("active");
+      if (href && href.charAt(0) === "/" && href === here) {
+        a.classList.add("active");
+        a.setAttribute("aria-current", "page"); // expose the active page to AT
+      }
     });
 
     // theme-toggle.js may have run before this nav existed; sync the glyph.

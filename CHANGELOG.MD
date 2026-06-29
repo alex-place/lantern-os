@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.100] - 2026-06-29
+- perf(home): persist the Flourishing world-model cache to disk so cold loads stay fast. The panel + correlations caches were in-memory only with a 24h TTL, but the stable host auto-redeploys often — so the first visitor after every restart paid the full live World Bank fetch (the 25s/45s the home page budgets for). Both caches now round-trip through `data/flourishing-cache.json` (gitignored), so a restart reuses a still-fresh snapshot. Also: the hero version now prefers the live git semver over the committed-and-stale `/version.json`, and `site-chrome.js` sets `aria-current="page"` on the active nav link for assistive tech (it already set the `.active` class). `node --check` clean.
+
 ## [1.7.99] - 2026-06-29
 - fix(site): repair the site-wide Patreon support link and gate the home provider pin to live providers. Every "♥ Patreon ♥" CTA (nav, chat, trader, explore, changelog, pricing, +12 more pages) pointed at `patreon.com/lanternos`, which **404s** — the live page is `patreon.com/c/lanterndreamjournal` ("Keystone OS", $5/$20/$200 tiers). Replaced all 17 dead URLs so the monetization CTA on every page resolves. Also wired the home chat **provider pin** to `/api/providers/status`: options whose provider is not dispatch-available (no key / out of credits) are now disabled and tagged "(offline)" instead of silently routing a pinned turn to a failing path, and a previously-pinned-but-now-offline provider falls back to Auto. Home page only; `node --check` clean.
 
