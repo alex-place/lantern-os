@@ -1,7 +1,9 @@
 // Web Search Client — calls MCP web_search tool for real-time grounding
 // Uses DuckDuckGo lite via local MCP server (no API key required)
 
-const http = require("http");
+const http = require("http"); // For MCP calls
+const https = require("https"); // For direct DDG/Wiki calls
+const console = require("console"); // Explicitly import console for logging
 
 const MCP_HOST = process.env.MCP_SERVER_HOST || "127.0.0.1";
 const MCP_PORT = parseInt(process.env.MCP_SERVER_PORT || "8771", 10);
