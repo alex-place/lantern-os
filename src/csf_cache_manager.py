@@ -28,6 +28,34 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("lantern.csf_cache")
 
+# Compression is delegated to the ONE canonical CSF codec layer (zstd-19+LDM by
+# default, self-describing 1-byte codec header) rather than hand-rolling zlib.
+# On agent-cache / JSONL-shaped payloads the canonical codec is ~35-40x smaller
+# than the old zlib-3 (10.5x -> 362-422x; see experiments/csf_compression_benchmark.py).
+# Hot write path -> default to zstd, not the slower max-ratio "omni" panel.
+# CSF_CACHE_CODEC overrides ("zstd" | "zlib" | "omni" | "store").
+try:  # canonical codec; falls back to raw zlib only if the package is unavailable
+    import csf as _csf
+    _CACHE_CODEC = os.environ.get("CSF_CACHE_CODEC") or "zstd"
+    if _CACHE_CODEC == "zstd" and _csf.DEFAULT_CODEC != "zstd":
+        _CACHE_CODEC = _csf.DEFAULT_CODEC  # zstandard not installed -> zlib
+except Exception:  # pragma: no cover - csf package missing
+    _csf = None
+    _CACHE_CODEC = "zlib"
+
+
+def _codec_compress(raw: bytes) -> bytes:
+    if _csf is not None:
+        return _csf.compress_bytes(raw, _CACHE_CODEC)
+    return b"\x01" + zlib.compress(raw, 9)  # mimic codec-id header (1 = zlib)
+
+
+def _codec_decompress(blob: bytes) -> bytes:
+    if _csf is not None:
+        return _csf.decompress_bytes(blob)
+    # csf unavailable: blob is [1-byte codec id][payload]; only zlib is decodable here
+    return zlib.decompress(blob[1:])
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CACHE_DIR = REPO_ROOT / "data" / "csf_cache"
 
@@ -51,16 +79,16 @@ def _build_csf_segment(key: str, value: Any, meta: Dict[str, Any]) -> bytes:
         "integrity_hash": _sha256_short(value),
     }
     body_json = json.dumps(record, ensure_ascii=False).encode("utf-8")
-    compressed = zlib.compress(body_json, level=3)
+    compressed = _codec_compress(body_json)
 
     # Token dictionary (minimal — just top keywords)
     tokens = {t.lower(): i for i, t in enumerate(set(json.dumps(value).split())) if len(t) > 2}
     dict_json = json.dumps(tokens, ensure_ascii=False).encode("utf-8")
-    dict_compressed = zlib.compress(dict_json, level=3)
+    dict_compressed = _codec_compress(dict_json)
 
     header = struct.pack(
         ">8sHHIQQQ",
-        b"CSFv1\x00\x00",
+        b"CSFv2\x00\x00",
         1, 0x0001, 1,
         len(body_json), 0, 0,
     )
@@ -82,8 +110,16 @@ def _parse_csf_segment(raw: bytes) -> Optional[Dict[str, Any]]:
     try:
         if len(raw) < 16:
             return None
-        magic = raw[:8]
-        if magic != b"CSFv1\x00\x00":
+        # struct ">8s" right-pads the 7-byte magic to 8, so match on the 5-byte
+        # version prefix. (The pre-fix reader compared raw[:8] to a 7-byte literal
+        # and so NEVER matched — the cache silently never returned a hit.)
+        magic = raw[:5]
+        # v2 = canonical CSF codec (self-describing header); v1 = legacy raw zlib.
+        if magic == b"CSFv2":
+            legacy = False
+        elif magic == b"CSFv1":
+            legacy = True
+        else:
             return None
         # Read footer CRC
         stored_crc = struct.unpack(">I", raw[-4:])[0]
@@ -99,7 +135,7 @@ def _parse_csf_segment(raw: bytes) -> Optional[Dict[str, Any]]:
         pos += dict_len
         # Remaining is compressed body
         compressed = raw[pos:-4]
-        body_json = zlib.decompress(compressed)
+        body_json = zlib.decompress(compressed) if legacy else _codec_decompress(compressed)
         return json.loads(body_json)
     except Exception as exc:
         logger.warning("CSF parse error: %s", exc)
@@ -189,7 +225,8 @@ class CsfCacheManager:
             "cache_dir": str(self.cache_dir),
             "ttl_seconds": self._ttl_seconds,
             "entry_count": len(self.keys()),
-            "format": "CSF v1.0",
+            "format": "CSF v2.0",
+            "codec": _CACHE_CODEC,
             "enforced": True,
         }
 
@@ -199,8 +236,10 @@ class CsfCacheManager:
         """Validate every cached segment.  Returns (ok_count, corrupt_count)."""
         ok = 0
         corrupt = 0
-        for key in self.keys():
-            raw = self._path(key).read_bytes()
+        # Iterate files directly: keys() returns hashed stems, so re-deriving the
+        # path via _path() would hash twice and miss every file.
+        for path in self.cache_dir.glob("*.csf"):
+            raw = path.read_bytes()
             parsed = _parse_csf_segment(raw)
             if parsed is None:
                 corrupt += 1

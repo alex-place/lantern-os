@@ -102,7 +102,19 @@ Curated references organized by component. Not a bookmark dump. Living document 
 - **Hyperdimensional computing / VSA** ([arXiv:2111.06077](https://arxiv.org/abs/2111.06077))
   - Ternary `{-1,0,1}` sparse high-dimensional codes; reference for the 12-axis vector-symbolic substrate
 
-**Status:** Append-only JSONL working; Graph layer needed; ternary lattice substrate implemented (`src/csf/v07/`)
+### Compression — beating zstd-19 (memory encoding)
+- **Language Modeling Is Compression** (DeepMind, [arXiv:2309.10668](https://arxiv.org/abs/2309.10668))
+  - A predictor is a compressor: `p(next|ctx)` → arithmetic coding; a 3.2M transformer beats LZMA2 (17.7% vs 23%)
+  - Grounds GRC / corrected E1 (issue #1595)
+- **OpenZL** (Meta, 2025) · **DataCortex** — structure-aware reversible transforms beat zstd on ratio+speed for structured data (2–3× on NDJSON)
+  - Grounds CSF-Col (issue #1593): known-schema row→column + typed coding
+- **Revisiting Data Compression with LM** ([arXiv:2601.02875](https://arxiv.org/html/2601.02875v1))
+  - Weight-accounting wall: LLM compression only pays past ~100GB — *dissolved here* by the resident-model amortization
+- **Σ₀ collapse certificate** ([`SIGMA0-COLLAPSE-CERTIFICATE.md`](SIGMA0-COLLAPSE-CERTIFICATE.md))
+  - Load-bearing constraint on GRC: ungrounded recurrent depth *raises* predictive entropy (collapse → uniform); the NIS/anisotropy canary is the measured depth-exit
+- Full theorization + closed doors (low-rank, Kolmogorov, geometry, PAQ): [`research/2026-06-29-csf-beating-zstd.md`](research/2026-06-29-csf-beating-zstd.md)
+
+**Status:** Append-only JSONL working; zstd-19+LDM / omni ships; CSF-Col (#1593) recommended next; Graph layer needed; ternary lattice substrate implemented (`src/csf/v07/`)
 
 ---
 

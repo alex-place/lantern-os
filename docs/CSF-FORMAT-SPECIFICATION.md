@@ -183,6 +183,49 @@ backward-compat · code review · decode-safety · honesty audit). Two defects w
 brotli payload could decode to silently-wrong bytes (→ CRC-32 + a `ValueError` decode contract), and a
 docstring over-claim (→ reworded to the envelope framing above). CSF tests pass.
 
+### 2.7.2 Beyond the envelope — beating zstd-19 (theorized, tracked)
+
+Omni is the *upper envelope of off-the-shelf byte codecs*; to go past it you must model structure or
+statistics LZ cannot express. Four grounded techniques are theorized in
+[**research/2026-06-29-csf-beating-zstd.md**](research/2026-06-29-csf-beating-zstd.md):
+
+| # | Technique | Lossless | Regime | Beats zstd-19? | Issue |
+|---|---|---|---|---|---|
+| 1 | **CSF-Col** — known-schema row→column transpose + typed coding → zstd backend | yes | hot | yes, 1.5–2.5× predicted on memory logs | [#1593](https://github.com/alex-place/lantern-os/issues/1593) |
+| 2 | **RKD** — retrieval-keyed lossless delta vs nearest prior record | yes | batch | yes on similar records | [#1594](https://github.com/alex-place/lantern-os/issues/1594) |
+| 3 | **GRC** — grounded resident-model residual coding, Σ₀-gated adaptive depth (corrected E1) | yes | cold | only if grounded (ungrounded *raises* entropy — proven) | [#1595](https://github.com/alex-place/lantern-os/issues/1595) |
+| 4 | **Hybrid** — GRC over a CSF-Col residual | yes | cold | highest ceiling | [#1596](https://github.com/alex-place/lantern-os/issues/1596) |
+
+The Σ₀ collapse certificate (§ external) is load-bearing for #3: "deeper recurrence → fewer bits" holds
+**only inside the grounded, non-collapsed regime**; the NIS/anisotropy canary supplies the measured
+depth-exit. **CSF-Col (#1593) is the recommended first build** — see § 2.7.3 for the shipped result.
+
+### 2.7.3 CSF-Col — shipped (transform id 2)
+
+[`src/csf/col_transform.py`](../src/csf/col_transform.py) is a lossless invertible byte→byte transform
+(registered as Omni **transform id 2**) that transposes flat-ish JSONL records from row-major to
+column-major before the entropy backend, so like-typed fields (timestamps, `confidence`, the near-constant
+`reasoner`/`verified`) form long compressible runs. Values are captured as **raw source substrings** (no
+JSON re-serialization → byte-exact), and `forward()` self-checks its own round-trip and raises
+`NotApplicable` otherwise — so Omni (which re-verifies and keeps the strict min) auto-selects it **only on
+JSONL where it actually wins**, and fast-skips everything else.
+
+Measured, all round-trip-verified lossless (`col+brotli` selected by Omni vs the prior best baseline):
+
+| Corpus (raw) | best before | **Omni + CSF-Col** | gain |
+|---|---|---|---|
+| `csf_memory/deltas.jsonl` (21 KB) | 19.9× (brotli) | **24.4×** | **+23%** |
+| `csf_memory/raw.jsonl` (320 KB) | 15.5× (omni) | **16.4×** | **+6%** |
+| `convergence/records.jsonl` (353 KB) | 8.5× | **8.7×** | +2% |
+| small / text-dominated (e.g. 1.9 KB `agi-benchmark`) | — | falls back to brotli | no regression (not selected) |
+
+**Honest framing.** The win is real but modest on these corpora because they are dominated by large
+free-text fields (`hypothesis`/`result`) that don't columnarize — the gain comes from the small structured
+fields, and it grows with schema homogeneity (largest on the append-only `deltas` stream). It does **not**
+reach the 2–3× that schema-rich (mostly-typed-field) NDJSON sees in the literature. Because Omni selects per
+input, CSF-Col never regresses: on text-dominated or tiny blobs the framing overhead loses and it simply
+isn't picked. Tests: [`tests/test_csf_col.py`](../tests/test_csf_col.py) (13, incl. 1.5k-case fuzz).
+
 ---
 
 ## 2.8 Per-user profile pack (one file per user, KB-grounded)

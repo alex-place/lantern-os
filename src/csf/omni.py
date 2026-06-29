@@ -94,9 +94,20 @@ def _delta_inv(b: bytes) -> bytes:
     return bytes(out)
 
 
+# CSF-Col (Technique 1, issue #1593): lossless row->column transpose for JSONL records.
+# forward() raises NotApplicable (fast, on the first non-'{' byte) for non-JSONL input,
+# so it's simply skipped by the panel; it self-checks its own round-trip before returning.
+from . import col_transform as _col
+
+
+def _col_fwd(b: bytes) -> bytes:
+    return _col.forward(b)   # raises NotApplicable -> candidate skipped by _encode_all
+
+
 TRANSFORMS: dict[int, tuple[str, Callable[[bytes], bytes], Callable[[bytes], bytes]]] = {
     0: ("none", lambda b: b, lambda b: b),
     1: ("delta", _delta_fwd, _delta_inv),
+    2: ("col", _col_fwd, _col.inverse),
 }
 
 
@@ -155,6 +166,11 @@ _SEARCH_ORDER: list[tuple[int, int]] = [
     if c in CODECS
 ]
 
+# CSF-Col (transform 2) only pays paired with a strong backend, and only on JSONL
+# (forward() fast-skips everything else). Listed after the t∈{0,1} panel so a tie
+# prefers the simpler/no-transform encoding; omni still keeps the strict min size.
+_COL_ORDER: list[tuple[int, int]] = [(2, c) for c in (5, 6, 3) if c in CODECS]
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -174,9 +190,9 @@ def _candidates(effort: str, portable: bool) -> list[tuple[int, int]]:
     if effort == "fast":
         order = [(0, c) for c in (0, 1, 5) if c in CODECS]
     elif effort == "exhaustive":
-        order = list(_SEARCH_ORDER)                         # codecs x {none, delta}
+        order = list(_SEARCH_ORDER) + _COL_ORDER            # codecs x {none, delta} + col
     else:  # "max"
-        order = [(t, c) for (t, c) in _SEARCH_ORDER if t == 0]
+        order = [(t, c) for (t, c) in _SEARCH_ORDER if t == 0] + _COL_ORDER
     if portable:
         order = [(t, c) for (t, c) in order if c in _STDLIB_CODEC_IDS]
     return order
