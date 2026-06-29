@@ -317,7 +317,35 @@
     .pip-hud i { color: var(--ph); font-style: normal; text-shadow: 0 0 7px rgba(43,255,136,.4); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
     .pip-hud .grow { margin-left: auto; }
 
-    @media (max-width: 620px) { .radio.pipboy { padding: 18px 16px 14px; } .pip-tab { letter-spacing: .12em; font-size: .66rem; } }
+    /* ── Small-width / mobile layout ──────────────────────────────────────────
+       On a phone the two-column deck collapses to one. Source order is dial→screen,
+       which would bury the player under 300+ stations — so flip it: the player
+       (now-playing + transport) rides on top, the dial scrolls below it. Touch
+       targets grow, the keyboard-only help line hides, and the rows that wrap
+       (modes, HUD) breathe a little. */
+    @media (max-width: 620px) {
+      .radio.pipboy { padding: 18px 14px 14px; }
+      .pip-tab { letter-spacing: .12em; font-size: .66rem; }
+      .pip-sub { gap: 6px 10px; }
+      .deckwrap { gap: 12px; }
+      .deckwrap .screen { order: -1; }          /* player first, dial below */
+      .dial { min-height: 0; padding: 7px; }
+      .stationscroll { max-height: 44vh; }       /* keep the long list from owning the page */
+      .nowtitle { font-size: 1.04rem; }
+      .nowlore { min-height: 0; }
+      .tbtn { width: 44px; height: 40px; }       /* bigger transport hit-areas */
+      .tbtn.play { width: 58px; }
+      .tog { height: 34px; }
+      .modes .range { max-width: none; flex: 1 1 120px; }   /* volume fills its row */
+      .keys { display: none; }                   /* keyboard hints are moot on touch */
+      .pip-hud { gap: 10px 14px; }
+    }
+    @media (max-width: 400px) {
+      .radio.pipboy { padding: 14px 10px 12px; border-radius: 22px; }
+      .pip-tab { letter-spacing: .06em; font-size: .6rem; padding: 6px 2px 5px; }
+      .nowtitle { font-size: .96rem; }
+      .tbtns { gap: 6px; }
+    }
 
     @media (prefers-reduced-motion: reduce) {
       .radio::after, .onair i, .crt-noise, .crt-roll, .nowtitle.scroll, .pip-display::before { animation: none; }
@@ -589,7 +617,8 @@
       audio.play().catch(function(){ /* autoplay blocked until a gesture; the click IS the gesture */ });
     }
 
-    playBtn.addEventListener('click', function () { if (audio.paused) play(); else audio.pause(); });
+    var userPaused = false;   // set when the listener explicitly stops the dial
+    playBtn.addEventListener('click', function () { if (audio.paused) { userPaused = false; play(); } else { userPaused = true; audio.pause(); } });
     document.getElementById('prev').addEventListener('click', function () { tune(prevIndex(), true); });
     document.getElementById('next').addEventListener('click', function () { tune(nextIndex(), true); });
 
@@ -752,7 +781,7 @@
     document.addEventListener('keydown', function (e) {
       if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
       switch (e.key) {
-        case ' ': case 'k': e.preventDefault(); if (audio.paused) play(); else audio.pause(); break;
+        case ' ': case 'k': e.preventDefault(); if (audio.paused) { userPaused = false; play(); } else { userPaused = true; audio.pause(); } break;
         case 'ArrowRight': if (audio.duration) audio.currentTime = Math.min(audio.duration, audio.currentTime+5); break;
         case 'ArrowLeft':  if (audio.duration) audio.currentTime = Math.max(0, audio.currentTime-5); break;
         case 'ArrowUp':   e.preventDefault(); prefs.vol = Math.min(100, prefs.vol+5); prefs.muted=false; applyVolume(); savePrefs(); break;
@@ -894,6 +923,30 @@
       if (start < 0) start = findByFreq(DEFAULT_FREQ);
       if (start < 0) start = 0;
       tune(start, false);
+      tryAutoplay();
+    }
+
+    // Autoplay: a radio should come on by itself. We attempt playback immediately,
+    // but browsers block unsolicited audio until a user gesture — so if we're still
+    // paused a moment later, arm a one-shot that starts the dial on the listener's
+    // first interaction anywhere on the page (unless they've already hit pause).
+    // Gestures that land on a real control are left for that control to handle, so
+    // we don't fight the station the user just tapped.
+    function tryAutoplay() {
+      play();
+      setTimeout(function () {
+        if (!audio.paused || userPaused) return;
+        var onGesture = function (e) {
+          document.removeEventListener('pointerdown', onGesture, true);
+          document.removeEventListener('keydown', onGesture, true);
+          document.removeEventListener('touchstart', onGesture, true);
+          if (e && e.target && e.target.closest && e.target.closest('button, .station, input, select, a')) return;
+          if (audio.paused && !userPaused) play();
+        };
+        document.addEventListener('pointerdown', onGesture, true);
+        document.addEventListener('keydown', onGesture, true);
+        document.addEventListener('touchstart', onGesture, true);
+      }, 250);
     }
 
     // Load the full playlist manifest (the big offline library, 250+ songs). The
