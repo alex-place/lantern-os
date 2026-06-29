@@ -14,6 +14,6 @@ jobs:
     name: Release provenance (stub)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Acknowledge
         run: echo "Release provenance workflow — no artifacts to hash in v1.0.0"

@@ -26,7 +26,7 @@ jobs:
     name: Verify stable version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Block RC / prerelease
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -43,7 +43,7 @@ jobs:
     needs: [guard-stable]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build pages bundle
         run: |
@@ -95,7 +95,7 @@ jobs:
     needs: [deploy-pages]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
