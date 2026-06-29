@@ -367,7 +367,7 @@ class PrWatcher {
         '.check_runs[] | select([.conclusion] | inside(["failure","cancelled","timed_out","action_required","startup_failure"])) | .name'
       );
       names = new Set(String(out).split("\n").map((s) => s.trim()).filter(Boolean));
-      if (names.size) console.log(`[PR Watcher] base (${this.baseRef}) red checks ignored for merge: ${[...names].join(", ")}`);
+      if (names.size) console.warn(`[PR Watcher] base (${this.baseRef}) red checks ignored for merge: ${[...names].join(", ")}`);
     } catch (err) {
       console.warn(`[PR Watcher] base-branch check scan failed (${err.message}); static ignore list only`);
     }
