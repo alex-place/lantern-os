@@ -282,7 +282,7 @@
 <body>
 
 <!-- ── Whole-screen file drop overlay ── -->
-<div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">.pdf → Knowledge Center &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
+<div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">files → attached to chat &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
 
 <!-- ── Site nav ── -->
 <nav class="site-nav">
@@ -296,7 +296,7 @@
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
-    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
+    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -330,7 +330,7 @@
     </select>
     <button type="submit">Chat ✦</button>
   </form>
-  <input type="file" id="home-file-input" accept=".pdf,.docx" multiple style="display:none">
+  <input type="file" id="home-file-input" multiple style="display:none">
   <div class="home-file-chip" id="home-file-chip">
     <span id="home-file-chip-name">📄 file.docx</span>
     <button type="button" onclick="clearHomeDocx()" aria-label="Remove file">✕</button>
@@ -481,7 +481,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // /version.json can 500 in some checkouts; fall back to the git
     // endpoint's semver (already fetched below) before giving up.
     const g = git?.version;
-    const v = version?.version || g?.semver || 'unknown';
+    // Prefer the live git semver (reflects the running commit) over the static
+    // /version.json file, which is committed and routinely lags the real build.
+    const v = g?.semver || version?.version || 'unknown';
     const branch = g?.branch || '';
     const shortCommit = g?.commit ? g.commit.slice(0, 7) : '—';
     const commitDate = g?.date ? fmtDate(g.date) : '';
@@ -612,6 +614,45 @@ document.addEventListener('DOMContentLoaded', () => {
     providerPin.addEventListener('change', () => {
       try { localStorage.setItem('keystone.providerPin', providerPin.value); } catch {}
     });
+
+    // Gate the pin to providers the running server can actually dispatch to.
+    // The dropdown advertised Claude/ChatGPT/Grok/Local even when their keys are
+    // absent (or out of credits), so pinning one silently routed to a failing
+    // path. /api/providers/status reports per-provider `available` from
+    // process.env — we grey out the dead ones and tag them "(offline)" so the
+    // user sees the truth before navigating to the chat. Auto is never gated.
+    (async function gateProviderPin() {
+      // dropdown value → providers/status provider bucket
+      const PIN_TO_PROVIDER = {
+        claude: 'anthropic', openai: 'openai', gemini: 'gemini',
+        grok: 'xai', ollama: 'ollama', 'keystone-ft': 'ollama',
+      };
+      let status;
+      try {
+        const r = await fetch('/api/providers/status', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (!r.ok) return;
+        status = await r.json();
+      } catch { return; }
+      const providers = status && status.providers;
+      if (!providers) return;
+      let pinnedWentOffline = false;
+      for (const opt of providerPin.options) {
+        if (!opt.value) continue; // Auto
+        const bucket = PIN_TO_PROVIDER[opt.value];
+        const available = bucket && providers[bucket] && providers[bucket].available;
+        if (!available) {
+          opt.disabled = true;
+          if (!/\(offline\)$/.test(opt.textContent)) opt.textContent += ' (offline)';
+          if (providerPin.value === opt.value) pinnedWentOffline = true;
+        }
+      }
+      // A previously-pinned provider that is now offline would dispatch-fail —
+      // fall back to Auto so the next chat actually gets an answer.
+      if (pinnedWentOffline) {
+        providerPin.value = '';
+        try { localStorage.setItem('keystone.providerPin', ''); } catch {}
+      }
+    })();
   }
   function pinnedProviderQS() {
     const v = providerPin && providerPin.value;
@@ -641,27 +682,31 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   /* Route picked/dropped files: .docx → chip (improve flow on submit),
-     .pdf → forward to the chat's Knowledge Center upload. Mirrors the
-     dream-chat.html drop handler so both pages behave the same. */
-  function forwardPdf(file) {
-    const reader = new FileReader();
-    reader.onload = function () {
+     everything else (.pdf, images, text, code…) → forward to the chat as an
+     attachment so the LLM can read it directly. Mirrors dream-chat.html. */
+  function forwardAttach(files) {
+    const q = (document.getElementById('home-chat-input').value || '').trim();
+    Promise.all(files.map(f => new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res({ name: f.name, data: r.result });
+      r.onerror = () => res(null);
+      r.readAsDataURL(f);
+    }))).then(items => {
       try {
-        sessionStorage.setItem('pendingPdf', JSON.stringify({ name: file.name, data: reader.result }));
+        sessionStorage.setItem('pendingAttach', JSON.stringify({ q, files: items.filter(Boolean) }));
       } catch { /* storage full — chat will fall back to its own picker */ }
-      window.location.href = '/dream-chat.html?autoprocess=pdf';
-    };
-    reader.readAsDataURL(file);
+      const qs = pinnedProviderQS(); // '&provider=…' or ''
+      window.location.href = '/dream-chat.html' + (qs ? ('?' + qs.slice(1)) : '');
+    });
   }
 
   function handleHomeFiles(fileList) {
     const files = [...(fileList || [])];
     if (!files.length) return;
     const docx = files.find(f => f.name.toLowerCase().endsWith('.docx'));
-    const pdf  = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
+    const rest = files.filter(f => !f.name.toLowerCase().endsWith('.docx'));
     if (docx) setDocxChip(docx);
-    else if (pdf) forwardPdf(pdf);
-    else document.getElementById('home-chat-input').placeholder = 'Please choose a PDF or Word (.docx) file…';
+    if (rest.length) forwardAttach(rest);
   }
 
   /* "+" attach button → native file picker */

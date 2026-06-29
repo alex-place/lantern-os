@@ -44,6 +44,20 @@ function renderToolReplay(tool) {
     return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
       + `<a href="${esc(tool.url)}" download="${esc(tool.filename || '')}" style="display:inline-block;margin-top:6px;padding:6px 12px;border:1px solid var(--accent,#06b6d4);border-radius:8px;color:var(--accent,#06b6d4);text-decoration:none;font-weight:600">⬇ Download ${esc(tool.filename || 'file')}</a>`;
   }
+  if (tool.kind === 'embed' && tool.src) {
+    // Same allowlist as the live summoner — a persisted row must not become a
+    // framing sink if the store is ever tampered with.
+    const okSrc = /^\/[^/]/.test(tool.src) || /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i.test(tool.src);
+    if (!okSrc) return null;
+    const icon = tool.embedKind === 'listen' ? '📻' : tool.embedKind === 'watch' ? '🎬' : '🕹️';
+    const verb = tool.embedKind === 'watch' ? 'Now showing' : 'Now playing';
+    const h = Math.max(160, Math.min(640, Number(tool.height) || 360));
+    return `<div class="chat-embed" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;overflow:hidden;max-width:480px">`
+      + `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:12.5px"><span aria-hidden="true">${icon}</span><span>${verb} — ${esc(tool.title || 'embed')}</span></div>`
+      + `<iframe src="${esc(tool.src)}" style="width:100%;height:${h}px;border:0;display:block" title="${esc(tool.title || 'embed')}" allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>`
+      + (tool.lore ? `<div style="padding:6px 10px;font-size:11px;opacity:0.6;border-top:1px solid var(--border,#2a2a3a)">${esc(tool.lore)}</div>` : '')
+      + `</div>`;
+  }
   return null;
 }
 window.renderToolReplay = renderToolReplay;
@@ -502,6 +516,7 @@ const COMMANDS = [
   { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
   { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
   { name: 'swarm',       group: 'Build',   usage: '!swarm <task>',     desc: 'Multi-agent swarm (council/consensus) on a task' },
+  { name: 'radio',       group: 'Explore', usage: '!radio',            desc: 'Summon Keystone Radio inline (also: “play fallout radio”)', aliases: ['play'] },
   { name: 'videos',      group: 'Explore', usage: '!videos',           desc: 'Fresh videos feed', aliases: ['watch'] },
   { name: 'discover',    group: 'Explore', usage: '!discover',         desc: 'Discover reads/news feed', aliases: ['news', 'reads', 'feed'] },
   { name: 'build',       group: 'Explore', usage: '!build',            desc: 'Repo build activity (releases + commits)', aliases: ['github', 'releases', 'commits'] },
@@ -581,21 +596,56 @@ async function renderIssues() {
 // ── Autowork live-step panel (issue #527 / autonomous-work/stream) ─────────────
 // Consumes the SSE stream and renders each phase as it happens, so the user can
 // watch plan → patch → tests → commit → push → PR in real time.
+// [key, label, description] — the description tells the user what each step is
+// actually doing (the panel used to show a bare label + a red ✗ on failure).
 const AUTOWORK_PHASES = [
-  ['create_issue','File issue'],
-  ['fetch_issue', 'Fetch issue'],
-  ['branch',      'Create branch'],
-  ['research',    'Research (codebase + web)'],
-  ['plan',        'Generate plan'],
-  ['patch',       'Generate patch'],
-  ['apply',       'Apply changes'],
-  ['tests',       'Run tests'],
-  ['commit',      'Commit'],
-  ['push',        'Push'],
-  ['pr',          'Open PR'],
-  ['convergence', 'Convergence record'],
-  ['record',      'Log record'],
+  ['create_issue','File issue',         'filing a tracked GitHub issue for the task'],
+  ['fetch_issue', 'Fetch issue',        'reading the issue title + body'],
+  ['branch',      'Create branch',      'isolating the work in a fresh git worktree'],
+  ['research',    'Research',           'scanning the codebase + web for relevant context'],
+  ['plan',        'Generate plan',      'deciding which files to change and how'],
+  ['patch',       'Generate patch',     'writing the code diff'],
+  ['apply',       'Apply changes',      'applying the diff to the worktree'],
+  ['tests',       'Run tests',          'verifying the change against the planned tests'],
+  ['commit',      'Commit',             'committing the verified change'],
+  ['push',        'Push',               'pushing the branch to GitHub'],
+  ['pr',          'Open PR',            'opening a draft pull request'],
+  ['convergence', 'Convergence record', 'recording the hypothesis + evidence + confidence'],
+  ['record',      'Log record',         'appending the run to the convergence log'],
 ];
+
+// Inject the autowork panel styles once: compact rows (white-space:normal kills the
+// chat bubble's pre-wrap that was blowing each step up to ~130px tall), the mandala
+// spinner for the active step, and a responsive layout that drops descriptions on
+// narrow screens.
+function ensureAutoworkStyles() {
+  if (document.getElementById('aw-styles')) return;
+  const st = document.createElement('style');
+  st.id = 'aw-styles';
+  st.textContent = [
+    '.aw-panel{white-space:normal;font-size:13px}',
+    '.aw-activity{display:flex;align-items:center;gap:9px;padding:8px 10px;margin-bottom:8px;border:1px solid var(--border,#222);border-radius:10px;background:var(--surface2,rgba(127,127,127,.06))}',
+    '.aw-activity img{width:22px;height:22px;flex:none}',
+    '.aw-act-text{font-size:12.5px;line-height:1.35;min-width:0}',
+    '.aw-act-text b{font-weight:700}.aw-act-text span{opacity:.65}',
+    '.aw-spin{animation:aw-spin 2.4s linear infinite}',
+    '@keyframes aw-spin{to{transform:rotate(360deg)}}',
+    '.aw-steps{white-space:normal;display:flex;flex-direction:column;gap:1px}',
+    '.aw-step{display:flex;align-items:flex-start;gap:8px;padding:3px 4px;border-radius:6px;opacity:.45;transition:opacity .15s,background .15s}',
+    '.aw-step.is-active{opacity:1;background:var(--surface2,rgba(92,200,255,.08))}',
+    '.aw-step.is-done,.aw-step.is-error,.aw-step.is-retry{opacity:1}',
+    '.aw-ico{width:18px;height:18px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1}',
+    '.aw-ico img{width:16px;height:16px}',
+    '.aw-body{flex:1;min-width:0}',
+    '.aw-row1{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}',
+    '.aw-label{font-size:12.5px;font-weight:600}',
+    '.aw-desc{font-size:11.5px;opacity:.6}',
+    '.aw-extra{font-size:11px;opacity:.7;margin-left:auto;white-space:nowrap}',
+    '.aw-detail{font-size:11.5px;opacity:.85;line-height:1.4;margin-top:2px}',
+    '@media (max-width:520px){.aw-desc{display:none}.aw-extra{margin-left:0}}',
+  ].join('\n');
+  document.head.appendChild(st);
+}
 
 // `target` is either an issue number (number/numeric string — `!work #N`) or a
 // free-form task object `{ task: "fix the intent handler" }` from the chat
@@ -617,35 +667,54 @@ async function runAutowork(target, btn, base) {
   const row = document.createElement('div');
   row.className = 'msg-row agent';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  ensureAutoworkStyles();
   // The "File issue" step only applies to task mode; drop it for issue-number runs.
   const phases = taskMode ? AUTOWORK_PHASES : AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
-  const stepRowsHtml = phases.map(([k, label]) =>
-    `<div class="aw-step" data-phase="${k}" style="display:flex;align-items:center;gap:8px;padding:3px 0;opacity:0.4">
-       <span class="aw-icon" style="width:16px;text-align:center">○</span>
-       <span class="aw-label" style="font-size:12.5px">${label}</span>
-       <span class="aw-extra" style="font-size:11px;opacity:0.6;margin-left:auto"></span>
-     </div>`).join('');
+  const PHASE_INFO = Object.fromEntries(AUTOWORK_PHASES.map((p) => [p[0], { label: p[1], desc: p[2] }]));
+  const stepRowsHtml = phases.map(([k, label, desc]) =>
+    `<div class="aw-step" data-phase="${k}"><div class="aw-ico">○</div><div class="aw-body">`
+    + `<div class="aw-row1"><span class="aw-label">${esc(label)}</span><span class="aw-desc">${esc(desc)}</span><span class="aw-extra"></span></div>`
+    + `<div class="aw-detail" style="display:none"></div></div></div>`).join('');
+  // Activity line = a live, streamed-feel header: the mandala spins while a step runs
+  // and the text names what's happening right now (addresses "shows little/no info").
   row.innerHTML =
-    `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>
-     <div class="bubble" style="font-size:13px">
-       <div class="aw-steps">${stepRowsHtml}</div>
-       <div class="aw-diff" style="display:none;margin-top:8px"></div>
-       <div class="aw-final" style="margin-top:8px;font-weight:600"></div>
-     </div>`;
+    `<div class="msg-label">Keystone · Autowork ${esc(panelLabel)}</div>`
+    + `<div class="bubble aw-panel">`
+    + `<div class="aw-activity"><img src="/mandala.svg" class="aw-spin" alt=""><div class="aw-act-text"><b>Starting autowork…</b> <span>${esc(taskMode ? 'filing the task as an issue' : 'on issue ' + panelLabel)}</span></div></div>`
+    + `<div class="aw-steps">${stepRowsHtml}</div>`
+    + `<div class="aw-diff" style="display:none;margin-top:8px"></div>`
+    + `<div class="aw-final" style="margin-top:8px;font-weight:600"></div>`
+    + `</div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
 
-  const setStep = (phase, status, extra) => {
+  const actImg = row.querySelector('.aw-activity img');
+  const actText = row.querySelector('.aw-act-text');
+  const setActivity = (label, desc, spinning) => {
+    if (actText) actText.innerHTML = '<b>' + esc(label) + '</b>' + (desc ? ' <span>— ' + esc(desc) + '</span>' : '');
+    if (actImg) actImg.classList.toggle('aw-spin', spinning !== false);
+  };
+
+  const setStep = (phase, status, extra, detail) => {
     const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
     if (!el) return;
-    el.style.opacity = '1';
-    const icon = el.querySelector('.aw-icon');
-    const ex = el.querySelector('.aw-extra');
-    if (status === 'start')        { icon.textContent = '◐'; icon.style.color = 'var(--accent)'; }
-    else if (status === 'done')    { icon.textContent = '✓'; icon.style.color = '#4ade80'; }
-    else if (status === 'error')   { icon.textContent = '✗'; icon.style.color = '#f87171'; }
-    else if (status === 'skipped') { icon.textContent = '⊘'; icon.style.color = '#facc15'; }
-    if (extra) ex.textContent = extra;
+    el.classList.remove('is-active', 'is-done', 'is-error', 'is-retry');
+    const ico = el.querySelector('.aw-ico');
+    ico.style.color = '';
+    if (status === 'start')        { el.classList.add('is-active'); ico.innerHTML = '<img src="/mandala.svg" class="aw-spin" alt="">'; }
+    else if (status === 'done')    { el.classList.add('is-done');  ico.textContent = '✓'; ico.style.color = '#4ade80'; }
+    else if (status === 'error')   { el.classList.add('is-error'); ico.textContent = '✗'; ico.style.color = '#f87171'; }
+    else if (status === 'retry')   { el.classList.add('is-retry'); ico.textContent = '↻'; ico.style.color = '#facc15'; }
+    else if (status === 'skipped') { ico.textContent = '⊘'; ico.style.color = '#facc15'; el.style.opacity = '1'; }
+    if (extra) el.querySelector('.aw-extra').textContent = extra;
+    // Surface WHY a step retried/failed, in plain language, right under the row —
+    // so a failure is never an unexplained red ✗ (the transparency fix).
+    if (detail) {
+      const det = el.querySelector('.aw-detail');
+      det.textContent = detail;
+      det.style.display = 'block';
+      det.style.color = (status === 'error') ? '#f87171' : (status === 'retry') ? '#facc15' : '';
+    }
   };
 
   try {
@@ -660,17 +729,25 @@ async function runAutowork(target, btn, base) {
     const decoder = new TextDecoder();
     let buf = '';
     let finalDone = null;
+    let awRunId = null;   // captured from the 'run' event → lets us re-attach if the SSE drops
 
     const handleEvent = (evName, data) => {
       let d = {};
       try { d = JSON.parse(data); } catch { return; }
+      if (evName === 'run') { awRunId = d.runId; return; }
       if (evName === 'step') {
         let extra = '';
         if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
         else if (d.phase === 'research' && d.status === 'done') extra = `${d.filesFound || 0} files · ${d.webSourcesFound || 0} web`;
         else if (d.phase === 'create_issue' && d.status === 'done') extra = `#${d.issue}`;
         else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
-        setStep(d.phase, d.status, extra);
+        else if (d.status === 'retry') extra = `retry ${d.attempt || ''}`.trim();
+        setStep(d.phase, d.status, extra, d.detail);
+        // Keep the live activity header in sync with the current step.
+        const info = PHASE_INFO[d.phase] || { label: d.phase, desc: '' };
+        if (d.status === 'start')      setActivity(info.label + '…', info.desc, true);
+        else if (d.status === 'retry') setActivity(info.label + ' — retrying', d.detail || '', true);
+        else if (d.status === 'error') setActivity(info.label + ' failed', d.detail || '', false);
       } else if (evName === 'diff') {
         const diffEl = row.querySelector('.aw-diff');
         const files = (d.files || []).join(', ');
@@ -682,7 +759,10 @@ async function runAutowork(target, btn, base) {
       } else if (evName === 'error') {
         const fin = row.querySelector('.aw-final');
         fin.style.color = '#f87171';
-        fin.textContent = `✗ ${d.error || 'error'}`;
+        // Grounded failure (#1348): show the cause, with the raw provider/stage detail
+        // tucked into an expandable line so it's actionable but not noisy.
+        fin.innerHTML = `✗ ${esc(d.error || 'error')}`
+          + (d.detail ? `<details style="margin-top:4px"><summary style="cursor:pointer;opacity:.7;font-size:11px">detail</summary><pre style="white-space:pre-wrap;font-size:11px;opacity:.8;margin:4px 0">${esc(d.detail)}</pre></details>` : '');
       } else if (evName === 'done') {
         finalDone = d;
       }
@@ -712,6 +792,8 @@ async function runAutowork(target, btn, base) {
       fin.innerHTML = finalDone.prUrl
         ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
         : `✓ ${esc(finalDone.message || 'Done')}`;
+      setActivity('Complete', finalDone.prUrl ? 'opened a pull request' : 'autonomous work finished', false);
+      if (actImg) actImg.src = '/mandala.svg'; // steady (no spin)
     } else {
       btn.textContent = '✗ Failed';
       btn.style.color = '#f87171';
@@ -719,14 +801,63 @@ async function runAutowork(target, btn, base) {
         fin.style.color = '#f87171';
         fin.textContent = `✗ ${esc((finalDone && finalDone.message) || 'Auto-work failed')}`;
       }
+      setActivity('Stopped', (finalDone && finalDone.message) || 'see the failed step above', false);
     }
     if (typeof scrollToBottom === 'function') scrollToBottom();
   } catch (e) {
     btn.textContent = '✗ Error';
     btn.style.color = '#f87171';
+    // The SSE connection dropped mid-run (long plan/patch steps can outlast an idle
+    // proxy). Flip the still-spinning active step to an error glyph and stop the
+    // mandala — otherwise the panel spins forever with no explanation.
+    const activeStep = row.querySelector('.aw-step.is-active');
+    if (activeStep) {
+      activeStep.classList.remove('is-active');
+      activeStep.classList.add('is-error');
+      const ai = activeStep.querySelector('.aw-ico');
+      if (ai) { ai.textContent = '✗'; ai.style.color = '#f87171'; }
+    }
+    const isNet = /network|failed to fetch|load failed/i.test(e && e.message || '');
     const fin = row.querySelector('.aw-final');
+    // Recovery: the run keeps executing server-side after a disconnect. If we captured
+    // a runId, poll the status endpoint — the chat re-attaches to the finished run
+    // (incl. the PR url) instead of giving up on a "network error".
+    if (isNet && awRunId) {
+      setActivity('Reconnecting…', 'connection dropped — the run is still going on the server; waiting for it to finish', true);
+      fin.style.color = '';
+      fin.textContent = '';
+      let recovered = false;
+      for (let i = 0; i < 48; i++) {   // ~4 min at 5s
+        await new Promise(r => setTimeout(r, 5000));
+        let s = null;
+        try { s = await (await fetch(`${base}/api/convergence/autonomous-work/status?runId=${encodeURIComponent(awRunId)}`)).json(); } catch (_e) { continue; }
+        if (s && s.found && s.latestPhase) setActivity('Reconnecting…', `server is at: ${s.latestPhase} (${s.latestStatus || ''})`, true);
+        if (s && s.done) {
+          recovered = true;
+          if (s.succeeded && s.prUrl) {
+            setActivity('Complete', 'recovered after a dropped connection', false);
+            fin.style.color = '#4ade80';
+            fin.innerHTML = `✓ Auto-worked #${esc(s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : (issue || ''))} — <a href="${esc(s.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a> <span style="opacity:.6;font-size:11px">(reconnected)</span>`;
+          } else {
+            setActivity('Stopped', s.message || 'run ended', false);
+            fin.style.color = '#f87171';
+            fin.textContent = `✗ ${esc(s.message || ('run ended at ' + (s.latestPhase || 'an unknown step')))}`;
+          }
+          break;
+        }
+      }
+      if (!recovered) {
+        setActivity('Connection lost', 'could not confirm the result — check the issue on GitHub for a new PR', false);
+        fin.style.color = '#f87171';
+        fin.textContent = '✗ Lost connection mid-run and timed out waiting to reconnect. The run may still finish on the server — check the issue for a new PR.';
+      }
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+      return;
+    }
+    const msg = isNet ? 'Lost connection to the server mid-run (the run may still be finishing on the server — check the issue for a new PR).' : (e && e.message) || 'unknown error';
+    setActivity('Connection lost', msg, false);
     fin.style.color = '#f87171';
-    fin.textContent = `✗ Auto-work error: ${e.message}`;
+    fin.textContent = `✗ ${msg}`;
     if (typeof scrollToBottom === 'function') scrollToBottom();
   }
 }
@@ -745,17 +876,27 @@ function parseImageRequest(text) {
   return null;
 }
 
+// True when the user wants a REAL photo of a specific subject ("find/show me a photo
+// of X") rather than an AI illustration ("draw/paint X"). Drives whether we try a real
+// image search (Wikimedia Commons) before the generate chain (#1343). The "draw/paint/
+// sketch/generate/create/render" verbs mean generate and take priority if both appear.
+function imageWantsRealPhoto(text) {
+  if (/^[!/]image\b/i.test(text)) return false; // explicit command → generate
+  if (/\b(?:draw|paint|sketch|generate|create|render|illustrate)\b/i.test(text)) return false;
+  return /\b(?:find|show|get|give|search|look\s+up|fetch)\b[^.?!]*?\b(?:image|picture|photo|pic|photograph)\b/i.test(text);
+}
+
 // Render a generated image for `prompt`. Tries OpenAI (DALL·E / gpt-image-1) FIRST via the
 // server (the key stays server-side; the saved image serves from /images/… so it dodges local
 // TLS interception). On any failure — no key, billing limit, content refusal, timeout — it
 // falls back to a keyless text-to-image source (Pollinations) and then real photos (LoremFlickr),
 // loaded directly by the browser, so an image still appears.
-function renderWebImage(prompt) {
+function renderWebImage(prompt, wantRealPhoto) {
   const messages = document.getElementById('messages');
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const row = document.createElement('div');
   row.className = 'msg-row agent';
-  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Generating an image of <b>${esc(prompt)}</b>…</div>`;
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">${wantRealPhoto ? 'Searching for a photo of' : 'Generating an image of'} <b>${esc(prompt)}</b>…</div>`;
   messages.appendChild(row);
   if (typeof scrollToBottom === 'function') scrollToBottom();
   const bubble = row.querySelector('.bubble');
@@ -817,7 +958,28 @@ function renderWebImage(prompt) {
     })();
   }
 
+  // Real-photo intent (#1343): try a real image search (Wikimedia Commons, keyless) for
+  // a specific subject BEFORE generating. If it finds an actual photo, show that and stop;
+  // otherwise fall through to the generate chain so an image still appears.
+  if (wantRealPhoto) {
+    fetch('/api/image-search?q=' + encodeURIComponent(prompt))
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.url) {
+          show(d.url,
+            `Here's a real photo of <b>${esc(prompt)}</b> <span style="opacity:.55;font-size:11px">· found via ${esc(d.source || 'web search')}, not AI-generated</span>:`,
+            `found via ${d.source || 'web search'}`);
+        } else {
+          generateChain();
+        }
+      })
+      .catch(() => generateChain());
+    return;
+  }
+  generateChain();
+
   // OpenAI first (server-side). 80s budget; on timeout/failure, fall back to keyless.
+  function generateChain() {
   let done = false;
   const to = setTimeout(() => { if (!done) { done = true; keylessFallback(); } }, 80000);
   fetch('/api/image/ai-generate', {
@@ -831,6 +993,7 @@ function renderWebImage(prompt) {
       else keylessFallback();
     })
     .catch(() => { if (!done) { done = true; clearTimeout(to); keylessFallback(); } });
+  }
 }
 
 // Vision: send an uploaded image to a vision model (Claude / GPT-4o, server-side) and render
@@ -878,10 +1041,18 @@ function docFormatOf(noun) {
 }
 // One alternation of document nouns, ordered specific→general so the format is inferable.
 var DOC_NOUNS = 'docx|word\\s?document|word\\s?doc|word\\s?file|word(?!s)|xlsx|spread\\s?sheet|excel|workbook|pptx|power\\s?point|slide\\s?deck|slide\\s?show|slides?|deck|presentation|pdf|document|report|brief|memo|white\\s?paper|one[- ]?pager|write[- ]?up';
+// Coding-intent markers: if present, an incidental "pdf/report/document" mention is
+// part of a code task ("write a function that generates a pdf report") and must NOT
+// be hijacked into document generation (#1274).
+var CODING_INTENT_RE = /\b(function|method|class|code|script|program|module|library|package|api|endpoint|route|component|app(?:lication)?|repo(?:sitory)?|bug|refactor|debug|compile|unit test|test case|algorithm|variable|parameter|return|import|export|css|html|sql|query|regex|json|yaml)\b/i;
+
 function parseDocRequest(text) {
   const explicit = text.match(new RegExp('^[!/](' + DOC_NOUNS + '|doc)\\s+(.+)', 'i'));
   if (explicit) return { prompt: explicit[2].trim(), format: docFormatOf(explicit[1]) };
-  const nl = text.match(new RegExp('\\b(?:make|create|generate|write|draft|build|produce|prepare)\\b[^.?!]*?\\b(' + DOC_NOUNS + ')\\b\\s*(?:about|on|for|covering|titled|of|:)?\\s*(.+)', 'i'));
+  // A genuine document request leads with the verb (optionally behind a polite prefix),
+  // not buried mid-sentence, and doesn't read as a coding task.
+  if (CODING_INTENT_RE.test(text)) return null;
+  const nl = text.match(new RegExp('^(?:please\\s+|can\\s+you\\s+|could\\s+you\\s+|i\\s+(?:need|want)\\s+(?:you\\s+to\\s+|a\\s+)?)?(?:make|create|generate|write|draft|build|produce|prepare)\\b[^.?!]*?\\b(' + DOC_NOUNS + ')\\b\\s*(?:about|on|for|covering|titled|of|:)?\\s*(.+)', 'i'));
   if (nl && nl[2] && nl[2].trim().length >= 3) return { prompt: nl[2].trim().replace(/[.?!]+$/, ''), format: docFormatOf(nl[1]) };
   return null;
 }
@@ -1081,6 +1252,193 @@ function detectEmbedIntent(text) {
   return null;
 }
 
+// ── On-demand Explore embeds (summon games / radio / films into chat) ─────────
+// "play fallout radio", "play pac-man", "watch nosferatu" — summon any Explore
+// embed straight into the conversation as a sandboxed iframe, no LLM cost. Same
+// content source as the Explore feed (data/explore/embeds.json via
+// /api/explore/embeds) and the same allowlist + sandbox as explore.html's player,
+// so there's one catalog to maintain. Loop stage: Act (media/interaction is a
+// first-class cockpit capability). See keystone-radio-feature / explore-embed-feed.
+
+// An embed src may only be a root-relative path (our own /fallout-radio.html) or an
+// https archive.org / github.io / youtube / vimeo URL — parity with explore.html's
+// safeEmbedSrc. Anything else is never framed (defense vs a poisoned catalog row).
+const CHAT_EMBED_HOSTS = /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
+function safeEmbedSrc(u) {
+  const s = String(u || '');
+  return (/^\/[^/]/.test(s) || CHAT_EMBED_HOSTS.test(s)) ? s : '';
+}
+
+// Launch verbs that signal "open this thing now". A single embed token (e.g. "radio")
+// only summons when one of these is present; a multi-word name ("fallout radio") fires
+// on its own. Keeps "I love the radio" from blasting audio at you.
+const SUMMON_VERBS = /\b(play|summon|open|launch|start|run|boot|listen(?:\s+to)?|tune\s+(?:in|into|to)?|put\s+on|turn\s+on|fire\s+up|load|cue\s+up|watch)\b/i;
+
+// The flagship stays summonable even before /api/explore/embeds is deployed (a new
+// route 404s on a stale server). kind: listen|game|watch drives the verb + icon.
+const EMBED_SEED = [
+  {
+    slug: 'keystone-radio', title: 'Keystone Radio', kind: 'listen',
+    src: '/fallout-radio.html', height: 620, source: 'Keystone Radio',
+    url: '/fallout-radio.html',
+    lore: 'A retro Pip-Boy tuner spinning public-domain 1940s radio — the songs that play at the end of the world. Press play; tune the dial.',
+    aliases: ['fallout radio', 'keystone radio', 'pip-boy radio', 'radio'],
+  },
+];
+
+let _embedCatalog = null;    // hydrated [{slug,title,kind,src,height,_terms}]
+let _embedCatalogP = null;   // in-flight hydrate promise
+
+// Derive match phrases (≥2 words OK) + distinctive single tokens from an embed's
+// slug, title, src filename, and curated aliases. A multi-word phrase is specific
+// enough to fire on its own; a lone token needs a launch verb.
+function embedSummonTerms(e) {
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const srcBase = norm((String(e.src || '').split('/').pop() || '').replace(/\.[a-z0-9]+$/i, '')); // "/fallout-radio.html" → "fallout radio"
+  const phrases = new Set();
+  [norm(e.slug), norm(e.title), srcBase, ...(e.aliases || []).map(norm)].forEach(p => { if (p) phrases.add(p); });
+  // Years / platform tags pollute titles ("Prince of Persia (1990)", "...usa nes") — never match on those.
+  const STOP = new Set(['the','of','and','for','usa','japan','europe','rev','nes','snes','gb','gbc','n64','dos','msdos','arcade','game','play','listen','watch']);
+  const tokens = new Set();
+  // Drop real publish years (1900s–2019, which appear in titles like "(1990)") but
+  // keep names that just look year-ish, e.g. the game "2048".
+  phrases.forEach(p => p.split(' ').forEach(t => {
+    if (t.length >= 4 && !STOP.has(t) && !/^(19\d\d|20[01]\d)$/.test(t)) tokens.add(t);
+  }));
+  (e.aliases || []).forEach(a => { const n = norm(a); if (n && !n.includes(' ') && n.length >= 3) tokens.add(n); }); // short single-word aliases ("2048")
+  return { phrases: [...phrases].filter(p => p.length >= 3), tokens: [...tokens] };
+}
+
+// Pull the full catalog once (radio seed first so it always wins), enriching with
+// games/films from the server. Best-effort: offline → seed only, radio still works.
+function hydrateEmbedCatalog() {
+  if (_embedCatalog) return Promise.resolve(_embedCatalog);
+  if (_embedCatalogP) return _embedCatalogP;
+  _embedCatalogP = (async () => {
+    const list = EMBED_SEED.map(e => ({ ...e }));
+    try {
+      const r = await fetch(`${embedBase()}/api/explore/embeds`, { cache: 'no-store' });
+      if (r.ok) {
+        const d = await r.json();
+        for (const row of (Array.isArray(d.embeds) ? d.embeds : [])) {
+          const src = row && row.embed && row.embed.src;
+          const slug = row && (row.slug || String(row.id || '').replace(/^embed:/, ''));
+          if (!src || !slug || !safeEmbedSrc(src)) continue;
+          if (list.some(e => e.slug === slug)) continue;          // seed (flagship) wins
+          const topics = Array.isArray(row.topics) ? row.topics : [];
+          const kind = topics.includes('listen') ? 'listen'
+            : topics.some(t => t === 'watch' || t === 'film') ? 'watch' : 'game';
+          list.push({
+            slug, title: row.title || slug, kind, src,
+            height: Number(row.embed.height) || 360,
+            source: row.source || '', lore: row.lore || '', url: row.url || src, aliases: [],
+          });
+        }
+      }
+    } catch { /* offline → seed only */ }
+    _embedCatalog = list.map(e => ({ ...e, _terms: embedSummonTerms(e) }));
+    return _embedCatalog;
+  })();
+  return _embedCatalogP;
+}
+
+// Return the embed the user is asking to summon, or null. Synchronous against the
+// hydrated catalog (kicked off at load); falls back to the seed so the radio always
+// resolves even on the very first message.
+function detectEmbedSummon(text) {
+  const s = String(text || '').trim();
+  if (!s || s[0] === '!' || s[0] === '/') return null;            // "!"/"/" commands handled elsewhere
+  const flat = s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = ' ' + flat + ' ';
+  const hasVerb = SUMMON_VERBS.test(s);
+  const catalog = _embedCatalog || EMBED_SEED.map(e => ({ ...e, _terms: embedSummonTerms(e) }));
+  let best = null;
+  const consider = (embed, len) => { if (!best || len > best.len) best = { embed, len }; };
+  for (const e of catalog) {
+    const terms = e._terms || embedSummonTerms(e);
+    // (a) The whole message IS the name ("fallout radio", "pac man", "radio") → fire,
+    //     no verb needed. Exact match wins big so it beats any in-sentence token match.
+    for (const p of terms.phrases) { if (flat === p) consider(e, p.length + 1000); }
+    // (b) A launch verb + a name (phrase or distinctive token) anywhere in the message
+    //     ("play fallout radio", "put on the radio", "watch nosferatu"). Requiring the
+    //     verb keeps "tell me about pac-man" / "i love the radio" from summoning.
+    if (hasVerb) {
+      for (const p of terms.phrases) { if (p.includes(' ') && norm.includes(' ' + p + ' ')) consider(e, p.length); }
+      for (const t of terms.tokens) { if (norm.includes(' ' + t + ' ')) consider(e, t.length); }
+    }
+  }
+  return best ? best.embed : null;
+}
+
+// Single active summoned embed — tearing down the previous one means two radios
+// never play over each other when you summon again.
+let activeChatEmbed = null;
+
+// Frame an embed inline in the chat. Mirrors explore.html's player: safeEmbedSrc
+// allowlist, the same sandbox attrs, a stop (unloads → silences) + fullscreen.
+function renderChatEmbed(embed, userText) {
+  addUserBubble(userText);
+  persistToolTurn('operator', userText);
+  const messages = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  const src = safeEmbedSrc(embed.src);
+  if (!src) {
+    row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Couldn't summon <b>${embedEsc(embed.title)}</b> — that embed isn't framable.</div>`;
+    messages.appendChild(row);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    return;
+  }
+  if (activeChatEmbed && activeChatEmbed.stop) { try { activeChatEmbed.stop(); } catch {} activeChatEmbed = null; }
+  const icon = embed.kind === 'listen' ? '📻' : embed.kind === 'watch' ? '🎬' : '🕹️';
+  const verb = embed.kind === 'watch' ? 'Now showing' : 'Now playing';
+  const h = Math.max(160, Math.min(640, Number(embed.height) || 360));
+  row.innerHTML =
+    `<div class="msg-label">Keystone</div>` +
+    `<div class="bubble" style="font-size:13px">` +
+      `<div class="chat-embed" style="border:1px solid var(--border,#2a2a3a);border-radius:10px;overflow:hidden;max-width:480px">` +
+        `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(92,200,255,.10);color:var(--accent,#5cc8ff);font-weight:600;font-size:12.5px">` +
+          `<span aria-hidden="true">${icon}</span><span style="flex:1">${verb} — ${embedEsc(embed.title)}</span>` +
+          `<button type="button" class="ce-fs" title="Fullscreen" aria-label="Fullscreen" style="background:none;border:0;color:inherit;cursor:pointer;font-size:14px;line-height:1">⛶</button>` +
+          `<button type="button" class="ce-stop" title="Stop" aria-label="Stop" style="background:none;border:0;color:inherit;cursor:pointer;font-size:14px;line-height:1">✕</button>` +
+        `</div>` +
+        `<div class="ce-frame">` +
+          `<iframe src="${embedEsc(src)}" style="width:100%;height:${h}px;border:0;display:block" title="${embedEsc(embed.title)}" ` +
+            `allow="autoplay; fullscreen; gamepad" referrerpolicy="no-referrer" ` +
+            `sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>` +
+        `</div>` +
+        (embed.lore ? `<div style="padding:6px 10px;font-size:11px;opacity:0.6;border-top:1px solid var(--border,#2a2a3a)">${embedEsc(embed.lore)}</div>` : '') +
+      `</div>` +
+    `</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+
+  const frame = row.querySelector('.ce-frame');
+  const iframe = row.querySelector('iframe');
+  const stop = () => { if (frame) frame.innerHTML = `<div style="padding:16px 10px;font-size:12px;opacity:0.6">⏹ Stopped — summon it again to play.</div>`; };
+  activeChatEmbed = { iframe, stop };
+  const stopBtn = row.querySelector('.ce-stop');
+  if (stopBtn) stopBtn.addEventListener('click', () => { stop(); if (activeChatEmbed && activeChatEmbed.iframe === iframe) activeChatEmbed = null; });
+  const fsBtn = row.querySelector('.ce-fs');
+  if (fsBtn) fsBtn.addEventListener('click', () => {
+    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); return; }
+    const node = row.querySelector('.ce-frame iframe') || row.querySelector('.ce-frame');
+    const req = node && (node.requestFullscreen || node.webkitRequestFullscreen || node.msRequestFullscreen);
+    if (req) { try { req.call(node); } catch {} }
+  });
+  try { iframe.focus(); } catch {}
+
+  // Persist so a reload / session-switch restores the live embed (renderToolReplay 'embed').
+  persistToolTurn('lantern', `${verb} — ${embed.title}: ${embed.url || src}`, {
+    agent: 'Keystone', provider: 'explore-embed',
+    tool: { kind: 'embed', src, title: embed.title, height: h, embedKind: embed.kind, lore: embed.lore || '', url: embed.url || src },
+  });
+}
+
+// Warm the catalog at load so games/films resolve on the first message (the radio
+// resolves from the seed regardless).
+hydrateEmbedCatalog();
+
 // ── Main send ─────────────────────────────────────────────────────────────────
 async function sendMessage(opts = {}) {
   const input = document.getElementById('input');
@@ -1137,7 +1495,7 @@ async function sendMessage(opts = {}) {
     input.style.height = 'auto';
     addUserBubble(text);
     persistToolTurn('operator', text);
-    renderWebImage(imagePrompt);
+    renderWebImage(imagePrompt, imageWantsRealPhoto(text));
     return;
   }
 
@@ -1163,6 +1521,37 @@ async function sendMessage(opts = {}) {
     addUserBubble(text);
     persistToolTurn('operator', text);
     renderDocGen(docReq.prompt, docReq.format);
+    return;
+  }
+
+  // !radio summons Keystone Radio; !play <name> summons any Explore embed by name.
+  // (Slash forms /radio and /play work too — /radio normalizes via the command list.)
+  const summonCmd = text.match(/^[!/](radio|play)\b\s*(.*)$/i);
+  if (summonCmd) {
+    input.value = '';
+    input.style.height = 'auto';
+    const arg = summonCmd[2].trim();
+    const picked = arg ? detectEmbedSummon('play ' + arg)
+                       : (_embedCatalog || EMBED_SEED)[0];   // bare !radio/!play → flagship radio
+    if (picked) { renderChatEmbed(picked, text); return; }
+    addUserBubble(text);
+    const m = document.getElementById('messages');
+    const r = document.createElement('div');
+    r.className = 'msg-row agent';
+    r.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Couldn't find an embed called <b>${embedEsc(arg)}</b>. Try “play fallout radio”, or browse <a href="/explore.html" style="color:var(--accent)">Explore →</a>.</div>`;
+    m.appendChild(r);
+    if (typeof scrollToBottom === 'function') scrollToBottom();
+    return;
+  }
+
+  // Natural-language embed summon → frame a game / radio / film inline ("play fallout
+  // radio", "play pac-man", "watch nosferatu"). Deterministic, no LLM. Runs AFTER
+  // image/video/doc so a genuine "show me a video of X" still routes to YouTube.
+  const summonEmbed = detectEmbedSummon(text);
+  if (summonEmbed) {
+    input.value = '';
+    input.style.height = 'auto';
+    renderChatEmbed(summonEmbed, text);
     return;
   }
 

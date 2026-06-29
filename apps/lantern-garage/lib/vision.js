@@ -6,6 +6,8 @@
 // Pairs with the file-upload work tool: an image attachment routes here so the chat can SEE it.
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const GEMINI_MODEL = process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const DEFAULT_PROMPT = "Describe this image in detail. If it contains text, transcribe it. If it's a chart, screenshot, diagram, or error, explain what it shows.";
 
 // Accept a data: URL or raw base64 → { data, mediaType }.
@@ -63,6 +65,28 @@ async function _openaiVision(prompt, data, mediaType, apiKey, signal) {
   return String(text).trim();
 }
 
+async function _geminiVision(prompt, data, mediaType, apiKey, signal) {
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt || DEFAULT_PROMPT },
+          { inline_data: { mime_type: mediaType || "image/png", data } },
+        ],
+      }],
+    }),
+    signal,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((json && json.error && json.error.message) || `HTTP ${res.status}`);
+  const text = (json.candidates && json.candidates[0] && json.candidates[0].content
+    && json.candidates[0].content.parts || []).map((p) => p.text || "").join("").trim();
+  if (!text) throw new Error("empty vision response");
+  return text;
+}
+
 // analyzeImage(prompt, image) → { ok, text, model } | { ok:false, error }.
 async function analyzeImage(prompt, image, opts = {}) {
   const { data, mediaType } = _split(image);
@@ -70,10 +94,16 @@ async function analyzeImage(prompt, image, opts = {}) {
   const mt = opts.mimeType || mediaType || "image/png";
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (!anthropicKey && !openaiKey) return { ok: false, error: "no vision provider key configured" };
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!anthropicKey && !openaiKey && !geminiKey) return { ok: false, error: "no vision provider key configured" };
 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), opts.timeoutMs || 60000);
+  // Try each configured provider in turn; fall through to the next on failure so a
+  // single provider being down/over-quota (OpenAI billing was the #1484 blank-report
+  // cause) doesn't kill image analysis. Gemini is included because its key is the one
+  // reliably funded here — without it screenshot reports file with no description.
+  const errors = [];
   try {
     if (anthropicKey) {
       try {
@@ -81,14 +111,25 @@ async function analyzeImage(prompt, image, opts = {}) {
         return { ok: true, text, model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5" };
       } catch (e) {
         if (e.name === "AbortError") throw e;
-        console.warn(`[vision] claude failed (${e.message}); falling back to gpt-4o-mini`);
+        errors.push(`claude: ${e.message}`);
+        console.warn(`[vision] claude failed (${e.message}); trying next provider`);
       }
     }
     if (openaiKey) {
-      const text = await _openaiVision(prompt, data, mt, openaiKey, ctrl.signal);
-      return { ok: true, text, model: "gpt-4o-mini" };
+      try {
+        const text = await _openaiVision(prompt, data, mt, openaiKey, ctrl.signal);
+        return { ok: true, text, model: "gpt-4o-mini" };
+      } catch (e) {
+        if (e.name === "AbortError") throw e;
+        errors.push(`openai: ${e.message}`);
+        console.warn(`[vision] openai failed (${e.message}); trying gemini`);
+      }
     }
-    return { ok: false, error: "vision provider failed" };
+    if (geminiKey) {
+      const text = await _geminiVision(prompt, data, mt, geminiKey, ctrl.signal);
+      return { ok: true, text, model: GEMINI_MODEL };
+    }
+    return { ok: false, error: errors.length ? `all vision providers failed — ${errors.join("; ")}` : "vision provider failed" };
   } catch (e) {
     return { ok: false, error: e.name === "AbortError" ? "vision timed out" : (e.message || String(e)) };
   } finally {
