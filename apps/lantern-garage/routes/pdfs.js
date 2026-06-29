@@ -57,13 +57,27 @@ function loadArchiveIndex(repoRoot) {
 // Stream one PDF member out of the archive. Fixed argv (python + script + 2
 // positional args), shell:false — no shell, no injection surface. Returns a
 // Buffer or throws.
-function readPdfFromArchive(repoRoot, archiveAbs, member) {
-  const python = process.env.PYTHON_BIN || 'python';
+function readPdfFromArchive(repoRoot, archiveAbs, member, logError = true) {
+  const pythonCandidates = [
+    process.env.PYTHON_BIN,
+    'python3',
+    'python',
+  ].filter(Boolean); // Remove null/undefined
+
   const script = path.join(repoRoot, 'scripts', 'csf_read_member.py');
-  return execFileSync(python, [script, archiveAbs, member], {
-    maxBuffer: 128 * 1024 * 1024, // largest corpus PDF ~61 MB
-    windowsHide: true,
-  });
+
+  for (const python of pythonCandidates) {
+    try {
+      return execFileSync(python, [script, archiveAbs, member], {
+        maxBuffer: 128 * 1024 * 1024, // largest corpus PDF ~61 MB
+        windowsHide: true,
+      });
+    } catch (e) {
+      if (e.code === 'ENOENT' && logError) console.warn(`[PDF] Python interpreter '${python}' not found for csf_read_member.py. Trying next candidate.`);
+      else if (e.code !== 'ENOENT') throw e; // Re-throw other errors immediately
+    }
+  }
+  throw new Error(`Failed to execute csf_read_member.py: No suitable Python interpreter found among ${pythonCandidates.join(', ')}.`);
 }
 
 function loadPublicationDates(repoRoot) {
