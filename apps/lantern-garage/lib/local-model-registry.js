@@ -31,6 +31,12 @@
  *   taskTypes     string[] task intents this model is eligible to LEAD
  *   rank          number   default preference within a task (lower = earlier)
  *   capabilityScore number raw-task strength 0..1 (used when capability-first)
+ *   verified      bool     OPTIONAL. The capability above is REPRODUCED on our box
+ *                          (eval/probe log), not just vendor-claimed. Absent → treated
+ *                          as verified (back-compat). Explicit `false` = vendor/predicted
+ *                          only → the model is registered but CANNOT lead by capability
+ *                          over a reproduced peer (External Reality Rule). Flip to true
+ *                          only when a probe/eval log backs the number.
  *   note          string   human note
  *
  * Source of truth: built-in DEFAULTS below, overlaid (by id) with
@@ -47,6 +53,16 @@
  * is no longer the universal coding default. VRAM is auto-detected via nvidia-smi
  * (override: VRAM_BUDGET_GB; disable detection: VRAM_AUTODETECT=0; force
  * rank-order / Ouro-first: LOCAL_CAPABILITY_FIRST=0).
+ *
+ * Grounding gate (2026-06-29, best-in-slot rule): capability-first selection is
+ * EVIDENCE-GATED. A registered model whose capability is vendor-claimed / predicted
+ * but not yet reproduced on our hardware (`verified:false`) may sit in the chain but
+ * is sorted BEHIND every reproduced peer — it never auto-LEADS on a benchmark we
+ * haven't run (External Reality Rule). This is how new candidates (e.g.
+ * LoopCoder-v2, whose every number is predicted and whose PLT arch may not even load
+ * 4-bit — see experiments/loopcoder_v2_4bit_probe.py) enter without silently
+ * displacing a known-good lead. Override for the probe/eval run itself with
+ * LOCAL_ALLOW_UNVERIFIED=1.
  */
 
 const fs = require("fs");
@@ -110,6 +126,26 @@ const DEFAULTS = [
     rank: 0,
     capabilityScore: 0.92,        // SWE-bench Verified 77.2% — consumer-frontier local (2026)
     note: "Local FRONTIER coder (Qwen 3.6-27B dense). Leads only on a ≥24GB box. PENDING #1388: confirm exact served tag + measured VRAM.",
+  },
+  {
+    id: "loopcoder-v2",
+    endpoint: DEFAULT_ENDPOINT,
+    selfConverges: false,         // PLT loops internally for refinement (fixed 2-loop),
+                                  // but that is NOT a Q-exit convergence certificate →
+                                  // the Core still wraps it in loopedReason() (grounding
+                                  // by default). Only Ouro's learned Q-exit self-converges.
+    toolCalling: false,           // tool/function-calling not documented on the model card
+    vramGB: 6,                    // 7B PLT @ 4-bit — TARGETS the 8GB box; UNMEASURED (probe)
+    ctxTokens: 131072,            // max_position_embeddings 131072 (model card)
+    taskTypes: ["coding"],
+    rank: 2,
+    capabilityScore: 0.84,        // PREDICTED from vendor SWE-bench Verified 64.4 (two-loop);
+                                  // gated by verified:false until reproduced on-box.
+    verified: false,             // every number is vendor/predicted; custom IQuestPLTCoderForCausalLM
+                                  // arch may not load 4-bit. Run experiments/loopcoder_v2_4bit_probe.py
+                                  // (FIT/RUNS/SPEED → data/convergence/loopcoder-probe-log.jsonl),
+                                  // then flip true with the measured capabilityScore. Apache-2.0.
+    note: "Looped coder CANDIDATE (LoopCoder-v2, 7B PLT, arXiv 2606.18023). Evidence-gated: registered but cannot lead until the 4-bit box probe passes. See docs/research/2026-06-29-best-in-slot-local-coder.md.",
   },
   {
     id: "lantern-csf-dream",
@@ -233,6 +269,18 @@ function toolCalling(modelId) {
   return e ? !!e.toolCalling : false;
 }
 
+/** Is this entry's capability REPRODUCED on our box (not just vendor-claimed)?
+ *  Absent `verified` → true (back-compat); only an explicit `false` demotes. */
+function _isVerified(e) {
+  return !!e && e.verified !== false;
+}
+
+/** Public: has this model's capability been reproduced on-box? (id or entry) */
+function isVerified(modelId) {
+  const e = typeof modelId === "object" ? modelId : getEntry(modelId);
+  return _isVerified(e);
+}
+
 /**
  * Ordered list of local model ids eligible to LEAD this task, gated by VRAM.
  *
@@ -268,11 +316,19 @@ function selectChain(taskType = "default", opts = {}) {
       (e.taskTypes.includes(taskType) || (widenWithDefault && e.taskTypes.includes("default"))),
   );
 
-  eligible.sort((a, b) =>
-    capFirst
+  // Grounding gate: an unverified (vendor-claimed) model never leads over a
+  // reproduced peer, regardless of its predicted capabilityScore. LOCAL_ALLOW_UNVERIFIED=1
+  // lifts the gate (used by the probe/eval run that PRODUCES the evidence).
+  const allowUnverified = process.env.LOCAL_ALLOW_UNVERIFIED === "1";
+  eligible.sort((a, b) => {
+    if (!allowUnverified) {
+      const d = (_isVerified(a) ? 0 : 1) - (_isVerified(b) ? 0 : 1);
+      if (d) return d; // verified first
+    }
+    return capFirst
       ? (b.capabilityScore || 0) - (a.capabilityScore || 0) || (a.rank || 0) - (b.rank || 0)
-      : (a.rank || 0) - (b.rank || 0) || (b.capabilityScore || 0) - (a.capabilityScore || 0),
-  );
+      : (a.rank || 0) - (b.rank || 0) || (b.capabilityScore || 0) - (a.capabilityScore || 0);
+  });
 
   return eligible.map((e) => e.id);
 }
@@ -287,6 +343,7 @@ module.exports = {
   getEntry,
   selfConverges,
   toolCalling,
+  isVerified,
   selectChain,
   selectBest,
   _resetCache,

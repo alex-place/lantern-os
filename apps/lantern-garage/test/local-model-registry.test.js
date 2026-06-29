@@ -24,10 +24,12 @@ function freshEnv(fn) {
     VRAM_BUDGET_GB: process.env.VRAM_BUDGET_GB,
     LOCAL_CAPABILITY_FIRST: process.env.LOCAL_CAPABILITY_FIRST,
     VRAM_AUTODETECT: process.env.VRAM_AUTODETECT,
+    LOCAL_ALLOW_UNVERIFIED: process.env.LOCAL_ALLOW_UNVERIFIED,
   };
   try {
     delete process.env.VRAM_BUDGET_GB;
     delete process.env.LOCAL_CAPABILITY_FIRST;
+    delete process.env.LOCAL_ALLOW_UNVERIFIED;
     process.env.VRAM_AUTODETECT = "0";
     reg._resetCache();
     fn();
@@ -143,6 +145,42 @@ test("VRAM budget: env override wins; detection-off falls back to the 8GB box", 
     assert.equal(reg._vramBudgetGB(), 8, "no override + detection off → 8GB fallback");
     process.env.VRAM_BUDGET_GB = "24";
     assert.equal(reg._vramBudgetGB(), 24, "explicit env override always wins");
+  });
+});
+
+test("grounding gate: an unverified candidate (LoopCoder-v2) never auto-leads", () => {
+  freshEnv(() => {
+    // 8GB box, capability-first: LoopCoder-v2 (predicted 0.84) would out-score
+    // Qwen2.5-Coder (0.80) by raw capability, but it's verified:false → it must
+    // sort BEHIND every reproduced peer, so Qwen still leads.
+    const chain = reg.selectChain("coding");
+    assert.equal(chain[0], "qwen2.5-coder", "verified coder leads despite lower predicted score");
+    assert.ok(chain.includes("loopcoder-v2"), "the candidate is registered and eligible (fits 8GB)");
+    assert.ok(
+      chain.indexOf("qwen2.5-coder") < chain.indexOf("loopcoder-v2"),
+      "unverified candidate is demoted below the reproduced lead",
+    );
+    assert.equal(reg.isVerified("loopcoder-v2"), false, "LoopCoder-v2 is vendor-claimed, not reproduced");
+    assert.equal(reg.isVerified("qwen2.5-coder"), true, "absent `verified` → treated as verified");
+  });
+});
+
+test("LOCAL_ALLOW_UNVERIFIED=1 lifts the gate (the probe/eval run can lead it)", () => {
+  freshEnv(() => {
+    process.env.LOCAL_ALLOW_UNVERIFIED = "1";
+    reg._resetCache();
+    // Gate lifted → pure capability order; LoopCoder's predicted 0.84 now leads the 8GB box.
+    assert.equal(reg.selectBest("coding"), "loopcoder-v2", "unverified candidate leads only when explicitly allowed");
+  });
+});
+
+test("LoopCoder-v2 contract: looped-but-wrapped, no tools, fits the 8GB box", () => {
+  freshEnv(() => {
+    assert.equal(reg.selfConverges("loopcoder-v2"), false, "fixed 2-loop PLT is not a Q-exit certificate → Core wraps it");
+    assert.equal(reg.toolCalling("loopcoder-v2"), false, "tool-calling undocumented → false");
+    const e = reg.getEntry("loopcoder-v2");
+    assert.ok(e && e.vramGB <= 8, "7B @ 4-bit targets the 8GB box");
+    assert.ok(e.taskTypes.includes("coding") && !e.taskTypes.includes("kernel"), "coder, not a kernel model");
   });
 });
 
