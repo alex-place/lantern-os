@@ -21,6 +21,7 @@ const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
+const { councilReview } = require("./council-review");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
@@ -260,15 +261,11 @@ async function handleStreamChat(req, url, res) {
       }
       swarmMessage = parts.join(" ") || "Hello swarm";
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "X-Accel-Buffering": "no",
-      });
-      const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
-      const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
+      // Use the shared SSE helpers so the product chat (which reads {type:"token",
+      // text:…}) actually renders these. The old raw {token} format was dropped.
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
 
       sendToken(`Keystone routing…\n\n`);
       const agent = selectAgent(swarmMessage);
@@ -278,17 +275,53 @@ async function handleStreamChat(req, url, res) {
         .then((result) => {
           const words = result.text.split(" ");
           for (const word of words) sendToken(word + " ");
+          const council = result.council || null;
+          if (council && Array.isArray(council.dissent) && council.dissent.length) {
+            sendToken(`\n\n**Where the council disagreed (${council.dissent.length}):**\n`);
+            for (const d of council.dissent) sendToken(`- ${d}\n`);
+          }
           const meta = { agent: "Keystone", provider: result.provider, online: true, swarm: { provider: result.provider, model: result.model, mode, job } };
           if (result.consensus) meta.swarm.consensus = result.consensus;
-          if (result.council) meta.swarm.council = result.council;
+          if (council) meta.swarm.council = council;
           sendDone("keystone", meta);
-          res.end();
         })
         .catch((err) => {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
-          res.end();
         });
+      return;
+    }
+
+    // Grounded self-assessment: !report-card produces an honest letter-grade
+    // scorecard of Keystone OS. Evidence is gathered deterministically (git, real
+    // counts, eval numbers, boot probe) so the model can only SYNTHESIZE grades
+    // from real measurements — it can't invent a receipt. Strengthens Verify.
+    if (cmd.name === "report-card" || cmd.name === "report_card" || cmd.name === "reportcard") {
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+
+      sendToken(`📋 Gathering grounded evidence…\n\n`);
+      try {
+        const { gatherEvidence, formatEvidenceForPrompt, REPORT_CARD_SYSTEM_PROMPT } = require("./report-card");
+        const { callLlm } = require("./self-edit-engine");
+        const evidence = gatherEvidence(repoRoot);
+        const userMsg = `${formatEvidenceForPrompt(evidence)}\n\nProduce the report card now, grading only from the evidence above.`;
+        // Synthesize via callLlm's auto cascade (Vertex leads — the funded path; #1285),
+        // not swarmOrchestrate, whose direct API-key providers are credit-starved here.
+        const text = await callLlm(REPORT_CARD_SYSTEM_PROMPT, userMsg, requestedProvider || "auto", 4096);
+        if (!text || !text.trim()) {
+          sendToken(`Could not generate a report card — no provider returned a result.\n`);
+          sendDone("failed", { agent: "ReportCard", error: "empty_result" });
+        } else {
+          for (const word of text.split(" ")) sendToken(word + " ");
+          sendDone("report_card", { agent: "ReportCard", online: true });
+        }
+      } catch (e) {
+        sendToken(`Report card failed: ${e.message}\n`);
+        sendDone("failed", { agent: "ReportCard", error: e.message });
+      }
+      res.end();
       return;
     }
 
@@ -538,6 +571,7 @@ async function handleStreamChat(req, url, res) {
           if (cm) conf = Math.max(0, Math.min(1, parseFloat(cm[1])));
           const answer = String(result.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(result.text);
           const members = (result.council && result.council.members) || [];
+          const dissent = (result.council && result.council.dissent) || [];
           let recordId = null;
           try {
             const rec = await emitConvergenceRecord({
@@ -547,18 +581,22 @@ async function handleStreamChat(req, url, res) {
               evidence_ids: members.map((m) => m.provider),
               reasoner: "convergance-council",
               verified: true,
-              verification_notes: `Σ₀ council convergence over ${members.length} provider(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}`,
+              verification_notes: `Σ₀ council convergence over ${members.length} member(s) [${members.map((m) => `${m.role}:${m.provider}`).join(", ")}]; synthesizer=${result.provider}/${result.model}` + (dissent.length ? `; dissent: ${dissent.join(" | ")}` : "; dissent: none"),
               source: `council/${result.provider}/${result.model}`,
             });
             recordId = rec && rec.id;
           } catch (_e) { /* record emit is best-effort */ }
           for (const w of answer.split(" ")) sendToken(w + " ");
+          if (dissent.length) {
+            sendToken(`\n\n**Where the council disagreed (${dissent.length}):**\n`);
+            for (const d of dissent) sendToken(`- ${d}\n`);
+          }
           sendDone("keystone", {
             agent: "Keystone",
             provider: result.provider,
             online: true,
             routeLabel: "Convergence · Σ₀ council",
-            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), recordId },
+            convergence: { confidence: conf, synthesizer: `${result.provider}/${result.model}`, providers: members.map((m) => ({ role: m.role, provider: m.provider })), dissent, recordId },
           });
           return;
         } catch (err) {
@@ -1090,6 +1128,18 @@ async function handleStreamChat(req, url, res) {
           context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
         });
         Object.assign(signature, signaturePatch);
+        // Σ₀ council: fold both canary axes (+ any reason-face dissent) into one Δ and the
+        // 4-way answerability gate (grounded/seam_open/pin/refuted), log a council record so
+        // the operator-escalation backtest accrues data, and stamp the verdict for the UI.
+        // Passive — never mutates the reply.
+        try {
+          const c = councilReview(fullReply, {
+            groundingContext,
+            dissent: Array.isArray(signature.dissent) ? signature.dissent : [],
+            context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
+          });
+          signature.council = { verdict: c.verdict, delta: c.delta, recommend: c.recommend, groundedBy: c.groundedBy };
+        } catch { /* council must never break a reply */ }
         if (collapse.collapsed) {
           console.warn(
             `[canary_collapse] proximity=${collapse.proximity} action=${signaturePatch.canary.action} ` +
@@ -1549,7 +1599,13 @@ async function handleStreamChat(req, url, res) {
   // Live/stateful queries must NOT be answered from a static doc — they need the
   // LLM with live project context (GitHub/MCP). Only static knowledge short-circuits.
   const wantsLiveData = /\b(current|currently|now|today|latest|recent|open (issues?|prs?|pull)|status|right now|this (week|sprint)|what'?s? (open|happening|next))\b/i.test(message);
+  // Greetings / social chitchat must NOT short-circuit to a doc section — "hello"
+  // or "who are you" scored a spurious near-hit against an arbitrary doc (e.g.
+  // CLAUDE.md#Node.js) and rendered that section's raw text (an empty ```bash
+  // fence) instead of an actual reply. These belong to the model, not the KB.
+  const isGreetingOrChitchat = /^\s*(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening)|how (are|r) (you|u)|who are you|what'?s up|thanks?|thank you|ok(ay)?|cool|nice|lol)\b[\s!.?,]*$/i.test(message.trim());
   if (kbAnswer && kbAnswer.hit && !isKeystoneDebug && !isRpMode && !requestedProvider && !wantsLiveData
+      && !isGreetingOrChitchat
       && !routeDecision.requires_convergence
       && (kbAnswer.tier === "deterministic" || kbAnswer.score >= KB_ANSWER_MIN)) {
     const ans = `${kbAnswer.text}\n\n— from the Knowledge Center: ${kbAnswer.source}`;
@@ -1665,7 +1721,16 @@ async function handleStreamChat(req, url, res) {
           }, (upstream) => {
             if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`ollama_status_${upstream.statusCode}`)); return; }
             let buf = "";
+            // Mid-stream collapse guard (#1342): the local model can spiral into
+            // runaway word-salad repetition. The post-hoc canary only WARNS after the
+            // bad text already reached the user; here we score the reply as it grows
+            // and HARD-STOP the stream once degeneration is unambiguous (high threshold
+            // so healthy prose is never cut), appending an honest truncation notice.
+            const { scoreReplyCollapse } = require("./collapse-canary");
+            const COLLAPSE_BLOCK = parseFloat(process.env.COLLAPSE_BLOCK_PROXIMITY || "0.85");
+            let _lastCanaryLen = 0, _collapseTripped = false;
             upstream.on("data", (chunk) => {
+              if (_collapseTripped) return;
               buf += chunk.toString();
               const lines = buf.split("\n");
               buf = lines.pop();
@@ -1676,8 +1741,21 @@ async function handleStreamChat(req, url, res) {
                   if (parsed.message?.content) { fullReply += parsed.message.content; sendToken(parsed.message.content); }
                 } catch {}
               }
+              // Check on growth checkpoints once there's enough text to judge.
+              if (!_collapseTripped && fullReply.length >= 400 && fullReply.length - _lastCanaryLen >= 240) {
+                _lastCanaryLen = fullReply.length;
+                const sc = scoreReplyCollapse(fullReply, { threshold: COLLAPSE_BLOCK });
+                if (sc.collapsed) {
+                  _collapseTripped = true;
+                  console.warn(`[canary_collapse_block] proximity=${sc.proximity} provider=ollama signals=${JSON.stringify(sc.signals)}`);
+                  sendToken("\n\n⚠️ _(stopped — the local model began repeating itself; reply truncated. Try rephrasing or switch to a cloud model.)_");
+                  try { upstream.destroy(); } catch (_e) {}
+                  try { req2.destroy(); } catch (_e) {}
+                  resolve();
+                }
+              }
             });
-            upstream.on("end", () => resolve());
+            upstream.on("end", () => { if (!_collapseTripped) resolve(); });
             upstream.on("error", reject);
           });
           req2.on("error", reject);
@@ -1847,7 +1925,7 @@ async function handleStreamChat(req, url, res) {
         const tools = toolRunner.geminiTools({ operator });
         if (tools[0] && tools[0].functionDeclarations.length) {
           const geminiModelName = modelFor("gemini");
-          const generationConfig = { maxOutputTokens: isRpMode ? 2048 : 4096, temperature: isRpMode ? 0.88 : 0.7 }; // #1210: room for multi-call tool reasoning + answer
+          const generationConfig = { maxOutputTokens: isRpMode ? 2048 : 4096, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } }; // #1210 room for tools + answer; thinkingBudget:0 stops 2.5-flash buffering a long silent thinking phase that starves the SSE reader (vertex_empty_response)
           const contents = [
             ...compacted.map((h) => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.text }] })),
             { role: "user", parts: [{ text: message }] },
@@ -1919,7 +1997,7 @@ async function handleStreamChat(req, url, res) {
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {
         contents: [{ role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] }],
-        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7 },
+        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } },
       };
       if (groundingEnabled) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];
