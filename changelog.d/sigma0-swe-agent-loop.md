@@ -1,0 +1,4 @@
+### Σ₀ SWE agent loop — propose → apply → test → retry (core)
+
+- New `scripts/swe_agent_loop.py`: the control loop that turns brittle single-shot SWE diffs (Qwen single-shot scored 0/3, applied-but-wrong) into execution-grounded self-correction — propose a patch, run the repo's real tests, and a failing test (`refuted`) feeds its output back into the next attempt. The council's `refuted→retry` (lib/council-review.js, lib/exec-verify.js) made into a loop.
+- Model call + repo apply/test are injected, so the loop logic is unit-tested offline (`--selftest`, 5/5: retry-until-pass, exhaust→refuted, unappliable→apply_failed, failure-fed-back, empty→no_patch). Live deps (`ollama_propose`, `git_apply_and_test`) are wired for the next step: per-instance orchestration inside the swebench WSL/Docker env.

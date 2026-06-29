@@ -18,26 +18,26 @@ jobs:
   validate-hff:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: lantern-os
 
       - name: Checkout HFF Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: human-flourishing-frameworks/human-flourishing-frameworks
           path: human-flourishing-frameworks
         continue-on-error: true
 
       - name: Checkout HFF Public Site
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: human-flourishing-frameworks/hff-public-site
           path: hff-public-site
         continue-on-error: true
 
       - name: Checkout Lantern Symbolic Sandbox
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: alex-place/lantern-symbolic-sandbox
           path: lantern-symbolic-sandbox
@@ -76,7 +76,7 @@ jobs:
           }
 
       - name: Upload Validation Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: oss-validation-results

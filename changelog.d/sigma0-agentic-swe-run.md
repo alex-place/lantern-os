@@ -1,0 +1,4 @@
+### Σ₀ live agentic SWE runner — propose → grade → retry on the real stack
+
+- New `scripts/swe_agentic_run.py`: drives `swe_agent_loop.run_agent_loop` against a real SWE-bench instance — host ollama proposes (oracle context, last failure fed back), the swebench grader runs that instance in WSL/Docker, and a failing apply/test feeds back into the next attempt. First live run (astropy-14365, 620s of real container builds): attempt 1 `apply_failed` → fed back → attempt 2 `applied` (`refuted`) — the loop self-corrected against real test output. 0/1 resolved (expected floor for a local 7B on a hard bug); the mechanism is proven end-to-end.
+- Gotcha baked in: swebench's `logs/` mkdir hits a Python 3.14 + `/mnt/c` (9p) `FileExistsError`, so the grade runs in WSL-native ext4 and copies the report + test-output back to `/mnt/c`.

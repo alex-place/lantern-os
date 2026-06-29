@@ -192,6 +192,18 @@ function _creatorCtx() {
   return { jobQueue, repoRoot };
 }
 
+// Thumbnails are served by routes/media at /media/<path>; renderMarkdown in the
+// chat (safeUrl allows site-absolute paths) renders `![alt](/media/…)` inline.
+// Return a markdown image for an entry that has a thumbnail, else null.
+function _thumbMarkdown(entry) {
+  const t = entry && entry.thumbnail;
+  if (!t) return null;
+  const rel = String(t).replace(/\\/g, "/"); // Windows store → URL separators
+  const url = rel.startsWith("/") ? rel : "/media/" + rel.replace(/^\/+/, "");
+  const alt = String(entry.title || "thumbnail").replace(/[\[\]]/g, "");
+  return `![${alt}](${encodeURI(url)})`;
+}
+
 const REGISTRY = {
   Read: {
     policy: "read", desc: "Read a file from the filesystem (repo-relative).",
@@ -676,18 +688,25 @@ const REGISTRY = {
 
   // ── Creator Suite: short-form video pipeline in chat (mirrors create.html) ──
   list_creator_projects: {
-    policy: "read", desc: "List the user's Creator video projects (id, title, status). Use to find an entryId for analyze_video.",
+    policy: "read", desc: "List the user's Creator video projects as a markdown gallery (title, status, thumbnail image, id). Relay the markdown to the user so the thumbnails render; use the `id` for analyze_video.",
     schema: { type: "object", properties: { limit: { type: "integer", description: "max projects (default 20)" } } },
     run(i) {
       const { repoRoot } = _creatorCtx();
       const entries = entryStore.listEntries(repoRoot) || [];
       const sorted = [...entries].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       const limit = Math.max(1, Math.min(50, parseInt(i.limit, 10) || 20));
-      const rows = sorted.slice(0, limit).map((e) => ({
-        id: e.id, title: e.title || "Untitled", status: e.status || "uploaded",
-        hasVideo: Boolean(e.filePath), createdAt: e.createdAt || null,
-      }));
-      return JSON.stringify({ count: rows.length, total: entries.length, projects: rows }, null, 2);
+      const shown = sorted.slice(0, limit);
+      if (!shown.length) return "No Creator projects yet. Upload a video on /create.html or pass a filePath to analyze_video to start one.";
+      // Markdown so the chat renders each thumbnail inline (renderMarkdown → <img>).
+      const blocks = shown.map((e, n) => {
+        const title = e.title || "Untitled";
+        const status = e.status || "uploaded";
+        const thumb = _thumbMarkdown(e);
+        return `${n + 1}. **${title}** — status: ${status} · \`${e.id}\`\n` +
+          (thumb ? thumb : "_(no thumbnail yet — run analyze_video)_");
+      });
+      const header = `Found ${shown.length}${entries.length > shown.length ? " of " + entries.length : ""} Creator project${shown.length === 1 ? "" : "s"} (most recent first):`;
+      return header + "\n\n" + blocks.join("\n\n");
     },
   },
 
@@ -737,10 +756,10 @@ const REGISTRY = {
   },
 
   creator_job_status: {
-    policy: "read", desc: "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + top score.",
+    policy: "read", desc: "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + the project thumbnail (markdown image — relay it so it renders inline).",
     schema: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
     run(i) {
-      const { jobQueue } = _creatorCtx();
+      const { jobQueue, repoRoot } = _creatorCtx();
       const job = jobQueue.getJob((i.jobId || "").trim());
       if (!job) return JSON.stringify({ error: `job not found: ${i.jobId}` });
       const ls = job.liveStats || {};
@@ -754,7 +773,13 @@ const REGISTRY = {
       if (job.status === "complete" && job.result && job.result.timeline) {
         const hl = job.result.timeline.highlights;
         out.highlights = Array.isArray(hl) ? hl.length : 0;
-        if (job.input && job.input.entryId) out.openProject = `/entry.html?id=${job.input.entryId}`;
+        if (job.input && job.input.entryId) {
+          out.openProject = `/entry.html?id=${job.input.entryId}`;
+          // Surface the (possibly render-derived) thumbnail so chat shows the result visually.
+          const entry = entryStore.getEntry(repoRoot, job.input.entryId);
+          const thumb = _thumbMarkdown(entry);
+          if (thumb) out.thumbnail = thumb;
+        }
       }
       return JSON.stringify(out, null, 2);
     },

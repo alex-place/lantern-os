@@ -492,6 +492,151 @@
       margin-top: 8px;
     }
 
+    /* ── Kingdome of Hearts image showcase panel ── */
+    .showcase {
+      position: relative;
+      margin: 0 auto 28px;
+      max-width: 1100px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .showcase-chrome {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(127,127,127,0.06), transparent);
+    }
+    .showcase-dots { display: inline-flex; gap: 5px; }
+    .showcase-dots i {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--border); display: inline-block;
+    }
+    .showcase-dots i:first-child { background: var(--accent); }
+    .showcase-titlebar {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .showcase-body { padding: 18px; }
+    .showcase-head { margin: 0 0 14px; }
+    .showcase-label {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 4px;
+    }
+    .showcase-head h2 { margin: 0 0 4px; font-size: 1.15rem; color: var(--text); }
+    .showcase-head p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+    }
+    .showcase-side { display: grid; gap: 12px; align-content: start; }
+    .showcase-tile {
+      position: relative; display: block; padding: 0; border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden; cursor: zoom-in; background: #0a0a12;
+      transition: border-color .15s ease, transform .15s ease;
+    }
+    .showcase-tile:hover, .showcase-tile:focus-visible {
+      border-color: var(--accent); transform: translateY(-2px);
+      outline: none;
+    }
+    .showcase-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .showcase-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .showcase-tile.feature img { aspect-ratio: 4 / 5; }
+    .showcase-tile.small img { aspect-ratio: 3 / 4; }
+    .showcase-cap {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 6px 10px; font-size: 0.72rem; color: #fff;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,0.72));
+    }
+    @media (max-width: 640px) {
+      .showcase-grid { grid-template-columns: 1fr; }
+    }
+    /* lightbox preview */
+    .lightbox {
+      position: fixed; inset: 0; z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.86); padding: 24px;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 92vw; max-height: 86vh; border-radius: 10px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    .lightbox-cap {
+      position: absolute; bottom: 18px; left: 0; right: 0; text-align: center;
+      color: #ddd; font-size: 0.85rem;
+    }
+    .lightbox-close {
+      position: absolute; top: 16px; right: 20px;
+      background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.25);
+      width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; cursor: pointer;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,0.2); }
+
+    /* ── Gage's showcase (BFDM series + pixel art) ── */
+    .gage-banner img {
+      width: 100%; display: block; border-radius: 8px;
+      border: 1px solid var(--border); background: #fff; margin-bottom: 6px;
+    }
+    .gage-credit { font-size: 0.8rem; color: var(--muted); margin: 0 0 16px; }
+    .gage-credit b { color: var(--accent); }
+    .gage-subhead {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--accent);
+      margin: 18px 0 10px; display: block;
+    }
+    .bfdm-grid {
+      display: grid; gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+    .bfdm-card {
+      border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+      background: #0a0a12;
+    }
+    .bfdm-card video {
+      width: 100%; display: block; aspect-ratio: 16 / 10;
+      object-fit: contain; background: #000;
+    }
+    .bfdm-card .bfdm-label {
+      padding: 7px 10px; font-size: 0.8rem; font-weight: 700; color: var(--text);
+    }
+    .sprite-gallery {
+      display: grid; gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+    .sprite-gallery .showcase-tile { cursor: zoom-in; background: #fff; }
+    .sprite-gallery .showcase-tile img {
+      width: 100%; aspect-ratio: 1 / 1; object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .sprite-gallery .showcase-tile.wide img { aspect-ratio: 16 / 9; image-rendering: auto; }
+    .lightbox img.pixelated { image-rendering: pixelated; }
+
+    /* ── Kingdome of Hearts / Three Doors gallery (manifest-driven) ── */
+    .koh-gallery {
+      display: grid; gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+    .koh-gallery .showcase-tile { cursor: zoom-in; background: #0a0a12; }
+    .koh-gallery .showcase-tile img {
+      width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block;
+    }
+    .koh-empty { color: var(--muted); font-size: 0.9rem; }
+    .koh-gallery-sm { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+    .koh-gallery .showcase-tile.untitled { outline: 1px dashed color-mix(in srgb, var(--muted) 50%, transparent); }
+    .koh-review { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+    .koh-review > summary {
+      cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.02em; padding: 4px 0;
+    }
+    .koh-review > summary:hover { color: var(--text); }
+    .koh-review #kohReviewCount { color: var(--accent); }
+
     .explore-info-box {
       max-width: 880px;
       margin: 0 auto;
@@ -880,6 +1025,128 @@
     <div class="feed-status" id="feedStatus" role="status" aria-live="polite">Loading your feed…</div>
     <div class="feed-stream" id="feedStream" role="feed" aria-busy="true" aria-label="Ranked content feed"></div>
 
+    <!-- ── Kingdome of Hearts image showcase ── -->
+    <section class="showcase" aria-labelledby="kohTitle">
+      <div class="showcase-chrome">
+        <span class="showcase-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="showcase-titlebar">♥ Kingdome of Hearts — gallery</span>
+      </div>
+      <div class="showcase-body">
+        <div class="showcase-head">
+          <span class="showcase-label">Showcase</span>
+          <h2 id="kohTitle">Kingdome of Hearts — Three Doors</h2>
+          <p>The infinitely replayable doors game. Every run, three doors open onto new worlds and new heroes. Click any card to preview it full-size.</p>
+        </div>
+        <p class="koh-empty" id="kohEmpty">Loading gallery…</p>
+        <span class="gage-subhead" id="kohDoorsHead" hidden>🚪 Doors</span>
+        <div class="koh-gallery" id="kohDoors"></div>
+        <span class="gage-subhead" id="kohHeroesHead" hidden>🦸 Heroes</span>
+        <div class="koh-gallery" id="kohHeroes"></div>
+        <span class="gage-subhead" id="kohWorldHead" hidden>🌌 World</span>
+        <div class="koh-gallery" id="kohWorld"></div>
+        <details class="koh-review" id="kohReviewWrap" hidden>
+          <summary><span id="kohReviewCount">0</span> images need a human title/category — click to review</summary>
+          <p class="koh-empty">These are auto-imported with no descriptive filename. Open any to preview; titling is a human pass.</p>
+          <div class="koh-gallery koh-gallery-sm" id="kohReview"></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- lightbox preview overlay for the showcase -->
+    <div class="lightbox" id="kohLightbox" role="dialog" aria-modal="true" aria-label="Image preview">
+      <button type="button" class="lightbox-close" id="kohClose" aria-label="Close preview">✕</button>
+      <img id="kohLightboxImg" src="" alt="">
+      <div class="lightbox-cap" id="kohLightboxCap"></div>
+    </div>
+
+    <!-- ── Pencil Guy's Showcase — by Gage ── -->
+    <section class="showcase" aria-labelledby="gageTitle">
+      <div class="showcase-chrome">
+        <span class="showcase-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="showcase-titlebar">✏️ Pencil Guy's Showcase — by Gage</span>
+      </div>
+      <div class="showcase-body">
+        <div class="gage-banner">
+          <img src="https://media.lantern-os.net/gage/banner.webp" alt="BFDM RE-MA+ banner artwork by Gage" decoding="async">
+        </div>
+        <div class="showcase-head">
+          <span class="showcase-label">Showcase</span>
+          <h2 id="gageTitle">Pencil Guy &amp; the BFDM series</h2>
+          <p class="gage-credit">Hand-drawn object-show episodes and original game sprites, all made by <b>Gage</b>.</p>
+        </div>
+
+        <span class="gage-subhead">📺 BFDM — watch the series</span>
+        <div class="bfdm-grid">
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster1.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/intro.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Intro</div>
+          </div>
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster1.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/ep1.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Episode 1</div>
+          </div>
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster2.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/ep2-part1.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Episode 2 — Part 1</div>
+          </div>
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster2.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/ep2-part2.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Episode 2 — Part 2</div>
+          </div>
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster3.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/ep3.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Episode 3</div>
+          </div>
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster4.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/ep4-part1.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Episode 4: The Multiverse — Part 1</div>
+          </div>
+          <div class="bfdm-card">
+            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster4.webp">
+              <source src="https://media.lantern-os.net/gage/bfdm/ep4-part2.mp4" type="video/mp4"></video>
+            <div class="bfdm-label">Episode 4: The Multiverse — Part 2</div>
+          </div>
+        </div>
+
+        <span class="gage-subhead">🎮 Title cards &amp; game art</span>
+        <div class="sprite-gallery">
+          <button type="button" class="showcase-tile wide" data-pixel="0"
+            data-full="https://media.lantern-os.net/gage/sprites/title-hearts-land.png" data-cap="Hearts Land — title card">
+            <img src="https://media.lantern-os.net/gage/sprites/title-hearts-land.png" alt="Hearts Land title card"></button>
+          <button type="button" class="showcase-tile wide" data-pixel="0"
+            data-full="https://media.lantern-os.net/gage/sprites/title-eraser-fall.png" data-cap="Eraser: Fall Time — title card">
+            <img src="https://media.lantern-os.net/gage/sprites/title-eraser-fall.png" alt="Eraser Fall Time title card"></button>
+          <button type="button" class="showcase-tile wide" data-pixel="0"
+            data-full="https://media.lantern-os.net/gage/sprites/title-eraser-snowday.png" data-cap="Eraser: Snow Day — title card">
+            <img src="https://media.lantern-os.net/gage/sprites/title-eraser-snowday.png" alt="Eraser Snow Day title card"></button>
+          <button type="button" class="showcase-tile" data-pixel="1"
+            data-full="https://media.lantern-os.net/gage/sprites/boss-eraser.png" data-cap="Eraser boss">
+            <img src="https://media.lantern-os.net/gage/sprites/boss-eraser.png" alt="Eraser boss sprite"></button>
+          <button type="button" class="showcase-tile" data-pixel="1"
+            data-full="https://media.lantern-os.net/gage/sprites/boss-highlighter.png" data-cap="Highlighter boss">
+            <img src="https://media.lantern-os.net/gage/sprites/boss-highlighter.png" alt="Highlighter boss sprite"></button>
+          <button type="button" class="showcase-tile" data-pixel="1"
+            data-full="https://media.lantern-os.net/gage/sprites/boss-marker.png" data-cap="Orange Pico marker boss">
+            <img src="https://media.lantern-os.net/gage/sprites/boss-marker.png" alt="Marker boss sprite"></button>
+          <button type="button" class="showcase-tile" data-pixel="1"
+            data-full="https://media.lantern-os.net/gage/sprites/eraser-rpg-ball.gif" data-cap="Eraser RPG ball (animated)">
+            <img src="https://media.lantern-os.net/gage/sprites/eraser-rpg-ball.gif" alt="Eraser RPG ball animation"></button>
+          <button type="button" class="showcase-tile" data-pixel="1"
+            data-full="https://media.lantern-os.net/gage/sprites/itch-insanity.png" data-cap="Itch Insanity">
+            <img src="https://media.lantern-os.net/gage/sprites/itch-insanity.png" alt="Itch Insanity art"></button>
+          <button type="button" class="showcase-tile" data-pixel="1"
+            data-full="https://media.lantern-os.net/gage/sprites/highlighter-cutscene.png" data-cap="Highlighter driver cutscene">
+            <img src="https://media.lantern-os.net/gage/sprites/highlighter-cutscene.png" alt="Highlighter cutscene art"></button>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Single slim quick-links row — the feed is the page; everything else
          is a text link, not an engagement-less panel (#1217 single-pane). ── -->
     <nav class="quick-links" aria-label="Jump to Keystone tools">
@@ -908,6 +1175,95 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle && window.toggleTheme) {
     themeToggle.addEventListener('click', toggleTheme);
+  }
+
+  /* Kingdome of Hearts / Three Doors gallery — rendered from a manifest so the
+     set can grow without touching markup. Each entry becomes a .showcase-tile
+     that the shared lightbox below picks up. */
+  (async () => {
+    const empty = document.getElementById('kohEmpty');
+    const grids = {
+      door: document.getElementById('kohDoors'),
+      hero: document.getElementById('kohHeroes'),
+      world: document.getElementById('kohWorld'),
+    };
+    const heads = {
+      door: document.getElementById('kohDoorsHead'),
+      hero: document.getElementById('kohHeroesHead'),
+      world: document.getElementById('kohWorldHead'),
+    };
+    const reviewWrap = document.getElementById('kohReviewWrap');
+    const reviewGrid = document.getElementById('kohReview');
+    const reviewCount = document.getElementById('kohReviewCount');
+    if (!grids.door) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let base = '/assets/content/koh/';           // overridden by manifest.base (→ R2)
+    const tile = (it) => {
+      const cap = it.title || '';                // review items have no title
+      return '<button type="button" class="showcase-tile' + (cap ? '' : ' untitled') + '"' +
+        ' data-full="' + esc(base + it.full) + '" data-cap="' + esc(cap || it.src) + '">' +
+        '<img src="' + esc(base + it.thumb) + '" alt="' + esc(cap || 'untitled artwork — needs review') + '" decoding="async">' +
+        (cap ? '<span class="showcase-cap">' + esc(cap) + '</span>' : '') +
+      '</button>';
+    };
+    try {
+      const r = await fetch('/assets/content/koh/manifest.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error('manifest ' + r.status);
+      const data = await r.json();
+      if (data && data.base) base = data.base;
+      const items = (data && data.items) || [];
+      for (const cat of ['door', 'hero', 'world']) {
+        const sel = items.filter((i) => i.status === 'auto' && i.cat === cat);
+        if (sel.length) {
+          grids[cat].innerHTML = sel.map(tile).join('');
+          heads[cat].hidden = false;
+        }
+      }
+      const review = items.filter((i) => i.status === 'review');
+      if (review.length) {
+        reviewGrid.innerHTML = review.map(tile).join('');
+        reviewCount.textContent = review.length;
+        reviewWrap.hidden = false;
+      }
+      if (empty) empty.hidden = true;
+    } catch (err) {
+      if (empty) { empty.hidden = false; empty.textContent = 'Could not load the gallery.'; }
+      console.warn('[koh] gallery load failed:', err);
+    }
+  })();
+
+  /* Shared image-preview lightbox — serves every .showcase-tile[data-full]
+     (Kingdome of Hearts cards + Gage's sprite gallery). */
+  const box = document.getElementById('kohLightbox');
+  const boxImg = document.getElementById('kohLightboxImg');
+  const boxCap = document.getElementById('kohLightboxCap');
+  const closeBtn = document.getElementById('kohClose');
+  let lastFocus = null;
+  if (box) {
+    const open = (tile) => {
+      lastFocus = tile;
+      boxImg.src = tile.getAttribute('data-full');
+      boxImg.alt = tile.getAttribute('data-cap') || '';
+      boxImg.classList.toggle('pixelated', tile.getAttribute('data-pixel') === '1');
+      boxCap.textContent = tile.getAttribute('data-cap') || '';
+      box.classList.add('open');
+      closeBtn.focus();
+    };
+    const close = () => {
+      box.classList.remove('open');
+      boxImg.src = '';
+      if (lastFocus) lastFocus.focus();
+    };
+    document.addEventListener('click', (e) => {
+      const tile = e.target.closest('.showcase-tile[data-full]');
+      if (tile) open(tile);
+    });
+    closeBtn.addEventListener('click', close);
+    box.addEventListener('click', (e) => { if (e.target === box) close(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && box.classList.contains('open')) close();
+    });
   }
 });
 

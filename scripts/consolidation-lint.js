@@ -17,7 +17,8 @@
  *                loose-root-file     un-allowlisted scratch at repo root     MED
  *   MODERNIZE    unsafe-exec         exec/spawn on interpolated input        HIGH
  *                legacy-var          `var` declarations (use const/let)      LOW
- *   CONSOLIDATE  forbidden-subsystem CLAUDE.md banned subsystem name (advice) INFO
+ *   CONSOLIDATE  duplicate-merger    2nd PR auto-merger (`gh pr merge`)      HIGH
+ *                forbidden-subsystem CLAUDE.md banned subsystem name (advice) INFO
  *
  * Modes:
  *   (default)   scan the whole tracked tree, print a report, exit 0.
@@ -101,6 +102,18 @@ const FORBIDDEN_SUBSYSTEM = [
   { re: /(^|\/)bci[-_]/i, why: 'BCI concept (out of scope)' },
 ];
 
+// MONO-MERGER RULE (anti-sprawl): the repo must have exactly ONE PR auto-merger.
+// Canonical = apps/lantern-garage/lib/pr-watcher.js (review + verdict gate +
+// protected-path gate + self-healing ignore-list). Any OTHER executable file that
+// lands PRs via `gh pr merge` is a competing merger — sprawl — and is flagged HIGH.
+// (Two mergers were consolidated into one on 2026-06-29; this rule keeps it that way.)
+const CANONICAL_MERGER = 'apps/lantern-garage/lib/pr-watcher.js';
+// Files allowed to mention `gh pr merge`: the canonical merger, and this linter
+// itself (it names the pattern in its own rule definition + report strings).
+const MERGER_EXEMPT = new Set([CANONICAL_MERGER, 'scripts/consolidation-lint.js']);
+const MERGE_CALL = /gh\s+pr\s+merge\b|["']pr["']\s*,\s*["']merge["']/;
+const MERGER_SCAN_EXT = new Set([...CODE_EXT, '.yml', '.yaml']); // code + CI workflows
+
 // ── gather the file universe ────────────────────────────────────────────────
 const tracked = sh('git ls-files').split('\n').filter(Boolean);
 let universe, reportSet;
@@ -139,6 +152,17 @@ for (const file of universe) {
 
   for (const f of FORBIDDEN_SUBSYSTEM) {
     if (f.re.test(file)) add('forbidden-subsystem', 'INFO', file, f.why);
+  }
+
+  // mono-merger: only the canonical merger may call `gh pr merge`
+  if (MERGER_SCAN_EXT.has(ext) && !MERGER_EXEMPT.has(file) &&
+      !TEST_FILE.test(file) && !VENDOR.test(file)) {
+    let src = '';
+    try { src = fs.readFileSync(abs, 'utf8'); } catch { src = ''; }
+    if (MERGE_CALL.test(src)) {
+      add('duplicate-merger', 'HIGH', file,
+          `auto-merges PRs via 'gh pr merge' — only ${CANONICAL_MERGER} may; consolidate (anti-sprawl)`);
+    }
   }
 
   // basename map for code consolidation candidates
@@ -241,7 +265,7 @@ function printReport(items, counts, scanned) {
     DEDUPLICATE: ['exact-duplicate', 'duplicate-basename'],
     SQUEEZE: ['stray-file', 'loose-root-file'],
     MODERNIZE: ['unsafe-exec', 'legacy-var'],
-    CONSOLIDATE: ['forbidden-subsystem'],
+    CONSOLIDATE: ['duplicate-merger', 'forbidden-subsystem'],
   };
   const mark = { HIGH: '✖', MEDIUM: '⚠', LOW: '·', INFO: 'ℹ' };
   console.log(`\n🔍 Consolidation Lint — squeeze & consolidate  (mode: ${STAGED ? 'staged' : 'full'})`);
@@ -287,5 +311,5 @@ Usage: node scripts/consolidation-lint.js [options]
 
 Rules: exact-duplicate, duplicate-basename (DEDUPLICATE) · stray-file,
 loose-root-file (SQUEEZE) · unsafe-exec, legacy-var (MODERNIZE) ·
-forbidden-subsystem (CONSOLIDATE).`);
+duplicate-merger, forbidden-subsystem (CONSOLIDATE).`);
 }

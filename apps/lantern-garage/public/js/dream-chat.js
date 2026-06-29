@@ -265,8 +265,13 @@
             `</details></div>`;
         }
         // #1270: a persisted tool turn (image / youtube / document) rebuilds its
-        // rich element from meta.tool; everything else replays as escaped text.
-        let bubbleHtml = escapeHtml(entry.text);
+        // rich element from meta.tool. Agent text replays through renderMarkdown
+        // (same renderer as the live SSE finalize) so markdown — bold, links,
+        // code, and /media thumbnails — survives reload instead of showing raw
+        // `![..](..)`. User text stays escaped (no markdown for user input).
+        let bubbleHtml = isUser
+          ? escapeHtml(entry.text)
+          : (typeof window.renderMarkdown === "function" ? window.renderMarkdown(entry.text) : escapeHtml(entry.text));
         if (!isUser && entry.meta && entry.meta.tool && typeof window.renderToolReplay === "function") {
           const rich = window.renderToolReplay(entry.meta.tool);
           if (rich) bubbleHtml = rich;

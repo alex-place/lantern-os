@@ -456,7 +456,7 @@
     },
     {
       "name": "list_creator_projects",
-      "description": "List the user's Creator video projects (id, title, status). Use to find an entryId for analyze_video.",
+      "description": "List the user's Creator video projects as a markdown gallery (title, status, thumbnail image, id). Relay the markdown to the user so the thumbnails render; use the `id` for analyze_video.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -508,7 +508,7 @@
     },
     {
       "name": "creator_job_status",
-      "description": "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + top score.",
+      "description": "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + the project thumbnail (markdown image — relay it so it renders inline).",
       "input_schema": {
         "type": "object",
         "properties": {
