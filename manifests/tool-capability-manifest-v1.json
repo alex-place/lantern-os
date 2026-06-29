@@ -453,6 +453,82 @@
       "execution_enabled": false,
       "execution_disabled_reason": "chat_tool_exec_disabled",
       "result_receipt_schema_version": 1
+    },
+    {
+      "name": "list_creator_projects",
+      "description": "List the user's Creator video projects (id, title, status). Use to find an entryId for analyze_video.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "max projects (default 20)"
+          }
+        }
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "analyze_video",
+      "description": "Start highlight analysis (motion/scene/audio) on a Creator project. Pass entryId of an existing project, OR filePath (repo-relative video) to create one. Returns a jobId — poll it with creator_job_status.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "description": "existing project id (from list_creator_projects)"
+          },
+          "filePath": {
+            "type": "string",
+            "description": "repo-relative path to an uploaded video; creates a new project"
+          },
+          "title": {
+            "type": "string",
+            "description": "title for a new project (optional)"
+          }
+        }
+      },
+      "policy": "action",
+      "operator_required": true,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "creator_job_status",
+      "description": "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + top score.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
     }
   ]
 }

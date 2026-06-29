@@ -30,7 +30,7 @@ async function main() {
   assert.strictEqual(direct.schema_version, 1);
   assert.deepStrictEqual(
     direct.tools.map((tool) => tool.name),
-    ["Read", "LS", "Glob", "Grep", "Bash", "PowerShell", "Write", "Edit", "web_search", "github_issue", "web_fetch", "workspace_write", "workspace_read", "workspace_list", "create_document", "local_eval_keystone_run"]
+    ["Read", "LS", "Glob", "Grep", "Bash", "PowerShell", "Write", "Edit", "web_search", "github_issue", "web_fetch", "workspace_write", "workspace_read", "workspace_list", "create_document", "local_eval_keystone_run", "list_creator_projects", "analyze_video", "creator_job_status"]
   );
   for (const tool of direct.tools) {
     assert.strictEqual(tool.surface_availability.dream_chat, true);

@@ -95,14 +95,9 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest tests -q --timeout=30 \
-            --ignore=tests/test_anti_entropy_memory.py \
-            --ignore=tests/test_audit_chain.py \
-            --ignore=tests/test_discord_bot.py \
-            --ignore=tests/test_discord_voice_gate.py \
-            --ignore=tests/test_convergence_io_engine.py \
-            --ignore=tests/test_p4_integration_full_loops.py \
-            --ignore=tests/test_three_doors_engine.py
+          # Full suite — no excludes (anti-entropy/audit-chain pass; discord suites
+          # self-skip via importorskip when their deps are absent).
+          python -m pytest tests -q --timeout=30
 
   workflow-shape:
     name: CI parallel shape guard

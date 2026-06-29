@@ -469,6 +469,21 @@ make check-node  # Node.js syntax
 make check-types # Python types (mypy)
 ```
 
+### Continuous Integration
+
+CI runs the **full** `pytest tests` suite with no `--ignore` excludes (the
+anti-entropy and audit-chain suites pass; the Discord suites self-skip via
+`importorskip` when their optional deps are absent). The canonical chat/MCP tool
+surface is locked by a contract test (`tests/test_mcp_tool_parity.py` +
+`tests/test_tool_capability_manifest.js`): the only source of truth is
+`apps/lantern-garage/lib/tool-runner.js`, and the committed fallback manifest is
+regenerated from it. After adding or removing a tool, regenerate the manifest so
+the contract tests stay green:
+
+```bash
+echo '' | node scripts/tool-runner-bridge.js generate-manifest
+```
+
 ### Convergence Validation
 
 ```bash
