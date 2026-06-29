@@ -1566,7 +1566,22 @@ async function handleStreamChat(req, url, res) {
   // Live/stateful queries must NOT be answered from a static doc — they need the
   // LLM with live project context (GitHub/MCP). Only static knowledge short-circuits.
   const wantsLiveData = /\b(current|currently|now|today|latest|recent|open (issues?|prs?|pull)|status|right now|this (week|sprint)|what'?s? (open|happening|next))\b/i.test(message);
+  // Greetings / social chitchat must NOT short-circuit to a doc section — "hello"
+  // or "who are you" scored a spurious near-hit against an arbitrary doc (e.g.
+  // CLAUDE.md#Node.js) and rendered that section's raw text (an empty ```bash
+  // fence) instead of an actual reply. These belong to the model, not the KB.
+  // Identity/social questions ("who are you", "how are you") are about the
+  // assistant itself, never a doc, so they match anywhere in a short message
+  // (covers "Hello, who are you?"); pure greetings/thanks only count when the
+  // whole short message is the pleasantry.
+  const _msgT = message.trim();
+  const _wordCount = _msgT.split(/\s+/).length;
+  const _isIdentityOrSocial = /\b(who (are|r) (you|u|ya)|what (are|r) (you|u)|how (are|r) (you|u|ya)|what'?s up)\b/i.test(_msgT);
+  const _isPureGreeting = /^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening)|thanks?|thank you|ty|np|ok(ay)?|cool|nice|lol)\b[\s!.?,]*$/i.test(_msgT)
+    || (/^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening))\b/i.test(_msgT) && _wordCount <= 6);
+  const isGreetingOrChitchat = _isIdentityOrSocial || _isPureGreeting;
   if (kbAnswer && kbAnswer.hit && !isKeystoneDebug && !isRpMode && !requestedProvider && !wantsLiveData
+      && !isGreetingOrChitchat
       && !routeDecision.requires_convergence
       && (kbAnswer.tier === "deterministic" || kbAnswer.score >= KB_ANSWER_MIN)) {
     const ans = `${kbAnswer.text}\n\n— from the Knowledge Center: ${kbAnswer.source}`;
