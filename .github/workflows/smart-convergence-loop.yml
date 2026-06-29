@@ -55,7 +55,7 @@ jobs:
             -OutputPath smart-convergence-loop-report.json
 
       - name: Upload convergence report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: smart-convergence-loop-report

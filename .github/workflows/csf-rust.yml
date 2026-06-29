@@ -59,7 +59,7 @@ jobs:
 
       - name: Upload binary artifact
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: csf-linux-x64
           path: src/csf_rust/target/release/csf
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload benchmark report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: criterion-report
           path: src/csf_rust/target/criterion/

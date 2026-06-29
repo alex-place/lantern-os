@@ -112,7 +112,7 @@ jobs:
             --ignore=tests/test_three_doors_engine.py
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: pytest-results
@@ -158,7 +158,7 @@ jobs:
           node tests/test_dream_journal_keystone.js
 
       - name: Upload Node test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: node-test-results
@@ -281,7 +281,7 @@ jobs:
         run: pip-audit --format=json --output=pip-audit-results.json || true
 
       - name: Upload security scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: security-scan-results
@@ -343,7 +343,7 @@ jobs:
         run: python src/convergence_io_engine.py loop > convergence-report.json
 
       - name: Upload convergence report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: convergence-report
           path: convergence-report.json
