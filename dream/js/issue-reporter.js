@@ -15,6 +15,108 @@
 
   var state = { dataUrl: null, blob: null, pasteBound: false, title: "", body: "", describing: false, repo: "" };
 
+  // ── DOM / console error capture ─────────────────────────────────────────────
+  // Buffer recent JS errors so the filed report includes them (url + dom errors).
+  // Listeners are installed as soon as this script loads; they cover interactive
+  // errors. Capped ring buffer so a noisy page can't bloat the payload.
+  var errorLog = [];
+  function pushError(kind, msg) {
+    try {
+      var line = "[" + new Date().toISOString().slice(11, 19) + "] " + kind + ": " + String(msg).slice(0, 500);
+      if (errorLog[errorLog.length - 1] !== line) errorLog.push(line); // de-dupe consecutive
+      if (errorLog.length > 25) errorLog.shift();
+    } catch (e) { /* ignore */ }
+  }
+  window.addEventListener("error", function (e) {
+    if (e && e.message) pushError("error", e.message + (e.filename ? " @ " + e.filename + ":" + e.lineno + ":" + e.colno : ""));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    var r = e && e.reason;
+    pushError("unhandledrejection", (r && (r.stack || r.message)) || String(r || "unhandled rejection"));
+  });
+  (function () {
+    var _ce = window.console && console.error;
+    if (typeof _ce === "function") {
+      console.error = function () {
+        try { pushError("console.error", Array.prototype.map.call(arguments, function (a) { return (a && a.stack) || String(a); }).join(" ")); } catch (e) {}
+        return _ce.apply(console, arguments);
+      };
+    }
+  })();
+
+  // Page URL + captured DOM/console errors, appended to every report so they're
+  // visible in the filed issue body (not just in meta).
+  function buildEnvSection() {
+    var lines = ["", "---", "", "**Page:** " + (location.href || "(unknown)"),
+      "**Viewport:** " + window.innerWidth + "×" + window.innerHeight,
+      "**User agent:** " + navigator.userAgent];
+    if (errorLog.length) {
+      lines.push("", "**Console / DOM errors captured (" + errorLog.length + "):**", "```");
+      lines.push.apply(lines, errorLog);
+      lines.push("```");
+    } else {
+      lines.push("", "_No console/DOM errors captured this session._");
+    }
+    return lines.join("\n");
+  }
+
+  // ── Self-contained modal ────────────────────────────────────────────────────
+  // The modal markup ships in dream-chat.html; on pages that don't include it (e.g.
+  // the home page) inject it + its styles once so the 📷 button works anywhere.
+  var MODAL_CSS =
+    ".modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;z-index:1000;opacity:0;pointer-events:none;transition:opacity .2s}" +
+    ".modal-overlay.open{opacity:1;pointer-events:auto}" +
+    ".modal-content{width:100%;max-width:600px;background:var(--surface,#11161d);border-radius:16px 16px 0 0;max-height:80vh;overflow-y:auto;margin:0 auto;transform:translateY(100%);transition:transform .3s ease}" +
+    ".modal-overlay.open .modal-content{transform:translateY(0)}" +
+    ".modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px;border-bottom:1px solid var(--border,#2a323d);position:sticky;top:0;background:var(--surface,#11161d)}" +
+    ".modal-header h2{font-size:18px;font-weight:600}" +
+    ".modal-close{width:32px;height:32px;border-radius:6px;border:none;background:transparent;color:var(--muted,#8a94a3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;transition:all .2s}" +
+    ".modal-close:hover{background:var(--surface2,#1a212b);color:var(--text,#e6edf3)}" +
+    ".modal-body{padding:20px;display:flex;flex-direction:column;gap:16px}" +
+    ".form-group{display:flex;flex-direction:column;gap:6px}" +
+    ".form-label{font-size:13px;font-weight:500;color:var(--muted,#8a94a3);text-transform:uppercase;letter-spacing:.5px}" +
+    ".form-input{background:var(--surface2,#1a212b);border:1px solid var(--border,#2a323d);border-radius:8px;padding:10px 12px;color:var(--text,#e6edf3);font-family:inherit;font-size:14px;outline:none;transition:all .2s}" +
+    ".form-input:focus{border-color:var(--accent,#06b6d4)}";
+
+  var MODAL_HTML =
+    '<div class="modal-overlay" id="issue-modal" role="dialog" aria-modal="true" aria-labelledby="issue-title" onclick="if(event.target===event.currentTarget) window.issueReporter.close()">' +
+      '<div class="modal-content"><div class="modal-header"><h2 id="issue-title">📷 Report an issue</h2>' +
+        '<button class="modal-close" aria-label="Close" onclick="window.issueReporter.close()">×</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="form-group"><label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone writes the report from this</span></label>' +
+          '<div id="issue-dropzone" tabindex="0" style="border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2)">' +
+            '<img id="issue-shot-preview" alt="Screenshot preview" style="display:none;width:100%;border-radius:8px;max-height:38vh;object-fit:contain">' +
+            '<div id="issue-dropzone-empty"><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">' +
+              '<button type="button" id="issue-capture-btn" class="form-input" style="width:auto;cursor:pointer;background:var(--surface)" onclick="event.stopPropagation();window.issueReporter.retake()">📷 Capture this page</button>' +
+              '<button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface)" onclick="event.stopPropagation();window.issueReporter.pickFile()">⬆ Upload image</button></div>' +
+              '<div style="font-size:12px;color:var(--muted)">the page is captured automatically — or press <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> then <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste a region</div></div></div>' +
+          '<div id="issue-shot-clear" style="display:none;text-align:right;margin-top:6px">' +
+            '<button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:4px 10px" onclick="window.issueReporter.retake()">↻ Retake</button>' +
+            '<button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:4px 10px;margin-left:6px" onclick="window.issueReporter.clearShot()">✕ Remove</button></div>' +
+          '<input type="file" id="issue-file-input" accept="image/*" style="display:none"></div>' +
+        '<div class="form-group" id="issue-summary-group" style="display:none"><label class="form-label">Keystone\'s report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>' +
+          '<div id="issue-summary" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface2)">' +
+            '<div id="issue-summary-title" style="font-weight:600;font-size:14px;color:var(--text)"></div>' +
+            '<div id="issue-summary-body" style="color:var(--muted);font-size:13px;margin-top:6px;white-space:pre-wrap;line-height:1.5"></div></div></div>' +
+        '<div id="issue-status" style="font-size:13px;color:var(--muted);min-height:18px" aria-live="polite"></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button class="form-input" style="width:auto;cursor:pointer;background:var(--surface2)" onclick="window.issueReporter.close()">Cancel</button>' +
+          '<button id="issue-submit-btn" class="form-input" style="width:auto;cursor:pointer;background:var(--accent,#06b6d4);color:#04121a;font-weight:600;opacity:.5" onclick="window.issueReporter.submit()" disabled>File issue</button>' +
+        '</div></div></div></div>';
+
+  function ensureModal() {
+    if (document.getElementById("issue-modal")) return;
+    if (!document.getElementById("issue-reporter-styles")) {
+      var st = document.createElement("style");
+      st.id = "issue-reporter-styles";
+      st.textContent = MODAL_CSS;
+      document.head.appendChild(st);
+    }
+    var wrap = document.createElement("div");
+    wrap.innerHTML = MODAL_HTML;
+    while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+  }
+
   function $(id) { return document.getElementById(id); }
   function setStatus(msg, isErr) {
     var el = $("issue-status");
@@ -168,6 +270,58 @@
   }
 
   // ── Auto-capture the current page (no picker, no permission) ────────────────
+  // html2canvas 1.4.1 (the latest release) can't parse modern CSS color syntax:
+  // `color-mix()` and the `color(srgb …)` serialization Chrome emits for it throw
+  // "unsupported color function". The home page leans on color-mix() heavily, so
+  // capture would fail outright. We resolve those tokens to rgba() in the cloned
+  // DOM (see onclone below) before html2canvas ever reads them.
+  function colorSrgbToRgba(token) {
+    // token: "color(srgb 0.1 0.2 0.3 / 0.5)" — only the srgb form Chrome emits here.
+    var inner = token.slice(token.indexOf("srgb") + 4, token.lastIndexOf(")")).trim();
+    var parts = inner.split("/");
+    var rgb = parts[0].trim().split(/\s+/).map(Number);
+    var a = parts[1] !== undefined ? parseFloat(parts[1]) : 1;
+    var to255 = function (n) { return Math.max(0, Math.min(255, Math.round((n || 0) * 255))); };
+    return "rgba(" + to255(rgb[0]) + "," + to255(rgb[1]) + "," + to255(rgb[2]) + "," + (isNaN(a) ? 1 : a) + ")";
+  }
+  function resolveMix(token) {
+    // Let the live browser resolve color-mix() to a concrete rgb via a throwaway node.
+    try {
+      var d = document.createElement("span");
+      d.style.backgroundColor = token;
+      d.style.position = "fixed"; d.style.left = "-9999px";
+      document.body.appendChild(d);
+      var v = getComputedStyle(d).backgroundColor;
+      document.body.removeChild(d);
+      if (v && v.indexOf("color") === -1) return v;          // got plain rgb(a)
+      if (v && v.indexOf("color(srgb") > -1) return colorSrgbToRgba(v);
+    } catch (e) { /* fall through */ }
+    return "rgba(0,0,0,0)";
+  }
+  function sanitizeColorValue(v) {
+    return v
+      .replace(/color-mix\([^)]*\)/g, resolveMix)
+      .replace(/color\(srgb[^)]*\)/g, colorSrgbToRgba);
+  }
+  var CAPTURE_COLOR_PROPS = ["color", "background-color", "box-shadow",
+    "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+    "outline-color"];
+  function sanitizeCloneColors(clonedDoc) {
+    try {
+      var win = clonedDoc.defaultView || window;
+      var els = clonedDoc.querySelectorAll("*");
+      for (var i = 0; i < els.length; i++) {
+        var cs = win.getComputedStyle(els[i]);
+        for (var p = 0; p < CAPTURE_COLOR_PROPS.length; p++) {
+          var v = cs.getPropertyValue(CAPTURE_COLOR_PROPS[p]);
+          if (v && (v.indexOf("color-mix") > -1 || v.indexOf("color(") > -1)) {
+            els[i].style.setProperty(CAPTURE_COLOR_PROPS[p], sanitizeColorValue(v));
+          }
+        }
+      }
+    } catch (e) { /* best-effort: capture still falls back on hard failure */ }
+  }
+
   // Renders the live DOM to an image with html2canvas, so the user never has to
   // pick a screen/window/tab — clicking 📷 (or opening the modal) just screenshots
   // the page they're looking at. Our own modal + overlays are excluded.
@@ -196,7 +350,8 @@
       scrollY: -window.scrollY,
       ignoreElements: function (el) {
         return el.id === "issue-modal" || el.id === "drop-overlay";
-      }
+      },
+      onclone: function (clonedDoc) { sanitizeCloneColors(clonedDoc); }
     }).then(function (canvas) {
       canvas.toBlob(function (blob) {
         if (blob) acceptBlob(blob);
@@ -240,6 +395,7 @@
   }
 
   function open() {
+    ensureModal();
     wire();
     var m = $("issue-modal");
     if (m) m.classList.add("open");
@@ -300,9 +456,11 @@
 
     var payload = {
       title: title,
-      body: (state.body || "").trim(),
+      // Always include the page URL + captured DOM/console errors in the body so they
+      // land in the filed issue, in addition to meta.
+      body: ((state.body || "").trim() + "\n" + buildEnvSection()).trim(),
       image: state.dataUrl || null,
-      meta: { url: location.href, userAgent: navigator.userAgent, viewport: window.innerWidth + "x" + window.innerHeight }
+      meta: { url: location.href, userAgent: navigator.userAgent, viewport: window.innerWidth + "x" + window.innerHeight, errors: errorLog.slice() }
     };
 
     fetch("/api/github/issue", {
