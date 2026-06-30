@@ -24,7 +24,9 @@ Promotion flow:
 import asyncio
 import hashlib
 import json
+import math
 import os
+import re
 import uuid
 from dataclasses import asdict, dataclass, field
 from collections import defaultdict
@@ -193,7 +195,7 @@ _MAX_INDEX_SIZE = 100_000
 class MemoryEngine:
     """Local-first cube-partitioned memory store."""
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: Optional[str] = None, persist_index: bool = True):
         self.base = Path(base_path or os.environ.get("CSF_MEMORY_PATH", "data/csf_memory"))
         self.base.mkdir(parents=True, exist_ok=True)
         for part in CubePartition:
@@ -201,6 +203,12 @@ class MemoryEngine:
         self._pending: List[Any] = []  # async write queue
         self._keyword_index: Dict[str, Set[str]] = defaultdict(set)
         self._entity_index: Dict[str, Set[str]] = defaultdict(set)
+        self._doc_count: int = 0  # total records indexed — denominator for IDF
+        # The persisted _index.json is only a cold-start cache (always rebuildable
+        # from the registries). persist_index=False skips per-write index saves —
+        # use for ephemeral/benchmark engines to avoid O(n^2) ingestion. The
+        # in-memory index stays current either way, so query() is unaffected.
+        self._persist_index = persist_index
         self._index_path = self.base / "_index.json"
         self._load_index()
 
@@ -265,6 +273,7 @@ class MemoryEngine:
 
     def _update_index(self, record: MemoryRecord) -> None:
         """Add a record to keyword/entity indexes."""
+        self._doc_count += 1  # one record indexed — IDF denominator
         for kw in record.keywords:
             kw_lower = kw.lower()
             # Skip index update if already at max size
@@ -280,12 +289,15 @@ class MemoryEngine:
 
     def _save_index(self) -> None:
         """Persist indexes to JSON for fast cold starts."""
+        if not self._persist_index:
+            return  # ephemeral engine — in-memory index only, rebuildable on demand
         try:
             with open(self._index_path, "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "keywords": {k: list(v) for k, v in self._keyword_index.items()},
                         "entities": {k: list(v) for k, v in self._entity_index.items()},
+                        "doc_count": self._doc_count,
                     },
                     f,
                     ensure_ascii=False,
@@ -301,6 +313,7 @@ class MemoryEngine:
                     data = json.load(f)
                 self._keyword_index = defaultdict(set, {k: set(v) for k, v in data.get("keywords", {}).items()})
                 self._entity_index = defaultdict(set, {k: set(v) for k, v in data.get("entities", {}).items()})
+                self._doc_count = int(data.get("doc_count", 0))
                 return
             except Exception:
                 pass
@@ -310,6 +323,7 @@ class MemoryEngine:
         """Full scan of all registries to rebuild indexes."""
         self._keyword_index.clear()
         self._entity_index.clear()
+        self._doc_count = 0  # recomputed by _update_index per record below
         for part in CubePartition:
             reg = self._registry_path(part)
             if not reg.exists():
@@ -480,30 +494,55 @@ class MemoryEngine:
                 return False
         return True
 
-    @staticmethod
+    def _idf(self, keyword: str) -> float:
+        """Smoothed inverse document frequency for a keyword (issue #1689).
+
+        Document frequency is free — it's the size of the keyword's posting list
+        in the inverted index. Rare terms (small df) score higher because they
+        are more discriminative for ranking. Always positive (>= 1.0) so a
+        matched term never subtracts from a record's score.
+        """
+        df = len(self._keyword_index.get(keyword.lower(), ()))
+        n = max(self._doc_count, df, 1)
+        return math.log((n + 1.0) / (df + 1.0)) + 1.0
+
     def _multi_signal_score(
+        self,
         rec: MemoryRecord,
         query_keywords: List[str],
         query_entities: List[str],
     ) -> float:
-        """Fused retrieval score: semantic 0.5 + keyword 0.3 + entity 0.2.
+        """Fused retrieval score: IDF-weighted lexical 0.8 + entity 0.2 (#1689).
 
-        Semantic component falls back to record confidence when no external
-        vector similarity is available.
+        The previous formula was semantic*0.5 + keyword*0.3 + entity*0.2 where the
+        "semantic" term was rec.confidence — a constant 1.0 for raw traces. That
+        put a flat 0.5 on EVERY candidate (pure offset, no ranking signal) and let
+        a plain keyword-coverage fraction decide order regardless of how common the
+        matched words were. Lexical scoring is now IDF-weighted: a match on a rare,
+        distinctive word outranks a match on a common one. (Real vector-embedding
+        similarity can re-enter as a third signal once the store populates
+        vector_embedding — tracked in #1690 for the JS path.)
         """
-        semantic = rec.confidence if rec.confidence else 0.5
-        keyword_score = 0.0
-        entity_score = 0.0
-
+        # IDF-weighted coverage of the query's keywords by this record (0..1):
+        # share of the query's *total IDF mass* that this record's keywords cover.
+        lexical = 0.0
         if query_keywords and rec.keywords:
-            matched = sum(1 for kw in query_keywords if kw.lower() in [k.lower() for k in rec.keywords])
-            keyword_score = matched / max(len(query_keywords), 1)
+            rec_kw = {k.lower() for k in rec.keywords}
+            num = den = 0.0
+            for qk in {k.lower() for k in query_keywords}:
+                w = self._idf(qk)
+                den += w
+                if qk in rec_kw:
+                    num += w
+            lexical = (num / den) if den else 0.0
 
+        entity_score = 0.0
         if query_entities and rec.entities:
-            matched = sum(1 for ent in query_entities if ent.lower() in [e.lower() for e in rec.entities])
+            rec_ent = {e.lower() for e in rec.entities}
+            matched = sum(1 for ent in query_entities if ent.lower() in rec_ent)
             entity_score = matched / max(len(query_entities), 1)
 
-        return semantic * 0.5 + keyword_score * 0.3 + entity_score * 0.2
+        return 0.8 * lexical + 0.2 * entity_score
 
     def promote(
         self,
@@ -570,6 +609,42 @@ def _next_cube(current: CubePartition, target_tier: Tier) -> CubePartition:
     return current
 
 
+# Stopwords dropped when auto-deriving index keywords from trace text.
+_DERIVE_STOP = frozenset((
+    "the a an and or but if then else when where why how to of in on at for with by "
+    "from up down out off over under again is are was were be been being do does did "
+    "this that these those it its as so no not only own same than too very can will "
+    "just should now i me my we our you your he she they them his her their what who "
+    "whom which there here have has had about into onto upon also more most some any "
+    "all each few other such been being get got go went said say like one two"
+).split())
+
+# Default breadth for auto-derived trace keywords. Benchmarking (LongMemEval s,
+# issue #1689 follow-up) showed retrieval recall@5 jumps ~0.45 -> ~0.87 when each
+# turn is indexed by ~48 distinctive tokens instead of ~12 — the answer-bearing
+# word is usually deeper than the first dozen tokens. IDF downweights the common
+# words this admits, so wider indexing is nearly free for ranking.
+_DERIVE_KEYWORD_CAP = 48
+
+
+def _derive_keywords(text: str, cap: int = _DERIVE_KEYWORD_CAP) -> List[str]:
+    """Extract up to `cap` distinctive (non-stopword, len>2) tokens from text.
+
+    Used so a trace is indexed by its CONTENT, not gated by whether the caller
+    bothered to pass a keywords list (the old default was [] — i.e. unindexed,
+    invisible to keyword/multi-signal retrieval entirely)."""
+    seen: Set[str] = set()
+    out: List[str] = []
+    for w in re.split(r"[^a-z0-9]+", str(text or "").lower()):
+        if len(w) <= 2 or w in _DERIVE_STOP or w in seen:
+            continue
+        seen.add(w)
+        out.append(w)
+        if len(out) >= cap:
+            break
+    return out
+
+
 def create_trace(
     text: str,
     session_id: str,
@@ -581,7 +656,11 @@ def create_trace(
     keywords: Optional[List[str]] = None,
     entities: Optional[List[str]] = None,
 ) -> MemoryRecord:
-    """Factory: create a raw trace record."""
+    """Factory: create a raw trace record.
+
+    When `keywords` is omitted, they are auto-derived from `text` so the record
+    is actually retrievable (see _derive_keywords). Pass an explicit list to
+    override (e.g. domain writers that curate their own keywords)."""
     return MemoryRecord(
         memory_id=f"trace_{uuid.uuid4().hex[:8]}_{_ts()}",
         tier=Tier.TRACE,
@@ -599,7 +678,7 @@ def create_trace(
         privacy_scope=privacy_scope,
         source_surface=surface,
         tags=tags or [],
-        keywords=keywords or [],
+        keywords=keywords if keywords is not None else _derive_keywords(text),
         entities=entities or [],
     )
 

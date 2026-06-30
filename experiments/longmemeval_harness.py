@@ -173,6 +173,9 @@ def ingest(engine: MemoryEngine, instance: Dict[str, Any]) -> int:
             if not text:
                 continue
             gold = bool(turn.get("has_answer"))
+            # Let create_trace auto-derive keywords from the text (the real product
+            # path). Indexing breadth is the dominant recall lever — hardcoding a
+            # narrow cap here understated the engine (issue #1689 follow-up).
             rec = create_trace(
                 text=text,
                 session_id=f"{instance['question_id']}-s{si}",
@@ -181,7 +184,6 @@ def ingest(engine: MemoryEngine, instance: Dict[str, Any]) -> int:
                 confidence=1.0,
                 privacy_scope=PrivacyScope.INTERNAL,
                 tags=["longmemeval", "gold"] if gold else ["longmemeval"],
-                keywords=_tokens(text),
             )
             rec.metadata = {"gold": gold, "session": si, "turn": ti}
             engine.write(rec)
@@ -223,7 +225,9 @@ def evaluate(instances: List[Dict[str, Any]], k: int) -> Dict[str, Any]:
             continue  # no gold-labelled turn → cannot score retrieval
         total += 1
         with tempfile.TemporaryDirectory() as tmp:
-            engine = MemoryEngine(base_path=tmp)
+            # persist_index=False: each question gets a throwaway engine; skipping
+            # per-write index persistence avoids O(n^2) ingestion (~490 turns each).
+            engine = MemoryEngine(base_path=tmp, persist_index=False)
             ingest(engine, inst)
             for mode, ms in modes.items():
                 recs = retrieve(engine, inst["question"], k, ms)
