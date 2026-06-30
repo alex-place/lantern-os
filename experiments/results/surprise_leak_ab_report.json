@@ -1,0 +1,27 @@
+{
+  "kind": "surprise_leak_layer1",
+  "ts": 1782799580,
+  "model": "mistral:latest",
+  "base_url": "http://localhost:11434/v1",
+  "grader": "string(approx)",
+  "n_scored": 199,
+  "n_no_logprob": 0,
+  "n_errors": 0,
+  "hallucination_rate": 0.5025,
+  "auroc_field_uncertainty": 0.5,
+  "auroc_mean_bits_baseline": 0.7911,
+  "auroc_p90_bits": 0.8058,
+  "delta_field_minus_mean_ci": {
+    "delta_lo": -0.3524,
+    "delta_hi": -0.2232,
+    "delta_median": -0.2908,
+    "frac_positive": 0.0
+  },
+  "rows_path": "experiments\\results\\surprise_leak_mistral7b.jsonl",
+  "provenance": {
+    "REAL": "generations, captured logprobs, labels, AUROC/bootstrap",
+    "APPROX": "string grader mis-labels some answers; use --judge-model",
+    "PORT": "surprise_field/field_to_uncertainty == token-surprise.js"
+  },
+  "hypothesis": "field_uncertainty AUROC > 0.5 (signal real) AND > mean_bits AUROC (the tailMass field beats plain perplexity)"
+}

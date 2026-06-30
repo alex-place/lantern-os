@@ -65,15 +65,16 @@
     .feed-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     .feed-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+    /* FB-style single feed column: one centered stream of larger posts,
+       not a 2–3-up grid. The whole page reads as a modern social feed. */
     .feed-stream {
       display: grid;
-      gap: 12px;
+      gap: 16px;
       grid-template-columns: 1fr;
-      max-width: 920px;
+      max-width: 600px;
       margin: 0 auto;
     }
-    @media (min-width: 720px) { .feed-stream { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 1100px) { .feed-stream { grid-template-columns: repeat(3, 1fr); } }
+    .feed-chips { max-width: 600px; }
 
     .feed-card {
       position: relative;
@@ -161,6 +162,60 @@
     .feed-card[data-type="belief"] { --tile: #22c55e; }
     .feed-card[data-type="read"]   { --tile: #06b6d4; }
     .feed-card[data-type="embed"]  { --tile: #06b6d4; }
+    .feed-card[data-type="art"]    { --tile: #ec4899; }
+
+    /* Image showcase card — Kingdome of Hearts art + Gage sprites. The
+       lead art bleeds to the card edges and opens the shared lightbox full-size
+       (the button carries .showcase-tile[data-full], picked up by the global
+       lightbox delegate). */
+    .feed-card .fc-media {
+      width: calc(100% + 36px);
+      margin: -18px -18px 1px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: var(--surface2);
+      cursor: zoom-in;
+      display: block;
+      line-height: 0;
+      overflow: hidden;
+    }
+    .feed-card .fc-media:hover, .feed-card .fc-media:focus-visible {
+      transform: none;
+      box-shadow: none;
+    }
+    .feed-card .fc-media-img {
+      width: 100%;
+      height: auto;
+      max-height: 560px;
+      object-fit: cover;
+      display: block;
+    }
+    /* Pixel art (game sprites) renders crisp and CONTAINED, not cropped/blurred. */
+    .feed-card .fc-media-img.pixelated {
+      image-rendering: pixelated;
+      object-fit: contain;
+      max-height: 420px;
+      background: #0d1117;
+      padding: 18px 0;
+      box-sizing: border-box;
+    }
+
+    /* Inline video card — Gage's BFDM episodes (self-hosted mp4). preload
+       none so seven posters don't all fetch; a single 'play' handler pauses any
+       other video / open embed so only one plays at a time. */
+    .feed-card.is-video .fc-video {
+      width: calc(100% + 36px);
+      margin: -18px -18px 1px;
+      background: #000;
+      line-height: 0;
+    }
+    .feed-card.is-video .fc-video video {
+      width: 100%;
+      max-height: 560px;
+      display: block;
+      background: #000;
+    }
     .feed-card::before {
       content: '';
       position: absolute;
@@ -1040,131 +1095,25 @@
       <button type="button" class="feed-chip" data-type="build" aria-pressed="false"><span aria-hidden="true">🛠️</span> Build</button>
       <button type="button" class="feed-chip" data-type="doc" aria-pressed="false"><span aria-hidden="true">📚</span> Docs</button>
       <button type="button" class="feed-chip" data-type="belief" aria-pressed="false"><span aria-hidden="true">🌍</span> Beliefs</button>
+      <button type="button" class="feed-chip" data-topic="kingdome" aria-pressed="false"><span aria-hidden="true">♥</span> Kingdome</button>
+      <button type="button" class="feed-chip" data-topic="gage" aria-pressed="false"><span aria-hidden="true">✏️</span> Gage</button>
     </div>
     <div class="feed-status" id="feedStatus" role="status" aria-live="polite">Loading your feed…</div>
     <div class="feed-stream" id="feedStream" role="feed" aria-busy="true" aria-label="Ranked content feed"></div>
 
-    <!-- ── Kingdome of Hearts image showcase ── -->
-    <section class="showcase" aria-labelledby="kohTitle">
-      <div class="showcase-chrome">
-        <span class="showcase-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="showcase-titlebar">♥ Kingdome of Hearts — gallery</span>
-      </div>
-      <div class="showcase-body">
-        <div class="showcase-head">
-          <span class="showcase-label">Showcase</span>
-          <h2 id="kohTitle">Kingdome of Hearts — Three Doors</h2>
-          <p>The infinitely replayable doors game. Every run, three doors open onto new worlds and new heroes. Click any card to preview it full-size.</p>
-        </div>
-        <p class="koh-empty" id="kohEmpty">Loading gallery…</p>
-        <span class="gage-subhead" id="kohDoorsHead" hidden>🚪 Doors</span>
-        <div class="koh-gallery" id="kohDoors"></div>
-        <span class="gage-subhead" id="kohHeroesHead" hidden>🦸 Heroes</span>
-        <div class="koh-gallery" id="kohHeroes"></div>
-        <span class="gage-subhead" id="kohWorldHead" hidden>🌌 World</span>
-        <div class="koh-gallery" id="kohWorld"></div>
-        <details class="koh-review" id="kohReviewWrap" hidden>
-          <summary><span id="kohReviewCount">0</span> images need a human title/category — click to review</summary>
-          <p class="koh-empty">These are auto-imported with no descriptive filename. Open any to preview; titling is a human pass.</p>
-          <div class="koh-gallery koh-gallery-sm" id="kohReview"></div>
-        </details>
-      </div>
-    </section>
+    <!-- The Kingdome of Hearts gallery + Gage's showcase are no longer static walls
+         glued to the bottom of every view: each image/video is now a ranked `art`
+         feed card (lib/explore-feed galleryCards/gageCards), filterable via the
+         ♥ Kingdome / ✏️ Gage chips and fed through the same PCSF algorithm.
+         Only this shared lightbox markup remains — feed `art` cards reuse it. -->
 
-    <!-- lightbox preview overlay for the showcase -->
+    <!-- lightbox preview overlay (shared by every feed art card) -->
     <div class="lightbox" id="kohLightbox" role="dialog" aria-modal="true" aria-label="Image preview">
       <button type="button" class="lightbox-close" id="kohClose" aria-label="Close preview">✕</button>
       <img id="kohLightboxImg" src="" alt="">
       <div class="lightbox-cap" id="kohLightboxCap"></div>
     </div>
 
-    <!-- ── Pencil Guy's Showcase — by Gage ── -->
-    <section class="showcase" aria-labelledby="gageTitle">
-      <div class="showcase-chrome">
-        <span class="showcase-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="showcase-titlebar">✏️ Pencil Guy's Showcase — by Gage</span>
-      </div>
-      <div class="showcase-body">
-        <div class="gage-banner">
-          <img src="https://media.lantern-os.net/gage/banner.webp" alt="BFDM RE-MA+ banner artwork by Gage" decoding="async">
-        </div>
-        <div class="showcase-head">
-          <span class="showcase-label">Showcase</span>
-          <h2 id="gageTitle">Pencil Guy &amp; the BFDM series</h2>
-          <p class="gage-credit">Hand-drawn object-show episodes and original game sprites, all made by <b>Gage</b>.</p>
-        </div>
-
-        <span class="gage-subhead">📺 BFDM — watch the series</span>
-        <div class="bfdm-grid">
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster1.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/intro.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Intro</div>
-          </div>
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster1.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/ep1.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Episode 1</div>
-          </div>
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster2.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/ep2-part1.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Episode 2 — Part 1</div>
-          </div>
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster2.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/ep2-part2.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Episode 2 — Part 2</div>
-          </div>
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster3.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/ep3.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Episode 3</div>
-          </div>
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster4.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/ep4-part1.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Episode 4: The Multiverse — Part 1</div>
-          </div>
-          <div class="bfdm-card">
-            <video controls preload="none" playsinline poster="https://media.lantern-os.net/gage/bfdm/poster4.webp">
-              <source src="https://media.lantern-os.net/gage/bfdm/ep4-part2.mp4" type="video/mp4"></video>
-            <div class="bfdm-label">Episode 4: The Multiverse — Part 2</div>
-          </div>
-        </div>
-
-        <span class="gage-subhead">🎮 Title cards &amp; game art</span>
-        <div class="sprite-gallery">
-          <button type="button" class="showcase-tile wide" data-pixel="0"
-            data-full="https://media.lantern-os.net/gage/sprites/title-hearts-land.png" data-cap="Hearts Land — title card">
-            <img src="https://media.lantern-os.net/gage/sprites/title-hearts-land.png" alt="Hearts Land title card"></button>
-          <button type="button" class="showcase-tile wide" data-pixel="0"
-            data-full="https://media.lantern-os.net/gage/sprites/title-eraser-fall.png" data-cap="Eraser: Fall Time — title card">
-            <img src="https://media.lantern-os.net/gage/sprites/title-eraser-fall.png" alt="Eraser Fall Time title card"></button>
-          <button type="button" class="showcase-tile wide" data-pixel="0"
-            data-full="https://media.lantern-os.net/gage/sprites/title-eraser-snowday.png" data-cap="Eraser: Snow Day — title card">
-            <img src="https://media.lantern-os.net/gage/sprites/title-eraser-snowday.png" alt="Eraser Snow Day title card"></button>
-          <button type="button" class="showcase-tile" data-pixel="1"
-            data-full="https://media.lantern-os.net/gage/sprites/boss-eraser.png" data-cap="Eraser boss">
-            <img src="https://media.lantern-os.net/gage/sprites/boss-eraser.png" alt="Eraser boss sprite"></button>
-          <button type="button" class="showcase-tile" data-pixel="1"
-            data-full="https://media.lantern-os.net/gage/sprites/boss-highlighter.png" data-cap="Highlighter boss">
-            <img src="https://media.lantern-os.net/gage/sprites/boss-highlighter.png" alt="Highlighter boss sprite"></button>
-          <button type="button" class="showcase-tile" data-pixel="1"
-            data-full="https://media.lantern-os.net/gage/sprites/boss-marker.png" data-cap="Orange Pico marker boss">
-            <img src="https://media.lantern-os.net/gage/sprites/boss-marker.png" alt="Marker boss sprite"></button>
-          <button type="button" class="showcase-tile" data-pixel="1"
-            data-full="https://media.lantern-os.net/gage/sprites/eraser-rpg-ball.gif" data-cap="Eraser RPG ball (animated)">
-            <img src="https://media.lantern-os.net/gage/sprites/eraser-rpg-ball.gif" alt="Eraser RPG ball animation"></button>
-          <button type="button" class="showcase-tile" data-pixel="1"
-            data-full="https://media.lantern-os.net/gage/sprites/itch-insanity.png" data-cap="Itch Insanity">
-            <img src="https://media.lantern-os.net/gage/sprites/itch-insanity.png" alt="Itch Insanity art"></button>
-          <button type="button" class="showcase-tile" data-pixel="1"
-            data-full="https://media.lantern-os.net/gage/sprites/highlighter-cutscene.png" data-cap="Highlighter driver cutscene">
-            <img src="https://media.lantern-os.net/gage/sprites/highlighter-cutscene.png" alt="Highlighter cutscene art"></button>
-        </div>
-      </div>
-    </section>
 
     <!-- ── Single slim quick-links row — the feed is the page; everything else
          is a text link, not an engagement-less panel (#1217 single-pane). ── -->
@@ -1195,64 +1144,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // calls toggleTheme() via its onclick. Do NOT add a second click listener here
   // — two handlers fire per click and cancel out, so the toggle appears dead.
 
-  /* Kingdome of Hearts / Three Doors gallery — rendered from a manifest so the
-     set can grow without touching markup. Each entry becomes a .showcase-tile
-     that the shared lightbox below picks up. */
-  (async () => {
-    const empty = document.getElementById('kohEmpty');
-    const grids = {
-      door: document.getElementById('kohDoors'),
-      hero: document.getElementById('kohHeroes'),
-      world: document.getElementById('kohWorld'),
-    };
-    const heads = {
-      door: document.getElementById('kohDoorsHead'),
-      hero: document.getElementById('kohHeroesHead'),
-      world: document.getElementById('kohWorldHead'),
-    };
-    const reviewWrap = document.getElementById('kohReviewWrap');
-    const reviewGrid = document.getElementById('kohReview');
-    const reviewCount = document.getElementById('kohReviewCount');
-    if (!grids.door) return;
-    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    let base = '/assets/content/koh/';           // overridden by manifest.base (→ R2)
-    const tile = (it) => {
-      const cap = it.title || '';                // review items have no title
-      return '<button type="button" class="showcase-tile' + (cap ? '' : ' untitled') + '"' +
-        ' data-full="' + esc(base + it.full) + '" data-cap="' + esc(cap || it.src) + '">' +
-        '<img src="' + esc(base + it.thumb) + '" alt="' + esc(cap || 'untitled artwork — needs review') + '" decoding="async">' +
-        (cap ? '<span class="showcase-cap">' + esc(cap) + '</span>' : '') +
-      '</button>';
-    };
-    try {
-      const r = await fetch('/assets/content/koh/manifest.json', { cache: 'no-store' });
-      if (!r.ok) throw new Error('manifest ' + r.status);
-      const data = await r.json();
-      if (data && data.base) base = data.base;
-      const items = (data && data.items) || [];
-      for (const cat of ['door', 'hero', 'world']) {
-        const sel = items.filter((i) => i.status === 'auto' && i.cat === cat);
-        if (sel.length) {
-          grids[cat].innerHTML = sel.map(tile).join('');
-          heads[cat].hidden = false;
-        }
-      }
-      const review = items.filter((i) => i.status === 'review');
-      if (review.length) {
-        reviewGrid.innerHTML = review.map(tile).join('');
-        reviewCount.textContent = review.length;
-        reviewWrap.hidden = false;
-      }
-      if (empty) empty.hidden = true;
-    } catch (err) {
-      if (empty) { empty.hidden = false; empty.textContent = 'Could not load the gallery.'; }
-      console.warn('[koh] gallery load failed:', err);
-    }
-  })();
-
   /* Shared image-preview lightbox — serves every .showcase-tile[data-full]
-     (Kingdome of Hearts cards + Gage's sprite gallery). */
+     rendered by the feed (Kingdome of Hearts + Gage `art` cards, the explore showcase→feed change). */
   const box = document.getElementById('kohLightbox');
   const boxImg = document.getElementById('kohLightboxImg');
   const boxCap = document.getElementById('kohLightboxCap');
@@ -1323,7 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ICON = { embed: '🕹️', read: '📰', watch: '🎬', listen: '🎵', build: '🛠️', doc: '📚', belief: '🌍', action: '⚡' };
+  const ICON = { embed: '🕹️', read: '📰', watch: '🎬', listen: '🎵', build: '🛠️', doc: '📚', belief: '🌍', art: '🎨', action: '⚡' };
 
   // Only http(s) and root-relative URLs are linkable. A card url is sourced from
   // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
@@ -1502,8 +1395,64 @@ document.addEventListener('DOMContentLoaded', () => {
     if (posinset) { el.setAttribute('aria-posinset', String(posinset)); el.setAttribute('aria-setsize', '-1'); }
     const why = c.evidence && c.evidence.why ? c.evidence.why : '';
     const embedSrc = (c.embed && c.embed.src) ? safeEmbedSrc(c.embed.src) : '';
+    const media = c.media || null;
+    const date = shortDate(c.published);
 
-    if (embedSrc) {
+    if (media && media.kind === 'video') {
+      // Self-hosted video card — Gage's BFDM episodes. Native controls,
+      // preload="none" so the poster shows without fetching the mp4; a 'play'
+      // handler enforces single-active (pause other videos, stop any open embed).
+      el.className = 'feed-card is-video';
+      const vsrc = safeImg(media.src || '');           // https / root-relative only
+      const poster = safeImg(media.poster || c.image || '');
+      el.innerHTML =
+        '<div class="fc-top"><span class="fc-type"><span aria-hidden="true">' + (ICON[c.type] || '🎬') + '</span> ' + esc(c.type) + '</span>' +
+          (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
+        '<div class="fc-frame fc-video">' +
+          (vsrc
+            ? '<video controls preload="none" playsinline' + (poster ? ' poster="' + esc(poster) + '"' : '') + '>' +
+                '<source src="' + esc(vsrc) + '" type="video/mp4"></video>'
+            : '<div class="fc-thumb-ph" aria-hidden="true"><span class="fc-ph-icon">🎬</span></div>') +
+        '</div>' +
+        '<span class="fc-title">' + esc(c.title) + '</span>' +
+        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+        '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
+      const vid = el.querySelector('video');
+      if (vid) vid.addEventListener('play', () => {
+        stream.querySelectorAll('video').forEach((v) => { if (v !== vid) { try { v.pause(); } catch (_) {} } });
+        if (activeEmbed) deactivateEmbed(activeEmbed);   // a game/film yields to the video
+        record(c.key, 'click', 0);                       // playing = engagement
+      });
+    } else if (media && media.kind === 'image') {
+      // Image showcase card — Kingdome of Hearts art + Gage sprites. The
+      // lead art opens the shared lightbox full-size: the button carries
+      // .showcase-tile[data-full], picked up by the global lightbox delegate.
+      el.className = 'feed-card is-art';
+      const full = safeImg(media.full || '');
+      const thumb = safeImg(c.image || media.thumb || '') || full;
+      const fb = safeImg(c.imageFallback || '');
+      const pixCls = media.pixel ? ' pixelated' : '';
+      el.innerHTML =
+        '<div class="fc-top"><span class="fc-type"><span aria-hidden="true">' + (ICON[c.type] || '🎨') + '</span> ' + esc(c.type) + '</span>' +
+          (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
+        (full
+          ? '<button type="button" class="fc-media showcase-tile" data-full="' + esc(full) + '" data-cap="' + esc(c.title || '') + '"' + (media.pixel ? ' data-pixel="1"' : '') + '>' +
+              '<img class="fc-media-img' + pixCls + '" src="' + esc(thumb) + '" alt="' + esc(c.title || '') + '" loading="lazy" referrerpolicy="no-referrer">' +
+            '</button>'
+          : '<div class="fc-thumb-ph" aria-hidden="true"><span class="fc-ph-icon">🎨</span></div>') +
+        '<a class="fc-title" href="' + esc(full || '#') + '"' + (full ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + esc(c.title) + '</a>' +
+        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+        '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
+      const im = el.querySelector('.fc-media-img');
+      // A broken CDN cover swaps to the generated same-origin thumbnail, then a glyph.
+      if (im && fb) im.addEventListener('error', () => {
+        if (im.src.indexOf('/api/explore/thumb.svg') === -1) { im.classList.remove('pixelated'); im.src = fb; }
+      }, { once: true });
+      const mediaBtn = el.querySelector('.fc-media');
+      if (mediaBtn) mediaBtn.addEventListener('click', () => record(c.key, 'click', 0));
+      const titleLink = el.querySelector('a.fc-title');
+      if (titleLink) titleLink.addEventListener('click', () => record(c.key, 'click', 0));
+    } else if (embedSrc) {
       // Open-archive game / film / listening panel. The heavy iframe does NOT
       // load until the user presses Play — it renders as a poster and the
       // single-active player (activateEmbed) injects + focuses the frame, tearing
@@ -1558,7 +1507,6 @@ document.addEventListener('DOMContentLoaded', () => {
       el.className = 'feed-card';
       const href = safeUrl(c.url);
       const ext = /^https?:/i.test(href);
-      const date = shortDate(c.published);
       const img = safeImg(c.image || '');
       const summary = c.summary ? esc(c.summary) : '';
       el.innerHTML =
@@ -1699,19 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (playObserver) playObserver.disconnect();
     stream.innerHTML = '';
     if (io) { io.unobserve(sentinel); io.observe(sentinel); }
-    syncShowcases();
     loadPage();
-  }
-
-  // The static showcase galleries (Kingdome of Hearts, Pencil Guy art) are
-  // "All"-context discovery sections, not feed cards. When a specific chip is
-  // active (Finance, Read, …) they read as a wall of unrelated images glued to
-  // the bottom of that feed — so show them only on the unfiltered "All" view.
-  function syncShowcases() {
-    var on = filter === 'all';
-    document.querySelectorAll('.showcase').forEach(function (s) {
-      s.style.display = on ? '' : 'none';
-    });
   }
 
   if (chips) {
@@ -1758,7 +1694,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Kick off, then keep the sentinel observed. Fallback for no IntersectionObserver.
-  syncShowcases();   // honor a deep-linked filter on first paint
   loadPage();
   if (io) io.observe(sentinel);
   else window.addEventListener('scroll', () => {
