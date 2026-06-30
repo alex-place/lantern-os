@@ -27,6 +27,21 @@
       "env": {
         "LEADERBOARD_ROUTING": "1"
       }
+    },
+    {
+      "name": "lantern-verify",
+      "comment": "Preview-tool verify server: server.js on an auto-assigned free port. When the launcher injects PORT, server.js would normally bind 0.0.0.0 + require SESSION_SECRET; we pin the host back to loopback and provide a throwaway loopback-only SESSION_SECRET so it boots on a fresh port even when 4177/4178 are taken by other sessions.",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/lantern-garage/server.js"
+      ],
+      "port": 4188,
+      "autoPort": true,
+      "env": {
+        "LEADERBOARD_ROUTING": "1",
+        "LANTERN_GARAGE_HOST": "127.0.0.1",
+        "SESSION_SECRET": "preview-verify-loopback-only-secret"
+      }
     }
   ]
 }

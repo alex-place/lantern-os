@@ -1,0 +1,25 @@
+{
+  "source": "Pencil Guy — by Gage",
+  "credit": "Hand-drawn object-show episodes and original game sprites, all made by Gage.",
+  "base": "https://media.lantern-os.net/gage/",
+  "videos": [
+    { "slug": "bfdm-intro",     "title": "BFDM — Intro",                          "file": "bfdm/intro.mp4",     "poster": "bfdm/poster1.webp" },
+    { "slug": "bfdm-ep1",       "title": "BFDM — Episode 1",                      "file": "bfdm/ep1.mp4",       "poster": "bfdm/poster1.webp" },
+    { "slug": "bfdm-ep2-p1",    "title": "BFDM — Episode 2 · Part 1",             "file": "bfdm/ep2-part1.mp4", "poster": "bfdm/poster2.webp" },
+    { "slug": "bfdm-ep2-p2",    "title": "BFDM — Episode 2 · Part 2",             "file": "bfdm/ep2-part2.mp4", "poster": "bfdm/poster2.webp" },
+    { "slug": "bfdm-ep3",       "title": "BFDM — Episode 3",                      "file": "bfdm/ep3.mp4",       "poster": "bfdm/poster3.webp" },
+    { "slug": "bfdm-ep4-p1",    "title": "BFDM — Episode 4: The Multiverse · Part 1", "file": "bfdm/ep4-part1.mp4", "poster": "bfdm/poster4.webp" },
+    { "slug": "bfdm-ep4-p2",    "title": "BFDM — Episode 4: The Multiverse · Part 2", "file": "bfdm/ep4-part2.mp4", "poster": "bfdm/poster4.webp" }
+  ],
+  "art": [
+    { "slug": "title-hearts-land",    "title": "Hearts Land — title card",        "file": "sprites/title-hearts-land.png",    "pixel": false },
+    { "slug": "title-eraser-fall",    "title": "Eraser: Fall Time — title card",  "file": "sprites/title-eraser-fall.png",    "pixel": false },
+    { "slug": "title-eraser-snowday", "title": "Eraser: Snow Day — title card",   "file": "sprites/title-eraser-snowday.png", "pixel": false },
+    { "slug": "boss-eraser",          "title": "Eraser boss",                     "file": "sprites/boss-eraser.png",          "pixel": true },
+    { "slug": "boss-highlighter",     "title": "Highlighter boss",                "file": "sprites/boss-highlighter.png",     "pixel": true },
+    { "slug": "boss-marker",          "title": "Orange Pico marker boss",         "file": "sprites/boss-marker.png",          "pixel": true },
+    { "slug": "eraser-rpg-ball",      "title": "Eraser RPG ball (animated)",      "file": "sprites/eraser-rpg-ball.gif",      "pixel": true },
+    { "slug": "itch-insanity",        "title": "Itch Insanity",                   "file": "sprites/itch-insanity.png",        "pixel": true },
+    { "slug": "highlighter-cutscene", "title": "Highlighter driver cutscene",     "file": "sprites/highlighter-cutscene.png", "pixel": true }
+  ]
+}

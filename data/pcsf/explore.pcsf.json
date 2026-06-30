@@ -19,7 +19,8 @@
     { "type": "watch",  "icon": "🎬", "label": "Watch",  "from": "lanternYT channel videos" },
     { "type": "build",  "icon": "🛠️", "label": "Build",  "from": "GitHub releases + commits" },
     { "type": "doc",    "icon": "📚", "label": "Docs",   "from": "Keystone knowledge index" },
-    { "type": "belief", "icon": "🌍", "label": "Beliefs","from": "flourishing-feeds fused world-model beliefs" }
+    { "type": "belief", "icon": "🌍", "label": "Beliefs","from": "flourishing-feeds fused world-model beliefs" },
+    { "type": "art",    "icon": "🎨", "label": "Art",    "from": "Kingdome of Hearts gallery manifest + data/explore/gage.json — image/video showcases surfaced as ranked feed cards (topics:kingdome|gage)" }
   ],
 
   "sources": [
@@ -48,10 +49,12 @@
     { "name": "MIT Tech Review","key": "source:MIT Tech Review","type": "read",  "url": "https://www.technologyreview.com/" },
     { "name": "lanternYT",      "key": "source:lanternYT",      "type": "watch", "url": "https://www.youtube.com/@lantern1975" },
     { "name": "Flourishing",    "key": "source:Flourishing",    "type": "belief","url": "/flourishing.html" },
-    { "name": "Knowledge Center","key": "source:Knowledge Center","type": "doc", "url": "/knowledgecenter.html" }
+    { "name": "Knowledge Center","key": "source:Knowledge Center","type": "doc", "url": "/knowledgecenter.html" },
+    { "name": "Kingdome of Hearts","key": "source:Kingdome of Hearts","type": "art", "url": "/explore.html?topic=kingdome" },
+    { "name": "Pencil Guy — by Gage","key": "source:Pencil Guy — by Gage","type": "art", "url": "/explore.html?topic=gage" }
   ],
 
-  "topics": ["ai", "local-first", "building", "research", "world-model", "keystone", "game", "listen", "lore"],
+  "topics": ["ai", "local-first", "building", "research", "world-model", "keystone", "game", "listen", "lore", "kingdome", "gage", "art"],
 
   "default_priority": [
     "source:embed:keystone-brainrot",
@@ -79,7 +82,9 @@
     "source:MIT Tech Review",
     "source:lanternYT",
     "source:Flourishing",
-    "source:Knowledge Center"
+    "source:Knowledge Center",
+    "source:Kingdome of Hearts",
+    "source:Pencil Guy — by Gage"
   ],
 
   "notes": "default_priority is the editorial cold-start ranking: a zero-signal user sees Keystone's own build activity first, then taste-maker reads, then watch/belief/doc. Once the leaderboard has 'explore' outcomes for a source key, rankCandidates reorders by learned compositeScore and this editorial order only breaks ties (then card freshness)."

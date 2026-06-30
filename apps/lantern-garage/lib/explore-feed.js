@@ -36,6 +36,8 @@ const REPO_ROOT = path.resolve(__dirname, "../../..");
 const PCSF_FILE = path.join(REPO_ROOT, "data", "pcsf", "explore.pcsf.json");
 const KNOWLEDGE_META = path.join(REPO_ROOT, "data", "knowledge", "index.meta.json");
 const EMBEDS_FILE = path.join(REPO_ROOT, "data", "explore", "embeds.json");
+const KOH_MANIFEST = path.join(REPO_ROOT, "apps", "lantern-garage", "public", "assets", "content", "koh", "manifest.json");
+const GAGE_FILE = path.join(REPO_ROOT, "data", "explore", "gage.json");
 const REPO_BLOB = "https://github.com/alex-place/lantern-os/blob/master/";
 
 const PER_SOURCE_TIMEOUT_MS = 8000;
@@ -434,6 +436,119 @@ function embedCards() {
     });
 }
 
+// Kingdome of Hearts gallery → ranked feed cards. The Three Doors image
+// set used to be a static wall glued to the BOTTOM of every Explore view,
+// bypassing the ranking, the filter chips, and the engagement signal. Now each
+// titled image is a normal `art` card tagged topics:["kingdome", …] so it flows
+// through the ONE ranked feed (PCSF + diversity), the ♥ Kingdome chip filters to
+// it, and clicks/dwell float the best art up. We read the SAME manifest the page
+// used (public/assets/content/koh/manifest.json — `base` points at the R2 CDN),
+// cached like the other static seeds. Only titled `auto` items ship (the
+// untitled `review` set still needs a human pass and carries no real caption).
+let _koh;
+function loadKohManifest() {
+  if (_koh !== undefined) return _koh;
+  try {
+    const raw = JSON.parse(fs.readFileSync(KOH_MANIFEST, "utf8"));
+    _koh = raw && Array.isArray(raw.items) ? raw : null;
+  } catch {
+    _koh = null;
+  }
+  return _koh;
+}
+
+const KOH_CAT_LABEL = { door: "Doors", hero: "Heroes", world: "World" };
+
+function galleryCards() {
+  const m = loadKohManifest();
+  if (!m) return [];
+  const base = m.base || "/assets/content/koh/";
+  return (m.items || [])
+    .filter((it) => it && it.status === "auto" && it.title && it.full && it.thumb)
+    .map((it) => {
+      const full = base + it.full;
+      const thumb = base + it.thumb;
+      const catLabel = KOH_CAT_LABEL[it.cat] || "Gallery";
+      return {
+        id: "koh:" + it.id,
+        type: "art",
+        title: it.title,
+        url: full,
+        source: "Kingdome of Hearts",
+        published: null,
+        // topics carry BOTH the collection (for the ♥ Kingdome chip / ?topic=
+        // deep link) and the broad "art" tag, plus the door/hero/world category.
+        topics: ["kingdome", "art", it.cat].filter(Boolean),
+        image: thumb,
+        imageFallback: genThumb("art", it.title, "Kingdome of Hearts"),
+        // media tells the client renderer this is an image showcase: lead art that
+        // opens the shared lightbox full-size (kind:"image").
+        media: { kind: "image", full, thumb, pixel: false },
+        evidence: { why: "Kingdome of Hearts — " + catLabel, source: "Three Doors gallery" },
+      };
+    });
+  // key falls through to keyForSource("Kingdome of Hearts"): the whole gallery is
+  // ONE leaderboard source, so diversityRerank spreads it instead of letting 240+
+  // images wall the feed.
+}
+
+// Gage's showcase → ranked feed cards. The BFDM episodes (self-hosted mp4)
+// and original game art used to be a second static wall. Data-driven from
+// data/explore/gage.json so the set grows with a JSON edit; videos become `watch`
+// cards (kind:"video", inline <video>), sprites become `art` image cards — all
+// tagged topics:["gage", …] for the ✏️ Gage chip while flowing through the one feed.
+let _gage;
+function loadGageSeed() {
+  if (_gage !== undefined) return _gage;
+  try {
+    _gage = JSON.parse(fs.readFileSync(GAGE_FILE, "utf8"));
+  } catch {
+    _gage = null;
+  }
+  return _gage;
+}
+
+function gageCards() {
+  const g = loadGageSeed();
+  if (!g) return [];
+  const base = g.base || "";
+  const source = g.source || "Pencil Guy — by Gage";
+  const videos = (g.videos || [])
+    .filter((v) => v && v.slug && v.file)
+    .map((v) => ({
+      id: "gage:" + v.slug,
+      type: "watch",
+      title: v.title || v.slug,
+      url: "",
+      source,
+      published: null,
+      topics: ["gage", "watch", "art"],
+      image: v.poster ? base + v.poster : genThumb("watch", v.title || v.slug, source),
+      imageFallback: genThumb("watch", v.title || v.slug, source),
+      media: { kind: "video", src: base + v.file, poster: v.poster ? base + v.poster : "" },
+      evidence: { why: "BFDM series — hand-drawn by Gage", source },
+    }));
+  const art = (g.art || [])
+    .filter((a) => a && a.slug && a.file)
+    .map((a) => {
+      const full = base + a.file;
+      return {
+        id: "gage:" + a.slug,
+        type: "art",
+        title: a.title || a.slug,
+        url: full,
+        source,
+        published: null,
+        topics: ["gage", "art"],
+        image: full,
+        imageFallback: genThumb("art", a.title || a.slug, source),
+        media: { kind: "image", full, thumb: full, pixel: !!a.pixel },
+        evidence: { why: "Original game art by Gage", source },
+      };
+    });
+  return [...videos, ...art];
+}
+
 // ── Aggregate (Observe) ──────────────────────────────────────────────────────
 
 // Fan out to every producer; one source failing/timing out drops only its cards.
@@ -446,6 +561,8 @@ async function aggregate(userCtx) {
     ["belief", beliefCards],
     ["doc", () => Promise.resolve(docCards())],
     ["finance", () => Promise.resolve(financeCards(userCtx))],
+    ["gallery", () => Promise.resolve(galleryCards())],
+    ["gage", () => Promise.resolve(gageCards())],
   ];
   const settled = await Promise.allSettled(
     producers.map(([label, fn]) => withTimeout(fn(), PER_SOURCE_TIMEOUT_MS, label).catch(() => [])),
@@ -637,7 +754,7 @@ async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, topic =
   };
 }
 
-module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder, embedCards };
+module.exports = { aggregate, rankedFeed, pagedFeed, pickPage, diversityRerank, keyForSource, editorialOrder, embedCards, galleryCards, gageCards };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
