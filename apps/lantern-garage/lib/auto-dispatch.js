@@ -40,6 +40,7 @@ const DEFAULT_REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const STATE_FILE = () => path.join(DEFAULT_REPO_ROOT, "data", "agent-work-queue", "auto-dispatch-state.json");
 
 let inFlight = false;
+let inFlightSince = 0;   // epoch ms the current run took the lock (0 = not in flight)
 let timer = null;
 
 // Runtime status (truthful, in-memory; persisted bits reload on boot).
@@ -94,6 +95,19 @@ function setEnabled(on) {
 function intervalMs() {
   const n = Number(process.env.AUTO_DISPATCH_INTERVAL_MS);
   return Number.isFinite(n) && n >= 30000 ? n : 5 * 60 * 1000;
+}
+// Hard wall-clock ceiling on a single in-flight run. The 20-min dispatch budget is a
+// SOCKET-INACTIVITY timeout, not a wall clock: a slow-but-active autonomous-work stream
+// (data trickling, never a `done`) keeps the socket alive past 20 min and never settles,
+// pinning inFlight=true and blocking every future tick for the rest of the process
+// lifetime (sustained-work wedge). This ceiling lets the next tick force-release the lock.
+function staleMs() {
+  const n = Number(process.env.AUTO_DISPATCH_STALE_MS);
+  return Number.isFinite(n) && n >= 60000 ? n : 40 * 60 * 1000; // default 2× the 20-min budget
+}
+// Has the in-flight lock been held past the wall-clock ceiling? (wedge-recovery predicate)
+function inFlightStale(now = Date.now()) {
+  return inFlight && inFlightSince > 0 && now - inFlightSince > staleMs();
 }
 
 function getStatus() {
@@ -197,7 +211,31 @@ function autoLaneOccupied(repoRoot) {
 
 async function tick(ctx) {
   if (!enabled()) { status.pauseReason = "disabled (kill switch off)"; return; }
-  if (inFlight) { status.pauseReason = "a run is already in flight (serialized)"; return; }
+  if (inFlight) {
+    if (inFlightStale()) {
+      // The prior run blew past the wall-clock ceiling without settling — force-release
+      // the lock so the loop resumes (the abandoned worktree run finishes orphaned/GC'd).
+      // Record it as a failed result so the wedge is visible in history, not silent.
+      logErr(`[auto-dispatch] wedge recovery — in-flight run exceeded the ${Math.round(staleMs() / 60000)}m wall-clock ceiling; force-releasing the lock`);
+      const rec = {
+        issueNumber: status.lastPick && status.lastPick.issueNumber,
+        title: status.lastPick && status.lastPick.title,
+        at: new Date().toISOString(),
+        ok: false,
+        stoppedAt: "wedge_recovered: in-flight run exceeded the wall-clock ceiling",
+      };
+      status.lastResult = rec;
+      status.history.unshift(rec);
+      status.history = status.history.slice(0, 20);
+      inFlight = false;
+      inFlightSince = 0;
+      saveState();
+      // fall through: this tick dispatches fresh
+    } else {
+      status.pauseReason = "a run is already in flight (serialized)";
+      return;
+    }
+  }
   status.lastTickAt = new Date().toISOString();
   const port = ctx.port;
   if (!(await cloudHealthy(port))) {
@@ -215,6 +253,7 @@ async function tick(ctx) {
   const issue = pickTopIssue(ctx.repoRoot);
   if (!issue) { status.pauseReason = "backlog empty — no unclaimed open issues"; saveState(); return; }
   inFlight = true;
+  inFlightSince = Date.now();
   status.pauseReason = null;
   status.lastPick = { issueNumber: issue.issueNumber, title: issue.title, at: new Date().toISOString() };
   saveState();
@@ -250,6 +289,7 @@ async function tick(ctx) {
     logErr("[auto-dispatch] error (non-fatal):", e && e.message);
   } finally {
     inFlight = false;
+    inFlightSince = 0;
   }
 }
 
@@ -273,5 +313,9 @@ function stop() {
 
 module.exports = {
   start, stop, tick, enabled, setEnabled, getStatus, intervalMs,
-  cloudHealthy, pickTopIssue, _inFlight: () => inFlight,
+  cloudHealthy, pickTopIssue, staleMs, inFlightStale,
+  _inFlight: () => inFlight,
+  _inFlightSince: () => inFlightSince,
+  // test hook: simulate an in-flight run (optionally taken `ageMs` ago) without a real dispatch.
+  _setInFlight: (v, ageMs) => { inFlight = !!v; inFlightSince = v ? Date.now() - (ageMs || 0) : 0; },
 };
