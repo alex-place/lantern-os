@@ -1013,7 +1013,46 @@ function parseToolCall(text) {
     if (close !== -1) rest = rest.slice(0, close);
     inner = _firstJsonObject(rest);
   }
-  if (inner === null) { const b = text.match(/\{[\s\S]*?"name"[\s\S]*?\}/); if (b) inner = _firstJsonObject(b[0]); }
+  if (inner === null) {
+    // Fallback: many local models emit the call as a bare or ```json-fenced object
+    // with NO <tool_call> wrapper, e.g. {"name":"web_search","input":{"query":"…"}}.
+    // The `input` is itself a nested object, so the old non-greedy regex
+    // (/\{…?"name"…?\}/) stopped at the first INNER "}" and handed _firstJsonObject a
+    // truncated, unbalanceable string → every nested-input tool silently failed to
+    // parse. Instead, scan each "{" and brace-balance to find the first COMPLETE
+    // object that actually carries a string "name" (#1127 item 4: local tool-calling).
+    for (let i = text.indexOf("{"); i !== -1; i = text.indexOf("{", i + 1)) {
+      const candidate = _firstJsonObject(text.slice(i));
+      if (!candidate) continue;
+      const probe = _loadsLenient(candidate);
+      if (probe && typeof probe === "object" && typeof probe.name === "string" && probe.name.trim()) {
+        inner = candidate;
+        break;
+      }
+    }
+  }
+  if (inner === null) {
+    // Final fallback: small local models often drop the {"name","input"} envelope
+    // entirely and emit `<knownTool>{…args…}` — the tool name as a bare prefix with
+    // the arguments inline as the object, e.g. web_search{"query":"…"}. Recognize it
+    // ONLY for a name that is an actual registry tool (bounded → low false-positive),
+    // mapping the inline object straight to `input`. (#1127 item 4.)
+    for (const toolName of TOOL_NAMES) {
+      const idx = text.indexOf(toolName);
+      if (idx === -1) continue;
+      const after = text.slice(idx + toolName.length).replace(/^[\s:>"'`]*/, "");
+      if (!after.startsWith("{")) continue;
+      const objStr = _firstJsonObject(after);
+      if (!objStr) continue;
+      const args = _loadsLenient(objStr);
+      if (args && typeof args === "object") {
+        // If the inline object is itself a {"name","input"} envelope, defer to the
+        // standard path below instead of nesting it under input.
+        if (typeof args.name === "string") { inner = objStr; break; }
+        return { name: toolName, input: args };
+      }
+    }
+  }
   if (inner === null) return null;
   const obj = _loadsLenient(inner);
   if (!obj || typeof obj !== "object") return null;
