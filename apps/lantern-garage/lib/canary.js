@@ -24,6 +24,25 @@ const { appendJsonlQueued } = require("./file-queue");
 const repoRoot = path.resolve(__dirname, "../../../");
 const CANARY_EVENTS = path.resolve(repoRoot, "data/convergence/canary-events.jsonl");
 
+// The risk above which a confident-unanchored reply is "must-verify" (red) rather
+// than "offer-to-verify" (amber). Env-tunable; default 0.7. The amber floor is the
+// groundedness canary's own ungrounded threshold (default 0.5), so:
+//   green = anchored / not assertive enough to worry
+//   amber = ungrounded, 0.5 ≤ risk < HIGH      → offer a manual re-ground
+//   red   = ungrounded, risk ≥ HIGH            → auto-escalate to a grounding pass
+const GROUND_HIGH = (() => {
+  const v = Number(process.env.KEYSTONE_GROUND_HIGH);
+  return Number.isFinite(v) && v > 0 && v <= 1 ? v : 0.7;
+})();
+
+// Derive the 3-band verdict from the groundedness sub-score. Pure function of the
+// canary output — the band is the single source of truth the UI thresholds on, so
+// client logic stays dumb and the cutoff stays server-owned + configurable.
+function groundednessBand(grounded) {
+  if (!grounded.ungrounded) return "green";
+  return grounded.risk >= GROUND_HIGH ? "red" : "amber";
+}
+
 /**
  * Run both canary axes over a completed reply.
  *
@@ -55,6 +74,15 @@ function runCanaries(reply, opts = {}) {
   const signaturePatch = {
     sigma0_proximity: collapse.proximity,
     sigma0_grounding: { risk: grounded.risk, anchored: grounded.anchored },
+    // 3-band groundedness verdict (green/amber/red) — the active-gate input the UI
+    // reads to decide: pass · offer re-ground · auto-escalate. Stamped on every
+    // reply (green when healthy); additive, never mutates the reply.
+    groundedness: {
+      band: groundednessBand(grounded),
+      risk: grounded.risk,
+      anchored: grounded.anchored,
+      highThreshold: GROUND_HIGH,
+    },
   };
   if (collapse.collapsed) {
     tripped.push("collapse");

@@ -1271,6 +1271,28 @@ async function handleStreamChat(req, url, res) {
             `provider=${signature.provider} signals=${JSON.stringify(grounded.signals)}`
           );
         }
+        // #1733 honest abstention + manufactured negative: we FORCED a grounding pass
+        // (a "Ground this" / auto-verify retry) and the reply is STILL confident-but-
+        // unanchored with no grounding context found. Fail closed — flag it so the UI
+        // says "couldn't verify" instead of re-badging ungrounded — and append the
+        // verified "could not ground" example to the convergence corpus the ADR-0010
+        // distillation draws on (the positive/grounded half is emitClaimDraft below).
+        if (forceGround && grounded.ungrounded && !groundingContext) {
+          signature.abstained = true;
+          try {
+            const { appendConvergenceRecord } = require("./dream-chat");
+            appendConvergenceRecord({
+              hypothesis: String(message || "").slice(0, 500),
+              evidence: [],
+              result: "unverified",
+              confidence: { groundedness: Number((1 - grounded.risk).toFixed(2)) },
+              source: "groundedness-canary:forced-grounding-empty",
+              surface: "dream-chat",
+              provider: signature.provider,
+              risk: grounded.risk,
+            });
+          } catch { /* corpus logging must never break a reply */ }
+        }
       }
     } catch { /* canaries must never break a reply */ }
     // ── #911 live coding emitter: log Python candidates offline ─────────────
