@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.121] - 2026-06-29
+- feat(verify+converge): convergence replay / time-travel debugger (#1419). Adds `apps/lantern-garage/routes/replay.js` (+ `test/replay.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn routes. Improves the **Verify** + **Converge** stages: step back through convergence records to replay how a conclusion was reached. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.120] - 2026-06-29
 - fix(convergence): resolve a duplicate `class ConvergenceRecord` that broke CI across three workflows. `src/convergence/objects.py` defined `ConvergenceRecord` **twice** — the canonical reasoning record (`id`, `hypothesis`, `evidence_ids`, …) and, lower in the same file, an unrelated "grade card" (`oh_score`/`cap_score`/`overall_grade`). The second definition silently **shadowed** the first, so every `ConvergenceRecord(id=…)` raised `TypeError: unexpected keyword argument 'id'` — **65 failures + 10 errors** that turned the `CI`, `Static surface CI`, and `Orchestration challenge CI` workflows red (all three run the same pytest suite). The grade-card class is renamed `GradeCardRecord` and its sole consumer (`src/convergence_io_engine.py` `grade()`) updated; the canonical `ConvergenceRecord` is importable again. Verified: the 53 previously-failing convergence tests pass, and `objects.py` now defines each class exactly once. (Anti-sprawl: this is precisely the duplicate-definition class of bug the consolidation linter exists to prevent.)
 

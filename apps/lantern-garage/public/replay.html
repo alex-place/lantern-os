@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Convergence Replay — Keystone OS</title>
+  <style>
+    /* Convergence Replay / time-travel debugger (#1419): scrub the agent's reasoning. */
+    .w { max-width: 900px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+    .controls button { background: var(--surface2, rgba(255,255,255,.06)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.16)); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    .controls .pos { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--muted, #9aa0aa); margin-left: auto; }
+    select { background: var(--surface2, rgba(255,255,255,.05)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+    input[type=range] { width: 100%; margin: 8px 0 4px; }
+    .traj { position: relative; height: 70px; margin: 8px 0 0; }
+    .traj svg { width: 100%; height: 70px; display: block; }
+    .step .h { font-size: 16px; color: var(--text, #e5e7eb); line-height: 1.4; margin-bottom: 8px; }
+    .meta { font-size: 12px; color: var(--muted, #9aa0aa); margin-bottom: 8px; }
+    .meta .tag { display: inline-block; font-size: 10px; border-radius: 5px; padding: 2px 7px; margin-right: 6px;
+      background: rgba(56,189,248,.12); color: #38bdf8; }
+    .conf { font-size: 28px; font-weight: 700; }
+    .delta { font-size: 13px; font-weight: 600; margin-left: 8px; }
+    .up { color: #4ade80; } .down { color: #f87171; } .flat { color: #9aa0aa; }
+    .field { margin-top: 10px; } .field .l { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #9aa0aa); }
+    .field .v { font-size: 13px; color: var(--text, #d8dce2); line-height: 1.5; margin-top: 3px; }
+    .verified { color: #4ade80; } .unverified { color: #f87171; }
+    .reg h2 { font-size: 14px; color: var(--text, #e5e7eb); margin: 0 0 8px; }
+    .reg .row { font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.07)); cursor: pointer; }
+    .reg .row:hover { color: var(--accent, #06b6d4); }
+    .reg .why { color: #f59e0b; }
+    .empty { color: var(--muted, #9aa0aa); font-size: 14px; text-align: center; padding: 24px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/grounding-diff.html">Grounding</a>
+      <a href="/replay.html" class="active">Replay</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Convergence Replay</h1>
+    <p class="lede">git-bisect for the agent's reasoning. Scrub the timeline of past convergence records — hypothesis → evidence → result → confidence — and watch where confidence shifted or a verdict flipped. Jump straight to the regressions.</p>
+
+    <div class="card" id="player">
+      <div class="controls">
+        <button id="prev">◀ Step</button>
+        <button id="play">▶ Play</button>
+        <button id="next">Step ▶</button>
+        Reasoner: <select id="reasoner"><option value="">all</option></select>
+        <span class="pos" id="pos">—</span>
+      </div>
+      <input type="range" id="scrub" min="0" max="0" value="0">
+      <div class="traj"><svg id="traj" viewBox="0 0 600 70" preserveAspectRatio="none"></svg></div>
+    </div>
+
+    <div class="card step" id="stepCard"><div class="empty">Loading…</div></div>
+    <div class="card reg" id="regCard" style="display:none"><h2 id="regTitle">Regressions — where reasoning went wrong</h2><div id="regs"></div></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    var timeline = [], idx = 0, playing = null;
+
+    function drawTraj() {
+      var svg = document.getElementById('traj'); var n = timeline.length;
+      if (!n) { svg.innerHTML = ''; return; }
+      var pts = timeline.map(function (s, i) {
+        var x = n > 1 ? i / (n - 1) * 600 : 300;
+        var c = (s.confidence == null) ? 0.5 : s.confidence;
+        return [x, 66 - c * 60];
+      });
+      var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+      var cx = pts[idx][0], cy = pts[idx][1];
+      svg.innerHTML = '<path d="' + path + '" fill="none" stroke="#38bdf8" stroke-width="1.5"/>'
+        + '<line x1="' + cx + '" y1="0" x2="' + cx + '" y2="70" stroke="#06b6d4" stroke-width="1" opacity="0.6"/>'
+        + '<circle cx="' + cx + '" cy="' + cy + '" r="4" fill="#06b6d4"/>';
+    }
+
+    function render() {
+      var s = timeline[idx]; if (!s) { document.getElementById('stepCard').innerHTML = '<div class="empty">No records to replay yet.</div>'; return; }
+      document.getElementById('pos').textContent = (idx + 1) + ' / ' + timeline.length;
+      document.getElementById('scrub').value = idx;
+      var conf = s.confidence == null ? '—' : Math.round(s.confidence * 100) + '%';
+      var dcls = s.delta == null ? 'flat' : (s.delta > 0 ? 'up' : (s.delta < 0 ? 'down' : 'flat'));
+      var darr = s.delta == null ? '' : (s.delta > 0 ? '▲ +' : (s.delta < 0 ? '▼ ' : '■ ')) + Math.round(s.delta * 100) + ' pts';
+      document.getElementById('stepCard').innerHTML =
+        '<div class="meta"><span class="tag">' + esc(s.reasoner) + '</span>' + esc((s.ts || '').replace('T', ' ').slice(0, 19))
+          + (s.verified === true ? ' · <span class="verified">verified</span>' : (s.verified === false ? ' · <span class="unverified">unverified</span>' : '')) + '</div>'
+        + '<div class="h">' + esc(s.hypothesis) + '</div>'
+        + '<div><span class="conf">' + conf + '</span><span class="delta ' + dcls + '">' + darr + '</span></div>'
+        + (s.evidence ? '<div class="field"><div class="l">Evidence</div><div class="v">' + esc(s.evidence) + '</div></div>' : '')
+        + (s.result ? '<div class="field"><div class="l">Result</div><div class="v">' + esc(s.result) + '</div></div>' : '');
+      drawTraj();
+    }
+
+    function go(i) { idx = Math.max(0, Math.min(timeline.length - 1, i)); render(); }
+
+    async function load() {
+      var reasoner = document.getElementById('reasoner').value;
+      var r = await fetch('/api/replay' + (reasoner ? '?reasoner=' + encodeURIComponent(reasoner) : '')).then(function (x) { return x.json(); });
+      timeline = r.timeline || []; idx = 0;
+      var sel = document.getElementById('reasoner');
+      if (sel.options.length <= 1 && r.reasoners) r.reasoners.forEach(function (rs) { var o = document.createElement('option'); o.value = rs; o.textContent = rs; sel.appendChild(o); });
+      document.getElementById('scrub').max = Math.max(0, timeline.length - 1);
+      var rc = document.getElementById('regCard');
+      if (r.regressions && r.regressions.length) {
+        rc.style.display = '';
+        var total = r.regressionsTotal || r.regressions.length;
+        document.getElementById('regTitle').textContent = 'Regressions — where reasoning went wrong ('
+          + (total > r.regressions.length ? 'showing ' + r.regressions.length + ' of ' + total : total) + ')';
+        document.getElementById('regs').innerHTML = r.regressions.map(function (g) {
+          return '<div class="row" data-i="' + g.i + '">#' + (g.i + 1) + ' · ' + esc(g.hypothesis.slice(0, 70)) + ' <span class="why">— ' + esc(g.reason) + '</span></div>'; }).join('');
+        document.querySelectorAll('.reg .row').forEach(function (el) { el.addEventListener('click', function () { go(parseInt(el.getAttribute('data-i'), 10)); }); });
+      } else { rc.style.display = 'none'; }
+      render();
+    }
+
+    document.getElementById('prev').addEventListener('click', function () { go(idx - 1); });
+    document.getElementById('next').addEventListener('click', function () { go(idx + 1); });
+    document.getElementById('scrub').addEventListener('input', function (e) { go(parseInt(e.target.value, 10)); });
+    document.getElementById('reasoner').addEventListener('change', load);
+    document.getElementById('play').addEventListener('click', function () {
+      var btn = this;
+      if (playing) { clearInterval(playing); playing = null; btn.textContent = '▶ Play'; return; }
+      btn.textContent = '❚❚ Pause';
+      playing = setInterval(function () { if (idx >= timeline.length - 1) { clearInterval(playing); playing = null; btn.textContent = '▶ Play'; return; } go(idx + 1); }, 700);
+    });
+    load();
+  </script>
+</body>
+</html>
