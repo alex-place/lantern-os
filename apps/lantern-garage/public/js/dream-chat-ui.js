@@ -1766,7 +1766,14 @@ async function sendMessage(opts = {}) {
   try {
     const provider = requestedProvider;
     // Files attached via the "+" work tool — sent with this one turn, then cleared.
-    const sentAttachments = (window.pendingAttachments || []).filter(a => a && a.text).map(a => ({ name: a.name, text: a.text }));
+    // Forward text files AND images. Images carry a data URL (no extracted text) and the
+    // server resolves them via the vision model — without this they were dropped here and
+    // the model would report it received "0 files" despite a visible attachment (#1606).
+    const sentAttachments = (window.pendingAttachments || [])
+      .filter(a => a && (a.text || a.image))
+      .map(a => (a.image && !a.text)
+        ? { name: a.name, image: a.image, mimeType: a.mimeType }
+        : { name: a.name, text: a.text });
     const resp = await fetch('/api/dream/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

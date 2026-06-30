@@ -31,6 +31,7 @@ const { defaultRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
 const { generateDoorSceneImage } = require("./image-generation");
+const { analyzeImage } = require("./vision");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
 // #1012 boiling-frog defense: ms epoch of the last mandatory external-grounding tick.
@@ -247,6 +248,27 @@ async function handleStreamChat(req, url, res) {
   });
   let { message, user, requestedAgent, requestedProvider, history, mcpFlag, routeIntent } = parsed;
   const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  // Image attachments (#1606): every downstream consumer on this path treats an attachment
+  // as TEXT, so an uploaded image (which carries no extractable text) used to vanish silently
+  // and the model would honestly report it received "0 files". Resolve each image to a text
+  // description via the provider-portable vision helper so the chat can actually SEE and act
+  // on the picture. Runs once per turn, bounded to the (≤4) attachments parse already capped.
+  for (const a of attachments) {
+    if (a && typeof a.image === "string" && a.image.trim() && !(a.text && a.text.trim())) {
+      try {
+        const v = await analyzeImage(
+          "Describe this image in detail for a reasoning assistant: transcribe any visible text verbatim, and note objects, layout, colours, charts, and anything notable so the assistant can answer questions or act on it.",
+          a.image,
+          { mimeType: a.mimeType },
+        );
+        a.text = v && v.ok && v.text
+          ? `[image "${a.name}" — visual description from vision model below]\n${v.text}`
+          : `[image "${a.name}" — could not be analyzed: ${(v && v.error) || "vision unavailable"}]`;
+      } catch (e) {
+        a.text = `[image "${a.name}" — vision error: ${e && e.message ? e.message : String(e)}]`;
+      }
+    }
+  }
   // "Ground this" retry (groundedness canary loop): force the web-search grounding
   // Prepend attachment content to the user's message if available.
   if (attachments.length > 0) {
@@ -1008,7 +1030,9 @@ async function handleStreamChat(req, url, res) {
   // primary evidence: read, quote, summarize, or act on them, and ground answers in their content.
   let attachmentBlock = "";
   if (attachments.length) {
-    const blocks = attachments.map((a) => `--- Attached file: ${a.name} (${a.text.length} chars) ---\n${a.text}`).join("\n\n");
+    const blocks = attachments
+      .filter((a) => a && a.text)
+      .map((a) => `--- Attached file: ${a.name} (${a.text.length} chars) ---\n${a.text}`).join("\n\n");
     attachmentBlock = `\n\nAttached files for this turn (the user uploaded these — treat them as the primary evidence; quote/summarize/act on them and cite the filename):\n${blocks}`;
   }
 
@@ -1883,6 +1907,12 @@ async function handleStreamChat(req, url, res) {
               // call another tool or answer — matching the cloud models' agency. Bounded.
               const convo = buildProviderMessages(sysForOllama, compacted, message);
               let lastTurn = fullReply;
+              // The first turn was a pure tool call — its raw markup (```json …,
+              // <tool_call>…, or name{…}) must NOT leak into the user-facing answer.
+              // Build the final reply from the GROUNDED follow-up turns only, falling
+              // back to the original text just in case nothing usable comes back.
+              const _firstTurn = fullReply;
+              let toolAnswer = "";
               const MAX_TOOL_ITERS = 5;
               for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
                 const result = await toolRunner.runTool(tc.name, tc.input, { operator });
@@ -1897,8 +1927,11 @@ async function handleStreamChat(req, url, res) {
                 const followText = await streamOllamaFollow(convo);
                 const nextTc = toolRunner.parseToolCall(followText);
                 if (nextTc) { tc = nextTc; lastTurn = followText; } // markup already streamed; keep going
-                else { if (followText.trim()) fullReply += "\n\n" + followText; tc = null; }
+                else { if (followText.trim()) toolAnswer += (toolAnswer ? "\n\n" : "") + followText.trim(); tc = null; }
               }
+              // Prefer the grounded answer; only fall back to the first turn if the
+              // local model produced no usable follow-up text at all.
+              fullReply = toolAnswer.trim() || _firstTurn;
             }
           } catch (e) { /* tool handling is non-fatal — fall through to normal render */ }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);

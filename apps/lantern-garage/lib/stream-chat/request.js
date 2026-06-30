@@ -12,15 +12,28 @@ function sanitizeHistory(value, limit = 6) {
 }
 
 // Uploaded files attached to this turn (the "+" work tool). Bounded count + size.
-function sanitizeAttachments(value, maxItems = 4, maxChars = 24000) {
+// An attachment is kept if it carries extractable text OR an image data URL (#1606):
+// images have no text but must survive so the server can resolve them via the vision
+// model — otherwise they vanish and the model reports it received "0 files".
+function sanitizeAttachments(value, maxItems = 4, maxChars = 24000, maxImageChars = 8_000_000) {
   if (!Array.isArray(value)) return [];
   return value
-    .filter((a) => a && typeof a === "object" && typeof a.text === "string" && a.text.trim())
+    .filter((a) => a && typeof a === "object" && (
+      (typeof a.text === "string" && a.text.trim()) ||
+      (typeof a.image === "string" && a.image.trim())
+    ))
     .slice(0, maxItems)
-    .map((a) => ({
-      name: String(a.name || "file").slice(0, 200),
-      text: String(a.text).slice(0, maxChars),
-    }));
+    .map((a) => {
+      const name = String(a.name || "file").slice(0, 200);
+      if (typeof a.image === "string" && a.image.trim()) {
+        return {
+          name,
+          image: String(a.image).slice(0, maxImageChars),
+          mimeType: typeof a.mimeType === "string" ? a.mimeType.slice(0, 100) : "image/png",
+        };
+      }
+      return { name, text: String(a.text).slice(0, maxChars) };
+    });
 }
 
 async function parseStreamChatRequest(req, url, deps = {}) {

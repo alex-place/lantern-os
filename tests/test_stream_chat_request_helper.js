@@ -84,6 +84,31 @@ assert.deepStrictEqual(sanitizeHistory([{ role: "user" }]), []);
   });
   assert.strictEqual(whitespaceBody.parseError, "empty_body");
 
+  // Image attachments survive sanitization (#1606): an uploaded image carries a data URL
+  // and NO text. It must be kept (so the server can resolve it via vision) — previously it
+  // was filtered out and the model reported it received "0 files".
+  const withImage = await parseStreamChatRequest({ method: "POST" }, postUrl, {
+    collectRequestBody: async () => JSON.stringify({
+      message: "what is this?",
+      user: "alex",
+      attachments: [
+        { name: "photo.png", image: "data:image/png;base64,iVBORw0KAA==", mimeType: "image/png" },
+        { name: "notes.txt", text: "hello world" },
+        { name: "empty.png", image: "   " },     // blank image → dropped
+        { name: "nothing.bin" },                 // neither text nor image → dropped
+      ],
+    }),
+  });
+  assert.strictEqual(withImage.attachments.length, 2);
+  const img = withImage.attachments.find((a) => a.name === "photo.png");
+  assert.ok(img, "image attachment kept");
+  assert.strictEqual(img.image, "data:image/png;base64,iVBORw0KAA==");
+  assert.strictEqual(img.mimeType, "image/png");
+  assert.strictEqual(img.text, undefined);
+  const txt = withImage.attachments.find((a) => a.name === "notes.txt");
+  assert.ok(txt && txt.text === "hello world", "text attachment kept");
+  assert.strictEqual(txt.image, undefined);
+
   console.log("stream-chat request helper tests passed");
 })().catch((error) => {
   console.error(error);
