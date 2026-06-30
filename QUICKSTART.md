@@ -132,8 +132,8 @@ Handy if you want to experiment without breaking your working copy: one stable c
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 ```
-
-- **Port 4177** — your stable copy (the `master` branch)
+- **Port 4177** — your stable copy (the `master` branch), no hot-reload
+- **Port 4178** — your playground (your current branch, auto-reloads as you change files)
 - **Port 4178** — your playground (your current branch, auto-reloads as you change files)
 - **Port 8771** — MCP server (shared, tools for Claude Code) *(requires Python)*
 
