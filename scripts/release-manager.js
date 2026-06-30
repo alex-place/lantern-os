@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const args = process.argv.slice(2);
 const bumpType = args[0] || 'patch'; // major, minor, or patch
@@ -47,7 +47,7 @@ function updatePackageJson(file, newVersion) {
 
 function getCommitsSince(lastTag) {
   try {
-    return execSync(`git log ${lastTag}..HEAD --pretty=format:"%s"`, { cwd: ROOT, encoding: 'utf-8' })
+    return execFileSync('git', ['log', `${lastTag}..HEAD`, '--pretty=format:%s'], { cwd: ROOT, encoding: 'utf-8' })
       .split('\n')
       .filter(l => l.trim())
       .slice(0, 20); // Last 20 commits
@@ -124,12 +124,15 @@ try {
     console.log(`✓ Updated CHANGELOG.MD with ${commits.length} commits`);
   }
 
-  // Commit
-  execSync(`git add package.json apps/lantern-garage/package.json ${autoChangelog ? 'CHANGELOG.MD' : ''}`, { cwd: ROOT });
-  execSync(
-    `git commit -m "chore(release): bump to ${newVersion}${autoChangelog ? ' + auto-changelog' : ''}\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>"`,
-    { cwd: ROOT }
-  );
+  // Commit — shell-free: file list + message are discrete argv elements.
+  execFileSync('git', [
+    'add', 'package.json', 'apps/lantern-garage/package.json',
+    ...(autoChangelog ? ['CHANGELOG.MD'] : []),
+  ], { cwd: ROOT });
+  execFileSync('git', [
+    'commit', '-m',
+    `chore(release): bump to ${newVersion}${autoChangelog ? ' + auto-changelog' : ''}\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>`,
+  ], { cwd: ROOT });
   console.log(`✓ Committed version bump`);
 
   console.log(`\n✅ Version bump complete. Ready to tag & release.`);

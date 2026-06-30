@@ -15,7 +15,7 @@
 
 const fs   = require("fs");
 const path = require("path");
-const { execFileSync, execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -54,9 +54,16 @@ const rel  = p  => path.join(ROOT, p);
 const has  = p  => fs.existsSync(rel(p));
 const read = p  => fs.readFileSync(rel(p), "utf8");
 
-function git(cmd) {
-  try { return execSync(`git -C ${ROOT} ${cmd}`, { encoding: "utf8" }).trim(); }
-  catch { return null; }
+// Shell-free: argv array to execFileSync (no shell). stderr is discarded so a
+// failing query (e.g. no origin/master) stays quiet — the helper already returns
+// null on error, which is why callers previously appended `2>/dev/null`.
+function git(args) {
+  try {
+    return execFileSync("git", ["-C", ROOT, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch { return null; }
 }
 
 function isGitIgnored(filePath) {
@@ -99,7 +106,7 @@ function scan() {
   }
 
   // 3. Git state — uncommitted changes
-  const dirty = git("status --short");
+  const dirty = git(["status", "--short"]);
   if (dirty && dirty.length > 0) {
     issues.push(issue(
       "GIT:DIRTY",
@@ -110,9 +117,9 @@ function scan() {
   }
 
   // 4. Git state — local master ahead of origin
-  const branch = git("branch --show-current");
+  const branch = git(["branch", "--show-current"]);
   if (branch === "master") {
-    const ahead = git("rev-list --count origin/master..master 2>/dev/null");
+    const ahead = git(["rev-list", "--count", "origin/master..master"]);
     if (ahead && parseInt(ahead, 10) > 0) {
       issues.push(issue(
         "GIT:UNPUSHED",

@@ -5,7 +5,7 @@
  * Non-blocking: failures do not prevent startup.
  */
 
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 const { existsSync } = require("fs");
 const { join } = require("path");
 
@@ -38,12 +38,15 @@ function main() {
 
   try {
     if (isWin) {
-      execSync(
-        `powershell -ExecutionPolicy Bypass -File "${script}"`,
+      // Shell-free: the installer path is a discrete argv element (handles spaces
+      // and never re-interprets the path through a shell).
+      execFileSync(
+        "powershell",
+        ["-ExecutionPolicy", "Bypass", "-File", script],
         { stdio: "inherit", timeout: 300000 }
       );
     } else {
-      execSync(`bash "${script}"`, { stdio: "inherit", timeout: 300000 });
+      execFileSync("bash", [script], { stdio: "inherit", timeout: 300000 });
     }
     console.log("[ensure-rust] Rust installed successfully.");
   } catch (err) {

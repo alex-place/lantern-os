@@ -14,7 +14,7 @@
 
 const fs            = require("fs");
 const path          = require("path");
-const { execSync }  = require("child_process");
+const { execFileSync } = require("child_process");
 
 const REPO_ROOT     = path.resolve(__dirname, "..");
 
@@ -25,8 +25,11 @@ function worktreeBase(repoRoot) {
   return path.join(repoRoot, ".claude", "worktrees");
 }
 
-function git(cmd, repoRoot = REPO_ROOT, opts = {}) {
-  return execSync(`git -C ${JSON.stringify(repoRoot)} ${cmd}`, {
+// Shell-free: argv elements are passed discretely to execFileSync (shell:false),
+// so a path or branch name can never be re-interpreted by a shell — no quoting
+// needed (the old `${JSON.stringify(...)}` quoting is gone with the shell).
+function git(args, repoRoot = REPO_ROOT, opts = {}) {
+  return execFileSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     ...opts,
   }).trim();
@@ -51,7 +54,7 @@ function createWorktree(lane, issueNumber, issueTitle, repoRoot = REPO_ROOT) {
 
   // Remove stale worktree dir if it exists but isn't registered
   if (fs.existsSync(wtPath)) {
-    try { git(`worktree remove --force ${JSON.stringify(wtPath)}`, repoRoot); } catch {}
+    try { git(["worktree", "remove", "--force", wtPath], repoRoot); } catch {}
     fs.rmSync(wtPath, { recursive: true, force: true });
   }
 
@@ -59,16 +62,16 @@ function createWorktree(lane, issueNumber, issueTitle, repoRoot = REPO_ROOT) {
   // `master`, so the worktree base includes fixes merged since this checkout
   // last pulled (#942). Best-effort fetch keeps origin/master current; fall back
   // to local master only if the remote-tracking ref can't be resolved.
-  try { git(`fetch origin master`, repoRoot); } catch { /* offline — use local origin/master */ }
+  try { git(["fetch", "origin", "master"], repoRoot); } catch { /* offline — use local origin/master */ }
   let baseRef = "origin/master";
-  try { git(`rev-parse --verify --quiet ${baseRef}`, repoRoot); }
+  try { git(["rev-parse", "--verify", "--quiet", baseRef], repoRoot); }
   catch { baseRef = "master"; }
   try {
-    git(`branch ${JSON.stringify(branch)} ${baseRef}`, repoRoot);
+    git(["branch", branch, baseRef], repoRoot);
   } catch (e) {
     if (!e.message.includes("already exists")) throw e;
   }
-  git(`worktree add ${JSON.stringify(wtPath)} ${JSON.stringify(branch)}`, repoRoot);
+  git(["worktree", "add", wtPath, branch], repoRoot);
 
   return { worktreePath: wtPath, branch };
 }
@@ -78,13 +81,13 @@ function createWorktree(lane, issueNumber, issueTitle, repoRoot = REPO_ROOT) {
  */
 function removeWorktree(worktreePath, { deleteBranch = false, branch, repoRoot = REPO_ROOT } = {}) {
   try {
-    git(`worktree remove --force ${JSON.stringify(worktreePath)}`, repoRoot);
+    git(["worktree", "remove", "--force", worktreePath], repoRoot);
   } catch {}
   if (fs.existsSync(worktreePath)) {
     fs.rmSync(worktreePath, { recursive: true, force: true });
   }
   if (deleteBranch && branch) {
-    try { git(`branch -D ${JSON.stringify(branch)}`, repoRoot); } catch {}
+    try { git(["branch", "-D", branch], repoRoot); } catch {}
   }
 }
 
@@ -92,7 +95,7 @@ function removeWorktree(worktreePath, { deleteBranch = false, branch, repoRoot =
  * List all registered worktrees (excluding main).
  */
 function listWorktrees(repoRoot = REPO_ROOT) {
-  const raw = git("worktree list --porcelain", repoRoot);
+  const raw = git(["worktree", "list", "--porcelain"], repoRoot);
   const trees = [];
   let current = {};
   for (const line of raw.split("\n")) {
