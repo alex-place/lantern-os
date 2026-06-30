@@ -67,6 +67,27 @@ The lossless, retrieval-indexed form of the Σ₀ "no-change is free / dust" obs
 [`memory_engine.py`](../../src/csf/memory_engine.py) (unwired). **Constraint:** base record must be retained
 and decompression deterministic.
 
+### 2.1 Premise probed (2026-06-29) — does NOT pay at current data scale; DEFER
+
+Before building the index-dependent compaction path, the load-bearing premise — *"zstd cannot reference a
+match outside its window, so retrieval reaches a base record zstd can't"* — was tested directly on the real
+logs (`probe_rkd_premise()` in [`csf_compression_benchmark.py`](../../experiments/csf_compression_benchmark.py)):
+
+- **Probe A (window sensitivity).** zstd-19 on `raw.jsonl` (320,163 B) with a **16 KB** window → 23,176 B;
+  with a **128 MB** window (can reach anywhere) → 22,349 B — only **3.6 % better**. Allowing zstd arbitrarily
+  distant matches barely helps, because every memory log here (≤320 KB) **already fits inside zstd-19's
+  default window**. The near-duplicate redundancy is *local*, and LZ already captures it.
+- **Probe B (RKD oracle ceiling).** A deliberately *over-credited* oracle — global lexicographic clustering of
+  records (more than real RKD could do) + an honest permutation cost to stay lossless — still **loses to
+  col-best** on the logs that matter: `raw.jsonl` +2,688 B worse (≈14 %), `deltas.jsonl` +241 B worse. It only
+  edges brotli by ~10–40 B on the two tiny 3–4 KB logs, where real RKD's back-reference encoding would erase
+  the margin.
+
+**Verdict: premise refuted at current scale.** RKD is a *multi-MB / window-exceeding* technique; it has no
+headroom while logs fit in the zstd window. **Defer** until a single memory log exceeds ~the zstd window
+(≈8 MB at L19) — at which point re-run the probe before building. Not a current-data win; do not wire the
+index for compression on this basis alone.
+
 ## 3. Technique 3 — grounded residual coding with Σ₀-gated adaptive depth (GRC = corrected E1) · #1595
 
 Use the **already-resident** model as the arithmetic-coding predictor for **cold** archives. Three moves:

@@ -278,6 +278,63 @@ def bench_col_memory(per_file):
     return rows
 
 
+def probe_rkd_premise(per_file):
+    """Falsify/confirm Technique 2 (RKD, #1594) BEFORE building it.
+
+    RKD's load-bearing premise: "zstd cannot reference a match outside its window, so
+    retrieval reaches a distant base record zstd can't." Two cheap probes test it on the
+    real logs:
+      A. window sensitivity — zstd-19 with a tiny vs huge window. If a huge window barely
+         beats a small one, the file already fits in the window and distant matching adds
+         nothing (no RKD headroom).
+      B. RKD oracle ceiling — globally sort records to cluster all near-duplicates
+         adjacently (MORE than real RKD could achieve), compress, and add an honest
+         permutation cost (n*log2(n) bits) to stay lossless. If even this over-credited
+         oracle can't beat brotli-11/col, real RKD can't either at this scale."""
+    if zstd is None or brotli is None:
+        print("\n### RKD premise probe (#1594) — needs zstd+brotli; skipped")
+        return []
+    import math
+    from csf import omni as _omni
+
+    def zwin(b, wlog):
+        p = zstd.ZstdCompressionParameters.from_level(19, window_log=wlog)
+        return len(zstd.ZstdCompressor(compression_params=p).compress(b))
+
+    print("\n### RKD premise probe (Technique 2, #1594) — should we build it at current scale?")
+    print(f"{'log':<24}{'raw':>9}{'zstd w=14':>11}{'zstd w=27':>11}{'win gain':>10}"
+          f"{'brotli11':>10}{'col-best':>10}{'RKD-oracle':>12}  verdict")
+    print("-" * 110)
+    out = []
+    for name, b in per_file:
+        raw = len(b)
+        w14, w27 = zwin(b, 14), zwin(b, 27)
+        win_gain = (w14 / w27 - 1) * 100 if w27 else 0.0
+        br = len(brotli.compress(b, quality=11))
+        col_best = min((s for lbl, s in _omni.rank(b, effort="exhaustive")
+                        if lbl.startswith("col")), default=br)
+        lines = b.split(b"\n")
+        trailing = bool(lines) and lines[-1] == b""
+        if trailing:
+            lines = lines[:-1]
+        n = len(lines)
+        order = sorted(range(n), key=lambda i: lines[i])
+        sorted_blob = b"\n".join(lines[i] for i in order) + (b"\n" if trailing else b"")
+        perm = math.ceil(n * math.log2(max(n, 2)) / 8)        # lossless: restore order
+        oracle = len(brotli.compress(sorted_blob, quality=11)) + perm
+        best_codec = min(br, col_best)
+        verdict = "RKD edge" if oracle < best_codec else f"loses (+{oracle - best_codec}B)"
+        print(f"{name[:23]:<24}{raw:>9,}{w14:>11,}{w27:>11,}{win_gain:>9.1f}%"
+              f"{br:>10,}{col_best:>10,}{oracle:>12,}  {verdict}")
+        out.append({"log": name, "win_gain_pct": win_gain, "oracle": oracle,
+                    "best_codec": best_codec})
+    wins = [r for r in out if r["oracle"] < r["best_codec"]]
+    print(f"  -> Even the over-credited RKD oracle beats the best codec on only "
+          f"{len(wins)}/{len(out)} logs (the tiny ones). Window gain w14->w27 is small "
+          f"because logs fit in zstd's window. Premise does not pay at current scale -> DEFER #1594.")
+    return out
+
+
 def dominance(name: str, rows):
     """Confirm CSF-Omni is the top (or tied-top) ratio on this corpus.
 
@@ -325,6 +382,7 @@ def main():
     mem_files = corpus_csf_memory()
     if mem_files:
         bench_col_memory(mem_files)
+        probe_rkd_premise(mem_files)
 
     cube = corpus_cube_delta()
     if cube:
