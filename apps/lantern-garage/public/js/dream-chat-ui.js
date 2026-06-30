@@ -517,7 +517,7 @@ const COMMANDS = [
   { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
   { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
   { name: 'swarm',       group: 'Build',   usage: '!swarm <task>',     desc: 'Multi-agent swarm (council/consensus) on a task' },
-  { name: 'radio',       group: 'Explore', usage: '!radio',            desc: 'Summon Keystone Radio inline (also: “play fallout radio”)', aliases: ['play'] },
+  { name: 'radio',       group: 'Explore', usage: '!radio',            desc: 'Summon Radio inline (also: “play fallout radio”)', aliases: ['play'] },
   { name: 'videos',      group: 'Explore', usage: '!videos',           desc: 'Fresh videos feed', aliases: ['watch'] },
   { name: 'discover',    group: 'Explore', usage: '!discover',         desc: 'Discover reads/news feed', aliases: ['news', 'reads', 'feed'] },
   { name: 'build',       group: 'Explore', usage: '!build',            desc: 'Repo build activity (releases + commits)', aliases: ['github', 'releases', 'commits'] },
@@ -1329,8 +1329,8 @@ const SUMMON_VERBS = /\b(play|summon|open|launch|start|run|boot|listen(?:\s+to)?
 // route 404s on a stale server). kind: listen|game|watch drives the verb + icon.
 const EMBED_SEED = [
   {
-    slug: 'keystone-radio', title: 'Keystone Radio', kind: 'listen',
-    src: '/fallout-radio.html', height: 620, source: 'Keystone Radio',
+    slug: 'keystone-radio', title: 'Radio', kind: 'listen',
+    src: '/fallout-radio.html', height: 620, source: 'Radio',
     url: '/fallout-radio.html',
     lore: 'A retro Pip-Boy tuner spinning public-domain 1940s radio — the songs that play at the end of the world. Press play; tune the dial.',
     aliases: ['fallout radio', 'keystone radio', 'pip-boy radio', 'radio'],
@@ -1575,7 +1575,7 @@ async function sendMessage(opts = {}) {
     return;
   }
 
-  // !radio summons Keystone Radio; !play <name> summons any Explore embed by name.
+  // !radio summons Radio; !play <name> summons any Explore embed by name.
   // (Slash forms /radio and /play work too — /radio normalizes via the command list.)
   const summonCmd = text.match(/^[!/](radio|play)\b\s*(.*)$/i);
   if (summonCmd) {

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a140e">
-  <title>Keystone Radio — Founder's Frequency</title>
+  <title>Radio — Founder's Frequency</title>
   <style>
     /*
-      Keystone Radio — a retro Pip-Boy / tube-radio MP3 player.
+      Radio — a retro Pip-Boy / tube-radio MP3 player.
       Its own phosphor-green CRT theme (a radio is its own device, so it ignores
       the site light/dark theme on purpose). A TRUE <audio> player: custom
       transport (play/pause, prev/next, seek, volume, mute), repeat, and
@@ -354,7 +354,7 @@
   </style>
 </head>
 <body>
-  <main class="radio pipboy" aria-label="Keystone Radio — unofficial Pip-Boy player">
+  <main class="radio pipboy" aria-label="Radio — unofficial Pip-Boy player">
    <div class="pip-display">
     <div class="pip-tabs" aria-label="Pip-Boy modules">
       <span class="pip-tab" aria-disabled="true" title="module offline">STAT</span>
@@ -768,7 +768,7 @@
       if (!('mediaSession' in navigator)) return;
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
-          title: s.title, artist: s.artist, album: 'Keystone Radio · ' + s.freq + ' FM'
+          title: s.title, artist: s.artist, album: 'Radio · ' + s.freq + ' FM'
         });
         navigator.mediaSession.setActionHandler('play', play);
         navigator.mediaSession.setActionHandler('pause', function(){ audio.pause(); });
