@@ -338,6 +338,73 @@ function selectBest(taskType = "default", opts = {}) {
   return selectChain(taskType, opts)[0] || null;
 }
 
+/**
+ * Resolve the AUTHORITATIVE local model lead + ordered chain for an intent.
+ *
+ * The registry is the SOURCE OF TRUTH for which local model leads (CLAUDE.md North
+ * Star: models are replaceable; never hardcode one). This folds the operator's
+ * OLLAMA_MODEL pin and any caller-supplied served fallback chain into the registry's
+ * VRAM-gated capability order WITHOUT letting a stale pin (e.g. the legacy
+ * `ouro:latest` default) silently front-jump and defeat the capability swap — the
+ * exact bug that left keystone chat pinned to Ouro while the adapter quietly picked
+ * the better model.
+ *
+ * LEAD precedence:
+ *   1. An OLLAMA_MODEL pin the registry does NOT manage (operator pulled a custom
+ *      model the registry has no opinion on) → honor it as the lead.
+ *   2. Otherwise the registry's capability-gated #1 for this intent + detected box.
+ * A registry-managed pin stays a CANDIDATE in the chain but takes its capability
+ * slot — never a front-jump. Escape hatch: LOCAL_CAPABILITY_FIRST=0 flips the
+ * registry to rank-order (Ouro-first) and that rank-0 model leads naturally.
+ *
+ * @param {string} intent  kernel|coding|reasoning|creative|csf|default
+ * @param {object} [opts]
+ *   pin       {string|null} operator pin (default: process.env.OLLAMA_MODEL)
+ *   fallback  {string[]}    extra served models kept as deduped tail candidates
+ *   vramBudgetGB, capabilityFirst, includeAll — forwarded to selectChain
+ * @returns {{chain:string[], lead:string|null, registryLead:string|null,
+ *   reason:string, vramBudgetGB:number, capabilityFirst:boolean,
+ *   pinHonored:boolean, pin:string|null}}
+ */
+function resolveLocalLead(intent = "default", opts = {}) {
+  const pin = (opts.pin !== undefined ? opts.pin : process.env.OLLAMA_MODEL) || "";
+  const fallback = Array.isArray(opts.fallback) ? opts.fallback : [];
+  const budget = Number.isFinite(opts.vramBudgetGB) ? opts.vramBudgetGB : _vramBudgetGB();
+  const pref = _capabilityFirstPref(opts.capabilityFirst);
+  const capabilityFirst = pref === null ? !STRICT_TASKS.has(intent) : pref;
+
+  const registryChain = selectChain(intent, opts);
+  const registryLead = registryChain[0] || null;
+
+  // Registry chain leads; the caller's served fallbacks fill the tail (deduped).
+  const seen = new Set();
+  const chain = [];
+  const push = (m) => { if (m && !seen.has(m)) { seen.add(m); chain.push(m); } };
+  registryChain.forEach(push);
+  fallback.forEach(push);
+
+  // OLLAMA_MODEL pin: always kept as a CANDIDATE; it LEADS only when the registry
+  // does not manage it (a deliberate custom model). A registry-managed pin keeps
+  // its capability slot so it can never front-jump the swap.
+  const pinManaged = pin ? !!getEntry(pin) : false;
+  if (pin) push(pin);
+  let lead = registryLead;
+  let pinHonored = false;
+  if (pin && !pinManaged) { lead = pin; pinHonored = true; }
+
+  // Re-assert the resolved lead as the chain head.
+  let ordered = chain;
+  if (lead && chain[0] !== lead) ordered = [lead, ...chain.filter((x) => x !== lead)];
+
+  const reason = pinHonored
+    ? `operator pin OLLAMA_MODEL=${pin} (not registry-managed)`
+    : (lead
+        ? `best local model for ${intent} @ ${budget}GB box${capabilityFirst ? "" : " · rank-order"}`
+        : `no local model fits ${budget}GB → cloud fallback`);
+
+  return { chain: ordered, lead, registryLead, reason, vramBudgetGB: budget, capabilityFirst, pinHonored, pin: pin || null };
+}
+
 module.exports = {
   loadRegistry,
   getEntry,
@@ -346,6 +413,7 @@ module.exports = {
   isVerified,
   selectChain,
   selectBest,
+  resolveLocalLead,
   _resetCache,
   _vramBudgetGB,
   _detectVramGB,

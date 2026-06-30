@@ -1156,6 +1156,12 @@ async function handleStreamChat(req, url, res) {
   // dead zone ("Cannot access 'fullReply' before initialization").
   let fullReply = "";
 
+  // Capability-gated local-model swap decision (lib/local-model-registry.js),
+  // captured when the LOCAL model chain is built below and stamped onto the done
+  // signature when a local model answers — so the auto-swap is visible, not silent.
+  // Declared up here because sendDone() (defined next) closes over it.
+  let _localModelSwap = null;
+
   // Consistent sendDone with Σ₀ PCSF signature for all responses
   const sendDone = (source, extra = {}) => {
     const signature = {
@@ -1169,6 +1175,14 @@ async function handleStreamChat(req, url, res) {
       convergenceId: routeDecision.convergence_id || null,
       requiresConvergence: routeDecision.requires_convergence || false,
     };
+    // Surface the capability-gated local-model swap (lib/local-model-registry.js):
+    // when a LOCAL model answered, tell the UI which model LED and WHY (VRAM-gated
+    // to the detected box) so the auto-swap is visible rather than silent. `served`
+    // is the model that actually replied — it differs from `lead` only when the
+    // lead wasn't serving and the chain fell through.
+    if ((source === "ollama" || source === "offline") && _localModelSwap) {
+      signature.modelSwap = { ..._localModelSwap, served: extra.model || _localModelSwap.lead };
+    }
     // ── Degraded-local indicator (issue #740, narrowed by #1167) ────────────
     // In Auto mode (no explicit provider) the cloud chain (Gemini→Claude→OpenAI→
     // Grok) can silently fall through to the local Ollama model — which ignores
@@ -1665,26 +1679,38 @@ async function handleStreamChat(req, url, res) {
     if (cleaned.length) staticChain = cleaned;
   }
   // Σ₀ local-model adapter (lib/local-model-registry.js): the registry is the
-  // source of truth for which LOCAL model LEADS this intent — VRAM-gated to the
-  // box and Ouro-default / capability-first aware. Its picks lead; any remaining
-  // static-chain models stay as fallbacks. Falls back to the static chain on any
-  // error so this is purely additive. See docs/SIGMA0-MODEL-ADAPTER.md.
+  // SOURCE OF TRUTH for which LOCAL model LEADS this intent — VRAM-gated to the
+  // detected box and capability-first aware. resolveLocalLead() folds the static
+  // fallbacks AND the operator's OLLAMA_MODEL pin into the registry's capability
+  // order and returns the authoritative lead, so a stale pin (the legacy
+  // ouro:latest default) can no longer front-jump and defeat the swap. A custom
+  // (non-registry) pin still leads — the operator's deliberate choice wins. Capture
+  // the decision for the UI. Fail-safe: any error keeps the static chain.
+  let _swapLead = null;
   try {
-    const regChain = require("./local-model-registry").selectChain(intent);
-    if (regChain && regChain.length) {
-      const lead = new Set(regChain);
-      staticChain = [...regChain, ...staticChain.filter((m) => !lead.has(m))];
-    }
+    const _resolved = require("./local-model-registry").resolveLocalLead(intent, { fallback: staticChain });
+    staticChain = _resolved.chain;
+    _swapLead = _resolved.lead;
+    _localModelSwap = {
+      lead: _resolved.lead,
+      registryLead: _resolved.registryLead,
+      reason: _resolved.reason,
+      vramBudgetGB: _resolved.vramBudgetGB,
+      intent,
+      capabilityFirst: _resolved.capabilityFirst,
+      pinHonored: _resolved.pinHonored,
+      candidates: _resolved.chain.slice(0, 5),
+    };
   } catch (_e) { /* keep static chain */ }
   let modelChain = staticChain;
   try { modelChain = await orderChainByLeaderboard(staticChain, intent); } catch { /* keep static */ }
-  // Lead with the operator-pinned served model (OLLAMA_MODEL) when set, so the chat
-  // uses the model that's actually pulled/served (e.g. ouro:latest) instead of the
-  // static chain's default first entry. Deduped so it leads exactly once. Previously
-  // OLLAMA_MODEL was documented as "always a candidate" but never actually led.
-  if (process.env.OLLAMA_MODEL) {
-    const _pinned = process.env.OLLAMA_MODEL;
-    modelChain = [_pinned, ...modelChain.filter((x) => x !== _pinned)];
+  // Re-assert the registry's authoritative lead as the chain head: the leaderboard
+  // reorder tunes the FALLBACK order (measured win-rate) but must never displace the
+  // deterministic, VRAM-gated swap pick. (OLLAMA_MODEL is already folded into the
+  // chain by resolveLocalLead — a registry-managed pin keeps its capability slot; a
+  // custom pin is the lead and is preserved here.)
+  if (_swapLead && modelChain[0] !== _swapLead) {
+    modelChain = [_swapLead, ...modelChain.filter((x) => x !== _swapLead)];
   }
 
   // ── Tier 0: cheap Knowledge Center answer before any model ($0, no LLM) ──

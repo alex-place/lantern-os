@@ -1740,6 +1740,7 @@ async function sendMessage(opts = {}) {
   let doneProvider = '';
   let doneIntent = '';      // routed intent (coding_change, trading, …) — drives the autowork suggestion
   let doneModel = '';       // actual model id from the PCSF receipt (e.g. claude-haiku-4-5)
+  let doneModelSwap = null; // capability-gated local-model swap decision (which local model led + why)
   let doneTimestamp = '';   // receipt generatedAt — the signature timestamp
   let doneOnline = true;    // false when no model answered (offline path)
   // #930: coalesce per-token DOM writes into one render per animation frame instead
@@ -1852,6 +1853,7 @@ async function sendMessage(opts = {}) {
             doneProvider = evt.source || evt.provider || (evt.receipt && evt.receipt.provider) || '';
             doneIntent = evt.intent || (evt.receipt && evt.receipt.intent) || '';
             doneModel = evt.model || (evt.receipt && evt.receipt.model) || '';
+            doneModelSwap = evt.modelSwap || null;
             doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
             doneOnline = evt.online !== false;
             if (Array.isArray(evt.actions) && evt.actions.length) doneActions = evt.actions;
@@ -2065,18 +2067,34 @@ async function sendMessage(opts = {}) {
       const pm = [doneProvider, doneModel].filter(Boolean).join('/');
       // Visible part: label + time only.
       const visibleText = [displayLabel, time].filter(Boolean).join(' · ');
+      // Capability-gated local-model swap (lib/local-model-registry.js): when a
+      // LOCAL model answered, show WHICH model led so the auto-swap is visible —
+      // the cockpit telling you what's under the hood, not a warning. The model is
+      // interchangeable by design (Σ₀ North Star); the reason is a hover tooltip.
+      let swapChip = '', swapTitle = '', swapDebug = '';
+      if (doneModelSwap && (doneModelSwap.served || doneModelSwap.lead)) {
+        const _e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+        const served = doneModelSwap.served || doneModelSwap.lead;
+        const fellThrough = doneModelSwap.lead && served !== doneModelSwap.lead;
+        swapTitle = `Auto-selected ${served} — ${doneModelSwap.reason || 'local model'}` +
+          (fellThrough ? ` (lead ${doneModelSwap.lead} wasn't serving)` : '') +
+          '. Models are interchangeable (Σ₀); pick a provider in Settings to override.';
+        swapChip = ` · <span class="model-swap-chip" title="${_e(swapTitle)}" style="opacity:0.6">⇄ ${_e(served)}</span>`;
+        const cand = Array.isArray(doneModelSwap.candidates) ? doneModelSwap.candidates.join(' → ') : '';
+        swapDebug = `<div style="margin-top:2px">swap: ${_e(doneModelSwap.reason || '')}${cand ? ' · chain: ' + _e(cand) : ''}</div>`;
+      }
       if (pm) {
         // Wrap provider/model in a disclosure so it's accessible but not noisy.
         sig.innerHTML =
-          `<span>${visibleText}</span>` +
+          `<span>${visibleText}${swapChip}</span>` +
           `<details class="sig-debug" style="display:inline-block;margin-left:6px">` +
           `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none" aria-label="Debug details">▸ debug</summary>` +
-          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}</span>` +
+          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}${swapDebug}</span>` +
           `</details>`;
-        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}; model: ${pm}`);
+        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}; model: ${pm}` + (swapTitle ? `; ${swapTitle}` : ''));
       } else {
-        sig.textContent = visibleText;
-        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}`);
+        sig.innerHTML = `<span>${visibleText}${swapChip}</span>`;
+        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}` + (swapTitle ? `; ${swapTitle}` : ''));
       }
     }
     msg.appendChild(sig);

@@ -191,3 +191,74 @@ test("_detectVramGB returns a number or null and is memoized", () => {
     assert.equal(reg._detectVramGB(), d, "memoized within a cache window");
   });
 });
+
+// ── resolveLocalLead: the authoritative lead + pin precedence (the swap) ───────
+// This is the function keystone chat calls. The bug it fixes: a stale
+// OLLAMA_MODEL=ouro:latest pin front-jumped the chain and defeated the capability
+// swap. The lead must be the registry's pick, not the stale pin. Tests pass `pin`
+// explicitly so they're deterministic regardless of the host's real OLLAMA_MODEL.
+
+test("resolveLocalLead: a stale registry-managed pin (ouro) does NOT defeat the swap", () => {
+  freshEnv(() => {
+    // The exact production bug: OLLAMA_MODEL=ouro:latest on an 8GB box.
+    const r = reg.resolveLocalLead("coding", { pin: "ouro:latest" });
+    assert.equal(r.lead, "qwen2.5-coder", "the capability pick leads, not the stale pin");
+    assert.equal(r.chain[0], "qwen2.5-coder", "and it's the chain head");
+    assert.ok(r.chain.includes("ouro:latest"), "the pinned model stays a candidate (fallback)");
+    assert.equal(r.pinHonored, false, "a registry-managed pin is not honored as the lead");
+  });
+});
+
+test("resolveLocalLead: a custom (non-registry) pin LEADS — operator's deliberate choice wins", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "deepseek-coder:33b" });
+    assert.equal(r.lead, "deepseek-coder:33b", "the registry has no opinion on it → honor the pin");
+    assert.equal(r.chain[0], "deepseek-coder:33b", "and it leads the chain");
+    assert.equal(r.pinHonored, true, "flagged as an honored operator pin");
+    assert.ok(r.chain.includes("qwen2.5-coder"), "registry models still trail as fallbacks");
+  });
+});
+
+test("resolveLocalLead: LOCAL_CAPABILITY_FIRST=0 restores Ouro-first (rank-order escape)", () => {
+  freshEnv(() => {
+    process.env.LOCAL_CAPABILITY_FIRST = "0";
+    reg._resetCache();
+    const r = reg.resolveLocalLead("coding", { pin: "ouro:latest" });
+    assert.equal(r.lead, "ouro:latest", "rank-order puts the Σ₀ kernel model first");
+    assert.equal(r.capabilityFirst, false, "decision reports rank-order mode");
+  });
+});
+
+test("resolveLocalLead: caller fallbacks are appended as a deduped tail", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "", fallback: ["mistral", "qwen2.5-coder", "satyr"] });
+    assert.equal(r.lead, "qwen2.5-coder", "registry lead still wins over fallbacks");
+    assert.equal(r.chain.filter((m) => m === "qwen2.5-coder").length, 1, "no duplicate of a model in both registry + fallback");
+    assert.ok(r.chain.includes("mistral") && r.chain.includes("satyr"), "novel fallbacks survive as candidates");
+  });
+});
+
+test("resolveLocalLead: ≥24GB box → the frontier 27B leads (no pin)", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "", vramBudgetGB: 24 });
+    assert.equal(r.lead, "qwen3.6-27b", "the box can run the frontier coder, so it leads");
+    assert.match(r.reason, /24GB/, "reason explains the box budget");
+  });
+});
+
+test("resolveLocalLead: defaults the pin to OLLAMA_MODEL from the env", () => {
+  freshEnv(() => {
+    // freshEnv does not manage OLLAMA_MODEL, so snapshot/restore it here.
+    const prev = process.env.OLLAMA_MODEL;
+    try {
+      process.env.OLLAMA_MODEL = "ouro:latest";
+      reg._resetCache();
+      const r = reg.resolveLocalLead("coding"); // no explicit pin → reads env
+      assert.equal(r.lead, "qwen2.5-coder", "env pin is treated identically (registry-managed → no front-jump)");
+      assert.ok(r.chain.includes("ouro:latest"), "env-pinned model is still a candidate");
+    } finally {
+      if (prev === undefined) delete process.env.OLLAMA_MODEL;
+      else process.env.OLLAMA_MODEL = prev;
+    }
+  });
+});
