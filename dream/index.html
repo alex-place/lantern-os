@@ -149,133 +149,24 @@
       flex-shrink: 0;
     }
     .home-file-chip button:hover { color: var(--text); }
-    /* ── Secondary experiences — redesigned tiles ── */
-    .home-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-    @media (max-width: 480px) { .home-tiles { grid-template-columns: 1fr; } }
-    .home-tiles .panel {
-      --tile: var(--accent);
-      position: relative;
-      overflow: hidden;
-      gap: 7px;
-      padding: 20px 18px 18px;
-      transition: border-color .2s, background .2s, transform .15s, box-shadow .2s;
+    /* ── Simple links row (above the footer) ── */
+    .home-links {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 22px; width: 100%; margin: 4px auto 0;
     }
-    /* per-tile accent identity */
-    .home-tiles .tile-trader  { --tile: #10b981; }   /* emerald — markets   */
-    .home-tiles .tile-create  { --tile: #a78bfa; }   /* violet  — studio    */
-    .home-tiles .tile-explore { --tile: #06b6d4; }   /* cyan    — convergence */
-    /* top accent bar that wipes in on hover */
-    .home-tiles .panel::before {
-      content: "";
-      position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: var(--tile);
-      transform: scaleX(0); transform-origin: left;
-      transition: transform .28s ease;
+    .home-links a {
+      color: var(--text); font-size: 0.95rem; font-weight: 600;
+      text-decoration: none; padding: 4px 2px;
+      border-bottom: 1px solid transparent;
+      transition: color .15s, border-color .15s;
     }
-    .home-tiles .panel:hover,
-    .home-tiles .panel:focus-visible {
-      border-color: var(--tile);
-    }
-    .home-tiles .panel:hover::before,
-    .home-tiles .panel:focus-visible::before {
-      transform: scaleX(1);
-    }
-    .home-tiles .panel:focus-visible {
-      outline: 2px solid var(--tile);
-      outline-offset: 2px;
-    }
-    /* icon in a tinted rounded chip */
-    .home-tiles .panel-icon {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 46px; height: 46px; margin-bottom: 2px;
-      border-radius: 13px; font-size: 23px; line-height: 1;
-      background: color-mix(in srgb, var(--tile) 15%, transparent);
-      border: 1px solid color-mix(in srgb, var(--tile) 32%, transparent);
-      transition: transform .2s ease, background .2s, border-color .2s;
-    }
-    .home-tiles .panel:hover .panel-icon {
-      transform: translateY(-1px) scale(1.05) rotate(-4deg);
-      background: color-mix(in srgb, var(--tile) 26%, transparent);
-    }
-    /* eyebrow label now sits above the title, tinted to the tile */
-    .home-tiles .panel-label { color: var(--tile); font-size: 0.62rem; }
-    .home-tiles .panel h2 { font-size: 1.18rem; margin: 1px 0 0; }
-    .home-tiles .panel p { font-size: 0.82rem; }
-    .home-tiles .panel-arrow {
-      color: var(--tile);
-      display: inline-flex; align-items: center;
-      transition: transform .2s ease;
-    }
-    .home-tiles .panel:hover .panel-arrow { transform: translateX(5px); }
+    .home-links a:hover,
+    .home-links a:focus-visible { color: var(--accent); border-color: var(--accent); }
+    .home-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* Fallback: allow scroll whenever the one-screen shell can't fit its
-       content (short viewports, and typical phones where the stacked tiles
-       + footer exceed the viewport height and were being clipped). */
+       content (short viewports, and typical phones). */
     @media (max-height: 900px) { body { overflow: auto; } .home-main { justify-content: flex-start; } }
-
-    /* ── Accessibility: High Contrast ── */
-    @media (prefers-contrast: more) {
-      .home-tiles .panel {
-        border-width: 2px;
-      }
-      .home-tiles .panel:focus-visible {
-        outline-width: 3px;
-      }
-    }
-
-    /* ── Accessibility: Forced Colors ── */
-    @media (forced-colors: active) {
-      .home-tiles .panel {
-        border: 2px solid CanvasText;
-      }
-      .home-tiles .panel::before {
-        background: CanvasText;
-      }
-    }
-
-    /* ── Flourishing world-model panel (grounded from real yearly feeds) ── */
-    .flourish-panel {
-      --tile: var(--accent);
-      position: relative; overflow: hidden;
-      max-width: 900px; width: 100%; margin: 0 auto;
-      display: flex; flex-direction: column; gap: 11px;
-      padding: 18px 18px 16px;
-      transition: border-color .2s, box-shadow .2s, transform .15s;
-    }
-    /* match the home tiles: same top accent bar + hover treatment */
-    .flourish-panel::before {
-      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: var(--tile); transform-origin: left;
-    }
-    .flourish-panel:hover { border-color: var(--tile); box-shadow: var(--shadow-hover); }
-    .flourish-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .flourish-head .panel-label { color: var(--accent); font-size: 0.62rem; }
-    .flourish-head h2 { margin: 1px 0 0; font-size: 1.12rem; }
-    .flourish-more { font-size: 0.78rem; color: var(--accent); white-space: nowrap; align-self: center; }
-    .flourish-domains { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 20px; }
-    @media (max-width: 480px) { .flourish-domains { grid-template-columns: 1fr; } }
-    .fd-row { display: flex; flex-direction: column; gap: 4px; }
-    .fd-top { display: flex; justify-content: space-between; font-size: 0.8rem; }
-    .fd-name { text-transform: capitalize; color: var(--text); font-weight: 600; }
-    .fd-val { color: var(--muted); font-variant-numeric: tabular-nums; }
-    .fd-bar { position: relative; height: 7px; border-radius: 9999px;
-              background: color-mix(in srgb, var(--muted) 22%, transparent); overflow: hidden; }
-    .fd-ci { position: absolute; top: 0; bottom: 0;
-             background: color-mix(in srgb, var(--accent) 30%, transparent); }
-    .fd-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px; background: var(--accent); }
-    .flourish-q { font-size: 0.82rem; color: var(--text); line-height: 1.45;
-                  background: color-mix(in srgb, var(--accent) 8%, transparent);
-                  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-                  border-radius: 10px; padding: 8px 11px; }
-    .flourish-q b { color: var(--accent); }
-    .flourish-pattern { font-size: 0.8rem; color: var(--text); line-height: 1.4;
-                        background: color-mix(in srgb, var(--accent) 9%, transparent);
-                        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-                        border-radius: 10px; padding: 7px 11px; }
-    .flourish-pattern b { color: var(--accent); }
-    .flourish-pattern .fp-r { font-variant-numeric: tabular-nums; color: var(--muted); }
-    .flourish-prov { font-size: 0.7rem; color: var(--muted); }
-    .flourish-prov a, .flourish-prov u { color: var(--muted); }
   </style>
   <title>unisona.ai</title>
   <meta name="description" content="unisona.ai — your AI that actually remembers you. Local, private, and free.">
@@ -347,45 +238,12 @@
   </div>
   <p class="sub" style="text-align:center;margin-top:-4px;"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></p>
 
-  <!-- ── Secondary experiences ── -->
-  <div class="home-tiles">
-    <a class="panel tile-trader" href="/stock-trader.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">▲</span>
-      <span class="panel-label">Markets</span>
-      <h2>Trader</h2>
-      <p>Live prediction markets, swipe-deck entries, and signal history.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-    <a class="panel tile-create" href="/create.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">✦</span>
-      <span class="panel-label">Studio</span>
-      <h2>Create</h2>
-      <p>Write, upload, and organize your creative projects.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-    <a class="panel tile-explore" href="/explore.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">◎</span>
-      <span class="panel-label">Archive</span>
-      <h2>Explore</h2>
-      <p>Your personal archive, tools, games, and settings.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-  </div>
-
-  <!-- ── Flourishing world-model panel — grounded from real yearly feeds ── -->
-  <section class="panel flourish-panel" id="flourish-panel" aria-label="Flourishing world model" hidden>
-    <div class="flourish-head">
-      <div>
-        <span class="panel-label">World Model</span>
-        <h2>Flourishing — the Bayesian world model</h2>
-      </div>
-      <a class="flourish-more" href="/flourishing.html">Full dashboard →</a>
-    </div>
-    <div class="flourish-domains" id="flourish-domains"></div>
-    <div class="flourish-q" id="flourish-q" hidden></div>
-    <div class="flourish-pattern" id="flourish-pattern" hidden></div>
-    <div class="flourish-prov" id="flourish-prov"></div>
-  </section>
+  <!-- ── Simple links ── -->
+  <nav class="home-links" aria-label="Quick links">
+    <a href="/stock-trader.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+  </nav>
 
 </main>
 
@@ -532,66 +390,6 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
-<script>
-/* Flourishing world-model panel — fetches grounded yearly feeds + the Question Machine's
-   next-to-ground question. Hidden until data loads, so feed/network failures degrade to
-   nothing rather than a broken card. */
-(async function loadFlourishing() {
-  const panel = document.getElementById('flourish-panel');
-  if (!panel) return;
-  try {
-    const r = await fetch('/api/flourishing/panel', { cache: 'no-store', signal: AbortSignal.timeout(25000) });
-    if (!r.ok) return;
-    const p = await r.json();
-    if (!p || !p.ok || !Array.isArray(p.domains) || !p.domains.length) return;
-
-    document.getElementById('flourish-domains').innerHTML = p.domains.map(d => {
-      const pct = Math.round(d.score * 100), u = Math.round(d.uncertainty * 100);
-      const lo = Math.max(0, pct - u), hi = Math.min(100, pct + u);
-      return `<div class="fd-row">
-        <div class="fd-top"><span class="fd-name">${d.domain}</span>
-          <span class="fd-val">${pct}% ±${u}% · ${d.n} belief${d.n === 1 ? '' : 's'} · ${d.n_sources || d.n} src</span></div>
-        <div class="fd-bar"><span class="fd-ci" style="left:${lo}%;width:${hi - lo}%"></span>
-          <span class="fd-fill" style="width:${pct}%"></span></div>
-      </div>`;
-    }).join('');
-
-    const q = p.questions && p.questions[0];
-    const qEl = document.getElementById('flourish-q');
-    if (q) {
-      qEl.innerHTML = `<b>Question Machine →</b> next to ground: <b>${q.entity}</b> ` +
-        `(±${Math.round(q.uncertainty * 100)}%, ${q.n_sources || 1} source${(q.n_sources || 1) === 1 ? '' : 's'}${q.agreement ? ' · ' + q.agreement : ''})`;
-      qEl.hidden = false;
-    }
-
-    const upd = p.updated_at ? new Date(p.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'now';
-    const ung = (p.ungrounded_domains || []).join(', ');
-    const corr = p.corroboration || {};
-    document.getElementById('flourish-prov').innerHTML =
-      `${(p.sources || ['World Bank']).join(' · ')} · ` +
-      `<u title="beliefs grounded by ≥2 independent sources — agreement tightens uncertainty">` +
-      `${corr.multi_source || 0}/${corr.beliefs || 0} corroborated</u> · updated ${upd}` +
-      (ung ? ` · <u title="no live feed for this domain">${ung} not live-grounded</u>` : '');
-
-    panel.hidden = false;
-
-    // Cross-domain patterns load separately — the per-country correlation fetch is heavier,
-    // so it must not block the belief panel. Populates the pattern line when it arrives.
-    fetch('/api/flourishing/correlations', { cache: 'no-store', signal: AbortSignal.timeout(45000) })
-      .then(r => (r.ok ? r.json() : null))
-      .then(c => {
-        const top = c && c.correlations && c.correlations[0];
-        if (!top) return;
-        const pe = document.getElementById('flourish-pattern');
-        const sign = top.r >= 0 ? '+' : '';
-        pe.innerHTML = `<b>Pattern →</b> ${top.label} ` +
-          `<span class="fp-r">(r=${sign}${top.r}, ${top.strength} ${top.direction}, n=${top.n} countries)</span>`;
-        pe.hidden = false;
-      })
-      .catch(() => {});
-  } catch (_) { /* leave hidden */ }
-})();
-</script>
 <script src="/js/update-checker.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 <!-- Screenshot → GitHub issue reporter (📷 in the header). Modal + styles self-inject; report includes the page URL + captured DOM/console errors. -->
