@@ -115,9 +115,24 @@ function scoreReplyCollapse(text, opts = {}) {
     0.2 * signals.selfRepeatRatio +
     0.1 * Math.min(1, signals.longestRunRatio * 5);
 
-  // The two failure modes (repetition vs run-on rambling) are independent — take the
-  // worse of the two rather than blending, so neither masks the other.
-  const proximity = Math.min(1, Math.max(repetitionBlend, runOnPenalty));
+  // #1609: extreme phrase/sentence-loop penalty. The weighted blend above tops out
+  // around ~0.84 even when a reply is ~95% duplicate trigrams AND ~95% duplicate
+  // sentences (the classic local-model "I can help. I can help. …" / multi-word loop),
+  // because longestRunRatio (immediate same-TOKEN runs) stays ~0 for multi-word loops.
+  // That left the most common spiral sitting just under a high block threshold (0.85),
+  // so the mid-stream guard never fired. When repetition is unambiguous (echo or literal
+  // self-repeat very high) AND the vocabulary has genuinely contracted (low TTR — which
+  // legit lists/tables/poems with refrains do NOT have), ramp it to full collapse. Gating
+  // on low TTR keeps structured-but-repetitive prose (numbered lists, markdown tables)
+  // safely below threshold. MAX-combined like the run-on penalty so it can't be diluted.
+  const repetitionPeak = Math.max(signals.ngramEchoRatio, signals.selfRepeatRatio);
+  const peakPenalty = signals.typeTokenRatio < 0.30
+    ? Math.max(0, Math.min(1, (repetitionPeak - 0.6) / 0.3))
+    : 0;
+
+  // The failure modes (repetition blend vs extreme loop vs run-on rambling) are
+  // independent — take the worst rather than blending, so none masks the others.
+  const proximity = Math.min(1, Math.max(repetitionBlend, runOnPenalty, peakPenalty));
 
   return {
     proximity: Number(proximity.toFixed(4)),

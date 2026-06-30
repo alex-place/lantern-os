@@ -142,6 +142,46 @@ ok("bullet list without periods → NOT collapsed (breaks on newlines)", () => {
   assert.ok(!r.collapsed, `list should not collapse, got proximity=${r.proximity} seg=${r.signals.longestSegmentTokens}`);
 });
 
+// ── #1609: phrase/sentence loops must trip the HIGH (0.85) block threshold ──
+// The mid-stream guard hard-stops the local Ollama stream at COLLAPSE_BLOCK_PROXIMITY
+// (default 0.85). Classic multi-word loops used to score ~0.82-0.84 (just under), so the
+// guard never fired and the user saw the full spiral. They must now exceed 0.85.
+const BLOCK = 0.85;
+ok("repeated sentence loop → trips the 0.85 block threshold (#1609)", () => {
+  const text = "I can definitely help you with that request. ".repeat(20);
+  const r = scoreReplyCollapse(text, { threshold: BLOCK });
+  assert.ok(r.proximity >= BLOCK, `phrase loop should be >= ${BLOCK}, got ${r.proximity}`);
+  assert.strictEqual(r.collapsed, true);
+});
+
+ok("repeated multi-word phrase loop → trips the 0.85 block threshold (#1609)", () => {
+  const text = "Let me check the trade screen panels for you now. ".repeat(15);
+  const r = scoreReplyCollapse(text, { threshold: BLOCK });
+  assert.ok(r.proximity >= BLOCK, `multi-word loop should be >= ${BLOCK}, got ${r.proximity}`);
+});
+
+ok("numbered list with similar steps → stays below 0.85 block (#1609 no false-trip)", () => {
+  const text = Array.from({ length: 12 }, (_, i) =>
+    `${i + 1}. Step ${i + 1}: configure the option and save the file before moving on.`).join("\n");
+  const r = scoreReplyCollapse(text, { threshold: BLOCK });
+  assert.ok(r.proximity < BLOCK, `legit list must stay < ${BLOCK}, got ${r.proximity}`);
+});
+
+ok("markdown table → stays below 0.85 block (#1609 no false-trip)", () => {
+  const text = "| Name | Role |\n|---|---|\n" +
+    Array.from({ length: 10 }, (_, i) => `| user${i} | editor |`).join("\n");
+  const r = scoreReplyCollapse(text, { threshold: BLOCK });
+  assert.ok(r.proximity < BLOCK, `markdown table must stay < ${BLOCK}, got ${r.proximity}`);
+});
+
+ok("poem with a repeated refrain → stays below 0.85 block (#1609 no false-trip)", () => {
+  const text = "The bell tolls on. ".repeat(2) +
+    "Through mist and stone the river runs deep and cold past the old mill where willows bend. " +
+    "The bell tolls on. ".repeat(2);
+  const r = scoreReplyCollapse(text, { threshold: BLOCK });
+  assert.ok(r.proximity < BLOCK, `refrain poem must stay < ${BLOCK}, got ${r.proximity}`);
+});
+
 ok("run-on → antiCollapseSignal recommends truncate_output", () => {
   const rambling = Array(90).fill("word").map((w, i) => w + i).join(" "); // 90-token unbroken run
   const r = scoreReplyCollapse(rambling);
