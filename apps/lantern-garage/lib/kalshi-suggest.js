@@ -20,6 +20,7 @@
 const kalshi = require("./kalshi-api");
 const { getWinRate, getCategory, getCategoryStats } = require("./kalshi-winrate-tracker");
 const { evaluateExit, getMarketState, scoreHold } = require("./kalshi-adaptive-exits");
+const { breakevenWinProb, netEvCents } = require("./kalshi-fees");
 
 // ── exit thresholds (DEPRECATED - replaced by adaptive exits) ──────────────────
 // Kept for reference only; adaptive exits now use convergence-based logic
@@ -30,8 +31,19 @@ const FLATTEN_MINS = 30;     // NOW BLOCKED — no flatten-at-close, let converg
 // ── entry filters (profitability-driven) ────────────────────────────────────
 const MIN_CONVICTION = 65;   // only enter if ≥65% confidence (was 40%)
 const MAX_SPREAD_CENTS = 2;  // only enter if spread ≤2¢ (was 6¢)
-const MIN_CATEGORY_WINRATE = 45;  // skip category if <45% historical win rate
 const MAX_ENTRY_PRICE_PCT = 5;  // only enter if entry within ±5% of fair value
+
+// ── Σ₀ evidence gate (replaces the old flat 45% win-rate gate) ───────────────
+// A "buy" card is an important claim → it needs evidence. Win rate alone is a trap
+// (the live crypto ledger ran 53% wins but −46% EXPECTANCY: small wins, full losses).
+// So we gate on the resolved-trade EXPECTANCY and a fee-aware break-even, not win%.
+const MIN_RESOLVED_SAMPLE = 30;   // resolved closes needed before an edge is "proven"
+const MIN_EXPECTANCY = 0;         // measured expectancy must clear 0 (after the fact)
+const WINRATE_MARGIN = 0.02;      // proven win% must beat fee break-even by ≥2pts
+// External reality beats internal consistency: by default we SUPPRESS a card whose own
+// resolved ledger proves it loses money. Set KALSHI_ALLOW_NEGATIVE_EV=1 to show it anyway
+// (still clearly labelled "−EV / unproven" in the reason + provenance).
+const ALLOW_NEGATIVE_EV = process.env.KALSHI_ALLOW_NEGATIVE_EV === "1";
 
 function num(v) {
   const f = parseFloat(v);
@@ -74,8 +86,44 @@ function isSupportedEntryMarket(m) {
   return { ok: true };
 }
 
-// Check if entry passes profitability filters
-function isEntryTradeable(m, conviction, spread) {
+/**
+ * Build the Σ₀ evidence record for a candidate entry: what the resolved-trade ledger
+ * actually says about this market's category. This is the [claim, evidence, confidence,
+ * source] the suggestion must carry instead of a bare heuristic conviction %.
+ */
+function entryProvenance(m, f) {
+  const cat = getCategory(m.ticker);
+  const stats = getCategoryStats(cat); // {trades, winRate, expectancy, ...} | null
+  const n = stats ? stats.trades : 0;
+  const proven = !!stats && n >= MIN_RESOLVED_SAMPLE;
+  const winRate = stats ? stats.winRate : null;          // %
+  const expectancy = stats ? stats.expectancy : null;    // % per trade
+  const breakeven = Math.round(breakevenWinProb(f.sideAsk) * 100); // fee-aware, %
+  // Grounded confidence: only a proven, +expectancy edge earns a high number. Heuristic
+  // conviction is downgraded to a tie-breaker, never the source of confidence.
+  let confidence;
+  if (proven && expectancy > MIN_EXPECTANCY && winRate / 100 >= breakevenWinProb(f.sideAsk) + WINRATE_MARGIN) {
+    confidence = Math.min(0.9, 0.5 + Math.min(0.4, expectancy / 100)); // edge-scaled
+  } else if (proven) {
+    confidence = 0.15; // proven but losing/thin — low, honest
+  } else {
+    confidence = 0.25; // unproven — no resolved evidence either way
+  }
+  return {
+    category: cat,
+    proven,
+    sampleN: n,
+    winRate,
+    expectancy,
+    breakevenPct: breakeven,
+    source: "paper-ledger:data/kalshi/paper-positions.jsonl",
+    confidence,
+  };
+}
+
+// Check if entry passes profitability filters. `f` is the favorability() result.
+function isEntryTradeable(m, f, spread) {
+  const conviction = f.conviction;
   // 0. Structure gate: parlays and range bands are never tradeable here.
   const supported = isSupportedEntryMarket(m);
   if (!supported.ok) return supported;
@@ -86,10 +134,21 @@ function isEntryTradeable(m, conviction, spread) {
   // 2. Spread constraint: must be ≤2¢
   if (spread > MAX_SPREAD_CENTS) return { ok: false, reason: `spread ${spread}¢ > ${MAX_SPREAD_CENTS}¢` };
 
-  // 3. Category win rate: category must have >45% historical win rate
-  const cat = getCategory(m.ticker);
-  const winRate = getWinRate(m.ticker);
-  if (winRate < MIN_CATEGORY_WINRATE) return { ok: false, reason: `${cat} win rate ${winRate}% < ${MIN_CATEGORY_WINRATE}%` };
+  // 3. Σ₀ EVIDENCE GATE — the binding signal is MEASURED resolved-trade expectancy,
+  // because that is what actually happened (it already prices the real exit discipline:
+  // tiny wins, full losses → the crypto ledger's 53% win / −46% expectancy trap). The
+  // fee-aware break-even is computed too, but only for the provenance label — measured
+  // expectancy overrides a theoretical price model when the two disagree.
+  const prov = entryProvenance(m, f);
+  if (prov.proven && prov.expectancy <= MIN_EXPECTANCY && !ALLOW_NEGATIVE_EV) {
+    // Its own resolved ledger proves it loses money after fees. Don't present the claim.
+    return {
+      ok: false,
+      reason: `${prov.category} expectancy ${prov.expectancy}% ≤ 0 (n=${prov.sampleN} resolved, fee break-even ${prov.breakevenPct}% @ ${f.sideAsk}¢)`,
+      provenance: prov,
+      suppressedNegEv: true,
+    };
+  }
 
   // 4. Fair value bounds: entry price must be within ±5% of mid-price
   const yesA = m.yes_ask || 0, noA = m.no_ask || 0;
@@ -97,10 +156,10 @@ function isEntryTradeable(m, conviction, spread) {
   const yesOffPct = mid > 0 ? Math.abs(yesA - mid) / mid * 100 : 0;
   const noOffPct = mid > 0 ? Math.abs(noA - mid) / mid * 100 : 0;
   if (yesOffPct > MAX_ENTRY_PRICE_PCT || noOffPct > MAX_ENTRY_PRICE_PCT) {
-    return { ok: false, reason: `entry off fair value by >5%` };
+    return { ok: false, reason: `entry off fair value by >5%`, provenance: prov };
   }
 
-  return { ok: true };
+  return { ok: true, provenance: prov };
 }
 
 function favorability(m, nowMs) {
@@ -249,19 +308,32 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
   const exitTickers = new Set(exits.map((e) => e.ticker));
 
   const entries = [];
+  let suppressedNegEv = 0;
   for (const m of markets) {
     if (m.yes_ask == null && m.no_ask == null) continue;
     if (exitTickers.has(m.ticker)) continue;           // already an exit card
     const f = favorability(m, nowMs);
     const spread = Math.abs((m.yes_ask || 0) - (m.no_ask || 0));
 
-    // Apply profitability filters — Phase 1 optimization
-    const check = isEntryTradeable(m, f.conviction, spread);
-    if (!check.ok) continue;  // skip non-tradeable entries
+    // Apply profitability filters + Σ₀ evidence gate
+    const check = isEntryTradeable(m, f, spread);
+    if (!check.ok) {
+      if (check.suppressedNegEv) suppressedNegEv++;
+      continue;  // skip non-tradeable entries
+    }
+    const prov = check.provenance;
+
+    // Honest provenance suffix the deck renders (it shows card.reason verbatim): the
+    // user sees the resolved-trade basis, never just a heuristic conviction %.
+    const evNote = prov.proven
+      ? `paper-edge ${prov.winRate}% exp ${prov.expectancy >= 0 ? "+" : ""}${prov.expectancy}% n=${prov.sampleN}`
+      : `⚠ unproven — no resolved-trade edge (n=${prov.sampleN})`;
+    const reason = `${f.reason} · ${evNote}`;
 
     const denom = (m.yes_ask || 0) + (m.no_ask || 0);
     const yesPct = denom > 0 ? Math.round((m.yes_ask / denom) * 100) : (m.yes_ask || 0);
     const favLabel = f.side === "yes" ? (m.yes_sub_title || "YES") : (m.no_sub_title || "NO");
+    const evCents = prov.winRate != null ? netEvCents(f.sideAsk, prov.winRate / 100) : null;
     entries.push({
       kind: "entry", action: "buy",
       ticker: m.ticker,
@@ -272,8 +344,11 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
       favSide: f.side,                                   // 'yes' | 'no'
       favLabel,
       favAsk: f.sideAsk,
-      conviction: f.conviction,
-      reason: f.reason,
+      conviction: f.conviction,                          // heuristic now-slice score (NOT a probability)
+      confidence: prov.confidence,                       // grounded [0..1] from resolved ledger
+      provenance: prov,                                  // {proven, sampleN, winRate, expectancy, breakevenPct, source}
+      netEvCents: evCents,                               // fee-aware EV per contract at the measured win%
+      reason,
       minsToClose: Number.isFinite(f.minsToClose) ? Math.round(f.minsToClose) : null,
       close: m.close_time || "",
     });
@@ -281,16 +356,18 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
     // Reason → Act: emit one ConvergenceRecord per tradeable entry suggestion.
     // This reasoner has a RESOLVABLE outcome — the trade settles win/lose — so the
     // record gives the convergence loop something real to grade later (Verify).
-    // Mirrors routes/dream.js: guarded so a failed record never breaks a suggestion.
+    // Confidence is the GROUNDED ledger-derived number, not the heuristic conviction.
     try {
       const { emitConvergenceRecord } = require("./convergence-records");
       await emitConvergenceRecord({
         hypothesis: `buy ${f.side.toUpperCase()} (${favLabel}) @ ${f.sideAsk}¢ — ${m.title || m.ticker} [${m.ticker}]`,
-        evidence_ids: [m.ticker],
-        result: `entry ${f.side} ${favLabel} @ ${f.sideAsk}¢ · ${f.reason}`,
-        confidence: Math.max(0, Math.min(1, f.conviction / 100)), // conviction is 0..100
+        evidence_ids: [m.ticker, prov.source],
+        result: `entry ${f.side} ${favLabel} @ ${f.sideAsk}¢ · ${reason}`,
+        confidence: Math.max(0, Math.min(1, prov.confidence)),
         reasoner: "kalshi-suggest",
-        source: `kalshi-market/${m.ticker}`,
+        source: prov.proven
+          ? `paper-ledger n=${prov.sampleN} winRate=${prov.winRate}% exp=${prov.expectancy}%`
+          : `unproven (n=${prov.sampleN})`,
       });
     } catch { /* convergence record non-critical */ }
   }
@@ -305,16 +382,20 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
 
   // EXITS ON TOP (sell ASAP), then entries (unless exitsOnly is true)
   const cards = exitsOnly ? exits : [...exits, ...entries];
+  const suppressNote = suppressedNegEv > 0
+    ? ` ${suppressedNegEv} entr${suppressedNegEv === 1 ? "y" : "ies"} suppressed by the Σ₀ EV gate (resolved-ledger expectancy ≤ 0 after fees; set KALSHI_ALLOW_NEGATIVE_EV=1 to show).`
+    : "";
   return {
     count: cards.length,
     exitCount: exits.length,
     entryCount: entries.length,
+    suppressedNegEv,
     generatedAt: new Date().toISOString(),
-    note: exitsOnly
+    note: (exitsOnly
       ? "EXITS ONLY — sell positions immediately (stop-loss / take-profit / convergence-determined). No entries shown."
-      : "Exits (stop-loss / take-profit / convergence) first — sell ASAP — then now-slice favorable entries.",
+      : "Exits (stop-loss / take-profit / convergence) first — sell ASAP — then now-slice favorable entries.") + suppressNote,
     cards: cards.slice(0, limit),
   };
 }
 
-module.exports = { getSuggestions, isSupportedEntryMarket };
+module.exports = { getSuggestions, isSupportedEntryMarket, isEntryTradeable, entryProvenance };
