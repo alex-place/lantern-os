@@ -513,6 +513,7 @@ const COMMANDS = [
   { name: 'issues',      group: 'Build',   usage: '!issues',           desc: 'Browse open issues — one click runs autowork', aliases: ['backlog'] },
   { name: 'work',        group: 'Build',   usage: '!work #123',        desc: 'Run keystone autowork on an issue → linked PR', aliases: ['edit'] },
   { name: 'review',      group: 'Build',   usage: '!review #123',      desc: 'Review a pull request’s diff right in the chat' },
+  { name: 'prs',         group: 'Build',   usage: '!prs',              desc: 'Browse open PRs — one click reviews each (also: “review pull requests”)', aliases: ['pull-requests', 'pullrequests', 'review-prs'] },
   { name: 'convergence', group: 'Build',   usage: '!convergence',      desc: 'Run the convergence loop + fleet/version status', aliases: ['convergance', 'converge'] },
   { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
   { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
@@ -592,6 +593,75 @@ async function renderIssues() {
   } catch (e) {
     bubble.innerHTML = `Couldn’t load issues (${esc(e.message)}). ${ghLink}`;
   }
+}
+
+// ── Open-PR browser (!prs / "review pull requests") ───────────────────────────
+// PR analogue of renderIssues: lists the open PRs with a one-click "Review →" that
+// runs the existing !review #N flow. Listing is a plain gh call (no LLM), so this
+// works even when every provider is down — which is exactly the dead-end this fixes:
+// a plural "review pull requests" used to fall through to the AI-unavailable fallback.
+async function renderPRs() {
+  hideEmptyState();
+  const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+  const messages = document.getElementById('messages');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Loading open pull requests…</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  const ghLink = '<a href="https://github.com/alex-place/lantern-os/pulls" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Open on GitHub →</a>';
+  try {
+    const r = await fetch(`${base}/api/dream/prs?limit=20`, { cache: 'no-store' });
+    const d = await r.json();
+    if (!d.ok || !Array.isArray(d.prs) || !d.prs.length) {
+      bubble.innerHTML = `No open pull requests to show${d && d.error ? ` (${esc(d.error)})` : ''}. ${ghLink}`;
+      return;
+    }
+    const rows = d.prs.map(p => {
+      const draft = p.isDraft
+        ? `<span style="font-size:10px;background:var(--surface2);padding:1px 6px;border-radius:8px;opacity:0.8">draft</span>` : '';
+      return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border)">
+        <a href="https://github.com/alex-place/lantern-os/pull/${p.number}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-weight:600;font-size:12px;text-decoration:none">#${p.number}</a>
+        <span style="flex:1;font-size:12.5px">${esc(p.title)} ${draft}</span>
+        <button class="pr-review-btn" data-pr="${p.number}" style="font-size:11px;padding:3px 10px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap">Review →</button>
+      </div>`;
+    }).join('');
+    bubble.innerHTML = `<b>Open pull requests</b> · ${d.prs.length} · ${ghLink}${rows}`;
+    bubble.querySelectorAll('.pr-review-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const n = parseInt(btn.getAttribute('data-pr'), 10);
+        fillAndSend('!review #' + n);   // reuse the server-side !review #N reviewer
+      });
+    });
+  } catch (e) {
+    bubble.innerHTML = `Couldn’t load pull requests (${esc(e.message)}). ${ghLink}`;
+  }
+}
+
+// ── Natural-language PR review intent ─────────────────────────────────────────
+// "review pull requests" / "review prs" / "!prs" → list open PRs (the deterministic,
+// provider-free browser above). "review pr #1410" / "review #1410" → route to the
+// server's !review #N reviewer. Returns { kind:'list' } | { kind:'one', number } | null.
+// Deliberately narrow so it never hijacks an ordinary turn — "review my essay" stays an
+// LLM chat. !review #N (with a number) is left to the server handler (returns null).
+function detectPrReviewIntent(text) {
+  const t = String(text || '').trim();
+  // Bang/slash forms. `!review #N` is left to the server reviewer (return null → fall through).
+  let m = t.match(/^[!/](review|prs?|pull[\s-]?requests?|review[\s-]?prs?)\b\s*#?(\d+)?\s*$/i);
+  if (m) {
+    if (m[2]) return /^review$/i.test(m[1]) ? null : { kind: 'one', number: parseInt(m[2], 10) };
+    return { kind: 'list' };
+  }
+  // "review pr #1410" / "review pull request 1410" / "review #1410"
+  m = t.match(/^review\s+(?:the\s+)?(?:pull\s*request|pr)\s*#?(\d+)\s*$/i)
+   || t.match(/^review\s+#(\d+)\s*$/i);
+  if (m) return { kind: 'one', number: parseInt(m[1], 10) };
+  // "review pull requests" / "review the open prs" / "list/show/browse open pull requests"
+  m = t.match(/^(?:review|list|show|browse|see|view|check|open)\s+(?:(?:the|all|my|open|any)\s+)*(?:pull\s*requests?|prs?)\s*\??$/i);
+  if (m) return { kind: 'list' };
+  return null;
 }
 
 // ── Autowork live-step panel (issue #527 / autonomous-work/stream) ─────────────
@@ -1698,6 +1768,19 @@ async function sendMessage(opts = {}) {
     // Dummy button so runAutowork can report status without a chip
     const dummyBtn = { textContent: '', style: {} };
     runAutowork(parseInt(workMatch[1], 10), dummyBtn, base).catch(err => console.error('[autowork]', err));
+    return;
+  }
+
+  // PR review intent — "review pull requests" / "!prs" lists the open PRs (deterministic,
+  // no LLM, works while every provider is down); "review pr #N" runs the !review reviewer.
+  // Placed before the LLM path so the plural ask no longer dead-ends at "AI unavailable".
+  const prIntent = detectPrReviewIntent(text);
+  if (prIntent) {
+    input.value = '';
+    input.style.height = 'auto';
+    if (prIntent.kind === 'one') { fillAndSend('!review #' + prIntent.number); return; }
+    addUserBubble(text);
+    renderPRs().catch(e => console.error('[prs]', e));
     return;
   }
 

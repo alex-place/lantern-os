@@ -55,6 +55,33 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
     return true;
   }
 
+  // ── Open PRs for the in-chat review browser (!prs / "review pull requests") ──
+  // Powers the chat command that lists open PRs with one-click "Review →" (which
+  // fires the existing !review #N flow). Listing is a shell-free gh call — no LLM —
+  // so it works even when every provider is down, which is exactly the dead-end this
+  // fixes: "review pull requests" used to fall through to the AI-unavailable fallback.
+  if (url.pathname === "/api/dream/prs" && req.method === "GET") {
+    const { safeExec } = require("../lib/safe-exec");
+    const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20));
+    try {
+      const out = safeExec(
+        ["gh", "pr", "list", "--repo", "alex-place/lantern-os", "--state", "open",
+          "--limit", String(limit), "--json", "number,title,isDraft,headRefName"],
+        { timeout: 15000 }
+      );
+      const prs = JSON.parse(out).map((p) => ({
+        number: p.number,
+        title: p.title,
+        isDraft: !!p.isDraft,
+        branch: p.headRefName || "",
+      }));
+      sendJson(res, { ok: true, prs });
+    } catch (e) {
+      sendJson(res, { ok: false, error: (e && e.message) || String(e), prs: [] });
+    }
+    return true;
+  }
+
   // ── CSF search endpoint ───────────────────────────────────────────────
   if (url.pathname === "/api/csf/search" && req.method === "GET") {
     const query = (url.searchParams.get("q") || "").trim();
