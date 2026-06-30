@@ -82,7 +82,7 @@ Complete navigation map of Keystone OS local-first personal operating system. Al
 ## 💰 Trading & Markets
 
 ### 6. Lantern Trader Dashboard
-- **Main Trading UI** — `/trader-dashboard.html`
+- **Main Trading UI** — `/kalshi-terminal.html`
   - Real-time market zones and support/resistance levels
   - Watchlist price monitoring (SPY, AAPL, TSLA, NVDA, AMD)
   - Live positions and account equity
@@ -259,7 +259,7 @@ Home (/)
 │   ├── Agent Leaderboard (/leaderboard)
 │   ├── Dashboard (/flourishing)
 │   ├── Full Journal (/dream-journal/index.html)
-│   ├── Trading (/trader-dashboard.html)
+│   ├── Trading (/kalshi-terminal.html)
 │   └── Settings (/settings/providers.html)
 │
 ├── Help & Support

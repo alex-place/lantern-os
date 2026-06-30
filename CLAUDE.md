@@ -275,7 +275,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 | dream-chat-agent-select | Switch agent personas + verify prompt changes | `/dream-chat.html` |
 | dream-chat-error-handling | Send malformed input + verify error state | `/dream-chat.html` |
 | home-nav-links | Click all nav links + verify page loads | `/` → all targets |
-| trader-dashboard-load | Verify Kalshi deck renders | `/trader-dashboard.html` |
+| trader-dashboard-load | Verify Kalshi deck renders | `/kalshi-terminal.html` |
 | responsive-mobile | Test 375x812 (iPhone) viewport | All pages |
 | responsive-tablet | Test 768x1024 (iPad) viewport | All pages |
 | console-monitoring | Capture console errors during all scenarios | All pages |
