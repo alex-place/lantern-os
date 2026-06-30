@@ -94,16 +94,46 @@ function walkMd(dir, rel = '') {
   return out;
 }
 
+// Categorize a doc into one filter bucket. Structural (path-based) rules win
+// first; the former 144-doc "Library" catch-all is then split into balanced
+// TOPICAL buckets keyed on the filename so no single chip dominates the library.
+// Keyword order matters: more specific intent (audits/reports) is tested before
+// broad domain terms so e.g. "TRADING-VALIDATION" lands under reports, not trading.
 function categorize(rel) {
   if (rel.startsWith('docs/adr/')) return ['architecture', 'ADR'];
   if (rel.startsWith('docs/convergence-io/')) return ['convergence-io', 'Convergence IO'];
   if (rel.startsWith('docs/research/')) return ['research', 'Research'];
   if (/SIGMA0|TESSERACT|RESEARCH-CANON|CONVERGANCE|convergence/i.test(rel)) return ['research', 'Research'];
-  if (rel.startsWith('lore/')) return ['library', 'Lore'];
+  if (rel.startsWith('lore/')) return ['lore', 'Lore'];
+
+  const base = rel.split('/').pop().toUpperCase();
+
+  // Audits, reports, QA, validations, reviews, readiness checks
+  if (/AUDIT|REPORT|SUMMARY|[-_]QA\b|\bQA[-_]|VALIDATION|FEATURE-TEST|READINESS|REVIEW/.test(base))
+    return ['reports', 'Audits & reports'];
+  // Trading & markets
+  if (/TRADER|TRADING|KALSHI|IBKR|PORTFOLIO|PREDICTION-MARKET|MARKET/.test(base))
+    return ['trading', 'Trading'];
+  // Training & models
+  if (/OURO|TRAINING|SERVING|GPU|LOOPLM|DATASET|MULTISOURCE/.test(base))
+    return ['training', 'Training & models'];
+  // Creator suite (studio, video, uploads, the v10 viral pipeline)
+  if (/CREATOR|FACECAM|THREE-DOORS|UPLOAD|JOURNAL_UPLOAD|V10|VIRAL|EDITOR/.test(base))
+    return ['creator', 'Creator suite'];
+  // Setup & integrations (provider/API hookups, deploys, connectors)
+  if (/SETUP|CONNECTOR|OAUTH|DEPLOY|TUNNEL|API-SPEC|API-REFERENCE|MCP|YOUTUBE|MEDIA-HOSTING|CLOUDFLARE|HOSTING|PATREON/.test(base))
+    return ['setup', 'Setup & integrations'];
+  // Operations (workflow, repo process, runbooks, governance, CI/CD)
+  if (/MONOWORKSTREAM|ROLLOVER|REPO-CONTRACT|MERGE|WORK-?QUEUE|RUNBOOK|CICD|RUNTIME|BACKLOG|DISPATCH|SCRIPTS|PII|GOVERNANCE|PRIVACY|HANDOFF|QUEUE|STANDARDS|SITEMAP|CODEMAP/.test(base))
+    return ['ops', 'Operations'];
+
   return ['library', 'Library'];
 }
 
-const ICON = { architecture: '🏛️', 'convergence-io': '🔭', research: '🧪', library: '📄', hff: '🌍' };
+const ICON = {
+  architecture: '🏛️', 'convergence-io': '🔭', research: '🧪', library: '📄', hff: '🌍',
+  setup: '🔌', trading: '📈', training: '🧠', creator: '🎬', ops: '⚙️', reports: '📋', lore: '📜',
+};
 
 function card({ cat, type = 'md', href, external = false, icon, title, summary, catLabel, fmt = 'MD' }) {
   const ext = external
