@@ -105,6 +105,9 @@ const prWatcher = new PrWatcher({
   mergeIgnoreChecks: process.env.PR_WATCHER_MERGE_IGNORE_CHECKS
     ? process.env.PR_WATCHER_MERGE_IGNORE_CHECKS.split(",").map((s) => s.trim()).filter(Boolean)
     : null,
+  mergeIgnorePatterns: process.env.PR_WATCHER_MERGE_IGNORE_PATTERNS
+    ? process.env.PR_WATCHER_MERGE_IGNORE_PATTERNS.split(",").map((s) => s.trim()).filter(Boolean)
+    : null,
 });
 
 // Shared dependency bundle passed to every route module
