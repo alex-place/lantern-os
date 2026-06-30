@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Symptom Journal — Keystone OS</title>
+  <style>
+    /* Health/symptom journal with calibrated honesty (#1435): patterns, never diagnoses. */
+    .w { max-width: 820px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 14px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .disclaim { font-size: 12px; line-height: 1.5; color: #fcd34d; background: rgba(245,158,11,.08);
+      border: 1px solid rgba(245,158,11,.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 16px; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    h2 { font-size: 14px; color: var(--text, #e5e7eb); margin: 0 0 10px; }
+    label { font-size: 12px; color: var(--muted, #9aa0aa); display: block; margin-bottom: 3px; }
+    input { width: 100%; box-sizing: border-box; background: var(--surface2, rgba(255,255,255,.05)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 9px; padding: 8px 10px; font-size: 14px; margin-bottom: 8px; }
+    .btn { background: var(--accent, #06b6d4); color: #06222a; border: none; border-radius: 9px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .pat { padding: 10px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.07)); }
+    .pat .f { font-size: 14px; color: var(--text, #e5e7eb); font-weight: 600; }
+    .pat .v { font-size: 13px; color: var(--text, #d8dce2); line-height: 1.45; margin: 3px 0; }
+    .pat .m { font-size: 11px; color: var(--muted, #9aa0aa); }
+    .worse { color: #f87171; } .better { color: #4ade80; }
+    .conf { display: inline-block; font-size: 10px; border-radius: 5px; padding: 1px 6px; background: rgba(56,189,248,.1); color: #38bdf8; }
+    .abstain { font-size: 12px; color: var(--muted, #9aa0aa); padding: 5px 0; }
+    .entry { font-size: 13px; color: var(--muted, #9aa0aa); padding: 4px 0; display: flex; justify-content: space-between; }
+    .entry b { color: var(--text, #e5e7eb); }
+    .sevbadge { font-family: var(--font-mono, monospace); }
+    .empty { color: var(--muted, #9aa0aa); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/decisions.html">Decisions</a>
+      <a href="/health.html" class="active">Symptoms</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Symptom Journal</h1>
+    <p class="lede">Log how you feel over time with the factors around it (sleep, stress, foods, weather…). It surfaces <em>patterns in your own log</em> — and stays quiet until there's enough data to be honest.</p>
+    <div class="disclaim" id="disclaim">⚕ This reflects patterns in your own log, not a diagnosis or medical advice. Persistent, severe, or worrying symptoms — see a clinician.</div>
+
+    <div class="card">
+      <h2>Log how you feel</h2>
+      <label>Symptom</label><input id="symptom" placeholder="e.g. Headache">
+      <label>Severity: <span id="sevVal">5</span> / 10</label>
+      <input id="severity" type="range" min="1" max="10" value="5" oninput="document.getElementById('sevVal').textContent=this.value">
+      <label>Factors today (comma-separated)</label><input id="factors" placeholder="e.g. poor sleep, skipped lunch, high stress">
+      <button class="btn" id="log">Log entry</button>
+    </div>
+
+    <div class="card">
+      <h2>Possible patterns <span class="m" style="font-weight:400;color:var(--muted)">— in your log, not causes</span></h2>
+      <div id="patterns"></div>
+    </div>
+
+    <div class="card">
+      <h2>Recent entries</h2>
+      <div id="entries"></div>
+    </div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+
+    function renderPatterns(p) {
+      var html = '';
+      if (p.patterns && p.patterns.length) {
+        html += p.patterns.map(function (e) {
+          var cls = e.diff > 0 ? 'worse' : (e.diff < 0 ? 'better' : '');
+          return '<div class="pat"><div class="f ' + cls + '">' + esc(e.factor) + '</div><div class="v">' + esc(e.verdict) + '</div>'
+            + '<div class="m">' + e.nWith + ' days with · ' + e.nWithout + ' without · avg ' + e.avgWith + ' vs ' + e.avgWithout
+            + ' &nbsp;<span class="conf">confidence ' + Math.round(e.confidence * 100) + '% (capped)</span></div></div>';
+        }).join('');
+      }
+      if (p.insufficient && p.insufficient.length) {
+        html += p.insufficient.map(function (e) { return '<div class="abstain">↯ ' + esc(e.verdict) + '</div>'; }).join('');
+      }
+      if (!html) html = '<div class="empty">No factors logged yet — add a few entries with factors to start seeing patterns.</div>';
+      document.getElementById('patterns').innerHTML = html;
+      if (p.disclaimer) document.getElementById('disclaim').textContent = '⚕ ' + p.disclaimer;
+    }
+
+    async function load() {
+      var r = await fetch('/api/symptoms').then(function (x) { return x.json(); });
+      renderPatterns(r.patterns || {});
+      var es = (r.entries || []).slice(-12).reverse();
+      document.getElementById('entries').innerHTML = es.length ? es.map(function (e) {
+        return '<div class="entry"><span><b>' + esc(e.symptom) + '</b> · ' + esc(e.date) + (e.factors && e.factors.length ? ' · ' + esc(e.factors.join(', ')) : '') + '</span><span class="sevbadge">' + e.severity + '/10</span></div>';
+      }).join('') : '<div class="empty">No entries yet.</div>';
+    }
+    async function log() {
+      var symptom = document.getElementById('symptom').value.trim(); if (!symptom) return;
+      var factors = document.getElementById('factors').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      await fetch('/api/symptoms', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symptom: symptom, severity: parseInt(document.getElementById('severity').value, 10), factors: factors }) });
+      document.getElementById('symptom').value = ''; document.getElementById('factors').value = '';
+      load();
+    }
+    document.getElementById('log').addEventListener('click', log);
+    load();
+  </script>
+</body>
+</html>
