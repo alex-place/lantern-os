@@ -61,10 +61,11 @@ module.exports = function imageRoutes(req, res, url, deps) {
         const raw = await collectRequestBody(req, 16 * 1024 * 1024); // image base64 is large
         const data = JSON.parse(raw || "{}");
         const prompt = String(data.prompt || "").slice(0, MAX_PROMPT_LEN * 4);
-        const image = data.image || "";
+        const image = String(data.image || "");
+        const mimeType = String(data.mimeType || "");
         if (!image) { sendJson(res, { ok: false, error: "image required" }, 400); return; }
         const { analyzeImage } = require("../lib/vision");
-        const result = await analyzeImage(prompt, image, { mimeType: data.mimeType });
+        const result = await analyzeImage(prompt, image, { mimeType });
         sendJson(res, result, result.ok ? 200 : 502);
       } catch (err) {
         sendJson(res, { ok: false, error: err.message }, 500);
