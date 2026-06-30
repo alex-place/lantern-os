@@ -29,7 +29,7 @@
 // High risk = high assertiveness AND no anchor = the 42-state signature.
 
 const { tokenize, splitUnits } = require("./canary-util");
-const { toUncertainty } = require("./token-surprise");
+const { toUncertainty, calibrationFor } = require("./token-surprise");
 
 const MIN_TOKENS = 16; // below this there isn't enough signal — don't cry ungrounded
 
@@ -107,6 +107,9 @@ function inTextAnchor(text) {
  *        an uncertainty scalar [0,1], a surpriseField summary, or a [{bits}] array
  *        (see ./token-surprise.js). Present only when the provider exposes per-token
  *        logprobs (local / OpenAI-style); absent (cloud) → behaves exactly as before.
+ * @param {string} [opts.surpriseModel]  OPTIONAL model id → per-model calibration of the
+ *        surprise→uncertainty MAGNITUDE (#1681). Unknown/absent → default (unchanged).
+ * @param {{center:number,gain:number}} [opts.surpriseCalibration]  OPTIONAL explicit override.
  * @returns {{risk:number, ungrounded:boolean, anchored:boolean, signals:object, reason?:string}}
  */
 function scoreReplyGroundedness(text, opts = {}) {
@@ -145,7 +148,10 @@ function scoreReplyGroundedness(text, opts = {}) {
   // corner (assertive × unanchored): it never fabricates risk in a hedged/anchored/
   // reflective reply (base risk ≈ 0 there → sharpen has nothing to multiply), and an
   // absent signal (cloud, no logprobs) leaves the score byte-identical to before.
-  signals.modelUncertainty = opts.tokenSurprise != null ? toUncertainty(opts.tokenSurprise) : 0;
+  // #1681: per-model calibration so the scalar's MAGNITUDE is meaningful (not just ranked).
+  // Explicit surpriseCalibration wins; else resolve from surpriseModel; else default (unchanged).
+  const surpriseCalib = opts.surpriseCalibration || calibrationFor(opts.surpriseModel);
+  signals.modelUncertainty = opts.tokenSurprise != null ? toUncertainty(opts.tokenSurprise, surpriseCalib) : 0;
   const sharpen = 1 + SURPRISE_ALPHA * signals.modelUncertainty * (1 - signals.anchor);
 
   const risk = Math.min(1, signals.assertiveness * (1 - signals.anchor) * sharpen);

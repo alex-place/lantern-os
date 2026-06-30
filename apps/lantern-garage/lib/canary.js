@@ -34,6 +34,8 @@ const CANARY_EVENTS = path.resolve(repoRoot, "data/convergence/canary-events.jso
  * @param {number|object|Array} [opts.tokenSurprise]  OPTIONAL model-internal surprise
  *        (per-token logprobs → uncertainty), forwarded to the groundedness axis. Absent
  *        for providers that don't expose logprobs (e.g. Anthropic) → no behavior change.
+ * @param {string} [opts.surpriseModel]  OPTIONAL model id → per-model calibration of the
+ *        surprise→uncertainty magnitude (#1681), forwarded to the groundedness axis.
  * @param {object} [opts.context]  metadata for the event log (source, provider, agent, surface)
  * @param {boolean} [opts.emit=true]  append a canary event when either axis trips
  * @returns {{
@@ -47,6 +49,8 @@ function runCanaries(reply, opts = {}) {
   const grounded = scoreReplyGroundedness(text, {
     groundingContext: opts.groundingContext,
     tokenSurprise: opts.tokenSurprise,
+    surpriseModel: opts.surpriseModel,             // #1681: per-model calibration of the magnitude
+    surpriseCalibration: opts.surpriseCalibration, // (explicit override; else resolved from the model id)
   });
 
   const tripped = [];

@@ -47,3 +47,27 @@ the groundedness canary. This change opens it.
   default single-shot chat path — the one that matters — is wired.
 - **Layers 2–3 unrun (#1679/#1680):** whether feeding this in raises hallucination recall
   / verified-pass-rate is still the open question. This change only opens the valve.
+
+## Per-model calibration (#1681) — magnitude made meaningful
+
+The caveat above (magnitude uncalibrated) is now addressed. `token-surprise.js` carries a
+per-model calibration table (`CALIBRATION` + `calibrationFor(modelId)`); `fieldToUncertainty`
+/`toUncertainty` take a `{center,gain}`, and the groundedness canary resolves it from the
+reply's model id (`runCanaries({surpriseModel})` → `scoreReplyGroundedness`). Unknown models
+fall back to the prior default — unchanged behaviour.
+
+Values are **derived from the #1673 labeled rows**, not guessed: `center` = midpoint of the
+class-mean blends, `gain` = 2 / (halluc_mean − correct_mean), so a correct reply lands ~0.27
+and a hallucination ~0.73 at the class means. Because the logistic is strictly monotonic,
+**AUROC is unchanged** — calibration only fixes the *magnitude*.
+
+| | default (the #1678 collapse) | calibrated (#1681) |
+|---|---|---|
+| confident ("Eiffel Tower opened 1889") | 0.007 | **0.05** |
+| guess ("…673 billion grains of sand") | 0.14 | **0.997** |
+
+Measured live on real Ollama (qwen2.5-coder:1.5b) logprobs through the real modules:
+default leaves both replies below a 0.5 threshold (indistinguishable); calibration lifts the
+guess above it while keeping the confident reply below — a separation a fixed canary
+threshold can act on. Per-model values for the two #1673 models ship; others use the default
+until measured (the obvious extension as #1682's PLT re-run lands its own rows).
