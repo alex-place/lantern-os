@@ -21,6 +21,7 @@ const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
+const streamSurprise = require("./stream-surprise");
 const { councilReview } = require("./council-review");
 const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
@@ -1128,6 +1129,11 @@ async function handleStreamChat(req, url, res) {
   // dispatch loop runs. A `let` declared later left those calls in the temporal
   // dead zone ("Cannot access 'fullReply' before initialization").
   let fullReply = "";
+  // #1678 Verify valve: per-token logprob accumulator. Logprob-exposing providers feed it
+  // during streaming; sendDone() reads it once as tokenSurprise for the groundedness canary.
+  // No-op when SURPRISE_CANARY is off or the provider has no logprobs (value() → null →
+  // modelUncertainty 0 → behaviour byte-identical to before).
+  const surprise = streamSurprise.createSurpriseAccumulator();
 
   // Consistent sendDone with Σ₀ PCSF signature for all responses
   const sendDone = (source, extra = {}) => {
@@ -1174,9 +1180,14 @@ async function handleStreamChat(req, url, res) {
       if (fullReply) {
         const { collapse, grounded, signaturePatch } = runCanaries(fullReply, {
           groundingContext,
+          tokenSurprise: surprise.value(), // #1678: model-internal uncertainty (null when none captured)
           context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
         });
         Object.assign(signature, signaturePatch);
+        // #1678 Verify-valve telemetry: when a logprob-exposing provider fed the accumulator,
+        // surface the model-internal surprise field on the done signature — operator-visible
+        // proof the valve is open. Absent for no-logprob providers (Anthropic) and flag off.
+        if (surprise.count()) signature.surprise = surprise.field();
         // Σ₀ council: fold both canary axes (+ any reason-face dissent) into one Δ and the
         // 4-way answerability gate (grounded/seam_open/pin/refuted), log a council record so
         // the operator-escalation backtest accrues data, and stamp the verdict for the UI.
@@ -1989,6 +2000,7 @@ async function handleStreamChat(req, url, res) {
     // otherwise it falls through to the backstop. Gates every per-provider guard.
     const _hardPin = requestedProvider && _isLastProvider;
     fullReply = "";   // fresh per provider — never carry a failed attempt's partial text
+    surprise.reset(); // #1678: nor a failed attempt's captured logprobs
 
   // Provider: Gemini (streaming)
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -2082,6 +2094,11 @@ async function handleStreamChat(req, url, res) {
       if (groundingEnabled) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];
       }
+      // #1678 Verify valve: request per-token logprobs, but only on the non-grounding wire —
+      // Gemini rejects responseLogprobs alongside the googleSearch tool. Flag-gated no-op otherwise.
+      if (!groundingEnabled) {
+        geminiPayloadBase.generationConfig = streamSurprise.withGeminiLogprobs(geminiPayloadBase.generationConfig);
+      }
       const payload = JSON.stringify(geminiPayloadBase);
       const _gt = await geminiTransport({ model: geminiModel, apiKey: geminiKey });
       await new Promise((resolve, reject) => {
@@ -2111,6 +2128,7 @@ async function handleStreamChat(req, url, res) {
               if (!raw) continue;
               try {
                 const evt = JSON.parse(raw);
+                surprise.pushGeminiEvent(evt); // #1678
                 const parts = evt.candidates?.[0]?.content?.parts || [];
                 for (const p of parts) {
                   const token = p.text || "";
@@ -2167,7 +2185,7 @@ async function handleStreamChat(req, url, res) {
         msg.includes("quota") ||
         /gemini_status_5\d\d/.test(msg) || // 500/502/503/504 high-demand
         msg.includes("gemini_timeout");
-      if (isTransient) { fullReply = ""; continue; } // retry with next model silently
+      if (isTransient) { fullReply = ""; surprise.reset(); continue; } // retry with next model silently
       // Terminal gemini failure (chain exhausted / non-transient): record to the
       // leaderboard so PCSF learns provider reliability. Not reached on a
       // transient retry that later succeeds (that path `continue`d above). (#1236)
@@ -2437,11 +2455,11 @@ async function handleStreamChat(req, url, res) {
     }
     try {
       // FAST-mode anti-repetition decode params (issue #729): top_p + frequency_penalty.
-      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
+      const payload = JSON.stringify(streamSurprise.withOpenAILogprobs(serving.applyOpenAIDecodeParams({
         model: modelFor("openai"),
         stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
-      }));
+      }))); // #1678: + per-token logprobs when SURPRISE_CANARY on (else unchanged)
 
       await new Promise((resolve, reject) => {
         const req2 = https.request({
@@ -2471,6 +2489,7 @@ async function handleStreamChat(req, url, res) {
               if (raw === "[DONE]" || raw === "") continue;
               try {
                 const evt = JSON.parse(raw);
+                surprise.pushOpenAIEvent(evt); // #1678
                 const token = evt.choices?.[0]?.delta?.content || "";
                 if (token) { fullReply += token; sendToken(token); }
               } catch { /* skip malformed */ }
@@ -2574,10 +2593,10 @@ async function handleStreamChat(req, url, res) {
     try {
       const xaiModel = modelFor("xai");
       // xAI/Grok is OpenAI-compatible → FAST-mode decode params (issue #729).
-      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
+      const payload = JSON.stringify(streamSurprise.withOpenAILogprobs(serving.applyOpenAIDecodeParams({
         model: xaiModel, stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
-      }));
+      }))); // #1678: + per-token logprobs when SURPRISE_CANARY on (else unchanged)
       await new Promise((resolve, reject) => {
         const req2 = require("https").request({
           agent: llmAgent,
@@ -2593,7 +2612,7 @@ async function handleStreamChat(req, url, res) {
               if (!line.startsWith("data: ")) continue;
               const raw = line.slice(6).trim();
               if (raw === "[DONE]" || !raw) continue;
-              try { const t = JSON.parse(raw).choices?.[0]?.delta?.content || ""; if (t) { fullReply += t; sendToken(t); } } catch { /* skip */ }
+              try { const evt = JSON.parse(raw); surprise.pushOpenAIEvent(evt); /* #1678 */ const t = evt.choices?.[0]?.delta?.content || ""; if (t) { fullReply += t; sendToken(t); } } catch { /* skip */ }
             }
           });
           upstream.on("end", resolve); upstream.on("error", reject);
