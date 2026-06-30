@@ -168,7 +168,7 @@
       <div id="attach-chips" class="attach-chips" aria-live="polite"></div>
       <div class="input-wrapper">
         <button id="attach-btn" class="attach-btn" type="button" aria-label="Upload a file" onclick="lanternAttach.pickAny()" title="Upload a file">+</button>
-        <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text)">🎙️</button>
+        <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text (Ctrl+Shift+M)" aria-pressed="false" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text) · Ctrl/Cmd+Shift+M">🎙️</button>
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
         <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
       </div>
@@ -502,6 +502,7 @@
   });
 </script>
 
+<script src="js/voice-dictation.js?v=20260630-voice"></script>
 <script src="js/dream-chat.js?v=20260629-thumbs"></script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/dream-chat-ui.js?v=20260629-thumbs"></script>

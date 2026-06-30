@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Keystone Stock Trader</title>
 
+<!-- Apply the saved theme before paint so the global header + light mode don't flash (#1577). -->
+<script>
+  (function(){ try {
+    var stored = localStorage.getItem('lantern-theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var isDark = stored ? stored === 'dark' : prefersDark;
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  } catch(e){ document.documentElement.setAttribute('data-theme','dark'); } })();
+</script>
+<!-- Shared global header styling (#1579). Loaded BEFORE the trader <style> so the
+     trader's own rules still win on any conflict. -->
+<link rel="stylesheet" href="/css/site.css">
+
 <style>
   @import url('/vendor/fonts/fonts.css'); /* #861: vendored local-first (was Google Fonts CDN) */
   @import url('/css/trader.css');
@@ -20,9 +33,32 @@
     --tv-grid:rgba(255,255,255,.06);--tv-axis:rgba(255,255,255,.65);
     --tv-candle-up:#26a69a;--tv-candle-down:#ef5350;
   }
+  /* Light theme (#1577): the global ☀/🌙 toggle flips data-theme; remap the
+     terminal palette so the whole trader is genuinely light-mode-aware, not
+     hard-locked to dark. Accent colors (green/red/amber/blue) carry over. */
+  html[data-theme="light"]{
+    --bg0:#f4f6fa;--bg1:#ffffff;--bg2:#eef1f6;--bg3:#e3e8f0;
+    --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#828b9c;
+    --tv-text-primary:#1a1d24;--tv-text-secondary:#4a5160;
+    --tv-grid:rgba(0,0,0,.08);--tv-axis:rgba(0,0,0,.55);
+  }
+  /* A handful of surfaces/borders in this terminal are hardcoded dark
+     (rgba(15,18,28,…) / white-translucent borders). Remap them for light mode
+     so cards, panels and dividers stay legible (#1577). */
+  html[data-theme="light"] .card,
+  html[data-theme="light"] .fpanel{background:var(--bg1);border-color:var(--border)}
+  html[data-theme="light"] .card:hover{border-color:#b9c2d0}
+  html[data-theme="light"] .wl-item,
+  html[data-theme="light"] .log-item,
+  html[data-theme="light"] .order-row,
+  html[data-theme="light"] .news-item{border-bottom-color:rgba(0,0,0,.07)}
+  html[data-theme="light"] .range-btn.active{background:rgba(0,0,0,.08);border-color:rgba(0,0,0,.15);color:var(--text0)}
   html,body{height:100%;background:var(--bg0);color:var(--text0);font-family:var(--sans);font-size:13px;overflow-x:hidden}
+  body{overflow-y:hidden}            /* global nav (52px) + .layout fill the viewport; panels scroll internally */
+  .site-footer{display:none}         /* full-screen app has its own footer; suppress the injected global one (#1579) */
   /* ── Layout ── */
-  .layout{display:grid;grid-template-columns:180px 1fr;grid-template-rows:52px 1fr auto;height:100vh}
+  /* Leave room for the injected global site-nav (52px sticky bar, #1579). */
+  .layout{display:grid;grid-template-columns:180px 1fr;grid-template-rows:52px 1fr auto;height:calc(100vh - 52px)}
   .header{grid-column:1/-1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
   .sidebar{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;padding:8px 0}
   .main{overflow-y:auto;padding:12px;background:var(--bg0)}
@@ -240,7 +276,7 @@
     <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
   </div>
   <div class="pulse"></div>
-  <a href="/trading-news.html" class="nav-link">News →</a>
+  <a href="/explore.html?topic=finance" class="nav-link">News →</a>
 </div>
 
 <!-- Sidebar -->
@@ -413,8 +449,10 @@ const MIN_VISIBLE_BARS = 10;
 // TradingView-style chart colors (canvas can't read CSS custom properties,
 // so these mirror the --tv-* vars defined in :root).
 const CHART_AXIS_FONT   = '10px "IBM Plex Mono",monospace';
-const CHART_AXIS_COLOR  = 'rgba(255,255,255,.65)';
-const CHART_GRID_COLOR  = 'rgba(255,255,255,.06)';
+// Read the live --tv-* vars so chart axes/grid follow the light/dark theme (#1577).
+const chartVar = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
+const CHART_AXIS_COLOR  = () => chartVar('--tv-axis', 'rgba(255,255,255,.65)');
+const CHART_GRID_COLOR  = () => chartVar('--tv-grid', 'rgba(255,255,255,.06)');
 const CHART_CANDLE_UP   = '#26a69a';
 const CHART_CANDLE_DOWN = '#ef5350';
 
@@ -694,12 +732,12 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   for(const price of priceTicks){
     if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
-    ctx.strokeStyle = CHART_GRID_COLOR;
+    ctx.strokeStyle = CHART_GRID_COLOR();
     ctx.beginPath();
     ctx.moveTo(0, yy);
     ctx.lineTo(pw, yy);
     ctx.stroke();
-    ctx.fillStyle = CHART_AXIS_COLOR;
+    ctx.fillStyle = CHART_AXIS_COLOR();
     ctx.textAlign = 'left';
     const edge = yy < 8 ? 'top' : (yy > ph-8 ? 'bottom' : 'middle');
     ctx.textBaseline = edge;
@@ -714,7 +752,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // Labels are real clock times/dates for the active timeframe, edge-clamped
     // so the first/last never bleed into the gutter or get clipped, plus a faint
     // vertical gridline per tick.
-    ctx.fillStyle = CHART_AXIS_COLOR;
+    ctx.fillStyle = CHART_AXIS_COLOR();
     ctx.textBaseline = 'bottom';
     const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 84)));
     const timeTicks = timeAxisTicks(bars, timeMaxTicks);
@@ -725,7 +763,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       const cx = t.idx*slotW + slotW/2;
       if(cx - lastLabelX < MIN_LABEL_GAP) continue;
       lastLabelX = cx;
-      ctx.strokeStyle = CHART_GRID_COLOR;
+      ctx.strokeStyle = CHART_GRID_COLOR();
       ctx.beginPath();
       ctx.moveTo(Math.round(cx)+0.5, 0);
       ctx.lineTo(Math.round(cx)+0.5, ph);
@@ -1801,6 +1839,11 @@ function startDashboard(){
 document.addEventListener('DOMContentLoaded', startDashboard);
 
 </script>
+<!-- Global header (#1579) + theme toggle (#1577). site-chrome injects the shared
+     <nav class="site-nav"> at the top of <body>; theme-toggle defines toggleTheme()
+     for the ☀/🌙 button; both run before auth-gate (which highlights the active link). -->
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

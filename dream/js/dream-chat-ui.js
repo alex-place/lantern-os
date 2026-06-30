@@ -648,6 +648,54 @@ function ensureAutoworkStyles() {
   document.head.appendChild(st);
 }
 
+// In-chat review actions for an autowork draft PR (#1503): Approve (mark ready +
+// squash-merge), Rework (re-run autowork on the same issue), Discard (close + delete
+// branch). Approve/Discard hit POST /api/convergence/pr-action behind a confirm;
+// Rework just re-invokes runAutowork. No-op when there's no PR to act on.
+function renderAutoworkActions(fin, prUrl, issue, btn, base) {
+  if (!fin || !prUrl) return;
+  if (fin.querySelector('.aw-actions')) return;   // don't double-render on reconnect
+  const bar = document.createElement('div');
+  bar.className = 'aw-actions';
+  bar.style.cssText = 'margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+  const mk = (label, title, color) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label; b.title = title;
+    b.style.cssText = `font:600 11px var(--font-sans,sans-serif);padding:4px 10px;border-radius:8px;border:1px solid ${color};background:transparent;color:${color};cursor:pointer`;
+    return b;
+  };
+  const approve = mk('✓ Approve', 'Mark ready for review & squash-merge', '#4ade80');
+  const rework  = mk('↻ Rework',  'Re-run autowork on this issue (supersedes this attempt)', '#a78bfa');
+  const discard = mk('✕ Discard', 'Close the PR & delete its branch', '#f87171');
+  const all = [approve, rework, discard];
+  const setMsg = (txt, color) => {
+    let m = bar.querySelector('.aw-action-msg');
+    if (!m) { m = document.createElement('span'); m.className = 'aw-action-msg'; m.style.cssText = 'font-size:11px;margin-left:4px'; bar.appendChild(m); }
+    m.style.color = color || ''; m.textContent = txt;
+  };
+  async function doAction(action, confirmText) {
+    if (!window.confirm(confirmText)) return;
+    all.forEach(b => b.disabled = true);
+    setMsg('Working…', '');
+    try {
+      const r = await (await fetch(`${base}/api/convergence/pr-action`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prUrl, action }),
+      })).json();
+      if (r && r.ok) { setMsg('✓ ' + (r.message || 'Done'), '#4ade80'); approve.remove(); discard.remove(); rework.remove(); }
+      else { setMsg('✗ ' + ((r && r.error) || 'Failed'), '#f87171'); all.forEach(b => b.disabled = false); }
+    } catch (e) { setMsg('✗ ' + (e && e.message || 'request failed'), '#f87171'); all.forEach(b => b.disabled = false); }
+  }
+  approve.onclick = () => doAction('approve', `Approve and squash-merge this PR?\n\n${prUrl}`);
+  discard.onclick = () => doAction('discard', `Discard (close) this PR and delete its branch?\n\n${prUrl}`);
+  rework.onclick = () => {
+    if (!window.confirm(`Re-run autowork on issue #${issue}? This supersedes the current attempt.`)) return;
+    if (typeof runAutowork === 'function' && btn) runAutowork(parseInt(issue, 10) || issue, btn, base).catch(e => console.error('[autowork rework]', e));
+  };
+  all.forEach(b => bar.appendChild(b));
+  fin.appendChild(bar);
+}
+
 // `target` is either an issue number (number/numeric string — `!work #N`) or a
 // free-form task object `{ task: "fix the intent handler" }` from the chat
 // "Run as autowork" button. Task mode files a GitHub issue first (server-side),
@@ -793,6 +841,7 @@ async function runAutowork(target, btn, base) {
       fin.innerHTML = finalDone.prUrl
         ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
         : `✓ ${esc(finalDone.message || 'Done')}`;
+      renderAutoworkActions(fin, finalDone.prUrl, finalDone.issue || issue, btn, base);
       setActivity('Complete', finalDone.prUrl ? 'opened a pull request' : 'autonomous work finished', false);
       if (actImg) actImg.src = '/mandala.svg'; // steady (no spin)
     } else {
@@ -839,6 +888,7 @@ async function runAutowork(target, btn, base) {
             setActivity('Complete', 'recovered after a dropped connection', false);
             fin.style.color = '#4ade80';
             fin.innerHTML = `✓ Auto-worked #${esc(s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : (issue || ''))} — <a href="${esc(s.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a> <span style="opacity:.6;font-size:11px">(reconnected)</span>`;
+            renderAutoworkActions(fin, s.prUrl, (s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : issue), btn, base);
           } else {
             setActivity('Stopped', s.message || 'run ended', false);
             fin.style.color = '#f87171';

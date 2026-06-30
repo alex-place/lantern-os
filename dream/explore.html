@@ -92,19 +92,37 @@
     /* Lead image — bleeds to the card edges, clipped by the card's radius. */
     .feed-card .fc-thumb {
       width: calc(100% + 36px);
-      height: 172px;
+      height: 216px;
       object-fit: cover;
       display: block;
       margin: -18px -18px 1px;
       background: var(--surface2);
     }
+    /* Company-logo lead (finance cards with no source photo): CONTAIN the brand
+       mark on a tile (not cropped to a wide cover). The tile colour is chosen
+       PER LOGO at render time (cardEl analyses the logo's brightness): a dark
+       logo gets a light tile, a bright logo gets a dark tile — so it always has
+       contrast. Generous padding keeps it from reading as "zoomed in". Falls back
+       to the minimal generated cover if the logo 404s (.is-logo* removed first). */
+    .feed-card .fc-thumb.is-logo {
+      object-fit: contain;
+      padding: 44px;
+      box-sizing: border-box;
+      background: #1b2330; /* neutral until cardEl picks light/dark; no flash */
+      border-bottom: 1px solid var(--border);
+    }
+    .feed-card .fc-thumb.is-logo-light { background: #f4f6fa; }
+    .feed-card .fc-thumb.is-logo-dark  { background: #0f1722; }
+    /* Logo PNG that ships its OWN background (opaque) — fill the tile like a photo
+       instead of padding it, so it doesn't read as a small image on a mismatched tile. */
+    .feed-card .fc-thumb.is-logo-filled { object-fit: cover; padding: 0; background: transparent; }
     /* Generated lead thumbnail for cards with no (or a broken) source image —
        docs, image-less reads, beliefs. A type-tinted gradient block with the type
        glyph, so EVERY card has a consistent lead visual instead of reading as a
        bare, thumbnail-less "?" tile. */
     .feed-card .fc-thumb-ph {
       width: calc(100% + 36px);
-      height: 150px;
+      height: 216px;
       margin: -18px -18px 1px;
       display: flex;
       align-items: center;
@@ -1016,6 +1034,7 @@
       <button type="button" class="feed-chip active" data-type="all" aria-pressed="true">All</button>
       <button type="button" class="feed-chip" data-type="embed" aria-pressed="false"><span aria-hidden="true">🕹️</span> Play</button>
       <button type="button" class="feed-chip" data-type="read" aria-pressed="false"><span aria-hidden="true">📰</span> Read</button>
+      <button type="button" class="feed-chip" data-topic="finance" aria-pressed="false"><span aria-hidden="true">📈</span> Finance</button>
       <button type="button" class="feed-chip" data-type="watch" aria-pressed="false"><span aria-hidden="true">🎬</span> Watch</button>
       <button type="button" class="feed-chip" data-type="listen" aria-pressed="false"><span aria-hidden="true">🎵</span> Listen</button>
       <button type="button" class="feed-chip" data-type="build" aria-pressed="false"><span aria-hidden="true">🛠️</span> Build</button>
@@ -1172,10 +1191,9 @@
 <script>
 /* Theme toggle event listener */
 document.addEventListener('DOMContentLoaded', () => {
-  const themeToggle = document.getElementById('theme-toggle');
-  if (themeToggle && window.toggleTheme) {
-    themeToggle.addEventListener('click', toggleTheme);
-  }
+  // NOTE: the global-header theme button (injected by site-chrome.js) already
+  // calls toggleTheme() via its onclick. Do NOT add a second click listener here
+  // — two handlers fire per click and cancel out, so the toggle appears dead.
 
   /* Kingdome of Hearts / Three Doors gallery — rendered from a manifest so the
      set can grow without touching markup. Each entry becomes a .showcase-tile
@@ -1355,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { threshold: 0.5 }) : null;
 
   let filter = 'all';
+  let filterKind = 'type';           // 'type' (media type chip) | 'topic' (cross-cutting, e.g. finance)
   const seen = new Set();            // stable card ids already shown (dedup across pages)
   let loading = false, totalShown = 0, cycles = 0;
 
@@ -1437,6 +1456,39 @@ document.addEventListener('DOMContentLoaded', () => {
     ph.setAttribute('aria-hidden', 'true');
     ph.innerHTML = '<span class="fc-ph-icon">' + (ICON[type] || '◈') + '</span>';
     return ph;
+  }
+
+  // Pick the best tile for a company logo by reading its pixels (CORS-enabled):
+  //  • mostly-opaque logo (its own baked background) → fill the tile like a photo
+  //  • transparent dark logo  → LIGHT tile (so it's visible)
+  //  • transparent bright logo → DARK tile
+  // CORS taint / any failure → safe default (light tile, where most logos read).
+  function pickLogoTile(im) {
+    if (im.dataset.tiled) return;
+    im.dataset.tiled = '1';
+    try {
+      const w = im.naturalWidth, h = im.naturalHeight;
+      if (!w || !h) { im.classList.add('is-logo-light'); return; }
+      const cv = document.createElement('canvas');
+      cv.width = Math.min(w, 64); cv.height = Math.min(h, 64);
+      const cx = cv.getContext('2d');
+      cx.drawImage(im, 0, 0, cv.width, cv.height);
+      const d = cx.getImageData(0, 0, cv.width, cv.height).data;
+      let lum = 0, a = 0, opaque = 0, total = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        total++;
+        const al = d[i + 3] / 255;
+        if (al > 0.9) opaque++;
+        if (al < 0.15) continue;
+        lum += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) * al;
+        a += al;
+      }
+      const avg = a ? lum / a : 128;
+      if (total && opaque / total > 0.9) im.classList.add('is-logo-filled'); // baked bg → fill
+      else im.classList.add(avg >= 140 ? 'is-logo-dark' : 'is-logo-light');
+    } catch (e) {
+      im.classList.add('is-logo-light'); // tainted canvas → safe default
+    }
   }
 
   function cardEl(c, posinset) {
@@ -1524,16 +1576,24 @@ document.addEventListener('DOMContentLoaded', () => {
       // leaving a broken-image glyph or an empty gap.
       if (img) {
         const thumb = document.createElement('img');
-        thumb.className = 'fc-thumb';
+        const isLogo = c.imageFit === 'contain';
+        thumb.className = 'fc-thumb' + (isLogo ? ' is-logo' : '');
+        // crossOrigin only for logos — it lets us read pixels to pick a contrasting
+        // tile. Source photos may not send CORS headers, so never set it there.
+        if (isLogo) thumb.crossOrigin = 'anonymous';
         thumb.src = img; thumb.alt = '';
         thumb.loading = 'lazy'; thumb.referrerPolicy = 'no-referrer';
-        // A broken external cover (archive art / GitHub OG / OWID chart) swaps to
-        // the same-origin generated thumbnail; if THAT fails, the glyph block.
+        // A broken external cover (archive art / GitHub OG / OWID chart / a missing
+        // company logo) swaps to the same-origin generated thumbnail; if THAT
+        // fails, the glyph block. Drop logo classes first so the fallback fills.
         const fb = safeImg(c.imageFallback || '');
         thumb.addEventListener('error', () => {
-          if (fb && thumb.src.indexOf('/api/explore/thumb.svg') === -1) { thumb.src = fb; }
-          else thumb.replaceWith(placeholderThumb(c.type));
+          if (fb && thumb.src.indexOf('/api/explore/thumb.svg') === -1) {
+            thumb.classList.remove('is-logo', 'is-logo-light', 'is-logo-dark', 'is-logo-filled');
+            thumb.crossOrigin = null; thumb.src = fb;
+          } else thumb.replaceWith(placeholderThumb(c.type));
         });
+        if (isLogo) thumb.addEventListener('load', () => pickLogoTile(thumb), { once: true });
         el.insertBefore(thumb, el.firstChild);
       } else {
         el.insertBefore(placeholderThumb(c.type), el.firstChild);
@@ -1588,7 +1648,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const r = await fetch('/api/explore/feed/page', {
         method: 'POST', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seen: [...seen], limit: PAGE, type: filter === 'all' ? null : filter }),
+        body: JSON.stringify({
+          seen: [...seen], limit: PAGE,
+          type: (filterKind === 'type' && filter !== 'all') ? filter : null,
+          topic: filterKind === 'topic' ? filter : null,
+        }),
       });
       const data = r.ok ? await r.json() : null;
       if (epoch !== filterEpoch) return;                 // a filter change superseded this page
@@ -1635,14 +1699,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (playObserver) playObserver.disconnect();
     stream.innerHTML = '';
     if (io) { io.unobserve(sentinel); io.observe(sentinel); }
+    syncShowcases();
     loadPage();
+  }
+
+  // The static showcase galleries (Kingdome of Hearts, Pencil Guy art) are
+  // "All"-context discovery sections, not feed cards. When a specific chip is
+  // active (Finance, Read, …) they read as a wall of unrelated images glued to
+  // the bottom of that feed — so show them only on the unfiltered "All" view.
+  function syncShowcases() {
+    var on = filter === 'all';
+    document.querySelectorAll('.showcase').forEach(function (s) {
+      s.style.display = on ? '' : 'none';
+    });
   }
 
   if (chips) {
     chips.addEventListener('click', (e) => {
       const btn = e.target.closest('.feed-chip');
-      if (!btn || btn.dataset.type === filter) return;
-      filter = btn.dataset.type;
+      if (!btn) return;
+      const val = btn.dataset.topic || btn.dataset.type || 'all';
+      const kind = btn.dataset.topic ? 'topic' : 'type';
+      if (val === filter && kind === filterKind) return;
+      filter = val; filterKind = kind;
       chips.querySelectorAll('.feed-chip').forEach(b => {
         const on = b === btn;
         b.classList.toggle('active', on);
@@ -1652,7 +1731,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Deep-link preselect (#1581): /explore.html?topic=finance (or ?filter=finance)
+  // opens straight on that chip — e.g. the trader page "News →" link. Falls back to
+  // the default 'all' feed when the param names no real chip.
+  if (chips) {
+    const params = new URLSearchParams(location.search);
+    const want = (params.get('topic') || params.get('filter') || '').toLowerCase();
+    const wantType = (params.get('type') || '').toLowerCase();
+    let preBtn = null, preKind = 'type';
+    if (want) {
+      preBtn = chips.querySelector('.feed-chip[data-topic="' + (window.CSS && CSS.escape ? CSS.escape(want) : want) + '"]');
+      if (preBtn) { filter = want; preKind = 'topic'; }
+      else { const t = chips.querySelector('.feed-chip[data-type="' + want + '"]'); if (t) { preBtn = t; filter = want; preKind = 'type'; } }
+    } else if (wantType) {
+      preBtn = chips.querySelector('.feed-chip[data-type="' + wantType + '"]');
+      if (preBtn) { filter = wantType; preKind = 'type'; }
+    }
+    if (preBtn) {
+      filterKind = preKind;
+      chips.querySelectorAll('.feed-chip').forEach(b => {
+        const on = b === preBtn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+  }
+
   // Kick off, then keep the sentinel observed. Fallback for no IntersectionObserver.
+  syncShowcases();   // honor a deep-linked filter on first paint
   loadPage();
   if (io) io.observe(sentinel);
   else window.addEventListener('scroll', () => {

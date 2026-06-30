@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Grounding Diff — Keystone OS</title>
+  <style>
+    /* Grounding Diff viewer (#1420): the mandated [claim · evidence · source · confidence]
+       tuple as a first-class artifact, with contradicting claims highlighted. */
+    .gd-wrap { max-width: 1100px; margin: 0 auto; padding: 18px 16px 60px; }
+    .gd-head h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .gd-head p { margin: 0 0 14px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .gd-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 16px; }
+    .gd-controls label { font-size: 12px; color: var(--muted, #9aa0aa); display: inline-flex; gap: 6px; align-items: center; }
+    .gd-controls select, .gd-controls input { background: var(--surface2, rgba(255,255,255,.05)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+    .gd-summary { font-size: 12px; color: var(--muted, #9aa0aa); margin: 0 0 12px; }
+    .gd-summary b { color: var(--text, #e5e7eb); }
+    .gd-summary .warn { color: #f59e0b; }
+
+    .gd-grid-head, .gd-row { display: grid; grid-template-columns: 1.4fr 2fr 0.9fr 0.9fr; gap: 12px; }
+    .gd-grid-head { padding: 0 14px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #9aa0aa); }
+    .gd-row { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 12px; padding: 14px; margin-bottom: 10px; align-items: start; }
+    .gd-row.contradicted { border-color: #f59e0b; box-shadow: inset 3px 0 0 #f59e0b; }
+    .gd-claim-title { font-size: 14px; font-weight: 600; color: var(--text, #e5e7eb); line-height: 1.35; }
+    .gd-claim-body { font-size: 12px; color: var(--muted, #9aa0aa); margin-top: 5px; line-height: 1.45; }
+    .gd-scope { display: inline-block; font-size: 10px; font-family: var(--font-mono, monospace); color: #38bdf8;
+      background: rgba(56,189,248,.10); border-radius: 5px; padding: 1px 6px; margin-top: 6px; }
+    .gd-ev { font-size: 12px; color: var(--text, #d8dce2); line-height: 1.45; }
+    .gd-ev .gd-ev-item { border-left: 2px solid var(--border, rgba(255,255,255,.16)); padding-left: 8px; margin-bottom: 6px; }
+    .gd-ev .none { color: var(--muted, #9aa0aa); font-style: italic; }
+    .gd-src .tag { display: inline-block; font-size: 10px; color: #a78bfa; background: rgba(167,139,250,.12);
+      border-radius: 5px; padding: 2px 6px; margin: 0 4px 4px 0; }
+    .gd-src .none { color: var(--muted, #9aa0aa); font-size: 11px; }
+    .gd-conf .bar { height: 7px; border-radius: 4px; background: var(--surface2, rgba(255,255,255,.08)); overflow: hidden; margin-top: 4px; }
+    .gd-conf .bar > i { display: block; height: 100%; border-radius: 4px; }
+    .gd-conf .pct { font-size: 13px; font-weight: 600; color: var(--text, #e5e7eb); }
+    .gd-conf .na { font-size: 12px; color: var(--muted, #9aa0aa); }
+    .gd-status { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; margin-top: 6px; }
+    .gd-status.pending { color: #9aa0aa; } .gd-status.approved { color: #4ade80; } .gd-status.rejected { color: #f87171; }
+    .gd-contra-note { grid-column: 1 / -1; margin-top: 10px; padding: 8px 10px; border-radius: 8px;
+      background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.35); color: #fbbf24; font-size: 12px; line-height: 1.45; }
+    .gd-empty { text-align: center; padding: 48px 20px; color: var(--muted, #9aa0aa); }
+    .gd-empty b { color: var(--text, #e5e7eb); display: block; font-size: 15px; margin-bottom: 6px; }
+    @media (max-width: 720px) { .gd-grid-head { display: none; } .gd-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/">
+      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+      <span style="font-size:18px;font-weight:600">Keystone OS</span>
+    </a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/stock-trader.html">Trader</a>
+      <a href="/create.html">Create</a>
+      <a href="/explore.html">Explore</a>
+      <a href="/grounding-diff.html" class="active">Grounding</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="gd-wrap">
+    <div class="gd-head">
+      <h1>Grounding Diff</h1>
+      <p>Every factual claim the system makes, surfaced as its mandated tuple — <b>claim · evidence · source · confidence</b> — the External Reality Rule made visible. Claims whose approved peers disagree on an overlapping scope are flagged as <span style="color:#f59e0b">contradictions</span>.</p>
+    </div>
+
+    <div class="gd-controls">
+      <label>Status
+        <select id="f-status">
+          <option value="">all</option>
+          <option value="pending">pending</option>
+          <option value="approved">approved</option>
+          <option value="rejected">rejected</option>
+        </select>
+      </label>
+      <label>Contradiction threshold
+        <input id="f-threshold" type="number" min="0" max="1" step="0.05" value="0.7" style="width:72px">
+      </label>
+      <label><input id="f-only-contra" type="checkbox"> contradictions only</label>
+      <button class="nav-btn" id="reload" title="Reload" style="font-size:13px">↻ Reload</button>
+    </div>
+
+    <div class="gd-summary" id="summary" aria-live="polite">Loading…</div>
+
+    <div class="gd-grid-head">
+      <div>Claim</div><div>Evidence</div><div>Source</div><div>Confidence</div>
+    </div>
+    <div id="rows"></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+
+    function confColor(c) { return c == null ? '#6b7280' : (c >= 0.75 ? '#4ade80' : (c >= 0.5 ? '#f59e0b' : '#f87171')); }
+
+    function shortId(id) { return String(id || '').replace(/^claim:/, '').slice(0, 8); }
+
+    function render(packets, contraByPacket, contraList) {
+      var onlyContra = document.getElementById('f-only-contra').checked;
+      var rowsEl = document.getElementById('rows');
+      rowsEl.innerHTML = '';
+      var shown = 0;
+      packets.forEach(function (p) {
+        var contras = contraByPacket[p.packet_id] || [];
+        if (onlyContra && !contras.length) return;
+        shown++;
+        var conf = p.confidence;
+        var sources = p.sources || [];
+        var row = document.createElement('div');
+        row.className = 'gd-row' + (contras.length ? ' contradicted' : '');
+        var evHtml = sources.length
+          ? sources.map(function (s) { return '<div class="gd-ev-item">' + esc(s.excerpt || '(no excerpt)') + '</div>'; }).join('')
+          : '<div class="none">no evidence attached — ungrounded claim</div>';
+        var srcHtml = sources.length
+          ? sources.map(function (s) { return '<span class="tag">' + esc(s.type) + '</span>'; }).join('')
+          : '<span class="none">—</span>';
+        var confHtml = (conf == null)
+          ? '<span class="na">n/a</span>'
+          : '<span class="pct" style="color:' + confColor(conf) + '">' + Math.round(conf * 100) + '%</span>'
+            + '<span class="bar"><i style="width:' + Math.round(conf * 100) + '%;background:' + confColor(conf) + '"></i></span>';
+        var st = (p.status || 'pending').toLowerCase();
+        row.innerHTML =
+          '<div><div class="gd-claim-title">' + esc(p.title || '(untitled claim)') + '</div>'
+            + (p.safe_wording && p.safe_wording !== p.title ? '<div class="gd-claim-body">' + esc(p.safe_wording) + '</div>' : '')
+            + (p.scope ? '<div class="gd-scope">' + esc(p.scope) + '</div>' : '')
+            + '<div class="gd-status ' + esc(st) + '">' + esc(st) + (p.signed ? ' · signed' : '') + '</div></div>'
+          + '<div class="gd-ev">' + evHtml + '</div>'
+          + '<div class="gd-src">' + srcHtml + '</div>'
+          + '<div class="gd-conf">' + confHtml + '</div>'
+          + contras.map(function (c) {
+              return '<div class="gd-contra-note">⚠ Contradiction with claim <b>' + esc(shortId(c.other))
+                + '</b> on scope <b>' + esc(c.scope || '?') + '</b>: ' + esc(c.reason || 'overlapping scope, divergent wording') + '</div>';
+            }).join('');
+        rowsEl.appendChild(row);
+      });
+      if (!shown) {
+        rowsEl.innerHTML = '<div class="gd-empty"><b>' + (onlyContra ? 'No contradictions 🎉' : 'No claims yet')
+          + '</b>' + (onlyContra ? 'Every approved claim is consistent on its scope.'
+            : 'Claims are auto-drafted from grounded chat replies. Ask Keystone a factual question to populate this view.') + '</div>';
+      }
+    }
+
+    async function load() {
+      var summary = document.getElementById('summary');
+      summary.textContent = 'Loading…';
+      var status = document.getElementById('f-status').value;
+      var threshold = document.getElementById('f-threshold').value || '0.7';
+      try {
+        var qs = status ? ('?status=' + encodeURIComponent(status)) : '';
+        var claimsResp = await fetch('/api/claims' + qs).then(function (r) { return r.json(); });
+        var contraResp = await fetch('/api/claims/contradictions?threshold=' + encodeURIComponent(threshold))
+          .then(function (r) { return r.json(); }).catch(function () { return { contradictions: [] }; });
+        var packets = (claimsResp && claimsResp.packets) || [];
+        var contraList = (contraResp && contraResp.contradictions) || [];
+        // Index contradictions by each involved packet → its partner.
+        var byPacket = {};
+        contraList.forEach(function (c) {
+          (byPacket[c.packetA] = byPacket[c.packetA] || []).push({ other: c.packetB, scope: c.scope, reason: c.reason });
+          (byPacket[c.packetB] = byPacket[c.packetB] || []).push({ other: c.packetA, scope: c.scope, reason: c.reason });
+        });
+        var grounded = packets.filter(function (p) { return (p.sources || []).length; }).length;
+        summary.innerHTML = '<b>' + packets.length + '</b> claim' + (packets.length === 1 ? '' : 's')
+          + ' · <b>' + grounded + '</b> grounded · '
+          + (contraList.length ? '<span class="warn"><b>' + contraList.length + '</b> contradiction'
+              + (contraList.length === 1 ? '' : 's') + ' flagged</span>' : 'no contradictions');
+        render(packets, byPacket, contraList);
+      } catch (e) {
+        summary.textContent = 'Failed to load claims: ' + (e && e.message || e);
+      }
+    }
+
+    document.getElementById('reload').addEventListener('click', load);
+    document.getElementById('f-status').addEventListener('change', load);
+    document.getElementById('f-threshold').addEventListener('change', load);
+    document.getElementById('f-only-contra').addEventListener('change', load);
+    load();
+  </script>
+</body>
+</html>

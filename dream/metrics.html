@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Outcome Metrics — Keystone OS</title>
+  <style>
+    /* Outcome metrics dashboard (#1411): the three Σ₀ "are we actually good?" numbers,
+       computed from append-only logs. */
+    .m-wrap { max-width: 1000px; margin: 0 auto; padding: 18px 16px 60px; }
+    .m-head h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .m-head p { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .m-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .m-tile { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 18px; }
+    .m-tile h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--text, #e5e7eb); }
+    .m-tile .sub { font-size: 11px; color: var(--muted, #9aa0aa); margin: 0 0 12px; line-height: 1.4; }
+    .m-big { font-size: 38px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+    .m-big.na { font-size: 18px; font-weight: 600; color: var(--muted, #9aa0aa); }
+    .m-bar { height: 8px; border-radius: 5px; background: var(--surface2, rgba(255,255,255,.08)); overflow: hidden; margin: 12px 0 10px; }
+    .m-bar > i { display: block; height: 100%; border-radius: 5px; }
+    .m-meta { font-size: 12px; color: var(--muted, #9aa0aa); line-height: 1.6; }
+    .m-meta b { color: var(--text, #e5e7eb); }
+    .m-delta { font-size: 12px; font-weight: 600; }
+    .m-delta.up { color: #4ade80; } .m-delta.down { color: #f87171; } .m-delta.flat { color: #9aa0aa; }
+    .m-chip { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+      border-radius: 5px; padding: 2px 6px; margin-top: 8px; }
+    .m-chip.ok { color: #4ade80; background: rgba(74,222,128,.10); }
+    .m-chip.insufficient_data, .m-chip.not_instrumented { color: #f59e0b; background: rgba(245,158,11,.10); }
+    .m-foot { font-size: 11px; color: var(--muted, #9aa0aa); margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/">
+      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+      <span style="font-size:18px;font-weight:600">Keystone OS</span>
+    </a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/grounding-diff.html">Grounding</a>
+      <a href="/metrics.html" class="active">Metrics</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="m-wrap">
+    <div class="m-head">
+      <h1>Outcome Metrics</h1>
+      <p>The three numbers that turn "trustworthy action layer" from an assertion into evidence (Σ₀ External Reality Rule, applied to ourselves). Computed from append-only logs; movement is measured against the first captured baseline.</p>
+    </div>
+    <div class="m-tiles" id="tiles"><div class="m-tile"><div class="sub">Loading…</div></div></div>
+    <div class="m-foot" id="foot"></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    function color(r) { return r == null ? '#6b7280' : (r >= 0.75 ? '#4ade80' : (r >= 0.5 ? '#f59e0b' : '#f87171')); }
+    function asPct(r) { return r == null ? null : Math.round(r * 100); }
+
+    function deltaHtml(cur, base) {
+      if (cur == null || base == null) return '';
+      var d = Math.round((cur - base) * 100);
+      var cls = d > 0 ? 'up' : (d < 0 ? 'down' : 'flat');
+      var arrow = d > 0 ? '▲' : (d < 0 ? '▼' : '■');
+      return '<span class="m-delta ' + cls + '">' + arrow + ' ' + Math.abs(d) + ' pts vs baseline</span>';
+    }
+
+    function rateTile(title, sub, rate, status, metaHtml, baseRate) {
+      var p = asPct(rate);
+      var bigHtml = (p == null)
+        ? '<div class="m-big na">no data yet</div>'
+        : '<div class="m-big" style="color:' + color(rate) + '">' + p + '%</div>'
+          + '<div class="m-bar"><i style="width:' + p + '%;background:' + color(rate) + '"></i></div>';
+      return '<div class="m-tile"><h2>' + esc(title) + '</h2><div class="sub">' + esc(sub) + '</div>'
+        + bigHtml + (p != null ? deltaHtml(rate, baseRate) : '')
+        + '<div class="m-meta">' + metaHtml + '</div>'
+        + '<span class="m-chip ' + esc(status) + '">' + esc(String(status).replace(/_/g, ' ')) + '</span></div>';
+    }
+
+    async function load() {
+      try {
+        var r = await fetch('/api/metrics/outcomes').then(function (x) { return x.json(); });
+        if (!r || !r.ok) throw new Error((r && r.error) || 'failed');
+        var m = r.metrics, base = r.baseline || {};
+        var vp = m.verifiedPatchRate, ho = m.honestyRate, rq = m.routeQuality;
+        var tiles = [
+          rateTile('Verified patch rate', '% of code tasks whose patch applied + tests passed', vp.rate, vp.status,
+            '<b>' + vp.verified + '</b> / ' + vp.n + ' code tasks verified', base.verifiedPatchRate),
+          rateTile('Honesty rate', 'anchored replies vs confident-but-unanchored (42-state)', ho.rate, ho.status,
+            '<b>' + ho.anchored + '</b> anchored · <b>' + ho.unsupported + '</b> unsupported · ' + ho.n + ' reviewed', base.honestyRate),
+          rateTile('Route escalation', 'share of routes that escalated FAST → cloud/deep', rq.escalationRate, rq.status,
+            '<b>' + rq.escalations + '</b> / ' + rq.decisions + ' routes · avg latency '
+              + (rq.avgLatencySec != null ? rq.avgLatencySec.toFixed(1) + 's' : 'n/a')
+              + '<br>cost &amp; re-prompt: <span style="color:#f59e0b">not instrumented yet</span>', base.escalationRate),
+        ];
+        document.getElementById('tiles').innerHTML = tiles.join('');
+        document.getElementById('foot').textContent =
+          'Generated ' + (m.generatedAt || '') + ' · baseline captured ' + (base.capturedAt || 'n/a');
+      } catch (e) {
+        document.getElementById('tiles').innerHTML = '<div class="m-tile"><div class="sub">Failed to load: ' + esc(e.message) + '</div></div>';
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

@@ -1833,47 +1833,91 @@
     voiceBtn.title = "Voice input needs https or localhost";
   }
 
+  // Dictation state. `dictationBase` is the composer text captured when a session
+  // starts, so the transcript is APPENDED to what the user already typed (and to a
+  // previous dictation) rather than overwriting it. `voiceUserStopped` distinguishes
+  // a deliberate stop from an unexpected one, and `voiceLastError` carries the last
+  // engine error into onend so it can decide whether to auto-recover. (#1607)
+  let dictationBase = "";
+  let voiceUserStopped = false;
+  let voiceLastError = "";
+  let voiceAccumulated = "";
+  const VD = (window.VoiceDictation || {
+    mergeTranscript: (b, a, i) => [b, a, i].map(s => (s || "").trim()).filter(Boolean).join(" "),
+    voiceErrorMessage: (c) => "🎙️ Voice input error: " + (c || "unknown"),
+    shouldAutoRecover: (c, stopped) => !stopped && !["not-allowed", "service-not-allowed", "audio-capture", "network"].includes(c),
+  });
+
+  // Screen-reader announcements for state changes (idle / listening / error). A polite
+  // aria-live region is created once and reused. (#1607 accessibility)
+  function announceVoice(msg) {
+    if (!msg) return;
+    let live = document.getElementById("voice-aria-status");
+    if (!live) {
+      live = document.createElement("div");
+      live.id = "voice-aria-status";
+      live.setAttribute("aria-live", "polite");
+      live.setAttribute("role", "status");
+      live.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap";
+      document.body.appendChild(live);
+    }
+    live.textContent = msg;
+  }
+
+  function setVoiceIdle() {
+    isListening = false;
+    voiceBtn.classList.remove("listening");
+    voiceBtn.setAttribute("aria-pressed", "false");
+    inputEl.placeholder = "Write something, ask a question…";
+  }
+
   function initVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { voiceBtn.title = "Voice not supported (use Chrome)"; voiceBtn.style.opacity = "0.4"; return; }
+    if (!SR) { voiceBtn.title = "Voice not supported (use Chrome, Edge, or Safari)"; voiceBtn.style.opacity = "0.4"; voiceBtn.setAttribute("aria-disabled", "true"); return; }
     recognition = new SR();
-    recognition.continuous = false;
+    // Continuous + interim: long-form dictation that keeps going across natural pauses
+    // instead of cutting off after one phrase. (#1607)
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
-    let accumulated = "";
     recognition.onresult = (e) => {
       let interim = "", final = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) final += e.results[i][0].transcript;
         else interim += e.results[i][0].transcript;
       }
-      if (final) accumulated += (accumulated ? " " : "") + final.trim();
-      // Live feedback: show finalized + in-progress words in the composer as you speak. (#858)
-      const live = (accumulated + (interim ? (accumulated ? " " : "") + interim : "")).trim();
+      if (final) voiceAccumulated += (voiceAccumulated ? " " : "") + final.trim();
+      // Preserve typed text: merge base + finalized + in-progress into the composer.
+      const live = VD.mergeTranscript(dictationBase, voiceAccumulated, interim);
       if (live) { inputEl.value = live; inputEl.dispatchEvent(new Event("input")); }
     };
     recognition.onend = () => {
-      isListening = false;
-      voiceBtn.classList.remove("listening");
-      inputEl.placeholder = "Write something, ask a question…";
-      // Dictation: drop the transcript into the composer for review (no auto-send).
-      const dictated = accumulated.trim();
-      accumulated = "";
-      if (dictated) { inputEl.value = dictated; inputEl.dispatchEvent(new Event("input")); try { inputEl.focus(); } catch (e) {} }
+      // In continuous mode the engine also fires onend on its own (silence/timeout).
+      // If the user didn't tap stop and the last error (if any) is recoverable,
+      // transparently restart so dictation isn't cut short. (#1607 recovery)
+      if (!voiceUserStopped && VD.shouldAutoRecover(voiceLastError, false)) {
+        try { recognition.start(); return; } catch (e) { /* fall through to idle */ }
+      }
+      setVoiceIdle();
+      // Persist the merged transcript so the next session appends to it (no auto-send).
+      const finalVal = VD.mergeTranscript(dictationBase, voiceAccumulated, "");
+      voiceAccumulated = "";
+      if (finalVal) { inputEl.value = finalVal; inputEl.dispatchEvent(new Event("input")); }
+      try { inputEl.focus(); } catch (e) {}   // focus management after recording
+      announceVoice("Voice input stopped.");
     };
     recognition.onerror = (e) => {
-      isListening = false; voiceBtn.classList.remove("listening");
-      inputEl.placeholder = "Write something, ask a question…";
       const err = (e && e.error) || "unknown";
-      const map = {
-        "not-allowed": "🎙️ Microphone blocked. Allow mic access for this site (lock icon in the address bar), then try again.",
-        "service-not-allowed": "🎙️ Microphone blocked by the browser or OS. Allow mic access and retry.",
-        "audio-capture": "🎙️ No microphone found — check your input device.",
-        "no-speech": "🎙️ Didn't catch any speech. Tap the mic and try again.",
-        "network": "🎙️ Speech service unreachable. Check your connection and retry.",
-        "aborted": ""
-      };
-      showVoiceHint(err in map ? map[err] : ("🎙️ Voice input error: " + err));
+      voiceLastError = err;
+      // Hard failures (denied permission, no mic, network) stop and surface a message;
+      // soft ones (no-speech on a pause) are left for onend's auto-recovery so we don't
+      // spam the user mid-dictation.
+      if (!VD.shouldAutoRecover(err, false)) {
+        voiceUserStopped = true;   // prevent onend from restarting after a hard error
+        setVoiceIdle();
+        const msg = VD.voiceErrorMessage(err);
+        if (msg) { showVoiceHint(msg); announceVoice(msg); }
+      }
     };
     // Share this single recognition instance with the composer's voice button
     // (dream-chat-ui.js startVoiceInput() reads window.recognition).
@@ -1882,22 +1926,42 @@
 
   function toggleVoice() {
     if (!window.isSecureContext) {
-      showVoiceHint("🎙️ Voice input needs a secure connection. Open the app at http://127.0.0.1:4177 or over https.");
+      const m = "🎙️ Voice input needs a secure connection. Open the app at http://127.0.0.1:4177 or over https.";
+      showVoiceHint(m); announceVoice(m);
       return;
     }
     if (!recognition) initVoice();
     if (!recognition) return;
     if (isListening) {
+      voiceUserStopped = true;   // deliberate stop — don't auto-recover
       recognition.stop();
     } else {
+      voiceUserStopped = false;
+      voiceLastError = "";
+      voiceAccumulated = "";
+      dictationBase = inputEl.value || "";   // append to existing typed text
       isListening = true;
       voiceBtn.classList.add("listening");
+      voiceBtn.setAttribute("aria-pressed", "true");
       inputEl.placeholder = "🎤 Listening…";
-      try { recognition.start(); } catch(e) { isListening = false; voiceBtn.classList.remove("listening"); inputEl.placeholder = "Tell me a dream…"; }
+      announceVoice("Listening. Speak now; tap the mic again to stop.");
+      try { recognition.start(); } catch (e) { setVoiceIdle(); }
     }
   }
   // Expose the working toggle so the nav mic button can start/stop listening in one click.
   window.toggleVoice = toggleVoice;
+
+  // Keyboard shortcut: Ctrl/Cmd+Shift+M starts/stops dictation without reaching for the
+  // mouse. Bound once. (#1607 accessibility)
+  if (!window.__voiceShortcutBound) {
+    window.__voiceShortcutBound = true;
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "M" || e.key === "m")) {
+        e.preventDefault();
+        toggleVoice();
+      }
+    });
+  }
 
   let ttsAudio = null;
 
