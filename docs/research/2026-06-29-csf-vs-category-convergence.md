@@ -48,6 +48,38 @@ the Σ₀ "local ownership is a feature" principle — but it is **not** a "we b
 2. Keep CSF as the *embedded, zero-dependency, best-fit memory codec* and measure it on the axis
    it actually wins — integration simplicity + lossless local ownership — not bits/byte.
 
+## Improvisation: can "best-in-slot across all sectors" peak the edge? (measured)
+
+Follow-up to the convergence: if the frontier wins by per-column scheme selection, push
+CSF-Omni's best-fit envelope down to the column. Prototype with full lossless round-trip:
+[`experiments/csf_slot_prototype.py`](../../experiments/csf_slot_prototype.py). Measured on
+the realistic `raw.jsonl` (22,002 B is the shipping CSF-Col→brotli baseline):
+
+| approach | size | vs CSF-Col→brotli |
+|---|--:|--:|
+| v1 — per-column **separate** best-in-slot streams | 23,255 | **−5.4%** |
+| v2 — per-column **transform** + one brotli (greedy proxy) | 22,758 | **−3.3%** |
+| v3 — **isolate the incompressible sector**, shared brotli for the rest | **21,457** | **+2.5%** |
+
+Findings (each grounded by the prototype's round-trip-verified numbers):
+1. **Separate per-column streams lose (−5.4%)** — they forfeit brotli's cross-column context
+   and add 22× framing; at 373 rows that exceeds the per-column fit gain.
+2. **A standalone-smaller transform can enlarge the shared stream (−3.3%)** — un-hexing the
+   checksum saves ~438 B in isolation but injects max-entropy bytes that flush brotli's
+   context for neighbours. *Standalone-smallest ≠ joint-smallest; the greedy proxy selector
+   is the wrong signal for a single-stream codec.*
+3. **The only real win is isolating the incompressible sector (+2.5%)** — store the SHA-256
+   checksum (53% of bytes) raw, keep the rest in one shared brotli. Ceiling is ~2.5%, not 2×,
+   for the same reason #1596 failed: the archive is hash-saturated + content already at 0.3 bpb.
+
+`["per-column best-in-slot yields only ~2.5% over the shipping single-stream CSF-Col on real memory logs, and only by isolating the incompressible checksum; naive per-column selection is a net regression because the data has no compressible per-sector headroom and single-stream context dominates at this scale", "csf_slot_prototype.py v1/v2/v3 lossless round-trips on data/csf_memory/raw.jsonl", 0.85, "experiments/csf_slot_prototype.py"]`
+
+**Where best-in-slot WOULD peak edges:** corpora dominated by diverse-but-compressible columns
+(timestamps→delta, ints→FoR, floats→Gorilla, enums→dict) **at scale** — CLP-S/BtrBlocks's home
+turf, not Keystone's small hash-heavy logs. The grounded selector rule that pays: choose by
+*measured joint size*, and isolate incompressible sectors (needs per-schema segmentation —
+v3 isolated 0 on the mixed-schema concatenation because checksum lengths differ across logs).
+
 ## Sources
 - CLP on JSON (CLP-S): https://blog.yscope.com/clp-on-json-high-compression-and-fast-search-on-dynamically-structured-logs-cfe1d4957e6b
 - CLP (Uber, two orders of magnitude / 169×): https://www.uber.com/blog/reducing-logging-cost-by-two-orders-of-magnitude-using-clp/
