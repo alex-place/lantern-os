@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Money Cockpit — Keystone OS</title>
+  <style>
+    /* Personal financial reasoning cockpit (#1434): local-first, shows its work. */
+    .w { max-width: 880px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    h2 { font-size: 14px; color: var(--text, #e5e7eb); margin: 0 0 10px; }
+    label { font-size: 12px; color: var(--muted, #9aa0aa); display: block; margin-bottom: 3px; }
+    input { width: 100%; box-sizing: border-box; background: var(--surface2, rgba(255,255,255,.05)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 9px; padding: 8px 10px; font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .btn { background: var(--accent, #06b6d4); color: #06222a; border: none; border-radius: 9px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .tile { text-align: center; padding: 12px; border-radius: 12px; background: var(--surface2, rgba(255,255,255,.04)); }
+    .tile .n { font-size: 24px; font-weight: 700; color: var(--text, #e5e7eb); }
+    .tile .l { font-size: 11px; color: var(--muted, #9aa0aa); text-transform: uppercase; letter-spacing: .04em; }
+    .tile .wk { font-size: 10px; color: var(--muted, #9aa0aa); margin-top: 4px; font-family: var(--font-mono, monospace); }
+    .neg { color: #f87171; } .pos { color: #4ade80; }
+    .flag { font-size: 13px; padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; line-height: 1.45; }
+    .flag.alert { background: rgba(248,113,113,.10); border: 1px solid rgba(248,113,113,.4); color: #fca5a5; }
+    .flag.warn { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.4); color: #fcd34d; }
+    .flag.ok { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.4); color: #86efac; }
+    .afford .verdict { font-size: 18px; font-weight: 700; }
+    .v-yes { color: #4ade80; } .v-caution { color: #f59e0b; } .v-no { color: #f87171; }
+    .reasoning { font-size: 14px; color: var(--text, #d8dce2); line-height: 1.55; margin: 8px 0; }
+    .wkline { font-size: 11px; color: var(--muted, #9aa0aa); font-family: var(--font-mono, monospace); }
+    .row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+    .priv { font-size: 11px; color: var(--muted, #9aa0aa); }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/decisions.html">Decisions</a>
+      <a href="/finance.html" class="active">Money</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Money Cockpit</h1>
+    <p class="lede">Local-first money reasoning — your numbers never leave this machine. Enter a snapshot and it works out your runway, savings rate, net worth, and debt timelines (with the formula behind every figure), then stress-tests "can I afford this?" against the real numbers. <span class="priv">🔒 Saved only to a local file on disk.</span></p>
+
+    <div class="card">
+      <h2>Your snapshot</h2>
+      <div class="grid">
+        <div><label>Monthly income ($)</label><input id="income" type="number" value="5000"></div>
+        <div><label>Monthly expenses ($)</label><input id="expenses" type="number" value="4200"></div>
+        <div><label>Savings ($)</label><input id="savings" type="number" value="9000"></div>
+        <div><label>Debt balance ($)</label><input id="debtBal" type="number" value="6000"></div>
+        <div><label>Debt APR (%)</label><input id="debtApr" type="number" value="22"></div>
+        <div><label>Debt min payment ($/mo)</label><input id="debtMin" type="number" value="150"></div>
+      </div>
+      <button class="btn" id="analyze">Analyze</button>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none">
+      <h2>Reasoning</h2>
+      <div class="tiles" id="tiles"></div>
+      <div id="flags" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card afford">
+      <h2>Can I afford…</h2>
+      <div class="row">
+        <div style="flex:1"><label>Amount ($)</label><input id="amount" type="number" value="2500"></div>
+        <div><label>Pay how?</label><select id="mode" style="padding:8px 10px;border-radius:9px;background:var(--surface2,rgba(255,255,255,.05));color:var(--text,#e5e7eb);border:1px solid var(--border,rgba(255,255,255,.14))"><option value="cash">cash</option><option value="financed">financed</option></select></div>
+        <button class="btn" id="afford" style="margin:0">Stress-test</button>
+      </div>
+      <div id="affordResult" style="margin-top:12px"></div>
+    </div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    function profile() {
+      var bal = parseFloat(document.getElementById('debtBal').value) || 0;
+      return {
+        monthlyIncome: parseFloat(document.getElementById('income').value) || 0,
+        monthlyExpenses: parseFloat(document.getElementById('expenses').value) || 0,
+        savings: parseFloat(document.getElementById('savings').value) || 0,
+        debts: bal > 0 ? [{ name: 'Card', balance: bal, apr: (parseFloat(document.getElementById('debtApr').value) || 0) / 100, minPayment: parseFloat(document.getElementById('debtMin').value) || 0 }] : [],
+      };
+    }
+    function money(x) { return x === Infinity ? '∞' : '$' + (Math.round(x * 100) / 100).toLocaleString(); }
+
+    function renderAnalysis(a) {
+      document.getElementById('resultCard').style.display = '';
+      var rw = a.runwayMonths === Infinity ? '∞' : a.runwayMonths + ' mo';
+      var sr = a.savingsRate == null ? '—' : Math.round(a.savingsRate * 100) + '%';
+      document.getElementById('tiles').innerHTML =
+        tile(rw, 'runway', a.work.runwayMonths)
+        + tile(sr, 'savings rate', a.work.savingsRate)
+        + tile(money(a.monthlyNet), 'monthly net', a.work.monthlyNet, a.monthlyNet < 0 ? 'neg' : 'pos')
+        + tile(money(a.netWorth), 'net worth', a.work.netWorth, a.netWorth < 0 ? 'neg' : 'pos')
+        + (a.debtPlans || []).map(function (d) {
+            return tile(d.neverClears ? 'never' : d.payoffMonths + ' mo', d.name + ' payoff', '$' + d.balance + ' @ ' + Math.round(d.apr * 100) + '%', d.neverClears ? 'neg' : ''); }).join('');
+      document.getElementById('flags').innerHTML = (a.flags || []).map(function (f) {
+        return '<div class="flag ' + esc(f.level) + '">' + esc(f.msg) + '</div>'; }).join('');
+    }
+    function tile(nv, l, wk, cls) {
+      return '<div class="tile"><div class="n ' + (cls || '') + '">' + esc(nv) + '</div><div class="l">' + esc(l) + '</div><div class="wk">' + esc(wk || '') + '</div></div>';
+    }
+
+    async function analyze() {
+      var r = await fetch('/api/finance/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile()) }).then(function (x) { return x.json(); });
+      if (r.analysis) renderAnalysis(r.analysis);
+    }
+    async function afford() {
+      var purchase = { amount: parseFloat(document.getElementById('amount').value) || 0 };
+      if (document.getElementById('mode').value === 'financed') { purchase.financed = true; purchase.months = 24; purchase.apr = 0.1; }
+      var r = await fetch('/api/finance/afford', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile: profile(), purchase: purchase }) }).then(function (x) { return x.json(); });
+      var a = r.affordability || {};
+      var vcls = 'v-' + (a.verdict || 'no');
+      document.getElementById('affordResult').innerHTML =
+        '<div class="verdict ' + vcls + '">' + (a.verdict === 'yes' ? '✓ Yes' : (a.verdict === 'caution' ? '⚠ Caution' : '✕ No')) + '</div>'
+        + '<div class="reasoning">' + esc(a.reasoning || '') + '</div>'
+        + Object.values(a.work || {}).map(function (w) { return '<div class="wkline">' + esc(w) + '</div>'; }).join('');
+    }
+    document.getElementById('analyze').addEventListener('click', analyze);
+    document.getElementById('afford').addEventListener('click', afford);
+    analyze();
+  </script>
+</body>
+</html>

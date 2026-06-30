@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Taste Model — Keystone OS</title>
+  <style>
+    /* Retrieval-based preference model (#1426): learns your taste from accept/reject. */
+    .w { max-width: 860px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    h2 { font-size: 14px; color: var(--text, #e5e7eb); margin: 0 0 10px; }
+    input { width: 100%; box-sizing: border-box; background: var(--surface2, rgba(255,255,255,.05)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 9px; padding: 9px 11px; font-size: 14px; margin-bottom: 8px; }
+    .btn { border: none; border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .accept { background: #4ade80; color: #052e16; } .reject { background: #f87171; color: #2a0a0a; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .feat { display: inline-block; font-size: 11px; border-radius: 6px; padding: 2px 8px; margin: 0 4px 4px 0;
+      background: rgba(56,189,248,.10); color: #38bdf8; }
+    .profile { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .wt { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; align-items: center; }
+    .wt .bar { flex: 1; height: 7px; border-radius: 4px; background: var(--surface2, rgba(255,255,255,.07)); margin: 0 8px; overflow: hidden; position: relative; }
+    .wt .bar > i { position: absolute; top: 0; bottom: 0; }
+    .like .bar > i { background: #4ade80; left: 50%; } .dislike .bar > i { background: #f87171; right: 50%; }
+    .wt .n { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--muted, #9aa0aa); width: 42px; text-align: right; }
+    .ranked .item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.07)); }
+    .ranked .score { font-family: var(--font-mono, monospace); font-weight: 700; }
+    .pos { color: #4ade80; } .neg { color: #f87171; } .zero { color: #9aa0aa; }
+    .reasons { font-size: 11px; color: var(--muted, #9aa0aa); }
+    .empty { color: var(--muted, #9aa0aa); font-size: 13px; }
+    .hint { font-size: 11px; color: var(--muted, #9aa0aa); }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/memory-decay.html">Memory</a>
+      <a href="/preferences.html" class="active">Taste</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Taste Model</h1>
+    <p class="lede">Learns <em>your</em> taste, not the internet's. Tell it what you accept and reject — each item tagged with features — and it re-ranks future options by what you actually like. Retrieval, not retraining: every decision updates the weights instantly and the ranking is fully explainable.</p>
+
+    <div class="card">
+      <h2>Record a decision</h2>
+      <input id="item" placeholder="Item — e.g. &quot;A sci-fi novel about first contact&quot;">
+      <input id="features" placeholder="Features / tags, comma-separated — e.g. sci-fi, slow-burn, hardcover">
+      <div class="row"><button class="btn accept" id="acc">👍 Accept</button><button class="btn reject" id="rej">👎 Reject</button>
+        <span class="hint" id="count"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>What it's learned about you</h2>
+      <div class="profile"><div><div class="hint">Likes</div><div id="likes"></div></div><div><div class="hint">Dislikes</div><div id="dislikes"></div></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Re-rank by taste</h2>
+      <p class="hint">Comma-separate candidates as <code>name:feat1|feat2</code> — they'll be ranked by your learned preference.</p>
+      <input id="cands" placeholder="e.g. Book A:sci-fi|hardcover, Book B:romance|paperback, Book C:sci-fi|slow-burn">
+      <button class="btn" id="rank" style="background:var(--accent,#06b6d4);color:#06222a">Rank for me</button>
+      <div class="ranked" id="ranked" style="margin-top:12px"></div>
+    </div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    function feats() { return document.getElementById('features').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean); }
+
+    function wtRow(w, cls) {
+      var pct = Math.round(Math.abs(w.weight) * 100);
+      return '<div class="wt ' + cls + '"><span>' + esc(w.feature) + '</span><span class="bar"><i style="width:' + (pct / 2) + '%"></i></span>'
+        + '<span class="n">' + (w.weight > 0 ? '+' : '') + w.weight.toFixed(2) + '</span></div>';
+    }
+    function renderProfile(p) {
+      document.getElementById('likes').innerHTML = (p.likes || []).length ? p.likes.map(function (w) { return wtRow(w, 'like'); }).join('') : '<div class="empty">nothing yet</div>';
+      document.getElementById('dislikes').innerHTML = (p.dislikes || []).length ? p.dislikes.map(function (w) { return wtRow(w, 'dislike'); }).join('') : '<div class="empty">nothing yet</div>';
+    }
+    async function decide(accepted) {
+      var f = feats(); if (!f.length) return;
+      var r = await fetch('/api/preferences/decide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item: document.getElementById('item').value.trim(), features: f, accepted: accepted }) }).then(function (x) { return x.json(); });
+      if (r.profile) renderProfile(r.profile);
+      document.getElementById('item').value = ''; document.getElementById('features').value = '';
+      load();
+    }
+    async function rank() {
+      var cands = document.getElementById('cands').value.split(',').map(function (c) {
+        var parts = c.split(':'); var name = (parts[0] || '').trim();
+        var features = (parts[1] || '').split('|').map(function (s) { return s.trim(); }).filter(Boolean);
+        return name ? { id: name, features: features } : null;
+      }).filter(Boolean);
+      if (!cands.length) return;
+      var r = await fetch('/api/preferences/rank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ candidates: cands }) }).then(function (x) { return x.json(); });
+      document.getElementById('ranked').innerHTML = (r.ranked || []).map(function (it) {
+        var cls = it.score > 0 ? 'pos' : (it.score < 0 ? 'neg' : 'zero');
+        var why = (it.reasons || []).map(function (rr) { return rr.feature + ' (' + (rr.weight > 0 ? '+' : '') + rr.weight.toFixed(2) + ')'; }).join(', ');
+        return '<div class="item"><div>' + esc(it.id) + '<div class="reasons">' + esc(why || 'no known features') + '</div></div><span class="score ' + cls + '">' + (it.score > 0 ? '+' : '') + it.score.toFixed(2) + '</span></div>';
+      }).join('');
+    }
+    async function load() {
+      var r = await fetch('/api/preferences').then(function (x) { return x.json(); });
+      document.getElementById('count').textContent = (r.count || 0) + ' decisions learned';
+      renderProfile(r.profile || {});
+    }
+    document.getElementById('acc').addEventListener('click', function () { decide(true); });
+    document.getElementById('rej').addEventListener('click', function () { decide(false); });
+    document.getElementById('rank').addEventListener('click', rank);
+    load();
+  </script>
+</body>
+</html>
