@@ -1,6 +1,8 @@
-*.jpeg filter=lfs diff=lfs merge=lfs -text
-*.gif filter=lfs diff=lfs merge=lfs -text
-*.zip filter=lfs diff=lfs merge=lfs -text
-*.pdf filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
-*.jpg filter=lfs diff=lfs merge=lfs -text
+# Binary media (images, PDFs, archives) are NOT stored in git.
+#
+# They live in Cloudflare R2 and are served from media.lantern-os.net — see
+# docs/MEDIA-HOSTING-R2.md. Previously these were Git-LFS-tracked, which exhausted
+# the repo's LFS budget and broke clones/checkouts (and the stable auto-deploy)
+# with a smudge abort. Add or update media via scripts/sync-media-r2.sh, never git.
+#
+# (No LFS filters remain — *.png/jpg/jpeg/gif/pdf/zip are gitignored instead.)

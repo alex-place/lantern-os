@@ -15,6 +15,21 @@ data/private/**
 private/**
 .local-private/**
 
+# ─── Binary media → Cloudflare R2 (never git; see docs/MEDIA-HOSTING-R2.md) ────
+# These were Git-LFS-tracked and exhausted the LFS budget (broke clones + the
+# stable deploy). Media now lives in R2, served from media.lantern-os.net.
+# Upload with scripts/sync-media-r2.sh. SVGs stay tracked (text/vector, tiny).
+# Re-include a specific essential raster with an explicit exception, e.g.
+#   !apps/lantern-garage/public/favicon.png
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.pdf
+*.zip
+*.mp4
+
 # Dreamer notebooks — private user data (local only)
 data/dreamer/notebooks/*.jsonl
 data/dream_journal/*.jsonl
