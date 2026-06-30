@@ -33,6 +33,31 @@ External grounding: Meta **OpenZL** (2025, structure-aware reversible transforms
 ([`sigma0_compressibility.py`](../../experiments/sigma0_compressibility.py)). **Prediction:** 1.5–2.5× over
 zstd-19 on `data/csf_memory/*.jsonl`. **Build first.**
 
+### 1.1 Built + measured (2026-06-29) — implemented, lossless, shipping in Omni
+
+CSF-Col is implemented as Omni transform id 2 ([`src/csf/col_transform.py`](../../src/csf/col_transform.py),
+wired in [`src/csf/omni.py`](../../src/csf/omni.py); fuzz/round-trip tests in
+[`tests/test_csf_col.py`](../../tests/test_csf_col.py)). It captures values as **raw source substrings**
+(never re-serializes JSON) and self-checks its own round-trip before returning, so it can at worst be skipped,
+never corrupt. Measured head-to-head on the real Memory object via
+[`bench_col_memory`](../../experiments/csf_compression_benchmark.py) (`col-best` = smallest `col+codec` in the
+exhaustive panel; bytes, not ratio):
+
+| log (`data/csf_memory`) | raw | zstd-19 | brotli-11 | col-best | col-best vs zstd-19 | Omni ships |
+|---|--:|--:|--:|--:|--:|---|
+| `deltas.jsonl` | 21,286 | 1,193 | 1,067 | **872** | **−26.9%** | col+brotli-11 |
+| `raw.jsonl` | 320,163 | 22,349 | 20,969 | **19,482** | **−12.8%** | col+brotli-11 |
+| `elephant-door-…jsonl` | 4,649 | 1,267 | 1,065 | 1,146 | −9.6% | brotli-11 |
+| `sample_traces.jsonl` | 3,541 | 1,143 | 935 | 1,013 | −11.4% | brotli-11 |
+
+**Verdict (honest):** the **weak-form** prediction holds — CSF-Col's best pairing clears zstd-19 on **4/4** real
+logs. The **strong-form** "1.5–2.5× over zstd-19" is **refuted**: the best result is ~1.37× (deltas), and on the
+big realistic log (`raw.jsonl`) it is ~1.15× over zstd-19 / ~7% under the brotli-11 champion. On
+schema-homogeneous append-only logs (deltas, raw) col is selected and ships; on small heterogeneous logs Omni's
+strict-min envelope correctly falls back to plain brotli-11, so **col is never a regression**. Net: ship it
+inside Omni (already done) as a real-but-modest win, not the 2× headline. The 2× ceiling needs the residual
+neural pass (#1595/#1596), not the transform alone.
+
 ## 2. Technique 2 — retrieval-keyed lossless delta (RKD) · #1594
 
 At compaction, find the nearest prior record via the memory retrieval index and store a *lossless*

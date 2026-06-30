@@ -1,0 +1,2 @@
+### Added
+- **CSF-Col (#1593) benchmark + evidence on the real Memory object.** `experiments/csf_compression_benchmark.py` now measures the columnar transform per-log over `data/csf_memory/*.jsonl` against zstd-19 / brotli-11 / Omni. Honest verdict recorded in `docs/research/2026-06-29-csf-beating-zstd.md`: CSF-Col's best pairing clears zstd-19 on 4/4 real logs (up to −27% bytes on schema-homogeneous logs), but the strong "1.5–2.5× over zstd-19" claim is **refuted** (best ~1.37×). Omni's strict-min envelope ships col only when it wins, so it is never a regression.

@@ -74,6 +74,18 @@ def corpus_jsonl_mem() -> bytes:
         return f.read(CAP)
 
 
+def corpus_csf_memory() -> list[tuple[str, bytes]]:
+    """The canonical North-Star Memory object: every real append-only log under
+    data/csf_memory, returned per-file so CSF-Col (Technique 1, #1593) — a per-stream
+    transform — is measured on each log exactly as it would compress on the hot path."""
+    out = []
+    for p in sorted(REPO.glob("data/csf_memory/*.jsonl")):
+        b = p.read_bytes()
+        if b:
+            out.append((p.name, b[:CAP]))
+    return out
+
+
 def corpus_cube_delta() -> bytes:
     p = REPO / "data/cubes/alex.private/deltas/deltas.jsonl"
     return p.read_bytes() if p.exists() else b""
@@ -221,6 +233,51 @@ def bench_csf_symbolic(text_blob: bytes):
     print(f"  NOTE: compress_text has no decode path shipped — round-trip UNVERIFIED.")
 
 
+def bench_col_memory(per_file):
+    """CSF-Col (Technique 1, #1593) head-to-head on the real Memory object.
+
+    For each data/csf_memory log, reports the falsifiable acceptance test from #1593:
+    CSF-Col's best backend pairing vs zstd-19 and brotli-11 (the two named baselines),
+    plus what CSF-Omni actually ships (which keeps the strict min, so col never hurts).
+    The prediction "clear zstd-19 on real logs" passes per-log; the strong "1.5-2.5x
+    OVER zstd-19" form is reported honestly so it can be confirmed or refuted."""
+    if zstd is None or brotli is None:
+        print("\n### CSF-Col on data/csf_memory — needs zstd+brotli; skipped")
+        return []
+    from csf import omni as _omni, col_transform as _col
+    z19c = zstd.ZstdCompressor(level=19)
+    print(f"\n### CSF-Col (Technique 1, #1593) on the Memory object -- data/csf_memory/*.jsonl")
+    print(f"{'log':<42}{'raw':>9}{'zstd19':>9}{'brotli11':>9}{'col-best':>10}"
+          f"{'vs zstd19':>11}  ships")
+    print("-" * 100)
+    rows = []
+    for name, b in per_file:
+        raw = len(b)
+        z19 = len(z19c.compress(b))
+        br = len(brotli.compress(b, quality=11))
+        try:
+            _col.forward(b)
+            applies = True
+        except _col.NotApplicable:
+            applies = False
+        # col-best = smallest col+codec candidate omni would consider (exhaustive panel).
+        ranked = _omni.rank(b, effort="exhaustive")
+        col_best = min((s for lbl, s in ranked if lbl.startswith("col")), default=None)
+        ships = _omni.describe(_omni.compress_best(b, effort="exhaustive"))
+        col_disp = f"{col_best:,}" if col_best is not None else "n/a"
+        vs = f"{(z19 / col_best - 1) * 100:+.1f}%" if col_best else "—"
+        print(f"{name:<42}{raw:>9,}{z19:>9,}{br:>9,}{col_disp:>10}{vs:>11}  {ships}")
+        rows.append({"log": name, "raw": raw, "zstd19": z19, "brotli11": br,
+                     "col_best": col_best, "col_applies": applies, "omni_ships": ships})
+    # Verdict — weak form (clear zstd-19) vs strong form (>=1.5x over zstd-19).
+    cleared = [r for r in rows if r["col_best"] and r["col_best"] < r["zstd19"]]
+    strong = [r for r in rows if r["col_best"] and r["zstd19"] / r["col_best"] >= 1.5]
+    print(f"  -> CSF-Col clears zstd-19 on {len(cleared)}/{len(rows)} logs; "
+          f"reaches the strong >=1.5x-over-zstd19 bar on {len(strong)}/{len(rows)}. "
+          f"Omni keeps the strict min, so col is never a regression.")
+    return rows
+
+
 def dominance(name: str, rows):
     """Confirm CSF-Omni is the top (or tied-top) ratio on this corpus.
 
@@ -264,6 +321,10 @@ def main():
     if jsonl:
         rows = bench_blob("B. jsonl append-only memory log", jsonl)
         summary.append(("B. jsonl memory log", rows))
+
+    mem_files = corpus_csf_memory()
+    if mem_files:
+        bench_col_memory(mem_files)
 
     cube = corpus_cube_delta()
     if cube:
