@@ -565,49 +565,7 @@
       margin-top: 8px;
     }
 
-    /* ── Kingdome of Hearts image showcase panel ── */
-    .showcase {
-      position: relative;
-      margin: 0 auto 28px;
-      max-width: 1100px;
-      background: var(--surface);
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: var(--shadow);
-    }
-    .showcase-chrome {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(127,127,127,0.06), transparent);
-    }
-    .showcase-dots { display: inline-flex; gap: 5px; }
-    .showcase-dots i {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: var(--border); display: inline-block;
-    }
-    .showcase-dots i:first-child { background: var(--accent); }
-    .showcase-titlebar {
-      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--muted);
-    }
-    .showcase-body { padding: 18px; }
-    .showcase-head { margin: 0 0 14px; }
-    .showcase-label {
-      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 4px;
-    }
-    .showcase-head h2 { margin: 0 0 4px; font-size: 1.15rem; color: var(--text); }
-    .showcase-head p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
-    .showcase-grid {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 12px;
-    }
-    .showcase-side { display: grid; gap: 12px; align-content: start; }
+    /* ── Image showcase tile (feed art cards) — opens the shared lightbox ── */
     .showcase-tile {
       position: relative; display: block; padding: 0; border: 1px solid var(--border);
       border-radius: 10px; overflow: hidden; cursor: zoom-in; background: #0a0a12;
@@ -626,9 +584,6 @@
       padding: 6px 10px; font-size: 0.72rem; color: #fff;
       background: linear-gradient(180deg, transparent, rgba(0,0,0,0.72));
     }
-    @media (max-width: 640px) {
-      .showcase-grid { grid-template-columns: 1fr; }
-    }
     /* lightbox preview */
     .lightbox {
       position: fixed; inset: 0; z-index: 1000;
@@ -640,6 +595,7 @@
       max-width: 92vw; max-height: 86vh; border-radius: 10px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.6);
     }
+    .lightbox img.pixelated { image-rendering: pixelated; }
     .lightbox-cap {
       position: absolute; bottom: 18px; left: 0; right: 0; text-align: center;
       color: #ddd; font-size: 0.85rem;
@@ -650,65 +606,6 @@
       width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; cursor: pointer;
     }
     .lightbox-close:hover { background: rgba(255,255,255,0.2); }
-
-    /* ── Gage's showcase (BFDM series + pixel art) ── */
-    .gage-banner img {
-      width: 100%; display: block; border-radius: 8px;
-      border: 1px solid var(--border); background: #fff; margin-bottom: 6px;
-    }
-    .gage-credit { font-size: 0.8rem; color: var(--muted); margin: 0 0 16px; }
-    .gage-credit b { color: var(--accent); }
-    .gage-subhead {
-      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--accent);
-      margin: 18px 0 10px; display: block;
-    }
-    .bfdm-grid {
-      display: grid; gap: 12px;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    }
-    .bfdm-card {
-      border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
-      background: #0a0a12;
-    }
-    .bfdm-card video {
-      width: 100%; display: block; aspect-ratio: 16 / 10;
-      object-fit: contain; background: #000;
-    }
-    .bfdm-card .bfdm-label {
-      padding: 7px 10px; font-size: 0.8rem; font-weight: 700; color: var(--text);
-    }
-    .sprite-gallery {
-      display: grid; gap: 10px;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    }
-    .sprite-gallery .showcase-tile { cursor: zoom-in; background: #fff; }
-    .sprite-gallery .showcase-tile img {
-      width: 100%; aspect-ratio: 1 / 1; object-fit: contain;
-      image-rendering: pixelated;
-    }
-    .sprite-gallery .showcase-tile.wide img { aspect-ratio: 16 / 9; image-rendering: auto; }
-    .lightbox img.pixelated { image-rendering: pixelated; }
-
-    /* ── Kingdome of Hearts / Three Doors gallery (manifest-driven) ── */
-    .koh-gallery {
-      display: grid; gap: 12px;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    }
-    .koh-gallery .showcase-tile { cursor: zoom-in; background: #0a0a12; }
-    .koh-gallery .showcase-tile img {
-      width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block;
-    }
-    .koh-empty { color: var(--muted); font-size: 0.9rem; }
-    .koh-gallery-sm { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
-    .koh-gallery .showcase-tile.untitled { outline: 1px dashed color-mix(in srgb, var(--muted) 50%, transparent); }
-    .koh-review { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
-    .koh-review > summary {
-      cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--muted);
-      letter-spacing: 0.02em; padding: 4px 0;
-    }
-    .koh-review > summary:hover { color: var(--text); }
-    .koh-review #kohReviewCount { color: var(--accent); }
 
     .explore-info-box {
       max-width: 880px;
