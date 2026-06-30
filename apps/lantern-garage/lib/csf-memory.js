@@ -148,18 +148,58 @@ function distinctiveHitCount(text, query) {
   return hits;
 }
 
+// Smoothed inverse document frequency over a candidate pool (#1690 — JS port of
+// MemoryEngine._idf). df = how many candidate records contain the term; N = pool
+// size. Rare, distinctive terms score higher so a match on one outranks a match
+// on a word common to the whole pool. Always >= 1 (a match never subtracts).
+function _idf(df, n) {
+  return Math.log((n + 1) / (df + 1)) + 1;
+}
+
+// IDF-weighted share of the query's terms covered by a record (0..1): the
+// fraction of the query's TOTAL idf mass that this record's tokens account for.
+function idfWeightedScore(queryTokens, recordTokenSet, dfMap, n) {
+  if (!queryTokens.length) return 0;
+  let num = 0, den = 0;
+  for (const qt of queryTokens) {
+    const w = _idf(dfMap.get(qt) || 0, n);
+    den += w;
+    if (recordTokenSet.has(qt)) num += w;
+  }
+  return den ? num / den : 0;
+}
+
 // Query-filtered memory: only return records relevant to the user's message
 // Σ₀ Fix: Validate scores; don't force low-relevance memories into context
 function queryMemories(message, limit = 3) {
   const allRecords = readMemoryRecords(50);
   if (allRecords.length === 0) return [];
-  const scored = allRecords.map(r => {
+
+  // Tokenize once; build document frequencies for the query terms over the
+  // candidate pool so ranking can weight rare terms above common ones (#1690).
+  const queryTokens = getFilteredTokens(message);
+  const recTokenSets = allRecords.map(r => {
+    const text = r.content?.text || r.content?.raw_input || (r.tags || []).join(" ");
+    return new Set(getFilteredTokens(`${text} ${(r.tags || []).join(" ")}`));
+  });
+  const N = allRecords.length;
+  const dfMap = new Map();
+  for (const qt of queryTokens) {
+    let df = 0;
+    for (const s of recTokenSets) if (s.has(qt)) df++;
+    dfMap.set(qt, df);
+  }
+
+  const scored = allRecords.map((r, i) => {
     const text = r.content?.text || r.content?.raw_input || (r.tags || []).join(" ");
     const tagText = (r.tags || []).join(" ");
+    // Coverage score (unchanged) gates relevance; IDF score ranks within the gate.
     const score = Math.max(relevanceScore(text, message), relevanceScore(tagText, message));
-    return { record: r, score };
+    const idf = idfWeightedScore(queryTokens, recTokenSets[i], dfMap, N);
+    return { record: r, score, idf };
   });
-  scored.sort((a, b) => b.score - a.score);
+  // Rank by IDF-weighted relevance (rare-term matches first); coverage breaks ties.
+  scored.sort((a, b) => (b.idf - a.idf) || (b.score - a.score));
 
   // Σ₀ Fix: Filter by relevance threshold (0.3 = at least 30% word match)
   // Don't force low-score memories into context just to avoid empty results
@@ -486,6 +526,7 @@ async function formatCSFContextForPromptAsync(message) {
 module.exports = {
   relevanceScore,
   distinctiveHitCount,
+  idfWeightedScore,
   readMemoryRecords,
   _verifyRecords,
   readIngestDocs,
