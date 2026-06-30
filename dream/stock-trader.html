@@ -58,11 +58,60 @@
   .site-footer{display:none}         /* full-screen app has its own footer; suppress the injected global one (#1579) */
   /* ── Layout ── */
   /* Leave room for the injected global site-nav (52px sticky bar, #1579). */
-  .layout{display:grid;grid-template-columns:180px 1fr;grid-template-rows:52px 1fr auto;height:calc(100vh - 52px)}
-  .header{grid-column:1/-1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
-  .sidebar{background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto;padding:8px 0}
-  .main{overflow-y:auto;padding:12px;background:var(--bg0)}
-  .footer{grid-column:1/-1;background:var(--bg1);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 260px 1.2fr;gap:8px;padding:8px;max-height:196px;box-sizing:border-box}
+  /* ── Accessibility (#1632, WCAG 2.1 AA) ── */
+  .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--blue,#3b82f6);outline-offset:2px;border-radius:2px}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  }
+  /* Minimalist TradingView-style scrollbars (replaces the chunky white OS bars) */
+  *{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28);background-clip:padding-box}
+  ::-webkit-scrollbar-corner{background:transparent}
+  html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
+  html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
+  .layout{display:grid;grid-template-columns:180px 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  /* Draggable divider to resize the bottom panel section (#1630) */
+  .footer-resize{position:absolute;top:-4px;left:0;right:0;height:8px;cursor:ns-resize;z-index:30}
+  .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
+  .footer-resize:hover::before{background:var(--tv-text-secondary)}
+  body.resizing-footer{cursor:ns-resize;user-select:none}
+  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
+  /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
+     selected-symbol info is its OWN pinned, scrollable section at the bottom. */
+  /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
+     run all the way to the bottom; the footer trading panel sits under the charts. */
+  .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+  #wlList{flex:1 1 auto;overflow-y:auto;min-height:0;padding:8px 0}
+  .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
+  /* #1712: TradingView-style trading panel — summary row + tabs + table body */
+  .footer{grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
+  .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
+  .tp-stat{display:flex;flex-direction:column;gap:1px}
+  .tp-stat .l{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+  .tp-stat .v{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0)}
+  .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
+  .tp-tabs{display:flex;gap:2px;padding:6px 12px 0;border-bottom:1px solid var(--border);overflow-x:auto}
+  .tp-tab{font-family:var(--mono);font-size:11px;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;padding:6px 12px 8px;cursor:pointer;white-space:nowrap}
+  .tp-tab:hover{color:var(--text1)}
+  .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
+  .tp-badge{font-size:9px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
+  .tp-body{flex:1;min-height:0;overflow-y:auto;padding:6px 12px 10px}
+  .tp-pane{display:none}
+  .tp-pane.active{display:block}
+  /* positions / orders table */
+  .tp-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  .tp-table th{text-align:right;font-weight:500;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .tp-table th:first-child,.tp-table td:first-child{text-align:left}
+  .tp-table td{text-align:right;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text1);white-space:nowrap}
+  .tp-table tr:hover td{background:var(--bg2)}
+  .tp-side{font-weight:700} .tp-side.long{color:var(--green)} .tp-side.short{color:var(--red)}
+  .tp-sym{font-weight:700;color:var(--text0);cursor:pointer}
+  .tp-sym:hover{color:var(--blue)}
+  .tp-empty{font-family:var(--mono);font-size:11px;color:var(--text2);padding:24px;text-align:center}
   /* ── Header ── */
   .logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green);letter-spacing:.08em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
@@ -74,23 +123,51 @@
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .nav-link{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;margin-left:auto;transition:background .15s,color .15s}
+  .nav-link{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--text0);background:var(--bg3)}
+  .ovn-toggle{cursor:pointer}
+  .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
-  .wl-item{padding:6px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s}
+  /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
+     signal on a tight second line. */
+  .wl-item{padding:5px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.25;display:flex;align-items:center;gap:8px}
+  .wl-content{flex:1;min-width:0}
+  /* Circular brand badge (TradingView-style). Background is chosen adaptively per
+     logo (adaptLogoBg): dark by default so colour logos pop, light only for
+     dark-monochrome marks (e.g. Intel) that would vanish on dark. */
+  .wl-logo{width:24px;height:24px;border-radius:50%;flex:0 0 auto;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);image-rendering:auto}
+  .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
+  .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:7px;font-weight:700;border-color:rgba(255,255,255,.08)}
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
-  .wl-sym{font-family:var(--mono);font-size:11px;font-weight:600}
-  .wl-row{display:flex;justify-content:space-between;align-items:center}
-  .wl-price{font-family:var(--mono);font-size:10px;color:var(--text1)}
-  .wl-chg{font-family:var(--mono);font-size:9px;font-weight:600}
+  .wl-sym{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--text0)}
+  .wl-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .wl-price{font-family:var(--mono);font-size:9.5px;color:var(--text1)}
+  .wl-chg{font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
-  .wl-signal{font-family:var(--mono);font-size:8px;margin-top:2px}
-  .wl-add{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border)}
-  .wl-add input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:10px;padding:4px 6px;border-radius:3px}
-  .wl-add button{background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:3px;cursor:pointer}
-  .wl-add button:hover{color:var(--text0)}
-  .wl-remove{font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer;padding:0 4px}
+  .wl-signal{font-family:var(--mono);font-size:8px}
+  /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal. */
+  .wl-info{display:none;flex:0 0 auto;max-height:58%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
+  .wl-info.show{display:block}
+  .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
+  .wi-name{font-size:9px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wi-px{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:5px}
+  .wi-meta{font-family:var(--mono);font-size:9px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:3px 12px}
+  .wi-meta b{color:var(--text1);font-weight:600}
+  /* #1711: expanded info — Technicals / Returns / Key stats sections */
+  .wi-sect{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin:10px 0 5px;border-top:1px solid var(--border);padding-top:8px}
+  .wi-tech{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text1)}
+  .wi-tech.up{color:var(--green)} .wi-tech.dn{color:var(--red)}
+  .wi-rets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .wi-ret{background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:5px 4px;text-align:center}
+  .wi-ret-v{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text2)}
+  .wi-ret.up .wi-ret-v{color:var(--green)} .wi-ret.dn .wi-ret-v{color:var(--red)}
+  .wi-ret-l{font-family:var(--mono);font-size:8px;color:var(--text2);margin-top:1px}
+  .wl-add{display:flex;padding:8px 12px;border-bottom:1px solid var(--border)}
+  /* #1709: single full-width "Add symbol" button → opens the search popup */
+  .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
+  .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
+  .wl-remove{font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
@@ -100,8 +177,29 @@
   .card.state-watching{border-color:rgba(74,158,255,.25)}
   .card.state-quiet{opacity:.75}
   .card-header{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .card-ticker{font-family:var(--mono);font-size:14px;font-weight:600}
+  .card-ticker{font-family:var(--mono);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px dotted transparent}
+  .card-ticker:hover{border-bottom-color:var(--tv-text-secondary)}
+  /* Per-slot symbol editor input (#1628) */
+  .slot-sym{font-family:var(--mono);font-size:14px;font-weight:600;width:84px;background:var(--bg0);color:var(--tv-text);border:1px solid var(--tv-accent);border-radius:3px;padding:1px 5px;text-transform:uppercase;outline:none}
+  /* Fixed N-slot layouts (#1628/#1629): the grid fills the .main area exactly and
+     every chart flexes to fill its cell — no fixed-height cards leaving empty
+     space below, and no chart bleeding under the footer. Rows/cols set in JS. */
+  .main.main-fixed{overflow:hidden}
+  .cards-grid.grid-fixed{height:100%;gap:8px}
+  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1}
+  .cards-grid.grid-fixed .card .zone-ladder{flex:1 1 auto;height:auto!important;min-height:0;margin-bottom:6px}
+  /* Drag-to-reorder chart slots (multi-chart layouts) */
+  .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:13px;line-height:1;user-select:none;padding:0 2px}
+  .drag-handle:active{cursor:grabbing}
+  .card.dragging{opacity:.45}
+  .card.drag-over{outline:2px dashed var(--blue);outline-offset:-2px}
   .card-price{font-family:var(--mono);font-size:12px;color:var(--text1)}
+  /* Tick-flash (#1627): on each price change, flash green/red for ~1s then fade
+     back to the normal colour. Normal state is untouched. */
+  @keyframes cpFlashUp{0%{color:var(--green);background:rgba(0,212,170,.20)}100%{color:var(--text1);background:transparent}}
+  @keyframes cpFlashDown{0%{color:var(--red);background:rgba(255,95,109,.20)}100%{color:var(--text1);background:transparent}}
+  .card-price.flash-up{animation:cpFlashUp 1s ease-out;border-radius:3px}
+  .card-price.flash-down{animation:cpFlashDown 1s ease-out;border-radius:3px}
   .card-state{font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:2px;letter-spacing:.1em}
   .state-open .card-state{background:rgba(0,212,170,.12);color:var(--green)}
   .state-watching .card-state{background:rgba(74,158,255,.12);color:var(--blue)}
@@ -129,10 +227,12 @@
   /* Order ticket trigger row */
   .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
   .order-ticket button{flex:1;font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
-  .btn-buy{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.3)}
-  .btn-buy:hover{background:rgba(0,212,170,.22)}
-  .btn-sell{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.3)}
-  .btn-sell:hover{background:rgba(255,95,109,.22)}
+  /* #1696: always-vibrant BUY/SELL — bold fill + bright text (no longer relies on
+     Σ₀ highlighting to stand out). */
+  .btn-buy{background:rgba(0,212,170,.32);color:#7df5d6;border-color:var(--green);font-weight:700}
+  .btn-buy:hover{background:rgba(0,212,170,.5);color:#defff6}
+  .btn-sell{background:rgba(255,95,109,.32);color:#ffb3ba;border-color:var(--red);font-weight:700}
+  .btn-sell:hover{background:rgba(255,95,109,.5);color:#ffe1e4}
   /* Σ₀-grounded signal emphasis (#1578): a side is highlighted only when the
      card's dir matches AND conf ≥ the kalshi-suggest MIN_CONVICTION floor (65%).
      Otherwise (flat / quiet / low-confidence) BOTH buttons mute — no emphasis
@@ -140,8 +240,30 @@
   .order-ticket button.sig-on{transition:background .15s,box-shadow .15s}
   .btn-buy.sig-on{background:rgba(0,212,170,.30);border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset,0 0 10px rgba(0,212,170,.25)}
   .btn-sell.sig-on{background:rgba(255,95,109,.30);border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset,0 0 10px rgba(255,95,109,.25)}
-  .order-ticket button.sig-off{opacity:.4;filter:grayscale(.5)}
-  .order-ticket button.sig-off:hover{opacity:.6}
+  /* #1696: buttons stay vibrant — Σ₀ no longer mutes them (sig-off is a no-op). */
+  .order-ticket button.sig-off{opacity:1;filter:none}
+  /* ── Symbol-search popup (#1692) ── */
+  .sym-bg{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-start;justify-content:center;background:rgba(5,6,8,.62);padding-top:8vh}
+  .sym-bg.hidden{display:none}
+  .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  .sym-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:8px;outline:none}
+  .sym-head input:focus{border-color:var(--blue)}
+  .sym-close{cursor:pointer;color:var(--text2);font-size:16px;padding:4px 8px;border-radius:4px}
+  .sym-close:hover{color:var(--text0);background:var(--bg2)}
+  .sym-chips{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .sym-chip{font-family:var(--mono);font-size:10px;padding:4px 11px;border-radius:14px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
+  .sym-chip.active{background:var(--blue);color:#04121a;border-color:var(--blue);font-weight:600}
+  .sym-results{overflow-y:auto;flex:1}
+  .sym-row{display:flex;align-items:center;gap:12px;padding:8px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03)}
+  .sym-row:hover,.sym-row.sel{background:var(--bg2)}
+  .sym-logo{width:28px;height:28px;border-radius:50%;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);flex:0 0 auto}
+  .sym-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
+  .sym-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:9px;font-weight:700}
+  .sym-sym{font-family:var(--mono);font-weight:700;font-size:13px;color:var(--text0);min-width:62px}
+  .sym-name{flex:1;color:var(--text1);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sym-ex{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.05em}
+  .sym-empty{padding:22px;text-align:center;color:var(--text2);font-size:12px}
   @media (prefers-reduced-motion: reduce){ .order-ticket button{transition:none} }
   /* Chart canvas + overlay — canvas covers the full ladder and draws its own
      right-side price axis (52px) + bottom time axis (16px); the HTML overlay
@@ -175,7 +297,7 @@
      container sits under the header on the right edge and is click-through
      (pointer-events:none) so the rest of the terminal stays interactive while
      the ticket is open; only the panel itself captures input. */
-  .ot-bg{position:fixed;top:52px;right:0;bottom:0;z-index:1100;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
+  .ot-bg{position:fixed;top:104px;right:0;bottom:0;z-index:1100;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
   .ot-bg.hidden{display:none}
   .ot-modal{pointer-events:auto;background:var(--bg1);border-left:1px solid var(--border);
     width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
@@ -211,12 +333,15 @@
   .ot-usd{font-size:10px;color:var(--text2);text-align:right;flex:1}
   .ot-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
   .ot-section-title{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.15em}
-  .ot-exit-row{display:flex;flex-direction:column;gap:6px}
-  .ot-exit-head{display:flex;align-items:center;gap:6px}
-  .ot-exit-head input[type=checkbox]{accent-color:var(--blue)}
-  .ot-exit-fields{display:flex;align-items:center;gap:6px}
-  .ot-exit-fields .ot-field{flex:1;width:auto;text-align:left}
-  .ot-tick-label{font-size:9px;color:var(--text2);white-space:nowrap}
+  .ot-exit-row{display:flex;flex-direction:column;gap:7px}
+  .ot-exit-head{display:flex;align-items:center;gap:7px;cursor:pointer}
+  .ot-exit-head input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;cursor:pointer}
+  .ot-exit-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ot-fieldcell{display:flex;flex-direction:column;gap:3px}
+  .ot-fieldcell>span{font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.1em}
+  .ot-exit-fields .ot-field{width:100%;text-align:right}
+  .ot-field:focus{outline:none;border-color:var(--blue);background:var(--bg1)}
+  .ot-field:disabled{opacity:.45;cursor:not-allowed}
   .ot-info-row{display:flex;justify-content:space-between;font-size:10px;color:var(--text2)}
   .ot-info-row span:last-child{color:var(--text0)}
   .ot-submit{font-family:var(--mono);font-size:12px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;text-transform:uppercase;text-align:center}
@@ -225,8 +350,25 @@
   .ot-submit.sell{background:rgba(255,95,109,.15);color:var(--red);border-color:var(--red)}
   .ot-submit.sell:hover{background:rgba(255,95,109,.28)}
   /* ── Footer panels ── */
-  .fpanel{padding:10px 14px;overflow-y:auto;max-height:180px;background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px}
-  .panel-title{font-family:var(--mono);font-size:9px;color:var(--tv-text-secondary);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
+  .fpanel{padding:10px 14px;overflow-y:auto;min-height:0;background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px}
+  /* Sticky within the scrolling .fpanel (#1626): the section title stays pinned at
+     the top while the feed scrolls under it. Opaque bg + the panel's own padding
+     reclaimed via negative margins so nothing peeks above it. */
+  .panel-title{font-family:var(--mono);font-size:9px;color:var(--tv-text-secondary);letter-spacing:.15em;text-transform:uppercase;position:sticky;top:-10px;z-index:3;background:var(--bg1);margin:-10px -14px 8px;padding:10px 14px 6px}
+  .s0-sig{border:1px solid var(--tv-border);border-left:3px solid var(--green);border-radius:4px;padding:7px 9px;margin-bottom:6px;background:rgba(0,212,170,.05)}
+  .s0-sig.short{border-left-color:var(--red);background:rgba(255,95,109,.05)}
+  .s0-head{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--tv-text)}
+  .s0-lvl{font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);margin-top:2px}
+  .s0-why{font-size:10px;color:var(--tv-text-secondary);margin-top:3px;font-style:italic}
+  .s0-empty{font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:4px 0}
+  /* #1710: "watching" narration lines */
+  .s0-watchhdr{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 4px;border-top:1px solid var(--tv-border);padding-top:7px}
+  .s0-watch{font-family:var(--mono);font-size:10px;color:var(--tv-text);padding:4px 8px;margin-bottom:4px;border-left:3px solid var(--blue);border-radius:3px;background:rgba(74,158,255,.06);line-height:1.4}
+  .s0-watch.short{border-left-color:var(--red);background:rgba(255,95,109,.05)}
+  .s0-watch b{color:var(--tv-text);font-weight:700}
+  .s0-eye{margin-right:2px}
+  .s0-status{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:2px 0 7px;margin-bottom:6px;border-bottom:1px solid var(--tv-border)}
+  .s0-status .pos{color:var(--green)} .s0-status .neg{color:var(--red)}
   /* Agent log */
   .log-item{font-family:var(--mono);font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);display:grid;grid-template-columns:45px 55px 1fr;gap:4px;align-items:start}
   .log-time{color:var(--text2)}.log-agent{font-weight:600}
@@ -250,7 +392,8 @@
 <div class="layout">
 
 <!-- Header -->
-<div class="header">
+<h1 class="visually-hidden">Keystone Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
+<div class="header" role="region" aria-label="Trading toolbar">
   <div class="logo">Keystone<span>Trader</span></div>
   <div class="badge badge-paper">PAPER</div>
   <div class="hstat"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
@@ -258,11 +401,22 @@
   <div class="hstat"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
   <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
-  <select id="chartTypeSelect" class="chart-ctrl" onchange="changeChartType(this.value)">
+  <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
+  <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
+    <option value="0">⊞ All</option>
+    <option value="1">1 chart</option>
+    <option value="2">2 charts</option>
+    <option value="3">3 charts</option>
+    <option value="4">4 charts</option>
+    <option value="6">6 charts</option>
+    <option value="10">10 charts</option>
+    <option value="20">20 charts</option>
+  </select>
+  <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)">
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
-  <select id="chartTfSelect" class="chart-ctrl" onchange="changeTimeframe(this.value)">
+  <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
     <option value="15m">15m</option>
@@ -276,40 +430,45 @@
     <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
   </div>
   <div class="pulse"></div>
+  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
+  <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link">News →</a>
 </div>
 
 <!-- Sidebar -->
-<div class="sidebar">
+<div class="sidebar" role="complementary" aria-label="Watchlist">
   <div class="wl-add">
-    <input type="text" id="wlAddInput" placeholder="Add ticker" maxlength="10" onkeydown="if(event.key==='Enter')addWatchlistTicker()">
-    <button onclick="addWatchlistTicker()">+</button>
+    <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
   </div>
   <div id="wlList"></div>
+  <div id="wlInfo" class="wl-info"></div>
 </div>
 
 <!-- Main: ticker cards -->
-<div class="main">
+<div class="main" role="main" aria-label="Charts">
   <div class="cards-grid" id="cardsGrid"></div>
 </div>
 
 <!-- Footer -->
-<div class="footer">
-  <div class="fpanel">
-    <div class="panel-title">Agent Feed</div>
-    <div id="agentLog"></div>
+<div class="footer" style="position:relative">
+  <div class="footer-resize" id="footerResize" role="separator" aria-label="Resize the panel section" tabindex="0" title="Drag to resize"></div>
+  <!-- Account summary row (#1712) -->
+  <div class="tp-summary" id="tpSummary"></div>
+  <!-- Tabs -->
+  <div class="tp-tabs" role="tablist">
+    <button class="tp-tab active" role="tab" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
+    <button class="tp-tab" role="tab" data-tab="orders" onclick="tpTab('orders')">Orders</button>
+    <button class="tp-tab" role="tab" data-tab="history" onclick="tpTab('history')">Order history</button>
+    <button class="tp-tab" role="tab" data-tab="signals" onclick="tpTab('signals')">⚡ Σ₀ Signals</button>
+    <button class="tp-tab" role="tab" data-tab="feed" onclick="tpTab('feed')">Agent Feed</button>
   </div>
-  <div class="fpanel">
-    <div class="panel-title">Recent Orders</div>
-    <div id="orders"></div>
-  </div>
-  <div class="fpanel">
-    <div class="panel-title">Market Status</div>
-    <div id="mktStatus"></div>
-  </div>
-  <div class="fpanel">
-    <div class="panel-title">Market News</div>
-    <div id="marketNews"></div>
+  <!-- Tab bodies -->
+  <div class="tp-body">
+    <div class="tp-pane active" id="tp-positions"></div>
+    <div class="tp-pane" id="tp-orders"></div>
+    <div class="tp-pane" id="tp-history"></div>
+    <div class="tp-pane" id="tp-signals"><div id="sigma0Signals"></div></div>
+    <div class="tp-pane" id="tp-feed"><div id="agentLog"></div></div>
   </div>
 </div>
 
@@ -321,11 +480,11 @@
     <div class="fs-header">
       <span class="fs-ticker" id="fsTicker">—</span>
       <span class="fs-price" id="fsPrice">—</span>
-      <select id="fsChartTypeSelect" class="chart-ctrl" onchange="changeChartType(this.value)">
+      <select id="fsChartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)">
         <option value="line">Line</option>
         <option value="candle">Candles</option>
       </select>
-      <select id="fsChartTfSelect" class="chart-ctrl" onchange="changeTimeframe(this.value)">
+      <select id="fsChartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
         <option value="15m">15m</option>
@@ -346,7 +505,7 @@
     </div>
     <div class="fs-body">
       <div class="zone-ladder" id="ladder-fs">
-        <canvas class="chart-canvas" id="chart-fs"></canvas>
+        <canvas class="chart-canvas" id="chart-fs" aria-hidden="true"></canvas>
         <div class="ladder-overlay" id="overlay-fs"></div>
       </div>
     </div>
@@ -354,6 +513,23 @@
 </div>
 
 <!-- Order ticket -->
+<!-- Symbol-search popup (#1692) -->
+<div class="sym-bg hidden" id="symSearchBg" onclick="if(event.target===this)closeSymbolSearch()">
+  <div class="sym-modal" role="dialog" aria-modal="true" aria-label="Symbol search">
+    <div class="sym-head">
+      <span aria-hidden="true">🔍</span>
+      <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
+      <span class="sym-close" role="button" tabindex="0" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter')closeSymbolSearch()" title="Close">✕</span>
+    </div>
+    <div class="sym-chips" id="symChips">
+      <button type="button" class="sym-chip active" data-class="" onclick="setSymClass('',this)">All</button>
+      <button type="button" class="sym-chip" data-class="us_equity" onclick="setSymClass('us_equity',this)">Stocks</button>
+      <button type="button" class="sym-chip" data-class="crypto" onclick="setSymClass('crypto',this)">Crypto</button>
+    </div>
+    <div class="sym-results" id="symResults"></div>
+  </div>
+</div>
+
 <div class="ot-bg hidden" id="otBg" onclick="if(event.target===this)closeOrderTicket()">
   <div class="ot-modal">
     <div class="ot-header">
@@ -380,12 +556,12 @@
 
       <div class="ot-row" id="otLimitRow" style="display:none">
         <span class="ot-label">Limit price</span>
-        <input type="number" class="ot-field" id="otLimitPrice" step="0.01" oninput="renderOrderTicket()">
+        <input type="number" class="ot-field" id="otLimitPrice" aria-label="Limit price" step="0.01" oninput="renderOrderTicket()">
       </div>
 
       <div class="ot-row">
         <span class="ot-label">Units</span>
-        <input type="number" class="ot-field" id="otQty" value="1" min="1" step="1" oninput="renderOrderTicket()">
+        <input type="number" class="ot-field" id="otQty" aria-label="Quantity" value="1" min="1" step="1" oninput="renderOrderTicket()">
       </div>
       <div class="ot-row"><span></span><span class="ot-usd" id="otUsdEquiv">≈ $0.00 USD</span></div>
 
@@ -393,24 +569,30 @@
         <div class="ot-section-title">Exits</div>
         <div class="ot-exit-row">
           <div class="ot-exit-head">
-            <input type="checkbox" id="otTpEnabled" onchange="otToggleExit('Tp')">
+            <input type="checkbox" id="otTpEnabled" aria-label="Enable take-profit" onchange="otToggleExit('Tp')">
             <span class="ot-label">Take profit, price</span>
           </div>
           <div class="ot-exit-fields">
-            <input type="number" class="ot-field" id="otTpPrice" step="0.01" disabled oninput="otSyncFromPrice('tp')">
-            <span class="ot-tick-label">ticks</span>
-            <input type="number" class="ot-field" id="otTpTicks" step="1" disabled oninput="otSyncFromTicks('tp')">
+            <label class="ot-fieldcell"><span>Price</span>
+              <input type="number" class="ot-field" id="otTpPrice" aria-label="Take-profit price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('tp')">
+            </label>
+            <label class="ot-fieldcell"><span>Ticks</span>
+              <input type="number" class="ot-field" id="otTpTicks" aria-label="Take-profit ticks" step="1" placeholder="0" disabled oninput="otSyncFromTicks('tp')">
+            </label>
           </div>
         </div>
         <div class="ot-exit-row">
           <div class="ot-exit-head">
-            <input type="checkbox" id="otSlEnabled" onchange="otToggleExit('Sl')">
+            <input type="checkbox" id="otSlEnabled" aria-label="Enable stop-loss" onchange="otToggleExit('Sl')">
             <span class="ot-label">Stop loss, price</span>
           </div>
           <div class="ot-exit-fields">
-            <input type="number" class="ot-field" id="otSlPrice" step="0.01" disabled oninput="otSyncFromPrice('sl')">
-            <span class="ot-tick-label">ticks</span>
-            <input type="number" class="ot-field" id="otSlTicks" step="1" disabled oninput="otSyncFromTicks('sl')">
+            <label class="ot-fieldcell"><span>Price</span>
+              <input type="number" class="ot-field" id="otSlPrice" aria-label="Stop-loss price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('sl')">
+            </label>
+            <label class="ot-fieldcell"><span>Ticks</span>
+              <input type="number" class="ot-field" id="otSlTicks" aria-label="Stop-loss ticks" step="1" placeholder="0" disabled oninput="otSyncFromTicks('sl')">
+            </label>
           </div>
         </div>
       </div>
@@ -431,10 +613,17 @@
 // ── State ──────────────────────────────────────────────────────────────────
 let zonesData      = {};
 let wlPrices       = [];
+const _lastCardPrice = {};   // last seen price per ticker, for the tick-flash (#1627)
+// Configurable chart grid (#1628): slotCount 0 = show ALL watchlist tickers (legacy).
+// >0 = show that many chart slots, seeded from the watchlist but each freely
+// re-assignable by typing a symbol. Persisted across reloads.
+let slotCount  = parseInt(localStorage.getItem('trader.slotCount')||'0',10) || 0;
+let chartSlots = (()=>{ try{ return JSON.parse(localStorage.getItem('trader.chartSlots'))||[]; }catch(e){ return []; } })();
+const SLOT_COLS = {1:1,2:2,3:3,4:2,6:3,10:5,20:5};
 let activeTicker   = null;
 let barsData       = {};
 let chartType      = 'line';
-let chartTimeframe = '5m';
+let chartTimeframe = (()=>{ try{ return localStorage.getItem('trader.tf') || '5m'; }catch(e){ return '5m'; } })();
 let fullscreenTicker = null;
 let otTicker = null, otSide = 'buy', otOrderType = 'market';
 const TICK_SIZE = 0.01;
@@ -644,9 +833,9 @@ const _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','No
 function _fmtTick(d, kind, showDate){
   if(kind === 'year')  return String(d.getFullYear());
   if(kind === 'month') return _MONTHS[d.getMonth()] + (d.getMonth()===0 ? " '"+String(d.getFullYear()).slice(2) : '');
-  if(kind === 'day')   return (d.getMonth()+1)+'/'+d.getDate();
+  if(kind === 'day')   return String(d.getDate());           // #1698: day number only (28, not 6/28)
   const hhmm = d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
-  return showDate ? (d.getMonth()+1)+'/'+d.getDate()+' '+hhmm : hhmm;
+  return showDate ? d.getDate()+' '+hhmm : hhmm;             // month is carried by the 'month' tick
 }
 function timeAxisTicks(bars, maxTicks){
   const n = bars.length;
@@ -886,7 +1075,12 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   // the user can still zoom out to reveal the full history.
   if(bars.length > 0 && view.visibleBars == null){
     const isFs = viewKey === 'overlay-fs';
-    view.visibleBars = Math.min(bars.length, isFs ? 180 : 70);
+    // #1699: default the visible window to ~one range-label's worth of candles per
+    // timeframe (1D≈78×5m, 5D≈35×1h, 1M≈22 daily trading days) instead of a flat
+    // 70 — so the candle count matches the selected range. Pan to see more history.
+    const DEFAULT_VIS = { '1m': 78, '5m': 78, '15m': 52, '1h': 35, '4h': 30, '1d': 22 };
+    const base = DEFAULT_VIS[chartTimeframe] || 70;
+    view.visibleBars = Math.min(bars.length, isFs ? Math.round(base * 2.2) : base);
     view.barOffset = 0;
   }
 
@@ -1063,10 +1257,10 @@ function buildCard(ticker, d){
   const emph = emphasisAttrs(dir, conf);
 
   return `
-<div class="card state-${state}" id="card-${ticker}">
+<div class="card state-${state}" id="card-${ticker}" data-ticker="${ticker}">
   <div class="card-header">
     <div style="display:flex;align-items:center;gap:8px">
-      <span class="card-ticker">${ticker}</span><span id="pnl-${ticker}">${pnlHtml}</span>
+      ${slotCount ? `<span class="drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder ${ticker}">⠿</span>` : ''}<span class="card-ticker" role="button" tabindex="0" aria-label="Change symbol, currently ${ticker}" onclick="editSlot('${ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editSlot('${ticker}')}" title="Click to change symbol">${ticker}</span><span id="pnl-${ticker}">${pnlHtml}</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span class="card-price" id="cp-${ticker}">—</span>
@@ -1075,7 +1269,7 @@ function buildCard(ticker, d){
   </div>
   <div id="meta-${ticker}">${confHtml}${watchHtml}</div>
   <div class="zone-ladder" id="ladder-${ticker}">
-    <canvas class="chart-canvas" id="chart-${ticker}"></canvas>
+    <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
   </div>
   <div class="order-ticket">
@@ -1136,23 +1330,129 @@ function updateCardMeta(ticker, d){
 
 // ── Render all cards ─────────────────────────────────────────────────────────
 let lastCardOrder = null;
+// Which tickers the grid renders. slotCount 0 → all watchlist (sorted by state).
+// >0 → the chartSlots, seeded from the watchlist first-N but kept in user order.
+function visibleTickers(){
+  const all = wlPrices.map(t=>t.ticker);
+  if(!slotCount){
+    const order={open:0,watching:1,quiet:2};
+    return all.slice().sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})]);
+  }
+  // Seed/extend slots from the watchlist until we have slotCount of them.
+  if(chartSlots.length < slotCount){
+    const seed = all.filter(t=>!chartSlots.includes(t));
+    while(chartSlots.length < slotCount && seed.length) chartSlots.push(seed.shift());
+    while(chartSlots.length < slotCount) chartSlots.push(all[chartSlots.length % Math.max(1,all.length)] || 'SPY');
+    persistSlots();
+  }
+  return chartSlots.slice(0, slotCount);
+}
+function applyGridCols(){
+  const grid = document.getElementById('cardsGrid');
+  if(!grid) return;
+  const main = document.querySelector('.main');
+  if(slotCount){
+    const cols = SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount));
+    const rows = Math.ceil(slotCount / cols);
+    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    grid.style.gridTemplateRows    = `repeat(${rows},1fr)`;   // rows fill the height equally
+    grid.classList.add('grid-fixed');
+    grid.classList.toggle('grid-single', slotCount === 1);
+    if(main) main.classList.add('main-fixed');
+  } else {
+    grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(340px,1fr))';
+    grid.style.gridTemplateRows    = '';
+    grid.classList.remove('grid-fixed','grid-single');
+    if(main) main.classList.remove('main-fixed');
+  }
+}
+function persistSlots(){
+  try{ localStorage.setItem('trader.slotCount', String(slotCount)); localStorage.setItem('trader.chartSlots', JSON.stringify(chartSlots)); }catch(e){}
+}
+function setSlotCount(v){
+  slotCount = parseInt(v,10) || 0;
+  _preZoomSlot = null;                                       // manual layout change exits zoom mode
+  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='none';
+  persistSlots();
+  lastCardOrder = '';            // force a full rebuild
+  applyGridCols();
+  renderCards();
+}
+
 function renderCards(){
   const grid = document.getElementById('cardsGrid');
-  const sorted = wlPrices.map(t=>t.ticker).sort((a,b)=>{
-    const order={open:0,watching:1,quiet:2};
-    return order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})];
-  });
+  const list = visibleTickers();
 
-  // Avoid tearing down + rebuilding all 16 cards (and their canvases) on every
+  // Avoid tearing down + rebuilding all the cards (and their canvases) on every
   // periodic refresh — only do a full rebuild when the card set/order changes.
-  const orderKey = sorted.join(',');
+  const orderKey = slotCount + '|' + list.join(',');
   if(orderKey === lastCardOrder){
-    sorted.forEach(t => updateCardMeta(t, zonesData[t]||{}));
+    list.forEach(t => updateCardMeta(t, zonesData[t]||{}));
     return;
   }
   lastCardOrder = orderKey;
-  grid.innerHTML = sorted.map(t => buildCard(t, zonesData[t]||{})).join('');
-  sorted.forEach(t => renderZoneLadder(t, zonesData[t]||{}, getCurrentPrice(t)));
+  applyGridCols();
+  grid.innerHTML = list.map(t => buildCard(t, zonesData[t]||{})).join('');
+  list.forEach(t => renderZoneLadder(t, zonesData[t]||{}, getCurrentPrice(t)));
+}
+
+// Per-slot symbol editor (#1628): click a chart's ticker to retype it. Validates +
+// resolves via the same Alpaca-backed watchlist endpoint (#1624), then swaps the slot.
+// Clicking a chart's ticker opens the symbol-search popup (#1692) to switch it.
+function editSlot(oldTicker){
+  openSymbolSearch((sym)=>commitSlotSymbol(oldTicker, sym), { title: 'Change chart symbol' });
+}
+async function commitSlotSymbol(oldTicker, sym){
+  if(!sym || sym===oldTicker) return;
+  if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
+  // The symbol is already Alpaca-validated by the search; add it to the watchlist
+  // so price/zone data flows, then re-render.
+  try{ await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); }catch(e){}
+  lastCardOrder=''; await loadWatchlistPrices(); await loadZones(); renderCards();
+}
+
+// ── Symbol-search popup (#1692) — TradingView-style search over all Alpaca assets ──
+let _symPick=null, _symClass='', _symDebounce=null, _symSel=0, _symRows=[], _symEpoch=0;
+function openSymbolSearch(onPick, opts){
+  _symPick = onPick; opts = opts || {}; _symClass = opts.class || '';
+  document.querySelectorAll('#symChips .sym-chip').forEach(c=>c.classList.toggle('active',(c.dataset.class||'')===_symClass));
+  document.getElementById('symSearchBg').classList.remove('hidden');
+  const inp=document.getElementById('symSearchInput'); inp.value=''; setTimeout(()=>inp.focus(),30);
+  runSymSearch('');
+}
+function closeSymbolSearch(){ document.getElementById('symSearchBg').classList.add('hidden'); _symPick=null; }
+function setSymClass(c, btn){ _symClass=c; document.querySelectorAll('#symChips .sym-chip').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); runSymSearch(document.getElementById('symSearchInput').value); }
+function onSymSearchInput(){ clearTimeout(_symDebounce); _symDebounce=setTimeout(()=>runSymSearch(document.getElementById('symSearchInput').value), 170); }
+async function runSymSearch(q){
+  const ep = ++_symEpoch;   // ignore stale responses (a faster/earlier query resolving late)
+  try{
+    const url='/api/trading/symbols/search?limit=40&q='+encodeURIComponent(q)+(_symClass?'&class='+_symClass:'');
+    const r=await fetch(url); const d=await r.json();
+    if(ep!==_symEpoch) return;
+    _symRows=d.results||[]; _symSel=0; renderSymResults();
+  }catch(e){ if(ep===_symEpoch) document.getElementById('symResults').innerHTML='<div class="sym-empty">Search unavailable</div>'; }
+}
+function renderSymResults(){
+  const el=document.getElementById('symResults');
+  if(!_symRows.length){ el.innerHTML='<div class="sym-empty">No matching symbols</div>'; return; }
+  el.innerHTML=_symRows.map((a,i)=>{
+    const cr=a.class==='crypto';
+    const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const ph=`<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
+    const logo = cr ? ph
+      : `<img class="sym-logo${_logoBg[a.symbol]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${esc(a.symbol)}" src="/api/trading/logo?symbol=${encodeURIComponent(a.symbol)}" alt="" onload="adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph.replace(/"/g,'&quot;')}&quot;">`;
+    return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
+      ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
+      <span class="sym-name">${esc(a.name)}</span>
+      <span class="sym-ex">${esc(a.exchange)||(cr?'CRYPTO':'')}</span></div>`;
+  }).join('');
+}
+function pickSym(i){ const a=_symRows[i]; if(!a) return; const cb=_symPick; closeSymbolSearch(); if(cb) cb(a.symbol); }
+function symSearchKey(e){
+  if(e.key==='Escape'){ closeSymbolSearch(); }
+  else if(e.key==='ArrowDown'){ e.preventDefault(); _symSel=Math.min(_symRows.length-1,_symSel+1); renderSymResults(); const r=document.querySelector('.sym-row.sel'); if(r)r.scrollIntoView({block:'nearest'}); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); _symSel=Math.max(0,_symSel-1); renderSymResults(); const r=document.querySelector('.sym-row.sel'); if(r)r.scrollIntoView({block:'nearest'}); }
+  else if(e.key==='Enter'){ e.preventDefault(); pickSym(_symSel); }
 }
 
 // ── Order ticket ──────────────────────────────────────────────────────────────
@@ -1166,17 +1466,16 @@ function otCurrentPrice(){
   return price;
 }
 
-function openOrderTicket(ticker, side){
-  otTicker    = ticker;
-  otSide      = side;
-  otOrderType = 'market';
+let otUserClosed = false;   // #1694: respect an explicit X — don't auto-reopen
+// #1695: retarget the order panel to a symbol WITHOUT changing its open/closed state.
+function setOrderSymbol(ticker){
+  if(!ticker) return;
+  otTicker = ticker;
   const price = getCurrentPrice(ticker);
-
   document.getElementById('otTickerLabel').textContent = ticker;
   document.getElementById('otQty').value = 1;
   document.getElementById('otLimitPrice').value = price ? price.toFixed(2) : '';
   document.getElementById('otLimitRow').style.display = 'none';
-
   ['Tp','Sl'].forEach(kind=>{
     document.getElementById('ot'+kind+'Enabled').checked = false;
     document.getElementById('ot'+kind+'Price').value = '';
@@ -1184,18 +1483,25 @@ function openOrderTicket(ticker, side){
     document.getElementById('ot'+kind+'Price').disabled = true;
     document.getElementById('ot'+kind+'Ticks').disabled = true;
   });
-
+  renderOrderTicket();
+}
+function openOrderPanel(){
+  otUserClosed = false;
   document.getElementById('otBg').classList.remove('hidden');
   document.body.classList.add('ot-open');
-  renderOrderTicket();
   // The chart area just got narrower — re-fit visible charts to the new width.
   requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
+function openOrderTicket(ticker, side){
+  otSide = side; otOrderType = 'market';
+  setOrderSymbol(ticker);
+  openOrderPanel();
+}
 
 function closeOrderTicket(){
+  otUserClosed = true;                 // #1694: stays closed until reopened via BUY/SELL
   document.getElementById('otBg').classList.add('hidden');
   document.body.classList.remove('ot-open');
-  otTicker = null;
   requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 
@@ -1328,41 +1634,132 @@ async function submitOrderTicket(){
 }
 
 // ── Watchlist sidebar ─────────────────────────────────────────────────────────
+const _symNames = {};   // ticker → "Company Name · EXCHANGE", lazily fetched (#1631)
+const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
+// Brand logo for a ticker (FMP) with a symbol-initials placeholder fallback.
+function tickerLogoHtml(ticker){
+  const ph = `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
+  if(_wlIsCrypto(ticker)) return ph;
+  return `<img class="wl-logo${_logoBg[ticker]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${ticker}" src="/api/trading/logo?symbol=${encodeURIComponent(ticker)}" alt="" onload="adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph}&quot;">`;
+}
+// Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
+// the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
+// everything else keeps the dark badge so colour logos pop. Cached in localStorage.
+const _logoBg = (()=>{ try{ return JSON.parse(localStorage.getItem('logoBg')||'{}'); }catch(e){ return {}; } })();
+function adaptLogoBg(img){
+  const sym = img.dataset.sym;
+  if(_logoBg[sym]){ img.classList.toggle('on-light', _logoBg[sym]==='l'); return; }
+  try{
+    const c=document.createElement('canvas'); c.width=c.height=24;
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(img,0,0,24,24);
+    const d=ctx.getImageData(0,0,24,24).data;
+    let lum=0,n=0,colorful=0;
+    for(let i=0;i<d.length;i+=4){ const a=d[i+3]; if(a<40) continue; const r=d[i],g=d[i+1],b=d[i+2]; lum+=0.299*r+0.587*g+0.114*b; if(Math.max(r,g,b)-Math.min(r,g,b)>40) colorful++; n++; }
+    // Light badge only for DARK + MONOCHROME marks (e.g. Intel black). Colour logos
+    // (Meta blue, Tesla red) stay on the dark badge so they pop like the screenshot.
+    const dark = n && (lum/n) < 110 && (colorful/n) < 0.25;
+    _logoBg[sym] = dark ? 'l' : 'd';
+    try{ localStorage.setItem('logoBg', JSON.stringify(_logoBg)); }catch(e){}
+    img.classList.toggle('on-light', dark);
+  }catch(e){ /* tainted or decode error → leave dark badge */ }
+}
+const _wlPx = (p)=> p>100 ? p.toLocaleString() : (p!=null ? p.toFixed(4) : '—');
+
 function renderWatchlist(){
   document.getElementById('wlList').innerHTML = wlPrices.map(t=>{
     const d  = zonesData[t.ticker]||{};
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
-    const sigTxt = dir ? `<div class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${d.confidence||sig.confidence||0}%</div>` : '';
-    return `<div class="wl-item${activeTicker===t.ticker?' active':''}" onclick="focusTicker('${t.ticker}')">
-      <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}% <span class="wl-remove" onclick="removeWatchlistTicker('${t.ticker}',event)">×</span></span></div>
-      <div class="wl-row"><span class="wl-price">$${t.price>100?t.price.toLocaleString():t.price.toFixed(4)}</span></div>
-      ${sigTxt}
+    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span></span>';
+    return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart" onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'){focusTicker('${t.ticker}')}">
+      ${tickerLogoHtml(t.ticker)}
+      <div class="wl-content">
+        <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-price">$${_wlPx(t.price)}</span></div>
+        <div class="wl-row"><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>${sigTxt}<button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button></div>
+      </div>
     </div>`;
   }).join('');
+  if(activeTicker) renderSymbolInfo(activeTicker);
+}
+
+// Selected-symbol info panel (#1631) — TradingView-style: name/exchange + day stats
+// + signal. Company name is lazy-fetched once via the Alpaca-backed symbol-info GET.
+const _symStats = {};   // ticker → /api/trading/symbol-stats (returns/volume/technicals)
+function _fmtVol(v){ return v==null?'—': v>=1e9?(v/1e9).toFixed(2)+'B': v>=1e6?(v/1e6).toFixed(2)+'M': v>=1e3?(v/1e3).toFixed(1)+'K': v; }
+function renderSymbolInfo(ticker){
+  const el = document.getElementById('wlInfo'); if(!el) return;
+  if(!ticker){ el.className='wl-info'; el.innerHTML=''; return; }
+  const t = wlPrices.find(x=>x.ticker===ticker) || {ticker, price:null, chg_pct:0};
+  const d = zonesData[ticker]||{};
+  const sig = d.last_signal||{};
+  const dir = d.direction||sig.direction||'';
+  const conf = d.confidence||sig.confidence||0;
+  const chg = t.chg_pct||0;
+  const cl = chg>0?'up':chg<0?'dn':'flat';
+  const kind = _wlIsCrypto(ticker)?'Crypto':'Equity';
+  const st = _symStats[ticker];
+  const retCell = (lbl,v)=>`<div class="wi-ret ${v==null?'':v>=0?'up':'dn'}"><div class="wi-ret-v">${v==null?'—':(v>=0?'+':'')+v+'%'}</div><div class="wi-ret-l">${lbl}</div></div>`;
+  const techCls = st&&st.technical ? (st.technical.includes('Buy')?'up':st.technical.includes('Sell')?'dn':'') : '';
+  el.className = 'wl-info show';
+  el.innerHTML = `
+    <div class="wi-sym">${ticker}</div>
+    <div class="wi-name">${_symNames[ticker]||kind}</div>
+    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span></div>
+    ${(st&&st.available)?`
+    <div class="wi-sect">Technicals</div>
+    <div class="wi-tech ${techCls}">${st.technical}</div>
+    <div class="wi-sect">Returns</div>
+    <div class="wi-rets">${retCell('1M',st.returns['1M'])}${retCell('3M',st.returns['3M'])}${retCell('YTD',st.returns['YTD'])}${retCell('1Y',st.returns['1Y'])}${retCell('3Y',st.returns['3Y'])}</div>
+    <div class="wi-sect">Key stats</div>
+    <div class="wi-meta"><span><b>Volume</b> ${_fmtVol(st.volume)}</span><span><b>Avg Vol</b> ${_fmtVol(st.avgVolume)}</span><span><b>SMA50</b> $${st.sma50}</span></div>`:''}
+    <div class="wi-sect">About</div>
+    <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>`;
+  if(!_symNames[ticker] && kind==='Equity'){
+    fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
+      if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
+    }).catch(()=>{});
+  }
+  if(_symStats[ticker]===undefined){
+    _symStats[ticker]=null;   // in-flight
+    fetch('/api/trading/symbol-stats?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
+      _symStats[ticker]=j||{}; if(activeTicker===ticker) renderSymbolInfo(ticker);
+    }).catch(()=>{ _symStats[ticker]={}; });
+  }
 }
 
 function focusTicker(t){
   activeTicker = t;
   renderWatchlist();
+  renderSymbolInfo(t);
+  setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
+  if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
   openFullscreenChart(t);
 }
 
-// ── Fullscreen ticker chart ──────────────────────────────────────────────────
+// ── Zoom a ticker (#1629) ─────────────────────────────────────────────────────
+// Inline zoom: instead of a full-screen popup, expand the chart into the grid as a
+// single tall chart (reusing the 1-slot layout, #1628). A "← Back to grid" button
+// restores the previous layout.
+let _preZoomSlot = null;
 function openFullscreenChart(t){
+  if(_preZoomSlot===null) _preZoomSlot = slotCount;   // remember layout to restore
   fullscreenTicker = t;
-  document.getElementById('fsTicker').textContent = t;
-  document.getElementById('fsChartTypeSelect').value = chartType;
-  document.getElementById('fsChartTfSelect').value = chartTimeframe;
-  syncRangeButtons(chartTimeframe);
-  document.getElementById('fsBg').classList.remove('hidden');
-  renderFullscreenChart();
+  chartSlots = [t]; slotCount = 1;
+  const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value='1';
+  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='';
+  persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
+  try{ document.querySelector('.main').scrollTop = 0; }catch(e){}
 }
 
 function closeFullscreenChart(){
   fullscreenTicker = null;
-  document.getElementById('fsBg').classList.add('hidden');
+  slotCount = (_preZoomSlot!=null ? _preZoomSlot : 0); _preZoomSlot = null;
+  const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value=String(slotCount);
+  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='none';
+  document.getElementById('fsBg').classList.add('hidden');   // legacy popup (now unused)
+  persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
 }
 
 function renderFullscreenChart(){
@@ -1561,10 +1958,17 @@ document.addEventListener('mousemove', function(e){
   ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : 'grab';
 });
 
-document.addEventListener('mouseup', function(){
+document.addEventListener('mouseup', function(e){
   if(!_chartDrag) return;
-  _chartDrag.ladder.style.cursor = '';
+  const drag = _chartDrag;
+  drag.ladder.style.cursor = '';
   _chartDrag = null;
+  // A click (negligible movement — not a pan/zoom drag) on a chart switches the
+  // order panel to that chart's symbol, so BUY/SELL targets what you clicked.
+  if(Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) < 6 && drag.dataTicker){
+    setOrderSymbol(drag.dataTicker);
+    openOrderPanel();
+  }
 });
 
 // Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
@@ -1608,6 +2012,16 @@ async function addWatchlistTicker(){
   }
 }
 
+// Add a pre-validated symbol (chosen from the search popup, #1692) to the watchlist.
+async function addWatchlistSymbol(sym){
+  if(!sym) return;
+  try{
+    await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    renderCards();
+  }catch(e){}
+}
+
 async function removeWatchlistTicker(ticker, evt){
   if(evt) evt.stopPropagation();
   try{
@@ -1637,8 +2051,89 @@ async function loadZones(){
     });
     updateRegimeBadges();
     renderFullscreenChart();
+    renderSigma0Signals();
   }catch(e){ console.warn('zones load failed',e); }
   finally{ zonesLoading = false; }
+}
+
+// ── Σ₀ Signals: explicit "when to enter" instructions from the EV decision ────
+// Reads each ticker's last_signal.sigma0 (convergence_ev) and renders an
+// actionable entry instruction — direction, entry/stop/target, R:R, EV, p_win,
+// and the evidence — instead of merely tinting a BUY/SELL button. The engine
+// auto-executes ENTER signals; this is the human-readable narration of that.
+// Compact session/portfolio status for the Σ₀ panel (#1625) — the old Telegram
+// "Portfolio Update / Session Start" lines, but dense (no chat spacing): equity,
+// today P&L, open positions, market regime + open/closed, tickers scanned, cadence.
+const s0Status = { equity:null, pnl:null, positions:0, market:null, marketOpen:null };
+function renderS0StatusHtml(){
+  const pnl = s0Status.pnl||0;
+  const reg = s0Status.market || '—';
+  const dot = reg==='BULLISH'?'🟢':reg==='BEARISH'?'🔴':'⚪';
+  const openTxt = s0Status.marketOpen===false?' · closed':(s0Status.marketOpen?' · open':'');
+  const scanned = Object.keys(zonesData||{}).length;
+  return `<div class="s0-status">`+
+    `<span>💼 ${s0Status.equity!=null?'$'+fmt(s0Status.equity,0):'—'}</span>`+
+    `<span class="${pnl>=0?'pos':'neg'}">${pnl>=0?'▲':'▼'} ${pnl>=0?'+':'-'}$${fmt(Math.abs(pnl),0)} today</span>`+
+    `<span>${s0Status.positions?('📌 '+s0Status.positions+' open'):'📭 flat'}</span>`+
+    `<span>${dot} ${reg}${openTxt}</span>`+
+    `<span>⏱ ${scanned} scanned · 1m</span>`+
+  `</div>`;
+}
+function renderSigma0Signals(){
+  const el = document.getElementById('sigma0Signals');
+  if(!el) return;
+  const statusHtml = renderS0StatusHtml();
+  const enters = [];
+  Object.keys(zonesData||{}).forEach(t=>{
+    const s0 = (zonesData[t]&&zonesData[t].last_signal&&zonesData[t].last_signal.sigma0) || null;
+    if(!s0 || s0.decision !== 'ENTER') return;
+    const ins = s0.instruction || {};
+    const dir = String(ins.direction || zonesData[t].direction || '').toUpperCase();
+    enters.push({
+      ticker:t, isShort: dir==='BEARISH',
+      label: dir==='BULLISH'?'LONG':dir==='BEARISH'?'SHORT':'—',
+      entry:ins.entry, stop:ins.stop, target:ins.target, rr:ins.rr,
+      ev:s0.ev_r, p:s0.p_win, why:(s0.why||[]).join(', ')
+    });
+  });
+  enters.sort((a,b)=> (b.ev||0)-(a.ev||0));
+
+  // #1710: narrate what the agent is actively WATCHING — tickers with a direction
+  // that reached the EV gate (SKIP) or are sitting in a zone, so the panel shows
+  // live activity ("Looking for a LONG on TSLA …") even when nothing has fired.
+  const enterSet = new Set(enters.map(e=>e.ticker));
+  // Parse the latest Σ₀ decision lines from the agent feed (newest-first) — each
+  // SKIP line carries direction + p_win + why, so we narrate what's being evaluated.
+  const watching = [];
+  const seenW = new Set();
+  for(const l of (window._sigLogs || [])){
+    const body = String(l.body || l.action || '');
+    const m = body.match(/^([A-Z][\w.\/]*)\s+(LONG|SHORT)\s+EV\s+([+-]?\d+(?:\.\d+)?)R\s+p_win\s+(\d+(?:\.\d+)?)\b[^|]*?\bSKIP\b\s*\|?\s*(.*)$/);
+    if(!m) continue;
+    const tk = m[1];
+    if(seenW.has(tk) || enterSet.has(tk)) continue;
+    seenW.add(tk);
+    watching.push({ ticker:tk, isShort:m[2]==='SHORT', label:m[2], p:Math.round(parseFloat(m[4])*100), why:(m[5]||'').trim().slice(0,42) });
+  }
+  watching.sort((a,b)=> (b.p||0)-(a.p||0));
+
+  const entersHtml = enters.slice(0,6).map(i=>`
+    <div class="s0-sig${i.isShort?' short':''}">
+      <div class="s0-head">${i.label} ${newsEsc(i.ticker)} — ENTER @ $${i.entry}</div>
+      <div class="s0-lvl">stop $${i.stop} · target $${i.target} · R:R ${i.rr} · EV ${i.ev>=0?'+':''}${i.ev}R · win ${Math.round((i.p||0)*100)}%</div>
+      <div class="s0-why">${newsEsc(i.why)}</div>
+    </div>`).join('');
+  const watchHtml = watching.slice(0,6).map(w=>`
+    <div class="s0-watch${w.isShort?' short':''}">
+      <span class="s0-eye">👀</span> Looking for a <b>${w.label}</b> on <b>${newsEsc(w.ticker)}</b>${w.why?` — ${newsEsc(w.why)}`:''} · ${w.p}%
+    </div>`).join('');
+
+  if(!enters.length && !watching.length){
+    el.innerHTML = statusHtml + '<div class="s0-empty">Scanning every minute — no setups forming yet.</div>';
+    return;
+  }
+  el.innerHTML = statusHtml + entersHtml
+    + (watching.length ? `<div class="s0-watchhdr">Watching ${watching.length} setup${watching.length===1?'':'s'}</div>` + watchHtml : '');
 }
 
 let pricesLoading = false;
@@ -1651,7 +2146,20 @@ async function loadWatchlistPrices(){
     renderWatchlist();
     wlPrices.forEach(t=>{
       const el = document.getElementById('cp-'+t.ticker);
-      if(el) el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
+      if(el){
+        // Tick-flash (#1627): price stays its normal colour, but each time it
+        // changes it flashes green (up) / red (down) for ~1s, then fades back.
+        const prev = _lastCardPrice[t.ticker];
+        el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
+        if(prev!=null && t.price !== prev){
+          const cls = t.price > prev ? 'flash-up' : 'flash-down';
+          el.classList.remove('flash-up','flash-down');
+          void el.offsetWidth;                       // restart the animation
+          el.classList.add(cls);
+          setTimeout(()=>el.classList.remove(cls), 1000);
+        }
+        _lastCardPrice[t.ticker] = t.price;
+      }
       renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
     });
     updateRegimeBadges();
@@ -1661,6 +2169,35 @@ async function loadWatchlistPrices(){
 }
 
 let barsLoading = false;
+// ── Chart bar cache: stale-while-revalidate ──────────────────────────────────
+// Charts paint instantly from the last fetch (localStorage), then loadBars()
+// replaces it with live data. Keyed per timeframe — purely a paint speed-up, the
+// cache is never trusted as truth (a live fetch always follows). Cookies aren't
+// used here: they're 4KB-capped and ride every HTTP request, so bar data belongs
+// in localStorage, not cookies.
+const BARS_CACHE_TTL = 12*3600*1000;   // 12h
+function _saveBarsCache(){
+  try{
+    // Trim to the last ~220 bars/ticker — plenty for the instant paint (visible
+    // window is ~78), and keeps the cache small across timeframes. loadBars still
+    // fetches the full history a beat later.
+    const trimmed = {};
+    for(const k in barsData){ const a = barsData[k] || []; trimmed[k] = a.length > 220 ? a.slice(-220) : a; }
+    localStorage.setItem('trader.bars.'+chartTimeframe, JSON.stringify({ts:Date.now(), bars:trimmed}));
+  }catch(e){ /* quota exceeded → skip caching, no harm */ }
+}
+function _restoreBarsCache(){
+  try{
+    const c = JSON.parse(localStorage.getItem('trader.bars.'+chartTimeframe)||'null');
+    if(!c || !c.bars || (Date.now()-(c.ts||0)) > BARS_CACHE_TTL) return false;
+    barsData = c.bars;
+    return true;
+  }catch(e){ return false; }
+}
+function _paintFromCache(){
+  try{ (wlPrices||[]).forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price)); }catch(e){}
+  try{ renderFullscreenChart(); }catch(e){}
+}
 async function loadBars(){
   if(barsLoading) return;
   barsLoading = true;
@@ -1672,6 +2209,7 @@ async function loadBars(){
     for(const ticker of Object.keys(bars)){
       barsData[ticker] = bars[ticker].bars || [];
     }
+    _saveBarsCache();                       // persist for instant paint next time
     wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
     updateRegimeBadges();
     renderFullscreenChart();
@@ -1689,8 +2227,13 @@ function changeChartType(type){
 
 function changeTimeframe(tf){
   chartTimeframe = tf;
+  try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
   document.getElementById('chartTfSelect').value = tf;
   document.getElementById('fsChartTfSelect').value = tf;
+  // #1699: reset every chart's visible window so the new timeframe's default
+  // (one range-label's worth of candles) takes effect instead of carrying over.
+  Object.values(chartView).forEach(v=>{ v.visibleBars=null; v.barOffset=0; v.gVis=null; v.gOff=null; });
+  if(_restoreBarsCache()) _paintFromCache();    // instant paint from cache; loadBars refreshes
   syncRangeButtons(tf);
   loadBars();
 }
@@ -1707,6 +2250,71 @@ function syncRangeButtons(tf){
   });
 }
 
+// ── TradingView-style trading panel (#1712) ───────────────────────────────────
+function tpTab(name){
+  document.querySelectorAll('.tp-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.tp-pane').forEach(p=>p.classList.toggle('active', p.id==='tp-'+name));
+}
+function renderTpSummary(a){
+  const el=document.getElementById('tpSummary'); if(!el) return;
+  a=a||{};
+  const cell=(l,v,cls)=>`<div class="tp-stat"><div class="l">${l}</div><div class="v ${cls||''}">${v}</div></div>`;
+  const money=(v)=> v==null?'—':'$'+fmt(v,2);
+  const signed=(v)=> v==null?'—':(v>=0?'+':'-')+'$'+fmt(Math.abs(v),2);
+  const cls=(v)=> v>0?'pos':v<0?'neg':'';
+  el.innerHTML =
+    cell('Account balance', money(a.cash)) +
+    cell('Equity', money(a.equity)) +
+    cell('Realized P&L', signed(a.realized_today), cls(a.realized_today)) +
+    cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized)) +
+    cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today)) +
+    cell('Buying power', money(a.buying_power));
+}
+function renderPositionsTable(positions){
+  const el=document.getElementById('tp-positions'); if(!el) return;
+  const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).length;
+  if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
+  el.innerHTML = `<table class="tp-table"><thead><tr>
+    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th></tr></thead><tbody>`+
+    positions.map(p=>{
+      const side=(p.side||'long').toLowerCase();
+      const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0;
+      const c=pnl>=0?'var(--green)':'var(--red)';
+      return `<tr>
+        <td><span class="tp-sym" onclick="focusTicker('${p.symbol}')">${p.symbol}</span></td>
+        <td class="tp-side ${side==='short'?'short':'long'}">${side==='short'?'Short':'Long'}</td>
+        <td>${p.qty}</td><td>$${fmt(p.avg_entry_price,2)}</td><td>$${fmt(p.current_price,2)}</td>
+        <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
+        <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
+        <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+// Broker timestamps arrive in UTC ("2026-06-30 13:33:19+00:00"); show them in ET
+// so they line up with the agent feed. Time-only for today, +date for older.
+function _fmtOrderTime(s){
+  if(!s) return '—';
+  const d=new Date(String(s).replace(' ','T'));
+  if(isNaN(d)) return s;
+  const tz={timeZone:'America/New_York'};
+  const time=d.toLocaleTimeString('en-US',{...tz,hour:'numeric',minute:'2-digit',second:'2-digit'});
+  const day=d.toLocaleDateString('en-US',tz), today=new Date().toLocaleDateString('en-US',tz);
+  return day===today ? time : d.toLocaleDateString('en-US',{...tz,month:'short',day:'numeric'})+' '+time;
+}
+function renderOrders(orders){
+  const openEl=document.getElementById('tp-orders'), histEl=document.getElementById('tp-history');
+  const arr=Array.isArray(orders)?orders:[];
+  const row=(o)=>`<tr>
+    <td><span class="tp-sym" onclick="focusTicker('${o.symbol}')">${o.symbol}</span></td>
+    <td class="tp-side ${o.side==='buy'?'long':'short'}">${(o.side||'').toUpperCase()}</td>
+    <td>${o.qty}</td><td>${o.type||'market'}</td><td>${o.limit_price?'$'+fmt(o.limit_price,2):'—'}</td>
+    <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}</td>
+    <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td></tr>`;
+  const tbl=(rows)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
+  const isOpen=(o)=>['new','accepted','pending','open','partially_filled'].includes((o.status||'').toLowerCase());
+  if(openEl) openEl.innerHTML = tbl(arr.filter(isOpen).map(row).join(''));
+  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!isOpen(o)).slice(0,30).map(row).join(''));
+}
+
 async function loadPortfolio(){
   try{
     const r  = await fetch('/api/trading/positions');
@@ -1718,6 +2326,10 @@ async function loadPortfolio(){
     pe.textContent = (pnl>=0?'+':'')+'$'+fmt(Math.abs(pnl),0);
     pe.className   = 'v '+(pnl>=0?'pos':'neg');
     document.getElementById('hPos').textContent = (d.positions||[]).length;
+    s0Status.equity = a.equity; s0Status.pnl = pnl; s0Status.positions = (d.positions||[]).length;
+    renderSigma0Signals();
+    renderTpSummary(a);                     // #1712
+    renderPositionsTable(d.positions||[]);
   }catch(e){}
 }
 
@@ -1727,8 +2339,9 @@ async function loadMarketStatus(){
     const d = await r.json();
     document.getElementById('hVix').textContent = d.vix ? d.vix+' '+d.vix_regime : '—';
     document.getElementById('hMkt').textContent = d.market||'—';
+    s0Status.market = d.market; s0Status.marketOpen = d.market_open; renderSigma0Signals();
     const ms = document.getElementById('mktStatus');
-    ms.innerHTML = `
+    if(ms) ms.innerHTML = `
       <div class="mkt-row"><span class="mkt-label">VIX</span><span class="mkt-val">${d.vix||'—'} (${d.vix_regime||'—'})</span></div>
       <div class="mkt-row"><span class="mkt-label">Market</span><span class="mkt-val">${d.market||'—'}</span></div>
       <div class="mkt-row"><span class="mkt-label">SPY 1D</span><span class="mkt-val" style="color:${(d.spy_1d||0)>=0?'var(--green)':'var(--red)'}">${fmtPct(d.spy_1d)}</span></div>
@@ -1743,10 +2356,14 @@ async function loadAgentLog(){
   try{
     const r = await fetch('/api/trading/agent-log');
     const logs = await r.json();
-    if(!Array.isArray(logs)||logs.length===lastLogLen) return;
+    window._sigLogs = Array.isArray(logs) ? logs : [];   // #1710: feed the watching narration
+    if(!Array.isArray(logs)||logs.length===lastLogLen){ renderSigma0Signals(); return; }
     lastLogLen = logs.length;
+    renderSigma0Signals();
     const cls = {grok:'log-grok',claude:'log-claude',risk:'log-risk',system:'log-system',trail:'log-trail'};
-    document.getElementById('agentLog').innerHTML = [...logs].reverse().map(l=>`
+    // Newest first (#1626): the API returns newest-first, so render as-is (the old
+    // .reverse() put the latest scans at the BOTTOM, forcing a scroll to see them).
+    document.getElementById('agentLog').innerHTML = [...logs].map(l=>`
       <div class="log-item">
         <span class="log-time">${l.time||''}</span>
         <span class="log-agent ${cls[l.type]||'log-system'}">${(l.agent||'').slice(0,8)}</span>
@@ -1759,18 +2376,7 @@ async function loadOrders(){
   try{
     const r = await fetch('/api/trading/orders');
     const orders = await r.json();
-    if(!Array.isArray(orders)||!orders.length){
-      document.getElementById('orders').innerHTML = '<div style="font-family:var(--mono);font-size:9px;color:var(--text2)">No recent orders</div>';
-      return;
-    }
-    document.getElementById('orders').innerHTML = orders.slice(0,8).map(o=>`
-      <div class="order-row">
-        <span style="color:${o.side==='buy'?'var(--green)':'var(--red)'}">${o.side.toUpperCase()}</span>
-        <span>${o.symbol}</span>
-        <span style="color:var(--text2)">${o.qty}</span>
-        <span style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status}</span>
-        <span style="color:var(--text2)">${o.filled_at||'—'}</span>
-      </div>`).join('');
+    renderOrders(orders);                   // #1712: Orders + Order history tabs
   }catch(e){}
 }
 
@@ -1788,33 +2394,6 @@ function relTime(iso){
   if(hrs < 24) return hrs+'h ago';
   return Math.round(hrs/24)+'d ago';
 }
-async function loadMarketNews(){
-  const el = document.getElementById('marketNews');
-  if(!el) return;
-  try{
-    const r = await fetch('/api/trading/news/recent?limit=12');
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d = await r.json();
-    const items = Array.isArray(d.records) ? d.records : [];
-    if(!items.length){ el.innerHTML = '<div class="news-empty">No market news yet</div>'; return; }
-    el.innerHTML = items.map(n => {
-      const head = newsEsc(n.headline || n.title || 'Untitled');
-      const src  = newsEsc(n.source || 'Yahoo Finance');
-      const when = relTime(n.published || n.date || n.recorded_at);
-      const syms = Array.isArray(n.symbols) && n.symbols.length ? ' · '+newsEsc(n.symbols.slice(0,3).join(' ')) : '';
-      const hot  = (n.impact_score||n.impact||0) >= 75 ? ' <span class="news-impact">●</span>' : '';
-      const url  = n.url ? newsEsc(n.url) : '';
-      const meta = `${src}${when?' · '+when:''}${syms}${hot}`;
-      const inner = `<span class="news-head">${head}</span><span class="news-meta">${meta}</span>`;
-      return url
-        ? `<a class="news-item" href="${url}" target="_blank" rel="noopener noreferrer">${inner}</a>`
-        : `<div class="news-item">${inner}</div>`;
-    }).join('');
-  }catch(e){
-    el.innerHTML = '<div class="news-empty">News feed offline</div>';
-  }
-}
-
 // ── Full refresh (every 30s) ──────────────────────────────────────────────────
 async function fullRefresh(){
   await Promise.all([loadZones(), loadWatchlistPrices(), loadPortfolio(), loadMarketStatus()]);
@@ -1822,19 +2401,133 @@ async function fullRefresh(){
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// Drag-to-resize the bottom panel section (#1630). The footer row height is a CSS
+// var on .layout; the handle drags it between 120px and 75vh, and it persists.
+function initFooterResize(){
+  const handle = document.getElementById('footerResize');
+  const layout = document.querySelector('.layout');
+  if(!handle || !layout) return;
+  const saved = parseInt(localStorage.getItem('trader.footerH')||'',10);
+  if(saved>0) layout.style.setProperty('--footer-h', saved+'px');
+  let dragging=false;
+  const onMove=(e)=>{
+    if(!dragging) return;
+    const y = (e.touches&&e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    const h = Math.max(120, Math.min(window.innerHeight*0.75, window.innerHeight - y));
+    layout.style.setProperty('--footer-h', h+'px');
+  };
+  const onUp=()=>{
+    if(!dragging) return;
+    dragging=false; document.body.classList.remove('resizing-footer');
+    const px = parseInt(layout.style.getPropertyValue('--footer-h'),10);
+    if(px>0){ try{ localStorage.setItem('trader.footerH', String(px)); }catch(e){} }
+    window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchmove',onMove); window.removeEventListener('touchend',onUp);
+  };
+  const start=(e)=>{ e.preventDefault(); dragging=true; document.body.classList.add('resizing-footer');
+    window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchmove',onMove,{passive:false}); window.addEventListener('touchend',onUp); };
+  handle.addEventListener('mousedown',start);
+  handle.addEventListener('touchstart',start,{passive:false});
+}
+
+// Drag-to-reorder chart slots in fixed layouts. Delegated on the grid (survives
+// re-renders); only the ⠿ handle initiates a drag, so chart pan/zoom still works.
+let _dragWlTk = null;   // a watchlist symbol being dragged onto a chart (#1700)
+function initChartDrag(){
+  const grid = document.getElementById('cardsGrid');
+  if(!grid || grid._dragInit) return;
+  grid._dragInit = true;
+  let dragTk = null;
+  const clear = ()=> grid.querySelectorAll('.card.dragging,.card.drag-over').forEach(c=>c.classList.remove('dragging','drag-over'));
+
+  // Watchlist → chart: dragging a watchlist row onto a chart slot switches THAT
+  // slot to the dragged symbol (others unchanged). Delegated on the list.
+  const wlList = document.getElementById('wlList');
+  if(wlList){
+    wlList.addEventListener('dragstart', (e)=>{
+      const item = e.target.closest('.wl-item');
+      if(!item){ return; }
+      _dragWlTk = item.dataset.wlTicker;
+      e.dataTransfer.effectAllowed = 'copy';
+      try{ e.dataTransfer.setData('text/plain', _dragWlTk||''); }catch(_){}
+    });
+    wlList.addEventListener('dragend', ()=>{ _dragWlTk = null; clear(); });
+  }
+
+  grid.addEventListener('dragstart', (e)=>{
+    const h = e.target.closest('.drag-handle');
+    if(!h || !slotCount){ return; }
+    const card = h.closest('.card'); dragTk = card && card.dataset.ticker;
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', dragTk||''); }catch(_){}
+    if(card) card.classList.add('dragging');
+  });
+  grid.addEventListener('dragend', ()=>{ clear(); dragTk = null; });
+  grid.addEventListener('dragover', (e)=>{
+    if((!dragTk && !_dragWlTk) || !slotCount) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = _dragWlTk ? 'copy' : 'move';
+    const over = e.target.closest('.card');
+    grid.querySelectorAll('.card.drag-over').forEach(c=>c.classList.remove('drag-over'));
+    if(over && over.dataset.ticker !== dragTk) over.classList.add('drag-over');
+  });
+  grid.addEventListener('drop', (e)=>{
+    if((!dragTk && !_dragWlTk) || !slotCount) return;
+    e.preventDefault();
+    const over = e.target.closest('.card');
+    if(over){
+      const dropTk = over.dataset.ticker;
+      if(_dragWlTk){
+        // #1700: replace this slot with the dragged watchlist symbol
+        const idx = chartSlots.indexOf(dropTk);
+        if(idx >= 0 && dropTk !== _dragWlTk){ chartSlots[idx] = _dragWlTk; persistSlots(); lastCardOrder=''; renderCards(); }
+      } else if(dragTk){
+        const i = chartSlots.indexOf(dragTk), j = chartSlots.indexOf(dropTk);
+        if(dropTk && dropTk!==dragTk && i>=0 && j>=0){ chartSlots[i]=dropTk; chartSlots[j]=dragTk; persistSlots(); lastCardOrder=''; renderCards(); }
+      }
+    }
+    clear(); dragTk = null; _dragWlTk = null;
+  });
+}
+
 function startDashboard(){
+  _restoreBarsCache();          // preload cached bars so the first chart render paints instantly
+  // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
+  // from localStorage at init).
+  ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
   syncRangeButtons(chartTimeframe);
+  initFooterResize();
+  initChartDrag();
+  // #1694: order panel is open by default (for the active/first symbol) once data
+  // loads, unless the user closes it with X.
+  setTimeout(()=>{ if(!otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); } }, 1600);
+  // Restore the saved chart-grid layout (#1628).
+  const ls = document.getElementById('chartLayoutSelect');
+  if(ls){ ls.value = String(slotCount); }
+  applyGridCols();
   fullRefresh();
   loadBars();
   loadAgentLog();
   loadOrders();
-  loadMarketNews();
+  refreshOvernightScan();
   setInterval(fullRefresh,         30000);
-  setInterval(loadWatchlistPrices,  5000);
+  setInterval(loadWatchlistPrices,  3000);   // #1627: tighter so the tick-flash is responsive
   setInterval(loadBars,            15000);
   setInterval(loadAgentLog,         5000);
   setInterval(loadOrders,          60000);
-  setInterval(loadMarketNews,     120000);
+  setInterval(refreshOvernightScan, 60000);  // reflect the auto-reset at market open
+}
+// 🌙 Overnight (market-closed) crypto scanning toggle (#1714)
+function _setOvnBtn(on){
+  const b=document.getElementById('ovnToggle'); if(!b) return;
+  b.textContent='🌙 Overnight '+(on?'ON':'OFF');
+  b.classList.toggle('ovn-on', !!on);
+}
+async function refreshOvernightScan(){
+  try{ const j=await (await fetch('/api/trading/overnight-scan')).json(); _setOvnBtn(j.enabled); }catch(e){}
+}
+async function toggleOvernightScan(){
+  try{ const j=await (await fetch('/api/trading/overnight-scan?set=toggle',{method:'POST'})).json(); _setOvnBtn(j.enabled); }catch(e){}
 }
 document.addEventListener('DOMContentLoaded', startDashboard);
 
