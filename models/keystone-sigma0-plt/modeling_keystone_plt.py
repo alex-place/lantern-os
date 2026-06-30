@@ -65,12 +65,12 @@ class KeystoneRMSNorm(nn.Module):
         self.variance_epsilon = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        dtype = x.dtype
+        # canonical Llama RMSNorm: variance in fp32, cast back, then scale.
+        input_dtype = x.dtype
         x = x.to(torch.float32)
         var = x.pow(2).mean(-1, keepdim=True)
         x = x * torch.rsqrt(var + self.variance_epsilon)
-        return (self.weight * x.to(dtype)) if self.weight.dtype != torch.float32 \
-            else (self.weight * x).to(dtype)
+        return self.weight * x.to(input_dtype)
 
 
 def _rope_cos_sin(positions: torch.Tensor, head_dim: int, theta: float,
