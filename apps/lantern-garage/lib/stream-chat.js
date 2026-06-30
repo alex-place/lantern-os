@@ -116,10 +116,16 @@ function _extractRunnable(reply) {
 // underlying call finishes (and self-times-out) in the background.
 const GROUNDING_TIMEOUT_MS = parseInt(process.env.GROUNDING_TIMEOUT_MS, 10) || 4000;
 
-// Σ₀ council execution check. OFF by default — it runs model-authored code in a sandbox,
-// which is an operator-gated security decision (SECURITY.md). Set COUNCIL_EXEC_VERIFY=1 to
-// let a coding reply's own asserts decide grounded-vs-refuted on real execution.
-const COUNCIL_EXEC_VERIFY = process.env.COUNCIL_EXEC_VERIFY === "1";
+// Σ₀ council execution check. ON by default — when a coding reply carries runnable code + a
+// check, RUN it so the reply's own asserts (not the model's self-judgment) decide
+// grounded-vs-refuted. This is the dominant grounding anchor; leaving it off kept the council's
+// verify-face text-only. The sandbox is shell-free, temp-dir isolated, hard-timed, output-capped,
+// and runs with a MINIMAL env that strips every API key (lib/exec-verify.js) — that isolation is
+// what makes default-on defensible on the local single-operator surface. Set COUNCIL_EXEC_VERIFY=0
+// to disable on shared/multi-tenant surfaces where running model-authored code is unacceptable
+// (SECURITY.md: prompt-injection could still steer the model to emit network/FS-touching code,
+// though it cannot read secrets).
+const COUNCIL_EXEC_VERIFY = process.env.COUNCIL_EXEC_VERIFY !== "0";
 const COUNCIL_EXEC_TIMEOUT_MS = parseInt(process.env.COUNCIL_EXEC_TIMEOUT_MS, 10) || 8000;
 function withTimeout(promise, ms, fallback) {
   return Promise.race([
