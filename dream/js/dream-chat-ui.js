@@ -766,6 +766,54 @@ function renderAutoworkActions(fin, prUrl, issue, btn, base) {
   fin.appendChild(bar);
 }
 
+// In-chat accept/reject for a pull request being REVIEWED (#1503 follow-up). The
+// `!review #N` / `!prs` flow renders a diff + verdict but, until now, offered no way
+// to act on it — so "review a PR in chat, then accept it in chat" dead-ended at
+// GitHub. This attaches the same Approve / Discard actions the autowork run panel
+// gives a fresh draft PR (POST /api/convergence/pr-action), keyed by PR number, to
+// ANY reviewed PR — closing the work → review → accept loop in one surface. No Rework
+// button here: a bare PR review isn't tied to a known issue/run to re-drive.
+function renderPrReviewActions(container, prNum, base) {
+  if (!container || !prNum) return;
+  if (container.querySelector('.pr-review-actions')) return;   // don't double-render on re-render
+  base = base || ((typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+  const prUrl = `https://github.com/alex-place/lantern-os/pull/${prNum}`;
+  const bar = document.createElement('div');
+  bar.className = 'pr-review-actions';
+  bar.style.cssText = 'margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+  const mk = (label, title, color) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label; b.title = title;
+    b.style.cssText = `font:600 11px var(--font-sans,sans-serif);padding:4px 10px;border-radius:8px;border:1px solid ${color};background:transparent;color:${color};cursor:pointer`;
+    return b;
+  };
+  const approve = mk('✓ Approve & merge', 'Mark ready for review & squash-merge', '#4ade80');
+  const discard = mk('✕ Discard', 'Close the PR & delete its branch', '#f87171');
+  const all = [approve, discard];
+  const setMsg = (txt, color) => {
+    let m = bar.querySelector('.pr-action-msg');
+    if (!m) { m = document.createElement('span'); m.className = 'pr-action-msg'; m.style.cssText = 'font-size:11px;margin-left:4px'; bar.appendChild(m); }
+    m.style.color = color || ''; m.textContent = txt;
+  };
+  async function doAction(action, confirmText) {
+    if (!window.confirm(confirmText)) return;
+    all.forEach(b => b.disabled = true);
+    setMsg('Working…', '');
+    try {
+      const r = await (await fetch(`${base}/api/convergence/pr-action`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pr: prNum, action }),
+      })).json();
+      if (r && r.ok) { setMsg('✓ ' + (r.message || 'Done'), '#4ade80'); approve.remove(); discard.remove(); }
+      else { setMsg('✗ ' + ((r && r.error) || 'Failed'), '#f87171'); all.forEach(b => b.disabled = false); }
+    } catch (e) { setMsg('✗ ' + (e && e.message || 'request failed'), '#f87171'); all.forEach(b => b.disabled = false); }
+  }
+  approve.onclick = () => doAction('approve', `Approve and squash-merge PR #${prNum}?\n\n${prUrl}`);
+  discard.onclick = () => doAction('discard', `Discard (close) PR #${prNum} and delete its branch?\n\n${prUrl}`);
+  all.forEach(b => bar.appendChild(b));
+  container.appendChild(bar);
+}
+
 // `target` is either an issue number (number/numeric string — `!work #N`) or a
 // free-form task object `{ task: "fix the intent handler" }` from the chat
 // "Run as autowork" button. Task mode files a GitHub issue first (server-side),
@@ -2186,6 +2234,15 @@ async function sendMessage(opts = {}) {
     }
   }
 
+  // In-chat PR review (#1503 follow-up): when this turn was a `!review #N` (the server
+  // tags the done event source "review"), attach Approve / Discard so the user can
+  // accept or reject the reviewed PR without leaving chat — closing the
+  // work → review → accept loop in one surface. PR number comes from the sent text.
+  if (doneProvider === 'review' && !didError) {
+    const _prm = String(text || '').match(/#?(\d+)/);
+    if (_prm) renderPrReviewActions(bubble, parseInt(_prm[1], 10), (typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+  }
+
   // Signature line: always show a human-readable label + time. Raw provider/model id
   // goes in a collapsed <details> so curious users can inspect it without it cluttering
   // every reply for normal users. (#1141)
@@ -2439,7 +2496,6 @@ document.getElementById('input').addEventListener('input', e => {
       // Try to set the selected provider
       if (select.querySelector(`option[value="${provider}"]`)) {
         select.value = provider;
-        console.log(`[dream-chat] Provider set to: ${provider}`);
       } else if (provider !== 'auto') {
         // Provider not available; log but don't break
         console.warn(`[dream-chat] Requested provider '${provider}' not available, using router default`);
