@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.124] - 2026-06-30
+- feat(verify): symptom journal with calibrated honesty / cite-or-abstain (#1435). Adds `apps/lantern-garage/routes/health.js` (+ `test/health-journal.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn/replay/preferences/finance routes. Improves the **Verify** stage: logs symptoms and answers with calibrated honesty — cites sources or abstains rather than guessing about health. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.123] - 2026-06-29
 - feat(reason+verify): personal financial reasoning cockpit (#1434). Adds `apps/lantern-garage/routes/finance.js` (+ `test/financial-cockpit.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn/replay/preferences routes. Improves the **Reason** + **Verify** stages: reasons over personal financial data and surfaces evidence-grounded answers. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 

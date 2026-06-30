@@ -181,6 +181,7 @@ const routes = [
   require("./routes/replay"),           // #1419: convergence replay / time-travel debugger
   require("./routes/preferences"),      // #1426: retrieval-based personal preference model
   require("./routes/finance"),          // #1434: personal financial reasoning cockpit
+  require("./routes/health"),           // #1435: symptom journal with calibrated honesty
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),
