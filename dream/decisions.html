@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Decision Journal — Keystone OS</title>
+  <style>
+    /* Decisions, remembered and graded (#1436): log a confident call, grade it later,
+       see your calibration. */
+    .d-wrap { max-width: 880px; margin: 0 auto; padding: 18px 16px 60px; }
+    .d-head h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .d-head p { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    label { display: block; font-size: 12px; color: var(--muted, #9aa0aa); margin: 0 0 4px; }
+    input, textarea, select { width: 100%; box-sizing: border-box; background: var(--surface2, rgba(255,255,255,.05));
+      color: var(--text, #e5e7eb); border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 9px;
+      padding: 8px 10px; font-size: 14px; font-family: inherit; }
+    textarea { min-height: 56px; resize: vertical; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .row > div { flex: 1; min-width: 140px; }
+    .conf-val { color: var(--text, #e5e7eb); font-weight: 600; }
+    .btn { background: var(--accent, #06b6d4); color: #06222a; border: none; border-radius: 9px; padding: 9px 16px;
+      font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn.ghost { background: transparent; border: 1px solid var(--border, rgba(255,255,255,.2)); color: var(--text, #e5e7eb); }
+    .calib { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center; }
+    .calib .big { font-size: 30px; font-weight: 700; }
+    .calib .sum { font-size: 13px; line-height: 1.5; color: var(--muted, #9aa0aa); }
+    .bkt { display: grid; grid-template-columns: 64px 1fr 1fr; gap: 8px; font-size: 12px; align-items: center; margin-top: 6px; }
+    .bkt .lbl { color: var(--muted, #9aa0aa); }
+    .bar { height: 7px; border-radius: 4px; background: var(--surface2, rgba(255,255,255,.08)); overflow: hidden; }
+    .bar > i { display: block; height: 100%; }
+    .tag { display: inline-block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border-radius: 5px;
+      padding: 2px 7px; }
+    .t-career { color:#38bdf8; background:rgba(56,189,248,.12);} .t-money{color:#4ade80;background:rgba(74,222,128,.12);}
+    .t-relationship{color:#f472b6;background:rgba(244,114,182,.12);} .t-health{color:#f59e0b;background:rgba(245,158,11,.12);}
+    .t-home{color:#a78bfa;background:rgba(167,139,250,.12);} .t-other{color:#9aa0aa;background:rgba(255,255,255,.08);}
+    .dec { border-left: 3px solid var(--border, rgba(255,255,255,.14)); padding-left: 12px; margin-bottom: 14px; }
+    .dec.good { border-left-color: #4ade80; } .dec.bad { border-left-color: #f87171; } .dec.mixed { border-left-color: #f59e0b; }
+    .dec .title { font-size: 15px; font-weight: 600; color: var(--text, #e5e7eb); }
+    .dec .meta { font-size: 12px; color: var(--muted, #9aa0aa); margin: 3px 0; }
+    .dec .why { font-size: 13px; color: var(--text, #d8dce2); line-height: 1.45; margin: 4px 0; }
+    .dec .grade { font-size: 11px; font-weight: 600; }
+    .grade.overconfident { color: #f59e0b; } .grade.underconfident { color: #38bdf8; } .grade\.well-calibrated { color: #4ade80; }
+    .resolve { display: flex; gap: 6px; margin-top: 6px; }
+    .resolve button { font-size: 11px; padding: 4px 9px; border-radius: 7px; border: 1px solid var(--border, rgba(255,255,255,.18));
+      background: transparent; cursor: pointer; }
+    .resolve .good { color: #4ade80; border-color: #4ade80; } .resolve .mixed { color: #f59e0b; border-color: #f59e0b; }
+    .resolve .bad { color: #f87171; border-color: #f87171; }
+    h2 { font-size: 14px; color: var(--text, #e5e7eb); margin: 22px 0 10px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/grounding-diff.html">Grounding</a>
+      <a href="/decisions.html" class="active">Decisions</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="d-wrap">
+    <div class="d-head">
+      <h1>Decision Journal</h1>
+      <p>Log a real decision — a job offer, a move, a big purchase — with how confident you are it's the right call. Months later, mark how it turned out. Over time you'll see whether your confident gut calls are actually good, or whether you run over- or under-confident.</p>
+    </div>
+
+    <div class="card">
+      <label for="title">The decision</label>
+      <input id="title" placeholder="e.g. Take the job at Acme over staying put">
+      <div class="row" style="margin-top:10px">
+        <div><label for="category">Category</label><select id="category">
+          <option value="career">career</option><option value="money">money</option><option value="relationship">relationship</option>
+          <option value="health">health</option><option value="home">home</option><option value="other" selected>other</option>
+        </select></div>
+        <div><label for="confidence">Confidence it's the right call: <span class="conf-val" id="confval">70%</span></label>
+          <input id="confidence" type="range" min="0" max="100" value="70" oninput="document.getElementById('confval').textContent=this.value+'%'"></div>
+      </div>
+      <label for="rationale">Why (your reasoning)</label>
+      <textarea id="rationale" placeholder="What's driving the call?"></textarea>
+      <label for="expected" style="margin-top:10px">What you expect to happen</label>
+      <textarea id="expected" placeholder="The outcome you're betting on"></textarea>
+      <div style="margin-top:10px"><button class="btn" id="save">Log decision</button></div>
+    </div>
+
+    <div class="card" id="calibCard" style="display:none">
+      <h2 style="margin-top:0">Your calibration</h2>
+      <div class="calib">
+        <div><div class="big" id="calibBig">—</div><div class="sum" id="calibSum"></div></div>
+        <div id="buckets"></div>
+      </div>
+    </div>
+
+    <h2>Open decisions</h2>
+    <div id="open"></div>
+    <h2>Resolved</h2>
+    <div id="resolved"></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    function pctOf(x) { return x == null ? '—' : Math.round(x * 100) + '%'; }
+
+    function decCard(d) {
+      var out = d.status === 'resolved' ? (d.outcome || '') : '';
+      var grade = d.grade ? '<span class="grade ' + esc(d.grade.verdict) + '">' + esc(d.grade.verdict) + '</span>' : '';
+      var resolveBtns = d.status === 'open'
+        ? '<div class="resolve">How did it turn out? '
+            + ['good', 'mixed', 'bad'].map(function (o) { return '<button class="' + o + '" data-id="' + esc(d.id) + '" data-o="' + o + '">' + o + '</button>'; }).join('') + '</div>'
+        : '<div class="meta">Outcome: <b>' + esc(d.outcome) + '</b> · you were ' + pctOf(d.confidence) + ' confident ' + grade + '</div>';
+      return '<div class="dec ' + esc(out) + '"><div class="title">' + esc(d.title) + '</div>'
+        + '<div class="meta"><span class="tag t-' + esc(d.category) + '">' + esc(d.category) + '</span> · '
+        + pctOf(d.confidence) + ' confident · ' + esc((d.createdAt || '').slice(0, 10)) + '</div>'
+        + (d.rationale ? '<div class="why">' + esc(d.rationale) + '</div>' : '')
+        + resolveBtns + '</div>';
+    }
+
+    function renderCalib(c) {
+      if (!c || c.status !== 'ok') { document.getElementById('calibCard').style.display = 'none'; return; }
+      document.getElementById('calibCard').style.display = '';
+      document.getElementById('calibBig').textContent = pctOf(c.goodCallRate) + ' good calls';
+      document.getElementById('calibSum').textContent = c.summary;
+      document.getElementById('buckets').innerHTML = '<div class="bkt"><span class="lbl">said</span><span class="lbl">predicted</span><span class="lbl">actual</span></div>'
+        + c.buckets.map(function (b) {
+            return '<div class="bkt"><span class="lbl">' + esc(b.range) + '</span>'
+              + '<span><div class="bar"><i style="width:' + Math.round(b.predicted * 100) + '%;background:#38bdf8"></i></div></span>'
+              + '<span><div class="bar"><i style="width:' + Math.round(b.actual * 100) + '%;background:#4ade80"></i></div></span></div>';
+          }).join('');
+    }
+
+    async function load() {
+      var r = await fetch('/api/decisions').then(function (x) { return x.json(); });
+      var decisions = (r && r.decisions) || [];
+      document.getElementById('open').innerHTML = decisions.filter(function (d) { return d.status === 'open'; }).map(decCard).join('') || '<div class="meta" style="color:var(--muted)">No open decisions — log one above.</div>';
+      document.getElementById('resolved').innerHTML = decisions.filter(function (d) { return d.status === 'resolved'; }).map(decCard).join('') || '<div class="meta" style="color:var(--muted)">None graded yet.</div>';
+      renderCalib(r && r.calibration);
+      document.querySelectorAll('.resolve button').forEach(function (b) {
+        b.addEventListener('click', function () { resolve(b.getAttribute('data-id'), b.getAttribute('data-o')); });
+      });
+    }
+
+    async function save() {
+      var body = {
+        title: document.getElementById('title').value.trim(),
+        category: document.getElementById('category').value,
+        confidence: parseInt(document.getElementById('confidence').value, 10) / 100,
+        rationale: document.getElementById('rationale').value.trim(),
+        expectedOutcome: document.getElementById('expected').value.trim(),
+      };
+      if (!body.title) return;
+      await fetch('/api/decisions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      document.getElementById('title').value = ''; document.getElementById('rationale').value = ''; document.getElementById('expected').value = '';
+      load();
+    }
+    async function resolve(id, outcome) {
+      await fetch('/api/decisions/' + encodeURIComponent(id) + '/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ outcome: outcome }) });
+      load();
+    }
+    document.getElementById('save').addEventListener('click', save);
+    load();
+  </script>
+</body>
+</html>

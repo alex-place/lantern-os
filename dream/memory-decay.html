@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Decaying Memory — Keystone OS</title>
+  <style>
+    /* Confidence-decay memory (#1422): facts lose confidence on a forgetting curve until
+       re-grounded; the retriever down-ranks stale ones. */
+    .m-wrap { max-width: 820px; margin: 0 auto; padding: 18px 16px 60px; }
+    .m-head h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .m-head p { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    textarea, input { width: 100%; box-sizing: border-box; background: var(--surface2, rgba(255,255,255,.05));
+      color: var(--text, #e5e7eb); border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 9px;
+      padding: 9px 11px; font-size: 14px; font-family: inherit; }
+    textarea { min-height: 52px; resize: vertical; }
+    .btn { background: var(--accent, #06b6d4); color: #06222a; border: none; border-radius: 9px; padding: 8px 15px;
+      font-size: 14px; font-weight: 600; cursor: pointer; }
+    .mem { display: grid; grid-template-columns: 1fr 150px auto; gap: 12px; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.07)); }
+    .mem .txt { font-size: 14px; color: var(--text, #e5e7eb); line-height: 1.4; }
+    .mem .sub { font-size: 11px; color: var(--muted, #9aa0aa); margin-top: 3px; }
+    .conf .bar { height: 8px; border-radius: 5px; background: var(--surface2, rgba(255,255,255,.08)); overflow: hidden; }
+    .conf .bar > i { display: block; height: 100%; border-radius: 5px; }
+    .conf .lbl { font-size: 11px; margin-top: 3px; }
+    .fresh { color: #4ade80; } .aging { color: #f59e0b; } .stale { color: #f87171; }
+    .reground { font-size: 12px; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--accent, #06b6d4);
+      background: transparent; color: var(--accent, #06b6d4); cursor: pointer; white-space: nowrap; }
+    .empty { color: var(--muted, #9aa0aa); font-size: 13px; padding: 16px 0; }
+    .row { display: flex; gap: 10px; align-items: flex-end; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/grounding-diff.html">Grounding</a>
+      <a href="/memory-decay.html" class="active">Memory</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="m-wrap">
+    <div class="m-head">
+      <h1>Decaying Memory</h1>
+      <p>Facts lose confidence on a forgetting curve from the last time they were grounded — so old, never-reconfirmed claims fade and the retriever stops trusting them. Ground a fact again to reset its clock and extend how long it sticks (spaced repetition). This is "verify first" built into memory itself.</p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div style="flex:1"><textarea id="text" placeholder="A fact worth remembering — e.g. &quot;The deploy script lives in scripts/deploy.sh&quot;"></textarea></div>
+        <button class="btn" id="add">Remember</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="list"><div class="empty">Loading…</div></div>
+    </div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    function color(s) { return s === 'fresh' ? '#4ade80' : (s === 'aging' ? '#f59e0b' : '#f87171'); }
+
+    function memRow(m) {
+      var pct = Math.round((m.confidence || 0) * 100);
+      var ageDays = m.lastGroundedAt ? Math.max(0, (Date.now() - Date.parse(m.lastGroundedAt)) / 86400000) : 0;
+      return '<div class="mem"><div><div class="txt">' + esc(m.text) + '</div>'
+        + '<div class="sub">' + esc(m.source || 'manual') + ' · grounded ' + ageDays.toFixed(1) + 'd ago · '
+          + (m.reinforcements || 0) + '× reinforced · half-life ' + Math.round(m.halfLifeDays || 0) + 'd</div></div>'
+        + '<div class="conf"><div class="bar"><i style="width:' + pct + '%;background:' + color(m.staleness) + '"></i></div>'
+          + '<div class="lbl ' + esc(m.staleness) + '">' + pct + '% · ' + esc(m.staleness) + '</div></div>'
+        + '<button class="reground" data-id="' + esc(m.id) + '">↻ Re-ground</button></div>';
+    }
+
+    async function load() {
+      var r = await fetch('/api/decay-memory').then(function (x) { return x.json(); });
+      var mems = (r && r.memories) || [];
+      document.getElementById('list').innerHTML = mems.length
+        ? mems.map(memRow).join('')
+        : '<div class="empty">No memories yet. Add a fact above — then watch its confidence decay until you re-ground it.</div>';
+      document.querySelectorAll('.reground').forEach(function (b) {
+        b.addEventListener('click', function () { reground(b.getAttribute('data-id')); });
+      });
+    }
+    async function add() {
+      var text = document.getElementById('text').value.trim();
+      if (!text) return;
+      await fetch('/api/decay-memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text }) });
+      document.getElementById('text').value = ''; load();
+    }
+    async function reground(id) {
+      await fetch('/api/decay-memory/' + encodeURIComponent(id) + '/reinforce', { method: 'POST' });
+      load();
+    }
+    document.getElementById('add').addEventListener('click', add);
+    load();
+  </script>
+</body>
+</html>
