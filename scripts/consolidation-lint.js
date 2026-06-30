@@ -13,7 +13,8 @@
  *
  *   DEDUPLICATE  exact-duplicate     identical content in 2+ files          HIGH
  *                duplicate-basename  same filename across dirs (consolidate) MED
- *   SQUEEZE      stray-file          tracked temp/backup/scratch artifact    HIGH
+ *   SQUEEZE      stray-file          tracked temp/backup artifact (def. junk) HIGH
+ *                stray-name          name looks like temp/scratch (review)    MED
  *                loose-root-file     un-allowlisted scratch at repo root     MED
  *   MODERNIZE    unsafe-exec         exec/spawn on interpolated input        HIGH
  *                legacy-var          `var` declarations (use const/let)      LOW
@@ -84,14 +85,22 @@ const TEST_FILE = /(^|\/)(tests?|__tests__)\/|(^|[._-])test[._-]|\.test\.|_test\
 
 const MAX_HASH_BYTES = 2 * 1024 * 1024; // skip files > 2MB for content-dup
 
-// Stray / junk artifacts that should never be tracked.
-const STRAY = [
+// Definite junk — a temp/backup/editor extension is unambiguous, so HIGH and
+// safe to `--fix` (untrack). These never name a real, consumed file.
+const STRAY_HARD = [
   /\.(tmp|bak|orig|swp|swo|rej|old)$/i,
   /~$/,
+  /\.(py|js)\.orig$/i,
+];
+// Heuristic name tokens — weaker signal, surfaced for REVIEW (MEDIUM), never
+// HIGH-blocked or auto-untracked. A deliberately-named, *consumed* file can
+// legitimately contain `tmp`/`scratch` or end in `.log` — e.g.
+// `manifests/TMP-REPO-RAG-INDEX.json`, which `Invoke-LanternConvergenceLoop.ps1`
+// and `oss-repo-validation.yml` actually read. Don't gate commits on a guess.
+const STRAY_SOFT = [
   /(^|[._-])tmp([._-]|$)/i,      // tmp.js, steptoe_tmp.html, x-tmp.json
   /(^|[._-])scratch([._-]|$)/i,
   /\.(log)$/i,                    // committed logs
-  /^.*\.(py|js)\.orig$/i,
 ];
 
 // CLAUDE.md forbidden subsystems (advisory consolidation flags).
@@ -143,8 +152,10 @@ for (const file of universe) {
   const abs = path.join(REPO, file);
 
   // ── path-only rules (no read) ──
-  if (STRAY.some((re) => re.test(base))) {
-    add('stray-file', 'HIGH', file, 'temp/backup/scratch artifact — should not be tracked');
+  if (STRAY_HARD.some((re) => re.test(base))) {
+    add('stray-file', 'HIGH', file, 'temp/backup artifact — should not be tracked');
+  } else if (STRAY_SOFT.some((re) => re.test(base))) {
+    add('stray-name', 'MEDIUM', file, 'name looks like temp/scratch — review (may be a real, consumed file)');
   } else if (!file.includes('/') && !ROOT_ALLOW.has(base) &&
              /\.(txt|html|json|js|log|tmp)$/i.test(base) && !base.startsWith('.')) {
     add('loose-root-file', 'MEDIUM', file, 'scratch-looking file at repo root — move into a subdir or delete');
@@ -263,7 +274,7 @@ function sh(cmd) {
 function printReport(items, counts, scanned) {
   const G = {
     DEDUPLICATE: ['exact-duplicate', 'duplicate-basename'],
-    SQUEEZE: ['stray-file', 'loose-root-file'],
+    SQUEEZE: ['stray-file', 'stray-name', 'loose-root-file'],
     MODERNIZE: ['unsafe-exec', 'legacy-var'],
     CONSOLIDATE: ['duplicate-merger', 'forbidden-subsystem'],
   };
@@ -310,6 +321,6 @@ Usage: node scripts/consolidation-lint.js [options]
   -h, --help  this message
 
 Rules: exact-duplicate, duplicate-basename (DEDUPLICATE) · stray-file,
-loose-root-file (SQUEEZE) · unsafe-exec, legacy-var (MODERNIZE) ·
+stray-name, loose-root-file (SQUEEZE) · unsafe-exec, legacy-var (MODERNIZE) ·
 duplicate-merger, forbidden-subsystem (CONSOLIDATE).`);
 }
