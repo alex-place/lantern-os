@@ -73,10 +73,35 @@ just zstd; instrument `a(Σ)`/NIS as the exit; stamp model id+version (recompres
 
 ## 4. Technique 4 — hybrid GRC over a CSF-Col residual · #1596
 
-CSF-Col strips the ~70 % structural redundancy at zero compute; GRC drives only the high-`L` residual to the
-entropy floor. No external work combines a *known-schema* structural transform with a *resident grounded*
-predictor. Because most tokens never reach the model, this is also the **fastest** neural variant. Best
-ceiling; build last (blocked by #1593, #1595).
+**Theory.** CSF-Col strips the ~70 % structural redundancy at zero compute; GRC drives only the high-`L`
+residual to the entropy floor. No external work combines a *known-schema* structural transform with a
+*resident grounded* predictor. Because most tokens never reach the model, this is also the **fastest** neural
+variant. Best ceiling.
+
+**Go/no-go probe — DEFER (no premise at current data scale).** Before building the ~20 min/MB cold coder,
+the load-bearing premise — "the col residual is a slice of surprising language an LM can drive below brotli"
+— was tested directly on the real `data/csf_memory` logs. Reproducible:
+[`experiments/csf_hybrid_residual_probe.py`](../../experiments/csf_hybrid_residual_probe.py).
+
+The probe decomposes the CSF-Col output into per-column brotli-11 streams and accounts where the bytes go on
+the realistic log (`raw.jsonl`, 23.1 KB col+brotli budget):
+
+| slice | brotli B | % of budget | neural-addressable? |
+|---|--:|--:|---|
+| `checksum` (sha-256 hex digest) | 12,374 | 53 % | **No** — 3.96 bpb is *at* the 4-bit hex entropy floor; a cryptographic hash is incompressible by any predictor |
+| `content` (the payload) | 4,944 | 21 % | **No** — already 0.31 bpb via cross-record redundancy; below the LM floor |
+| structural (timestamps, enums, floats) | ~3,200 | ~14 % | No — brotli < 1 bpb |
+| random id suffixes (`memory_id`, …) | ~2,600 | ~11 % | No — uuid/hash entropy |
+
+Stage B then ran the #1595 instrument (gpt2-124M teacher-forced CE = ideal arithmetic-coder floor) on
+`content`, the single **most** language-like column — #1596's best possible case: **gpt2 0.339 bpb vs
+brotli-11 0.308 bpb → neural loses by 10 %**, at ~20 min/MB cold vs brotli's milliseconds. There is **no
+natural-language residual above the brotli floor** (0 % of the budget). The compressed archive is dominated by
+(a) crypto-hash entropy no model can touch and (b) content brotli already crushes; the hybrid's whole-file
+ceiling is < ~11 % even crediting a resident model a free halving of `content`, and 53 % of the budget is a
+hard incompressible wall. **Build only if a future log carries a large, low-redundancy free-text column**
+(re-run the probe with `--model <resident>` then). Latent finding: stored checksums are **not** recomputable
+by the current engine (`verify()` = 0/373), so the 53 % column also can't be dropped — irreducible as stored.
 
 ## 5. Doors that stay closed (theorized and refuted/impractical)
 
@@ -90,6 +115,10 @@ ceiling; build last (blocked by #1593, #1595).
 
 ## 6. Verdict
 
-**Technique 1 (CSF-Col) is how you beat zstd-19 in production today.** Techniques 3/4 are the entropy-floor
-ceiling, reachable only offline, only grounded, and only because the model is already resident — and the Σ₀
-non-collapse certificate is what converts "is it safe to go deeper" from a guess into a measured boundary.
+**Technique 1 (CSF-Col) is how you beat zstd-19 in production today.** Techniques 2/3/4 are all **deferred or
+refuted at the current data scale** — RKD (#1594) has no headroom while logs fit zstd's window, GRC-alone
+(#1595) loses >2× to col, and the hybrid (#1596) has no language residual to address because the real archive
+is crypto-hash entropy + already-crushed content (probe above). Techniques 3/4 remain the entropy-floor
+ceiling reachable only offline, only grounded, only because the model is resident — but they need a corpus
+with a large, low-redundancy free-text column to have any premise. The Σ₀ non-collapse certificate is what
+converts "is it safe to go deeper" from a guess into a measured boundary.
