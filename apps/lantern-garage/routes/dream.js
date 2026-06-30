@@ -104,7 +104,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
         return true;
       }
 
-      const { execSync } = require("child_process");
+      const { safeExec } = require("../lib/safe-exec");
       const fullPath = path.join(repoRoot, filePath);
 
       // Safety: ensure path is within repo
@@ -148,9 +148,9 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
 
       // Git add and commit
       try {
-        execSync(`git add "${filePath}"`, { cwd: repoRoot });
+        safeExec(["git", "add", filePath], { cwd: repoRoot });
         const commitMsg = message || `code: ${filePath}`;
-        execSync(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`, { cwd: repoRoot });
+        safeExec(["git", "commit", "-m", commitMsg], { cwd: repoRoot });
       } catch (gitErr) {
         // Commit might fail if nothing changed, that's OK
       }

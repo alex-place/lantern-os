@@ -240,7 +240,7 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
       try {
         const autoVersionScript = path.join(repoRoot, "scripts/auto-version.js");
         if (require("fs").existsSync(autoVersionScript)) {
-          require("child_process").execSync(`node ${autoVersionScript}`, { cwd: repoRoot, encoding: "utf8" });
+          require("../lib/safe-exec").safeExec(["node", autoVersionScript], { cwd: repoRoot, encoding: "utf8" });
         }
       } catch (e) {
         console.error("[Auto-version] Error:", e.message);
