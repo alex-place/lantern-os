@@ -150,4 +150,49 @@ test("absent context reports an error, no corruption", () => {
   assert.strictEqual(content, BASE, "file left unchanged");
 });
 
+// 7) Edge-context drift (the #1708 failure): the diff's OUTER context lines are
+//    stale/hallucinated, but the changed region and its immediate neighbours are
+//    correct. Full-block location fails; edge fuzz trims the bad outer context
+//    and lands the edit.
+test("drifted outer context still applies via edge fuzz", () => {
+  const file = ["alpha", "bravo", "charlie", "delta", "echo", ""].join("\n");
+  const diff = [
+    "--- a/f.txt",
+    "+++ b/f.txt",
+    "@@ -1,4 +1,4 @@",
+    " STALE-HEADER-LINE",   // hallucinated leading context — not in file
+    " bravo",
+    "-charlie",
+    "+CHARLIE",
+    " delta",
+    " STALE-FOOTER-LINE",   // hallucinated trailing context — not in file
+    "",
+  ].join("\n");
+  const { stats, content } = applyTo(file, "f.txt", diff);
+  assert.deepStrictEqual(stats.errors, [], "no apply errors");
+  assert.ok(content.includes("CHARLIE") && !/^charlie$/m.test(content), "edit landed");
+  assert.ok(!content.includes("STALE-"), "hallucinated context not injected");
+  assert.ok(content.includes("alpha") && content.includes("echo"), "untouched lines preserved");
+});
+
+// 8) Edge fuzz must NOT trim the changed (-) line away: if the only mismatch is
+//    the removed line itself (genuinely absent), it still errors — no corruption.
+test("edge fuzz never drops the changed line (still errors when absent)", () => {
+  const file = ["alpha", "bravo", "charlie", ""].join("\n");
+  const diff = [
+    "--- a/f.txt",
+    "+++ b/f.txt",
+    "@@ -1,3 +1,3 @@",
+    " alpha",
+    "-NONEXISTENT",         // the line to remove isn't in the file
+    "+REPLACEMENT",
+    " charlie",
+    "",
+  ].join("\n");
+  const { stats, content } = applyTo(file, "f.txt", diff);
+  assert.strictEqual(stats.errors.length, 1, "one error reported");
+  assert.match(stats.errors[0].error, /hunk_not_located/, "not-located error");
+  assert.strictEqual(content, file, "file left unchanged");
+});
+
 console.log(`\n${passed} fuzzy-apply tests passed.`);

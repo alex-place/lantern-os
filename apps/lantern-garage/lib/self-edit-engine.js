@@ -190,9 +190,42 @@ function locateBlock(lines, before, hint) {
   return -1;
 }
 
+// Count the leading / trailing pure-context lines of a hunk's "before" block
+// (context = a " " line, present identically in before and after). These are the
+// only lines edge-fuzz may trim — the +/- region must stay to anchor the match.
+// Mirrors hunkBlocks: skips "\ No newline" markers and the trailing spurious "".
+function beforeTags(hunk) {
+  let end = hunk.lines.length;
+  while (end > 0 && hunk.lines[end - 1] === "") end--;
+  const tags = [];
+  for (let i = 0; i < end; i++) {
+    const tag = hunk.lines[i][0];
+    if (tag === "\\" || tag === "+") continue; // "+" is not part of `before`
+    tags.push(tag === "-" ? "-" : " ");
+  }
+  return tags;
+}
+function leadingContext(hunk) {
+  const t = beforeTags(hunk);
+  let n = 0; while (n < t.length && t[n] === " ") n++; return n;
+}
+function trailingContext(hunk) {
+  const t = beforeTags(hunk);
+  let n = 0; while (n < t.length && t[t.length - 1 - n] === " ") n++; return n;
+}
+
+// Max context lines edge-fuzz will trim from each end (GNU patch's default fuzz
+// ceiling). Small on purpose: enough to absorb LLM outer-context drift without
+// letting a hunk slide onto an unrelated region.
+const MAX_FUZZ = 3;
+
 // Apply one hunk by locating its context in the file rather than trusting the
 // (often-wrong) @@ line numbers. Fuzzy: tolerant of header-count drift, line
 // drift, and whitespace differences — the failure modes of LLM-authored diffs.
+// When the full context block won't locate (a leading/trailing context line
+// drifted — the #1708 failure), fall back to GNU-patch-style edge fuzz: trim up
+// to MAX_FUZZ *context* lines off each end (never +/- lines, so the changed
+// region always anchors) and retry, smallest trim first.
 function applyHunkFuzzy(lines, hunk) {
   const { before, after } = hunkBlocks(hunk);
   if (before.length === 0) {
@@ -200,10 +233,28 @@ function applyHunkFuzzy(lines, hunk) {
     return [...lines.slice(0, at), ...after, ...lines.slice(at)];
   }
   const pos = locateBlock(lines, before, hunk.oldStart - 1);
-  if (pos < 0) {
-    throw new Error(`hunk_not_located: ${before.length}-line context near line ${hunk.oldStart} not found`);
+  if (pos >= 0) {
+    return [...lines.slice(0, pos), ...after, ...lines.slice(pos + before.length)];
   }
-  return [...lines.slice(0, pos), ...after, ...lines.slice(pos + before.length)];
+  // Edge-fuzz fallback. Leading/trailing context lines sit at the front/back of
+  // BOTH before and after identically, so trimming N of them from before's edge
+  // means trimming the same N from after's edge — the splice stays consistent.
+  const lead = Math.min(MAX_FUZZ, leadingContext(hunk));
+  const trail = Math.min(MAX_FUZZ, trailingContext(hunk));
+  for (let total = 1; total <= lead + trail; total++) {
+    for (let dropFront = 0; dropFront <= Math.min(total, lead); dropFront++) {
+      const dropBack = total - dropFront;
+      if (dropBack > trail) continue;
+      const b = before.slice(dropFront, before.length - dropBack);
+      if (b.length === 0) continue; // need a non-empty anchor (keeps #6 erroring)
+      const a = after.slice(dropFront, after.length - dropBack);
+      const p = locateBlock(lines, b, hunk.oldStart - 1 + dropFront);
+      if (p >= 0) {
+        return [...lines.slice(0, p), ...a, ...lines.slice(p + b.length)];
+      }
+    }
+  }
+  throw new Error(`hunk_not_located: ${before.length}-line context near line ${hunk.oldStart} not found`);
 }
 
 // Targets of a parsed diff, as repo-relative paths, tagged created vs changed.
