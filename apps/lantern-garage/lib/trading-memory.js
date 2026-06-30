@@ -14,9 +14,15 @@ const path = require("path");
 const crypto = require("crypto");
 const { appendJsonlQueued } = require("./file-queue");
 const tradingStore = require("./trading-store");
+const csfWriter = require("./csf-memory-writer");
 
-const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-const CSF_MEMORY_REGISTRY = path.join(REPO_ROOT, "data", "csf_memory", "raw.jsonl");
+// Resolve the registry lazily so CSF_MEMORY_PATH (honoured by the Python
+// MemoryEngine and csf-memory-writer.js) also isolates this writer's writes —
+// previously this path was frozen at require() time to the repo's real data/
+// dir, so even tests polluted data/csf_memory/raw.jsonl.
+function _registryPath() {
+  return path.join(csfWriter._csfMemoryPath(), "raw.jsonl");
+}
 
 const _seenOrders = new Set();
 const _seenSignals = new Set();
@@ -55,25 +61,25 @@ function _csfRecord(tier, content, tags, keywords, memoryId) {
     confidence_reasoning: "",
     staleness_signals: [],
   };
-  const payload = Object.fromEntries(
-    Object.entries(base).filter(([k]) => k !== "checksum")
-  );
-  base.checksum = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload, Object.keys(payload).sort()))
-    .digest("hex");
+  // Use the shared canonical checksum (recursive key-sort over the whole
+  // record, nested content included). The previous
+  // `JSON.stringify(payload, Object.keys(payload).sort())` form passed the key
+  // list as a *replacer allowlist*, not a sort — so nested content.* (the
+  // actual order/signal payload) was excluded from the hash, and the digest
+  // matched neither the Python nor the other JS writer. See
+  // tests/test_csf_memory_integrity.py.
+  base.checksum = csfWriter._checksum(base);
   return base;
 }
 
 /** Normalise whatever shape the route sends into a flat array. */
 function _toArray(payload, keys = []) {
   if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
   for (const k of keys) {
     if (Array.isArray(payload[k])) return payload[k];
   }
-  if (payload && typeof payload === "object" && Object.keys(payload).length) {
-    return [payload];
-  }
+  if (Object.keys(payload).length) return [payload];
   return [];
 }
 
@@ -103,7 +109,7 @@ async function recordOrder(order) {
     [String(order.symbol || ""), "order"],
     memId,
   );
-  await appendJsonlQueued(CSF_MEMORY_REGISTRY, rec);
+  await appendJsonlQueued(_registryPath(), rec);
   return order;
 }
 
@@ -134,25 +140,27 @@ async function recordSignal(signal) {
     [String(signal.symbol || ""), "signal", String(signal.agent || "")],
     memId,
   );
-  await appendJsonlQueued(CSF_MEMORY_REGISTRY, rec);
+  await appendJsonlQueued(_registryPath(), rec);
   return signal;
 }
 
 /**
  * Called from POST /api/trading/orders. Writes each new order to the local
- * trading store and to CSF memory.
- * @param {object[]} orders
+ * trading store and to CSF memory. Accepts a bare array, a `{ orders: [...] }`
+ * wrapper, or a single order object — all normalised via `_toArray` so a
+ * wrapped payload neither throws ("orders is not iterable") nor silently
+ * no-ops (the PR #338 payload-shape contract).
+ * @param {object[]|{orders:object[]}|object} payload
  * @returns {Promise<object[]>} orders that were written (deduped)
  */
-async function recordNewOrders(orders) {
+async function recordNewOrders(payload) {
+  const orders = _toArray(payload, ["orders"]);
   const written = [];
   for (const order of orders) {
     const key = String(order.id || order.order_id || "").slice(0, 64);
-    const alreadySeen = key && _seenOrders.has(key);
+    if (key && _seenOrders.has(key)) continue;
     const stored = await tradingStore.appendOrder(order);
-    if (!alreadySeen) {
-      await recordOrder(order).catch(() => {});
-    }
+    await recordOrder(order).catch(() => {});
     written.push(stored);
   }
   return written;
@@ -160,11 +168,15 @@ async function recordNewOrders(orders) {
 
 /**
  * Called from POST /api/trading/agent-log. Writes each new signal to the
- * local trading store and to CSF memory.
- * @param {{ logs: object[] }} param0
+ * local trading store and to CSF memory. Accepts a `{ logs: [...] }`,
+ * `{ agentLog: [...] }`, or `{ agent_log: [...] }` wrapper, a bare array,
+ * or a single entry — all normalised via `_toArray` so alternate wrapper
+ * keys don't silently write 0 records (the PR #338 payload-shape contract).
+ * @param {object[]|{logs?:object[],agentLog?:object[],agent_log?:object[]}|object} payload
  * @returns {Promise<object[]>} entries that were written
  */
-async function recordNewSignals({ logs = [] } = {}) {
+async function recordNewSignals(payload) {
+  const logs = _toArray(payload, ["logs", "agentLog", "agent_log"]);
   const written = [];
   for (const entry of logs) {
     const stored = await tradingStore.appendLogEntry(entry);
@@ -192,7 +204,7 @@ async function queryRecent({ limit = 50, kind } = {}) {
 function queryRecentTradingRecords(limit = 50, kind) {
   const fs = require("fs");
   try {
-    const lines = fs.readFileSync(CSF_MEMORY_REGISTRY, "utf8").trim().split("\n").filter(Boolean);
+    const lines = fs.readFileSync(_registryPath(), "utf8").trim().split("\n").filter(Boolean);
     return lines
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })
       .filter((r) => {

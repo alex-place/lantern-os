@@ -40,6 +40,21 @@ const DEFAULT_MERGE_IGNORE_CHECKS = [
   "Single-workstream check", // self-clears as lanes merge; not a code-quality gate
 ];
 
+// Deploy-preview / CDN-build checks (Netlify, Vercel, …) match by PATTERN, not exact
+// name, because their names carry a per-site slug (e.g. "Header rules - magical-…").
+// They are NOT a code-quality gate: a failed preview deploy says nothing about whether
+// the diff is correct. Critically, they run ONLY on PRs — they never appear on the base
+// branch — so _baseFailingChecks can never neutralise them the way it heals the suite
+// checks. A single Netlify outage ("Deploy failed") therefore wedges EVERY PR forever
+// unless we ignore them here. Override with PR_WATCHER_MERGE_IGNORE_PATTERNS
+// (comma-separated regex sources). (#1727 zipper-wedge fix)
+const DEFAULT_MERGE_IGNORE_PATTERNS = [
+  /^netlify\//i,                                        // netlify/<site>/deploy-preview (StatusContext)
+  /^(Header rules|Pages changed|Redirect rules) - /i,  // Netlify per-deploy sub-checks
+  /deploy[\s_-]?preview/i,                              // generic deploy-preview checks
+  /^vercel\b/i,                                          // Vercel deployment checks
+];
+
 // Check conclusions that BLOCK a merge (a real, non-ignored failure or still-running).
 const BLOCKING_CONCLUSIONS = new Set([
   "FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE",
@@ -59,7 +74,7 @@ const DEFAULT_PROTECTED_PATHS = [
 ];
 
 class PrWatcher {
-  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeProtectedPaths = null, baseRef = "master" } = {}) {
+  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeIgnorePatterns = null, mergeProtectedPaths = null, baseRef = "master" } = {}) {
     this.repoRoot = repoRoot;
     this.port = port;
     this.idleMs = idleMs;
@@ -70,6 +85,9 @@ class PrWatcher {
     this._baseFailCache = null;   // Set<string> of checks failing on baseRef
     this._baseFailCacheAt = 0;    // when that cache was last refreshed
     this.mergeIgnoreChecks = new Set(mergeIgnoreChecks || DEFAULT_MERGE_IGNORE_CHECKS);
+    this.mergeIgnorePatterns = (mergeIgnorePatterns || DEFAULT_MERGE_IGNORE_PATTERNS).map(
+      (p) => (p instanceof RegExp ? p : new RegExp(p, "i"))
+    );
     this.protectedPaths = (mergeProtectedPaths || DEFAULT_PROTECTED_PATHS).map(
       (p) => (p instanceof RegExp ? p : new RegExp(p, "i"))
     );
@@ -133,7 +151,8 @@ class PrWatcher {
    * Should we auto-merge this PR right now? Pure + unit-tested.
    * Gates: auto-merge enabled · this exact commit already reviewed · idle ·
    * no conflicts (mergeable) · not a draft · touches no protected path · every
-   * check passing except the ignore-list (chronically-red suites). `pv` is a
+   * check passing except the ignore-list (chronically-red suites) and the
+   * deploy-preview infra patterns (Netlify/Vercel; PR-only, not a quality gate). `pv` is a
    * `gh pr view --json` object (must include `files` for the protected-path gate).
    * `extraIgnore` is an optional Set of check names to additionally ignore — the
    * runtime caller passes the checks currently failing on the base branch so the
@@ -171,6 +190,7 @@ class PrWatcher {
       const name = c.name || c.context || "";
       if (this.mergeIgnoreChecks.has(name)) continue;
       if (extraIgnore && extraIgnore.has(name)) continue; // chronically red on base branch
+      if (this.mergeIgnorePatterns.some((re) => re.test(name))) continue; // deploy-preview infra (PR-only; base-heal can't reach)
       if (name === "All checks passed") continue;          // aggregate roll-up — recomputed here
       if (c.status && c.status !== "COMPLETED") return { merge: false, reason: `pending:${name || "?"}` };
       const conclusion = String(c.conclusion || c.state || "").toUpperCase();

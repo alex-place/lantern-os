@@ -9,9 +9,14 @@
 const path = require("path");
 const crypto = require("crypto");
 const { appendJsonlQueued } = require("./file-queue");
+const csfWriter = require("./csf-memory-writer");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-const CSF_MEMORY_REGISTRY = path.join(REPO_ROOT, "data", "csf_memory", "raw.jsonl");
+// Resolve lazily so CSF_MEMORY_PATH isolates this writer's writes too
+// (matches the Python MemoryEngine and csf-memory-writer.js).
+function _csfRegistryPath() {
+  return path.join(csfWriter._csfMemoryPath(), "raw.jsonl");
+}
 const NEWS_REGISTRY = path.join(REPO_ROOT, "data", "lantern-garage", "trading", "news.jsonl");
 const RELATIONS_REGISTRY = path.join(REPO_ROOT, "data", "lantern-garage", "trading", "news-relations.jsonl");
 
@@ -73,11 +78,12 @@ function _csfEntityRecord(item, memoryId) {
     confidence_reasoning: `impact=${item.impact || 0}`,
     staleness_signals: [],
   };
-  const payload = Object.fromEntries(Object.entries(base).filter(([k]) => k !== "checksum"));
-  base.checksum = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload, Object.keys(payload).sort()))
-    .digest("hex");
+  // Shared canonical checksum (recursive key-sort over the whole record,
+  // nested content included). Replaces a broken
+  // `JSON.stringify(payload, Object.keys(payload).sort())` form whose array arg
+  // was a replacer allowlist, not a sort — it dropped nested content.* from the
+  // hash. See tests/test_csf_memory_integrity.py.
+  base.checksum = csfWriter._checksum(base);
   return base;
 }
 
@@ -118,7 +124,7 @@ async function recordNewsItem(item) {
   const rec = _csfEntityRecord(item, memId);
 
   await Promise.all([
-    appendJsonlQueued(CSF_MEMORY_REGISTRY, rec),
+    appendJsonlQueued(_csfRegistryPath(), rec),
     appendJsonlQueued(NEWS_REGISTRY, { ...rec.content, memory_id: memId, recorded_at: _now() }),
   ]);
   return rec;

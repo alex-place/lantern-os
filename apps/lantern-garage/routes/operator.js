@@ -229,8 +229,17 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
       }
 
       // Step 2: npm install
+      //
+      // Anchor the prefix to THIS file's location, not the passed-in repoRoot.
+      // `--prefix apps/lantern-garage` was relative to `cwd: repoRoot`; whenever
+      // repoRoot resolved to the app dir itself (some launch paths / worktrees),
+      // npm installed into apps/lantern-garage/apps/lantern-garage/ — a stray
+      // ~975-file node_modules tree that then dirties git forever. operator.js
+      // always lives in apps/lantern-garage/routes/, so `..` is the app dir
+      // regardless of how the server was started. Absolute prefix = idempotent.
       try {
-        const npm = execSync("npm install --prefix apps/lantern-garage", { cwd: repoRoot, encoding: "utf8", timeout: 60000 });
+        const appDir = path.resolve(__dirname, "..");
+        const npm = execSync(`npm install --prefix "${appDir}"`, { cwd: appDir, encoding: "utf8", timeout: 60000 });
         steps.push({ step: "npm_install", ok: true, output: npm.trim() });
       } catch (e) {
         steps.push({ step: "npm_install", ok: false, output: e.stdout?.trim() || e.message });

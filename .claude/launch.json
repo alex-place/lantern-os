@@ -30,14 +30,17 @@
     },
     {
       "name": "lantern-verify",
-      "comment": "Σ₀ surprise-valve verify (#1687/#1702). Fixed port 4191 (NO autoPort) so preview REUSES the already-running, key-hydrated branch server launched from C:/dev/lantern-os-valve-verify (SURPRISE_CANARY=1, Vertex, CHAT_TOOL_EXEC=0). runtimeArgs point at that worktree's verify-server.js only as a fallback if the server isn't already up. Disposable — not for prod.",
+      "comment": "Preview-tool verify server: server.js on an auto-assigned free port. When the launcher injects PORT, server.js would normally bind 0.0.0.0 + require SESSION_SECRET; we pin the host back to loopback and provide a throwaway loopback-only SESSION_SECRET so it boots on a fresh port even when 4177/4178 are taken by other sessions.",
       "runtimeExecutable": "node",
       "runtimeArgs": [
-        "C:\\dev\\lantern-os-valve-verify\\apps\\lantern-garage\\verify-server.js"
+        "apps/lantern-garage/server.js"
       ],
-      "port": 4191,
+      "port": 4188,
+      "autoPort": true,
       "env": {
-        "SESSION_SECRET": "valve-verify-throwaway-not-for-prod"
+        "LEADERBOARD_ROUTING": "1",
+        "LANTERN_GARAGE_HOST": "127.0.0.1",
+        "SESSION_SECRET": "preview-verify-loopback-only-secret"
       }
     }
   ]

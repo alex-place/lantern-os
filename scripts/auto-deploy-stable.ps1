@@ -259,6 +259,12 @@ try {
     if (Test-Path $src) { Copy-Item -LiteralPath $src -Destination (Join-Path $tmp ($f -replace '[\\/]', '__')) -Force -ErrorAction SilentlyContinue }
   }
 
+  # Belt-and-suspenders for the LFS wedge (#1550): GIT_LFS_SKIP_SMUDGE (set above) tells
+  # git-lfs to skip the download, but a `required=true` filter still hard-fails the reset
+  # if the filter command itself errors. Clearing `required` in the stable repo lets the
+  # reset complete (writing the LFS pointer) instead of wedging on a dead endpoint.
+  & git -C $STABLE config --local filter.lfs.required false 2>&1 | Out-Null
+
   & git -C $STABLE reset --hard origin/master --quiet 2>&1 | Out-Null
 
   # restore preserved runtime data (master did not change these this deploy)

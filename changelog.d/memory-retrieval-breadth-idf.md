@@ -1,0 +1,1 @@
+- perf(remember): MemoryEngine retrieval overhaul — IDF-weighted ranking plus auto-derived trace keywords (records were unindexed when keywords were omitted) lifts multi-signal recall@5 from 0.43 to 0.81 on the LongMemEval hard haystack; adds a `persist_index=False` option to avoid O(n²) bulk ingestion (#1689, #1728).

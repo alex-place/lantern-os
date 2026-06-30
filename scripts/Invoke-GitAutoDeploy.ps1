@@ -7,6 +7,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# LFS-wedge guard (#1550): the repo declares *.png/.pdf/.zip etc. as `filter=lfs
+# required=true`, but the LFS endpoint is unprovisioned. Without this, the fetch/checkout/
+# pull below run the smudge filter, it fails against the dead endpoint, and the whole
+# auto-deploy wedges (2026-06-28 outage). Skip smudge AND drop the `required` hard-fail so
+# a git op with an unresolvable LFS object still completes. Mirrors scripts/auto-deploy-stable.ps1.
+$env:GIT_LFS_SKIP_SMUDGE = '1'
+
 function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -19,8 +26,13 @@ function Sync-GitRepo {
     Write-Log "Starting git sync for $TargetBranch branch"
     
     Push-Location $Path
-    
+
     try {
+        # Belt-and-suspenders: even with GIT_LFS_SKIP_SMUDGE set, a `required=true` filter
+        # makes git hard-fail if the filter command itself errors. Clearing `required`
+        # locally lets the checkout/pull proceed (writing the LFS pointer) instead of wedging.
+        git config --local filter.lfs.required false 2>$null
+
         # Stash any local changes
         Write-Log "Stashing local changes"
         $stashResult = git stash push -m "auto-deploy-stash-$(Get-Date -Format 'yyyyMMddHHmmss')"

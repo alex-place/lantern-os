@@ -1,0 +1,5 @@
+### Added
+- CSF memory read-path integrity verification (#1663 follow-up). `csf-memory.js` `readMemoryRecords()` — the single funnel feeding `queryMemories`/`queryConversationMemory` and thus prompt injection — now recomputes each record's checksum via `csf-memory-writer.js` `verifyRecord`. Controlled by `CSF_VERIFY_ON_READ`: `off` (no verification, legacy behavior), `warn` (default — log mismatches, keep records, non-destructive), `enforce` (also drop mismatching records so corrupt/tampered memory is never injected). Records with no checksum are always kept; verification stays runtime-local (Python and JS canonical forms diverge), so `warn` is the safe default until every writer/record shares one runtime's stamp. The live stable store was re-stamped (373/373 now verify), making `enforce` safe to enable there.
+
+### Tests
+- `tests/test_csf_memory_read_verify.js` — `_verifyRecords` keeps everything under `off`/`warn`/default, drops only checksum-mismatching records under `enforce`, and always keeps unstamped legacy records.

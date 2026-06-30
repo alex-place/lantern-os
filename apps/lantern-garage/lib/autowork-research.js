@@ -33,6 +33,19 @@ try { ({ searchRepoFiles } = require("./repo-context")); } catch (_e) { /* optio
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 const RUN_LOG_DIR = path.join(REPO_ROOT, "data", "autowork-runs");
 
+// Web grounding is best-effort and must NEVER block the run. The underlying search
+// client guards SOCKET idle time but not DNS resolution, so a transient DNS stall
+// can hang a fetch indefinitely. This absolute wall-clock deadline converts any
+// such hang into a clean rejection the caller already handles (emit "skipped",
+// proceed with whatever evidence was gathered). Override with AUTOWORK_WEB_TIMEOUT.
+const WEB_PHASE_TIMEOUT = parseInt(process.env.AUTOWORK_WEB_TIMEOUT || "90000", 10);
+function _withDeadline(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_res, rej) => setTimeout(() => rej(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ]);
+}
+
 // English + boilerplate code words that match hundreds of files. Filtering these is
 // what turns "20 generic files" into a small, relevant scope.
 const STOPWORDS = new Set([
@@ -187,14 +200,14 @@ async function researchIssue(o) {
         // top-level require here would be a cycle.
         const { wideSearch } = require("./wide-search");
         const wq = (issueTitle || keywords.slice(0, 6).join(" ")).slice(0, 200);
-        const r = await wideSearch({
+        const r = await _withDeadline(wideSearch({
           query: wq,
           breadth: 5,
           perQuery: 3,
           // Forward each wide-search sub-step under the research phase so the run log
           // and any SSE caller see the fan-out / low-pass / high-pass ladder.
           onStep: (stage, status, extra) => emit("research", `wide_${stage}_${status}`, extra),
-        });
+        }), WEB_PHASE_TIMEOUT, "wide web search");
         webEvidence = (r.sources || []).slice(0, 5).map((s) => ({ title: s.title, url: s.url, snippet: s.snippet }));
         webSummary = r.answer || null;
         webConfidence = r.confidence != null ? r.confidence : null;
@@ -205,7 +218,7 @@ async function researchIssue(o) {
     } else {
       const searchQuery = keywords.slice(0, 4).join(" ");
       try {
-        const r = await webSearch(searchQuery, 3);
+        const r = await _withDeadline(webSearch(searchQuery, 3), WEB_PHASE_TIMEOUT, "narrow web search");
         if (r && r.success && Array.isArray(r.results)) {
           webEvidence = r.results.slice(0, 3).map((x) => ({ title: x.title, url: x.url, snippet: x.snippet }));
           emit("research", "web_search", { mode: "narrow", query: searchQuery, source: r.source, results: webEvidence.length, sources: webEvidence.map((w) => w.url) });

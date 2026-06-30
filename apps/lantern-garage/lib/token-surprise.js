@@ -76,13 +76,27 @@ function surpriseField(perToken) {
 }
 
 // Map a field summary to an internal-uncertainty scalar in [0,1].
-// tailMass (already a fraction) is the primary driver; p90 is a saturating secondary
-// (4 bits ≈ confident, 12 bits ≈ very unsure). Calibrated so fluent text → ~0.
+//
+// #1673 (docs/research/2026-06-30-surprise-leak-layer1-result.md) measured this on 199
+// labeled factual answers × 2 local models: the prior tailMass-driven map collapsed to
+// chance (AUROC 0.50–0.52, nonzero on only 0–3% of rows) because models are *confidently
+// wrong at low per-token surprise* — its 6-bit gate (p < 1/64) almost never fires. Raw
+// perplexity separates hallucination (mean/p90 bits, AUROC 0.76–0.81). So drive the
+// scalar from a mean/p90-bits blend through a strictly-monotonic logistic: ranking —
+// hence AUROC — is preserved at every bit scale (recovers 0.77/0.81 on the #1673 data,
+// beating either statistic alone), while fluent text saturates to ~0. CENTER/GAIN fix the
+// [0,1] shape only and do NOT affect AUROC; per-model threshold calibration is Layer 2.
+// The canary consumes this raise-only with anchor-override, so an uncalibrated,
+// conservatively-small scalar that is correctly *ordered* is a safe Layer-1 no-op on
+// confident text.
 function fieldToUncertainty(field) {
   if (!field) return 0;
-  const tail = clamp01(field.tailMass);
-  const p90 = clamp01((field.p90Bits - 4) / 8);
-  return round(clamp01(0.7 * tail + 0.3 * p90));
+  const mean = Number.isFinite(field.meanBits) ? field.meanBits : 0;
+  const p90 = Number.isFinite(field.p90Bits) ? field.p90Bits : mean;
+  const blendBits = 0.5 * mean + 0.5 * p90;
+  const CENTER = 5; // bits at which uncertainty ≈ 0.5 (≈ a coin-flip token)
+  const GAIN = 1; // <2 bits → ~0 (fluent), >8 bits → ~1 (guessing)
+  return round(clamp01(1 / (1 + Math.exp(-GAIN * (blendBits - CENTER)))));
 }
 
 // Normalize whatever a caller passes as `tokenSurprise` into an uncertainty scalar:

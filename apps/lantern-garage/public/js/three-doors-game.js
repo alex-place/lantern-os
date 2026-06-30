@@ -55,7 +55,6 @@ function loadProgress() {
     
     // Version migration
     if (data.version !== PROGRESS_VERSION) {
-      console.log("[Three Doors] Migrating progress from version", data.version, "to", PROGRESS_VERSION);
       return migrateProgress(data);
     }
     
@@ -476,6 +475,7 @@ function skipPoem() {
   appendSceneMsg("kingdome-garden", data, "", "offline");
 }
 
+// ── Inline engine fallback ────────────────────────────────────────
 // ── Convergence Navigator ─────────────────────────────────────────
 // Door choice now CAUSALLY determines the next scene (it used to be cosmetic:
 // the old engineChoose did stage_index+1 and ignored which door you picked).
@@ -496,8 +496,8 @@ const MAX_OFF_SPINE = 3;            // force a spine beat after this many detour
 const DEEP_SCENES = (typeof SERVER_GENERATED_SCENES !== "undefined")
   ? SERVER_GENERATED_SCENES : new Set();
 
-// Strip emoji / punctuation / "[GLITCHED]" so the garden's "🍀 The Cloverfield"
-// matches NEXT_MAP's lowercase plain keys.
+// Strip emoji / punctuation so the garden's "🍀 The Cloverfield" and
+// "💾 The XP Door [GLITCHED]" match NEXT_MAP's lowercase plain keys.
 function normalizeDoorName(name) {
   return (name || "")
     .toLowerCase()

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { readFileViaMcp } = require("./mcp-resource-client");
+const csfWriter = require("./csf-memory-writer");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
@@ -23,6 +24,39 @@ function _readText(filePath) {
   try { return fs.readFileSync(filePath, "utf8"); } catch { return ""; }
 }
 
+// Read-path integrity verification (#1663 follow-up — promotes the dormant
+// MemoryRecord.verify() onto the read path so corrupt/tampered memory cannot be
+// injected into a prompt). CSF_VERIFY_ON_READ:
+//   "off"     — no verification, zero cost, legacy behavior
+//   "warn"    — recompute each checksum, log mismatches, keep the records (default)
+//   "enforce" — additionally DROP mismatching records from retrieval
+// Records with no checksum are always kept (legacy/unstamped). JS and Python use
+// different canonical forms, so a Python-stamped record will not verify under the
+// JS scheme — keep "warn" until every writer/record shares one runtime's stamp.
+function _verifyMode() {
+  return (process.env.CSF_VERIFY_ON_READ || "warn").toLowerCase();
+}
+
+function _verifyRecords(records, file = "") {
+  const mode = _verifyMode();
+  if (mode === "off" || !records || !records.length) return records || [];
+  const bad = [];
+  const kept = [];
+  for (const r of records) {
+    if (r && r.checksum && !csfWriter.verifyRecord(r)) {
+      bad.push(r.memory_id || "(no id)");
+      if (mode === "enforce") continue; // drop tampered/corrupt record
+    }
+    kept.push(r);
+  }
+  if (bad.length) {
+    const action = mode === "enforce" ? "dropped" : "kept (warn)";
+    const shown = bad.slice(0, 5).join(", ") + (bad.length > 5 ? " …" : "");
+    console.warn(`[csf-memory] ${bad.length} record(s) failed checksum in ${file} — ${action}: ${shown}`);
+  }
+  return kept;
+}
+
 function readMemoryRecords(limit = 20) {
   const records = [];
   if (!fs.existsSync(CSF_MEMORY_PATH)) return records;
@@ -31,9 +65,11 @@ function readMemoryRecords(limit = 20) {
   for (const file of files) {
     const text = _readText(path.join(CSF_MEMORY_PATH, file));
     const lines = text.trim().split("\n").filter(Boolean);
+    const parsed = [];
     for (const line of lines) {
-      try { records.push(JSON.parse(line)); } catch {}
+      try { parsed.push(JSON.parse(line)); } catch {}
     }
+    records.push(..._verifyRecords(parsed, String(file)));
     if (records.length >= limit) break;
   }
   return records.slice(0, limit);
@@ -99,6 +135,44 @@ function relevanceScore(text, query) {
   return hits / queryTokens.length;
 }
 
+// IDF support for the live chat read path (#1690 — ports the Python MemoryEngine #1689 fix).
+// The JS path has no persistent inverted index, so document frequency is computed over the
+// candidate records each query. Rare, distinctive words then outweigh common ones instead of
+// every matched token counting the same — a turn matching a rare keyword beats a distractor
+// matching only a common one.
+function buildDocFreq(records) {
+  const df = new Map();
+  for (const r of records || []) {
+    const text = `${r.content?.text || r.content?.raw_input || ""} ${(r.tags || []).join(" ")}`;
+    for (const tok of new Set(getFilteredTokens(text))) df.set(tok, (df.get(tok) || 0) + 1);
+  }
+  return { df, N: Math.max((records || []).length, 1) };
+}
+
+// Smoothed inverse document frequency; always > 0 (BM25-style +1 smoothing).
+function idfOf(dfInfo, token) {
+  const d = (dfInfo && dfInfo.df.get(token)) || 0;
+  const N = (dfInfo && dfInfo.N) || 1;
+  return Math.log((N + 1) / (d + 1)) + 1;
+}
+
+// IDF-weighted relevance: the fraction of the query's IDF mass that `text` matches
+// (0..1, so the existing MIN_RELEVANCE threshold still applies). Falls back to the flat
+// hit ratio when no df info is supplied (keeps other callers unchanged).
+function relevanceScoreIdf(text, query, dfInfo) {
+  if (!dfInfo) return relevanceScore(text, query);
+  const queryTokens = getFilteredTokens(query);
+  if (queryTokens.length === 0) return 0;
+  const textTokens = new Set(getFilteredTokens(text));
+  let matchedIdf = 0, totalIdf = 0;
+  for (const qt of queryTokens) {
+    const w = idfOf(dfInfo, qt);
+    totalIdf += w;
+    if (textTokens.has(qt)) matchedIdf += w;
+  }
+  return totalIdf > 0 ? matchedIdf / totalIdf : 0;
+}
+
 // Count of DISTINCT non-stopword tokens shared between query and text. The ratio
 // from relevanceScore alone lets a SINGLE coincidental content word clear a
 // threshold on a short query — the #1276 confabulation case — so cross-session
@@ -117,10 +191,11 @@ function distinctiveHitCount(text, query) {
 function queryMemories(message, limit = 3) {
   const allRecords = readMemoryRecords(50);
   if (allRecords.length === 0) return [];
+  const dfInfo = buildDocFreq(allRecords);   // IDF over the candidate pool (#1690)
   const scored = allRecords.map(r => {
     const text = r.content?.text || r.content?.raw_input || (r.tags || []).join(" ");
     const tagText = (r.tags || []).join(" ");
-    const score = Math.max(relevanceScore(text, message), relevanceScore(tagText, message));
+    const score = Math.max(relevanceScoreIdf(text, message, dfInfo), relevanceScoreIdf(tagText, message, dfInfo));
     return { record: r, score };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -330,12 +405,18 @@ function queryConversationMemory(message, limit = 4) {
 }
 
 // New: query-time relevance-filtered context — compact, ~500-1500 chars max
-function formatCSFContextForPrompt(message) {
+//
+// `opts.memories` lets a caller inject an already-resolved memory list (e.g. the
+// async semantic-reranked path below) instead of the default keyword query, so
+// the live chat read path gets the multi-signal retrieval that csf-memory.js
+// already implements — without duplicating this whole builder.
+function formatCSFContextForPrompt(message, opts = {}) {
   const parts = [];
 
-  // Relevant memories only (scored by keyword match to message)
+  // Relevant memories only (scored by keyword match to message, unless an
+  // already-resolved list was injected via opts.memories).
   if (message) {
-    const memories = queryMemories(message, 3);
+    const memories = Array.isArray(opts.memories) ? opts.memories : queryMemories(message, 3);
     if (memories.length > 0) {
       const memText = memories.map(m => {
         const text = m.content?.text || m.content?.raw_input || "";
@@ -425,10 +506,30 @@ function formatCSFContextForPrompt(message) {
   return parts.join("\n\n");
 }
 
+// Async entry point for the live chat read path. Resolves the Memories section
+// via the semantic reranker (real nomic-embed similarity over a wider keyword
+// candidate pool — our multi-signal retrieval), then delegates everything else
+// to the sync builder. Fail-safe: any embed/Ollama failure falls back to the
+// keyword path inside queryMemoriesSemantic, so the caller always gets context.
+async function formatCSFContextForPromptAsync(message) {
+  if (!message) return formatCSFContextForPrompt(message);
+  let memories = [];
+  try {
+    memories = await queryMemoriesSemantic(message, 3);
+  } catch {
+    memories = queryMemories(message, 3);
+  }
+  return formatCSFContextForPrompt(message, { memories });
+}
+
 module.exports = {
   relevanceScore,
+  relevanceScoreIdf,
+  buildDocFreq,
+  idfOf,
   distinctiveHitCount,
   readMemoryRecords,
+  _verifyRecords,
   readIngestDocs,
   queryMemories,
   queryMemoriesSemantic,
@@ -442,4 +543,5 @@ module.exports = {
   saveDoorChoice,
   buildCSFContext,
   formatCSFContextForPrompt,
+  formatCSFContextForPromptAsync,
 };

@@ -67,6 +67,28 @@ ok("merge: base-red check via extraIgnore -> true",
 ok("merge: base-GREEN check still blocks (not in extraIgnore) -> false",
   m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Lint & validate", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now, new Set()).merge === false);
 
+// ── deploy-preview infra ignored by PATTERN: PR-only checks (Netlify/Vercel) that
+// _baseFailingChecks can never reach. A Netlify "Deploy failed" must not wedge merges. ──
+const netlifyFail = [
+  { name: "Header rules - magical-rabanadas-2c70f4", status: "COMPLETED", conclusion: "FAILURE" },
+  { name: "Pages changed - magical-rabanadas-2c70f4", status: "COMPLETED", conclusion: "FAILURE" },
+  { name: "Redirect rules - magical-rabanadas-2c70f4", status: "COMPLETED", conclusion: "FAILURE" },
+  { context: "netlify/magical-rabanadas-2c70f4/deploy-preview", state: "FAILURE" },
+];
+ok("merge: failing Netlify deploy-preview cluster ignored -> true",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [...netlifyFail, ...green] }, reviewed, now).merge === true);
+ok("merge: Vercel deployment failure ignored -> true",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Vercel", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now).merge === true);
+ok("merge: generic 'Deploy Preview' check ignored -> true",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Deploy Preview / build", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now).merge === true);
+// …but a real, non-preview failure alongside green deploy previews STILL blocks.
+ok("merge: real failure beside ignored previews still blocks -> false",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [...netlifyFail, { name: "Debug statement check", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now).merge === false);
+// A check that merely CONTAINS "deploy" but is a real gate (e.g. "Deploy readiness
+// tests") must NOT be swallowed — the pattern targets *-preview, not the word deploy.
+ok("merge: non-preview 'deploy' gate not swallowed -> false",
+  m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Deploy readiness tests", status: "COMPLETED", conclusion: "FAILURE" }, ...green] }, reviewed, now).merge === false);
+
 // ── verdict gate: review must APPROVE, not merely happen (the #1302 hole) ──
 const greenPvBase = { isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green };
 ok("merge: REQUEST_CHANGES verdict -> false", m._shouldMerge(greenPvBase, { headSha: "A", reviewedSha: "A", reviewVerdict: "REQUEST_CHANGES", shaSeenAt: now - 2000 }, now).merge === false);

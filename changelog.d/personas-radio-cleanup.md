@@ -1,0 +1,1 @@
+- refactor(chat): remove the 5 fictional RP personas (lantern, blinkbug, waterfall, xenon, founder) from chat persona selection — only the grounded "keystone" agent remains; rename "Keystone Radio" embed to just "Radio". The load-bearing "lantern" message-role string and the separate Three-Doors/convergence subsystems are untouched.

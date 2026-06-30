@@ -217,6 +217,88 @@ async function recordSignal(entry, opts = {}) {
   return _writeTrace({ content, tags, keywords, entities, confidence: 0.6, sourceSurface: "trading" }, opts);
 }
 
+// Lowercased non-stopword tokens for keyword extraction from a question.
+// Tiny inline stoplist — keeps this module self-contained (csf-memory.js has the
+// full list, but importing it here would create a cycle).
+const _KW_STOP = new Set([
+  "the", "and", "for", "are", "was", "what", "why", "how", "who", "this", "that",
+  "with", "from", "into", "your", "you", "our", "can", "will", "does", "did",
+  "should", "would", "could", "about", "between", "over", "under", "have", "has",
+]);
+
+function _keywordsFromText(text, limit = 8) {
+  const seen = new Set();
+  const out = [];
+  for (const w of String(text || "").toLowerCase().split(/[\s.,;!?"'(){}[\]/-]+/)) {
+    if (w.length <= 2 || _KW_STOP.has(w) || seen.has(w)) continue;
+    seen.add(w);
+    out.push(w);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
+ * Ingest one !convergance (Σ₀ council) chat interaction as a CSF trace memory.
+ *
+ * This is the Remember-stage hook: every convergence question + its converged
+ * answer is written into the ONE canonical CSF memory (data/csf_memory) so it is
+ * recalled by csf-memory.js queryMemories() in later chats — not a separate store.
+ * Best-effort: callers wrap in try/catch; a write failure must never break chat.
+ *
+ * @param {object} interaction
+ * @param {string} interaction.question  - the user's convergence question
+ * @param {string} interaction.answer    - the converged council answer
+ * @param {number} [interaction.confidence=0.6]
+ * @param {string[]} [interaction.providers]  - council member providers
+ * @param {string[]} [interaction.dissent]    - points of council disagreement
+ * @param {string} [interaction.recordId]     - linked Convergence Record id
+ * @param {string} [interaction.synthesizer]  - "provider/model" that synthesized
+ * @param {string} [interaction.surface="chat"]
+ * @param {string} [interaction.sessionId="chat"]
+ */
+async function recordConvergance(interaction, opts = {}) {
+  interaction = interaction || {};
+  const question = String(interaction.question || "").trim();
+  const answer = String(interaction.answer || "").trim();
+  if (!question && !answer) return null;
+
+  const confidence = typeof interaction.confidence === "number"
+    ? Math.max(0, Math.min(1, interaction.confidence))
+    : 0.6;
+  const providers = (interaction.providers || []).filter(Boolean);
+  const dissent = (interaction.dissent || []).filter(Boolean);
+  const surface = interaction.surface || "chat";
+
+  const summary = `Convergence Q: ${question.slice(0, 200)} → A: ${answer.slice(0, 400)}`.trim();
+
+  const tags = ["convergance", "chat", "council"];
+  const keywords = ["convergance", ...(_keywordsFromText(question))];
+  const entities = providers.slice(0, 5);
+
+  const content = {
+    text: summary,
+    session_id: interaction.sessionId || "chat",
+    timestamp: _nowIso(),
+    surface,
+    role: "convergance",
+    raw_input: question,
+    event: "convergance",
+    question,
+    answer,
+    confidence,
+    providers,
+    dissent,
+    synthesizer: interaction.synthesizer || "",
+    convergence_record_id: interaction.recordId || null,
+  };
+
+  return _writeTrace(
+    { content, tags, keywords, entities, confidence, sourceSurface: surface },
+    opts,
+  );
+}
+
 /**
  * Return the most recent trading trace records (orders and/or signals),
  * newest first. `kind`, if given, should be "order" or "signal" — filters
@@ -251,6 +333,15 @@ module.exports = {
   extractTickers,
   recordOrder,
   recordSignal,
+  recordConvergance,
   queryRecent,
   verifyRecord,
+  // Shared canonical-checksum primitives. trading-memory.js / trading-news.js
+  // import these so every JS writer stamps records with the SAME recursive
+  // canonical-JSON + SHA-256 scheme (see _canonicalJson). Do NOT reintroduce a
+  // per-writer checksum — that is how data/csf_memory diverged into three
+  // incompatible schemes (see tests/test_csf_memory_integrity.py).
+  _checksum,
+  _canonicalJson,
+  _csfMemoryPath,
 };
