@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Fact-check — Keystone OS</title>
+  <style>
+    /* Personal fact-check (#1430): paste a claim → verdict + evidence + sources + confidence. */
+    .fc-wrap { max-width: 760px; margin: 0 auto; padding: 18px 16px 60px; }
+    .fc-head h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .fc-head p { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .fc-input { width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical;
+      background: var(--surface1, rgba(255,255,255,.04)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 12px; padding: 12px 14px;
+      font-size: 15px; line-height: 1.5; font-family: inherit; }
+    .fc-actions { display: flex; gap: 10px; align-items: center; margin: 10px 0 0; }
+    .fc-btn { background: var(--accent, #06b6d4); color: #06222a; border: none; border-radius: 10px;
+      padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .fc-btn:disabled { opacity: .5; cursor: default; }
+    .fc-hint { font-size: 12px; color: var(--muted, #9aa0aa); }
+    .fc-result { margin-top: 22px; }
+    .fc-verdict { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 14px;
+      border: 1px solid var(--border, rgba(255,255,255,.12)); background: var(--surface1, rgba(255,255,255,.03)); }
+    .fc-badge { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+      padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+    .v-supported { color: #052e16; background: #4ade80; }
+    .v-refuted { color: #2a0a0a; background: #f87171; }
+    .v-misleading { color: #2a1a02; background: #f59e0b; }
+    .v-unverified { color: #e5e7eb; background: rgba(255,255,255,.14); }
+    .fc-conf { font-size: 13px; color: var(--muted, #9aa0aa); }
+    .fc-conf b { color: var(--text, #e5e7eb); font-size: 18px; }
+    .fc-reason { margin: 12px 0 0; font-size: 14px; line-height: 1.55; color: var(--text, #d8dce2); }
+    .fc-sources h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #9aa0aa); margin: 22px 0 8px; }
+    .fc-src { display: block; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; text-decoration: none;
+      border: 1px solid var(--border, rgba(255,255,255,.10)); background: var(--surface1, rgba(255,255,255,.03)); }
+    .fc-src .t { font-size: 13px; color: var(--text, #e5e7eb); font-weight: 600; }
+    .fc-src .u { font-size: 11px; color: #38bdf8; word-break: break-all; }
+    .fc-src .s { font-size: 12px; color: var(--muted, #9aa0aa); margin-top: 4px; line-height: 1.45; }
+    .fc-disc { font-size: 11px; color: var(--muted, #9aa0aa); margin-top: 18px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/">
+      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+      <span style="font-size:18px;font-weight:600">Keystone OS</span>
+    </a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/grounding-diff.html">Grounding</a>
+      <a href="/factcheck.html" class="active">Fact-check</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="fc-wrap">
+    <div class="fc-head">
+      <h1>Did this actually happen?</h1>
+      <p>Paste any viral claim, headline, or DM. Keystone searches real sources and weighs the claim against them — returning a verdict, its confidence, and the sources so you can check the work. When the evidence is thin, it says so rather than guessing.</p>
+    </div>
+
+    <textarea id="claim" class="fc-input" placeholder="e.g. &quot;Scientists confirmed coffee cures the common cold&quot;" aria-label="Claim to fact-check"></textarea>
+    <div class="fc-actions">
+      <button id="go" class="fc-btn">Check it</button>
+      <span class="fc-hint" id="hint">Ctrl/Cmd+Enter to check</span>
+    </div>
+
+    <div class="fc-result" id="result" aria-live="polite"></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    var labels = { supported: 'Likely true', refuted: 'Likely false', misleading: 'Misleading', unverified: 'Unverified' };
+
+    function renderSources(sources) {
+      if (!sources || !sources.length) return '';
+      return '<div class="fc-sources"><h3>Sources (' + sources.length + ')</h3>'
+        + sources.map(function (s) {
+            var inner = '<div class="t">' + esc(s.title || s.url || 'source') + '</div>'
+              + (s.url ? '<div class="u">' + esc(s.url) + '</div>' : '')
+              + (s.snippet ? '<div class="s">' + esc(s.snippet) + '</div>' : '');
+            return s.url ? '<a class="fc-src" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + inner + '</a>'
+                         : '<div class="fc-src">' + inner + '</div>';
+          }).join('')
+        + '</div>';
+    }
+
+    function render(r) {
+      var v = r.verdict || 'unverified';
+      var conf = (typeof r.confidence === 'number') ? Math.round(r.confidence * 100) + '%' : '—';
+      document.getElementById('result').innerHTML =
+        '<div class="fc-verdict"><span class="fc-badge v-' + esc(v) + '">' + esc(labels[v] || v) + '</span>'
+          + '<span class="fc-conf">confidence <b>' + conf + '</b></span></div>'
+        + (r.reasoning ? '<p class="fc-reason">' + esc(r.reasoning) + '</p>' : '')
+        + renderSources(r.sources)
+        + '<p class="fc-disc">This is an automated grounding pass, not a professional fact-check. Always read the sources yourself before sharing.</p>';
+    }
+
+    async function check() {
+      var claim = document.getElementById('claim').value.trim();
+      if (!claim) return;
+      var go = document.getElementById('go');
+      go.disabled = true; var old = go.textContent; go.textContent = 'Checking…';
+      document.getElementById('result').innerHTML = '<p class="fc-hint">Searching sources and weighing the claim…</p>';
+      try {
+        var r = await fetch('/api/factcheck', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claim: claim }) }).then(function (x) { return x.json(); });
+        if (!r || !r.ok) throw new Error((r && r.error) || 'failed');
+        render(r);
+      } catch (e) {
+        document.getElementById('result').innerHTML = '<p class="fc-hint">Couldn\'t check that: ' + esc(e.message) + '</p>';
+      } finally { go.disabled = false; go.textContent = old; }
+    }
+
+    document.getElementById('go').addEventListener('click', check);
+    document.getElementById('claim').addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); check(); }
+    });
+  </script>
+</body>
+</html>
