@@ -148,6 +148,27 @@ const DEFAULTS = [
     note: "Looped coder CANDIDATE (LoopCoder-v2, 7B PLT, arXiv 2606.18023). Evidence-gated: registered but cannot lead until the 4-bit box probe passes. See docs/research/2026-06-29-best-in-slot-local-coder.md.",
   },
   {
+    id: "keystone-sigma0-plt",
+    endpoint: process.env.KEYSTONE_PLT_ENDPOINT || DEFAULT_ENDPOINT,
+    selfConverges: false,         // PLT loops internally (fixed 2-loop) but that is NOT a
+                                  // Q-exit convergence certificate → Core still wraps it in
+                                  // loopedReason() (grounding by default).
+    toolCalling: false,
+    vramGB: 6,                    // 7.6B PLT @ 4-bit ≈ 5.71GB MEASURED on-box (RTX 3070, #1757).
+    ctxTokens: 131072,
+    taskTypes: ["coding"],
+    rank: 3,
+    capabilityScore: 0.84,        // PREDICTED (vendor two-loop SWE-bench); gated by verified:false.
+    verified: false,             // OWNED proprietary PLT bootstrap (ADR-0011). Loads + generates
+                                  // correct code on-box (missing=0/unexpected=0), but is NOT yet
+                                  // faithful-parity verified (needs vLLM --ref top1≥0.99 on ≥24GB)
+                                  // and has no live serve path by default. Make it REACHABLE by
+                                  // running models/keystone-sigma0-plt/serve_keystone_plt.py and
+                                  // setting KEYSTONE_PLT_ENDPOINT (or OLLAMA_BASE_URL) at it. Cannot
+                                  // LEAD until parity + an on-box eval win flips this true.
+    note: "Proprietary Σ₀ PLT coder we own (ADR-0011). Gated: reachable only when serve_keystone_plt.py runs; never leads until faithful parity + eval win (External Reality Rule).",
+  },
+  {
     id: "lantern-csf-dream",
     endpoint: DEFAULT_ENDPOINT,
     selfConverges: false,
