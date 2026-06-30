@@ -74,6 +74,26 @@ data/agent-work-queue/**/issue-*.json
 # tool-logs/ and autowork-runs/, it must never be committed.
 data/convergence/council-reviews.jsonl
 
+# Runtime-local convergence/observability append-logs. The Convergence Core
+# writes these on every chat / routing decision / autowork run — they are
+# *per-environment memory*, not seed data (North Star: "memory is persistent,
+# append-only JSONL ... runtime-local by design"). They were committed before
+# this rule existed, so every chat re-dirtied git and the WIP-committing
+# automation kept pushing one developer's local chat history onto the others.
+# Untracked here (kept on disk); each environment now accumulates its own.
+#   NOTE — deliberately NOT ignored (committed *data*, must stay tracked):
+#   data/eval/*.jsonl (BENCHMARKS source-of-truth ledgers, CI-gated),
+#   data/knowledge/index*.* (RAG seed read at runtime — no deploy rebuild),
+#   data/contexts/personas.json (hand-edited config, read-only in code).
+data/convergence/records.jsonl
+data/convergence/issue-work-records.jsonl
+data/convergence-autonomous-work.jsonl
+data/convergence-records.jsonl
+data/agi-benchmark.jsonl
+data/router-gate-decisions.jsonl
+data/pcsf/gpu-training.pcsf.json
+data/issue-screenshots/
+
 # Stray apps/data/ runtime tree. A tool-logger.js off-by-one (REPO resolved to
 # apps/ instead of the repo root) scattered runtime data here, and the
 # WIP-committing automation kept re-committing it. Canonical runtime data lives
