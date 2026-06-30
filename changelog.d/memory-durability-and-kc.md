@@ -1,0 +1,2 @@
+- perf(remember): throttle MemoryEngine index persistence — `write()` re-saved the entire index on every call (O(n²) ingestion); it now persists at most once per 128 writes with O(1) registry-byte-size stale-detection + rebuild-on-load and a `flush()` for graceful shutdown, so sustained writes stay ~2.5 ms/write while a stale cache after a crash never hides records (#1728).
+- docs(kc): add Knowledge Center article "How Keystone Remembers" (docs/MEMORY-RETRIEVAL.md) documenting the CSF memory & retrieval system; carded + ingested into the product RAG index.

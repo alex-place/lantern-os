@@ -1,12 +1,14 @@
 """Retrieval-quality tests for MemoryEngine: IDF ranking, keyword breadth,
-and the persist_index escape hatch (issues #1689 / #1728)."""
+and durable, throttled index persistence (issues #1689 / #1728)."""
 import tempfile
+from unittest import mock
 
 from csf.memory_engine import (
     MemoryEngine,
     create_trace,
     _derive_keywords,
     _DERIVE_KEYWORD_CAP,
+    _INDEX_SAVE_EVERY,
 )
 
 
@@ -82,5 +84,69 @@ def test_persist_index_false_skips_disk_but_query_works():
 def test_persist_index_true_writes_index_file():
     with tempfile.TemporaryDirectory() as tmp:
         eng = _engine(tmp, persist_index=True)
-        eng.write(create_trace("persisted note", "s1"))
+        for i in range(_INDEX_SAVE_EVERY):  # reach the throttle threshold -> auto-flush
+            eng.write(create_trace(f"persisted note {i}", f"s{i}"))
         assert (eng.base / "_index.json").exists()
+
+
+# ── Throttled, durable index persistence (#1728) ─────────────────────────────
+def _spy_rebuild():
+    """Return (spy_fn, counter) to count _rebuild_index calls under mock.patch."""
+    calls = {"n": 0}
+    orig = MemoryEngine._rebuild_index
+
+    def spy(self):
+        calls["n"] += 1
+        return orig(self)
+
+    return spy, calls
+
+
+def test_unflushed_writes_are_recovered_by_rebuild_on_cold_start():
+    # Fewer than the throttle threshold -> index never auto-saved. A fresh engine
+    # must still surface the records (rebuild-on-stale), never lose them.
+    with tempfile.TemporaryDirectory() as tmp:
+        e1 = _engine(tmp)
+        for i in range(10):
+            e1.write(create_trace(f"note {i} zephyrine{i}", f"s{i}"))
+        # deliberately no flush() — simulate an ungraceful exit
+        e2 = _engine(tmp)
+        hits = e2.query(keywords=["zephyrine7"], use_multi_signal=True, match_any=True)
+        assert len(hits) == 1
+
+
+def test_stale_index_is_detected_and_rebuilt():
+    with tempfile.TemporaryDirectory() as tmp:
+        e1 = _engine(tmp)
+        for i in range(5):
+            e1.write(create_trace(f"note {i} alpha{i}", f"s{i}"))
+        spy, calls = _spy_rebuild()
+        with mock.patch.object(MemoryEngine, "_rebuild_index", spy):
+            e2 = _engine(tmp)  # stale cache (no flush) -> must rebuild
+        assert calls["n"] == 1
+        assert len(e2.query(keywords=["alpha3"], use_multi_signal=True, match_any=True)) == 1
+
+
+def test_flush_lets_cold_start_trust_cache_without_rebuild():
+    with tempfile.TemporaryDirectory() as tmp:
+        e1 = _engine(tmp)
+        for i in range(5):
+            e1.write(create_trace(f"note {i} bravo{i}", f"s{i}"))
+        e1.flush()  # graceful: persist current index
+        spy, calls = _spy_rebuild()
+        with mock.patch.object(MemoryEngine, "_rebuild_index", spy):
+            e2 = _engine(tmp)
+        assert calls["n"] == 0  # registry sizes match -> trusted, no rebuild
+        assert len(e2.query(keywords=["bravo2"], use_multi_signal=True, match_any=True)) == 1
+
+
+def test_auto_flush_at_threshold_persists_current_cache():
+    with tempfile.TemporaryDirectory() as tmp:
+        e1 = _engine(tmp)
+        for i in range(_INDEX_SAVE_EVERY):  # last write triggers an auto-flush
+            e1.write(create_trace(f"note {i} charlie{i}", f"s{i}"))
+        spy, calls = _spy_rebuild()
+        with mock.patch.object(MemoryEngine, "_rebuild_index", spy):
+            e2 = _engine(tmp)
+        assert calls["n"] == 0  # threshold flush left a current cache
+        assert len(e2.query(keywords=["charlie100"], use_multi_signal=True, match_any=True)) == 1

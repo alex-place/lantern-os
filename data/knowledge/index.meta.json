@@ -1,5 +1,5 @@
 {
-  "built_at": 1782487209.3741558,
+  "built_at": 1782842464.3711693,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -17,6 +17,7 @@
     "docs/adr/0001-record-architecture-decisions.md",
     "docs/adr/0002-single-convergence-core.md",
     "docs/adr/0003-one-canonical-csf-module.md",
+    "docs/MEMORY-RETRIEVAL.md",
     "docs/adr/0004-append-only-memory.md",
     "docs/adr/0005-interchangeable-model-providers.md",
     "docs/adr/0006-dual-boot-worktree-topology.md",
@@ -47,6 +48,6 @@
     "docs/convergence-io/CEG.md",
     "docs/convergence-io/DILATION.md"
   ],
-  "sections": 651,
-  "sha256": "8dd9046f77766ea7ebaa2c0f5331a6bd99958ad3672d23db11f06574bd70d0b3"
+  "sections": 669,
+  "sha256": "278440194003da936cb78c09e7b9bd4b57c83f73ec9b6d70ace4e6c77f71db0a"
 }

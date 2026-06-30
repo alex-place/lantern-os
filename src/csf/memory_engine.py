@@ -191,6 +191,12 @@ class MemoryRecord:
 # Memory limits to prevent unbounded growth
 _MAX_INDEX_SIZE = 100_000
 
+# Persist the index to disk at most once per this many writes (#1728). The old
+# code re-serialized the whole index on EVERY write -> O(n^2) bulk ingestion.
+# The in-memory index stays current regardless; the persisted file is only a
+# cold-start cache, validated on load against registry sizes and rebuilt if stale.
+_INDEX_SAVE_EVERY = 128
+
 
 class MemoryEngine:
     """Local-first cube-partitioned memory store."""
@@ -209,6 +215,7 @@ class MemoryEngine:
         # use for ephemeral/benchmark engines to avoid O(n^2) ingestion. The
         # in-memory index stays current either way, so query() is unaffected.
         self._persist_index = persist_index
+        self._writes_since_save = 0  # throttle counter for index persistence (#1728)
         self._index_path = self.base / "_index.json"
         self._load_index()
 
@@ -228,8 +235,22 @@ class MemoryEngine:
             json.dump(record.to_dict(), f, indent=2, ensure_ascii=False, default=str)
         self._append_registry(record)
         self._update_index(record)
-        self._save_index()
+        # Throttled persistence (#1728): the in-memory index was already updated
+        # above, so query() is current immediately. Only the on-disk cache is
+        # written at most once per _INDEX_SAVE_EVERY records.
+        self._writes_since_save += 1
+        if self._writes_since_save >= _INDEX_SAVE_EVERY:
+            self.flush()
         return path
+
+    def flush(self) -> None:
+        """Persist the in-memory index to disk now and reset the write throttle.
+
+        Call on graceful shutdown so the next cold start trusts the cache instead
+        of rebuilding. Safe to call anytime; a no-op when persist_index=False.
+        """
+        self._writes_since_save = 0
+        self._save_index()
 
     def write_async(self, record: MemoryRecord):
         """Fire-and-forget async write. Tracks pending queue depth.
@@ -287,6 +308,21 @@ class MemoryEngine:
                 continue
             self._entity_index[ent_lower].add(record.memory_id)
 
+    def _registry_sizes(self) -> Dict[str, int]:
+        """Byte size of each partition registry — the staleness fingerprint.
+
+        Registries are append-only, so their size strictly increases with every
+        write. A persisted index whose recorded sizes equal the current sizes is
+        therefore guaranteed current; any mismatch means records were appended
+        after the last save and the index must be rebuilt. O(1) per partition."""
+        sizes: Dict[str, int] = {}
+        for part in CubePartition:
+            try:
+                sizes[part.value] = self._registry_path(part).stat().st_size
+            except OSError:
+                sizes[part.value] = 0
+        return sizes
+
     def _save_index(self) -> None:
         """Persist indexes to JSON for fast cold starts."""
         if not self._persist_index:
@@ -298,6 +334,7 @@ class MemoryEngine:
                         "keywords": {k: list(v) for k, v in self._keyword_index.items()},
                         "entities": {k: list(v) for k, v in self._entity_index.items()},
                         "doc_count": self._doc_count,
+                        "registry_sizes": self._registry_sizes(),
                     },
                     f,
                     ensure_ascii=False,
@@ -306,11 +343,19 @@ class MemoryEngine:
             pass  # index is a perf optimization; failure is non-fatal
 
     def _load_index(self) -> None:
-        """Load persisted indexes, or rebuild from registries if stale/missing."""
+        """Load the persisted index only if it is provably current; else rebuild.
+
+        Throttled saves (#1728) mean the on-disk index can lag the registries
+        after an ungraceful exit. We trust it only when its recorded registry
+        sizes match the live ones exactly — otherwise a stale cache would hide
+        recently-written records from retrieval. Rebuild is the safe fallback.
+        """
         if self._index_path.exists():
             try:
                 with open(self._index_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                if data.get("registry_sizes") != self._registry_sizes():
+                    raise ValueError("stale index — registry sizes changed since last save")
                 self._keyword_index = defaultdict(set, {k: set(v) for k, v in data.get("keywords", {}).items()})
                 self._entity_index = defaultdict(set, {k: set(v) for k, v in data.get("entities", {}).items()})
                 self._doc_count = int(data.get("doc_count", 0))
