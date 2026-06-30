@@ -50,7 +50,7 @@ try:
     _CSF_CACHE_AVAILABLE = True
 except Exception:
     _CSF_CACHE_AVAILABLE = False
-from convergence.objects import ConvergenceRecord
+from convergence.objects import GradeCardRecord
 
 
 class Layer(IntEnum):
@@ -723,9 +723,9 @@ class TesseractEngine:
         self.grade_card_path = self.data_dir / "convergence" / "grade-card.jsonl"
         self.grade_card_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def grade(self) -> ConvergenceRecord:
+    def grade(self) -> GradeCardRecord:
         """
-        Generates a ConvergenceRecord (grade card) for the system's health.
+        Generates a GradeCardRecord (grade card) for the system's health.
         This involves running OH, CAP, and SCOPE checks.
         """
         start_time = time.time()
@@ -807,7 +807,7 @@ class TesseractEngine:
         else:
             overall_grade = "F"
 
-        record = ConvergenceRecord(
+        record = GradeCardRecord(
             timestamp=datetime.now(),
             oh_score=oh_score,
             cap_score=cap_score,

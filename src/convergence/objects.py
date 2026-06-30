@@ -200,12 +200,18 @@ class ConvergenceRecord:
 
 
 @dataclass
-class ConvergenceRecord:
+class GradeCardRecord:
     """A snapshot of the system's health and convergence status.
 
     This record captures the "grade card" of the system, including scores for
     various axes (OH, CAP, SCOPE), an overall grade, and contextual information.
     It serves as a canonical shape for all future grade cards.
+
+    NOTE: this is intentionally NOT named ``ConvergenceRecord``. It was, and that
+    duplicate class name (defined later in this module) silently shadowed the
+    canonical reasoning record above — breaking every ``ConvergenceRecord(id=…)``
+    call site and ~65 tests. A grade card is a distinct object from a convergence
+    record; it gets its own name.
     """
     timestamp: datetime = field(default_factory=datetime.now)
     # Overall Health (OH) axis score: 0.0-1.0, higher is better.
