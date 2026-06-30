@@ -13,7 +13,7 @@
 (function () {
   "use strict";
 
-  var state = { dataUrl: null, blob: null, pasteBound: false, title: "", body: "", describing: false, repo: "" };
+  var state = { dataUrl: null, blob: null, pasteBound: false, title: "", body: "", describing: false, repo: "", describeFailed: false, describeReason: "" };
 
   // ── DOM / console error capture ─────────────────────────────────────────────
   // Buffer recent JS errors so the filed report includes them (url + dom errors).
@@ -155,10 +155,40 @@
     btn.style.opacity = ready ? "1" : ".5";
   }
   function resetReport() {
-    state.title = ""; state.body = "";
+    state.title = ""; state.body = ""; state.describeFailed = false; state.describeReason = "";
     var g = $("issue-summary-group");
     if (g) g.style.display = "none";
+    var ud = $("issue-userdesc-group");
+    if (ud) ud.style.display = "none";
+    var ta = $("issue-user-desc");
+    if (ta) ta.value = "";
     setReady(false);
+  }
+  // Lazily insert an editable description field. Shown only when AI auto-description
+  // is unavailable, so a vision-down report still carries the reporter's own words
+  // instead of being filed as a contentless screenshot (the #1567 noise class).
+  // Injected in JS so it works for both modal sources (the copy shipped in
+  // dream-chat.html and the one this script injects elsewhere).
+  function ensureUserDescField() {
+    var existing = $("issue-user-desc");
+    if (existing) return existing;
+    var anchor = $("issue-status");
+    if (!anchor || !anchor.parentNode) return null;
+    var group = document.createElement("div");
+    group.className = "form-group";
+    group.id = "issue-userdesc-group";
+    group.style.display = "none";
+    group.innerHTML =
+      '<label class="form-label">Describe the issue <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone couldn\'t read the screenshot, so tell us what\'s wrong</span></label>' +
+      '<textarea id="issue-user-desc" class="form-input" rows="3" placeholder="What went wrong? What did you expect to happen?" style="resize:vertical;font-family:inherit"></textarea>';
+    anchor.parentNode.insertBefore(group, anchor);
+    var ta = group.querySelector("#issue-user-desc");
+    ta.addEventListener("input", function () {
+      var v = ta.value.trim();
+      state.body = v;
+      setReady(!!v);
+    });
+    return ta;
   }
   function renderSummary() {
     var g = $("issue-summary-group"), t = $("issue-summary-title"), b = $("issue-summary-body");
@@ -226,11 +256,18 @@
     var where = "";
     try { where = location.pathname + (location.hash || ""); } catch (e) { where = "the app"; }
     state.title = "Issue reported from screenshot on " + (where || "the app");
-    state.body = "A user reported an issue with a screenshot. Automatic analysis was unavailable (" +
-      String(reason || "vision unavailable").slice(0, 160) + "), so this report has no written description — see the attached screenshot.";
+    // No AI description available. Don't auto-file a contentless report (that produced
+    // empty, unactionable issues like #1567). Require the reporter to describe it first.
+    state.body = "";
+    state.describeFailed = true;
+    state.describeReason = String(reason || "vision unavailable").slice(0, 160);
     renderSummary();
-    setReady(true);
-    setStatus("Keystone couldn't read the screenshot, but you can still file it with the image attached.");
+    var ta = ensureUserDescField();
+    var grp = $("issue-userdesc-group");
+    if (grp) grp.style.display = "";
+    if (ta) { ta.value = ""; try { ta.focus(); } catch (e) { /* focus best-effort */ } }
+    setReady(false);   // stays disabled until the user types a description
+    setStatus("Keystone couldn't read the screenshot (" + state.describeReason + "). Add a short description, then file.");
   }
 
   function blobToDataUrl(blob) {
@@ -445,6 +482,14 @@
     if (!state.dataUrl) { setStatus("Add a screenshot first — Keystone writes the report from it.", true); return; }
     if (state.describing) { setStatus("Keystone is still writing the report — one moment.", true); return; }
     if (!title) { setStatus("No report yet — try re-attaching the screenshot.", true); return; }
+    // When AI couldn't read the screenshot, require the reporter's own words so we
+    // don't file an empty, unactionable issue (#1567).
+    var userBody = (state.body || "").trim();
+    if (state.describeFailed && !userBody) {
+      setStatus("Add a short description first — Keystone couldn't read the screenshot.", true);
+      var ta = $("issue-user-desc"); if (ta) { try { ta.focus(); } catch (e) { /* best-effort */ } }
+      return;
+    }
 
     // The server hosts the screenshot (in the fork) and files the issue with it
     // embedded in the body — fully automatic. We still copy to the clipboard inside
@@ -454,11 +499,17 @@
     if (btn) btn.disabled = true;
     setStatus("Filing the issue and attaching the screenshot…");
 
+    // On the AI-unavailable path, mark the description as reporter-written so it's clear
+    // in the issue that no automatic analysis ran.
+    var bodyText = state.describeFailed
+      ? (userBody + "\n\n_Automatic screenshot analysis was unavailable (" + (state.describeReason || "vision unavailable") + ") — description written by the reporter._")
+      : userBody;
+
     var payload = {
       title: title,
       // Always include the page URL + captured DOM/console errors in the body so they
       // land in the filed issue, in addition to meta.
-      body: ((state.body || "").trim() + "\n" + buildEnvSection()).trim(),
+      body: (bodyText + "\n" + buildEnvSection()).trim(),
       image: state.dataUrl || null,
       meta: { url: location.href, userAgent: navigator.userAgent, viewport: window.innerWidth + "x" + window.innerHeight, errors: errorLog.slice() }
     };

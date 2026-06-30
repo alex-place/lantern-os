@@ -1,0 +1,1 @@
+- fix(issue-reporter): when Keystone can't read a screenshot (vision provider down/over quota), the report no longer auto-fills a contentless body and lets you file immediately. Instead it shows an editable description field and keeps "File issue" disabled until you type something, so vision-down reports carry real signal instead of becoming empty, unactionable issues (#1567).
