@@ -1910,6 +1910,12 @@ async function handleStreamChat(req, url, res) {
               // call another tool or answer — matching the cloud models' agency. Bounded.
               const convo = buildProviderMessages(sysForOllama, compacted, message);
               let lastTurn = fullReply;
+              // The first turn was a pure tool call — its raw markup (```json …,
+              // <tool_call>…, or name{…}) must NOT leak into the user-facing answer.
+              // Build the final reply from the GROUNDED follow-up turns only, falling
+              // back to the original text just in case nothing usable comes back.
+              const _firstTurn = fullReply;
+              let toolAnswer = "";
               const MAX_TOOL_ITERS = 5;
               for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
                 const result = await toolRunner.runTool(tc.name, tc.input, { operator });
@@ -1924,8 +1930,11 @@ async function handleStreamChat(req, url, res) {
                 const followText = await streamOllamaFollow(convo);
                 const nextTc = toolRunner.parseToolCall(followText);
                 if (nextTc) { tc = nextTc; lastTurn = followText; } // markup already streamed; keep going
-                else { if (followText.trim()) fullReply += "\n\n" + followText; tc = null; }
+                else { if (followText.trim()) toolAnswer += (toolAnswer ? "\n\n" : "") + followText.trim(); tc = null; }
               }
+              // Prefer the grounded answer; only fall back to the first turn if the
+              // local model produced no usable follow-up text at all.
+              fullReply = toolAnswer.trim() || _firstTurn;
             }
           } catch (e) { /* tool handling is non-fatal — fall through to normal render */ }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
