@@ -28,7 +28,7 @@ const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
-const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
+const { resolveGrounding, formatGroundingForPrompt, gatherProjectContext } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
@@ -153,6 +153,18 @@ function triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMes
     });
   
   return entryId;
+}
+
+// #1693: The grounding canary needs to be precise. Upstream project context (e.g. from
+// `gatherProjectContext`) can contain generic information that isn't directly relevant
+// to the asserted claims in a reply. If this generic context is included in the
+// `anchor` calculation for `scoreReplyGroundedness`, it can artificially boost the
+// score and suppress the ungroundedness canary, even when the reply is truly ungrounded.
+// For now, we temporarily disable its contribution to the `anchor` calculation until a
+// more sophisticated claim-evidence overlap mechanism is implemented.
+function formatGroundingContextForCanary(context) {
+  // Filter out project context for the canary, as per #1693
+  return context.filter(item => item.type !== 'project_context');
 }
 
 /**
