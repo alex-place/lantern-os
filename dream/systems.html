@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <meta name="loop-stage" content="observe">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Systems Health — Keystone OS</title>
+  <style>
+    /* Single boot health-check + readiness gate (#1551). */
+    .w { max-width: 760px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .overall { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; margin-bottom: 16px; font-size: 15px;
+      border: 1px solid var(--border, rgba(255,255,255,.12)); color: var(--text, #e5e7eb); }
+    .overall.up { background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.4); }
+    .overall.degraded { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.45); }
+    .overall.down { background: rgba(248,113,113,.10); border-color: rgba(248,113,113,.5); }
+    .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+    .up .dot { background: #4ade80; } .degraded .dot { background: #f59e0b; } .down .dot { background: #f87171; }
+    .sys { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.07)); }
+    .pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 3px 9px; border-radius: 6px; flex: 0 0 auto; min-width: 66px; text-align: center; }
+    .s-up { color: #052e16; background: #4ade80; } .s-down { color: #2a0a0a; background: #f87171; } .s-disabled { color: #e5e7eb; background: rgba(255,255,255,.14); }
+    .sys .label { font-size: 14px; color: var(--text, #e5e7eb); font-weight: 600; }
+    .sys .reason { font-size: 12px; color: var(--muted, #9aa0aa); margin-top: 2px; }
+    .foot { font-size: 11px; color: var(--muted, #9aa0aa); margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/metrics.html">Metrics</a>
+      <a href="/systems.html" class="active">Systems</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Systems Health</h1>
+    <p class="lede">One signal for what is actually running. Every moving part — this server, the local model, MCP, the dev dual-server, the trader, cloud providers — as up, down, or disabled with the reason. Backed by <code>GET /api/health?full=1</code>.</p>
+    <div class="overall" id="overall"><span class="dot"></span><span id="overallText">Checking…</span></div>
+    <div id="systems"></div>
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    async function load() {
+      try {
+        var h = await fetch('/api/health?full=1').then(function (x) { return x.json(); });
+        var o = document.getElementById('overall');
+        o.className = 'overall ' + (h.overall || 'down');
+        document.getElementById('overallText').textContent =
+          (h.overall === 'up' ? 'All systems operational' : (h.overall === 'degraded' ? 'Degraded — some parts down' : 'Down — a critical part is offline'))
+          + ' · ' + (h.counts ? h.counts.up + ' up / ' + h.counts.down + ' down / ' + h.counts.disabled + ' disabled' : '');
+        document.getElementById('systems').innerHTML = (h.subsystems || []).map(function (s) {
+          var cls = 's-' + s.state;
+          return '<div class="sys"><span class="pill ' + cls + '">' + esc(s.state) + '</span>'
+            + '<div><div class="label">' + esc(s.label || s.name) + '</div>'
+            + '<div class="reason">' + esc(s.reason || s.detail || '') + '</div></div></div>';
+        }).join('');
+        document.getElementById('foot').textContent = 'Checked ' + (h.generatedAt || '') + ' · auto-refreshes every 15s';
+      } catch (e) {
+        document.getElementById('overallText').textContent = 'Failed to load health: ' + e.message;
+      }
+    }
+    load(); setInterval(load, 15000);
+  </script>
+</body>
+</html>
