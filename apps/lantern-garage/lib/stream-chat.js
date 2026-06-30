@@ -250,6 +250,7 @@ async function handleStreamChat(req, url, res) {
   });
   let { message, user, requestedAgent, requestedProvider, history, mcpFlag, routeIntent } = parsed;
   const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  let routingDecision = { model: null, provider: null, reason: "initial" }; // Initialize routing decision
   // Image attachments (#1606): every downstream consumer on this path treats an attachment
   // as TEXT, so an uploaded image (which carries no extractable text) used to vanish silently
   // and the model would honestly report it received "0 files". Resolve each image to a text
@@ -422,6 +423,7 @@ async function handleStreamChat(req, url, res) {
       // fixes the prior bug where the async selectProvider was used un-awaited.)
       const { provider, model: kernelModel, mode: rolloverMode } = await selectKernelProvider(requestedProvider);
       let llmFn;
+      routingDecision = { model: kernelModel, provider: provider, reason: "keystone_kernel_selection" };
 
       try {
         // #897: actually escalate through the kernel chain on failure (Keystone/Ouro
