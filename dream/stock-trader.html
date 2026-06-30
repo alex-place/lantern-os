@@ -369,6 +369,22 @@
   .s0-eye{margin-right:2px}
   .s0-status{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:2px 0 7px;margin-bottom:6px;border-bottom:1px solid var(--tv-border)}
   .s0-status .pos{color:var(--green)} .s0-status .neg{color:var(--red)}
+  /* Σ₀ Council (Converge stage): calibration + per-signal realized edge */
+  .s0-cl-mat{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.08em}
+  .s0-cl-mat.ready{color:var(--green);background:rgba(0,212,170,.12)}
+  .s0-cl-mat.warm{color:var(--amber);background:rgba(255,176,32,.12)}
+  .s0-cl-stats{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:7px 0;margin:6px 0;border-top:1px solid var(--tv-border);border-bottom:1px solid var(--tv-border)}
+  .s0-cl-stats b{color:var(--tv-text);font-weight:700}
+  .s0-cl-hdr{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 5px}
+  .s0-cl-row{display:grid;grid-template-columns:74px 1fr 52px;gap:8px;align-items:center;font-family:var(--mono);font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+  .s0-cl-name{color:var(--tv-text);font-weight:600}
+  .s0-cl-name.member{color:var(--purple)}
+  .s0-cl-bar{position:relative;height:8px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+  .s0-cl-bar i{position:absolute;top:0;bottom:0;left:50%;display:block}
+  .s0-cl-bar i.pos{background:var(--green)} .s0-cl-bar i.neg{background:var(--red)}
+  .s0-cl-lift{text-align:right;font-weight:700}
+  .s0-cl-lift.pos{color:var(--green)} .s0-cl-lift.neg{color:var(--red)} .s0-cl-lift.nil{color:var(--tv-text-secondary)}
+  .s0-cl-sub{font-size:8px;color:var(--tv-text-secondary)}
   /* Agent log */
   .log-item{font-family:var(--mono);font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);display:grid;grid-template-columns:45px 55px 1fr;gap:4px;align-items:start}
   .log-time{color:var(--text2)}.log-agent{font-weight:600}
@@ -460,6 +476,7 @@
     <button class="tp-tab" role="tab" data-tab="orders" onclick="tpTab('orders')">Orders</button>
     <button class="tp-tab" role="tab" data-tab="history" onclick="tpTab('history')">Order history</button>
     <button class="tp-tab" role="tab" data-tab="signals" onclick="tpTab('signals')">⚡ Σ₀ Signals</button>
+    <button class="tp-tab" role="tab" data-tab="council" onclick="tpTab('council')">🎯 Council</button>
     <button class="tp-tab" role="tab" data-tab="feed" onclick="tpTab('feed')">Agent Feed</button>
   </div>
   <!-- Tab bodies -->
@@ -468,6 +485,7 @@
     <div class="tp-pane" id="tp-orders"></div>
     <div class="tp-pane" id="tp-history"></div>
     <div class="tp-pane" id="tp-signals"><div id="sigma0Signals"></div></div>
+    <div class="tp-pane" id="tp-council"><div id="sigma0Council"><div class="s0-empty">Loading council…</div></div></div>
     <div class="tp-pane" id="tp-feed"><div id="agentLog"></div></div>
   </div>
 </div>
@@ -2136,6 +2154,52 @@ function renderSigma0Signals(){
     + (watching.length ? `<div class="s0-watchhdr">Watching ${watching.length} setup${watching.length===1?'':'s'}</div>` + watchHtml : '');
 }
 
+// ── Σ₀ Council (Converge stage): realized calibration + per-signal edge ───────
+// Reads /api/trading/sigma0/calibration (sigma0-trader-council.js) and shows how
+// well-calibrated the EV gate is, and which evidence signals — Grok, Claude, zone,
+// structure, … — actually predicted wins (lift = strong_winrate − weak_winrate).
+// This is the human-readable view of the re-weighting evidence.
+const COUNCIL_LABELS = { grok:'Grok', claude:'Claude', zone:'Zone', structure:'Structure',
+  pattern:'Pattern', trend:'Trend', news:'News', llm:'LLM (legacy)' };
+async function loadCouncil(){
+  const el = document.getElementById('sigma0Council');
+  if(!el) return;
+  let d;
+  try{ d = await (await fetch('/api/trading/sigma0/calibration')).json(); }
+  catch(e){ el.innerHTML = '<div class="s0-empty">Council unavailable.</div>'; return; }
+  if(!d || !d.graded){ el.innerHTML = '<div class="s0-empty">No graded trades yet — the loop populates as positions close.</div>'; return; }
+  const cal = d.calibration || {};
+  const ready = d.maturity==='ready';
+  const pct = (v)=> v==null?'—':Math.round(v*100)+'%';
+  const head = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">`+
+    `<span class="s0-cl-mat ${ready?'ready':'warm'}">${ready?'● ready':'◐ warming'}</span>`+
+    `<span class="s0-cl-sub">${d.graded_with_conviction||0}/20 conviction-graded${d.graded_with_signals!=null?` · ${d.graded_with_signals} with signals`:''}</span></div>`;
+  const stats = `<div class="s0-cl-stats">`+
+    `<span>win rate <b>${pct(d.win_rate)}</b></span>`+
+    `<span>avg P&L <b class="${(d.avg_pnl_pct||0)>=0?'pos':'neg'}">${d.avg_pnl_pct>=0?'+':''}${d.avg_pnl_pct??'—'}%</b></span>`+
+    `<span>Brier <b>${cal.mean_brier!=null?cal.mean_brier.toFixed(3):'—'}</b></span>`+
+    `<span>skill <b>${cal.skill_score!=null?(cal.skill_score>=0?'+':'')+cal.skill_score.toFixed(3):'—'}</b></span>`+
+    `<span>graded <b>${d.graded}</b></span></div>`;
+  const edge = d.per_signal_edge || {};
+  const rows = Object.keys(edge).map(k=>({k, ...edge[k]}))
+    .sort((a,b)=> (b.lift==null?-99:b.lift) - (a.lift==null?-99:a.lift));
+  const maxAbs = Math.max(0.01, ...rows.map(r=> r.lift==null?0:Math.abs(r.lift)));
+  const member = (k)=> k==='grok'||k==='claude';
+  const rowHtml = rows.map(r=>{
+    const lift = r.lift;
+    const cls = lift==null?'nil':(lift>0?'pos':lift<0?'neg':'nil');
+    const w = lift==null?0:Math.round(Math.abs(lift)/maxAbs*50);
+    const bar = lift==null?'' : `<i class="${lift>0?'pos':'neg'}" style="width:${w}%;${lift<0?'right:50%;left:auto':''}"></i>`;
+    return `<div class="s0-cl-row">`+
+      `<span class="s0-cl-name${member(r.k)?' member':''}">${COUNCIL_LABELS[r.k]||r.k}</span>`+
+      `<span class="s0-cl-bar">${bar}</span>`+
+      `<span class="s0-cl-lift ${cls}">${lift==null?'n/a':(lift>0?'+':'')+lift}</span></div>`;
+  }).join('');
+  el.innerHTML = head + stats +
+    `<div class="s0-cl-hdr">Per-signal realized edge (lift = strong − weak win-rate)</div>` +
+    (rowHtml || '<div class="s0-empty">No signal-bearing trades graded yet.</div>');
+}
+
 let pricesLoading = false;
 async function loadWatchlistPrices(){
   if(pricesLoading) return;
@@ -2509,12 +2573,14 @@ function startDashboard(){
   loadBars();
   loadAgentLog();
   loadOrders();
+  loadCouncil();
   refreshOvernightScan();
   setInterval(fullRefresh,         30000);
   setInterval(loadWatchlistPrices,  3000);   // #1627: tighter so the tick-flash is responsive
   setInterval(loadBars,            15000);
   setInterval(loadAgentLog,         5000);
   setInterval(loadOrders,          60000);
+  setInterval(loadCouncil,         60000);   // Σ₀ Converge: calibration + per-signal edge
   setInterval(refreshOvernightScan, 60000);  // reflect the auto-reset at market open
 }
 // 🌙 Overnight (market-closed) crypto scanning toggle (#1714)
