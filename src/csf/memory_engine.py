@@ -357,8 +357,22 @@ class MemoryEngine:
             return False
         return True
 
-    def _indexed_candidates(self, keywords: Optional[List[str]], entities: Optional[List[str]]) -> Optional[Set[str]]:
-        """Return candidate memory_ids from indexes, or None for full scan."""
+    def _indexed_candidates(
+        self,
+        keywords: Optional[List[str]],
+        entities: Optional[List[str]],
+        match_any: bool = False,
+    ) -> Optional[Set[str]]:
+        """Return candidate memory_ids from indexes, or None for full scan.
+
+        match_any=False (default): a candidate must match ALL provided keywords
+        and entities (set intersection) — strict, good for precise lookups.
+
+        match_any=True: a candidate matching ANY provided keyword/entity is
+        included (set union). Natural-language queries rarely have every token in
+        one record, so AND-intersection returns nothing; union is the correct
+        recall behavior for retrieval-augmented memory (ranking then orders them).
+        """
         if not keywords and not entities:
             return None
         candidate_sets: List[Set[str]] = []
@@ -370,10 +384,12 @@ class MemoryEngine:
                 candidate_sets.append(self._entity_index.get(ent.lower(), set()))
         if not candidate_sets:
             return None
-        # Intersection across all provided keywords and entities
         result = candidate_sets[0].copy()
         for s in candidate_sets[1:]:
-            result &= s
+            if match_any:
+                result |= s
+            else:
+                result &= s
         return result
 
     def query(
@@ -389,6 +405,7 @@ class MemoryEngine:
         entities: Optional[List[str]] = None,
         limit: int = 100,
         use_multi_signal: bool = False,
+        match_any: bool = False,
     ) -> List[MemoryRecord]:
         """Query memory records with optional multi-signal retrieval.
 
@@ -400,7 +417,7 @@ class MemoryEngine:
         """
         results: List[MemoryRecord] = []
         scored: List[tuple[float, MemoryRecord]] = []
-        candidate_ids = self._indexed_candidates(keywords, entities)
+        candidate_ids = self._indexed_candidates(keywords, entities, match_any=match_any)
 
         if candidate_ids is not None:
             # Index path: load only candidates

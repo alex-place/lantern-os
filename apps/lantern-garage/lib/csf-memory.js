@@ -330,12 +330,18 @@ function queryConversationMemory(message, limit = 4) {
 }
 
 // New: query-time relevance-filtered context — compact, ~500-1500 chars max
-function formatCSFContextForPrompt(message) {
+//
+// `opts.memories` lets a caller inject an already-resolved memory list (e.g. the
+// async semantic-reranked path below) instead of the default keyword query, so
+// the live chat read path gets the multi-signal retrieval that csf-memory.js
+// already implements — without duplicating this whole builder.
+function formatCSFContextForPrompt(message, opts = {}) {
   const parts = [];
 
-  // Relevant memories only (scored by keyword match to message)
+  // Relevant memories only (scored by keyword match to message, unless an
+  // already-resolved list was injected via opts.memories).
   if (message) {
-    const memories = queryMemories(message, 3);
+    const memories = Array.isArray(opts.memories) ? opts.memories : queryMemories(message, 3);
     if (memories.length > 0) {
       const memText = memories.map(m => {
         const text = m.content?.text || m.content?.raw_input || "";
@@ -425,6 +431,22 @@ function formatCSFContextForPrompt(message) {
   return parts.join("\n\n");
 }
 
+// Async entry point for the live chat read path. Resolves the Memories section
+// via the semantic reranker (real nomic-embed similarity over a wider keyword
+// candidate pool — our multi-signal retrieval), then delegates everything else
+// to the sync builder. Fail-safe: any embed/Ollama failure falls back to the
+// keyword path inside queryMemoriesSemantic, so the caller always gets context.
+async function formatCSFContextForPromptAsync(message) {
+  if (!message) return formatCSFContextForPrompt(message);
+  let memories = [];
+  try {
+    memories = await queryMemoriesSemantic(message, 3);
+  } catch {
+    memories = queryMemories(message, 3);
+  }
+  return formatCSFContextForPrompt(message, { memories });
+}
+
 module.exports = {
   relevanceScore,
   distinctiveHitCount,
@@ -442,4 +464,5 @@ module.exports = {
   saveDoorChoice,
   buildCSFContext,
   formatCSFContextForPrompt,
+  formatCSFContextForPromptAsync,
 };

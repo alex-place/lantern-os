@@ -16,6 +16,7 @@ const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
 const { emitConvergenceRecord } = require("./convergence-records");
+const { recordConvergance } = require("./csf-memory-writer");
 const { resolveCodingRoute } = require("./route-contract");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
@@ -24,7 +25,7 @@ const { runCanaries } = require("./canary");
 const { councilReview } = require("./council-review");
 const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
-const { formatCSFContextForPrompt, saveDoorChoice } = require("./csf-memory");
+const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
 const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
@@ -628,6 +629,20 @@ async function handleStreamChat(req, url, res) {
             });
             recordId = rec && rec.id;
           } catch (_e) { /* record emit is best-effort */ }
+          // Remember-stage hook: ingest this convergence interaction into the ONE
+          // canonical CSF memory so it's recalled in later chats. Best-effort.
+          try {
+            await recordConvergance({
+              question,
+              answer,
+              confidence: conf,
+              providers: members.map((m) => m.provider),
+              dissent,
+              recordId,
+              synthesizer: `${result.provider}/${result.model}`,
+              surface: surfaceMode || "chat",
+            });
+          } catch (_e) { /* CSF ingest is best-effort — never break chat */ }
           for (const w of answer.split(" ")) sendToken(w + " ");
           if (dissent.length) {
             sendToken(`\n\n**Where the council disagreed (${dissent.length}):**\n`);
@@ -647,6 +662,16 @@ async function handleStreamChat(req, url, res) {
           try {
             const fb = await swarmOrchestrate({ job: "chat", mode: "single", systemPrompt: convSystem, message: question, history });
             const ans = String(fb.text).replace(/\n*CONFIDENCE:\s*[0-9]*\.?[0-9]+\s*$/i, "").trim() || String(fb.text);
+            try {
+              await recordConvergance({
+                question,
+                answer: ans,
+                confidence: 0.5,
+                providers: [fb.provider].filter(Boolean),
+                synthesizer: `${fb.provider}/${fb.model || "single"}`,
+                surface: surfaceMode || "chat",
+              });
+            } catch (_e) { /* best-effort */ }
             for (const w of ans.split(" ")) sendToken(w + " ");
             sendDone("keystone", { agent: "Keystone", provider: fb.provider, online: true, routeLabel: "Convergence · single (council unavailable)" });
           } catch (e2) {
@@ -979,8 +1004,10 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  // CSF long-term memory + door state (query-time relevance filtered)
-  const csfContext = formatCSFContextForPrompt(message);
+  // CSF long-term memory + door state (query-time relevance filtered).
+  // Async path: Memories section is semantic-reranked (nomic-embed multi-signal)
+  // when Ollama is up, else falls back to keyword scoring inside the query.
+  const csfContext = await formatCSFContextForPromptAsync(message);
   const csfBlock = csfContext ? `\n\nLong-term memory (CSF):\n${csfContext}` : "";
 
   // Convergence Oracle — ground EVERY question in its cosmic-time observer slice (in-process
