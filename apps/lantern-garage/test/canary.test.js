@@ -60,6 +60,56 @@ check("grounding context flows through the harness", () => {
   assert.strictEqual(grounded.grounded.anchored, true);
 });
 
+// 3-band groundedness verdict (#1731): the active-gate input the UI thresholds on
+// to decide pass · offer re-ground · auto-escalate. Server-owned + configurable.
+check("groundedness band: healthy reply is green", () => {
+  const g = runCanaries(HEALTHY, { emit: false }).signaturePatch.groundedness;
+  assert.strictEqual(g.band, "green");
+  assert.strictEqual(g.anchored, false);
+  assert.ok(typeof g.highThreshold === "number");
+});
+
+check("groundedness band: confident-unanchored is amber/red, consistent with risk", () => {
+  const g = runCanaries(CONFIDENT_UNANCHORED, { emit: false }).signaturePatch.groundedness;
+  assert.notStrictEqual(g.band, "green");
+  const expected = g.risk >= g.highThreshold ? "red" : "amber";
+  assert.strictEqual(g.band, expected, `risk=${g.risk} thr=${g.highThreshold}`);
+});
+
+check("groundedness band: grounding context pulls it back to green", () => {
+  const g = runCanaries(CONFIDENT_UNANCHORED, {
+    emit: false, groundingContext: "Web search: Peace of Westphalia, 1648 ...",
+  }).signaturePatch.groundedness;
+  assert.strictEqual(g.band, "green");
+});
+
+check("groundedness band: default red cutoff is 0.7", () => {
+  const g = runCanaries(HEALTHY, { emit: false }).signaturePatch.groundedness;
+  assert.strictEqual(g.highThreshold, 0.7);
+});
+
+check("groundedness band: KEYSTONE_GROUND_HIGH is read from env and drives the band", () => {
+  const prev = process.env.KEYSTONE_GROUND_HIGH;
+  const bust = () => {
+    delete require.cache[require.resolve("../lib/canary")];
+    delete require.cache[require.resolve("../lib/groundedness-canary")];
+  };
+  try {
+    process.env.KEYSTONE_GROUND_HIGH = "0.55";
+    bust();
+    const { runCanaries: rc } = require("../lib/canary");
+    const g = rc(CONFIDENT_UNANCHORED, { emit: false }).signaturePatch.groundedness;
+    // the env value is plumbed through, and the band follows the rule against it
+    assert.strictEqual(g.highThreshold, 0.55);
+    const expected = g.risk >= 0.55 ? "red" : "amber";
+    assert.strictEqual(g.band, expected, `risk=${g.risk} thr=0.55`);
+  } finally {
+    if (prev === undefined) delete process.env.KEYSTONE_GROUND_HIGH;
+    else process.env.KEYSTONE_GROUND_HIGH = prev;
+    bust();
+  }
+});
+
 // The event stream is the canonical convergence path, and emit is a no-throw promise.
 check("recordCanaryEvent returns a promise, never throws", () => {
   assert.ok(/data[\\/]convergence[\\/]canary-events\.jsonl$/.test(CANARY_EVENTS), CANARY_EVENTS);

@@ -513,6 +513,7 @@ const COMMANDS = [
   { name: 'issues',      group: 'Build',   usage: '!issues',           desc: 'Browse open issues — one click runs autowork', aliases: ['backlog'] },
   { name: 'work',        group: 'Build',   usage: '!work #123',        desc: 'Run keystone autowork on an issue → linked PR', aliases: ['edit'] },
   { name: 'review',      group: 'Build',   usage: '!review #123',      desc: 'Review a pull request’s diff right in the chat' },
+  { name: 'prs',         group: 'Build',   usage: '!prs',              desc: 'Browse open PRs — one click reviews each (also: “review pull requests”)', aliases: ['pull-requests', 'pullrequests', 'review-prs'] },
   { name: 'convergence', group: 'Build',   usage: '!convergence',      desc: 'Run the convergence loop + fleet/version status', aliases: ['convergance', 'converge'] },
   { name: 'code',        group: 'Build',   usage: '!code <task>',      desc: 'Coding turn on the cloud coder' },
   { name: 'self-edit',   group: 'Build',   usage: '!self-edit <task>', desc: 'Plan an edit to Keystone’s own code', aliases: ['selfedit'] },
@@ -592,6 +593,75 @@ async function renderIssues() {
   } catch (e) {
     bubble.innerHTML = `Couldn’t load issues (${esc(e.message)}). ${ghLink}`;
   }
+}
+
+// ── Open-PR browser (!prs / "review pull requests") ───────────────────────────
+// PR analogue of renderIssues: lists the open PRs with a one-click "Review →" that
+// runs the existing !review #N flow. Listing is a plain gh call (no LLM), so this
+// works even when every provider is down — which is exactly the dead-end this fixes:
+// a plural "review pull requests" used to fall through to the AI-unavailable fallback.
+async function renderPRs() {
+  hideEmptyState();
+  const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+  const messages = document.getElementById('messages');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Loading open pull requests…</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+  const bubble = row.querySelector('.bubble');
+  const ghLink = '<a href="https://github.com/alex-place/lantern-os/pulls" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Open on GitHub →</a>';
+  try {
+    const r = await fetch(`${base}/api/dream/prs?limit=20`, { cache: 'no-store' });
+    const d = await r.json();
+    if (!d.ok || !Array.isArray(d.prs) || !d.prs.length) {
+      bubble.innerHTML = `No open pull requests to show${d && d.error ? ` (${esc(d.error)})` : ''}. ${ghLink}`;
+      return;
+    }
+    const rows = d.prs.map(p => {
+      const draft = p.isDraft
+        ? `<span style="font-size:10px;background:var(--surface2);padding:1px 6px;border-radius:8px;opacity:0.8">draft</span>` : '';
+      return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--border)">
+        <a href="https://github.com/alex-place/lantern-os/pull/${p.number}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-weight:600;font-size:12px;text-decoration:none">#${p.number}</a>
+        <span style="flex:1;font-size:12.5px">${esc(p.title)} ${draft}</span>
+        <button class="pr-review-btn" data-pr="${p.number}" style="font-size:11px;padding:3px 10px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap">Review →</button>
+      </div>`;
+    }).join('');
+    bubble.innerHTML = `<b>Open pull requests</b> · ${d.prs.length} · ${ghLink}${rows}`;
+    bubble.querySelectorAll('.pr-review-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const n = parseInt(btn.getAttribute('data-pr'), 10);
+        fillAndSend('!review #' + n);   // reuse the server-side !review #N reviewer
+      });
+    });
+  } catch (e) {
+    bubble.innerHTML = `Couldn’t load pull requests (${esc(e.message)}). ${ghLink}`;
+  }
+}
+
+// ── Natural-language PR review intent ─────────────────────────────────────────
+// "review pull requests" / "review prs" / "!prs" → list open PRs (the deterministic,
+// provider-free browser above). "review pr #1410" / "review #1410" → route to the
+// server's !review #N reviewer. Returns { kind:'list' } | { kind:'one', number } | null.
+// Deliberately narrow so it never hijacks an ordinary turn — "review my essay" stays an
+// LLM chat. !review #N (with a number) is left to the server handler (returns null).
+function detectPrReviewIntent(text) {
+  const t = String(text || '').trim();
+  // Bang/slash forms. `!review #N` is left to the server reviewer (return null → fall through).
+  let m = t.match(/^[!/](review|prs?|pull[\s-]?requests?|review[\s-]?prs?)\b\s*#?(\d+)?\s*$/i);
+  if (m) {
+    if (m[2]) return /^review$/i.test(m[1]) ? null : { kind: 'one', number: parseInt(m[2], 10) };
+    return { kind: 'list' };
+  }
+  // "review pr #1410" / "review pull request 1410" / "review #1410"
+  m = t.match(/^review\s+(?:the\s+)?(?:pull\s*request|pr)\s*#?(\d+)\s*$/i)
+   || t.match(/^review\s+#(\d+)\s*$/i);
+  if (m) return { kind: 'one', number: parseInt(m[1], 10) };
+  // "review pull requests" / "review the open prs" / "list/show/browse open pull requests"
+  m = t.match(/^(?:review|list|show|browse|see|view|check|open)\s+(?:(?:the|all|my|open|any)\s+)*(?:pull\s*requests?|prs?)\s*\??$/i);
+  if (m) return { kind: 'list' };
+  return null;
 }
 
 // ── Autowork live-step panel (issue #527 / autonomous-work/stream) ─────────────
@@ -1508,6 +1578,10 @@ async function sendMessage(opts = {}) {
   // box — so we must not read or clear the box on this path.
   const overrideText = (opts && typeof opts.text === 'string') ? opts.text : null;
   const forceGround = !!(opts && opts.forceGround);
+  // Auto-escalation (#1732): the groundedness canary fired this re-ground itself because
+  // the prior reply was confident + unanchored (red band) — not a human click. Rides the
+  // same forceGround path; used only to label the turn honestly.
+  const autoVerify = !!(opts && opts.auto);
   // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
   // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
   // they're folded in here so there is exactly one sendMessage, no monkey-patching.
@@ -1711,6 +1785,19 @@ async function sendMessage(opts = {}) {
     return;
   }
 
+  // PR review intent — "review pull requests" / "!prs" lists the open PRs (deterministic,
+  // no LLM, works while every provider is down); "review pr #N" runs the !review reviewer.
+  // Placed before the LLM path so the plural ask no longer dead-ends at "AI unavailable".
+  const prIntent = detectPrReviewIntent(text);
+  if (prIntent) {
+    input.value = '';
+    input.style.height = 'auto';
+    if (prIntent.kind === 'one') { fillAndSend('!review #' + prIntent.number); return; }
+    addUserBubble(text);
+    renderPRs().catch(e => console.error('[prs]', e));
+    return;
+  }
+
   // Explore embeds — surface videos / discover feed / GitHub activity / Patreon
   // tiers inline when asked (bang commands or a "show/what/latest" NL framing).
   // Deterministic, no LLM cost; same server-cached routes as the Explore page.
@@ -1732,7 +1819,9 @@ async function sendMessage(opts = {}) {
   const abortTimer = setTimeout(() => ac.abort(), 90000);
   showStopButton(() => { userStopped = true; ac.abort(); });
 
-  addUserBubble(forceGround && overrideText != null ? text + '  ↻ grounding' : text);
+  addUserBubble(forceGround && overrideText != null
+    ? text + (autoVerify ? '  ↻ auto-verifying' : '  ↻ grounding')
+    : text);
   // Don't clear the input box on a "Ground this" retry — the user didn't type this.
   if (overrideText == null) { input.value = ''; input.style.height = 'auto'; }
   history.push({ role: 'user', text });
@@ -1881,6 +1970,12 @@ async function sendMessage(opts = {}) {
                 bubble.dataset.ungroundedRisk = String(evt.sigma0_grounding.risk);
               }
             }
+            // 3-band groundedness verdict (#1731): green=pass · amber=offer · red=auto-verify.
+            if (evt.groundedness && evt.groundedness.band) {
+              bubble.dataset.groundednessBand = evt.groundedness.band;
+            }
+            // #1733: a forced grounding pass found no source → honest abstention framing.
+            if (evt.abstained) bubble.dataset.abstained = '1';
             // Σ₀ council: the unified 4-way answerability verdict + disagreement Δ.
             if (evt.council && evt.council.verdict) {
               bubble.dataset.councilVerdict = String(evt.council.verdict);
@@ -1987,29 +2082,54 @@ async function sendMessage(opts = {}) {
   // Σ₀ groundedness canary: confident claims, no external anchor (the 42-state).
   // Honest signal to the user — internally consistent but unverified. Suppressed
   // when Σ₀ verify already grounded the reply.
-  if (bubble.dataset.ungrounded && !bubble.dataset.sigma0Corrected) {
+  if (bubble.dataset.abstained) {
+    // #1733 honest abstention: a forced grounding pass found no external source for the
+    // claims. Fail closed (BetterSafe doctrine) — say so plainly rather than re-badging
+    // "ungrounded". The verified "could not ground" negative was logged server-side.
+    const note = document.createElement('span');
+    note.title = "I couldn't find an external source to verify these claims. Treat this as unverified.";
+    note.style.cssText = 'font-size:10px;margin-left:6px;vertical-align:middle;color:#f5a623;cursor:help;opacity:0.95';
+    note.textContent = '⚠ unverified — no source found';
+    bubble.appendChild(note);
+  } else if (bubble.dataset.ungrounded && !bubble.dataset.sigma0Corrected) {
     const risk = bubble.dataset.ungroundedRisk;
-    const badge = document.createElement('span');
-    badge.title = 'Confident claims with no external source — self-consistent but unverified.'
-      + (risk ? ` (Σ₀ groundedness risk ${risk})` : '');
-    badge.style.cssText = 'font-size:10px;opacity:0.7;margin-left:6px;vertical-align:middle;color:#f5a623;cursor:help';
-    badge.textContent = '⚠ ungrounded';
-    bubble.appendChild(badge);
-    // Actionable half: offer a one-click retry that re-runs THIS question with forced
-    // web grounding — detect → actually ground, the 42-state loop closed in the UI.
-    // Suppressed when we're online-less (web search can't reach reality) or when this
-    // turn was already a forced-grounding retry (don't invite an endless re-ground).
-    if (doneOnline !== false && !forceGround) {
-      const reground = document.createElement('button');
-      reground.type = 'button';
-      reground.textContent = '🌐 Ground this';
-      reground.title = 'Re-answer this question with a live web search for sources.';
-      reground.style.cssText = 'font-size:10px;margin-left:8px;vertical-align:middle;color:var(--accent);background:none;border:1px solid currentColor;border-radius:4px;padding:1px 6px;cursor:pointer;opacity:0.85';
-      reground.addEventListener('click', () => {
-        reground.disabled = true;
-        sendMessage({ text, forceGround: true });
-      });
-      bubble.appendChild(reground);
+    const band = bubble.dataset.groundednessBand;
+    // RED band — high-risk confident-unanchored — and we're online and this isn't already
+    // a grounding retry: AUTO-ESCALATE. Fire the grounding pass without a human click, so
+    // the loop self-corrects (Verify→Converge, #1732). The re-run carries forceGround:true,
+    // so the `!forceGround` guard below stops it from escalating a second time.
+    if (band === 'red' && doneOnline !== false && !forceGround) {
+      const note = document.createElement('span');
+      note.title = 'Confident claims with no external source — automatically re-answering with a live web search.';
+      note.style.cssText = 'font-size:10px;margin-left:6px;vertical-align:middle;color:#f5a623;opacity:0.9';
+      note.textContent = '↻ auto-verifying an unsourced claim…';
+      bubble.appendChild(note);
+      sendMessage({ text, forceGround: true, auto: true });
+    } else {
+      // AMBER (or red while offline): the honest passive badge. Unchanged from before the
+      // active gate — internally consistent but unverified, surfaced to the user.
+      const badge = document.createElement('span');
+      badge.title = 'Confident claims with no external source — self-consistent but unverified.'
+        + (risk ? ` (Σ₀ groundedness risk ${risk})` : '');
+      badge.style.cssText = 'font-size:10px;opacity:0.7;margin-left:6px;vertical-align:middle;color:#f5a623;cursor:help';
+      badge.textContent = '⚠ ungrounded';
+      bubble.appendChild(badge);
+      // Actionable half: offer a one-click retry that re-runs THIS question with forced
+      // web grounding — detect → actually ground, the 42-state loop closed in the UI.
+      // Suppressed when we're online-less (web search can't reach reality) or when this
+      // turn was already a forced-grounding retry (don't invite an endless re-ground).
+      if (doneOnline !== false && !forceGround) {
+        const reground = document.createElement('button');
+        reground.type = 'button';
+        reground.textContent = '🌐 Ground this';
+        reground.title = 'Re-answer this question with a live web search for sources.';
+        reground.style.cssText = 'font-size:10px;margin-left:8px;vertical-align:middle;color:var(--accent);background:none;border:1px solid currentColor;border-radius:4px;padding:1px 6px;cursor:pointer;opacity:0.85';
+        reground.addEventListener('click', () => {
+          reground.disabled = true;
+          sendMessage({ text, forceGround: true });
+        });
+        bubble.appendChild(reground);
+      }
     }
   }
 
