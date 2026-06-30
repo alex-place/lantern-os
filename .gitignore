@@ -80,6 +80,13 @@ data/convergence/council-reviews.jsonl
 # in the repo-root data/. Ignore the whole stray tree so it can never re-commit.
 apps/data/
 
+# Stray nested app install. The /api/actions/update npm step used a *relative*
+# --prefix, so when repoRoot resolved to the app dir it installed into
+# apps/lantern-garage/apps/lantern-garage/node_modules/ (~975 files). Root cause
+# fixed in routes/operator.js (absolute prefix anchored to __dirname); this is a
+# belt-and-suspenders guard so the stray tree can never be committed if it recurs.
+apps/lantern-garage/apps/
+
 # Research Convergence Loop runtime output (memories, records, reports, queue)
 data/research/*.jsonl
 data/research/reports/
