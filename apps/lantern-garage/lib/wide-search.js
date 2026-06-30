@@ -116,12 +116,24 @@ async function expandQueries(query, { breadth = 6, lowProvider = LOW } = {}) {
   }).slice(0, want);
 }
 
+// Absolute per-subquery deadline (ms). The per-request socket `timeout` in the
+// search client only covers SOCKET idle time — it does NOT bound DNS resolution
+// or a server that dribbles keep-alives, so a transient DNS stall on
+// api.duckduckgo.com / en.wikipedia.org can hang a webSearch() forever and freeze
+// the whole autowork run inside fanOut's Promise.all. This wall-clock race
+// guarantees every sub-query resolves so web grounding stays best-effort, never
+// load-bearing. Override with WIDE_SEARCH_SUBQUERY_TIMEOUT.
+const SUBQUERY_TIMEOUT = parseInt(process.env.WIDE_SEARCH_SUBQUERY_TIMEOUT || "20000", 10);
+
 /** Run every sub-query in parallel and dedupe into one numbered source pool. */
-async function fanOut(queries, { perQuery = 4, emit = () => {} } = {}) {
+async function fanOut(queries, { perQuery = 4, emit = () => {}, timeoutMs = SUBQUERY_TIMEOUT } = {}) {
   const settled = await Promise.all(
     queries.map(async (sq) => {
       try {
-        const r = await webSearch(sq, perQuery);
+        const r = await Promise.race([
+          webSearch(sq, perQuery),
+          new Promise((_res, rej) => setTimeout(() => rej(new Error(`subquery timeout after ${timeoutMs}ms`)), timeoutMs)),
+        ]);
         const results = r && r.success && Array.isArray(r.results) ? r.results : [];
         emit("observe", "subquery_done", { query: sq, source: r && r.source, results: results.length });
         return results.map((x) => ({ ...x, via: sq }));
