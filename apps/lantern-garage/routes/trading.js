@@ -10,6 +10,7 @@ const TraderAgent = require('../lib/trader-agent');
 const tradingMemory = require('../lib/trading-memory');
 const tradingStore = require('../lib/trading-store');
 const tradingNews = require('../lib/trading-news');
+const { computeOutcomeMetrics } = require('../lib/outcome-metrics');
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
 const { TradingPriceFeed } = require('../lib/trader-price-feed');
 const { getStrategyFitness, logPerformance } = require('../lib/strategy-performance-logger');
@@ -561,6 +562,80 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, data, 200);
     } catch (error) {
       sendJson(res, { error: error.message }, 502);
+    }
+    return true;
+  }
+
+  // POST /api/trading/eval/swe-bench/run
+  // Triggers a SWE-bench evaluation.
+  if (url.pathname === '/api/trading/eval/swe-bench/run' && req.method === 'POST') {
+    if (!traderAgent) {
+      sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+      return true;
+    }
+    try {
+      const body = await collectRequestBody(req);
+      const payload = body ? JSON.parse(body) : {};
+      const { task_id, model_name } = payload;
+      if (!task_id) {
+        sendJson(res, { status: 'error', error: 'task_id is required' }, 400);
+        return true;
+      }
+      const result = await traderAgent.runSWEBenchEval(task_id, model_name);
+      sendJson(res, result, 200);
+    } catch (error) {
+      console.error('[Trading] /eval/swe-bench/run error:', error.message);
+      sendJson(res, { status: 'error', error: error.message }, 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/eval/swe-bench/results
+  // Retrieves SWE-bench evaluation results.
+  if (url.pathname === '/api/trading/eval/swe-bench/results' && req.method === 'GET') {
+    try {
+      const metrics = computeOutcomeMetrics();
+      sendJson(res, metrics.codingCapabilityRate.sweBench, 200);
+    } catch (error) {
+      console.error('[Trading] /eval/swe-bench/results error:', error.message);
+      sendJson(res, { status: 'error', error: error.message }, 500);
+    }
+    return true;
+  }
+
+  // POST /api/trading/eval/human-eval-chat/run
+  // Triggers a HumanEval-chat evaluation.
+  if (url.pathname === '/api/trading/eval/human-eval-chat/run' && req.method === 'POST') {
+    if (!traderAgent) {
+      sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
+      return true;
+    }
+    try {
+      const body = await collectRequestBody(req);
+      const payload = body ? JSON.parse(body) : {};
+      const { task_id, model_name } = payload;
+      if (!task_id) {
+        sendJson(res, { status: 'error', error: 'task_id is required' }, 400);
+        return true;
+      }
+      const result = await traderAgent.runHumanEvalChatEval(task_id, model_name);
+      sendJson(res, result, 200);
+    } catch (error) {
+      console.error('[Trading] /eval/human-eval-chat/run error:', error.message);
+      sendJson(res, { status: 'error', error: error.message }, 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/eval/human-eval-chat/results
+  // Retrieves HumanEval-chat evaluation results.
+  if (url.pathname === '/api/trading/eval/human-eval-chat/results' && req.method === 'GET') {
+    try {
+      const metrics = computeOutcomeMetrics();
+      sendJson(res, metrics.codingCapabilityRate.humanEvalChat, 200);
+    } catch (error) {
+      console.error('[Trading] /eval/human-eval-chat/results error:', error.message);
+      sendJson(res, { status: 'error', error: error.message }, 500);
     }
     return true;
   }

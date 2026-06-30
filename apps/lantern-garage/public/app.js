@@ -264,6 +264,8 @@ async function refresh() {
   renderAccessModel(accessModel);
   renderActionCapabilities(capabilities);
   renderFeedbackMemory(feedback);
+  renderSWEBenchResults();
+  renderHumanEvalChatResults();
   renderValidators();
   renderFleet(queue, status);
   renderHff(status);
@@ -564,6 +566,54 @@ function renderFleet(queue = {}, status = {}) {
   $("fleetCounts").textContent = `P0:${p0} P1:${p1} items:${items.length}`;
   $("fleetBadge").textContent = status.controls?.mcpOk ? "LOCAL" : "HELD";
   $("fleetBadge").className = status.controls?.mcpOk ? "badge badge-live" : "badge badge-blocked";
+}
+
+async function renderSWEBenchResults() {
+  try {
+    const results = await api("/api/trading/eval/swe-bench/results");
+    $("sweBenchTotal").textContent = results.n;
+    $("sweBenchPassed").textContent = results.passed;
+    $("sweBenchRate").textContent = results.rate !== null ? `${(results.rate * 100).toFixed(1)}%` : "--";
+    $("sweBenchStatus").textContent = results.status;
+    $("sweBenchBadge").textContent = results.status === "ok" ? "OK" : "PENDING";
+    $("sweBenchBadge").className = results.status === "ok" ? "badge badge-live" : "badge badge-medium";
+  } catch (error) {
+    console.error("Error fetching SWE-bench results:", error);
+    $("sweBenchTotal").textContent = "--";
+    $("sweBenchPassed").textContent = "--";
+    $("sweBenchRate").textContent = "--";
+    $("sweBenchStatus").textContent = "error";
+    $("sweBenchBadge").textContent = "ERROR";
+    $("sweBenchBadge").className = "badge badge-blocked";
+  }
+}
+
+async function renderHumanEvalChatResults() {
+  try {
+    const results = await api("/api/trading/eval/human-eval-chat/results");
+    $("humanEvalChatTotal").textContent = results.n;
+    $("humanEvalChatPassed").textContent = results.passed;
+    $("humanEvalChatRate").textContent = results.rate !== null ? `${(results.rate * 100).toFixed(1)}%` : "--";
+    $("humanEvalChatStatus").textContent = results.status;
+    $("humanEvalChatBadge").textContent = results.status === "ok" ? "OK" : "PENDING";
+    $("humanEvalChatBadge").className = results.status === "ok" ? "badge badge-live" : "badge badge-medium";
+  } catch (error) {
+    console.error("Error fetching HumanEval-chat results:", error);
+    $("humanEvalChatTotal").textContent = "--";
+    $("humanEvalChatPassed").textContent = "--";
+    $("humanEvalChatRate").textContent = "--";
+    $("humanEvalChatStatus").textContent = "error";
+    $("humanEvalChatBadge").textContent = "ERROR";
+    $("humanEvalChatBadge").className = "badge badge-blocked";
+  }
+}
+
+async function triggerSWEBenchEval() {
+  await postAction("/api/trading/eval/swe-bench/run", "SWE-bench evaluation");
+}
+
+async function triggerHumanEvalChatEval() {
+  await postAction("/api/trading/eval/human-eval-chat/run", "HumanEval-chat evaluation");
 }
 
 function renderHff(status = {}) {
