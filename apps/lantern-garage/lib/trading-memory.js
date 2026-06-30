@@ -75,12 +75,11 @@ function _csfRecord(tier, content, tags, keywords, memoryId) {
 /** Normalise whatever shape the route sends into a flat array. */
 function _toArray(payload, keys = []) {
   if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
   for (const k of keys) {
     if (Array.isArray(payload[k])) return payload[k];
   }
-  if (payload && typeof payload === "object" && Object.keys(payload).length) {
-    return [payload];
-  }
+  if (Object.keys(payload).length) return [payload];
   return [];
 }
 
@@ -147,19 +146,21 @@ async function recordSignal(signal) {
 
 /**
  * Called from POST /api/trading/orders. Writes each new order to the local
- * trading store and to CSF memory.
- * @param {object[]} orders
+ * trading store and to CSF memory. Accepts a bare array, a `{ orders: [...] }`
+ * wrapper, or a single order object — all normalised via `_toArray` so a
+ * wrapped payload neither throws ("orders is not iterable") nor silently
+ * no-ops (the PR #338 payload-shape contract).
+ * @param {object[]|{orders:object[]}|object} payload
  * @returns {Promise<object[]>} orders that were written (deduped)
  */
-async function recordNewOrders(orders) {
+async function recordNewOrders(payload) {
+  const orders = _toArray(payload, ["orders"]);
   const written = [];
   for (const order of orders) {
     const key = String(order.id || order.order_id || "").slice(0, 64);
-    const alreadySeen = key && _seenOrders.has(key);
+    if (key && _seenOrders.has(key)) continue;
     const stored = await tradingStore.appendOrder(order);
-    if (!alreadySeen) {
-      await recordOrder(order).catch(() => {});
-    }
+    await recordOrder(order).catch(() => {});
     written.push(stored);
   }
   return written;
@@ -167,11 +168,15 @@ async function recordNewOrders(orders) {
 
 /**
  * Called from POST /api/trading/agent-log. Writes each new signal to the
- * local trading store and to CSF memory.
- * @param {{ logs: object[] }} param0
+ * local trading store and to CSF memory. Accepts a `{ logs: [...] }`,
+ * `{ agentLog: [...] }`, or `{ agent_log: [...] }` wrapper, a bare array,
+ * or a single entry — all normalised via `_toArray` so alternate wrapper
+ * keys don't silently write 0 records (the PR #338 payload-shape contract).
+ * @param {object[]|{logs?:object[],agentLog?:object[],agent_log?:object[]}|object} payload
  * @returns {Promise<object[]>} entries that were written
  */
-async function recordNewSignals({ logs = [] } = {}) {
+async function recordNewSignals(payload) {
+  const logs = _toArray(payload, ["logs", "agentLog", "agent_log"]);
   const written = [];
   for (const entry of logs) {
     const stored = await tradingStore.appendLogEntry(entry);

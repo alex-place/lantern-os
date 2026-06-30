@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.125] - 2026-06-30
+- fix(trading): normalize `recordNewOrders`/`recordNewSignals` payload shapes (#338). `apps/lantern-garage/lib/trading-memory.js` iterated `recordNewOrders` with `for (const order of orders)` and destructured `recordNewSignals({ logs })`, so wrapped payloads broke the **Act**/**Observe** recording path: `recordNewOrders({orders:[...]})` threw "orders is not iterable" and `recordNewSignals({agentLog|agent_log:[...]})` silently wrote 0 records. Both now route through the module's existing `_toArray` helper (bare array, wrapper object, or single entry); `_toArray` guards null/non-object inputs so `{}` / `{orders:[]}` return `[]`, and `recordNewOrders` only pushes newly-seen orders so a re-ingest of the same id returns `[]`. Restores the PR #338 payload-shape contract — `node tests/test_trading_memory_js.js` goes from 11 passed/5 failed to 16 passed/0 failed.
+
 ## [1.7.124] - 2026-06-30
 - feat(verify): symptom journal with calibrated honesty / cite-or-abstain (#1435). Adds `apps/lantern-garage/routes/health.js` (+ `test/health-journal.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn/replay/preferences/finance routes. Improves the **Verify** stage: logs symptoms and answers with calibrated honesty — cites sources or abstains rather than guessing about health. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 
