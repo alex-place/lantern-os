@@ -2,6 +2,55 @@
   "_comment": "Curated embed seed for the Explore feed (Observe stage). Each entry becomes one full-width 'embed' card rendered as a lazy iframe. Sourced from open archives (Internet Archive / Musopen, public-domain or freely-streamable) and local Keystone games. Every card carries [why, source] per the Σ₀ Verify rule. To add/replace content, edit this file — no code change. Per-card key = 'source:embed:<slug>' so each panel earns or loses its slot independently (engagement or discarded). Verified live 2026-06-27.",
   "embeds": [
     {
+      "slug": "unisona-1-8",
+      "title": "What's New — Unisona 1.8",
+      "kind": "read",
+      "url": "/whats-new.html",
+      "source": "unisona.ai",
+      "published": "2026-06-30",
+      "topics": [
+        "release",
+        "update",
+        "unisona",
+        "changelog"
+      ],
+      "lore": "The personal reasoning cockpit goes public — one name, one loop, a user-facing surface at every stage of Observe → Remember → Reason → Act → Verify → Converge.",
+      "why": "The 1.8 milestone release, written to be read — links into every new cockpit",
+      "evidence_source": "local /whats-new.html · CHANGELOG.MD [1.8.0] · docs/UNISONA-1.8.md",
+      "embed": {
+        "provider": "local",
+        "src": "/whats-new.html",
+        "height": 720,
+        "interactive": false,
+        "width": 820
+      }
+    },
+    {
+      "slug": "three-doors",
+      "title": "Kingdome of Hearts — Three Doors",
+      "kind": "game",
+      "url": "/three-doors-game.html",
+      "source": "Keystone Arcade",
+      "published": "2026-06-30",
+      "topics": [
+        "game",
+        "play",
+        "kingdome",
+        "doors"
+      ],
+      "thumb": "https://media.lantern-os.net/koh/ba0a53b095-t.webp",
+      "lore": "Seven stages, three doors each scene, no wrong choices. A dream journey through the Kingdome — each loop different.",
+      "why": "Keystone's own choose-your-path game, served locally — the Three Doors loop made playable",
+      "evidence_source": "local /three-doors-game.html · data/three-doors/scenes.json",
+      "embed": {
+        "provider": "local",
+        "src": "/three-doors-game.html",
+        "height": 640,
+        "interactive": true,
+        "width": 720
+      }
+    },
+    {
       "slug": "t-rex",
       "title": "T-Rex Runner",
       "kind": "game",

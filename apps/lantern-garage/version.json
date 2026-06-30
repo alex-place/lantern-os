@@ -1,7 +1,7 @@
 {
-  "version": "1.7.48",
-  "buildId": "1.7.48+2026-06-22.194227",
-  "timestamp": "2026-06-22T19:42:27.201Z",
+  "version": "1.8.0",
+  "buildId": "1.8.0+2026-06-30.milestone",
+  "timestamp": "2026-06-30T00:00:00.000Z",
   "branch": "master",
-  "commit": "50b496a4"
+  "commit": "df56f766"
 }

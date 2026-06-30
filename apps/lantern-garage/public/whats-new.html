@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#7c6af7">
+  <title>What's New — Unisona 1.8 — unisona.ai</title>
+  <meta name="description" content="Unisona 1.8 — the personal reasoning cockpit goes public. One front door, one loop, a cockpit at every stage.">
+  <meta property="og:title" content="Unisona 1.8 — the personal reasoning cockpit goes public">
+  <meta property="og:description" content="One name, one loop, a user-facing cockpit at every stage: Observe, Remember, Reason, Act, Verify, Converge.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="css/dream-chat.css">
+  <style>
+    /* Long scrolling document, not the fixed chat shell — override the height clamp. */
+    html, body { height: auto; overflow-y: auto; }
+    .app { display: block; height: auto; overflow: visible; }
+    .wn-page { max-width: 820px; margin: 0 auto; padding: 0 24px 96px; }
+    .wn-hero {
+      padding: 56px 0 40px; border-bottom: 1px solid var(--border); margin-bottom: 40px;
+    }
+    .wn-eyebrow {
+      display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent);
+      border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; margin-bottom: 18px;
+    }
+    .wn-hero h1 { font-size: 2.3rem; line-height: 1.15; font-weight: 800; margin: 0 0 14px; }
+    .wn-hero p.lede { font-size: 1.06rem; color: var(--muted); line-height: 1.6; max-width: 64ch; margin: 0; }
+    .wn-meta { margin-top: 22px; font-size: 0.82rem; color: var(--muted); }
+    .wn-meta strong { color: var(--text); }
+    .wn-section { margin-bottom: 36px; }
+    .wn-section > h2 { font-size: 1.25rem; font-weight: 700; margin: 0 0 6px; }
+    .wn-section > p.sub { color: var(--muted); font-size: 0.92rem; margin: 0 0 18px; line-height: 1.6; }
+    .wn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    @media (max-width: 640px) { .wn-grid { grid-template-columns: 1fr; } .wn-hero h1 { font-size: 1.8rem; } }
+    .wn-card {
+      border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+      background: var(--surface); transition: border-color .15s, transform .15s;
+    }
+    .wn-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .wn-card .stage { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+    .wn-card h3 { font-size: 1rem; font-weight: 700; margin: 6px 0 6px; }
+    .wn-card p { font-size: 0.86rem; color: var(--muted); line-height: 1.55; margin: 0; }
+    .wn-card .pr { font-size: 0.74rem; color: var(--muted); opacity: .8; }
+    .wn-principle {
+      border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      border-radius: 12px; padding: 20px 22px; background: var(--surface); margin: 8px 0 0;
+    }
+    .wn-principle blockquote { margin: 0 0 10px; font-size: 1.02rem; line-height: 1.6; color: var(--text); }
+    .wn-principle p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.6; }
+    .wn-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    .wn-cta a {
+      text-decoration: none; font-size: 0.9rem; font-weight: 600;
+      padding: 11px 18px; border-radius: 10px; border: 1px solid var(--border); color: var(--text);
+    }
+    .wn-cta a.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .wn-cta a:hover { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+<nav class="site-nav">
+  <a class="nav-brand" href="/stock-trader.html">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
+    unisona.ai
+  </a>
+  <div class="nav-links">
+    <a href="/stock-trader.html">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/create.html">✏️ Create</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep" style="margin: 0 4px;">·</span>
+    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
+    <a href="/changelog.html">Changelog</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☀</button>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="wn-page">
+
+    <header class="wn-hero">
+      <span class="wn-eyebrow">★ Unisona 1.8</span>
+      <h1>The personal reasoning cockpit goes public.</h1>
+      <p class="lede">1.8 isn't new architecture — it's the loop, finally legible. The project is now
+        <strong>unisona.ai</strong> end to end, and <strong>Observe → Remember → Reason → Act → Verify → Converge</strong>
+        now has a user-facing cockpit at <em>every</em> stage. One name, one front door, one loop you can watch
+        ground itself.</p>
+      <div class="wn-meta">Released <strong>2026-06-30</strong> · version <strong>1.8.0</strong> · codename <em>one front door</em></div>
+    </header>
+
+    <section class="wn-section">
+      <h2>A cockpit at every stage</h2>
+      <p class="sub">The system is one loop with four core objects — Memory, Task, Tool, Convergence Record.
+        1.8 gives each stage a surface you can see and drive.</p>
+      <div class="wn-grid">
+
+        <div class="wn-card">
+          <span class="stage">🔭 Observe</span>
+          <h3>The Explore feed</h3>
+          <p>One ranked feed of things worth your attention — games, reading, builds, docs — every card carrying a <em>why</em> and a <em>source</em>.</p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">🧠 Remember</span>
+          <h3>Confidence-decay memory</h3>
+          <p>Facts forget gracefully — confidence decays unless reinforced, so stale claims fade instead of being asserted forever. <span class="pr">#1422</span></p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">💭 Reason</span>
+          <h3>Finance · preferences · tutor</h3>
+          <p>A financial cockpit over your own numbers <span class="pr">#1434</span>, a preference model grounded in what you've said <span class="pr">#1426</span>, and a learn-anything tutor with retention tracking <span class="pr">#1438</span>.</p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">⚙️ Act</span>
+          <h3>Autowork you can steer</h3>
+          <p>In-chat Approve / Rework / Discard for autowork draft PRs <span class="pr">#1503</span>, with the Σ₀ council wired into self-coding runs <span class="pr">#1598</span>.</p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">✅ Verify</span>
+          <h3>Grounding you can read</h3>
+          <p>A fact-check button <span class="pr">#1430</span>, a Grounding Diff viewer <span class="pr">#1420</span>, drift canaries <span class="pr">#1428</span>, and a cite-or-abstain symptom journal <span class="pr">#1435</span>.</p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">🎯 Converge</span>
+          <h3>Calibration &amp; replay</h3>
+          <p>A decision journal that scores your gut calls <span class="pr">#1436</span> and a convergence replay / time-travel debugger <span class="pr">#1419</span>.</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="wn-section">
+      <h2>Under the hood</h2>
+      <p class="sub">The brand, the model, the trader, and the chat all moved with it.</p>
+      <div class="wn-grid">
+        <div class="wn-card">
+          <h3>Brand: unisona.ai</h3>
+          <p>Home rebranded with canonical + social meta <span class="pr">#1657</span>; every page's chrome rebranded <span class="pr">#1661</span>; the Triagon signal mascot <span class="pr">#1604</span>.</p>
+        </div>
+        <div class="wn-card">
+          <h3>Council exec-verify ON</h3>
+          <p>The Σ₀ council now defaults to grounding its verdict on a real execution check, closing the refuted→retry loop in chat. <span class="pr">#1640 #1568</span></p>
+        </div>
+        <div class="wn-card">
+          <h3>CSF &amp; own-the-model</h3>
+          <p>The CSF-Col transform ships and live-path compression is corrected <span class="pr">#1601</span>; the PLT training package lands with ADR-0011 <span class="pr">#1645</span>.</p>
+        </div>
+        <div class="wn-card">
+          <h3>Trader &amp; voice</h3>
+          <p>Fee-aware trade-EV gate <span class="pr">#1648</span>, market news <span class="pr">#1582</span>, a global header <span class="pr">#1579</span>, and continuous voice-to-text dictation <span class="pr">#1607</span>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="wn-section">
+      <h2>The principle behind it</h2>
+      <div class="wn-principle">
+        <blockquote>“Nothing is accepted without evidence. Every important claim carries
+          <strong>[claim, evidence, confidence, source]</strong>.”</blockquote>
+        <p>Every cockpit in 1.8 ships under that External Reality Rule. None of them assert — they cite,
+          or they abstain. That's the whole product: a loop you can watch ground itself.</p>
+      </div>
+
+      <div class="wn-cta">
+        <a class="primary" href="/dream-chat.html">Open the chat →</a>
+        <a href="/explore.html">Browse Explore</a>
+        <a href="/changelog.html">Full changelog</a>
+        <a href="/repo/docs/UNISONA-1.8.md">Release notes</a>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ── Footer ── -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span><strong>unisona.ai</strong> · <a href="/stock-trader.html">Home</a> · <a href="/dream-chat.html">Chat</a> · <a href="/explore.html">Explore</a></span>
+    <span style="margin-left: auto;"><a href="/knowledgecenter.html">Help</a>
+      <span class="sep" style="margin: 0 4px;">·</span>
+      <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a></span>
+  </div>
+</footer>
+
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/auth-gate.js" defer></script>
+</body>
+</html>

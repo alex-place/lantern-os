@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.8.0] - 2026-06-30
+- **Unisona 1.8 — the personal reasoning cockpit goes public.** The 1.7.1xx line consolidates into one milestone: the project is now branded **unisona.ai** end to end, and the Observe → Remember → Reason → Act → Verify → Converge loop has a user-facing cockpit at *every* stage. Nothing here is new architecture — it's the loop, finally legible to a person using it. See `/whats-new.html` for the readable version and `docs/UNISONA-1.8.md` for the full release notes.
+
+### Added
+- **Brand: unisona.ai across the whole surface** — home rebranded with canonical + social meta (#1657) and every page's chrome/nav/footer rebranded to unisona.ai (#1661), with the Triagon signal mascot (#1604). One name, one front door.
+- **Verify cockpit** — a personal **fact-check button**: paste a claim, get a grounded verdict with sources (#1430); the **Grounding Diff viewer** (claim · evidence · source · confidence) (#1420); **drift canaries** as a passive observability product (#1428); and the **symptom journal** with calibrated, cite-or-abstain honesty (#1435).
+- **Reason cockpit** — a **personal financial reasoning cockpit** that reasons over your own numbers and shows its evidence (#1434); a **retrieval-based personal preference model** that grounds recommendations in what you've actually said before (#1426); and a **learn-anything tutor** with retention tracking (#1438).
+- **Remember cockpit** — **confidence-decay memory**: facts forget gracefully unless reinforced, instead of being asserted forever (#1422).
+- **Converge cockpit** — a **decision journal + calibration** loop (log a call with your predicted confidence, record the outcome, get scored on whether your gut is actually good) (#1436); and a **convergence replay / time-travel debugger** to step back through how a conclusion was reached (#1419).
+- **Act cockpit** — in-chat **Approve / Rework / Discard** for autowork draft PRs (#1503), and the Σ₀ council wired into self-coding runs so Δ accrues on real decisions (#1598).
+- **Explore** — the milestone is surfaced as a card in the Explore feed (`data/explore/embeds.json`), and the release notes are indexed in the Knowledge Center for in-product RAG.
+
+### Changed
+- **Σ₀ council exec-verify defaults ON** (#1640) and the verdict is grounded on a real execution check, closing the refuted→retry loop in chat (#1568) — a run test is ground truth, and execution overrides text.
+- **Converge instrumentation** — verified-patch / honesty / route-quality metrics are now recorded as first-class signals (#1411).
+- **CSF** ships the CSF-Col transform and corrects compression on the live paths (#1601); the own-the-model PLT training package lands with ADR-0011 (#1645).
+- **Stock trader** gains a fee-aware trade-EV gate (#1648), surfaced market news (#1582), and a global header with a working light/dark toggle (#1579).
+- **Chat** gains production-grade, continuous voice-to-text dictation (#1607).
+
+### Verify
+- Every cockpit above ships under the External Reality Rule: each surfaces **[claim, evidence, confidence, source]** rather than asserting. The Explore card and KC article carry their own `why` + `source` per the Σ₀ Verify rule. Version bumped 1.7.124 → 1.8.0 (minor) to mark the milestone and satisfy the change-record gate.
+
 ## [1.7.124] - 2026-06-30
 - feat(verify): symptom journal with calibrated honesty / cite-or-abstain (#1435). Adds `apps/lantern-garage/routes/health.js` (+ `test/health-journal.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn/replay/preferences/finance routes. Improves the **Verify** stage: logs symptoms and answers with calibrated honesty — cites sources or abstains rather than guessing about health. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 
