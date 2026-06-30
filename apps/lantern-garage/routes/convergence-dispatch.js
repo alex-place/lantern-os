@@ -586,6 +586,10 @@ module.exports = async (req, res, url, deps) => {
           step("council", "done", { delta: councilDelta, verdict: councilVerdict, pr: prNumber });
         } catch (_e) { /* council scoring is best-effort */ }
 
+        // Close the loop: label the PR convergence-recorded + autowork-verified so the
+        // assigned-issue merge gate (lib/pr-watcher.js) can land it. Fire-and-forget.
+        try { require("../lib/autowork-research").markPrConverged(prUrl).catch(() => {}); } catch (_e) { /* best-effort */ }
+
         step("done", "ok", { prUrl, testsVerified, councilDelta, councilVerdict, changedFiles: changedFiles.length });
 
         sendJson(res, {
@@ -1189,6 +1193,10 @@ module.exports = async (req, res, url, deps) => {
         const agiBenchLog = path.join(REPO_ROOT, "data", "agi-benchmark.jsonl");
         fsSync.appendFileSync(agiBenchLog, JSON.stringify(agiRow) + "\n");
         step("agi-benchmark", "done", { path: "data/agi-benchmark.jsonl", overall: agiRow.overall });
+
+        // Close the loop: label the PR convergence-recorded + autowork-verified so the
+        // assigned-issue merge gate (lib/pr-watcher.js) can land it. Fire-and-forget.
+        try { require("../lib/autowork-research").markPrConverged(prUrl).catch(() => {}); } catch (_e) { /* best-effort */ }
 
         send("done", {
           ok: true,

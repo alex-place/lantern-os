@@ -109,6 +109,41 @@ function newRunId(issueNumber) {
   return `autowork-${issueNumber || "task"}-${Date.now()}`;
 }
 
+// Gate labels the pr-watcher merge gate reads (see lib/pr-watcher.js). A PR closing
+// a human-assigned issue can't auto-merge until it carries BOTH — applied here when
+// an autowork run finishes (Verify → Converge closed), so the gate is satisfied and
+// visible on the PR across hosts (not just via the local run log).
+const GATE_LABELS = ["convergance-record", "autowork-verified"];
+const GH_REPO_FOR_LABELS = "alex-place/lantern-os";
+
+/**
+ * Mark a PR as convergence-recorded + autowork-verified by applying the gate labels.
+ * Best-effort and fully async: ensures each label exists (`gh label create --force`)
+ * then adds both to the PR. Any failure (no gh, offline, perms) is swallowed — a
+ * labelling miss must never break the autowork pipeline; the local run-log evidence
+ * still satisfies the gate on the fleet host.
+ * @param {string|number} prRef  PR number or a /pull/<n> URL
+ */
+async function markPrConverged(prRef) {
+  const { execFile } = require("child_process");
+  const pr = String(prRef || "").match(/(\d+)/)?.[1];
+  if (!pr) return false;
+  const run = (args) => new Promise((resolve) => {
+    execFile("gh", args, { cwd: REPO_ROOT, timeout: 20_000 }, (err) => resolve(!err));
+  });
+  try {
+    for (const name of GATE_LABELS) {
+      // --force makes create idempotent (creates or updates colour/desc).
+      await run(["label", "create", name, "--repo", GH_REPO_FOR_LABELS, "--force",
+        "--color", "5319e7", "--description", "Σ₀ assigned-issue merge gate"]);
+    }
+    return await run(["pr", "edit", pr, "--repo", GH_REPO_FOR_LABELS,
+      "--add-label", GATE_LABELS.join(",")]);
+  } catch {
+    return false;
+  }
+}
+
 // Rank repo files for the issue. Prefer the symbol-aware ranker (repo-context);
 // fall back to a stopword-filtered `git grep` in the worktree so a missing index
 // never sends the model in blind.
@@ -257,5 +292,6 @@ module.exports = {
   researchIssue,
   logStep,
   newRunId,
+  markPrConverged,
   STOPWORDS,
 };

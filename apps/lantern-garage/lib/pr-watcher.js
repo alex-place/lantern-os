@@ -60,6 +60,17 @@ const BLOCKING_CONCLUSIONS = new Set([
   "FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE",
 ]);
 
+// ── Σ₀ assigned-issue convergence gate ──────────────────────────────────────
+// A PR that closes a HUMAN-ASSIGNED issue must not land on master until the work
+// has both a convergence record (the !convergance step) and autowork verification
+// (the !work / !autowork loop ran end-to-end). The signal is portable + visible on
+// the PR (these labels) AND can be auto-satisfied locally from the fleet host's
+// autowork run log (data/autowork-runs/*.jsonl). One successful autowork run emits
+// both. This binds the dynamic human lanes (alex/, kriskin/, mookman11/, …) to the
+// Verify→Converge stages: assigned work is grounded before it merges.
+const CONVERGANCE_LABELS = new Set(["convergance-record", "convergence-record"]);
+const AUTOWORK_VERIFY_LABEL = "autowork-verified";
+
 // Sensitive surfaces a human must review before merge — never auto-land. Absorbed
 // from GitHub Agentic Workflows: agents may propose changes here, but humans decide.
 // Docs / deps / UI fall through and keep auto-merging. Override with
@@ -159,7 +170,7 @@ class PrWatcher {
    * ignore-list self-heals (see _baseFailingChecks).
    * Returns { merge: boolean, reason: string }.
    */
-  _shouldMerge(pv, entry, now, extraIgnore = null) {
+  _shouldMerge(pv, entry, now, extraIgnore = null, gate = null) {
     if (!this.autoMerge) return { merge: false, reason: "automerge_disabled" };
     if (!pv) return { merge: false, reason: "no_pr_data" };
     if (pv.isDraft) return { merge: false, reason: "draft" };
@@ -196,7 +207,55 @@ class PrWatcher {
       const conclusion = String(c.conclusion || c.state || "").toUpperCase();
       if (BLOCKING_CONCLUSIONS.has(conclusion)) return { merge: false, reason: `failed:${name || "?"}` };
     }
+
+    // Σ₀ assigned-issue convergence gate: a PR closing a human-assigned issue needs
+    // a convergence record AND autowork verification before it merges. Agents/humans
+    // propose; the loop must close (Verify → Converge) before it lands. (#1755)
+    if (gate && gate.required) {
+      if (!gate.convergance) return { merge: false, reason: `needs_convergance_record:#${gate.issue}` };
+      if (!gate.autowork)    return { merge: false, reason: `needs_autowork_verification:#${gate.issue}` };
+    }
+
     return { merge: true, reason: "ready" };
+  }
+
+  // ── assigned-issue gate helpers (pure parts unit-tested) ─────────────────────
+
+  /** Issue numbers this PR closes: GitHub's closingIssuesReferences first, else a
+   *  body scan for "Fixes/Closes/Resolves #N". Pure. */
+  static _closingIssues(pv) {
+    const refs = (pv && pv.closingIssuesReferences || [])
+      .map((r) => Number(r && r.number)).filter((n) => Number.isFinite(n));
+    if (refs.length) return [...new Set(refs)];
+    const body = String((pv && pv.body) || "");
+    const nums = [...body.matchAll(/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi)]
+      .map((m) => Number(m[1])).filter((n) => Number.isFinite(n));
+    return [...new Set(nums)];
+  }
+
+  /** {convergance, autowork} signals carried by the PR's labels. Pure. */
+  static _gateFromLabels(labels) {
+    const names = new Set((labels || []).map((l) => String((l && l.name) || l || "").toLowerCase()));
+    return {
+      convergance: [...CONVERGANCE_LABELS].some((n) => names.has(n)),
+      autowork: names.has(AUTOWORK_VERIFY_LABEL),
+    };
+  }
+
+  /** {convergance, autowork} signals from ONE autowork run-log record. Pure.
+   *  convergance ← the convergence-record phase completed; autowork ← the run
+   *  reached a verified terminal (council verdict / done-ok / tests verified). */
+  static _runRecordSignals(o) {
+    const phase = String((o && o.phase) || "");
+    const status = String((o && o.status) || "");
+    return {
+      convergance: (phase === "convergence" && status === "done") || (phase === "record" && status === "done"),
+      autowork:
+        phase === "council" ||
+        (phase === "done" && status === "ok") ||
+        (phase === "result" && status === "ok") ||
+        (o && o.testsVerified === true),
+    };
   }
 
   /** Parse an /api/dream/chat response into { ok, text, error }. */
@@ -342,7 +401,7 @@ class PrWatcher {
       try {
         pv = await this._ghJson(
           "pr", "view", String(entry.number),
-          "--json", "number,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefOid,files"
+          "--json", "number,isDraft,mergeable,mergeStateStatus,statusCheckRollup,headRefOid,files,labels,body,closingIssuesReferences"
         );
       } catch (err) {
         console.warn(`[PR Watcher] merge: could not view #${entry.number}: ${err.message}`);
@@ -351,8 +410,14 @@ class PrWatcher {
       // Stale head — a push landed since we last polled; let the next tick re-review.
       if (pv.headRefOid && pv.headRefOid !== entry.headSha) continue;
 
-      const decision = this._shouldMerge(pv, entry, now, baseIgnore);
-      if (!decision.merge) continue;
+      const gate = await this._assignedIssueGate(pv);
+      const decision = this._shouldMerge(pv, entry, now, baseIgnore, gate);
+      if (!decision.merge) {
+        if (decision.reason.startsWith("needs_")) {
+          console.warn(`[PR Watcher] PR #${entry.number} held: ${decision.reason} (assigned issue needs convergence + autowork)`);
+        }
+        continue;
+      }
 
       try {
         await this._gh("pr", "merge", String(entry.number), "--squash", "--admin", "--delete-branch");
@@ -394,6 +459,67 @@ class PrWatcher {
     this._baseFailCache = names;
     this._baseFailCacheAt = now;
     return names;
+  }
+
+  /** Logins assigned to issue #n (best-effort; [] on any error). */
+  async _issueAssignees(n) {
+    try {
+      const j = await this._ghJson("issue", "view", String(n), "--json", "assignees");
+      return (j.assignees || []).map((a) => a.login).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Scan the fleet host's autowork run log for convergence + verification evidence
+   *  on any of `issueSet`. Best-effort; missing dir / parse errors → no evidence. */
+  _autoworkEvidence(issueSet) {
+    let convergance = false, autowork = false;
+    try {
+      const dir = path.join(this.repoRoot, "data", "autowork-runs");
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.endsWith(".jsonl")) continue;
+        const lines = fs.readFileSync(path.join(dir, f), "utf8").split("\n");
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let o;
+          try { o = JSON.parse(line); } catch { continue; }
+          if (!issueSet.has(Number(o.issue))) continue;
+          const sig = PrWatcher._runRecordSignals(o);
+          if (sig.convergance) convergance = true;
+          if (sig.autowork) autowork = true;
+          if (convergance && autowork) return { convergance, autowork };
+        }
+      }
+    } catch { /* no run log — fall through to label-only */ }
+    return { convergance, autowork };
+  }
+
+  /**
+   * Compute the assigned-issue convergence gate for a PR. Returns
+   * { required:false } unless the PR closes an issue with ≥1 assignee — then
+   * { required:true, issue, convergance, autowork } where the two booleans come
+   * from the PR's labels OR the local autowork run log (either source satisfies).
+   */
+  async _assignedIssueGate(pv) {
+    const issues = PrWatcher._closingIssues(pv);
+    if (!issues.length) return { required: false };
+
+    let assigned = null;
+    for (const n of issues) {
+      const who = await this._issueAssignees(n);
+      if (who.length) { assigned = n; break; }
+    }
+    if (assigned == null) return { required: false };
+
+    const fromLabels = PrWatcher._gateFromLabels(pv.labels);
+    const fromRuns = this._autoworkEvidence(new Set(issues));
+    return {
+      required: true,
+      issue: assigned,
+      convergance: fromLabels.convergance || fromRuns.convergance,
+      autowork: fromLabels.autowork || fromRuns.autowork,
+    };
   }
 
   async _reviewPr(entry) {

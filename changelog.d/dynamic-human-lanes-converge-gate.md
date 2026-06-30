@@ -1,0 +1,2 @@
+- Dynamic per-human work lanes: the monoworkstream hooks now key the one-open-PR lane off each branch's first path segment, so `alex/`, `kriskin/`, `mookman11/` and any future `<name>/` prefix each get their own concurrent lane (no shared "all humans" bottleneck, unlimited contributors). (#1755)
+- Assigned-issue convergence merge gate: a PR closing a human-assigned issue can't auto-merge until it carries both a convergence record (`!convergance`) and autowork verification (`!work`), via PR labels or the autowork run log; enforced by `lib/pr-watcher.js`. (#1755)

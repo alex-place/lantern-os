@@ -116,4 +116,46 @@ ok("merge: .env change -> false", m._shouldMerge(greenPv([{ path: ".env.example"
 ok("merge: protected reason names the file", m._shouldMerge(greenPv([{ path: ".github/workflows/ci.yml" }]), reviewed, now).reason === "protected_path:.github/workflows/ci.yml");
 ok("merge: GitHub `filename` field also works", m._shouldMerge(greenPv([{ filename: "src/migration/001.sql" }]), reviewed, now).merge === false);
 
+// ── assigned-issue convergence gate: pure signal helpers ─────────────────────
+// _closingIssues: GitHub's closingIssuesReferences first, else a body scan.
+ok("closing: from closingIssuesReferences",
+  JSON.stringify(PrWatcher._closingIssues({ closingIssuesReferences: [{ number: 42 }, { number: 7 }] })) === "[42,7]");
+ok("closing: body 'Fixes #N' fallback",
+  JSON.stringify(PrWatcher._closingIssues({ body: "Fixes #99\n\nsome text" })) === "[99]");
+ok("closing: Closes/Resolves variants + dedupe",
+  JSON.stringify(PrWatcher._closingIssues({ body: "Closes #5, resolved #5, fix #6" })) === "[5,6]");
+ok("closing: none -> []", PrWatcher._closingIssues({ body: "no refs here" }).length === 0);
+ok("closing: refs win over body",
+  JSON.stringify(PrWatcher._closingIssues({ closingIssuesReferences: [{ number: 1 }], body: "Fixes #2" })) === "[1]");
+
+// _gateFromLabels: both spellings of the convergance label + autowork-verified, case-insensitive.
+ok("labels: convergance-record -> convergance", PrWatcher._gateFromLabels([{ name: "convergance-record" }]).convergance === true);
+ok("labels: convergence-record (alt spelling) -> convergance", PrWatcher._gateFromLabels([{ name: "Convergence-Record" }]).convergance === true);
+ok("labels: autowork-verified -> autowork", PrWatcher._gateFromLabels([{ name: "autowork-verified" }]).autowork === true);
+ok("labels: none -> both false", PrWatcher._gateFromLabels([{ name: "bug" }]).convergance === false && PrWatcher._gateFromLabels([]).autowork === false);
+
+// _runRecordSignals: convergence/record phases → convergance; council/done-ok/result-ok/testsVerified → autowork.
+ok("run: convergence done -> convergance", PrWatcher._runRecordSignals({ phase: "convergence", status: "done" }).convergance === true);
+ok("run: record done -> convergance", PrWatcher._runRecordSignals({ phase: "record", status: "done" }).convergance === true);
+ok("run: council -> autowork", PrWatcher._runRecordSignals({ phase: "council", status: "done" }).autowork === true);
+ok("run: done ok -> autowork", PrWatcher._runRecordSignals({ phase: "done", status: "ok" }).autowork === true);
+ok("run: result ok -> autowork", PrWatcher._runRecordSignals({ phase: "result", status: "ok" }).autowork === true);
+ok("run: testsVerified -> autowork", PrWatcher._runRecordSignals({ phase: "test", status: "done", testsVerified: true }).autowork === true);
+ok("run: plain research step -> neither", (() => { const s = PrWatcher._runRecordSignals({ phase: "research", status: "done" }); return !s.convergance && !s.autowork; })());
+
+// ── _shouldMerge with the gate: assigned issue needs BOTH records ─────────────
+const gReady = { required: true, issue: 42, convergance: true, autowork: true };
+const gNoConv = { required: true, issue: 42, convergance: false, autowork: true };
+const gNoWork = { required: true, issue: 42, convergance: true, autowork: false };
+const gNotReq = { required: false };
+ok("gate: required + both -> merges", m._shouldMerge(greenPvBase, reviewed, now, null, gReady).merge === true);
+ok("gate: missing convergance -> blocked", m._shouldMerge(greenPvBase, reviewed, now, null, gNoConv).merge === false);
+ok("gate: missing convergance names reason", m._shouldMerge(greenPvBase, reviewed, now, null, gNoConv).reason === "needs_convergance_record:#42");
+ok("gate: missing autowork -> blocked", m._shouldMerge(greenPvBase, reviewed, now, null, gNoWork).merge === false);
+ok("gate: missing autowork names reason", m._shouldMerge(greenPvBase, reviewed, now, null, gNoWork).reason === "needs_autowork_verification:#42");
+ok("gate: not required (unassigned) -> merges", m._shouldMerge(greenPvBase, reviewed, now, null, gNotReq).merge === true);
+ok("gate: null gate -> merges (back-compat)", m._shouldMerge(greenPvBase, reviewed, now, null, null).merge === true);
+// The gate only applies once the normal gates pass — a draft assigned PR still blocks on draft, not the gate.
+ok("gate: draft still blocks before gate", m._shouldMerge({ isDraft: true, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now, null, gNoConv).reason === "draft");
+
 console.log(`\n${pass} checks passed`);

@@ -331,26 +331,45 @@ Each test run logs:
 }
 ```
 
-## Per-Agent Workstream Rule (Critical)
+## Per-Lane Workstream Rule (Critical)
 
-Each agent gets **one open PR lane at a time**. All agent lanes run concurrently.
+Each **lane** gets **one open PR at a time**. All lanes run concurrently. The lane key
+is the branch's **first path segment**: agent prefixes are fixed lanes, every other
+prefix is a **dynamic human lane** named after that prefix.
 
-| Branch prefix | Lane |
-|---|---|
-| `claude/` | Claude lane |
-| `gemini/` | Gemini lane |
-| `codex/` | Codex lane |
-| `devin/` | Devin lane |
-| `grok/` | Grok lane |
-| `openai/` | OpenAI lane |
-| anything else | Human lane |
+| Branch prefix | Lane | Kind |
+|---|---|---|
+| `claude/` | Claude lane | agent |
+| `gemini/` | Gemini lane | agent |
+| `codex/` | Codex lane | agent |
+| `devin/` | Devin lane | agent |
+| `grok/` | Grok lane | agent |
+| `openai/` | OpenAI lane | agent |
+| `alex/` | Alex lane | human (dynamic) |
+| `kriskin/` | Kriskin lane | human (dynamic) |
+| `mookman11/` | Mookman11 lane | human (dynamic) |
+| any other `<name>/` | that contributor's lane | human (dynamic) |
+| no `/` (unprefixed) | shared `human` lane | human (fallback) |
+
+**Dynamic human lanes:** the human roster is open-ended — any new `<name>/…` prefix
+becomes its own concurrent lane with no code or roster change, so more than one (and
+more than three) humans can work at once. `alex/`, `kriskin/`, `mookman11/` no longer
+block each other.
 
 Rules:
-- A second branch from the same agent prefix is blocked until its first PR is merged/closed
+- A second branch in the same lane is blocked until its first PR is merged/closed
 - Commits/pushes to a branch **that already has an open PR** are always allowed
 - `gh-pages`, `master`, `dev` are exempt
 - Direct push to master is blocked — open a PR, or: `OVERRIDE_MERGE=1 git push origin master`
 - Slop commit messages (empty, < 8 chars, "wip", "placeholder", "temp", etc.) are blocked
+
+**Assigned-issue merge gate:** a PR that closes a **human-assigned** issue cannot
+auto-merge into `master` until it carries **both** a convergence record (`!convergance`)
+and autowork verification (`!work`/`!autowork`) — surfaced as the `convergance-record` +
+`autowork-verified` labels, or the fleet host's `data/autowork-runs/*.jsonl` evidence. A
+successful autowork run satisfies both. Enforced by the single merger
+(`apps/lantern-garage/lib/pr-watcher.js`); held with `needs_convergance_record:#N` /
+`needs_autowork_verification:#N`.
 
 Install hooks:
 ```powershell

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1] - 2026-06-30
+### Changed
+- **Dynamic per-human work lanes.** The monoworkstream hooks (`scripts/hooks/pre-commit`, `pre-push`) now key the one-open-PR lane off the branch's first path segment for *everyone*, instead of collapsing all humans into a single shared lane. `alex/`, `kriskin/`, `mookman11/` — and any future `<name>/` prefix — each get their own concurrent lane (one open PR each) with no roster edit, so more than one and more than three humans can work at once. Unprefixed branches share a `human` fallback lane. (#1755)
+
+### Added
+- **Assigned-issue convergence merge gate.** A PR that closes a human-assigned issue is now blocked from auto-merging into `master` until it carries **both** a convergence record (`!convergance`) and autowork verification (`!work`/`!autowork`). The single merger (`apps/lantern-garage/lib/pr-watcher.js`) reads the `convergance-record` + `autowork-verified` labels or the fleet host's `data/autowork-runs/*.jsonl` evidence; a successful autowork run satisfies both and applies the labels automatically. Held PRs report `needs_convergance_record:#N` / `needs_autowork_verification:#N`. Unassigned issues are unaffected. Unit-tested in `tests/test_pr_watcher.js`. (#1755)
+
 ## [1.8.0] - 2026-06-30
 - **Unisona 1.8 — the personal reasoning cockpit goes public.** The 1.7.1xx line consolidates into one milestone: the project is now branded **unisona.ai** end to end, and the Observe → Remember → Reason → Act → Verify → Converge loop has a user-facing cockpit at *every* stage. Nothing here is new architecture — it's the loop, finally legible to a person using it. See `/whats-new.html` for the readable version and `docs/UNISONA-1.8.md` for the full release notes.
 

@@ -49,11 +49,23 @@ branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 [ -z "$branch" ] && exit 0
 case "$branch" in gh-pages|master|dev) exit 0 ;; esac
 
-# Derive agent prefix
-agent=$(echo "$branch" | cut -d'/' -f1)
-case "$agent" in
-  claude|gemini|codex|devin|grok|openai) ;;
-  *) agent="human" ;;
+# Derive the LANE key from the branch's first path segment.
+#   • Known agent prefixes (claude/, gemini/, …) are each their own lane.
+#   • Every OTHER prefix is a DYNAMIC HUMAN LANE keyed by that prefix —
+#     alex/, kriskin/, mookman11/, or any future <name>/ — so humans run
+#     concurrently, each still capped at one open PR. The set is open-ended:
+#     a new contributor just needs a "<name>/…" branch to get their own lane.
+#   • A branch with NO '/' collapses to the shared "human" lane (back-compat
+#     for ad-hoc, unprefixed branches).
+first=$(echo "$branch" | cut -d'/' -f1)
+case "$first" in
+  claude|gemini|codex|devin|grok|openai) lane="$first"; lane_kind="agent" ;;
+  *)
+    case "$branch" in
+      */*) lane="$first"; lane_kind="human" ;;
+      *)   lane="human";  lane_kind="human" ;;
+    esac
+    ;;
 esac
 
 # Allow if this branch already has an open PR (fixing an existing PR)
@@ -62,36 +74,29 @@ branch_pr=$(gh pr list --repo alex-place/lantern-os --state open \
   --jq "map(select(.headRefName == \"$branch\")) | length" 2>/dev/null)
 [ "${branch_pr:-0}" -gt 0 ] && exit 0
 
-# Check for a conflicting open PR from the same agent lane
-if [ "$agent" = "human" ]; then
-  conflict=$(gh pr list --repo alex-place/lantern-os --state open \
-    --json headRefName \
-    --jq '[.[] | select(.headRefName | test("^(claude|gemini|codex|devin|grok|openai)/") | not)] | length' \
-    2>/dev/null)
+# A jq filter selecting OTHER open PRs sharing this lane. The shared "human" lane
+# groups every unprefixed (no-'/') branch; a named lane matches first-segment ==
+# lane (covers both agents and per-human lanes).
+if [ "$lane" = "human" ] && [ "$lane_kind" = "human" ]; then
+  lane_match='select(.headRefName | contains("/") | not)'
 else
-  conflict=$(gh pr list --repo alex-place/lantern-os --state open \
-    --json headRefName \
-    --jq "[.[] | select(.headRefName | startswith(\"$agent/\"))] | length" \
-    2>/dev/null)
+  lane_match="select((.headRefName | split(\"/\")[0]) == \"$lane\")"
 fi
+
+conflict=$(gh pr list --repo alex-place/lantern-os --state open \
+  --json headRefName \
+  --jq "[.[] | $lane_match] | length" 2>/dev/null)
 
 if [ "${conflict:-0}" -gt 0 ]; then
   echo ""
-  echo "PER-AGENT WORKSTREAM BLOCK: agent '$agent' already has an open PR."
+  echo "WORKSTREAM BLOCK: $lane_kind lane '$lane' already has an open PR."
   echo ""
-  if [ "$agent" = "human" ]; then
-    gh pr list --repo alex-place/lantern-os --state open \
-      --json number,title,headRefName \
-      --jq '[.[] | select(.headRefName | test("^(claude|gemini|codex|devin|grok|openai)/") | not)] | .[] | "  #\(.number) \(.title) [\(.headRefName)]"' \
-      2>/dev/null
-  else
-    gh pr list --repo alex-place/lantern-os --state open \
-      --json number,title,headRefName \
-      --jq "[.[] | select(.headRefName | startswith(\"$agent/\"))] | .[] | \"  #\\(.number) \\(.title) [\\(.headRefName)]\"" \
-      2>/dev/null
-  fi
+  gh pr list --repo alex-place/lantern-os --state open \
+    --json number,title,headRefName \
+    --jq "[.[] | $lane_match] | .[] | \"  #\\(.number) \\(.title) [\\(.headRefName)]\"" \
+    2>/dev/null
   echo ""
-  echo "Finish or close that PR before opening another lane for '$agent'."
+  echo "Finish or close that PR before opening another lane for '$lane'."
   echo "Bypass: SKIP_MONOWORKSTREAM=1 git commit ..."
   echo ""
   exit 1

@@ -411,15 +411,37 @@ This repo supports **multiple humans working in parallel** while maintaining qua
 - This prevents AI agents from creating conflicting work in the same lane
 - Example: Only one `claude/*` PR can be open at a time
 
-### Humans: One-PR-per-contributor
-- Multiple humans can work in parallel on different branches
-- Each human contributor is limited to **one open PR at a time**
-- This prevents individual humans from creating conflicting work
-- Example: Alex can have one PR, while another contributor can have a different PR simultaneously
+### Humans: Dynamic per-contributor lanes
+Human lanes are **dynamic** — there is no fixed roster and no shared "all humans" lane.
+The lane key is the branch's **first path segment**, so every contributor who prefixes
+their branches with their own name gets their own concurrent lane:
+
+- `alex/…`, `kriskin/…`, `mookman11/…` are the current human lanes — and **any new
+  `<name>/…` prefix becomes a new lane automatically** (no code change, no roster edit).
+  This supports more than one and more than three humans working at once.
+- Each human lane is still capped at **one open PR at a time** (focus per contributor):
+  `alex/` can have one PR open while `kriskin/` and `mookman11/` each have their own —
+  they no longer block each other.
+- A branch with **no `/`** (ad-hoc, unprefixed) falls back to a single shared `human`
+  lane, so stray branches can't spawn unlimited free lanes.
+
+### Assigned-issue merge gate (Verify → Converge)
+A PR that **closes a human-assigned GitHub issue** cannot be auto-merged into `master`
+until the work is grounded with **both**:
+1. a **convergence record** (`!convergance` — hypothesis + evidence + confidence), and
+2. **autowork verification** (`!work` / `!autowork` ran the loop end-to-end).
+
+The single merger (`apps/lantern-garage/lib/pr-watcher.js`) enforces this: it reads the
+PR's `convergance-record` + `autowork-verified` labels **or** the fleet host's autowork
+run log (`data/autowork-runs/*.jsonl`). A successful autowork run satisfies both and
+applies the labels automatically. Until then the PR is held with reason
+`needs_convergance_record:#N` / `needs_autowork_verification:#N`. Unassigned issues and
+PRs that close no issue are unaffected. Issues are routed to a lane + assignee via
+`/refinement`.
 
 ### Rules
 - **Commits and pushes to a branch that already has an open PR are always allowed.**
-- **No new branches while you have an open PR.** The pre-push hook enforces this via GitHub CLI.
+- **No new branches while your lane has an open PR.** The pre-push hook enforces this via GitHub CLI.
 - **Exempt branches:** `gh-pages` (static site deploy) and `master` are long-lived branches and never count as a workstream.
 - **Emergency bypass:** `SKIP_MONOWORKSTREAM=1 git commit ...` or `SKIP_MONOWORKSTREAM=1 git push ...`
 
