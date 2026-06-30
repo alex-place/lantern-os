@@ -1,0 +1,1 @@
+- feat(ui): replace remaining user-facing "Keystone OS" brand text (21 mentions across 11 pages) and the chat agent display name with "unisona.ai" (persona id stays keystone; code/routes/keys/docs untouched).
