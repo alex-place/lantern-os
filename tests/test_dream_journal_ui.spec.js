@@ -16,14 +16,14 @@
 const { test, expect } = require("@playwright/test");
 const { baseUrl: BASE_URL } = require("./lantern-test-base");
 
-test.describe("Keystone OS Home UI", () => {
-  test("home page loads and shows Keystone OS branding", async ({ page }) => {
+test.describe("unisona.ai Home UI", () => {
+  test("home page loads and shows unisona.ai branding", async ({ page }) => {
     await page.goto(BASE_URL);
-    await expect(page).toHaveTitle(/Keystone OS/);
-    await expect(page.locator(".nav-brand")).toContainText("Keystone OS");
-    await expect(page.locator("h1")).toContainText("Keystone");
+    await expect(page).toHaveTitle(/unisona/i);
+    await expect(page.locator(".nav-brand")).toContainText("unisona.ai");
+    await expect(page.locator("h1")).toContainText("unisona.ai");
     // Static hero tagline (not overwritten by the live-state loader)
-    await expect(page.locator("#hero-tagline")).toContainText("Keystone OS");
+    await expect(page.locator(".tagline")).toContainText("remembers you");
   });
 
   test("home navigation tiles render", async ({ page }) => {

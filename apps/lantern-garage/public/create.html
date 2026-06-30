@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#7c6af7">
+  <meta name="theme-color" content="#06b6d4">
   <script>
     /* Theme bootstrap — set before first paint to avoid flash of wrong theme */
     (function() {
@@ -17,14 +17,11 @@
       }
     })();
   </script>
-  <title>Creator Dashboard — Lantern OS</title>
+  <title>Create — unisona.ai</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    :root {
-      --radius: 14px;
-      --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
-      --shadow-hover: 0 4px 16px rgba(0,0,0,0.1);
-    }
+    /* --radius / --shadow / --shadow-hover come from site.css :root (identical
+       values), so the cards here match the rest of the site by inheritance. */
 
     .page {
       max-width: 1120px;
@@ -910,7 +907,7 @@
       <option>Webcam moves around</option>
       <option>No Facecam</option>
     </select>
-    <span style="flex-basis:100%; font-size:0.78rem; color:var(--muted); margin-top:2px;">Tell Lantern where your facecam usually appears if detection struggles.</span>
+    <span style="flex-basis:100%; font-size:0.78rem; color:var(--muted); margin-top:2px;">Tell Keystone where your facecam usually appears if detection struggles.</span>
   </div>
 
   <!-- Live upload progress (one row per file) -->

@@ -2,6 +2,7 @@
 
 ## [1.8.3] - 2026-06-30
 ### Changed
+- **Brand consistency: shared chrome + Create page now read unisona.ai.** `js/site-chrome.js` — the single source of truth for the nav + footer on every page that uses it (Create, Explore, Trader, Kalshi, Help, …) — was still injecting the legacy "Keystone OS" brand after the 1.8 rebrand; it now reads **unisona.ai**, matching the canonical home. `create.html` is retitled `Create — unisona.ai`, its `theme-color` aligned to the site accent (`#06b6d4`), its redundant `:root` token overrides dropped in favour of the canonical `site.css` tokens, and stale "Lantern" body copy updated. Stale Playwright brand assertions (`test_dream_chat_ux`, `test_dream_journal_ui`) — which still expected "Keystone OS" and a dead `#hero-tagline` selector after the rebrand — were corrected to the current brand.
 - **Home: oversized secondary panels demoted to a compact link row.** The chat-first home index (`apps/lantern-garage/public/index.html`) replaced its four full-size card panels (Trader / Create / Explore / Orchestration) — which dominated the page and read as cluttered — with a small, de-emphasized link row (Trader · Create · Explore) that sits beneath the chat in the vertically-centered hero stack, keeping each tile's accent glyph for identity. Links use `--muted`, brightening to `--text` on hover. Orchestration is dropped from the home page (a dev/routing surface, still reachable from Explore "Work board", `work.html`, and `ops.html`).
 
 ### Added
