@@ -118,12 +118,18 @@ for file in $(git diff --cached --name-only); do
     slop_fail=1
   fi
 
-  # 2. Debug pollution
-  if echo "$content" | grep -qE \
-    "(^|[^a-zA-Z])(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\)|import pdb)"; then
-    echo "SLOP [debug]: debug statement found in $file — remove before committing."
-    slop_fail=1
-  fi
+  # 2. Debug pollution — but console.* is the intended interface in test files and
+  # CLI/research tooling, so exempt those (mirrors .github/workflows/slop-check.yml).
+  case "$file" in
+    */test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) ;;  # console.* expected here
+    *)
+      if echo "$content" | grep -qE \
+        "(^|[^a-zA-Z])(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\)|import pdb)"; then
+        echo "SLOP [debug]: debug statement found in $file — remove before committing."
+        slop_fail=1
+      fi
+      ;;
+  esac
 
   # 3. SQL injection risk — string-concatenated query
   if echo "$content" | grep -iqE \

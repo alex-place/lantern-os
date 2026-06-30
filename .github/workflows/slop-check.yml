@@ -47,10 +47,18 @@ jobs:
       - name: Check for committed debug statements
         run: |
           set +e
-          # Exclude test files — console.log is the test reporter, not a debug leak
+          # Exempt code where console.* is the intended interface, not a debug leak:
+          #   - test files anywhere (top-level tests/, colocated apps/**/test/, *.test.*,
+          #     *.spec.*, test_*) — console.log is the test reporter
+          #   - scripts/ and experiments/ — CLI / research tools whose stdout IS console.log
+          # The old list only matched top-level tests/ + test_*, so colocated
+          # apps/**/test/*.test.js and scripts/*.mjs CLIs tripped the gate falsely (#1561).
+          # Real leaks in shipped lib/ routes/ public/ code are still caught.
           diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py' '*.mjs' \
-            ':(exclude)tests/*.js' ':(exclude)tests/*.ts' ':(exclude)tests/*.py' \
-            ':(exclude)test_*.js' ':(exclude)test_*.ts' ':(exclude)test_*.py')
+            ':(exclude,glob)**/tests/**' ':(exclude,glob)**/test/**' \
+            ':(exclude,glob)**/*.test.*' ':(exclude,glob)**/*.spec.*' \
+            ':(exclude,glob)**/test_*.py' ':(exclude,glob)**/test_*.js' ':(exclude,glob)**/test_*.ts' \
+            ':(exclude,glob)scripts/**' ':(exclude,glob)experiments/**')
           hits=$(echo "$diff" | grep -E \
             '^\+(.*)(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\))' \
             | grep -v '^+++')
