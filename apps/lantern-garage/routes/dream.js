@@ -310,6 +310,27 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
         }
       }
 
+      // Handle 'trading' intent by returning a tool with kind 'trade'
+      const intent = await classifyIntent(message);
+      if (intent === 'trading') {
+        result.tool = {
+          kind: 'trade',
+          data: {
+            panels: [
+              { title: 'Current Positions', content: 'AAPL: 100 shares, +$500\nTSLA: 50 shares, -$200' },
+              { title: 'Market Overview', content: 'S&P 500: +0.5%\nNASDAQ: +0.8%' },
+              { title: 'Trade History', content: 'Bought AAPL @ $150, Sold TSLA @ $200' },
+            ],
+            // Add more data as needed for the trade screen
+          },
+          label: 'Trade Screen',
+          prompt: message,
+          note: 'Displaying relevant trade information.',
+        };
+        result.reply = 'Here is your trading overview:';
+        result.source = 'trading_tool';
+      }
+
       const provLatency = Date.now() - provStart;
       try {
         await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-journal", role: "operator", text: message.slice(0, maxConversationTextLength) });

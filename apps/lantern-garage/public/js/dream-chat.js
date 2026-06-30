@@ -46,7 +46,7 @@
     if (RP_OPT_IN_RE.test(msg)) return "dream_chat";
     if (CODING_TRIGGERS.some(t => lower.includes(t))) return "coding_change";
     if (/\b(debug|error|broken|crash|not working|not responding)\b/i.test(lower)) return "technical_debug";
-    if (/\b(buy|sell|trade|trading|position|portfolio|market|ticker|stock|kalshi|prediction market|should i (buy|sell|hold))\b/i.test(lower)) return "trading";
+    if (/\b(buy|sell|trade|trading|position|portfolio|market|ticker|stock|kalshi|prediction market|should i (buy|sell|hold)|trade screen)\b/i.test(lower)) return "trading";
     if (/\b(remember (this|that)|save (this|that)|log (this|that)|add to (my )?(journal|memory|notes?))\b/i.test(lower)) return "memory";
     if (/\b(show me a? ?(video|clip|youtube)|play a? ?video|find a? ?video)\b/i.test(lower)) return "media";
     return "general";

@@ -39,6 +39,18 @@ function renderToolReplay(tool) {
       + `allow="encrypted-media;picture-in-picture" allowfullscreen loading="lazy"></iframe>`
       + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
   }
+  if (tool.kind === 'trade' && tool.data) {
+    const tradeData = tool.data;
+    let html = `<div class="trade-screen-panels" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:10px">`;
+    for (const panel of tradeData.panels || []) {
+      html += `<div class="trade-panel" style="border:1px solid var(--border,#2a2a3a);border-radius:8px;padding:12px;background:var(--bg-card,#1e1e2e)">`
+        + `<h3 style="margin-top:0;font-size:1.1em;color:var(--accent,#5cc8ff)">${esc(panel.title || 'Trade Panel')}</h3>`
+        + `<p style="font-size:0.9em;color:var(--text,#cdd)">${esc(panel.content || 'No content.')}</p>`
+        + `</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
   if (tool.kind === 'document' && tool.url) {
     const kb = tool.bytes ? ' · ' + Math.round(tool.bytes / 1024) + ' KB' : '';
     return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
