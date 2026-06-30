@@ -6,6 +6,7 @@ const path = require("path");
 const {
   logprobToBits, fromOpenAILogprobs, fromOllamaLogprobs,
   surpriseField, fieldToUncertainty, toUncertainty,
+  calibrationFor, DEFAULT_CALIBRATION,
 } = require("../lib/token-surprise");
 
 let failures = 0;
@@ -110,6 +111,44 @@ check("toUncertainty: accepts scalar | field | array", () => {
   assert.ok(toUncertainty(surpriseField(arr)) > 0.8);
   assert.strictEqual(toUncertainty(1.5), 1); // clamps
 });
+
+// ── #1681 per-model calibration ─────────────────────────────────────────────
+check("calibrationFor: known model → specific, unknown → default, family/tag match", () => {
+  assert.strictEqual(calibrationFor("unknown-model"), DEFAULT_CALIBRATION);
+  assert.strictEqual(calibrationFor(""), DEFAULT_CALIBRATION);
+  assert.strictEqual(calibrationFor(null), DEFAULT_CALIBRATION);
+  const q = calibrationFor("qwen2.5-coder:1.5b");
+  assert.ok(q.center < 5 && q.gain > 1, `qwen calib should be tuned: ${JSON.stringify(q)}`);
+  // family/tag resolution: a different tag of the same base resolves to the family calib
+  assert.strictEqual(calibrationFor("mistral:latest"), calibrationFor("mistral"));
+  assert.strictEqual(calibrationFor("qwen2.5-coder:latest"), calibrationFor("qwen2.5-coder:1.5b"));
+});
+
+check("default calibration leaves the uncalibrated mapping unchanged", () => {
+  const f = surpriseField(Array(20).fill({ bits: 6 }));
+  assert.strictEqual(fieldToUncertainty(f), fieldToUncertainty(f, DEFAULT_CALIBRATION));
+});
+
+// The point of #1681: calibration makes the MAGNITUDE meaningful (usable against a fixed
+// ~0.5 threshold) where the default logistic collapses a low-bit model's replies to ~0.
+const CALIB_MODEL = { "surprise_leak_qwen15b.jsonl": "qwen2.5-coder:1.5b", "surprise_leak_mistral7b.jsonl": "mistral" };
+for (const [fn, modelId] of Object.entries(CALIB_MODEL)) {
+  check(`per-model calibration separates magnitude on real data (${modelId})`, () => {
+    const rows = fs.readFileSync(path.join(RESULTS, fn), "utf8").trim().split("\n")
+      .map((l) => JSON.parse(l)).filter((r) => r.field && typeof r.hallucination === "number");
+    const calib = calibrationFor(modelId);
+    const mean = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
+    const uCorrect = mean(rows.filter((r) => !r.hallucination).map((r) => fieldToUncertainty(r.field, calib)));
+    const uHalluc = mean(rows.filter((r) => r.hallucination).map((r) => fieldToUncertainty(r.field, calib)));
+    // default-calibration magnitudes (the bug #1681 fixes): both collapse toward 0
+    const dCorrect = mean(rows.filter((r) => !r.hallucination).map((r) => fieldToUncertainty(r.field)));
+    const dHalluc = mean(rows.filter((r) => r.hallucination).map((r) => fieldToUncertainty(r.field)));
+    assert.ok(uHalluc - uCorrect > 0.25, `calibrated separation too small: halluc=${uHalluc.toFixed(3)} correct=${uCorrect.toFixed(3)}`);
+    assert.ok(uHalluc > 0.5 && uCorrect < 0.5, `classes should straddle 0.5: halluc=${uHalluc.toFixed(3)} correct=${uCorrect.toFixed(3)}`);
+    assert.ok(dHalluc < 0.1 && dCorrect < 0.1, `default calibration should collapse to ~0 (the bug): halluc=${dHalluc.toFixed(3)} correct=${dCorrect.toFixed(3)}`);
+    console.log(`        ${modelId}: calibrated correct=${uCorrect.toFixed(3)} halluc=${uHalluc.toFixed(3)}  (default ${dCorrect.toFixed(3)}/${dHalluc.toFixed(3)})`);
+  });
+}
 
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nall token-surprise checks passed");

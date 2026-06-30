@@ -1181,6 +1181,7 @@ async function handleStreamChat(req, url, res) {
         const { collapse, grounded, signaturePatch } = runCanaries(fullReply, {
           groundingContext,
           tokenSurprise: surprise.value(), // #1678: model-internal uncertainty (null when none captured)
+          surpriseModel: signature.model,  // #1681: calibrate the uncertainty magnitude to this model
           context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
         });
         Object.assign(signature, signaturePatch);
