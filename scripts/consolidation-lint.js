@@ -202,18 +202,29 @@ for (const file of universe) {
   // modernize (JS family, non-test)
   if (JS_EXT.has(ext) && !TEST_FILE.test(file)) {
     const text = content.toString('utf8');
-    const lines = text.split('\n');
     let varCount = 0;
-    lines.forEach((line, i) => {
+    text.split('\n').forEach((line) => {
       if (/^\s*var\s+[A-Za-z_$]/.test(line)) varCount++;
-      // exec/spawn fed an interpolated or concatenated argument
-      if (/\b(execSync|exec|spawnSync|spawn)\s*\(\s*[`'"][^)]*\$\{/.test(line) ||
-          /\b(execSync|spawnSync)\s*\([^)]*['"`]\s*\+/.test(line)) {
-        add('unsafe-exec', 'HIGH', `${file}:${i + 1}`,
-            'shell call on interpolated input — route through lib/safe-exec.js');
-      }
     });
     if (varCount > 0) add('legacy-var', 'LOW', file, `${varCount} \`var\` declaration(s) — use const/let`);
+
+    // unsafe-exec — scanned over the FULL text, not per line: the call and its
+    // interpolated argument routinely span lines, e.g.
+    //   execSync(
+    //     `git commit -m "${msg}"`, { cwd })
+    // which a per-line regex never sees. Two shapes are flagged: a template-literal
+    // argument containing `${…}`, or a quoted string concatenated (`+`) with a
+    // NON-literal (a variable): the char after `+` must itself be non-quote, so
+    // `"a" + "b"` constant joins are exempt. `execFileSync` is intentionally NOT
+    // matched (argv arrays never reach a shell), and a leading `.`/word char is
+    // excluded so `re.exec(`…`)` (RegExp/method calls) doesn't false-positive.
+    const EXEC_UNSAFE = /(?<![.\w])(execSync|exec|spawnSync|spawn)\s*\(\s*(?:`[^`]*\$\{|[`'"][^`'"]*[`'"]\s*\+\s*[^\s'"`])/g;
+    let m;
+    while ((m = EXEC_UNSAFE.exec(text)) !== null) {
+      const lineNo = text.slice(0, m.index).split('\n').length;
+      add('unsafe-exec', 'HIGH', `${file}:${lineNo}`,
+          'shell call on interpolated input — route through lib/safe-exec.js');
+    }
   }
 }
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.114] - 2026-06-29
+- tooling(consolidate): make the consolidation linter's `unsafe-exec` rule **multiline-aware**. It scanned per-line, so it missed the common shape where the call opens on one line and the interpolated argument is on the next — `execSync(\n  \`git commit -m "${msg}"\`)`. It now scans the full file text and reports the call's line number, catching 4 real sites that were previously invisible (e.g. `lib/video-pipeline-debugger.js` `ffprobe …"${videoPath}"`, `routes/queue.js` `gh issue view ${issueNumber}`, the release-manager commit, the ensure-rust powershell call). Precision improved at the same time: `execFileSync` is never matched (argv arrays don't reach a shell), `re.exec(\`…\`)`/method calls are excluded via a `(?<![.\w])` guard, and constant string joins (`"a" + "b"`) no longer false-positive (the char after `+` must be a non-literal). Verified on a synthetic fixture (flags the multiline + `"x"+var`, skips the constant template and `RegExp.exec`) and on the tree (13 real finds, 0 self-flag).
+
 ## [1.7.113] - 2026-06-29
 - feat(verify): personal fact-check button — paste a claim, get a grounded verdict (#1430). Adds `apps/lantern-garage/public/factcheck.html` backed by `routes/factcheck.js`, registered in `server.js` alongside the #1411 metrics route. Improves the **Verify** stage of the loop: a claim is checked against grounded evidence and returned as a verdict with sources. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 
