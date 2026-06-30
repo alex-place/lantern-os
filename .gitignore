@@ -450,3 +450,6 @@ apps/lantern-garage/public/assets/gage/**/*.gif
 
 # Ingest staging (external-repo docs pulled via gh, not vendored)
 data/ingest-staging/
+# Memory recall benchmark — keep the fixture, ignore runtime output + real datasets
+data/longmemeval/*
+!data/longmemeval/fixture.json

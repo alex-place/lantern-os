@@ -1,0 +1,47 @@
+{
+  "_comment": "Synthetic LongMemEval-style fixture for experiments/memory_recall_bench.js. NOT a real benchmark — it exists so the harness is runnable + CI-testable offline and so the IDF mode's advantage over flat keyword matching is demonstrable. Instance q1 is adversarial: the gold session matches only the RARE query term (arrhythmia) while 6 distractors each match two COMMON query terms (cardiologist+medication), so flat keyword ranking pushes gold out of top-5 but IDF ranking pulls it to #1. Drop a real data/longmemeval/longmemeval_s.json beside this file for a publishable number.",
+  "instances": [
+    {
+      "id": "q1-rare-term-idf",
+      "question": "What did the cardiologist say about my arrhythmia medication?",
+      "answer_session_ids": ["q1-gold"],
+      "sessions": [
+        { "session_id": "q1-gold", "turns": [{ "role": "user", "content": "After the ECG, Dr. Lee adjusted my arrhythmia plan and said it looks stable now." }] },
+        { "session_id": "q1-d1", "turns": [{ "role": "user", "content": "My cardiologist switched my medication brand last week." }] },
+        { "session_id": "q1-d2", "turns": [{ "role": "user", "content": "I asked the cardiologist about medication side effects." }] },
+        { "session_id": "q1-d3", "turns": [{ "role": "user", "content": "The cardiologist office called about my medication refill." }] },
+        { "session_id": "q1-d4", "turns": [{ "role": "user", "content": "Cardiologist appointment to review medication dosage timing." }] },
+        { "session_id": "q1-d5", "turns": [{ "role": "user", "content": "A new cardiologist wants a medication adjustment next month." }] },
+        { "session_id": "q1-d6", "turns": [{ "role": "user", "content": "Insurance denied the cardiologist prescribed medication." }] }
+      ]
+    },
+    {
+      "id": "q2-neighbor-dog",
+      "question": "What breed is my neighbor's dog?",
+      "answer_session_ids": ["q2-gold"],
+      "sessions": [
+        { "session_id": "q2-gold", "turns": [{ "role": "user", "content": "My neighbor's dog is a border collie breed, super energetic." }] },
+        { "session_id": "q2-d1", "turns": [{ "role": "user", "content": "I walked my own dog this morning before work." }] },
+        { "session_id": "q2-d2", "turns": [{ "role": "user", "content": "The neighbor borrowed a ladder over the weekend." }] },
+        { "session_id": "q2-d3", "turns": [{ "role": "user", "content": "We planted tomatoes in the garden yesterday." }] },
+        { "session_id": "q2-d4", "turns": [{ "role": "user", "content": "The coffee machine at the office broke again." }] },
+        { "session_id": "q2-d5", "turns": [{ "role": "user", "content": "I booked a flight to Denver for the conference." }] },
+        { "session_id": "q2-d6", "turns": [{ "role": "user", "content": "My phone battery has been draining fast lately." }] }
+      ]
+    },
+    {
+      "id": "q3-motorcycle-parking",
+      "question": "Where did I park the motorcycle downtown?",
+      "answer_session_ids": ["q3-gold"],
+      "sessions": [
+        { "session_id": "q3-gold", "turns": [{ "role": "user", "content": "I park the motorcycle in the downtown garage on 5th Street." }] },
+        { "session_id": "q3-d1", "turns": [{ "role": "user", "content": "The downtown traffic was terrible during rush hour." }] },
+        { "session_id": "q3-d2", "turns": [{ "role": "user", "content": "I bought a new helmet for the motorcycle." }] },
+        { "session_id": "q3-d3", "turns": [{ "role": "user", "content": "We had lunch at a downtown cafe near the river." }] },
+        { "session_id": "q3-d4", "turns": [{ "role": "user", "content": "My car insurance renewal is due in March." }] },
+        { "session_id": "q3-d5", "turns": [{ "role": "user", "content": "The library extended its weekend hours." }] },
+        { "session_id": "q3-d6", "turns": [{ "role": "user", "content": "I finished reading a novel about sailing." }] }
+      ]
+    }
+  ]
+}
