@@ -35,6 +35,8 @@ These documents are non-negotiable for safe, compliant contributions.
 
 **THEN:** [Convergence Core Mapping](docs/convergence-core-mapping.md) — how existing code aligns with architecture.
 
+**BENCHMARKS:** [docs/BENCHMARKS.md](docs/BENCHMARKS.md) — the maintained registry of every *external* mark we run (HumanEval, SWE-bench, LongMemEval, …). Update it in the same PR whenever a harness or measured result changes.
+
 ---
 
 **THE ENTIRE PROJECT IS ONE LOOP:**

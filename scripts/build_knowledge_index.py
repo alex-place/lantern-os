@@ -31,6 +31,27 @@ MAX_SECTION_CHARS = 1200
 KC_HTML = REPO / "apps" / "lantern-garage" / "public" / "knowledgecenter.html"
 CORE_DOCS = ["README.md", "CLAUDE.md", "AGENTS.md", "QUICKSTART.md"]
 
+# External (out-of-repo) sources — e.g. Human Flourishing Frameworks docs pulled
+# into gitignored staging. They are SURFACED as KC/Explore cards that link to their
+# upstream source, but their text is intentionally NOT folded into the committed
+# grounding index (the staging decision: nothing about the external repo is
+# committed here). Built by scripts/build_doc_library.js.
+EXTERNAL_SOURCES = OUT_DIR / "external-sources.json"
+
+
+def external_docs() -> list[dict]:
+    if not EXTERNAL_SOURCES.exists():
+        return []
+    try:
+        data = json.loads(EXTERNAL_SOURCES.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    out = []
+    for e in data if isinstance(data, list) else []:
+        if isinstance(e, dict) and e.get("doc") and e.get("url"):
+            out.append(e)
+    return out
+
 
 def knowledge_base_docs() -> list[str]:
     docs = list(CORE_DOCS)
@@ -92,14 +113,34 @@ def main():
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+    # External sources: card-only (no text in the committed index). Appended to the
+    # doc list + carried in doc_meta so KC/Explore can render+link them upstream.
+    ext = external_docs()
+    doc_meta = {}
+    all_docs = list(docs)
+    for e in ext:
+        d = e["doc"]
+        if d not in all_docs:
+            all_docs.append(d)
+        doc_meta[d] = {
+            "url": e["url"],
+            "source": e.get("source", "External"),
+            "title": e.get("title") or d.split("/")[-1],
+            "external": True,
+            "topics": e.get("topics") or ["research"],
+        }
+
     meta = {
         "built_at": time.time(),
-        "docs": docs,
+        "docs": all_docs,
+        "doc_meta": doc_meta,
         "sections": len(records),
+        "external": len(ext),
         "sha256": hashlib.sha256(idx.read_bytes()).hexdigest(),
     }
     (OUT_DIR / "index.meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print(f"knowledge index: {len(records)} sections from {len(meta['docs'])} docs -> {idx}")
+    print(f"knowledge index: {len(records)} sections from {len(docs)} in-repo docs "
+          f"+ {len(ext)} external card-only docs -> {idx}")
     print(f"  sha256={meta['sha256'][:16]}…")
     return 0
 

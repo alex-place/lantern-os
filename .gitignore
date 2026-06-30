@@ -420,3 +420,6 @@ apps/lantern-garage/public/assets/gage/**/*.mp4
 apps/lantern-garage/public/assets/gage/**/*.webp
 apps/lantern-garage/public/assets/gage/**/*.png
 apps/lantern-garage/public/assets/gage/**/*.gif
+
+# Ingest staging (external-repo docs pulled via gh, not vendored)
+data/ingest-staging/

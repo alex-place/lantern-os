@@ -272,23 +272,33 @@ function docCards() {
   const meta = loadKnowledgeMeta();
   if (!meta) return [];
   const built = meta.built_at ? meta.built_at * 1000 : null;
-  // Surface the whole indexed library (45+ docs), not a slice of 8 — the Docs
-  // filter looked nearly empty otherwise. Diversity rerank keeps them from walling
-  // the unfiltered feed; the Docs chip then shows the full set.
+  const docMeta = meta.doc_meta || {};
+  // Surface the whole curated library — the Docs chip shows the full set; diversity
+  // rerank keeps it from walling the unfiltered feed. External docs (e.g. Human
+  // Flourishing Frameworks, registered via data/knowledge/external-sources.json)
+  // carry their own upstream url/source/title in doc_meta so the card links to the
+  // formatted source rather than this repo's blob.
   return (meta.docs || [])
-    .slice(0, 80)
+    .slice(0, 300)
     .map((doc) => {
-      const base = String(doc).split("/").pop().replace(/\.md$/i, "").replace(/[-_]/g, " ");
+      const ext = docMeta[doc];
+      const base = ext && ext.title
+        ? ext.title
+        : String(doc).split("/").pop().replace(/\.md$/i, "").replace(/[-_]/g, " ");
+      const source = (ext && ext.source) || "Knowledge Center";
       return {
         id: "doc:" + doc,
         type: "doc",
         title: base,
-        url: REPO_BLOB + doc,
-        source: "Knowledge Center",
+        url: (ext && ext.url) || (REPO_BLOB + doc),
+        source,
         published: built,
-        topics: ["keystone", "research"],
-        image: genThumb("doc", base, "Knowledge Center"),
-        evidence: { why: "Indexed Keystone reference doc", source: doc },
+        topics: (ext && ext.topics) || ["keystone", "research"],
+        image: genThumb("doc", base, source),
+        evidence: {
+          why: ext ? "Indexed external reference doc" : "Indexed Keystone reference doc",
+          source: (ext && ext.url) || doc,
+        },
       };
     });
 }

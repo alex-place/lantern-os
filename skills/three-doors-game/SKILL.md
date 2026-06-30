@@ -1,6 +1,6 @@
 ---
 name: three-doors-game
-description: Use this skill when the user wants to play, continue, export, import, ingest, or preserve the Lantern OS 3 Doors Game. Trigger on phrases such as "3 doors", "three doors", "lets play", "images only", "!threedoors", "!ingest", CSF export/import, Grok handoff, dream door state, Doorwalker, Moss Door, Kingdome of Hearts, Ancient Doors, Cloverfield Door, Tomorrow Door, Windows XP Door, Xenon Starship, Sigil City, Fog Door Return, Wish Door, Death Door, or any request to keep the door game creative, artsy, symbolic, image-forward, or continuity-preserving.
+description: This skill should be used when the user wants to play, continue, export, import, ingest, or preserve the Lantern OS 3 Doors Game. Trigger on phrases such as "3 doors", "three doors", "lets play", "images only", "!threedoors", "!ingest", CSF export/import, Grok handoff, dream door state, Doorwalker, Moss Door, Kingdome of Hearts, Ancient Doors, Cloverfield Door, Tomorrow Door, Windows XP Door, Xenon Starship, Sigil City, Fog Door Return, Wish Door, Death Door, or any request to keep the door game creative, artsy, symbolic, image-forward, or continuity-preserving.
 ---
 
 # Three Doors Game
@@ -25,12 +25,12 @@ Default behavior:
 
 If the user says `images only`, respond only with image generation or image-like output. Do not add explanatory prose.
 
-When image generation is available and the user asks for images, generate the image directly. Favor detailed anime aesthetic unless the user specifies another style:
+When image generation is available and the user asks for images, generate the image directly. Favor a painterly/liminal tarot-Planescape aesthetic unless the user specifies another style:
 
-- expressive eyes
-- smooth cel-shaded coloring
-- clean linework
-- strong atmosphere
+- painterly oil-and-watercolor rendering
+- liminal tarot / Planescape matte-painting atmosphere
+- soft bleeding edges and layered glazes
+- strong atmosphere and volumetric light
 - emotional character presence
 - cinematic 16:9 composition when the user asks for wide/game scenes
 
@@ -56,27 +56,39 @@ Avoid:
 - too many mechanics
 - gore or hostile horror unless the user explicitly steers there
 
-## Current active continuity
+## Canon doors & dynamic routing (source of truth)
 
-If no newer state is supplied, use this current state:
+Doors are **not improvised**. Every choice layer's doors, and the scene each door
+opens onto, come from the canonical scene graph and route map in
+`data/three-doors/scenes.json` — the same data the Python engine, Discord bot, and
+web UI share. During normal play, do not invent door names that aren't in the graph.
 
-- The user started over and chose a purely creative/artsy game mode.
-- Initial reset doors: The Moss Door, The Arcade Door, The Rain Door.
-- The user stepped through The Moss Door.
-- Inside The Moss Door, the user met a moss-covered fox friend.
-- The fox wears a brass tag reading: `FRIEND OF THE ONE WHO CHOSE GREEN`.
-- The fox recognized the user and implied prior friendship: `You came back.`
-- The active scene is inside a lush moss/forest/ruin threshold with green light, soft earth, ferns, water, lanterns, and a friendly fox companion.
+- **Scenes** (`scenes`): each key (`moss-entry`, `burrow`, `sunken-bell`,
+  `little-crown`, `garden-door`, `xenon-convergence`, `end-of-time`,
+  `kingdome-garden`, `storybook`, `cloverfield`, `future-doors`, `xp-door`,
+  `sigil-city`, `fog-door-return`) carries its `text`, its exactly-three `doors`,
+  `archetype`, and `palette`. Render the scene's own doors — don't substitute your own.
+- **Routing** (`next_map`): maps each chosen door name (lowercased) to the next
+  scene key. This is the dynamic routing now in development — follow it exactly.
+  If a chosen door isn't in `next_map`, route to the nearest themed scene rather
+  than inventing one.
+- **Journey stages** (`stages`): the seven major gates of the Kingdome loop —
+  `kingdome-garden → cloverfield → future-doors → xp-door → xenon-convergence →
+  sigil-city → fog-door-return`.
+- **Poem gate** (`poem_gate`): the riddle, accepted answers, and win text live on
+  scene `kingdome-garden`.
 
-## Active next-state pattern
+## Starting / resuming play
 
-From the Moss Door scene, continue with three new doors or thresholds suitable for the fox friend to guide the user toward. Suggested next layer:
+If no live state is supplied, begin at the canonical entry scene `moss-entry`:
+Lantern stands beside the player, flame steady, brass plate reading
+**GUIDE OF THE ONE WHO CHOSE GREEN**, saying *"You came back."* The fox may be
+present (`fox_present`). Offer that scene's three canonical doors — The Burrow Door,
+The Sunken Bell Door, The Little Crown Door — and route the choice through `next_map`.
 
-1. The Burrow Door: small, root-framed, warm, smells of rain and old blankets.
-2. The Sunken Bell Door: half underwater, rings softly when no one touches it.
-3. The Little Crown Door: tiny golden door in a tree stump, sized for the fox, but widening when trusted.
-
-Use these only if they fit; invent new ones if the user changes tone.
+When the user chooses: look the door up in `next_map`, load the target scene,
+render its `text`, then offer that scene's three `doors`. Keep prose vivid and let
+the canon doors carry the scene.
 
 ## Canonical Kingdome seven-door loop
 
@@ -105,7 +117,7 @@ Accepted answers include: yourself, myself, i am, the one, silence, love, the fo
 
 ## Canonical routing notes
 
-Use `data/three-doors/scenes.json` as the canonical scene graph when code-level routing matters. Current implemented scene keys include `moss-entry`, `burrow`, `sunken-bell`, `little-crown`, `garden-door`, `xenon-convergence`, `end-of-time`, `kingdome-garden`, `storybook`, `cloverfield`, `future-doors`, `xp-door`, `sigil-city`, and `fog-door-return`.
+`data/three-doors/scenes.json` is the canonical scene graph for *all* play, not just code-level routing (see "Canon doors & dynamic routing" above). Current implemented scene keys: `moss-entry`, `burrow`, `sunken-bell`, `little-crown`, `garden-door`, `xenon-convergence`, `end-of-time`, `kingdome-garden`, `storybook`, `cloverfield`, `future-doors`, `xp-door`, `sigil-city`, and `fog-door-return`.
 
 For normal play, do not dump the whole seven-door loop unless asked. Let the user encounter it through scenes. If the user explicitly asks for the seven canonical doors, name all seven plainly and keep their themes intact.
 

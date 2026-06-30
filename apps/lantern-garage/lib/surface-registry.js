@@ -71,6 +71,9 @@ const EXTENSION = {
   "courtney.html":                 ["creator", "CREATOR_ENABLED"],
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
+  // games — playable surfaces beside the loop (linked from Explore as game cards)
+  "three-doors.html":              ["game", null],
+  "three-doors-game.html":         ["game", null],
   // human-flourishing frameworks
   "flourishing.html":              ["flourishing", "HFF_ENABLED"],
   "hff.html":                      ["flourishing", "HFF_ENABLED"],
