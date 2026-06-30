@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.113] - 2026-06-29
+- feat(verify): personal fact-check button — paste a claim, get a grounded verdict (#1430). Adds `apps/lantern-garage/public/factcheck.html` backed by `routes/factcheck.js`, registered in `server.js` alongside the #1411 metrics route. Improves the **Verify** stage of the loop: a claim is checked against grounded evidence and returned as a verdict with sources. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.112] - 2026-06-29
 - tooling(consolidate): split the consolidation linter's `stray-file` rule into two tiers after dogfooding surfaced a false positive. The name-token `tmp` heuristic was flagging `manifests/TMP-REPO-RAG-INDEX.json` — a `TMP-`-prefixed but **consumed** manifest (read by `Invoke-LanternConvergenceLoop.ps1` and the `oss-repo-validation.yml` CI job) — as HIGH `stray-file`, which the merged pre-commit gate would have used to **block commits** of any legitimately `tmp`-named file and which `--fix` would have offered to untrack. Now only unambiguous junk *extensions* (`.tmp/.bak/.orig/.swp/.swo/.rej/.old/~/.py.orig/.js.orig`) are HIGH `stray-file` (safe to auto-untrack); name-token heuristics (`tmp`/`scratch`/`.log`) become a new MEDIUM **`stray-name`** that is surfaced for review only — never commit-blocked, never auto-removed. `--fix` still targets `stray-file` exclusively. Verified: the manifest now reports `stray-name (MEDIUM)`, repo HIGH count drops accordingly, and the linter still passes its own gate. Coexists with the `duplicate-merger` rule added in the interim.
 

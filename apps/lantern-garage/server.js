@@ -173,6 +173,7 @@ const routes = [
   require("./routes/explore"),         // Explore: single-pane PCSF-ranked feed + interaction logging (#1211)
   require("./routes/convergence-dispatch"),
   require("./routes/metrics"),          // #1411: outcome metrics (verified-patch / honesty / route-quality)
+  require("./routes/factcheck"),        // #1430: personal fact-check button
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),
