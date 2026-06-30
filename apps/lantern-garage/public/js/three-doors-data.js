@@ -232,6 +232,24 @@ const SCENES = {
     ],
     fox: true, palette: ["#0a0810","#1a101a","#3a1a4a","#7a5a9a","#d0b0e0","#050305"], archetype: "mysterious-wise",
   },
+  "ancient-doors": {
+    text: "**The Ancient Doors** stand in a vault older than the Kingdome itself, three thresholds carved before there was anyone to carve them. Stone breathes here; the dust is made of finished prayers. Keystone's flame steadies and lowers, the way a flame does inside a place that was holy before fire had a name. Somewhere far back, the **King's** voice arrives as if remembered rather than spoken: *\"Before the garden, before the first door — there was the asking. Choose the deep, the long, or the kept.\"*",
+    doors: [
+      { name: "The Deep Origin Door", label: "A", description: "Worn black basalt, sinking. The beginning before the beginning, where everything was still possible." },
+      { name: "The History Door", label: "B", description: "Layered like sediment, every age pressed into the next. Walk through and you walk through time itself." },
+      { name: "The Temple Door", label: "C", description: "Gold gone green with age. What was worshipped here has no name now, only the shape of the asking." },
+    ],
+    fox: true, palette: ["#0e0a06","#241a10","#473420","#b8915a","#e8d4a8","#070503"], archetype: "ancestral",
+  },
+  "threshold-rest": {
+    text: "**The Threshold Rest** is the in-between the King keeps for travelers — not a door but the bench beside the doors, where the choosing pauses and the chosen settles. A low lantern. A pot of something warm. The walked path hangs on the wall as a quiet thread of light, and you can read your own footsteps in it. Keystone sits, for once not leading, just *here*. It says, softly, *\"You don't have to choose yet. Resting is also part of the loop.\"*",
+    doors: [
+      { name: "The Onward Door", label: "A", description: "Back to the choosing, rested. The next threshold waits, patient and bright." },
+      { name: "The Look-Back Door", label: "B", description: "Returns you one step, to a door you passed. Some thresholds are worth the second walk." },
+      { name: "The Stay Door", label: "C", description: "Remain a while in the warm in-between. Nothing is lost by being still." },
+    ],
+    fox: true, palette: ["#100c0a","#251c18","#43332c","#c79f86","#ecdacc","#080605"], archetype: "restful",
+  },
 };
 
 // ── 7-stage Kingdome journey (stage_index → scene_key) ──
@@ -247,9 +265,9 @@ const STAGES = [
 
 const NEXT_MAP = {
   "the burrow door":"burrow","the sunken bell door":"sunken-bell","the little crown door":"little-crown",
-  "the root door":"moss-entry","the ember door":"moss-entry","the stream door":"moss-entry",
-  "the deep door":"sunken-bell","the echo door":"burrow","the surface door":"little-crown",
-  "the throne door":"kingdome-garden","the hollow door":"burrow","the star door":"moss-entry",
+  "the root door":"moss-entry","the ember door":"moss-entry","the stream door":"sunken-bell",
+  "the deep door":"recursion-well","the echo door":"echo-chamber","the surface door":"little-crown",
+  "the throne door":"kingdome-garden","the hollow door":"raven-tower","the star door":"void-threshold",
   "the seed door":"garden-door","the harvest door":"garden-door","the convergence bloom":"xenon-convergence",
   "the mirror door":"xenon-convergence","the branch door":"end-of-time","the merge door":"end-of-time",
   "the return door":"moss-entry","the beyond door":"garden-door","the eternal door":"xenon-convergence",
@@ -257,17 +275,19 @@ const NEXT_MAP = {
   "the page of the word":"kingdome-garden","the page of the egg":"kingdome-garden","the page of the war":"kingdome-garden",
   "the lucky door":"kingdome-garden","the today door":"moss-entry","the tomorrow door":"kingdome-garden",
   "the delta registry":"csf-archive","the symbolic dictionary":"memory-vault","the convergence index":"convergence-node",
-  "the bright memory":"memory-vault","the shadow memory":"csf-archive","the quantum memory":"convergence-node",
-  "the proof door":"convergence-node","the paradox door":"memory-vault","the synthesis door":"csf-archive",
+  "the bright memory":"memory-vault","the shadow memory":"memory-vault","the quantum memory":"convergence-node",
+  "the proof door":"convergence-node","the paradox door":"memory-vault","the synthesis door":"convergence-node",
   "the lucid door":"dream-thread","the deep dream door":"xenon-convergence","the waking door":"moss-entry",
-  "the light memory":"beacon-tower","the shadow cast":"csf-archive","the next sweep":"convergence-node",
+  "the light memory":"beacon-tower","the shadow cast":"raven-tower","the next sweep":"convergence-node",
   "the yes shelf":"choice-archive","the no shelf":"memory-vault","the maybe shelf":"dream-thread",
   "the level below":"recursion-well","the spiral out":"beacon-tower","the center point":"convergence-node",
   "the first echo":"echo-chamber","the transformed echo":"dream-thread","the final echo":"xenon-convergence",
-  "the blooming door":"flux-garden","the withering door":"garden-door","the eternal blossom":"xenon-convergence",
+  "the blooming door":"flux-garden","the withering door":"void-threshold","the eternal blossom":"xenon-convergence",
   "the form door":"void-threshold","the formless door":"convergence-node","the both door":"recursion-well",
   "the raven door":"raven-tower","the nested memory door":"memory-vault","the prophecy door":"storybook","the mirror crow door":"sigil-city",
-  "the ancient doors":"kingdome-garden","the cloverfield door":"cloverfield","the tomorrow door":"future-doors",
+  "the ancient doors":"ancient-doors","the cloverfield door":"cloverfield","the tomorrow door":"future-doors",
+  "the deep origin door":"recursion-well","the history door":"csf-archive","the temple door":"raven-tower",
+  "the onward door":"kingdome-garden","the look-back door":"threshold-rest","the stay door":"threshold-rest",
   "the xp door glitched":"xp-door","the xenon starship":"xenon-convergence","the sigil city of doors":"sigil-city",
   "the fog door return":"fog-door-return",
   "the blue screen door":"xp-door","the desktop door":"xp-door","the boot sequence door":"xp-door",
@@ -301,6 +321,8 @@ const SD_PROMPTS = {
   "flux-garden":"sanctuary of constant becoming, flowers shifting between species and colors, garden as transformation not growth, Xenon dancing as ribbon of becoming, lantern-headed guide pulsing with light, bioluminescent plants, dark fantasy, anime aesthetic, cel-shaded, 16:9",
   "void-threshold":"edge where existence questions itself, space between decisions, infinite potential not nothing, lantern-headed guide burning brightest against possibility, liminal boundary, dark fantasy, anime aesthetic, cel-shaded, transcendent void, 16:9",
   "raven-tower":"tower in perpetual twilight, black ravens circling intelligently, shelves carved from shadow and starlight, lantern-headed guide dimmed in respect, ancient wisdom, memory and prophecy, dark fantasy, anime aesthetic, cel-shaded, mysterious and knowing, 16:9",
+  "ancient-doors":"ancient stone vault older than time, three carved primordial doorways, basalt and aged gold gone green, dust like finished prayers, lantern-headed guide with lowered reverent flame, deep earthy ochre and bronze light, painterly tarot atmosphere, soft volumetric haze, ancestral sacred mood, 16:9",
+  "threshold-rest":"quiet in-between resting place beside the doors, low warm lantern, a bench, a pot of something warm, the walked path hanging on the wall as a thread of light, lantern-headed guide sitting peacefully not leading, soft amber calm, painterly liminal atmosphere, gentle restful mood, 16:9",
 };
 
 // ── Image Hierarchy ──────────────────────────────────────────────────────
@@ -316,7 +338,7 @@ const LOCAL_PNG_SCENES = new Set([
 const SERVER_GENERATED_SCENES = new Set([
   "csf-archive", "memory-vault", "convergence-node", "dream-thread",
   "beacon-tower", "choice-archive", "recursion-well", "echo-chamber",
-  "flux-garden", "void-threshold", "raven-tower"
+  "flux-garden", "void-threshold", "raven-tower", "ancient-doors", "threshold-rest"
 ]);
 
 function getSceneImageUrl(sceneKey) {

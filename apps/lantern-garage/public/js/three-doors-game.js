@@ -476,47 +476,174 @@ function skipPoem() {
 }
 
 // ── Inline engine fallback ────────────────────────────────────────
-function stageState(stageIndex, loopCount, history) {
-  const key = STAGES[stageIndex % STAGES.length];
-  const scene = SCENES[key];
+// ── Convergence Navigator ─────────────────────────────────────────
+// Door choice now CAUSALLY determines the next scene (it used to be cosmetic:
+// the old engineChoose did stage_index+1 and ignored which door you picked).
+//
+// This is the Reason stage of the Convergence loop: given the chosen door
+// (Observe) and the player's visit history (Remember), it scores candidate
+// destinations and picks one (Act). Selection is DETERMINISTIC argmax — no
+// RNG — so it can mirror the Python engine and stay Σ₀-compliant (no new
+// memory system: visit counts live in playerProgress.sceneVisits).
+//
+// Council synthesis: door-affinity makes the choice causal; novelty/recency
+// make the destination diverge on repeat visits (the "dynamic" part, driven
+// only by Memory); a hard off-spine cap guarantees the 7-gate arc always
+// closes and you can always come home (no dead ends, bounded staleness).
+
+const NAV_WEIGHTS = { door: 3.0, spine: 2.5, nov: 1.2, arch: 0.8, stale: 1.5, loop: 0.6 };
+const MAX_OFF_SPINE = 3;            // force a spine beat after this many detours
+const DEEP_SCENES = (typeof SERVER_GENERATED_SCENES !== "undefined")
+  ? SERVER_GENERATED_SCENES : new Set();
+
+// Strip emoji / punctuation so the garden's "🍀 The Cloverfield" and
+// "💾 The XP Door [GLITCHED]" match NEXT_MAP's lowercase plain keys.
+function normalizeDoorName(name) {
+  return (name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")          // emoji, ★, brackets, punctuation (keeps "glitched")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Primary destination for a door. Falls back to the next spine beat so every
+// door — including unmapped/custom ones — always advances the journey onward.
+function resolveDoorTarget(doorName, spineIndex) {
+  const norm = normalizeDoorName(doorName);
+  let target = NEXT_MAP[norm];
+  if (!target) {
+    const noThe = norm.replace(/^the /, "");
+    for (const k of Object.keys(NEXT_MAP)) {
+      const nk = normalizeDoorName(k);
+      if (nk === norm || nk.replace(/^the /, "") === noThe) { target = NEXT_MAP[k]; break; }
+    }
+  }
+  if (target && SCENES[target]) return target;
+  return STAGES[(spineIndex + 1) % STAGES.length];   // onward fallback = next gate
+}
+
+function navScore(c, ctx) {
+  const W = NAV_WEIGHTS;
+  const visits = ctx.sceneVisits[c] || 0;
+  const aff = (c === ctx.mapped) ? 1 : 0.15;
+  const nov = 1 / (1 + visits);
+  const onSpine = (c === ctx.nextBeat) ? Math.min(1, 0.5 + 0.25 * ctx.beatsSinceSpine) : 0;
+  const arch = (ctx.mapped && SCENES[c]?.archetype &&
+    SCENES[c].archetype === SCENES[ctx.mapped]?.archetype) ? 1 : 0;
+  const recIdx = ctx.recent.lastIndexOf(c);                  // -1 if not recent
+  const stale = recIdx === -1 ? 0 : Math.exp(-(ctx.recent.length - 1 - recIdx) / 2);
+  const loop = (Math.min(ctx.loopCount, 4) / 4) * (DEEP_SCENES.has(c) ? 1 : 0);
+  return W.door * aff + W.spine * onSpine + W.nov * nov + W.arch * arch
+       - W.stale * stale + W.loop * loop;
+}
+
+// Pure routing function — exported for headless unit tests; deterministic.
+function navigate(currentScene, doorName, state) {
+  const spineIndex = state.spine_index ?? 0;
+  const beatsSinceSpine = state.beats_since_spine ?? 0;
+  const nextBeat = STAGES[(spineIndex + 1) % STAGES.length];
+  const mapped = resolveDoorTarget(doorName, spineIndex);
+
+  // Candidate set: the chosen door's target, the next narrative gate, and the
+  // *other* doors' targets as on-theme novel neighbors. Guarantees non-empty.
+  const scene = SCENES[currentScene];
+  const neighborTargets = (scene?.doors || [])
+    .filter(d => normalizeDoorName(d.name) !== normalizeDoorName(doorName))
+    .map(d => resolveDoorTarget(d.name, spineIndex));
+  let candidates = [...new Set([mapped, nextBeat, ...neighborTargets])]
+    .filter(c => SCENES[c] && c !== currentScene);
+  if (!candidates.length) candidates = [nextBeat];   // never empty
+
+  // Hard liveness cap: after MAX_OFF_SPINE detours, force the next gate so the
+  // 7-beat arc always closes (≤ MAX_OFF_SPINE+1 turns to the next gate).
+  let picked;
+  if (beatsSinceSpine >= MAX_OFF_SPINE && SCENES[nextBeat]) {
+    picked = nextBeat;
+  } else {
+    const ctx = {
+      mapped, nextBeat, beatsSinceSpine,
+      sceneVisits: state.sceneVisits || {},
+      recent: state.recent || [],
+      loopCount: state.loop_count ?? 0,
+    };
+    // argmax; ties resolved by candidate order (mapped first → choice wins ties)
+    picked = candidates.reduce((best, c) =>
+      navScore(c, ctx) > navScore(best, ctx) ? c : best, candidates[0]);
+  }
+
+  // Spine bookkeeping: landing on a gate sets spine position to that gate;
+  // a loop completes when we return to the Garden after having reached the Fog.
+  const pickedSpine = STAGES.indexOf(picked);
+  let newSpine = spineIndex, newBeats = beatsSinceSpine, loopCompleted = false;
+  if (pickedSpine !== -1) {
+    if (pickedSpine === 0 && spineIndex === STAGES.length - 1) loopCompleted = true;
+    newSpine = pickedSpine;
+    newBeats = 0;
+  } else {
+    newBeats = beatsSinceSpine + 1;
+  }
+  return { scene: picked, spine_index: newSpine, beats_since_spine: newBeats, loop_completed: loopCompleted };
+}
+
+// ── Inline engine fallback ────────────────────────────────────────
+function sceneState(sceneKey, spineIndex, loopCount, history, beatsSinceSpine) {
+  const scene = SCENES[sceneKey] || SCENES["kingdome-garden"];
   return {
-    scene_key: key, text: scene.text, doors: scene.doors, fox_present: scene.fox,
-    history: history, stage_index: stageIndex, stage_count: STAGES.length, loop_count: loopCount,
+    scene_key: sceneKey, text: scene.text, doors: scene.doors, fox_present: scene.fox,
+    history: history, stage_index: spineIndex, stage_count: STAGES.length,
+    loop_count: loopCount, beats_since_spine: beatsSinceSpine, archetype: scene.archetype,
   };
 }
 
 function engineStart() {
   const saved = loadProgress();
-  if (typeof saved.stage_index === "number" && saved.history) {
-    return stageState(saved.stage_index, saved.loop_count || 0, saved.history);
+  if (saved.currentScene && SCENES[saved.currentScene] && saved.history) {
+    return sceneState(saved.currentScene, saved.stage_index || 0,
+      saved.loop_count || 0, saved.history, saved.beats_since_spine || 0);
   }
-  return stageState(0, 0, ["Entered the Garden at the Beginning"]);
+  return sceneState("kingdome-garden", 0, 0, ["Entered the Garden at the Beginning"], 0);
 }
 
 function engineChoose(label) {
   if (!gameState) return null;
   const door = gameState.doors.find(d => d.label.toUpperCase() === label.toUpperCase());
-  // Custom door: advance stage using player's text as door name
   const doorName = door ? door.name : label;
   if (!door && label.length <= 1) return null; // single-char that isn't A/B/C = invalid
-  let stageIndex = (gameState.stage_index ?? 0) + 1;
-  let loopCount = gameState.loop_count ?? 0;
+
+  const state = {
+    spine_index: gameState.stage_index ?? 0,
+    beats_since_spine: gameState.beats_since_spine ?? playerProgress.beats_since_spine ?? 0,
+    loop_count: gameState.loop_count ?? 0,
+    sceneVisits: playerProgress.sceneVisits || {},
+    recent: playerProgress.recent || [],
+  };
+  const nav = navigate(gameState.scene_key, doorName, state);
+
   const history = [...(gameState.history || []), "Chose " + doorName];
-  let loopCompleted = false;
-  if (stageIndex >= STAGES.length) {
-    stageIndex = 0;
+  let loopCount = state.loop_count;
+  if (nav.loop_completed) {
     loopCount += 1;
-    loopCompleted = true;
     history.push("Returned to the Garden — loop " + loopCount + " complete");
   }
-  const newState = stageState(stageIndex, loopCount, history);
-  newState.loop_completed = loopCompleted;
-  // Save progress
-  playerProgress.stage_index = stageIndex;
+
+  const newState = sceneState(nav.scene, nav.spine_index, loopCount, history, nav.beats_since_spine);
+  newState.loop_completed = nav.loop_completed;
+  newState.last_choice = doorName;
+
+  // Persist convergence state (Remember). No new store — reuses playerProgress.
+  playerProgress.stage_index = nav.spine_index;
+  playerProgress.beats_since_spine = nav.beats_since_spine;
   playerProgress.loop_count = loopCount;
+  playerProgress.currentScene = nav.scene;
   playerProgress.history = history.slice(-24);
+  playerProgress.recent = [...(playerProgress.recent || []), nav.scene].slice(-6);
   saveProgress();
   return newState;
+}
+
+// Headless test export (Node) — browser ignores this.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { navigate, resolveDoorTarget, normalizeDoorName, navScore };
 }
 
 // ── API calls ─────────────────────────────────────────────────────
