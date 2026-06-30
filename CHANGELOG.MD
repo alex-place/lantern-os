@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.118] - 2026-06-29
+- feat(verify): drift canaries as a passive observability product (#1428). Adds `apps/lantern-garage/routes/drift.js` (+ `test/drift-monitor.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay routes. Improves the **Verify** stage: passively watches for behavioral drift via canaries and surfaces it as an observability signal. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.117] - 2026-06-29
 - feat(remember): confidence-decay memory — facts that forget gracefully (#1422). Adds `apps/lantern-garage/routes/memory-decay.js` (+ `test/memory-decay.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions routes. Improves the **Remember** stage: memory confidence decays over time unless reinforced, so stale facts fade gracefully instead of being asserted forever. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 

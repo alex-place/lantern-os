@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Drift Monitor — Keystone OS</title>
+  <style>
+    /* Drift canaries as observability (#1428): is the agent quietly drifting? */
+    .w { max-width: 900px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; margin-bottom: 16px;
+      border: 1px solid var(--border, rgba(255,255,255,.12)); }
+    .banner.ok { background: rgba(74,222,128,.08); border-color: rgba(74,222,128,.4); }
+    .banner.warn { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.45); }
+    .banner.alert { background: rgba(248,113,113,.10); border-color: rgba(248,113,113,.5); }
+    .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+    .ok .dot { background: #4ade80; } .warn .dot { background: #f59e0b; } .alert .dot { background: #f87171; }
+    .banner .msg { font-size: 14px; color: var(--text, #e5e7eb); }
+    .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .tile { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 16px; }
+    .tile h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--text, #e5e7eb); }
+    .tile .sub { font-size: 11px; color: var(--muted, #9aa0aa); margin: 0 0 10px; }
+    .big { font-size: 32px; font-weight: 700; }
+    .trend { font-size: 12px; font-weight: 600; margin-left: 8px; }
+    .rising { color: #f87171; } .falling { color: #4ade80; } .stable, .flat { color: #9aa0aa; }
+    .spark { display: flex; align-items: flex-end; gap: 3px; height: 44px; margin-top: 12px; }
+    .spark > span { flex: 1; display: flex; flex-direction: column-reverse; gap: 1px; }
+    .spark i { display: block; border-radius: 1px; }
+    .legend { font-size: 11px; color: var(--muted, #9aa0aa); margin-top: 6px; }
+    .chip { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; }
+    .breakdown { margin-top: 16px; } .breakdown h2 { font-size: 13px; color: var(--text, #e5e7eb); margin: 0 0 8px; }
+    .brow { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted, #9aa0aa); padding: 3px 0; }
+    .brow b { color: var(--text, #e5e7eb); }
+    .controls { margin-bottom: 14px; font-size: 12px; color: var(--muted, #9aa0aa); }
+    select { background: var(--surface2, rgba(255,255,255,.05)); color: var(--text, #e5e7eb);
+      border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/grounding-diff.html">Grounding</a>
+      <a href="/drift.html" class="active">Drift</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Drift Monitor</h1>
+    <p class="lede">Two passive canaries watch every reply: <b>collapse</b> (repetition / degeneration) and the <b>42-state</b> (fluent but unanchored). They only fire when something trips, so this is a stream of drift incidents — a "is my agent quietly drifting?" monitor. Both axes are kept separate on purpose; a 42-state reply looks healthy on the collapse axis.</p>
+
+    <div class="controls">Window:
+      <select id="win" onchange="load()">
+        <option value="24">last 24h</option><option value="72">last 3d</option><option value="168">last 7d</option><option value="720">last 30d</option>
+      </select>
+    </div>
+
+    <div class="banner ok" id="banner"><span class="dot"></span><span class="msg" id="msg">Loading…</span></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="breakdown" id="breakdown"></div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+
+    function spark(timeline) {
+      var max = Math.max(1, Math.max.apply(null, timeline.map(function (b) { return b.collapse + b.grounded; })));
+      return '<div class="spark">' + timeline.map(function (b) {
+        var ch = Math.round(b.collapse / max * 40), gh = Math.round(b.grounded / max * 40);
+        return '<span><i style="height:' + gh + 'px;background:#f59e0b"></i><i style="height:' + ch + 'px;background:#f87171"></i></span>';
+      }).join('') + '</div><div class="legend"><span class="chip" style="background:#f87171"></span> collapse &nbsp; <span class="chip" style="background:#f59e0b"></span> 42-state</div>';
+    }
+
+    function axisTile(title, sub, axis) {
+      return '<div class="tile"><h2>' + esc(title) + '</h2><div class="sub">' + esc(sub) + '</div>'
+        + '<div><span class="big">' + axis.recent + '</span><span class="trend ' + esc(axis.trend) + '">' + esc(axis.trend)
+        + ' · was ' + axis.prior + '</span></div></div>';
+    }
+
+    function breakdown(label, rows) {
+      if (!rows || !rows.length) return '';
+      return '<h2>' + esc(label) + '</h2>' + rows.map(function (r) {
+        return '<div class="brow"><span>' + esc(r.value) + '</span><b>' + r.count + '</b></div>'; }).join('');
+    }
+
+    async function load() {
+      var win = document.getElementById('win').value;
+      var r = await fetch('/api/drift?windowHours=' + win).then(function (x) { return x.json(); });
+      var d = (r && r.drift) || {};
+      var b = document.getElementById('banner');
+      b.className = 'banner ' + (d.alert || 'ok');
+      document.getElementById('msg').textContent = d.summary || 'No data';
+      document.getElementById('tiles').innerHTML =
+        axisTile('Collapse', 'repetition / degeneration', d.axes ? d.axes.collapse : { recent: 0, prior: 0, trend: 'flat' })
+        + axisTile('42-state', 'fluent but unanchored', d.axes ? d.axes.grounded : { recent: 0, prior: 0, trend: 'flat' })
+        + '<div class="tile" style="grid-column:1/-1"><h2>Incident timeline</h2><div class="sub">trips per bucket across the window</div>'
+          + spark(d.timeline || []) + '</div>';
+      document.getElementById('breakdown').innerHTML =
+        breakdown('By provider', d.byProvider) + breakdown('By agent', d.byAgent) + breakdown('By surface', d.bySurface)
+        + (d.status === 'insufficient_data' ? '<div class="sub" style="margin-top:10px;color:var(--muted)">No canary events logged yet — incidents will appear here as the agent runs.</div>' : '');
+    }
+    load();
+  </script>
+</body>
+</html>
