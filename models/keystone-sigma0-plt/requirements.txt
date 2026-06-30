@@ -1,0 +1,12 @@
+# Keystone-Σ₀ PLT — training-box dependencies.
+# Install torch separately for your CUDA (e.g. cu121):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# transformers is pinned to the version the upstream config targets.
+transformers==4.57.1
+huggingface_hub>=0.25
+accelerate>=1.0
+bitsandbytes>=0.44
+peft>=0.13
+datasets>=3.0
+safetensors>=0.4
+sentencepiece>=0.2

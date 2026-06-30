@@ -1,0 +1,7 @@
+# Downloaded weights + trained adapters — never commit (≈18 GB).
+# Every training box runs download_and_patch.py to materialize these.
+checkpoint/
+adapter/
+*.safetensors
+*.pt
+ref_logits.pt

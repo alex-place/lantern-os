@@ -66,7 +66,9 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0006](0006-dual-boot-worktree-topology.md) | Dual-boot 4177/4178 worktree topology | Proposed (awaiting Alex's approval) |
 | [0007](0007-monoworkstream-one-pr-lane-per-agent.md) | Monoworkstream — one PR lane per agent | Proposed (awaiting Alex's approval) |
 | [0008](0008-personal-ai-wrapper-end-product.md) | End product is a personal AI wrapper — capabilities as Tools + Skills | Accepted |
-
 | [0008](0008-end-product-personal-ai-wrapper.md) | End product is a personal AI wrapper — capabilities are Tools + Skills | Proposed (awaiting Alex's approval) |
+| [0009](0009-one-routing-contract-cloud-primary-coding.md) | One routing contract — cloud-primary coding | Proposed (awaiting Alex's approval) |
+| [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Proposed (awaiting Alex's approval) |
+| [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->
