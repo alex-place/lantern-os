@@ -177,6 +177,7 @@ const routes = [
   require("./routes/decisions"),        // #1436: decision journal + calibration
   require("./routes/memory-decay"),     // #1422: confidence-decay memory
   require("./routes/drift"),            // #1428: drift-canary observability
+  require("./routes/learn"),            // #1438: learn-anything tutor + retention
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),

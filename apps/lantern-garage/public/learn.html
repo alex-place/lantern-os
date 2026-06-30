@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Learn — Keystone OS</title>
+  <style>
+    /* Learn-anything tutor with retention (#1438): spaced repetition that resurfaces what you got wrong. */
+    .w { max-width: 760px; margin: 0 auto; padding: 18px 16px 60px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: var(--text, #e5e7eb); }
+    .lede { margin: 0 0 16px; color: var(--muted, #9aa0aa); font-size: 13px; line-height: 1.5; }
+    .card { background: var(--surface1, rgba(255,255,255,.03)); border: 1px solid var(--border, rgba(255,255,255,.10));
+      border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+    input, textarea { width: 100%; box-sizing: border-box; background: var(--surface2, rgba(255,255,255,.05));
+      color: var(--text, #e5e7eb); border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 9px;
+      padding: 9px 11px; font-size: 14px; font-family: inherit; margin-bottom: 8px; }
+    textarea { min-height: 50px; resize: vertical; }
+    .btn { background: var(--accent, #06b6d4); color: #06222a; border: none; border-radius: 9px; padding: 9px 16px;
+      font-size: 14px; font-weight: 600; cursor: pointer; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+    .stat { text-align: center; } .stat .n { font-size: 26px; font-weight: 700; color: var(--text, #e5e7eb); }
+    .stat .l { font-size: 11px; color: var(--muted, #9aa0aa); text-transform: uppercase; letter-spacing: .04em; }
+    .study { text-align: center; padding: 24px 18px; }
+    .study .front { font-size: 19px; color: var(--text, #e5e7eb); margin-bottom: 14px; line-height: 1.4; }
+    .study .back { font-size: 15px; color: var(--text, #d8dce2); line-height: 1.55; padding: 14px; border-radius: 10px;
+      background: var(--surface2, rgba(255,255,255,.05)); margin: 0 0 14px; text-align: left; }
+    .grades { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .grades button { border: none; border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .g0 { background: #f87171; color: #2a0a0a; } .g3 { background: #f59e0b; color: #2a1a02; }
+    .g4 { background: #38bdf8; color: #04222e; } .g5 { background: #4ade80; color: #052e16; }
+    .struggle h2 { font-size: 14px; color: var(--text, #e5e7eb); margin: 0 0 8px; }
+    .srow { font-size: 13px; color: var(--muted, #9aa0aa); padding: 4px 0; display: flex; justify-content: space-between; }
+    .srow b { color: #f59e0b; }
+    .acc { color: #4ade80; } .acc.low { color: #f87171; }
+    .empty { color: var(--muted, #9aa0aa); font-size: 14px; text-align: center; padding: 18px; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">Keystone OS</span></a>
+    <div class="nav-links">
+      <a href="/dream-chat.html">Chat</a>
+      <a href="/memory-decay.html">Memory</a>
+      <a href="/learn.html" class="active">Learn</a>
+      <a href="/knowledgecenter.html">Help</a>
+    </div>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
+  </nav>
+
+  <main class="w">
+    <h1>Learn</h1>
+    <p class="lede">Add anything you want to remember. The tutor schedules each concept with spaced repetition — concepts you recall easily come back rarely, ones you get wrong resurface fast — and tracks whether your understanding is actually sticking.</p>
+
+    <div class="card" id="statsCard"><div class="stats" id="stats"></div></div>
+
+    <div class="card study" id="studyCard">
+      <div id="studyBody"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <input id="front" placeholder="Concept / question — e.g. What is a Brier score?">
+      <textarea id="back" placeholder="The answer / explanation you want to retain"></textarea>
+      <input id="topic" placeholder="Topic (optional) — e.g. statistics">
+      <button class="btn" id="add">Add concept</button>
+    </div>
+
+    <div class="card struggle" id="struggleCard" style="display:none">
+      <h2>Concepts you keep getting wrong</h2>
+      <div id="struggle"></div>
+    </div>
+  </main>
+
+  <script>
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+    var queue = [], current = null, revealed = false;
+
+    function renderStats(s) {
+      var acc = s.recentAccuracy == null ? '—' : Math.round(s.recentAccuracy * 100) + '%';
+      var accCls = (s.recentAccuracy != null && s.recentAccuracy < 0.7) ? 'low' : '';
+      document.getElementById('stats').innerHTML =
+        '<div class="stat"><div class="n">' + s.due + '</div><div class="l">due now</div></div>'
+        + '<div class="stat"><div class="n">' + s.total + '</div><div class="l">concepts</div></div>'
+        + '<div class="stat"><div class="n">' + s.mature + '</div><div class="l">mature</div></div>'
+        + '<div class="stat"><div class="n acc ' + accCls + '">' + acc + '</div><div class="l">recall accuracy</div></div>';
+    }
+
+    function renderStudy() {
+      var b = document.getElementById('studyBody');
+      if (!queue.length) { b.innerHTML = '<div class="empty">🎉 Nothing due right now. Add concepts, or come back when reviews are due.</div>'; return; }
+      current = queue[0]; revealed = false;
+      b.innerHTML = '<div class="front">' + esc(current.front) + '</div>'
+        + '<button class="btn" id="reveal">Show answer</button>';
+      document.getElementById('reveal').addEventListener('click', reveal);
+    }
+    function reveal() {
+      revealed = true;
+      document.getElementById('studyBody').innerHTML =
+        '<div class="front">' + esc(current.front) + '</div>'
+        + '<div class="back">' + esc(current.back) + (current.source ? '<div style="font-size:11px;color:#38bdf8;margin-top:6px">' + esc(current.source) + '</div>' : '') + '</div>'
+        + '<div class="grades"><button class="g0" data-g="0">Forgot</button><button class="g3" data-g="3">Hard</button>'
+        + '<button class="g4" data-g="4">Good</button><button class="g5" data-g="5">Easy</button></div>';
+      document.querySelectorAll('.grades button').forEach(function (btn) {
+        btn.addEventListener('click', function () { grade(parseInt(btn.getAttribute('data-g'), 10)); });
+      });
+    }
+    async function grade(g) {
+      await fetch('/api/learn/' + encodeURIComponent(current.id) + '/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ grade: g }) });
+      queue.shift(); renderStudy(); refreshStats();
+    }
+    async function refreshStats() {
+      var r = await fetch('/api/learn').then(function (x) { return x.json(); });
+      renderStats(r.stats || {});
+      var sc = document.getElementById('struggleCard');
+      if (r.stats && r.stats.struggling && r.stats.struggling.length) {
+        sc.style.display = '';
+        document.getElementById('struggle').innerHTML = r.stats.struggling.map(function (c) {
+          return '<div class="srow"><span>' + esc(c.front) + '</span><b>' + c.lapses + '× wrong</b></div>'; }).join('');
+      } else { sc.style.display = 'none'; }
+    }
+    async function load() {
+      var r = await fetch('/api/learn').then(function (x) { return x.json(); });
+      queue = (r.due || []).slice();
+      renderStats(r.stats || {}); renderStudy();
+      var sc = document.getElementById('struggleCard');
+      if (r.stats && r.stats.struggling && r.stats.struggling.length) {
+        sc.style.display = '';
+        document.getElementById('struggle').innerHTML = r.stats.struggling.map(function (c) {
+          return '<div class="srow"><span>' + esc(c.front) + '</span><b>' + c.lapses + '× wrong</b></div>'; }).join('');
+      }
+    }
+    async function add() {
+      var front = document.getElementById('front').value.trim(), back = document.getElementById('back').value.trim();
+      if (!front || !back) return;
+      await fetch('/api/learn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ front: front, back: back, topic: document.getElementById('topic').value.trim() }) });
+      document.getElementById('front').value = ''; document.getElementById('back').value = ''; document.getElementById('topic').value = '';
+      load();
+    }
+    document.getElementById('add').addEventListener('click', add);
+    load();
+  </script>
+</body>
+</html>

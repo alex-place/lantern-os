@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.119] - 2026-06-29
+- feat(reason+remember): learn-anything tutor with retention tracking (#1438). Adds `apps/lantern-garage/routes/learn.js` (+ `test/learn-tutor.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift routes. Improves the **Reason** + **Remember** stages: an interactive tutor for any topic that tracks what you retain over time. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.118] - 2026-06-29
 - feat(verify): drift canaries as a passive observability product (#1428). Adds `apps/lantern-garage/routes/drift.js` (+ `test/drift-monitor.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay routes. Improves the **Verify** stage: passively watches for behavioral drift via canaries and surfaces it as an observability signal. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 
