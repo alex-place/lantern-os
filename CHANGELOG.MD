@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.122] - 2026-06-29
+- feat(reason): retrieval-based personal preference model (#1426). Adds `apps/lantern-garage/routes/preferences.js` (+ `test/preference-model.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn/replay routes. Improves the **Reason** stage: retrieves your past expressed preferences to ground recommendations instead of guessing. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.121] - 2026-06-29
 - feat(verify+converge): convergence replay / time-travel debugger (#1419). Adds `apps/lantern-garage/routes/replay.js` (+ `test/replay.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions/memory-decay/drift/learn routes. Improves the **Verify** + **Converge** stages: step back through convergence records to replay how a conclusion was reached. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 

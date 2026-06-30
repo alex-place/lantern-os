@@ -179,6 +179,7 @@ const routes = [
   require("./routes/drift"),            // #1428: drift-canary observability
   require("./routes/learn"),            // #1438: learn-anything tutor + retention
   require("./routes/replay"),           // #1419: convergence replay / time-travel debugger
+  require("./routes/preferences"),      // #1426: retrieval-based personal preference model
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),
