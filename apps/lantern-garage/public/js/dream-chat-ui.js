@@ -1323,7 +1323,7 @@ function safeEmbedSrc(u) {
 // Launch verbs that signal "open this thing now". A single embed token (e.g. "radio")
 // only summons when one of these is present; a multi-word name ("fallout radio") fires
 // on its own. Keeps "I love the radio" from blasting audio at you.
-const SUMMON_VERBS = /\b(play|summon|open|launch|start|run|boot|listen(?:\s+to)?|tune\s+(?:in|into|to)?|put\s+on|turn\s+on|fire\s+up|load|cue\s+up|watch)\b/i;
+const SUMMON_VERBS = /\b(play|summon|open|launch|start|run|boot|listen(?:\s+to)?|tune\s+(?:in|into|to)?|put\s+on|turn\s+on|fire\s+up|load|cue\s+up|watch|show(?:\s+me)?|pull\s+up|bring\s+up|display)\b/i;
 
 // The flagship stays summonable even before /api/explore/embeds is deployed (a new
 // route 404s on a stale server). kind: listen|game|watch drives the verb + icon.
@@ -1334,6 +1334,16 @@ const EMBED_SEED = [
     url: '/fallout-radio.html',
     lore: 'A retro Pip-Boy tuner spinning public-domain 1940s radio — the songs that play at the end of the world. Press play; tune the dial.',
     aliases: ['fallout radio', 'keystone radio', 'pip-boy radio', 'radio'],
+  },
+  {
+    // #1617: "show me the panels from the trade screen" used to send the local
+    // tool-calling model into a read-the-HTML loop that dumped raw markup. Summoning
+    // the real terminal inline frames the live panels instead.
+    slug: 'kalshi-terminal', title: 'Kalshi Trade Terminal', kind: 'app',
+    src: '/kalshi-terminal.html', height: 640, source: 'Keystone Trading',
+    url: '/kalshi-terminal.html',
+    lore: 'The live Kalshi trade screen — swipe-deck panels for decisive entries, open positions, and market signals.',
+    aliases: ['trade screen', 'trade panels', 'trading terminal', 'kalshi terminal', 'trade deck', 'kalshi'],
   },
 ];
 
@@ -1441,8 +1451,8 @@ function renderChatEmbed(embed, userText) {
     return;
   }
   if (activeChatEmbed && activeChatEmbed.stop) { try { activeChatEmbed.stop(); } catch {} activeChatEmbed = null; }
-  const icon = embed.kind === 'listen' ? '📻' : embed.kind === 'watch' ? '🎬' : '🕹️';
-  const verb = embed.kind === 'watch' ? 'Now showing' : 'Now playing';
+  const icon = embed.kind === 'listen' ? '📻' : embed.kind === 'watch' ? '🎬' : embed.kind === 'app' ? '📊' : '🕹️';
+  const verb = (embed.kind === 'watch' || embed.kind === 'app') ? 'Now showing' : 'Now playing';
   const h = Math.max(160, Math.min(640, Number(embed.height) || 360));
   row.innerHTML =
     `<div class="msg-label">Keystone</div>` +
