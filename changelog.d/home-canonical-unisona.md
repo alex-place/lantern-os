@@ -1,1 +1,1 @@
-- feat(home): home header now advertises the new primary domain — added canonical + Open Graph/Twitter meta pointing at https://www.unisona.ai/ (brand stays Keystone OS).
+- feat(home): home now branded **unisona.ai** — visible header/title/hero/footer read unisona.ai, plus canonical + Open Graph/Twitter meta pointing at https://www.unisona.ai/.
