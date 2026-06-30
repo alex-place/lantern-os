@@ -102,7 +102,25 @@ best-first:
 | `VRAM_BUDGET_GB` | `8` | The box budget. Models with `vramGB >` this are gated out. |
 | `LOCAL_CAPABILITY_FIRST` | `0` | `1` → best-capability-that-fits leads (Qwen for coding). |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Default endpoint for all entries. |
-| `OLLAMA_MODEL` | — | Operator pin; still leads the chain when set (unchanged). |
+| `OLLAMA_MODEL` | — | Operator pin. Kept as a chain **candidate**; it only **leads** when it is a model the registry does **not** manage (a deliberate custom GGUF). A registry-managed pin keeps its capability slot — see `resolveLocalLead` below. |
+
+### The authoritative lead: `resolveLocalLead(intent, opts)`
+
+`selectChain` answers "what's the capability order?" — but keystone chat needs ONE
+authoritative lead that folds in the operator's `OLLAMA_MODEL` pin and the caller's
+served-fallback chain. `resolveLocalLead(intent, { pin, fallback })` is that single
+resolver:
+
+1. An `OLLAMA_MODEL` pin the registry does **not** manage (a custom model) → it leads.
+2. Otherwise the registry's capability-gated `#1` leads; the pin stays a candidate.
+
+This fixed a real bug: a stale `OLLAMA_MODEL=ouro:latest` (the legacy default) used to
+**front-jump the chain and silently defeat the capability swap** — keystone chat stayed
+pinned to Ouro while the adapter had already picked the better model. The lead is now
+re-asserted as the chain head *after* the leaderboard reorder, so neither a stale pin nor
+measured win-rate can displace the deterministic, VRAM-gated swap pick.
+`LOCAL_CAPABILITY_FIRST=0` still restores Ouro-first (rank-order) cleanly. The chosen
+local model + reason is surfaced in the chat reply signature (a `⇄ <model>` chip).
 
 ---
 
@@ -135,8 +153,8 @@ ignores it — it Q-exits internally). When VRAM grows, registering the next mod
 | `lib/local-model-registry.js` | **New** — the adapter/registry + contract. |
 | `data/models/local-registry.json` | **New** — declarative, operator-editable overlay. |
 | `lib/provider-router.js` | Coding chain leads `ouro:latest` then `qwen2.5-coder` (Ouro default). |
-| `lib/stream-chat.js` | (a) local model chain is registry-led (VRAM-gated), static models kept as fallbacks; (b) the `LOOP_REASONER` wrap is now `selfConverges`-aware (no double-loop on Ouro, grounding wrap for Qwen). |
-| `test/local-model-registry.test.js` | **New** — 9 cases: Ouro-default, capability-first, VRAM gating, `selfConverges` contract, kernel-strict. |
+| `lib/stream-chat.js` | (a) local model chain is registry-led via `resolveLocalLead` (VRAM-gated); the lead is re-asserted as the chain head after the leaderboard reorder so a stale `OLLAMA_MODEL` pin can't defeat the swap; (b) the `LOOP_REASONER` wrap is `selfConverges`-aware (no double-loop on Ouro, grounding wrap for Qwen); (c) the swap decision is stamped onto the done signature so the UI can surface the chosen model. |
+| `test/local-model-registry.test.js` | **New** — capability-first, VRAM gating, `selfConverges` contract, kernel-strict, the grounding gate, and the `resolveLocalLead` pin-precedence cases (stale-pin-doesn't-win, custom-pin-leads, rank-order escape). |
 
 All wiring is additive and falls back to prior behavior on any error.
 
