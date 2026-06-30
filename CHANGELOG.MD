@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.7.117] - 2026-06-29
+- feat(remember): confidence-decay memory — facts that forget gracefully (#1422). Adds `apps/lantern-garage/routes/memory-decay.js` (+ `test/memory-decay.test.js`), registered in `server.js` alongside the metrics/factcheck/decisions routes. Improves the **Remember** stage: memory confidence decays over time unless reinforced, so stale facts fade gracefully instead of being asserted forever. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
+
 ## [1.7.116] - 2026-06-29
 - feat(converge): decision journal + calibration — are your gut calls actually good? (#1436). Adds `apps/lantern-garage/routes/decisions.js` (+ `test/decision-journal.test.js`), registered in `server.js` alongside the metrics/factcheck routes. Improves the **Converge** stage: log a decision with your predicted confidence, later record the outcome, and get a calibration score on whether your gut calls are actually good. Rebased onto master after the zipper merge; version bumped to satisfy the change-record gate.
 
