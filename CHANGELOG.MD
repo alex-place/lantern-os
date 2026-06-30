@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.3] - 2026-06-30
+### Changed
+- **Home: oversized secondary panels demoted to a compact link row.** The chat-first home index (`apps/lantern-garage/public/index.html`) replaced its four full-size card panels (Trader / Create / Explore / Orchestration) — which dominated the page and read as cluttered — with a small, de-emphasized link row (Trader · Create · Explore) that sits beneath the chat in the vertically-centered hero stack, keeping each tile's accent glyph for identity. Links use `--muted`, brightening to `--text` on hover. Orchestration is dropped from the home page (a dev/routing surface, still reachable from Explore "Work board", `work.html`, and `ops.html`).
+
+### Added
+- **a11y: Σ₀-grounded font/style best-practice contract in the CI suite.** `scripts/test-a11y.js` gains a font/style contract (WCAG 2.1/2.2 SC 1.4.3/1.4.11/1.4.4): it parses the real theme tokens from `site.css` and rules from `dream-chat-ui.css`, enforces AA text-contrast in both light and dark themes, bans background/surface-intent tokens (`--accent-dim`, `--surface*`, `--border`, `--bg`) from being used as a text `color:`, and sets a 10px legibility floor. Caught the live regression where the "Keystone · chat" thinking-wheel route card + reply signature were below AA (1.12:1 / 2.77:1); both moved to `--muted` (4.83:1). Also fixes a Test-3 false positive that flagged decorative `alt=""` (valid per WCAG H67).
+
 ## [1.8.2] - 2026-06-30
 ### Changed
 - **Dual-boot quickstart installs the workstream hooks.** `scripts/Start-DualServers.ps1` (the single entry behind `make quickstart` and direct invocation) now runs `Install-MonoworkstreamHooks.ps1` after the prerequisite check, so the dynamic per-lane PR gate (`alex/`, `kriskin/`, `mookman11/`, any `<name>/` — one open PR each) plus the slop + change-record hooks are active without a manual install step. The main checkout's `.git/hooks` is shared by the stable (:4177) and dev (:4178) worktrees via the common git dir, so one install covers all three; best-effort, so a hook-install hiccup never blocks the servers. (#1755)

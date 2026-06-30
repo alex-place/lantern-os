@@ -149,19 +149,29 @@
       flex-shrink: 0;
     }
     .home-file-chip button:hover { color: var(--text); }
-    /* per-tile accent identity */
-    .home-tiles .tile-trader  { --tile: #10b981; }   /* emerald — markets   */
-    .home-tiles .tile-create  { --tile: #a78bfa; }   /* violet  — studio    */
-    .home-tiles .tile-explore { --tile: #06b6d4; }   /* cyan    — convergence */
-    .home-tiles .tile-orchestration { --tile: #f59e0b; } /* amber — routing */
-    /* top accent bar that wipes in on hover */
-    .home-tiles .panel::before {
-      content: "";
-      position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: var(--tile);
-      transform: scaleX(0); transform-origin: left;
-      transition: transform .28s ease;
+    /* ── Quick links — compact destinations beneath the chat.
+       Replaces the oversized secondary card panels: the home is chat-first,
+       so Trader / Create / Explore are now a small de-emphasized link row that
+       sits inside the vertically-centered hero stack. ── */
+    .home-links {
+      display: flex; flex-wrap: wrap;
+      justify-content: center; align-items: center;
+      gap: 6px 24px;
     }
+    .home-links a {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: var(--muted); text-decoration: none;
+      font-size: 0.95rem; font-weight: 500; letter-spacing: 0.01em;
+      padding: 5px 4px;
+      border-bottom: 1.5px solid transparent;
+      transition: color .16s, border-color .16s;
+    }
+    .home-links a:hover { color: var(--text); border-bottom-color: var(--tile, var(--accent)); }
+    .home-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+    .home-links .glyph { color: var(--tile, var(--accent)); font-size: 0.8rem; line-height: 1; }
+    .home-links .tile-trader  { --tile: #10b981; }   /* emerald — markets */
+    .home-links .tile-create  { --tile: #a78bfa; }   /* violet  — studio  */
+    .home-links .tile-explore { --tile: #06b6d4; }   /* cyan    — archive */
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* Fallback: allow scroll whenever the one-screen shell can't fit its
        content (short viewports, and typical phones). */
@@ -237,37 +247,12 @@
   </div>
   <p class="sub" style="text-align:center;margin-top:-4px;"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></p>
 
-  <!-- ── Secondary experiences ── -->
-  <div class="home-tiles">
-    <a class="panel tile-trader" href="/stock-trader.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">▲</span>
-      <span class="panel-label">Markets</span>
-      <h2>Trader</h2>
-      <p>Live prediction markets, swipe-deck entries, and signal history.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-    <a class="panel tile-create" href="/create.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">✦</span>
-      <span class="panel-label">Studio</span>
-      <h2>Create</h2>
-      <p>Write, upload, and organize your creative projects.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-    <a class="panel tile-explore" href="/explore.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">◎</span>
-      <span class="panel-label">Archive</span>
-      <h2>Explore</h2>
-      <p>Your personal archive, tools, games, and settings.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-    <a class="panel tile-orchestration" href="/orchestration.html">
-      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">🧭</span>
-      <span class="panel-label">Routing</span>
-      <h2>Orchestration</h2>
-      <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
-      <span class="panel-arrow">Open →</span>
-    </a>
-  </div>
+  <!-- ── Secondary experiences — compact link row near the footer ── -->
+  <nav class="home-links" aria-label="More from unisona.ai">
+    <a class="tile-trader" href="/stock-trader.html"><span class="glyph" aria-hidden="true">▲</span>Trader</a>
+    <a class="tile-create" href="/create.html"><span class="glyph" aria-hidden="true">✦</span>Create</a>
+    <a class="tile-explore" href="/explore.html"><span class="glyph" aria-hidden="true">◎</span>Explore</a>
+  </nav>
 
 </main>
 
