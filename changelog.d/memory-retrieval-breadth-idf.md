@@ -1,1 +1,3 @@
 - perf(remember): MemoryEngine retrieval overhaul — IDF-weighted ranking plus auto-derived trace keywords (records were unindexed when keywords were omitted) lifts multi-signal recall@5 from 0.43 to 0.81 on the LongMemEval hard haystack. Index persistence is now throttled (was re-saved on every write → O(n²) ingestion) with O(1) stale-detection + rebuild-on-load and a `flush()` for graceful shutdown, so sustained writes stay ~2.5 ms/write. The live chat retrieval (`csf-memory.js`) gains the same IDF-weighted ranking (#1689, #1690, #1728).
+
+- docs(kc): add Knowledge Center article "How Keystone Remembers" (docs/MEMORY-RETRIEVAL.md) documenting the CSF memory & retrieval system; carded + ingested into the product RAG index.
