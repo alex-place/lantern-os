@@ -83,3 +83,25 @@ production caller plumbs logprobs into the groundedness canary
 | Python port == `token-surprise.js` | identical fields on shared vectors (`--selftest` + node cross-check) | High | repo |
 | Ollama exposes per-token logprobs (v0.30.10) | live `/v1/chat/completions` returns `logprobs.content[].logprob` | High | repo (2026-06-30) |
 | Sequence-level uncertainty predicts confabulation | Farquhar et al., *Nature* 2024 | Med | external |
+
+## Resolution (2026-06-30) — the leak now carries signal
+
+Acted on the "what to do" above. `fieldToUncertainty` in
+[`token-surprise.js`](../../apps/lantern-garage/lib/token-surprise.js) was rewritten to
+drive the scalar from a `0.5·meanBits + 0.5·p90Bits` perplexity blend through a
+strictly-monotonic logistic (CENTER=5 bits, GAIN=1) instead of the chance-level 6-bit
+`tailMass` gate. Because the transform is strictly monotonic, AUROC equals the ranking of
+the blend at every bit scale — so the [0,1] shaping does not cost separation.
+
+Re-validated **offline against this note's own committed labeled rows** (no model needed),
+locked as a data-driven regression test in
+[`test/token-surprise.test.js`](../../apps/lantern-garage/test/token-surprise.test.js):
+
+| Model | old `tailMass` field | **new perplexity-blend field** | nonzero rows (old→new) |
+|---|---|---|---|
+| qwen2.5-coder:1.5b | 0.5188 (chance) | **0.7681** | 3% → 100% |
+| mistral:7b | 0.5000 (chance) | **0.8108** | 0% → 100% |
+
+The blend slightly *exceeds* `mean_bits`/`p90_bits` alone on both runs. The canary's
+raise-only anchor-override wiring is unchanged. **Layers 2–3 remain unrun** — the open
+input is now a calibrated, signal-bearing scalar rather than a degenerate one.
