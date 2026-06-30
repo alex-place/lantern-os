@@ -149,20 +149,19 @@
       flex-shrink: 0;
     }
     .home-file-chip button:hover { color: var(--text); }
-    /* ── Simple links row (above the footer) ── */
-    .home-links {
-      display: flex; flex-wrap: wrap; justify-content: center;
-      gap: 22px; width: 100%; margin: 4px auto 0;
+    /* per-tile accent identity */
+    .home-tiles .tile-trader  { --tile: #10b981; }   /* emerald — markets   */
+    .home-tiles .tile-create  { --tile: #a78bfa; }   /* violet  — studio    */
+    .home-tiles .tile-explore { --tile: #06b6d4; }   /* cyan    — convergence */
+    .home-tiles .tile-orchestration { --tile: #f59e0b; } /* amber — routing */
+    /* top accent bar that wipes in on hover */
+    .home-tiles .panel::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--tile);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform .28s ease;
     }
-    .home-links a {
-      color: var(--text); font-size: 0.95rem; font-weight: 600;
-      text-decoration: none; padding: 4px 2px;
-      border-bottom: 1px solid transparent;
-      transition: color .15s, border-color .15s;
-    }
-    .home-links a:hover,
-    .home-links a:focus-visible { color: var(--accent); border-color: var(--accent); }
-    .home-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* Fallback: allow scroll whenever the one-screen shell can't fit its
        content (short viewports, and typical phones). */
@@ -238,12 +237,37 @@
   </div>
   <p class="sub" style="text-align:center;margin-top:-4px;"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></p>
 
-  <!-- ── Simple links ── -->
-  <nav class="home-links" aria-label="Quick links">
-    <a href="/stock-trader.html">Trader</a>
-    <a href="/create.html">Create</a>
-    <a href="/explore.html">Explore</a>
-  </nav>
+  <!-- ── Secondary experiences ── -->
+  <div class="home-tiles">
+    <a class="panel tile-trader" href="/stock-trader.html">
+      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">▲</span>
+      <span class="panel-label">Markets</span>
+      <h2>Trader</h2>
+      <p>Live prediction markets, swipe-deck entries, and signal history.</p>
+      <span class="panel-arrow">Open →</span>
+    </a>
+    <a class="panel tile-create" href="/create.html">
+      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">✦</span>
+      <span class="panel-label">Studio</span>
+      <h2>Create</h2>
+      <p>Write, upload, and organize your creative projects.</p>
+      <span class="panel-arrow">Open →</span>
+    </a>
+    <a class="panel tile-explore" href="/explore.html">
+      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">◎</span>
+      <span class="panel-label">Archive</span>
+      <h2>Explore</h2>
+      <p>Your personal archive, tools, games, and settings.</p>
+      <span class="panel-arrow">Open →</span>
+    </a>
+    <a class="panel tile-orchestration" href="/orchestration.html">
+      <span class="panel-icon" aria-hidden="true" style="font-size:20px;font-weight:700;color:var(--tile)">🧭</span>
+      <span class="panel-label">Routing</span>
+      <h2>Orchestration</h2>
+      <p>Stateless router — intent classification, convergence gate, provider fallback.</p>
+      <span class="panel-arrow">Open →</span>
+    </a>
+  </div>
 
 </main>
 
