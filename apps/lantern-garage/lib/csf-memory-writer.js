@@ -253,4 +253,12 @@ module.exports = {
   recordSignal,
   queryRecent,
   verifyRecord,
+  // Shared canonical-checksum primitives. trading-memory.js / trading-news.js
+  // import these so every JS writer stamps records with the SAME recursive
+  // canonical-JSON + SHA-256 scheme (see _canonicalJson). Do NOT reintroduce a
+  // per-writer checksum — that is how data/csf_memory diverged into three
+  // incompatible schemes (see tests/test_csf_memory_integrity.py).
+  _checksum,
+  _canonicalJson,
+  _csfMemoryPath,
 };

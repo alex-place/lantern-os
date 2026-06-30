@@ -33,6 +33,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Set
 
+# Canonicalization scheme id for MemoryRecord.checksum. Bump this (and add a
+# dispatch in verify()) only if a future change makes old records unverifiable
+# AND you have chosen to keep them verifiable rather than re-stamp them. The
+# current decision is to re-stamp legacy records on migration, not to carry
+# multiple schemes — see MemoryRecord.verify() and tests/test_csf_memory_integrity.py.
+CHECKSUM_SCHEME = "py-json-canonical/v1"
+
 
 class Tier(str, Enum):
     TRACE = "trace"
@@ -90,12 +97,43 @@ class MemoryRecord:
             self.checksum = self._compute_checksum()
 
     def _compute_checksum(self) -> str:
-        """SHA-256 of canonical JSON (excludes checksum itself)."""
+        """SHA-256 of canonical JSON (excludes checksum itself).
+
+        Canonicalization scheme ``CHECKSUM_SCHEME`` (``py-json-canonical/v1``):
+        ``json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)``.
+        This is the **Python-runtime** scheme; it is NOT byte-identical to the
+        JS writers' canonical form (JS formats e.g. ``1.0`` as ``1``), so a
+        record stamped by one runtime will not ``verify()`` under the other.
+        Checksum verification is therefore **runtime-local** by design — see
+        the cross-runtime contract documented in
+        ``apps/lantern-garage/lib/csf-memory-writer.js``.
+        """
         payload = {k: v for k, v in asdict(self).items() if k != "checksum"}
         canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def verify(self) -> bool:
+        """Tamper-evidence check: recompute the canonical checksum and compare.
+
+        IMPORTANT — known limitations (see tests/test_csf_memory_integrity.py):
+
+        * ``verify()`` is **not invoked on any read/load path** today.
+          ``from_dict()``/``MemoryEngine.read()``/``query()`` deliberately do
+          NOT re-verify, so this is an opt-in integrity probe, not an enforced
+          gate. Turning it into a read-path gate requires first re-stamping or
+          migrating legacy records (see ``scripts/restamp-csf-memory.js``),
+          otherwise it would reject genuine records.
+        * It only confirms records written by the **same** canonicalization
+          scheme (``py-json-canonical/v1``). Records authored by the JS writers
+          use a JS canonical scheme and will not verify here.
+        * Records written before 2026-06-29 by ``trading-memory.js`` /
+          ``trading-news.js`` used a *broken* canonicalization (a
+          ``JSON.stringify`` replacer-allowlist mistaken for a key sort) that
+          excluded nested ``content.*`` from the hash. Those records are not
+          verifiable under any sound scheme and should be re-stamped on
+          migration rather than blessed by a versioned fallback (that would
+          assert integrity over content the hash never covered).
+        """
         return self.checksum == self._compute_checksum()
 
     def promote(

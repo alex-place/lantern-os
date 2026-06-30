@@ -75,7 +75,7 @@ Ordered **proven-region wideners → grounding reinforcements → heuristic guar
 9. Two-sided canary: add a **frozen**/contentless lower NIS tail + CUSUM/hysteresis. (`surprise.py`, `collapse.py`, `engine.py`)
 10. Direction-targeted Σ₀⁻¹ with a re-excitation floor (inject along slowest-recovering near-null modes). (`collapse.py`)
 11. Evidence-aware bidirectional confidence dynamics (deep ungrounded abstraction towers self-extinguish). (`memory_engine.py`, `pattern_extractor.py`)
-12. Integrity-/freshness-ranked retrieval (`rec.verify()` on read path + recency term). (`memory_engine.py`)
+12. Integrity-/freshness-ranked retrieval (recency term). **Status: partial.** `MemoryRecord.verify()` exists but is *not* wired onto the read path — `from_dict()`/`read()`/`query()` do not re-verify, and checksum canonicalization is runtime-local (Python vs JS writers diverge; pre-2026-06-29 trading records used a broken scheme). Re-stamp via `scripts/restamp-csf-memory.js` before promoting `verify()` to an enforced read gate. See `tests/test_csf_memory_integrity.py`. (`memory_engine.py`)
 13. Persist collapse/NIS events into Converge as a pattern-quality multiplier. (`pattern_extractor.py`)
 14. Circuit-breaker hardening (the `pcsf.py` bug + quota recovery + half-open probe). (`pcsf.py`, `ccf.py`, `ceg.py`) — [#765]
 15. Cross-model collapse-threshold regression gate on model swap (CI harness).

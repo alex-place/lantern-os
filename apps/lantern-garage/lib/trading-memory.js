@@ -14,9 +14,15 @@ const path = require("path");
 const crypto = require("crypto");
 const { appendJsonlQueued } = require("./file-queue");
 const tradingStore = require("./trading-store");
+const csfWriter = require("./csf-memory-writer");
 
-const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
-const CSF_MEMORY_REGISTRY = path.join(REPO_ROOT, "data", "csf_memory", "raw.jsonl");
+// Resolve the registry lazily so CSF_MEMORY_PATH (honoured by the Python
+// MemoryEngine and csf-memory-writer.js) also isolates this writer's writes —
+// previously this path was frozen at require() time to the repo's real data/
+// dir, so even tests polluted data/csf_memory/raw.jsonl.
+function _registryPath() {
+  return path.join(csfWriter._csfMemoryPath(), "raw.jsonl");
+}
 
 const _seenOrders = new Set();
 const _seenSignals = new Set();
@@ -55,13 +61,14 @@ function _csfRecord(tier, content, tags, keywords, memoryId) {
     confidence_reasoning: "",
     staleness_signals: [],
   };
-  const payload = Object.fromEntries(
-    Object.entries(base).filter(([k]) => k !== "checksum")
-  );
-  base.checksum = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(payload, Object.keys(payload).sort()))
-    .digest("hex");
+  // Use the shared canonical checksum (recursive key-sort over the whole
+  // record, nested content included). The previous
+  // `JSON.stringify(payload, Object.keys(payload).sort())` form passed the key
+  // list as a *replacer allowlist*, not a sort — so nested content.* (the
+  // actual order/signal payload) was excluded from the hash, and the digest
+  // matched neither the Python nor the other JS writer. See
+  // tests/test_csf_memory_integrity.py.
+  base.checksum = csfWriter._checksum(base);
   return base;
 }
 
@@ -103,7 +110,7 @@ async function recordOrder(order) {
     [String(order.symbol || ""), "order"],
     memId,
   );
-  await appendJsonlQueued(CSF_MEMORY_REGISTRY, rec);
+  await appendJsonlQueued(_registryPath(), rec);
   return order;
 }
 
@@ -134,7 +141,7 @@ async function recordSignal(signal) {
     [String(signal.symbol || ""), "signal", String(signal.agent || "")],
     memId,
   );
-  await appendJsonlQueued(CSF_MEMORY_REGISTRY, rec);
+  await appendJsonlQueued(_registryPath(), rec);
   return signal;
 }
 
@@ -192,7 +199,7 @@ async function queryRecent({ limit = 50, kind } = {}) {
 function queryRecentTradingRecords(limit = 50, kind) {
   const fs = require("fs");
   try {
-    const lines = fs.readFileSync(CSF_MEMORY_REGISTRY, "utf8").trim().split("\n").filter(Boolean);
+    const lines = fs.readFileSync(_registryPath(), "utf8").trim().split("\n").filter(Boolean);
     return lines
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })
       .filter((r) => {
