@@ -117,6 +117,36 @@ archives **iff grounded**; ungrounded it underperforms zstd (proven). Honesty ga
 just zstd; instrument `a(Σ)`/NIS as the exit; stamp model id+version (recompress on model swap — tension with
 "models are interchangeable").
 
+### 3.1 Ungrounded ceiling probed (2026-06-29) — ungrounded GRC REFUTED; grounding bar quantified
+
+Cheap go/no-go before building the cold coder: a model's teacher-forced cross-entropy in bits/byte *is* the
+ideal-arithmetic-coder floor for that model (DeepMind, above), so we measured it directly and compared to
+what CSF **ships on the full file** — not a sliced brotli, which would be unfair to brotli (its cross-record
+dictionary needs the whole file). Probe: [`grc_ceiling_probe.py`](../../experiments/grc_ceiling_probe.py),
+gpt2-124M on CPU. bpb = bits/byte, lower better:
+
+| log | rawB | brotli-11 (full) | CSF-Col (full) | gpt2 CE | verdict |
+|---|--:|--:|--:|--:|---|
+| `deltas.jsonl` | 21,286 | 0.401 | **0.328** | 0.585 | gpt2 **loses +78%** |
+| `raw.jsonl` | 320,163 | 0.524 | **0.487** | 1.016 | gpt2 **loses +109%** |
+| `elephant-door-…` | 4,649 | 1.833 | 1.972 | **1.035** | gpt2 beats (tiny, no redundancy) |
+| `sample_traces.jsonl` | 3,541 | 2.112 | 2.289 | **1.051** | gpt2 beats (tiny, no redundancy) |
+
+**The ungrounded-neural verdict is refuted exactly as Theorem 1 predicts, but for the *information* reason,
+not just the collapse one:** brotli/col reach 0.3–0.5 bpb by exploiting **cross-record redundancy** (record
+N is a near-duplicate of an earlier one). An ungrounded LM sees only each token's language probability
+(~1.0 bpb) and is **blind to that redundancy**, so it loses >2× on the realistic logs. It wins only on the
+two tiny 3–4 KB logs that *have* no redundancy for brotli to exploit. This is the measured form of "ungrounded
+prediction underperforms" — grounding (retrieved context) is precisely what would let the predictor *see* the
+duplicate and drive its bits toward zero.
+
+**Bar that grounding must clear:** beat CSF-Col's **0.49 bpb** on `raw.jsonl`. **Caveat:** a larger resident
+model (Qwen-3B / Ouro-1.4B) lowers CE vs gpt2-124M, but would have to roughly **halve** it to reach 0.49 — at
+~20 min/MB cold compute. **Recommendation:** do **not** build GRC-alone (#1595) for memory logs; the only live
+form is **#1596 (hybrid)** — run the neural pass on the **CSF-Col residual** (the genuine high-`L` tokens after
+structure+redundancy are stripped), where the LM prior actually adds value. Re-run `grc_ceiling_probe.py
+--model <resident>` on the real model before committing.
+
 ## 4. Technique 4 — hybrid GRC over a CSF-Col residual · #1596
 
 CSF-Col strips the ~70 % structural redundancy at zero compute; GRC drives only the high-`L` residual to the
