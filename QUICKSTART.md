@@ -137,6 +137,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 - **Port 4178** — your playground (your current branch, auto-reloads as you change files)
 - **Port 8771** — MCP server (shared, tools for Claude Code) *(requires Python)*
 
+On startup this also installs the **monoworkstream git hooks** (contributors only) — the
+dynamic per-lane PR gate: `alex/`, `kriskin/`, `mookman11/`, or any `<name>/` branch each
+get one concurrent PR lane, plus the slop + change-record checks. Nothing to do manually.
+
 *(If you happen to have `make` installed — it isn't on Windows by default — `make quickstart` does the same thing.)*
 
 ### Start automatically when your PC turns on (Windows)

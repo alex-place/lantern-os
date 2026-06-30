@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.2] - 2026-06-30
+### Changed
+- **Dual-boot quickstart installs the workstream hooks.** `scripts/Start-DualServers.ps1` (the single entry behind `make quickstart` and direct invocation) now runs `Install-MonoworkstreamHooks.ps1` after the prerequisite check, so the dynamic per-lane PR gate (`alex/`, `kriskin/`, `mookman11/`, any `<name>/` — one open PR each) plus the slop + change-record hooks are active without a manual install step. The main checkout's `.git/hooks` is shared by the stable (:4177) and dev (:4178) worktrees via the common git dir, so one install covers all three; best-effort, so a hook-install hiccup never blocks the servers. (#1755)
+
 ## [1.8.1] - 2026-06-30
 ### Changed
 - **Dynamic per-human work lanes.** The monoworkstream hooks (`scripts/hooks/pre-commit`, `pre-push`) now key the one-open-PR lane off the branch's first path segment for *everyone*, instead of collapsing all humans into a single shared lane. `alex/`, `kriskin/`, `mookman11/` — and any future `<name>/` prefix — each get their own concurrent lane (one open PR each) with no roster edit, so more than one and more than three humans can work at once. Unprefixed branches share a `human` fallback lane. (#1755)

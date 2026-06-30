@@ -42,6 +42,9 @@ quickstart:
 	@echo "   • QUICKSTART.md — how to run both servers"
 	@echo "   • AGENTS.md — workflow and git rules"
 	@echo ""
+	@echo "   (Start-DualServers.ps1 also installs the monoworkstream hooks —"
+	@echo "    dynamic per-lane PR gate: alex/ kriskin/ mookman11/ <name>/ each 1 PR.)"
+	@echo ""
 	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 
 quickstart-no-browser:

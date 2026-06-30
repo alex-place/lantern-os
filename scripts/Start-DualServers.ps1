@@ -59,6 +59,26 @@ foreach ($wt in @($StableRoot, $DevRoot)) {
 }
 Write-Host ("Node {0}; worktrees present." -f (node --version)) -ForegroundColor Green
 
+# --- Workstream hooks (dynamic per-lane PR gate) -----------------------------
+# Install the monoworkstream git hooks as part of quickstart so the dynamic
+# per-human lanes (alex/, kriskin/, mookman11/, any NAME/ - one open PR each)
+# plus the slop + change-record gates are active. The main checkout's .git/hooks
+# is shared by every linked worktree (stable :4177, dev :4178) via the common git
+# dir, so installing once here covers them all. Best-effort: a hook-install hiccup
+# must never block the servers from coming up.
+try {
+    $hookInstaller = Join-Path $RepoRoot "scripts\Install-MonoworkstreamHooks.ps1"
+    if (Test-Path $hookInstaller) {
+        Push-Location $RepoRoot
+        try { & $hookInstaller | Out-Null } finally { Pop-Location }
+        Write-Host "Workstream hooks installed (dynamic per-lane PR gate active)." -ForegroundColor Green
+    } else {
+        Write-Host "Workstream hook installer not found - skipping (lane gate not enforced locally)." -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host ("Workstream hooks install skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
 # --- Hydrate persistent environment (so the servers get their keys) ----------
 # Keys/credentials live in the Machine/User environment, not a committed .env.
 foreach ($scope in 'Machine','User') {
