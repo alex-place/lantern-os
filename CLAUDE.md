@@ -193,7 +193,7 @@ Business logic is split into `apps/lantern-garage/lib/`:
 
 ### Dream Journal agents
 
-Six agent personas are defined in `apps/lantern-garage/lib/dream-chat.js`: `lantern`, `blinkbug`, `keystone`, `waterfall`, `xenon`, `founder`. Each has a `systemPrompt`. `selectAgent()` scores inbound messages by keyword match; the winner's prompt is injected into the LLM call.
+The chat persona is a single grounded agent, **`keystone`**, defined in `apps/lantern-garage/lib/dream-chat.js` and loaded from `data/contexts/personas.json`. `selectAgent()` scores inbound messages by keyword match and defaults to `keystone`; the persona's `systemPrompt` is injected into the LLM call. (The earlier fictional RP personas — `lantern`, `blinkbug`, `waterfall`, `xenon`, `founder` — were removed in #1664. The string `lantern` persists *only* as the internal assistant message-role used by conversation/CSF storage, not as a selectable persona.)
 
 **Only these five skills have real implementations:** `dream_journal`, `lucid_dreaming`, `archive_curator`, `voice_curator`, `job_application`. All other `skills/*/SKILL.md` entries are design contracts only — do not claim they are live.
 
