@@ -1,0 +1,1 @@
+- feat(ui): rebrand page chrome (titles, nav brand, footer, eyebrow, version badge, dynamic document.title) from "Keystone OS" to "unisona.ai" across 45 pages; body/marketing copy left unchanged.

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#7c6af7">
-  <title>Entry Details — Keystone OS</title>
+  <title>Entry Details — unisona.ai</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
     :root {
@@ -872,7 +872,7 @@ async function loadEntry() {
     // Update page title
     document.getElementById("entry-title").textContent = entry.title;
     document.getElementById("entry-date").textContent = formattedCreated;
-    document.title = (entry.title || "Entry") + " — Keystone OS";
+    document.title = (entry.title || "Entry") + " — unisona.ai";
 
     // Update overview tab
     document.getElementById("entry-created").textContent = formattedCreated;
@@ -1591,7 +1591,7 @@ function startTitleEdit() {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title })
         });
         if (currentProject) currentProject.title = title;
-        document.title = title + ' — Keystone OS';
+        document.title = title + ' — unisona.ai';
       } catch (e) { console.error('rename failed', e); }
     }
   };
