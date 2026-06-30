@@ -211,11 +211,11 @@
 
     <!-- Right rail — wired to real socials (see SOCIALS config in the script). -->
     <div class="rail" id="rail">
-      <a class="av" id="navMain" target="_blank" rel="noopener noreferrer" title="Follow Keystone OS">🏮</a>
+      <a class="av" id="navMain" target="_blank" rel="noopener noreferrer" title="Follow unisona.ai">🏮</a>
       <a class="ic" id="navHeart" target="_blank" rel="noopener noreferrer" title="Support on Patreon">❤️<small>69.4K</small></a>
       <a class="ic" id="navComment" target="_blank" rel="noopener noreferrer" title="Source on GitHub">💬<small>1.2K</small></a>
       <button class="ic" id="navShare" type="button" title="Share">🔁<small>8.8K</small></button>
-      <a class="disc" id="navDisc" target="_blank" rel="noopener noreferrer" title="Keystone OS">🎵</a>
+      <a class="disc" id="navDisc" target="_blank" rel="noopener noreferrer" title="unisona.ai">🎵</a>
     </div>
     <div class="meta">
       <a class="h" id="navHandle" target="_blank" rel="noopener noreferrer">@keystone_os</a>
@@ -247,7 +247,7 @@
     patreon: "https://www.patreon.com/c/lanterndreamjournal",
     github:  "https://github.com/alex-place/lantern-os",
     shareUrl:  "https://lantern-os.net/explore.html",
-    shareText: "Keystone OS — the only AI that doesn't have brainrot 🧠🏮 #tungtungsahur #onlyinohio"
+    shareText: "unisona.ai — the only AI that doesn't have brainrot 🧠🏮 #tungtungsahur #onlyinohio"
   };
 
   function wire(id, href){ var el=document.getElementById(id); if(el && href) el.href=href; }
@@ -270,7 +270,7 @@
   var shareBtn = document.getElementById('navShare');
   if(shareBtn){
     shareBtn.addEventListener('click', function(){
-      var data = { title: "Keystone OS", text: SOCIALS.shareText, url: SOCIALS.shareUrl };
+      var data = { title: "unisona.ai", text: SOCIALS.shareText, url: SOCIALS.shareUrl };
       // Web Share is gated to a user gesture + (in iframes) an allow="web-share"
       // grant Explore doesn't issue — so try it, then fall back to clipboard.
       if (navigator.share) {
