@@ -1888,6 +1888,7 @@ async function sendMessage(opts = {}) {
   let doneIntent = '';      // routed intent (coding_change, trading, …) — drives the autowork suggestion
   let doneModel = '';       // actual model id from the PCSF receipt (e.g. claude-haiku-4-5)
   let doneModelSwap = null; // capability-gated local-model swap decision (which local model led + why)
+  let doneRouteReason = null; // #1554: why this turn routed here (taskType + provider-selection reason + gate)
   let doneTimestamp = '';   // receipt generatedAt — the signature timestamp
   let doneOnline = true;    // false when no model answered (offline path)
   // #930: coalesce per-token DOM writes into one render per animation frame instead
@@ -2008,6 +2009,7 @@ async function sendMessage(opts = {}) {
             doneIntent = evt.intent || (evt.receipt && evt.receipt.intent) || '';
             doneModel = evt.model || (evt.receipt && evt.receipt.model) || '';
             doneModelSwap = evt.modelSwap || null;
+            doneRouteReason = evt.routeReason || (evt.receipt && evt.receipt.routeReason) || null;
             doneTimestamp = evt.timestamp || (evt.receipt && evt.receipt.generatedAt) || '';
             doneOnline = evt.online !== false;
             if (Array.isArray(evt.actions) && evt.actions.length) doneActions = evt.actions;
@@ -2277,18 +2279,34 @@ async function sendMessage(opts = {}) {
         const cand = Array.isArray(doneModelSwap.candidates) ? doneModelSwap.candidates.join(' → ') : '';
         swapDebug = `<div style="margin-top:2px">swap: ${_e(doneModelSwap.reason || '')}${cand ? ' · chain: ' + _e(cand) : ''}</div>`;
       }
+      // #1554 — capability-gated routing, observable: assemble WHY this turn routed
+      // to this model (server routeReason = task classification + provider-selection
+      // reason + optional conversation-gate note). Surfaced as a hover tooltip on the
+      // signature label and expanded in the route disclosure below.
+      const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+      let routeReasonText = '';
+      if (doneRouteReason && (doneRouteReason.why || doneRouteReason.taskType)) {
+        const rp = [];
+        if (doneRouteReason.taskType) rp.push(doneRouteReason.taskType);
+        if (doneRouteReason.why) rp.push(doneRouteReason.why);
+        if (doneRouteReason.gate) rp.push('gate: ' + doneRouteReason.gate);
+        routeReasonText = rp.join(' · ');
+      }
+      const routeTitle = routeReasonText ? ` title="routed: ${esc(routeReasonText)}"` : '';
+      const routeDebug = routeReasonText ? `<div style="margin-top:2px">route: ${esc(routeReasonText)}</div>` : '';
       if (pm) {
-        // Wrap provider/model in a disclosure so it's accessible but not noisy.
+        // Wrap provider/model + route reason in a disclosure so it's accessible but
+        // not noisy; the visible label carries the reason as a hover tooltip (#1554).
         sig.innerHTML =
-          `<span>${visibleText}${swapChip}</span>` +
+          `<span${routeTitle}>${visibleText}${swapChip}</span>` +
           `<details class="sig-debug" style="display:inline-block;margin-left:6px">` +
-          `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none" aria-label="Debug details">▸ debug</summary>` +
-          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}${swapDebug}</span>` +
+          `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none" aria-label="Route and model details">▸ route</summary>` +
+          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}${swapDebug}${routeDebug}</span>` +
           `</details>`;
-        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}; model: ${pm}` + (swapTitle ? `; ${swapTitle}` : ''));
+        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}; model: ${pm}` + (routeReasonText ? `; routed: ${routeReasonText}` : '') + (swapTitle ? `; ${swapTitle}` : ''));
       } else {
-        sig.innerHTML = `<span>${visibleText}${swapChip}</span>`;
-        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}` + (swapTitle ? `; ${swapTitle}` : ''));
+        sig.innerHTML = `<span${routeTitle}>${visibleText}${swapChip}</span>`;
+        sig.setAttribute('aria-label', `Keystone replied${time ? ' at ' + time : ''}` + (routeReasonText ? `; routed: ${routeReasonText}` : '') + (swapTitle ? `; ${swapTitle}` : ''));
       }
     }
     msg.appendChild(sig);
