@@ -112,6 +112,25 @@ function _extractRunnable(reply) {
   return { language: "python", code, test };
 }
 
+// Verify-gated distillation flywheel: when KEYSTONE_LOCAL_FIRST=1, record cloud-solved + verified
+// coding episodes as a corpus for local model improvement. This is a persistent learning mechanism
+// via retrieval/experience, not weight retraining of the base model. It also triggers a local-adapter
+// refresh and measures the lift via CAP-1.
+const KEYSTONE_LOCAL_FIRST = process.env.KEYSTONE_LOCAL_FIRST === "1";
+const OURO_LOCAL_FIRST_CORPUS = path.resolve(repoRoot, "data/ouro-local-first-corpus.jsonl");
+async function keystoneLocalFirst(instruction, reply, result) {
+  if (!KEYSTONE_LOCAL_FIRST) return;
+  if (!result || !result.verified || !result.runnable) return;
+  try {
+    await appendJsonlQueued(OURO_LOCAL_FIRST_CORPUS, {
+      instruction: instruction.slice(0, 200),
+      code: result.runnable.code,
+      test: result.runnable.test,
+      source: "keystone-local-first", ts: Date.now(),
+    });
+  } catch (e) { console.error("[keystoneLocalFirst] failed to record:", e.message); }
+}
+
 // Per-request grounding (web search + live GitHub project context) is best-effort
 // enrichment that runs BEFORE the model is called. If the network or the `gh` CLI
 // is slow/hung, an unbounded await there stalls the ENTIRE chat reply (no tokens,
@@ -436,6 +455,7 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Search failed: ${result.error || "unknown error"}\n`);
           sendDone("web_search", { agent: "WebSearch", online: false, error: result.error });
         }
+        keystoneLocalFirst(issue, result.text, runnableResult);
       } catch (e) {
         sendToken(`Search error: ${e.message}\n`);
         sendDone("web_search", { agent: "WebSearch", online: false, error: e.message });

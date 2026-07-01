@@ -30,6 +30,7 @@ const validators = [
   { name: "Founder controls", state: "held", next: "Require operator-machine auth proof before enabling remote dispatch." },
   { name: "Convergence loop", state: "held", next: "Run PowerShell locally; cloud/Linux keeps the issue visible." },
   { name: "Cloud mirrors", state: "candidate", next: "Promote only after health endpoint returns verified 200." },
+  { name: "Keystone Local First", state: "held", next: "Verify-gated distillation flywheel is off; enable via KEYSTONE_LOCAL_FIRST=1." },
 ];
 
 function appOrigin() {
@@ -163,6 +164,11 @@ function renderValidators() {
   const pass = validators.filter((validator) => validator.state === "pass").length;
   const held = validators.filter((validator) => validator.state === "held").length;
   $("validatorCounts").textContent = `${pass} pass | ${held} held | ${validators.length} total`;
+  // Update Keystone Local First validator state based on capabilities
+  const keystoneLocalFirstValidator = validators.find(v => v.name === "Keystone Local First");
+  if (keystoneLocalFirstValidator) {
+    keystoneLocalFirstValidator.state = capabilities.keystoneLocalFirst ? "pass" : "held";
+  }
   $("validatorBadge").textContent = held ? "HELD" : "PASS";
   $("validatorBadge").className = held ? "badge badge-blocked" : "badge badge-live";
 }
