@@ -6,6 +6,7 @@ const { appendJsonlQueued } = require("./file-queue");
 const {
   packAndUploadCheckpoint,
   dispatchAllAutomatable,
+  decayUserInterests,
   loadGpuPcsf,
 } = require("./training-dispatcher");
 
@@ -236,6 +237,19 @@ async function decayStaleMemories(repoRoot) {
 }
 
 /**
+ * Periodically decays user interest weights to ensure recency.
+ * This prevents stale interests from dominating personalization.
+ */
+async function decayAllUserInterests() {
+  try {
+    await decayUserInterests();
+    console.log("[self-improvement] User interests decayed successfully.");
+  } catch (e) {
+    console.error("[self-improvement] Failed to decay user interests:", e.message);
+  }
+}
+
+/**
  * maybeDispatchTraining — called after minePatterns. Dispatches a training job
  * when enough promoted high-confidence records have accumulated since the last run.
  * Reads threshold from TRAINING_PROMOTE_THRESHOLD env (default 20).
@@ -303,14 +317,16 @@ async function maybeDispatchTraining(repoRoot, promoted) {
  * record to the append-only improvement log.
  */
 async function runWeeklyImprovement(repoRoot) {
-  const [patternResult, toolRanking, decayResult] = await Promise.all([
+  const [patternResult, toolRanking, decayResult, userInterestDecayResult] = await Promise.all([
     minePatterns(repoRoot).catch((err) => {
       console.error("[self-improvement] minePatterns failed:", err.message);
       return { patterns: 0, promoted: 0 };
     }),
     scoreTools(repoRoot).catch((err) => {
       console.error("[self-improvement] scoreTools failed:", err.message);
-      return [];
+      return {
+        ranking: [],
+      };
     }),
     decayStaleMemories(repoRoot).catch((err) => {
       console.error("[self-improvement] decayStaleMemories failed:", err.message);
@@ -322,12 +338,17 @@ async function runWeeklyImprovement(repoRoot) {
     console.error("[self-improvement] maybeDispatchTraining failed:", err.message);
     return { trainingDispatched: false, reason: err.message };
   });
+  await decayAllUserInterests().catch((err) => {
+    console.error("[self-improvement] decayAllUserInterests failed:", err.message);
+    // Non-fatal, continue with other improvements
+  });
 
   const summary = {
     runAt: isoNow(),
     patterns: patternResult.patterns,
     promoted: patternResult.promoted,
-    toolsScored: toolRanking.length,
+    toolsScored: toolRanking.ranking.length,
+    userInterestsDecayed: true, // Indicates the decay process ran
     staleMemories: decayResult.stale,
     ...trainingResult,
   };

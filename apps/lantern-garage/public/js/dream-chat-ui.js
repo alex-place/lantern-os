@@ -11,6 +11,7 @@ function persistToolTurn(role, text, meta) {
     fetch('/api/conversations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role, text, surface: 'garage', sessionId, ...(meta ? { meta } : {}) }),
+      userId: localStorage.getItem('lantern_user_id') || 'anonymous', // Pass userId for personalization
     }).catch(() => {}); // best-effort — a failed persist must never break the live reply
   } catch { /* best-effort */ }
 }

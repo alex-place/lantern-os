@@ -474,6 +474,7 @@ async function storeConversation(event) {
   const textarea = $("conversationText");
   const text = textarea.value.trim();
   if (!text) return;
+  const userId = localStorage.getItem('lantern_user_id') || 'anonymous'; // Retrieve userId
 
   // Check for mining safety keywords
   const lowerText = text.toLowerCase();
@@ -508,7 +509,8 @@ async function storeConversation(event) {
     method: "POST",
     body: JSON.stringify({
       role: $("conversationRole").value,
-      text,
+      text, // Pass the user ID to the server
+      userId,
       surface: "garage-dashboard",
       miningContext: miningSafetyAcknowledged ? "safety_boundary_acknowledged" : "general"
     }),

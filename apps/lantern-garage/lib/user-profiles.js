@@ -52,6 +52,7 @@ function createProfile(userId, data = {}) {
       emailNotifications: data.preferences?.emailNotifications !== false,
       ...data.preferences,
     },
+    userInterests: data.userInterests || {}, // Stores decayed topic/source weight vector
     metadata: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -56,6 +56,7 @@ const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require(
 const { buildBrainOrder } = require("./stream-chat/provider-order");
 const { appendJsonlQueued } = require("./file-queue");
 const { emitClaimDraft } = require("./claim-drafter");
+const { getProfile, updateProfile } = require("./user-profiles");
 
 const repoRoot = path.resolve(__dirname, "../../../");
 const OURO_HARVEST_LIVE = path.resolve(repoRoot, "data/ouro-harvest-live.jsonl");
@@ -175,6 +176,28 @@ function triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMes
   return entryId;
 }
 
+/**
+ * Updates the user's interest vector based on content interaction.
+ * This is an append-only, local-first update.
+ * @param {string} userId - The ID of the user.
+ * @param {object} interests - An object where keys are topics/sources and values are weights.
+ */
+async function updateUserInterests(userId, newInterests) {
+  if (!userId || !newInterests || Object.keys(newInterests).length === 0) {
+    return;
+  }
+  try {
+    const userProfile = await getProfile(userId);
+    const currentInterests = userProfile?.userInterests || {};
+    const updatedInterests = { ...currentInterests };
+    for (const [key, weight] of Object.entries(newInterests)) {
+      updatedInterests[key] = (updatedInterests[key] || 0) + weight;
+    }
+    await updateProfile(userId, { userInterests: updatedInterests });
+  } catch (e) {
+    console.error("[updateUserInterests] failed to update user profile:", e.message);
+  }
+}
 /**
  * Analyze a convergence loop result and determine:
  * - What categories of failures exist
@@ -338,6 +361,16 @@ async function handleStreamChat(req, url, res) {
   // branch even when the heuristic wouldn't have fired for this message.
   const forceGround = !!parsed.forceGround;
 
+  // Retrieve user interests for personalization
+  let userInterests = {};
+  if (user) {
+    try {
+      const userProfile = await getProfile(user);
+      userInterests = userProfile?.userInterests || {};
+    } catch (e) {
+      console.error("[stream-chat] failed to retrieve user interests:", e.message);
+    }
+  }
   // Surface mode: dream-chat (default) or three-doors.
   // The game page declares itself via body.surface; bang commands can also flip it below.
   let surfaceMode = parsed.surface === "three-doors" ? "three-doors" : "dream-chat";
@@ -744,7 +777,8 @@ async function handleStreamChat(req, url, res) {
         low_pass_start: "  Pruning the source pool for relevance…\n",
         high_pass_start: "  Synthesizing a grounded, cited answer…\n",
         gap_check_start: "  Checking what's still missing…\n",
-      };
+  updateUserInterests,
+};
       // Rounds run inside THIS request are capped so one HTTP turn can't hang
       // forever; a task that isn't done after this many rounds is left
       // "running" and the user is told the resume command. The task keeps its
