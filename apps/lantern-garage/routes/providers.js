@@ -158,6 +158,22 @@ module.exports = async function providerRoutes(req, res, url, deps) {
 
   _syncUserEnvKeys();
 
+  // ── GET /api/providers/models ──────────────────────────────────────────
+  // Per-provider model choices for the chat UI's model dropdown (#1127 work
+  // item 1). Keyed by the UI's provider names (claude/openai/gemini/grok);
+  // `default` is the effective modelFor() resolution (env override included)
+  // so the dropdown reflects what Auto would actually run.
+  if (req.method === "GET" && url.pathname === "/api/providers/models") {
+    const { CHAT_MODEL_OPTIONS, modelFor } = require("../lib/provider-models");
+    const UI_NAME = { anthropic: "claude", openai: "openai", gemini: "gemini", xai: "grok" };
+    const out = {};
+    for (const [internal, options] of Object.entries(CHAT_MODEL_OPTIONS)) {
+      out[UI_NAME[internal] || internal] = { default: modelFor(internal), options };
+    }
+    sendJson(res, { providers: out }, 200);
+    return true;
+  }
+
   // ── GET /api/providers/status ──────────────────────────────────────────
   if (req.method === "GET" && url.pathname === "/api/providers/status") {
     const providers = {};
