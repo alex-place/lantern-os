@@ -108,7 +108,6 @@ function validateProgress(data) {
   
   // Validate challenge-specific numbers
   if (typeof validated.shiniesFound !== "number" || isNaN(validated.shiniesFound)) validated.shiniesFound = 0;
-  if (typeof validated.futurePathsVisited !== "number" || isNaN(validated.futurePathsVisited)) validated.futurePathsVisited = 0;
   if (typeof validated.glitchesFound !== "number" || isNaN(validated.glitchesFound)) validated.glitchesFound = 0;
   if (typeof validated.sigilLocationsVisited !== "number" || isNaN(validated.sigilLocationsVisited)) validated.sigilLocationsVisited = 0;
   
@@ -231,6 +230,102 @@ function awardPrize(prizeId) {
   }
 }
 
+async function chooseFutureDoor(doorName) {
+  appendUserMsg(`I choose the ${doorName} path.`);
+  removeDoorChoices();
+  const typingEl = appendTyping();
+
+  try {
+    const resp = await fetch("/api/three-doors/choose-future-door", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        doorName,
+        currentScene: playerProgress.currentScene,
+        history: gameState.history,
+        playerProgress,
+      }),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Server error: ${resp.statusText}`);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let fullResponse = "";
+    let imageId = null;
+    let futureAnalysis = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      let lastNewlineIndex;
+      while ((lastNewlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.substring(0, lastNewlineIndex).trim();
+        buffer = buffer.substring(lastNewlineIndex + 1);
+
+        if (line.startsWith("data:")) {
+          const data = JSON.parse(line.substring(5));
+          if (data.type === "token") {
+            fullResponse += data.text;
+            typingEl.querySelector(".message-content").innerHTML = md(fullResponse);
+          } else if (data.type === "image_id") {
+            imageId = data.id;
+            renderImagePlaceholder(imageId);
+          } else if (data.type === "future_analysis") {
+            futureAnalysis = data.analysis;
+          }
+        }
+      }
+    }
+
+    removeTyping();
+    typingEl.remove(); // Remove the typing indicator element itself
+    appendAgentMsg(fullResponse); // Append the final message
+
+    // Update futurePathsVisited for challenge
+    playerProgress.futurePathsVisited = (playerProgress.futurePathsVisited || 0) + 1;
+    saveProgress();
+    checkChallenges("future-doors", null, true);
+
+    if (imageId) {
+      // Poll for image completion and update the placeholder
+      pollForImage(imageId, (imageUrl) => {
+        const imgEl = document.getElementById(`image-placeholder-${imageId}`);
+        if (imgEl) {
+          imgEl.outerHTML = `<img src="${imageUrl}" alt="Generated scene" class="generated-image" />`;
+        }
+      });
+    }
+
+    if (futureAnalysis) {
+      // Display the future analysis as a special message
+      const chat = document.getElementById("chat");
+      const el = document.createElement("div");
+      el.className = "message agent toast";
+      el.innerHTML = `<div class="agent-avatar">🔮</div><div class="message-content" style="border-left-color:#8b5cf6"><div style="font-size:12px;font-weight:600;color:#8b5cf6;margin-bottom:2px">Future Path Analysis</div><div style="font-size:13px">${md(futureAnalysis)}</div></div>`;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // The Tomorrow Door doesn't lead to a new scene directly, but analyzes a future.
+    // The game should then return to the previous scene or offer new choices.
+    // For now, we'll just re-render the current scene to allow more choices.
+    renderScene(SCENES[playerProgress.currentScene.key], false);
+
+  } catch (e) {
+    removeTyping();
+    appendAgentMsg(`An error occurred while choosing the future path: ${e.message}`);
+    renderScene(SCENES[playerProgress.currentScene.key], false); // Allow retrying
+  }
+}
+
 function showPrizeToast(prizeId) {
   const prize = PRIZES[prizeId];
   if (!prize) return;
@@ -311,7 +406,7 @@ const CHALLENGES = {
   "cloverfield": [
     { id: "lucky-find", name: "Lucky Find", description: "Find a shiny in the Cloverfield", reward: "lorekeeper-badge", check: (p) => p.shiniesFound >= 1 },
     { id: "four-leaf", name: "Four-Leaf Master", description: "Visit Cloverfield 5 times", reward: "speedwalker-badge", check: (p) => (p.sceneVisits?.["cloverfield"] || 0) >= 5 },
-  ],
+  ], // The Tomorrow Door
   "future-doors": [
     { id: "time-traveler", name: "Time Traveler", description: "Visit all Future Door sub-paths", reward: "xenon-navigator-badge", check: (p) => p.futurePathsVisited >= 3 },
   ],
@@ -395,6 +490,11 @@ async function checkServer() {
   } finally {
     clearTimeout(t);
   }
+
+  if (currentScene.type === "future-doors") {
+    return chooseFutureDoor(doorName);
+  }
+
   updateStatusLine();
   return serverAvailable;
 }
@@ -567,6 +667,17 @@ function navigate(currentScene, doorName, state) {
     newBeats = beatsSinceSpine + 1;
   }
   return { scene: picked, spine_index: newSpine, beats_since_spine: newBeats, loop_completed: loopCompleted };
+}
+
+function renderImagePlaceholder(imageId) {
+  const chat = document.getElementById("chat");
+  const el = document.createElement("div");
+  el.className = "message agent";
+  el.innerHTML = `<div class="agent-avatar">🖼️</div><div class="message-content">
+    <div id="image-placeholder-${imageId}" class="image-placeholder">Generating image...</div>
+  </div>`;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 // ── Inline engine fallback ────────────────────────────────────────

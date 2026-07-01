@@ -49,7 +49,7 @@ const serving = require("./serving-modes");
 const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
-// Extracted helper modules (split out of this file for smaller-context editing):
+// Extracted helper modules (split out of this file for smaller-context editing): 
 const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
@@ -160,17 +160,17 @@ function withTimeout(promise, ms, fallback) {
 
 
 // Non-blocking image generation sidecar for Three Doors mode
-function triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh }) {
-  if (surfaceMode !== "three-doors") return null;
+function triggerImageGeneration({ cleanText, doors, surfaceMode, symbolMesh, sceneType }) {
+  if (surfaceMode !== "three-doors" || (sceneType !== "three-doors" && sceneType !== "future-doors")) return null;
   
   const entryId = Date.now().toString();
-  generateDoorSceneImage({ cleanText, doors: suggestions, symbolMesh, entryId })
+  generateDoorSceneImage({ cleanText, doors, symbolMesh, entryId, sceneType })
     .then(result => {
       // Image generation completes asynchronously; failure is non-blocking
     })
     .catch(err => {
       // Image generation errors are non-blocking
-    });
+    }); 
   
   return entryId;
 }
@@ -434,6 +434,90 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
         });
+      return;
+    }
+
+    if (cmd.name === "choose-future-door") {
+      // This command is triggered by the frontend when a Tomorrow Door path is chosen.
+      // It does not directly correspond to a user message, but rather an action.
+      const { doorName, currentScene, history, playerProgress } = JSON.parse(cmd.args);
+
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendImageId = (id) => sse.sendEvent(res, "image_id", { id });
+      const sendFutureAnalysis = (analysis) => sse.sendEvent(res, "future_analysis", { analysis });
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+
+      try {
+        // 1. Generate an image for the chosen future path
+        const imagePrompt = `A vivid, imaginative scene depicting the consequences or unfolding of choosing the "${doorName}" path, starting from the current situation: "${currentScene.description}". Focus on the immediate future, showing what might happen next.`;
+        const imageEntryId = Date.now().toString();
+        generateDoorSceneImage({
+          cleanText: imagePrompt,
+          doors: [{ name: doorName }],
+          symbolMesh: currentScene.symbolMesh,
+          entryId: imageEntryId,
+          sceneType: "future-doors",
+        }).then(result => {
+          if (result && result.id) {
+            sendImageId(result.id);
+          }
+        }).catch(err => {
+          console.error("Future Door image generation failed:", err);
+        });
+
+        // 2. Analyze the chosen future path and its implications
+        const analysisPrompt = `Given the user chose the "${doorName}" path from the Tomorrow Door, and the current scene is "${currentScene.description}", describe the likely immediate future in a "creed voice" and "true cast" manner. Focus on potential outcomes, challenges, and opportunities this choice opens up. Be evocative and slightly mysterious, hinting at branching possibilities. Incorporate elements from the generated image (if available) into the analysis.`;
+
+        // Use a dedicated agent for future analysis
+        const futureAgent = AGENT_PERSONAS.creed;
+        const futureSystemPrompt = `${futureAgent.systemPrompt}\n\nYour role is to analyze a chosen future path from the Tomorrow Door. Speak in a "creed voice" and "true cast" manner, offering evocative insights into the potential outcomes, challenges, and opportunities of this choice. Be slightly mysterious, hinting at branching possibilities.`;
+
+        const messages = [
+          { role: "system", content: futureSystemPrompt },
+          ...history,
+          { role: "user", content: analysisPrompt },
+        ];
+
+        const stream = unifiedAgentStreamSSE({
+          messages,
+          user,
+          modelFor,
+          logConversation,
+          agent: futureAgent,
+          provider: requestedProvider,
+          sessionId,
+          surfaceMode,
+        });
+
+        let fullAnalysisText = "";
+        stream.on("data", (data) => {
+          if (data.type === "token") {
+            fullAnalysisText += data.text;
+            sendToken(data.text);
+          } else if (data.type === "done") {
+            sendFutureAnalysis(fullAnalysisText); // Send the full analysis text as a separate event
+            sendDone("creed-future-analysis", {
+              agent: futureAgent.name,
+              provider: data.provider,
+              model: data.model,
+              online: true,
+              analysis: fullAnalysisText,
+            });
+          }
+        });
+
+        stream.on("error", (err) => {
+          console.error("Future Door analysis stream error:", err);
+          sendToken(`An error occurred during future analysis: ${err.message}`);
+          sendDone("error", { error: err.message });
+        });
+
+      } catch (e) {
+        console.error("Error processing choose-future-door:", e);
+        sendToken(`An unexpected error occurred: ${e.message}`);
+        sendDone("error", { error: e.message });
+      }
       return;
     }
 
