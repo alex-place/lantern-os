@@ -25,6 +25,7 @@ const execAsync = promisify(exec);
 const { searchRepoFiles, readFileContent } = require("./repo-context");
 const { applyPatch, validatePatch, parsePatch, looksLikeSearchReplace, parseSearchReplace } = require("./patch-engine");
 const { appendJsonlQueued } = require("./file-queue");
+const { buildRepoMapEvidence, mergeGroundingResults, computeContextPrecision } = require("./repo-map-grounding");
 
 const KEYSTONE_SYSTEM_PROMPT = `You are Keystone Code Kernel inside Lantern OS.
 You are a repository-first coding agent modeled after Claude Code.
@@ -199,6 +200,7 @@ async function keystoneRun(issue, repo, llm, options = {}) {
     applyPatch,
     validatePatch,
     runVerification: defaultRunVerification,
+    buildRepoMapEvidence,
     ...(options.tools || {}),
   };
   const results = [];
@@ -209,12 +211,23 @@ async function keystoneRun(issue, repo, llm, options = {}) {
     const searchResults = await tools.searchRepoFiles(issue, maxFiles);
     log(verbose, `Found ${searchResults.length} relevant files`);
 
+    // #1409: layer repo-map's PageRank-centrality picks on top of the existing
+    // keyword/symbol search — additive only (mergeGroundingResults never drops an
+    // existing result), so this can only supplement grounding, never regress it.
+    // Best-effort: a failure here must never break the kernel run.
+    let evidencePacket = null;
+    let groundedResults = searchResults;
+    try {
+      evidencePacket = await tools.buildRepoMapEvidence(issue, repo);
+      groundedResults = mergeGroundingResults(searchResults, evidencePacket, maxFiles);
+    } catch (_e) { /* repo-map is a bonus signal, not a dependency */ }
+
     const files = [];
-    for (const result of searchResults.slice(0, maxFiles)) {
+    for (const result of groundedResults.slice(0, maxFiles)) {
       try {
         const content = await tools.readFileContent(result.path);
         files.push({ path: result.path, content, relevance: result.score });
-        log(verbose, `  ✓ ${result.path}`);
+        log(verbose, `  ✓ ${result.path}${result.fromRepoMap ? " (repo-map)" : ""}`);
       } catch (e) {
         log(verbose, `  ✗ ${result.path} (read error)`);
       }
@@ -227,6 +240,7 @@ async function keystoneRun(issue, repo, llm, options = {}) {
     results.push({
       phase: "ground",
       files: files.map((f) => ({ path: f.path, relevance: f.relevance })),
+      evidencePacket,
     });
 
     const groundingContext = files
@@ -337,6 +351,10 @@ Output ONLY the diffs and new files. No explanation.`;
           attempts: attempt,
           verified: true,
           fullResults: results,
+          // #1409 acceptance: measure selected-and-used vs selected-and-unused.
+          contextPrecision: computeContextPrecision(
+            (evidencePacket && evidencePacket.files || []).map((f) => f.path),
+            (applyResult.changed || []).map((c) => c.path)),
         };
         emitConvergenceRecord({ issue, result, confidence: 0.95 }).catch(() => {});
         return result;
@@ -354,6 +372,9 @@ Output ONLY the diffs and new files. No explanation.`;
           attempts: attempt,
           verified: false,
           fullResults: results,
+          contextPrecision: computeContextPrecision(
+            (evidencePacket && evidencePacket.files || []).map((f) => f.path),
+            (applyResult.changed || []).map((c) => c.path)),
         };
         emitConvergenceRecord({ issue, result, confidence: 0.5 }).catch(() => {});
         return result;
@@ -411,6 +432,9 @@ async function emitConvergenceRecord({ issue, result, confidence }) {
       attempts: result.attempts,
       applied: Array.isArray(result.applied) ? result.applied : [],
       test_output: result.tests?.output ? String(result.tests.output).slice(0, 500) : null,
+      // #1409: repo-map context precision (selected-and-used vs selected-and-unused),
+      // present only on success/applied_unverified where a patch actually landed.
+      context_precision: result.contextPrecision || null,
     },
     result: result.status,
     confidence,
