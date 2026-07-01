@@ -1,9 +1,9 @@
-{
+﻿{
   "name": "lantern-os",
-  "version": "1.8.12",
+  "version": "1.8.14",
   "private": true,
   "main": "index.js",
-  "description": "Lantern OS ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Dream Journal",
+  "description": "Lantern OS ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Dream Journal",
   "scripts": {
     "setup": "node scripts/ensure-rust.js && node scripts/build-csf-rust.js",
     "postinstall": "npm run setup",

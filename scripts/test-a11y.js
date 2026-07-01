@@ -103,12 +103,15 @@ async function testHtmlFile(filePath) {
   const images = doc.querySelectorAll('img');
   let imagesOk = 0;
   images.forEach(img => {
-    if (img.hasAttribute('alt') && img.getAttribute('alt').trim()) {
+    // A present `alt` attribute is conformant even when empty: alt="" is the
+    // deliberate decorative-image pattern (WCAG H67), and aria-hidden also
+    // removes an image from the a11y tree. Only a MISSING alt attribute is a
+    // failure. (Matches axe-core: it flags absent alt, not empty alt — flagging
+    // alt="" was a false positive on decorative placeholders like #kohLightboxImg.)
+    if (img.hasAttribute('alt') || img.hasAttribute('aria-hidden')) {
       imagesOk++;
-    } else if (img.hasAttribute('aria-hidden')) {
-      imagesOk++; // Decorative images can be hidden
     } else {
-      results.issues.push(`Image missing alt text: ${img.getAttribute('src') || 'unknown'}`);
+      results.issues.push(`Image missing alt attribute: ${img.getAttribute('src') || 'unknown'}`);
     }
   });
   if (imagesOk === images.length && images.length > 0) {
@@ -166,6 +169,133 @@ async function testHtmlFile(filePath) {
   return results;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Test 7: Font & style best-practice contract  (design-token contrast + consistency)
+//
+// Σ₀-grounded thresholds — every rule carries [evidence, confidence, source]:
+//  • WCAG 2.2 SC 1.4.3 Contrast (Minimum), AA — body text ≥ 4.5:1, large text
+//    (≥24px, or ≥18.66px bold) ≥ 3:1; thresholds are NOT rounded (4.499 fails).
+//    confidence 0.99 · https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
+//  • WCAG 2.1 SC 1.4.11 Non-text Contrast, AA — UI components ≥ 3:1 (advisory).
+//    confidence 0.95 · https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
+//  • Legibility floor — ~16px is the widely-advised body minimum; <10px text is a
+//    hard red-line here. confidence 0.80 (consensus, not a WCAG number)
+//    https://www.section508.gov/develop/fonts-typography/
+//  • Consistency (globally advised) — a background/surface-intent token
+//    (--accent-dim, --surface, --surface2, --border, --bg) must NEVER be a text
+//    `color:`. That exact misuse made the "Keystone · chat" thinking-wheel label
+//    invisible (--accent-dim #cffafe on #fff = 1.12:1). Metadata text uses --muted,
+//    the token designed for it. confidence 0.97.
+//
+// Deterministic & server-free: parses the real theme palette from site.css and the
+// real rules from dream-chat-ui.css, so a regression (e.g. reverting a label to
+// --accent-dim) turns this red. Reuses the contrast helpers above.
+const CSS_DIR = path.join(PUBLIC_DIR, 'css');
+const TOKEN_CSS = path.join(CSS_DIR, 'site.css');
+const CHAT_CSS  = path.join(CSS_DIR, 'dream-chat-ui.css');
+
+// Background/surface-intent tokens that are never legible as text on their own surface.
+const FORBIDDEN_TEXT_TOKENS = ['--accent-dim', '--surface2', '--surface', '--border', '--bg'];
+const MIN_FONT_PX = 10;          // hard legibility red-line (best-practice body target is 16px)
+const MIN_CONTRAST_LARGE = 3;    // SC 1.4.3 large-text threshold
+
+// The per-reply text roles whose contrast we contractually enforce in BOTH themes.
+// `on` is the surface token the text sits on; `px`/`bold` pick the AA threshold.
+const TEXT_ROLES = [
+  { sel: '.route-card',                       on: '--bg',       px: 12, label: 'thinking-wheel route card' },
+  { sel: '.msg-route-sig',                    on: '--bg',       px: 11, label: 'reply signature line' },
+  { sel: '.message.agent .message-content',   on: '--surface2', px: 15, label: 'assistant message body' },
+];
+
+function parseTokenBlock(css, blockRe) {
+  const out = {};
+  const m = css.match(blockRe);
+  if (m) {
+    const re = /(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;/g;
+    let t; while ((t = re.exec(m[1])) !== null) out[t[1]] = t[2];
+  }
+  return out;
+}
+function ruleBlock(css, selector) {
+  const re = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}');
+  const m = css.match(re);
+  return m ? m[1] : null;
+}
+function declValue(block, prop) {
+  if (!block) return null;
+  const m = block.match(new RegExp('(?:^|[;{\\s])' + prop + '\\s*:\\s*([^;]+)'));
+  return m ? m[1].trim() : null;
+}
+// Resolve a `color:` value ("var(--muted, #6b7280)" / "#000") to a hex for a theme.
+function resolveColor(value, tokens) {
+  if (!value) return null;
+  const v = value.match(/var\(\s*(--[\w-]+)/);
+  if (v) return tokens[v[1]] || null;
+  const hex = value.match(/#[0-9a-fA-F]{6}/);
+  return hex ? hex[0] : null;
+}
+
+function testDesignTokens() {
+  const results = { issues: [], warnings: [], passed: 0 };
+  console.log('\n🎨 Font & style best-practice contract (design tokens)');
+  console.log('═'.repeat(50));
+
+  if (!fs.existsSync(TOKEN_CSS) || !fs.existsSync(CHAT_CSS)) {
+    results.warnings.push('site.css or dream-chat-ui.css not found — token contract skipped');
+    return results;
+  }
+  const tokenCss = fs.readFileSync(TOKEN_CSS, 'utf8');
+  // Strip /* … */ comments before any analysis — prose that documents an
+  // anti-pattern (e.g. "was color:var(--accent-dim)") must not trip the scans.
+  const chatCss  = fs.readFileSync(CHAT_CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const THEMES = {
+    light: parseTokenBlock(tokenCss, /:root\s*\{([^}]*)\}/),
+    dark:  parseTokenBlock(tokenCss, /\[data-theme="dark"\]\s*\{([^}]*)\}/),
+  };
+
+  // (a) Contrast contract — each role meets AA on its surface in BOTH themes.
+  for (const role of TEXT_ROLES) {
+    const block = ruleBlock(chatCss, role.sel);
+    const colorVal = declValue(block, 'color');
+    if (!colorVal) { results.warnings.push(`${role.sel}: no color declaration found`); continue; }
+    const need = (role.px >= 24 || (role.px >= 18.66 && role.bold)) ? MIN_CONTRAST_LARGE : MIN_CONTRAST_AA;
+    for (const theme of ['light', 'dark']) {
+      const tokens = THEMES[theme];
+      const fg = hexToRgb(resolveColor(colorVal, tokens));
+      const bg = hexToRgb(tokens[role.on]);
+      if (!fg || !bg) { results.warnings.push(`${role.sel} [${theme}]: unresolved color/surface`); continue; }
+      const cr = getContrastRatio(fg, bg);
+      if (cr < need) {
+        results.issues.push(`${role.label} (${role.sel}) [${theme}]: ${cr.toFixed(2)}:1 < ${need}:1 — color ${colorVal} on ${role.on}`);
+      } else {
+        results.passed++;
+      }
+    }
+  }
+
+  // (b) Consistency — no background/surface token used as a text color.
+  const colorRe = /(?:^|[;{\s])color\s*:\s*var\(\s*(--[\w-]+)/gi;
+  let cm;
+  while ((cm = colorRe.exec(chatCss)) !== null) {
+    if (FORBIDDEN_TEXT_TOKENS.includes(cm[1])) {
+      results.issues.push(`background-intent token ${cm[1]} used as text color — illegible on its own surface (see SC 1.4.3); use --muted/--text/--accent`);
+    }
+  }
+
+  // (c) Legibility floor — no text below the hard minimum.
+  const sizeRe = /font-size\s*:\s*([0-9.]+)(px|rem)/gi;
+  let sm;
+  while ((sm = sizeRe.exec(chatCss)) !== null) {
+    const px = sm[2] === 'rem' ? parseFloat(sm[1]) * 16 : parseFloat(sm[1]);
+    if (px < MIN_FONT_PX) results.issues.push(`font-size ${sm[1]}${sm[2]} (~${px.toFixed(1)}px) below ${MIN_FONT_PX}px legibility floor`);
+  }
+
+  if (results.issues.length === 0) console.log(`✓ ${results.passed} token-contrast checks pass (both themes); no illegible text colors or sub-${MIN_FONT_PX}px text`);
+  else { console.log(`\n✗ Style contract issues (${results.issues.length}):`); results.issues.forEach(i => console.log(`  - ${i}`)); }
+  if (results.warnings.length) { console.log(`⚠ Warnings (${results.warnings.length}):`); results.warnings.forEach(w => console.log(`  - ${w}`)); }
+  return results;
+}
+
 async function runA11yTests() {
   console.log('\n🧪 WCAG 2.1 AA Accessibility Tests\n');
 
@@ -188,6 +318,11 @@ async function runA11yTests() {
     totalPassed += result.passed;
     totalIssues += result.issues.length;
   }
+
+  // Test 7: site-wide font & style best-practice contract (CSS design tokens).
+  const styleResult = testDesignTokens();
+  totalPassed += styleResult.passed;
+  totalIssues += styleResult.issues.length;
 
   // Summary
   console.log('\n\n' + '='.repeat(50));

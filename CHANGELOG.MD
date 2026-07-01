@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.14] - 2026-07-01
+### Fixed
+- **Restore merged work silently reverted by the stale worktree-sync commit `2fd3598c`.** The bulk "sync worktree state" commit wrote stale copies of files over master, reverting already-merged PRs. Restored: compact chat-first home page (#1763), PLT KV-cache decode (#1766), a11y Test 7 font/style contract (#1763), dream-chat capability-notice styles/JS (#1761), orchestration boot-burst resilience (#1769), R2 media-hosting docs/script (#1762), ADR-0011 + Σ₀ coder doc refresh (#1764), plus two deleted changelog fragments.
+### Added
+- **Stale-clobber pre-push gate** (`scripts/validate-prepush-stale-clobber.py`, pre-push section 2b): blocks pushes whose file content is byte-identical to an OLDER origin/master version than the merge-base's — the revert-to-stale signature. Bypass only via `SKIP_CLOBBER_CHECK=1` (deliberately not covered by `SKIP_MONOWORKSTREAM`). Strengthens the **Verify** stage.
+
 ## [1.8.12] - 2026-07-01
 ### Added
 - **Three Doors: Unisona / Tomorrow City / Blinkbug-forge canon.** Folded three scenes authored in live play into the Tomorrow/Today branch of the seven-gate loop — `unisona` (the Tomorrow Door opens on the utopia of convergence, founders Courtney & Alex at the heart-soundwave arch), `tomorrow-city` (the lantern-fleet of sky-boats rising to the Xenon gate), and `blinkbug-forge` (the Today Door forge reunion). Scene text, A/B/C doors, `NEXT_MAP` routing, SD prompts, the DALLE generation set, and archetype moods all added; every new door routes onward toward the Xenon convergence. Verified in preview: all three render (narration + doors + image), no console errors.

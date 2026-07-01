@@ -59,6 +59,27 @@ transformer. It is the same Convergence-Core coder path — `Reason → Act` for
 local brain is **Ouro-1.4B with weight-tied recurrent depth + a learned Q-exit gate**, plus
 our own Σ₀ fine-tune. It runs **fully local**, served as a drop-in Ollama-API model.
 
+## Two Σ₀-coder tracks (read this first)
+
+There is **one active local coder** and **one proposed owned-base experiment** — they
+are *not* parallel product coders, and one does not fork the loop. Keep them straight:
+
+| | **Ouro Σ₀ Coder** (this doc) | **Keystone-Σ₀ PLT** ([ADR-0011](adr/0011-proprietary-sigma0-base-model.md)) |
+|---|---|---|
+| **Role** | the **active** local coder — the incumbent that ships | a **proposed** experiment: *own* the reasoning substrate (modeling code + weights) |
+| **Base** | `ByteDance/Ouro-1.4B-Thinking` (third-party, looped) | hand-ported PLT from Apache-2.0 LoopCoder-V2 (~9B), modeling code **we own** |
+| **Why it exists** | best small-model trade *today*; recurrent-depth research front | so we can change the forward pass + adapter-train a frozen base (ADR-0010) — impossible with a rented kernel |
+| **Status** | served, registered, in use | **Proposed**; Stage-0 4-bit smoke **PASS**, faithful parity **pending** ≥24 GB box; `verified:false`, not serving |
+| **Loop mechanism** | learned **Q-exit** adaptive depth (`Sigma0LoopLM`) | fixed 2-loop PLT + the proposed **[Adaptive Loop Gate](../models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md)** (learned halt over a frozen base, default-off) |
+
+Both are *interchangeable registry entries*, not separate systems — same Convergence
+Core, same verify gate, same "a reproduced on-box win is the only thing that promotes a
+model" rule. The owned-PLT track does **not** replace Ouro and does **not** revive the
+deleted Qwen coder; if it ever clears parity + eval, a future ADR converges the two
+looped families rather than running them in parallel. Full owned-track design + runbook:
+**[`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md)** and
+[ADR-0011](adr/0011-proprietary-sigma0-base-model.md).
+
 ## What we had then → what we have now
 
 There used to be **two** local coders documented separately; there is now **one**. This is
@@ -349,6 +370,7 @@ Seq-length note: corpus p99 audited at 1219 tokens; bumped to **seq=1536** so th
 function-call outputs is no longer truncated — fits an A10/local-RTX without swapping to CPU.
 
 ## Related
+- [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) · [`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md) — the **owned-base** track (Keystone-Σ₀ PLT): own the modeling code, bootstrap Apache-2.0 weights, adapter-only. Proposed; Stage-0 smoke PASS, faithful parity pending
 - [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) — the offline retrain flywheel that improves this adapter
 - [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) · [SIGMA0-COLLAPSE-EXPLAINER.md](SIGMA0-COLLAPSE-EXPLAINER.md) — the safety foundation; why `accel` exit is the certificate-consistent policy
 - [SIGMA0-CODER-CLAUDE-CODE-STATUS.md](SIGMA0-CODER-CLAUDE-CODE-STATUS.md) — can it drive Claude Code? (bridge solved, model-reliability blocked)
