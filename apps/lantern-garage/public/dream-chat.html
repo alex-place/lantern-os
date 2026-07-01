@@ -264,6 +264,15 @@
         </select>
       </div>
 
+      <!-- Model pin (#1127): shown only for cloud providers with choices; "Default"
+           lets the server's modelFor() resolution (env override included) decide. -->
+      <div class="form-group" id="model-select-group" style="display:none">
+        <label class="form-label" for="model-select">Model</label>
+        <select id="model-select" class="form-input">
+          <option value="">Default</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label class="form-label">API Keys</label>
         <div class="setting-card">

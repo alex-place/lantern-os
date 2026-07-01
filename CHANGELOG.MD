@@ -6,6 +6,10 @@
 ### Added
 - **Stale-clobber pre-push gate** (`scripts/validate-prepush-stale-clobber.py`, pre-push section 2b): blocks pushes whose file content is byte-identical to an OLDER origin/master version than the merge-base's — the revert-to-stale signature. Bypass only via `SKIP_CLOBBER_CHECK=1` (deliberately not covered by `SKIP_MONOWORKSTREAM`). Strengthens the **Verify** stage.
 
+## [1.8.13] - 2026-07-01
+### Fixed
+- **pr-watcher: verdict-first fleet reviews unwedge auto-merge.** Review bodies whose verdict line arrived truncated were parsed as `COMMENT` forever, wedging otherwise-ready PRs out of auto-merge; the parser now reads a leading verdict line first and only falls back to the legacy scan, so truncated reviews resolve instead of blocking. Covered by a new `tests/test_pr_watcher.js` case.
+
 ## [1.8.12] - 2026-07-01
 ### Added
 - **Three Doors: Unisona / Tomorrow City / Blinkbug-forge canon.** Folded three scenes authored in live play into the Tomorrow/Today branch of the seven-gate loop — `unisona` (the Tomorrow Door opens on the utopia of convergence, founders Courtney & Alex at the heart-soundwave arch), `tomorrow-city` (the lantern-fleet of sky-boats rising to the Xenon gate), and `blinkbug-forge` (the Today Door forge reunion). Scene text, A/B/C doors, `NEXT_MAP` routing, SD prompts, the DALLE generation set, and archetype moods all added; every new door routes onward toward the Xenon convergence. Verified in preview: all three render (narration + doors + image), no console errors.
