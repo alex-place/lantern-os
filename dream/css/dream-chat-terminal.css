@@ -1,0 +1,173 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   dream-chat-terminal.css — opt-in "Terminal" skin (03 · Terminal layout)
+
+   A phosphor-CRT / Pip-Boy skin for dream-chat, adapted from the fallout-radio
+   aesthetic and re-themed for the Σ₀ frontier model. It is ENTIRELY scoped under
+   html[data-skin="terminal"] — with the attribute absent, this file contributes
+   nothing and the default look is unchanged. Toggle it with the ▚ button in the
+   sidebar footer (see js/terminal-skin.js).
+
+   Strategy: the whole page is token-driven, so the skin mostly just REDEFINES the
+   design tokens (phosphor green on green-black in dark; dark-green ink on pale
+   mint in light — a genuine "daylight terminal", not a naive invert). A small set
+   of chrome overrides add the terminal feel: monospace, uppercase micro-labels,
+   scanlines, a soft phosphor glow, and left-accent "bracket" bubbles.
+   Both themes are authored to clear WCAG-AA contrast.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens: dark (phosphor-on-black) — default when the skin is on ─────────── */
+html[data-skin="terminal"] {
+  --bg: #050e08;
+  --surface: #08140d;
+  --surface2: #0c1f14;
+  --border: #14301f;
+  --text: #cdefd8;        /* soft phosphor ink — body copy */
+  --muted: #6fbf90;       /* dim phosphor — secondary text */
+  --accent: #2bff88;      /* bright phosphor — the dial */
+  --accent-hover: #57ffa3;
+  --accent-dim: #0f2a1b;
+}
+
+/* ── Tokens: light ("daylight lab terminal" — dark-green ink on pale mint) ──── */
+html[data-skin="terminal"][data-theme="light"] {
+  --bg: #dfece1;
+  --surface: #e9f3ea;
+  --surface2: #d6e8da;
+  --border: #a9c6b4;
+  --text: #0f3524;
+  --muted: #33604a;
+  --accent: #0e6b3b;
+  --accent-hover: #0b5730;
+  --accent-dim: #c3ddca;
+}
+
+/* ── Global type: everything goes monospace, lightly tracked ────────────────── */
+html[data-skin="terminal"] body {
+  font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", "Courier New", monospace;
+  letter-spacing: 0.02em;
+}
+
+/* ── Scanlines: a faint, non-interactive CRT overlay over the whole app ─────── */
+html[data-skin="terminal"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 45;                 /* above content, below modals (≈1000) + drop-overlay (9999) */
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(43, 255, 136, .045) 0 1px, transparent 1px 3px);
+  mix-blend-mode: screen;
+}
+html[data-skin="terminal"][data-theme="light"] body::after {
+  background: repeating-linear-gradient(to bottom, rgba(14, 107, 59, .05) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* the overlay is static by design — no animation, so nothing to gate here */
+}
+
+/* ── Top nav → Pip-Boy sub-bar: uppercase, tracked, phosphor divider ────────── */
+html[data-skin="terminal"] .site-nav { border-bottom: 1px solid var(--border); }
+html[data-skin="terminal"] .nav-brand span {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+html[data-skin="terminal"] .nav-brand img { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent)); }
+html[data-skin="terminal"] .nav-links a {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+}
+
+/* ── Chat surface: a subtle CRT depth gradient behind the log ───────────────── */
+html[data-skin="terminal"] .chat-container {
+  background: radial-gradient(120% 80% at 50% 0%, #0a1a10 0%, var(--bg) 70%);
+}
+html[data-skin="terminal"][data-theme="light"] .chat-container {
+  background: radial-gradient(120% 80% at 50% 0%, #eef6ef 0%, var(--bg) 70%);
+}
+
+/* ── Empty state heading → glowing terminal title ──────────────────────────── */
+html[data-skin="terminal"] .empty-state h1,
+html[data-skin="terminal"] .empty-state h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ── Starter chips → tracked, uppercase, phosphor edge on hover ─────────────── */
+html[data-skin="terminal"] .starter-chip {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 7px;
+}
+html[data-skin="terminal"] .starter-chip:hover {
+  box-shadow: inset 0 0 14px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* ── New-chat button: phosphor gradient (via tokens) needs dark ink on top ──── */
+html[data-skin="terminal"] .sidebar-new-chat {
+  color: #04140b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+html[data-skin="terminal"][data-theme="light"] .sidebar-new-chat { color: #eaf7ee; }
+
+/* ── Message bubbles ───────────────────────────────────────────────────────── */
+/* Agent replies get a left phosphor "bracket" bar + a faint inner bloom. */
+html[data-skin="terminal"] .message.agent .message-content,
+html[data-skin="terminal"] .msg-row.agent .bubble {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: inset 0 0 22px color-mix(in srgb, var(--accent) 6%, transparent);
+}
+/* User bubbles ride the phosphor gradient — flip the text to a legible ink. */
+html[data-skin="terminal"] .message.user .message-content,
+html[data-skin="terminal"] .msg-row.user .bubble {
+  color: #04140b;
+  border-radius: 6px;
+}
+html[data-skin="terminal"][data-theme="light"] .message.user .message-content,
+html[data-skin="terminal"][data-theme="light"] .msg-row.user .bubble {
+  color: #eaf7ee;
+}
+/* The route signature / label under agent replies → tiny uppercase HUD text. */
+html[data-skin="terminal"] .msg-row.agent .msg-label,
+html[data-skin="terminal"] .msg-row.agent .msg-route-sig {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* ── Composer → transport bar ──────────────────────────────────────────────── */
+html[data-skin="terminal"] .input-container { background: var(--surface); }
+html[data-skin="terminal"] .input-wrapper {
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 20px color-mix(in srgb, var(--accent) 5%, transparent);
+}
+html[data-skin="terminal"] .input-field::placeholder {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+}
+html[data-skin="terminal"] .send-button {
+  color: #04140b;
+  border-radius: 8px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+html[data-skin="terminal"][data-theme="light"] .send-button { color: #eaf7ee; }
+html[data-skin="terminal"] .send-button:hover:not(:disabled) {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ── Sidebar labels → tracked uppercase (already uppercase; add glow-free feel) */
+html[data-skin="terminal"] .sidebar-section-label { letter-spacing: 0.18em; }
+
+/* ── The skin toggle itself: light up when engaged ─────────────────────────── */
+html[data-skin="terminal"] #skin-toggle {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--accent) 14%, transparent);
+}

@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/dream-chat.css">
   <link rel="stylesheet" href="/css/dream-chat-ui.css">
+  <link rel="stylesheet" href="/css/dream-chat-terminal.css?v=20260630-terminal">
+  <!-- Restore the opt-in Terminal (CRT) skin before paint, to avoid a flash of the default theme. -->
+  <script>(function(){try{if(localStorage.getItem('keystone-skin')==='terminal')document.documentElement.setAttribute('data-skin','terminal');}catch(e){}})();</script>
   <title>Dream Chat — unisona.ai</title>
 
 <style>
@@ -116,6 +119,7 @@
       <button class="clear-all-btn" id="clear-all-btn" onclick="clearAllHistory()" style="display:none;">Clear all history (operator)</button>
       <div class="sidebar-foot-actions">
         <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="toggleTheme()">☀</button>
+        <button class="nav-btn" id="skin-toggle" title="Toggle terminal (CRT) skin" aria-label="Toggle terminal CRT skin" aria-pressed="false" onclick="toggleSkin()">▚</button>
         <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
         <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
         <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
@@ -505,6 +509,7 @@
 <script src="js/voice-dictation.js?v=20260630-voice"></script>
 <script src="js/dream-chat.js?v=20260630-cap4"></script>
 <script src="/js/theme-toggle.js"></script>
+<script src="/js/terminal-skin.js?v=20260630-terminal"></script>
 <script src="/js/dream-chat-ui.js?v=20260629-thumbs"></script>
 <script src="/vendor/html2canvas/html2canvas.min.js"></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>

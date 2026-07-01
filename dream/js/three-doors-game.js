@@ -14,6 +14,15 @@ function toggleNarrator() {
   localStorage.setItem("three-doors-narrator", narratorEnabled ? "on" : "off");
   const btn = document.getElementById("narrator-toggle");
   if (btn) btn.style.opacity = narratorEnabled ? "1" : "0.4";
+  updateStatusLine();
+}
+
+function updateStatusLine() {
+  const el = document.getElementById("status-line");
+  if (!el) return;
+  el.textContent = !serverAvailable
+    ? "Offline — inline engine active"
+    : narratorEnabled ? "Local AI narrating" : "Inline engine — narration off";
 }
 // Apply initial state once DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
@@ -33,6 +42,7 @@ const DEFAULT_PROGRESS = {
   sceneVisits: {},
   completedChallenges: [],
   poemSolved: false,
+  poemAnsweredCorrectly: false,
   poemAttempts: 0,
   loop_count: 0,
   stage_index: 0,
@@ -94,6 +104,7 @@ function validateProgress(data) {
   
   // Validate booleans
   if (typeof validated.poemSolved !== "boolean") validated.poemSolved = false;
+  if (typeof validated.poemAnsweredCorrectly !== "boolean") validated.poemAnsweredCorrectly = false;
   if (typeof validated.loopCompleted !== "boolean") validated.loopCompleted = false;
   
   // Validate numbers
@@ -302,7 +313,7 @@ if (!playerProgress.prizes) {
 // ── Challenge System ───────────────────────────────────────────────
 const CHALLENGES = {
   "kingdome-garden": [
-    { id: "poem-master", name: "Poem Master", description: "Solve the King's poem on first try", reward: "kingdome-crown", check: (p) => p.poemSolved && p.poemAttempts === 1 },
+    { id: "poem-master", name: "Poem Master", description: "Solve the King's poem on first try", reward: "kingdome-crown", check: (p) => p.poemAnsweredCorrectly && p.poemAttempts === 1 },
     { id: "king-audience", name: "King's Audience", description: "Visit the Garden 3 times", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["kingdome-garden"] || 0) >= 3 },
   ],
   "cloverfield": [
@@ -334,16 +345,21 @@ const GLOBAL_CHALLENGES = [
   { id: "synthesasia-master", name: "Synthesasia Master", description: "Complete 3 full loops", reward: "synthesasia-badge", check: (p) => (p.loop_count || 0) >= 3 },
 ];
 
-function checkChallenges(sceneKey, turnCount) {
-  // Track scene visits
-  if (!playerProgress.sceneVisits) playerProgress.sceneVisits = {};
-  playerProgress.sceneVisits[sceneKey] = (playerProgress.sceneVisits[sceneKey] || 0) + 1;
-  
-  // Track poem attempts
-  if (sceneKey === "kingdome-garden" && !playerProgress.poemSolved) {
-    playerProgress.poemAttempts = (playerProgress.poemAttempts || 0) + 1;
+function checkChallenges(sceneKey, turnCount, countVisit) {
+  // Track scene visits — skipped when this call is just a redraw of the
+  // scene the player is already in (page reload, poem-answer redraw), so
+  // those don't inflate "visit N times" progress. Challenge checks below
+  // still run every time (harmless: already-completed ones are guarded).
+  if (countVisit !== false) {
+    if (!playerProgress.sceneVisits) playerProgress.sceneVisits = {};
+    playerProgress.sceneVisits[sceneKey] = (playerProgress.sceneVisits[sceneKey] || 0) + 1;
+
+    // Track poem attempts
+    if (sceneKey === "kingdome-garden" && !playerProgress.poemSolved) {
+      playerProgress.poemAttempts = (playerProgress.poemAttempts || 0) + 1;
+    }
   }
-  
+
   // Check scene-specific challenges
   const sceneChallenges = CHALLENGES[sceneKey] || [];
   for (const challenge of sceneChallenges) {
@@ -392,9 +408,7 @@ async function checkServer() {
   } finally {
     clearTimeout(t);
   }
-  document.getElementById("status-line").textContent = serverAvailable
-    ? "Local AI narrating · engine ready"
-    : "Offline — inline engine active";
+  updateStatusLine();
   return serverAvailable;
 }
 
@@ -449,13 +463,15 @@ function submitPoem() {
   const accepted = ["yourself","myself","i am","the one","silence","love","the lantern","the light","convergence","me","i","the name","name"];
   if (accepted.some(a => val.includes(a))) {
     playerProgress.poemSolved = true;
+    playerProgress.poemAnsweredCorrectly = true;
     saveProgress();
     awardPrize("kingdome-crown");
     // Refresh scene to show doors with King's response
     appendUserMsg("Answer: \"" + input.value.trim() + "\"");
     const scene = SCENES["kingdome-garden"];
     const kingResponse = `The King nods slowly, his crown of vines and cursors blinking in recognition. *\"Correct,\"* he says, his voice like old light through moss. *\"You understand what was lost at the beginning is the thing that was gained. The doors are now open to you.\"*`;
-    const data = { scene_key: "kingdome-garden", text: scene.text + "\n\n" + kingResponse, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [] };
+    // resumed: true — this redraws the Garden the player is already in, not a new visit.
+    const data = { scene_key: "kingdome-garden", text: scene.text + "\n\n" + kingResponse, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [], resumed: true };
     appendSceneMsg("kingdome-garden", data, "", "offline");
   } else {
     const chat = document.getElementById("chat");
@@ -468,10 +484,14 @@ function submitPoem() {
 }
 
 function skipPoem() {
+  // poemSolved only hides the poem prompt on future Garden visits — it must
+  // NOT imply poemAnsweredCorrectly, or skipping would earn the "solved the
+  // poem on the first try" prize for free.
   playerProgress.poemSolved = true;
   saveProgress();
   const scene = SCENES["kingdome-garden"];
-  const data = { scene_key: "kingdome-garden", text: scene.text, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [] };
+  // resumed: true — this redraws the Garden the player is already in, not a new visit.
+  const data = { scene_key: "kingdome-garden", text: scene.text, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [], resumed: true };
   appendSceneMsg("kingdome-garden", data, "", "offline");
 }
 
@@ -598,10 +618,27 @@ function sceneState(sceneKey, spineIndex, loopCount, history, beatsSinceSpine) {
 function engineStart() {
   const saved = loadProgress();
   if (saved.currentScene && SCENES[saved.currentScene] && saved.history) {
-    return sceneState(saved.currentScene, saved.stage_index || 0,
+    const state = sceneState(saved.currentScene, saved.stage_index || 0,
       saved.loop_count || 0, saved.history, saved.beats_since_spine || 0);
+    // Resuming an in-progress session on the same scene isn't a new visit —
+    // that visit was already counted when the player first navigated here.
+    // Without this flag, every page reload while parked on a scene would
+    // re-count as a fresh visit and could fire "visit N times" challenges
+    // just from refreshing the browser.
+    state.resumed = true;
+    return state;
   }
-  return sceneState("kingdome-garden", 0, 0, ["Entered the Garden at the Beginning"], 0);
+  const state = sceneState("kingdome-garden", 0, 0, ["Entered the Garden at the Beginning"], 0);
+  // Persist right away — otherwise a reload before the first door choice
+  // never sees a saved currentScene, so it looks like a brand-new game every
+  // time and re-counts the Garden as freshly visited (inflating challenge
+  // progress just from refreshing the page).
+  playerProgress.currentScene = state.scene_key;
+  playerProgress.history = state.history;
+  playerProgress.stage_index = state.stage_index;
+  playerProgress.loop_count = state.loop_count;
+  saveProgress();
+  return state;
 }
 
 function engineChoose(label) {
@@ -647,21 +684,6 @@ if (typeof module !== "undefined" && module.exports) {
 }
 
 // ── API calls ─────────────────────────────────────────────────────
-async function apiDoors(action, choice) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 6000);
-  try {
-    const r = await fetch("/api/dream/doors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, action, choice: choice || "" }),
-      signal: ctrl.signal,
-    });
-    if (!r.ok) throw new Error("doors API " + r.status);
-    return r.json();
-  } finally { clearTimeout(t); }
-}
-
 async function apiNarrate(sceneKey, sceneText) {
   // Local-only narration: provider "local" routes to Ollama (lantern-csf-dream);
   // no cloud provider is contacted. Keystone is the voice of the game.
@@ -682,28 +704,14 @@ async function apiNarrate(sceneKey, sceneText) {
 
 // ── Game actions ─────────────────────────────────────────────────
 async function getSceneData(action, label) {
-  // Step 1: game state — server Python engine or inline JS fallback
-  let data;
-  let usedServer = false;
-  try {
-    if (serverAvailable) {
-      data = await apiDoors(action, label);
-      // Validate server response: must have scene_key and doors array
-      if (!data || data.error || !data.scene_key || !Array.isArray(data.doors)) {
-        console.warn("[Three Doors] Server returned invalid data, falling back to inline:", data);
-        throw new Error("invalid server response");
-      }
-      usedServer = true;
-    } else throw new Error("offline");
-  } catch (e) {
-    console.warn("[Three Doors] Using inline fallback:", e.message);
-    data = action === "start" ? engineStart() : engineChoose(label);
-  }
+  // Game state is always the inline JS engine — there is no server-side
+  // doors engine wired up (only the local narrator below hits the server).
+  const data = action === "start" ? engineStart() : engineChoose(label);
   if (!data) return null;
 
-  // Step 2: local LLM narration — only if we successfully used the server
-  let geminiText = "", source = usedServer ? "engine" : "offline";
-  if (usedServer && narratorEnabled) {
+  // Local LLM narration, when the server is reachable and the toggle is on.
+  let geminiText = "", source = "engine";
+  if (serverAvailable && narratorEnabled) {
     try {
       const narration = await apiNarrate(data.scene_key, data.text || SCENES[data.scene_key]?.text || "");
       if (narration) { geminiText = narration; source = "local"; }

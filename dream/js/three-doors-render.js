@@ -79,8 +79,10 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     saveProgress();
   }
 
-  // Check challenges
-  checkChallenges(sceneKey, history.length);
+  // Check challenges — the visit counter is skipped on a mere resume/redraw
+  // (page reload, poem-answer redraw) since those don't represent a new
+  // visit; the challenge checks themselves still run (idempotent).
+  checkChallenges(sceneKey, history.length, !sceneData.resumed);
 
   const chat = document.getElementById("chat");
   const el = document.createElement("div");
@@ -277,12 +279,9 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     if (input) { input.value = ""; input.disabled = false; }
     if (picks) {
       picks.innerHTML = doors.map(d => `
-        <button onclick="chooseDoor('${d.label}','${d.name.replace(/'/g,"\\'")}')"
-          style="flex:1;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-family:inherit;color:var(--text);text-align:left;transition:border-color 0.15s,background 0.15s;min-width:0"
-          onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--surface)'"
-          onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface2)'">
-          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:2px">${d.label}</div>
-          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.name}</div>
+        <button class="door-pick" onclick="chooseDoor('${d.label}','${d.name.replace(/'/g,"\\'")}')">
+          <span class="door-letter">${d.label}</span>
+          <div class="door-pick-name">${d.name}</div>
         </button>`).join("");
     }
   } else {
@@ -296,12 +295,9 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     last_choice: sceneData.last_choice || "",
   };
 
-  // Journey position in the header status line
+  // Journey position lives in the stage breadcrumb bar (#status-line is
+  // reserved for engine/narrator connectivity — see updateStatusLine()).
   if (typeof sceneData.stage_index === "number") {
-    const arch = sceneData.archetype ? " · " + sceneData.archetype : "";
-    document.getElementById("status-line").textContent =
-      "Loop " + ((sceneData.loop_count ?? 0) + 1) + " · Stage " +
-      (sceneData.stage_index + 1) + "/" + (sceneData.stage_count || 7) + arch;
     updateStageBreadcrumb(sceneData.stage_index, sceneData.loop_count ?? 0);
   }
 }
@@ -320,10 +316,11 @@ function updateStageBreadcrumb(stageIndex, loopCount) {
   crumbs.innerHTML = STAGE_LABELS.map((label, i) => {
     const active = i === stageIndex;
     const visited = i < stageIndex || (loopCount > 0 && i > stageIndex);
-    const color = active ? "var(--accent)" : visited ? "var(--muted)" : "var(--border)";
-    const weight = active ? "600" : "400";
-    return (i > 0 ? `<span style="color:var(--border)">›</span>` : "") +
-      `<span style="color:${color};font-weight:${weight};cursor:default" title="Stage ${i+1}: ${label}">${label}</span>`;
+    const cls = active ? "gate-step-dot active" : visited ? "gate-step-dot visited" : "gate-step-dot";
+    const dot = `<span class="${cls}" title="Stage ${i + 1}: ${label}"><span class="dot"></span>${label}</span>`;
+    if (i === 0) return `<span class="gate-step">${dot}</span>`;
+    const lineCls = i <= stageIndex ? "gate-step-line filled" : "gate-step-line";
+    return `<span class="gate-step"><span class="${lineCls}"></span>${dot}</span>`;
   }).join("");
 }
 
