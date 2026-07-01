@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.9] - 2026-07-01
+### Changed
+- **Dual-boot launcher now preflights dependency drift and is documented as one idempotent command (#1552).** `Start-DualServers.ps1` gains a `Test-WorktreeDeps` preflight that resolve-probes each worktree's `node_modules` and runs `npm install` only when a required dependency can't resolve (missing/drifted) — catching the common silent failure where a drifted `node_modules` makes the server throw at `require()` and the port answers HTTP 000. A healthy tree is untouched; a lockfile older than `package.json` is flagged as a warning. QUICKSTART documents the full check-then-act path (prereqs → deps → env → clean-slate → launch+health → watchdog) and that re-running the one command is the correct fix for a down/misbehaving server. Improves the **Act** stage (dev/runtime reliability).
+
 ## [1.8.8] - 2026-07-01
 ### Fixed
 - **Chat capability questions no longer dump a raw Knowledge Center doc section (#1778).** Asking Keystone *"what can you do"* (and *"what do you do" / "how can you help" / "what are your capabilities"*) scored a spurious near-hit against `CLAUDE.md#Node.js` and short-circuited to that section's raw text — an empty ` ```bash ` fence — instead of a real reply (the "bash error popup" a user screenshotted). The existing greeting/identity Knowledge-Center-bypass guard in `stream-chat.js` is extended with a capability-query pattern so these questions always reach the model, which can enumerate real skills. Deterministic regex; verified it matches the capability phrasings without over-matching "what can I do here", "what's the weather", or "can you write python". Strengthens the **Observe/Reason** boundary — a capability ask is answered by the assistant, not a stray doc.
