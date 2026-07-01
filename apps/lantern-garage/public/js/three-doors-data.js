@@ -225,7 +225,7 @@ const SCENES = {
       { name: "The Key Market", label: "B", description: "Stalls of keys for doors not yet dreamed. One of them is warm." },
       { name: "The Lady's Gate", label: "C", description: "Silent, watched, absolutely fair. It opens only for what is safe to carry." },
     ],
-    fox: true, palette: ["#14081a","#2e103a","#5c206b","#c084fc","#f0d0ff","#0a0410"], archetype: "convergent",
+    fox: true, palette: ["#14081a","#2e103a","#5c206b","#c084fc","#f0d0ff","#0a0410"], archetype: "sigil",
   },
   "fog-door-return": {
     text: "At the city's edge the streets dissolve into the **Sea of Fog and Clouds**, and there it is: **the Fog Door Return**, standing in the mist where the Fog God sleeps. Through its frame you can already see the Garden at the Beginning, green and waiting. Lantern passes through first — it always does — and its glow turns back to you. *\"You came back\"* it will say on the other side. It always says that. It is always true.",

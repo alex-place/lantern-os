@@ -50,6 +50,7 @@ const DEFAULT_PROGRESS = {
   futurePathsVisited: 0,
   glitchesFound: 0,
   sigilLocationsVisited: 0,
+  walkedDoors: [], // New property to track walked door IDs
   loopCompleted: false,
 };
 
@@ -93,6 +94,7 @@ function validateProgress(data) {
   if (!Array.isArray(validated.prizes)) validated.prizes = ["first-steps"];
   if (!Array.isArray(validated.visited)) validated.visited = [];
   if (!Array.isArray(validated.completedChallenges)) validated.completedChallenges = [];
+  if (!Array.isArray(validated.walkedDoors)) validated.walkedDoors = []; // Validate walkedDoors
   
   // Validate objects (check for null and non-object types)
   if (typeof validated.sceneVisits !== "object" || validated.sceneVisits === null || Array.isArray(validated.sceneVisits)) {
@@ -228,6 +230,55 @@ function awardPrize(prizeId) {
     playerProgress.prizes.push(prizeId);
     saveProgress();
     showPrizeToast(prizeId);
+  }
+}
+
+/**
+ * Dynamically generates door options for the 'sigil-city' scene based on
+ * the player's `walkedDoors` array.
+ */
+function renderSigilCity() {
+  const scene = SCENES["sigil-city"];
+  const doorOptionsEl = document.getElementById("door-options");
+  doorOptionsEl.innerHTML = ""; // Clear existing options
+
+  // Add static doors first
+  scene.doors.forEach((door, index) => {
+    const btn = document.createElement("button");
+    btn.className = "door-button";
+    btn.innerHTML = `<span class="door-label">${door.label}</span> <span class="door-name">${door.name}</span><br><span class="door-description">${door.description}</span>`;
+    btn.onclick = () => chooseDoor(door.label);
+    doorOptionsEl.appendChild(btn);
+  });
+
+  // Add dynamically generated doors for walked paths
+  if (playerProgress.walkedDoors && playerProgress.walkedDoors.length > 0) {
+    const walkedDoorsContainer = document.createElement("div");
+    walkedDoorsContainer.className = "walked-doors-container";
+    
+    const header = document.createElement("h3");
+    header.textContent = "Your Walked Paths:";
+    walkedDoorsContainer.appendChild(header);
+
+    playerProgress.walkedDoors.forEach((doorId, index) => {
+      const [fromSceneKey, doorLabel] = doorId.split('-');
+      const fromScene = SCENES[fromSceneKey];
+      if (fromScene) {
+        const originalDoor = fromScene.doors.find(d => d.label === doorLabel);
+        if (originalDoor) {
+          const btn = document.createElement("button");
+          btn.className = "door-button walked-door-button";
+          btn.innerHTML = `<span class="door-label">🚪</span> <span class="door-name">${originalDoor.name}</span><br><span class="door-description">From ${fromScene.text.split('\n')[0].replace(/\*\*/g, '').replace('You stand inside ', '').replace('You crawl through ', '').replace('Beneath ', '').replace('Through ', '').replace('Past the meadow, the path forks upward into ', '').replace('The ', '').replace(' Door', '')}</span>`;
+          // For now, just log. Later, this could lead to a "revisit" or "compare" function.
+          btn.onclick = () => {
+            appendUserMsg(`Revisiting ${originalDoor.name} from ${fromScene.text.split('\n')[0].replace(/\*\*/g, '').replace('You stand inside ', '').replace('You crawl through ', '').replace('Beneath ', '').replace('Through ', '').replace('Past the meadow, the path forks upward into ', '').replace('The ', '').replace(' Door', '')}`);
+            // Implement logic to revisit or show details of the door
+          };
+          walkedDoorsContainer.appendChild(btn);
+        }
+      }
+    });
+    doorOptionsEl.appendChild(walkedDoorsContainer);
   }
 }
 
@@ -398,7 +449,7 @@ async function checkServer() {
   updateStatusLine();
   return serverAvailable;
 }
-
+  addWalkedDoor(`${currentScene}-${doorLabel}`); // Track the specific door walked
 // ── Metrics collection (non-blocking) ────────────────────────────
 function logThreeDoorsEvent(event, payload) {
   fetch("/api/metrics/three-doors", {
@@ -502,8 +553,23 @@ function resolveDoorTarget(doorName, spineIndex) {
       if (nk === norm || nk.replace(/^the /, "") === noThe) { target = NEXT_MAP[k]; break; }
     }
   }
+  // Render Sigil City if it's the current scene
+  if (gameState.currentScene === "sigil-city") {
+    renderSigilCity();
+  }
   if (target && SCENES[target]) return target;
   return STAGES[(spineIndex + 1) % STAGES.length];   // onward fallback = next gate
+}
+
+/**
+ * Adds a door's ID to the player's walkedDoors array if not already present.
+ * @param {string} doorId - The unique identifier for the walked door (e.g., "scene-label").
+ */
+function addWalkedDoor(doorId) {
+  if (!playerProgress.walkedDoors.includes(doorId)) {
+    playerProgress.walkedDoors.push(doorId);
+    saveProgress();
+  }
 }
 
 function navScore(c, ctx) {
