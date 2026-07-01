@@ -2018,7 +2018,12 @@ async function handleStreamChat(req, url, res) {
       const u = new URL(process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434");
       const loopModel = modelChain[0];
       const callLLM = (p, sys) => new Promise((resolve, reject) => {
-        const body = JSON.stringify({ model: loopModel, stream: false, messages: buildProviderMessages(sys, compacted, p) });
+        // #1609: the loop-reasoner local path was the one Ollama call site that
+        // built its body with no `options`, so the served model ran with Ollama's
+        // weak defaults (repeat_last_n=64) and could spiral into mid-generation
+        // repetition. Apply the same anti-repetition decode params as every other
+        // local call site.
+        const body = JSON.stringify({ model: loopModel, stream: false, messages: buildProviderMessages(sys, compacted, p), options: serving.applyOllamaDecodeParams({}) });
         const rq = http.request({ hostname: u.hostname, port: u.port || 11434, path: "/api/chat", method: "POST",
           headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) } }, (resp) => {
           let d = ""; resp.on("data", (c) => (d += c));
