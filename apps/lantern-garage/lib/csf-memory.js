@@ -33,8 +33,8 @@ function _readText(filePath) {
 // Records with no checksum are always kept (legacy/unstamped). JS and Python use
 // different canonical forms, so a Python-stamped record will not verify under the
 // JS scheme — keep "warn" until every writer/record shares one runtime's stamp.
-function _verifyMode() {
-  return (process.env.CSF_VERIFY_ON_READ || "warn").toLowerCase();
+function _verifyMode() { // #1663 follow-up: promote to 'enforce' on stable
+  return (process.env.CSF_VERIFY_ON_READ || "enforce").toLowerCase();
 }
 
 function _verifyRecords(records, file = "") {
