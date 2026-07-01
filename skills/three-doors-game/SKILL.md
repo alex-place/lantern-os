@@ -208,24 +208,26 @@ names that contradict the graph.
 - **Poem gate** (`poem_gate`): the riddle, accepted answers, and win text live on
   the Garden hub scene (`kingdome-garden`).
 
-### The seven canonical journey gates
+### The seven major gates (and the door tree)
 
-Three-door scenes route, over time, through the seven major gates of the Kingdome
-loop (`kingdome-garden → cloverfield → future-doors → xp-door → xenon-convergence →
-sigil-city → fog-door-return`). Keep their themes intact:
+The Kingdome has **seven major doors**, and the long route threads them in order —
+**Ancient → Cloverfield → Tomorrow → XP → Xenon → Sigil → Fog Return** — before
+returning to the Garden. **Every other door is a subset of exactly one major door**:
+a minor door, or a sub-child, or a sub-sub-child, and on down. The whole world is a
+strict tree rooted at these seven — opening a minor door keeps you inside its
+major's domain, and any door's lineage always traces back to one of the seven.
+(Web-game scene keys: `kingdome-garden → cloverfield → future-doors → xp-door →
+xenon-convergence → sigil-city → fog-door-return`.)
 
-1. **Ancient Doors** — deep time, origins, first-cause: the garden at the beginning
-   (the Tree of Life and its four rivers), the Tower that reached for heaven, the
-   Hanging Gardens. Sub-doors: The Deep / History / Temple Door.
-2. **The Cloverfield** — luck, small joys, ordinary aliveness; today as sacred play.
-3. **Tomorrow Door** — branching futures, possibility trees, gardens not yet grown.
-4. **The XP Door [GLITCHED]** — corrupted nostalgia, Windows-XP liminality, safe
-   childhood glitches.
-5. **Xenon Starship** — the midway convergence where all worlds see each other.
-6. **Sigil — City of Doors** — the hub where every walked door can be seen,
-   compared, carried, traded, or returned to.
-7. **Fog Door Return** — the homecoming through fog and cloud to the Garden at the
-   Beginning; **Odin the Fog God** keeps this gate.
+1. **Ancient Doors** — the deep past: the **Library of Babylon**, the **Hanging
+   Gardens**, and the **Tower of Babel**.
+2. **Cloverfield** — luck, small treasures, "today alive."
+3. **Tomorrow Door** — observatories, branching futures, possible selves.
+4. **XP Door [GLITCHED]** — the safe, nostalgic computer-dream world.
+5. **Xenon Starship / Midway Convergence** — planets, routes, convergence.
+6. **Sigil — City of Doors** — keys, markets, bridges; every threshold made visible.
+7. **Fog Door Return** — misty cliffs, trust, and the path home; **Odin the Fog
+   God** keeps this gate, which opens back onto the Garden and closes the loop.
 
 The **Garden at the Beginning** / Kingdome of Hearts binds the loop. Its poem gate:
 
