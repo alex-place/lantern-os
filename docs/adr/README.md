@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-23
-updated: 2026-06-23
+updated: 2026-07-01
 ---
 
 # Architecture Decision Records (ADRs)
@@ -70,5 +70,6 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0009](0009-one-routing-contract-cloud-primary-coding.md) | One routing contract — cloud-primary coding | Proposed (awaiting Alex's approval) |
 | [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Proposed (awaiting Alex's approval) |
 | [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Proposed (awaiting Alex's approval) |
+| [0012](0012-nested-adaptive-reason.md) | Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model) | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->

@@ -115,6 +115,35 @@ check("computeOutcomeMetrics wires distillationFlywheel into the aggregate outpu
   assert.strictEqual(out.distillationFlywheel.status, "insufficient_data"); // empty repo root
 });
 
+// ── adaptiveDepthMetrics (#1423) — Q-exit gate telemetry, native-mode runs only ─────
+check("no ouro-deep rows -> insufficient_data, no fabricated depth", () => {
+  const r = m.adaptiveDepthMetrics([{ benchmark: "other-bench", mean_depth: 3 }]);
+  assert.strictEqual(r.n, 0);
+  assert.strictEqual(r.meanDepth, null);
+  assert.strictEqual(r.status, "insufficient_data");
+});
+
+check("aggregates mean depth, exit reasons, and canary signal rate from ouro-deep rows only", () => {
+  const rows = [
+    { benchmark: "ouro-deep", mean_depth: 2, exit_reason: "adaptive_qexit", canary_signal: "none" },
+    { benchmark: "ouro-deep", mean_depth: 4, exit_reason: "adaptive_qexit", canary_signal: "echo" },
+    { benchmark: "ouro-deep", mean_depth: 6, exit_reason: "convergence_exit", canary_signal: "none" },
+    { benchmark: "other-bench", mean_depth: 99, exit_reason: "ignored", canary_signal: "ignored" },
+  ];
+  const r = m.adaptiveDepthMetrics(rows);
+  assert.strictEqual(r.n, 3);
+  assert.strictEqual(r.meanDepth, 4); // (2+4+6)/3, other-bench row excluded
+  assert.deepStrictEqual(r.exitReasons, { adaptive_qexit: 2, convergence_exit: 1 });
+  assert.strictEqual(r.canarySignalRate, 1 / 3);
+  assert.strictEqual(r.status, "ok");
+});
+
+check("computeOutcomeMetrics wires adaptiveDepth into the aggregate output", () => {
+  const out = m.computeOutcomeMetrics("/no/such/repo/root");
+  assert.ok(out.adaptiveDepth);
+  assert.strictEqual(out.adaptiveDepth.status, "insufficient_data"); // empty repo root
+});
+
 // ── readJsonl is resilient to bad lines / missing files ─────────────────────────
 check("readJsonl returns [] for a missing file", () =>
   assert.deepStrictEqual(m.readJsonl("/no/such/file.jsonl"), []));

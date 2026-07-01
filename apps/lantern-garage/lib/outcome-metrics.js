@@ -99,6 +99,33 @@ function distillationFlywheelMetrics(distillPairs, convergenceRecords) {
   };
 }
 
+// 5. Adaptive-depth (Ouro Q-exit) telemetry (#1423) — the recurrent-depth gate already
+// computes mean_depth/exit_reason/canary_* per generation (src/sigma0/loop_lm.py) and
+// scripts/ouro_serve.py already persists it to the SAME eval leaderboard routeQuality()
+// reads for latency (data/eval/leaderboard.jsonl, benchmark:"ouro-deep") — no new store.
+// Honest scope: this reflects OURO_NATIVE=1 (native/deep-mode) runs only. The default
+// live chat-serving path is the fast cached generate() and never computes this — see
+// ADR-0012 for why flipping that default is a product decision, not a bug fix.
+function adaptiveDepthMetrics(leaderboardRecords) {
+  const rows = (leaderboardRecords || []).filter((r) => r && r.benchmark === "ouro-deep");
+  const n = rows.length;
+  const depths = rows.map((r) => r.mean_depth).filter((d) => typeof d === "number");
+  const meanDepth = depths.length ? depths.reduce((a, b) => a + b, 0) / depths.length : null;
+  const exitReasons = {};
+  for (const r of rows) {
+    const reason = r.exit_reason || "unknown";
+    exitReasons[reason] = (exitReasons[reason] || 0) + 1;
+  }
+  const signaled = rows.filter((r) => r.canary_signal && r.canary_signal !== "none").length;
+  return {
+    n,
+    meanDepth: meanDepth == null ? null : Math.round(meanDepth * 100) / 100,
+    exitReasons,
+    canarySignalRate: pct(signaled, n),
+    status: statusFor(n > 0 ? 1 : null, n),
+  };
+}
+
 // Aggregate from the live append-only logs.
 function computeOutcomeMetrics(repoRoot) {
   const root = repoRoot || DEFAULT_REPO_ROOT;
@@ -131,6 +158,7 @@ function computeOutcomeMetrics(repoRoot) {
     honestyRate: honestyRate(reviews),
     routeQuality: routeQuality(decisions, leaderboard),
     distillationFlywheel: distillationFlywheelMetrics(distillPairs, convergenceRecords),
+    adaptiveDepth: adaptiveDepthMetrics(leaderboard),
   };
 }
 
@@ -152,6 +180,8 @@ function loadOrCaptureBaseline(metrics, repoRoot) {
       // "local model closed X% of the gap this week" has a real fixed reference point.
       flywheelKeystoneShare: metrics.distillationFlywheel.keystoneShare,
       flywheelCorpusSize: metrics.distillationFlywheel.corpusSize,
+      // #1423: canary-signal rate across native-mode (OURO_NATIVE=1) runs at capture time.
+      adaptiveDepthCanaryRate: metrics.adaptiveDepth.canarySignalRate,
     };
     fs.writeFileSync(file, JSON.stringify(baseline, null, 2));
     return baseline;
@@ -164,6 +194,7 @@ module.exports = {
   honestyRate,
   routeQuality,
   distillationFlywheelMetrics,
+  adaptiveDepthMetrics,
   computeOutcomeMetrics,
   loadOrCaptureBaseline,
 };
