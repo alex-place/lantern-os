@@ -467,7 +467,7 @@ async function handleStreamChat(req, url, res) {
       }
 
       res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
+        "Content-Type": "text/event-stream; charset=utf-8", // type: ignore
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "Access-Control-Allow-Origin": "*",

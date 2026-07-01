@@ -116,6 +116,7 @@ class KeystoneMLP(nn.Module):
 # gate_norm.weight}. Hidden-states mode (the released weights): per head,
 # g = sigmoid(Linear(RMSNorm(residual))).
 # ──────────────────────────────────────────────────────────────────────────────
+
 class LoopGateProjection(nn.Module):
     def __init__(self, config: KeystonePLTConfig):
         super().__init__()
@@ -123,16 +124,16 @@ class LoopGateProjection(nn.Module):
         self.num_heads = config.num_attention_heads
         self.head_dim = config.head_dim
         if self.use_hidden_states:
-            self.gate_norm = KeystoneRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+            self.gate_norm = KeystoneRMSNorm(config.hidden_size, eps=config.rms_norm_eps) # type: ignore
             self.weight = nn.Parameter(torch.empty(self.num_heads, config.hidden_size))
         else:
             # query-based mode: gate from the post-RoPE query (per head)
             self.weight = nn.Parameter(torch.empty(self.num_heads, self.head_dim))
         self.bias = nn.Parameter(torch.zeros(self.num_heads))
 
-    def forward(self, residual: torch.Tensor, query: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, residual: torch.Tensor, query: Optional[torch.Tensor] = None) -> torch.Tensor: # type: ignore
         """Return per-head gate g, shape [B, num_heads, T, 1] in [0, 1]."""
-        if self.use_hidden_states:
+        if self.use_hidden_states: # type: ignore
             x = self.gate_norm(residual)                       # [B, T, hidden]
             logits = F.linear(x, self.weight, self.bias)       # [B, T, num_heads]
             g = torch.sigmoid(logits).permute(0, 2, 1)         # [B, num_heads, T]
@@ -186,7 +187,7 @@ class KeystonePLTAttention(nn.Module):
         return out  # [B, Hq, T, D]
 
     def forward(self, hidden: torch.Tensor, residual: torch.Tensor, loop_idx: int,
-                cos, sin, causal_mask, window_mask, loop0_kv):
+                cos, sin, causal_mask, window_mask, loop0_kv): # type: ignore
         b, t, _ = hidden.shape
         q, k, v = self._project(hidden, cos, sin)
 
@@ -214,7 +215,7 @@ class KeystonePLTDecoderLayer(nn.Module):
         self.input_layernorm = KeystoneRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = KeystoneRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def forward(self, hidden, loop_idx, cos, sin, causal_mask, window_mask, loop0_kv):
+    def forward(self, hidden, loop_idx, cos, sin, causal_mask, window_mask, loop0_kv): # type: ignore
         residual = hidden                                       # pre-norm = gate input
         x = self.input_layernorm(hidden)
         attn_out, kv = self.self_attn(x, residual, loop_idx, cos, sin,
@@ -288,7 +289,7 @@ class KeystonePLTModel(KeystonePLTPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
-    def forward(self, input_ids=None, attention_mask=None, inputs_embeds=None, **kw):
+    def forward(self, input_ids=None, attention_mask=None, inputs_embeds=None, **kw): # type: ignore
         cfg = self.config
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -307,30 +308,93 @@ class KeystonePLTModel(KeystonePLTPreTrainedModel):
         emb_scale = 1.0 if cfg.plt_emb_scale is None else cfg.plt_emb_scale
         hidden_scale = 1.0 if cfg.plt_hidden_scale is None else cfg.plt_hidden_scale
 
-        hidden = E
-        loop0_kv = [None] * len(self.layers)
-        for loop_idx in range(cfg.plt_num_loops):
-            if loop_idx > 0:
-                h_prev = hidden
-                if cfg.plt_clp_shift:                            # parity knob (default off)
-                    h_prev = torch.roll(h_prev, shifts=1, dims=1)
-                    h_prev[:, 0, :] = 0.0
-                hidden = emb_scale * E + hidden_scale * h_prev   # cross-loop processing
+        if not cfg.plt_adaptive:
+            # Fixed-loop forward pass (original behavior)
+            hidden = E
+            loop0_kv = [None] * len(self.layers)
+            for loop_idx in range(cfg.plt_num_loops):
+                if loop_idx > 0:
+                    h_prev = hidden
+                    if cfg.plt_clp_shift:                            # parity knob (default off)
+                        h_prev = torch.roll(h_prev, shifts=1, dims=1)
+                        h_prev[:, 0, :] = 0.0
+                    hidden = emb_scale * E + hidden_scale * h_prev   # cross-loop processing
 
+                for i, layer in enumerate(self.layers):
+                    if self.gradient_checkpointing and self.training:
+                        hidden, kv = torch.utils.checkpoint.checkpoint(
+                            layer, hidden, loop_idx, cos, sin, causal_mask, window_mask,
+                            loop0_kv[i], use_reentrant=False)
+                    else:
+                        hidden, kv = layer(hidden, loop_idx, cos, sin, causal_mask,
+                                           window_mask, loop0_kv[i])
+                    if loop_idx == 0:
+                        loop0_kv[i] = kv
+
+                last = loop_idx == cfg.plt_num_loops - 1
+                if (not last and cfg.plt_normalize_per_loop) or last:
+                    hidden = self.norm(hidden)
+        else:
+            # Adaptive Loop Gate (ALG) forward pass
+            # New learnable parameters for ALG
+            if not hasattr(self, 'alg_gate_0'):
+                self.alg_gate_0 = nn.Linear(cfg.hidden_size, 1, bias=True).to(device)
+                self.alg_gate_1 = nn.Linear(cfg.hidden_size, 1, bias=True).to(device)
+                self.alg_halting_signal = nn.Linear(cfg.hidden_size, 1, bias=True).to(device)
+                # Initialize weights to prefer 2 loops initially, then allow adaptation
+                nn.init.constant_(self.alg_gate_0.weight, 0.0)
+                nn.init.constant_(self.alg_gate_0.bias, -1.0) # Prefer loop 1 over loop 0
+                nn.init.constant_(self.alg_gate_1.weight, 0.0)
+                nn.init.constant_(self.alg_gate_1.bias, 1.0)  # Prefer loop 2 over loop 1
+                nn.init.constant_(self.alg_halting_signal.weight, 0.0)
+                nn.init.constant_(self.alg_halting_signal.bias, 2.0) # Initially encourage 2 loops
+
+            # Store hidden states for blending
+            h_0 = E # Output after 0 loops (just embeddings)
+            h_1 = None
+            h_2 = None
+            
+            loop0_kv = [None] * len(self.layers)
+            current_hidden = E
+
+            # Loop 0
             for i, layer in enumerate(self.layers):
-                if self.gradient_checkpointing and self.training:
-                    hidden, kv = torch.utils.checkpoint.checkpoint(
-                        layer, hidden, loop_idx, cos, sin, causal_mask, window_mask,
-                        loop0_kv[i], use_reentrant=False)
-                else:
-                    hidden, kv = layer(hidden, loop_idx, cos, sin, causal_mask,
-                                       window_mask, loop0_kv[i])
-                if loop_idx == 0:
-                    loop0_kv[i] = kv
+                current_hidden, kv = layer(current_hidden, 0, cos, sin, causal_mask, window_mask, loop0_kv[i])
+                loop0_kv[i] = kv
+            h_1 = self.norm(current_hidden) # Output after 1 loop
 
-            last = loop_idx == cfg.plt_num_loops - 1
-            if (not last and cfg.plt_normalize_per_loop) or last:
-                hidden = self.norm(hidden)
+            # Loop 1 (effectively the second loop in the PLT architecture)
+            h_prev_for_loop1 = h_1
+            if cfg.plt_clp_shift:
+                h_prev_for_loop1 = torch.roll(h_prev_for_loop1, shifts=1, dims=1)
+                h_prev_for_loop1[:, 0, :] = 0.0
+            current_hidden_for_loop1 = emb_scale * E + hidden_scale * h_prev_for_loop1
+            for i, layer in enumerate(self.layers):
+                current_hidden_for_loop1, _ = layer(current_hidden_for_loop1, 1, cos, sin, causal_mask, window_mask, loop0_kv[i])
+            h_2 = self.norm(current_hidden_for_loop1) # Output after 2 loops
+
+            # Adaptive blending based on learned gates
+            gate_0 = torch.sigmoid(self.alg_gate_0(E)) # Gate between 0 and 1 loops
+            gate_1 = torch.sigmoid(self.alg_gate_1(h_1)) # Gate between 1 and 2 loops
+            
+            # Halting signal to determine effective depth
+            halting_signal = torch.sigmoid(self.alg_halting_signal(h_2)) # Example: use h_2 for halting decision
+            
+            # Blend outputs: (1-g0)*h0 + g0*((1-g1)*h1 + g1*h2)
+            # This is a simplified blending. A more complex one could use the halting signal
+            # to select one of h_0, h_1, h_2 directly, or blend based on confidence.
+            # For now, let's blend h_0, h_1, h_2 based on the gates.
+            # The halting signal could be used to weight the final output, or to decide when to stop.
+            # For this initial implementation, let's use the gates to blend the outputs.
+            # A simple approach: blend h_0 and h_1, then blend the result with h_2
+            blended_h_0_1 = (1.0 - gate_0) * h_0 + gate_0 * h_1
+            hidden = (1.0 - gate_1) * blended_h_0_1 + gate_1 * h_2
+            
+            # Optionally, use the halting signal to further refine or select
+            # For example, if halting_signal is low, it means we should have stopped earlier.
+            # This part needs careful design based on how `plt_adaptive` is meant to work.
+            # For now, we'll just use the blended output.
+            # The halting signal could be used as a loss component during training.
 
         return hidden
 

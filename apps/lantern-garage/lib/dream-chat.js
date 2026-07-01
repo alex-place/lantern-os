@@ -338,7 +338,7 @@ function selectAgent(message) {
   // Find persona with highest score
   const winner = personas.reduce((best, p) =>
     (scores[p.id] > scores[best.id]) ? p : best
-  );
+  , personas[0]); // Provide an initial value for reduce
 
   // Σ₀ default: an unmatched message (every persona still at the baseline score) must NOT
   // fall through to the first/dream persona — route it to the grounded Σ₀ agent instead.

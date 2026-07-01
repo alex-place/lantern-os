@@ -29,6 +29,7 @@ const validators = [
   { name: "Access lanes", state: "pass", next: "Wire real identity provider before private data leaves local mode." },
   { name: "Founder controls", state: "held", next: "Require operator-machine auth proof before enabling remote dispatch." },
   { name: "Convergence loop", state: "held", next: "Run PowerShell locally; cloud/Linux keeps the issue visible." },
+  { name: "Adaptive Loop Gate", state: "held", next: "Implement and verify adaptive loop gate for dynamic recurrent depth." },
   { name: "Cloud mirrors", state: "candidate", next: "Promote only after health endpoint returns verified 200." },
 ];
 

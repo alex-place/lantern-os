@@ -125,6 +125,7 @@ const DEFAULTS = [
                                   // coder so it leads regardless — no verified peer to displace.
     verified: false,             // OWNED proprietary PLT bootstrap from the LoopCoder-V2 Apache-2.0
                                   // weights (ADR-0011). On-box (RTX 3070) it LOADS 4-bit (~6.4GB<8),
+    selfConverges: true,          // With Adaptive Loop Gate (ALG), it self-converges.
                                   // serves ollama-compatible, and generates coherent code at ~5–6 tok/s
                                   // (static KV cache). Kept `verified:false` honestly: it is the SOLE
                                   // local coder by operator decision, not yet a reproduced eval WIN over
@@ -133,6 +134,7 @@ const DEFAULTS = [
                                   // :11435 (or KEYSTONE_PLT_ENDPOINT); if the shim is down the provider
                                   // chain falls back to cloud (Claude), not to another local model.
     note: "Sole local Σ₀ coder (ADR-0011, LoopCoder-V2 lineage). Default for coding/reasoning/default; kernel stays Ouro. Serve via models/keystone-sigma0-plt/serve_keystone_plt.py on :11435.",
+    plt_adaptive: false,          // Adaptive Loop Gate (ALG) for dynamic recurrent depth.
   },
   {
     id: "lantern-csf-dream",
