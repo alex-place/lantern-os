@@ -2,7 +2,7 @@
 # Install torch separately for your CUDA (e.g. cu121):
 #   pip install torch --index-url https://download.pytorch.org/whl/cu121
 # transformers is pinned to the version the upstream config targets.
-transformers==4.57.1
+transformers==5.0.0rc3
 huggingface_hub>=0.25
 accelerate>=1.0
 bitsandbytes>=0.44
