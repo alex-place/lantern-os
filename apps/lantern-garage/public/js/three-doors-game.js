@@ -544,14 +544,10 @@ async function checkServer() {
     clearTimeout(t);
   }
 
-  if (currentScene.type === "future-doors") {
-    return chooseFutureDoor(doorName);
-  }
-
   updateStatusLine();
   return serverAvailable;
 }
-  addWalkedDoor(`${currentScene}-${doorLabel}`); // Track the specific door walked
+
 // ── Metrics collection (non-blocking) ────────────────────────────
 function logThreeDoorsEvent(event, payload) {
   fetch("/api/metrics/three-doors", {
@@ -987,6 +983,7 @@ async function chooseDoor(label, name) {
   doorsLocked = true;
 
   logThreeDoorsEvent("door_choice", { label, name, sceneKey: gameState?.scene_key });
+  addWalkedDoor(`${gameState?.scene_key || "start"}-${label}`); // Track the specific door walked (Sigil City walked-paths)
   writeCubeDelta('story_choice', [name.toLowerCase().replace(/\s+/g, '-')], 'explore:' + (gameState?.scene_key || ''), { coordinate: `explore:${gameState?.scene_key || ''}:${label}` });
 
   document.querySelectorAll(".door-chip").forEach(b => b.disabled = true);
