@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.12] - 2026-07-01
+### Added
+- **Three Doors: Unisona / Tomorrow City / Blinkbug-forge canon.** Folded three scenes authored in live play into the Tomorrow/Today branch of the seven-gate loop — `unisona` (the Tomorrow Door opens on the utopia of convergence, founders Courtney & Alex at the heart-soundwave arch), `tomorrow-city` (the lantern-fleet of sky-boats rising to the Xenon gate), and `blinkbug-forge` (the Today Door forge reunion). Scene text, A/B/C doors, `NEXT_MAP` routing, SD prompts, the DALLE generation set, and archetype moods all added; every new door routes onward toward the Xenon convergence. Verified in preview: all three render (narration + doors + image), no console errors.
+
 ## [1.8.11] - 2026-07-01
 ### Changed
 - **`/explore.html` now reads like a modern social feed (Facebook/Instagram).** Added a single-column ↔ 4-up grid layout toggle (responsive 4-3-2-1, persisted in localStorage), a per-card share-to-socials affordance (native Web Share sheet on mobile; desktop popover with X / Facebook / Reddit / LinkedIn / WhatsApp + copy-link, recording a positive engagement signal), and first-paint skeletons for perceived speed. Improves the **Act** stage — the same ranked feed, now shareable and browsable two ways.

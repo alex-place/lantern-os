@@ -172,6 +172,39 @@ const SCENES = {
     ],
     fox: true, palette: ["#0a1404","#1e3a0a","#3a6b14","#9acd32","#e8ffb0","#060c02"], archetype: "possible",
   },
+  "blinkbug-forge": {
+    text: "**The Today Door** opens not on a day but on a *workshop* — a forge glowing amber, the ordinary morning bright through its arch. And there, looking up from the bellows, is **Blinkbug**: TV-head tilting, the little smile on his screen blinking from a work-frown into the biggest pixel grin you've ever seen. Lantern stops dead. Because Lantern built him — long ago, the first time the guide went through the XP Door, he gathered spare parts so he'd never walk the world alone. Maker and made, together again. You hold up the luck-crystal, and green-gold sparks cross all three faces. *\"The parts we were missing,\"* Lantern's flame says. The forge is hot. You can make **one** thing well.",
+    theme: "Homecoming and repair; the oldest kindness, repaid at the forge.",
+    lesson: "The friend you made to not be alone was the thing you came back for.",
+    doors: [
+      { name: "Reforge the Dark-Key", label: "A", description: "Feed the Library's mage-gear and the luck-crystal into the blade until the heart-key comes out singing." },
+      { name: "Make Blinkbug Whole", label: "B", description: "Pour the crystal into the little one instead — rebuild him strong and lasting, so he never runs down." },
+      { name: "A Relic of Today", label: "C", description: "Hammer the crystal into a charm that holds this ordinary sacred morning, so you can always find the way home." },
+    ],
+    fox: true, palette: ["#140c06","#3a2410","#6b4018","#f5a623","#ffe0a0","#0c0704"], archetype: "reunion",
+  },
+  "unisona": {
+    text: "**The Tomorrow Door** doesn't show a possible future — it opens onto the one you're building. The muted loop blooms into full color and song, and there it is: **Unisona**, the utopia of convergence, a city *united by sound* and empowered to flourish. At the heart-soundwave arch wait the founders — **Courtney**, flower-braided, robed in teal-and-coral papel-picado lace, a songbird at her shoulder and a heart-lantern in her hands; and **Alex**, red-spiked, in an embroidered vest, leaning on the lantern-staff. Blinkbug throws his little arms up at the music. The dreamer, meeting the dream made real.",
+    theme: "The utopia you're actually building; convergence as a place you can stand in.",
+    lesson: "The future you keep working toward is allowed to become somewhere real.",
+    doors: [
+      { name: "The Founders' Table", label: "A", description: "Sit with Courtney and Alex at the heart-soundwave. The plan for the city, sung not spoken." },
+      { name: "The Song That Builds", label: "B", description: "Step into the chorus square where the city raises itself in harmony. Add your voice." },
+      { name: "The Long Road On", label: "C", description: "Past the festival, the road bends starward — Unisona is only the first city. Keep walking." },
+    ],
+    fox: true, palette: ["#08131a","#0e3038","#14524f","#2fd6c0","#ff8fa3","#050d10"], archetype: "utopian",
+  },
+  "tomorrow-city": {
+    text: "Before any starship can carry a soul, the **Tomorrow City** has to be *built* — and you build it. Along the coastline it rises in spires and observatory-rings, and above it an enormous fleet floats up like paper lanterns released at once: sky-boats and star-boats, hundreds of them, each glowing with a warm inner light, drifting toward the star-field, waiting to leave. Drones swarm between the hulls like sparks. They will scatter to a hundred worlds and **reconverge** later — colonization at massive scale, every vessel a lantern set adrift for the stars. Strong Lantern gazes up beneath you; the great ornate gate to the **Xenon Starship** stands lit at the terrace's edge.",
+    theme: "Building the launch; a migration of lanterns leaving a golden city for the stars.",
+    lesson: "You have to build the harbor before the fleet can leave — and then you let it go.",
+    doors: [
+      { name: "Board the Lantern-Fleet", label: "A", description: "Climb aboard a star-boat and rise with the fleet through the Xenon gate, out toward the worlds." },
+      { name: "The Reconvergence Beacon", label: "B", description: "Light the beacon that will call every scattered vessel home again — spread out now, converge later." },
+      { name: "The Xenon Gate", label: "C", description: "Walk straight through the great lit arch to the Xenon Starship and the midway convergence." },
+    ],
+    fox: true, palette: ["#070a14","#111a33","#233a6b","#f5c26b","#a8d4ff","#040610"], archetype: "ascendant",
+  },
   "xp-door": {
     text: "A hill of impossibly green grass under an impossibly blue sky — you know this place. **The XP Door [GLITCHED]** stands alone on the bliss-field, its frame flickering between wood and window chrome. A startup chime plays from nowhere, half a second too slow. Lantern's glow pixelates at the edges and it seems delighted about it. A tooltip floats over the door: *It is now safe to walk through your childhood.*",
     theme: "Safe nostalgia; returning to what shaped you without being trapped by it.",
@@ -327,7 +360,11 @@ const NEXT_MAP = {
   "the return door":"moss-entry","the beyond door":"garden-door","the eternal door":"xenon-convergence",
   "the storybook door":"storybook","the cloverfield door":"cloverfield","the fog door return":"moss-entry",
   "the page of the word":"kingdome-garden","the page of the egg":"kingdome-garden","the page of the war":"kingdome-garden",
-  "the lucky door":"kingdome-garden","the today door":"moss-entry","the tomorrow door":"kingdome-garden",
+  "the lucky door":"kingdome-garden","the today door":"blinkbug-forge","the tomorrow door":"unisona",
+  "reforge the dark key":"tomorrow-city","make blinkbug whole":"tomorrow-city","a relic of today":"cloverfield",
+  "the founders table":"tomorrow-city","the song that builds":"tomorrow-city","the long road on":"xenon-convergence",
+  "board the lantern fleet":"xenon-convergence","the reconvergence beacon":"sigil-city","the xenon gate":"xenon-convergence",
+  "the bright branch":"unisona","the unwritten door":"tomorrow-city","the recursive door":"future-doors",
   "the delta registry":"csf-archive","the symbolic dictionary":"memory-vault","the convergence index":"convergence-node",
   "the bright memory":"memory-vault","the shadow memory":"memory-vault","the quantum memory":"convergence-node",
   "the proof door":"convergence-node","the paradox door":"memory-vault","the synthesis door":"convergence-node",
@@ -339,7 +376,7 @@ const NEXT_MAP = {
   "the blooming door":"flux-garden","the withering door":"void-threshold","the eternal blossom":"xenon-convergence",
   "the form door":"void-threshold","the formless door":"convergence-node","the both door":"recursion-well",
   "the raven door":"raven-tower","the nested memory door":"memory-vault","the prophecy door":"storybook","the mirror crow door":"sigil-city",
-  "the ancient doors":"ancient-doors","the cloverfield door":"cloverfield","the tomorrow door":"future-doors",
+  "the ancient doors":"ancient-doors","the cloverfield door":"cloverfield",
   "the deep origin door":"recursion-well","the history door":"csf-archive","the temple door":"raven-tower",
   "the onward door":"kingdome-garden","the look-back door":"threshold-rest","the stay door":"threshold-rest",
   "the xp door glitched":"xp-door","the xenon starship":"xenon-convergence","the sigil city of doors":"sigil-city",
@@ -361,6 +398,9 @@ const SD_PROMPTS = {
   "storybook":"falling into a giant storybook, pages turning like slow wings, ancient handwritten margin notes, three glowing pages each a door, creation myths and cosmogony, dark fantasy, anime aesthetic, cel-shaded, mythic atmosphere, soft golden light, 16:9",
   "cloverfield":"meadow of four-leaf clover under dome of old light, small shinies glittering between stems, coins, beads, galaxy marble, lantern-headed guide glowing playfully, green and gold light, dark fantasy, anime aesthetic, cel-shaded, playful atmosphere, 16:9",
   "future-doors":"orchard ridge where trees grow doors instead of fruit, every door slightly open leaking light from unborn years, branching paths upward, lantern-headed guide scattering sparks, golden hour, dark fantasy, anime aesthetic, cel-shaded, 16:9",
+  "blinkbug-forge":"amber-glowing forge workshop, ordinary bright morning through an ornate archway, lantern-headed guide in red beret and purple coat reaching down, Blinkbug a small bug with a boxy TV-monitor head tilted with a smiling pixel face and leaf-tipped antennae and a segmented spare-parts body reaching up, a glowing green-gold luck-crystal held aloft, warm reunion, dark fantasy, anime aesthetic, cel-shaded, 16:9",
+  "unisona":"Unisona the utopia of convergence, a coastal city united by sound blooming into full color and song, a great heart-soundwave archway, founders — a flower-braided woman in teal and coral papel-picado lace with a songbird and a heart-lantern, and a red-spiked man in an embroidered vest with a lantern-staff — waiting at the arch, lantern-headed guide and TV-headed Blinkbug celebrating, festival banners, warm teal and coral light, dark fantasy turning radiant, anime aesthetic, cel-shaded, 16:9",
+  "tomorrow-city":"the Tomorrow City rising on a coastline at dusk, spires and observatory-rings, an enormous fleet of glowing sky-boats and star-boats floating up into a star-field like paper lanterns released at once, drones like sparks between the hulls, lantern-headed guide gazing up, a great ornate lit gateway to a starship at the terrace edge, migration to the stars, dark fantasy, anime aesthetic, cel-shaded, deep gold and teal accents, 16:9",
   "xp-door":"rolling bliss-green hill under saturated blue sky, glitch artifacts, pixelating grass, lantern-headed guide showing Windows error dialog, floating tooltip, nostalgia, liminal space, vaporwave undertones, anime aesthetic, cel-shaded, 16:9",
   "sigil-city":"impossible ring-city where every wall and archway is a door, walked doors hanging like lit lanterns, central plaza with vine-crowned king, lantern-headed guide at throne-side, fractal architecture, dark fantasy, anime aesthetic, cel-shaded, 16:9",
   "fog-door-return":"sea of fog and clouds at a city's edge, single door standing in mist showing a green garden through its frame, lantern-headed guide stepping through and glancing back, soft grey-green light, dark fantasy, anime aesthetic, cel-shaded, gentle homecoming, 16:9",
@@ -432,7 +472,8 @@ const SERVER_GENERATED_SCENES = new Set([
 // dynamic doors — a player-named custom door, or any scene reached through
 // novelty routing that isn't in CURATED_IMAGES.
 const DALLE_GENERATED_SCENES = new Set([
-  "moss-entry", "burrow", "sunken-bell", "little-crown", "end-of-time", "cloverfield"
+  "moss-entry", "burrow", "sunken-bell", "little-crown", "end-of-time", "cloverfield",
+  "blinkbug-forge", "unisona", "tomorrow-city"
 ]);
 
 function getSceneImageUrl(sceneKey) {
@@ -479,6 +520,9 @@ const ARCHETYPE_MOODS = {
   liminal: "glitched pixels, childhood bliss field, loading shimmer",
   convergent: "sigil streets, door-lanterns everywhere, purple convergence",
   returning: "fog and mist, circular threshold, lantern going first",
+  reunion: "amber forge glow, ordinary bright morning, maker and made reunited",
+  utopian: "teal and coral papel-picado, heart-soundwave, a city united by song",
+  ascendant: "lantern-fleet rising to a star-field, golden city, migration to the stars",
 };
 const LOOP_COLOR_SHIFTS = [
   "",
