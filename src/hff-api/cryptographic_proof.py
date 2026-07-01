@@ -12,7 +12,9 @@ import hashlib
 import json
 import os
 import sqlite3
+import stat
 import time
+import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -36,21 +38,58 @@ def generate_keypair() -> Tuple[Ed25519PrivateKey, Ed25519PublicKey]:
     return private_key, public_key
 
 
+#: Environment variable holding the passphrase used to encrypt the private key
+#: at rest.  Set it in the node's environment (not committed) to enable
+#: encryption without changing any call sites.
+KEY_PASSPHRASE_ENV = "HFF_KEY_PASSPHRASE"
+
+
+def _resolve_passphrase(passphrase: Optional[Any]) -> Optional[bytes]:
+    """Resolve a passphrase to bytes, falling back to ``HFF_KEY_PASSPHRASE``.
+
+    Returns ``None`` when no passphrase is configured (unencrypted key).
+    An empty string is treated as "no passphrase" so an exported-but-blank
+    env var doesn't produce an empty-password-encrypted key.
+    """
+    if passphrase is None:
+        passphrase = os.environ.get(KEY_PASSPHRASE_ENV) or None
+    if passphrase is None:
+        return None
+    return passphrase.encode("utf-8") if isinstance(passphrase, str) else bytes(passphrase)
+
+
 def save_keypair(
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     private_path: str,
     public_path: str,
+    passphrase: Optional[Any] = None,
 ) -> None:
     """Persist an Ed25519 key pair to PEM files.
 
-    The private key is written **unencrypted**.  In production you would
-    encrypt it with a passphrase; this is a teaching implementation.
+    The private key is encrypted at rest when a passphrase is supplied, either
+    via the *passphrase* argument or the ``HFF_KEY_PASSPHRASE`` environment
+    variable.  When no passphrase is configured the key is written unencrypted
+    (backwards-compatible) and a ``UserWarning`` is emitted so the weaker
+    posture is never silent.  The private file is also written with
+    owner-only (0600) permissions on POSIX.
     """
+    secret = _resolve_passphrase(passphrase)
+    if secret:
+        enc = serialization.BestAvailableEncryption(secret)
+    else:
+        enc = serialization.NoEncryption()
+        warnings.warn(
+            "Ed25519 private key written UNENCRYPTED — set "
+            f"{KEY_PASSPHRASE_ENV} (or pass passphrase=) to encrypt it at rest.",
+            UserWarning,
+            stacklevel=2,
+        )
+
     priv_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
+        encryption_algorithm=enc,
     )
     pub_bytes = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
@@ -62,16 +101,27 @@ def save_keypair(
 
     with open(private_path, "wb") as f:
         f.write(priv_bytes)
+    # Best-effort owner-only perms; no-op / harmless on platforms without POSIX
+    # mode bits (e.g. Windows).
+    try:
+        os.chmod(private_path, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
     with open(public_path, "wb") as f:
         f.write(pub_bytes)
 
 
 def load_keypair(
-    private_path: str, public_path: str
+    private_path: str, public_path: str, passphrase: Optional[Any] = None
 ) -> Tuple[Ed25519PrivateKey, Ed25519PublicKey]:
-    """Load an Ed25519 key pair from PEM files."""
+    """Load an Ed25519 key pair from PEM files.
+
+    Decrypts the private key using *passphrase* or ``HFF_KEY_PASSPHRASE`` when
+    present; unencrypted keys still load with no passphrase configured.
+    """
+    secret = _resolve_passphrase(passphrase)
     with open(private_path, "rb") as f:
-        private_key = serialization.load_pem_private_key(f.read(), password=None)
+        private_key = serialization.load_pem_private_key(f.read(), password=secret)
     with open(public_path, "rb") as f:
         public_key = serialization.load_pem_public_key(f.read())
 
