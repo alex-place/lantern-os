@@ -605,23 +605,42 @@ server.listen(port, host, () => {
   const enableCryptoObserver = process.env.KALSHI_CRYPTO_OBSERVER !== "false"
     && !!(process.env.KALSHI_API_KEY_ID || process.env.KALSHI_PRIVATE_KEY || process.env.KALSHI_PRIVATE_KEY_PATH);
   const cryptoObserverScript = path.join(repoRoot, "experiments", "crypto_live_trader.py");
-  let cryptoObserverProcess = null;
   if (enableCryptoObserver && fs.existsSync(cryptoObserverScript)) {
     const pythonExe = process.platform === "win32" ? "python" : "python3";
     const logDir = path.join(repoRoot, "logs");
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
-    const observerLogFd = fs.openSync(path.join(logDir, "crypto-observer.log"), "a");
-    cryptoObserverProcess = spawn(pythonExe, [cryptoObserverScript, "--interval", "10", "--edge", "0.06"], {
-      cwd: repoRoot,
-      stdio: ["ignore", observerLogFd, observerLogFd],
-    });
-    cryptoObserverProcess.on("error", (err) => console.error(`[CryptoObserver] Failed to start: ${err.message}`));
-    cryptoObserverProcess.on("exit", (code) => console.warn(`[CryptoObserver] Exited with code ${code} — training data gap from this point`));
-    deps.cryptoObserver = {
-      pid: cryptoObserverProcess.pid,
-      startedAt: new Date().toISOString(),
-      process: cryptoObserverProcess,
+    // A crash used to leave a silent training-data gap until the next server
+    // restart. Relaunch with exponential backoff; a run that survives 10 min
+    // resets the attempt counter so intermittent crashes don't exhaust retries.
+    let observerAttempts = 0;
+    const OBSERVER_MAX_ATTEMPTS = 6;
+    const startCryptoObserver = () => {
+      const observerLogFd = fs.openSync(path.join(logDir, "crypto-observer.log"), "a");
+      const startedAtMs = Date.now();
+      const child = spawn(pythonExe, [cryptoObserverScript, "--interval", "10", "--edge", "0.06"], {
+        cwd: repoRoot,
+        stdio: ["ignore", observerLogFd, observerLogFd],
+      });
+      child.on("error", (err) => console.error(`[CryptoObserver] Failed to start: ${err.message}`));
+      child.on("exit", (code) => {
+        fs.closeSync(observerLogFd);
+        if (Date.now() - startedAtMs > 10 * 60 * 1000) observerAttempts = 0;
+        observerAttempts++;
+        if (observerAttempts > OBSERVER_MAX_ATTEMPTS) {
+          console.warn(`[CryptoObserver] Exited with code ${code} — gave up after ${OBSERVER_MAX_ATTEMPTS} restarts; training data gap from this point`);
+          return;
+        }
+        const delayMs = Math.min(60000, 2000 * 2 ** (observerAttempts - 1));
+        console.warn(`[CryptoObserver] Exited with code ${code} — restarting in ${Math.round(delayMs / 1000)}s (attempt ${observerAttempts}/${OBSERVER_MAX_ATTEMPTS})`);
+        setTimeout(startCryptoObserver, delayMs).unref();
+      });
+      deps.cryptoObserver = {
+        pid: child.pid,
+        startedAt: new Date().toISOString(),
+        process: child,
+      };
     };
+    startCryptoObserver();
     console.log("[CryptoObserver] Started — logging to logs/crypto-observer.log");
   } else if (enableCryptoObserver) {
     console.warn(`[CryptoObserver] Script not found: ${cryptoObserverScript}`);

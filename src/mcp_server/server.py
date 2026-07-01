@@ -1708,4 +1708,13 @@ if __name__ == "__main__":
     logger.info("Lantern OS MCP Server starting on http://%s:%s", host, port)
     logger.info("Tools available: %s", list(TOOLS_REGISTRY.keys()))
     logger.info("Mesh mode: founder control + opt-in peer donations")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except OSError as exc:
+        # TOCTOU: port was free at the probe but taken by the time uvicorn bound.
+        # Same singleton semantics — one clean line, not a traceback.
+        logger.warning(
+            "MCP port %s:%s grabbed between probe and bind (%s) — exiting cleanly (singleton guard).",
+            host, port, exc,
+        )
+        sys.exit(0)
