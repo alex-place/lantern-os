@@ -98,7 +98,12 @@ def main():
         p = REPO / rel
         if not p.exists():
             continue
-        md = strip_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
+        # Normalize CRLF→LF first: most repo docs are CRLF, and the `^---\n`
+        # frontmatter strip (and section splitter) silently failed on `---\r\n`,
+        # which leaked YAML frontmatter (author/status/date) into the grounding
+        # corpus as an "(intro)" section. Normalizing fixes both.
+        raw = p.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+        md = strip_frontmatter(raw)
         for lv, heading, body in split_sections(md):
             text = re.sub(r"\n{3,}", "\n\n", body)[:MAX_SECTION_CHARS]
             rid = hashlib.sha1(f"{rel}#{heading}".encode()).hexdigest()[:12]

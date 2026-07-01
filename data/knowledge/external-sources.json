@@ -1,0 +1,376 @@
+[
+  {
+    "doc": "hff/CONVERGENCE-EVIDENCE-REPORT.md",
+    "title": "CONVERGENCE EVIDENCE REPORT",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/CONVERGENCE-EVIDENCE-REPORT.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/LOCAL-LLM-STORAGE-FORMAT.md",
+    "title": "Local LLM Storage Format — Permanent Archive & Mesh HDD Backup",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/LOCAL-LLM-STORAGE-FORMAT.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/ORCHESTRATOR-CONVERGENCE-POLICY-v2.md",
+    "title": "Orchestrator Convergence Policy v2",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/ORCHESTRATOR-CONVERGENCE-POLICY-v2.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/ORCHESTRATOR-POLICY.md",
+    "title": "Orchestrator-Backed Deployment Policy",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/ORCHESTRATOR-POLICY.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/README.md",
+    "title": "Lantern — Local-First AI Chat + Media Curator for Households",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/README.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/UNIFIED-DEPLOYMENT-MANIFEST.md",
+    "title": "Unified Deployment Manifest — Lantern OS v1.0",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/UNIFIED-DEPLOYMENT-MANIFEST.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/apps_bettersafe-pilot_bettersafe-feature-schema.md",
+    "title": "BetterSafe Feature Schema — Local-First Data Model",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_bettersafe-pilot_bettersafe-feature-schema.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/apps_bettersafe-pilot_bettersafe-local-first-architecture.md",
+    "title": "BetterSafe — Local-First Architecture",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_bettersafe-pilot_bettersafe-local-first-architecture.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/apps_bettersafe-pilot_social-services-registry-schema.md",
+    "title": "Social Services Registry — Waynesville & Spring Valley, Ohio",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_bettersafe-pilot_social-services-registry-schema.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/apps_lantern-discord-radio_README.md",
+    "title": "Lantern Discord Radio Bot",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_lantern-discord-radio_README.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/apps_rhythm-os_DEPLOYMENT.md",
+    "title": "Rhythm OS Deployment Guide",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_rhythm-os_DEPLOYMENT.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/apps_rhythm-os_README.md",
+    "title": "Rhythm OS — Music + AI Convergence",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/apps_rhythm-os_README.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/deploy_README.md",
+    "title": "Multi-Platform Deploy — HFF Dashboard",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/deploy_README.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_CLAIM-PACKET-SCIENTIFIC-RIGOR.md",
+    "title": "Claim Packet Scientific Rigor Standard",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_CLAIM-PACKET-SCIENTIFIC-RIGOR.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_CLAIM-PACKET-TEMPLATE.md",
+    "title": "Claim Packet Template",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_CLAIM-PACKET-TEMPLATE.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_CONVERGENCE-LOOP.md",
+    "title": "Lantern OS Convergence Loop",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_CONVERGENCE-LOOP.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_INNOVATOR-EVIDENCE-METHOD.md",
+    "title": "Innovator Evidence Method",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_INNOVATOR-EVIDENCE-METHOD.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_LANTERN-ORCHESTRATOR-DEPENDENCY.md",
+    "title": "Orchestrator Dependency Contract",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_LANTERN-ORCHESTRATOR-DEPENDENCY.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_MCP-CONNECTOR-REVIEW-2026-06-17.md",
+    "title": "MCP Connector Review — 2026-06-17",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_MCP-CONNECTOR-REVIEW-2026-06-17.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_V1-READINESS-GATES.md",
+    "title": "Lantern OS v1.0.0 Readiness Gates",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_V1-READINESS-GATES.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_adr_ADR-1-EVENT-SOURCING.md",
+    "title": "ADR-1: Event Sourcing for Immutable Audit Trail",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_adr_ADR-1-EVENT-SOURCING.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_adr_ADR-2-BYZANTINE-CONSENSUS.md",
+    "title": "ADR-2: Byzantine Fault Tolerant Consensus for Research Queue Acceptance",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_adr_ADR-2-BYZANTINE-CONSENSUS.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_adr_ADR-3-DISCORD-ARCHITECTURE.md",
+    "title": "ADR-3: Discord Bot Architecture — Continuous Playback + Reaction Control",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_adr_ADR-3-DISCORD-ARCHITECTURE.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_arc-reactor-mining-lab_README.md",
+    "title": "Arc Reactor Mining Lab",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_arc-reactor-mining-lab_README.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_bettersafe-capability-profile-views.md",
+    "title": "BetterSafe Capability Profile Views",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_bettersafe-capability-profile-views.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_internationalization-and-accessibility.md",
+    "title": "Internationalization and Accessibility Posture",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_internationalization-and-accessibility.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_live-polling-readiness.md",
+    "title": "Live Polling Readiness",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_live-polling-readiness.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_public-ux-baseline.md",
+    "title": "Public UX Baseline",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_public-ux-baseline.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/docs_repo-layout.md",
+    "title": "HFF Repository Layout",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/docs_repo-layout.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/lantern_os_master_push_rag_house_plan.md",
+    "title": "Lantern OS Master Push + RAG House Convergence Report",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/lantern_os_master_push_rag_house_plan.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/lore_LANTERN-CHARACTERS-AND-REALMS.md",
+    "title": "Lantern OS Lore: Characters and Realms",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/lore_LANTERN-CHARACTERS-AND-REALMS.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/lore_LORE.md",
+    "title": "Lantern OS Lore & Symbolic Sandbox",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/lore_LORE.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/manifests_dual-boot.md",
+    "title": "Dual Boot Manifest",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/manifests_dual-boot.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  },
+  {
+    "doc": "hff/manifests_windows-surfaces.md",
+    "title": "Windows Surface Manifest",
+    "url": "https://github.com/human-flourishing-frameworks/human-flourishing-frameworks/blob/master/manifests_windows-surfaces.md",
+    "source": "Human Flourishing Frameworks",
+    "topics": [
+      "convergence",
+      "flourishing",
+      "research"
+    ]
+  }
+]
