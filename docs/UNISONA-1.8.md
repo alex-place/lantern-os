@@ -83,6 +83,36 @@ In-chat **Approve / Rework / Discard** for autowork draft PRs (#1503), with the
 
 ---
 
+## Point releases since 1.8.0
+
+1.8 shipped on 2026-06-30 and kept moving. The 1.8.1–1.8.6 point releases added
+real user-facing surface and tightened the dev loop underneath:
+
+- **Three Doors, regenerated (1.8.6)** — the Kingdome of Hearts Explore game is
+  reworked end to end: every scene keeps a fixed theme + meta-lesson while the
+  prose is regenerated per visit, each turn offers exactly three randomized
+  doors, and scenes render real art (curated Kingdome concept art with a
+  `gpt-image-2` fallback) instead of placeholders. The guide is Lantern
+  throughout.
+- **Kalshi terminal reskin (1.8.5)** — the swipe deck adopts the shared
+  unisona.ai chrome, a polished device-console frame, and a collapsible
+  account · profile · positions HUD showing the live Σ₀ council verdict; it now
+  passes the WCAG a11y audit.
+- **The grounded Kalshi trader (1.8.4)** — since momentum has no edge after fees,
+  the profitable arm chases information the thin market hasn't priced: it
+  web-grounds a cited P(YES) on near-term event markets (weather first) and takes
+  a position only when the edge clears the fee hurdle, graded forward by Brier
+  score rather than asserted.
+- **One brand, cleaner home (1.8.3)** — shared chrome, the Create page, and stale
+  body copy all read unisona.ai; the home demotes its heavy panels to a compact
+  link row; and a WCAG font/style contract runs in CI so contrast regressions
+  can't ship.
+- **Workflow hardening (1.8.1–1.8.2)** — dynamic per-contributor PR lanes and an
+  assigned-issue convergence merge gate (#1755), with the dual-boot quickstart
+  now installing the workstream hooks automatically.
+
+---
+
 ## The principle behind 1.8
 
 > Nothing is accepted without evidence. Every important claim carries
