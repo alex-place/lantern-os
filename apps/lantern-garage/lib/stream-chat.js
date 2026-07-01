@@ -1993,9 +1993,16 @@ async function handleStreamChat(req, url, res) {
   const _msgT = message.trim();
   const _wordCount = _msgT.split(/\s+/).length;
   const _isIdentityOrSocial = /\b(who (are|r) (you|u|ya)|what (are|r) (you|u)|how (are|r) (you|u|ya)|what'?s up)\b/i.test(_msgT);
+  // Capability questions ("what can you do", "what do you do", "how can you
+  // help", "what are you capable of") are about the assistant's own abilities —
+  // they must be answered by the model (which can enumerate real skills), never
+  // by a raw doc section. "what can you do" scored a spurious near-hit against
+  // CLAUDE.md#Node.js and rendered its empty ```bash fence instead (#1778).
+  const _isCapabilityQuery = /\b(what|how)\b.{0,20}\b(can|could|do|are)\b.{0,20}\b(you|u)\b.{0,20}\b(do|help|capable|able|good at|offer|assist)\b/i.test(_msgT)
+    || /\bwhat('?s| is| are)?\b.{0,20}\byour\b.{0,20}\b(capabilit|skill|feature|abilit|function)/i.test(_msgT);
   const _isPureGreeting = /^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening)|thanks?|thank you|ty|np|ok(ay)?|cool|nice|lol)\b[\s!.?,]*$/i.test(_msgT)
     || (/^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening))\b/i.test(_msgT) && _wordCount <= 6);
-  const isGreetingOrChitchat = _isIdentityOrSocial || _isPureGreeting;
+  const isGreetingOrChitchat = _isIdentityOrSocial || _isCapabilityQuery || _isPureGreeting;
   if (kbAnswer && kbAnswer.hit && !isKeystoneDebug && !isRpMode && !requestedProvider && !wantsLiveData
       && !isGreetingOrChitchat
       && !routeDecision.requires_convergence
