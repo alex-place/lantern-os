@@ -46,6 +46,26 @@ function loadTask(id) {
   }
 }
 
+/**
+ * Find the most recently updated still-running task for a chat session — lets
+ * a plain "keep going" / "continue" resume a task without the user having to
+ * remember or paste its id, which is how a real person actually talks.
+ */
+function findLatestRunningTask(sessionId) {
+  if (!sessionId) return null;
+  try {
+    _ensureDir();
+    const candidates = fs.readdirSync(TASKS_DIR)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => { try { return JSON.parse(fs.readFileSync(path.join(TASKS_DIR, f), "utf8")); } catch { return null; } })
+      .filter((t) => t && t.status === "running" && t.sessionId === sessionId)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    return candidates[0] || null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 function saveTask(task) {
   _ensureDir();
   task.updatedAt = new Date().toISOString();
@@ -157,4 +177,4 @@ async function runRound(task, onStep) {
   return task;
 }
 
-module.exports = { createTask, loadTask, saveTask, runRound, newTaskId, MAX_TOTAL_ROUNDS, TASKS_DIR };
+module.exports = { createTask, loadTask, saveTask, runRound, newTaskId, findLatestRunningTask, MAX_TOTAL_ROUNDS, TASKS_DIR };
