@@ -59,28 +59,6 @@ echo "Syncing $SRC  →  r2://$R2_BUCKET   ${MODE:-(LIVE)}"
   --header-upload "Cache-Control: public, max-age=31536000, immutable" \
   --transfers 8 --checkers 16 --fast-list $MODE -P
 
-# ── Binary-media trees moved off git-LFS → R2 (2026-06-30) ─────────────────────
-# Each entry "<repo-relative dir>:<R2 prefix>". Media-only filter. The R2 prefix
-# must match how the asset is referenced (e.g. three-doors → data/images/ so it
-# resolves at media.lantern-os.net/data/images/three-doors/<scene>.png).
-MEDIA_TREES=(
-  "apps/lantern-garage/public/data/images:data/images"
-  "apps/lantern-garage/public/images:images"
-  "apps/lantern-garage/public/reports:reports"
-  "skills/lantern-rag-dollhouse/assets:dollhouse"
-  "data/images:caadi-images"
-)
-for entry in "${MEDIA_TREES[@]}"; do
-  d="${entry%%:*}"; pfx="${entry##*:}"
-  [ -d "$REPO/$d" ] || { echo "skip (absent): $d"; continue; }
-  echo "Syncing $d  →  r2://$R2_BUCKET/$pfx   ${MODE:-(LIVE)}"
-  "$RCLONE" sync "$REPO/$d" ":s3:$R2_BUCKET/$pfx" \
-    "${RCLONE_S3[@]}" \
-    --include "*.{png,jpg,jpeg,gif,webp,pdf,mp4}" \
-    --header-upload "Cache-Control: public, max-age=31536000, immutable" \
-    --transfers 8 --checkers 16 --fast-list $MODE -P
-done
-
 echo
 echo "Done. If LIVE: set manifest \"base\" to your R2 public URL, e.g."
 echo "  https://media.lantern-os.net/koh/   (custom domain)"
