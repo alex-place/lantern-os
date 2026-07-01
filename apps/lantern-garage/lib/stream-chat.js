@@ -10,7 +10,7 @@ const path = require("path");
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
-const { modelFor } = require("./provider-models");
+const { modelFor: defaultModelFor, isAllowedModel } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
@@ -251,6 +251,18 @@ async function handleStreamChat(req, url, res) {
   });
   let { message, user, requestedAgent, requestedProvider, history, mcpFlag, routeIntent } = parsed;
   const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  // Model pin (#1127 work item 1): a UI-selected model is honoured only when the
+  // user ALSO pinned its provider and the id is on the provider-models allowlist —
+  // a stray/retired id can never hijack routing. This `modelFor` shadows the module
+  // import for every provider call site in this handler: pinned model for the pinned
+  // provider, normal default for everyone else (fallback providers keep their own
+  // defaults when the backstop chain walks past the pin).
+  const { _PROVIDER_ALIASES } = require("./stream-chat/provider-order");
+  const _pinnedInternal = _PROVIDER_ALIASES[String(requestedProvider || "").toLowerCase()] || null;
+  const _modelPin = (parsed.requestedModel && _pinnedInternal && isAllowedModel(_pinnedInternal, parsed.requestedModel))
+    ? { provider: _pinnedInternal, model: parsed.requestedModel }
+    : null;
+  const modelFor = (p) => (_modelPin && p === _modelPin.provider) ? _modelPin.model : defaultModelFor(p);
 
   // Remember-stage hook (#1429): a declarative personal-fact statement ("my kid's shoe size
   // is 7") gets persisted into the ONE canonical CSF memory, same pattern as recordConvergance
@@ -2531,7 +2543,9 @@ async function handleStreamChat(req, url, res) {
   if (_p === "anthropic" && anthropicKey) {
     try {
       let claudeModel = "claude-haiku-4-5-20251001";
-      if (requestedProvider === "claude-sonnet") {
+      if (_modelPin && _modelPin.provider === "anthropic") {
+        claudeModel = _modelPin.model; // UI model pin (#1127) — validated allowlist id
+      } else if (requestedProvider === "claude-sonnet") {
         claudeModel = process.env.ANTHROPIC_SONNET_MODEL || "claude-sonnet-4-6";
       } else {
         claudeModel = process.env.ANTHROPIC_MODEL || claudeModel;
