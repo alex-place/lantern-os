@@ -7,7 +7,7 @@
 function persistToolTurn(role, text, meta) {
   if (!text) return;
   try {
-    const sessionId = localStorage.getItem('lantern_chat_session') || null;
+    const sessionId = localStorage.getItem('lantern_chat_session') || null; // #1268
     fetch('/api/conversations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role, text, surface: 'garage', sessionId, ...(meta ? { meta } : {}) }),
