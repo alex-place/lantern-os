@@ -81,6 +81,24 @@ function routeQuality(decisions, leaderboard) {
   };
 }
 
+// 4. Distillation flywheel (#1421/#1555) — is local->cloud escalation actually feeding local
+// improvement? Reuses the EXISTING flywheel primitives in keystone-escalation.js
+// (recordDistillationPair()'s corpus, readRolloverShare()'s landed-work aggregation) rather
+// than a new store — this function only adds the "observable" half that was missing: a
+// corpus-size number and the local/cloud landed-work share as one tile-ready metric.
+function distillationFlywheelMetrics(distillPairs, convergenceRecords) {
+  const { readRolloverShare } = require("./keystone-escalation");
+  const share = readRolloverShare(convergenceRecords);
+  const corpus = (distillPairs || []).filter((r) => r && r.meta && r.meta.source === "escalation-distill");
+  return {
+    corpusSize: corpus.length,
+    keystoneShare: share.keystoneShare,        // fraction of landed work the LOCAL model won
+    escalationRate: share.escalationRate,       // fraction of attempts that had to escalate off local
+    landed: share.landed, escalations: share.escalations,
+    status: (corpus.length === 0 && share.landed === 0) ? "insufficient_data" : "ok",
+  };
+}
+
 // Aggregate from the live append-only logs.
 function computeOutcomeMetrics(repoRoot) {
   const root = repoRoot || DEFAULT_REPO_ROOT;
@@ -96,20 +114,23 @@ function computeOutcomeMetrics(repoRoot) {
     const blob = `${r.result || ""} ${r.verification_notes || ""}`;
     return /\b(patch|git apply|apply_failed|FAIL_TO_PASS|tests?\s+(passed|failed))\b/i.test(blob);
   };
+  const convergenceRecords = readJsonl(d("convergence", "records.jsonl"));
   const patchRecords = [
     ...readJsonl(d("convergence", "issue-work-records.jsonl")),
-    ...readJsonl(d("convergence", "records.jsonl")),
+    ...convergenceRecords,
     ...readJsonl(d("convergence-autonomous-work.jsonl")),
   ].filter(isPatchRecord);
   const reviews = readJsonl(d("convergence", "council-reviews.jsonl"));
   const decisions = readJsonl(d("router-gate-decisions.jsonl"));
   const leaderboard = readJsonl(d("eval", "leaderboard.jsonl"));
+  const distillPairs = readJsonl(d("distill", "escalation-wins.jsonl"));
 
   return {
     generatedAt: new Date().toISOString(),
     verifiedPatchRate: verifiedPatchRate(patchRecords),
     honestyRate: honestyRate(reviews),
     routeQuality: routeQuality(decisions, leaderboard),
+    distillationFlywheel: distillationFlywheelMetrics(distillPairs, convergenceRecords),
   };
 }
 
@@ -127,6 +148,10 @@ function loadOrCaptureBaseline(metrics, repoRoot) {
       verifiedPatchRate: metrics.verifiedPatchRate.rate,
       honestyRate: metrics.honestyRate.rate,
       escalationRate: metrics.routeQuality.escalationRate,
+      // #1421/#1555: local-vs-cloud landed-work share + corpus size at capture time, so
+      // "local model closed X% of the gap this week" has a real fixed reference point.
+      flywheelKeystoneShare: metrics.distillationFlywheel.keystoneShare,
+      flywheelCorpusSize: metrics.distillationFlywheel.corpusSize,
     };
     fs.writeFileSync(file, JSON.stringify(baseline, null, 2));
     return baseline;
@@ -138,6 +163,7 @@ module.exports = {
   verifiedPatchRate,
   honestyRate,
   routeQuality,
+  distillationFlywheelMetrics,
   computeOutcomeMetrics,
   loadOrCaptureBaseline,
 };

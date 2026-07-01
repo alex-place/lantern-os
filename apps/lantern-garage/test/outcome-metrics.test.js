@@ -75,6 +75,46 @@ check("no decisions → insufficient_data", () => {
   assert.strictEqual(r.status, "insufficient_data");
 });
 
+// ── distillationFlywheelMetrics (#1421/#1555) ───────────────────────────────────
+// Reuses keystone-escalation.js's readRolloverShare() — only adds a corpus-size number
+// and packages both as one tile-ready metric. Not re-testing readRolloverShare's own
+// aggregation logic here (that's keystone-escalation's test file); this checks the wiring.
+check("counts only escalation-distill pairs, ignores other distill sources", () => {
+  const pairs = [
+    { meta: { source: "escalation-distill" } },
+    { meta: { source: "escalation-distill" } },
+    { meta: { source: "some-other-pipeline" } },
+    { meta: {} },
+    {},
+  ];
+  const r = m.distillationFlywheelMetrics(pairs, []);
+  assert.strictEqual(r.corpusSize, 2);
+});
+
+check("no corpus + no landed work → insufficient_data", () => {
+  const r = m.distillationFlywheelMetrics([], []);
+  assert.strictEqual(r.corpusSize, 0);
+  assert.strictEqual(r.status, "insufficient_data");
+});
+
+check("landed work with zero corpus still reports ok (share/escalation known, corpus just empty)", () => {
+  const records = [
+    { reasoner: "keystone-kernel", result: "landed-by-ollama/ouro", timestamp: new Date().toISOString() },
+    { reasoner: "keystone-kernel", result: "landed-by-anthropic/claude", timestamp: new Date().toISOString() },
+  ];
+  const r = m.distillationFlywheelMetrics([], records);
+  assert.strictEqual(r.corpusSize, 0);
+  assert.strictEqual(r.landed, 2);
+  assert.strictEqual(r.keystoneShare, 0.5);
+  assert.strictEqual(r.status, "ok");
+});
+
+check("computeOutcomeMetrics wires distillationFlywheel into the aggregate output", () => {
+  const out = m.computeOutcomeMetrics("/no/such/repo/root");
+  assert.ok(out.distillationFlywheel);
+  assert.strictEqual(out.distillationFlywheel.status, "insufficient_data"); // empty repo root
+});
+
 // ── readJsonl is resilient to bad lines / missing files ─────────────────────────
 check("readJsonl returns [] for a missing file", () =>
   assert.deepStrictEqual(m.readJsonl("/no/such/file.jsonl"), []));
