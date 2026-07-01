@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-07-01T07:44:48Z",
+  "judge_model": "qwen2.5-coder:latest",
+  "datasets": [
+    {
+      "file": "surprise_leak_qwen15b.jsonl",
+      "judge_model": "qwen2.5-coder:latest",
+      "n": 199,
+      "n_errors": 0,
+      "judge_halluc_rate": 0.7035175879396985,
+      "string_halluc_rate": 0.8040201005025126,
+      "agreement": 0.8894472361809045,
+      "auroc_field_judge": 0.5214285714285715,
+      "auroc_mean_judge": 0.7245762711864406,
+      "auroc_field_string": 0.51875,
+      "auroc_mean_string": 0.7621794871794871
+    },
+    {
+      "file": "surprise_leak_mistral7b.jsonl",
+      "judge_model": "qwen2.5-coder:latest",
+      "n": 199,
+      "n_errors": 0,
+      "judge_halluc_rate": 0.3969849246231156,
+      "string_halluc_rate": 0.5025125628140703,
+      "agreement": 0.864321608040201,
+      "auroc_field_judge": 0.5,
+      "auroc_mean_judge": 0.8086497890295359,
+      "auroc_field_string": 0.5,
+      "auroc_mean_string": 0.791060606060606
+    }
+  ]
+}

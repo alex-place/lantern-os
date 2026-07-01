@@ -1,10 +1,18 @@
 # Changelog
 
-## [1.8.9] - 2026-07-01
+## [1.8.11] - 2026-07-01
 ### Changed
 - **`/explore.html` now reads like a modern social feed (Facebook/Instagram).** Added a single-column ↔ 4-up grid layout toggle (responsive 4-3-2-1, persisted in localStorage), a per-card share-to-socials affordance (native Web Share sheet on mobile; desktop popover with X / Facebook / Reddit / LinkedIn / WhatsApp + copy-link, recording a positive engagement signal), and first-paint skeletons for perceived speed. Improves the **Act** stage — the same ranked feed, now shareable and browsable two ways.
 ### Fixed
 - **Explore feed loads faster, more consistently, and never repeats.** Endless-scroll pages each re-ran the full aggregate+rank fan-out (~295 ms/page and re-ranked mid-scroll, reading as inconsistent loading); a short-TTL per-audience rank cache (`lib/explore-feed.js`, `EXPLORE_FEED_TTL_MS`, default 15 s) serves pages within the window from one stable rank — measured ~5 ms/page (≈60× faster) with no jitter, while engagement still re-steers on the next window. Infinite scroll no longer cycles already-seen posts: when the catalog loops the client stops and says "caught up" (verified 39 pages, 348 unique cards, zero duplicates).
+
+## [1.8.10] - 2026-07-01
+### Changed
+- **Knowledge Center library rebalanced — no more "Library" dumping ground (#1708).** Regenerated the doc-library card block from the current catalog and added a deterministic path/keyword reclassifier (`reclassifyLibrary`) in `scripts/build_doc_library.js` that rescues any catch-all `library` doc (catalogued-but-unbucketed or uncatalogued) into a topical bucket — setup / trading / training / creator / reports / ops. The checked-in `knowledgecenter.html` was stale (Library held 46 cards); it now holds 5, with every filter chip backed by a sensible non-empty subset (research 57, architecture 36, guides 28, setup/ops/creator 14, …). Improves the **Remember** stage: browsing the grounding corpus by category is useful again. (No single catch-all chip dominates; the reclassifier keeps it that way as new docs land.)
+
+## [1.8.9] - 2026-07-01
+### Changed
+- **Dual-boot launcher now preflights dependency drift and is documented as one idempotent command (#1552).** `Start-DualServers.ps1` gains a `Test-WorktreeDeps` preflight that resolve-probes each worktree's `node_modules` and runs `npm install` only when a required dependency can't resolve (missing/drifted) — catching the common silent failure where a drifted `node_modules` makes the server throw at `require()` and the port answers HTTP 000. A healthy tree is untouched; a lockfile older than `package.json` is flagged as a warning. QUICKSTART documents the full check-then-act path (prereqs → deps → env → clean-slate → launch+health → watchdog) and that re-running the one command is the correct fix for a down/misbehaving server. Improves the **Act** stage (dev/runtime reliability).
 
 ## [1.8.8] - 2026-07-01
 ### Fixed

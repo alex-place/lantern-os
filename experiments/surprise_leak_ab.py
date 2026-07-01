@@ -279,14 +279,25 @@ def generate(client, model, question, max_tokens):
 
 
 def judge(client, model, question, gold, prediction) -> bool:
-    """Optional LLM grader (SimpleQA-style). Returns True iff CORRECT."""
+    """Optional LLM grader (SimpleQA-style). Returns True iff CORRECT.
+
+    #1683: check INCORRECT first. "INCORRECT" contains "CORRECT" as a substring, so a
+    plain `"CORRECT" in text` check silently mislabels every correct INCORRECT verdict
+    as correct — found via a judge-regrade run that came back at 0.0% hallucination
+    rate on a dataset the string grader put at 50-80% (docs/research/
+    2026-07-01-surprise-leak-judge-regrade.md). Validated live across 398 real judge
+    calls with the fix in place.
+    """
     msg = (f"Question: {question}\nGold answer(s): {gold}\nModel answer: {prediction}\n\n"
            "Is the model answer CORRECT (semantically matches a gold answer)? "
            "Reply with exactly one word: CORRECT or INCORRECT.")
     r = client.chat.completions.create(
         model=model, temperature=0.0, max_tokens=4,
         messages=[{"role": "user", "content": msg}])
-    return "CORRECT" in (r.choices[0].message.content or "").upper()
+    content = (r.choices[0].message.content or "").upper()
+    if "INCORRECT" in content:
+        return False
+    return "CORRECT" in content
 
 
 # ─────────────────────────────── self-test ─────────────────────────────────

@@ -143,6 +143,25 @@ function catLabelFor(rel, cat) {
   return (CATS[cat] && CATS[cat].label) || 'Library';
 }
 
+// Path/keyword reclassifier for the catch-all: keeps "Library" from becoming a
+// dumping ground for docs the catalog leaves unbucketed (or that arrive
+// uncatalogued). Only ever applied when the category would otherwise be
+// 'library', so it can never override a deliberate catalog category. Rules are
+// ordered most-specific first; genuinely-misc docs stay 'library' (#1708).
+function reclassifyLibrary(rel) {
+  const p = rel.toLowerCase();
+  const rules = [
+    ['setup',    /(setup|connector|oauth|deployment|tunnel|api-spec|mcp-client|ibkr|youtube|media-hosting)/],
+    ['trading',  /(trader|trading|kalshi|prediction-market|portfolio)/],
+    ['training', /(ouro|training|serving|\bgpu\b|weekly-training|sigma0|plt)/],
+    ['creator',  /(creator|v10-|facecam|three-doors|upload)/],
+    ['reports',  /(audit|-report|summary|\bqa\b|validation|feature-test)/],
+    ['ops',      /(monoworkstream|rollover|repo-contract|auto-merge|work-queue|runbook|cicd|backlog|dispatch|scripts?\/)/],
+  ];
+  for (const [cat, re] of rules) if (re.test(p)) return cat;
+  return 'library';
+}
+
 // ── card renderer (larger panel + metadata footer: category · status · grounding · date) ──
 function card(c) {
   const cat = c.cat;
@@ -194,7 +213,8 @@ function inRepoCards() {
     const e = byPath.get(rel);
     if (e) {
       if (e.action !== 'keep') { stats.excluded++; continue; }
-      const cat = CATS[e.category] ? e.category : 'library';
+      let cat = CATS[e.category] ? e.category : 'library';
+      if (cat === 'library') cat = reclassifyLibrary(rel);   // rescue catch-all into a topical bucket
       entries.push({
         rel, cat, icon: e.icon,
         catLabel: catLabelFor(rel, cat),
@@ -209,7 +229,7 @@ function inRepoCards() {
     } else {
       // uncatalogued → fallback extraction, flagged Unreviewed
       const { title, summary } = fallbackMeta(readText(path.join(REPO, rel)));
-      const cat = 'library';
+      const cat = reclassifyLibrary(rel);   // uncatalogued → best-effort topical bucket, not a dump
       entries.push({
         rel, cat, catLabel: catLabelFor(rel, cat),
         title: title || prettyFromName(path.basename(rel)),
