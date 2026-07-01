@@ -60,12 +60,23 @@ DEFAULT_SUMMER_NORMAL_F = 84.0
 
 COOL_BIAS_F = 1.2       # Central-Park sensor runs cool vs the gridded forecast
 REGRESSION_K = 0.06     # large positive anomalies verify less extreme (regression)
-SIGMA_BASE_F = 2.4      # day-1 summer max-temp forecast σ (NWS MAE ≈ a few °F)
+SIGMA_BASE_F = 2.4      # day-AHEAD (lead>=1) summer max-temp forecast σ (NWS MAE ≈ a few °F)
 SIGMA_PER_LEAD_F = 0.5  # error spread grows with lead time
+# SAME-DAY nowcast σ: for a market on TODAY's high, much of the day's heating is
+# already observed, so the remaining spread is far tighter than a day-ahead forecast.
+# Using the day-ahead 2.4 for a same-day high over-spreads the distribution and
+# manufactures a phantom edge against the (well-calibrated, tight) live same-day
+# market — the exact false positive found on the live 2026-07-01 KXHIGHNY board.
+SIGMA_NOWCAST_F = 1.5   # same-day high; physically ~NWS same-day MAE, not curve-fit
 
 # Calibration-band half-widths — the honest uncertainty in the calibration itself.
 MEAN_UNC_F = 0.8        # ± downshift uncertainty (until IEM measures it)
-SIGMA_LO, SIGMA_HI = 0.78, 1.25   # the high may be more / less predictable than nominal
+# The high may be MUCH more predictable than the nominal day-ahead σ when the
+# synoptic pattern is stable — a liquid market peaked on one bucket implies an
+# effective σ ~1.5F (well below 2.4). SIGMA_LO must reach that low so a routine-day
+# "edge" only counts if it beats even the market's own tight-σ view; otherwise the
+# band rubber-stamps model-vs-market noise (the phantom NO 94-95 on the live board).
+SIGMA_LO, SIGMA_HI = 0.6, 1.30    # 0.6*2.4 = 1.44F floor covers the tight liquid market
 
 # P(actual KNYC high ≥ 100 °F | NWS forecast high), from the ≥100 record + the
 # 2013-2025 near-miss streak (many 99 °F, zero 100 °F). Interpolated.
@@ -114,7 +125,12 @@ def calibrated_mean(forecast_high: float, month: int, day: int) -> float:
 
 
 def sigma_for_lead(lead_days: int) -> float:
-    return SIGMA_BASE_F + SIGMA_PER_LEAD_F * max(0, lead_days - 1)
+    # lead_days<=0 == same-day nowcast (settles tonight): tight spread, so the model
+    # does NOT out-spread the market and invent a routine-day edge. The model's real
+    # edge lives in the >=100 F CEILING on extreme days, not in σ-width on routine days.
+    if lead_days <= 0:
+        return SIGMA_NOWCAST_F
+    return SIGMA_BASE_F + SIGMA_PER_LEAD_F * (lead_days - 1)
 
 
 def _bucket_just_below_100(ladder: List[Bucket]) -> Optional[str]:
