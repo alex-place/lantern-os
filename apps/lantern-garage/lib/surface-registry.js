@@ -61,7 +61,6 @@ const EXTENSION = {
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "crypto-dashboard.html":         ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
-  "test_deck_demo.html":           ["trading", "TRADING_ENABLED"],
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   "brainrot.html":                 ["creator", "CREATOR_ENABLED"],
@@ -94,9 +93,6 @@ const EXTENSION = {
   "whats-new.html":                ["meta", null],
   // visualization
   "observer-mesh-cube.html":       ["viz", null],
-  // legacy / superseded (kept for rollback; not the live path)
-  "dream-chat-v1.html":            ["legacy", null],
-  "dream-chat-orion.html":         ["legacy", null],
 };
 
 /** Classify one top-level surface filename. Returns null if unclassified. */
