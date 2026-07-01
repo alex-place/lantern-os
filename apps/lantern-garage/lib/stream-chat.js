@@ -30,7 +30,7 @@ const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
 const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
-const { defaultRings } = require("./grounding-rings");
+const { defaultRings, xenonStarshipRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
 const { generateDoorSceneImage } = require("./image-generation");
@@ -534,6 +534,34 @@ async function handleStreamChat(req, url, res) {
         "Connection": "keep-alive",
         "Access-Control-Allow-Origin": "*",
         "X-Accel-Buffering": "no",
+      });
+
+      // Special handling for Xenon Starship convergence
+      if (converganceRoute === "xenon-convergence") {
+        const xenonPreamble = buildBehaviorPreamble(requestedAgent, message, history, {
+          surfaceMode,
+          threeDoorsPreamble: THREE_DOORS_XENON_STARSHIP_PREAMBLE,
+        });
+        const xenonRings = xenonStarshipRings();
+        const xenonGrounding = await resolveGrounding(message, history, {
+          rings: xenonRings,
+          forceGround,
+          sessionId,
+        });
+        const xenonFormattedGrounding = formatGroundingForPrompt(xenonGrounding);
+        const xenonContext = await formatCSFContextForPromptAsync(message, history, sessionId);
+        const xenonSystemPrompt = `${xenonPreamble}\n\n${xenonFormattedGrounding}\n\n${xenonContext}`;
+
+        // Emit convergence record for Xenon Starship
+        emitConvergenceRecord({
+          type: "xenon-starship-convergence",
+          details: { message, history, xenonSystemPrompt, xenonGrounding, xenonRings },
+        });
+      }
+
+      const preamble = buildBehaviorPreamble(requestedAgent, message, history, {
+        surfaceMode,
+        threeDoorsPreamble: THREE_DOORS_PREAMBLE,
       });
       const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
       const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);

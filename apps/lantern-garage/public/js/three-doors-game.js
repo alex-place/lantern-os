@@ -1,5 +1,6 @@
 // ── Three Doors Game Logic ─────────────────────────────────────────────────────
 // Game state, progress management, prize system, and UI rendering
+//
 // Depends on three-doors-data.js for SCENES, STAGES, and constants
 
 // ── State ─────────────────────────────────────────────────────────
@@ -606,6 +607,11 @@ function resolveDoorTarget(doorName, spineIndex) {
   return STAGES[(spineIndex + 1) % STAGES.length];   // onward fallback = next gate
 }
 
+// Xenon Starship specific logic
+function handleXenonStarship(doorName) {
+  // Placeholder for Xenon Starship specific logic, e.g., triggering image generation
+}
+
 function navScore(c, ctx) {
   const W = NAV_WEIGHTS;
   const visits = ctx.sceneVisits[c] || 0;
@@ -627,6 +633,11 @@ function navigate(currentScene, doorName, state) {
   const beatsSinceSpine = state.beats_since_spine ?? 0;
   const nextBeat = STAGES[(spineIndex + 1) % STAGES.length];
   const mapped = resolveDoorTarget(doorName, spineIndex);
+
+  // Special handling for Xenon Starship
+  if (doorName === "xenon-convergence") {
+    handleXenonStarship(doorName);
+  }
 
   // Candidate set: the chosen door's target, the next narrative gate, and the
   // *other* doors' targets as on-theme novel neighbors. Guarantees non-empty.
