@@ -41,9 +41,6 @@ const DEFAULT_PROGRESS = {
   visited: [],
   sceneVisits: {},
   completedChallenges: [],
-  poemSolved: false,
-  poemAnsweredCorrectly: false,
-  poemAttempts: 0,
   loop_count: 0,
   stage_index: 0,
   currentScene: null,
@@ -103,12 +100,9 @@ function validateProgress(data) {
   }
   
   // Validate booleans
-  if (typeof validated.poemSolved !== "boolean") validated.poemSolved = false;
-  if (typeof validated.poemAnsweredCorrectly !== "boolean") validated.poemAnsweredCorrectly = false;
   if (typeof validated.loopCompleted !== "boolean") validated.loopCompleted = false;
-  
+
   // Validate numbers
-  if (typeof validated.poemAttempts !== "number" || isNaN(validated.poemAttempts)) validated.poemAttempts = 0;
   if (typeof validated.loop_count !== "number" || isNaN(validated.loop_count)) validated.loop_count = 0;
   if (typeof validated.stage_index !== "number" || isNaN(validated.stage_index)) validated.stage_index = 0;
   
@@ -210,7 +204,6 @@ const PRIZES = {
   "glitch-hunter-badge": { name: "Glitch Hunter", icon: "💾", rarity: "epic", description: "Found all XP Door corruption sequences", unlockable: false },
   "xenon-navigator-badge": { name: "Xenon Navigator", icon: "✨", rarity: "epic", description: "Reached both Xenon Starship and Sigil City", unlockable: false },
   "synthesasia-badge": { name: "Synthesasia in Threes", icon: "◈", rarity: "legendary", description: "Mastered pattern recognition through 3 loops", unlockable: false },
-  "poem-master": { name: "Poem Master", icon: "📜", rarity: "epic", description: "Solved the King's poem on the first try", unlockable: false },
   "lucky-find": { name: "Lucky Find", icon: "🍀", rarity: "common", description: "Found a shiny in the Cloverfield", unlockable: false },
   "time-traveler": { name: "Time Traveler", icon: "⏰", rarity: "rare", description: "Visited all Future Door sub-paths", unlockable: false },
   "convergence-master": { name: "Convergence Master", icon: "🌌", rarity: "epic", description: "Reached Xenon Starship twice", unlockable: false },
@@ -244,8 +237,8 @@ function showPrizeToast(prizeId) {
   const rarityColor = RARITY_COLORS[prize.rarity] || "#9ca3af";
   const chat = document.getElementById("chat");
   const el = document.createElement("div");
-  el.className = "message agent";
-  el.innerHTML = `<div class="agent-avatar">${prize.icon}</div><div class="message-content" style="background:${rarityColor}15;border-color:${rarityColor}40"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${rarityColor};margin-bottom:4px">${prize.rarity} Prize</div><div style="font-size:13px;font-weight:600">${prize.name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${prize.description}</div></div>`;
+  el.className = "message agent toast";
+  el.innerHTML = `<div class="agent-avatar">${prize.icon}</div><div class="message-content" style="border-left-color:${rarityColor}"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:${rarityColor};margin-bottom:2px">${prize.rarity} Prize</div><div style="font-size:13px;font-weight:600">${prize.name}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${prize.description}</div></div>`;
   chat.appendChild(el);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -313,7 +306,6 @@ if (!playerProgress.prizes) {
 // ── Challenge System ───────────────────────────────────────────────
 const CHALLENGES = {
   "kingdome-garden": [
-    { id: "poem-master", name: "Poem Master", description: "Solve the King's poem on first try", reward: "kingdome-crown", check: (p) => p.poemAnsweredCorrectly && p.poemAttempts === 1 },
     { id: "king-audience", name: "King's Audience", description: "Visit the Garden 3 times", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["kingdome-garden"] || 0) >= 3 },
   ],
   "cloverfield": [
@@ -347,17 +339,12 @@ const GLOBAL_CHALLENGES = [
 
 function checkChallenges(sceneKey, turnCount, countVisit) {
   // Track scene visits — skipped when this call is just a redraw of the
-  // scene the player is already in (page reload, poem-answer redraw), so
-  // those don't inflate "visit N times" progress. Challenge checks below
-  // still run every time (harmless: already-completed ones are guarded).
+  // scene the player is already in (e.g. a page reload), so those don't
+  // inflate "visit N times" progress. Challenge checks below still run
+  // every time (harmless: already-completed ones are guarded).
   if (countVisit !== false) {
     if (!playerProgress.sceneVisits) playerProgress.sceneVisits = {};
     playerProgress.sceneVisits[sceneKey] = (playerProgress.sceneVisits[sceneKey] || 0) + 1;
-
-    // Track poem attempts
-    if (sceneKey === "kingdome-garden" && !playerProgress.poemSolved) {
-      playerProgress.poemAttempts = (playerProgress.poemAttempts || 0) + 1;
-    }
   }
 
   // Check scene-specific challenges
@@ -389,8 +376,8 @@ function checkChallenges(sceneKey, turnCount, countVisit) {
 function showChallengeComplete(challenge) {
   const chat = document.getElementById("chat");
   const el = document.createElement("div");
-  el.className = "message agent";
-  el.innerHTML = `<div class="agent-avatar">🏆</div><div class="message-content" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.3)"><div style="font-size:12px;font-weight:600;color:#fbbf24;margin-bottom:4px">Challenge Complete</div><div style="font-size:13px">${challenge.name}: ${challenge.description}</div></div>`;
+  el.className = "message agent toast";
+  el.innerHTML = `<div class="agent-avatar">🏆</div><div class="message-content" style="border-left-color:#fbbf24"><div style="font-size:12px;font-weight:600;color:#fbbf24;margin-bottom:2px">Challenge Complete</div><div style="font-size:13px">${challenge.name}: ${challenge.description}</div></div>`;
   chat.appendChild(el);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -422,10 +409,28 @@ function logThreeDoorsEvent(event, payload) {
 }
 
 // ── Markdown-lite renderer ────────────────────────────────────────
+// Splits on blank lines into paragraphs (the source scene text uses \n\n
+// deliberately — flattening it into one run-on block was the main
+// readability problem). A paragraph that's ENTIRELY a quoted, italicized
+// line (the pattern every scene uses for something a character says out
+// loud) renders as a distinct spoken-line block instead of blending into
+// the narration around it.
 function md(text) {
-  return text
+  const inline = (s) => s
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/\n/g, "<br>");
+
+  return text
+    .split(/\n\n+/)
+    .map((para) => {
+      const trimmed = para.trim();
+      const speech = trimmed.match(/^\*["“](.+)["”]\*$/s);
+      return speech
+        ? `<blockquote class="king-speech">${inline(speech[1])}</blockquote>`
+        : `<p>${inline(trimmed)}</p>`;
+    })
+    .join("");
 }
 
 // ── Chat helpers ─────────────────────────────────────────────────
@@ -452,47 +457,6 @@ function appendTyping() {
 function removeTyping() {
   const el = document.getElementById("typing-indicator");
   if (el) el.remove();
-}
-
-// ── Poem gate ───────────────────────────────────────────────────
-function submitPoem() {
-  const input = document.getElementById("poem-answer");
-  if (!input) return;
-  const val = input.value.trim().toLowerCase();
-  // Accepted answers based on CSF lore: "silence", "the name", "yourself", "the lantern", "the light"
-  const accepted = ["yourself","myself","i am","the one","silence","love","the lantern","the light","convergence","me","i","the name","name"];
-  if (accepted.some(a => val.includes(a))) {
-    playerProgress.poemSolved = true;
-    playerProgress.poemAnsweredCorrectly = true;
-    saveProgress();
-    awardPrize("kingdome-crown");
-    // Refresh scene to show doors with King's response
-    appendUserMsg("Answer: \"" + input.value.trim() + "\"");
-    const scene = SCENES["kingdome-garden"];
-    const kingResponse = `The King nods slowly, his crown of vines and cursors blinking in recognition. *\"Correct,\"* he says, his voice like old light through moss. *\"You understand what was lost at the beginning is the thing that was gained. The doors are now open to you.\"*`;
-    // resumed: true — this redraws the Garden the player is already in, not a new visit.
-    const data = { scene_key: "kingdome-garden", text: scene.text + "\n\n" + kingResponse, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [], resumed: true };
-    appendSceneMsg("kingdome-garden", data, "", "offline");
-  } else {
-    const chat = document.getElementById("chat");
-    const el = document.createElement("div");
-    el.className = "message agent";
-    el.innerHTML = `<div class="agent-avatar">👑</div><div class="message-content" style="font-size:13px;color:var(--muted)">The King waits. The garden holds its breath. *\"Think deeper,\"* he says. *\"What was lost at the beginning is the thing that was gained.\"*</div>`;
-    chat.appendChild(el);
-    chat.scrollTop = chat.scrollHeight;
-  }
-}
-
-function skipPoem() {
-  // poemSolved only hides the poem prompt on future Garden visits — it must
-  // NOT imply poemAnsweredCorrectly, or skipping would earn the "solved the
-  // poem on the first try" prize for free.
-  playerProgress.poemSolved = true;
-  saveProgress();
-  const scene = SCENES["kingdome-garden"];
-  // resumed: true — this redraws the Garden the player is already in, not a new visit.
-  const data = { scene_key: "kingdome-garden", text: scene.text, doors: scene.doors, fox_present: scene.fox, history: gameState?.history || [], resumed: true };
-  appendSceneMsg("kingdome-garden", data, "", "offline");
 }
 
 // ── Inline engine fallback ────────────────────────────────────────
@@ -629,6 +593,12 @@ function engineStart() {
     return state;
   }
   const state = sceneState("kingdome-garden", 0, 0, ["Entered the Garden at the Beginning"], 0);
+  // First pass only: three immediate choices, not the full seven-gate menu —
+  // matches the "always exactly three meaningful choices" play contract.
+  // No real preference profile exists yet, so pick a random three of the
+  // seven and relabel them A–C; SCENES["kingdome-garden"].doors (all seven)
+  // is untouched, so routing/novelty scoring still sees the full graph.
+  state.doors = pickThreeDoors(state.doors);
   // Persist right away — otherwise a reload before the first door choice
   // never sees a saved currentScene, so it looks like a brand-new game every
   // time and re-counts the Garden as freshly visited (inflating challenge
@@ -639,6 +609,12 @@ function engineStart() {
   playerProgress.loop_count = state.loop_count;
   saveProgress();
   return state;
+}
+
+function pickThreeDoors(doors) {
+  const shuffled = [...doors].sort(() => Math.random() - 0.5).slice(0, 3);
+  const letters = ["A", "B", "C"];
+  return shuffled.map((d, i) => ({ ...d, label: letters[i] }));
 }
 
 function engineChoose(label) {
@@ -686,7 +662,7 @@ if (typeof module !== "undefined" && module.exports) {
 // ── API calls ─────────────────────────────────────────────────────
 async function apiNarrate(sceneKey, sceneText) {
   // Local-only narration: provider "local" routes to Ollama (lantern-csf-dream);
-  // no cloud provider is contacted. Keystone is the voice of the game.
+  // no cloud provider is contacted. Lantern is the voice of the game.
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15000);
   try {
@@ -819,7 +795,7 @@ function submitCustomDoor() {
     chooseDoor("CUSTOM", val);
     return;
   }
-  // Anything conversational — talk to Keystone, in persona, inside the scene
+  // Anything conversational — talk to Lantern, in persona, inside the scene
   input.value = "";
   askLantern(val);
 }

@@ -1,13 +1,25 @@
 ﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#06b6d4">
 <title>Kingdome of Hearts</title>
 <link rel="stylesheet" href="/css/site.css">
 <link rel="stylesheet" href="css/dream-chat.css">
+<link rel="stylesheet" href="/css/dream-chat-terminal.css?v=20260630-terminal">
+<!-- Restore the opt-in Terminal (CRT) skin before paint, to avoid a flash of the default theme. -->
+<script>(function(){try{if(localStorage.getItem('keystone-skin')==='terminal')document.documentElement.setAttribute('data-skin','terminal');}catch(e){}})();</script>
 <style>
+  /* ── Kingdome of Hearts: this surface's identity color ──
+     Per docs/KEYSTONE-BRAND-GUIDELINES.md §3, "Games / playful" surfaces
+     carry rose (#fb7185) as their accent, distinct from the cyan brand
+     chrome in the shared nav. Everything specific to this game — doors,
+     the gate track, the threshold motif — reads in rose; the nav stays
+     cyan so the app-wide brand is still recognizable. */
+  :root { --door-accent: #fb7185; --door-accent-dim: rgba(251, 113, 133, 0.15); }
+
   /* ── Override dream-chat.css layout for this page ── */
   html, body { overflow: auto !important; height: auto !important; min-height: 100dvh; }
   ::-webkit-scrollbar { display: block !important; width: 4px; }
@@ -16,6 +28,38 @@
   .chat-container { overflow: visible !important; flex: 1 1 auto !important; max-height: none !important; width: 100% !important; max-width: 720px; margin: 0 auto; padding: 16px; box-sizing: border-box; }
   .input-container { max-width: 720px; margin: 0 auto; width: 100%; padding: 8px 16px; box-sizing: border-box; }
 
+  /* Door console — replaces the generic chat input row */
+  .console-picks { display: flex; gap: 6px; margin-bottom: 10px; }
+  .console-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .console-input-row { display: flex; gap: 8px; align-items: center; }
+  .console-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .console-input:focus { border-color: var(--door-accent); }
+  .console-submit {
+    padding: 10px 18px;
+    background: var(--door-accent);
+    color: #1a0d0f;
+    border: none;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .console-submit:hover { background: #fca5b1; }
+
   /* ── Explore additions on top of dream-chat.css ── */
   .doors-banner {
     display: flex;
@@ -23,39 +67,81 @@
     gap: 8px;
     margin-top: 10px;
   }
+  /* Door cards: an arched top edge + a center seam standing in for the
+     literal thing being offered — a threshold, not a menu row. */
   .door-chip {
     display: flex;
     align-items: flex-start;
     gap: 12px;
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 11px 14px;
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding: 13px 14px 11px;
     cursor: pointer;
     text-align: left;
     width: 100%;
-    transition: border-color 0.18s, background 0.18s;
+    position: relative;
+    transition: border-color 0.18s, background 0.18s, transform 0.18s;
     font-family: inherit;
     color: var(--text);
   }
-  .door-chip:hover:not(:disabled) {
-    border-color: var(--accent);
-    background: var(--surface);
+  .door-chip::before {
+    content: "";
+    position: absolute;
+    top: 8px; bottom: 8px; left: 50%;
+    width: 1px;
+    background: var(--border);
+    transition: background 0.18s;
   }
+  .door-chip:hover:not(:disabled) {
+    border-color: var(--door-accent);
+    background: var(--surface);
+    transform: translateY(-1px);
+  }
+  .door-chip:hover:not(:disabled)::before { background: var(--door-accent); }
   .door-chip:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
   .door-letter {
-    font-size: 16px;
+    font-size: 12px;
     font-weight: 700;
-    color: var(--accent);
+    color: var(--door-accent);
+    letter-spacing: 0.08em;
     min-width: 20px;
     margin-top: 1px;
   }
   .door-info { flex: 1; }
   .door-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   .door-desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  /* Quick-pick strip below the input — small versions of the same door */
+  .door-pick {
+    flex: 1;
+    padding: 9px 10px 7px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text);
+    text-align: left;
+    min-width: 0;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+  }
+  .door-pick:hover {
+    border-color: var(--door-accent);
+    background: var(--surface);
+    transform: translateY(-1px);
+  }
+  .door-pick .door-letter { font-size: 10px; margin-bottom: 2px; display: block; }
+  .door-pick .door-pick-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .scene-image {
     width: 100%;
@@ -115,9 +201,164 @@
 
   .agent-avatar { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
 
-  /* Override agent bubble for doors content */
+  /* ── Base message system ──
+     three-doors-game.js emits .message/.message-content/.agent-avatar for
+     the King's poem, prize toasts, challenge toasts, the typing indicator,
+     and freeform Lantern replies — none of dream-chat.css's classes
+     (.msg-row/.bubble) apply here, so this page defines its own quiet,
+     non-chat-app version: a plain row, not a messaging-app bubble. */
+  .message { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+  .message.user { justify-content: flex-end; }
+  .message.user .message-content {
+    background: var(--door-accent-dim);
+    border: 1px solid rgba(251,113,133,0.3);
+    border-radius: 12px;
+    padding: 9px 13px;
+    max-width: 80%;
+    font-size: 13px;
+  }
+  .message-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 13px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Prize / challenge banners — a ribbon, not a conversation turn */
+  .message.toast { margin-bottom: 10px; }
+  .message.toast .message-content {
+    border-left-width: 3px;
+    padding: 8px 13px;
+  }
+
+  /* Scene header kicker + door-list kicker — the brand's eyebrow-label
+     pattern, in this surface's rose identity. */
+  .scene-kicker, .doors-kicker, .riddle-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .doors-section { margin-top: 14px; }
+  .doors-kicker { color: var(--door-accent); margin-bottom: 8px; }
+
+  /* Scene narration — a page of the story, not a chat line. The source
+     text's own paragraph breaks (\n\n) are honored instead of flattened
+     into one run-on block, and the first paragraph opens with a dropped
+     capital. */
+  .scene-narration { font-size: 14.5px; line-height: 1.7; color: var(--text); }
+  .scene-narration p { margin: 0 0 12px; }
+  .scene-narration p:last-child { margin-bottom: 4px; }
+  .scene-narration p:first-child::first-letter {
+    font-size: 2.6em;
+    font-weight: 700;
+    color: var(--door-accent);
+    float: left;
+    line-height: 0.8;
+    margin: 0.05em 0.08em 0 0;
+  }
+
+  /* A character's spoken line — set apart from narration, not blended
+     into it. Large opening quote mark, indented, in the character's
+     "voice" rather than the narrator's. */
+  .king-speech {
+    margin: 4px 0 14px;
+    padding: 2px 0 2px 18px;
+    border-left: 2px solid var(--door-accent);
+    font-size: 15px;
+    font-style: italic;
+    color: var(--text);
+    position: relative;
+  }
+  .king-speech::before {
+    content: "\201C";
+    position: absolute;
+    left: -3px; top: -8px;
+    font-size: 32px;
+    font-style: normal;
+    font-weight: 700;
+    color: var(--door-accent);
+    opacity: 0.55;
+    line-height: 1;
+  }
+
+  /* Current scene card gets a lit top edge; earlier ones in the scroll
+     recede — reads like flipping back through a journal, not scrolling
+     an endless equally-weighted feed. */
+  .doors-message .message-content { position: relative; }
+  .doors-message .message-content::before {
+    content: "";
+    position: absolute;
+    top: -1px; left: 14px; right: 14px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--door-accent), transparent);
+    border-radius: 2px;
+  }
+  .doors-message.is-past {
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+  .doors-message.is-past:hover { opacity: 0.9; }
+  .doors-message.is-past .message-content::before { display: none; }
+  .doors-message.is-past .scene-image { max-height: 110px; }
+  .doors-message.is-past .doors-section { display: none; }
+
+  /* Gate track — the 7-stage loop as dots on a connecting line */
+  .gate-track {
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .gate-track-loop {
+    background: var(--door-accent);
+    color: #1a0d0f;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .gate-track-steps { display: flex; align-items: center; }
+  .gate-step { display: flex; align-items: center; }
+  .gate-step-line { width: 14px; height: 1px; background: var(--border); flex-shrink: 0; }
+  .gate-step-line.filled { background: var(--door-accent); opacity: 0.5; }
+  .gate-step-dot {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: default;
+  }
+  .gate-step-dot .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    flex-shrink: 0;
+  }
+  .gate-step-dot.visited .dot { border-color: var(--muted); background: var(--muted); }
+  .gate-step-dot.active { color: var(--text); font-weight: 600; }
+  .gate-step-dot.active .dot {
+    border-color: var(--door-accent);
+    background: var(--door-accent);
+    box-shadow: 0 0 0 3px var(--door-accent-dim);
+  }
+
+  /* Override agent bubble for doors content — no avatar column anymore,
+     so the card takes the full width of the reading column. */
+  .doors-message { display: block; }
   .doors-message .message-content {
-    max-width: 90%;
+    max-width: 100%;
     width: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -141,11 +382,16 @@
   }
 
   .welcome-doors { text-align: center; padding: 0; display: flex; flex-direction: column; align-items: center; }
+  /* Signature element: nested archways receding to a lit vanishing point —
+     "I am before the first door and after the last." Built from the game's
+     own geometry (the door shape used everywhere below), not a photo. */
   .welcome-doors-backdrop {
     width: 100%;
     max-width: 100%;
     aspect-ratio: 16/9;
-    background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.6) 100%);
+    background:
+      radial-gradient(ellipse at 50% 62%, rgba(251,113,133,0.16) 0%, transparent 55%),
+      linear-gradient(180deg, #0b0f1a 0%, #060811 100%);
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -155,14 +401,29 @@
     animation: backdropFade 0.8s ease-out forwards;
   }
   @keyframes backdropFade { from { opacity: 0; } to { opacity: 1; } }
-  .welcome-doors-backdrop img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .threshold-motif {
     position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 0;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    width: auto;
+    opacity: 0.9;
+  }
+  .threshold-motif .arch-ring { animation: threshold-breathe 6s ease-in-out infinite; transform-origin: 200px 260px; }
+  .threshold-motif .arch-ring:nth-child(2) { animation-delay: -1.2s; }
+  .threshold-motif .arch-ring:nth-child(3) { animation-delay: -2.4s; }
+  .threshold-motif .arch-ring:nth-child(4) { animation-delay: -3.6s; }
+  .threshold-motif .arch-glow { animation: threshold-glow 6s ease-in-out infinite; }
+  @keyframes threshold-breathe {
+    0%, 100% { transform: scale(1); opacity: var(--ring-op, 0.5); }
+    50% { transform: scale(1.015); opacity: calc(var(--ring-op, 0.5) + 0.15); }
+  }
+  @keyframes threshold-glow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.85; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .threshold-motif .arch-ring, .threshold-motif .arch-glow { animation: none; }
   }
   .welcome-doors-content {
     position: relative;
@@ -173,11 +434,9 @@
     opacity: 0;
   }
   @keyframes contentSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-  .welcome-doors .big-door { font-size: 56px; margin-bottom: 16px; animation: doorBounce 0.8s ease-out 0.4s forwards; opacity: 0; }
-  @keyframes doorBounce { 0% { opacity: 0; transform: scale(0.8); } 60% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
-  .welcome-doors h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.7); animation: fadeInDown 0.6s ease-out 0.5s forwards; opacity: 0; }
+  .welcome-doors h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: var(--text); animation: fadeInDown 0.6s ease-out 0.5s forwards; opacity: 0; }
   @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-  .welcome-doors p { color: rgba(255,255,255,0.9); font-size: 14px; max-width: 320px; margin: 0 auto 20px; line-height: 1.5; text-shadow: 0 1px 4px rgba(0,0,0,0.5); animation: fadeInUp 0.6s ease-out 0.6s forwards; opacity: 0; }
+  .welcome-doors p { color: var(--muted); font-size: 14px; max-width: 320px; margin: 0 auto 20px; line-height: 1.5; animation: fadeInUp 0.6s ease-out 0.6s forwards; opacity: 0; }
   @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Three-doors preview section */
@@ -192,12 +451,15 @@
   }
   @media (max-width: 580px) { .doors-preview { grid-template-columns: 1fr; gap: 12px; } }
   .door-preview-chip {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 10px;
-    padding: 14px 12px;
+    background: var(--surface2);
+    border: 1px solid rgba(251,113,133,0.3);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding: 16px 12px 12px;
     text-align: center;
-    color: rgba(255,255,255,0.9);
+    color: var(--muted);
     font-size: 12px;
     line-height: 1.4;
     cursor: default;
@@ -208,11 +470,19 @@
   .door-preview-chip:nth-child(2) { animation-delay: 0.8s; }
   .door-preview-chip:nth-child(3) { animation-delay: 0.9s; }
   @keyframes doorPreviewFade { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-  .door-preview-chip strong { display: block; font-size: 18px; margin-bottom: 4px; }
+  .door-preview-chip strong {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--door-accent);
+    margin-bottom: 6px;
+  }
 
   .start-btn {
-    background: var(--accent);
-    color: #fff;
+    background: var(--door-accent);
+    color: #1a0d0f;
     border: none;
     border-radius: 10px;
     padding: 12px 28px;
@@ -223,16 +493,16 @@
     font-family: inherit;
     animation: buttonGlow 0.6s ease-out 1.1s forwards;
     opacity: 0;
-    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+    box-shadow: 0 0 0 0 rgba(251, 113, 133, 0);
   }
   @keyframes buttonGlow {
-    from { opacity: 0; transform: translateY(10px); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.5); }
-    to { opacity: 1; transform: translateY(0); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+    from { opacity: 0; transform: translateY(10px); box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.5); }
+    to { opacity: 1; transform: translateY(0); box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
   }
   .start-btn:hover {
-    background: var(--accent-hover);
+    background: #fca5b1;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+    box-shadow: 0 4px 12px rgba(251, 113, 133, 0.35);
   }
   .start-btn:active { transform: translateY(0); }
 
@@ -241,15 +511,15 @@
     display: inline-block;
     margin-top: 16px;
     font-size: 12px;
-    color: rgba(255,255,255,0.6);
+    color: var(--muted);
     text-decoration: none;
-    border-bottom: 1px solid rgba(255,255,255,0.3);
+    border-bottom: 1px solid var(--border);
     transition: all 0.2s ease;
     animation: fadeIn 0.6s ease-out 1.2s forwards;
     opacity: 0;
   }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  .learn-more-link:hover { color: rgba(255,255,255,0.9); border-bottom-color: rgba(255,255,255,0.6); }
+  .learn-more-link:hover { color: var(--text); border-bottom-color: var(--muted); }
 
   /* Auto-load state: hide welcome screen */
   body.game-started .welcome-doors { display: none; }
@@ -267,29 +537,66 @@
   .loading-state .lantern-icon { font-size: 48px; animation: pulse 2s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-  /* Mandala avatar pulse */
-  .mandala-avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 2px;
+  /* ═══════════════════════════════════════════════════════════════════════
+     Terminal (CRT) skin — Kingdome-specific chrome, layered on top of the
+     shared dream-chat-terminal.css tokens (which already retint --bg/
+     --surface/--text/--muted/--accent and switch the whole page to
+     monospace). This block only handles what's local to this page: the
+     rose "door" identity color, and a few Kingdome components that don't
+     exist in dream-chat (doors, the gate track, the threshold motif).
+     ═══════════════════════════════════════════════════════════════════════ */
+  html[data-skin="terminal"] {
+    --door-accent: var(--accent);
+    --door-accent-dim: var(--accent-dim);
   }
-  .mandala-avatar svg {
-    animation: mandala-pulse 3s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px var(--accent));
+  html[data-skin="terminal"] .scene-kicker,
+  html[data-skin="terminal"] .doors-kicker,
+  html[data-skin="terminal"] .console-label,
+  html[data-skin="terminal"] .gate-step-dot,
+  html[data-skin="terminal"] .gate-track-loop {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
   }
-  @keyframes mandala-pulse {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-      filter: drop-shadow(0 0 8px var(--accent));
-    }
-    50% {
-      opacity: 0.7;
-      transform: scale(1.08);
-      filter: drop-shadow(0 0 16px var(--accent));
-    }
+  /* Scene art becomes a CRT screen: scanlines + curvature vignette */
+  html[data-skin="terminal"] .scene-image {
+    border-color: var(--border);
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.5), inset 0 0 14px color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+  html[data-skin="terminal"] .scene-image::before {
+    content: "";
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--accent) 6%, transparent) 0 1px, transparent 1px 3px);
+  }
+  html[data-skin="terminal"] .scene-image::after {
+    content: "";
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: radial-gradient(125% 125% at 50% 45%, transparent 55%, rgba(0,0,0,0.45) 100%);
+  }
+  /* Door cards read as terminal panels: square corners + bracket accents */
+  html[data-skin="terminal"] .door-chip,
+  html[data-skin="terminal"] .door-pick,
+  html[data-skin="terminal"] .door-preview-chip {
+    border-radius: 4px;
+    box-shadow: inset 0 0 16px color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+  html[data-skin="terminal"] .door-chip::before { background: var(--border); }
+  html[data-skin="terminal"] .door-chip:hover:not(:disabled)::before { background: var(--accent); }
+  html[data-skin="terminal"] .door-letter { text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent); }
+  /* Gate track: a HUD readout, not a soft progress bar */
+  html[data-skin="terminal"] .gate-step-dot.active {
+    text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  html[data-skin="terminal"] .king-speech { font-style: normal; }
+  html[data-skin="terminal"] .king-speech::before { font-family: initial; }
+  /* Welcome title glows like the radio's now-playing readout */
+  html[data-skin="terminal"] .welcome-doors h2 {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html[data-skin="terminal"] .threshold-motif .arch-ring,
+    html[data-skin="terminal"] .threshold-motif .arch-glow { animation: none; }
   }
 </style>
 </head>
@@ -311,51 +618,66 @@
     <div class="nav-actions">
       <span id="status-line" style="font-size:11px;color:var(--muted);margin-right:6px"></span>
       <button onclick="resetGame()" title="New game" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit">↺ New</button>
+      <button class="nav-btn" id="skin-toggle" title="Toggle terminal (CRT) skin" aria-label="Toggle terminal CRT skin" aria-pressed="false" onclick="toggleSkin()" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit">▚</button>
       <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" style="background:none;border:none;cursor:pointer;font-size:16px">🌙</button>
     </div>
   </nav>
 
-  <!-- Stage breadcrumb bar -->
-  <div id="stage-breadcrumb" style="display:none;padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:none;align-items:center;gap:6px;overflow-x:auto;white-space:nowrap">
-    <span id="stage-loop-badge" style="background:var(--accent);color:#fff;padding:2px 7px;border-radius:10px;font-weight:600;font-size:10px;flex-shrink:0">Loop 1</span>
-    <div id="stage-crumbs" style="display:flex;gap:4px;align-items:center"></div>
+  <!-- Gate track: the seven-stage loop as a real progress track, not a
+       text breadcrumb — the journey is a sequence, so a step-track earns
+       its place here. -->
+  <div id="stage-breadcrumb" class="gate-track" style="display:none">
+    <span id="stage-loop-badge" class="gate-track-loop">Loop 1</span>
+    <div id="stage-crumbs" class="gate-track-steps"></div>
   </div>
 
   <!-- Chat area -->
   <div class="chat-container" id="chat">
     <div class="welcome-doors" id="welcome">
       <div class="welcome-doors-backdrop">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/Caspar_David_Friedrich_-_Wanderer_above_the_sea_of_fog.jpg" alt="Wanderer Above the Sea of Fog — Caspar David Friedrich" style="opacity: 0.8;">
+        <!-- Signature motif: nested archways receding to a lit vanishing
+             point. Built from the same arch geometry as the door cards
+             below, not a stock photo — the doorway IS the subject. -->
+        <svg class="threshold-motif" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <radialGradient id="threshold-core" cx="50%" cy="88%" r="55%">
+              <stop offset="0%" style="stop-color:var(--door-accent)" stop-opacity="0.85"/>
+              <stop offset="55%" style="stop-color:var(--door-accent)" stop-opacity="0.25"/>
+              <stop offset="100%" style="stop-color:var(--door-accent)" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <ellipse class="arch-glow" cx="200" cy="264" rx="90" ry="34" fill="url(#threshold-core)"/>
+          <path class="arch-ring" style="--ring-op:0.22" d="M40,300 V150 A160,160 0 0 1 360,150 V300" fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+          <path class="arch-ring" style="--ring-op:0.32" d="M78,300 V158 A122,122 0 0 1 322,158 V300" fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+          <path class="arch-ring" style="--ring-op:0.45;stroke:var(--door-accent)" d="M116,300 V166 A84,84 0 0 1 284,166 V300" fill="none" stroke-width="1.5"/>
+          <path class="arch-ring" style="--ring-op:0.65;stroke:var(--door-accent)" d="M154,300 V174 A46,46 0 0 1 246,174 V300" fill="none" stroke-width="1.75"/>
+        </svg>
       </div>
       <div class="welcome-doors-content">
-        <div class="big-door">🏯</div>
         <h2>Kingdome of Hearts</h2>
-        <p>A seven-stage dream journey through the Kingdome. Three doors each scene — no wrong choices. Keystone guides you. Each loop is different.</p>
+        <p>A seven-gate dream loop. Every door you take reshapes the one after it — no wrong choices, and no two loops the same.</p>
         <button class="start-btn" onclick="startGame()">Enter the Kingdome</button>
         <div class="doors-preview">
-          <div class="door-preview-chip"><strong>🚪</strong> Red Door</div>
-          <div class="door-preview-chip"><strong>🚪</strong> Blue Door</div>
-          <div class="door-preview-chip"><strong>🚪</strong> Gold Door</div>
+          <div class="door-preview-chip"><strong>Familiar</strong>Doors you've opened before, seen with new eyes</div>
+          <div class="door-preview-chip"><strong>Unopened</strong>Doors still forming — never visited, never scripted</div>
+          <div class="door-preview-chip"><strong>Homeward</strong>A door back to the Garden, whenever the loop closes</div>
         </div>
         <a href="#" class="learn-more-link" onclick="event.preventDefault(); alert('Coming soon — learn more about the Kingdome mechanics')">Learn More →</a>
       </div>
     </div>
   </div>
 
-  <!-- Door choice bar — quick picks + custom input -->
-  <div class="input-container" id="choice-bar" style="display:none">
-    <!-- Current door quick-picks (updated each scene) -->
-    <div id="door-quick-picks" style="display:flex;gap:6px;margin-bottom:8px"></div>
-    <!-- Custom / free-text input -->
-    <div style="display:flex;gap:8px;align-items:center">
-      <input id="custom-door-input" type="text"
-        placeholder="name your own door — or just talk to Keystone..."
-        style="flex:1;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:14px;outline:none;transition:border-color 0.15s"
-        onfocus="this.style.borderColor='var(--accent)'"
-        onblur="this.style.borderColor='var(--border)'"
-        onkeydown="if(event.key==='Enter')submitCustomDoor()" />
-      <button onclick="submitCustomDoor()"
-        style="padding:10px 16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;flex-shrink:0">→</button>
+  <!-- Door console — quick picks + a door of your own naming -->
+  <div class="input-container console" id="choice-bar" style="display:none">
+    <div id="door-quick-picks" class="console-picks"></div>
+    <div class="console-custom">
+      <div class="console-label">Or name your own door</div>
+      <div class="console-input-row">
+        <input id="custom-door-input" class="console-input" type="text"
+          placeholder="a door, or just talk to Lantern…"
+          onkeydown="if(event.key==='Enter')submitCustomDoor()" />
+        <button class="console-submit" onclick="submitCustomDoor()">Open</button>
+      </div>
     </div>
   </div>
 
@@ -377,6 +699,7 @@
 </footer>
 
 <script src="js/theme-toggle.js"></script>
+<script src="/js/terminal-skin.js?v=20260630-terminal"></script>
 <script>
   // Auto-load game on page load — all scripts are now loaded
   window.addEventListener('load', () => {

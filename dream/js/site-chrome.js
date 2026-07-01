@@ -35,7 +35,7 @@
       '<nav class="site-nav">\n' +
       '  <a class="nav-brand" href="/">\n' +
       '    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">\n' +
-      '    <span style="font-size:18px;font-weight:600">unisona.ai</span>\n' +
+      '    <span style="font-size:18px;font-weight:600">Keystone OS</span>\n' +
       "  </a>\n" +
       '  <div class="nav-links">\n    ' +
       links +
@@ -61,7 +61,7 @@
       '  <div class="footer-inner">\n' +
       '    <span class="footer-brand">\n' +
       '      <span class="dot online" id="status-dot" title="Server status"></span>\n' +
-      "      unisona.ai\n" +
+      "      Keystone OS\n" +
       "    </span>\n" +
       '    <span class="sep">·</span>\n' +
       '    <a href="/">Home</a>\n    ' +

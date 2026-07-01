@@ -1,8 +1,8 @@
-// ── Three Doors Keystone Conversation ───────────────────────────────────────────
-// Freeform conversation with Keystone — the guide answers mid-scene
+// ── Three Doors Lantern Conversation ───────────────────────────────────────────
+// Freeform conversation with Lantern — the guide answers mid-scene
 // Depends on three-doors-data.js for SCENES
 
-// ── Freeform conversation with Keystone — the guide answers mid-scene ──
+// ── Freeform conversation with Lantern — the guide answers mid-scene ──
 const lanternHistory = [];
 let lanternBusy = false;
 
@@ -13,12 +13,18 @@ async function askLantern(text) {
   appendUserMsg(esc(text));
   appendTyping();
 
-  // First history entry anchors Keystone in the current scene
-  const sceneText = (SCENES[gameState?.scene_key]?.text || gameState?.text || "")
+  // First history entry anchors Lantern in the current scene — including its
+  // persistent theme + meta-lesson, so a freeform reply (an answer to the
+  // King's question, a reaction, anything typed) gets assessed symbolically
+  // against what this door is actually about, not just pattern-matched.
+  const scene = SCENES[gameState?.scene_key];
+  const sceneText = (scene?.text || gameState?.text || "")
     .replace(/\*\*/g, "").replace(/\*/g, "").slice(0, 300);
   const sceneCtx = {
     role: "assistant",
-    text: `Scene: ${gameState?.scene_key || "the Kingdome"} (loop ${gameState?.loop_count ?? 0}). ${sceneText}`,
+    text: `Scene: ${gameState?.scene_key || "the Kingdome"} (loop ${gameState?.loop_count ?? 0}). ${sceneText}` +
+      (scene?.theme ? `\nThis door's persistent theme: ${scene.theme}` : "") +
+      (scene?.lesson ? `\nIts meta-lesson (assess the dreamer's words against this, gently, in character — never grade them literally right or wrong): ${scene.lesson}` : ""),
   };
 
   let fullText = "";
@@ -79,7 +85,7 @@ async function askLantern(text) {
     const chat = document.getElementById("chat");
     const el = document.createElement("div");
     el.className = "message agent";
-    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content"><em>Keystone's flame flickers — it can't find words right now. Try again, or choose a door.</em></div>`;
+    el.innerHTML = `<div class="agent-avatar">🏮</div><div class="message-content"><em>Lantern's flame flickers — it can't find words right now. Try again, or choose a door.</em></div>`;
     chat.appendChild(el);
     chat.scrollTop = chat.scrollHeight;
   } else {

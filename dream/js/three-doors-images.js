@@ -9,6 +9,26 @@ const POLLINATIONS_BASE = "https://image.pollinations.ai/prompt/";
 const pollinationsCache = {}; // keyed by sceneKey_loopCount for fresh art each loop
 let trainingImageCount = 0;
 
+// Shared direct Node DALL-E / gpt-image-2 call (POST /api/image/ai-generate,
+// see lib/openai-image.js) — used for scenes with no curated R2 art AND for
+// dynamic/custom doors (a player-named door, or a novelty-routed "deep"
+// scene) that have no fixed art of their own. Returns null on any failure
+// so callers can fall through to Pollinations without special-casing.
+async function tryDalleGenerate(sceneKey, prompt) {
+  try {
+    const response = await fetch("/api/image/ai-generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, size: "1024x1024" }),
+    });
+    const data = await response.json();
+    if (data.ok && data.url) return { url: data.url, model: data.model };
+  } catch (e) {
+    logThreeDoorsEvent('image_error', { sceneKey, error: e.message });
+  }
+  return null;
+}
+
 async function loadPollinationsImage(imgId, canvasId, sceneKey) {
   const loopCount = gameState?.loop_count ?? 0;
   const cacheKey = `${sceneKey}_L${loopCount}`;
@@ -23,23 +43,19 @@ async function loadPollinationsImage(imgId, canvasId, sceneKey) {
   const cvs = document.getElementById(canvasId);
   if (!img && !cvs) return;
 
-  // Try server-side generation first (uses OPENAI_API_KEY for DALL-E 3)
-  if (SERVER_GENERATED_SCENES.has(sceneKey)) {
-    try {
-      const apiUrl = `/api/image/generate?scene=${sceneKey}&useApi=true&prompt=${encodeURIComponent(fullPrompt)}`;
-      const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-      const data = await response.json();
-      if (data.path) {
-        pollinationsCache[cacheKey] = data.path;
-        logThreeDoorsEvent('image_load', { sceneKey, source: 'dalle3', loop: loopCount });
-        if (cvs) cvs.style.display = "none";
-        if (img) { img.src = data.path; img.style.display = ""; }
-        collectTrainingImage(sceneKey, fullPrompt, data.path);
-        return;
-      }
-    } catch (e) {
-      logThreeDoorsEvent('image_error', { sceneKey, error: e.message });
-      // Fall through to Pollinations
+  // Scenes with no curated R2 art (DALLE_GENERATED_SCENES ∪ legacy
+  // SERVER_GENERATED_SCENES — both now go through the same direct Node
+  // DALL-E / gpt-image-2 call, no Python subprocess, no dead GET endpoint;
+  // see lib/openai-image.js): try that first.
+  if (DALLE_GENERATED_SCENES.has(sceneKey) || SERVER_GENERATED_SCENES.has(sceneKey)) {
+    const dalleImg = await tryDalleGenerate(sceneKey, fullPrompt);
+    if (dalleImg) {
+      pollinationsCache[cacheKey] = dalleImg.url;
+      logThreeDoorsEvent('image_load', { sceneKey, source: dalleImg.model || 'dalle', loop: loopCount });
+      if (cvs) cvs.style.display = "none";
+      if (img) { img.src = dalleImg.url; img.style.display = ""; }
+      collectTrainingImage(sceneKey, fullPrompt, dalleImg.url);
+      return;
     }
   }
 

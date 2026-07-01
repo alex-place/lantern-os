@@ -1090,21 +1090,6 @@
       // can weigh it accordingly, instead of trusting an off-tone local reply.
       if (routeLabel) {
         const isDegraded = /degraded/i.test(routeLabel);
-        const isLocalCap = /local model|may be limited|complex coding/i.test(routeLabel); // #1556 [CAP-4]
-        // #1556 [CAP-4]: when a local model answered — either the degraded cloud→
-        // local fallback (#740) or the coding-on-local fast path (#1167) — show a
-        // plain capability notice so the user weighs the answer rather than
-        // trusting a possibly-fabricated local reply. A readable line, not just an
-        // amber route color they might miss.
-        if (isDegraded || isLocalCap) {
-          const notice = document.createElement("div");
-          notice.className = "msg-capability-notice";
-          notice.setAttribute("role", "status");
-          notice.textContent = isDegraded
-            ? "⚠ Answered by the local model (cloud was unreachable) — quality may be lower. Ask me to retry, or name a provider to escalate."
-            : "ⓘ Local model — complex coding may be limited or wrong. Say “escalate” (or pick a provider) to use a cloud model.";
-          row.appendChild(notice);
-        }
         const sig = document.createElement("div");
         sig.className = isDegraded ? "msg-route-sig degraded" : "msg-route-sig";
         if (/debug route/i.test(routeLabel)) sig.classList.add("route-debug");

@@ -612,14 +612,10 @@
 .msg-footer.grok { color: #e2c97e; opacity: 0.8; }
 .msg-footer.gemini { color: #4fc3f7; opacity: 0.8; }
 
-/* Route signature ("Keystone · chat · time" under every reply). Was
-   color:var(--accent) — accent is only ~2.77:1 at this 11px size on the white
-   page (WCAG AA fail). Per-reply metadata reads better as quiet-but-legible
-   secondary text: --muted is 4.83:1 on white and theme-aware. Enforced by the
-   font/style contract in scripts/test-a11y.js. */
+/* Route signature */
 .msg-route-sig {
   font-size: 0.68rem;
-  color: var(--muted, #6b7280);
+  color: var(--accent, #e2c97e);
   opacity: 1;
   font-weight: 500;
   padding: 2px 8px;
@@ -630,21 +626,6 @@
    "Keystone · debug route" label reads distinctly from the gold chat route. */
 .msg-route-sig.route-debug {
   color: #000;
-}
-/* #1556 [CAP-4]: capability expectation for local-model replies — a clear,
-   readable line (not just a subtle amber route color) so the user weighs a
-   possibly confident-but-wrong local answer instead of trusting it. */
-.msg-capability-notice {
-  align-self: flex-start;
-  max-width: 92%;
-  margin: 4px 0 2px;
-  padding: 6px 10px;
-  font-size: 0.72rem;
-  line-height: 1.4;
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.10);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  border-radius: 6px;
 }
 .msg-row.agent .msg-route-sig,
 .msg-row.agent .msg-footer,
@@ -658,16 +639,11 @@
   padding-right: 8px;
 }
 
-/* Routing card shown while backend delegates ("Keystone · chat" on the thinking
-   wheel). Was color:var(--accent-dim) @ opacity 0.8 — in light mode --accent-dim
-   is a pale cyan (#cffafe) on a white page, ~1.12:1 contrast, effectively
-   invisible (WCAG AA fail; --accent-dim is a surface token, never a text color).
-   Use the theme-aware --muted secondary-text token at full opacity: legible in
-   both themes. Enforced by the font/style contract in scripts/test-a11y.js. */
+/* Routing card shown while backend delegates */
 .route-card {
   font-size: 0.75rem;
-  color: var(--muted, #6b7280);
-  opacity: 1;
+  color: var(--accent-dim, #a08840);
+  opacity: 0.8;
   padding: 2px 0 4px;
   font-style: italic;
   letter-spacing: 0.02em;
