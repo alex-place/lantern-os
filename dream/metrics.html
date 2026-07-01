@@ -88,7 +88,7 @@
         var r = await fetch('/api/metrics/outcomes').then(function (x) { return x.json(); });
         if (!r || !r.ok) throw new Error((r && r.error) || 'failed');
         var m = r.metrics, base = r.baseline || {};
-        var vp = m.verifiedPatchRate, ho = m.honestyRate, rq = m.routeQuality;
+        var vp = m.verifiedPatchRate, ho = m.honestyRate, rq = m.routeQuality, fw = m.distillationFlywheel, ad = m.adaptiveDepth;
         var tiles = [
           rateTile('Verified patch rate', '% of code tasks whose patch applied + tests passed', vp.rate, vp.status,
             '<b>' + vp.verified + '</b> / ' + vp.n + ' code tasks verified', base.verifiedPatchRate),
@@ -98,6 +98,27 @@
             '<b>' + rq.escalations + '</b> / ' + rq.decisions + ' routes · avg latency '
               + (rq.avgLatencySec != null ? rq.avgLatencySec.toFixed(1) + 's' : 'n/a')
               + '<br>cost &amp; re-prompt: <span style="color:#f59e0b">not instrumented yet</span>', base.escalationRate),
+          // #1421/#1555: is local->cloud escalation actually feeding local improvement?
+          // "Local model closed X% of the gap" IS the keystoneShare number — the fraction
+          // of landed work the local model won outright, vs escalating to cloud.
+          rateTile('Distillation flywheel', 'local vs cloud landed-work share (local model closing the gap)', fw.keystoneShare, fw.status,
+            '<b>' + fw.corpusSize + '</b> verified cloud-teacher pairs captured · <b>' + fw.landed + '</b> landed · '
+              + (fw.escalationRate != null ? Math.round(fw.escalationRate * 100) + '% escalation rate' : 'escalation rate n/a'),
+            base.flywheelKeystoneShare),
+          // #1423: the Q-exit gate's own telemetry (mean_depth/exit_reason/canary_*), already
+          // computed by src/sigma0/loop_lm.py and persisted by scripts/ouro_serve.py — surfaced
+          // here rather than duplicated. NOT live default-chat behavior: only OURO_NATIVE=1
+          // (native/deep-mode) runs compute this; see ADR-0012 for why flipping the default
+          // serving path is a product decision, not a bug fix.
+          // canarySignalRate is a BADNESS metric (higher = more collapse-adjacent runs), but
+          // color()/rateTile() assume higher=better=green — invert to a "clean-run rate" so a
+          // healthy 0%-signal run reads green, not red.
+          rateTile('Adaptive-depth stability (Ouro Q-exit)', 'share of native-mode runs with no collapse-canary signal — benchmark telemetry, not live default chat (ADR-0012)',
+            ad.canarySignalRate == null ? null : 1 - ad.canarySignalRate, ad.status,
+            '<b>' + (ad.meanDepth != null ? ad.meanDepth : 'n/a') + '</b> mean recurrent depth · <b>' + ad.n + '</b> native-mode runs'
+              + (ad.n ? ' · <b>' + Math.round(ad.canarySignalRate * 100) + '%</b> flagged a canary signal' : '')
+              + (ad.n ? '<br>exit reasons: ' + Object.keys(ad.exitReasons).map(function (k) { return esc(k) + ' ×' + ad.exitReasons[k]; }).join(', ') : ''),
+            base.adaptiveDepthCanaryRate == null ? null : 1 - base.adaptiveDepthCanaryRate),
         ];
         document.getElementById('tiles').innerHTML = tiles.join('');
         document.getElementById('foot').textContent =
