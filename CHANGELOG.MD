@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.9] - 2026-07-01
+### Changed
+- **`/explore.html` now reads like a modern social feed (Facebook/Instagram).** Added a single-column ↔ 4-up grid layout toggle (responsive 4-3-2-1, persisted in localStorage), a per-card share-to-socials affordance (native Web Share sheet on mobile; desktop popover with X / Facebook / Reddit / LinkedIn / WhatsApp + copy-link, recording a positive engagement signal), and first-paint skeletons for perceived speed. Improves the **Act** stage — the same ranked feed, now shareable and browsable two ways.
+### Fixed
+- **Explore feed loads faster, more consistently, and never repeats.** Endless-scroll pages each re-ran the full aggregate+rank fan-out (~295 ms/page and re-ranked mid-scroll, reading as inconsistent loading); a short-TTL per-audience rank cache (`lib/explore-feed.js`, `EXPLORE_FEED_TTL_MS`, default 15 s) serves pages within the window from one stable rank — measured ~5 ms/page (≈60× faster) with no jitter, while engagement still re-steers on the next window. Infinite scroll no longer cycles already-seen posts: when the catalog loops the client stops and says "caught up" (verified 39 pages, 348 unique cards, zero duplicates).
+
 ## [1.8.8] - 2026-07-01
 ### Fixed
 - **Chat capability questions no longer dump a raw Knowledge Center doc section (#1778).** Asking Keystone *"what can you do"* (and *"what do you do" / "how can you help" / "what are your capabilities"*) scored a spurious near-hit against `CLAUDE.md#Node.js` and short-circuited to that section's raw text — an empty ` ```bash ` fence — instead of a real reply (the "bash error popup" a user screenshotted). The existing greeting/identity Knowledge-Center-bypass guard in `stream-chat.js` is extended with a capability-query pattern so these questions always reach the model, which can enumerate real skills. Deterministic regex; verified it matches the capability phrasings without over-matching "what can I do here", "what's the weather", or "can you write python". Strengthens the **Observe/Reason** boundary — a capability ask is answered by the assistant, not a stray doc.
