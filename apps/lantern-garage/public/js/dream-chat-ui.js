@@ -39,6 +39,10 @@ function renderToolReplay(tool) {
       + `allow="encrypted-media;picture-in-picture" allowfullscreen loading="lazy"></iframe>`
       + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
   }
+  if (tool.kind === 'xenon-starship-art' && tool.url) {
+    const searchUrl = tool.url; // Assuming tool.url is the direct link to the generated art
+      + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
+  }
   if (tool.kind === 'document' && tool.url) {
     const kb = tool.bytes ? ' · ' + Math.round(tool.bytes / 1024) + ' KB' : '';
     return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
