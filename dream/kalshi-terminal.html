@@ -1,54 +1,34 @@
 ﻿<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#06b6d4">
+<script>
+  /* Theme bootstrap — set before first paint (shared with home + chat) */
+  (function(){
+    try{
+      var stored=localStorage.getItem('lantern-theme');
+      var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme',(stored?stored==='dark':prefersDark)?'dark':'light');
+    }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }
+  })();
+</script>
 <link rel="stylesheet" href="/css/site.css">
 <link rel="stylesheet" href="/vendor/fonts/fonts.css"><!-- #861: vendored local-first (was Google Fonts CDN) -->
 <title>Kalshi Terminal — unisona.ai</title>
 <style>
-/* ── palette override: match kalshi-dashboard aesthetic ── */
-[data-theme="dark"]{
-  --bg:#0a0c10;
-  --surface:#12151c;
-  --surface2:#1a1f29;
-  --border:#2a313d;
-  --text:#e8eaf0;
-  --muted:#a4adbf;
-  --accent:#4a9eff;
-  --accent-dim:#1a2d4d;
-  --green:#00d4aa;
-  --gold:#f5a623;
-  --danger:#ff5f6d;
-  --shadow:0 2px 12px rgba(0,0,0,.45);
-  --shadow-hover:0 4px 24px rgba(0,0,0,.6);
-}
-[data-theme="light"]{
-  --bg:#f0f2f7;
-  --surface:#ffffff;
-  --surface2:#f5f7fb;
-  --border:#d0d5e0;
-  --text:#1a1f2e;
-  --muted:#6b7280;
-  --accent:#1a6fcf;
-  --accent-dim:#dbeafe;
-  --green:#059669;
-  --gold:#d97706;
-  --danger:#dc2626;
-  --shadow:0 2px 12px rgba(0,0,0,.10);
-  --shadow-hover:0 4px 24px rgba(0,0,0,.18);
-}
-body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
-
-/* ── nav status indicators ───────────────────────────────── */
-.nav-stat{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
-.nav-stat b{color:var(--text);font-weight:600}
+/* Canonical site.css tokens — NO palette override, so this page matches home + chat
+   in both themes and stays WCAG-AA (metadata uses --muted, never --accent-dim as text). */
+html,body{height:100%;background:var(--bg);color:var(--text)}
+body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.site-nav{flex-shrink:0}
 
 
 /* ── card stage ──────────────────────────────────────────── */
-.deck{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  position:relative;padding:8px 16px 0;min-height:0}
-.stage{position:relative;width:min(440px,94vw);height:min(500px,62vh)}
+.deck{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  position:relative;padding:10px 16px 16px;min-height:0}
+.stage{position:relative;width:min(440px,94vw);height:min(460px,52vh)}
 
 .card{position:absolute;inset:0;background:var(--surface);border:1px solid var(--border);
   border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;
@@ -136,21 +116,19 @@ body{height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .reload{font-size:12px;padding:8px 20px;border-radius:8px;border:1px solid var(--accent);
   background:rgba(6,182,212,.1);color:var(--accent);cursor:pointer;font-weight:600}
 
-/* action buttons — live inside each card */
-.actions{display:none}
-.card-actions{display:flex;gap:12px;align-items:center;justify-content:center;
-  padding:10px 0 2px;margin-top:auto;border-top:1px solid var(--border)}
-.btn-pass{font-size:16px;font-weight:700;padding:10px 28px;border-radius:12px;border:2px solid var(--danger);
-  background:rgba(220,38,38,.1);color:var(--danger);cursor:pointer;letter-spacing:.03em;transition:all .15s;min-width:110px}
-.btn-pass:hover{background:rgba(220,38,38,.22);transform:scale(1.04)}
-.btn-take{font-size:16px;font-weight:700;padding:10px 28px;border-radius:12px;border:none;
-  background:linear-gradient(135deg,#059669,#00d4aa);color:#fff;cursor:pointer;letter-spacing:.03em;transition:all .15s;min-width:110px;box-shadow:0 3px 14px rgba(0,180,130,.35)}
-.btn-take:hover{filter:brightness(1.08);transform:scale(1.04)}
-.peek .card-actions,.peek2 .card-actions{display:none}
-.keyboard-hint{font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:.05em;text-transform:uppercase;font-weight:500}
-/* theme toggle */
-.theme-toggle{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;color:var(--muted);font-size:13px;transition:border-color .2s}
-.theme-toggle:hover{border-color:var(--accent);color:var(--text)}
+/* Two-button game — one prominent Pass / Take pair below the card. The in-card
+   buttons are hidden so there is exactly one action control set. */
+.actions{display:flex;gap:16px;justify-content:center;align-items:center;flex-wrap:wrap}
+.card-actions{display:none}
+.btn-pass,.btn-take{font-size:17px;font-weight:700;padding:14px 42px;border-radius:12px;
+  cursor:pointer;font-family:inherit;letter-spacing:.02em;transition:transform .1s,background .15s,filter .15s;min-width:140px}
+.btn-pass{border:2px solid var(--danger);background:transparent;color:var(--danger)}
+.btn-pass:hover{background:color-mix(in srgb,var(--danger) 12%,transparent);transform:scale(1.03)}
+.btn-take{border:none;background:var(--green);color:#052e22}
+.btn-take:hover{filter:brightness(1.06);transform:scale(1.03)}
+.btn-pass:focus-visible,.btn-take:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.btn-pass:disabled,.btn-take:disabled{opacity:.5;cursor:default;transform:none}
+.kbd-hint{font-size:11px;color:var(--muted);text-align:center;margin:0;letter-spacing:.06em;text-transform:uppercase}
 
 /* focus visible for keyboard navigation */
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -174,87 +152,158 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .side-why{font-size:9px;color:var(--muted);margin-top:3px;line-height:1.3;
   font-family:'IBM Plex Mono',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* image gallery panel */
-.image-gallery{padding:8px 16px;border-top:1px solid var(--border);flex-shrink:0;max-height:180px;overflow-y:auto}
-.image-gallery-title{font-size:10px;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;
-  display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;font-weight:600}
-.image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px}
-.image-item{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--border);
-  background:var(--surface);aspect-ratio:1;cursor:pointer;transition:all .2s}
-.image-item:hover{border-color:var(--accent);transform:scale(1.05);box-shadow:0 0 12px rgba(6,182,212,.3)}
-.image-item img{width:100%;height:100%;object-fit:cover}
-.image-item-loader{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
-  color:var(--muted);font-size:24px;animation:spin .8s linear infinite}
-@keyframes spin{100%{transform:rotate(360deg)}}
+/* ══ Device console — polished frame (fallout-radio inspired, theme-adaptive) ══ */
+.kx-console{flex:1;min-height:0;display:flex;flex-direction:column;
+  width:min(560px,96vw);margin:10px auto 12px;
+  background:linear-gradient(180deg,var(--surface2),var(--surface));
+  border:1px solid var(--border);border-radius:20px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -6px 16px rgba(0,0,0,.10),var(--shadow-hover);
+  padding:12px 14px 0;position:relative;overflow:hidden}
+/* four recessed corner screws — subtle device detail */
+.kx-console::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;border-radius:20px;
+  background:
+    radial-gradient(circle at 13px 13px, color-mix(in srgb,var(--border) 88%,#000) 0 2px, transparent 3px),
+    radial-gradient(circle at calc(100% - 13px) 13px, color-mix(in srgb,var(--border) 88%,#000) 0 2px, transparent 3px),
+    radial-gradient(circle at 13px calc(100% - 13px), color-mix(in srgb,var(--border) 88%,#000) 0 2px, transparent 3px),
+    radial-gradient(circle at calc(100% - 13px) calc(100% - 13px), color-mix(in srgb,var(--border) 88%,#000) 0 2px, transparent 3px)}
+.kx-console>*{position:relative;z-index:2}
 
-/* image modal */
-.image-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;
-  justify-content:center;z-index:100;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s}
-.image-modal-overlay.active{opacity:1;pointer-events:auto}
-.image-modal-content{position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;gap:12px;
-  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px}
-.image-modal-img{max-width:100%;max-height:70vh;object-fit:contain}
-.image-modal-close{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.5);
-  color:var(--text);border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:16px;
-  transition:background .2s}
-.image-modal-close:hover{background:rgba(0,0,0,.8)}
+/* the recessed "screen" that holds the card */
+.deck{border-radius:14px;
+  background:radial-gradient(130% 100% at 50% 0%, color-mix(in srgb,var(--accent) 7%,var(--bg)) 0%, var(--bg) 60%);
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.20),inset 0 0 0 1px var(--border)}
+/* faint scanlines over the screen — very subtle, works in both themes */
+.deck::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.45;
+  background:repeating-linear-gradient(to bottom, rgba(127,127,127,0) 0 2px, rgba(127,127,127,.05) 2px 3px);mix-blend-mode:overlay}
+.deck>*{position:relative;z-index:2}
+/* soft phosphor glow behind the live card */
+.card.front{box-shadow:var(--shadow-hover),0 0 26px -6px color-mix(in srgb,var(--accent) 40%,transparent)}
+/* NOW-readout status line */
+.progress{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);text-align:center;margin:0;padding:0}
+
+/* tactile transport + tabs */
+.mode-bar{padding:2px 2px 10px}
+.mode-btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.mode-btn.active{box-shadow:inset 0 0 12px -2px color-mix(in srgb,var(--accent) 55%,transparent)}
+.btn-pass{box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.btn-take{box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 4px 16px -6px color-mix(in srgb,var(--green) 70%,transparent)}
+
+/* ══ Account · profile · positions — bottom status HUD, collapsed to a bar ══ */
+.acct{flex-shrink:0;border-top:1px solid var(--border);margin:8px -14px 0}
+.acct-bar{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:none;border:none;cursor:pointer;padding:9px 16px;color:var(--text);
+  font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;text-align:left}
+.acct-bar:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.acct-bar:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.acct-summary{display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted)}
+.acct-summary b{color:var(--text);font-weight:600}
+.acct-sep{color:var(--border);margin:0 3px}
+.acct-env{color:var(--accent);font-weight:600}
+.acct-edge{color:var(--gold)}
+.acct-caret{color:var(--muted);font-size:12px;flex-shrink:0}
+.acct-panel{max-height:44vh;overflow-y:auto;padding:2px 16px 14px}
+.acct-panel[hidden]{display:none}
+.acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px}
+.acct-sec h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:6px 0 5px;font-weight:700}
+.acct-kv{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+.acct .mut{color:var(--muted)}
+.acct-kv a{color:var(--accent);text-decoration:none}
+.acct-note{font-size:11px;color:var(--muted);margin-top:5px;font-style:italic;line-height:1.5}
+.acct .pill{font-size:10px}
+/* ── deck mode toggle + Σ₀ council banner ───────────────────────────────────── */
+.mode-bar{display:flex;gap:6px;justify-content:center;padding:8px 8px 2px;flex-wrap:wrap;flex-shrink:0}
+.mode-btn{background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.mode-btn:hover{color:var(--text)}
+.mode-btn.active{background:var(--accent);color:#fff;border-color:transparent}
+.mode-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.council-banner{margin:0 auto 4px;max-width:560px;padding:8px 12px;border-radius:8px;font-size:11px;line-height:1.5}
+.council-banner.warn{background:rgba(220,70,70,.10);border:1px solid rgba(220,70,70,.45)}
+.council-banner.ok{background:rgba(60,180,120,.08);border:1px solid rgba(60,180,120,.4)}
+.council-banner .cb-head{font-weight:700;font-size:12px;margin-bottom:2px;color:#e8edf5}
+.council-banner.warn .cb-head{color:#ff9b9b}
+.council-banner .cb-stats{color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px}
+.council-banner .cb-verdict{color:var(--muted);margin-top:3px;font-size:10px;font-style:italic}
+/* grounded-card evidence box */
+.grounded-box{margin-top:6px;padding:7px 9px;border-radius:7px;font-size:10.5px;line-height:1.5;font-family:'IBM Plex Mono',ui-monospace,monospace}
+.grounded-box.ok{background:rgba(60,150,220,.08);border:1px solid rgba(60,150,220,.4)}
+.grounded-box.warn{background:rgba(220,160,40,.08);border:1px solid rgba(220,160,40,.4);color:var(--muted)}
+.grounded-box.pending{background:#11151d;border:1px solid #2c3446;color:var(--muted)}
+.grounded-box .gb-head{color:#cfe3f5;margin-bottom:3px}
+.grounded-box .gb-rat{color:var(--muted);margin-bottom:3px;font-family:inherit}
+.grounded-box .gb-foot{color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grounded-box a{color:#6db3f2;text-decoration:none}
+.reground-btn{margin-left:auto;background:#1b2230;color:#cfe3f5;border:1px solid #2c3446;border-radius:6px;padding:3px 9px;font-size:10px;cursor:pointer;font-family:inherit}
+.reground-btn:hover{background:#222b3d}
+.reground-btn:disabled{opacity:.6;cursor:default}
+.grounded-box .spin{display:inline-block;animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 
-<h1 class="sr-only">Kalshi Terminal — Swipe Deck</h1>
+<a class="sr-only" href="#deck">Skip to the deck</a>
+<h1 class="sr-only">Kalshi Swipe — unisona.ai</h1>
 
+<!-- Global header — shared with home + chat -->
 <nav class="site-nav">
-  <a class="nav-brand" href="/stock-trader.html">
-    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle">
-    unisona.ai
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">unisona.ai</span>
   </a>
   <div class="nav-links">
-    <a href="/kalshi-terminal.html" class="active">Kalshi Swipe</a>
-    <a href="/stock-trader.html">Dashboard</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/stock-trader.html">Trader</a>
+    <a href="/kalshi-terminal.html" class="active" aria-current="page">Kalshi</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep" style="margin:0 4px">·</span>
+    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
   </div>
   <div class="nav-actions">
-    <span class="nav-stat" id="cEnv" aria-label="Environment status"><span class="dot" id="envDot"></span>—</span>
-    <span class="nav-stat" id="cBal" aria-label="Account balance">—</span>
-    <span class="nav-stat" id="cCreds" aria-label="Credentials status">—</span>
-    <span id="cMode" aria-label="Trading mode"><span class="pill held">—</span></span>
-    <span class="nav-stat" id="cFresh" aria-label="Data freshness"><span class="dot" id="sdot"></span>—</span>
-    <span class="nav-stat" id="cLive" aria-label="Live poller status" style="font-size:11px;color:var(--green)">⟳ —</span>
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode" onclick="toggleTheme()">☀</button>
+    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
+    <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="toggleTheme()">☀</button>
+    <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" title="Report an issue (screenshot → GitHub)" onclick="if(window.issueReporter)window.issueReporter.open()">📷</button>
   </div>
 </nav>
 
+<!-- Device console — polished frame (bezel + recessed screen + tactile controls) -->
+<div class="kx-console">
+<!-- Deck mode — compact -->
+<div class="mode-bar" role="tablist" aria-label="Deck mode">
+  <button class="mode-btn" id="mGrounded" role="tab" aria-selected="false" onclick="setMode('grounded')" title="Web-grounded event markets — research-driven P(YES) vs market price, paper-only">🔎 Grounded</button>
+  <button class="mode-btn" id="mReplay" role="tab" aria-selected="true" onclick="setMode('replay')" title="Swipe recorded history — graded instantly vs the real outcome">⟲ Replay</button>
+  <button class="mode-btn" id="mPaper" role="tab" aria-selected="false" onclick="setMode('paper')" title="Live candidate markets, paper-only (no real orders)">📝 Paper</button>
+  <button class="mode-btn" id="mLive" role="tab" aria-selected="false" onclick="setMode('live')" title="Live decks (currently paused — no proven edge after fees)">● Live</button>
+</div>
 
-<main class="deck">
-  <article class="stage" id="stage" role="region" aria-label="Current market position"></article>
-  <div class="end" id="end" role="status" aria-label="No positions available">
-    <div>No open positions</div>
-    <div style="font-size:12px;color:var(--muted)">Checking for new positions every 5s automatically.</div>
+<!-- The two-button game -->
+<main class="deck" id="deck">
+  <article class="stage" id="stage" role="region" aria-label="Current market card"></article>
+  <div class="end" id="end" role="status" aria-label="No cards available">
+    <div>No cards right now</div>
+    <div style="font-size:12px;color:var(--muted)">Checking automatically…</div>
     <button class="btn-ghost" onclick="syncDeck()">↻ Refresh</button>
   </div>
+  <p class="progress" id="progress" aria-live="polite" aria-label="Deck progress" role="status"></p>
+  <div class="actions" role="group" aria-label="Card actions">
+    <button class="btn-pass" id="bPass" aria-label="Pass on current card" onclick="act('pass')">✕ Pass</button>
+    <button class="btn-take" id="bTake" aria-label="Take current card" onclick="act('take')">✓ Take</button>
+  </div>
+  <p class="kbd-hint" aria-hidden="true">← Pass&nbsp;&nbsp;·&nbsp;&nbsp;Take →</p>
 </main>
 
-<div class="progress" id="progress" aria-live="polite" aria-label="Deck progress" role="status"></div>
-<div class="actions" role="region" aria-label="Card action buttons">
-  <button class="btn-pass" id="bPass" aria-label="Pass on current position" onclick="act('pass')">✕ Pass</button>
-  <button class="btn-take" id="bTake" aria-label="Take current position" onclick="act('take')">✓ Take it</button>
-  <div class="keyboard-hint">← Pass  Take →</div>
-</div>
-
-<div class="image-gallery" id="imageGallery" style="display:none" aria-label="Market chart and news images">
-  <div class="image-gallery-title">
-    <span>📊 Market Charts</span>
-    <button onclick="toggleGallery()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">▼</button>
-  </div>
-  <div class="image-grid" id="imageGrid"></div>
-</div>
-
-<div class="image-modal-overlay" id="imageModal" onclick="closeImageModal(event)">
-  <div class="image-modal-content" onclick="event.stopPropagation()">
-    <button class="image-modal-close" onclick="closeImageModal()">✕</button>
-    <img id="modalImage" class="image-modal-img" src="" alt="Full size image">
-  </div>
-</div>
+<!-- Account · profile · positions — collapsed to a bar by default -->
+<section class="acct" aria-label="Account, profile and positions">
+  <button class="acct-bar" id="acctToggle" type="button" aria-expanded="false" aria-controls="acctPanel" onclick="toggleAcct()">
+    <span class="acct-summary" id="acctSummary"><span class="dot" id="acctDot"></span>Loading account…</span>
+    <span class="acct-caret" id="acctCaret" aria-hidden="true">▴</span>
+  </button>
+  <div class="acct-panel" id="acctPanel" hidden></div>
+</section>
+</div><!-- /kx-console -->
 
 <div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
@@ -264,6 +313,90 @@ const API='/api/trading/kalshi';
 const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
 let lastSyncMs=0, lastDetCount=null;
+// Deck MODE: 'replay' (recorded history, graded vs known outcome — always works),
+// 'paper' (live candidates, paper-only), 'live' (original decks, currently paused).
+// Default to replay so the swipe is testable + the council trains while live is halted.
+let MODE='replay', replayExhausted=false, lastGroundStats=null;
+
+function setMode(m){
+  if(MODE===m && deck.length) return;
+  MODE=m; deck=[]; idx=0; liveMap={}; prefetching=false; replayExhausted=false;
+  for(const [id,mode] of [['mGrounded','grounded'],['mReplay','replay'],['mPaper','paper'],['mLive','live']]){
+    const b=document.getElementById(id);
+    if(b){ b.classList.toggle('active',mode===m); b.setAttribute('aria-selected',mode===m?'true':'false'); }
+  }
+  const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
+  document.getElementById('end').style.display='none';
+  loadCouncil();
+  if(MODE==='live') syncDeck(); else loadModeDeck();
+}
+
+// Load a paper/replay/grounded deck slice and append unique cards (continuous deck).
+async function loadModeDeck(){
+  let d;
+  if(MODE==='replay'){
+    if(replayExhausted) return;
+    d=await j(`/replay-deck?limit=20&offset=${deck.length}`);
+    if(!d || !(d.cards||[]).length){ replayExhausted=true; }
+  } else if(MODE==='grounded'){
+    d=await j('/grounded-deck?limit=14');
+    if(d) lastGroundStats=d;
+  } else { // paper
+    d=await j('/paper-deck?limit=20');
+  }
+  const cards=(d&&d.cards)||[];
+  stampCards(cards, d&&d.generatedAt);
+  if(MODE==='grounded'){
+    // Grounded cards mutate as background research completes (pending → done), so
+    // UPDATE in place (preserving order + the card on screen) and append new tickers.
+    const pos=new Map(deck.map((c,i)=>[c.ticker,i]));
+    for(const nc of cards){
+      if(pos.has(nc.ticker)){
+        const i=pos.get(nc.ticker);
+        if(!(i===idx&&dragging)) deck[i]=Object.assign({},nc,{_genMs:deck[i]._genMs});
+      } else deck.push(nc);
+    }
+    if(idx<deck.length){
+      document.getElementById('end').style.display='none';
+      if(!document.getElementById('front')) render(); else if(!dragging) patchFront(deck[idx]);
+    } else showModeEnd(d);
+    markFresh(deck.length-idx);
+    return;
+  }
+  const have=new Set(deck.map(c=>c.ticker));
+  const add=cards.filter(c=>!have.has(c.ticker));
+  if(deck.length===0){ deck=add.slice(); idx=0; }
+  else if(add.length){ deck.push(...add); }
+  if(idx<deck.length){
+    document.getElementById('end').style.display='none';
+    if(!document.getElementById('front')) render();
+  } else {
+    showModeEnd(d);
+  }
+  markFresh(deck.length-idx);
+}
+
+function showModeEnd(d){
+  const end=document.getElementById('end');
+  const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
+  if(!end) return;
+  end.style.display='flex';
+  const note = MODE==='replay'
+    ? (replayExhausted?'Replay deck complete — every swipe was graded into the Σ₀ council below.':'Loading replay history…')
+    : (d&&d.note)||'No live candidate markets right now (Kalshi closed or no creds). Try Replay to swipe recorded history.';
+  end.innerHTML=`<div style="color:var(--gold);font-weight:700">${MODE==='replay'?'⟲ Replay':'📝 Paper'} — ${idx} swiped</div>`
+    +`<div style="font-size:12px;color:var(--muted);max-width:340px">${note}</div>`
+    +`<button class="btn-ghost" onclick="setMode('${MODE}')">↻ Reload deck</button>`;
+}
+
+// Σ₀ council readout — realized after-fee truth, shown prominently (honesty surface).
+async function loadCouncil(){
+  try{
+    const c=await j('/council');
+    if(c&&!c.error) lastCouncil=c;
+    renderAccount();
+  }catch(_){}
+}
 
 // ── real-time freshness ───────────────────────────────────────────────────────
 // Every card carries _genMs (server generatedAt, else receipt time). Only cards
@@ -276,7 +409,8 @@ function stampCards(cards, genAt){
   return cards||[];
 }
 function cardAgeMs(card){ return card._genMs==null ? Infinity : Date.now()-card._genMs; }
-function isFresh(card){ return cardAgeMs(card) < MAX_AGE_MS; }
+// Replay cards are recorded history — staleness (a live-price concern) doesn't apply.
+function isFresh(card){ return MODE==='replay' ? true : cardAgeMs(card) < MAX_AGE_MS; }
 // Drop non-fresh cards. Never yank a card mid-drag. Returns true if the visible
 // front card was removed (caller must re-render); pruning hidden cards needs none.
 function flushStale(){
@@ -286,45 +420,104 @@ function flushStale(){
   return frontChanged;
 }
 
-function toggleTheme(){
-  const el=document.documentElement;
-  const next=el.getAttribute('data-theme')==='dark'?'light':'dark';
-  el.setAttribute('data-theme',next);
-  document.getElementById('themeToggle').textContent=next==='dark'?'☀':'🌙';
-  try{localStorage.setItem('kalshi-theme',next);}catch(_){}
-}
-
 async function j(path,opts){ try{const r=await fetch(API+path,opts);return await r.json();}catch(e){return{error:e.message};} }
-const c=v=>v==null?'—':v;
 
-async function loadConnection(){
-  conn=await j('/connection');
-  // Kalshi exchange down or network error
-  if(conn.error || conn.exchangeActive===false){
-    document.getElementById('cEnv').innerHTML='<span class="dot offline"></span><span style="color:var(--danger)">offline</span>';
-    document.getElementById('cCreds').innerHTML='<span style="color:var(--muted)">—</span>';
-    document.getElementById('cMode').innerHTML='<span class="pill held">OFFLINE</span>';
-    return;
-  }
-  document.getElementById('cEnv').innerHTML=`<span class="dot ${conn.env==='prod'?'online':'warn'}" id="envDot"></span><b>${c(conn.env)}</b>`;
-  const credOk=conn.credentials;
-  document.getElementById('cCreds').innerHTML=credOk
-    ?'<span class="dot online"></span>creds'
-    :'<span class="dot offline"></span><span style="color:var(--danger)">no creds</span>';
-  const live=conn.canTradeLive;
-  document.getElementById('cMode').innerHTML=live
-    ?'<span class="pill live">LIVE</span>'
-    :'<span class="pill held">DRY-RUN</span>';
+// ── account · profile · positions (collapsed to a bar; theme.js owns the toggle) ──
+let acctOpen=false, lastCouncil=null;
+const acctState={conn:null,bal:null,session:null,positions:null,posLoaded:false};
+
+function fmtUsd(x){ return '$'+((Number(x)||0)/100).toFixed(2); }
+function balStr(bal){ if(!bal||bal.error) return '—'; return bal.balance_dollars!=null?('$'+Number(bal.balance_dollars).toFixed(2)):fmtUsd(bal.balance_cents!=null?bal.balance_cents:(bal.balance||0)); }
+
+async function loadAccount(){
+  const [cn,bal,ses]=await Promise.all([
+    j('/connection'),
+    j('/balance'),
+    fetch('/api/auth/session').then(r=>r.json()).catch(()=>({authenticated:false,role:'guest'})),
+  ]);
+  acctState.conn=cn; acctState.bal=bal; acctState.session=ses; conn=cn||{};
+  renderAccount();
 }
-async function loadBalance(){
-  const d=await j('/balance');
-  const amt=d.error?'—':'$'+(d.balance_dollars!=null?d.balance_dollars:((d.balance||0)/100).toFixed(2));
-  document.getElementById('cBal').innerHTML=`<b>${amt}</b>`;
+// balance refresh alias kept for callers (e.g. after a live order)
+async function loadBalance(){ return loadAccount(); }
+
+async function loadPositions(){
+  const p=await j('/positions');
+  acctState.positions=(p&&(p.market_positions||(p.data&&p.data.market_positions)))||[];
+  acctState.posLoaded=true;
+  renderAccount();
+}
+
+function renderAccount(){
+  const cn=acctState.conn||{}, bal=acctState.bal||{}, ses=acctState.session||{};
+  const name=(ses.user&&ses.user.name)||(ses.authenticated?'You':'Guest');
+  const dotCls=cn.error?'offline':(cn.canTradeLive?'online':'warn');
+  const envLbl=cn.error?'offline':(cn.canTradeLive?'LIVE':(cn.credentials?'dry-run':'no creds'));
+  const posN=acctState.posLoaded?(acctState.positions||[]).length:null;
+  const noEdge=lastCouncil&&/NO PROVEN EDGE/i.test(lastCouncil.verdict||'');
+  const sum=document.getElementById('acctSummary');
+  if(sum) sum.innerHTML=`<span class="dot ${dotCls}"></span><b>${name}</b><span class="acct-sep">·</span>${balStr(bal)}`
+    +(posN!=null?`<span class="acct-sep">·</span>${posN} pos`:'')
+    +`<span class="acct-sep">·</span><span class="acct-env">${envLbl}</span>`
+    +(noEdge?`<span class="acct-sep">·</span><span class="acct-edge">⛔ no proven edge</span>`:'');
+  const panel=document.getElementById('acctPanel');
+  if(panel&&acctOpen) panel.innerHTML=renderAcctPanel();
+}
+
+function renderAcctPanel(){
+  const cn=acctState.conn||{}, bal=acctState.bal||{}, ses=acctState.session||{}, co=lastCouncil||{};
+  const name=(ses.user&&ses.user.name)||(ses.authenticated?'You':'Guest');
+  const tier=(ses.user&&ses.user.tier)||ses.role||'guest';
+  const reason=cn.tradingPaused?'trading paused (kill-switch)':cn.killSwitch?'kill-switch engaged':(cn.credentials?'':'no credentials configured');
+  let pos;
+  if(!acctState.posLoaded) pos='<div class="mut">Loading positions…</div>';
+  else if(!(acctState.positions||[]).length) pos=`<div class="mut">No open Kalshi positions${cn.credentials?'':' — connect credentials to view'}.</div>`;
+  else pos=acctState.positions.map(p=>{const pnl=Number(p.realized_pnl||0);return `<div class="acct-kv"><span>${(p.ticker||'').slice(0,24)}</span><span>${p.position} · ${fmtUsd(p.market_exposure)} <b style="color:${pnl>=0?'var(--green)':'var(--danger)'}">${pnl>=0?'+':''}${fmtUsd(pnl)}</b></span></div>`;}).join('');
+  const wr=co.win_rate!=null?Math.round(co.win_rate*100)+'%':'—';
+  const net=co.avg_pnl_pct!=null?(co.avg_pnl_pct>=0?'+':'')+co.avg_pnl_pct+'%':'—';
+  const netCol=co.avg_pnl_pct>=0?'var(--green)':'var(--danger)';
+  return `
+    <div class="acct-grid">
+      <section class="acct-sec">
+        <h3>Profile</h3>
+        <div class="acct-kv"><span>${name}</span><span class="pill">${tier}</span></div>
+        <div class="acct-kv"><span class="mut">Account</span><a href="/profile.html">View profile →</a></div>
+      </section>
+      <section class="acct-sec">
+        <h3>Kalshi account</h3>
+        <div class="acct-kv"><span class="mut">Balance</span><b>${balStr(bal)}</b></div>
+        <div class="acct-kv"><span class="mut">Environment</span><span>${cn.env||'—'}</span></div>
+        <div class="acct-kv"><span class="mut">Status</span><span>${cn.error?'offline':(cn.canTradeLive?'live tradable':(cn.credentials?'connected · dry-run':'no credentials'))}</span></div>
+        ${reason?`<div class="acct-note">${reason}</div>`:''}
+      </section>
+      <section class="acct-sec">
+        <h3>Positions held</h3>${pos}
+      </section>
+      ${co.graded!=null?`<section class="acct-sec">
+        <h3>Σ₀ Council</h3>
+        <div class="acct-kv"><span class="mut">Graded</span><span><b>${co.graded}</b> <span class="mut">${co.maturity||''}</span></span></div>
+        <div class="acct-kv"><span class="mut">Win · net/trade after fees</span><span><b>${wr}</b> gross · <b style="color:${netCol}">${net}</b></span></div>
+        <div class="acct-note">${co.verdict||''}</div>
+      </section>`:''}
+    </div>`;
+}
+
+function toggleAcct(){
+  acctOpen=!acctOpen;
+  const panel=document.getElementById('acctPanel'), btn=document.getElementById('acctToggle'), caret=document.getElementById('acctCaret');
+  if(panel) panel.hidden=!acctOpen;
+  if(btn) btn.setAttribute('aria-expanded',acctOpen?'true':'false');
+  if(caret) caret.textContent=acctOpen?'▾':'▴';
+  const sec=document.querySelector('.acct'); if(sec) sec.classList.toggle('open',acctOpen);
+  if(acctOpen){ if(!acctState.posLoaded) loadPositions(); renderAccount(); }
 }
 
 // ── syncDeck: initial load + live merge every SYNC_MS ────────────────────────
 // Show all open positions (exits first, then holds) + suggestion fill
 async function syncDeck(){
+  // Paper/replay/grounded modes are paper-only and don't use the live positions deck.
+  // Paper + grounded re-poll (grounded cards mutate as background research completes).
+  if(MODE!=='live'){ if(MODE==='paper'||MODE==='grounded') await loadModeDeck(); return; }
   const d=await j('/positions-deck');
   // GLOBAL TRADING-PAUSE: server cleared all cards. Force-empty the deck (the
   // in-place prune never removes the front card deck[idx]) and show why.
@@ -425,6 +618,9 @@ async function maybePrefetch(){
   if(remaining>=PREFETCH_AT) return;
   prefetching=true;
   try {
+    // Paper/replay modes refill from their own endpoint (next history slice / fresh
+    // live candidates). The prefetching flag guards re-entrancy via render().
+    if(MODE!=='live'){ await loadModeDeck(); return; }
     const pendingTickers=new Set(deck.slice(idx).map(c=>c.ticker));
     const [detR, ieR, cryR]=await Promise.all([
       j('/decisive-deck?risk=0.5').catch(()=>({})),
@@ -493,6 +689,28 @@ function sigma0Badge(card){
   </div>`;
 }
 
+// Grounded-card extra: research status, rationale, evidence/sources, Re-ground.
+function groundedExtra(card){
+  if(card.mode!=='grounded') return '';
+  const st=card.grounding_status;
+  const reBtn=`<button id="regroundBtn" class="reground-btn" onclick="event.stopPropagation();reground('${(card.ticker||'').replace(/'/g,'')}')">🔎 Re-ground</button>`;
+  if(st==='pending'){
+    return `<div class="grounded-box pending"><span class="spin">🔎</span> Researching market in real time — web grounding in progress…</div>`;
+  }
+  if(st==='knowledge-only'){
+    return `<div class="grounded-box warn">⚠ No live sources — knowledge-only estimate. Deferring to the market price (no edge claimed). ${reBtn}</div>`;
+  }
+  // web-grounded
+  const py=card.grounded_p_yes!=null?Math.round(card.grounded_p_yes*100):null;
+  const srcN=(card.sources||[]).length;
+  const srcLinks=(card.sources||[]).slice(0,4).map((u,i)=>`<a href="${(u||'').replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer">[${i+1}]</a>`).join(' ');
+  const evN=(card.evidence||[]).length;
+  return `<div class="grounded-box ok">
+    <div class="gb-head">🔎 Web-grounded · P(YES) <b>${py}%</b> vs market <b>${card.yesPct}%</b> · ${card.model||''}</div>
+    ${card.rationale?`<div class="gb-rat">${card.rationale.replace(/</g,'&lt;')}</div>`:''}
+    <div class="gb-foot">${srcN?`${srcN} live source${srcN>1?'s':''}: ${srcLinks}`:'no source links'}${evN?` · ${evN} evidence`:''} ${reBtn}</div>
+  </div>`;
+}
 function cleanTitle(title,ticker){
   if(!title) return ticker||'Market';
   // Strip leading "yes " / "no " prefix from raw position labels
@@ -709,6 +927,7 @@ function cardInner(card){
       </div>
       <div class="reason">${card.reason||''}</div>
       ${sigma0Badge(card)}
+      ${groundedExtra(card)}
       ${strategyReason}
       ${fitnessDisplay}
       ${traceHtml}
@@ -783,6 +1002,10 @@ setInterval(()=>{
 // Time: must complete within 500ms (velocity = distance/time)
 function attachSwipe(el){
   if(!el) return;
+  // Each render attaches fresh window-level move/up listeners; without removing the
+  // previous card's, stale handlers accumulate and race on the shared `dragging` flag
+  // (a stale mouseup can clear it before the live card's handler runs, eating swipes).
+  if(attachSwipe._cleanup) attachSwipe._cleanup();
   const DEADZONE=10, MIN_SWIPE=150, MAX_SWIPE_TIME=500;
   let startX=0,startY=0,startMs=0,dx=0,dy=0,active=false;
   const take=el.querySelector('.stamp.take'), pass=el.querySelector('.stamp.pass');
@@ -867,6 +1090,11 @@ function attachSwipe(el){
   el.addEventListener('touchstart',down,{passive:true});
   el.addEventListener('touchmove',move,{passive:true});
   el.addEventListener('touchend',up);
+  // Remove THIS card's window listeners before the next card attaches its own.
+  attachSwipe._cleanup=()=>{
+    window.removeEventListener('mousemove',move);
+    window.removeEventListener('mouseup',up);
+  };
 }
 function flyOut(dir){
   const el=document.getElementById('front'); if(!el) return;
@@ -890,8 +1118,55 @@ async function act(dir,fromSwipe){
   if(dir==='pass'){ if(!fromSwipe) return flyOut('pass'); idx++; render(); return; }
   if(dir==='take' && !fromSwipe) return flyOut('take');
 
-  // ── Guard: refuse bad takes before anything fires ─────────────────────────
   const card=deck[idx];
+
+  // ── REPLAY mode: grade the swipe vs the recorded outcome (Verify→Converge) ──
+  if(MODE==='replay'){
+    busy=true;
+    try{
+      const res=await j('/replay-grade',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ticker:card.ticker, side:card.favSide, entryCents:card.favAsk||card.entryCents||50})});
+      showReplayResult(res,card);
+      loadCouncil();
+      idx++; render();
+    }catch(e){ showResult({error:e.message},card); idx++; }
+    finally{ busy=false; }
+    return;
+  }
+  // ── GROUNDED mode: take a web-grounded pick → paper position (forward-graded) ─
+  if(MODE==='grounded'){
+    if(card.grounding_status!=='done'){
+      blockTake(card.grounding_status==='knowledge-only'?'No live sources — Re-ground for live data before taking':'Still researching — wait for grounding');
+      return;
+    }
+    if(card.favAsk==null){ blockTake('No live ask — cannot paper-trade'); return; }
+    busy=true;
+    try{
+      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
+        source:'kalshi-grounded', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
+      const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+      showGroundedResult(res,card);
+      idx++; render();
+    }catch(e){ showResult({error:e.message},card); idx++; }
+    finally{ busy=false; }
+    return;
+  }
+  // ── PAPER mode: open a paper position (no real order) ───────────────────────
+  if(MODE==='paper'){
+    if(card.favAsk==null){ blockTake('No live ask — cannot paper-trade'); return; }
+    busy=true;
+    try{
+      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk};
+      const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+      showPaperResult(res,card);
+      idx++; render();
+    }catch(e){ showResult({error:e.message},card); idx++; }
+    finally{ busy=false; }
+    return;
+  }
+
+  // ── LIVE mode: original guarded real/dry-run order path ─────────────────────
+  // ── Guard: refuse bad takes before anything fires ─────────────────────────
   const isSell=card.kind==='exit'||card.kind==='position';
   if(!isSell){
     // Suggestion / signal / convergence card — enforce quality bar
@@ -951,6 +1226,50 @@ function showResult(res,card){
   clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3200);
 }
 
+function showReplayResult(res,card){
+  const t=document.getElementById('toast');
+  if(res.error){ t.className='toast err show'; t.textContent='✕ '+res.error; }
+  else{
+    const w=res.won; const lbl=(card.favSide==='yes'?'▲ YES':'▼ NO');
+    t.className='toast '+(w?'live':'err')+' show';
+    t.textContent=`REPLAY · ${lbl} → ${w?'WON':'LOST'} · net ${res.net_cents>=0?'+':''}${res.net_cents}¢ after fee (real outcome: ${res.outcome===1?'YES':'NO'})`;
+  }
+  clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3400);
+}
+
+function showPaperResult(res,card){
+  const t=document.getElementById('toast');
+  if(res.error){ t.className='toast err show'; t.textContent='✕ '+res.error; }
+  else{
+    const lbl=(card.favSide==='yes'?'▲ YES':'▼ NO');
+    t.className='toast dry show';
+    t.textContent=`PAPER · opened ${lbl} @ ${card.favAsk}¢ · tracked in ledger (no real order)`;
+  }
+  clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3400);
+}
+
+function showGroundedResult(res,card){
+  const t=document.getElementById('toast');
+  if(res.error){ t.className='toast err show'; t.textContent='✕ '+res.error; }
+  else{
+    const lbl=(card.favSide==='yes'?'▲ YES':'▼ NO');
+    t.className='toast live show';
+    t.textContent=`GROUNDED · ${lbl} @ ${card.favAsk}¢ · P(YES) ${Math.round((card.grounded_p_yes||0)*100)}% · paper pick logged, graded on resolution`;
+  }
+  clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3600);
+}
+
+// Re-ground a single market on demand (web search + LLM, ~20s). Updates the card in place.
+async function reground(ticker){
+  const card=deck[idx]; if(!card||card.ticker!==ticker) return;
+  const btn=document.getElementById('regroundBtn'); if(btn){ btn.disabled=true; btn.textContent='🔎 Researching…'; }
+  try{
+    const res=await j('/ground',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker})});
+    if(res&&res.card){ deck[idx]=Object.assign({},res.card,{_genMs:Date.now()}); patchFront(deck[idx]); loadCouncil(); }
+    else if(btn){ btn.disabled=false; btn.textContent='🔎 Re-ground'; }
+  }catch(_){ if(btn){ btn.disabled=false; btn.textContent='🔎 Re-ground'; } }
+}
+
 // ── image gallery ────────────────────────────────────────────────────────────
 let imageGalleryOpen=true;
 
@@ -1002,9 +1321,11 @@ function toggleGallery(){
 
 // Consolidated keyboard shortcut handler (arrow keys + escape)
 document.addEventListener('keydown',e=>{
+  const tag=(e.target&&e.target.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
   if(e.key==='ArrowRight') act('take');
   else if(e.key==='ArrowLeft') act('pass');
-  else if(e.key==='Escape') closeImageModal();
+  else if(e.key==='Escape'&&acctOpen) toggleAcct();
 });
 
 // ── live-status heartbeat ─────────────────────────────────────────────────────
@@ -1025,52 +1346,47 @@ async function pollLiveStatus(){
 }
 
 // Polling interval references for visibility-based pausing
-let connInterval, balInterval, syncInterval, imgInterval, liveInterval;
+let syncInterval, acctInterval;
 
 function init(){
-  // Restore saved theme
-  try{const t=localStorage.getItem('kalshi-theme');if(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('themeToggle').textContent=t==='dark'?'☀':'🌙';}}catch(_){}
-  loadConnection(); loadBalance(); syncDeck(); loadImages(); pollLiveStatus();
-
-  // Start polling with normal intervals
-  connInterval=setInterval(loadConnection,20000);
-  balInterval=setInterval(loadBalance,30000);
+  // Theme is handled by the shared bootstrap + /js/theme-toggle.js (#theme-toggle).
+  loadAccount(); setMode('replay'); loadCouncil();
   syncInterval=setInterval(syncDeck,SYNC_MS);
-  imgInterval=setInterval(loadImages,60000);
-  liveInterval=setInterval(pollLiveStatus,15000);
-  
-  // Pause/resume on visibility change to save API quota and battery
+  acctInterval=setInterval(()=>{loadAccount();loadCouncil();},30000);
+
+  // Pause/resume on tab visibility to save API quota + battery.
   document.addEventListener('visibilitychange',()=>{
-    if(document.hidden){
-      // Clear all intervals when tab is hidden
-      clearInterval(connInterval); clearInterval(balInterval);
-      clearInterval(syncInterval); clearInterval(imgInterval); clearInterval(liveInterval);
-
-      // Set slow fallback intervals (30s for syncDeck, others 2x slower)
-      connInterval=setInterval(loadConnection,40000);
-      balInterval=setInterval(loadBalance,60000);
-      syncInterval=setInterval(syncDeck,30000);
-      imgInterval=setInterval(loadImages,120000);
-      liveInterval=setInterval(pollLiveStatus,60000);
-    }else{
-      // Clear slow intervals
-      clearInterval(connInterval); clearInterval(balInterval);
-      clearInterval(syncInterval); clearInterval(imgInterval); clearInterval(liveInterval);
-
-      // Restore normal intervals
-      connInterval=setInterval(loadConnection,20000);
-      balInterval=setInterval(loadBalance,30000);
-      syncInterval=setInterval(syncDeck,SYNC_MS);
-      imgInterval=setInterval(loadImages,60000);
-      liveInterval=setInterval(pollLiveStatus,15000);
-
-      // Immediate refresh on tab focus
-      loadConnection(); loadBalance(); syncDeck(); loadImages(); pollLiveStatus();
-    }
+    clearInterval(syncInterval); clearInterval(acctInterval);
+    const slow=document.hidden;
+    syncInterval=setInterval(syncDeck,slow?30000:SYNC_MS);
+    acctInterval=setInterval(()=>{loadAccount();loadCouncil();},slow?60000:30000);
+    if(!slow){ syncDeck(); loadAccount(); loadCouncil(); }
   });
 }
 document.addEventListener('DOMContentLoaded',init);
 </script>
+
+<!-- Global footer — shared with home + chat -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-brand">
+      <span class="dot online" id="status-dot" title="Server status"></span>
+      unisona.ai
+    </span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/stock-trader.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep">·</span>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span class="sr-only" id="status-label">connecting…</span>
+  </div>
+</footer>
+
+<script src="/js/theme-toggle.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

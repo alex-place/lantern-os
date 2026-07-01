@@ -68,6 +68,9 @@
 
     .meta-row { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.78rem; margin-top: 10px; }
     .meta-row b { color: var(--text); }
+    /* #1528 — a rung that didn't actually run (model unavailable) needs to read as
+       "skipped", not a bare asterisk nobody will notice or understand. */
+    .rung-skipped { color: #f59e0b; font-weight: 700; cursor: help; }
     .log { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); max-height: 160px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
     .log div { padding: 1px 0; }
     .hidden { display: none; }
@@ -185,6 +188,14 @@
 
   // Minimal, safe markdown → HTML (escape first, then a few inline rules + [n]→sup).
   function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+  // #1528 — a rung that didn't run needs a visible, explained "skipped" marker, not a
+  // bare asterisk. `ran` is tiers.lowRan / tiers.highRan; `why` is a plain-English
+  // explanation shown as a hover tooltip (esc()'d since it lands in an HTML attribute).
+  function rungSkipped(ran, why) {
+    if (ran) return '';
+    return ` <span class="rung-skipped" title="${esc(why)}">skipped ⚠</span>`;
+  }
   function mdToHtml(md) {
     let h = esc(md);
     h = h.replace(/^### (.*)$/gm, '<h3>$1</h3>')
@@ -290,7 +301,7 @@
     $('meta').innerHTML =
       `<span>confidence <b>${r.confidence}</b></span>` +
       `<span>pool <b>${r.poolSize||0}</b> → kept <b>${(r.sources||[]).length}</b></span>` +
-      `<span>ladder <b>${r.tiers.low}${r.tiers.lowRan?'':'*'}</b> → <b>${r.tiers.high}${r.tiers.highRan?'':'*'}</b></span>` +
+      `<span>ladder <b>${r.tiers.low}${rungSkipped(r.tiers.lowRan,'low-fidelity model unavailable — cheap prune step was skipped; pool was kept unranked by fan-out hits instead')}</b> → <b>${r.tiers.high}${rungSkipped(r.tiers.highRan,'high-fidelity model unavailable — answer is the unrefined low-pass draft')}</b></span>` +
       `<span><b>${r.ms}</b>ms</span>`;
     if ((r.sources||[]).length) {
       $('src-wrap').classList.remove('hidden');
