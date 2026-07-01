@@ -488,6 +488,16 @@ const LOOP_COLOR_SHIFTS = [
   "mythic scale, symbolic geometry visible, dreamer is the light",
 ];
 
+// Locked Kingdome character canon — Alex's hand-drawn cast
+// (skills/three-doors-game/assets/reference/). Injected into every generated
+// scene so the art matches the real characters, not a generic "guide".
+const CHARACTER_CANON =
+  "the Kingdome companions in their exact canon: Lantern (a small figure whose head is a glass lantern with a warm orange flame, red beret, purple coat, white gloves, black boots), " +
+  "Eclipse (a purple jellyfish with two blue diamond eyes, a pale cloud collar and purple tentacles), " +
+  "Keystone (a grey cracked boulder-egg with two big eyes and a wide two-toothed smile); no fox";
+// Alex's art steer: surreal / atmospheric / grown-up, never bright-cute.
+const STYLE_CANON = "surreal, atmospheric, painterly, muted, grown-up, melancholy-wonder";
+
 function buildDynamicImagePrompt(sceneKey, seed, gameState) {
   const scene = SCENES[sceneKey];
   const archetype = scene?.archetype || "mystical";
@@ -497,5 +507,5 @@ function buildDynamicImagePrompt(sceneKey, seed, gameState) {
   const mood = ARCHETYPE_MOODS[archetype] || archetype;
   const loopShift = LOOP_COLOR_SHIFTS[Math.min(loopCount, LOOP_COLOR_SHIFTS.length - 1)];
   const choiceCtx = lastChoice ? `, player chose "${lastChoice}"` : "";
-  return ["fantasy dreamworld door scene", mood, style, loopShift, "Lantern glowing guide", choiceCtx, "no text no words no letters"].filter(Boolean).join(", ");
+  return ["fantasy dreamworld door scene", mood, style, STYLE_CANON, loopShift, CHARACTER_CANON, choiceCtx, "no text no words no letters"].filter(Boolean).join(", ");
 }
