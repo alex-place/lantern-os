@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.10] - 2026-07-01
+### Changed
+- **Knowledge Center library rebalanced — no more "Library" dumping ground (#1708).** Regenerated the doc-library card block from the current catalog and added a deterministic path/keyword reclassifier (`reclassifyLibrary`) in `scripts/build_doc_library.js` that rescues any catch-all `library` doc (catalogued-but-unbucketed or uncatalogued) into a topical bucket — setup / trading / training / creator / reports / ops. The checked-in `knowledgecenter.html` was stale (Library held 46 cards); it now holds 5, with every filter chip backed by a sensible non-empty subset (research 57, architecture 36, guides 28, setup/ops/creator 14, …). Improves the **Remember** stage: browsing the grounding corpus by category is useful again. (No single catch-all chip dominates; the reclassifier keeps it that way as new docs land.)
+
 ## [1.8.8] - 2026-07-01
 ### Fixed
 - **Chat capability questions no longer dump a raw Knowledge Center doc section (#1778).** Asking Keystone *"what can you do"* (and *"what do you do" / "how can you help" / "what are your capabilities"*) scored a spurious near-hit against `CLAUDE.md#Node.js` and short-circuited to that section's raw text — an empty ` ```bash ` fence — instead of a real reply (the "bash error popup" a user screenshotted). The existing greeting/identity Knowledge-Center-bypass guard in `stream-chat.js` is extended with a capability-query pattern so these questions always reach the model, which can enumerate real skills. Deterministic regex; verified it matches the capability phrasings without over-matching "what can I do here", "what's the weather", or "can you write python". Strengthens the **Observe/Reason** boundary — a capability ask is answered by the assistant, not a stray doc.
