@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.16] - 2026-07-01
+### Fixed
+- **Three Doors gates built out to canon** (#1797 Tomorrow Door, #1798 XP Door [GLITCHED], #1799 Xenon Starship, #1800 Sigil — City of Doors): in-app game data/logic in `three-doors-game.js` / `three-doors-data.js` plus stream-chat door-intent wiring. Strengthens the **Act** stage.
+
 ## [1.8.14] - 2026-07-01
 ### Fixed
 - **Restore merged work silently reverted by the stale worktree-sync commit `2fd3598c`.** The bulk "sync worktree state" commit wrote stale copies of files over master, reverting already-merged PRs. Restored: compact chat-first home page (#1763), PLT KV-cache decode (#1766), a11y Test 7 font/style contract (#1763), dream-chat capability-notice styles/JS (#1761), orchestration boot-burst resilience (#1769), R2 media-hosting docs/script (#1762), ADR-0011 + Σ₀ coder doc refresh (#1764), plus two deleted changelog fragments.
