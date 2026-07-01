@@ -65,6 +65,45 @@ foreach ($wt in @($StableRoot, $DevRoot)) {
 }
 Write-Host ("Node {0}; worktrees present." -f (node --version)) -ForegroundColor Green
 
+# --- Dependency preflight: catch node_modules drift BEFORE launch ------------
+# The dual-boot's most common silent failure is a worktree whose node_modules is
+# missing or drifted from package.json: the server then throws MODULE_NOT_FOUND at
+# require() time and the port answers HTTP 000 with nothing but a stack in the err
+# log. This preflight resolve-probes a required dependency in each worktree and runs
+# `npm install` ONLY when it can't resolve (missing/broken), so a healthy tree is
+# untouched and the command stays idempotent. A lockfile-vs-package.json drift is
+# surfaced as a warning (non-fatal). Refs the "preview HTTP 000 on node_modules
+# drift" gotcha.
+function Test-WorktreeDeps($wt) {
+    $appDir = Join-Path $wt 'apps\lantern-garage'
+    $nm     = Join-Path $appDir 'node_modules'
+    $probe  = 'try{require.resolve("express-session");process.exit(0)}catch(e){process.exit(3)}'
+    Push-Location $appDir
+    try {
+        & node -e $probe 2>$null | Out-Null
+        $resolved = ($LASTEXITCODE -eq 0)
+        if (-not $resolved) {
+            Write-Host ("  [deps] {0}: node_modules missing/drifted - running npm install..." -f $wt) -ForegroundColor Yellow
+            & npm install --no-audit --no-fund 2>&1 | Out-Null
+            & node -e $probe 2>$null | Out-Null
+            $resolved = ($LASTEXITCODE -eq 0)
+            if ($resolved) { Write-Host ("  [deps] {0}: dependencies installed." -f $wt) -ForegroundColor Green }
+            else           { Write-Host ("  [deps] {0}: STILL unresolved after npm install - server may fail to boot (see logs)." -f $wt) -ForegroundColor Red }
+        } else {
+            # Healthy: warn only if the lockfile is older than package.json (possible drift).
+            $pkg  = Join-Path $appDir 'package.json'
+            $lock = Join-Path $nm '.package-lock.json'
+            if ((Test-Path $pkg) -and (Test-Path $lock) -and
+                ((Get-Item $pkg).LastWriteTime -gt (Get-Item $lock).LastWriteTime)) {
+                Write-Host ("  [deps] {0}: package.json is newer than the installed lockfile - consider `npm install`." -f $wt) -ForegroundColor Yellow
+            } else {
+                Write-Host ("  [deps] {0}: dependencies OK." -f $wt) -ForegroundColor Green
+            }
+        }
+    } finally { Pop-Location }
+}
+foreach ($wt in @($StableRoot, $DevRoot)) { Test-WorktreeDeps $wt }
+
 # --- Workstream hooks (dynamic per-lane PR gate) -----------------------------
 # Install the monoworkstream git hooks as part of quickstart so the dynamic
 # per-human lanes (alex/, kriskin/, mookman11/, any NAME/ - one open PR each)

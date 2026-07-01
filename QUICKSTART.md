@@ -141,6 +141,26 @@ On startup this also installs the **monoworkstream git hooks** (contributors onl
 dynamic per-lane PR gate: `alex/`, `kriskin/`, `mookman11/`, or any `<name>/` branch each
 get one concurrent PR lane, plus the slop + change-record checks. Nothing to do manually.
 
+**One idempotent command.** `Start-DualServers.ps1` is safe to re-run any time — it's the
+single supported way to bring the servers up, and each step self-heals:
+
+1. **Prereqs** — verifies Node and both worktrees exist (exits early with instructions if not).
+2. **Dependency preflight** — resolve-probes each worktree's `node_modules` and runs
+   `npm install` **only if** it's missing or drifted from `package.json`. This catches the
+   most common silent failure: a drifted `node_modules` makes the server throw at `require()`
+   and the port then answers with nothing (HTTP 000). A healthy tree is left untouched, and a
+   lockfile older than `package.json` is flagged as a warning.
+3. **Env hydration** — loads API keys from the Machine/User environment (not a committed `.env`).
+4. **Clean slate** — tree-kills the current port owners *and* reaps leaked zombie servers, so a
+   re-run never stacks duplicates or contends for the shared child-service ports.
+5. **Launch + health check** — starts :4177 / :4178 (+ MCP :8771 if Python is present) and polls
+   `/api/version` until each answers.
+6. **Watchdog** — launches `Watch-DualServers.ps1` detached so a server that later crashes is
+   auto-restarted instead of staying dead until someone notices (`-NoWatchdog` to skip).
+
+Because every step is a check-then-act, running the command again is the correct fix for almost
+any "a server is down / acting weird" situation — it converges the running state back to intended.
+
 *(If you happen to have `make` installed — it isn't on Windows by default — `make quickstart` does the same thing.)*
 
 ### Start automatically when your PC turns on (Windows)
