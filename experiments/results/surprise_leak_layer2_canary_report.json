@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-07-01T07:03:25.868Z",
+  "datasets": [
+    {
+      "file": "surprise_leak_qwen15b.jsonl",
+      "model": "qwen2.5-coder:1.5b",
+      "n": 199,
+      "textOnly": {
+        "scored": 15,
+        "tooShort": 184,
+        "total": 199,
+        "recall": 0.7142857142857143,
+        "fpr": 1,
+        "tp": 10,
+        "fp": 1,
+        "tn": 0,
+        "fn": 4
+      },
+      "withSurprise": {
+        "scored": 15,
+        "tooShort": 184,
+        "total": 199,
+        "recall": 0.7142857142857143,
+        "fpr": 1,
+        "tp": 10,
+        "fp": 1,
+        "tn": 0,
+        "fn": 4
+      },
+      "delta": {
+        "recall": 0,
+        "fpr": 0
+      }
+    },
+    {
+      "file": "surprise_leak_mistral7b.jsonl",
+      "model": "mistral",
+      "n": 199,
+      "textOnly": {
+        "scored": 12,
+        "tooShort": 187,
+        "total": 199,
+        "recall": 1,
+        "fpr": 1,
+        "tp": 9,
+        "fp": 3,
+        "tn": 0,
+        "fn": 0
+      },
+      "withSurprise": {
+        "scored": 12,
+        "tooShort": 187,
+        "total": 199,
+        "recall": 1,
+        "fpr": 1,
+        "tp": 9,
+        "fp": 3,
+        "tn": 0,
+        "fn": 0
+      },
+      "delta": {
+        "recall": 0,
+        "fpr": 0
+      }
+    }
+  ]
+}
