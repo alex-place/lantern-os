@@ -11,20 +11,39 @@
  *
  * Anything not reached from index.html (directly or transitively) is an orphan.
  *
- * Usage:
- *   node scripts/find-orphan-pages.mjs           # report; exit 1 if orphans exist
- *   node scripts/find-orphan-pages.mjs --json
+ * An orphan is only a problem if it is *undeclared*. Many surfaces are reached solely
+ * via a server route or a feature flag, not a static link from index.html — those are
+ * intentional, and lib/surface-registry.js is the single source of truth for them. So
+ * this audit reports an orphan that IS a declared surface (or a nested `<subdir>/index.html`
+ * sub-app entry) as intentional, and fails ONLY on orphans that are neither linked nor
+ * declared — genuine sprawl.
  *
- * Limitations (reported, not deleted): pages reachable only via a server route or
- * redirect, or via a JS link built by string concatenation, can't be seen here and
- * will show as orphans — that is correct for "linked back to index", but verify
- * before deleting.
+ * Usage:
+ *   node scripts/find-orphan-pages.mjs           # report; exit 1 only on UNDECLARED orphans
+ *   node scripts/find-orphan-pages.mjs --json
  */
 import { readdirSync, statSync, readFileSync } from "node:fs";
 import { join, relative, sep, posix, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const REPO_ROOT = join(fileURLToPath(import.meta.url), "..", "..");
+
+// The surface-registry is the single source of truth for which top-level surfaces are
+// *intentional* (a core loop stage or a feature-gated extension). An orphan that is a
+// declared surface is intentional — reached via a server route / feature flag, not a
+// static link from index.html. An orphan that is NOT declared is genuine sprawl.
+const require = createRequire(import.meta.url);
+const registry = require(join(REPO_ROOT, "apps", "lantern-garage", "lib", "surface-registry.js"));
+
+// A top-level orphan is intentional iff it is declared in the registry. A nested
+// `<subdir>/index.html` is a sub-app entry point (outside the top-level boundary's scope)
+// and is likewise treated as intentional.
+function isIntentional(rel) {
+  if (!rel.includes("/")) return registry.classify(rel) !== null;
+  return /(^|\/)index\.html$/i.test(rel);
+}
+
 const PUBLIC = join(REPO_ROOT, "apps", "lantern-garage", "public");
 const START = "index.html";
 
@@ -114,21 +133,34 @@ while (queue.length) {
 }
 
 const orphans = [...htmlFiles].filter((f) => !reached.has(f)).sort();
+// Split orphans: `intentional` are declared surfaces / sub-app entries reached only via a
+// route or feature flag; `unexpected` are undeclared pages — genuine sprawl, and the only
+// thing this audit fails on.
+const intentional = orphans.filter(isIntentional);
+const unexpected = orphans.filter((f) => !isIntentional(f));
 
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ total: htmlFiles.size, reachable: reached.size, orphans }, null, 2));
-  process.exit(orphans.length ? 1 : 0);
+  console.log(JSON.stringify(
+    { total: htmlFiles.size, reachable: reached.size, orphans, intentional, unexpected },
+    null, 2
+  ));
+  process.exit(unexpected.length ? 1 : 0);
 }
 
 console.log(`Scanned ${htmlFiles.size} HTML pages under public/ — ${reached.size} reachable from index.html.\n`);
-if (orphans.length === 0) {
-  console.log("✓ No orphan pages: every page is linked back to index.html (directly or indirectly).");
+if (intentional.length) {
+  console.log(`ℹ ${intentional.length} orphan(s) are intentional (route-only / feature-gated per surface-registry):\n`);
+  for (const o of intentional) console.log(`  ${o}`);
+  console.log("");
+}
+if (unexpected.length === 0) {
+  console.log("✓ No undeclared orphan pages: every orphan is a declared surface or sub-app entry.");
   process.exit(0);
 }
-console.log(`⚠ ${orphans.length} page(s) NOT linked back to index.html:\n`);
-for (const o of orphans) console.log(`  ${o}`);
+console.log(`⚠ ${unexpected.length} UNDECLARED orphan page(s) — neither linked from index.html nor classified in lib/surface-registry.js:\n`);
+for (const o of unexpected) console.log(`  ${o}`);
 console.log(
-  "\nNote: a page may still be reachable via a server route/redirect or a JS-built link\n" +
-  "(this graph only follows static href/src + quoted *.html). Verify before deleting.\n"
+  "\nEither link the page back to index.html, classify it in lib/surface-registry.js\n" +
+  "(core loop stage or extension module), or delete it. Undeclared orphans are sprawl.\n"
 );
 process.exit(1);

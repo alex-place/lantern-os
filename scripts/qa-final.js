@@ -20,8 +20,6 @@ const ALL_PAGES = [
   '/courtney.html',
   '/create.html',
   '/dream-chat.html',
-  '/dream-chat-v1.html',
-  '/dream-chat-orion.html',
   '/dream-journal/',
   '/entry.html',
   '/flourishing.html',
