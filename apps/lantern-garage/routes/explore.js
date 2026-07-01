@@ -109,8 +109,11 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     // producer consumes it.
     const userId = (req.session && req.session.patreon && req.session.patreon.id) || null;
     const userCtx = buildUserNewsContext(userId);
+    // Cache key keeps the short-TTL rank stable per audience: signed-in users get
+    // their own personalized cache slot, everyone else shares "global".
+    const cacheKey = userId ? "u:" + userId : "global";
     try {
-      const feed = await pagedFeed({ seen, limit: body.limit, type, topic, userCtx });
+      const feed = await pagedFeed({ seen, limit: body.limit, type, topic, userCtx, cacheKey });
       sendJson(res, feed, 200);
     } catch (e) {
       sendJson(res, { cards: [], count: 0, error: e.message }, 200);

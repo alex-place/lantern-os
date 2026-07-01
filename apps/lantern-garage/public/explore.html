@@ -77,6 +77,109 @@
     }
     .feed-chips { max-width: 600px; }
 
+    /* ── Layout toolbar: single-column (FB) ↔ grid (IG 4-up) ── */
+    .feed-toolbar {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 10px; max-width: 600px; margin: 0 auto 12px;
+    }
+    .feed-layout { display: inline-flex; gap: 2px; padding: 2px;
+      border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .feed-layout-btn {
+      font: inherit; font-size: 0.95rem; line-height: 1;
+      width: 34px; height: 28px; border: none; border-radius: 8px;
+      background: transparent; color: var(--muted); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .feed-layout-btn:hover { color: var(--text); }
+    .feed-layout-btn.active { background: var(--accent); color: #fff; }
+    .feed-layout-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Grid (Instagram-style multi-up) — the same cards, tiled. Embed/video/art
+       full-bleed cards still span the whole row (grid-column: 1 / -1). Widen the
+       chip row + toolbar to match the wider stream when grid is active. */
+    body.layout-grid .feed-chips,
+    body.layout-grid .feed-toolbar { max-width: 1180px; }
+    .feed-stream.is-grid {
+      max-width: 1180px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) { .feed-stream.is-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 820px)  { .feed-stream.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px)  { .feed-stream.is-grid { grid-template-columns: 1fr; } }
+    .feed-stream.is-grid .feed-card { padding: 14px 14px 13px; }
+    .feed-stream.is-grid .feed-card .fc-thumb,
+    .feed-stream.is-grid .feed-card .fc-thumb-ph {
+      width: calc(100% + 28px); height: 150px; margin: -14px -14px 1px;
+    }
+    .feed-stream.is-grid .feed-card .fc-title { font-size: 0.98rem; }
+    /* Full-bleed interactive cards keep their own width; span all columns. */
+    .feed-stream.is-grid .feed-card.is-embed,
+    .feed-stream.is-grid .feed-card.is-video,
+    .feed-stream.is-grid .feed-card.is-art { grid-column: 1 / -1; }
+
+    /* ── Share control (per card) — parallel to the dismiss ✕ ── */
+    .feed-card .fc-share {
+      position: absolute; top: 6px; right: 36px;
+      width: 28px; height: 28px; border: none; border-radius: 6px;
+      background: transparent; color: var(--muted);
+      font-size: 15px; line-height: 1; cursor: pointer; opacity: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+    }
+    .feed-card:hover .fc-share, .feed-card:focus-within .fc-share { opacity: 1; }
+    .feed-card .fc-share:hover { background: var(--surface2); color: var(--text); }
+    .feed-card .fc-share:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
+    /* Embed cards: the share button lives inline in the title-bar control group. */
+    .feed-card.is-embed .fc-share {
+      position: static; opacity: 0.75; width: 30px; height: 30px; font-size: 15px;
+    }
+    .feed-card.is-embed .fc-share:hover { opacity: 1; background: var(--surface2); color: var(--text); }
+
+    /* ── Share menu popover (desktop fallback when Web Share API is absent) ── */
+    .share-menu {
+      position: absolute; z-index: 1200; min-width: 176px;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; box-shadow: var(--shadow-hover);
+      padding: 6px; display: none;
+    }
+    .share-menu.open { display: block; }
+    .share-menu button, .share-menu a {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 9px 11px; border: none; background: transparent; color: var(--text);
+      font: inherit; font-size: 0.85rem; text-align: left; text-decoration: none;
+      border-radius: 8px; cursor: pointer; box-sizing: border-box;
+    }
+    .share-menu button:hover, .share-menu a:hover { background: var(--surface2); }
+    .share-menu button:focus-visible, .share-menu a:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: -1px;
+    }
+    .share-menu .sm-ico { font-size: 1rem; width: 20px; text-align: center; }
+    .share-toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(12px);
+      background: var(--text); color: var(--bg); font-size: 0.82rem; font-weight: 600;
+      padding: 9px 16px; border-radius: 999px; box-shadow: var(--shadow-hover);
+      opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 1300;
+    }
+    .share-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── First-paint skeletons (perceived speed) ── */
+    .feed-skel {
+      border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface);
+      overflow: hidden;
+    }
+    .feed-skel .sk-img { height: 180px; background: var(--surface2); }
+    .feed-skel .sk-line { height: 12px; margin: 14px 16px 0; border-radius: 6px; background: var(--surface2); }
+    .feed-skel .sk-line.short { width: 45%; margin-bottom: 16px; }
+    .feed-skel .sk-img, .feed-skel .sk-line {
+      background-image: linear-gradient(90deg,
+        transparent 0%, color-mix(in srgb, var(--accent) 10%, transparent) 50%, transparent 100%);
+      background-size: 200% 100%; animation: sk-shimmer 1.25s ease-in-out infinite;
+    }
+    @keyframes sk-shimmer { to { background-position: -200% 0; } }
+
     .feed-card {
       position: relative;
       display: flex;
@@ -996,8 +1099,18 @@
       <button type="button" class="feed-chip" data-topic="kingdome" aria-pressed="false"><span aria-hidden="true">♥</span> Kingdome</button>
       <button type="button" class="feed-chip" data-topic="gage" aria-pressed="false"><span aria-hidden="true">✏️</span> Gage</button>
     </div>
+    <div class="feed-toolbar">
+      <div class="feed-layout" id="feedLayout" role="group" aria-label="Feed layout">
+        <button type="button" class="feed-layout-btn active" data-layout="single" aria-pressed="true" aria-label="Single column" title="Single column"><span aria-hidden="true">▤</span></button>
+        <button type="button" class="feed-layout-btn" data-layout="grid" aria-pressed="false" aria-label="Grid layout" title="Grid (4-up)"><span aria-hidden="true">▦</span></button>
+      </div>
+    </div>
     <div class="feed-status" id="feedStatus" role="status" aria-live="polite">Loading your feed…</div>
     <div class="feed-stream" id="feedStream" role="feed" aria-busy="true" aria-label="Ranked content feed"></div>
+
+    <!-- Desktop share-menu popover (Web Share API fallback); positioned per-click. -->
+    <div class="share-menu" id="shareMenu" role="menu" aria-label="Share this post" hidden></div>
+    <div class="share-toast" id="shareToast" role="status" aria-live="polite"></div>
 
     <!-- The Kingdome of Hearts gallery + Gage's showcase are no longer static walls
          glued to the bottom of every view: each image/video is now a ranked `art`
@@ -1116,6 +1229,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ICON = { embed: '🕹️', read: '📰', watch: '🎬', listen: '🎵', build: '🛠️', doc: '📚', belief: '🌍', art: '🎨', action: '⚡' };
 
+  // Share affordance — rendered on every card (parallel to the ✕ dismiss). Data
+  // is stamped onto the button after render (shareUrlFor); a delegated handler
+  // opens the native share sheet (Web Share API) or the desktop popover menu.
+  const SHARE_BTN = '<button type="button" class="fc-share" aria-label="Share this post" title="Share">↗</button>';
+
   // Only http(s) and root-relative URLs are linkable. A card url is sourced from
   // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
   // href (esc() escapes quotes but not the scheme). Anything else renders inert.
@@ -1148,6 +1266,103 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ key, event, dwellMs }) });
     } catch (e) { /* non-blocking */ }
   }
+
+  // ── Share to socials ──────────────────────────────────────────────────────
+  // Resolve a card to an absolute, shareable URL. External links share directly;
+  // local art/embeds resolve to an absolute origin URL; anything else falls back
+  // to the Explore page itself so a share is never a dead link.
+  function shareUrlFor(c) {
+    const u = (c && (c.url || (c.media && c.media.full))) || '';
+    if (/^https?:\/\//i.test(u)) return u;
+    if (/^\/[^/]/.test(u)) { try { return new URL(u, location.origin).href; } catch (_) {} }
+    return location.origin + '/explore.html';
+  }
+
+  const shareMenu = document.getElementById('shareMenu');
+  const shareToast = document.getElementById('shareToast');
+  let toastTimer = null;
+  function toast(msg) {
+    if (!shareToast) return;
+    shareToast.textContent = msg;
+    shareToast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => shareToast.classList.remove('show'), 1900);
+  }
+
+  // Social share targets — public intent URLs, no SDK/tracker. {u}=url, {t}=title.
+  const SHARE_TARGETS = [
+    { id: 'x',        ico: '𝕏',  label: 'Share on X',        href: (u, t) => 'https://twitter.com/intent/tweet?url=' + u + '&text=' + t },
+    { id: 'facebook', ico: 'f',  label: 'Share on Facebook', href: (u) => 'https://www.facebook.com/sharer/sharer.php?u=' + u },
+    { id: 'reddit',   ico: '🅡', label: 'Share on Reddit',   href: (u, t) => 'https://www.reddit.com/submit?url=' + u + '&title=' + t },
+    { id: 'linkedin', ico: 'in', label: 'Share on LinkedIn', href: (u) => 'https://www.linkedin.com/sharing/share-offsite/?url=' + u },
+    { id: 'whatsapp', ico: '🟢', label: 'Share on WhatsApp', href: (u, t) => 'https://api.whatsapp.com/send?text=' + t + '%20' + u },
+  ];
+
+  function closeShareMenu() {
+    if (!shareMenu) return;
+    shareMenu.classList.remove('open');
+    shareMenu.hidden = true;
+    shareMenu.innerHTML = '';
+  }
+
+  function openShareMenu(anchor, url, title) {
+    if (!shareMenu) return;
+    const eu = encodeURIComponent(url), et = encodeURIComponent(title);
+    let html = '';
+    SHARE_TARGETS.forEach((s) => {
+      html += '<a role="menuitem" href="' + esc(s.href(eu, et)) + '" target="_blank" rel="noopener noreferrer">' +
+        '<span class="sm-ico" aria-hidden="true">' + s.ico + '</span>' + esc(s.label) + '</a>';
+    });
+    html += '<button type="button" role="menuitem" class="sm-copy">' +
+      '<span class="sm-ico" aria-hidden="true">🔗</span>Copy link</button>';
+    shareMenu.innerHTML = html;
+    shareMenu.hidden = false;
+    shareMenu.classList.add('open');
+    // Position under the button, kept within the viewport.
+    const r = anchor.getBoundingClientRect();
+    const mw = shareMenu.offsetWidth || 180;
+    let left = window.scrollX + r.right - mw;
+    left = Math.max(window.scrollX + 8, left);
+    shareMenu.style.top = (window.scrollY + r.bottom + 6) + 'px';
+    shareMenu.style.left = left + 'px';
+    const copyBtn = shareMenu.querySelector('.sm-copy');
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+      const done = () => { toast('Link copied'); closeShareMenu(); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done, done);
+      } else {
+        try { const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy'); ta.remove(); } catch (_) {}
+        done();
+      }
+    });
+    shareMenu.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => { toast('Opening share…'); closeShareMenu(); }));
+    const first = shareMenu.querySelector('a, button');
+    if (first) first.focus();
+  }
+
+  function doShare(btn) {
+    const url = btn.dataset.url || (location.origin + '/explore.html');
+    const title = btn.dataset.title || 'Keystone Explore';
+    record(btn.dataset.key || '', 'like', 0);   // sharing = a strong positive signal
+    if (navigator.share) {
+      navigator.share({ title, url }).catch(() => {});
+      return;
+    }
+    if (shareMenu && shareMenu.classList.contains('open')) { closeShareMenu(); return; }
+    openShareMenu(btn, url, title);
+  }
+
+  // Delegated share handler + dismissal of the popover on outside click / Esc.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.fc-share');
+    if (btn) { e.preventDefault(); e.stopPropagation(); doShare(btn); return; }
+    if (shareMenu && shareMenu.classList.contains('open') && !e.target.closest('.share-menu')) closeShareMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && shareMenu && shareMenu.classList.contains('open')) closeShareMenu();
+  });
+  window.addEventListener('scroll', () => { if (shareMenu && shareMenu.classList.contains('open')) closeShareMenu(); }, { passive: true });
 
   // Impression logging (#1221): the CTR denominator. Fire one 'impression' per card
   // the first time it actually scrolls into view (not merely rendered off-screen),
@@ -1314,6 +1529,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '</div>' +
         '<span class="fc-title">' + esc(c.title) + '</span>' +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+        SHARE_BTN +
         '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
       const vid = el.querySelector('video');
       if (vid) vid.addEventListener('play', () => {
@@ -1340,6 +1556,7 @@ document.addEventListener('DOMContentLoaded', () => {
           : '<div class="fc-thumb-ph" aria-hidden="true"><span class="fc-ph-icon">🎨</span></div>') +
         '<a class="fc-title" href="' + esc(full || '#') + '"' + (full ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + esc(c.title) + '</a>' +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+        SHARE_BTN +
         '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
       const im = el.querySelector('.fc-media-img');
       // A broken CDN cover swaps to the generated same-origin thumbnail, then a glyph.
@@ -1381,6 +1598,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<span class="fc-embed-title"><span aria-hidden="true">' + (ICON[c.type] || '🕹️') + '</span> ' + esc(c.title) + '</span>' +
           '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
           '<span class="fc-embed-ctl">' +
+            SHARE_BTN +
             '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" aria-pressed="false" title="Fullscreen">⛶</button>' +
             '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
           '</span>' +
@@ -1414,6 +1632,7 @@ document.addEventListener('DOMContentLoaded', () => {
           esc(c.title) + '</a>' +
         (summary ? '<p class="fc-summary">' + summary + '</p>' : '') +
         '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
+        SHARE_BTN +
         '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
       // Lead thumbnail: the source image when we have one, otherwise a generated
       // type-tinted placeholder — so every card carries a lead visual (docs and
@@ -1447,6 +1666,14 @@ document.addEventListener('DOMContentLoaded', () => {
       el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
     }
 
+    // Stamp share metadata onto the card's share button (delegated handler reads it).
+    const shareBtn = el.querySelector('.fc-share');
+    if (shareBtn) {
+      shareBtn.dataset.url = shareUrlFor(c);
+      shareBtn.dataset.title = c.title || 'Keystone Explore';
+      if (c.key) shareBtn.dataset.key = c.key;
+    }
+
     el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       record(c.key, 'dismiss', 0);
@@ -1474,7 +1701,23 @@ document.addEventListener('DOMContentLoaded', () => {
   sentinel.setAttribute('aria-hidden', 'true');
   stream.after(sentinel);
 
+  // First-paint skeletons — shown while the very first page is in flight so the
+  // feed reads as "loading fast" instead of an empty gap. Cleared on first append.
+  function showSkeletons(n) {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('div');
+      d.className = 'feed-skel';
+      d.setAttribute('aria-hidden', 'true');
+      d.innerHTML = '<div class="sk-img"></div><div class="sk-line"></div><div class="sk-line short"></div>';
+      frag.appendChild(d);
+    }
+    stream.appendChild(frag);
+  }
+
   function appendCards(cards) {
+    // Clear any first-paint skeletons before the real cards land.
+    if (stream.querySelector('.feed-skel')) stream.innerHTML = '';
     const frag = document.createDocumentFragment();
     const els = [];
     cards.forEach((c, i) => { seen.add(c.id || c.key); const el = cardEl(c, totalShown + i + 1); els.push(el); frag.appendChild(el); });
@@ -1503,7 +1746,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = r.ok ? await r.json() : null;
       if (epoch !== filterEpoch) return;                 // a filter change superseded this page
       const cards = (data && data.cards) || [];
-      if (data && data.cycled) { cycles++; seen.clear(); } // endless: re-serve a fresh cycle
+      // "Infinite scroll WITHOUT repeats" (user request): when the server reports
+      // the catalog looped (`cycled`), STOP rather than re-serving already-seen
+      // posts. The feed keeps pulling fresh, unique cards until the whole catalog
+      // has been shown once, then says you're caught up — never a duplicate.
+      if (data && data.cycled) {
+        if (io) io.unobserve(sentinel);
+        if (statusEl) statusEl.textContent = totalShown
+          ? (totalShown + (filter === 'all' ? '' : ' ' + filter) + " · you're all caught up")
+          : 'No content available right now.';
+        return;
+      }
       if (!cards.length) {
         if (io) io.unobserve(sentinel);
         // Small filtered category fully shown → say "caught up", don't blank or
@@ -1544,9 +1797,32 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeEmbed) deactivateEmbed(activeEmbed);   // stop any playing game/film/radio
     if (playObserver) playObserver.disconnect();
     stream.innerHTML = '';
+    showSkeletons(6);
     if (io) { io.unobserve(sentinel); io.observe(sentinel); }
     loadPage();
   }
+
+  // ── Layout toggle: single column (Facebook) ↔ grid 4-up (Instagram) ──
+  const layout = document.getElementById('feedLayout');
+  function applyLayout(mode) {
+    const grid = mode === 'grid';
+    stream.classList.toggle('is-grid', grid);
+    document.body.classList.toggle('layout-grid', grid);
+    if (layout) layout.querySelectorAll('.feed-layout-btn').forEach((b) => {
+      const on = b.dataset.layout === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  let savedLayout = 'single';
+  try { savedLayout = localStorage.getItem('explore-layout') || 'single'; } catch (_) {}
+  applyLayout(savedLayout);
+  if (layout) layout.addEventListener('click', (e) => {
+    const b = e.target.closest('.feed-layout-btn');
+    if (!b) return;
+    applyLayout(b.dataset.layout);
+    try { localStorage.setItem('explore-layout', b.dataset.layout); } catch (_) {}
+  });
 
   if (chips) {
     chips.addEventListener('click', (e) => {
@@ -1592,6 +1868,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Kick off, then keep the sentinel observed. Fallback for no IntersectionObserver.
+  showSkeletons(6);
   loadPage();
   if (io) io.observe(sentinel);
   else window.addEventListener('scroll', () => {

@@ -661,7 +661,39 @@ function diversityRerank(scored) {
 // Order the merged cards through the PCSF leaderboard. Unscored cards (cold
 // start) fall back to editorial order, then freshness — exactly the contract in
 // issue #1216.
+//
+// ── Short-TTL rank cache (perf/consistency) ──
+// Endless scroll POSTs one page per ~viewport; each page previously re-ran the
+// FULL aggregate() + rankCandidates() + diversityRerank() fan-out, so scrolling
+// felt slow and each page could re-rank differently mid-scroll (jitter the user
+// reads as "inconsistent loading"). We memoize the ranked feed for a few seconds
+// per audience key: pages within the window are served from the same stable rank
+// (instant, no jitter), and engagement still re-steers the feed on the next
+// window. EXPLORE_FEED_TTL_MS=0 disables the cache (always recompute).
+const FEED_CACHE_TTL_MS = process.env.EXPLORE_FEED_TTL_MS != null
+  ? Math.max(0, Number(process.env.EXPLORE_FEED_TTL_MS) || 0)
+  : 15000;
+const _feedCache = new Map(); // cacheKey -> { at, feed }
+
 async function rankedFeed(opts = {}) {
+  const key = opts.cacheKey || (opts.userCtx ? "user" : "global");
+  if (FEED_CACHE_TTL_MS > 0) {
+    const hit = _feedCache.get(key);
+    if (hit && (Date.now() - hit.at) < FEED_CACHE_TTL_MS) return hit.feed;
+  }
+  const feed = await computeRankedFeed(opts);
+  if (FEED_CACHE_TTL_MS > 0) {
+    _feedCache.set(key, { at: Date.now(), feed });
+    // Bound the cache — one entry per audience key ('global' + signed-in users).
+    if (_feedCache.size > 64) {
+      const oldest = [..._feedCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+      if (oldest) _feedCache.delete(oldest[0]);
+    }
+  }
+  return feed;
+}
+
+async function computeRankedFeed(opts = {}) {
   const cards = await aggregate(opts.userCtx);
   const editorial = editorialOrder();
   const edIndex = (key) => {
@@ -732,9 +764,9 @@ function pickPage(pool, limit, exploreRatio) {
   return page.slice(0, limit);
 }
 
-async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, topic = null, userCtx = null, exploreRatio = 0.22 } = {}) {
+async function pagedFeed({ seen = [], limit = DEFAULT_PAGE, type = null, topic = null, userCtx = null, cacheKey = null, exploreRatio = 0.22 } = {}) {
   limit = Math.max(1, Math.min(30, Number(limit) || DEFAULT_PAGE));
-  const { cards } = await rankedFeed({ userCtx });
+  const { cards } = await rankedFeed({ userCtx, cacheKey });
   // A chip filters by media TYPE (read/watch/…) OR by TOPIC (finance) — topics are
   // the cross-cutting dimension (e.g. finance news is a `read` tagged "finance").
   let all = type ? cards.filter((c) => c.type === type) : cards;
