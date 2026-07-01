@@ -37,9 +37,17 @@
     Run a single sweep and exit (for testing / cron-style invocation) instead of
     looping forever.
 
+.PARAMETER RegisterTask
+    Install a Windows Scheduled Task ("LanternWatchdogRevive") that relaunches
+    this script every 15 minutes. Combined with the singleton guard, this closes
+    the "who watches the watchdog" gap: if the looping watchdog dies (or was only
+    ever started with -Once), the task revives it; if it is alive, the new
+    instance exits immediately.
+
 .EXAMPLE
     pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Watch-DualServers.ps1
     pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Watch-DualServers.ps1 -Once
+    pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Watch-DualServers.ps1 -RegisterTask
 #>
 
 param(
@@ -47,7 +55,8 @@ param(
     [string]$DevRoot               = "C:\dev\lantern-os-dev",
     [int]   $IntervalSeconds       = 30,
     [int]   $FailuresBeforeRestart = 2,
-    [switch]$Once
+    [switch]$Once,
+    [switch]$RegisterTask
 )
 
 $ErrorActionPreference = "Continue"
@@ -144,15 +153,53 @@ function Invoke-Sweep {
     }
 }
 
+if ($RegisterTask) {
+    $action  = New-ScheduledTaskAction -Execute "powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -StableRoot `"$StableRoot`" -DevRoot `"$DevRoot`""
+    # PS 5.1 task XML rejects [TimeSpan]::MaxValue; 10 years is effectively forever.
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+        -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 3650)
+    try {
+        Register-ScheduledTask -TaskName "LanternWatchdogRevive" -Action $action -Trigger $trigger -Force -ErrorAction Stop | Out-Null
+        Log "Registered scheduled task 'LanternWatchdogRevive' (relaunch every 15 min; singleton guard dedupes)."
+    } catch {
+        Log ("FAILED to register scheduled task 'LanternWatchdogRevive': {0}" -f $_.Exception.Message)
+        exit 1
+    }
+    return
+}
+
+# --- Singleton guard: a looping watchdog that dies must be revivable by blindly
+# relaunching this script (launcher, scheduled task, human). If a looping instance
+# is already alive, exit instead of stacking duplicates. -Once sweeps are exempt.
+if (-not $Once) {
+    $me = $PID
+    $dupes = Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProcessId -ne $me -and $_.CommandLine -like "*Watch-DualServers.ps1*" -and $_.CommandLine -notlike "*-Once*" -and $_.CommandLine -notlike "*-RegisterTask*" }
+    if ($dupes) {
+        Log ("Watchdog already running (pid {0}); exiting duplicate." -f ($dupes[0].ProcessId))
+        return
+    }
+}
+
+# Heartbeat: stamped every sweep so anything (including a future probe) can tell
+# a live looping watchdog from one that silently died or ran with -Once.
+$Heartbeat = Join-Path $LogDir "watchdog-heartbeat.txt"
+function Write-Heartbeat($mode) {
+    "$(Get-Date -Format 'u') mode=$mode pid=$PID" | Set-Content -Path $Heartbeat -Encoding ascii -ErrorAction SilentlyContinue
+}
+
 Log ("Watchdog starting (interval ${IntervalSeconds}s, restart after $FailuresBeforeRestart failed probes). Stable=$StableRoot Dev=$DevRoot")
 
 if ($Once) {
     Invoke-Sweep
+    Write-Heartbeat "once"
     Log "Single sweep complete (-Once); exiting."
     return
 }
 
 while ($true) {
     Invoke-Sweep
+    Write-Heartbeat "loop"
     Start-Sleep -Seconds $IntervalSeconds
 }

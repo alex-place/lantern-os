@@ -211,7 +211,8 @@ def _load_fleet_status() -> Dict[str, Any]:
     # Load designed slot count from agents config
     try:
         if _AGENTS_CONFIG_PATH.exists():
-            agents_cfg = json.loads(_AGENTS_CONFIG_PATH.read_text(encoding="utf-8"))
+            # utf-8-sig: tolerate the BOM PowerShell's Out-File prepends
+            agents_cfg = json.loads(_AGENTS_CONFIG_PATH.read_text(encoding="utf-8-sig"))
             designed_slots = agents_cfg.get("designedRingSlots", designed_slots)
             claim_boundary = agents_cfg.get("fleetClaimBoundary", claim_boundary)
     except Exception as exc:
@@ -220,7 +221,7 @@ def _load_fleet_status() -> Dict[str, Any]:
     # Load live status from fleet status file
     try:
         if _FLEET_STATUS_PATH.exists():
-            fleet = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8"))
+            fleet = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8-sig"))
             active_slots = fleet.get("activeSlots", 0)
             sleeping_slots = fleet.get("sleepingSlots", designed_slots)
             claim_boundary = fleet.get("fleetClaimBoundary", claim_boundary)
@@ -714,7 +715,7 @@ def _tool_fleet_status() -> Dict[str, Any]:
     slots_preview: List[Dict[str, Any]] = []
     try:
         if _FLEET_STATUS_PATH.exists():
-            raw = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8"))
+            raw = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8-sig"))
             slots_preview = raw.get("slots", [])[:5]  # first 5 for preview
     except Exception:
         pass
