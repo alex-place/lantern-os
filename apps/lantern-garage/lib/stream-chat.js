@@ -29,7 +29,7 @@ const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
-const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
+const { resolveGrounding, formatGroundingForPrompt, generateXpDoorImagePrompt } = require("./mesh-grounding");
 const { defaultRings, xenonStarshipRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
@@ -160,11 +160,20 @@ function withTimeout(promise, ms, fallback) {
 
 
 // Non-blocking image generation sidecar for Three Doors mode
-function triggerImageGeneration({ cleanText, doors, surfaceMode, symbolMesh, sceneType }) {
-  if (surfaceMode !== "three-doors" || (sceneType !== "three-doors" && sceneType !== "future-doors")) return null;
-  
+function triggerImageGeneration({ cleanText, doors, suggestions, surfaceMode, symbolMesh, sceneType }) {
+  if (surfaceMode !== "three-doors") return null;
+  if (sceneType && sceneType !== "three-doors" && sceneType !== "future-doors") return null;
+
   const entryId = Date.now().toString();
-  generateDoorSceneImage({ cleanText, doors, symbolMesh, entryId, sceneType })
+  const doorList = doors || suggestions || [];
+
+  // XP Door glitch aesthetic: adjust prompt when present (guarded — helper may not exist)
+  let imagePrompt = cleanText;
+  if (typeof generateXpDoorImagePrompt === "function" && doorList.some(d => d && d.type === "xp-door")) {
+    imagePrompt = generateXpDoorImagePrompt(cleanText, doorList);
+  }
+
+  generateDoorSceneImage({ cleanText: imagePrompt, doors: doorList, symbolMesh, entryId, sceneType })
     .then(result => {
       // Image generation completes asynchronously; failure is non-blocking
     })

@@ -455,6 +455,7 @@ const CHALLENGES = {
   "kingdome-garden": [
     { id: "king-audience", name: "King's Audience", description: "Visit the Garden 3 times", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["kingdome-garden"] || 0) >= 3 },
   ],
+  // XP Door challenges are defined in the XP Door scene logic
   "cloverfield": [
     { id: "lucky-find", name: "Lucky Find", description: "Find a shiny in the Cloverfield", reward: "lorekeeper-badge", check: (p) => p.shiniesFound >= 1 },
     { id: "four-leaf", name: "Four-Leaf Master", description: "Visit Cloverfield 5 times", reward: "speedwalker-badge", check: (p) => (p.sceneVisits?.["cloverfield"] || 0) >= 5 },
@@ -462,7 +463,7 @@ const CHALLENGES = {
   "future-doors": [
     { id: "time-traveler", name: "Time Traveler", description: "Visit all Future Door sub-paths", reward: "xenon-navigator-badge", check: (p) => p.futurePathsVisited >= 3 },
   ],
-  "xp-door": [
+  "xp-door": [ // XP Door specific challenges
     { id: "glitch-hunter", name: "Glitch Hunter", description: "Find all XP Door corruption sequences", reward: "glitch-hunter-badge", check: (p) => p.glitchesFound >= 3 },
   ],
   "xenon-convergence": [
@@ -678,6 +679,71 @@ function addWalkedDoor(doorId) {
   }
 }
 
+// XP Door specific logic
+function handleXpDoorInteraction(doorName) {
+  // Check if the door is specifically the XP Door
+  if (normalizeDoorName(doorName).includes("xp door")) {
+    playerProgress.glitchesFound = (playerProgress.glitchesFound || 0) + 1;
+    saveProgress();
+    // Additional logic for XP Door, e.g., triggering visual glitches, special narration
+    console.log("XP Door interacted! Glitches found:", playerProgress.glitchesFound);
+    // Trigger a visual glitch effect
+    triggerXpGlitchEffect();
+
+    // Check for glitch-hunter badge
+    checkChallenges("xp-door", null, false); // Don't count as a scene visit, just an interaction
+  }
+}
+
+function triggerXpGlitchEffect() {
+  const body = document.body;
+  body.classList.add('xp-glitch-active');
+
+  // Randomly apply different glitch styles
+  const glitchTypes = ['scanline', 'color-shift', 'pixelate', 'static'];
+  const randomGlitch = glitchTypes[Math.floor(Math.random() * glitchTypes.length)];
+  body.classList.add(`xp-glitch-${randomGlitch}`);
+
+  // Add a temporary, subtle audio glitch
+  const audio = new Audio('/audio/glitch_short.mp3'); // Ensure you have a short glitch sound
+  audio.volume = 0.3;
+  audio.play().catch(e => console.warn("Audio glitch failed to play:", e));
+
+  // Remove glitch effects after a short duration
+  setTimeout(() => {
+    body.classList.remove('xp-glitch-active');
+    body.classList.remove(`xp-glitch-${randomGlitch}`);
+  }, 1500); // Glitch lasts for 1.5 seconds
+
+  // Add a temporary text corruption to the current scene description
+  const sceneDescriptionEl = document.getElementById("scene-description");
+  if (sceneDescriptionEl) {
+    const originalText = sceneDescriptionEl.innerHTML;
+    const corruptedText = corruptText(originalText);
+    sceneDescriptionEl.innerHTML = corruptedText;
+
+    setTimeout(() => {
+      sceneDescriptionEl.innerHTML = originalText; // Restore original text
+    }, 1000);
+  }
+}
+
+function corruptText(text) {
+  const chars = "▓▒░█▌▐▀▄─│┼═║╒╓╔╕╗╘╙╚╛╝╞╟╠╡╢╣╤╥╦╧╨╩"; // Glitchy characters
+  let corrupted = "";
+  for (let i = 0; i < text.length; i++) {
+    if (Math.random() < 0.1) { // 10% chance to corrupt a character
+      corrupted += chars[Math.floor(Math.random() * chars.length)];
+    } else if (Math.random() < 0.05) { // 5% chance to insert a random char
+      corrupted += chars[Math.floor(Math.random() * chars.length)] + text[i];
+    }
+    else {
+      corrupted += text[i];
+    }
+  }
+  return corrupted;
+}
+
 function navScore(c, ctx) {
   const W = NAV_WEIGHTS;
   const visits = ctx.sceneVisits[c] || 0;
@@ -704,6 +770,9 @@ function navigate(currentScene, doorName, state) {
   if (doorName === "xenon-convergence") {
     handleXenonStarship(doorName);
   }
+
+  // Handle XP Door specific interactions
+  handleXpDoorInteraction(doorName);
 
   // Candidate set: the chosen door's target, the next narrative gate, and the
   // *other* doors' targets as on-theme novel neighbors. Guarantees non-empty.
