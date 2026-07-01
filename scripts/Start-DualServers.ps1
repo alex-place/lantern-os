@@ -20,6 +20,11 @@
 .PARAMETER NoChrome
     Skip auto-launching Chrome.
 
+.PARAMETER NoWatchdog
+    Skip launching Watch-DualServers.ps1. By default this launcher also starts the
+    watchdog (detached) so a server that later crashes is auto-restarted instead of
+    staying dead until a human notices (issue #1785).
+
 .PARAMETER StableRoot
     Worktree that serves :4177 (default C:\dev\lantern-os-stable).
 
@@ -33,6 +38,7 @@
 
 param(
     [switch]$NoChrome,
+    [switch]$NoWatchdog,
     [string]$StableRoot = "C:\dev\lantern-os-stable",
     [string]$DevRoot    = "C:\dev\lantern-os-dev"
 )
@@ -195,5 +201,23 @@ if ($pythonExists) {
 } else {
     Write-Host "MCP server requires Python. Install with: python -m pip install -r requirements.txt" -ForegroundColor DarkGray
 }
+# --- Watchdog: keep the servers alive after this launcher returns --------------
+# Start-DualServers is fire-and-forget; without a supervisor a crashed server
+# stays down until a human notices (issue #1785). Launch the watchdog detached so
+# it health-checks both ports and resurrects only the one that died.
+if (-not $NoWatchdog) {
+    $watchdog = Join-Path $PSScriptRoot "Watch-DualServers.ps1"
+    if (Test-Path $watchdog) {
+        Remove-Item env:PORT -ErrorAction SilentlyContinue
+        Start-Process -FilePath "powershell" `
+            -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File",$watchdog,"-StableRoot",$StableRoot,"-DevRoot",$DevRoot `
+            -WindowStyle Hidden | Out-Null
+        Write-Host "  Watchdog        (supervisor) auto-restarts a crashed server -> logs/watchdog.log" -ForegroundColor DarkGray
+    } else {
+        Write-Host "  Watchdog script not found ($watchdog); servers run unsupervised." -ForegroundColor Yellow
+    }
+}
+Write-Host ""
+
 Write-Host ""
 # Servers run detached (Start-Process); this launcher returns instead of blocking.
