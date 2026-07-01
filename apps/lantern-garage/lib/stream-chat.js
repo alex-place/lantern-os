@@ -115,7 +115,7 @@ function _extractRunnable(reply) {
 // Verify-gated distillation flywheel: when KEYSTONE_LOCAL_FIRST=1, record cloud-solved + verified
 // coding episodes as a corpus for local model improvement. This is a persistent learning mechanism
 // via retrieval/experience, not weight retraining of the base model. It also triggers a local-adapter
-// refresh and measures the lift via CAP-1.
+// refresh and measures the lift via CAP-1. This is enabled via an environment variable.
 const KEYSTONE_LOCAL_FIRST = process.env.KEYSTONE_LOCAL_FIRST === "1";
 const OURO_LOCAL_FIRST_CORPUS = path.resolve(repoRoot, "data/ouro-local-first-corpus.jsonl");
 async function keystoneLocalFirst(instruction, reply, result) {
@@ -455,7 +455,7 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Search failed: ${result.error || "unknown error"}\n`);
           sendDone("web_search", { agent: "WebSearch", online: false, error: result.error });
         }
-        keystoneLocalFirst(issue, result.text, runnableResult);
+        // keystoneLocalFirst(issue, result.text, runnableResult); // This was a misplaced call, removed.
       } catch (e) {
         sendToken(`Search error: ${e.message}\n`);
         sendDone("web_search", { agent: "WebSearch", online: false, error: e.message });
@@ -463,15 +463,17 @@ async function handleStreamChat(req, url, res) {
       res.end();
       return;
     }
-
     // Keystone Kernel Mode: File-grounded, tool-driven code execution
     if (cmd.name === "keystone") {
       const issue = cmd.args.trim() || message.replace(/!keystone\s*/i, "").trim();
-
       if (!issue) {
         res.writeHead(400, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
         res.end(JSON.stringify({ error: "issue_required", message: "Usage: !keystone <issue description>" }));
         return;
+      }
+      // If KEYSTONE_LOCAL_FIRST is enabled, route through keystoneRun to enable the distillation flywheel
+      if (KEYSTONE_LOCAL_FIRST) {
+        return keystoneRun(req, url, res, issue, history, logConversation, keystoneLocalFirst);
       }
 
       res.writeHead(200, {

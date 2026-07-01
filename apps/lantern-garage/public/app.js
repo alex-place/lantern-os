@@ -9,6 +9,7 @@ const MINING_SAFETY_STRINGS = [
   "No wallet cracking", // Security boundary
 ];
 
+const KEYSTONE_LOCAL_FIRST_ENV = window.KEYSTONE_LOCAL_FIRST_ENABLED === true;
 const fallbackAccessModel = {
   generatedAt: new Date().toISOString(),
   audienceTarget: "dozens_of_users",
@@ -166,8 +167,8 @@ function renderValidators() {
   $("validatorCounts").textContent = `${pass} pass | ${held} held | ${validators.length} total`;
   // Update Keystone Local First validator state based on capabilities
   const keystoneLocalFirstValidator = validators.find(v => v.name === "Keystone Local First");
-  if (keystoneLocalFirstValidator) {
-    keystoneLocalFirstValidator.state = capabilities.keystoneLocalFirst ? "pass" : "held";
+  if (keystoneLocalFirstValidator) { // Use the constant to reflect the environment variable state
+    keystoneLocalFirstValidator.state = KEYSTONE_LOCAL_FIRST_ENV ? "pass" : "held";
   }
   $("validatorBadge").textContent = held ? "HELD" : "PASS";
   $("validatorBadge").className = held ? "badge badge-blocked" : "badge badge-live";
