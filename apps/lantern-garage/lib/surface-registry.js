@@ -43,12 +43,12 @@ const CORE = {
   "drift.html":             "Verify",    // collapse + 42-state canary monitor (verification safety)
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
-  "keystone-work.html":     "Act",       // autowork detail
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
   "operations.html":        "Converge",  // loop observability
   "agent-status.html":      "Converge",  // agent observability
   "agent-leaderboard.html": "Converge",  // agent convergence leaderboard
   "metrics.html":           "Converge",  // convergence metrics
+  "systems.html":           "Converge",  // systems-health observability
   "replay.html":            "Converge",  // git-bisect over past convergence records
 };
 
@@ -59,17 +59,11 @@ const EXTENSION = {
   "trading.html":                  ["trading", "TRADING_ENABLED"],
   "trading-news.html":             ["trading", "TRADING_ENABLED"],
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
-  "kalshi-dashboard.html":         ["trading", "TRADING_ENABLED"],
-  "kalshi-crypto-deck.html":       ["trading", "TRADING_ENABLED"],
-  "kalshi-optimal-window.html":    ["trading", "TRADING_ENABLED"],
-  "kalshi-realtime-positions.html":["trading", "TRADING_ENABLED"],
   "crypto-dashboard.html":         ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
   "test_deck_demo.html":           ["trading", "TRADING_ENABLED"],
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
-  "creator-intake.html":           ["creator", "CREATOR_ENABLED"],
-  "document-studio.html":          ["creator", "CREATOR_ENABLED"],
   "brainrot.html":                 ["creator", "CREATOR_ENABLED"],
   "courtney.html":                 ["creator", "CREATOR_ENABLED"],
   // media
@@ -97,12 +91,12 @@ const EXTENSION = {
   "api-keys-settings.html":        ["account", null],
   // project meta
   "changelog.html":                ["meta", null],
+  "whats-new.html":                ["meta", null],
   // visualization
   "observer-mesh-cube.html":       ["viz", null],
   // legacy / superseded (kept for rollback; not the live path)
   "dream-chat-v1.html":            ["legacy", null],
   "dream-chat-orion.html":         ["legacy", null],
-  "ops.html":                      ["legacy", null],
 };
 
 /** Classify one top-level surface filename. Returns null if unclassified. */
