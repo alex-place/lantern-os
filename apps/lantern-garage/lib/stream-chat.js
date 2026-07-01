@@ -29,7 +29,7 @@ const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
-const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
+const { resolveGrounding, formatGroundingForPrompt, generateXpDoorImagePrompt } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
@@ -162,10 +162,19 @@ function withTimeout(promise, ms, fallback) {
 // Non-blocking image generation sidecar for Three Doors mode
 function triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh }) {
   if (surfaceMode !== "three-doors") return null;
-  
+
   const entryId = Date.now().toString();
-  generateDoorSceneImage({ cleanText, doors: suggestions, symbolMesh, entryId })
-    .then(result => {
+
+  // Check if any of the doors are 'xp-door' and adjust prompt accordingly
+  const isXpDoorPresent = suggestions.some(d => d.type === 'xp-door');
+  let imagePrompt = cleanText;
+  if (isXpDoorPresent) {
+    // Generate a specific prompt for the XP Door's glitch aesthetic
+    imagePrompt = generateXpDoorImagePrompt(cleanText, suggestions);
+  }
+
+  generateDoorSceneImage({ cleanText: imagePrompt, doors: suggestions, symbolMesh, entryId })
+    .then(() => {
       // Image generation completes asynchronously; failure is non-blocking
     })
     .catch(err => {
