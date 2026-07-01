@@ -1911,6 +1911,9 @@ async function sendMessage(opts = {}) {
   const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const nativeToolCalls = [];  // cloud-model (Claude/OpenAI/Gemini) tool *calls* — they emit no <tool_call> text, so we synthesize the cards at finalize
   const requestedProvider = document.getElementById('provider-select')?.value || '';
+  // Model pin (#1127): only meaningful alongside a pinned provider; the server
+  // re-validates against its allowlist, so this is a preference, not authority.
+  const requestedModel = requestedProvider ? (document.getElementById('model-select')?.value || '') : '';
 
   try {
     const provider = requestedProvider;
@@ -1930,6 +1933,7 @@ async function sendMessage(opts = {}) {
         message: text,
         user: 'dream-chat',
         provider,
+        model: requestedModel || undefined,
         attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
@@ -2522,6 +2526,57 @@ document.getElementById('input').addEventListener('input', e => {
       select.dispatchEvent(new Event('change', { bubbles: true }));
     }
   } catch (e) { /* no-op */ }
+})();
+
+// ── Model dropdown (#1127 work item 1) ──────────────────────────────────────
+// Follows the provider selection: cloud providers with server-listed choices show
+// a Model select (default = the server's effective modelFor() resolution); Auto,
+// local and keystone-ft hide it. Selection persists per provider in localStorage.
+(function wireModelSelect() {
+  const providerSel = document.getElementById('provider-select');
+  const modelSel = document.getElementById('model-select');
+  const group = document.getElementById('model-select-group');
+  if (!providerSel || !modelSel || !group) return;
+  let catalog = null; // { claude: {default, options:[{id,label}]}, ... }
+
+  function storeKey(p) { return `lantern_model_pin_${p}`; }
+
+  function render() {
+    const p = providerSel.value;
+    const entry = catalog && p ? catalog[p] : null;
+    if (!entry || !entry.options || !entry.options.length) {
+      group.style.display = 'none';
+      modelSel.innerHTML = '<option value="">Default</option>';
+      return;
+    }
+    const saved = localStorage.getItem(storeKey(p)) || '';
+    modelSel.innerHTML = '';
+    const def = document.createElement('option');
+    def.value = '';
+    def.textContent = `Default (${entry.default})`;
+    modelSel.appendChild(def);
+    for (const m of entry.options) {
+      const o = document.createElement('option');
+      o.value = m.id;
+      o.textContent = m.label || m.id;
+      if (m.id === saved) o.selected = true;
+      modelSel.appendChild(o);
+    }
+    group.style.display = '';
+  }
+
+  modelSel.addEventListener('change', () => {
+    const p = providerSel.value;
+    if (!p) return;
+    if (modelSel.value) localStorage.setItem(storeKey(p), modelSel.value);
+    else localStorage.removeItem(storeKey(p));
+  });
+  providerSel.addEventListener('change', render);
+
+  fetch('/api/providers/models')
+    .then(r => (r.ok ? r.json() : null))
+    .then(data => { catalog = (data && data.providers) || null; render(); })
+    .catch(() => { /* endpoint absent → dropdown stays hidden */ });
 })();
 
 // ── Observer side panel ───────────────────────────────────────────────────────
