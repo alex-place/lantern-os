@@ -21,6 +21,7 @@ const DEFAULTS = {
   openai: "gpt-4.1-mini",                 // env: OPENAI_MODEL
   gemini: "gemini-2.5-flash",             // env: GEMINI_MODEL  (2.0-flash had free-tier limit:0; 2.5 works)
   xai: "grok-3-mini",                     // env: XAI_MODEL — matches PROVIDERS.md + health check
+  cohere: "command-a-plus-05-2026",       // env: COHERE_MODEL — via Cohere's OpenAI-compat endpoint (command-r-plus retired 2025-09)
 };
 
 const ENV_VAR = {
@@ -28,6 +29,7 @@ const ENV_VAR = {
   openai: "OPENAI_MODEL",
   gemini: "GEMINI_MODEL",
   xai: "XAI_MODEL",
+  cohere: "COHERE_MODEL",
 };
 
 /** Resolve the effective model for a provider: env override if set, else the default. */

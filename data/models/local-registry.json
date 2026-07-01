@@ -1,6 +1,19 @@
 {
-  "_doc": "Σ₀ local-model adapter registry. Operator-editable overlay onto the built-in defaults in apps/lantern-garage/lib/local-model-registry.js (merged by id, TTL-cached ~60s). See docs/SIGMA0-MODEL-ADAPTER.md. Ouro is the Σ₀-native default; set LOCAL_CAPABILITY_FIRST=1 to let the best-fitting capability model (Qwen) lead coding. vramGB gates against the box (VRAM_BUDGET_GB, default 8).",
+  "_doc": "Σ₀ local-model adapter registry. Operator-editable overlay onto the built-in defaults in apps/lantern-garage/lib/local-model-registry.js (merged by id, TTL-cached ~60s). See docs/SIGMA0-MODEL-ADAPTER.md. keystone-sigma0-plt (the LoopCoder-V2-lineage owned PLT coder, ADR-0011) is now the SOLE local coder/default and serves on its own ollama-compatible shim at :11435 (models/keystone-sigma0-plt/serve_keystone_plt.py). The kernel stays Ouro/keystone-ft on :11434; Three Doors keeps lantern-csf-dream on :11434. Per-model endpoints are honored by endpointFor(). vramGB gates against the box (VRAM_BUDGET_GB, default 8).",
   "models": [
+    {
+      "id": "keystone-sigma0-plt",
+      "endpoint": "http://127.0.0.1:11435",
+      "selfConverges": false,
+      "toolCalling": false,
+      "vramGB": 6,
+      "ctxTokens": 131072,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 0,
+      "capabilityScore": 0.84,
+      "verified": false,
+      "note": "Sole local Σ₀ coder (ADR-0011, LoopCoder-V2 lineage). Default for coding/reasoning/default. Serve: python models/keystone-sigma0-plt/serve_keystone_plt.py --model D:/keystone-sigma0-plt-ckpt --port 11435 --dtype 4bit. On-box (RTX 3070): loads 4-bit ~6.4GB<8, ~5-6 tok/s (static KV cache). verified:false kept honestly until an eval WIN over a frontier coder; if the shim is down the chain falls back to cloud, not another local model."
+    },
     {
       "id": "ouro:latest",
       "endpoint": "http://127.0.0.1:11434",
@@ -8,10 +21,10 @@
       "toolCalling": false,
       "vramGB": 3,
       "ctxTokens": 8192,
-      "taskTypes": ["kernel", "reasoning", "coding", "default"],
+      "taskTypes": ["kernel"],
       "rank": 0,
       "capabilityScore": 0.4,
-      "note": "Σ₀-native default — Ouro-1.4B looped coder; Q-exit IS the thesis (arXiv 2510.25741)."
+      "note": "Σ₀ Convergence-Core kernel — Ouro-1.4B, native Q-exit (arXiv 2510.25741). Kernel-only; no longer competes on coding/default."
     },
     {
       "id": "keystone-ft",
@@ -24,18 +37,6 @@
       "rank": 0,
       "capabilityScore": 0.45,
       "note": "Keystone kernel fine-tune of Ouro (kernel chain lead, #894)."
-    },
-    {
-      "id": "qwen2.5-coder",
-      "endpoint": "http://127.0.0.1:11434",
-      "selfConverges": false,
-      "toolCalling": true,
-      "vramGB": 5,
-      "ctxTokens": 32768,
-      "taskTypes": ["coding", "default"],
-      "rank": 1,
-      "capabilityScore": 0.8,
-      "note": "Opt-in capability lever: Qwen2.5-Coder-7B (Q4_K_M ~4.7GB). Wrapped by loopedReason() since it does not self-converge. `ollama pull qwen2.5-coder:7b`, then LOCAL_CAPABILITY_FIRST=1."
     },
     {
       "id": "lantern-csf-dream",

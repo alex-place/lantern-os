@@ -2042,8 +2042,11 @@ async function handleStreamChat(req, url, res) {
     try {
       const http = require("http");
       const { loopedReason } = require("./loop-reasoner");
-      const u = new URL(process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434");
       const loopModel = modelChain[0];
+      // Per-model endpoint (lib/local-model-registry.js): the sole local coder
+      // keystone-sigma0-plt serves on its own shim (:11435); the kernel/dream models
+      // stay on :11434. Falls back to OLLAMA_BASE_URL for unmanaged models.
+      const u = new URL(require("./local-model-registry").endpointFor(loopModel));
       const callLLM = (p, sys) => new Promise((resolve, reject) => {
         // #1609: the loop-reasoner local path was the one Ollama call site that
         // built its body with no `options`, so the served model ran with Ollama's
@@ -2114,7 +2117,9 @@ async function handleStreamChat(req, url, res) {
           // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
           options: serving.applyOllamaDecodeParams({}),
         });
-        const ollamaUrl = new URL(ollamaBase);
+        // Per-model endpoint routing (lib/local-model-registry.js): the sole local
+        // coder keystone-sigma0-plt serves on :11435; kernel/dream stay on :11434.
+        const ollamaUrl = new URL(require("./local-model-registry").endpointFor(ollamaModel));
         await new Promise((resolve, reject) => {
           const req2 = http.request({
             hostname: ollamaUrl.hostname,
@@ -2190,7 +2195,7 @@ async function handleStreamChat(req, url, res) {
               // Stream one follow-up Ollama turn, returning its text (tokens already sent).
               const streamOllamaFollow = (messages) => new Promise((resolve) => {
                 const fp = JSON.stringify({ model: ollamaModel, stream: true, messages, options: serving.applyOllamaDecodeParams({}) });
-                const fu = new URL(ollamaBase);
+                const fu = new URL(require("./local-model-registry").endpointFor(ollamaModel));
                 let t = "";
                 const r3 = http.request({ hostname: fu.hostname, port: fu.port || 11434, path: "/api/chat", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(fp) } }, (up) => {
                   if (up.statusCode !== 200) { up.resume(); resolve(""); return; }
@@ -2966,6 +2971,123 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
+  // Provider: Cohere (streaming — via Cohere's OpenAI-compatible endpoint) (#cohere)
+  // Cohere's native /v2/chat SSE uses its own event shape; its OpenAI-compat surface
+  // (api.cohere.ai/compatibility/v1) speaks the exact choices[].delta.content wire the
+  // openai/xai paths already parse, so we reuse that machinery instead of a bespoke parser.
+  const cohereKey = process.env.COHERE_API_KEY;
+  if (_p === "cohere" && cohereKey) {
+    const COHERE_HOST = "api.cohere.ai";
+    const COHERE_PATH = "/compatibility/v1/chat/completions";
+    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — Cohere compat is
+    // OpenAI-shaped, so it reuses the same turn helper + registry/executor.
+    if (process.env.CHAT_TOOL_EXEC === "1") {
+      try {
+        const toolRunner = require("./tool-runner");
+        const { isOperatorRequest } = require("./request-auth");
+        const operator = isOperatorRequest(req);
+        const tools = toolRunner.openaiTools({ operator });
+        if (tools.length) {
+          const cohereModelName = modelFor("cohere");
+          const messages = buildProviderMessages(systemPrompt, compacted, message);
+          const MAX_TOOL_ITERS = 6;
+          let toolCalls = 0;
+          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+            const turn = await openaiCompatibleToolTurn({
+              host: COHERE_HOST, path: COHERE_PATH, apiKey: cohereKey, model: cohereModelName,
+              messages, tools, onToken: (t) => { fullReply += t; sendToken(t); },
+            });
+            if (!turn.toolCalls.length) break;
+            messages.push(turn.assistantMessage);
+            for (const tc of turn.toolCalls) {
+              toolCalls++;
+              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
+              sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
+                ok: !!r.ok, status: r.status, reason_code: r.reason_code,
+                receipt: r.receipt, preview: String(out).slice(0, 240) });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
+            }
+          }
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModelName, agent: doneAgentName } }).catch(() => {});
+          recordProviderSuccess("cohere");
+          recordProviderSuccessRouter("cohere");
+          const cohereReceipt = buildPcsfReceipt("cohere", cohereModelName, true);
+          sendReceipt(cohereReceipt);
+          sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: cohereModelName, online: true, cleanText, suggestions, webSuggestions, receipt: cohereReceipt, toolCalls });
+          return;
+        }
+      } catch (err) {
+        recordProviderFailure("cohere", `tool_loop: ${err.message}`);
+        if (fullReply) {
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          recordProviderSuccess("cohere");
+          sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: modelFor("cohere"), online: true, cleanText, suggestions, webSuggestions });
+          return;
+        }
+        if (_hardPin) { sendError(humanError(err)); sendFail(err.message); return; }
+        // else: fall through to single-shot
+      }
+    }
+    try {
+      const cohereModel = modelFor("cohere");
+      // Cohere compat accepts the OpenAI decode params (top_p + frequency_penalty).
+      // No per-token logprobs request — the compat surface does not expose them.
+      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
+        model: cohereModel, stream: true,
+        messages: buildProviderMessages(systemPrompt, compacted, message),
+      }));
+      await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          agent: llmAgent,
+          hostname: COHERE_HOST, path: COHERE_PATH, method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${cohereKey}`, "Content-Length": Buffer.byteLength(payload) },
+        }, (upstream) => {
+          if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`cohere_status_${upstream.statusCode}`)); return; }
+          let buf = "";
+          upstream.on("data", (chunk) => {
+            buf += chunk.toString();
+            const lines = buf.split("\n"); buf = lines.pop();
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const raw = line.slice(6).trim();
+              if (raw === "[DONE]" || !raw) continue;
+              try { const evt = JSON.parse(raw); const t = evt.choices?.[0]?.delta?.content || ""; if (t) { fullReply += t; sendToken(t); } } catch { /* skip */ }
+            }
+          });
+          upstream.on("end", resolve); upstream.on("error", reject);
+        });
+        req2.on("error", reject);
+        req2.setTimeout(15000, () => { req2.destroy(); reject(new Error("cohere_timeout")); });
+        req2.write(payload); req2.end();
+      });
+      // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
+      if (isEmptyReply(fullReply)) throw new Error("cohere_empty_response");
+      const { cleanText: cohereClean, suggestions: cohereDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cohereClean.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModel, agent: doneAgentName } }).catch(() => {});
+      recordProviderSuccess("cohere");
+      recordProviderSuccessRouter("cohere");
+      await recordConvergenceSignature("cohere", cohereModel, cohereClean, true);
+      const cohereReceipt = buildPcsfReceipt("cohere", cohereModel, true);
+      sendReceipt(cohereReceipt);
+      sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: cohereModel, online: true, cleanText: cohereClean, suggestions: cohereDoors, webSuggestions, receipt: cohereReceipt });
+      return;
+    } catch (err) {
+      const errorCode = err.message.includes("cohere_status_") ? err.message : "unknown";
+      recordProviderFailure("cohere", err.message);
+      recordProviderFailureRouter("cohere", errorCode);
+      try { recordModelOutcome("cohere", leaderboardTaskType, false, Date.now() - _turnStart); } catch { /* never break a reply */ }
+      if (_hardPin) {
+        sendError(humanError(err));
+        sendFail(err.message);
+        return;
+      }
+      console.warn(`[stream-chat] cohere auto-cascade failed — trying next provider (${err.message})`);
+    }
+  }
+
   // Provider: Ollama (streaming) — last-resort
   if (_p === "ollama") {
     // Attempt 1: Unified Agent Connector (health-checked, provider-ranked, Python-side SSE)
@@ -3024,7 +3146,10 @@ async function handleStreamChat(req, url, res) {
         // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
         options: serving.applyOllamaDecodeParams({}),
       });
-      const ollamaUrl = new URL(ollamaBase);
+      // Per-model endpoint routing (endpointFor falls back to OLLAMA_BASE_URL when the
+      // model is unmanaged/undefined, so this is behavior-preserving except that the sole
+      // local coder keystone-sigma0-plt now correctly targets its :11435 shim).
+      const ollamaUrl = new URL(require("./local-model-registry").endpointFor(ollamaModel));
       const ollamaOpts = {
         hostname: ollamaUrl.hostname,
         port: ollamaUrl.port || 11434,

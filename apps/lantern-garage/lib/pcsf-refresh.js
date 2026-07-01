@@ -108,7 +108,7 @@ async function _buildRouting() {
 
   // Only rank providers the streaming dispatch (stream-chat buildBrainOrder) can
   // actually execute — ranking a provider it can't run would be silently dropped.
-  const EXECUTABLE = new Set(["anthropic", "gemini", "openai", "xai", "ollama"]);
+  const EXECUTABLE = new Set(["anthropic", "gemini", "openai", "xai", "cohere", "ollama"]);
 
   const byTask = {};
   for (const [taskType, chain] of Object.entries(PROVIDER_CHAINS)) {

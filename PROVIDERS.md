@@ -95,15 +95,16 @@ updated: 2026-06-20
 - **Use Case:** Coding (Codestral), long-context chat
 - **Cost:** Competitive pricing
 
-#### 7. **Cohere**
+#### 7. **Cohere** ✅
 - **API Key:** `COHERE_API_KEY`
-- **Model Var:** `COHERE_MODEL` (default: `command-r-plus`)
-- **State:** ✗ Absent (not configured)
+- **Model Var:** `COHERE_MODEL` (default: `command-a-plus-05-2026` — `command-r-plus` was retired 2025-09-15)
+- **State:** ✓ Present (configured) — **implemented** in the main chat dispatch and the swarm orchestrator
 - **Get Key:** https://dashboard.cohere.com/api-keys
-- **Endpoint:** `api.cohere.com`
+- **Endpoint:** `api.cohere.ai/compatibility/v1/chat/completions` (Cohere's OpenAI-compatible surface — reuses the existing OpenAI SSE parser + tool-turn helper)
 - **Streaming:** Yes
 - **Use Case:** Long-context RAG, summarization
 - **Cost:** Per-token, free tier for testing
+- **Notes:** Wired via the OpenAI compatibility API rather than native `/v2/chat` so it shares the same streaming/tool-calling machinery as OpenAI/xAI. Verified end-to-end (HTTP 200 + streamed tokens) 2026-07-01.
 
 #### 8. **Perplexity AI**
 - **API Key:** `PERPLEXITY_API_KEY`
@@ -168,9 +169,9 @@ updated: 2026-06-20
 
 | Provider | Status | API Key | Reason |
 |----------|--------|---------|--------|
-| Grok (xAI) | ⏳ Declared | Configured | Reserved for future implementation |
+| Grok (xAI) | ✅ Implemented | Configured | In streaming dispatch |
+| Cohere | ✅ Implemented | Present | Via OpenAI-compat endpoint (main chat + swarm) |
 | Mistral | ⏳ Declared | Absent | Not yet implemented |
-| Cohere | ⏳ Declared | Absent | Not yet implemented |
 | Perplexity | ⏳ Declared | Absent | Not yet implemented |
 | DeepSeek | ⏳ Declared | Absent | Not yet implemented |
 | OpenRouter | ⏳ Declared | Absent | Not yet implemented |

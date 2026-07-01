@@ -51,7 +51,7 @@ const PROVIDER_CONFIGS = {
   gemini: { key: "GEMINI_API_KEY", model: "gemini-2.5-flash" },
   mistral: { key: "MISTRAL_API_KEY", model: "mistral-large-latest" },
   deepseek: { key: "DEEPSEEK_API_KEY", model: "deepseek-chat" },
-  cohere: { key: "COHERE_API_KEY", model: "command-r-plus" },
+  cohere: { key: "COHERE_API_KEY", model: "command-a-plus-05-2026" },
   perplexity: { key: "PERPLEXITY_API_KEY", model: "sonar-pro" },
   openrouter: { key: "OPENROUTER_API_KEY", model: "auto" },
   ollama: { key: null, model: "auto" },
@@ -142,7 +142,7 @@ const PROVIDER_CHAINS = {
     { provider: "mistral", models: ["mistral-large-latest"] },
     { provider: "openai", models: ["gpt-4o"] },
     { provider: "gemini", models: ["gemini-2.5-flash"] },
-    { provider: "cohere", models: ["command-r-plus"] },
+    { provider: "cohere", models: ["command-a-plus-05-2026"] },
   ],
   default: [
     { provider: "ollama", models: ["lantern-csf-dream", "qwen2.5-coder"] },

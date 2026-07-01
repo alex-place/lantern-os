@@ -95,13 +95,16 @@ const PROVIDER_CONFIG = {
   },
   cohere: {
     envKey: "COHERE_API_KEY",
-    baseUrl: "api.cohere.com",
-    path: () => "/v2/chat",
-    defaultModel: "command-r-plus",
-    modelChain: ["command-r-plus", "command-r", "command-light"],
+    // Cohere's OpenAI-compatible surface: speaks the choices[].delta.content SSE the
+    // shared "openai" extractor already parses. Native /v2/chat uses a different event
+    // shape the extractor cannot read (tokens came back empty) — so use compat here.
+    baseUrl: "api.cohere.ai",
+    path: () => "/compatibility/v1/chat/completions",
+    defaultModel: "command-a-plus-05-2026",
+    modelChain: ["command-a-plus-05-2026", "command-a-03-2025", "command-r-08-2024"],
     strengths: ["chat", "summarize", "research"],
     costTier: "cheap",
-    streamFormat: "cohere",
+    streamFormat: "openai",
   },
   perplexity: {
     envKey: "PERPLEXITY_API_KEY",
