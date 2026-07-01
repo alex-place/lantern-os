@@ -275,13 +275,18 @@ class PrWatcher {
 
   /**
    * Extract the reviewer's verdict from the review text. The review prompt asks the
-   * model to END with APPROVE / REQUEST_CHANGES / COMMENT, so the LAST verdict token
-   * wins ("I'd approve, but actually REQUEST_CHANGES" → REQUEST_CHANGES). Word-bounded
-   * so "disapprove" never counts as an approval. Defaults to COMMENT (does NOT merge)
-   * when no clear verdict is present — fail closed.
+   * model to OPEN with a "VERDICT: …" line (long replies get truncated by provider
+   * output limits — a trailing verdict never survived, wedging auto-merge on
+   * COMMENT-forever; see #1794/#1807). An explicit "VERDICT:" tag wins outright.
+   * Fallback for older comments: the LAST bare verdict token wins ("I'd approve,
+   * but actually REQUEST_CHANGES" → REQUEST_CHANGES). Word-bounded so "disapprove"
+   * never counts as an approval. Defaults to COMMENT (does NOT merge) when no clear
+   * verdict is present — fail closed.
    */
   static _parseVerdict(text) {
     const t = String(text || "").toUpperCase();
+    const tagged = t.match(/\bVERDICT\s*:\s*(APPROVE|REQUEST[_ ]CHANGES|COMMENT)\b/);
+    if (tagged) return tagged[1].replace(" ", "_");
     const lastOf = (re) => { const g = new RegExp(re, "gi"); let m, last = -1; while ((m = g.exec(t)) !== null) last = m.index; return last; };
     const req = Math.max(lastOf("REQUEST[_ ]CHANGES"), lastOf("REQUESTING CHANGES"));
     const app = lastOf("\\bAPPROVED?\\b");
@@ -579,7 +584,9 @@ class PrWatcher {
       "```",
       "",
       "Review this PR. Check for: correctness bugs, missing test coverage, security issues, simplification opportunities, AGENTS.md compliance.",
-      "Be specific — cite file and line. End with a clear verdict: APPROVE, REQUEST_CHANGES, or COMMENT.",
+      "Your reply may be truncated by output limits, so the FIRST line of your reply MUST be",
+      "exactly `VERDICT: APPROVE` or `VERDICT: REQUEST_CHANGES` or `VERDICT: COMMENT` —",
+      "then the review body. Be specific — cite file and line. Keep it under 400 words.",
     ].join("\n");
 
     const review = await this._keystoneChat(message);
