@@ -33,10 +33,21 @@ Requires the `gh` CLI (HTTPS works in this sandbox; direct git/gh calls are fine
 Generated data is local/gitignored (contains diffs of the whole repo).
 
 CLI:
+    # our own repo (default):
     python scripts/pr_crystallize.py --limit 200 --types feat,fix,refactor,perf
+    # external big-name OSS repos — license-gated (permissive SPDX only), parallel:
+    python scripts/pr_crystallize.py --repo huggingface/transformers --repo tiangolo/fastapi \
+        --limit 200 --jobs 8 --out data/training/pr-crystallized-external.jsonl
+    # pack a (decontaminated) corpus into one CSF archive:
     python scripts/pr_crystallize.py --pack \
         --in data/training/pr-crystallized.clean.jsonl \
         --csf-out data/csf/coder-crystallization.csf
+
+This feeds the "Unisona" local model: a brand-new 8GB-native coder that merges the
+Ouro (looped) + LoopCoder/PLT lineages by distilling into the Ouro-1.4B student
+(train+run on the 3070) from our PRs + permissive OSS PRs, tool-integrated with
+keystone chat / creator dashboard / traders, updated by the ADR-0010 OFFLINE,
+verify-gated flywheel (never an online weight write in the request path).
 """
 from __future__ import annotations
 
@@ -45,7 +56,16 @@ import json
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+# SPDX ids we may legally harvest + redistribute a derived training corpus from.
+# Permissive only — copyleft (GPL/AGPL/LGPL/MPL) and unlicensed repos are skipped
+# so the crystallized model stays cleanly Apache-2.0-compatible.
+PERMISSIVE_LICENSES = {
+    "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "BSD-3-Clause-Clear",
+    "ISC", "0BSD", "Unlicense", "Zlib", "BSL-1.0", "PostgreSQL", "Python-2.0",
+}
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO / "data" / "training" / "pr-crystallized.jsonl"
@@ -95,10 +115,12 @@ def pr_type(title: str) -> str:
     return m.group(1).lower() if m else "other"
 
 
-def gh_json(args: list[str]) -> object:
-    """Run a `gh` command that emits JSON; return the parsed value ([] on failure)."""
+def gh_json(args: list[str], repo: str | None = None) -> object:
+    """Run a `gh` command that emits JSON; return the parsed value ([] on failure).
+    `repo` ('owner/name') targets an EXTERNAL repo via `-R`; None = current repo."""
+    full = ["gh", *args] + (["-R", repo] if repo else [])
     try:
-        out = subprocess.run(["gh", *args], capture_output=True, text=True,
+        out = subprocess.run(full, capture_output=True, text=True,
                              encoding="utf-8", timeout=120)
     except (OSError, subprocess.TimeoutExpired) as e:
         print(f"  ! gh {' '.join(args[:3])}…: {e}", file=sys.stderr)
@@ -112,13 +134,30 @@ def gh_json(args: list[str]) -> object:
         return []
 
 
-def gh_diff(number: int) -> str:
+def gh_diff(number: int, repo: str | None = None) -> str:
+    cmd = ["gh", "pr", "diff", str(number)] + (["-R", repo] if repo else [])
     try:
-        out = subprocess.run(["gh", "pr", "diff", str(number)], capture_output=True,
-                             text=True, encoding="utf-8", timeout=120)
+        out = subprocess.run(cmd, capture_output=True, text=True,
+                             encoding="utf-8", timeout=120)
         return out.stdout if out.returncode == 0 else ""
     except (OSError, subprocess.TimeoutExpired):
         return ""
+
+
+def repo_license(repo: str) -> str | None:
+    """SPDX id of an external repo's license via the GitHub API (None if unknown)."""
+    data = gh_json(["api", f"repos/{repo}", "--jq", ".license.spdx_id"])
+    # `gh api --jq` on a scalar prints a bare string that json.loads sees as invalid
+    # unless quoted; fall back to a raw call.
+    if isinstance(data, str) and data:
+        return data
+    try:
+        out = subprocess.run(["gh", "api", f"repos/{repo}", "--jq", ".license.spdx_id"],
+                             capture_output=True, text=True, encoding="utf-8", timeout=60)
+        spdx = out.stdout.strip()
+        return spdx or None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
 
 def diff_stats(diff: str) -> tuple[int, int, list[str]]:
@@ -129,23 +168,25 @@ def diff_stats(diff: str) -> tuple[int, int, list[str]]:
     return added, deleted, files
 
 
-def issue_body(text: str, cache: dict) -> str:
+def issue_body(text: str, cache: dict, repo: str | None = None) -> str:
     """Best-effort: fetch the body of the first referenced issue (Closes #N)."""
     m = _ISSUE_REF_RE.search(text or "")
     if not m:
         return ""
     n = m.group(1)
-    if n in cache:
-        return cache[n]
-    data = gh_json(["issue", "view", n, "--json", "title,body"])
+    key = f"{repo or 'self'}#{n}"
+    if key in cache:
+        return cache[key]
+    data = gh_json(["issue", "view", n, "--json", "title,body"], repo)
     body = ""
     if isinstance(data, dict):
         body = f"{data.get('title','')}\n{data.get('body','') or ''}".strip()
-    cache[n] = body
+    cache[key] = body
     return body
 
 
-def build_row(pr: dict, diff: str, issue_cache: dict, with_issue_body: bool = False) -> dict | None:
+def build_row(pr: dict, diff: str, issue_cache: dict, with_issue_body: bool = False,
+              repo: str | None = None, spdx: str | None = None) -> dict | None:
     title = (pr.get("title") or "").strip()
     body = (pr.get("body") or "").strip()
     number = pr.get("number")
@@ -157,13 +198,14 @@ def build_row(pr: dict, diff: str, issue_cache: dict, with_issue_body: bool = Fa
         return None
 
     # Linked-issue body is a second gh call per PR — opt-in (title+body usually suffice).
-    linked = issue_body(f"{title}\n{body}", issue_cache) if with_issue_body else ""
+    linked = issue_body(f"{title}\n{body}", issue_cache, repo) if with_issue_body else ""
     intent = "\n\n".join(p for p in (title, body, linked) if p).strip()
     if len(intent) < 12:  # a title with no context is a weak instruction
         return None
 
+    where = f"the {repo} repository" if repo else "the Keystone OS repository"
     instruction = (
-        "You are a coding agent working in the Keystone OS repository. "
+        f"You are a coding agent working in {where}. "
         "Implement the following change and return a unified diff.\n\n" + intent
     )
     output = "```diff\n" + diff.rstrip() + "\n```"
@@ -176,6 +218,8 @@ def build_row(pr: dict, diff: str, issue_cache: dict, with_issue_body: bool = Fa
         "output": output,
         "meta": {
             "source": "pr-crystallize",
+            "repo": repo or "self",
+            "license": spdx,
             "pr": number,
             "merged_at": pr.get("mergedAt"),
             "type": pr_type(title),
@@ -209,56 +253,84 @@ def pack_csf(jsonl_path: Path, out_path: Path) -> dict:
             "codec": "omni", "path": str(out_path)}
 
 
-def extract(args) -> None:
-    types = {t.strip().lower() for t in args.types.split(",") if t.strip()}
+def _row_for(pr: dict, repo: str | None, spdx: str | None, args, issue_cache: dict):
+    """Fetch one PR's diff and build a row (or None). Runs in a worker thread."""
+    diff = gh_diff(pr.get("number"), repo)
+    if not diff or diff.count("\n") > args.max_diff_lines:
+        return None
+    return build_row(pr, diff, issue_cache, with_issue_body=args.with_issue_body,
+                     repo=repo, spdx=spdx)
+
+
+def _harvest_repo(repo: str | None, args, fout, issue_cache: dict) -> tuple[int, int]:
+    """Harvest one repo (None = current). External repos are license-gated. Returns (kept, skipped)."""
+    spdx = None
+    if repo is not None:
+        spdx = repo_license(repo)
+        if not args.allow_any_license and spdx not in PERMISSIVE_LICENSES:
+            print(f"  ! skip {repo}: license {spdx!r} not in the permissive allowlist", file=sys.stderr)
+            return (0, 0)
     prs = gh_json(["pr", "list", "--state", "merged", "--limit", str(args.limit),
-                   "--json", "number,title,body,mergedAt"])
+                   "--json", "number,title,body,mergedAt"], repo)
     if not isinstance(prs, list) or not prs:
-        print("No merged PRs returned by gh (auth? repo?).", file=sys.stderr)
-        sys.exit(1)
+        print(f"  ! {repo or 'self'}: no merged PRs (auth? repo?)", file=sys.stderr)
+        return (0, 0)
+    # Conventional-commit type filter applies to OUR repo only — external OSS repos
+    # rarely use `feat:`/`fix:` prefixes, so gate them by noise/size/intent instead.
+    types = {t.strip().lower() for t in args.types.split(",") if t.strip()}
+    if types and repo is None:
+        prs = [p for p in prs if pr_type(p.get("title") or "") in types]
+
+    kept = skipped = 0
+    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as ex:
+        for row in ex.map(lambda p: _row_for(p, repo, spdx, args, issue_cache), prs):
+            if row is None:
+                skipped += 1
+            else:
+                fout.write(json.dumps(row, ensure_ascii=False) + "\n")
+                kept += 1
+    print(f"  {repo or 'self'}: kept {kept}, skipped {skipped}  (license={spdx or 'n/a'}, jobs={args.jobs})")
+    return (kept, skipped)
+
+
+def extract(args) -> None:
+    # Sources: external --repo entries, plus OUR repo (default when no --repo, or --include-self).
+    repos: list[str | None] = list(args.repo)
+    if args.include_self or not repos:
+        repos = [None] + repos
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     issue_cache: dict = {}
-    kept = skipped = redactions = 0
-    with out_path.open("w", encoding="utf-8") as fout:
-        for pr in prs:
-            title = pr.get("title") or ""
-            if types and pr_type(title) not in types:
-                skipped += 1
-                continue
-            diff = gh_diff(pr.get("number"))
-            if not diff:
-                skipped += 1
-                continue
-            _, _, files = diff_stats(diff)
-            n_diff_lines = diff.count("\n")
-            if n_diff_lines > args.max_diff_lines:  # giant PR → not a clean single lesson
-                skipped += 1
-                continue
-            row = build_row(pr, diff, issue_cache, with_issue_body=args.with_issue_body)
-            if row is None:
-                skipped += 1
-                continue
-            redactions += row["meta"]["redactions"]
-            fout.write(json.dumps(row, ensure_ascii=False) + "\n")
-            kept += 1
+    total_kept = total_skipped = 0
+    with out_path.open("a" if args.append else "w", encoding="utf-8") as fout:
+        for repo in repos:
+            k, s = _harvest_repo(repo, args, fout, issue_cache)
+            total_kept += k
+            total_skipped += s
 
-    print(json.dumps({"kept": kept, "skipped": skipped, "redactions": redactions,
-                      "out": str(out_path), "scanned": len(prs)}, indent=2))
-    if args.pack and kept:
-        stats = pack_csf(out_path, Path(args.csf_out))
-        print("CSF:", json.dumps(stats, indent=2))
+    print(json.dumps({"kept": total_kept, "skipped": total_skipped, "out": str(out_path),
+                      "repos": [r or "self" for r in repos]}, indent=2))
+    if args.pack and total_kept:
+        print("CSF:", json.dumps(pack_csf(out_path, Path(args.csf_out)), indent=2))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--limit", type=int, default=200, help="how many recent merged PRs to scan")
+    ap.add_argument("--limit", type=int, default=200, help="how many recent merged PRs to scan PER repo")
+    ap.add_argument("--repo", action="append", default=[], metavar="OWNER/NAME",
+                    help="external repo to harvest (repeatable); permissive-licensed only unless --allow-any-license")
+    ap.add_argument("--include-self", action="store_true",
+                    help="also harvest the current repo (default when no --repo is given)")
+    ap.add_argument("--allow-any-license", action="store_true",
+                    help="skip the SPDX permissive-license gate on external repos (only for repos you've vetted)")
+    ap.add_argument("--jobs", type=int, default=6, help="concurrent gh-diff fetches (external harvest at scale)")
     ap.add_argument("--types", default="feat,fix,refactor,perf",
-                    help="conventional-commit types to keep (comma-sep); '' = all")
+                    help="conventional-commit types to keep for OUR repo (comma-sep); '' = all")
     ap.add_argument("--max-diff-lines", type=int, default=600,
                     help="skip PRs whose diff exceeds this many lines")
     ap.add_argument("--out", default=str(DEFAULT_OUT), help="output JSONL path")
+    ap.add_argument("--append", action="store_true", help="append to --out instead of overwriting")
     ap.add_argument("--with-issue-body", action="store_true",
                     help="also fetch each linked issue's body (2nd gh call per PR — slower)")
     ap.add_argument("--pack", action="store_true", help="also pack the output into CSF")
