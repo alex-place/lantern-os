@@ -1,0 +1,2 @@
+### Fixed
+- `scripts/Install-MonoworkstreamHooks.ps1` failed to parse under Windows PowerShell 5.1 ("string is missing the terminator"): the file was UTF-8 without BOM with an em-dash, which PS 5.1 misread as ANSI. Re-saved as pure-ASCII UTF-8 with BOM, and the installer output now documents the pre-push stale-clobber gate (section 2b, `scripts/validate-prepush-stale-clobber.py`, bypass `SKIP_CLOBBER_CHECK=1`).
