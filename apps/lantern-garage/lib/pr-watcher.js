@@ -187,7 +187,7 @@ class PrWatcher {
     // green + reviewed. Agents propose; humans dispose. (gh-aw-absorbed, #1251)
     for (const f of (pv.files || [])) {
       const fpath = f.path || f.filename || "";
-      if (this.protectedPaths.some((re) => re.test(fpath))) {
+      if (this.protectedPaths.some((re) => re.test(fpath))) { // #1251
         return { merge: false, reason: `protected_path:${fpath}` };
       }
     }

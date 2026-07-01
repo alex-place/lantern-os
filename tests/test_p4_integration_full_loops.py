@@ -29,7 +29,7 @@ import pytest
 # honest reason — instead of erroring at import. The real fix is a rewrite to the
 # current dict-based engine contract; tracked in #558.
 pytest.skip(
-    "Superseded: targets the removed ThreeDoorsGameState / pre-Kingdome engine "
+    "Superseded: targets the removed ThreeDoorsGameState / pre-Kingdome engine " # #558
     "API. Needs a rewrite to the 7-stage dict-based engine (see #558).",
     allow_module_level=True,
 )
