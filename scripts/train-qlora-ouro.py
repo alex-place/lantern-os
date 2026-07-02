@@ -46,6 +46,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--max-steps", type=int, default=-1, help="override epochs (smoke test); -1 = use epochs")
     ap.add_argument("--resume", default=None, help="resume training: 'auto' finds latest checkpoint in --out, or pass a checkpoint dir path")
+    ap.add_argument("--warm-start", default=None, help="load LoRA weights (adapter_model.safetensors) from this checkpoint dir as init; fresh optimizer/scheduler/step-count (safetensors-only, no torch.load — sidesteps CVE-2025-32434's torch>=2.6 gate on --resume)")
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank; alpha=2*r (handoff recipe: 32)")
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
@@ -136,6 +137,25 @@ def main():
         r=a.lora_r, lora_alpha=2 * a.lora_r, lora_dropout=0.05, bias="none",
         task_type="CAUSAL_LM", target_modules="all-linear"))
     model.print_trainable_parameters()
+
+    if a.warm_start:
+        from safetensors.torch import load_file
+        sd = load_file(os.path.join(a.warm_start, "adapter_model.safetensors"))
+        # saved adapter files omit the adapter name (e.g. "...lora_A.weight"); the live
+        # PeftModel's state dict expects it re-inserted (e.g. "...lora_A.default.weight").
+        # peft's own set_peft_model_state_dict auto-remap is unreliable on this stack (only
+        # matched 69/338 keys, silently leaving the rest at random LoRA init) — load directly.
+        sd = {(k[:-len(".weight")] + ".default.weight" if k.endswith(".weight") else k): v
+              for k, v in sd.items()}
+        res = model.load_state_dict(sd, strict=False)
+        missing_lora = [k for k in res.missing_keys if "lora_" in k]
+        unexpected_lora = [k for k in res.unexpected_keys if "lora_" in k]
+        print(f"warm-started LoRA weights from {a.warm_start} "
+              f"(missing_lora={len(missing_lora)}, unexpected_lora={len(unexpected_lora)})")
+        if missing_lora or unexpected_lora:
+            raise RuntimeError(f"warm-start key mismatch: missing={missing_lora[:3]} "
+                                f"unexpected={unexpected_lora[:3]} — refusing to train from a "
+                                f"partially-random adapter; fix the key remap")
 
     rows = []
     records = load_training_records(a.data)
