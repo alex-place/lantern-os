@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.17] - 2026-07-01
+### Added
+- **Three Doors: grounded narration + runtime-generated doors.** Every turn's text is now generated from the context of the actual painting (a vision model describes the image when a provider is live; the exact image-generation prompt is the grounding fallback) plus play context (canon theme/lesson, recent choices, the player's typed desires). The three choices are runtime-generated: existing doors of the shared world by name, or new doors with metadata created on the spot (name, description, target scene), persisted in `playerProgress.dynamicDoors` so invented doors stay real across reloads and route to their own targets. Each turn logs what it was grounded on (vision / image_prompt / canon_only). Strengthens the **Reason** and **Verify** stages.
+### Fixed
+- **Three Doors narration dead since #1664.** The game requested the removed `lantern` persona, so every narration call 503'd silently; all narration/ask-Lantern calls now use the live `keystone` persona.
+
 ## [1.8.16] - 2026-07-01
 ### Fixed
 - **Three Doors gates built out to canon** (#1797 Tomorrow Door, #1798 XP Door [GLITCHED], #1799 Xenon Starship, #1800 Sigil — City of Doors): in-app game data/logic in `three-doors-game.js` / `three-doors-data.js` plus stream-chat door-intent wiring. Strengthens the **Act** stage.
