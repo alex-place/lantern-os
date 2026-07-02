@@ -263,6 +263,10 @@ data/images/generated-doors/
 data/images/**/*.png
 data/images/**/*.jpg
 
+# Image-provider registry overlay: operator-local only (can redirect image gen
+# endpoints — keep it off the repo; SSRF-allowlisted in lib/image-model-registry.js)
+data/models/image-registry.json
+
 # LoRA model checkpoints (train locally, commit final only)
 data/models/lora/**/checkpoint-*.safetensors
 data/models/lora/**/optimizer.pt
