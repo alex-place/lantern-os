@@ -1,5 +1,5 @@
 {
-  "built_at": 1782956134.6796434,
+  "built_at": 1782963645.202647,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -86,6 +86,7 @@
     "docs/research/2026-06-30-surprise-valve-opened.md",
     "docs/research/2026-06-30-pumped-lossy-resonator.md",
     "docs/research/question-machine.md",
+    "docs/research/2026-07-01-unisona-crystallization.md",
     "docs/SIGMA0-WORKLIST.md",
     "docs/research/2026-06-29-best-in-slot-local-coder.md",
     "docs/research/CLAUDE-CODE-MULTI-AGENT-SPAWNING.md",
@@ -578,7 +579,7 @@
       ]
     }
   },
-  "sections": 2370,
+  "sections": 2378,
   "external": 34,
-  "sha256": "b4943a786ccc04730cab6511115ece69db26e796a6a0fc70d557d2b1e1a6e697"
+  "sha256": "2fd4811d8c8343d41cad52fc9824910cdd4a0498f1a0f3ef6f9ced8556343b18"
 }
