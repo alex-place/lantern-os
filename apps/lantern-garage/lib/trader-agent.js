@@ -42,6 +42,14 @@ class TraderAgent {
     this._pyConcurrency = config.pythonConcurrency || 3;
   }
 
+  // Is a live broker (Alpaca) configured? Without creds, get_positions /
+  // get_orders / place_order can only fail — and the *failure* is a ~7s cold
+  // Python spawn that hangs the header (#1860). Short-circuit to an honest
+  // "not connected" instead of paying that timeout on every poll.
+  _brokerConfigured() {
+    return !!(this.alpacaKey && this.alpacaSecret);
+  }
+
   _parseWatchlist(envString) {
     if (!envString) return ['SPY', 'AAPL', 'TSLA', 'NVDA', 'AMD'];
     try {
@@ -166,11 +174,13 @@ class TraderAgent {
 
   /**
    * Validate a ticker symbol is a real, tradable asset before adding it to the
-   * watchlist (#1624). Delegates to the Python engine (which holds the Alpaca
-   * creds). Returns { valid, tradable, symbol, name, asset_class, price?, reason }.
+   * watchlist (#1624). Uses the keyless Yahoo quote probe (#1860) instead of the
+   * Python→Alpaca lookup, which paid the ~7s cold-spawn cost and timed out —
+   * breaking "+ Add symbol" search + validation entirely (#1859).
+   * Returns { valid, tradable, symbol, name, asset_class, price?, reason }.
    */
   async validateSymbol(ticker) {
-    return this._callPython('validate_symbol', { ticker }, this.fastTimeout);
+    return yahoo.validateSymbol(ticker);
   }
 
   // All tradable Alpaca assets for the symbol-search popup (#1692). Big list, so
@@ -180,6 +190,10 @@ class TraderAgent {
     if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < 3600000) {
       return this.cache[cacheKey].data;
     }
+    // The full tradable-asset universe lives behind Alpaca. Without creds, don't
+    // pay the 45s doomed spawn — return empty fast; the search route falls back
+    // to a keyless exact-ticker validation so "+ Add symbol" still works (#1860).
+    if (!this._brokerConfigured()) return [];
     const result = await this._callPython('list_assets', {}, 45000); // big call
     const assets = (result && Array.isArray(result.assets)) ? result.assets : [];
     if (assets.length) this.cache[cacheKey] = { data: assets, time: Date.now() };
@@ -210,10 +224,13 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_market_status', {}, this.fastTimeout);
+      // Keyless Yahoo path (#1860): VIX / regime / SPY trend / session open with
+      // no Python spawn. Broker-only fields (equity, day P&L) come via
+      // getPositions, so they're intentionally absent here.
+      const result = await yahoo.getMarketStatus();
 
       this.cache[cacheKey] = {
-        data: { ...result, available: true },
+        data: result,
         time: Date.now()
       };
 
@@ -270,6 +287,10 @@ class TraderAgent {
     if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < 45000) {
       return this.cache[cacheKey].data;
     }
+    // No broker configured → no orders, and don't pay the 7–20s doomed spawn (#1860).
+    if (!this._brokerConfigured()) {
+      return { orders: [], count: 0, available: false, reason: 'broker not configured' };
+    }
     try {
       const result = await this._callPython('get_orders', { limit }, 20000);
       this.cache[cacheKey] = { data: result, time: Date.now() };
@@ -284,6 +305,17 @@ class TraderAgent {
     const cacheKey = 'positions';
     if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < 60000) { // 60s
       return this.cache[cacheKey].data;
+    }
+
+    // No broker configured → honest empty account instantly, not a 7s Python
+    // timeout that leaves the header's Equity/Positions stuck at "—" (#1860).
+    if (!this._brokerConfigured()) {
+      return {
+        positions: [],
+        account: { equity: 0, cash: 0, buying_power: 0 },
+        available: false,
+        reason: 'broker not configured',
+      };
     }
 
     try {

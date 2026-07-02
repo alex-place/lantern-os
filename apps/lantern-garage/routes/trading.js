@@ -570,6 +570,20 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         scored.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
         results = scored.slice(0, limit).map((s) => s[2]);
       }
+      // Fallback (#1860): when the broker asset universe is unavailable (no
+      // Alpaca creds → empty pool) but the user typed a query, validate it as an
+      // exact ticker via the keyless Yahoo probe so "+ Add symbol" still works
+      // for real symbols instead of returning nothing.
+      if (!results.length && q && !pool.length) {
+        const v = await traderAgent.validateSymbol(q);
+        if (v && v.valid) {
+          results = [{
+            symbol: v.symbol, name: v.name || v.symbol,
+            exchange: v.exchange || '', class: v.asset_class || 'us_equity',
+            tradable: v.tradable !== false,
+          }];
+        }
+      }
       sendJson(res, { results, total: pool.length, query: q }, 200);
     } catch (error) {
       sendJson(res, { results: [], error: error.message }, 200);
