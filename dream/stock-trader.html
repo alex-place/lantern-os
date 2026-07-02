@@ -2377,7 +2377,10 @@ function renderOrders(orders){
   const tbl=(rows)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
   const isOpen=(o)=>['new','accepted','pending','open','partially_filled'].includes((o.status||'').toLowerCase());
   if(openEl) openEl.innerHTML = tbl(arr.filter(isOpen).map(row).join(''));
-  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!isOpen(o)).slice(0,30).map(row).join(''));
+  // Show the full fetched history (up to the 500 the API returns), not just the
+  // 30 most recent — capping here was the visible half of "not all trades saved":
+  // a busy session closes dozens in an hour, so 30 rows hid most of the day.
+  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!isOpen(o)).slice(0,500).map(row).join(''));
 }
 
 async function loadPortfolio(){
@@ -2439,7 +2442,10 @@ async function loadAgentLog(){
 
 async function loadOrders(){
   try{
-    const r = await fetch('/api/trading/orders');
+    // Ask for the full broker-truth window (Alpaca caps a single page at 500).
+    // Without an explicit limit the API defaulted to 50, so a busy session's
+    // Order history silently dropped every fill past the 50 most recent.
+    const r = await fetch('/api/trading/orders?limit=500');
     const orders = await r.json();
     renderOrders(orders);                   // #1712: Orders + Order history tabs
   }catch(e){}
