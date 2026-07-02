@@ -545,8 +545,8 @@
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/adr/README.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Architecture Decision Records (ADRs)</span>
-        <span class="doc-sum">Index and authoring rules for the append-only ADR log; approval gate and status values. Note: two conflicting 0008 rows in the index table.</span>
-        <span class="doc-foot"><span class="doc-cat">ADR · Index</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jun 2026</span></span>
+        <span class="doc-sum">Index and authoring rules for the append-only ADR log; approval gate and status values. Each ADR listed exactly once (0008 collision reconciled 2026-07-01).</span>
+        <span class="doc-foot"><span class="doc-cat">ADR · Index</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
       </a>
       <a class="doc-card" data-cat="research" data-type="md" data-status="reference" data-grounding="partial" href="/repo/docs/RESEARCH-CANON.md">
         <span class="doc-top"><span class="doc-ico">🧪</span><span class="doc-fmt">MD</span></span>
@@ -799,6 +799,12 @@
         <span class="doc-title">ADR-0011: Own a proprietary Σ₀ base model</span>
         <span class="doc-sum">Proposed (not approved): fork a PLT looped-coder into a Keystone-owned Σ₀ base, adapter-only, council+CSF native; staged, each stage gated on on-box evidence.</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
+      </a>
+      <a class="doc-card" data-cat="architecture" data-type="md" data-status="draft" data-grounding="grounded" href="/repo/docs/adr/0013-subsystem-register-one-loop-gate.md">
+        <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0013: Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction</span>
+        <span class="doc-sum">ADR (Proposed, awaiting Alex): every public surface is registered CORE (one loop stage) or gated EXTENSION in lib/surface-registry.js, enforced by test:boundary + audit:orphans; consolidates three colliding 0001 drafts from PR #1813.</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
       </a>
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="draft" data-grounding="partial" href="/repo/docs/CONVERGENCE-HOOKS.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
@@ -1136,6 +1142,12 @@
         <span class="doc-sum">Runbook to train the XGBoost V10 video scorer from YouTube Shorts; runs on mock data, real-API integration into the scorer still a to-do.</span>
         <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
       </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-PLT-HANDOFF.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Keystone-Σ₀ PLT — Handoff (2026-07-01)</span>
+        <span class="doc-sum">What this is: the pick-up sheet for the &quot;loopcoder swap&quot; — bootstrapping our own</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
       <a class="doc-card" data-cat="trading" data-type="md" data-status="reference" data-grounding="ungrounded" href="/repo/docs/KALSHI-API-SPEC.md">
         <span class="doc-top"><span class="doc-ico">📈</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Kalshi Trading API Specification</span>
@@ -1418,6 +1430,12 @@
         <span class="doc-sum">APPROVAL GATE: leave status Proposed and approved-by pending. An ADR is not</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-hff-500y-merge-convergence.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Convergence Record — HFF / Lantern OS 500-Year Hardening Merge</span>
+        <span class="doc-sum">Lantern OS&#39;s existing Remember/Verify-stage patterns (External Reality Rule, CSF long-memory archive) are directly reusable inside the HFF…</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/FRONTIER-DIRECTIONS-2026-H2.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Frontier Directions — Deep Research + Design (2026 H2)</span>
@@ -1427,6 +1445,12 @@
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-surprise-leak-layer2-result.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Layer 2: does modelUncertainty change the canary&#39;s classification? Not on this dataset — and the code shows exactly why</span>
+        <span class="doc-sum">Loop stages: Verify (the leak).</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-surprise-leak-judge-regrade.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">LLM-judge re-grade of the surprise-leak dataset — and a real bug the re-grade surfaced</span>
         <span class="doc-sum">Loop stages: Verify (the leak).</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>

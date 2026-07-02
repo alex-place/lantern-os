@@ -228,18 +228,6 @@
     "reason": "Live ADR (Proposed, pending Alex approval); scope decision still governs; honestly flags wrapper vision as aspirational"
   },
   {
-    "path": "docs/adr/0008-personal-ai-wrapper-end-product.md",
-    "title": "End product is a personal AI wrapper — capabilities as Tools + Skills in the one loop",
-    "category": "architecture",
-    "description": "Accepted ADR: the product is a private personal-AI wrapper over the one loop, capabilities as consent-gated Tools and Skills, no autonomous submission.",
-    "status": "Duplicate",
-    "updated": "2026-06-24",
-    "grounding": "Grounded",
-    "action": "merge",
-    "mergeInto": "docs/adr/0008-end-product-personal-ai-wrapper.md",
-    "reason": "Duplicate ADR-0008; keep the fuller Proposed -end-product- variant (approval gate: agents leave Proposed)."
-  },
-  {
     "path": "docs/adr/0009-one-routing-contract-cloud-primary-coding.md",
     "title": "ADR-0009: One routing contract — cloud-primary for coding, local as verified backstop",
     "category": "architecture",
@@ -276,16 +264,28 @@
     "reason": "Live ADR, Status:Proposed and honest (medium-low parity confidence); decision record worth surfacing."
   },
   {
-    "path": "docs/adr/README.md",
-    "title": "Architecture Decision Records (ADRs)",
+    "path": "docs/adr/0013-subsystem-register-one-loop-gate.md",
+    "title": "ADR-0013: Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction",
     "category": "architecture",
-    "description": "Index and authoring rules for the append-only ADR log; approval gate and status values. Note: two conflicting 0008 rows in the index table.",
-    "status": "Living",
-    "updated": "2026-06-23",
+    "description": "ADR (Proposed, awaiting Alex): every public surface is registered CORE (one loop stage) or gated EXTENSION in lib/surface-registry.js, enforced by test:boundary + audit:orphans; consolidates three colliding 0001 drafts from PR #1813.",
+    "status": "Draft",
+    "updated": "2026-07-01",
     "grounding": "Grounded",
     "action": "keep",
     "mergeInto": "",
-    "reason": "Current ADR index and process doc; accurate but has a duplicate ADR-0008 entry to reconcile."
+    "reason": "Live Proposed ADR with evidence table; records the SCOPE-1 (#1557) register decision at a non-colliding number."
+  },
+  {
+    "path": "docs/adr/README.md",
+    "title": "Architecture Decision Records (ADRs)",
+    "category": "architecture",
+    "description": "Index and authoring rules for the append-only ADR log; approval gate and status values. Each ADR listed exactly once (0008 collision reconciled 2026-07-01).",
+    "status": "Living",
+    "updated": "2026-07-01",
+    "grounding": "Grounded",
+    "action": "keep",
+    "mergeInto": "",
+    "reason": "Current ADR index and process doc."
   },
   {
     "path": "docs/AGENT-HANDOFF-WORKQUEUE.md",
