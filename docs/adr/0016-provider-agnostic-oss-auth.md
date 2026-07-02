@@ -1,10 +1,10 @@
 ---
 adr: 0016
 title: Provider-agnostic OSS auth (local + Google + Discord + Patreon)
-status: Proposed
+status: Accepted
 date: 2026-07-02
 deciders: Alex Place (owner), Claude (drafting)
-approved-by: pending   # only Alex Place flips this; agents leave it `pending`
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---
@@ -20,7 +20,7 @@ superseded-by: none
 
 ## Status
 
-Proposed <!-- Accepted (Alex-approved only) | Superseded by ADR-NNNN | Deprecated -->
+Accepted (Alex Place, 2026-07-02)
 
 ## Context
 
