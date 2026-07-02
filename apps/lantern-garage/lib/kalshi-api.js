@@ -34,7 +34,13 @@ const KILL_SWITCH = path.join(KALSHI_DIR, "LIVE-KILL-SWITCH");
 const TRADING_PAUSED = path.join(KALSHI_DIR, "TRADING-PAUSED");
 
 const ENV = (process.env.KALSHI_ENV || "prod").toLowerCase();
-const HOST = ENV === "demo" ? "demo-api.kalshi.co" : "external-api.kalshi.com";
+// Kalshi consolidated its API onto `api.elections.kalshi.com`. The legacy
+// `external-api.kalshi.com` host still proxies READS but its order-placement
+// endpoint is retired — POST /portfolio/orders there returns 410 Gone, which is why
+// live orders were failing. The signature is host-agnostic (ts+method+path), so
+// moving hosts keeps auth working. Override with KALSHI_API_HOST if Kalshi migrates again.
+const HOST = process.env.KALSHI_API_HOST
+  || (ENV === "demo" ? "demo-api.kalshi.co" : "api.elections.kalshi.com");
 const BASE = "/trade-api/v2";
 
 // ── credentials (user-supplied via env; never entered here) ──────────────────
