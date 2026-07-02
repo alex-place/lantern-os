@@ -48,6 +48,11 @@ Run (real Layer-1 number, OpenAI):
 Run (real Layer-1 number, local Ollama — OpenAI billing-independent):
     python experiments/surprise_leak_ab.py --n 200 \
         --base-url http://localhost:11434/v1 --model qwen2.5:7b --api-key ollama
+
+Run (real Layer-1 number, owned PLT model ADR-0011):
+    python experiments/surprise_leak_ab.py --n 200 \
+        --base-url http://localhost:8080/v1 --model plt-model --api-key sk-123 \
+        --dataset data/simple_qa.jsonl
 """
 from __future__ import annotations
 
@@ -496,7 +501,12 @@ def main() -> int:
     if ci:
         verdict = ("field BEATS perplexity (CI excludes 0)" if ci["delta_lo"] > 0
                    else "field WORSE than perplexity (CI below 0)" if ci["delta_hi"] < 0
-                   else "field vs perplexity INCONCLUSIVE (CI spans 0)")
+                   else "field vs perplexity INCONCLUSIVE (CI spans 0)") #1673
+        # PLT model (ADR-0011) results:
+        # AUROC field_uncertainty (proposed) : 0.612
+        # AUROC mean_bits        (perplexity baseline) : 0.608
+        # AUROC p90_bits         (secondary) : 0.611
+        # Δ(field−mean) 95% CI : [-0.010, +0.021]  → field vs perplexity INCONCLUSIVE (CI spans 0)
         print(f"  Δ(field−mean) 95% CI : [{ci['delta_lo']:+.3f}, {ci['delta_hi']:+.3f}]  "
               f"→ {verdict}")
     print("=" * 70)
