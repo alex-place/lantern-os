@@ -76,6 +76,11 @@
     .add-form .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media (max-width: 520px) { .add-form .grid2 { grid-template-columns: 1fr; } }
 
+    .tag-sys {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--muted); border: 1px solid var(--border); border-radius: 6px;
+      padding: 1px 6px; margin-left: 8px; vertical-align: middle;
+    }
     .empty { color: var(--muted); font-size: 0.88rem; padding: 6px 2px; }
     #toast {
       position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
@@ -232,26 +237,40 @@
 
         const grow = document.createElement('div');
         grow.className = 'grow';
-        grow.innerHTML = `<div class="title">${esc(flag.label || flag.key)}</div>
-          <div class="sub"><span class="mono">${esc(flag.key)}</span>${flag.description ? ' — ' + esc(flag.description) : ''}</div>`;
+        const sysTag = flag.known ? ' <span class="tag-sys">system</span>' : '';
+        const dangerNote = flag.danger
+          ? '<div class="sub" style="color:var(--danger);margin-top:4px">⚠ Real-money switch — enabling arms live Kalshi orders (still gated by env + kill-switch + credentials).</div>'
+          : '';
+        grow.innerHTML = `<div class="title">${esc(flag.label || flag.key)}${sysTag}</div>
+          <div class="sub"><span class="mono">${esc(flag.key)}</span>${flag.description ? ' — ' + esc(flag.description) : ''}</div>${dangerNote}`;
 
         const toggles = document.createElement('div');
         toggles.className = 'toggles';
 
-        toggles.appendChild(switchEl(flag.enabled, async (val) => {
+        toggles.appendChild(switchEl(flag.enabled, async (val, input) => {
+          // Confirm before ARMING a danger (real-money) flag; disabling is unguarded.
+          if (val && flag.danger &&
+              !confirm(`Enable "${flag.label || flag.key}"?\n\nThis arms REAL-money Kalshi orders (still gated by KALSHI_TRADING_ENABLED, the kill-switch file, and credentials). Scope stays weather-edge, 1 contract.`)) {
+            input.checked = false;
+            return;
+          }
           const res = await api('PUT', '/api/admin/flags', { key: flag.key, enabled: val });
-          if (res.ok) { flag.enabled = val; toast('Saved'); } else { toast(res.data.error || 'Error'); }
+          if (res.ok) { flag.enabled = val; toast(val ? 'Enabled' : 'Disabled'); }
+          else { input.checked = !val; toast(res.data.error || 'Error'); }
         }));
 
-        const del = document.createElement('button');
-        del.className = 'btn danger';
-        del.textContent = 'Delete';
-        del.addEventListener('click', async () => {
-          const res = await api('DELETE', '/api/admin/flags/' + encodeURIComponent(flag.key));
-          if (res.ok) { card.remove(); toast('Deleted'); load(); } else { toast(res.data.error || 'Error'); }
-        });
-
-        toggles.appendChild(del);
+        // Known/system flags can't be deleted — a delete just returns them to default-OFF,
+        // so we omit the button to avoid confusion. Custom flags keep Delete.
+        if (!flag.known) {
+          const del = document.createElement('button');
+          del.className = 'btn danger';
+          del.textContent = 'Delete';
+          del.addEventListener('click', async () => {
+            const res = await api('DELETE', '/api/admin/flags/' + encodeURIComponent(flag.key));
+            if (res.ok) { card.remove(); toast('Deleted'); load(); } else { toast(res.data.error || 'Error'); }
+          });
+          toggles.appendChild(del);
+        }
         row.appendChild(grow);
         row.appendChild(toggles);
         card.appendChild(row);

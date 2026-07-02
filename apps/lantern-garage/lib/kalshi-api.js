@@ -59,8 +59,16 @@ function killSwitchActive() {
 function tradingPaused() {
   return fs.existsSync(TRADING_PAUSED);
 }
+// Admin/Patreon-gated master switch (data/admin/feature-flags.json, toggled at
+// /admin-flags.html). This is an ADDITIONAL AND-gate: an absent/off flag can only
+// keep the exchange path in dry-run, never arm it. Fail-safe — any read error → OFF.
+const LIVE_TRADING_FLAG = "kalshi_live_trading";
+function liveTradingFlagEnabled() {
+  try { return require("./feature-flags").isFlagEnabled(LIVE_TRADING_FLAG); }
+  catch { return false; }
+}
 function tradingEnabled() {
-  return process.env.KALSHI_TRADING_ENABLED === "1";
+  return process.env.KALSHI_TRADING_ENABLED === "1" && liveTradingFlagEnabled();
 }
 
 // ── RSA-PSS request signing (Kalshi auth scheme) ─────────────────────────────
@@ -240,7 +248,8 @@ function logLedger(entry) {
  */
 async function placeOrder(o) {
   const blockers = [];
-  if (!tradingEnabled()) blockers.push("trading_disabled (set KALSHI_TRADING_ENABLED=1)");
+  if (process.env.KALSHI_TRADING_ENABLED !== "1") blockers.push("trading_disabled (set KALSHI_TRADING_ENABLED=1)");
+  if (!liveTradingFlagEnabled()) blockers.push("live_flag_off (enable admin flag 'kalshi_live_trading' at /admin-flags.html)");
   if (killSwitchActive()) blockers.push("kill_switch_active (data/kalshi/LIVE-KILL-SWITCH)");
   if (!hasCredentials()) blockers.push("credentials_required");
 
@@ -298,6 +307,8 @@ async function getConnection() {
     exchangeActive: status.ok ? (status.data?.exchange_active ?? null) : null,
     credentials: hasCredentials(),
     tradingEnabled: tradingEnabled(),
+    envTradingEnabled: process.env.KALSHI_TRADING_ENABLED === "1",
+    liveTradingFlag: liveTradingFlagEnabled(),
     killSwitch: killSwitchActive(),
     tradingPaused: tradingPaused(),
     canTradeLive: tradingEnabled() && !killSwitchActive() && hasCredentials(),

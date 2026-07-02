@@ -42,6 +42,28 @@ const NAV_PAGES = [
   { path: "/knowledgecenter.html",   label: "Help" },
 ];
 
+/**
+ * Canonical "known" flags. These always appear in the admin UI (default OFF) even
+ * before anyone creates them, so a safety-critical switch is discoverable rather than
+ * hidden until typed by hand. A stored record (created/toggled by an admin) always
+ * wins over the default here; deleting one just returns it to the default-OFF state.
+ *
+ * kalshi_live_trading is an ADDITIONAL AND-gate on real-money orders (see
+ * kalshi-api.tradingEnabled): OFF can only keep the exchange path in dry-run, never
+ * arm it. It sits under the same admin/Patreon gate as this whole page.
+ */
+const KNOWN_FLAGS = [
+  {
+    key: "kalshi_live_trading",
+    label: "Kalshi live trading",
+    description:
+      "Master switch for placing REAL-money Kalshi orders. OFF = dry-run only. " +
+      "In addition to this flag, a live order still requires KALSHI_TRADING_ENABLED=1, " +
+      "the kill-switch file absent, and valid credentials. Scope stays weather-edge, 1 contract.",
+    danger: true,
+  },
+];
+
 let _cache = null;
 
 function ensureDir() {
@@ -83,12 +105,23 @@ function saveConfig(cfg) {
 
 // ── Feature flags ──────────────────────────────────────────────────────────
 
-/** All flags as an array of full records (admin view). */
+/**
+ * All flags as an array of full records (admin view). Known flags are merged in so
+ * they always show (default OFF) even when nobody has created them yet; a stored
+ * record overrides the default. `known`/`danger` are surfaced so the UI can protect
+ * them (no delete, confirm-on-enable).
+ */
 function listFlags() {
   const { flags } = loadConfig();
-  return Object.keys(flags)
-    .sort()
-    .map((key) => ({ key, ...flags[key] }));
+  const byKey = new Map();
+  for (const k of KNOWN_FLAGS) {
+    byKey.set(k.key, { key: k.key, label: k.label, description: k.description, enabled: false, known: true, danger: !!k.danger });
+  }
+  for (const key of Object.keys(flags)) {
+    const known = byKey.get(key);
+    byKey.set(key, { key, ...flags[key], known: !!known, danger: known ? !!known.danger : false });
+  }
+  return [...byKey.values()].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
 /** Compact { key: enabledBoolean } map for public client consumption. */
@@ -245,6 +278,7 @@ function _resetCache() {
 
 module.exports = {
   NAV_PAGES,
+  KNOWN_FLAGS,
   STORE_PATH,
   listFlags,
   getPublicFlags,
