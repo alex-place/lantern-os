@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.18] - 2026-07-01
+### Added
+- **Three Doors: server-authoritative canon + journey API.** New `/api/doors/canon`, `/api/doors/state`, `/api/doors/turn`, `/api/doors/pref` endpoints backed by one append-only journey log (`data/three-doors/journey.jsonl`) shared with the skill's `journey_append.js`. Confidence is source-derived server-side — client-sent confidence is ignored; every turn emits a ConvergenceRecord before the journey row is appended so the row carries a real `crId`. Strengthens the **Remember** and **Verify** stages.
+
 ## [1.8.17] - 2026-07-01
 ### Added
 - **Three Doors: grounded narration + runtime-generated doors.** Every turn's text is now generated from the context of the actual painting (a vision model describes the image when a provider is live; the exact image-generation prompt is the grounding fallback) plus play context (canon theme/lesson, recent choices, the player's typed desires). The three choices are runtime-generated: existing doors of the shared world by name, or new doors with metadata created on the spot (name, description, target scene), persisted in `playerProgress.dynamicDoors` so invented doors stay real across reloads and route to their own targets. Each turn logs what it was grounded on (vision / image_prompt / canon_only). Strengthens the **Reason** and **Verify** stages.
