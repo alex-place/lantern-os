@@ -18,6 +18,8 @@ const { swarmOrchestrate } = require("./swarm-orchestrator");
 const { emitConvergenceRecord } = require("./convergence-records");
 const { recordConvergance, recordLifeFact } = require("./csf-memory-writer");
 const { extractFact, categorize, keywordsFromFact } = require("./life-memory");
+const { rfc3161TimestampMerkleRoot } = require("./rfc3161-timestamp");
+const { publishMerkleRootToTransparencyLog } = require("./transparency-log");
 const { resolveCodingRoute } = require("./route-contract");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
@@ -184,6 +186,19 @@ function triggerImageGeneration({ cleanText, doors, suggestions, surfaceMode, sy
   return entryId;
 }
 
+// Periodically publish the latest Merkle root to the transparency log.
+// This runs in the background and does not block chat responses.
+let transparencyLogInterval = null;
+const TRANSPARENCY_LOG_INTERVAL_MS = parseInt(process.env.TRANSPARENCY_LOG_INTERVAL_MS, 10) || 60 * 60 * 1000; // 1 hour
+if (!transparencyLogInterval) {
+  transparencyLogInterval = setInterval(async () => {
+    try {
+      await publishMerkleRootToTransparencyLog();
+    } catch (e) { console.error("[transparency-log] failed to publish Merkle root:", e.message); }
+  }, TRANSPARENCY_LOG_INTERVAL_MS);
+}
+
+
 /**
  * Analyze a convergence loop result and determine:
  * - What categories of failures exist
@@ -295,6 +310,14 @@ async function handleStreamChat(req, url, res) {
   // Remember-stage hook (#1429): a declarative personal-fact statement ("my kid's shoe size
   // is 7") gets persisted into the ONE canonical CSF memory, same pattern as recordConvergance
   // below — no dedicated store, no dedicated recall UI. formatCSFContextForPromptAsync (below)
+  //
+  // RFC 3161 Timestamping and Transparency Log for Merkle Roots:
+  // When a Merkle root is recorded (e.g., via `recordConvergance`), it should be
+  // timestamped using RFC 3161 and published to a transparency log. This provides
+  // an external, auditable proof of existence and integrity.
+  if (parsed.merkleRoot) {
+    await rfc3161TimestampMerkleRoot(parsed.merkleRoot);
+  }
   // already retrieves + IDF-ranks it into later turns automatically. Best-effort, non-blocking.
   if (message) {
     try {

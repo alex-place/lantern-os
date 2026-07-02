@@ -163,7 +163,7 @@
     var ta = $("issue-user-desc");
     if (ta) ta.value = "";
     setReady(false);
-  }
+  } 
   // Lazily insert an editable description field. Shown only when AI auto-description
   // is unavailable, so a vision-down report still carries the reporter's own words
   // instead of being filed as a contentless screenshot (the #1567 noise class).
@@ -269,7 +269,7 @@
     setReady(false);   // stays disabled until the user types a description
     setStatus("Keystone couldn't read the screenshot (" + state.describeReason + "). Add a short description, then file.");
   }
-
+  
   function blobToDataUrl(blob) {
     return new Promise(function (resolve, reject) {
       var r = new FileReader();

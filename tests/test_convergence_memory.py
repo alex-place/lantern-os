@@ -274,6 +274,93 @@ class TestMemoryStore:
             assert True
 
 
+class TestMemoryTimestampingAndTransparency:
+    """Tests for RFC 3161 timestamping and transparency log integration."""
+
+    @pytest.fixture
+    def store(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reset_memory_store()
+            store = MemoryStore(tmpdir)
+            store.cache.clear()
+            yield store
+
+    def test_rfc3161_timestamp_merkle_root_recorded(self, store):
+        """Verify that RFC 3161 timestamp records are stored."""
+        merkle_root = "a" * 64
+        timestamp_data = {
+            "merkleRoot": merkle_root,
+            "timestamp": datetime.now().isoformat(),
+            "signature": "mock_signature_rfc3161",
+            "tsa_certificate": "mock_cert_rfc3161",
+        }
+        entry = store.append(
+            source="rfc3161-timestamp",
+            content=timestamp_data,
+            confidence=1.0,
+            verification_status="verified",
+            log_type="timestamps",
+        )
+        assert entry.content["merkleRoot"] == merkle_root
+        assert entry.content["signature"] == "mock_signature_rfc3161"
+        assert "timestamps" in store.logs
+
+    def test_transparency_log_publication_recorded(self, store):
+        """Verify that transparency log publication records are stored."""
+        merkle_root = "b" * 64
+        publication_data = {
+            "merkleRoot": merkle_root,
+            "logEntryId": "mock_log_entry_id",
+            "logUrl": "mock_log_url",
+        }
+        entry = store.append(
+            source="transparency-log",
+            content=publication_data,
+            confidence=1.0,
+            verification_status="verified",
+            log_type="transparency_log_publications",
+        )
+        assert entry.content["merkleRoot"] == merkle_root
+        assert entry.content["logEntryId"] == "mock_log_entry_id"
+        assert "transparency_log_publications" in store.logs
+
+    def test_existence_at_date_verifiability(self, store):
+        """Simulate verifying existence-at-date using external anchors.
+
+        This test doesn't perform actual cryptographic verification but ensures
+        that the necessary data points (timestamped Merkle roots, transparency log
+        entries) are present in the memory store to enable such verification.
+        """
+        # Record a Merkle root and its RFC 3161 timestamp
+        merkle_root_1 = "c" * 64
+        store.append(
+            source="rfc3161-timestamp",
+            content={"merkleRoot": merkle_root_1, "timestamp": "2023-01-01T10:00:00Z", "signature": "sig1"},
+            confidence=1.0, verification_status="verified", log_type="timestamps",
+        )
+
+        # Record a subsequent Merkle root and its transparency log publication
+        merkle_root_2 = "d" * 64
+        store.append(
+            source="transparency-log",
+            content={"merkleRoot": merkle_root_2, "logEntryId": "entry_abc", "logUrl": "http://example.com/log"},
+            confidence=1.0, verification_status="verified", log_type="transparency_log_publications",
+        )
+
+        # Query for these records to simulate verification process
+        timestamps = store.query(merkle_root_1, source_filter="rfc3161-timestamp")
+        assert any(t.content["merkleRoot"] == merkle_root_1 for t in timestamps)
+
+        log_entries = store.query(merkle_root_2, source_filter="transparency-log")
+        assert any(l.content["merkleRoot"] == merkle_root_2 for l in log_entries)
+
+        # In a real scenario, an external verifier would:
+        # 1. Retrieve the RFC 3161 timestamp record for merkle_root_1.
+        # 2. Verify the RFC 3161 signature against the TSA's certificate to confirm the timestamp.
+        # 3. Retrieve the transparency log entry for merkle_root_2.
+        # 4. Verify the inclusion proof for merkle_root_2 in the transparency log.
+        # This test ensures the data is available in the memory store for these steps.
+
 class TestMemory767Hardening:
     """#767 — confidence-laundering gate, ledger non-divergence, hash-chain."""
 

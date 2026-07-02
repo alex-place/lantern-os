@@ -159,7 +159,7 @@
       if (!isPublic && !gateOff && (!session || !session.authenticated)) {
         location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
       } else if (TRADE_PAGES.includes(pathname) && session && session.authenticated && !canTrade) {
-        // Direct navigation to a trade page without entitlement → bounce home.
+        // Direct navigation to a trade page without entitlement -> bounce home.
         location.href = '/';
       }
     })

@@ -22,6 +22,8 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { rfc3161TimestampMerkleRoot } = require("../apps/lantern-garage/lib/rfc3161-timestamp");
+const { publishMerkleRootToTransparencyLog } = require("../apps/lantern-garage/lib/transparency-log");
 
 const repoRoot = path.resolve(__dirname, "..");
 
@@ -143,6 +145,42 @@ async function main() {
         `${f} must compute its checksum via the shared csfWriter._checksum`
       );
     }
+  });
+
+  await ok("RFC 3161 timestamping of Merkle root is recorded", async () => {
+    const testMerkleRoot = "a".repeat(64); // Example SHA256 Merkle root
+    const timestampRecord = await rfc3161TimestampMerkleRoot(testMerkleRoot);
+    assert.ok(timestampRecord, "RFC 3161 timestamp record should be returned");
+    assert.strictEqual(timestampRecord.merkleRoot, testMerkleRoot, "Timestamp record should contain the correct Merkle root");
+    assert.ok(timestampRecord.timestamp, "Timestamp record should contain a timestamp");
+    assert.ok(timestampRecord.signature, "Timestamp record should contain a signature");
+
+    // Verify that the timestamp record is stored in CSF memory
+    const records = fs.readFileSync(registry, "utf8").split('\n').filter(Boolean).map(JSON.parse);
+    const found = records.some(rec =>
+      rec.source === "rfc3161-timestamp" &&
+      rec.content.merkleRoot === testMerkleRoot &&
+      rec.content.timestamp === timestampRecord.timestamp &&
+      rec.content.signature === timestampRecord.signature
+    );
+    assert.ok(found, "RFC 3161 timestamp record should be found in CSF memory");
+  });
+
+  await ok("Transparency log publication mechanism is tested", async () => {
+    const testMerkleRoot = "b".repeat(64); // Another example SHA256 Merkle root
+    const publishResult = await publishMerkleRootToTransparencyLog(testMerkleRoot);
+    assert.ok(publishResult, "Transparency log publication should return a result");
+    assert.strictEqual(publishResult.merkleRoot, testMerkleRoot, "Published result should contain the correct Merkle root");
+    assert.ok(publishResult.logEntryId, "Published result should contain a log entry ID");
+
+    // Verify that the publication record is stored in CSF memory
+    const records = fs.readFileSync(registry, "utf8").split('\n').filter(Boolean).map(JSON.parse);
+    const found = records.some(rec =>
+      rec.source === "transparency-log" &&
+      rec.content.merkleRoot === testMerkleRoot &&
+      rec.content.logEntryId === publishResult.logEntryId
+    );
+    assert.ok(found, "Transparency log publication record should be found in CSF memory");
   });
 
   log(`\n${passed} passed, ${failed} failed`);
