@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-05-26
-updated: 2026-06-24
+updated: 2026-07-01
 ---
 
 # AGENTS.md — Keystone OS
@@ -68,8 +68,8 @@ This repo is designed for agentic-first workflows. Every agent (Claude, Gemini, 
 |------|------------------|-------|
 | [`data/pcsf/model.pcsf.json`](data/pcsf/model.pcsf.json) | Default model per provider, available overrides | Don't search for model strings |
 | [`data/pcsf/agent.pcsf.json`](data/pcsf/agent.pcsf.json) | All agents, their capabilities, route bindings | Don't explore routes/ to understand what exists |
-| [`data/pcsf/settings.pcsf.json`](data/pcsf/settings.pcsf.json) | Every env var, purpose, current presence state | Don't grep for process.env |
-| [`data/pcsf/narrator.pcsf.json`](data/pcsf/narrator.pcsf.json) | All 6 persona narrators, keyword routing rules | Don't read dream-chat.js to understand agents |
+| [`data/pcsf/provider.pcsf.json`](data/pcsf/provider.pcsf.json) | Provider fallback chain + per-provider config (env-var presence lives in [`.env.example`](.env.example)) | Don't grep for process.env / provider order |
+| [`data/pcsf/narrator.pcsf.json`](data/pcsf/narrator.pcsf.json) | Keyword routing rules. **Note:** it still lists 6 legacy narrators, but only `keystone` is selectable at runtime — [`data/contexts/personas.json`](data/contexts/personas.json) is the source of truth (RP personas removed in #1664) | Don't read dream-chat.js to understand agents |
 | [`manifests/dream-journal-v1-agent-slots.json`](manifests/dream-journal-v1-agent-slots.json) | Queued work items with priority + description | Don't ask "what's left to do" |
 | [`manifests/CONVERGENCE-LOOP-AGENT-FLEET.md`](manifests/CONVERGENCE-LOOP-AGENT-FLEET.md) | 36-slot agent fleet design and receipt contract | Don't re-derive fleet structure |
 
@@ -113,17 +113,19 @@ Claude is expensive. Use it for design decisions and complex debugging. Delegate
 
 ### 4. Don't re-read files you've already read
 
-The route architecture is modular. Each file handles one domain:
+The route architecture is modular. **The authoritative list of what's registered is the `routes[]` array in [`server.js`](apps/lantern-garage/server.js) (≈ lines 150-221)** — `routes/` holds ~68 modules; the shortlist below is just the high-traffic ones. To find the handler for an endpoint, grep the `routes[]` requires, not this table.
 
 | File | Routes / Responsibility |
 |------|------------------------|
-| [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) | 90 lines — loads routes + deps, nothing else |
+| [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) | ~764 lines — loads `.env` + shared deps, wires the `routes[]` array, then **spawns & supervises child processes** (Discord bot, MCP children on 8771/8772, trading microservice, AI trader, Cloudflare tunnel, crypto observer) and in-process collectors/monitors (Kalshi/crypto/news collectors, position monitor, convergence trainer/enhancer/LoRA, auto-dispatch). **Not just glue** — read it when debugging startup/child-process behavior. |
 | [`apps/lantern-garage/routes/status.js`](apps/lantern-garage/routes/status.js) | `/api/health`, `/api/status`, wallet, readiness |
 | [`apps/lantern-garage/routes/rag.js`](apps/lantern-garage/routes/rag.js) | `/api/rag-cache`, flat-rag-house |
 | [`apps/lantern-garage/routes/operator.js`](apps/lantern-garage/routes/operator.js) | `/api/operator-notes`, conversations, actions |
 | [`apps/lantern-garage/routes/files.js`](apps/lantern-garage/routes/files.js) | `/repo/*`, `/view` (markdown) |
 | [`apps/lantern-garage/routes/dreamer.js`](apps/lantern-garage/routes/dreamer.js) | `/api/dreamer`, `/api/agents` |
-| [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) | ALL `/api/dream/*` + `/api/settings/providers` |
+| [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) | ALL `/api/dream/*` + `/api/settings/providers` + SSE stream |
+| [`apps/lantern-garage/routes/doors.js`](apps/lantern-garage/routes/doors.js) | Three Doors: server-authoritative canon + journey API |
+| [`apps/lantern-garage/routes/trading.js`](apps/lantern-garage/routes/trading.js) | Kalshi terminal — 60+ `/api/trading/*` endpoints |
 | [`apps/lantern-garage/routes/surfaces.js`](apps/lantern-garage/routes/surfaces.js) | `/hub`, `/surfaces/*`, static catch-all |
 | [`apps/lantern-garage/lib/stream-chat.js`](apps/lantern-garage/lib/stream-chat.js) | SSE streaming (Gemini→Claude→OpenAI→Grok→Ollama) |
 | [`apps/lantern-garage/lib/dream-chat.js`](apps/lantern-garage/lib/dream-chat.js) | Non-streaming chat + persona selection |
@@ -131,13 +133,14 @@ The route architecture is modular. Each file handles one domain:
 | [`apps/lantern-garage/lib/conversation-store.js`](apps/lantern-garage/lib/conversation-store.js) | append/read conversation JSONL |
 | [`apps/lantern-garage/lib/csf-memory.js`](apps/lantern-garage/lib/csf-memory.js) | CSF long-term memory reader, door state persistence |
 
-**Rule: If you need a route, read `routes/dream.js`. If you need streaming, read `lib/stream-chat.js`. Don't read `server.js` — it's just glue.**
+**Rule: If you need a route, grep the `routes[]` array in `server.js` for the module, then read that module. If you need streaming, read `lib/stream-chat.js`. Read `server.js` itself only for startup / child-process / supervisor behavior.**
 
 ### 5. Don't discover what tests exist — run them
 
 ```bash
 node tests/test_dream_journal_api.js       # 18 API tests — requires running server
 node tests/test_dream_chat_multiturns.js   # 11 multi-turn tests — requires running server
+node tests/test_doors_routes.js            # Three Doors route unit tests — no server required
 python -m pytest tests/test_dashboard_ux.py tests/test_dreamer_integration.py -q  # 26 Python tests
 ```
 
@@ -186,6 +189,7 @@ python src/convergence_io_engine.py health  # confirm everything healthy
 ```bash
 node tests/test_dream_journal_api.js        # 18 API tests
 node tests/test_dream_chat_multiturns.js    # 11 multi-turn tests
+node tests/test_doors_routes.js             # Three Doors route unit tests — no server required
 python -m pytest tests/ -q --tb=short       # Python unit tests
 ```
 
@@ -528,7 +532,7 @@ git fetch --prune
 6. All changes should go through Pull Requests.
 7. No new top-level directories without a ticket.
 8. Never commit secrets (`.env` is gitignored).
-9. Streaming uses `POST /api/dream/chat/stream` SSE endpoint (not GET).
+9. Streaming SSE is one handler that accepts **either** `GET /api/dream/stream` **or** `POST /api/dream/chat/stream` (both live; see `routes/dream.js` → `lib/stream-chat.js`).
 10. **Respect monoworkstream** — check for open PRs before creating branches.
 11. **Delegate mechanical work** to cheaper agents. Reserve Claude for architecture.
 12. **Run the orchestrator** (`convergence_io_engine.py`) before exploring manually.
@@ -577,6 +581,7 @@ echo "GEMINI_API_KEY=your_key" > apps/lantern-garage/.env.local
 ```bash
 node tests/test_dream_journal_api.js        # 18 API tests — requires running server
 node tests/test_dream_chat_multiturns.js    # 11 multi-turn tests — requires running server
+node tests/test_doors_routes.js             # Three Doors route unit tests — no server required
 python -m pytest tests/ -q --tb=short       # Python unit tests
 ```
 
@@ -595,7 +600,7 @@ python src/convergence_io_engine.py inspect
 
 | What | Where |
 |------|-------|
-| Server entry | [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) (90 lines, loads routes/) |
+| Server entry | [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) (~764 lines: `routes[]` wiring + child-process supervisor) |
 | All dream routes | [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) |
 | SSE streaming | [`apps/lantern-garage/lib/stream-chat.js`](apps/lantern-garage/lib/stream-chat.js) |
 | Dream chat UI | [`apps/lantern-garage/public/dream-chat.html`](apps/lantern-garage/public/dream-chat.html) |
@@ -611,4 +616,4 @@ python src/convergence_io_engine.py inspect
 | Startup guide | [`QUICKSTART.md`](QUICKSTART.md) |
 | Contributing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 
-**Last Updated:** 2026-06-05 — v1.0.0 Dream Journal Orion Edition
+**Last Updated:** 2026-07-01 — entry-point audit (Σ₀ council-grounded): server.js supervisor role, dual GET/POST stream route, routes[] as authoritative registry, doors.js/trading.js routes, test_doors_routes.js, provider.pcsf.json manifest, single-persona reality.

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.19] - 2026-07-01
+### Changed
+- **Three Doors: full CRT-terminal rewrite of both surfaces.** `three-doors.html` (landing) and `three-doors-game.html` (game) are rebuilt on the native rose-phosphor CRT stylesheet (`css/three-doors-crt.css`) in the style of the keystone chat + fallout-radio terminals — scanlines, phosphor glow, curved-glass scene tubes, and a HUD gate track. The opt-in `data-skin="terminal"` path (dream-chat.css + dream-chat-terminal.css + the per-page inline `<style>` blocks + the skin-toggle button + terminal-skin.js) is removed; the CRT is now the native chrome. The landing gains a canon seven-gate map, the Doorwalker's creed, the three door-types, and a live system-health panel. The stylesheet is reconciled with the shipped game JS (paragraph-wrapped narration + drop-cap, gate dots, Lantern's aside, image placeholder, in-scene cast strip). Both themes keep the authored WCAG-AA contrast. Strengthens the **Act** stage (the play surface).
+
+## [1.8.18] - 2026-07-01
+### Added
+- **Three Doors: server-authoritative canon + journey API.** New `/api/doors/canon`, `/api/doors/state`, `/api/doors/turn`, `/api/doors/pref` endpoints backed by one append-only journey log (`data/three-doors/journey.jsonl`) shared with the skill's `journey_append.js`. Confidence is source-derived server-side — client-sent confidence is ignored; every turn emits a ConvergenceRecord before the journey row is appended so the row carries a real `crId`. Strengthens the **Remember** and **Verify** stages.
+
 ## [1.8.17] - 2026-07-01
 ### Added
 - **Three Doors: grounded narration + runtime-generated doors.** Every turn's text is now generated from the context of the actual painting (a vision model describes the image when a provider is live; the exact image-generation prompt is the grounding fallback) plus play context (canon theme/lesson, recent choices, the player's typed desires). The three choices are runtime-generated: existing doors of the shared world by name, or new doors with metadata created on the spot (name, description, target scene), persisted in `playerProgress.dynamicDoors` so invented doors stay real across reloads and route to their own targets. Each turn logs what it was grounded on (vision / image_prompt / canon_only). Strengthens the **Reason** and **Verify** stages.
