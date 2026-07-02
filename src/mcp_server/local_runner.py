@@ -477,7 +477,8 @@ def worker_status() -> Dict[str, Any]:
     receipts = 0
     try:
         if RECEIPTS_PATH.exists():
-            receipts = sum(1 for _ in open(RECEIPTS_PATH, encoding="utf-8"))
+            with open(RECEIPTS_PATH, encoding="utf-8") as f:
+                receipts = sum(1 for _ in f)
     except Exception:
         pass
     return {"ok": True, "repo": str(root), "worktree_base": str(WORKTREE_BASE),
@@ -490,16 +491,17 @@ def receipt_get(task_id: str) -> Dict[str, Any]:
     out: List[Dict[str, Any]] = []
     try:
         if RECEIPTS_PATH.exists():
-            for line in open(RECEIPTS_PATH, encoding="utf-8"):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if rec.get("task_id") == task_id:
-                    out.append(rec)
+            with open(RECEIPTS_PATH, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if rec.get("task_id") == task_id:
+                        out.append(rec)
     except Exception as exc:
         return {"ok": False, "error": str(exc), "task_id": task_id}
     return {"ok": True, "task_id": task_id, "count": len(out), "receipts": out}

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -114,5 +115,4 @@ class ProvenanceLedger:
             counts: Dict[str, int] = {}
             for r in self._records:
                 counts[r.status] = counts.get(r.status, 0) + 1
-            return counts
             return counts
