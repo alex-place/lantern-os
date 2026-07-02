@@ -264,6 +264,18 @@
   "reason": "Live ADR, Status:Proposed and honest (medium-low parity confidence); decision record worth surfacing."
  },
  {
+  "path": "docs/adr/0012-nested-adaptive-reason.md",
+  "title": "ADR-0012: Nested adaptive Reason — Q-exit × fidelity escalation",
+  "category": "architecture",
+  "description": "ADR (Proposed): one Reason stage with within-model adaptive depth (Q-exit) nested inside cross-model fidelity escalation, canary-gated. Status Proposed, awaiting approval.",
+  "status": "Draft",
+  "updated": "2026-07-01",
+  "grounding": "Partial",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Live Proposed ADR drafted per issue #1527; records the nested-Reason decision — belongs in the surfaced ADR set."
+ },
+ {
   "path": "docs/adr/0013-subsystem-register-one-loop-gate.md",
   "title": "ADR-0013: Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction",
   "category": "architecture",
