@@ -17,7 +17,19 @@ const path = require("path");
 const https = require("https");
 const http = require("http");
 const tradingNews = require("./trading-news");
-const marketData = require("./market-data-client");
+// market-data-client (Finnhub news client) may be absent — a commit references it but
+// the file was never committed to the repo. Degrade gracefully (no Finnhub news)
+// rather than crash the entire server on boot.
+let marketData;
+try {
+  marketData = require("./market-data-client");
+} catch {
+  marketData = {
+    hasFinnhub: () => false,
+    finnhubMarketNews: async () => [],
+    finnhubCompanyNews: async () => [],
+  };
+}
 
 const WATCHLIST_PATH = path.resolve(__dirname, "..", "..", "..", "data", "lantern-garage", "trading", "watchlist.json");
 const BROAD_MARKET_SYMBOLS = ["^GSPC", "^DJI", "^IXIC", "^VIX"];

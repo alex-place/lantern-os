@@ -1,0 +1,2 @@
+### Fixed
+- **Server boots even when `market-data-client.js` is absent.** A commit referenced `./market-data-client` from `news-collector.js` but the file was never committed to the repo, so the entire server crashed on boot with `MODULE_NOT_FOUND` (taking down port 4177). The require is now guarded — a missing Finnhub news client degrades gracefully (no Finnhub news) instead of crashing the whole process.
