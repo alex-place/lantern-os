@@ -26,9 +26,9 @@ The North Star fixes one shape for the whole product: a single loop —
 `Observe → Remember → Reason → Act → Verify → Converge` — over four objects (Memory, Task,
 Tool, Convergence Record). This is the "Convergence Core."
 ([CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md);
-[CLAUDE.md](../CLAUDE.md) "Architectural Convergence Constraint"). The loop is implemented
-concretely in [`src/convergence/kernel.py`](../src/convergence/kernel.py) over
-[`src/convergence/objects.py`](../src/convergence/objects.py).
+[CLAUDE.md](../../CLAUDE.md) "Architectural Convergence Constraint"). The loop is implemented
+concretely in [`src/convergence/kernel.py`](../../src/convergence/kernel.py) over
+[`src/convergence/objects.py`](../../src/convergence/objects.py).
 
 This ADR records the decision that governs **every** loop stage: extension over addition.
 
@@ -86,7 +86,7 @@ sprawl.
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| One loop + four objects is the mandated shape | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md), [CLAUDE.md](../CLAUDE.md) | High | project docs |
-| Loop is implemented as one Kernel | [`kernel.py:23`](../src/convergence/kernel.py) | High | code |
-| Four objects exist as dataclasses | [`objects.py:41/67/95/131`](../src/convergence/objects.py) | High | code |
-| Forbidden list (dream engine, multi-memory, swarms, digital-twin) | [CLAUDE.md](../CLAUDE.md) "FORBIDDEN" | High | project doc |
+| One loop + four objects is the mandated shape | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md), [CLAUDE.md](../../CLAUDE.md) | High | project docs |
+| Loop is implemented as one Kernel | [`kernel.py:23`](../../src/convergence/kernel.py) | High | code |
+| Four objects exist as dataclasses | [`objects.py:41/67/95/131`](../../src/convergence/objects.py) | High | code |
+| Forbidden list (dream engine, multi-memory, swarms, digital-twin) | [CLAUDE.md](../../CLAUDE.md) "FORBIDDEN" | High | project doc |

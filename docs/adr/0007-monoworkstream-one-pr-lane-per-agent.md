@@ -23,7 +23,7 @@ review overload, merge conflicts between an agent's own lanes, and half-finished
 across branches. The owner is the sole reviewer/merger and cannot babysit an unbounded PR queue.
 
 This is a *git/PR throughput* constraint, distinct from runtime concurrency: many agents running
-in parallel slots is a desired feature ([`.claude/agent-slots.json`](../.claude/agent-slots.json)).
+in parallel slots is a desired feature ([`.claude/agent-slots.json`](../../.claude/agent-slots.json)).
 The limit is on open PR lanes, not active agents.
 
 ## Decision
@@ -37,7 +37,7 @@ blocked until that agent's first PR is merged/closed. All lanes run concurrently
   `OVERRIDE_MERGE=1`).
 - Slop commit messages (empty, < 8 chars, "wip", "placeholder", "temp", …) are blocked.
 - Enforced by git hooks installed via
-  [`scripts/Install-MonoworkstreamHooks.ps1`](../scripts/Install-MonoworkstreamHooks.ps1).
+  [`scripts/Install-MonoworkstreamHooks.ps1`](../../scripts/Install-MonoworkstreamHooks.ps1).
 - Bypasses for legitimate cases: `SKIP_MONOWORKSTREAM=1` (skip lane + slop checks),
   `OVERRIDE_MERGE=1` (allow direct master push).
 
@@ -69,7 +69,7 @@ when the rule would otherwise deadlock.
   protected.
 - **Negative / trade-offs:** a blocked lane needs a bypass to proceed; contributors must know the
   escape hatches; the version/changelog gate interacts with `SKIP_MONOWORKSTREAM`.
-- **Follow-ups:** keep [AGENTS.md](../AGENTS.md) / [CLAUDE.md](../CLAUDE.md) authoritative for the
+- **Follow-ups:** keep [AGENTS.md](../../AGENTS.md) / [CLAUDE.md](../../CLAUDE.md) authoritative for the
   lane table and bypass flags; this very ADR series ships under the `claude/` lane with
   `SKIP_MONOWORKSTREAM=1` because that lane already has an open PR.
 
@@ -81,8 +81,8 @@ See Options. "Do nothing" yields the unbounded-queue failure mode.
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| One open PR lane per agent prefix | [CLAUDE.md](../CLAUDE.md) "Per-Agent Workstream Rule" | High | project doc |
-| Prefix → lane mapping table | [CLAUDE.md](../CLAUDE.md) lane table | High | project doc |
-| Commits to a branch with an open PR allowed | [CLAUDE.md](../CLAUDE.md) rules | High | project doc |
-| Hooks install + bypass flags | [`scripts/Install-MonoworkstreamHooks.ps1`](../scripts/Install-MonoworkstreamHooks.ps1); `SKIP_MONOWORKSTREAM` / `OVERRIDE_MERGE` | High | code + doc |
-| Active-agent concurrency is a separate, allowed feature | [`.claude/agent-slots.json`](../.claude/agent-slots.json); [CLAUDE.md](../CLAUDE.md) note | High | code + doc |
+| One open PR lane per agent prefix | [CLAUDE.md](../../CLAUDE.md) "Per-Agent Workstream Rule" | High | project doc |
+| Prefix → lane mapping table | [CLAUDE.md](../../CLAUDE.md) lane table | High | project doc |
+| Commits to a branch with an open PR allowed | [CLAUDE.md](../../CLAUDE.md) rules | High | project doc |
+| Hooks install + bypass flags | [`scripts/Install-MonoworkstreamHooks.ps1`](../../scripts/Install-MonoworkstreamHooks.ps1); `SKIP_MONOWORKSTREAM` / `OVERRIDE_MERGE` | High | code + doc |
+| Active-agent concurrency is a separate, allowed feature | [`.claude/agent-slots.json`](../../.claude/agent-slots.json); [CLAUDE.md](../../CLAUDE.md) note | High | code + doc |

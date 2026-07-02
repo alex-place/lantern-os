@@ -1,5 +1,5 @@
 {
-  "built_at": 1782956667.3311024,
+  "built_at": 1782963645.202647,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -75,6 +75,7 @@
     "docs/MCP-DREAM-CHAT-TOOL-PARITY.md",
     "docs/adr/0008-end-product-personal-ai-wrapper.md",
     "docs/adr/0011-proprietary-sigma0-base-model.md",
+    "docs/adr/0013-subsystem-register-one-loop-gate.md",
     "docs/CONVERGENCE-HOOKS.md",
     "docs/SUPERFLEET-SWARM-DESIGN.md",
     "docs/research/2026-06-29-csf-beating-zstd.md",
@@ -156,15 +157,12 @@
     "docs/KNOWLEDGE-CENTER-AUDIT-2026-06-30.md",
     "docs/EDITOR_LEARNING_AUDIT.md",
     "docs/memory-recall-benchmark.md",
-    "docs/adr/adr-001-subsystem-one-loop-audit.md",
     "docs/caad/architecture/grounding/grounding-manifest.md",
     "docs/adr/0012-nested-adaptive-reason.md",
-    "docs/adr/0001-subsystem-register-one-loop-gate.md",
     "docs/research/2026-07-01-hff-500y-merge-convergence.md",
     "docs/FRONTIER-DIRECTIONS-2026-H2.md",
     "docs/research/2026-07-01-surprise-leak-layer2-result.md",
     "docs/research/2026-07-01-surprise-leak-judge-regrade.md",
-    "docs/adr/0001-subsystem-register.md",
     "docs/lore/CAST.md",
     "lore/LANTERN-CHARACTERS-AND-REALMS.md",
     "lore/LORE.md",
@@ -581,7 +579,7 @@
       ]
     }
   },
-  "sections": 2380,
+  "sections": 2378,
   "external": 34,
-  "sha256": "cb1d9d9b64469ec2de318d95d568e65d1d6adbce4d69eb41312f862b4a8831f1"
+  "sha256": "2fd4811d8c8343d41cad52fc9824910cdd4a0498f1a0f3ef6f9ced8556343b18"
 }

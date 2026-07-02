@@ -1,30 +1,26 @@
 "use strict";
 /**
- * auto-dispatch.js — gated auto-dispatch of the backlog to autowork.
+ * auto-dispatch.js — HEADLESS AUTO-DISPATCH IS DISABLED. Autowork is chat-only.
  *
- * When enabled, a scheduled worker pulls the **top-priority open issue** from the
- * queue (the same `loadOpenIssues` backlog the orchestration dashboard shows),
- * works it via the verified autonomous-work pipeline (`/api/convergence/autonomous-work`
- * → research → plan → patch → test → **draft PR**), one at a time, then picks the next.
+ * Per the founder rule "autowork must never be headless — every run routes through
+ * the Keystone chat UX" (memory: autowork-never-headless-chat-surface), the background
+ * timer that turned the top backlog issue into a draft PR every 5 min has been NEUTERED:
+ *   - `start()` no longer arms a timer (nothing self-dispatches).
+ *   - `enabled()` is hard-wired `false` — neither `AUTO_DISPATCH=1` nor a persisted
+ *     `enabledOverride:true` in a per-worktree state file can re-enable it.
+ *   - `setEnabled(true)` is a no-op that stays disabled (the dashboard/API toggle
+ *     can never turn the daemon back on).
+ * This closes the 2026-07-02 duplicate-daemon flood: a stale dev-worktree process
+ * (port 4178) whose state file carried `enabledOverride:true` was churning out draft
+ * PRs #1816–#1840 headlessly, invisible to chat. Each worktree ran its own daemon off
+ * its own state file, so N worktrees = N independent headless dispatchers.
  *
- * Safety gates (all on by design — this turns issues into PRs unattended):
- *   1. OFF by default — set `AUTO_DISPATCH=1` to enable (so dev/preview never auto-run).
- *   2. Serialized — one issue in flight at a time (`inFlight` lock).
- *   3. Cloud-paused — before dispatching, probes the live chat path; if it's degraded
- *      to the local model (the #965 "cloud unreachable" state), it PAUSES so it can't
- *      churn out low-quality local-model work. (getProviderStatus can't be used here:
- *      the chat path doesn't record cloud failures, so it wouldn't reflect the outage.)
- *   4. Draft PRs only — the pipeline opens draft PRs for human review; nothing auto-merges.
- *   5. Assigned-tracking — a dispatched issue is marked in data/agent-work-queue/assigned/
- *      so `loadOpenIssues` excludes it and it isn't re-picked.
+ * The ONLY way to run autowork now is from Keystone chat (`!work #N` / `!autowork`),
+ * which streams the run into the chat surface for live review.
  *
- * Env: AUTO_DISPATCH=1 (enable default), AUTO_DISPATCH_INTERVAL_MS (default 300000 = 5 min).
- *
- * Runtime control: the orchestration dashboard can flip the kill switch live
- * (setEnabled) without a restart — the timer always runs; tick() honors the
- * current enabled state. A runtime toggle is persisted so it survives restarts
- * and overrides the env default. setEnabled(false) stops NEW pickups; an
- * already in-flight run finishes (a worktree run can't be safely aborted mid-way).
+ * The tick()/staleMs()/inFlightStale() machinery and the module's exported API are
+ * retained (unit tests + `getStatus()` for the dashboard still reference them), but
+ * tick() can never fire because the loop is never armed and `enabled()` is always false.
  */
 const http = require("http");
 const fs = require("fs");
@@ -83,13 +79,21 @@ function saveState() {
 function envEnabled() {
   return process.env.AUTO_DISPATCH === "1";
 }
+// Headless auto-dispatch is permanently disabled — autowork is chat-only. This is
+// hard-wired `false` (not env/override driven) so a stale per-worktree state file with
+// `enabledOverride:true` can never resurrect the daemon. envEnabled() is retained only
+// so getStatus()/tests can still read the raw env intent.
 function enabled() {
-  return status.enabledOverride === null ? envEnabled() : status.enabledOverride;
+  return false;
 }
+// The dashboard/API kill switch can only ever turn the daemon OFF. A request to enable
+// is refused (logged, not persisted as true) so the headless loop stays dead.
 function setEnabled(on) {
-  status.enabledOverride = !!on;
+  if (on) {
+    log("[auto-dispatch] refused ENABLE — headless auto-dispatch is permanently disabled; autowork is chat-only (!work)");
+  }
+  status.enabledOverride = false;
   saveState();
-  log(`[auto-dispatch] runtime ${on ? "ENABLED" : "DISABLED"} via dashboard kill switch`);
   return enabled();
 }
 function intervalMs() {
@@ -295,18 +299,13 @@ async function tick(ctx) {
   }
 }
 
-function start(ctx) {
-  // The timer ALWAYS runs so the dashboard kill switch can flip the loop on/off
-  // live without a restart; tick() is a no-op while disabled.
-  log(
-    enabled()
-      ? `[auto-dispatch] ENABLED — gated worker every ${Math.round(intervalMs() / 1000)}s · serialized · draft PRs · cloud-paused · one-PR-per-lane`
-      : `[auto-dispatch] standby — loop armed, disabled (toggle on from the orchestration dashboard, or set AUTO_DISPATCH=1)`
-  );
-  if (timer) return timer;
-  timer = setInterval(() => { tick(ctx).catch(() => {}); }, intervalMs());
-  if (timer.unref) timer.unref();
-  return timer;
+function start(_ctx) {
+  // Headless auto-dispatch is permanently disabled — autowork is chat-only. The timer
+  // is NEVER armed, so nothing self-dispatches the backlog into draft PRs. Kept as a
+  // logging no-op (rather than deleting the call site) so server.js and the dashboard
+  // status route keep working unchanged.
+  log("[auto-dispatch] disabled — autowork is chat-only (run it from Keystone chat with !work); headless timer not armed");
+  return null;
 }
 
 function stop() {

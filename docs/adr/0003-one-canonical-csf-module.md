@@ -30,15 +30,15 @@ The v2 consolidation (2026-06, repo v1.5.0) resolved this.
 ## Decision
 
 We will keep **exactly one canonical CSF module** with a single public API at the package root,
-[`src/csf/__init__.py`](../src/csf/__init__.py): `pack`/`unpack`/`read_file` for file/blob
+[`src/csf/__init__.py`](../../src/csf/__init__.py): `pack`/`unpack`/`read_file` for file/blob
 archives and `compress`/`decompress` for byte strings, backed by the engine
-[`csf_pack.py`](../src/csf/csf_pack.py).
+[`csf_pack.py`](../../src/csf/csf_pack.py).
 
 - The duplicate/legacy **writers** are **deleted** so they cannot be called by mistake.
 - Existing on-disk archives remain openable **read-only** via
-  [`src/csf/legacy.py`](../src/csf/legacy.py).
+  [`src/csf/legacy.py`](../../src/csf/legacy.py).
 - The v07 lattice primitives (Tesseract "storage face") and the Status-Cube container
-  ([`status_cube.py`](../src/csf/status_cube.py)) are retained as kept components.
+  ([`status_cube.py`](../../src/csf/status_cube.py)) are retained as kept components.
 - **No second CSF format may be re-introduced.** New needs extend the one module.
 
 ## Options Considered
@@ -65,7 +65,7 @@ while removing the ways to create new divergence.
 - **Negative / trade-offs:** docstrings/spec must not over-promise the codec — see the known
   divergence below.
 - **Follow-ups:** [ARCHITECTURE.md §9.3](../ARCHITECTURE.md#9-known-divergences--debt) — the
-  public API advertises `zstd-19+LDM` ([`__init__.py:12`](../src/csf/__init__.py)) but active
+  public API advertises `zstd-19+LDM` ([`__init__.py:12`](../../src/csf/__init__.py)) but active
   paths have bottlenecked on zlib / low-level zstd; verify the real codec before quoting ratios.
   This is a perf-debt follow-up, not a reason to add a second format.
 
@@ -77,7 +77,7 @@ See Options. "Do nothing" (keep all writers) was the status quo that caused the 
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| One public API at package root | [`src/csf/__init__.py:12-18`](../src/csf/__init__.py) | High | code |
-| Legacy writers deleted, read-only via legacy.py | [`__init__.py:27`](../src/csf/__init__.py), [`legacy.py`](../src/csf/legacy.py) | High | code |
-| v07 lattice + Status-Cube kept | [`status_cube.py`](../src/csf/status_cube.py); [CLAUDE.md](../CLAUDE.md) CSF section | High | code + doc |
-| Codec claim vs reality is open debt | [`__init__.py:12`](../src/csf/__init__.py) vs ARCHITECTURE.md §9 | Medium | doc + prior measurement |
+| One public API at package root | [`src/csf/__init__.py:12-18`](../../src/csf/__init__.py) | High | code |
+| Legacy writers deleted, read-only via legacy.py | [`__init__.py:27`](../../src/csf/__init__.py), [`legacy.py`](../../src/csf/legacy.py) | High | code |
+| v07 lattice + Status-Cube kept | [`status_cube.py`](../../src/csf/status_cube.py); [CLAUDE.md](../../CLAUDE.md) CSF section | High | code + doc |
+| Codec claim vs reality is open debt | [`__init__.py:12`](../../src/csf/__init__.py) vs ARCHITECTURE.md §9 | Medium | doc + prior measurement |
