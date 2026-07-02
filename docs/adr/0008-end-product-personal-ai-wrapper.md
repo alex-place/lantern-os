@@ -32,7 +32,7 @@ The practical consequence of the missing definition: when asked "can it help a u
 information, fill out a job application, or make a resume?", the honest answer today is *no* —
 the only model-callable tool surface is the chat tool-loop's **7 repo-coding tools** (Read, LS,
 Glob, Grep, Bash, PowerShell, Write, Edit), all **sandboxed to the repo**
-([`tool-runner.js:33-136`](../apps/lantern-garage/lib/tool-runner.js)). The trained Ouro adapter
+([`tool-runner.js:33-136`](../../apps/lantern-garage/lib/tool-runner.js)). The trained Ouro adapter
 likewise clones *coding-session* behavior. Without a decided product scope, every such request
 gets reframed as "a different product," and capability never accretes toward a coherent whole.
 
@@ -52,17 +52,17 @@ so that broadening scope does **not** become sprawl (which ADR-0002 forbids).
 
 2. **Capabilities are Tools + Skills, not subsystems.** Every new user-facing ability is added as a
    **Tool** (a `name + input + output + success` capability — the core Tool object,
-   [`objects.py:95`](../src/convergence/objects.py)) registered in the canonical registry
-   ([`tool-runner.js`](../apps/lantern-garage/lib/tool-runner.js) /
-   [`tool_registry.py`](../src/convergence/tool_registry.py)), optionally orchestrated by a **Skill**
+   [`objects.py:95`](../../src/convergence/objects.py)) registered in the canonical registry
+   ([`tool-runner.js`](../../apps/lantern-garage/lib/tool-runner.js) /
+   [`tool_registry.py`](../../src/convergence/tool_registry.py)), optionally orchestrated by a **Skill**
    (a workflow over tools). They run in the loop's **Act** stage and are grounded in **Verify**.
    This keeps ADR-0002 intact: a resume builder is *Act-stage extension*, never a top-level system.
 
 3. **Model-agnostic capability.** Tools/Skills are independent of which model calls them (ADR-0005):
    the served local model (Ouro) handles cheap / private / offline / narrow calls; cloud models
    handle hard multi-step reasoning. The same `<tool_call>` protocol drives both
-   ([`tool-runner.js:150` preamble](../apps/lantern-garage/lib/tool-runner.js);
-   [`stream-chat.js:1579-1634` local tool loop](../apps/lantern-garage/lib/stream-chat.js)).
+   ([`tool-runner.js:150` preamble](../../apps/lantern-garage/lib/tool-runner.js);
+   [`stream-chat.js:1579-1634` local tool loop](../../apps/lantern-garage/lib/stream-chat.js)).
 
 4. **Two scopes of filesystem access.** The repo sandbox (`_safe()` rejecting paths outside the
    repo) is correct for *coding* tools but blocks *user* tools. A capability that produces a user
@@ -128,7 +128,7 @@ every user-capability request a scope argument instead of a build task.
 | No existing ADR defines the end-product/user-capability scope | [docs/adr/](.) ADRs 0001–0007 are all infrastructure | High | repo |
 | Briefing frames product as "reasoning and coding" | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md) | High | project doc |
 | Codemap/architecture already span chat, trading, media, orchestration | [CODEMAP.md §1](../CODEMAP.md), [ARCHITECTURE.md §4/§8](../ARCHITECTURE.md) | High | project docs |
-| Only model-callable tools today are 7 repo-coding tools, repo-sandboxed | [`tool-runner.js:33-136`](../apps/lantern-garage/lib/tool-runner.js) | High | code |
-| Local model gets a tool-exec loop when `CHAT_TOOL_EXEC=1` | [`stream-chat.js:1579-1634`](../apps/lantern-garage/lib/stream-chat.js) | High | code |
-| Tool is a core object; capabilities belong in Act | [`objects.py:95`](../src/convergence/objects.py), [ARCHITECTURE.md §3](../ARCHITECTURE.md) | High | code/doc |
-| Only 4 of 17 skills implemented | [ARCHITECTURE.md §9.2](../ARCHITECTURE.md), [CLAUDE.md](../CLAUDE.md) | High | project docs |
+| Only model-callable tools today are 7 repo-coding tools, repo-sandboxed | [`tool-runner.js:33-136`](../../apps/lantern-garage/lib/tool-runner.js) | High | code |
+| Local model gets a tool-exec loop when `CHAT_TOOL_EXEC=1` | [`stream-chat.js:1579-1634`](../../apps/lantern-garage/lib/stream-chat.js) | High | code |
+| Tool is a core object; capabilities belong in Act | [`objects.py:95`](../../src/convergence/objects.py), [ARCHITECTURE.md §3](../ARCHITECTURE.md) | High | code/doc |
+| Only 4 of 17 skills implemented | [ARCHITECTURE.md §9.2](../ARCHITECTURE.md), [CLAUDE.md](../../CLAUDE.md) | High | project docs |
