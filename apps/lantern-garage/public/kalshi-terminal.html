@@ -265,6 +265,108 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .actions{gap:12px}
   .btn-pass,.btn-take{padding:12px 30px;min-width:120px;font-size:16px}
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CRT SKIN — phosphor-green fallout-radio console. The deck is its OWN device,
+   so within .kx-console we remap the design tokens to a phosphor/amber palette
+   (the whole deck goes CRT without touching the shared nav/footer) and add the
+   curved-glass + scanline treatment. Simplified card: question · the call · one
+   Σ₀ line · evidence. Noisy rows (yes/no grid, trace chips, badges) are dropped.
+   ══════════════════════════════════════════════════════════════════════════ */
+.kx-console{
+  --bg:#06140d; --surface:#0a1f14; --surface2:#0c2318; --border:#17402a;
+  --text:#c9ffe1; --muted:#4fae7d; --green:#2bff88; --danger:#ff7a3c;
+  --gold:#ffb53b; --accent:#2bff88;
+  font-family:ui-monospace,"Cascadia Mono","Courier New",monospace;
+  -webkit-font-smoothing:none;
+  background:linear-gradient(180deg,#0d1a12,#07120c);
+  border:2px solid #15301f;border-radius:16px;
+  box-shadow:0 0 0 2px #050a07,0 22px 48px rgba(0,0,0,.6),inset 0 1px 0 rgba(80,255,160,.08);
+}
+.kx-console::before{background:
+  radial-gradient(circle at 13px 13px,#0a2417 0 2px,transparent 3px),
+  radial-gradient(circle at calc(100% - 13px) 13px,#0a2417 0 2px,transparent 3px),
+  radial-gradient(circle at 13px calc(100% - 13px),#0a2417 0 2px,transparent 3px),
+  radial-gradient(circle at calc(100% - 13px) calc(100% - 13px),#0a2417 0 2px,transparent 3px)}
+/* curved glass */
+.kx-console .deck{
+  background:radial-gradient(120% 100% at 50% 0%,#0a2417 0%,#06140d 72%);
+  border:1px solid #143a26;border-radius:14px/22px;
+  box-shadow:inset 0 0 60px rgba(0,0,0,.5),inset 0 0 14px rgba(43,255,136,.05),0 0 0 1px rgba(0,0,0,.5)}
+.kx-console .deck::before{opacity:.6;mix-blend-mode:normal;
+  background:repeating-linear-gradient(to bottom,rgba(43,255,136,.05) 0 1px,transparent 1px 3px)}
+.kx-console .deck::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(133deg,rgba(190,255,220,.06) 0%,transparent 42%)}
+/* card = phosphor screen element (OPAQUE so the stacked peek cards behind it
+   don't ghost through) */
+.kx-console .card{
+  background:linear-gradient(180deg,#0b2016,#07130d);
+  border:1px solid #1c4a30;border-radius:8px;color:var(--text);
+  box-shadow:inset 0 0 26px rgba(0,0,0,.35)}
+.kx-console .card.front{border-color:#2bff8855;
+  box-shadow:inset 0 0 26px rgba(0,0,0,.35),0 0 20px -6px rgba(43,255,136,.4)}
+.kx-console .card.peek{filter:brightness(.5)}
+.kx-console .card.peek2{filter:brightness(.32)}
+/* SIMPLIFY: drop the noisy secondary rows */
+.kx-console .sides,.kx-console .engine-trace,.kx-console .state-badge,.kx-console .card-klass{display:none}
+/* labels + question */
+.kx-console .card-top{color:#3c8a63;letter-spacing:.1em;text-transform:uppercase}
+.kx-console .countdown{color:var(--gold)}
+.kx-console .gen-age{color:var(--green);border-color:#1c4a30;background:rgba(43,255,136,.06)}
+.kx-console .card-q{color:var(--text);text-shadow:0 0 9px rgba(43,255,136,.35);font-weight:700}
+/* the CALL */
+.kx-console .fav{border:1px solid #1c4a30;background:rgba(43,255,136,.03);border-radius:7px}
+.kx-console .fav.yes{border-color:#2bff8844;background:rgba(43,255,136,.06)}
+.kx-console .fav.no{border-color:#ffb53b44;background:rgba(255,181,59,.05)}
+.kx-console .fav-tag{color:#3c8a63;letter-spacing:.2em}
+.kx-console .fav-act{font-size:21px;text-shadow:0 0 12px rgba(43,255,136,.5)}
+.kx-console .fav.yes .fav-act{color:var(--green)}
+.kx-console .fav.no .fav-act{color:var(--gold);text-shadow:0 0 12px rgba(255,181,59,.5)}
+.kx-console .fav-px{color:var(--muted)}
+.kx-console .conv-bar{background:#0c1f14;height:3px}
+.kx-console .conv-fill{box-shadow:0 0 6px currentColor}
+.kx-console .reason{color:var(--muted);font-family:inherit}
+/* simplified Σ₀ readout line */
+.s0{margin-top:7px;padding:5px 8px;border:1px solid #1c4a30;border-radius:6px;
+  background:rgba(43,255,136,.04);font-size:10px;letter-spacing:.02em;color:var(--muted);
+  font-family:ui-monospace,"Cascadia Mono",monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.s0 .s0-end{color:#2bff88;font-weight:700}
+.s0 .s0-end.NO{color:#ffb53b}
+.s0 .s0-sep{color:#1c4a30}
+.s0 .s0-pos{color:#2bff88}.s0 .s0-neg{color:#ff7a3c}
+.s0 .s0-v{margin-left:auto;font-weight:700;color:#2bff88;letter-spacing:.1em}
+.s0 .s0-v.SKIP_NEG_EV{color:#ff7a3c}.s0 .s0-v.LOW_CONFIDENCE{color:#ffb53b}
+/* grounded evidence */
+.kx-console .grounded-box{font-family:inherit}
+.kx-console .grounded-box.ok{background:rgba(43,255,136,.05);border-color:#1c4a30}
+.kx-console .grounded-box .gb-head{color:var(--green)}
+.kx-console .grounded-box .gb-rat,.kx-console .grounded-box .gb-foot{color:var(--muted)}
+.kx-console .grounded-box a{color:var(--gold)}
+/* meta strip */
+.kx-console .card-meta{color:#3c8a63;border-top-color:#143a26}
+.kx-console .card-meta .meta-badge{border-color:#1c4a30;background:rgba(43,255,136,.05);color:var(--green)}
+/* mode tabs */
+.kx-console .mode-btn{background:#0a1f14;color:var(--muted);border-color:#1c4a30;border-radius:6px;letter-spacing:.06em}
+.kx-console .mode-btn:hover{color:var(--green)}
+.kx-console .mode-btn.active{background:#0f2a1b;color:var(--green);border-color:#2bff8855;box-shadow:inset 0 0 12px rgba(43,255,136,.16)}
+/* transport buttons */
+.kx-console .btn-pass{border:2px solid #8a5a12;background:#160d02;color:var(--gold)}
+.kx-console .btn-pass:hover{background:#1e1204}
+.kx-console .btn-take{border:2px solid #2bff8855;background:#0f2a1b;color:var(--green);text-shadow:0 0 8px rgba(43,255,136,.5);box-shadow:inset 0 0 12px rgba(43,255,136,.12)}
+.kx-console .btn-take:hover{filter:brightness(1.15)}
+.kx-console .kbd-hint,.kx-console .progress{color:#3c8a63}
+/* stamps */
+.kx-console .stamp.take{color:var(--green);border-color:var(--green)}
+.kx-console .stamp.pass{color:var(--gold);border-color:var(--gold)}
+/* account HUD */
+.kx-console .acct{border-top-color:#143a26}
+.kx-console .acct-bar,.kx-console .acct-summary{color:var(--muted)}
+.kx-console .acct-summary b{color:var(--text)}
+.kx-console .acct-env{color:var(--gold)}
+@media (prefers-reduced-motion:no-preference){
+  .kx-console .card.front{animation:crtwarm .5s ease-out}
+  @keyframes crtwarm{from{filter:brightness(1.4) saturate(.6)}to{filter:none}}
+}
 </style>
 </head>
 <body>
@@ -299,10 +401,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- Device console — polished frame (bezel + recessed screen + tactile controls) -->
 <div class="kx-console">
 <!-- Deck mode — on-screen segmented switch -->
-<div class="mode-bar" role="tablist" aria-label="Deck mode">
-  <button class="mode-btn" id="mLive" role="tab" aria-selected="true" onclick="setMode('live')" title="Live positions + guarded orders (paper-safe while trading is paused)">● Live</button>
-  <button class="mode-btn" id="mPaper" role="tab" aria-selected="false" onclick="setMode('paper')" title="Live candidate markets, paper-only (no real orders)">📝 Paper</button>
-  <button class="mode-btn" id="mGrounded" role="tab" aria-selected="false" onclick="setMode('grounded')" title="Σ₀ calibrated weather-edge — live NWS-grounded fair value vs market, paper-only">🔎 Grounded</button>
+<div class="mode-bar" role="tablist" aria-label="Trading mode">
+  <button class="mode-btn" id="mLive" role="tab" aria-selected="true" onclick="switchMode('live')" title="LIVE — real 1-contract orders on the Σ₀ weather-edge (scope-gated)">● LIVE</button>
+  <button class="mode-btn" id="mPaper" role="tab" aria-selected="false" onclick="switchMode('paper')" title="PAPER — practice candidates, no real orders">📝 PAPER</button>
 </div>
 
 <!-- The two-button game -->
@@ -321,14 +422,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <p class="kbd-hint" aria-hidden="true">← Pass&nbsp;&nbsp;·&nbsp;&nbsp;Take →</p>
 </main>
 
-<!-- Account · profile · positions — collapsed to a bar by default -->
-<section class="acct" aria-label="Account, profile and positions">
-  <button class="acct-bar" id="acctToggle" type="button" aria-expanded="false" aria-controls="acctPanel" onclick="toggleAcct()">
-    <span class="acct-summary" id="acctSummary"><span class="dot" id="acctDot"></span>Loading account…</span>
-    <span class="acct-caret" id="acctCaret" aria-hidden="true">▴</span>
-  </button>
-  <div class="acct-panel" id="acctPanel" hidden></div>
-</section>
 </div><!-- /kx-console -->
 
 <div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
@@ -339,36 +432,44 @@ const API='/api/trading/kalshi';
 const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
 let lastSyncMs=0, lastDetCount=null;
-// Deck MODE: 'live' (positions + guarded orders, paper-safe while paused),
-// 'paper' (live candidates, paper-only), 'grounded' (Σ₀ calibrated weather-edge).
-// Default to live; when live is paused we auto-fall back to paper (see syncDeck).
-let MODE='live', lastGroundStats=null, didAutoFallback=false;
+// Trading MODE: 'live' (real 1-contract orders on the Σ₀ weather-edge, scope-gated)
+// or 'paper' (practice candidates, no real orders). Each mode has its OWN deck.
+// Switching forces a full reload so no state leaks across modes/decks.
+let MODE='live', lastGroundStats=null;
 
+// switchMode — the mode buttons call this: persist the choice and hard-reload.
+function switchMode(m){
+  if(m===MODE) return;
+  try{ localStorage.setItem('kx-mode', m); }catch(_){}
+  location.reload();
+}
+
+// setMode — apply the chosen mode in-page (called once at init).
 function setMode(m){
-  if(MODE===m && deck.length) return;
   MODE=m; deck=[]; idx=0; liveMap={}; prefetching=false;
-  for(const [id,mode] of [['mGrounded','grounded'],['mPaper','paper'],['mLive','live']]){
+  for(const [id,mode] of [['mPaper','paper'],['mLive','live']]){
     const b=document.getElementById(id);
     if(b){ b.classList.toggle('active',mode===m); b.setAttribute('aria-selected',mode===m?'true':'false'); }
   }
   const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
-  document.getElementById('end').style.display='none';
+  const end=document.getElementById('end'); if(end) end.style.display='none';
   loadCouncil();
-  if(MODE==='live') syncDeck(); else loadModeDeck();
+  loadModeDeck();
 }
 
 // Load a paper/grounded deck slice and append unique cards (continuous deck).
 async function loadModeDeck(){
   let d;
-  if(MODE==='grounded'){
+  if(MODE==='live'){
+    // LIVE deck = the Σ₀ weather-edge winning cards (real, scope-gated execution).
     d=await j('/grounded-deck?limit=14');
     if(d) lastGroundStats=d;
-  } else { // paper
+  } else { // paper — practice candidates
     d=await j('/paper-deck?limit=20');
   }
   const cards=(d&&d.cards)||[];
   stampCards(cards, d&&d.generatedAt);
-  if(MODE==='grounded'){
+  if(MODE==='live'){
     // Grounded cards mutate as background research completes (pending → done), so
     // UPDATE in place (preserving order + the card on screen) and append new tickers.
     const pos=new Map(deck.map((c,i)=>[c.ticker,i]));
@@ -403,8 +504,10 @@ function showModeEnd(d){
   const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
   if(!end) return;
   end.style.display='flex';
-  const note = (d&&d.note)||'No live candidate markets right now (Kalshi closed or no creds). Try Paper or Grounded.';
-  end.innerHTML=`<div style="color:var(--gold);font-weight:700">${MODE==='grounded'?'🔎 Grounded':'📝 Paper'} — ${idx} swiped</div>`
+  const note = (d&&d.note)||(MODE==='live'
+    ? 'No band-robust winning edge live right now — standing down is the correct output.'
+    : 'No practice candidates right now (Kalshi closed or no creds).');
+  end.innerHTML=`<div style="color:var(--gold);font-weight:700">${MODE==='live'?'● LIVE':'📝 PAPER'} — ${idx} swiped</div>`
     +`<div style="font-size:12px;color:var(--muted);max-width:340px">${note}</div>`
     +`<button class="btn-ghost" onclick="setMode('${MODE}')">↻ Reload deck</button>`;
 }
@@ -531,80 +634,9 @@ function toggleAcct(){
   if(acctOpen){ if(!acctState.posLoaded) loadPositions(); renderAccount(); }
 }
 
-// ── syncDeck: initial load + live merge every SYNC_MS ────────────────────────
-// Show all open positions (exits first, then holds) + suggestion fill
-async function syncDeck(){
-  // Paper/grounded modes are paper-only and don't use the live positions deck.
-  // Paper + grounded re-poll (grounded cards mutate as background research completes).
-  if(MODE!=='live'){ if(MODE==='paper'||MODE==='grounded') await loadModeDeck(); return; }
-  const d=await j('/positions-deck');
-  // GLOBAL TRADING-PAUSE: server cleared all cards. Force-empty the deck (the
-  // in-place prune never removes the front card deck[idx]) and show why.
-  if(d.paused){
-    // Default is Live, but a paused live board is a dead swipe — auto-fall back to
-    // Paper ONCE on first load so the deck shows actionable cards ("live then paper").
-    // A manual return to Live afterwards still shows the honest pause screen.
-    if(!didAutoFallback && idx===0){ didAutoFallback=true; setMode('paper'); return; }
-    deck=[]; idx=0; liveMap={};
-    const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
-    const end=document.getElementById('end');
-    if(end){
-      end.style.display='flex';
-      end.innerHTML='<div style="color:var(--gold);font-weight:700">⏸ TRADING PAUSED</div>'
-        +'<div style="font-size:12px;color:var(--muted);max-width:320px">'
-        +(d.note||'All cards cleared until a strategy is proven net-profitable after fees.')+'</div>'
-        +'<button class="btn-ghost" onclick="syncDeck()">↻ Re-check</button>';
-    }
-    const prog=document.getElementById('progress'); if(prog) prog.textContent='';
-    markFresh(0);
-    return;
-  }
-  if(!d.cards) return;
-  stampCards(d.cards, d.generatedAt);   // re-stamped each 5s sync → positions stay live
-  // Drop positions that expired more than 5 minutes ago — they can't be acted on
-  const fresh=d.cards.filter(c=>c.minsToClose==null||c.minsToClose>-5);
-  liveMap={}; for(const x of fresh) liveMap[x.ticker]=x;
-  markFresh(d.count);
-
-  if(deck.length===0){
-    deck=fresh; idx=0;
-    document.getElementById('end').style.display='none';
-    // No open positions → load the Σ₀ decisive deck instead of dead-ending empty
-    if(deck.length===0){ await maybePrefetch(); } else { render(); }
-    return;
-  }
-
-  const wasAtEnd=idx>=deck.length;
-  const acted=new Set(deck.slice(0,idx).map(c=>c.ticker));
-  const pending=new Set(deck.slice(idx).map(c=>c.ticker));
-  const freshSet=new Set(fresh.map(c=>c.ticker));
-
-  // 1. update prices on pending cards
-  for(let i=idx;i<deck.length;i++){
-    if(liveMap[deck[i].ticker]) deck[i]=Object.assign({},deck[i],liveMap[deck[i].ticker]);
-  }
-  // 2. inject brand-new tickers right after current position
-  const newCards=fresh.filter(c=>!acted.has(c.ticker)&&!pending.has(c.ticker));
-  if(newCards.length) deck.splice(Math.min(idx+1,deck.length),0,...newCards);
-  // 3. prune expired positions (not in fresh), and expired/weak suggestion cards
-  for(let i=deck.length-1;i>idx;i--){
-    const isPosCard=deck[i].kind==='position'||deck[i].kind==='exit';
-    if(isPosCard&&!freshSet.has(deck[i].ticker)){ deck.splice(i,1); continue; }
-    const isSugg=!isPosCard;
-    if(isSugg&&!isSuggestionTradeable(deck[i])) deck.splice(i,1);
-  }
-  // 4. auto-resurface: were at end, new cards have arrived
-  if(wasAtEnd&&idx<deck.length){
-    document.getElementById('end').style.display='none';
-    render(); return;
-  }
-  if(idx>=deck.length){ maybePrefetch(); return; }
-  // 5. patch front in place (no full re-render — preserves swipe state)
-  if(!dragging) patchFront(deck[idx]);
-  const rem=deck.length-idx;
-  document.getElementById('progress').textContent=rem>0?`Card ${deck.length-rem+1} of ${deck.length} · soonest first`:'';
-  maybePrefetch();
-}
+// ── syncDeck: re-poll the current mode's deck (both LIVE and PAPER load their own
+// deck via loadModeDeck). Kept as the interval/refresh entrypoint.
+async function syncDeck(){ return loadModeDeck(); }
 
 function markFresh(count){
   lastSyncMs=Date.now(); lastDetCount=count;
@@ -641,75 +673,30 @@ async function maybePrefetch(){
   if(remaining>=PREFETCH_AT) return;
   prefetching=true;
   try {
-    // Paper/grounded modes refill from their own endpoint (fresh
-    // live candidates). The prefetching flag guards re-entrancy via render().
-    if(MODE!=='live'){ await loadModeDeck(); return; }
-    const pendingTickers=new Set(deck.slice(idx).map(c=>c.ticker));
-    const [detR, ieR, cryR]=await Promise.all([
-      j('/decisive-deck?risk=0.5').catch(()=>({})),
-      j('/impossibility-deck').catch(()=>({})),
-      j('/crypto-intraday').catch(()=>({})),
-    ]);
-    const det=stampCards(detR.cards, detR.generatedAt);
-    const ie =stampCards(ieR.cards,  ieR.generatedAt);
-    const cry=stampCards(cryR.cards, cryR.generatedAt);
-    // only admit cards generated within the last minute
-    const ok=c=>!pendingTickers.has(c.ticker)&&isFresh(c)&&isSuggestionTradeable(c);
-    const detCards=det.filter(ok);
-    const ieDet=ie.filter(c=>c.stateLabel==='DETERMINED'&&ok(c));
-    const ieConf=ie.filter(c=>c.stateLabel==='CONFIDENT'&&ok(c));
-    const fill=cry.filter(ok);
-    // Σ₀-ranked decisive cards first, then IE/crypto fill; de-dup by ticker; sort by Σ₀ score
-    const seen=new Set(); const merged=[];
-    for(const c of [...detCards,...ieDet,...ieConf,...fill]){ if(seen.has(c.ticker))continue; seen.add(c.ticker); merged.push(c); }
-    merged.sort((a,b)=>(b.sigma0?.score||0)-(a.sigma0?.score||0));
-    const toAdd=merged.slice(0,DECK_TARGET-remaining);
-    if(!toAdd.length) return;
-    deck.push(...toAdd);
-    // Keep the not-yet-swiped portion Σ₀-ranked so the best risk-adjusted swipe
-    // leads — but NEVER reorder the card currently on screen (deck[idx]). Sorting
-    // from idx+1 keeps the visible front stable, which is what was causing the
-    // design to visibly switch/flicker on each prefetch cycle.
-    if(!dragging){
-      const head=deck.slice(0,idx+1);
-      const tail=deck.slice(idx+1).sort((a,b)=>(b.sigma0?.score||0)-(a.sigma0?.score||0));
-      deck=head.concat(tail);
-    }
-    const rem=deck.length-idx;
-    document.getElementById('progress').textContent=rem>0?`Card ${deck.length-rem+1} of ${deck.length} · soonest first`:'';
-    // Only do a full render when there is no card on screen yet (came from the end
-    // screen / empty deck). Otherwise refresh the front in place — no stage rebuild,
-    // no flicker. Peek layers refresh on the next genuine card change (a swipe).
-    if(!dragging&&idx<deck.length){
-      if(!document.getElementById('front')) render(); else patchFront(deck[idx]);
-    }
+    // Both modes refill from their own deck endpoint (loadModeDeck).
+    await loadModeDeck();
   } catch(_){}
   finally{ prefetching=false; }
 }
 
 // Σ₀ end-state badge — predicted attractor, win/loss odds, capturable delta, EV,
 // contraction confidence. Renders only on cards the Σ₀ engine scored.
+// Simplified single-line Σ₀ readout — the CRT skin styles `.s0`. (The old dense
+// two-row number grid was the main source of card clutter.)
 function sigma0Badge(card){
   const s=card.sigma0; if(!s||s.score==null) return '';
   const end=s.end_state||'—';
-  const endCol=end==='YES'?'var(--green)':end==='NO'?'var(--danger)':'var(--muted)';
-  const vCol=s.verdict==='STRONG'?'var(--green)':s.verdict==='SKIP_NEG_EV'?'var(--danger)':'var(--gold)';
-  const pWin=s.p_win!=null?Math.round(s.p_win*100)+'%':'—';
-  const loss=s.loss_odds!=null?Math.round(s.loss_odds*100)+'%':'—';
+  const win=s.p_win!=null?Math.round(s.p_win*100)+'%':'—';
   const conf=s.confidence!=null?Math.round(s.confidence*100)+'%':'—';
-  const ev=s.ev_cents, reward=s.reward_cents;
-  const evCol=ev>0?'var(--green)':'var(--danger)';
-  return `<div style="margin-top:6px;padding:6px 8px;border:1px solid #2c3446;border-radius:7px;background:#11151d;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;line-height:1.5">
-    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;margin-bottom:3px">
-      <span style="color:var(--muted)">Σ₀ → <b style="color:${endCol}">${end}</b> &nbsp;win <b style="color:#e8edf5">${pWin}</b> &nbsp;loss <b style="color:var(--danger)">${loss}</b></span>
-      <span style="color:${vCol};font-weight:700">${s.verdict||''}</span>
-    </div>
-    <div style="display:flex;gap:10px;color:var(--muted)">
-      <span>Δ <b style="color:var(--green)">+${reward!=null?reward+'¢':'—'}</b></span>
-      <span>EV <b style="color:${evCol}">${ev!=null?(ev>0?'+':'')+ev+'¢':'—'}</b></span>
-      <span>conf <b style="color:#e8edf5">${conf}</b></span>
-    </div>
-  </div>`;
+  const ev=s.ev_cents;
+  const evStr=ev==null?'—':(ev>0?'+':'')+ev+'¢';
+  return `<div class="s0">`
+    +`<span class="s0-end ${end}">Σ₀ ${end}</span>`
+    +`<span class="s0-sep">·</span>win ${win}`
+    +`<span class="s0-sep">·</span>EV <b class="${ev>0?'s0-pos':'s0-neg'}">${evStr}</b>`
+    +`<span class="s0-sep">·</span>conf ${conf}`
+    +(s.verdict?`<span class="s0-v ${s.verdict}">${s.verdict}</span>`:'')
+    +`</div>`;
 }
 
 // Grounded-card extra: research status, rationale, evidence/sources, Re-ground.
@@ -1147,93 +1134,37 @@ async function act(dir,fromSwipe){
 
   const card=deck[idx];
 
-  // ── GROUNDED mode: take a Σ₀ weather-edge pick ──────────────────────────────
-  // When live trading is enabled AND this is a deterministic weather-edge card, place
-  // a REAL 1-contract order (user-in-the-loop swipe) — the server's scope gate caps it
-  // and refuses any non-weather-edge source. Otherwise open a paper position.
-  if(MODE==='grounded'){
-    if(card.grounding_status!=='done'){
-      blockTake(card.grounding_status==='knowledge-only'?'No live sources — Re-ground for live data before taking':'Still researching — wait for grounding');
-      return;
-    }
+  // ── LIVE mode: place a REAL 1-contract order on the Σ₀ weather-edge card.
+  // The server's scope gate caps size and refuses any non-weather-edge source, so an
+  // out-of-scope or gated card comes back as a dry-run rather than a live fill.
+  if(MODE==='live'){
+    if(card.grounding_status && card.grounding_status!=='done'){ blockTake('Still loading — wait for the live edge'); return; }
     if(card.favAsk==null){ blockTake('No live ask — cannot trade'); return; }
-    const goLive = !!(conn && conn.canTradeLive) && /weather-edge/i.test(card.model||'');
     busy=true;
     try{
-      if(goLive){
-        const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
-          source:'kalshi-weather-edge', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
-        const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
-        showResult(res,card);   // live / dry-run toast
-      } else {
-        const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
-          source:'kalshi-grounded', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
-        const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
-        showGroundedResult(res,card);
-      }
+      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
+        source:'kalshi-weather-edge', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
+      const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+      showResult(res,card);            // live / dry-run toast
       idx++; render();
+      if(res.mode==='live') loadBalance();
     }catch(e){ showResult({error:e.message},card); idx++; }
     finally{ busy=false; }
     return;
   }
+
   // ── PAPER mode: open a paper position (no real order) ───────────────────────
   if(MODE==='paper'){
     if(card.favAsk==null){ blockTake('No live ask — cannot paper-trade'); return; }
     busy=true;
     try{
-      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk};
+      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk, source:'kalshi-paper'};
       const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
       showPaperResult(res,card);
       idx++; render();
     }catch(e){ showResult({error:e.message},card); idx++; }
     finally{ busy=false; }
     return;
-  }
-
-  // ── LIVE mode: original guarded real/dry-run order path ─────────────────────
-  // ── Guard: refuse bad takes before anything fires ─────────────────────────
-  const isSell=card.kind==='exit'||card.kind==='position';
-  if(!isSell){
-    // Suggestion / signal / convergence card — enforce quality bar
-    if(card.minsToClose!=null&&card.minsToClose<=0){ blockTake('Market expired — time window closed'); return; }
-    if(card.marketFound===false){ blockTake('Market closed — no live data'); return; }
-    if(card.favAsk==null){ blockTake('No live ask price — cannot trade'); return; }
-    if(card.kind==='convergence'){
-      if(card.favAsk>90){ blockTake(`Margin too thin (${100-(card.favAsk||0)}¢ profit) — need 10¢ min`); return; }
-      if(card.favAsk<80){ blockTake(`Not converged enough (${card.favAsk}¢) — need 80¢ min`); return; }
-    } else {
-      if(card.favAsk<4||card.favAsk>96){ blockTake(`Market converged (${card.favAsk}¢) — no edge`); return; }
-      if((card.conviction||0)<40){ blockTake(`Edge too thin — ${card.conviction||0}% conviction`); return; }
-    }
-    // Cash sufficiency check for buy orders
-    const orderCostCents=card.favAsk||0;
-    const balData=await j('/balance');
-    const balanceCents=balData.error?0:(balData.balance||balData.balance_cents||0);
-    if(balanceCents<orderCostCents){
-      blockTake(`Insufficient balance — need $${(orderCostCents/100).toFixed(2)}, have $${(balanceCents/100).toFixed(2)}`);
-      return;
-    }
-  } else {
-    // Position / exit card — only block if truly stale with no price
-    if(card.marketFound===false&&card.favAsk==null){ blockTake('Market settled — check your portfolio'); return; }
-  }
-
-  busy=true;
-  try {
-    const side=card.favSide;
-    const action=isSell?'sell':'buy';
-    const qty=isSell?(card.qty||1):1;
-    const o={ticker:card.ticker,side,action,type:'limit',count:qty,limitCents:card.favAsk||50};
-    const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
-    showResult(res,card);
-    // paper recording removed — real live data only
-    idx++; render();
-    if(res.mode==='live') loadBalance();
-  } catch(e) {
-    showResult({error:e.message},deck[idx]||{});
-    idx++;
-  } finally {
-    busy=false;
   }
 }
 
@@ -1362,9 +1293,14 @@ async function pollLiveStatus(){
 // Polling interval references for visibility-based pausing
 let syncInterval, acctInterval;
 
-function init(){
+async function init(){
   // Theme is handled by the shared bootstrap + /js/theme-toggle.js (#theme-toggle).
-  loadAccount(); setMode('live'); loadCouncil();
+  // Choose the mode: a stored choice wins; otherwise default to LIVE when an account
+  // is connected (credentials present / live-tradeable), else PAPER.
+  const cn = await j('/connection'); conn = cn || {};
+  let mode; try{ mode = localStorage.getItem('kx-mode'); }catch(_){}
+  if(mode!=='live' && mode!=='paper') mode = (conn.canTradeLive || conn.credentials) ? 'live' : 'paper';
+  loadAccount(); setMode(mode); loadCouncil();
   syncInterval=setInterval(syncDeck,SYNC_MS);
   acctInterval=setInterval(()=>{loadAccount();loadCouncil();},30000);
 
@@ -1400,6 +1336,8 @@ document.addEventListener('DOMContentLoaded',init);
   </div>
 </footer>
 
+<script src="/vendor/html2canvas/html2canvas.min.js" defer></script>
+<script src="/js/issue-reporter.js?v=20260628f-autoattach" defer></script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
