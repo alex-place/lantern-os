@@ -51,6 +51,7 @@ async function loadPollinationsImage(imgId, canvasId, sceneKey) {
     const dalleImg = await tryDalleGenerate(sceneKey, fullPrompt);
     if (dalleImg) {
       pollinationsCache[cacheKey] = dalleImg.url;
+      window.__sceneArt = { sceneKey, prompt: fullPrompt, url: dalleImg.url };
       logThreeDoorsEvent('image_load', { sceneKey, source: dalleImg.model || 'dalle', loop: loopCount });
       if (cvs) cvs.style.display = "none";
       if (img) { img.src = dalleImg.url; img.style.display = ""; }
@@ -66,6 +67,7 @@ async function loadPollinationsImage(imgId, canvasId, sceneKey) {
     probe.crossOrigin = "anonymous";
     probe.onload = () => {
       pollinationsCache[cacheKey] = pollinationsUrl;
+      window.__sceneArt = { sceneKey, prompt: fullPrompt, url: pollinationsUrl };
       logThreeDoorsEvent('image_load', { sceneKey, source: 'pollinations', loop: loopCount, seed });
       if (cvs) cvs.style.display = "none";
       if (img) { img.src = pollinationsUrl; img.style.display = ""; }

@@ -52,6 +52,13 @@ const DEFAULT_PROGRESS = {
   glitchesFound: 0,
   sigilLocationsVisited: 0,
   walkedDoors: [], // New property to track walked door IDs
+  // Runtime-generated doors (name -> {description, target, scene, createdAt}).
+  // Created by the grounded narrator; persisted so a door invented for this
+  // player stays real across reloads — consistent shared world, not a one-off.
+  dynamicDoors: {},
+  // What the player has typed into the custom-door input — their authored
+  // desires; the narrator folds these into new doors (theirs outrank ours).
+  customDesires: [],
   loopCompleted: false,
 };
 
@@ -96,6 +103,10 @@ function validateProgress(data) {
   if (!Array.isArray(validated.visited)) validated.visited = [];
   if (!Array.isArray(validated.completedChallenges)) validated.completedChallenges = [];
   if (!Array.isArray(validated.walkedDoors)) validated.walkedDoors = []; // Validate walkedDoors
+  if (!Array.isArray(validated.customDesires)) validated.customDesires = [];
+  if (typeof validated.dynamicDoors !== "object" || validated.dynamicDoors === null || Array.isArray(validated.dynamicDoors)) {
+    validated.dynamicDoors = {};
+  }
   
   // Validate objects (check for null and non-object types)
   if (typeof validated.sceneVisits !== "object" || validated.sceneVisits === null || Array.isArray(validated.sceneVisits)) {
@@ -519,10 +530,32 @@ function normalizeDoorName(name) {
     .trim();
 }
 
+// Register a runtime-generated door in the shared world. Existing doors
+// (already in NEXT_MAP or this scene's static set) are left alone; new doors
+// get persistent metadata so they stay real across reloads.
+function registerDynamicDoor(sceneKey, door) {
+  const norm = normalizeDoorName(door.name);
+  if (!norm) return;
+  if (NEXT_MAP[norm]) return; // an existing door of the shared world
+  if (!playerProgress.dynamicDoors) playerProgress.dynamicDoors = {};
+  const existing = playerProgress.dynamicDoors[norm];
+  playerProgress.dynamicDoors[norm] = {
+    name: door.name,
+    description: door.description || existing?.description || "",
+    target: (door.target && SCENES[door.target]) ? door.target : (existing?.target || ""),
+    scene: sceneKey,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+  };
+  saveProgress();
+}
+
 // Primary destination for a door. Falls back to the next spine beat so every
 // door — including unmapped/custom ones — always advances the journey onward.
 function resolveDoorTarget(doorName, spineIndex) {
   const norm = normalizeDoorName(doorName);
+  // Runtime-created doors resolve first — they carry their own metadata.
+  const dyn = playerProgress.dynamicDoors?.[norm];
+  if (dyn && dyn.target && SCENES[dyn.target]) return dyn.target;
   let target = NEXT_MAP[norm];
   if (!target) {
     const noThe = norm.replace(/^the /, "");
@@ -801,7 +834,7 @@ async function apiNarrate(sceneKey, sceneText) {
     const r = await fetch("/api/dream/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: `Scene: ${sceneKey}. ${sceneText.replace(/\*\*/g,"").replace(/\*/g,"").slice(0, 280)}`, agent: "lantern", provider: "local" }),
+      body: JSON.stringify({ message: `Scene: ${sceneKey}. ${sceneText.replace(/\*\*/g,"").replace(/\*/g,"").slice(0, 280)}`, agent: "keystone", provider: "local" }),
       signal: ctrl.signal,
     });
     if (!r.ok) throw new Error("chat API " + r.status);
@@ -918,6 +951,11 @@ function submitCustomDoor() {
   if (!input || !gameState) return;
   const val = input.value.trim();
   if (!val) return;
+  // Everything the player types is an authored desire — the grounded
+  // narrator folds these into future doors (their inventions outrank ours).
+  if (!playerProgress.customDesires) playerProgress.customDesires = [];
+  playerProgress.customDesires = [...playerProgress.customDesires, val].slice(-8);
+  saveProgress();
   const upper = val.toUpperCase();
   // Door label (A/B/C) or full door name — route to known door
   const knownDoor = gameState.doors?.find(d =>

@@ -64,6 +64,36 @@ function drawScene(canvas, sceneKey) {
   ctx.textAlign = "left";
 }
 
+// ── Door chip rendering (shared by initial render + runtime door swaps) ──
+function doorChipsHTML(doors) {
+  return doors.map(d => `
+    <button class="door-chip" onclick="chooseDoor('${d.label}', '${(d.name || "").replace(/'/g, "\\'")}')">
+      <div class="door-letter">${d.label}</div>
+      <div class="door-info">
+        <div class="door-name">${d.name}</div>
+        <div class="door-desc">${d.description || ""}</div>
+      </div>
+    </button>`).join("");
+}
+
+// Swap a scene message's doors (and the quick-pick bar) for a new set —
+// used when the narrator generates runtime doors. Keeps gameState in sync so
+// engineChoose can resolve the new labels/names.
+function applyDoors(msgEl, doors) {
+  if (!doors || doors.length !== 3) return;
+  const banner = msgEl.querySelector(".doors-banner");
+  if (banner) banner.innerHTML = doorChipsHTML(doors);
+  const picks = document.getElementById("door-quick-picks");
+  if (picks) {
+    picks.innerHTML = doors.map(d => `
+      <button class="door-pick" onclick="chooseDoor('${d.label}','${(d.name || "").replace(/'/g,"\\'")}')">
+        <span class="door-letter">${d.label}</span>
+        <div class="door-pick-name">${d.name}</div>
+      </button>`).join("");
+  }
+  if (gameState) gameState.doors = doors;
+}
+
 // ── Scene message rendering ───────────────────────────────────────
 function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
   removeTyping();
@@ -108,16 +138,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
   const doorHTML = `
       <div class="doors-section">
         <div class="doors-kicker">A, B, or C — choose your door</div>
-        <div class="doors-banner">
-          ${doors.map(d => `
-            <button class="door-chip" onclick="chooseDoor('${d.label}', '${d.name.replace(/'/g, "\\'")}')">
-              <div class="door-letter">${d.label}</div>
-              <div class="door-info">
-                <div class="door-name">${d.name}</div>
-                <div class="door-desc">${d.description}</div>
-              </div>
-            </button>`).join("")}
-        </div>
+        <div class="doors-banner">${doorChipsHTML(doors)}</div>
       </div>`;
 
   // One-line caption naming the moment (the skill's turn contract: the
@@ -190,6 +211,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     imgEl.onload = () => {
       if (cvsEl) cvsEl.style.display = "none";
       imgEl.style.display = "";
+      window.__sceneArt = { sceneKey, prompt: sceneData.image_prompt || SD_PROMPTS[sceneKey] || (scene.text || "").slice(0, 200), url: imageUrl };
       logThreeDoorsEvent("image_load", { sceneKey, source: "curated" });
     };
     imgEl.src = imageUrl;
@@ -218,8 +240,10 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     };
   }
 
-  // Async-refresh scene description with LLM-generated variant
-  if (descEl) refreshSceneText(sceneKey, descEl);
+  // Async-enrich: narration grounded on the painting + play context, and
+  // runtime-generated doors (existing or new-with-metadata). Engine content
+  // renders first and stays if enrichment fails or times out.
+  if (descEl) enrichScene(sceneKey, descEl, el);
 
   // Show choice bar with labelled quick-picks + custom input
   const bar = document.getElementById("choice-bar");
@@ -275,14 +299,106 @@ function updateStageBreadcrumb(stageIndex, loopCount) {
   }).join("");
 }
 
-// ── Async scene text refresh — unique LLM take on each visit ─────
-// Every door has a persistent theme + meta-lesson (SCENES[key].theme/.lesson)
-// that never changes — that's the canon. The actual prose is regenerated on
-// every visit so it's never the same twice, informed by the dreamer's own
-// history (a rough stand-in for "preferences" until there's a real profile).
-// The static scene.text still renders first (instant, no loading flash) and
-// this replaces it once the LLM responds — text as fallback, not truth.
-async function refreshSceneText(sceneKey, textEl) {
+// ── Async scene enrichment — grounded narration + runtime doors ──────
+// The turn's contract (from the /three-doors skill): the painting IS the
+// scene, so the narration must describe what the painting actually shows,
+// grounded on [image + play context], and the three doors must be either
+// existing doors of the shared world or new doors whose metadata (name,
+// description, target) is created at runtime — consistent with canon and
+// with what the player has been asking for. The engine's static text and
+// doors render first (instant, offline-safe); this replaces them when the
+// grounded generation succeeds, and quietly leaves them if it doesn't.
+
+// What the current painting shows — set by the image pipeline, consumed here.
+// { sceneKey, prompt, url } — prompt is the exact text the image was
+// generated from, which is the grounding fallback when vision is unavailable.
+window.__sceneArt = window.__sceneArt || null;
+
+// Ask a vision model what is actually in the painting. Best-effort: returns
+// null on any failure (CORS, provider down, timeout) and the caller falls
+// back to the generation prompt as image context.
+async function describeSceneImage(url) {
+  if (!url) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    const blob = await (await fetch(url, { signal: ctrl.signal })).blob();
+    clearTimeout(t);
+    if (!blob.type.startsWith("image/") || blob.size > 8 * 1024 * 1024) return null;
+    const base64 = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result).split(",")[1]);
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+    const ctrl2 = new AbortController();
+    const t2 = setTimeout(() => ctrl2.abort(), 20000);
+    const r = await fetch("/api/vision/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "Describe this painted scene in 2-3 sentences: the setting, any figures present, the light, and the mood. Mention only what is actually visible.",
+        image: base64,
+        mimeType: blob.type,
+      }),
+      signal: ctrl2.signal,
+    });
+    clearTimeout(t2);
+    if (!r.ok) return null;
+    const data = await r.json();
+    const text = (data.answer || data.reply || data.text || "").trim();
+    return text.length > 20 ? text : null;
+  } catch { return null; }
+}
+
+// Parse the narrator's [DOORS: A · Name — desc -> target | ...] line.
+// Canonical names can themselves contain an em-dash ("Sigil — City of Doors"),
+// so before splitting name/description on "—" we try to match the segment
+// against every door name the shared world already knows.
+function knownDoorNames() {
+  const names = [];
+  for (const key of Object.keys(SCENES)) {
+    for (const d of SCENES[key].doors || []) names.push(d.name);
+  }
+  for (const n of Object.keys(playerProgress?.dynamicDoors || {})) {
+    const dyn = playerProgress.dynamicDoors[n];
+    if (dyn?.name) names.push(dyn.name);
+  }
+  return names.sort((a, b) => b.length - a.length); // longest first
+}
+
+function parseGeneratedDoors(reply) {
+  const m = reply.match(/\[DOORS:([\s\S]*?)\]/i);
+  if (!m) return null;
+  const parts = m[1].split("|").map(s => s.trim()).filter(Boolean);
+  if (parts.length !== 3) return null;
+  const letters = ["A", "B", "C"];
+  const known = knownDoorNames();
+  const doors = [];
+  for (let i = 0; i < 3; i++) {
+    const seg = parts[i].replace(/^[ABC]\s*[·:.]\s*/i, "");
+    const arrow = seg.split("->");
+    const target = (arrow[1] || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const head = arrow[0].trim();
+    const headNorm = normalizeDoorName(head);
+    let name, description;
+    const canonical = known.find(k => headNorm === normalizeDoorName(k) || headNorm.startsWith(normalizeDoorName(k) + " "));
+    if (canonical) {
+      name = canonical;
+      description = head.slice(head.toLowerCase().indexOf(canonical.split(" ").pop().toLowerCase()) + canonical.split(" ").pop().length)
+        .replace(/^[\s—:-]+/, "").trim();
+    } else {
+      const nameDesc = head.split("—");
+      name = (nameDesc[0] || "").trim();
+      description = (nameDesc.slice(1).join("—") || "").trim();
+    }
+    if (!name || name.length > 80) return null;
+    doors.push({ label: letters[i], name, description, target: SCENES[target] ? target : "" });
+  }
+  return doors;
+}
+
+async function enrichScene(sceneKey, textEl, msgEl) {
   if (!textEl) return;
   const scene = SCENES[sceneKey];
   if (!scene) return;
@@ -290,30 +406,72 @@ async function refreshSceneText(sceneKey, textEl) {
   const theme = scene.theme || scene.archetype || "a threshold";
   const lesson = scene.lesson || "";
   const recentChoices = (gameState?.history || []).filter(h => h.startsWith("Chose ")).slice(-3).join(", ") || "just arrived";
-  const loopNote = loopCount > 0
-    ? ` This is loop ${loopCount + 1} — familiar, but seen with new eyes; don't repeat earlier phrasing.`
-    : "";
-  const taste = (playerProgress?.prizes || []).filter(p => p !== "first-steps").slice(-3).join(", ");
-  const tasteNote = taste ? ` The dreamer has shown a taste for: ${taste} — let that color the imagery if it fits.` : "";
-  const prompt = `You are Lantern, the dreaming guide, narrating the scene "${sceneKey}" inside the Kingdome of Hearts.
+  const loopNote = loopCount > 0 ? ` This is loop ${loopCount + 1} — familiar, but seen with new eyes; don't repeat earlier phrasing.` : "";
+  const desires = (playerProgress?.customDesires || []).slice(-4).join("; ");
+  const desiresNote = desires ? `\nThe dreamer has authored canon of their own — fold it in, their inventions outrank yours: ${desires}` : "";
+
+  // Give the image a moment to resolve, then ground on what it shows.
+  await new Promise(r => setTimeout(r, 2500));
+  const art = (window.__sceneArt && window.__sceneArt.sceneKey === sceneKey) ? window.__sceneArt : null;
+  const visionDesc = art ? await describeSceneImage(art.url) : null;
+  const imageContext = visionDesc
+    ? `The painting for this beat shows (vision-verified): ${visionDesc}`
+    : art ? `The painting for this beat was generated from: ${art.prompt}`
+    : `No painting resolved this beat — describe the scene from canon alone.`;
+
+  // The shared world the narrator may route into.
+  const ownDoors = (scene.doors || []).map(d => `${d.name} — ${d.description}`).join("; ");
+  const targetKeys = Object.keys(SCENES).join(", ");
+
+  const prompt = `You are Lantern, the dreaming guide, narrating one turn of Three Doors inside the Kingdome of Hearts.
+${imageContext}
 Persistent theme (canon, never changes): ${theme}
-Meta-lesson underneath the scene (canon, never changes — let it show through the imagery, don't state it outright): ${lesson}
-Write 3-4 evocative, sensory sentences of fresh prose for this specific visit — always true to the theme and lesson above, but never the same words twice. The dreamer arrived via: ${recentChoices}.${loopNote}${tasteNote} End on a threshold feeling that makes the next choice feel alive.`;
+Meta-lesson underneath (canon — let it show through the imagery, never state it): ${lesson}
+The dreamer arrived via: ${recentChoices}.${loopNote}${desiresNote}
+
+Write the beat: 3-4 vivid, warm, sensory sentences that describe THIS painting and open the moment — ground every image detail you mention in what the painting actually shows. Never reset the story.
+
+Then, on its own line, offer exactly three doors:
+[DOORS: A · Name — one-line sensory description -> target | B · Name — description -> target | C · Name — description -> target]
+Rules for doors: each is EITHER one of this scene's existing doors (${ownDoors}) OR a new door you invent now — named, atmospheric, symbolically weighted, consistent with the Kingdome (love is the law, death is imaginary, doors are meanings). If the dreamer has expressed desires, let at least one door answer them. target must be one of: ${targetKeys} — pick the world-scene the door most truly opens onto.`;
+
   const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), 20000);
+  setTimeout(() => ctrl.abort(), 25000);
   try {
     const r = await fetch("/api/dream/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: prompt, agent: "lantern" }),
+      // "keystone" is the only live persona (#1664 removed the RP set —
+      // requesting the old "lantern" agent 503s and killed narration silently).
+      body: JSON.stringify({ message: prompt, agent: "keystone" }),
       signal: ctrl.signal,
     });
     if (!r.ok) return;
     const data = await r.json();
-    const fresh = (data.reply || "").trim();
-    if (fresh.length < 40) return;
-    textEl.style.transition = "opacity 0.6s";
-    textEl.style.opacity = "0";
-    setTimeout(() => { textEl.innerHTML = md(fresh); textEl.style.opacity = "1"; }, 600);
-  } catch { /* static text stays */ }
+    const reply = (data.reply || "").trim();
+    if (reply.length < 40) return;
+
+    // Narration = reply minus the doors line.
+    const narration = reply.replace(/\[DOORS:[\s\S]*?\]/i, "").trim();
+    if (narration.length >= 40 && gameState?.scene_key === sceneKey) {
+      textEl.style.transition = "opacity 0.6s";
+      textEl.style.opacity = "0";
+      setTimeout(() => { textEl.innerHTML = md(narration); textEl.style.opacity = "1"; }, 600);
+    }
+
+    // Doors: swap in the generated set; register new ones so navigation works.
+    const doors = parseGeneratedDoors(reply);
+    if (doors && msgEl && gameState?.scene_key === sceneKey && !doorsLocked) {
+      doors.forEach(d => { if (typeof registerDynamicDoor === "function") registerDynamicDoor(sceneKey, d); });
+      applyDoors(msgEl, doors);
+    }
+
+    // Σ₀ evidence trail: what this turn was grounded on.
+    logThreeDoorsEvent("scene_enriched", {
+      sceneKey,
+      groundedOn: visionDesc ? "vision" : art ? "image_prompt" : "canon_only",
+      doorsGenerated: !!doors,
+      doorNames: doors ? doors.map(d => d.name) : [],
+    });
+  } catch { /* engine content stays */ }
 }
