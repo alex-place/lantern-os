@@ -12,7 +12,9 @@ const {
   linkDiscordAccount,
   exportToCSF,
   importFromCSF,
+  publicProfile,
 } = require("../lib/user-profiles");
+const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
 
 module.exports = async function profileRoutes(req, res, url, deps) {
   const path = url.pathname;
@@ -20,9 +22,9 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   console.log(`[PROFILES] ${method} ${path}`);
 
-  // GET /api/profiles/me — Get current user's profile
+  // GET /api/profiles/me — Get current user's profile (any provider; #1876)
   if (method === "GET" && path === "/api/profiles/me") {
-    const userId = req.session?.patreon?.id;
+    const userId = getSessionUserId(req);
     if (!userId) {
       res.writeHead(401, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Not authenticated" }));
@@ -30,12 +32,12 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
     const profile = getProfile(userId);
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify(profile));
+    return res.end(JSON.stringify(publicProfile(profile)));
   }
 
   // PUT /api/profiles/me — Update current user's profile
   if (method === "PUT" && path === "/api/profiles/me") {
-    const userId = req.session?.patreon?.id;
+    const userId = getSessionUserId(req);
     if (!userId) {
       res.writeHead(401, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Not authenticated" }));
@@ -44,6 +46,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
+      if (body.length > 1e6) req.destroy(); // 1MB cap — reject oversized bodies (DoS)
     });
 
     req.on("end", () => {
@@ -60,7 +63,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
         const profile = updateProfile(userId, safeUpdates);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(profile));
+        res.end(JSON.stringify(publicProfile(profile)));
       } catch (err) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: err.message }));
@@ -72,14 +75,14 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   // POST /api/profiles/me/link-discord — Link the current web user to a Discord id (#697)
   if (method === "POST" && path === "/api/profiles/me/link-discord") {
-    const userId = req.session?.patreon?.id;
+    const userId = getSessionUserId(req);
     if (!userId) {
       res.writeHead(401, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Not authenticated" }));
     }
 
     let body = "";
-    req.on("data", (chunk) => { body += chunk; });
+    req.on("data", (chunk) => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", () => {
       try {
         const { discordId } = JSON.parse(body || "{}");
@@ -104,7 +107,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   // GET /api/profiles/:userId — Get any user's public profile (admin-only)
   if (method === "GET" && /^\/api\/profiles\/[a-zA-Z0-9]+$/.test(path)) {
-    const adminOnly = req.session?.patreon?.role === "admin";
+    const adminOnly = getSessionUser(req)?.role === "admin";
     if (!adminOnly) {
       res.writeHead(403, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Admin only" }));
@@ -118,12 +121,12 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify(profile));
+    return res.end(JSON.stringify(publicProfile(profile)));
   }
 
   // GET /api/profiles — List all profiles (admin-only)
   if (method === "GET" && path === "/api/profiles") {
-    const isAdmin = req.session?.patreon?.role === "admin";
+    const isAdmin = getSessionUser(req)?.role === "admin";
     if (!isAdmin) {
       res.writeHead(403, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Admin only" }));
@@ -137,14 +140,14 @@ module.exports = async function profileRoutes(req, res, url, deps) {
       filter.search = url.searchParams.get("search");
     }
 
-    const profiles = listProfiles(filter);
+    const profiles = listProfiles(filter).map(publicProfile);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ profiles, count: profiles.length }));
   }
 
   // PUT /api/profiles/:userId/role — Set user role (admin-only)
   if (method === "PUT" && /^\/api\/profiles\/[a-zA-Z0-9]+\/role$/.test(path)) {
-    const isAdmin = req.session?.patreon?.role === "admin";
+    const isAdmin = getSessionUser(req)?.role === "admin";
     if (!isAdmin) {
       res.writeHead(403, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Admin only" }));
@@ -155,6 +158,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
     req.on("data", (chunk) => {
       body += chunk;
+      if (body.length > 1e6) req.destroy(); // 1MB cap — reject oversized bodies (DoS)
     });
 
     req.on("end", () => {
@@ -162,7 +166,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
         const { role } = JSON.parse(body);
         const profile = setUserRole(userId, role);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(profile));
+        res.end(JSON.stringify(publicProfile(profile)));
       } catch (err) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: err.message }));
@@ -174,7 +178,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   // DELETE /api/profiles/:userId — Delete profile (admin-only)
   if (method === "DELETE" && /^\/api\/profiles\/[a-zA-Z0-9]+$/.test(path)) {
-    const isAdmin = req.session?.patreon?.role === "admin";
+    const isAdmin = getSessionUser(req)?.role === "admin";
     if (!isAdmin) {
       res.writeHead(403, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Admin only" }));
@@ -188,7 +192,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   // GET /api/profiles/export/csf — Export profiles to CSF (admin-only)
   if (method === "GET" && path === "/api/profiles/export/csf") {
-    const isAdmin = req.session?.patreon?.role === "admin";
+    const isAdmin = getSessionUser(req)?.role === "admin";
     if (!isAdmin) {
       res.writeHead(403, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Admin only" }));

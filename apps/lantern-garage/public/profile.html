@@ -316,8 +316,8 @@ function renderProfile(profile) {
         <div class="info-value">${fmtDate(profile.metadata?.createdAt)}</div>
       </div>
       <div class="info-cell">
-        <div class="info-label">Patreon ID</div>
-        <div class="info-value"><code>${escapeHtml(profile.patreonId || profile.id || '—')}</code></div>
+        <div class="info-label">Account ID</div>
+        <div class="info-value"><code>${escapeHtml(profile.id || '—')}</code></div>
       </div>
     </div>
 

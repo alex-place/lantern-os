@@ -6,6 +6,8 @@
 
 const { getProfile } = require("./user-profiles");
 const { isFlagEnabledOr } = require("./feature-flags");
+const { getSessionUser } = require("./session-identity");
+const { roleLevel } = require("./role-hierarchy");
 
 /**
  * Is the Patreon login gate active? Controlled by the admin-toggleable
@@ -69,10 +71,10 @@ function isLocalBypass(req) {
 function requireAuth(req, res) {
   // Local-only bypass: dev port 4178, or LANTERN_LOCAL_ADMIN on loopback
   if (isLocalBypass(req)) return true;
-  // Patreon gate disabled by an admin → treat everyone as an allowed guest.
+  // Auth gate disabled by an admin → treat everyone as an allowed guest.
   if (!patreonAuthEnabled()) return true;
 
-  const session = req.session?.patreon;
+  const session = getSessionUser(req);
 
   if (!session?.id) {
     res.writeHead(302, { Location: "/auth.html" });
@@ -92,19 +94,18 @@ function requireRole(req, res, requiredRole = "supporter") {
   // Local-only bypass: dev port 4178, or LANTERN_LOCAL_ADMIN on loopback
   if (isLocalBypass(req)) return true;
 
-  // deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
-  const roleHierarchy = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
-  const requiredLevel = roleHierarchy[requiredRole] || 0;
+  // Role ordering comes from the one canonical hierarchy (role-hierarchy.js).
+  const requiredLevel = roleLevel(requiredRole);
 
-  const session = req.session?.patreon;
+  const session = getSessionUser(req);
 
   if (!session?.id) {
-    // Patreon gate disabled → treat the visitor as a guest: serve guest-level
+    // Auth gate disabled → treat the visitor as a guest: serve guest-level
     // pages, but still refuse anything that needs a higher tier (admin pages,
     // paid tiers) with a 403 — there is no login to redirect them to, and the
     // gate being off must never expose privileged surfaces.
     if (!patreonAuthEnabled()) {
-      if (requiredLevel <= roleHierarchy.guest) return true;
+      if (requiredLevel <= roleLevel("guest")) return true;
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
@@ -120,7 +121,7 @@ function requireRole(req, res, requiredRole = "supporter") {
     return false;
   }
 
-  const userLevel = roleHierarchy[session.role] || 0;
+  const userLevel = roleLevel(session.role);
 
   if (userLevel < requiredLevel) {
     // Insufficient role
@@ -178,7 +179,7 @@ function protectStaticPage(requiredRole = "supporter") {
 function hasEntitlement(req, key) {
   if (isLocalBypass(req)) return true;
 
-  const session = req.session?.patreon;
+  const session = getSessionUser(req);
   if (!session?.id) return false;
   if (session.role === "admin") return true;
 
@@ -193,7 +194,7 @@ function hasEntitlement(req, key) {
 function requireEntitlement(req, res, key) {
   if (isLocalBypass(req)) return true;
 
-  const session = req.session?.patreon;
+  const session = getSessionUser(req);
   if (!session?.id) {
     // Gate disabled → no login to redirect to; the entitlement still isn't
     // granted to an anonymous visitor, so deny with a 403 (keeps the trade /
@@ -234,14 +235,14 @@ function requireEntitlement(req, res, key) {
  */
 function isAdmin(req) {
   if (isLocalBypass(req)) return true;
-  return req.session?.patreon?.role === "admin";
+  return getSessionUser(req)?.role === "admin";
 }
 
 /**
  * Attach user profile to request for downstream handlers.
  */
 function attachProfile(req) {
-  const userId = req.session?.patreon?.id;
+  const userId = getSessionUser(req)?.id;
   if (userId) {
     req.userProfile = getProfile(userId);
     req.userId = userId;

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.26] - 2026-07-02
+### Added
+- **Provider-agnostic OSS auth (ADR-0016).** One identity model (`req.session.user`) backed by a provider registry — local scrypt password auth plus Google, Discord, and Patreon OAuth — with verified-both account linking. Fixes #1876/#1877. Strengthens the **Act** stage (access control). See `apps/lantern-garage/lib/session-identity.js` and `role-hierarchy.js`.
+
+
 ## [1.8.22] - 2026-07-02
 ### Added
 - **Three Doors skill moved into the repo** at `skills/three-doors/` (SKILL.md, scripts, canon reference art), version-controlled instead of living only in `~/.claude/skills/`. Its scene generator now uses a resilient multi-backend chain — **Vertex Imagen 4** (gcloud ADC project credits, best canon fidelity) → **HF Flux.1-schnell** (OSS, free) → **Pollinations** (keyless) → **OpenAI** — so a single capped provider no longer breaks a game turn (verified end-to-end). Reference PNGs are bundled as raw blobs via a local `.gitattributes` LFS override, since the repo-wide `*.png` LFS routing has an unprovisioned endpoint.
