@@ -1,0 +1,88 @@
+# unisona.ai desktop launcher
+
+A **thin launcher** that lets a non-developer run the unisona.ai / Keystone OS
+Convergence Core locally: double-click → the Core boots on a private loopback
+port → your default browser opens at it. Your memory, your keys, your machine.
+
+> **Design decision:** [docs/adr/0014-unisona-desktop-launcher.md](../../../docs/adr/0014-unisona-desktop-launcher.md).
+> This is a **delivery channel** for the local-first principle, **not** a new
+> subsystem. It boots the *one, unmodified* [`server.js`](../server.js) — it does
+> not fork the Core.
+
+## What it does (Phase 1)
+
+- Picks a **free loopback port** (never a fixed 4177 that could collide).
+- Spawns the existing `server.js` in **clean chat-only mode** — no Python MCP
+  children, no trading microservice, no Cloudflare tunnel.
+- Binds **127.0.0.1 only** (it deletes `PORT` and sets `LANTERN_GARAGE_HOST` so
+  the Core can never accidentally bind `0.0.0.0`).
+- Waits until the server actually answers, then opens your **default browser**
+  (no bundled Chromium — see ADR-0014, guardrail G5).
+- `Ctrl+C` tears down the **whole child-process tree** (`taskkill /T` on Windows).
+
+It uses **only Node builtins** — zero dependencies — so it can be wrapped into a
+single executable later without dragging in a dependency tree.
+
+## Run it now (dev)
+
+From a checkout that has had `npm install` run in `apps/lantern-garage`:
+
+```bash
+# from the repo
+node apps/lantern-garage/desktop/launcher.js
+# or, on Windows, double-click:
+apps\lantern-garage\desktop\Unisona.cmd
+```
+
+Point it at a *different* checkout (e.g. testing this launcher from a worktree
+against the main checkout that has `node_modules`):
+
+```bash
+UNISONA_SERVER_DIR="C:/dev/lantern-os/apps/lantern-garage" node launcher.js
+```
+
+### Flags / env
+
+| Flag | Env | Effect |
+|---|---|---|
+| `--port N` | `LANTERN_GARAGE_PORT` | Force a port instead of auto-picking |
+| `--page /x.html` | `UNISONA_LANDING_PAGE` | Which page to open (default `/`) |
+| `--no-open` | `UNISONA_NO_OPEN=1` | Boot the server but don't open a browser |
+| — | `UNISONA_SERVER_DIR` | Folder containing `server.js` |
+| — | `UNISONA_READY_TIMEOUT_MS` | Readiness-poll budget (default 45000) |
+
+## Building the shipped `.exe` (Phase 1 packaging — not yet wired)
+
+The launcher runs today via `node`. Turning it into a **signed, double-clickable
+`.exe`** is deliberately staged, because the Core depends on **native modules**
+(`sharp`, `tesseract.js`) that must match the bundling runtime's ABI. ADR-0014
+records the decision **against Electron** (native-module rebuild friction + a
+150 MB Chromium the user's browser already provides) in favour of shipping a
+**plain Node runtime + app directory + a small signed launcher**.
+
+Planned build (tracked as a follow-up, see ADR-0014 §Follow-ups):
+
+1. Ship `node.exe` (LTS) + the `apps/lantern-garage` tree (incl. prebuilt
+   `sharp`/`tesseract.js` binaries for `win32-x64`) as app resources.
+2. Compile `launcher.js` to `unisona.exe` (Node SEA, `--build-sea`; **not**
+   `pkg`, which is deprecated). The launcher points `UNISONA_SERVER_DIR` at the
+   bundled resources.
+3. **Sign** with Azure Artifact Signing (~$10/mo). Note: EV certs no longer
+   bypass SmartScreen (Microsoft removed that in 2024) — reputation builds over
+   download volume regardless.
+4. Installer (Inno Setup / MSIX) that lays the app into `%LOCALAPPDATA%\unisona`.
+
+## What Phase 1 does NOT do yet (see ADR-0014, "Phase 0" hardening)
+
+These are Core changes that must land **before** a public `.exe` ships. They are
+not launcher concerns — they harden the Core for everyone:
+
+- **State relocation** — the Core still reads/writes `data/` and `.env` relative
+  to the repo root. A shipped app must relocate writable state to
+  `%APPDATA%\unisona\`. (Until then, the launcher only makes sense on a checkout.)
+- **First-run key onboarding + OS credential vault** — keys must come from
+  Windows Credential Manager / DPAPI (`safeStorage`), user-supplied, never a
+  plaintext `.env` and never embedded in the binary.
+- **Loopback ≠ admin** — the Core currently grants admin to loopback requests.
+  On a desktop the user *is* loopback, so this must require an explicit local
+  token before shipping.
