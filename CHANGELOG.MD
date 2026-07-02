@@ -1,6 +1,8 @@
 # Changelog
 
 ## [1.8.22] - 2026-07-02
+### Added
+- **Three Doors skill moved into the repo** at `skills/three-doors/` (SKILL.md, scripts, canon reference art), version-controlled instead of living only in `~/.claude/skills/`. Its scene generator now uses a resilient multi-backend chain — **Vertex Imagen 4** (gcloud ADC project credits, best canon fidelity) → **HF Flux.1-schnell** (OSS, free) → **Pollinations** (keyless) → **OpenAI** — so a single capped provider no longer breaks a game turn (verified end-to-end). Reference PNGs are bundled as raw blobs via a local `.gitattributes` LFS override, since the repo-wide `*.png` LFS routing has an unprovisioned endpoint.
 ### Fixed
 - **Unisona training: repaired LoRA warm-start key remap in `scripts/train-qlora-ouro.py`.** `peft`'s `set_peft_model_state_dict` only matched 69/338 LoRA weight keys when warm-starting from a saved adapter checkpoint (its `adapter_name` re-insertion is unreliable on this transformers/peft combo), silently leaving most tensors at random init — the likely cause of a hard, tracebackless crash on the first optimizer step of a resumed run. `--warm-start` now loads via `model.load_state_dict()` with an explicit `.weight` → `.default.weight` key remap, verified against a real checkpoint (exact key match; LoRA param norm changes on load, confirming real weights transfer) and smoke-tested for 3 clean steps before use. Strengthens the **Act** stage (training tooling correctness).
 

@@ -1,0 +1,5 @@
+# Bundle the reference art as raw bytes — the repo-wide *.png/*.jpg LFS routing
+# has an unprovisioned endpoint that turns committed images into broken pointers.
+# These 4 small canon drawings must live in-tree so the skill is self-contained.
+*.png -filter -diff -merge -text
+*.jpg -filter -diff -merge -text
