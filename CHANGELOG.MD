@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.22] - 2026-07-02
+### Added
+- **Three Doors skill moved into the repo** at `skills/three-doors/` (SKILL.md, scripts, canon reference art), version-controlled instead of living only in `~/.claude/skills/`. Its scene generator now uses a resilient multi-backend chain — **Vertex Imagen 4** (gcloud ADC project credits, best canon fidelity) → **HF Flux.1-schnell** (OSS, free) → **Pollinations** (keyless) → **OpenAI** — so a single capped provider no longer breaks a game turn (verified end-to-end). Reference PNGs are bundled as raw blobs via a local `.gitattributes` LFS override, since the repo-wide `*.png` LFS routing has an unprovisioned endpoint.
+
 ## [1.8.21] - 2026-07-02
 ### Added
 - **Kalshi: scoped LIVE trading for the weather-edge (real orders, code-gated).** The Grounded weather-edge "Take" now places a **real 1-contract order** when live trading is enabled (`canTradeLive`), user-in-the-loop per swipe; otherwise it stays paper. A new **scope gate** in `kalshi-api.js` `placeOrder` allows a live order only for an allowlisted `source` (`KALSHI_LIVE_SCOPE`, default `kalshi-weather-edge`) and hard-caps size (`KALSHI_LIVE_MAX_CONTRACTS`, default 1) — any other source (crypto/momentum, unsourced) is forced to dry-run even with all global gates cleared. `getConnection` now reports `liveScope` + `liveMaxContracts`. Real money is confined in code to the band-robust, net-of-fees edge.
