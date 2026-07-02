@@ -358,12 +358,28 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, { positions: [], account: {} }, 503);
       return true;
     }
-    try {
-      const positions = await traderAgent.getPositions();
-      sendJson(res, positions, 200);
-    } catch (error) {
-      console.error('[Trading] /positions error:', error.message);
-      sendJson(res, { positions: [], account: {} }, 500);
+    // #1231: don't let the trader page hang on the cold Python spawn + Alpaca call.
+    // getPositions() can take up to fastTimeout (7s) on a cold cache; that stalls the
+    // positions tile on every load. Bound the client-facing wait to a short deadline
+    // and, if it's exceeded, return a fast "warming" payload while the call keeps
+    // running in the background to populate the 60s cache — so the NEXT poll is instant
+    // and live data (when Alpaca is configured) still flows. getPositions() never
+    // rejects (it resolves to a graceful fallback), so no error branch is needed.
+    const POSITIONS_DEADLINE_MS = 2500;
+    const WARMING = Symbol('warming');
+    const pending = traderAgent.getPositions();
+    pending.catch(() => {}); // keep the background warm alive without unhandled rejection
+    let timer;
+    const deadline = new Promise((resolve) => { timer = setTimeout(() => resolve(WARMING), POSITIONS_DEADLINE_MS); });
+    const winner = await Promise.race([pending, deadline]);
+    clearTimeout(timer);
+    if (winner === WARMING) {
+      sendJson(res, {
+        positions: [], account: { equity: 0, cash: 0, buying_power: 0 },
+        available: false, loading: true, reason: 'warming positions cache',
+      }, 200);
+    } else {
+      sendJson(res, winner, 200);
     }
     return true;
   }

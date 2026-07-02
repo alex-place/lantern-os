@@ -223,6 +223,17 @@ class TraderAgent {
       return this.cache[cacheKey].data;
     }
 
+    // #1231: get_market_status runs through cli.py → agents.py, which instantiates
+    // an Alpaca REST client at import and raises without creds — after the full
+    // fastTimeout (7s). #1860 gave positions/orders this guard but not market-status,
+    // so the VIX/regime tile still hung ~7s. Return an honest "unavailable" instantly.
+    if (!this._brokerConfigured()) {
+      return this._staleOr(cacheKey, {
+        market_open: false, vix: 0, vix_regime: 'UNAVAILABLE',
+        available: false, reason: 'broker not configured',
+      });
+    }
+
     try {
       // Keyless Yahoo path (#1860): VIX / regime / SPY trend / session open with
       // no Python spawn. Broker-only fields (equity, day P&L) come via
