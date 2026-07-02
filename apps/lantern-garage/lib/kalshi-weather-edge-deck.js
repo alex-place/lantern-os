@@ -17,6 +17,8 @@
 const kalshi = require("./kalshi-api");
 const nws = require("./kalshi-nws");
 const model = require("./kalshi-weather-edge");
+const { sizePosition } = require("./kalshi-kelly");
+const { getCalibrator } = require("./kalshi-calibration");
 
 const MONTHS = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
 const SOURCES = [
@@ -43,8 +45,26 @@ function cardFor(m, row, ctx) {
   const yesAsk = m.yes_ask, noAsk = m.no_ask;
   const isNo = row.side === "no";
   const entry = isNo ? (noAsk != null ? noAsk : Math.round(100 - yesAsk)) : yesAsk;
-  const pWinBucket = isNo ? 1 - row.fair : row.fair;   // model P(favoured side wins)
+  const rawPWin = isNo ? 1 - row.fair : row.fair;      // model P(favoured side wins), pre-calibration
+  // Verify→Reason: correct the model prob by the measured Brier bias before sizing.
+  const pWinBucket = ctx.calibrator ? ctx.calibrator.calibrate(rawPWin) : rawPWin;
   const reward = 100 - (entry != null ? entry : 50);
+
+  // Act: ask-based half-Kelly size behind the 5 pre-trade gates.
+  const spreadCents = isNo
+    ? (m.no_ask != null && m.no_bid != null ? m.no_ask - m.no_bid : null)
+    : (m.yes_ask != null && m.yes_bid != null ? m.yes_ask - m.yes_bid : null);
+  const volume = Number.isFinite(m.volume_24h) ? m.volume_24h
+    : (Number.isFinite(m.volume) ? m.volume : null);
+  const sizing = sizePosition({
+    winProb: pWinBucket,
+    askCents: entry,
+    worstCaseNetC: Math.round(row.worst_c),
+    spreadCents,
+    volume,
+    openInGroup: ctx.openInGroup || 0,
+    drawdownFrac: ctx.drawdownFrac || 0,
+  });
   return {
     kind: "grounded", mode: "grounded",
     ticker: m.ticker,
@@ -67,15 +87,34 @@ function cardFor(m, row, ctx) {
     ],
     sources: SOURCES,
     stateLabel: "CONFIDENT",
-    reason: `NWS ${ctx.fc}°F · calibrated fair ${row.fair_pct}% vs market ${row.ask_c}¢ → ${row.side.toUpperCase()} @ ${entry}¢ · worst-case +${Math.round(row.worst_c)}¢ net after fees`,
+    reason: `NWS ${ctx.fc}°F · calibrated fair ${row.fair_pct}% vs market ${row.ask_c}¢ → ${row.side.toUpperCase()} @ ${entry}¢ · worst-case +${Math.round(row.worst_c)}¢ net · ${sizing.contracts > 0 ? `size ${sizing.contracts} (½-Kelly)` : `NO SIZE — ${sizing.blockedBy.join("/")}`}`,
     grounding: GROUNDING,
+    // Act: sized order proposal + the 5-gate audit. contracts=0 means a gate blocked it.
+    sizing: {
+      contracts: sizing.contracts,
+      stakeCents: sizing.stakeCents,
+      gatesOk: sizing.gatesOk,
+      blockedBy: sizing.blockedBy,
+      kellyFraction: sizing.kellyFraction,
+      kellyRaw: sizing.kellyRaw,
+      feeAdjWinProb: sizing.feeAdjWinProb,
+      bankrollCents: sizing.bankrollCents,
+      gates: sizing.gates,
+    },
+    // Feedback stamp: the model prob at entry, so the paper ledger can grade it later
+    // (kalshi-calibration reads pPredicted off resolved rows to compute Brier + bias).
+    pPredicted: Math.round(pWinBucket * 1000) / 1000,
+    pPredictedRaw: Math.round(rawPWin * 1000) / 1000,
+    calibration: ctx.calibrator ? ctx.calibrator.report : "no calibrator",
     sigma0: {
       end_state: pWinBucket >= 0.5 ? row.side.toUpperCase() : (isNo ? "YES" : "NO"),
       p_win: Math.round(pWinBucket * 100) / 100,
+      p_win_raw: Math.round(rawPWin * 100) / 100,
       loss_odds: Math.round((1 - pWinBucket) * 100) / 100,
       ev_cents: Math.round(row.worst_c * 10) / 10,     // worst-case band edge = what you can rely on
       reward_cents: reward,
       confidence: ctx.confidence,
+      contracts: sizing.contracts,                     // 0 when a gate blocks
       score: Math.round(row.worst_c * 10) / 10,        // rank by reliable worst-case edge
       positive_ev: row.worst_c > 0,
       verdict: "STRONG",
@@ -90,6 +129,11 @@ function cardFor(m, row, ctx) {
 async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHIGHNY" } = {}) {
   const nowMs = Date.now();
   const today = new Date(nowMs);
+
+  // Verify→Reason: one calibrator per deck build, from the resolved weather ledger.
+  // Identity (no-op) until ≥20 settled trades — honest under-sample behavior.
+  let calibrator;
+  try { calibrator = getCalibrator(); } catch { calibrator = null; }
 
   // 1. Observe — live board + live NWS forecast (concurrent).
   let markets = [], highs = {};
@@ -139,10 +183,12 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     const rep = model.robustEdgeReport(fc, lead, ladder, ask, grp.d.month, grp.d.day, minEdgeCents);
     audit.push(`${grp.d.year}-${grp.d.month}-${grp.d.day} lead=${lead} NWS=${fc}°F -> ${rep.verdict}`);
     const ctx = { fc, ymd: fRec.ymd || `${grp.d.year}-${String(grp.d.month).padStart(2, "0")}-${String(grp.d.day).padStart(2, "0")}`,
-      nowMs, confidence: 0.6 };
+      nowMs, confidence: 0.6, calibrator };
+    // Concentration gate input: how many actionable rows we're already emitting this day.
+    let openInGroup = 0;
     for (const row of rep.actionable) {
       const m = grp.markets.find((x) => x.ticker === row.bucket);
-      if (m) cards.push(cardFor(m, row, ctx));
+      if (m) { cards.push(cardFor(m, { ...row }, { ...ctx, openInGroup })); openInGroup++; }
     }
   }
 
@@ -159,6 +205,10 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     grounded: cards.length,       // every card is externally grounded by construction
     knowledgeOnly: 0, pending: 0,
     positiveEv: cards.filter((c) => (c.sigma0?.ev_cents || 0) > 0).length,
+    sizedCards: cards.filter((c) => (c.sizing?.contracts || 0) > 0).length,
+    calibration: calibrator
+      ? { n: calibrator.n, brier: calibrator.brier, biasPt: Math.round((calibrator.bias || 0) * 1000) / 10, active: calibrator.active, report: calibrator.report }
+      : null,
     mode: "grounded",
     audit,
     generatedAt: new Date().toISOString(),
