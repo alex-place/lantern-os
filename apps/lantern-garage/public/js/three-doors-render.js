@@ -131,6 +131,16 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
     ? `<div class="fox-line">🏮 <em>"You came back."</em></div>`
     : foxPresent ? `<div class="fox-line">🏮 Lantern, your guide, is with you.</div>` : "";
 
+  // Opening beat only: introduce the companions in Alex's hand-drawn canon.
+  const castStrip = sceneKey === "castle-balcony" && !sceneData.resumed
+    ? `<div class="cast-strip" aria-label="The companions, as Alex draws them">
+        <figure><img src="/assets/content/koh/reference-lantern-t.webp" alt="Lantern"><figcaption>Lantern</figcaption></figure>
+        <figure><img src="/assets/content/koh/reference-eclipse-t.webp" alt="Eclipse"><figcaption>Eclipse</figcaption></figure>
+        <figure><img src="/assets/content/koh/reference-keystone-t.webp" alt="Keystone"><figcaption>Keystone</figcaption></figure>
+        <figure><img src="/assets/content/koh/reference-blinkbug-t.webp" alt="Blinkbug"><figcaption>Blinkbug</figcaption></figure>
+      </div>`
+    : "";
+
   el.innerHTML = `
     <div class="message-content">
       ${breadcrumb}
@@ -142,6 +152,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
       <div class="scene-caption">${caption}</div>
       <div id="${descId}" class="scene-narration">${md(displayText)}</div>
       ${lanternLine}
+      ${castStrip}
       ${doorHTML}
     </div>`;
 

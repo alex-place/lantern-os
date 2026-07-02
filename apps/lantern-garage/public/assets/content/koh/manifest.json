@@ -1,7 +1,7 @@
 {
-  "title": "Kingdome of Hearts \u2014 Three Doors",
+  "title": "Kingdome of Hearts — Three Doors",
   "base": "https://media.lantern-os.net/koh/",
-  "count": 272,
+  "count": 276,
   "items": [
     {
       "id": "c6bc099dd9",
@@ -116,7 +116,7 @@
     },
     {
       "id": "76a27ff5b4",
-      "title": "Cosmic Doors \u2014 blue",
+      "title": "Cosmic Doors — blue",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -389,7 +389,7 @@
     },
     {
       "id": "aba0d9c528",
-      "title": "Founder's Wish Door \u2014 board",
+      "title": "Founder's Wish Door — board",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -529,7 +529,7 @@
     },
     {
       "id": "99233f8be8",
-      "title": "Kingdome of Hearts \u2014 doors",
+      "title": "Kingdome of Hearts — doors",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1112,7 +1112,7 @@
     },
     {
       "id": "fb741a2da3",
-      "title": "Three Doors \u2014 A/B/C board",
+      "title": "Three Doors — A/B/C board",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1123,7 +1123,7 @@
     },
     {
       "id": "964547972c",
-      "title": "Three Doors \u2014 board",
+      "title": "Three Doors — board",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1134,7 +1134,7 @@
     },
     {
       "id": "7f452bc7ca",
-      "title": "Three Doors \u2014 board variant",
+      "title": "Three Doors — board variant",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1145,7 +1145,7 @@
     },
     {
       "id": "04b66adfff",
-      "title": "Three Doors \u2014 caravan",
+      "title": "Three Doors — caravan",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1156,7 +1156,7 @@
     },
     {
       "id": "7c8690db6c",
-      "title": "Three Doors \u2014 green board",
+      "title": "Three Doors — green board",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1167,7 +1167,7 @@
     },
     {
       "id": "cdab529949",
-      "title": "Three Doors \u2014 jeweled",
+      "title": "Three Doors — jeweled",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1178,7 +1178,7 @@
     },
     {
       "id": "7a57e85a1f",
-      "title": "Three Doors \u2014 New Game",
+      "title": "Three Doors — New Game",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1189,7 +1189,7 @@
     },
     {
       "id": "084ee0fb0c",
-      "title": "Three Doors \u2014 owl",
+      "title": "Three Doors — owl",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -1200,7 +1200,7 @@
     },
     {
       "id": "9a03a44601",
-      "title": "Three Doors \u2014 triptych",
+      "title": "Three Doors — triptych",
       "cat": "door",
       "status": "auto",
       "tags": [],
@@ -2529,7 +2529,7 @@
     },
     {
       "id": "d2e20c833c",
-      "title": "Kingdome of Hearts \u2014 title sketch",
+      "title": "Kingdome of Hearts — title sketch",
       "cat": "world",
       "status": "auto",
       "tags": [],
@@ -3298,6 +3298,66 @@
       "src": "lantern_ring_audio_gate_mk1_v0_2_concept_sheet.png",
       "full": "abfa303252.webp",
       "thumb": "abfa303252-t.webp"
+    },
+    {
+      "id": "reference-lantern",
+      "title": "How I draw Lantern — hand-drawn character reference",
+      "cat": "reference",
+      "status": "curated",
+      "tags": [
+        "reference",
+        "canon",
+        "lantern"
+      ],
+      "src": "lantern.png",
+      "full": "reference-lantern.webp",
+      "thumb": "reference-lantern-t.webp",
+      "titled_by": "human"
+    },
+    {
+      "id": "reference-eclipse",
+      "title": "How I draw Eclipse — hand-drawn character reference",
+      "cat": "reference",
+      "status": "curated",
+      "tags": [
+        "reference",
+        "canon",
+        "eclipse"
+      ],
+      "src": "eclipse.png",
+      "full": "reference-eclipse.webp",
+      "thumb": "reference-eclipse-t.webp",
+      "titled_by": "human"
+    },
+    {
+      "id": "reference-keystone",
+      "title": "How I draw Keystone — hand-drawn character reference",
+      "cat": "reference",
+      "status": "curated",
+      "tags": [
+        "reference",
+        "canon",
+        "keystone"
+      ],
+      "src": "keystone.png",
+      "full": "reference-keystone.webp",
+      "thumb": "reference-keystone-t.webp",
+      "titled_by": "human"
+    },
+    {
+      "id": "reference-blinkbug",
+      "title": "How I draw Blinkbug — hand-drawn character reference",
+      "cat": "reference",
+      "status": "curated",
+      "tags": [
+        "reference",
+        "canon",
+        "blinkbug"
+      ],
+      "src": "blinkbug.png",
+      "full": "reference-blinkbug.webp",
+      "thumb": "reference-blinkbug-t.webp",
+      "titled_by": "human"
     }
   ]
 }
