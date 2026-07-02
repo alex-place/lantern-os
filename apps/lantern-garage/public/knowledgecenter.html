@@ -129,36 +129,98 @@
 
     .doc-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+      gap: 16px;
     }
+    /* One vertical-card design serves BOTH card structures in the grid:
+       • hand-maintained cards  → .doc-ico + .doc-body(.doc-title,.doc-sum) + .doc-meta
+       • auto-generated cards    → .doc-top(.doc-ico,.doc-fmt) + .doc-title + .doc-sum + .doc-foot
+       Column layout + `margin-top:auto` on the meta/foot row keeps every card the
+       same shape regardless of which markup it uses. */
     .doc-card {
+      --tint: var(--accent);
       position: relative;
-      display: flex; gap: 12px; align-items: flex-start;
-      padding: 14px; background: var(--surface); border: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 10px; align-items: stretch;
+      padding: 20px 20px 18px; background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); text-decoration: none; color: var(--text);
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow); overflow: hidden;
       transition: border-color 0.2s, background 0.2s, transform 0.15s, box-shadow 0.2s;
     }
-    .doc-card:hover { border-color: var(--accent); background: var(--surface2); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-    .doc-card.hidden { display: none; }
-    .doc-ico {
-      flex: none; width: 34px; height: 34px; font-size: 19px; line-height: 1;
-      display: flex; align-items: center; justify-content: center; border-radius: 9px;
-      background: color-mix(in srgb, var(--accent) 12%, transparent);
-      border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+    /* Category-tinted accent rail down the left edge of every card */
+    .doc-card::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      background: var(--tint); opacity: 0.55; transition: opacity 0.2s;
     }
-    .doc-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-    .doc-title { font-size: 0.92rem; font-weight: 650; color: var(--text); }
-    .doc-sum { font-size: 0.78rem; color: var(--muted); line-height: 1.42; }
+    .doc-card:hover { border-color: var(--tint); background: var(--surface2); transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+    .doc-card:hover::before { opacity: 1; }
+    .doc-card.hidden { display: none; }
+
+    /* Top row (auto cards) — icon left, format badge right */
+    .doc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+    .doc-ico {
+      flex: none; width: 52px; height: 52px; font-size: 27px; line-height: 1;
+      display: flex; align-items: center; justify-content: center; border-radius: 13px;
+      background: color-mix(in srgb, var(--tint) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tint) 30%, transparent);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .doc-card:hover .doc-ico { transform: translateY(-1px) scale(1.05); background: color-mix(in srgb, var(--tint) 24%, transparent); }
+
+    /* Body wrapper only exists on hand-maintained cards; auto cards place title/sum directly */
+    .doc-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .doc-title { font-size: 1.02rem; font-weight: 700; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }
+    .doc-sum { font-size: 0.84rem; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
     .doc-status {
-      align-self: flex-start; margin-top: 2px;
+      align-self: flex-start; margin-top: 4px;
       font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
       color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px;
     }
-    .doc-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: none; }
-    .doc-cat { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); font-weight: 700; white-space: nowrap; }
-    .doc-fmt { font-size: 0.58rem; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+
+    /* Bottom metadata row — shared by both markups (.doc-meta = hand, .doc-foot = auto) */
+    .doc-meta, .doc-foot {
+      display: flex; flex-flow: row wrap; align-items: center; gap: 7px;
+      margin-top: auto; padding-top: 4px;
+    }
+    .doc-cat {
+      display: inline-block;
+      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+      white-space: nowrap; color: var(--tint);
+      background: color-mix(in srgb, var(--tint) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--tint) 28%, transparent);
+      border-radius: 999px; padding: 2px 9px;
+    }
+    .doc-fmt {
+      display: inline-block; flex: none;
+      font-size: 0.56rem; font-weight: 700; letter-spacing: 0.05em; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+    }
+    /* Status + grounding badges (auto cards) */
+    .doc-badge {
+      display: inline-block;
+      font-size: 0.58rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      border-radius: 999px; padding: 2px 8px; border: 1px solid var(--border); color: var(--muted);
+    }
+    .doc-badge.b-status[data-s="living"]     { color: #10b981; border-color: color-mix(in srgb, #10b981 40%, transparent); background: color-mix(in srgb, #10b981 10%, transparent); }
+    .doc-badge.b-status[data-s="reference"]  { color: #6366f1; border-color: color-mix(in srgb, #6366f1 40%, transparent); background: color-mix(in srgb, #6366f1 10%, transparent); }
+    .doc-badge.b-ground[data-g="grounded"]   { color: #10b981; border-color: color-mix(in srgb, #10b981 40%, transparent); background: color-mix(in srgb, #10b981 10%, transparent); }
+    .doc-badge.b-ground[data-g="partial"]    { color: #f59e0b; border-color: color-mix(in srgb, #f59e0b 40%, transparent); background: color-mix(in srgb, #f59e0b 10%, transparent); }
+    .doc-badge.b-ground[data-g="ungrounded"] { color: #94a3b8; border-color: color-mix(in srgb, #94a3b8 40%, transparent); background: color-mix(in srgb, #94a3b8 10%, transparent); }
+    .doc-date { font-size: 0.62rem; font-weight: 600; color: var(--muted); margin-left: auto; white-space: nowrap; }
+    /* Per-category tint — keyed on data-cat, so thumbnails + rails read at a glance */
+    .doc-card[data-cat="guides"]         { --tint: #06b6d4; }
+    .doc-card[data-cat="setup"]          { --tint: #14b8a6; }
+    .doc-card[data-cat="trading"]        { --tint: #f59e0b; }
+    .doc-card[data-cat="training"]       { --tint: #8b5cf6; }
+    .doc-card[data-cat="creator"]        { --tint: #ec4899; }
+    .doc-card[data-cat="ops"]            { --tint: #64748b; }
+    .doc-card[data-cat="architecture"]   { --tint: #6366f1; }
+    .doc-card[data-cat="research"]       { --tint: #10b981; }
+    .doc-card[data-cat="convergence-io"] { --tint: #0ea5e9; }
+    .doc-card[data-cat="hff"]            { --tint: #a78bfa; }
+    .doc-card[data-cat="lore"]           { --tint: #fb7185; }
+    .doc-card[data-cat="reports"]        { --tint: #f97316; }
+    .doc-card[data-cat="library"]        { --tint: #22c55e; }
     .doc-del {
       position: absolute; top: 8px; right: 8px;
       width: 22px; height: 22px; border-radius: 50%;
@@ -266,250 +328,6 @@
     <div class="doc-count" id="doc-count"></div>
 
     <div class="doc-grid" id="doc-grid">
-
-      <!-- Guides -->
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/docs/UNISONA-1.8.md">
-        <span class="doc-ico">★</span>
-        <span class="doc-body"><span class="doc-title">Unisona 1.8 Release Notes</span><span class="doc-sum">What shipped in 1.8 — the personal reasoning cockpit, stage by stage.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/AGENTS.md">
-        <span class="doc-ico">🤖</span>
-        <span class="doc-body"><span class="doc-title">Agents Guide</span><span class="doc-sum">How AI agents and the per-agent workstream lanes work.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/PROVIDERS.md">
-        <span class="doc-ico">🔌</span>
-        <span class="doc-body"><span class="doc-title">AI Providers</span><span class="doc-sum">Every AI provider, how to configure them, and the fallback chain.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/SKILLS.md">
-        <span class="doc-ico">🛠️</span>
-        <span class="doc-body"><span class="doc-title">Skills</span><span class="doc-sum">Available capabilities, persona routing, and the provider chain.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/docs/KEYSTONE-BRAND-GUIDELINES.md">
-        <span class="doc-ico">🎨</span>
-        <span class="doc-body"><span class="doc-title">Brand Guidelines</span><span class="doc-sum">Keystone Chat's voice, colors, type, and UI components.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/docs/ADMIN-FEATURE-FLAGS.md">
-        <span class="doc-ico">🚩</span>
-        <span class="doc-body"><span class="doc-title">Feature Flags</span><span class="doc-sum">Admin guide — feature flags &amp; per-page nav visibility.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/docs/KEYSTONE-MCP.md">
-        <span class="doc-ico">🔌</span>
-        <span class="doc-body"><span class="doc-title">Keystone ↔ MCP</span><span class="doc-sum">Chat linked to live project tools — GitHub issues + PRs and MCP tools.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/SECURITY.md">
-        <span class="doc-ico">🔒</span>
-        <span class="doc-body"><span class="doc-title">Security</span><span class="doc-sum">Policies, vulnerability guidelines, and responsible disclosure.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/CONTRIBUTING.md">
-        <span class="doc-ico">🤝</span>
-        <span class="doc-body"><span class="doc-title">Contributing</span><span class="doc-sum">Guidelines for pull requests and issues.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="guides" data-type="md" href="/repo/CODE_OF_CONDUCT.md">
-        <span class="doc-ico">💡</span>
-        <span class="doc-body"><span class="doc-title">Code of Conduct</span><span class="doc-sum">Community standards and expectations.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Guides</span><span class="doc-fmt">MD</span></span>
-      </a>
-
-      <!-- Architecture decisions (ADR) -->
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/README.md">
-        <span class="doc-ico">🏛️</span>
-        <span class="doc-body"><span class="doc-title">Architecture Decision Records</span><span class="doc-sum">The append-only decision log — why the system is the way it is. Index + approval gate.</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR · Index</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0001-record-architecture-decisions.md">
-        <span class="doc-ico">📜</span>
-        <span class="doc-body"><span class="doc-title">ADR-0001 · Record architecture decisions</span><span class="doc-sum">Adopt ADRs as the canonical decision log, with an owner-approval gate.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0002-single-convergence-core.md">
-        <span class="doc-ico">🧩</span>
-        <span class="doc-body"><span class="doc-title">ADR-0002 · Single Convergence Core</span><span class="doc-sum">One native core loop — reject architectural sprawl across components.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0003-one-canonical-csf-module.md">
-        <span class="doc-ico">🗄️</span>
-        <span class="doc-body"><span class="doc-title">ADR-0003 · One canonical CSF module</span><span class="doc-sum">A single CSF serialization module — no parallel forks of the format.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/MEMORY-RETRIEVAL.md">
-        <span class="doc-ico">🧠</span>
-        <span class="doc-body"><span class="doc-title">How Keystone Remembers</span><span class="doc-sum">The CSF memory & retrieval system — tiers, IDF-ranked recall, durable indexing. LongMemEval recall@5 0.43→0.81.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Memory</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0004-append-only-memory.md">
-        <span class="doc-ico">♻️</span>
-        <span class="doc-body"><span class="doc-title">ADR-0004 · Append-only memory</span><span class="doc-sum">JSONL + CSF archive as the only memory systems — append, never mutate.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0005-interchangeable-model-providers.md">
-        <span class="doc-ico">🔁</span>
-        <span class="doc-body"><span class="doc-title">ADR-0005 · Interchangeable model providers</span><span class="doc-sum">Models are interchangeable — a provider abstraction with fallback.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0006-dual-boot-worktree-topology.md">
-        <span class="doc-ico">🥾</span>
-        <span class="doc-body"><span class="doc-title">ADR-0006 · Dual-boot worktree topology</span><span class="doc-sum">The 4177/4178 dual-boot worktree topology for safe parallel work.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" href="/repo/docs/adr/0007-monoworkstream-one-pr-lane-per-agent.md">
-        <span class="doc-ico">🛤️</span>
-        <span class="doc-body"><span class="doc-title">ADR-0007 · Monoworkstream</span><span class="doc-sum">One open PR lane per agent — sovereign workstream lanes, no shared pool.</span><span class="doc-status">Proposed</span></span>
-        <span class="doc-meta"><span class="doc-cat">ADR</span><span class="doc-fmt">MD</span></span>
-      </a>
-
-      <!-- Research & theory -->
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-OURO-CODER.md">
-        <span class="doc-ico">🌀</span>
-        <span class="doc-body"><span class="doc-title">Σ₀ Ouro Coder</span><span class="doc-sum">The single source of truth for the local coder — Ouro-1.4B + Σ₀ QLoRA + adaptive Q-exit depth.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-CONTINUAL-TRAINING.md">
-        <span class="doc-ico">♻️</span>
-        <span class="doc-body"><span class="doc-title">Σ₀ Continual-Training Loop</span><span class="doc-sum">The closed flywheel — harvest → execution-verify → train → eval-gated promote.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md">
-        <span class="doc-ico">📊</span>
-        <span class="doc-body"><span class="doc-title">Progress Report — Shareholder Edition</span><span class="doc-sum">2026-06-19 — what shipped, the real metrics, the honest ceiling, and the roadmap.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-COLLAPSE-CERTIFICATE.md">
-        <span class="doc-ico">📐</span>
-        <span class="doc-body"><span class="doc-title">Σ₀ Collapse Certificate</span><span class="doc-sum">Lyapunov-collapse theorem, the Σ₀ trigger, and the anti-collapse operator. Freeze-prevention now proven for all A (normal & non-normal); Theorem 1 contraction still scoped to normal A.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-EV-GATE.md">
-        <span class="doc-ico">⚖️</span>
-        <span class="doc-body"><span class="doc-title">Σ₀ EV Gate (Trader)</span><span class="doc-sum">The trader's Converge stage: one transparent expected-value model over weighted evidence (Grok, Claude, zone, structure, pattern, trend, news). Grok + Claude are now graded council members, not gates; Σ₀ EV is the sole ENTER/SKIP decider.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-C3-NONCOLLAPSE-NORMAL.md">
-        <span class="doc-ico">🧊</span>
-        <span class="doc-body"><span class="doc-title">Σ₀ Anti-Freeze Theorem (C3)</span><span class="doc-sum">Proof that Σ₀⁻¹ prevents permanent freeze — now closed for all A (normal & non-normal) via the L2′ alignment-free Frobenius bound.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-T1-NONNORMAL-DICHOTOMY.md">
-        <span class="doc-ico">🧭</span>
-        <span class="doc-body"><span class="doc-title">Σ₀ Non-Normal Contraction (T1 — draft)</span><span class="doc-sum">Spectral-dichotomy route to Theorem 1 for non-normal A: collapse vs diverge. In progress — core confirmed numerically, full proof pending.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-COLLAPSE-EXPLAINER.md">
-        <span class="doc-ico">🗺️</span>
-        <span class="doc-body"><span class="doc-title">Collapse Certificate — Plain-Language Guide</span><span class="doc-sum">What Σ₀ is and why grounding is the safety mechanism — no control-theory background needed.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md">
-        <span class="doc-ico">🌌</span>
-        <span class="doc-body"><span class="doc-title">Quantum-Relativity Analysis</span><span class="doc-sum">Companion essay — the QM/GR mapping, explicitly framed as metaphor, not a physics result.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/TESSERACT-CONVERGENCE-LOOP.md">
-        <span class="doc-ico">🔄</span>
-        <span class="doc-body"><span class="doc-title">Tesseract Convergence Loop</span><span class="doc-sum">The 20-step convergence method — 4D status cube, Bayesian beliefs, and receipts.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/RESEARCH-CANON.md">
-        <span class="doc-ico">📚</span>
-        <span class="doc-body"><span class="doc-title">Research Canon</span><span class="doc-sum">Living references organized by Convergence-12 component — the grounding for each loop stage.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/KEYSTONE-IP-AND-BUILDOUT.md">
-        <span class="doc-ico">🛡️</span>
-        <span class="doc-body"><span class="doc-title">IP Register &amp; 2-Year Buildout</span><span class="doc-sum">Defensive-publication IP register + full enabling specs, mapped onto the buildout plan.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-21-overfitted-brain-dreams-generalization.md">
-        <span class="doc-ico">🌙</span>
-        <span class="doc-body"><span class="doc-title">Overfitted Brain — why we dream</span><span class="doc-sum">Hoel's hypothesis: dreams = noise injection for generalization. Grounds the no-dream-engine rule.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-21-convergence-plan-refinement.md">
-        <span class="doc-ico">🧭</span>
-        <span class="doc-body"><span class="doc-title">Convergence plan — 2026 frontier refinement</span><span class="doc-sum">Open build-order steps re-grounded against 2026 research: Brier confidence, verifier gate, live canary.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-19-kernel-model-frontier.md">
-        <span class="doc-ico">🧭</span>
-        <span class="doc-body"><span class="doc-title">Kernel model frontier</span><span class="doc-sum">Ouro LoopLM vs the 2026 dense small-model frontier — primary-source-verified, with a benchmark plan.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-19-convergence-tesseract-spiral.md">
-        <span class="doc-ico">🌀</span>
-        <span class="doc-body"><span class="doc-title">Convergence-exit spiral</span><span class="doc-sum">Recasts Ouro's Q-exit as convergence-exit (loop until ‖Δh‖/‖h‖&lt;ε), then loop→spiral→tesseract.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-19-convergence-core-agent-spine.md">
-        <span class="doc-ico">🧩</span>
-        <span class="doc-body"><span class="doc-title">Convergence Core spine</span><span class="doc-sum">The four core objects, the six-stage loop, and the write-back closure in code — verified file-by-file.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-22-frozen-weights-grounding-loop.md">
-        <span class="doc-ico">🧊</span>
-        <span class="doc-body"><span class="doc-title">Frozen-weights grounding loop</span><span class="doc-sum">The on-canon online convergence loop: weights frozen, adapt via memory + retrieval + calibration.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="md" href="/repo/docs/research/2026-06-22-ouro-subquadratic-attention.md">
-        <span class="doc-ico">⚡</span>
-        <span class="doc-body"><span class="doc-title">Sub-Quadratic Attention — Ouro UT</span><span class="doc-sum">The O(n²×T) training-cost problem mapped across the stack — SDPA fix shipped, SWA as next lever.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="research" data-type="tex" href="/repo/docs/sigma0-collapse-certificate.tex" target="_blank" rel="noopener">
-        <span class="doc-ico">📄</span>
-        <span class="doc-body"><span class="doc-title">Collapse Certificate — LaTeX source</span><span class="doc-sum">TeX source for the certificate — for typesetting and print.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Research</span><span class="doc-fmt">TEX</span></span>
-      </a>
-
-      <!-- Convergence IO stack -->
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/README.md">
-        <span class="doc-ico">🧩</span>
-        <span class="doc-body"><span class="doc-title">Convergence IO — Stack overview</span><span class="doc-sum">Index + how the primitives compose — the P1–P10 map and the gate order.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/DCF.md">
-        <span class="doc-ico">🏷️</span>
-        <span class="doc-body"><span class="doc-title">DCF — Data Classification</span><span class="doc-sum">P1 — every datum carries a class label; labels propagate through transformations.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/NAP.md">
-        <span class="doc-ico">⛔</span>
-        <span class="doc-body"><span class="doc-title">NAP — Negative Authority</span><span class="doc-sum">P2 — what agents are explicitly denied; hard denials can't be overridden by a capability claim.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/AAPF.md">
-        <span class="doc-ico">🧾</span>
-        <span class="doc-body"><span class="doc-title">AAPF — Action Provenance</span><span class="doc-sum">P3 — every action emits a reproducible, hashed record into an append-only ledger.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/PCSF.md">
-        <span class="doc-ico">🔌</span>
-        <span class="doc-body"><span class="doc-title">PCSF — Provider Capacity</span><span class="doc-sum">P4 — provider availability, fallback chain, circuit breakers, and per-tier quota.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/CCF.md">
-        <span class="doc-ico">✅</span>
-        <span class="doc-body"><span class="doc-title">CCF — Capability Claim</span><span class="doc-sum">P4 — an agent must prove a claimed capability at action time; honesty floor enforced.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/CEG.md">
-        <span class="doc-ico">🕸️</span>
-        <span class="doc-body"><span class="doc-title">CEG — Execution Graph</span><span class="doc-sum">The substrate — typed nodes + edges, an optimizer returning a constraint-satisfying plan.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-      <a class="doc-card" data-cat="convergence-io" data-type="md" href="/repo/docs/convergence-io/DILATION.md">
-        <span class="doc-ico">⏳</span>
-        <span class="doc-body"><span class="doc-title">D — Time-Dilation Field</span><span class="doc-sum">Slows uncertain regions, speeds confident ones — maps to how much grounding to buy.</span></span>
-        <span class="doc-meta"><span class="doc-cat">Convergence IO</span><span class="doc-fmt">MD</span></span>
-      </a>
-
 <!-- LIBRARY:AUTO:START (generated by scripts/build_doc_library.js — do not hand-edit) -->
       <!-- In-repo library (catalog-driven; scraped by build_knowledge_index.py → grounding corpus + Explore) -->
       <a class="doc-card" data-cat="guides" data-type="md" data-status="living" data-grounding="ungrounded" href="/repo/AGENTS.md">
@@ -545,8 +363,8 @@
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/adr/README.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Architecture Decision Records (ADRs)</span>
-        <span class="doc-sum">Index and authoring rules for the append-only ADR log; approval gate and status values. Each ADR listed exactly once (0008 collision reconciled 2026-07-01).</span>
-        <span class="doc-foot"><span class="doc-cat">ADR · Index</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
+        <span class="doc-sum">Index and authoring rules for the append-only ADR log; approval gate and status values. Note: two conflicting 0008 rows in the index table.</span>
+        <span class="doc-foot"><span class="doc-cat">ADR · Index</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jun 2026</span></span>
       </a>
       <a class="doc-card" data-cat="research" data-type="md" data-status="reference" data-grounding="partial" href="/repo/docs/RESEARCH-CANON.md">
         <span class="doc-top"><span class="doc-ico">🧪</span><span class="doc-fmt">MD</span></span>
@@ -799,12 +617,6 @@
         <span class="doc-title">ADR-0011: Own a proprietary Σ₀ base model</span>
         <span class="doc-sum">Proposed (not approved): fork a PLT looped-coder into a Keystone-owned Σ₀ base, adapter-only, council+CSF native; staged, each stage gated on on-box evidence.</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
-      </a>
-      <a class="doc-card" data-cat="architecture" data-type="md" data-status="draft" data-grounding="grounded" href="/repo/docs/adr/0013-subsystem-register-one-loop-gate.md">
-        <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">ADR-0013: Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction</span>
-        <span class="doc-sum">ADR (Proposed, awaiting Alex): every public surface is registered CORE (one loop stage) or gated EXTENSION in lib/surface-registry.js, enforced by test:boundary + audit:orphans; consolidates three colliding 0001 drafts from PR #1813.</span>
-        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
       </a>
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="draft" data-grounding="partial" href="/repo/docs/CONVERGENCE-HOOKS.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
@@ -1148,10 +960,10 @@
         <span class="doc-sum">Runbook to train the XGBoost V10 video scorer from YouTube Shorts; runs on mock data, real-API integration into the scorer still a to-do.</span>
         <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
       </a>
-      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-PLT-HANDOFF.md">
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/handoffs/sigma0-continual-training-2026-06-21.md">
         <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">Keystone-Σ₀ PLT — Handoff (2026-07-01)</span>
-        <span class="doc-sum">What this is: the pick-up sheet for the &quot;loopcoder swap&quot; — bootstrapping our own</span>
+        <span class="doc-title">Handoff: Σ₀ continual-training loop (close the flywheel)</span>
+        <span class="doc-sum">Tracking issue: 911</span>
         <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="trading" data-type="md" data-status="reference" data-grounding="ungrounded" href="/repo/docs/KALSHI-API-SPEC.md">
@@ -1424,6 +1236,12 @@
         <span class="doc-sum">Re-runnable harness measuring Keystone&#39;s live memory retrieval on LongMemEval vs Letta/Mem0/Zep; committed fixture is synthetic, real dataset gitignored, incumbents wired not run.</span>
         <span class="doc-foot"><span class="doc-cat">Audits &amp; reports</span><span class="doc-badge b-status" data-s="reference">Reference</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
       </a>
+      <a class="doc-card" data-cat="reports" data-type="md" data-status="unreviewed" href="/repo/docs/adr/adr-001-subsystem-one-loop-audit.md">
+        <span class="doc-top"><span class="doc-ico">📋</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR 001: Subsystem One-Loop Audit</span>
+        <span class="doc-sum">Proposed</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="reference" data-grounding="grounded" href="/repo/docs/caad/architecture/grounding/grounding-manifest.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Grounding Knowledge Base — Provenance Manifest</span>
@@ -1434,6 +1252,12 @@
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">0012 nested adaptive reason</span>
         <span class="doc-sum">APPROVAL GATE: leave status Proposed and approved-by pending. An ADR is not</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0001-subsystem-register-one-loop-gate.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR 0001: Subsystem Register and One-Loop Gate Audit</span>
+        <span class="doc-sum">Proposed</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-hff-500y-merge-convergence.md">
@@ -1459,6 +1283,18 @@
         <span class="doc-title">LLM-judge re-grade of the surprise-leak dataset — and a real bug the re-grade surfaced</span>
         <span class="doc-sum">Loop stages: Verify (the leak).</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/handoffs/opus-autowork-keystone-2026-06-18.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Opus 4.8 Autonomous Work Handoff</span>
+        <span class="doc-sum">Duration: 4 hours</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0001-subsystem-register.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Subsystem Register for One-Loop Alignment</span>
+        <span class="doc-sum">Context:</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="lore" data-type="md" data-status="lore" data-grounding="ungrounded" href="/repo/docs/lore/CAST.md">
         <span class="doc-top"><span class="doc-ico">📜</span><span class="doc-fmt">MD</span></span>
@@ -1748,6 +1584,17 @@
   const cards = () => Array.from(grid.querySelectorAll('.doc-card'));
   const hay = (c) => (c.textContent + ' ' + (c.getAttribute('href') || '')).toLowerCase();
 
+  // Reorder the grid alphabetically by title (case-insensitive, numeric-aware) so
+  // the whole library — and every category slice of it — reads A→Z. Called on load
+  // and again after the PDF reports are folded in.
+  const sortKey = (c) => (c.querySelector('.doc-title')?.textContent || c.textContent || '').trim().toLowerCase();
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  function sortGrid() {
+    cards()
+      .sort((a, b) => collator.compare(sortKey(a), sortKey(b)))
+      .forEach(c => grid.appendChild(c));
+  }
+
   function apply() {
     const term = q.value.toLowerCase().trim();
     const all = cards();
@@ -1847,19 +1694,19 @@
       card.target = '_blank';
       card.rel = 'noopener';
 
-      const metaParts = [];
-      if (pdf.folder) metaParts.push(pdf.folder);
       const dateVal = pdf.publishedAt || pdf.modifiedAt;
-      if (dateVal) metaParts.push(fmtDate(dateVal));
-      if (pdf.size) metaParts.push(fmtSize(pdf.size));
+      const sizeStr = pdf.size ? fmtSize(pdf.size) : '';
+      const dateStr = dateVal ? fmtDate(dateVal) : '';
 
       card.innerHTML =
-        '<span class="doc-ico">📄</span>' +
-        '<span class="doc-body">' +
-          '<span class="doc-title">' + esc(cleanTitle(pdf.pdfTitle) || pdf.name) + '</span>' +
-          '<span class="doc-sum">' + esc(metaParts.join(' · ')) + '</span>' +
+        '<span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">PDF</span></span>' +
+        '<span class="doc-title">' + esc(cleanTitle(pdf.pdfTitle) || pdf.name) + '</span>' +
+        '<span class="doc-sum">' + esc(pdf.folder || 'Research report') + '</span>' +
+        '<span class="doc-foot">' +
+          '<span class="doc-cat">Reports</span>' +
+          (sizeStr ? '<span class="doc-badge">' + esc(sizeStr) + '</span>' : '') +
+          (dateStr ? '<span class="doc-date">' + esc(dateStr) + '</span>' : '') +
         '</span>' +
-        '<span class="doc-meta"><span class="doc-cat">Reports</span><span class="doc-fmt">PDF</span></span>' +
         '<button class="doc-del" title="Delete document" aria-label="Delete">✕</button>';
 
       card.querySelector('.doc-del').addEventListener('click', async (e) => {
@@ -1880,11 +1727,13 @@
 
       grid.appendChild(card);
     }
+    sortGrid();   // re-sort A→Z now that PDFs are in the grid
     apply();
   }
 
+  sortGrid();     // alphabetize the static docs
   apply();        // initial counts for the static docs
-  loadReports();  // then fold in the PDFs and recount
+  loadReports();  // then fold in the PDFs, re-sort, and recount
 })();
 </script>
 <script src="/js/narrator.js" defer></script>
