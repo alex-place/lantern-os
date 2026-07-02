@@ -11,6 +11,13 @@ superseded-by: none
 
 # ADR-0008: The end product is a personal AI wrapper — user capabilities are Tools + Skills in the one loop
 
+> **Consolidation note (2026-07-01).** This file absorbed the duplicate
+> `0008-personal-ai-wrapper-end-product.md` (added by PR #1144), which claimed the same
+> ADR number and carried `status: Accepted` without an `approved-by` — in violation of
+> the approval gate. Its unique content (the no-autonomous-submission rule, the
+> `~/.keystone/workspace/` default, and follow-on issues #1095–#1100) is merged below;
+> the status remains **Proposed** until Alex explicitly approves.
+
 ## Status
 
 Proposed — awaiting approval from Alex Place.
@@ -32,7 +39,7 @@ The practical consequence of the missing definition: when asked "can it help a u
 information, fill out a job application, or make a resume?", the honest answer today is *no* —
 the only model-callable tool surface is the chat tool-loop's **7 repo-coding tools** (Read, LS,
 Glob, Grep, Bash, PowerShell, Write, Edit), all **sandboxed to the repo**
-([`tool-runner.js:33-136`](../apps/lantern-garage/lib/tool-runner.js)). The trained Ouro adapter
+([`tool-runner.js:33-136`](../../apps/lantern-garage/lib/tool-runner.js)). The trained Ouro adapter
 likewise clones *coding-session* behavior. Without a decided product scope, every such request
 gets reframed as "a different product," and capability never accretes toward a coherent whole.
 
@@ -52,22 +59,27 @@ so that broadening scope does **not** become sprawl (which ADR-0002 forbids).
 
 2. **Capabilities are Tools + Skills, not subsystems.** Every new user-facing ability is added as a
    **Tool** (a `name + input + output + success` capability — the core Tool object,
-   [`objects.py:95`](../src/convergence/objects.py)) registered in the canonical registry
-   ([`tool-runner.js`](../apps/lantern-garage/lib/tool-runner.js) /
-   [`tool_registry.py`](../src/convergence/tool_registry.py)), optionally orchestrated by a **Skill**
+   [`objects.py:95`](../../src/convergence/objects.py)) registered in the canonical registry
+   ([`tool-runner.js`](../../apps/lantern-garage/lib/tool-runner.js) /
+   [`tool_registry.py`](../../src/convergence/tool_registry.py)), optionally orchestrated by a **Skill**
    (a workflow over tools). They run in the loop's **Act** stage and are grounded in **Verify**.
    This keeps ADR-0002 intact: a resume builder is *Act-stage extension*, never a top-level system.
 
 3. **Model-agnostic capability.** Tools/Skills are independent of which model calls them (ADR-0005):
    the served local model (Ouro) handles cheap / private / offline / narrow calls; cloud models
    handle hard multi-step reasoning. The same `<tool_call>` protocol drives both
-   ([`tool-runner.js:150` preamble](../apps/lantern-garage/lib/tool-runner.js);
-   [`stream-chat.js:1579-1634` local tool loop](../apps/lantern-garage/lib/stream-chat.js)).
+   ([`tool-runner.js:150` preamble](../../apps/lantern-garage/lib/tool-runner.js);
+   [`stream-chat.js:1579-1634` local tool loop](../../apps/lantern-garage/lib/stream-chat.js)).
 
 4. **Two scopes of filesystem access.** The repo sandbox (`_safe()` rejecting paths outside the
    repo) is correct for *coding* tools but blocks *user* tools. A capability that produces a user
-   artifact (a resume PDF) must write to a **user workspace** distinct from the repo, gated by the
+   artifact (a resume PDF) must write to a **user workspace** distinct from the repo
+   (`~/.keystone/workspace/` by default, configurable via `KEYSTONE_WORKSPACE`), gated by the
    same operator/consent checks — not by widening the repo sandbox.
+
+5. **No autonomous submission.** The human must confirm any action that affects external state
+   (sending email, submitting a form, publishing content). The `web_fetch` tool reads; it does
+   not post.
 
 ## Options Considered
 
@@ -106,15 +118,15 @@ but it is *extension* work on an existing spine, not new architecture.
   grounding apply uniformly to every task.
 - **Negative / trade-offs:** the current surface is coding-only, so the wrapper vision is *aspirational
   until the user tool surface exists*; building it must resist the urge to spin up subsystems.
-- **Follow-ups (candidate issues, each an Act-stage Tool/Skill — not a subsystem):**
-  1. **Information tools** — `web_search` / `web_fetch` with cited, grounded results (Observe/Verify).
-  2. **User workspace** — a non-repo, consent-gated file area for user artifacts (distinct from `_safe()`).
-  3. **Document/artifact tools** — resume / cover-letter / DOCX / PDF generation over templates.
-  4. **Job-application Skill** — a workflow orchestrating lookup → document → fill/submit, human-in-loop.
+- **Follow-ups (filed as issues #1095–#1100, each an Act-stage Tool/Skill — not a subsystem):**
+  1. **Information tools** — `web_search` / `web_fetch` with cited, grounded results (Observe/Verify). (#1095)
+  2. **User workspace** — a non-repo, consent-gated file area for user artifacts (distinct from `_safe()`). (#1096)
+  3. **Document/artifact tools** — resume / cover-letter / DOCX / PDF generation over templates. (#1097)
+  4. **Job-application Skill** — a workflow orchestrating lookup → document → fill/submit, human-in-loop. (#1098)
   5. **Real Skills** — only 4 of 17 skill dirs are implemented ([ARCHITECTURE.md §9.2](../ARCHITECTURE.md));
-     user capabilities need genuine implementations, not contracts.
+     user capabilities need genuine implementations, not contracts. (#1099)
   6. **Training data** — capability behavior (lookup/resume/forms) is not coding-session data; capture
-     or synthesize those trajectories separately if the local model is to drive them.
+     or synthesize those trajectories separately if the local model is to drive them. (#1100)
 
 ## Alternatives considered
 
@@ -128,7 +140,7 @@ every user-capability request a scope argument instead of a build task.
 | No existing ADR defines the end-product/user-capability scope | [docs/adr/](.) ADRs 0001–0007 are all infrastructure | High | repo |
 | Briefing frames product as "reasoning and coding" | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md) | High | project doc |
 | Codemap/architecture already span chat, trading, media, orchestration | [CODEMAP.md §1](../CODEMAP.md), [ARCHITECTURE.md §4/§8](../ARCHITECTURE.md) | High | project docs |
-| Only model-callable tools today are 7 repo-coding tools, repo-sandboxed | [`tool-runner.js:33-136`](../apps/lantern-garage/lib/tool-runner.js) | High | code |
-| Local model gets a tool-exec loop when `CHAT_TOOL_EXEC=1` | [`stream-chat.js:1579-1634`](../apps/lantern-garage/lib/stream-chat.js) | High | code |
-| Tool is a core object; capabilities belong in Act | [`objects.py:95`](../src/convergence/objects.py), [ARCHITECTURE.md §3](../ARCHITECTURE.md) | High | code/doc |
-| Only 4 of 17 skills implemented | [ARCHITECTURE.md §9.2](../ARCHITECTURE.md), [CLAUDE.md](../CLAUDE.md) | High | project docs |
+| Only model-callable tools today are 7 repo-coding tools, repo-sandboxed | [`tool-runner.js:33-136`](../../apps/lantern-garage/lib/tool-runner.js) | High | code |
+| Local model gets a tool-exec loop when `CHAT_TOOL_EXEC=1` | [`stream-chat.js:1579-1634`](../../apps/lantern-garage/lib/stream-chat.js) | High | code |
+| Tool is a core object; capabilities belong in Act | [`objects.py:95`](../../src/convergence/objects.py), [ARCHITECTURE.md §3](../ARCHITECTURE.md) | High | code/doc |
+| Only 4 of 17 skills implemented | [ARCHITECTURE.md §9.2](../ARCHITECTURE.md), [CLAUDE.md](../../CLAUDE.md) | High | project docs |

@@ -1502,15 +1502,17 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         }
       }
 
-      // GET — Grounded deck: near-term groundable EVENT markets (weather first),
-      // web-researched P(YES) vs market price, fee-aware EV. Paper-only; renders from
-      // cache instantly and grounds misses in the background. The profitable arm —
-      // edge from information the thin market hasn't priced (vs momentum, which has none).
+      // GET — Grounded deck: the Σ₀ weather-edge deck. DETERMINISTIC, no LLM — every
+      // card's fair value is the live NWS-calibrated model (kalshi-weather-edge) against
+      // the live KXHIGHNY board, and an edge shows only when it survives the whole
+      // calibration band net of fees. This replaced the old LLM suggester, whose cards
+      // sat "pending" forever whenever a provider was unfunded. Paper-only; the profitable
+      // arm — edge from the >=100°F ceiling the thin market over-prices on extreme days.
       if (url.pathname === '/api/trading/kalshi/grounded-deck' && req.method === 'GET') {
-        const eventSuggester = require('../lib/kalshi-event-suggester');
+        const weatherDeck = require('../lib/kalshi-weather-edge-deck');
         const limit = q.limit ? Number(q.limit) : 12;
         try {
-          const out = await eventSuggester.getGroundedSuggestions({ limit });
+          const out = await weatherDeck.getWeatherEdgeDeck({ limit });
           return sendJson(res, out, 200), true;
         } catch (e) {
           return sendJson(res, { cards: [], count: 0, mode: 'grounded', error: e.message }, 200), true;

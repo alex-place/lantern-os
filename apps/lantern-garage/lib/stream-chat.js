@@ -1559,6 +1559,15 @@ async function handleStreamChat(req, url, res) {
     if (degradedLocal) {
       signature.degraded = true;
       finalRouteLabel = `${routeLabel} · ⚠ degraded — local model (cloud unreachable)`;
+    } else if (isLocalSource && isCodingIntent && !requestedProvider && !isRpMode) {
+      // #1556 [CAP-4]: coding-on-local is the designed fast path (#1167), NOT a
+      // cloud outage — so we don't claim "cloud unreachable". But a local model is
+      // weakest exactly at complex coding, the prime confident-wrong case. Set the
+      // capability expectation so the UI warns instead of passing a possibly
+      // fabricated coding answer off as authoritative. Acceptance: local-only
+      // coding turns warn (and can escalate) rather than fabricate.
+      signature.capability = "local-coding";
+      finalRouteLabel = `${routeLabel} · ⓘ local model — complex coding may be limited; ask to escalate`;
     }
     // Σ₀ verify: fire-and-forget — full grounding via dream-chat.js::verifyResponse
     if (SIGMA0_VERIFY && fullReply && message) {

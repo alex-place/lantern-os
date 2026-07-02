@@ -6,6 +6,25 @@ updated: 2026-06-25
 
 # Σ₀ Ouro Coder — the local coding agent (single source of truth)
 
+> ## ⚠️ Role update (2026-07-01): Ouro is now the KERNEL, not the coding lead
+>
+> When this doc was written, Ouro was *the* local coder. That changed. The current split in
+> [`local-model-registry.js`](../apps/lantern-garage/lib/local-model-registry.js) is:
+> - **Coding / reasoning / default lead → `keystone-sigma0-plt`** — the owned Parallel Loop
+>   Transformer we bootstrap from LoopCoder-V2 ([ADR-0011](adr/0011-proprietary-sigma0-base-model.md);
+>   serves on its own shim at `:11435`). It is the **sole local coder** by operator decision, but
+>   still **`verified:false`** — it leads because there's no verified peer to displace, not because
+>   it won an eval. Faithful parity + a head-to-head win vs a frontier coder are the open gates.
+> - **Kernel (the Σ₀ Convergence Core path) → Ouro / `keystone-ft`** — *this doc*. Ouro stays the
+>   recurrent-depth kernel/research front (Q-exit self-convergence) on `:11434`; it is no longer
+>   the universal coding default.
+>
+> So: two looped families, distinct roles, one Convergence Core — **not** parallel product coders.
+> Everything below still accurately describes the Ouro kernel path and the loop mechanism. For the
+> owned-PLT coder, see [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) and
+> [`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md) /
+> [`HANDOFF`](SIGMA0-PLT-HANDOFF.md).
+
 > **This is the one doc for the local Σ₀ coder — then and now.** It supersedes and folds
 > in two older pages:
 > - **`LANTERN-SIGMA0-CODER.md`** — *what we had then*: the Qwen2.5-Coder-3B QLoRA model
