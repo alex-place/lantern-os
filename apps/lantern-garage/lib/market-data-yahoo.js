@@ -248,4 +248,108 @@ function round(n, d) {
   return Math.round(n * f) / f;
 }
 
-module.exports = { getQuotes, getBars, getBarsMulti, isCrypto, tickerToYahoo, _TF: TF };
+// Is the US equity session open right now? (Mon–Fri, 09:30–16:00 America/New_York.)
+// DST-correct via Intl; does NOT account for market holidays — good enough to
+// avoid the 7s Python/Alpaca clock call that used to hang the header (#1860).
+function isUsEquityMarketOpen() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', weekday: 'short', hour: '2-digit',
+      minute: '2-digit', hour12: false,
+    }).formatToParts(new Date());
+    const get = (t) => parts.find((p) => p.type === t)?.value;
+    const wd = get('weekday');
+    if (wd === 'Sat' || wd === 'Sun') return false;
+    const mins = parseInt(get('hour'), 10) * 60 + parseInt(get('minute'), 10);
+    return mins >= 570 && mins < 960; // 09:30 (570) .. 16:00 (960) ET
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Keyless market status — VIX + regime + SPY trend + session open, straight from
+ * Yahoo. Replaces the Python→Alpaca `get_market_status` call that hit the 7s
+ * timeout and left the header's VIX/Market stuck at "—" (#1860). Broker-only
+ * fields (equity, day P&L) are NOT here — they come from getPositions.
+ * Returns: { market_open, vix, vix_regime, market, spy_1d, spy_5d, available, source, timestamp }
+ */
+async function getMarketStatus() {
+  const key = 'market_status';
+  const hit = cacheGet(key, QUOTE_TTL);
+  if (hit) return hit;
+
+  let vix = 0, spy_1d = 0, spy_5d = 0, gotData = false;
+  try {
+    const vres = await fetchChart('^VIX', '1d', '5d');
+    vix = Number(vres.meta && vres.meta.regularMarketPrice) || 0;
+    if (vix > 0) gotData = true;
+  } catch (e) { /* fall through — VIX optional */ }
+  try {
+    const sres = await fetchChart('SPY', '1d', '1mo');
+    const bars = parseBars(sres, 1);
+    if (bars.length >= 2) {
+      const last = bars[bars.length - 1].close;
+      const prev = bars[bars.length - 2].close;
+      const first5 = bars[Math.max(0, bars.length - 6)].close;
+      if (prev > 0) spy_1d = ((last - prev) / prev) * 100;
+      if (first5 > 0) spy_5d = ((last - first5) / first5) * 100;
+      gotData = true;
+    }
+  } catch (e) { /* fall through — SPY optional */ }
+
+  const vix_regime = vix <= 0 ? 'UNKNOWN'
+    : vix < 20 ? 'CALM' : vix < 30 ? 'ELEVATED' : vix < 40 ? 'HIGH' : 'EXTREME';
+  const market = spy_1d > 0.1 ? 'BULLISH' : spy_1d < -0.1 ? 'BEARISH' : 'NEUTRAL';
+
+  const out = {
+    market_open: isUsEquityMarketOpen(),
+    vix: round(vix, 2),
+    vix_regime,
+    market,
+    spy_1d: round(spy_1d, 2),
+    spy_5d: round(spy_5d, 2),
+    available: gotData,
+    source: 'yahoo',
+    timestamp: new Date().toISOString(),
+  };
+  if (gotData) cacheSet(key, out);
+  return out;
+}
+
+/**
+ * Keyless symbol validation — a live Yahoo quote probe. Replaces the Python
+ * Alpaca-asset lookup that timed out at 7s, breaking "+ Add symbol" search and
+ * validation (#1859/#1860). A ticker with a positive Yahoo price is treated as
+ * valid + tradable.
+ * Returns: { valid, tradable, symbol, name, exchange, asset_class, price?, reason }
+ */
+async function validateSymbol(ticker) {
+  const t = String(ticker || '').trim().toUpperCase();
+  if (!t || !/^[\^A-Z0-9.\-/]{1,12}$/.test(t)) {
+    return { valid: false, tradable: false, symbol: t, reason: 'invalid format' };
+  }
+  try {
+    const res = await fetchChart(t, '1d', '5d');
+    const meta = res.meta || {};
+    const price = Number(meta.regularMarketPrice) || 0;
+    if (price > 0) {
+      return {
+        valid: true, tradable: true, symbol: t,
+        name: meta.shortName || meta.longName || t,
+        exchange: meta.fullExchangeName || meta.exchangeName || '',
+        asset_class: isCrypto(t) ? 'crypto' : 'us_equity',
+        price: round(price, 4),
+        reason: '',
+      };
+    }
+    return { valid: false, tradable: false, symbol: t, reason: 'no market data' };
+  } catch (e) {
+    return { valid: false, tradable: false, symbol: t, reason: 'not a known symbol' };
+  }
+}
+
+module.exports = {
+  getQuotes, getBars, getBarsMulti, getMarketStatus, validateSymbol,
+  isCrypto, tickerToYahoo, isUsEquityMarketOpen, _TF: TF,
+};
