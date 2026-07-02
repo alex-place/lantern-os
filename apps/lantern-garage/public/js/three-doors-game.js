@@ -233,149 +233,29 @@ function awardPrize(prizeId) {
   }
 }
 
-async function chooseFutureDoor(doorName) {
-  appendUserMsg(`I choose the ${doorName} path.`);
-  removeDoorChoices();
-  const typingEl = appendTyping();
-
-  try {
-    const resp = await fetch("/api/three-doors/choose-future-door", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        doorName,
-        currentScene: playerProgress.currentScene,
-        history: gameState.history,
-        playerProgress,
-      }),
-    });
-
-    if (!resp.ok) {
-      throw new Error(`Server error: ${resp.statusText}`);
+// Sigil — City of Doors: every threshold made visible. Builds the walked-paths
+// strip shown inside the sigil-city scene message (the skill's promise for this
+// gate: keys, markets, bridges — an inventory of the doors you have opened).
+function buildWalkedPathsHTML() {
+  const walked = playerProgress.walkedDoors || [];
+  if (!walked.length) return "";
+  const pills = walked.slice(-18).map(doorId => {
+    let fromSceneKey, name;
+    if (doorId.includes("::")) {
+      // Current format: "<scene_key>::<door name>"
+      [fromSceneKey, name] = [doorId.slice(0, doorId.indexOf("::")), doorId.slice(doorId.indexOf("::") + 2)];
+    } else {
+      // Legacy format: "<scene_key>-<label>" — resolve label against the scene
+      const cut = doorId.lastIndexOf("-");
+      fromSceneKey = doorId.slice(0, cut);
+      const doorLabel = doorId.slice(cut + 1);
+      const door = SCENES[fromSceneKey]?.doors?.find(d => d.label === doorLabel);
+      name = door ? door.name : doorLabel;
     }
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-    let fullResponse = "";
-    let imageId = null;
-    let futureAnalysis = null;
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete lines
-      let lastNewlineIndex;
-      while ((lastNewlineIndex = buffer.indexOf("\n")) !== -1) {
-        const line = buffer.substring(0, lastNewlineIndex).trim();
-        buffer = buffer.substring(lastNewlineIndex + 1);
-
-        if (line.startsWith("data:")) {
-          const data = JSON.parse(line.substring(5));
-          if (data.type === "token") {
-            fullResponse += data.text;
-            typingEl.querySelector(".message-content").innerHTML = md(fullResponse);
-          } else if (data.type === "image_id") {
-            imageId = data.id;
-            renderImagePlaceholder(imageId);
-          } else if (data.type === "future_analysis") {
-            futureAnalysis = data.analysis;
-          }
-        }
-      }
-    }
-
-    removeTyping();
-    typingEl.remove(); // Remove the typing indicator element itself
-    appendAgentMsg(fullResponse); // Append the final message
-
-    // Update futurePathsVisited for challenge
-    playerProgress.futurePathsVisited = (playerProgress.futurePathsVisited || 0) + 1;
-    saveProgress();
-    checkChallenges("future-doors", null, true);
-
-    if (imageId) {
-      // Poll for image completion and update the placeholder
-      pollForImage(imageId, (imageUrl) => {
-        const imgEl = document.getElementById(`image-placeholder-${imageId}`);
-        if (imgEl) {
-          imgEl.outerHTML = `<img src="${imageUrl}" alt="Generated scene" class="generated-image" />`;
-        }
-      });
-    }
-
-    if (futureAnalysis) {
-      // Display the future analysis as a special message
-      const chat = document.getElementById("chat");
-      const el = document.createElement("div");
-      el.className = "message agent toast";
-      el.innerHTML = `<div class="agent-avatar">🔮</div><div class="message-content" style="border-left-color:#8b5cf6"><div style="font-size:12px;font-weight:600;color:#8b5cf6;margin-bottom:2px">Future Path Analysis</div><div style="font-size:13px">${md(futureAnalysis)}</div></div>`;
-      chat.appendChild(el);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    // The Tomorrow Door doesn't lead to a new scene directly, but analyzes a future.
-    // The game should then return to the previous scene or offer new choices.
-    // For now, we'll just re-render the current scene to allow more choices.
-    renderScene(SCENES[playerProgress.currentScene.key], false);
-
-  } catch (e) {
-    removeTyping();
-    appendAgentMsg(`An error occurred while choosing the future path: ${e.message}`);
-    renderScene(SCENES[playerProgress.currentScene.key], false); // Allow retrying
-  }
-}
-
-/**
- * Dynamically generates door options for the 'sigil-city' scene based on
- * the player's `walkedDoors` array.
- */
-function renderSigilCity() {
-  const scene = SCENES["sigil-city"];
-  const doorOptionsEl = document.getElementById("door-options");
-  doorOptionsEl.innerHTML = ""; // Clear existing options
-
-  // Add static doors first
-  scene.doors.forEach((door, index) => {
-    const btn = document.createElement("button");
-    btn.className = "door-button";
-    btn.innerHTML = `<span class="door-label">${door.label}</span> <span class="door-name">${door.name}</span><br><span class="door-description">${door.description}</span>`;
-    btn.onclick = () => chooseDoor(door.label);
-    doorOptionsEl.appendChild(btn);
-  });
-
-  // Add dynamically generated doors for walked paths
-  if (playerProgress.walkedDoors && playerProgress.walkedDoors.length > 0) {
-    const walkedDoorsContainer = document.createElement("div");
-    walkedDoorsContainer.className = "walked-doors-container";
-    
-    const header = document.createElement("h3");
-    header.textContent = "Your Walked Paths:";
-    walkedDoorsContainer.appendChild(header);
-
-    playerProgress.walkedDoors.forEach((doorId, index) => {
-      const [fromSceneKey, doorLabel] = doorId.split('-');
-      const fromScene = SCENES[fromSceneKey];
-      if (fromScene) {
-        const originalDoor = fromScene.doors.find(d => d.label === doorLabel);
-        if (originalDoor) {
-          const btn = document.createElement("button");
-          btn.className = "door-button walked-door-button";
-          btn.innerHTML = `<span class="door-label">🚪</span> <span class="door-name">${originalDoor.name}</span><br><span class="door-description">From ${fromScene.text.split('\n')[0].replace(/\*\*/g, '').replace('You stand inside ', '').replace('You crawl through ', '').replace('Beneath ', '').replace('Through ', '').replace('Past the meadow, the path forks upward into ', '').replace('The ', '').replace(' Door', '')}</span>`;
-          // For now, just log. Later, this could lead to a "revisit" or "compare" function.
-          btn.onclick = () => {
-            appendUserMsg(`Revisiting ${originalDoor.name} from ${fromScene.text.split('\n')[0].replace(/\*\*/g, '').replace('You stand inside ', '').replace('You crawl through ', '').replace('Beneath ', '').replace('Through ', '').replace('Past the meadow, the path forks upward into ', '').replace('The ', '').replace(' Door', '')}`);
-            // Implement logic to revisit or show details of the door
-          };
-          walkedDoorsContainer.appendChild(btn);
-        }
-      }
-    });
-    doorOptionsEl.appendChild(walkedDoorsContainer);
-  }
+    const from = fromSceneKey.replace(/-/g, " ");
+    return `<span class="history-pill" title="from ${from}">🚪 ${name}</span>`;
+  }).join("");
+  return `<div class="walked-paths"><div class="doors-kicker">Doors you have walked</div><div>${pills}</div></div>`;
 }
 
 function showPrizeToast(prizeId) {
@@ -650,10 +530,6 @@ function resolveDoorTarget(doorName, spineIndex) {
       const nk = normalizeDoorName(k);
       if (nk === norm || nk.replace(/^the /, "") === noThe) { target = NEXT_MAP[k]; break; }
     }
-  }
-  // Render Sigil City if it's the current scene
-  if (gameState.currentScene === "sigil-city") {
-    renderSigilCity();
   }
   if (target && SCENES[target]) return target;
   return STAGES[(spineIndex + 1) % STAGES.length];   // onward fallback = next gate
@@ -986,7 +862,10 @@ async function chooseDoor(label, name) {
   doorsLocked = true;
 
   logThreeDoorsEvent("door_choice", { label, name, sceneKey: gameState?.scene_key });
-  addWalkedDoor(`${gameState?.scene_key || "start"}-${label}`); // Track the specific door walked (Sigil City walked-paths)
+  // Track the walked door by NAME (labels get remapped A/B/C per turn, so a
+  // label lookup can resolve to the wrong door). "::" separates scene from
+  // name; buildWalkedPathsHTML still tolerates legacy "<scene>-<label>" ids.
+  addWalkedDoor(`${gameState?.scene_key || "start"}::${name}`);
   writeCubeDelta('story_choice', [name.toLowerCase().replace(/\s+/g, '-')], 'explore:' + (gameState?.scene_key || ''), { coordinate: `explore:${gameState?.scene_key || ''}:${label}` });
 
   document.querySelectorAll(".door-chip").forEach(b => b.disabled = true);

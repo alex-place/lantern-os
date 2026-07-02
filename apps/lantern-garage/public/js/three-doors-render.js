@@ -141,6 +141,12 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
       </div>`
     : "";
 
+  // Sigil — City of Doors: every threshold made visible. Show the doors the
+  // player has actually walked (built from playerProgress.walkedDoors).
+  const walkedPaths = sceneKey === "sigil-city" && typeof buildWalkedPathsHTML === "function"
+    ? buildWalkedPathsHTML()
+    : "";
+
   el.innerHTML = `
     <div class="message-content">
       ${breadcrumb}
@@ -153,6 +159,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
       <div id="${descId}" class="scene-narration">${md(displayText)}</div>
       ${lanternLine}
       ${castStrip}
+      ${walkedPaths}
       ${doorHTML}
     </div>`;
 
