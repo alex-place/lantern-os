@@ -88,12 +88,6 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
   const el = document.createElement("div");
   el.className = "message agent doors-message";
 
-  const sourceBadge = source === "local"
-    ? `<span class="source-badge gemini">Local LLM</span>`
-    : source === "engine"
-    ? `<span class="source-badge engine">Engine</span>`
-    : `<span class="source-badge offline">Offline</span>`;
-
   // Scene art
   const canvasId = "cvs-" + sceneKey + "-" + Date.now();
   const imgId = "img-" + sceneKey + "-" + Date.now();
@@ -113,7 +107,7 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
   // a second time. Doors are always shown; no gate, no duplicate.
   const doorHTML = `
       <div class="doors-section">
-        <div class="doors-kicker">Choose a door to continue</div>
+        <div class="doors-kicker">A, B, or C — choose your door</div>
         <div class="doors-banner">
           ${doors.map(d => `
             <button class="door-chip" onclick="chooseDoor('${d.label}', '${d.name.replace(/'/g, "\\'")}')">
@@ -126,20 +120,46 @@ function appendSceneMsg(sceneKey, sceneData, geminiText, source) {
         </div>
       </div>`;
 
+  // One-line caption naming the moment (the skill's turn contract: the
+  // painting is the scene; the caption names the beat).
+  const lastChoice = (history.filter(h => h.startsWith("Chose ")).slice(-1)[0] || "").replace("Chose ", "");
+  const sceneTitle = (scene.text || sceneData.text || "").match(/\*\*([^*]+)\*\*/)?.[1] || sceneKey.replace(/-/g, " ");
+  const caption = lastChoice ? `${sceneTitle} — through ${lastChoice}` : sceneTitle;
+
+  // Lantern's line: on resume it says what it always says, and means it.
+  const lanternLine = sceneData.resumed
+    ? `<div class="fox-line">🏮 <em>"You came back."</em></div>`
+    : foxPresent ? `<div class="fox-line">🏮 Lantern, your guide, is with you.</div>` : "";
+
+  // Opening beat only: introduce the companions in Alex's hand-drawn canon.
+  const castStrip = sceneKey === "castle-balcony" && !sceneData.resumed
+    ? `<div class="cast-strip" aria-label="The companions, as Alex draws them">
+        <figure><img src="/assets/content/koh/reference-lantern-t.webp" alt="Lantern"><figcaption>Lantern</figcaption></figure>
+        <figure><img src="/assets/content/koh/reference-eclipse-t.webp" alt="Eclipse"><figcaption>Eclipse</figcaption></figure>
+        <figure><img src="/assets/content/koh/reference-keystone-t.webp" alt="Keystone"><figcaption>Keystone</figcaption></figure>
+        <figure><img src="/assets/content/koh/reference-blinkbug-t.webp" alt="Blinkbug"><figcaption>Blinkbug</figcaption></figure>
+      </div>`
+    : "";
+
+  // Sigil — City of Doors: every threshold made visible. Show the doors the
+  // player has actually walked (built from playerProgress.walkedDoors).
+  const walkedPaths = sceneKey === "sigil-city" && typeof buildWalkedPathsHTML === "function"
+    ? buildWalkedPathsHTML()
+    : "";
+
   el.innerHTML = `
     <div class="message-content">
-      <div class="scene-kicker">
-        Lantern ${sourceBadge}
-      </div>
       ${breadcrumb}
       <div class="scene-image">
         <img id="${imgId}" alt="Scene art" style="display:none"
           onload="this.style.display='';document.getElementById('${canvasId}').style.display='none';logThreeDoorsEvent('image_load', { sceneKey: '${sceneKey}', source: 'image' })">
         <canvas id="${canvasId}" width="800" height="450"></canvas>
-        <div class="sd-badge">SD prompt — hover to copy</div>
       </div>
+      <div class="scene-caption">${caption}</div>
       <div id="${descId}" class="scene-narration">${md(displayText)}</div>
-      ${foxPresent ? `<div class="fox-line">🏮 Lantern, your guide, is with you.</div>` : ""}
+      ${lanternLine}
+      ${castStrip}
+      ${walkedPaths}
       ${doorHTML}
     </div>`;
 

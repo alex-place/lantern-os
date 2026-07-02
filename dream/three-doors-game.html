@@ -155,16 +155,18 @@
   }
   .scene-image canvas,
   .scene-image img { width: 100%; height: 100%; display: block; object-fit: cover; }
-  .scene-image .sd-badge {
-    position: absolute;
-    bottom: 7px;
-    right: 10px;
-    font-size: 10px;
+  /* Image-forward: the painting is the scene. One-line caption names the beat. */
+  .scene-caption {
+    font-size: 12px;
     color: var(--muted);
-    background: rgba(0,0,0,0.6);
-    padding: 2px 7px;
-    border-radius: 4px;
+    font-style: italic;
+    text-align: center;
+    margin: -2px 0 10px;
+    letter-spacing: 0.02em;
   }
+
+  .walked-paths { margin-top: 10px; }
+  .walked-paths .history-pill { font-size: 11px; padding: 3px 8px; }
 
   .fox-line {
     font-size: 13px;
@@ -480,6 +482,27 @@
     margin-bottom: 6px;
   }
 
+  /* The companions, in Alex's hand-drawn canon — shown before the game begins */
+  .cast-strip {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin: 4px auto 20px;
+    animation: fadeInUp 0.6s ease-out 0.7s forwards;
+    opacity: 0;
+  }
+  .cast-strip figure { margin: 0; text-align: center; }
+  .cast-strip img {
+    width: 64px; height: 64px;
+    object-fit: contain;
+    border-radius: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 4px;
+  }
+  .cast-strip figcaption { font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: 0.05em; }
+  @media (max-width: 480px) { .cast-strip { gap: 10px; } .cast-strip img { width: 52px; height: 52px; } }
+
   .start-btn {
     background: var(--door-accent);
     color: #1a0d0f;
@@ -656,6 +679,12 @@
       <div class="welcome-doors-content">
         <h2>Kingdome of Hearts</h2>
         <p>A seven-gate dream loop. Every door you take reshapes the one after it — no wrong choices, and no two loops the same.</p>
+        <div class="cast-strip" aria-label="The companions, as Alex draws them">
+          <figure><img src="/assets/content/koh/reference-lantern-t.webp" alt="Lantern — hand-drawn reference" loading="lazy"><figcaption>Lantern</figcaption></figure>
+          <figure><img src="/assets/content/koh/reference-eclipse-t.webp" alt="Eclipse — hand-drawn reference" loading="lazy"><figcaption>Eclipse</figcaption></figure>
+          <figure><img src="/assets/content/koh/reference-keystone-t.webp" alt="Keystone — hand-drawn reference" loading="lazy"><figcaption>Keystone</figcaption></figure>
+          <figure><img src="/assets/content/koh/reference-blinkbug-t.webp" alt="Blinkbug — hand-drawn reference" loading="lazy"><figcaption>Blinkbug</figcaption></figure>
+        </div>
         <button class="start-btn" onclick="startGame()">Enter the Kingdome</button>
         <div class="doors-preview">
           <div class="door-preview-chip"><strong>Familiar</strong>Doors you've opened before, seen with new eyes</div>

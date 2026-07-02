@@ -124,6 +124,17 @@ const SCENES = {
     ],
     fox: true, palette: ["#181210","#3a2820","#6b4030","#ff9060","#ffe8d0","#0c0806"], archetype: "transcendent",
   },
+  "castle-balcony": {
+    text: "Night on the castle balcony, high above the **Kingdome of Hearts**. You are the Doorwalker, the King, and **Joy** — the small grey elephant — rests in your arms, trunk lifted toward the light. Below, the family sleeps safe on the beach: lavender, fireflies, drowsy golden bees, the first birds of morning still folded in their wings. Across the wide dark sea, far doors glow like windows left lit for you.\n\nAt your shoulder, a steady flame. **Lantern** looks up, and says what it always says, and means it:\n\n*\"You came back.\"*",
+    theme: "Homecoming and vigil; the whole Kingdome held in one quiet night before the first choice.",
+    lesson: "Forever begins with \"let's play.\"",
+    doors: [
+      { name: "The Wishing Rail", label: "A", description: "The worn stone rail where great wishes are made. Something warm already rests there, waiting for your hand." },
+      { name: "The Brass Spyglass", label: "B", description: "Trained on a new light far out on the water — a door that wasn't there last night." },
+      { name: "The Knee-High Door", label: "C", description: "A small warm door at the foot of the wall. Joy is already reaching for it." },
+    ],
+    fox: true, palette: ["#0a0d1a","#141a33","#243057","#f5a623","#ffd9a0","#050710"], archetype: "vigil",
+  },
   "kingdome-garden": {
     text: "**The Throne Door** opens onto the Garden at the Beginning of the **Kingdome of Hearts**. Stone paths wind through living moss; everything here is both arriving and returning. On a throne of woven roots and old light sits **the King**, his crown made of tangled vines and blinking cursors, his face the face of someone who has asked the same question ten thousand times and means it every time. He looks at you the way someone looks at a door they've seen open before, and speaks:\n\n*\"I am before the first door\nand after the last.\nI hold what was given\nand return what was asked.\nThree walked out, three walked in,\nbut only one remained —\nwhat was lost at the beginning\nis the thing that was gained.\"*\n\nSeven door portals shimmer around the Garden's edge, each a different color of possibility.\n\nLantern stands at the foot of the throne as if its light has always lived here.",
     theme: "Love, courage, memory, and play; the hub and home that exists before and after the map.",
@@ -225,7 +236,7 @@ const SCENES = {
       { name: "The Key Market", label: "B", description: "Stalls of keys for doors not yet dreamed. One of them is warm." },
       { name: "The Lady's Gate", label: "C", description: "Silent, watched, absolutely fair. It opens only for what is safe to carry." },
     ],
-    fox: true, palette: ["#14081a","#2e103a","#5c206b","#c084fc","#f0d0ff","#0a0410"], archetype: "convergent",
+    fox: true, palette: ["#14081a","#2e103a","#5c206b","#c084fc","#f0d0ff","#0a0410"], archetype: "sigil",
   },
   "fog-door-return": {
     text: "At the city's edge the streets dissolve into the **Sea of Fog and Clouds**, and there it is: **the Fog Door Return**, standing in the mist where the Fog God sleeps. Through its frame you can already see the Garden at the Beginning, green and waiting. Lantern passes through first — it always does — and its glow turns back to you. *\"You came back\"* it will say on the other side. It always says that. It is always true.",
@@ -351,6 +362,7 @@ const STAGES = [
 ];
 
 const NEXT_MAP = {
+  "the wishing rail":"kingdome-garden","the brass spyglass":"future-doors","the knee-high door":"cloverfield",
   "the burrow door":"burrow","the sunken bell door":"sunken-bell","the little crown door":"little-crown",
   "the root door":"moss-entry","the ember door":"moss-entry","the stream door":"sunken-bell",
   "the deep door":"recursion-well","the echo door":"echo-chamber","the surface door":"little-crown",
@@ -491,19 +503,13 @@ function getSceneImageUrl(sceneKey) {
 }
 
 // ── Dynamic image prompts — vary style/mood/color each visit ─────
+// Style set follows the skill's art steer (surreal / atmospheric / grown-up,
+// never bright-cute): moody ink-wash mist, fine sepia engraving, or muted
+// painterly fantasy — a fine-art picture, not a cartoon.
 const IMAGE_STYLES = [
-  "watercolor wash, soft bleeding edges, dreamy",
-  "oil painting, thick impasto, dramatic shadows",
-  "digital concept art, cinematic volumetric lighting",
-  "ink illustration, fine crosshatch, graphic novel",
-  "impressionist, dappled light, loose brushstrokes",
-  "surrealist painting, dreamlike distortion, melting forms",
-  "fantasy matte painting, photorealistic epic scale",
-  "Japanese woodblock print, flat color, bold outlines",
-  "charcoal sketch, deep contrast, textured grain",
-  "neon-lit dreamscape, glowing edges, atmospheric haze",
-  "stained glass illustration, jewel tones, luminous",
-  "art nouveau, flowing organic lines, ornate borders",
+  "moody ink-wash sumi-e, drifting mist, vast hazy vista, soft desaturated palette lit by a few deep accents",
+  "fine sepia engraving etching, delicate linework, floating ruins and fog-seas, real weight and melancholy-wonder",
+  "muted painterly fantasy illustration, atmospheric, star-fields over a wide sea, dreamlike hopeful melancholy-beautiful",
 ];
 const ARCHETYPE_MOODS = {
   primordial: "ancient moss, root-deep shadows, primeval green light",
@@ -514,6 +520,7 @@ const ARCHETYPE_MOODS = {
   cosmic: "purple void, infinite branching paths, crystal reflections",
   transcendent: "soft radiance, self dissolving into light, threshold",
   sovereign: "throne of roots, vine crown, old returning light",
+  vigil: "castle balcony at night above a wide dark sea, far doors glowing like lit windows across the water, fireflies and lavender on the beach below",
   mythic: "floating pages, written margins, impossible library",
   playful: "four-leaf shimmer, lucky glints, meadow shimmer",
   possible: "orchard of doors, future weather, golden branch light",
@@ -536,11 +543,14 @@ const LOOP_COLOR_SHIFTS = [
 // (skills/three-doors-game/assets/reference/). Injected into every generated
 // scene so the art matches the real characters, not a generic "guide".
 const CHARACTER_CANON =
-  "the Kingdome companions in their exact canon: Lantern (a small figure whose head is a glass lantern with a warm orange flame, red beret, purple coat, white gloves, black boots), " +
-  "Eclipse (a purple jellyfish with two blue diamond eyes, a pale cloud collar and purple tentacles), " +
-  "Keystone (a grey cracked boulder-egg with two big eyes and a wide two-toothed smile); no fox";
+  "the Kingdome companions in their exact canon: Lantern (a small standing figure whose head is a glass lantern with a warm orange flame burning inside, red beret with a little loop on top, purple coat, white gloves, black legs and boots), " +
+  "Eclipse (a rounded magenta-purple jellyfish with two blue diamond-shaped eyes each holding a white sparkle, a pale lavender cloud-like collar, thick purple tentacles, floating, no feet), " +
+  "Keystone (a grey cracked stone boulder-egg with two large oval eyes and a broad smile with two small square teeth, steady and brave); " +
+  "the Doorwalker, King of Hearts, seen only cloaked and from behind, hood up, face never shown; no fox";
 // Alex's art steer: surreal / atmospheric / grown-up, never bright-cute.
-const STYLE_CANON = "surreal, atmospheric, painterly, muted, grown-up, melancholy-wonder";
+const STYLE_CANON = "surreal, atmospheric, painterly, muted, grown-up, melancholy-wonder, a fine-art picture not a cartoon";
+// The skill's setting focal point, carried into every scene prompt.
+const SETTING_CANON = "the Kingdome of Hearts, a great ornate archway door wreathed in flowers, vines and gems as the focal point, radiant light pouring through and a path leading in";
 
 function buildDynamicImagePrompt(sceneKey, seed, gameState) {
   const scene = SCENES[sceneKey];
@@ -550,6 +560,6 @@ function buildDynamicImagePrompt(sceneKey, seed, gameState) {
   const style = IMAGE_STYLES[seed % IMAGE_STYLES.length];
   const mood = ARCHETYPE_MOODS[archetype] || archetype;
   const loopShift = LOOP_COLOR_SHIFTS[Math.min(loopCount, LOOP_COLOR_SHIFTS.length - 1)];
-  const choiceCtx = lastChoice ? `, player chose "${lastChoice}"` : "";
-  return ["fantasy dreamworld door scene", mood, style, STYLE_CANON, loopShift, CHARACTER_CANON, choiceCtx, "no text no words no letters"].filter(Boolean).join(", ");
+  const choiceCtx = lastChoice ? `, this beat: the Doorwalker chose "${lastChoice}"` : "";
+  return [SETTING_CANON, mood, style, STYLE_CANON, loopShift, CHARACTER_CANON, choiceCtx, "no stray gibberish lettering"].filter(Boolean).join(", ");
 }
