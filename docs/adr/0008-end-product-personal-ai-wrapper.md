@@ -11,6 +11,13 @@ superseded-by: none
 
 # ADR-0008: The end product is a personal AI wrapper — user capabilities are Tools + Skills in the one loop
 
+> **Consolidation note (2026-07-01).** This file absorbed the duplicate
+> `0008-personal-ai-wrapper-end-product.md` (added by PR #1144), which claimed the same
+> ADR number and carried `status: Accepted` without an `approved-by` — in violation of
+> the approval gate. Its unique content (the no-autonomous-submission rule, the
+> `~/.keystone/workspace/` default, and follow-on issues #1095–#1100) is merged below;
+> the status remains **Proposed** until Alex explicitly approves.
+
 ## Status
 
 Proposed — awaiting approval from Alex Place.
@@ -66,8 +73,13 @@ so that broadening scope does **not** become sprawl (which ADR-0002 forbids).
 
 4. **Two scopes of filesystem access.** The repo sandbox (`_safe()` rejecting paths outside the
    repo) is correct for *coding* tools but blocks *user* tools. A capability that produces a user
-   artifact (a resume PDF) must write to a **user workspace** distinct from the repo, gated by the
+   artifact (a resume PDF) must write to a **user workspace** distinct from the repo
+   (`~/.keystone/workspace/` by default, configurable via `KEYSTONE_WORKSPACE`), gated by the
    same operator/consent checks — not by widening the repo sandbox.
+
+5. **No autonomous submission.** The human must confirm any action that affects external state
+   (sending email, submitting a form, publishing content). The `web_fetch` tool reads; it does
+   not post.
 
 ## Options Considered
 
@@ -106,15 +118,15 @@ but it is *extension* work on an existing spine, not new architecture.
   grounding apply uniformly to every task.
 - **Negative / trade-offs:** the current surface is coding-only, so the wrapper vision is *aspirational
   until the user tool surface exists*; building it must resist the urge to spin up subsystems.
-- **Follow-ups (candidate issues, each an Act-stage Tool/Skill — not a subsystem):**
-  1. **Information tools** — `web_search` / `web_fetch` with cited, grounded results (Observe/Verify).
-  2. **User workspace** — a non-repo, consent-gated file area for user artifacts (distinct from `_safe()`).
-  3. **Document/artifact tools** — resume / cover-letter / DOCX / PDF generation over templates.
-  4. **Job-application Skill** — a workflow orchestrating lookup → document → fill/submit, human-in-loop.
+- **Follow-ups (filed as issues #1095–#1100, each an Act-stage Tool/Skill — not a subsystem):**
+  1. **Information tools** — `web_search` / `web_fetch` with cited, grounded results (Observe/Verify). (#1095)
+  2. **User workspace** — a non-repo, consent-gated file area for user artifacts (distinct from `_safe()`). (#1096)
+  3. **Document/artifact tools** — resume / cover-letter / DOCX / PDF generation over templates. (#1097)
+  4. **Job-application Skill** — a workflow orchestrating lookup → document → fill/submit, human-in-loop. (#1098)
   5. **Real Skills** — only 4 of 17 skill dirs are implemented ([ARCHITECTURE.md §9.2](../ARCHITECTURE.md));
-     user capabilities need genuine implementations, not contracts.
+     user capabilities need genuine implementations, not contracts. (#1099)
   6. **Training data** — capability behavior (lookup/resume/forms) is not coding-session data; capture
-     or synthesize those trajectories separately if the local model is to drive them.
+     or synthesize those trajectories separately if the local model is to drive them. (#1100)
 
 ## Alternatives considered
 
