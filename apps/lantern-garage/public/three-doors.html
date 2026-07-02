@@ -13,232 +13,202 @@
   <meta name="twitter:image" content="/assets/three-doors-splash.webp">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/dream-chat-terminal.css?v=20260630-terminal">
+  <!-- Restore the opt-in Terminal (CRT) skin before paint, to avoid a flash of the default theme. -->
+  <script>(function(){try{if(localStorage.getItem('keystone-skin')==='terminal')document.documentElement.setAttribute('data-skin','terminal');}catch(e){}})();</script>
   <title>Kingdome of Hearts — Keystone OS</title>
   <style>
-    .doors-hero {
-      text-align: center;
-      padding: 80px 20px 60px;
-    }
-    .doors-hero-splash {
-      display: block;
-      width: min(920px, 100%);
-      margin: 0 auto 32px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-      animation: doors-beat 4s ease-in-out infinite;
-    }
-    @keyframes doors-beat {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.01); }
-    }
-    .doors-hero h1 {
-      font-size: clamp(2.2rem, 6vw, 3.2rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 16px;
-      line-height: 1.15;
-    }
-    .doors-hero h1 span {
-      color: var(--accent);
-    }
-    .doors-hero .tagline {
-      font-size: 1.1rem;
-      color: var(--muted);
-      max-width: 520px;
-      margin: 0 auto 32px;
-      line-height: 1.6;
-    }
+    /* ── Single-viewport shell: nav on top, hero fills the rest, status strip at the bottom ── */
+    html, body { height: 100dvh; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    .site-nav { flex-shrink: 0; }
 
-    .system-readiness {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 32px;
-      font-size: 0.95rem;
-    }
-    .readiness-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--muted);
-      animation: pulse 2s ease-in-out infinite;
-    }
-    .readiness-dot.healthy {
-      background: var(--green);
-    }
-    .readiness-dot.warning {
-      background: var(--gold);
-    }
-    .readiness-dot.critical {
-      background: var(--danger);
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    .doors-container {
-      max-width: 920px;
-      margin: 0 auto 48px;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-    @media (min-width: 740px) {
-      .doors-container {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    .door-card {
+    .page {
+      flex: 1 1 auto;
+      min-height: 0;               /* let the hero shrink instead of overflowing */
       display: flex;
       flex-direction: column;
       gap: 12px;
-      padding: 28px 24px;
-      background: var(--surface);
+      width: min(1100px, 100%);
+      margin: 0 auto;
+      padding: 16px 20px;
+      box-sizing: border-box;
+    }
+
+    /* ── Hero: the splash art IS the title. Scrim + copy overlaid on the lower edge. ── */
+    .doors-hero {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      border-radius: 16px;
+      overflow: hidden;
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      text-decoration: none;
-      color: var(--text);
-      box-shadow: var(--shadow);
-      transition: border-color 0.2s, background 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
     }
-    .door-card:hover {
-      border-color: var(--accent);
-      background: var(--surface2);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-hover);
+    .doors-hero-splash {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 30%;   /* keep the leaping pair + title lockup in frame */
+      animation: doors-drift 14s ease-in-out infinite;
     }
-    .door-card-icon {
-      font-size: 48px;
-      line-height: 1;
+    @keyframes doors-drift {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
     }
-    .door-card-title {
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-      color: var(--text);
+    @media (prefers-reduced-motion: reduce) {
+      .doors-hero-splash { animation: none; }
     }
-    .door-card-desc {
-      font-size: 0.95rem;
-      color: var(--muted);
+    .doors-hero-overlay {
+      position: absolute;
+      inset: auto 0 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px 24px;
+      padding: 72px 28px 22px;
+      background: linear-gradient(to top, rgba(4, 2, 12, 0.88) 0%, rgba(4, 2, 12, 0.55) 55%, transparent 100%);
+    }
+    .doors-hero h1 {
+      font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      color: #fff;
+      margin: 0 0 6px;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+    }
+    .doors-hero .tagline {
+      font-size: clamp(0.85rem, 1.6vw, 1rem);
+      color: rgba(255, 255, 255, 0.82);
+      max-width: 560px;
+      margin: 0;
       line-height: 1.5;
-      flex-grow: 1;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
     }
-    .door-card-stage {
-      font-size: 0.8rem;
-      color: var(--accent);
+    .hero-facts {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .hero-fact {
+      font-size: 0.72rem;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-top: 8px;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      backdrop-filter: blur(4px);
+      border-radius: 999px;
+      padding: 4px 12px;
+      white-space: nowrap;
     }
 
     .cta-button {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       background: var(--accent);
       color: #fff;
-      font-weight: 600;
-      font-size: 15px;
-      padding: 13px 28px;
-      border-radius: 10px;
+      font-weight: 700;
+      font-size: clamp(15px, 1.6vw, 17px);
+      padding: 14px 32px;
+      border-radius: 12px;
       text-decoration: none;
       border: none;
       cursor: pointer;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
       transition: background 0.15s, transform 0.1s;
+      flex-shrink: 0;
     }
+    /* Terminal (CRT) skin: bright phosphor accent needs dark ink, not white */
+    html[data-skin="terminal"] .cta-button { color: var(--bg); }
     .cta-button:hover {
       background: var(--accent-hover);
       transform: translateY(-1px);
     }
 
-    .health-panel {
-      max-width: 880px;
-      margin: 48px auto;
-      padding: 20px 24px;
+    /* ── Status strip: readiness + per-subsystem health in one compact row ── */
+    .status-strip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      padding: 10px 16px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+      border-radius: 12px;
+      font-size: 0.82rem;
+      color: var(--muted);
     }
-    .health-panel h3 {
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--accent);
-    }
-    .health-items {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-    }
-    .health-item {
+    .system-readiness {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.9rem;
-      color: var(--muted);
+      font-weight: 600;
+      color: var(--text);
+      margin-right: auto;
     }
-    .health-item-dot {
-      width: 8px;
-      height: 8px;
+    .readiness-dot {
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
       background: var(--muted);
-      flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite;
     }
-    .health-item-dot.ok {
-      background: var(--green);
+    .readiness-dot.healthy { background: var(--green); }
+    .readiness-dot.warning { background: var(--gold); }
+    .readiness-dot.critical { background: var(--danger); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
-    .health-item-dot.warn {
-      background: var(--gold);
-    }
-    .health-item-dot.fail {
-      background: var(--danger);
-    }
-
     .mandala-health {
       display: inline-block;
-      width: 3em;
-      height: 3em;
+      width: 1.4em;
+      height: 1.4em;
       background-image: url('/mandala-network.svg');
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
-      vertical-align: -0.25em;
       filter: drop-shadow(0 0 2px currentColor);
-      margin-right: 8px;
       animation: mandala-health-beat 2s ease-in-out infinite;
     }
-    .mandala-health.healthy {
-      color: var(--green);
-    }
-    .mandala-health.warning {
-      color: var(--gold);
-    }
-    .mandala-health.critical {
-      color: var(--danger);
-    }
+    .mandala-health.healthy { color: var(--green); }
+    .mandala-health.warning { color: var(--gold); }
+    .mandala-health.critical { color: var(--danger); }
     @keyframes mandala-health-beat {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.05); opacity: 0.8; }
     }
+    .health-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .health-item-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .health-item-dot.ok { background: var(--green); }
+    .health-item-dot.warn { background: var(--gold); }
+    .health-item-dot.fail { background: var(--danger); }
 
-    .info-callout {
-      max-width: 880px;
-      margin: 40px auto;
-      padding: 16px 20px;
-      background: var(--accent-dim);
-      border-left: 3px solid var(--accent);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 0.95rem;
-      line-height: 1.6;
+    /* ── Small / short screens: fall back to normal scrolling so nothing is clipped ── */
+    @media (max-width: 640px), (max-height: 480px) {
+      html, body { height: auto; }
+      body { overflow: auto; }
+      .doors-hero { min-height: 320px; flex-basis: 62dvh; }
     }
   </style>
 </head>
@@ -246,102 +216,71 @@
 
 <!-- ── Site nav ── -->
 <nav class="site-nav">
-  <a class="nav-brand" href="/trader-dashboard.html">
-    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    Keystone OS
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">unisona.ai</span>
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
-    <a href="/three-doors.html" class="active">Kingdome</a>
-    <a href="/create.html">✏️ Create</a>
+    <a href="/stock-trader.html">Trader</a>
+    <a href="/create.html">Create</a>
+    <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
+    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
   </div>
   <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode">☀</button>
+    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
+    <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
+    <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" title="Report an issue (screenshot → GitHub)" onclick="if(window.issueReporter)window.issueReporter.open()">📷</button>
   </div>
 </nav>
 
 <div class="page">
 
-  <!-- ── Hero ── -->
+  <!-- ── Hero: full-bleed splash art with the copy + CTA overlaid ── -->
   <div class="doors-hero">
     <img class="doors-hero-splash" src="/assets/three-doors-splash.webp" alt="Three Doors — the Doorwalker and a dancer leap hand in hand above the glittering Kingdome of Hearts, glowing doors on every horizon">
-    <h1><span>Kingdome of Hearts</span></h1>
-    <p class="tagline">A seven-stage dream journey through the Kingdome. Three doors each scene — no wrong choices. Keystone guides you. Each loop is different.</p>
+    <div class="doors-hero-overlay">
+      <div>
+        <h1>Kingdome of Hearts</h1>
+        <p class="tagline">A seven-stage dream journey. Three doors each scene — no wrong choices. Keystone guides you; each loop is different.</p>
+        <div class="hero-facts">
+          <span class="hero-fact">7 stages</span>
+          <span class="hero-fact">3 doors per scene</span>
+          <span class="hero-fact">Saved locally — no account</span>
+        </div>
+      </div>
+      <a href="/three-doors-game.html" class="cta-button">↪ Begin Adventure</a>
+    </div>
+  </div>
 
-    <!-- System status indicator -->
+  <!-- ── Status strip: readiness + subsystem health in one row ── -->
+  <div class="status-strip">
     <div class="system-readiness">
+      <span class="mandala-health healthy" id="health-mandala" aria-hidden="true"></span>
       <span class="readiness-dot healthy" id="readiness-dot" aria-live="polite"></span>
       <span id="readiness-label">Checking system…</span>
     </div>
-
-    <a href="/three-doors-game.html" class="cta-button">↪ Begin Adventure</a>
-  </div>
-
-  <!-- ── What to expect ── -->
-  <div class="doors-container">
-    <a href="/three-doors-game.html" class="door-card">
-      <div class="door-card-icon">🗺️</div>
-      <h2 class="door-card-title">Story Mode</h2>
-      <p class="door-card-desc">Navigate through seven stages of symbolic choice-making. Each decision shapes your path and the story that unfolds.</p>
-      <div class="door-card-stage">Interactive Experience</div>
-    </a>
-
-    <a href="/three-doors-game.html" class="door-card">
-      <div class="door-card-icon">🎯</div>
-      <h2 class="door-card-title">Meaningful Choices</h2>
-      <p class="door-card-desc">Your decisions matter. Explore different paths, discover multiple endings, and uncover hidden branches based on your choices.</p>
-      <div class="door-card-stage">7 Stages × 3+ Paths</div>
-    </a>
-  </div>
-
-  <!-- System Health Status -->
-  <div class="health-panel">
-    <h3><span class="mandala-health healthy" id="health-mandala" aria-hidden="true"></span>System Health</h3>
-    <div class="health-items">
-      <div class="health-item">
-        <span class="health-item-dot ok" id="dot-server"></span>
-        <span id="text-server">Server running</span>
-      </div>
-      <div class="health-item">
-        <span class="health-item-dot ok" id="dot-dreams"></span>
-        <span id="text-dreams">Journal ready</span>
-      </div>
-      <div class="health-item">
-        <span class="health-item-dot ok" id="dot-doors"></span>
-        <span id="text-doors">Game engine ready</span>
-      </div>
-      <div class="health-item">
-        <span class="health-item-dot ok" id="dot-model"></span>
-        <span id="text-model">AI model loaded</span>
-      </div>
+    <div class="health-item">
+      <span class="health-item-dot ok" id="dot-server"></span>
+      <span id="text-server">Server running</span>
+    </div>
+    <div class="health-item">
+      <span class="health-item-dot ok" id="dot-dreams"></span>
+      <span id="text-dreams">Journal ready</span>
+    </div>
+    <div class="health-item">
+      <span class="health-item-dot ok" id="dot-doors"></span>
+      <span id="text-doors">Game engine ready</span>
+    </div>
+    <div class="health-item">
+      <span class="health-item-dot ok" id="dot-model"></span>
+      <span id="text-model">AI model loaded</span>
     </div>
   </div>
 
-  <!-- Info callout -->
-  <div class="info-callout">
-    <strong>🎮 How It Works:</strong> Start the adventure, encounter three doors at each fork in the path. Your choice determines which story branch unfolds next. Some doors lead to familiar places, others to mysterious new territories. All your progress is saved locally — no account needed.
-  </div>
-
 </div>
-
-<!-- ── Site footer ── -->
-<footer class="site-footer">
-  <div class="footer-inner">
-    <span class="footer-brand"><span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS</span>
-    <span class="sep">·</span>
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/three-doors-game.html">Kingdome</a>
-    <a href="/create.html">✏️ Create</a>
-    <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
-    <a href="/changelog.html">Changelog</a>
-    <a href="https://github.com/alex-place/lantern-os" target="_blank">GitHub</a>
-  </div>
-</footer>
 
 <script src="/js/theme-toggle.js"></script>
 <script>
@@ -399,23 +338,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasFail = Object.values(healthStates).some(s => s === 'fail');
     const mandala = $('health-mandala');
     const dot = $('readiness-dot');
+    const label = $('readiness-label');
+    const state = hasFail ? 'critical' : allOk ? 'healthy' : 'warning';
+    const message = hasFail ? 'System needs attention' : allOk ? 'All systems ready' : 'Some systems loading';
 
-    if (hasFail) {
-      mandala?.classList.remove('healthy', 'warning');
-      mandala?.classList.add('critical');
-      dot?.className = 'readiness-dot critical';
-      $('readiness-label').textContent = 'System needs attention';
-    } else if (allOk) {
-      mandala?.classList.remove('critical', 'warning');
-      mandala?.classList.add('healthy');
-      dot?.className = 'readiness-dot healthy';
-      $('readiness-label').textContent = 'All systems ready';
-    } else {
-      mandala?.classList.remove('critical', 'healthy');
-      mandala?.classList.add('warning');
-      dot?.className = 'readiness-dot warning';
-      $('readiness-label').textContent = 'Some systems loading';
-    }
+    if (mandala) mandala.className = `mandala-health ${state}`;
+    if (dot) dot.className = `readiness-dot ${state}`;
+    if (label) label.textContent = message;
   }
 
   function updateIndicator(key, state, label) {
@@ -437,5 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 <script src="/js/auth-gate.js" defer></script>
+<script src="/js/issue-reporter.js?v=20260628f-autoattach" defer></script>
 </body>
 </html>
