@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.22] - 2026-07-02
+### Fixed
+- **Unisona training: repaired LoRA warm-start key remap in `scripts/train-qlora-ouro.py`.** `peft`'s `set_peft_model_state_dict` only matched 69/338 LoRA weight keys when warm-starting from a saved adapter checkpoint (its `adapter_name` re-insertion is unreliable on this transformers/peft combo), silently leaving most tensors at random init — the likely cause of a hard, tracebackless crash on the first optimizer step of a resumed run. `--warm-start` now loads via `model.load_state_dict()` with an explicit `.weight` → `.default.weight` key remap, verified against a real checkpoint (exact key match; LoRA param norm changes on load, confirming real weights transfer) and smoke-tested for 3 clean steps before use. Strengthens the **Act** stage (training tooling correctness).
+
 ## [1.8.21] - 2026-07-02
 ### Added
 - **Kalshi: scoped LIVE trading for the weather-edge (real orders, code-gated).** The Grounded weather-edge "Take" now places a **real 1-contract order** when live trading is enabled (`canTradeLive`), user-in-the-loop per swipe; otherwise it stays paper. A new **scope gate** in `kalshi-api.js` `placeOrder` allows a live order only for an allowlisted `source` (`KALSHI_LIVE_SCOPE`, default `kalshi-weather-edge`) and hard-caps size (`KALSHI_LIVE_MAX_CONTRACTS`, default 1) — any other source (crypto/momentum, unsourced) is forced to dry-run even with all global gates cleared. `getConnection` now reports `liveScope` + `liveMaxContracts`. Real money is confined in code to the band-robust, net-of-fees edge.
