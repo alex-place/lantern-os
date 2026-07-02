@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "description": "Machine-readable locked canon for the Three Doors / Kingdome of Hearts game. Source of truth: ~/.claude/skills/three-doors/SKILL.md. Cast text, creed, and gate descriptions are verbatim from SKILL.md; the hand-drawn reference art wins over any generated image.",
+  "cast": {
+    "lantern": { "name": "Lantern", "role": "the guide", "description": "A standing figure whose head is a lantern (a glass body with a warm orange flame burning inside); wears a red beret/cap with a little loop on top, a purple coat, white gloves, and black legs/boots. Warm and steady; its recurring line is \"You came back.\"", "recurringLine": "You came back." },
+    "eclipse": { "name": "Eclipse", "role": "the night/dark partner", "description": "A purple jellyfish: a rounded magenta-purple bell with two blue diamond-shaped eyes (a white sparkle inside each), a pale lavender cloud-like collar beneath, and thick purple tentacles (a pair curling up at the sides, more hanging straight down); it floats, no feet. The night/dark partner by nature, never by menace." },
+    "keystone": { "name": "Keystone", "role": "the tank", "description": "A grey stone/boulder, rounded egg/triangular shape, its surface run through with fine cracks; a face of two large oval eyes (white glint) and a broad smile with two small square teeth. Steady, brave, unbreakable. In grown-up / surreal scenes, draw him more soulfully — a smooth cracked stone egg, sometimes hooded or cloaked, gazing quietly over vast misty worlds. Same soul, a quieter face; the wide grin is his bright mood, not his only one." },
+    "blinkbug": { "name": "Blinkbug", "role": "Lantern's creation", "description": "A small bug with a boxy TV/monitor for a head (tilted), a cute face on the screen (two eyes, a little smile), two antennae tipped with rounded leaves, and a segmented caterpillar body cobbled from salvaged spare parts. Lantern built him long ago, the first time Lantern went through the XP Door, so the guide would have someone to explore the world with — maker and made. (Alex hasn't fixed his colours yet — keep it soft and line-friendly.)" },
+    "joy": { "name": "Joy", "role": "the carried one", "description": "A small grey elephant the player carries, trunk lifted toward the light." },
+    "odin": { "name": "Odin", "role": "the Fog God", "description": "A grey wolf warrior, ice-blue eyes, ornate blue-and-silver plate armour, bushy tail, a great rune-etched axe. Lord of riddles, watcher of fates — a guardian-tester at the Garden's gate, not a villain." },
+    "doorwalker": { "name": "The Doorwalker", "role": "the player — King of the Kingdome of Hearts", "description": "The player's own avatar (the Doorwalker, King of Hearts) renders cloaked and from behind, hood up, face never shown." }
+  },
+  "castRules": "The definitive design of each companion is the way Alex draws them by hand — when a generated image disagrees with these drawings, the drawings win. If the player adds to a companion (a staff, a role, a weapon), fold it in on top of the locked design — keep the lantern-head figure, the purple diamond-eyed jellyfish, the grey smiling stone. Additions extend the canon; they don't erase the established forms unless the player asks for a redesign. Player inventions outrank yours.",
+  "gates": [
+    { "key": "ancient", "order": 1, "name": "Ancient Doors", "description": "the deep past: the Library of Babylon, the Hanging Gardens, the Tower of Babel." },
+    { "key": "cloverfield", "order": 2, "name": "Cloverfield", "description": "luck, small treasures, \"today alive.\"" },
+    { "key": "tomorrow", "order": 3, "name": "Tomorrow Door", "description": "observatories, branching futures, possible selves." },
+    { "key": "xp", "order": 4, "name": "XP Door [GLITCHED]", "description": "the safe, nostalgic computer-dream world." },
+    { "key": "xenon", "order": 5, "name": "Xenon Starship / Midway Convergence", "description": "planets, routes, convergence." },
+    { "key": "sigil", "order": 6, "name": "Sigil — City of Doors", "description": "keys, markets, bridges; every threshold made visible." },
+    { "key": "fog-return", "order": 7, "name": "Fog Door Return", "description": "misty cliffs, trust, and the path home; Odin the Fog God keeps this gate, which opens back onto the Garden and closes the loop." }
+  ],
+  "gatesRule": "The Kingdome has seven major doors. The long route threads them in order — Ancient → Cloverfield → Tomorrow → XP → Xenon → Sigil → Fog Return — then returns to the Garden. Every other door is a subset of exactly one major door (a minor door, a sub-child, a sub-sub-child, and on down): the world is a strict tree rooted at these seven, and any door's lineage always traces back to one of them.",
+  "creed": "I am the King of the Kingdome of Hearts.\nHere, love is the law, and every living thing beats a verse of it true.\n\nFor all the birds who paint the morning with song, for all the bees who stitch the world with gold, for every small life that dares to bloom — I wear the crown.\n\nI carry a key as a blade, not to open by force, but to guard what is fragile, to break what is cruel, to lock away the trial that should not rule.\n\nBeyond the Garden's gate sleeps the Fog God, Odin — lord of riddles, watcher of fates. When we meet, it is not to destroy, but to play the oldest game: the dance of courage against the unknown.\n\nFor death is only imaginary in the Kingdome of Hearts. We fall, we rise, we laugh, we try again — forever begins with \"let's play.\"\n\nI have two faces so I may see with both eyes: one to feel, one to understand. Together they rule with kindness and fire.\n\nI fight for love. I fight for wonder. I fight so every heart can be free, so every wing can fly, so every flower can open, so every dreamer can dream.\n\nI am the King of the Kingdome of Hearts. I fight for the love of all the birds and the bees.",
+  "creedRules": [
+    "The key is a blade — carried to guard the fragile and break the cruel, never to force. (The heart-key forged into the dark-key sword is exactly this.)",
+    "Odin is the Fog God, lord of riddles — a guardian-tester at the Garden's gate, not a villain. Challenges are the dance of courage, won by heart and nerve as much as by force; \"winning\" can mean being understood, not killing.",
+    "Death is imaginary — nobody is truly lost; a fall just means \"try again.\" Keep even fierce fights warm at the core.",
+    "The King has two faces (a mask he carries) — one to feel, one to understand; kindness and fire together."
+  ],
+  "artDirection": {
+    "steer": "more surreal / more adult",
+    "style": "Surreal, atmospheric, and grown-up, not bright-cute. Reach for moody ink-wash / sumi-e mist, fine sepia engraving/etching, or muted painterly fantasy illustration; vast hazy vistas — floating ruins, fog-seas, star-fields — soft desaturated palettes lit by a few deep accents; real weight, real melancholy-wonder. A fine-art picture, not a cartoon.",
+    "settingAndLight": "The Kingdome of Hearts, and a great ornate archway door wreathed in flowers, vines and gems as the focal point, radiant light pouring through and a path leading in.",
+    "lettering": "Avoid stray gibberish lettering — but a short, intentional in-world sign (a door's name over an arch, a plaque) is welcome when it fits and reads cleanly; the reference art uses them well.",
+    "tone": "Keep the heart warm even when the picture is moody — dreamlike, hopeful, melancholy-beautiful. Uncanny is fine; gore and hostile horror are not, unless the player deliberately steers there.",
+    "promptRecipe": ["the moment (what is happening this beat, concretely)", "the cast present, in their locked forms (copy the descriptions verbatim)", "setting & light (Kingdome of Hearts + ornate archway door focal point)", "style (surreal / atmospheric / grown-up)"],
+    "stylePoolCaveat": "The ornate media.lantern-os.net/koh/ pool is a style reference only; it mis-renders the characters — e.g. flattening Lantern into a bare lamp — so trust it for mood, never for a character's body."
+  },
+  "forbidden": [
+    "the fox (earlier tellings had one; this game does not)",
+    "showing the Doorwalker's face (always cloaked, from behind, hood up)",
+    "stray gibberish lettering in images",
+    "gore and hostile horror (unless the player deliberately steers there)",
+    "resetting the world unless the player says \"start over\"",
+    "turning a play turn into repo work, system documentation, or an explanation of how the OS/CSF/convergence works (unless the player explicitly asks)"
+  ],
+  "openingScene": {
+    "canon": "If there's no game in progress, open on the castle balcony at night: the Doorwalker with Joy in their arms, the family safe on the beach below, the far doors glowing across the sea, and Lantern's flame steady nearby saying \"You came back.\"",
+    "exampleDoors": [
+      { "label": "A", "name": "Wishing Rail" },
+      { "label": "B", "name": "Brass Spyglass", "description": "trained on a new light on the water" },
+      { "label": "C", "name": "the knee-high Door", "description": "the small warm knee-high Door Joy is already reaching for" }
+    ]
+  },
+  "doorRules": "Offer exactly three, always labelled A / B / C. Each door needs: a short, memorable name; a distinct look and sensory atmosphere; a symbolic implication — doors are meanings, not just exits. Give the doors real weight and real difference; then ask, plainly, \"A, B, or C?\"",
+  "setting": "The Doorwalker is the King of the Kingdome of Hearts. The seat of the game is a castle above a wide sea; other doors glow across the water like far windows, and below is an oasis and beach — lavender, fireflies, drowsy golden bees, the first birds of morning. Here love is the law, death is only imaginary, and forever begins with \"let's play.\"",
+  "evidenceIds": [
+    "three-doors:cast-canon",
+    "three-doors:creed",
+    "three-doors:art-direction",
+    "three-doors:ref:lantern",
+    "three-doors:ref:eclipse",
+    "three-doors:ref:keystone",
+    "three-doors:ref:blinkbug"
+  ],
+  "referenceArt": {
+    "lantern":  { "web": "/assets/content/koh/reference-lantern.webp",  "thumb": "/assets/content/koh/reference-lantern-t.webp",  "cdn": "https://media.lantern-os.net/koh/reference-lantern.webp",  "skill": "C:/Users/alexp/.claude/skills/three-doors/assets/reference/lantern.png" },
+    "eclipse":  { "web": "/assets/content/koh/reference-eclipse.webp",  "thumb": "/assets/content/koh/reference-eclipse-t.webp",  "cdn": "https://media.lantern-os.net/koh/reference-eclipse.webp",  "skill": "C:/Users/alexp/.claude/skills/three-doors/assets/reference/eclipse.png" },
+    "keystone": { "web": "/assets/content/koh/reference-keystone.webp", "thumb": "/assets/content/koh/reference-keystone-t.webp", "cdn": "https://media.lantern-os.net/koh/reference-keystone.webp", "skill": "C:/Users/alexp/.claude/skills/three-doors/assets/reference/keystone.png" },
+    "blinkbug": { "web": "/assets/content/koh/reference-blinkbug.webp", "thumb": "/assets/content/koh/reference-blinkbug-t.webp", "cdn": "https://media.lantern-os.net/koh/reference-blinkbug.webp", "skill": "C:/Users/alexp/.claude/skills/three-doors/assets/reference/blinkbug.png" }
+  }
+}
