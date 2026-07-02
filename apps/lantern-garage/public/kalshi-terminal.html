@@ -265,6 +265,108 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .actions{gap:12px}
   .btn-pass,.btn-take{padding:12px 30px;min-width:120px;font-size:16px}
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CRT SKIN — phosphor-green fallout-radio console. The deck is its OWN device,
+   so within .kx-console we remap the design tokens to a phosphor/amber palette
+   (the whole deck goes CRT without touching the shared nav/footer) and add the
+   curved-glass + scanline treatment. Simplified card: question · the call · one
+   Σ₀ line · evidence. Noisy rows (yes/no grid, trace chips, badges) are dropped.
+   ══════════════════════════════════════════════════════════════════════════ */
+.kx-console{
+  --bg:#06140d; --surface:#0a1f14; --surface2:#0c2318; --border:#17402a;
+  --text:#c9ffe1; --muted:#4fae7d; --green:#2bff88; --danger:#ff7a3c;
+  --gold:#ffb53b; --accent:#2bff88;
+  font-family:ui-monospace,"Cascadia Mono","Courier New",monospace;
+  -webkit-font-smoothing:none;
+  background:linear-gradient(180deg,#0d1a12,#07120c);
+  border:2px solid #15301f;border-radius:16px;
+  box-shadow:0 0 0 2px #050a07,0 22px 48px rgba(0,0,0,.6),inset 0 1px 0 rgba(80,255,160,.08);
+}
+.kx-console::before{background:
+  radial-gradient(circle at 13px 13px,#0a2417 0 2px,transparent 3px),
+  radial-gradient(circle at calc(100% - 13px) 13px,#0a2417 0 2px,transparent 3px),
+  radial-gradient(circle at 13px calc(100% - 13px),#0a2417 0 2px,transparent 3px),
+  radial-gradient(circle at calc(100% - 13px) calc(100% - 13px),#0a2417 0 2px,transparent 3px)}
+/* curved glass */
+.kx-console .deck{
+  background:radial-gradient(120% 100% at 50% 0%,#0a2417 0%,#06140d 72%);
+  border:1px solid #143a26;border-radius:14px/22px;
+  box-shadow:inset 0 0 60px rgba(0,0,0,.5),inset 0 0 14px rgba(43,255,136,.05),0 0 0 1px rgba(0,0,0,.5)}
+.kx-console .deck::before{opacity:.6;mix-blend-mode:normal;
+  background:repeating-linear-gradient(to bottom,rgba(43,255,136,.05) 0 1px,transparent 1px 3px)}
+.kx-console .deck::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(133deg,rgba(190,255,220,.06) 0%,transparent 42%)}
+/* card = phosphor screen element (OPAQUE so the stacked peek cards behind it
+   don't ghost through) */
+.kx-console .card{
+  background:linear-gradient(180deg,#0b2016,#07130d);
+  border:1px solid #1c4a30;border-radius:8px;color:var(--text);
+  box-shadow:inset 0 0 26px rgba(0,0,0,.35)}
+.kx-console .card.front{border-color:#2bff8855;
+  box-shadow:inset 0 0 26px rgba(0,0,0,.35),0 0 20px -6px rgba(43,255,136,.4)}
+.kx-console .card.peek{filter:brightness(.5)}
+.kx-console .card.peek2{filter:brightness(.32)}
+/* SIMPLIFY: drop the noisy secondary rows */
+.kx-console .sides,.kx-console .engine-trace,.kx-console .state-badge,.kx-console .card-klass{display:none}
+/* labels + question */
+.kx-console .card-top{color:#3c8a63;letter-spacing:.1em;text-transform:uppercase}
+.kx-console .countdown{color:var(--gold)}
+.kx-console .gen-age{color:var(--green);border-color:#1c4a30;background:rgba(43,255,136,.06)}
+.kx-console .card-q{color:var(--text);text-shadow:0 0 9px rgba(43,255,136,.35);font-weight:700}
+/* the CALL */
+.kx-console .fav{border:1px solid #1c4a30;background:rgba(43,255,136,.03);border-radius:7px}
+.kx-console .fav.yes{border-color:#2bff8844;background:rgba(43,255,136,.06)}
+.kx-console .fav.no{border-color:#ffb53b44;background:rgba(255,181,59,.05)}
+.kx-console .fav-tag{color:#3c8a63;letter-spacing:.2em}
+.kx-console .fav-act{font-size:21px;text-shadow:0 0 12px rgba(43,255,136,.5)}
+.kx-console .fav.yes .fav-act{color:var(--green)}
+.kx-console .fav.no .fav-act{color:var(--gold);text-shadow:0 0 12px rgba(255,181,59,.5)}
+.kx-console .fav-px{color:var(--muted)}
+.kx-console .conv-bar{background:#0c1f14;height:3px}
+.kx-console .conv-fill{box-shadow:0 0 6px currentColor}
+.kx-console .reason{color:var(--muted);font-family:inherit}
+/* simplified Σ₀ readout line */
+.s0{margin-top:7px;padding:5px 8px;border:1px solid #1c4a30;border-radius:6px;
+  background:rgba(43,255,136,.04);font-size:10px;letter-spacing:.02em;color:var(--muted);
+  font-family:ui-monospace,"Cascadia Mono",monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.s0 .s0-end{color:#2bff88;font-weight:700}
+.s0 .s0-end.NO{color:#ffb53b}
+.s0 .s0-sep{color:#1c4a30}
+.s0 .s0-pos{color:#2bff88}.s0 .s0-neg{color:#ff7a3c}
+.s0 .s0-v{margin-left:auto;font-weight:700;color:#2bff88;letter-spacing:.1em}
+.s0 .s0-v.SKIP_NEG_EV{color:#ff7a3c}.s0 .s0-v.LOW_CONFIDENCE{color:#ffb53b}
+/* grounded evidence */
+.kx-console .grounded-box{font-family:inherit}
+.kx-console .grounded-box.ok{background:rgba(43,255,136,.05);border-color:#1c4a30}
+.kx-console .grounded-box .gb-head{color:var(--green)}
+.kx-console .grounded-box .gb-rat,.kx-console .grounded-box .gb-foot{color:var(--muted)}
+.kx-console .grounded-box a{color:var(--gold)}
+/* meta strip */
+.kx-console .card-meta{color:#3c8a63;border-top-color:#143a26}
+.kx-console .card-meta .meta-badge{border-color:#1c4a30;background:rgba(43,255,136,.05);color:var(--green)}
+/* mode tabs */
+.kx-console .mode-btn{background:#0a1f14;color:var(--muted);border-color:#1c4a30;border-radius:6px;letter-spacing:.06em}
+.kx-console .mode-btn:hover{color:var(--green)}
+.kx-console .mode-btn.active{background:#0f2a1b;color:var(--green);border-color:#2bff8855;box-shadow:inset 0 0 12px rgba(43,255,136,.16)}
+/* transport buttons */
+.kx-console .btn-pass{border:2px solid #8a5a12;background:#160d02;color:var(--gold)}
+.kx-console .btn-pass:hover{background:#1e1204}
+.kx-console .btn-take{border:2px solid #2bff8855;background:#0f2a1b;color:var(--green);text-shadow:0 0 8px rgba(43,255,136,.5);box-shadow:inset 0 0 12px rgba(43,255,136,.12)}
+.kx-console .btn-take:hover{filter:brightness(1.15)}
+.kx-console .kbd-hint,.kx-console .progress{color:#3c8a63}
+/* stamps */
+.kx-console .stamp.take{color:var(--green);border-color:var(--green)}
+.kx-console .stamp.pass{color:var(--gold);border-color:var(--gold)}
+/* account HUD */
+.kx-console .acct{border-top-color:#143a26}
+.kx-console .acct-bar,.kx-console .acct-summary{color:var(--muted)}
+.kx-console .acct-summary b{color:var(--text)}
+.kx-console .acct-env{color:var(--gold)}
+@media (prefers-reduced-motion:no-preference){
+  .kx-console .card.front{animation:crtwarm .5s ease-out}
+  @keyframes crtwarm{from{filter:brightness(1.4) saturate(.6)}to{filter:none}}
+}
 </style>
 </head>
 <body>
@@ -689,27 +791,22 @@ async function maybePrefetch(){
 
 // Σ₀ end-state badge — predicted attractor, win/loss odds, capturable delta, EV,
 // contraction confidence. Renders only on cards the Σ₀ engine scored.
+// Simplified single-line Σ₀ readout — the CRT skin styles `.s0`. (The old dense
+// two-row number grid was the main source of card clutter.)
 function sigma0Badge(card){
   const s=card.sigma0; if(!s||s.score==null) return '';
   const end=s.end_state||'—';
-  const endCol=end==='YES'?'var(--green)':end==='NO'?'var(--danger)':'var(--muted)';
-  const vCol=s.verdict==='STRONG'?'var(--green)':s.verdict==='SKIP_NEG_EV'?'var(--danger)':'var(--gold)';
-  const pWin=s.p_win!=null?Math.round(s.p_win*100)+'%':'—';
-  const loss=s.loss_odds!=null?Math.round(s.loss_odds*100)+'%':'—';
+  const win=s.p_win!=null?Math.round(s.p_win*100)+'%':'—';
   const conf=s.confidence!=null?Math.round(s.confidence*100)+'%':'—';
-  const ev=s.ev_cents, reward=s.reward_cents;
-  const evCol=ev>0?'var(--green)':'var(--danger)';
-  return `<div style="margin-top:6px;padding:6px 8px;border:1px solid #2c3446;border-radius:7px;background:#11151d;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;line-height:1.5">
-    <div style="display:grid;grid-template-columns:1fr auto;align-items:center;margin-bottom:3px">
-      <span style="color:var(--muted)">Σ₀ → <b style="color:${endCol}">${end}</b> &nbsp;win <b style="color:#e8edf5">${pWin}</b> &nbsp;loss <b style="color:var(--danger)">${loss}</b></span>
-      <span style="color:${vCol};font-weight:700">${s.verdict||''}</span>
-    </div>
-    <div style="display:flex;gap:10px;color:var(--muted)">
-      <span>Δ <b style="color:var(--green)">+${reward!=null?reward+'¢':'—'}</b></span>
-      <span>EV <b style="color:${evCol}">${ev!=null?(ev>0?'+':'')+ev+'¢':'—'}</b></span>
-      <span>conf <b style="color:#e8edf5">${conf}</b></span>
-    </div>
-  </div>`;
+  const ev=s.ev_cents;
+  const evStr=ev==null?'—':(ev>0?'+':'')+ev+'¢';
+  return `<div class="s0">`
+    +`<span class="s0-end ${end}">Σ₀ ${end}</span>`
+    +`<span class="s0-sep">·</span>win ${win}`
+    +`<span class="s0-sep">·</span>EV <b class="${ev>0?'s0-pos':'s0-neg'}">${evStr}</b>`
+    +`<span class="s0-sep">·</span>conf ${conf}`
+    +(s.verdict?`<span class="s0-v ${s.verdict}">${s.verdict}</span>`:'')
+    +`</div>`;
 }
 
 // Grounded-card extra: research status, rationale, evidence/sources, Re-ground.
