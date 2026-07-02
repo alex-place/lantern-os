@@ -24,9 +24,10 @@ const {
   setNavEntry,
 } = require("../lib/feature-flags");
 const { isAdmin } = require("../lib/auth-middleware");
+const { getSessionUserId } = require("../lib/session-identity");
 
 function actorOf(req) {
-  return req.session?.patreon?.id || "local-admin";
+  return getSessionUserId(req) || "local-admin";
 }
 
 module.exports = async function adminFlagsRoutes(req, res, url, deps) {

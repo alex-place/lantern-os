@@ -43,6 +43,18 @@ function createProfile(userId, data = {}) {
     entitlements: { trade: false, ...(data.entitlements || {}) },
     patreonId: data.patreonId || null,
     discordId: data.discordId || null, // linked Discord snowflake (#697), if any
+    // Provider-agnostic linked identities (ADR-0016). Each entry:
+    //   { provider, providerId, email, emailVerified, linkedAt }
+    // patreonId/discordId above are kept as denormalized mirrors for backward-compat
+    // (the Discord bot + older code read them directly).
+    identities: Array.isArray(data.identities) ? data.identities : [],
+    // Whether THIS profile's primary email has been verified by a provider that
+    // asserts it (Google/Discord). Local sign-ups are unverified until an email
+    // verification flow lands. Governs safe auto-linking (ADR-0016).
+    emailVerified: data.emailVerified === true,
+    // Local email+password credential (scrypt), or null. Never sent to the client;
+    // stripped by publicProfile(). Shape: { algo:'scrypt', salt, hash, n, r, p }.
+    credential: data.credential || null,
     avatar: data.avatar || null, // URL or base64 avatar
     bio: data.bio || "",
     settings: data.settings || {},
@@ -186,31 +198,21 @@ function deleteProfile(userId) {
  * Get or create profile from Patreon OAuth session.
  */
 function getOrCreateFromPatreon(patreonUser, patreonRole) {
-  const profile = loadProfileFromIndex(patreonUser.id);
-
-  if (profile) {
-    // Update with latest Patreon data
-    return updateProfile(patreonUser.id, {
-      name: patreonUser.name,
+  // Delegate to the one provider-agnostic path (ADR-0016) so Patreon logins take
+  // the same linking route as Google/Discord. Patreon email is treated as
+  // UNVERIFIED (Patreon does not assert email_verified), so it never auto-links.
+  const { profile } = getOrCreateFromIdentity(
+    "patreon",
+    {
+      providerId: patreonUser.id,
       email: patreonUser.email,
-      patreonId: patreonUser.id,
+      emailVerified: false,
+      name: patreonUser.name,
       tier: patreonUser.primaryTier,
-      role: patreonRole, // Use Patreon-mapped role unless overridden locally
-      metadata: {
-        source: "patreon",
-      },
-    });
-  }
-
-  // Create new profile from Patreon
-  return createProfile(patreonUser.id, {
-    name: patreonUser.name,
-    email: patreonUser.email,
-    patreonId: patreonUser.id,
-    tier: patreonUser.primaryTier,
-    role: patreonRole,
-    source: "patreon",
-  });
+    },
+    patreonRole
+  );
+  return profile;
 }
 
 /**
@@ -218,7 +220,9 @@ function getOrCreateFromPatreon(patreonUser, patreonRole) {
  */
 function exportToCSF() {
   ensureDirectories();
-  const profiles = listProfiles();
+  // Strip local password credentials — an export/backup must never carry scrypt
+  // hashes (security review, ADR-0016). publicProfile() is hoisted below.
+  const profiles = listProfiles().map(publicProfile);
 
   // For now, create a JSON backup that can be converted to binary CSF later
   const csf = {
@@ -358,6 +362,260 @@ function getProfileByDiscordId(discordId) {
   return getProfile(link.patreonId);
 }
 
+// ── Provider-agnostic identity, linking, email + local password (ADR-0016) ──
+
+/** All profiles as an array (latest-wins), excluding tombstoned deletes. */
+function allProfiles() {
+  return listProfiles().filter((p) => !p.deleted);
+}
+
+/**
+ * Find a profile by a (provider, providerId) identity — checks the generic
+ * `identities[]` first, then the legacy denormalized `patreonId`/`discordId`
+ * mirrors and the profile `id` itself (old Patreon profiles are keyed by
+ * patreonId). Returns the profile or null.
+ */
+function getProfileByIdentity(provider, providerId) {
+  if (!provider || providerId == null) return null;
+  const pid = String(providerId);
+  for (const p of allProfiles()) {
+    if ((p.identities || []).some((i) => i.provider === provider && String(i.providerId) === pid)) return p;
+    if (provider === "patreon" && (String(p.patreonId) === pid || String(p.id) === pid)) return p;
+    if (provider === "discord" && String(p.discordId) === pid) return p;
+  }
+  return null;
+}
+
+/**
+ * Find a profile by email. `verifiedOnly` restricts the match to profiles whose
+ * email a provider has verified (`emailVerified === true` or a verified identity
+ * with that email) — this is the gate that makes auto-linking safe (ADR-0016).
+ */
+function getProfileByEmail(email, { verifiedOnly = false } = {}) {
+  if (!email) return null;
+  const needle = String(email).toLowerCase();
+  let fallback = null;
+  for (const p of allProfiles()) {
+    const rootMatch = p.email && p.email.toLowerCase() === needle;
+    const idMatch = (p.identities || []).find((i) => i.email && i.email.toLowerCase() === needle);
+    if (!rootMatch && !idMatch) continue;
+    const verified = p.emailVerified === true || (idMatch && idMatch.emailVerified === true);
+    if (verified) return p; // strongest match wins immediately
+    if (!verifiedOnly) fallback = fallback || p;
+  }
+  return verifiedOnly ? null : fallback;
+}
+
+/**
+ * Append a provider identity to an existing profile (explicit or auto link).
+ * Keeps the legacy denormalized mirrors + account-links.jsonl in sync so the
+ * Discord bot and older readers keep working. Returns the updated profile, or
+ * null if the profile does not exist.
+ */
+function linkIdentity(profileId, provider, providerId, email, emailVerified) {
+  const profile = loadProfileFromIndex(profileId);
+  if (!profile) return null;
+  const pid = String(providerId);
+  const identities = (profile.identities || []).filter(
+    (i) => !(i.provider === provider && String(i.providerId) === pid)
+  );
+  identities.push({
+    provider,
+    providerId: pid,
+    email: email || null,
+    emailVerified: emailVerified === true,
+    linkedAt: new Date().toISOString(),
+  });
+  const updates = { identities };
+  // Denormalized mirrors + legacy stores for backward-compat.
+  if (provider === "patreon") updates.patreonId = pid;
+  if (provider === "discord") {
+    updates.discordId = pid;
+    // Mirror into account-links.jsonl {patreonId, discordId} that the Python bot
+    // (src/discord_lounge_bot/account_link.py) reads directly. `patreonId` here is
+    // the canonical profile id (kept named for on-disk/back-compat continuity).
+    fs.appendFileSync(
+      ACCOUNT_LINKS,
+      JSON.stringify({ patreonId: String(profileId), discordId: pid, linkedAt: new Date().toISOString() }) + "\n"
+    );
+  }
+  // If the linked identity is verified, the profile's email becomes verified too.
+  if (emailVerified === true && email) {
+    updates.emailVerified = true;
+    if (!profile.email) updates.email = email;
+  }
+  return updateProfile(profileId, updates);
+}
+
+/**
+ * Get-or-create a profile from ANY OAuth provider identity, applying the
+ * ADR-0016 linking policy:
+ *   1. Exact identity match (provider, providerId) → return it (idempotent login).
+ *   2. Else, if the incoming email is provider-verified AND matches an existing
+ *      profile whose email is also verified → AUTO-LINK (append identity).
+ *   3. Else → create a fresh profile. (Unverified email collisions do NOT merge —
+ *      that is the pre-hijacking defense; those users link explicitly later.)
+ *
+ * @param provider  'patreon' | 'google' | 'discord'
+ * @param u  { providerId, email, emailVerified, name, avatar, tier }
+ * @param role  role resolved by the provider's mapper (e.g. Patreon tier → role)
+ * @returns { profile, linked, created }
+ */
+function getOrCreateFromIdentity(provider, u, role) {
+  const providerId = String(u.providerId);
+  const emailVerified = u.emailVerified === true;
+
+  // 1. Same identity logging in again.
+  const existing = getProfileByIdentity(provider, providerId);
+  if (existing) {
+    const updates = { role, tier: u.tier != null ? u.tier : existing.tier };
+    if (u.name && !existing.name) updates.name = u.name;
+    if (u.avatar && !existing.avatar) updates.avatar = u.avatar;
+    if (emailVerified && u.email) {
+      updates.emailVerified = true;
+      if (!existing.email) updates.email = u.email;
+    }
+    // Ensure the identity is recorded even for legacy profiles that predate identities[].
+    const hasIdentity = (existing.identities || []).some(
+      (i) => i.provider === provider && String(i.providerId) === providerId
+    );
+    const updated = updateProfile(existing.id, updates);
+    if (!hasIdentity) return { profile: linkIdentity(existing.id, provider, providerId, u.email, emailVerified), linked: false, created: false };
+    return { profile: updated, linked: false, created: false };
+  }
+
+  // 2. Verified-both auto-link.
+  if (emailVerified && u.email) {
+    const match = getProfileByEmail(u.email, { verifiedOnly: true });
+    if (match) {
+      return { profile: linkIdentity(match.id, provider, providerId, u.email, true), linked: true, created: false };
+    }
+  }
+
+  // 3. Fresh profile. Patreon keeps its providerId as the profile id for on-disk
+  // continuity with existing index.jsonl records; others get a random id.
+  const newId = provider === "patreon" ? providerId : crypto.randomBytes(12).toString("hex");
+  const profile = createProfile(newId, {
+    name: u.name || "",
+    email: u.email || "",
+    emailVerified,
+    role,
+    tier: u.tier || null,
+    avatar: u.avatar || null,
+    patreonId: provider === "patreon" ? providerId : null,
+    discordId: provider === "discord" ? providerId : null,
+    identities: [
+      { provider, providerId, email: u.email || null, emailVerified, linkedAt: new Date().toISOString() },
+    ],
+    source: provider,
+  });
+  if (provider === "discord") {
+    fs.appendFileSync(
+      ACCOUNT_LINKS,
+      JSON.stringify({ patreonId: newId, discordId: providerId, linkedAt: new Date().toISOString() }) + "\n"
+    );
+  }
+  return { profile, linked: false, created: true };
+}
+
+// ── Local email + password (Node built-in scrypt, zero deps — ADR-0016) ──
+
+const SCRYPT_N = 16384, SCRYPT_R = 8, SCRYPT_P = 1, SCRYPT_KEYLEN = 64;
+
+/** Hash a plaintext password with scrypt. Returns a serializable credential. */
+function hashPassword(plaintext) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto
+    .scryptSync(String(plaintext), salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P })
+    .toString("hex");
+  return { algo: "scrypt", salt, hash, n: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P };
+}
+
+/** Constant-time verify a plaintext against a stored scrypt credential. */
+function verifyPassword(plaintext, credential) {
+  if (!credential || credential.algo !== "scrypt" || !credential.salt || !credential.hash) return false;
+  let derived;
+  try {
+    derived = crypto.scryptSync(String(plaintext), credential.salt, SCRYPT_KEYLEN, {
+      N: credential.n || SCRYPT_N,
+      r: credential.r || SCRYPT_R,
+      p: credential.p || SCRYPT_P,
+    });
+  } catch {
+    return false;
+  }
+  const stored = Buffer.from(credential.hash, "hex");
+  if (stored.length !== derived.length) return false;
+  return crypto.timingSafeEqual(stored, derived);
+}
+
+/** Set (or reset) a profile's local password. Returns the updated profile. */
+function setLocalPassword(profileId, plaintext) {
+  return updateProfile(profileId, { credential: hashPassword(plaintext) });
+}
+
+/**
+ * Create a local email+password account. Returns { profile } or { error }.
+ *
+ * SECURITY (ADR-0016 review): if ANY profile already exists for this email we
+ * refuse — we do NOT silently attach a password to it. Attaching would let an
+ * attacker claim a victim's existing (e.g. Patreon/Google) profile by registering
+ * a local password against the same email — an account-takeover / pre-hijacking
+ * path. Adding a password to an existing account must instead be an
+ * authenticated action from account settings (a follow-up). Local accounts start
+ * UNVERIFIED.
+ */
+function createLocalAccount(email, plaintext, name) {
+  if (getProfileByEmail(email)) return { error: "email_taken" };
+  const profile = createProfile(crypto.randomBytes(12).toString("hex"), {
+    name: name || "",
+    email,
+    emailVerified: false,
+    role: "guest",
+    credential: hashPassword(plaintext),
+    identities: [{ provider: "local", providerId: String(email).toLowerCase(), email, emailVerified: false, linkedAt: new Date().toISOString() }],
+    source: "local",
+  });
+  return { profile };
+}
+
+// Precomputed dummy credential so a login for an unknown email still performs a
+// scrypt comparison — equalizes timing and blocks user enumeration by response
+// latency (ADR-0016 review).
+const _DUMMY_CREDENTIAL = hashPassword(crypto.randomBytes(16).toString("hex"));
+
+/**
+ * Verify a local login. Returns the profile on success, or null.
+ *
+ * Email is NOT a unique key across providers (a verified Google profile and an
+ * unverified local one can share an address), so we resolve specifically to the
+ * profile that HOLDS a local credential for this email — not just any match. A
+ * scrypt comparison always runs (dummy credential when none is found) to keep the
+ * timing constant and block user enumeration (ADR-0016 review).
+ */
+function verifyLocalLogin(email, plaintext) {
+  const needle = String(email).toLowerCase();
+  let profile = null;
+  for (const p of allProfiles()) {
+    if (!p.credential) continue;
+    const match =
+      (p.email && p.email.toLowerCase() === needle) ||
+      (p.identities || []).some((i) => i.email && i.email.toLowerCase() === needle);
+    if (match) { profile = p; break; }
+  }
+  const credential = (profile && profile.credential) || _DUMMY_CREDENTIAL;
+  const okPassword = verifyPassword(plaintext, credential); // always runs scrypt
+  if (!profile) return null;
+  return okPassword ? profile : null;
+}
+
+/** Strip secrets (credential) before sending a profile to any client. */
+function publicProfile(profile) {
+  if (!profile) return profile;
+  const { credential, ...safe } = profile;
+  return safe;
+}
+
 module.exports = {
   createProfile,
   getProfile,
@@ -372,4 +630,15 @@ module.exports = {
   getProfileByDiscordId,
   exportToCSF,
   importFromCSF,
+  // ADR-0016: provider-agnostic identity + local auth
+  getProfileByIdentity,
+  getProfileByEmail,
+  linkIdentity,
+  getOrCreateFromIdentity,
+  hashPassword,
+  verifyPassword,
+  setLocalPassword,
+  createLocalAccount,
+  verifyLocalLogin,
+  publicProfile,
 };

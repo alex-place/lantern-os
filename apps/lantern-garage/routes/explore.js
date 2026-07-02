@@ -21,6 +21,7 @@ const { rankedFeed, pagedFeed, embedCards } = require("../lib/explore-feed");
 const { recordModelOutcome, recordOutcomeWithDecay } = require("../lib/model-leaderboard");
 const { buildUserNewsContext } = require("../lib/news-personalize");
 const { renderThumb } = require("../lib/explore-thumb");
+const { getSessionUserId } = require("../lib/session-identity");
 
 const SUCCESS_EVENTS = new Set(["click", "dwell", "like", "open"]);
 // "impression" is the CTR denominator (#1221): a card was actually seen. It is logged
@@ -107,7 +108,7 @@ module.exports = async function exploreRoute(req, res, url, deps) {
     // interests + their own engagement). Guests/local fall back to the shared
     // desk-watchlist context. Cheap to build per request; only the finance
     // producer consumes it.
-    const userId = (req.session && req.session.patreon && req.session.patreon.id) || null;
+    const userId = getSessionUserId(req);
     const userCtx = buildUserNewsContext(userId);
     // Cache key keeps the short-TTL rank stable per audience: signed-in users get
     // their own personalized cache slot, everyone else shares "global".
@@ -150,7 +151,7 @@ module.exports = async function exploreRoute(req, res, url, deps) {
         // Per-user signal (Remember): record the same outcome in the user's OWN
         // "explore-user" scope so news-personalize can rank by what THIS user
         // engages with, not just the crowd. Guests fold into the "global" scope.
-        const uid = (req.session && req.session.patreon && req.session.patreon.id) || "global";
+        const uid = getSessionUserId(req) || "global";
         recordOutcomeWithDecay("explore-user", uid, key, success, dwellMs, 0, 1.0);
       } catch (e) {
         sendJson(res, { ok: false, error: e.message }, 200);

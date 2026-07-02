@@ -203,6 +203,41 @@
     .guest-link-icon { font-size: 20px; flex-shrink: 0; }
     .guest-link-name { font-size: 13px; font-weight: 600; color: var(--text); }
     .guest-link-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Provider buttons (ADR-0016) */
+    .provider-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; border: 1px solid var(--border); border-radius: 14px;
+      padding: 13px 20px; font-size: 15px; font-weight: 700; cursor: pointer;
+      color: #fff; text-decoration: none; transition: transform .15s, filter .15s, background .15s;
+    }
+    .provider-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    .provider-btn[data-provider="google"]  { background: #fff; color: #1f2937; border-color: #dadce0; }
+    .provider-btn[data-provider="discord"] { background: #5865F2; border-color: transparent; }
+    .provider-btn[data-provider="patreon"] { background: #ff424d; border-color: transparent; }
+    .provider-btn .pi { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+    /* Local email/password form */
+    .local-form { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .local-form input {
+      width: 100%; box-sizing: border-box; padding: 12px 14px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(255,255,255,.04); color: var(--text); font-size: 14px;
+    }
+    .local-form input:focus { outline: none; border-color: var(--accent); }
+    .local-form .btn-local {
+      border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px;
+      font-weight: 700; cursor: pointer; color: #04121a;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+    }
+    .local-toggle { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+    .local-toggle a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+    .auth-error {
+      display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid rgba(248,113,113,.4); background: rgba(248,113,113,.10);
+      color: #fecaca; font-size: 13px; line-height: 1.5;
+    }
+    .auth-error.show { display: block; }
+    .field-error { color: #fca5a5; font-size: 12px; min-height: 14px; }
   </style>
 </head>
 <body>
@@ -215,36 +250,35 @@
 
   <div class="auth-gate" id="auth-gate">
     <div class="auth-gate-kicker">Access Control</div>
-    <h2>Sign In with Patreon</h2>
+    <h2>Sign in</h2>
     <p id="auth-message">
-      Unlock Keystone Desk and exclusive features based on your tier.
+      Choose how you'd like to continue. Your account is local-first — you own it.
     </p>
 
-    <div class="role-grid">
-      <div class="role-card">
-        <strong>Free</strong>
-        <span>Explore & learn</span>
-      </div>
-      <div class="role-card">
-        <strong>Wanderer</strong>
-        <span>$5/month</span>
-      </div>
-      <div class="role-card">
-        <strong>Deep Dreamer</strong>
-        <span>$20/month</span>
-      </div>
-      <div class="role-card">
-        <strong>Synthesasia Guild</strong>
-        <span>$200/month</span>
+    <div class="auth-error" id="auth-error" role="alert"></div>
+
+    <!-- OAuth provider buttons — rendered from the configured providers (ADR-0016) -->
+    <div class="auth-actions" id="provider-buttons"></div>
+
+    <!-- Local email + password -->
+    <div id="local-block" hidden>
+      <div class="auth-divider">or with email</div>
+      <form class="local-form" id="local-form" autocomplete="on">
+        <input type="text" id="local-name" name="name" placeholder="Display name" autocomplete="name" hidden>
+        <input type="email" id="local-email" name="email" placeholder="you@email.com" autocomplete="email" required>
+        <input type="password" id="local-password" name="password" placeholder="Password (min 8 characters)" autocomplete="current-password" required minlength="8">
+        <div class="field-error" id="local-error"></div>
+        <button type="submit" class="btn-local" id="local-submit">Sign in</button>
+      </form>
+      <div class="local-toggle" id="local-toggle-wrap">
+        New here? <a id="local-toggle">Create an account</a>
       </div>
     </div>
 
+    <div class="auth-divider">support</div>
     <div class="auth-actions">
-      <button class="btn-patreon-primary" id="auth-btn" onclick="loginWithPatreon()">
-        ♥ Continue with Patreon
-      </button>
       <a class="btn-patreon-secondary" href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer">
-        View Tiers & Support
+        View Patreon Tiers &amp; Support
       </a>
     </div>
 
@@ -299,36 +333,162 @@
   function safeReturnTo() {
     try {
       const rt = new URLSearchParams(location.search).get("returnTo");
-      if (rt && rt.startsWith("/") && !rt.startsWith("//")) return rt;
+      // Mirror the server validator (oauth-core safeReturnTo): root-relative only,
+      // no protocol-relative "//host" and no backslash tricks.
+      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) return rt;
     } catch (_) {}
     return "/";
   }
 
-  function loginWithPatreon() {
-    location.href = `/api/auth/patreon/start?returnTo=${encodeURIComponent(safeReturnTo())}`;
+  // Provider display metadata (icon + label). Only providers the SERVER reports as
+  // configured are actually rendered, so we never show a button that 500s (#1877).
+  const PROVIDER_META = {
+    google:  { label: "Continue with Google",  icon: "G" },
+    discord: { label: "Continue with Discord", icon: "◈" },
+    patreon: { label: "Continue with Patreon", icon: "♥" },
+  };
+
+  function startOAuth(provider) {
+    location.href = `/api/auth/${provider}/start?returnTo=${encodeURIComponent(safeReturnTo())}`;
+  }
+
+  function renderProviders(providers) {
+    const wrap = document.getElementById("provider-buttons");
+    wrap.innerHTML = "";
+    let oauthCount = 0;
+    (providers || []).forEach((p) => {
+      if (p.id === "local") return; // local is the form, not a button
+      const meta = PROVIDER_META[p.id];
+      if (!meta) return;
+      oauthCount++;
+      const btn = document.createElement("button");
+      btn.className = "provider-btn";
+      btn.setAttribute("data-provider", p.id);
+      btn.innerHTML = `<span class="pi">${meta.icon}</span> ${meta.label}`;
+      btn.addEventListener("click", () => startOAuth(p.id));
+      wrap.appendChild(btn);
+    });
+    // Local block visibility.
+    const hasLocal = (providers || []).some((p) => p.id === "local");
+    document.getElementById("local-block").hidden = !hasLocal;
+    if (!oauthCount && !hasLocal) {
+      showError("No sign-in methods are configured on this server yet. You can still continue as a guest below.");
+    }
+  }
+
+  // ── Error surfacing (fixes #1877: no more blank 500s) ──
+  const ERROR_TEXT = {
+    provider_unconfigured: "That sign-in method isn't set up on this server yet. Try another option below.",
+    unknown_provider: "Unknown sign-in method.",
+    oauth_failed: "Sign-in didn't complete. Please try again.",
+  };
+  function showError(msg) {
+    const el = document.getElementById("auth-error");
+    el.textContent = msg;
+    el.classList.add("show");
+  }
+  function surfaceQueryError() {
+    try {
+      const q = new URLSearchParams(location.search);
+      const err = q.get("error");
+      if (!err) return;
+      const provider = q.get("provider");
+      const base = ERROR_TEXT[err] || "Sign-in error.";
+      showError(provider ? `${base} (${provider})` : base);
+    } catch (_) {}
+  }
+
+  // ── Local email + password ──
+  let localMode = "login"; // or "register"
+  function setLocalMode(mode) {
+    localMode = mode;
+    const nameInput = document.getElementById("local-name");
+    const submit = document.getElementById("local-submit");
+    const toggleWrap = document.getElementById("local-toggle-wrap");
+    const pw = document.getElementById("local-password");
+    if (mode === "register") {
+      nameInput.hidden = false;
+      pw.setAttribute("autocomplete", "new-password");
+      submit.textContent = "Create account";
+      toggleWrap.innerHTML = 'Already have an account? <a id="local-toggle">Sign in</a>';
+    } else {
+      nameInput.hidden = true;
+      pw.setAttribute("autocomplete", "current-password");
+      submit.textContent = "Sign in";
+      toggleWrap.innerHTML = 'New here? <a id="local-toggle">Create an account</a>';
+    }
+    document.getElementById("local-toggle").addEventListener("click", () =>
+      setLocalMode(localMode === "login" ? "register" : "login")
+    );
+  }
+
+  async function submitLocal(e) {
+    e.preventDefault();
+    const email = document.getElementById("local-email").value.trim();
+    const password = document.getElementById("local-password").value;
+    const name = document.getElementById("local-name").value.trim();
+    const errEl = document.getElementById("local-error");
+    const submit = document.getElementById("local-submit");
+    errEl.textContent = "";
+    submit.disabled = true;
+    const prev = submit.textContent;
+    submit.textContent = "…";
+    try {
+      const url = localMode === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
+      const body = localMode === "register" ? { email, password, name } : { email, password };
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        location.href = safeReturnTo();
+        return;
+      }
+      const map = {
+        invalid_credentials: "Email or password is incorrect.",
+        email_taken: "An account with that email already exists. Try signing in.",
+        weak_password: "Password must be at least 8 characters.",
+        invalid_email: "That doesn't look like a valid email.",
+        too_many_attempts: "Too many attempts. Please wait a few minutes and try again.",
+        local_auth_disabled: "Email sign-up is disabled on this server.",
+      };
+      errEl.textContent = map[data.error] || "Something went wrong. Please try again.";
+    } catch (_) {
+      errEl.textContent = "Network error. Please try again.";
+    } finally {
+      submit.disabled = false;
+      submit.textContent = prev;
+    }
   }
 
   async function checkSession() {
+    surfaceQueryError();
     try {
       const res = await fetch("/api/auth/session", { credentials: "include" });
       if (!res.ok) throw new Error("No session");
-
       const session = await res.json();
-
       if (session.authenticated) {
         const role = session.role || "guest";
         const plan = LANTERN_ROLES[role];
-
         if (plan && plan.canAccess) {
-          // Already authenticated — go where they were headed (returnTo), else home.
           location.href = safeReturnTo();
           return;
         }
       }
+      renderProviders(session.providers);
     } catch (err) {
-      // Not authenticated, show login
+      // Session endpoint unreachable — fall back to fetching the provider list.
+      try {
+        const pr = await fetch("/api/auth/providers", { credentials: "include" });
+        const pj = await pr.json();
+        renderProviders(pj.providers);
+      } catch (_) {
+        renderProviders([]);
+      }
     }
-
     updateStatus("Ready to sign in");
   }
 
@@ -337,8 +497,11 @@
     if (el) el.textContent = message;
   }
 
-  // Check session on page load
-  document.addEventListener("DOMContentLoaded", checkSession);
+  document.addEventListener("DOMContentLoaded", () => {
+    setLocalMode("login");
+    document.getElementById("local-form").addEventListener("submit", submitLocal);
+    checkSession();
+  });
 </script>
 </body>
 </html>
