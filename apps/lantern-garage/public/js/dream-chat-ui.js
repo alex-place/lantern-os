@@ -905,7 +905,7 @@ async function runAutowork(target, btn, base) {
     const handleEvent = (evName, data) => {
       let d = {};
       try { d = JSON.parse(data); } catch { return; }
-      if (evName === 'run') { awRunId = d.runId; return; }
+      if (evName === 'run') { awRunId = d.runId; AW_LOCAL_RUNS.add(d.runId); return; }
       if (evName === 'step') {
         let extra = '';
         if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
@@ -1034,6 +1034,124 @@ async function runAutowork(target, btn, base) {
     if (typeof scrollToBottom === 'function') scrollToBottom();
   }
 }
+
+// ── Background autowork watcher ────────────────────────────────────────────────
+// Autowork is never headless-invisible: runs started OUTSIDE this chat client (the
+// auto-dispatch daemon, CI/fleet POSTs, another tab) are discovered via
+// /api/convergence/autonomous-work/active and get the same live step panel in-chat,
+// driven by polling /autonomous-work/status (which carries the full step history).
+const AW_LOCAL_RUNS = new Set();     // runIds this client started (already have a panel)
+const AW_WATCHED_RUNS = new Set();   // background runIds already given a panel
+
+function attachBackgroundAutoworkPanel(run, base) {
+  hideEmptyState();
+  const messages = document.getElementById('messages');
+  if (!messages) return;
+  ensureAutoworkStyles();
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const srcLabel = run.source === 'auto-dispatch' ? 'Auto-dispatch' : (run.source || 'background');
+  const issue = run.issue;
+  const phases = AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
+  const PHASE_INFO = Object.fromEntries(AUTOWORK_PHASES.map((p) => [p[0], { label: p[1], desc: p[2] }]));
+  const row = document.createElement('div');
+  row.className = 'msg-row agent';
+  row.innerHTML =
+    `<div class="msg-label">Keystone · ${esc(srcLabel)} · Autowork #${esc(issue)}</div>`
+    + `<div class="bubble aw-panel">`
+    + `<div class="aw-activity"><img src="/mandala.svg" class="aw-spin" alt=""><div class="aw-act-text"><b>Background autowork on #${esc(issue)}</b> <span>${esc(run.title || 'started by ' + srcLabel.toLowerCase() + ' — attaching live')}</span></div></div>`
+    + `<div class="aw-steps">${phases.map(([k, label, desc]) =>
+        `<div class="aw-step" data-phase="${k}"><div class="aw-ico">○</div><div class="aw-body">`
+        + `<div class="aw-row1"><span class="aw-label">${esc(label)}</span><span class="aw-desc">${esc(desc)}</span><span class="aw-extra"></span></div>`
+        + `<div class="aw-detail" style="display:none"></div></div></div>`).join('')}</div>`
+    + `<div class="aw-final" style="margin-top:8px;font-weight:600"></div>`
+    + `</div>`;
+  messages.appendChild(row);
+  if (typeof scrollToBottom === 'function') scrollToBottom();
+
+  const actImg = row.querySelector('.aw-activity img');
+  const actText = row.querySelector('.aw-act-text');
+  const setActivity = (label, desc, spinning) => {
+    if (actText) actText.innerHTML = '<b>' + esc(label) + '</b>' + (desc ? ' <span>— ' + esc(desc) + '</span>' : '');
+    if (actImg) actImg.classList.toggle('aw-spin', spinning !== false);
+  };
+  const setStep = (phase, status, extra, detail) => {
+    const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
+    if (!el) return;
+    el.classList.remove('is-active', 'is-done', 'is-error', 'is-retry');
+    const ico = el.querySelector('.aw-ico');
+    ico.style.color = '';
+    if (status === 'start')        { el.classList.add('is-active'); ico.innerHTML = '<img src="/mandala.svg" class="aw-spin" alt="">'; }
+    else if (status === 'done')    { el.classList.add('is-done');  ico.textContent = '✓'; ico.style.color = '#4ade80'; }
+    else if (status === 'error')   { el.classList.add('is-error'); ico.textContent = '✗'; ico.style.color = '#f87171'; }
+    else if (status === 'retry')   { el.classList.add('is-retry'); ico.textContent = '↻'; ico.style.color = '#facc15'; }
+    else if (status === 'skipped') { ico.textContent = '⊘'; ico.style.color = '#facc15'; el.style.opacity = '1'; }
+    if (extra) el.querySelector('.aw-extra').textContent = extra;
+    if (detail) {
+      const det = el.querySelector('.aw-detail');
+      det.textContent = detail;
+      det.style.display = 'block';
+      det.style.color = (status === 'error') ? '#f87171' : (status === 'retry') ? '#facc15' : '';
+    }
+  };
+  const applySteps = (steps) => {
+    for (const s of steps || []) {
+      let extra = '';
+      if (s.phase === 'tests' && s.status === 'done') extra = s.passed ? 'passed' : (s.ran ? 'failed' : 'none');
+      else if (s.phase === 'research' && s.status === 'done') extra = `${s.filesFound || 0} files · ${s.webSourcesFound || 0} web`;
+      else if (s.phase === 'pr' && s.status === 'done') extra = 'PR opened';
+      else if (s.status === 'retry') extra = `retry ${s.attempt || ''}`.trim();
+      setStep(s.phase, s.status, extra, s.detail || s.error);
+      const info = PHASE_INFO[s.phase];
+      if (info && s.status === 'start') setActivity(info.label + '…', info.desc, true);
+    }
+  };
+
+  (async () => {
+    const fin = row.querySelector('.aw-final');
+    for (let i = 0; i < 480; i++) {   // up to ~40 min at 5s — matches the daemon ceiling
+      let s = null;
+      try { s = await (await fetch(`${base}/api/convergence/autonomous-work/status?runId=${encodeURIComponent(run.runId)}`)).json(); } catch (_e) { /* transient */ }
+      if (s && s.found) {
+        applySteps(s.steps);
+        if (s.done) {
+          if (s.succeeded && s.prUrl) {
+            setActivity('Complete', 'background run opened a pull request', false);
+            fin.style.color = '#4ade80';
+            fin.innerHTML = `✓ Auto-worked #${esc(issue)} — <a href="${esc(s.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`;
+            renderAutoworkActions(fin, s.prUrl, issue, row.querySelector('.aw-ico'), base);
+          } else {
+            setActivity('Stopped', s.message || 'run ended', false);
+            fin.style.color = '#f87171';
+            fin.textContent = `✗ ${(s.message || ('run ended at ' + (s.latestPhase || 'an unknown step')))}`;
+          }
+          if (typeof scrollToBottom === 'function') scrollToBottom();
+          return;
+        }
+      }
+      await new Promise(r => setTimeout(r, 5000));
+    }
+    setActivity('Detached', 'stopped watching after 40 minutes — check GitHub for the PR', false);
+  })();
+}
+
+function startBackgroundAutoworkWatcher() {
+  const base = (typeof serverBase !== 'undefined') ? serverBase : window.location.origin;
+  const poll = async () => {
+    if (document.hidden) return;
+    if (!document.getElementById('messages')) return;
+    let d = null;
+    try { d = await (await fetch(`${base}/api/convergence/autonomous-work/active`)).json(); } catch (_e) { return; }
+    for (const run of (d && d.active) || []) {
+      if (!run.runId || run.source === 'chat') continue;              // chat runs already have a live panel
+      if (AW_LOCAL_RUNS.has(run.runId) || AW_WATCHED_RUNS.has(run.runId)) continue;
+      AW_WATCHED_RUNS.add(run.runId);
+      attachBackgroundAutoworkPanel(run, base);
+    }
+  };
+  setTimeout(poll, 4000);            // shortly after load, then steady cadence
+  setInterval(poll, 20000);
+}
+try { startBackgroundAutoworkWatcher(); } catch (_e) { /* watcher is best-effort */ }
 
 // ── Image requests ─────────────────────────────────────────────────────────────
 // Detect when the user is asking for a picture and return the subject prompt, else

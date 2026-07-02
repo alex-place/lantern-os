@@ -260,8 +260,10 @@ async function tick(ctx) {
   log(`[auto-dispatch] working top issue #${issue.issueNumber} — ${String(issue.title || "").slice(0, 60)}`);
   try {
     // Draft PR via the verified autonomous-work pipeline (research→plan→patch→test→openDraftPr).
+    // source/title tag the run's step log so the dream-chat background watcher can
+    // surface this daemon run live in the chat UI (autowork is never headless-invisible).
     const r = await post(port, "/api/convergence/autonomous-work",
-      { issue: issue.issueNumber, push: true, commit: true }, 20 * 60 * 1000);
+      { issue: issue.issueNumber, push: true, commit: true, source: "auto-dispatch", title: issue.title }, 20 * 60 * 1000);
     let result = null;
     try { result = r && r.text ? JSON.parse(r.text) : null; } catch { /* non-JSON */ }
     const rec = { issueNumber: issue.issueNumber, title: issue.title, at: new Date().toISOString() };
