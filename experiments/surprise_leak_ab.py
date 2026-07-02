@@ -1,3 +1,112 @@
+import random
+from collections import defaultdict
+
+class GroundednessEvaluator:
+    def __init__(self, p_hallucination_given_not_grounded=0.9, p_hallucination_given_grounded=0.1):
+        self.p_hallucination_given_not_grounded = p_hallucination_given_not_grounded
+        self.p_hallucination_given_grounded = p_hallucination_given_grounded
+
+    def is_grounded(self, text_output):
+        # Simulate a real grounding check
+        # For this simulation, we'll assume a simple heuristic
+        return "grounded" in text_output.lower()
+
+    def evaluate_hallucination(self, text_output, actual_grounded_status):
+        is_grounded_prediction = self.is_grounded(text_output)
+
+        if actual_grounded_status:
+            # If actually grounded, hallucination is less likely
+            return random.random() < self.p_hallucination_given_grounded
+        else:
+            # If not actually grounded, hallucination is more likely
+            return random.random() < self.p_hallucination_given_not_grounded
+
+class Model:
+    def __init__(self, use_surprise=False):
+        self.use_surprise = use_surprise
+
+    def generate_response(self, prompt):
+        # Simulate model response generation
+        # In a real scenario, this would involve an actual LLM call
+        response_text = f"This is a response to '{prompt}'."
+        actual_grounded_status = random.choice([True, False])
+
+        if actual_grounded_status:
+            response_text += " It is grounded in facts."
+        else:
+            response_text += " It contains some ungrounded information."
+
+        model_uncertainty = random.uniform(0, 1) if self.use_surprise else 0.0
+
+        return {
+            "text": response_text,
+            "actual_grounded_status": actual_grounded_status,
+            "model_uncertainty": model_uncertainty
+        }
+
+def run_experiment(num_samples=1000):
+    evaluator = GroundednessEvaluator()
+
+    results = defaultdict(lambda: {"true_positives": 0, "false_positives": 0, "false_negatives": 0, "true_negatives": 0})
+
+    for _ in range(num_samples):
+        prompt = "Tell me something interesting."
+
+        # Baseline: Text-only model
+        baseline_model = Model(use_surprise=False)
+        baseline_response = baseline_model.generate_response(prompt)
+        baseline_is_hallucination = evaluator.evaluate_hallucination(
+            baseline_response["text"], baseline_response["actual_grounded_status"]
+        )
+
+        # Canary: Text + Surprise model (modelUncertainty incorporated into groundedness axis)
+        canary_model = Model(use_surprise=True)
+        canary_response = canary_model.generate_response(prompt)
+
+        # Simulate how modelUncertainty affects the groundedness prediction for the canary
+        # Higher uncertainty makes it more likely to be flagged as ungrounded/hallucination
+        canary_groundedness_score = (
+            1 - canary_response["model_uncertainty"]
+        ) # Higher score means more grounded
+
+        # For the canary, we'll use a threshold on the groundedness score to predict hallucination
+        # This is where we aim to fix FPR or only raise it while improving recall
+        hallucination_threshold = 0.5 # This threshold can be tuned
+        canary_is_hallucination_predicted = canary_groundedness_score < hallucination_threshold
+
+        # Actual hallucination status for canary (same logic as baseline for fair comparison of detection)
+        canary_is_hallucination_actual = evaluator.evaluate_hallucination(
+            canary_response["text"], canary_response["actual_grounded_status"]
+        )
+
+        # Evaluate Baseline
+        if baseline_is_hallucination:
+            results["baseline"]["true_positives"] += 1
+        else:
+            results["baseline"]["false_negatives"] += 1
+
+        # Evaluate Canary
+        if canary_is_hallucination_predicted and canary_is_hallucination_actual:
+            results["canary"]["true_positives"] += 1
+        elif canary_is_hallucination_predicted and not canary_is_hallucination_actual:
+            results["canary"]["false_positives"] += 1
+        elif not canary_is_hallucination_predicted and canary_is_hallucination_actual:
+            results["canary"]["false_negatives"] += 1
+        else:
+            results["canary"]["true_negatives"] += 1
+
+    return results
+
+if __name__ == "__main__":
+    experiment_results = run_experiment(num_samples=5000)
+
+    print("Experiment Results:")
+    for config, metrics in experiment_results.items():
+        print(f"\nConfiguration: {config}")
+        recall = metrics["true_positives"] / (metrics["true_positives"] + metrics["false_negatives"]) if (metrics["true_positives"] + metrics["false_negatives"]) > 0 else 0
+        fpr = metrics["false_positives"] / (metrics["false_positives"] + metrics["true_negatives"]) if (metrics["false_positives"] + metrics["true_negatives"]) > 0 else 0
+        print(f"  Recall: {recall:.4f}")
+        print(f"  FPR: {fpr:.4f}")
 """
 Surprise-leak Layer-1 harness — does per-token surprise discriminate hallucination?
 
