@@ -32,9 +32,15 @@ const MAX_PROMPT_LEN = 1000;
 module.exports = function imageRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody, sendFile } = deps;
 
-  // POST /api/image/ai-generate — generate an image via the OpenAI Images API (Node, no python).
-  // Saves locally and returns { ok, url: "/images/<file>", model }. The chat's "draw me X" flow
-  // calls this first (OpenAI quality) and falls back to a keyless source when ok is false.
+  // POST /api/image/ai-generate — generate an image, selecting the provider through the
+  // OSS-first image-model-registry (Act stage). Returns the SAME contract as before —
+  // { ok, url: "/images/<file>", model } — so the chat "draw me X" flow and Three Doors
+  // (public/js/three-doors-images.js) keep working; they keyless-fall-back when ok is false.
+  //
+  // Phase 1: the local OSS lead (Flux/ComfyUI) has no driver yet and is unreachable, so the
+  // chain resolves to OpenAI exactly as before (no behavior change). Once Phase 3 lands the
+  // ComfyUI driver and the boot probe verifies it, the OSS provider leads automatically and
+  // the closed one drops to a fallback (or is forbidden by IMAGE_OSS_ONLY=1).
   if (req.method === "POST" && url.pathname === "/api/image/ai-generate") {
     // collectRequestBody is promise-style (req, maxBytes, timeoutMs) — NOT a callback.
     (async () => {
@@ -43,9 +49,33 @@ module.exports = function imageRoutes(req, res, url, deps) {
         const data = JSON.parse(raw || "{}");
         const prompt = String(data.prompt || "").slice(0, MAX_PROMPT_LEN * 4).trim();
         if (!prompt) { sendJson(res, { ok: false, error: "prompt required" }, 400); return; }
-        const { generateImage } = require("../lib/openai-image");
-        const result = await generateImage(prompt, { size: data.size });
-        sendJson(res, result, result.ok ? 200 : 502);
+
+        const registry = require("../lib/image-model-registry");
+        const taskType = data.taskType === "character" ? "character" : "scene";
+        // Driver map: prompt flows via a JSON body field to each driver (never interpolated).
+        const drivers = {
+          openai: (p) => require("../lib/openai-image").generateImage(p, { size: data.size }),
+          // ComfyUI/Flux driver lands in Phase 3 (#1847). True no-op until then so the chain
+          // falls through cleanly rather than crashing.
+          comfyui: async () => ({ ok: false, error: "comfyui provider not yet implemented (Phase 3)" }),
+          pollinations: async () => ({ ok: false, error: "pollinations handled client-side" }),
+        };
+
+        const chain = registry.resolveImageChain(taskType);
+        if (!chain.length) {
+          // No provider reachable → graceful {ok:false}, never a 500. Client keyless-falls-back.
+          sendJson(res, { ok: false, error: "no image provider available" }, 502);
+          return;
+        }
+
+        let result = { ok: false, error: "no image provider available" };
+        for (const provider of chain) {
+          const driver = drivers[provider.kind];
+          if (!driver) continue;
+          result = await driver(prompt);
+          if (result && result.ok) { result.provider = provider.id; break; }
+        }
+        sendJson(res, result, result && result.ok ? 200 : 502);
       } catch (err) {
         sendJson(res, { ok: false, error: err.message }, 500);
       }
