@@ -180,6 +180,32 @@ To undo it later:
 
 Logs are saved to `logs\lantern-autostart.log`.
 
+### Keep the public stable server auto-deploying (deploy host only)
+
+*Only relevant on the machine that serves `lantern-os.net` — most people can skip this.*
+
+The stable copy on port 4177 is kept up to the `master` branch by a scheduled task
+(`KeystoneAutoDeployStable`) that runs [`scripts/auto-deploy-stable.ps1`](scripts/auto-deploy-stable.ps1)
+every 5 minutes: fetch, validate (`node --check`), swap, health-check, and roll back on a
+bad boot. It runs windowless (a hidden `wscript` launcher — no terminal flashes) and
+preserves runtime data across each `git reset --hard`.
+
+The deploy script is **repo-managed**. `scripts/auto-deploy-stable.ps1` is the single source
+of truth; the copy that actually runs lives *outside* the repo (so a mid-deploy reset can't
+wipe it). One command installs/refreshes everything — the out-of-repo running copy, the hidden
+launcher, and the scheduled task:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Register-AutoDeployStable.ps1
+```
+
+You normally don't run it directly: **`Start-DualServers.ps1` re-syncs it automatically** on
+every quickstart whenever the task already exists, so editing the tracked script and re-running
+the dual-boot launcher is all it takes to ship a deploy-script change. For first-time setup on a
+new deploy host, pass `-RegisterAutoDeploy` to the dual-boot launcher (or run the command above
+once). Use `-NoAutoDeploy` to skip the sync, or `Register-AutoDeployStable.ps1 -Unregister` to
+remove the task and generated files. Deploy log: `C:\dev\auto-deploy-stable.log`.
+
 ### Voice (text-to-speech)
 
 - **Browser voice** works out of the box in Chrome and Edge — no setup.
