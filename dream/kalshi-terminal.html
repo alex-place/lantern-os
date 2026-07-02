@@ -230,7 +230,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .grounded-box.ok{background:rgba(60,150,220,.08);border:1px solid rgba(60,150,220,.4)}
 .grounded-box.warn{background:rgba(220,160,40,.08);border:1px solid rgba(220,160,40,.4);color:var(--muted)}
 .grounded-box.pending{background:#11151d;border:1px solid #2c3446;color:var(--muted)}
-.grounded-box .gb-head{color:#cfe3f5;margin-bottom:3px}
+.grounded-box .gb-head{color:var(--text);font-weight:600;margin-bottom:3px}
 .grounded-box .gb-rat{color:var(--muted);margin-bottom:3px;font-family:inherit}
 .grounded-box .gb-foot{color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .grounded-box a{color:#6db3f2;text-decoration:none}
@@ -239,6 +239,32 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .reground-btn:disabled{opacity:.6;cursor:default}
 .grounded-box .spin{display:inline-block;animation:spin 1.6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* The card is fixed-height but grounded cards carry variable-length evidence, so a
+   long card clipped its footer (sources/meta) under overflow:hidden — on desktop and
+   phones alike. Let ONLY the front card scroll its overflow. touch-action:pan-y keeps
+   horizontal swipe working (the swipe handler already bails on vertical-dominant
+   gestures), so a vertical drag scrolls the evidence and a horizontal drag still
+   takes/passes. Peek cards stay clipped (they're scaled + dimmed). */
+.card.front{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+.card.front::-webkit-scrollbar{width:6px}
+.card.front::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.card.front{scrollbar-width:thin}
+
+/* ── phones: reclaim vertical space + tighten content so most cards fit without
+   scrolling; the scroll rule above is the guarantee for the tallest cards. ──── */
+@media (max-width:480px){
+  .kx-console{padding:8px 10px 0;border-radius:16px;margin:6px auto 8px}
+  .deck{padding:6px 8px 10px;gap:8px}
+  .stage{width:min(440px,94vw);height:min(560px,66vh)}
+  .card{padding:11px 12px}
+  .card-q{font-size:14px;margin:4px 0 6px}
+  .fav{padding:7px 9px;margin:5px 0 6px}
+  .fav-act{font-size:17px}
+  .grounded-box{font-size:10px;padding:6px 8px;line-height:1.45}
+  .actions{gap:12px}
+  .btn-pass,.btn-take{padding:12px 30px;min-width:120px;font-size:16px}
+}
 </style>
 </head>
 <body>
