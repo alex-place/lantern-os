@@ -188,6 +188,25 @@
     .home-links .tile-create  { --tile: #a78bfa; }   /* violet  — studio  */
     .home-links .tile-explore { --tile: #06b6d4; }   /* cyan    — archive */
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
+    /* ── Narrow viewports (phones) ──
+       The one-line pill can't hold attach + input + provider-pin + submit at
+       ~360px, so the submit button slid off-screen (clipped by overflow:hidden).
+       Drop the provider pin (Auto still applies — it's the default), tighten the
+       control spacing, and let the input keep the room it needs so the whole bar
+       always fits on screen. Also scale the hero + link row down a notch. */
+    @media (max-width: 560px) {
+      .home-main { padding: 16px 14px; }
+      .hero__mandala { width: clamp(72px, 16vw, 108px); }
+      .hero .tagline { font-size: 0.95rem; max-width: 92%; }
+      .home-chat { max-width: 100%; padding: 4px 5px; }
+      .home-chat input { padding: 10px 8px; font-size: 0.95rem; }
+      .home-chat select { display: none; }           /* Auto is the mobile default */
+      .home-chat button[type="submit"] { margin-left: 2px; padding: 9px 15px; }
+      .home-attach-btn { width: 34px; height: 34px; font-size: 20px; }
+      .home-file-chip { max-width: 100%; }
+      .home-links { gap: 6px 20px; }
+      .home-links a { font-size: 0.9rem; }
+    }
     /* Fallback: on short viewports (small laptops, phones) let the page scroll
        and stack the three zones naturally instead of forcing the centered grid. */
     @media (max-height: 740px) {
