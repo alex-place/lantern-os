@@ -601,9 +601,12 @@ server.listen(port, host, () => {
   startAnalyzing();    // Start LoRA fine-tuning (proactive, no trades needed)
 
   // ── Crypto CIO Live Trader (15-min market observer + paper-trade signal log) ──
-  // Must run continuously during market hours so resolved windows produce training data.
-  // Gated by KALSHI_CRYPTO_OBSERVER env var (defaults ON when Kalshi creds are present).
-  const enableCryptoObserver = process.env.KALSHI_CRYPTO_OBSERVER !== "false"
+  // Paper-only observer of 15-min crypto markets. It has NO proven taker edge (loses
+  // after fees — see docs / kalshi-no-taker-edge) and, running 24/7, it floods the
+  // shared paper-positions ledger (thousands of sim rows) which swamps real swipe
+  // history and the Σ₀ council stats. So it is now OPT-IN: set KALSHI_CRYPTO_OBSERVER=1
+  // to re-enable data collection; default OFF.
+  const enableCryptoObserver = process.env.KALSHI_CRYPTO_OBSERVER === "1"
     && !!(process.env.KALSHI_API_KEY_ID || process.env.KALSHI_PRIVATE_KEY || process.env.KALSHI_PRIVATE_KEY_PATH);
   const cryptoObserverScript = path.join(repoRoot, "experiments", "crypto_live_trader.py");
   if (enableCryptoObserver && fs.existsSync(cryptoObserverScript)) {
@@ -646,7 +649,7 @@ server.listen(port, host, () => {
   } else if (enableCryptoObserver) {
     console.warn(`[CryptoObserver] Script not found: ${cryptoObserverScript}`);
   } else {
-    console.log("[CryptoObserver] Disabled (set KALSHI_CRYPTO_OBSERVER=false to suppress, or add Kalshi creds to enable)");
+    console.log("[CryptoObserver] Disabled (opt-in: set KALSHI_CRYPTO_OBSERVER=1 with Kalshi creds to collect paper data)");
   }
 
   // Auto-register this node to the mesh

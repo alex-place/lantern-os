@@ -99,11 +99,27 @@ async function pollOpen() {
         ? Math.round((new Date(market.close_time).getTime() - Date.now()) / 60000)
         : null;
 
-      // Expired market → auto-close
+      // Past close → grade against the SETTLED RESULT, not the order book.
+      // Once trading stops, a binary market's book empties (yes_bid ~ no_bid ~ 0),
+      // so the old `exitPriceCents: currentBid` booked EVERY expired position — the
+      // winners too — as a -100% total loss. A settled binary is worth 100¢ to the
+      // winning side and 0¢ to the loser; grade on `market.result`. If the market is
+      // closed but not yet settled (no result), leave it OPEN rather than fabricate a
+      // loss — the next poll (or the crypto observer) grades it once it resolves.
       if (minsToClose !== null && minsToClose <= 0) {
-        closePosition(pos.id, { exitTag: "EXPIRED", exitPriceCents: currentBid, pnlPct });
-        results.push({ ...pos, title: market.title || pos.ticker,
-          expired: true, pnlPct, pnlCents, currentBid, minsToClose: 0, status: "expired" });
+        const result = String(market.result || "").toLowerCase(); // 'yes' | 'no' | ''
+        if (result === "yes" || result === "no") {
+          const won = result === side;
+          const exitCents = won ? 100 : 0;
+          const settledPnlPct = Math.round(((exitCents - entryCents) / entryCents) * 100);
+          closePosition(pos.id, { exitTag: won ? "WON" : "LOST", exitPriceCents: exitCents, pnlPct: settledPnlPct });
+          results.push({ ...pos, title: market.title || pos.ticker,
+            resolved: true, won, pnlPct: settledPnlPct, exitPriceCents: exitCents, minsToClose: 0, status: "resolved" });
+        } else {
+          // closed, awaiting settlement — do NOT close at a fabricated -100%
+          results.push({ ...pos, title: market.title || pos.ticker,
+            pnlPct: null, minsToClose: 0, status: "closed-unsettled" });
+        }
         continue;
       }
 

@@ -203,7 +203,23 @@ async function getFills(q = {}) {
   return r;
 }
 
-// ── orders (dry-run / kill-switch gated) ─────────────────────────────────────
+// ── live-scope gate ──────────────────────────────────────────────────────────
+// Even with every global gate cleared (KALSHI_TRADING_ENABLED=1 + kill-switch off +
+// creds), a LIVE order is only allowed for an ALLOWLISTED source and up to a hard
+// contract cap. This keeps real money on the proven, band-robust weather-edge path
+// and forces everything else (crypto/momentum, unsourced orders) to dry-run —
+// enforced in code, not by trust. `KALSHI_LIVE_SCOPE=all` removes the restriction.
+function liveScopeSources() {
+  const raw = (process.env.KALSHI_LIVE_SCOPE || "kalshi-weather-edge").trim();
+  if (!raw || raw.toLowerCase() === "all") return null; // null = no source restriction
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+function liveMaxContracts() {
+  const n = parseInt(process.env.KALSHI_LIVE_MAX_CONTRACTS || "1", 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+// ── orders (dry-run / kill-switch / scope gated) ─────────────────────────────
 function logLedger(entry) {
   try {
     fs.mkdirSync(KALSHI_DIR, { recursive: true });
@@ -222,12 +238,24 @@ async function placeOrder(o) {
   if (killSwitchActive()) blockers.push("kill_switch_active (data/kalshi/LIVE-KILL-SWITCH)");
   if (!hasCredentials()) blockers.push("credentials_required");
 
+  // Scope gate: restrict live orders to the allowlisted source(s). An unsourced or
+  // off-scope order (e.g. crypto/momentum) can NEVER go live — it falls to dry-run.
+  const scope = liveScopeSources();
+  if (scope && !scope.has(o.source)) {
+    blockers.push(`out_of_live_scope (source=${o.source || "none"}; live-allowed=${[...scope].join(",")})`);
+  }
+
+  // Hard contract cap for live orders — a live order is clamped to at most this many.
+  const maxN = liveMaxContracts();
+  const cappedCount = Math.min(o.count || 1, maxN);
+
   const clientOrderId = crypto.randomUUID();
   const base = {
-    ticker: o.ticker, side: o.side, action: o.action, count: o.count,
-    type: o.type || "limit", clientOrderId,
+    ticker: o.ticker, side: o.side, action: o.action, count: cappedCount,
+    type: o.type || "limit", clientOrderId, source: o.source || null,
   };
   if (o.type !== "market") base.limitCents = o.limitCents;
+  if ((o.count || 1) !== cappedCount) base.countCappedFrom = o.count;
 
   if (blockers.length) {
     logLedger({ event: "dry_run_order_planned", mode: "dry_run", environment: ENV, wouldBlock: blockers, ...base });
@@ -236,7 +264,7 @@ async function placeOrder(o) {
 
   // LIVE path — all gates cleared. Kalshi expects yes_price/no_price in cents.
   const body = {
-    ticker: o.ticker, action: o.action, side: o.side, count: o.count,
+    ticker: o.ticker, action: o.action, side: o.side, count: cappedCount,
     type: o.type || "limit", client_order_id: clientOrderId,
   };
   if (o.type !== "market") {
@@ -267,6 +295,8 @@ async function getConnection() {
     killSwitch: killSwitchActive(),
     tradingPaused: tradingPaused(),
     canTradeLive: tradingEnabled() && !killSwitchActive() && hasCredentials(),
+    liveScope: (() => { const s = liveScopeSources(); return s ? [...s] : "all"; })(),
+    liveMaxContracts: liveMaxContracts(),
   };
 }
 
