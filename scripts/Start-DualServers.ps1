@@ -39,6 +39,8 @@
 param(
     [switch]$NoChrome,
     [switch]$NoWatchdog,
+    [switch]$RegisterAutoDeploy,
+    [switch]$NoAutoDeploy,
     [string]$StableRoot = "C:\dev\lantern-os-stable",
     [string]$DevRoot    = "C:\dev\lantern-os-dev"
 )
@@ -122,6 +124,30 @@ try {
     }
 } catch {
     Write-Host ("Workstream hooks install skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
+# --- Stable auto-deploy: keep the repo-managed deploy task in sync ------------
+# The stable :4177 worktree is brought up to origin/master every 5 min by the
+# KeystoneAutoDeployStable scheduled task, which runs scripts/auto-deploy-stable.ps1
+# via an out-of-repo running copy + a hidden wscript launcher (no console flash).
+# Register-AutoDeployStable.ps1 re-syncs that running copy from the tracked source so
+# the two can't drift by hand. We only touch it when this machine IS the deploy host
+# (task already exists) or the operator explicitly asks (-RegisterAutoDeploy); a fresh
+# contributor's quickstart never silently registers a deploy task. Best-effort: a
+# hiccup here must never block the servers from coming up. Skip with -NoAutoDeploy.
+if (-not $NoAutoDeploy) {
+    try {
+        $alreadySetUp = [bool](Get-ScheduledTask -TaskName 'KeystoneAutoDeployStable' -ErrorAction SilentlyContinue)
+        if ($RegisterAutoDeploy -or $alreadySetUp) {
+            $regAutoDeploy = Join-Path $PSScriptRoot "Register-AutoDeployStable.ps1"
+            if (Test-Path $regAutoDeploy) {
+                & $regAutoDeploy -RepoRoot $RepoRoot | Out-Null
+                Write-Host "Stable auto-deploy synced (KeystoneAutoDeployStable, every 5 min, hidden)." -ForegroundColor Green
+            }
+        }
+    } catch {
+        Write-Host ("Stable auto-deploy sync skipped: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+    }
 }
 
 # --- Hydrate persistent environment (so the servers get their keys) ----------

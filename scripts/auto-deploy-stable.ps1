@@ -1,11 +1,14 @@
 # Auto-deploy: bring the stable worktree (port 4177, serves lantern-os.net via the
 # Cloudflare tunnel) up to origin/master. Idempotent -- safe to run on a schedule.
 #
-# NOTE: this is the TRACKED REFERENCE copy. The copy that actually runs lives at
+# NOTE: this is the TRACKED, AUTHORITATIVE source. The copy that actually runs lives at
 #   C:\dev\deploy-stable-from-master.ps1   (OUTSIDE the repo, on purpose)
 # so the `git reset --hard` it performs can't wipe the running script mid-deploy.
-# Driven by the Windows scheduled task `KeystoneAutoDeployStable` (every 5 min,
-# runs as the user). Keep the two copies in sync by hand. Log: C:\dev\auto-deploy-stable.log
+# Driven by the Windows scheduled task `KeystoneAutoDeployStable` (every 5 min, runs as
+# the user via a hidden wscript launcher -- no console flash). Do NOT hand-sync the two
+# copies: `scripts/Register-AutoDeployStable.ps1` copies this file to the running path and
+# (re)registers the task, and Start-DualServers.ps1 re-runs it on every quickstart when the
+# task exists. Log: C:\dev\auto-deploy-stable.log
 #
 # CI/CD best practices applied:
 # - Single-instance LOCK (with stale-lock takeover) so overlapping 5-min runs can't
