@@ -23,7 +23,7 @@ updated: 2026-06-25
 > Everything below still accurately describes the Ouro kernel path and the loop mechanism. For the
 > owned-PLT coder, see [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) and
 > [`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md) /
-> [`HANDOFF.md`](../models/keystone-sigma0-plt/HANDOFF.md).
+> [`HANDOFF`](SIGMA0-PLT-HANDOFF.md).
 
 > **This is the one doc for the local Σ₀ coder — then and now.** It supersedes and folds
 > in two older pages:

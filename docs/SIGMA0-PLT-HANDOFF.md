@@ -1,8 +1,8 @@
 # Keystone-Σ₀ PLT — Handoff (2026-07-01)
 
 **What this is:** the pick-up sheet for the "loopcoder swap" — bootstrapping our own
-proprietary Σ₀ coder ([ADR-0011](../../docs/adr/0011-proprietary-sigma0-base-model.md))
-from the Apache-2.0 LoopCoder-V2 Parallel Loop Transformer. Read the [README](README.md)
+proprietary Σ₀ coder ([ADR-0011](adr/0011-proprietary-sigma0-base-model.md))
+from the Apache-2.0 LoopCoder-V2 Parallel Loop Transformer. Read the [README](../models/keystone-sigma0-plt/README.md)
 for the architecture; this doc is **only what's left to do and how**.
 
 ---
@@ -63,7 +63,7 @@ On a win: set `verified: true` + the **measured** `capabilityScore` on the
 
 ### P1 · Trained Adaptive Loop Gate — the real capability/speed lever
 Naively cutting to 1 loop hits 8.69 tok/s but **0/3 coherent** — a blunt cut destroys
-quality. The headroom needs a *trained* halt gate ([ADAPTIVE-LOOP-GATE.md](ADAPTIVE-LOOP-GATE.md),
+quality. The headroom needs a *trained* halt gate ([ADAPTIVE-LOOP-GATE.md](../models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md),
 adapter-only on a frozen base, default-off). Needs parity first, then GPU training via
 `train_lora.py`. Tracked in #1743 (Stage 1).
 

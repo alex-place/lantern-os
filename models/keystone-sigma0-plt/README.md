@@ -8,7 +8,7 @@ Decision record: **[ADR-0011](../../docs/adr/0011-proprietary-sigma0-base-model.
 
 This is the package to `git pull` on a GPU box and run.
 
-> **Picking this up? Start with [HANDOFF.md](HANDOFF.md)** — current state + the prioritized
+> **Picking this up? Start with [HANDOFF](../../docs/SIGMA0-PLT-HANDOFF.md)** — current state + the prioritized
 > list of what's left (faithful parity, eval vs a frontier coder, the Adaptive Loop Gate).
 
 **No GPU box? Test on Colab:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alex-place/lantern-os/blob/master/models/keystone-sigma0-plt/colab_parity.ipynb)
