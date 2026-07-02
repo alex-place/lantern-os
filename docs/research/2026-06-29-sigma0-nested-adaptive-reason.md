@@ -2,7 +2,8 @@
 
 **Date:** 2026-06-29
 **Stage improved:** Reason (+ Verify as the gating signal)
-**Status:** Design — proposed, not yet wired. ADR to follow with Alex's approval.
+**Status:** Proposed
+**ADR:** [Link to ADR once approved]
 
 ## The one-line thesis
 
