@@ -83,6 +83,25 @@
         + '<span class="m-chip ' + esc(status) + '">' + esc(String(status).replace(/_/g, ' ')) + '</span></div>';
     }
 
+    // #1221 Explore-feed engagement tile. Neutral accent — CTR is informational
+    // (feed engagement), not a pass/fail rate against a 75% bar.
+    function exploreTile(ex) {
+      var accent = '#7dd3fc';
+      var p = ex.impressions ? Math.round(ex.ctr * 100) : null;
+      var status = ex.impressions ? 'live' : 'no_data';
+      var bigHtml = (p == null)
+        ? '<div class="m-big na">no data yet</div>'
+        : '<div class="m-big" style="color:' + accent + '">' + p + '%</div>'
+          + '<div class="m-bar"><i style="width:' + Math.min(100, p) + '%;background:' + accent + '"></i></div>';
+      return '<div class="m-tile"><h2>Explore feed CTR</h2>'
+        + '<div class="sub">engagements ÷ impressions on the PCSF-ranked feed (last ' + esc(ex.windowDays) + 'd)</div>'
+        + bigHtml
+        + '<div class="m-meta"><b>' + ex.engagements + '</b> engagements / <b>' + ex.impressions + '</b> impressions'
+        + '<br>exploration share <b>' + Math.round(ex.explorationShare * 100) + '%</b> · dismiss rate <b>'
+        + Math.round(ex.dismissRate * 100) + '%</b> · <b>' + ex.uniqueEngaged + '</b>/<b>' + ex.uniqueSeen + '</b> unique cards</div>'
+        + '<span class="m-chip ' + esc(status) + '">' + esc(status.replace(/_/g, ' ')) + '</span></div>';
+    }
+
     async function load() {
       try {
         var r = await fetch('/api/metrics/outcomes').then(function (x) { return x.json(); });
@@ -120,6 +139,15 @@
               + (ad.n ? '<br>exit reasons: ' + Object.keys(ad.exitReasons).map(function (k) { return esc(k) + ' ×' + ad.exitReasons[k]; }).join(', ') : ''),
             base.adaptiveDepthCanaryRate == null ? null : 1 - base.adaptiveDepthCanaryRate),
         ];
+        // #1221: Explore-feed CTR is a Converge-stage dogfood signal — did the ranked
+        // feed earn engagement? CTR on a content feed is realistically single/low-double
+        // digits, so it gets a neutral accent (not color()'s 75%-green pass bar, which
+        // would paint a healthy feed red). Fetched separately so a cold log can't break
+        // the outcome tiles above.
+        try {
+          var ex = await fetch('/api/explore/metrics?days=7').then(function (x) { return x.json(); });
+          if (ex && ex.ok) tiles.push(exploreTile(ex));
+        } catch (_e) { /* explore tile is best-effort */ }
         document.getElementById('tiles').innerHTML = tiles.join('');
         document.getElementById('foot').textContent =
           'Generated ' + (m.generatedAt || '') + ' · baseline captured ' + (base.capturedAt || 'n/a');
