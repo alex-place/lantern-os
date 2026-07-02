@@ -4,6 +4,57 @@ created: 2026-05-26
 updated: 2026-06-26
 ---
 
+Lantern OS is an open-source operating system designed for privacy, security, and user control.
+
+## Investor & Advertising Research Brief
+
+This document outlines a preliminary research brief for investor outreach and identifying suitable advertising channels for Lantern OS.
+
+### Investor Funding Paths
+
+1.  **Grants:** Non-dilutive funding from foundations, government agencies, or open-source initiatives. Often focused on public good or specific technological advancements.
+2.  **Angel Investors:** High-net-worth individuals who provide capital for startups, usually in exchange for equity. Often bring industry expertise and connections.
+3.  **Venture Capital (VC) Firms:** Professional investors who manage funds from limited partners and invest in high-growth potential companies. Typically seek significant equity and board representation.
+4.  **Crowdfunding:** Raising small amounts of money from a large number of people, often through platforms like Kickstarter or Indiegogo. Can be equity-based, reward-based, or donation-based.
+5.  **Strategic Investors/Partnerships:** Corporations investing in startups that align with their strategic interests, potentially leading to future collaborations or acquisitions.
+
+### What Investors Look For
+
+*   **Strong Team:** Experience, dedication, and complementary skills.
+*   **Clear Vision & Mission:** A compelling problem solved and a well-defined roadmap.
+*   **Market Opportunity:** A large, growing, and addressable market.
+*   **Traction/Proof of Concept:** Early adoption, community engagement, or working prototypes.
+*   **Sustainable Business Model (or Funding Model for OS):** How the project will sustain itself (e.g., donations, premium features, services, grants).
+*   **Scalability:** Potential for widespread adoption and impact.
+
+### Shortlist of Investor Types/Programs for Lantern OS
+
+*   **Open-Source Foundations/Grants:** e.g., NLnet Foundation, Prototype Fund, Mozilla Open Source Support (MOSS) awards.
+*   **Privacy/Security Focused VCs/Angel Networks:** Investors specifically interested in privacy-enhancing technologies.
+*   **Crowdfunding Platforms:** To engage the community and validate demand.
+
+### Target Audience Identification for Advertising
+
+*   **Early Adopters/Tech Enthusiasts:** Individuals passionate about privacy, open-source, and cutting-edge technology.
+*   **Developers/Power Users:** Those who appreciate granular control, customization, and a secure development environment.
+*   **Privacy-Conscious Individuals:** Users actively seeking alternatives to mainstream operating systems due to privacy concerns.
+*   **Organizations/Businesses:** Small to medium-sized businesses prioritizing security and data control.
+
+### Low-Cost Advertising Channels
+
+1.  **Open-Source Communities & Forums:** Reddit (r/linux, r/privacy, r/opensource), Hacker News, specific OS forums.
+2.  **Tech Blogs & Publications:** Engaging with journalists and writers focused on privacy, security, and open-source.
+3.  **Social Media (Organic):** Twitter, Mastodon, LinkedIn – sharing updates, engaging with relevant hashtags, and building a community.
+4.  **Content Marketing:** Creating valuable blog posts, tutorials, and documentation that highlight Lantern OS's unique features and benefits.
+5.  **Partnerships:** Collaborating with other open-source projects, privacy tools, or hardware vendors.
+6.  **GitHub/GitLab:** A strong presence with clear documentation, active development, and community engagement.
+
+### Prerequisites for Advertising/Investor Outreach
+
+*   **Stable, Usable Release:** A functional version of Lantern OS that users can download and test.
+*   **Clear Documentation:** Installation guides, feature overviews, and troubleshooting.
+*   **Defined Vision & Roadmap:** A public document outlining the project's goals, features, and future direction.
+*   **Community Engagement Strategy:** Plans for handling user feedback, bug reports, and contributions.
 # Keystone OS
 
 <!-- Core CI / quality gates -->
