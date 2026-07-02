@@ -105,6 +105,12 @@ function cardFor(m, row, ctx) {
     // (kalshi-calibration reads pPredicted off resolved rows to compute Brier + bias).
     pPredicted: Math.round(pWinBucket * 1000) / 1000,
     pPredictedRaw: Math.round(rawPWin * 1000) / 1000,
+    // Full predictive distribution + ladder + which bucket this card holds, so the paper
+    // ledger can grade the whole DISTRIBUTION on settle (kalshi-weather-verify: RPS/PIT/
+    // reliability), not just the held-bucket scalar (kalshi-calibration: Brier).
+    dist: ctx.dist || null,
+    ladder: ctx.ladder || null,
+    heldBucket: row.bucket,
     calibration: ctx.calibrator ? ctx.calibrator.report : "no calibrator",
     sigma0: {
       end_state: pWinBucket >= 0.5 ? row.side.toUpperCase() : (isNo ? "YES" : "NO"),
@@ -185,10 +191,14 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     const ctx = { fc, ymd: fRec.ymd || `${grp.d.year}-${String(grp.d.month).padStart(2, "0")}-${String(grp.d.day).padStart(2, "0")}`,
       nowMs, confidence: 0.6, calibrator };
     // Concentration gate input: how many actionable rows we're already emitting this day.
+    // Full predictive distribution over the day's ladder, for distribution-level Verify
+    // (kalshi-weather-verify: RPS/PIT/reliability). rep.rows carries the nominal P(bucket).
+    const dist = {};
+    for (const r of rep.rows) dist[r.bucket] = r.fair;
     let openInGroup = 0;
     for (const row of rep.actionable) {
       const m = grp.markets.find((x) => x.ticker === row.bucket);
-      if (m) { cards.push(cardFor(m, { ...row }, { ...ctx, openInGroup })); openInGroup++; }
+      if (m) { cards.push(cardFor(m, { ...row }, { ...ctx, openInGroup, ladder, dist })); openInGroup++; }
     }
   }
 
