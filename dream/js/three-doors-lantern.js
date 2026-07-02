@@ -36,7 +36,7 @@ async function askLantern(text) {
       body: JSON.stringify({
         message: text,
         user: userId,
-        agent: "lantern",
+        agent: "keystone",
         surface: "three-doors",
         history: [sceneCtx, ...lanternHistory.slice(-5)],
       }),
