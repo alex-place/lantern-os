@@ -30,7 +30,7 @@ const { tokenizeCommand, safeExec } = require("./safe-exec");
 const { resolveCommand } = require("./command-allowlist");
 const { webSearch } = require("./web-search-client");
 const { workspaceWrite, workspaceRead, workspaceList, getWorkspaceRoot } = require("./user-workspace");
-const { createDocument, listTemplates } = require("./doc-generator");
+const { render: renderDocument, listTemplates: listDocTemplates } = require("./document-templates");
 const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
 const { getCreatorRuntime } = require("./creator-runtime");
@@ -451,35 +451,61 @@ const REGISTRY = {
   },
 
   // ── ADR-0008 document generation (#1097) ────────────────────────────────────
-  create_document: {
+  // Renders resume / cover-letter templates to the user workspace — HTML (print
+  // to PDF from the browser) or Markdown. Backed by document-templates.js, the
+  // single template library. This is what the Job Application Assistant persona
+  // calls to produce the tailored resume + cover letter.
+  generate_document: {
     policy: "mutating",
-    desc: 'Generate a document from a template and save it to the user workspace. Templates: "resume", "cover_letter". Pass structured fields matching the template. Returns the workspace path of the created file. Operator only.',
+    desc: 'Generate a tailored document from a template and save it to the user workspace. template: "resume" or "cover-letter". format: "html" (default — open in browser, Print → Save as PDF) or "markdown". Pass structured fields matching the template. Returns the workspace path. Operator only.',
     schema: {
       type: "object",
       properties: {
-        template: { type: "string", description: '"resume" or "cover_letter"' },
-        fields: { type: "object", description: "Template-specific fields (name, email, experience, etc.)" },
-        output_path: { type: "string", description: "Optional workspace-relative output path (auto-generated if omitted)" },
+        template: { type: "string", description: '"resume" or "cover-letter"' },
+        fields: { type: "object", description: "Template-specific fields (name, email, experience, skills, company, role, …)" },
+        format: { type: "string", enum: ["html", "markdown"], description: 'Output format (default: "html")' },
+        filename: { type: "string", description: "Workspace-relative base name without extension (default: the template name)" },
       },
       required: ["template", "fields"],
     },
     run(i) {
       if (!i.template) return "[error: template is required]";
       if (!i.fields || typeof i.fields !== "object") return "[error: fields must be an object]";
+      const format = i.format === "markdown" ? "markdown" : "html";
+      let rendered;
       try {
-        const result = createDocument(String(i.template), i.fields, i.output_path || null);
-        return [
-          `created ${result.template}: workspace:${result.path}`,
-          `full path: ${result.fullPath}`,
-          `size: ${result.byteLength} bytes`,
-          "",
-          "--- preview (first 500 chars) ---",
-          result.content.slice(0, 500) + (result.content.length > 500 ? "\n…" : ""),
-        ].join("\n");
+        rendered = renderDocument(String(i.template), i.fields, format);
       } catch (e) {
-        const tmplList = listTemplates().map((t) => `  ${t.name}: ${t.description}`).join("\n");
-        return `[create_document error: ${e.message}]\n\nAvailable templates:\n${tmplList}`;
+        const tmplList = listDocTemplates().map((t) => `  ${t.name}`).join("\n");
+        return `[generate_document error: ${e.message}]\n\nAvailable templates:\n${tmplList}`;
       }
+      _ensureWorkspace();
+      const base = String(i.filename || i.template)
+        .replace(/\.+\//g, "")
+        .replace(/\.(html|md|markdown)$/i, "");
+      const finalName = base + rendered.extension;
+      const p = _safeWs(finalName);
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, rendered.content, "utf8");
+      const lines = [`created workspace/${finalName} (${Buffer.byteLength(rendered.content)} bytes)`];
+      if (format === "html") {
+        lines.push("Tip: open it in the browser and use Print → Save as PDF to produce a submittable PDF.");
+      }
+      return lines.join("\n");
+    },
+  },
+  list_document_templates: {
+    policy: "read",
+    guest_safe: true, // read-only template metadata (no I/O) — safe for non-operators (#1213)
+    desc: "List available document templates (resume, cover-letter) and their input fields. Required fields are marked with *.",
+    schema: { type: "object", properties: {} },
+    run() {
+      return listDocTemplates()
+        .map((t) => {
+          const fields = (t.fields || []).map((f) => (f.required ? `${f.name}*` : f.name)).join(", ");
+          return `${t.name}: ${fields}`;
+        })
+        .join("\n");
     },
   },
   // ── workspace tools (ADR-0008 §Decision 4): user-artifact area outside the repo ────

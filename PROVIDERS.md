@@ -51,15 +51,18 @@ updated: 2026-06-20
 - **Use Case:** Fast inference, cost-effective chat
 - **Notes:** Pay-as-you-go. Widely compatible.
 
-#### 3. **Google Gemini** ✅
+#### 3. **Google Gemini / Vertex** ✅ (funded — primary)
 - **API Key:** `GEMINI_API_KEY` (or `GOOGLE_API_KEY` as fallback)
 - **Model Var:** `GEMINI_MODEL` (default: `gemini-2.5-flash`)
-- **State:** ✓ Present (configured)
-- **Get Key:** https://aistudio.google.com/app/apikey
-- **Endpoint:** `generativelanguage.googleapis.com`
+- **State:** ✓ Funded and primary. **Preferred path is Vertex ADC** — when
+  `VERTEX_PROJECT` is set (it is, in `.env`/`.env.local`), `geminiTransport` routes
+  through Vertex (funded GCP credits, no rate limit, reliable `googleSearch` grounding)
+  before ever falling back to the free AI-Studio key. Use Vertex credits by default.
+- **Get Key:** https://aistudio.google.com/app/apikey (AI-Studio fallback only)
+- **Endpoint:** Vertex `*-aiplatform.googleapis.com` (or `generativelanguage.googleapis.com` for the AI-Studio key)
 - **Streaming:** Yes
-- **Use Case:** Vision/multimodal, fast responses
-- **Notes:** Free tier generous (up to 1500 calls/min). Gemini 1.5 Flash available.
+- **Use Case:** Vision/multimodal, fast responses, live web grounding (googleSearch tool)
+- **Notes:** Vertex has no free-tier 429 on the search tool; the AI-Studio key does, so grounding prefers Vertex.
 
 #### 4. **xAI Grok** ⏳ (Declared, Not Yet Implemented)
 - **API Key:** `XAI_API_KEY`

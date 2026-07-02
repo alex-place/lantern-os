@@ -30,6 +30,17 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
+def _flt(v, default=0.0):
+    """Coerce Alpaca string/None numeric fields to float, else `default`."""
+    if v is None:
+        return default
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
 # Import trading agents
 try:
     from agents import (
@@ -218,10 +229,15 @@ def action_get_market_status(args):
 
         # Honest day P&L from activity (#1691), not equity-vs-last_equity; and the
         # market regime from SPY (the real market), not the account's frozen P&L.
+        # TODAY-only unrealized (intraday) + realized bucketed by close date so a
+        # multi-day hold never drags a prior session's P&L into today.
         import sqlite3 as _sql
         unrealized = 0.0
         try:
-            unrealized = sum(float(p.unrealized_pl) for p in alpaca.list_positions())
+            unrealized = sum(
+                _flt(getattr(p, 'unrealized_intraday_pl', None),
+                     default=_flt(getattr(p, 'unrealized_pl', 0)))
+                for p in alpaca.list_positions())
         except Exception:
             pass
         realized_today = 0.0
@@ -230,7 +246,8 @@ def action_get_market_status(args):
             _con = _sql.connect(_DB)
             _row = _con.execute(
                 "SELECT COALESCE(SUM(pnl_usd),0) FROM trade_history "
-                "WHERE status='closed' AND pnl_usd IS NOT NULL AND ts LIKE ?",
+                "WHERE status='closed' AND pnl_usd IS NOT NULL "
+                "AND COALESCE(closed_ts, ts) LIKE ?",
                 (datetime.now().strftime('%Y-%m-%d') + '%',)).fetchone()
             _con.close()
             realized_today = float(_row[0] or 0)
@@ -349,6 +366,13 @@ def action_get_positions(args):
 
         positions = []
         for pos in positions_list:
+            # unrealized_pl is lifetime (from entry price); unrealized_intraday_pl
+            # is TODAY-only (from the prior session's close). For a multi-day hold
+            # the two differ — intraday excludes the gain/loss that accrued on
+            # earlier days, which is exactly what Day P&L must not double-count.
+            u_life = _flt(getattr(pos, 'unrealized_pl', 0))
+            u_intraday = _flt(getattr(pos, 'unrealized_intraday_pl', None),
+                              default=u_life)
             positions.append({
                 'symbol': pos.symbol,
                 'qty': float(pos.qty),
@@ -356,18 +380,25 @@ def action_get_positions(args):
                 'current_price': float(pos.current_price),
                 'side': pos.side,
                 'market_value': float(pos.market_value),
-                'unrealized_pl': float(pos.unrealized_pl),
+                'unrealized_pl': u_life,
+                'unrealized_intraday_pl': u_intraday,
                 'unrealized_plpc': float(pos.unrealized_plpc),
                 'pnl_pct': float(pos.unrealized_plpc) * 100,
             })
 
         # Day P&L from ACTUAL trading activity, not Alpaca's equity-vs-last_equity
         # (which freezes after-hours and shows phantom gains with zero positions —
-        # #1691): unrealized on open positions + realized on trades CLOSED TODAY.
+        # #1691): TODAY-only unrealized on open positions + realized on trades
+        # CLOSED TODAY. Two boundary fixes over the original #1691 version:
+        #   • realized is bucketed by closed_ts (fall back to ts for legacy rows),
+        #     so an overnight hold's result lands on the day it was CLOSED.
+        #   • unrealized uses the intraday figure so a position opened yesterday
+        #     doesn't drag yesterday's move into today's Day P&L.
         # When flat with no trades today this is exactly $0.
         import sqlite3 as _sql
         from datetime import datetime as _dt
-        unrealized = sum(p['unrealized_pl'] for p in positions)
+        unrealized_today = sum(p['unrealized_intraday_pl'] for p in positions)
+        unrealized_total = sum(p['unrealized_pl'] for p in positions)
         realized_today = 0.0
         try:
             from agents import LESSONS_DB as _DB
@@ -375,14 +406,15 @@ def action_get_positions(args):
             _today = _dt.now().strftime('%Y-%m-%d')
             _row = _con.execute(
                 "SELECT COALESCE(SUM(pnl_usd),0) FROM trade_history "
-                "WHERE status='closed' AND pnl_usd IS NOT NULL AND ts LIKE ?",
+                "WHERE status='closed' AND pnl_usd IS NOT NULL "
+                "AND COALESCE(closed_ts, ts) LIKE ?",
                 (_today + '%',)).fetchone()
             _con.close()
             realized_today = float(_row[0] or 0)
         except Exception as _e:
             log.warning("realized-today query failed: %s", _e)
         equity = round(float(account.equity), 2)
-        day_pnl = round(unrealized + realized_today, 2)
+        day_pnl = round(unrealized_today + realized_today, 2)
         return {
             'positions': positions,
             'account': {
@@ -392,7 +424,8 @@ def action_get_positions(args):
                 'pnl_today': day_pnl,
                 'day_pnl_pct': round(day_pnl / equity * 100, 2) if equity else 0,
                 'realized_today': round(realized_today, 2),
-                'unrealized': round(unrealized, 2),
+                'unrealized': round(unrealized_today, 2),
+                'unrealized_total': round(unrealized_total, 2),
             }
         }
     except Exception as e:

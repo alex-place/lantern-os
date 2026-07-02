@@ -12,10 +12,11 @@
  *
  * groundMarket(market) -> { p_yes, confidence, rationale, evidence[], sources[], model, ts }
  *
- * Grounding path (funded providers only — Anthropic/OpenAI/xAI are dead here):
+ * Grounding path (Vertex/Gemini is the funded provider — Vertex ADC preferred):
  *   1. webSearch() — keyless (MCP -> DuckDuckGo -> Wikipedia), for evidence snippets.
- *   2. Gemini + native googleSearch tool — live web grounding with cited sources,
- *      with the proven 429 -> free-knowledge fallback (mirrors dream-chat.js).
+ *   2. Gemini + native googleSearch tool — live web grounding with cited sources.
+ *      Routed through geminiTransport, which uses Vertex (funded GCP credits, no rate
+ *      limit) when VERTEX_PROJECT is set, else the AI-Studio key with a 429 fallback.
  *   3. callLlm("auto") fallback (Vertex -> Gemini -> Ollama) if the direct call fails.
  *
  * Results are cached (TTL) and appended to data/kalshi/grounding-cache.jsonl as an

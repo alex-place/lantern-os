@@ -272,12 +272,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <!-- Device console — polished frame (bezel + recessed screen + tactile controls) -->
 <div class="kx-console">
-<!-- Deck mode — compact -->
+<!-- Deck mode — on-screen segmented switch -->
 <div class="mode-bar" role="tablist" aria-label="Deck mode">
-  <button class="mode-btn" id="mGrounded" role="tab" aria-selected="false" onclick="setMode('grounded')" title="Web-grounded event markets — research-driven P(YES) vs market price, paper-only">🔎 Grounded</button>
-  <button class="mode-btn" id="mReplay" role="tab" aria-selected="true" onclick="setMode('replay')" title="Swipe recorded history — graded instantly vs the real outcome">⟲ Replay</button>
+  <button class="mode-btn" id="mLive" role="tab" aria-selected="true" onclick="setMode('live')" title="Live positions + guarded orders (paper-safe while trading is paused)">● Live</button>
   <button class="mode-btn" id="mPaper" role="tab" aria-selected="false" onclick="setMode('paper')" title="Live candidate markets, paper-only (no real orders)">📝 Paper</button>
-  <button class="mode-btn" id="mLive" role="tab" aria-selected="false" onclick="setMode('live')" title="Live decks (currently paused — no proven edge after fees)">● Live</button>
+  <button class="mode-btn" id="mGrounded" role="tab" aria-selected="false" onclick="setMode('grounded')" title="Σ₀ calibrated weather-edge — live NWS-grounded fair value vs market, paper-only">🔎 Grounded</button>
 </div>
 
 <!-- The two-button game -->
@@ -314,15 +313,15 @@ const API='/api/trading/kalshi';
 const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
 let lastSyncMs=0, lastDetCount=null;
-// Deck MODE: 'replay' (recorded history, graded vs known outcome — always works),
-// 'paper' (live candidates, paper-only), 'live' (original decks, currently paused).
-// Default to replay so the swipe is testable + the council trains while live is halted.
-let MODE='replay', replayExhausted=false, lastGroundStats=null;
+// Deck MODE: 'live' (positions + guarded orders, paper-safe while paused),
+// 'paper' (live candidates, paper-only), 'grounded' (Σ₀ calibrated weather-edge).
+// Default to live; when live is paused we auto-fall back to paper (see syncDeck).
+let MODE='live', lastGroundStats=null, didAutoFallback=false;
 
 function setMode(m){
   if(MODE===m && deck.length) return;
-  MODE=m; deck=[]; idx=0; liveMap={}; prefetching=false; replayExhausted=false;
-  for(const [id,mode] of [['mGrounded','grounded'],['mReplay','replay'],['mPaper','paper'],['mLive','live']]){
+  MODE=m; deck=[]; idx=0; liveMap={}; prefetching=false;
+  for(const [id,mode] of [['mGrounded','grounded'],['mPaper','paper'],['mLive','live']]){
     const b=document.getElementById(id);
     if(b){ b.classList.toggle('active',mode===m); b.setAttribute('aria-selected',mode===m?'true':'false'); }
   }
@@ -332,14 +331,10 @@ function setMode(m){
   if(MODE==='live') syncDeck(); else loadModeDeck();
 }
 
-// Load a paper/replay/grounded deck slice and append unique cards (continuous deck).
+// Load a paper/grounded deck slice and append unique cards (continuous deck).
 async function loadModeDeck(){
   let d;
-  if(MODE==='replay'){
-    if(replayExhausted) return;
-    d=await j(`/replay-deck?limit=20&offset=${deck.length}`);
-    if(!d || !(d.cards||[]).length){ replayExhausted=true; }
-  } else if(MODE==='grounded'){
+  if(MODE==='grounded'){
     d=await j('/grounded-deck?limit=14');
     if(d) lastGroundStats=d;
   } else { // paper
@@ -382,10 +377,8 @@ function showModeEnd(d){
   const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
   if(!end) return;
   end.style.display='flex';
-  const note = MODE==='replay'
-    ? (replayExhausted?'Replay deck complete — every swipe was graded into the Σ₀ council below.':'Loading replay history…')
-    : (d&&d.note)||'No live candidate markets right now (Kalshi closed or no creds). Try Replay to swipe recorded history.';
-  end.innerHTML=`<div style="color:var(--gold);font-weight:700">${MODE==='replay'?'⟲ Replay':'📝 Paper'} — ${idx} swiped</div>`
+  const note = (d&&d.note)||'No live candidate markets right now (Kalshi closed or no creds). Try Paper or Grounded.';
+  end.innerHTML=`<div style="color:var(--gold);font-weight:700">${MODE==='grounded'?'🔎 Grounded':'📝 Paper'} — ${idx} swiped</div>`
     +`<div style="font-size:12px;color:var(--muted);max-width:340px">${note}</div>`
     +`<button class="btn-ghost" onclick="setMode('${MODE}')">↻ Reload deck</button>`;
 }
@@ -410,8 +403,7 @@ function stampCards(cards, genAt){
   return cards||[];
 }
 function cardAgeMs(card){ return card._genMs==null ? Infinity : Date.now()-card._genMs; }
-// Replay cards are recorded history — staleness (a live-price concern) doesn't apply.
-function isFresh(card){ return MODE==='replay' ? true : cardAgeMs(card) < MAX_AGE_MS; }
+function isFresh(card){ return cardAgeMs(card) < MAX_AGE_MS; }
 // Drop non-fresh cards. Never yank a card mid-drag. Returns true if the visible
 // front card was removed (caller must re-render); pruning hidden cards needs none.
 function flushStale(){
@@ -516,13 +508,17 @@ function toggleAcct(){
 // ── syncDeck: initial load + live merge every SYNC_MS ────────────────────────
 // Show all open positions (exits first, then holds) + suggestion fill
 async function syncDeck(){
-  // Paper/replay/grounded modes are paper-only and don't use the live positions deck.
+  // Paper/grounded modes are paper-only and don't use the live positions deck.
   // Paper + grounded re-poll (grounded cards mutate as background research completes).
   if(MODE!=='live'){ if(MODE==='paper'||MODE==='grounded') await loadModeDeck(); return; }
   const d=await j('/positions-deck');
   // GLOBAL TRADING-PAUSE: server cleared all cards. Force-empty the deck (the
   // in-place prune never removes the front card deck[idx]) and show why.
   if(d.paused){
+    // Default is Live, but a paused live board is a dead swipe — auto-fall back to
+    // Paper ONCE on first load so the deck shows actionable cards ("live then paper").
+    // A manual return to Live afterwards still shows the honest pause screen.
+    if(!didAutoFallback && idx===0){ didAutoFallback=true; setMode('paper'); return; }
     deck=[]; idx=0; liveMap={};
     const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
     const end=document.getElementById('end');
@@ -619,7 +615,7 @@ async function maybePrefetch(){
   if(remaining>=PREFETCH_AT) return;
   prefetching=true;
   try {
-    // Paper/replay modes refill from their own endpoint (next history slice / fresh
+    // Paper/grounded modes refill from their own endpoint (fresh
     // live candidates). The prefetching flag guards re-entrancy via render().
     if(MODE!=='live'){ await loadModeDeck(); return; }
     const pendingTickers=new Set(deck.slice(idx).map(c=>c.ticker));
@@ -706,10 +702,14 @@ function groundedExtra(card){
   const srcN=(card.sources||[]).length;
   const srcLinks=(card.sources||[]).slice(0,4).map((u,i)=>`<a href="${(u||'').replace(/"/g,'%22')}" target="_blank" rel="noopener noreferrer">[${i+1}]</a>`).join(' ');
   const evN=(card.evidence||[]).length;
+  // Deterministic model cards (Σ₀ weather-edge) have no LLM grounding to re-run —
+  // suppress the Re-ground button so the deck stays internally consistent.
+  const deterministic=/weather-edge/i.test(card.model||'');
+  const head=deterministic?'📐 Calibrated':'🔎 Web-grounded';
   return `<div class="grounded-box ok">
-    <div class="gb-head">🔎 Web-grounded · P(YES) <b>${py}%</b> vs market <b>${card.yesPct}%</b> · ${card.model||''}</div>
+    <div class="gb-head">${head} · P(YES) <b>${py}%</b> vs market <b>${card.yesPct}%</b> · ${card.model||''}</div>
     ${card.rationale?`<div class="gb-rat">${card.rationale.replace(/</g,'&lt;')}</div>`:''}
-    <div class="gb-foot">${srcN?`${srcN} live source${srcN>1?'s':''}: ${srcLinks}`:'no source links'}${evN?` · ${evN} evidence`:''} ${reBtn}</div>
+    <div class="gb-foot">${srcN?`${srcN} live source${srcN>1?'s':''}: ${srcLinks}`:'no source links'}${evN?` · ${evN} evidence`:''} ${deterministic?'':reBtn}</div>
   </div>`;
 }
 function cleanTitle(title,ticker){
@@ -1121,19 +1121,6 @@ async function act(dir,fromSwipe){
 
   const card=deck[idx];
 
-  // ── REPLAY mode: grade the swipe vs the recorded outcome (Verify→Converge) ──
-  if(MODE==='replay'){
-    busy=true;
-    try{
-      const res=await j('/replay-grade',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ticker:card.ticker, side:card.favSide, entryCents:card.favAsk||card.entryCents||50})});
-      showReplayResult(res,card);
-      loadCouncil();
-      idx++; render();
-    }catch(e){ showResult({error:e.message},card); idx++; }
-    finally{ busy=false; }
-    return;
-  }
   // ── GROUNDED mode: take a web-grounded pick → paper position (forward-graded) ─
   if(MODE==='grounded'){
     if(card.grounding_status!=='done'){
@@ -1225,17 +1212,6 @@ function showResult(res,card){
     t.textContent=ok?`LIVE · took ${lbl} ✓`:`LIVE · FAILED ${lbl} (status ${res.status}) — check portfolio`;
   } else { t.className='toast err show'; t.textContent=JSON.stringify(res).slice(0,140); }
   clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3200);
-}
-
-function showReplayResult(res,card){
-  const t=document.getElementById('toast');
-  if(res.error){ t.className='toast err show'; t.textContent='✕ '+res.error; }
-  else{
-    const w=res.won; const lbl=(card.favSide==='yes'?'▲ YES':'▼ NO');
-    t.className='toast '+(w?'live':'err')+' show';
-    t.textContent=`REPLAY · ${lbl} → ${w?'WON':'LOST'} · net ${res.net_cents>=0?'+':''}${res.net_cents}¢ after fee (real outcome: ${res.outcome===1?'YES':'NO'})`;
-  }
-  clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3400);
 }
 
 function showPaperResult(res,card){
@@ -1351,7 +1327,7 @@ let syncInterval, acctInterval;
 
 function init(){
   // Theme is handled by the shared bootstrap + /js/theme-toggle.js (#theme-toggle).
-  loadAccount(); setMode('replay'); loadCouncil();
+  loadAccount(); setMode('live'); loadCouncil();
   syncInterval=setInterval(syncDeck,SYNC_MS);
   acctInterval=setInterval(()=>{loadAccount();loadCouncil();},30000);
 

@@ -42,6 +42,22 @@
         "LANTERN_GARAGE_HOST": "127.0.0.1",
         "SESSION_SECRET": "preview-verify-loopback-only-secret"
       }
+    },
+    {
+      "name": "lantern-trader-verify",
+      "comment": "Like lantern-verify, but grants the loopback local-admin bypass (LANTERN_LOCAL_ADMIN=1) so gated pages like stock-trader.html render in the preview browser without a Patreon login. Loopback-only + throwaway secret; direct un-proxied hits only.",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/lantern-garage/server.js"
+      ],
+      "port": 4189,
+      "autoPort": true,
+      "env": {
+        "LEADERBOARD_ROUTING": "1",
+        "LANTERN_GARAGE_HOST": "127.0.0.1",
+        "SESSION_SECRET": "preview-verify-loopback-only-secret",
+        "LANTERN_LOCAL_ADMIN": "1"
+      }
     }
   ]
 }
