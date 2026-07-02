@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-23
-updated: 2026-07-01
+updated: 2026-07-02
 ---
 
 # Architecture Decision Records (ADRs)
@@ -71,5 +71,6 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Proposed (awaiting Alex's approval) |
 | [0012](0012-nested-adaptive-reason.md) | Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model) | Proposed (awaiting Alex's approval) |
 | [0013](0013-subsystem-register-one-loop-gate.md) | Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction | Proposed (awaiting Alex's approval) |
+| [0014](0014-unisona-desktop-launcher.md) | unisona.ai desktop — a thin signed launcher over the one Core, not an Electron repackage | Accepted (Alex Place, 2026-07-02) |
 
 <!-- Add new ADRs to this table on merge. -->

@@ -1,0 +1,17 @@
+{
+  "name": "unisona-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Thin desktop launcher for the unisona.ai local reasoning cockpit — boots the one Convergence Core server and opens it in the user's browser.",
+  "bin": {
+    "unisona": "launcher.js"
+  },
+  "main": "launcher.js",
+  "scripts": {
+    "start": "node launcher.js",
+    "start:no-open": "node launcher.js --no-open"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

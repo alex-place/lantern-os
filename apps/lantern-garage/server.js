@@ -573,32 +573,42 @@ server.listen(port, host, () => {
     console.error("[auto-dispatch] failed to start (non-fatal):", e && e.message);
   }
 
-  // ── Kalshi Tight-Band Collector (6s polling) ──
-  const kalshiCollector = require("./lib/kalshi-collector");
-  kalshiCollector.start();
-  deps.kalshiCollector = kalshiCollector; // Make available to routes
+  // ── Market/trading background loops ─────────────────────────────────────────
+  // These 24/7 collectors + convergence loops start on every boot. The desktop
+  // launcher (docs/adr/0014) runs the Core purely for chat and sets
+  // LANTERN_CHAT_ONLY=1 to skip them. Normal boots (4177/4178/cloud) leave the
+  // flag unset, so their behaviour is unchanged.
+  const chatOnly = process.env.LANTERN_CHAT_ONLY === "1";
+  if (chatOnly) {
+    console.log("[chat-only] Market collectors + convergence loops skipped (LANTERN_CHAT_ONLY=1)");
+  } else {
+    // ── Kalshi Tight-Band Collector (6s polling) ──
+    const kalshiCollector = require("./lib/kalshi-collector");
+    kalshiCollector.start();
+    deps.kalshiCollector = kalshiCollector; // Make available to routes
 
-  // ── Crypto Price & News Collector (30s polling) ──
-  const CryptoCollector = require("./lib/crypto-collector");
-  const cryptoCollector = new CryptoCollector();
-  cryptoCollector.start(10000); // 10s (#1697: tighter so 24/7 crypto price ticks are visible/flash)
-  deps.cryptoCollector = cryptoCollector; // Make available to routes
+    // ── Crypto Price & News Collector (30s polling) ──
+    const CryptoCollector = require("./lib/crypto-collector");
+    const cryptoCollector = new CryptoCollector();
+    cryptoCollector.start(10000); // 10s (#1697: tighter so 24/7 crypto price ticks are visible/flash)
+    deps.cryptoCollector = cryptoCollector; // Make available to routes
 
-  // ── Market News Collector (10-min polling, watchlist + broad market RSS) ──
-  const NewsCollector = require("./lib/news-collector");
-  const newsCollector = new NewsCollector();
-  newsCollector.start(300000); // 5-min interval
-  deps.newsCollector = newsCollector; // Make available to routes
+    // ── Market News Collector (10-min polling, watchlist + broad market RSS) ──
+    const NewsCollector = require("./lib/news-collector");
+    const newsCollector = new NewsCollector();
+    newsCollector.start(300000); // 5-min interval
+    deps.newsCollector = newsCollector; // Make available to routes
 
-  // ── Kalshi Position Monitor (10s polling) + Convergence Trainer ──
-  const { startMonitoring } = require("./lib/kalshi-position-monitor");
-  const { trainModel } = require("./lib/kalshi-convergence-trainer");
-  const { startEnhancing } = require("./lib/kalshi-convergence-enhancer");
-  const { startAnalyzing } = require("./lib/kalshi-convergence-lora");
-  startMonitoring();   // Start automated stop-loss monitoring
-  trainModel().catch(e => console.error("[Server] Convergence training failed:", e.message));
-  startEnhancing();    // Start continuous convergence improvement loop
-  startAnalyzing();    // Start LoRA fine-tuning (proactive, no trades needed)
+    // ── Kalshi Position Monitor (10s polling) + Convergence Trainer ──
+    const { startMonitoring } = require("./lib/kalshi-position-monitor");
+    const { trainModel } = require("./lib/kalshi-convergence-trainer");
+    const { startEnhancing } = require("./lib/kalshi-convergence-enhancer");
+    const { startAnalyzing } = require("./lib/kalshi-convergence-lora");
+    startMonitoring();   // Start automated stop-loss monitoring
+    trainModel().catch(e => console.error("[Server] Convergence training failed:", e.message));
+    startEnhancing();    // Start continuous convergence improvement loop
+    startAnalyzing();    // Start LoRA fine-tuning (proactive, no trades needed)
+  }
 
   // ── Crypto CIO Live Trader (15-min market observer + paper-trade signal log) ──
   // Paper-only observer of 15-min crypto markets. It has NO proven taker edge (loses
