@@ -42,12 +42,19 @@ class CryptoCollector {
       const prices = {};
       const now = new Date().toISOString();
 
+      // Single pass over markets, bucketing by symbol, instead of re-scanning the
+      // whole (up to 500-market) list once per symbol (#1890).
+      const bySymbol = {};
+      for (const s of CRYPTO_SYMBOLS) bySymbol[s] = [];
+      for (const m of markets) {
+        const title = (m.title || "").toUpperCase();
+        for (const symbol of CRYPTO_SYMBOLS) {
+          if (title.includes(symbol)) bySymbol[symbol].push(m);
+        }
+      }
+
       for (const symbol of CRYPTO_SYMBOLS) {
-        // Find markets related to this crypto
-        const cryptoMarkets = markets.filter(m => {
-          const title = (m.title || "").toUpperCase();
-          return title.includes(symbol);
-        });
+        const cryptoMarkets = bySymbol[symbol];
 
         if (cryptoMarkets.length > 0) {
           // Get soonest market for this crypto (highest conviction)

@@ -9,6 +9,7 @@ const TradingAPIBridge = require('../lib/trading-api-bridge');
 const TraderAgent = require('../lib/trader-agent');
 const tradingMemory = require('../lib/trading-memory');
 const tradingStore = require('../lib/trading-store');
+const { readJsonCached } = require('../lib/jsonl-cache');
 const tradingNews = require('../lib/trading-news');
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
 const { TradingPriceFeed } = require('../lib/trader-price-feed');
@@ -607,9 +608,10 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // scan cache + grounding pre-gate), so the API-spend reduction is observable.
   if (url.pathname === '/api/trading/llm-usage' && req.method === 'GET') {
     try {
-      const fs = require('fs');
       const p = require('path').join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'llm-usage.json');
-      const days = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8') || '{}') : {};
+      // mtime-cached: the daily tally file is polled by the trading UI but only
+      // changes when a scan runs — no need to re-read + re-parse every GET (#1889).
+      const days = readJsonCached(p, {});
       const today = Object.keys(days).sort().slice(-1)[0] || null;
       let totMade = 0, totSaved = 0;
       for (const d of Object.values(days)) { totMade += d.reads_made || 0; totSaved += (d.saved_cache || 0) + (d.saved_pregate || 0); }

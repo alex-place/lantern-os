@@ -15,6 +15,10 @@ PyJWT==2.13.0
 python-dotenv==1.2.2
 
 # Data & Database
+# zstandard: CSF (src/csf/csf_pack.py) uses it for the fast compression codec +
+# cross-file dictionary redundancy; without it packing silently falls back to
+# zlib, which is ~25-30x slower/larger on the append-only JSONL logs (#1892).
+zstandard>=0.22.0
 SQLAlchemy==2.0.23
 psycopg2-binary==2.9.9
 redis==5.0.1

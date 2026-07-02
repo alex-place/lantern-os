@@ -453,26 +453,35 @@ class MemoryStore:
                 "by_source": {},
             }
 
-        avg_confidence = sum(e.confidence for e in entries) / len(entries)
-
-        by_source = {}
+        # Single pass: accumulate per-source count + confidence sum and the
+        # high-confidence tally together, instead of re-scanning `entries` once
+        # per distinct source (the old form was O(n * sources) ≈ O(n^2)). (#1890)
+        conf_sum = 0.0
+        high_confidence = 0
+        acc: Dict[str, Dict[str, float]] = {}
         for entry in entries:
-            if entry.source not in by_source:
-                by_source[entry.source] = {"count": 0, "avg_confidence": 0.0}
-            by_source[entry.source]["count"] += 1
+            conf_sum += entry.confidence
+            if entry.confidence >= 0.85:
+                high_confidence += 1
+            slot = acc.get(entry.source)
+            if slot is None:
+                slot = acc[entry.source] = {"count": 0, "sum": 0.0}
+            slot["count"] += 1
+            slot["sum"] += entry.confidence
 
-        # Recalculate avg per source
-        for source in by_source:
-            matching = [e for e in entries if e.source == source]
-            by_source[source]["avg_confidence"] = (
-                sum(e.confidence for e in matching) / len(matching)
-            )
+        by_source = {
+            source: {
+                "count": int(s["count"]),
+                "avg_confidence": s["sum"] / s["count"] if s["count"] else 0.0,
+            }
+            for source, s in acc.items()
+        }
 
         return {
             "total_entries": len(entries),
-            "average_confidence": avg_confidence,
+            "average_confidence": conf_sum / len(entries),
             "by_source": by_source,
-            "high_confidence_count": len([e for e in entries if e.confidence >= 0.85]),
+            "high_confidence_count": high_confidence,
         }
 
     def export_csv(self, output_path: str = "data/memory-export.csv") -> None:
