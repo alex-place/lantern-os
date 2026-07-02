@@ -1534,6 +1534,21 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         }
       }
 
+      // GET — PAPER MLB run-total weather deck. Sibling of grounded-deck for KXMLBTOTAL:
+      // NWS game-time conditions per ballpark → run-total tilt (wind/temp/roof/precip) →
+      // paper hypotheses on weather TAILS only, net of fees. NOT in live scope (live stays
+      // weather-edge-only); logs to data/kalshi/mlb-weather-paper-ledger.jsonl for calibration.
+      if (url.pathname === '/api/trading/kalshi/mlb-weather-deck' && req.method === 'GET') {
+        const mlbDeck = require('../lib/kalshi-mlb-weather-deck');
+        const limit = q.limit ? Number(q.limit) : 12;
+        try {
+          const out = await mlbDeck.getMlbWeatherDeck({ limit });
+          return sendJson(res, out, 200), true;
+        } catch (e) {
+          return sendJson(res, { cards: [], count: 0, mode: 'paper', live: false, error: e.message }, 200), true;
+        }
+      }
+
       // POST — ground a single market on demand { ticker } (Re-ground button).
       if (url.pathname === '/api/trading/kalshi/ground' && req.method === 'POST') {
         const grounding = require('../lib/kalshi-grounding');

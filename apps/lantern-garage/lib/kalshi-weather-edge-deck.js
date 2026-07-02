@@ -65,6 +65,13 @@ function cardFor(m, row, ctx) {
     openInGroup: ctx.openInGroup || 0,
     drawdownFrac: ctx.drawdownFrac || 0,
   });
+  // What would ACTUALLY execute on the live path right now: the ½-Kelly size is the
+  // paper-bankroll optimum, but a live order is clamped to the hard per-order cap
+  // (kalshi-api.liveMaxContracts, default 1) and only fires when live is armed. Surface
+  // both so a card never implies it will place 25 contracts when the live cap is 1.
+  const liveContracts = ctx.liveArmed && sizing.contracts > 0
+    ? Math.min(sizing.contracts, ctx.liveCap)
+    : 0;
   return {
     kind: "grounded", mode: "grounded",
     ticker: m.ticker,
@@ -87,7 +94,7 @@ function cardFor(m, row, ctx) {
     ],
     sources: SOURCES,
     stateLabel: "CONFIDENT",
-    reason: `NWS ${ctx.fc}°F · calibrated fair ${row.fair_pct}% vs market ${row.ask_c}¢ → ${row.side.toUpperCase()} @ ${entry}¢ · worst-case +${Math.round(row.worst_c)}¢ net · ${sizing.contracts > 0 ? `size ${sizing.contracts} (½-Kelly)` : `NO SIZE — ${sizing.blockedBy.join("/")}`}`,
+    reason: `NWS ${ctx.fc}°F · calibrated fair ${row.fair_pct}% vs market ${row.ask_c}¢ → ${row.side.toUpperCase()} @ ${entry}¢ · worst-case +${Math.round(row.worst_c)}¢ net · ${sizing.contracts > 0 ? `size ${sizing.contracts} (½-Kelly, paper)${ctx.liveArmed ? ` · live cap → ${liveContracts}` : ""}` : `NO SIZE — ${sizing.blockedBy.join("/")}`}`,
     grounding: GROUNDING,
     // Act: sized order proposal + the 5-gate audit. contracts=0 means a gate blocked it.
     sizing: {
@@ -100,6 +107,10 @@ function cardFor(m, row, ctx) {
       feeAdjWinProb: sizing.feeAdjWinProb,
       bankrollCents: sizing.bankrollCents,
       gates: sizing.gates,
+      // paper ½-Kelly size vs what the live path would actually place (cap-clamped).
+      liveContracts,
+      liveArmed: !!ctx.liveArmed,
+      liveCap: ctx.liveCap,
     },
     // Feedback stamp: the model prob at entry, so the paper ledger can grade it later
     // (kalshi-calibration reads pPredicted off resolved rows to compute Brier + bias).
@@ -129,6 +140,13 @@ function cardFor(m, row, ctx) {
 async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHIGHNY" } = {}) {
   const nowMs = Date.now();
   const today = new Date(nowMs);
+
+  // Live-gate snapshot (pure, no network): reflect the ACTUAL arming state in the deck
+  // note + per-card sizing, instead of a hardcoded "paused" string that goes stale the
+  // moment the kill/pause files change. This deck never places an order itself; it
+  // reports whether the live path a card would feed is armed.
+  const liveArmed = kalshi.tradingEnabled() && !kalshi.killSwitchActive() && !kalshi.tradingPaused();
+  const liveCap = kalshi.liveMaxContracts ? kalshi.liveMaxContracts() : 1;
 
   // Verify→Reason: one calibrator per deck build, from the resolved weather ledger.
   // Identity (no-op) until ≥20 settled trades — honest under-sample behavior.
@@ -183,7 +201,7 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     const rep = model.robustEdgeReport(fc, lead, ladder, ask, grp.d.month, grp.d.day, minEdgeCents);
     audit.push(`${grp.d.year}-${grp.d.month}-${grp.d.day} lead=${lead} NWS=${fc}°F -> ${rep.verdict}`);
     const ctx = { fc, ymd: fRec.ymd || `${grp.d.year}-${String(grp.d.month).padStart(2, "0")}-${String(grp.d.day).padStart(2, "0")}`,
-      nowMs, confidence: 0.6, calibrator };
+      nowMs, confidence: 0.6, calibrator, liveArmed, liveCap };
     // Concentration gate input: how many actionable rows we're already emitting this day.
     let openInGroup = 0;
     for (const row of rep.actionable) {
@@ -195,9 +213,14 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
   // 5. Rank by reliable worst-case edge (Σ₀ score), best first.
   cards.sort((a, b) => (b.sigma0?.score ?? -999) - (a.sigma0?.score ?? -999));
 
+  const liveState = liveArmed
+    ? `LIVE ARMED — weather-edge scope, ${liveCap}-contract cap. Each card is a suggestion; an order still passes the 5 gates + scope + cap before it can fire.`
+    : (kalshi.tradingPaused() ? "PAPER — trading paused (data/kalshi/TRADING-PAUSED)."
+      : (kalshi.killSwitchActive() ? "PAPER — kill-switch engaged."
+        : "PAPER — live gate off (KALSHI_TRADING_ENABLED≠1 or admin flag off)."));
   const note = cards.length
-    ? "Σ₀ weather-edge — live NWS-calibrated fair value vs market, band-robust net of fees. Deterministic (no LLM). PAPER only; live trading remains paused."
-    : `Σ₀ weather-edge — no band-robust edge live right now (efficient board or milder forecast). Standing down is the correct output.${forecastMissing.length ? " (Some days lack a live NWS forecast.)" : ""}`;
+    ? `Σ₀ weather-edge — live NWS-calibrated fair value vs market, band-robust net of fees. Deterministic (no LLM). ${liveState}`
+    : `Σ₀ weather-edge — no band-robust edge live right now (efficient board or milder forecast). Standing down is the correct output.${forecastMissing.length ? " (Some days lack a live NWS forecast.)" : ""} ${liveState}`;
 
   return {
     cards: cards.slice(0, limit),
@@ -206,6 +229,8 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     knowledgeOnly: 0, pending: 0,
     positiveEv: cards.filter((c) => (c.sigma0?.ev_cents || 0) > 0).length,
     sizedCards: cards.filter((c) => (c.sizing?.contracts || 0) > 0).length,
+    liveArmed, liveCap,
+    liveSizedCards: cards.filter((c) => (c.sizing?.liveContracts || 0) > 0).length,
     calibration: calibrator
       ? { n: calibrator.n, brier: calibrator.brier, biasPt: Math.round((calibrator.bias || 0) * 1000) / 10, active: calibrator.active, report: calibrator.report }
       : null,
