@@ -1121,19 +1121,30 @@ async function act(dir,fromSwipe){
 
   const card=deck[idx];
 
-  // ── GROUNDED mode: take a web-grounded pick → paper position (forward-graded) ─
+  // ── GROUNDED mode: take a Σ₀ weather-edge pick ──────────────────────────────
+  // When live trading is enabled AND this is a deterministic weather-edge card, place
+  // a REAL 1-contract order (user-in-the-loop swipe) — the server's scope gate caps it
+  // and refuses any non-weather-edge source. Otherwise open a paper position.
   if(MODE==='grounded'){
     if(card.grounding_status!=='done'){
       blockTake(card.grounding_status==='knowledge-only'?'No live sources — Re-ground for live data before taking':'Still researching — wait for grounding');
       return;
     }
-    if(card.favAsk==null){ blockTake('No live ask — cannot paper-trade'); return; }
+    if(card.favAsk==null){ blockTake('No live ask — cannot trade'); return; }
+    const goLive = !!(conn && conn.canTradeLive) && /weather-edge/i.test(card.model||'');
     busy=true;
     try{
-      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
-        source:'kalshi-grounded', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
-      const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
-      showGroundedResult(res,card);
+      if(goLive){
+        const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
+          source:'kalshi-weather-edge', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
+        const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+        showResult(res,card);   // live / dry-run toast
+      } else {
+        const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
+          source:'kalshi-grounded', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
+        const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+        showGroundedResult(res,card);
+      }
       idx++; render();
     }catch(e){ showResult({error:e.message},card); idx++; }
     finally{ busy=false; }
