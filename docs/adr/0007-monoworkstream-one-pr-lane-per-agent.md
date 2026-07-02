@@ -1,10 +1,10 @@
 ---
 adr: 0007
 title: Monoworkstream — one open PR lane per agent
-status: Proposed
+status: Accepted
 date: 2026-06-23
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---

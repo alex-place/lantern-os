@@ -1,10 +1,10 @@
 ---
 adr: 0003
 title: One canonical CSF module
-status: Proposed
+status: Accepted
 date: 2026-06-23
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---

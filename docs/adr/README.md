@@ -58,19 +58,20 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Proposed (awaiting Alex's approval) |
-| [0002](0002-single-convergence-core.md) | Single Convergence Core — reject sprawl | Proposed (awaiting Alex's approval) |
-| [0003](0003-one-canonical-csf-module.md) | One canonical CSF module | Proposed (awaiting Alex's approval) |
-| [0004](0004-append-only-memory.md) | Append-only JSONL + CSF as the only memory | Proposed (awaiting Alex's approval) |
-| [0005](0005-interchangeable-model-providers.md) | Models are interchangeable — provider abstraction | Proposed (awaiting Alex's approval) |
-| [0006](0006-dual-boot-worktree-topology.md) | Dual-boot 4177/4178 worktree topology | Proposed (awaiting Alex's approval) |
-| [0007](0007-monoworkstream-one-pr-lane-per-agent.md) | Monoworkstream — one PR lane per agent | Proposed (awaiting Alex's approval) |
-| [0008](0008-end-product-personal-ai-wrapper.md) | End product is a personal AI wrapper — capabilities are Tools + Skills | Proposed (awaiting Alex's approval) |
-| [0009](0009-one-routing-contract-cloud-primary-coding.md) | One routing contract — cloud-primary coding | Proposed (awaiting Alex's approval) |
-| [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Proposed (awaiting Alex's approval) |
+| [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted (Alex Place, 2026-07-02) |
+| [0002](0002-single-convergence-core.md) | Single Convergence Core — reject sprawl | Accepted (Alex Place, 2026-07-02) |
+| [0003](0003-one-canonical-csf-module.md) | One canonical CSF module | Accepted (Alex Place, 2026-07-02) |
+| [0004](0004-append-only-memory.md) | Append-only JSONL + CSF as the only memory | Accepted (Alex Place, 2026-07-02) |
+| [0005](0005-interchangeable-model-providers.md) | Models are interchangeable — provider abstraction | Accepted (Alex Place, 2026-07-02) |
+| [0006](0006-dual-boot-worktree-topology.md) | Dual-boot 4177/4178 worktree topology | Accepted (Alex Place, 2026-07-02) |
+| [0007](0007-monoworkstream-one-pr-lane-per-agent.md) | Monoworkstream — one PR lane per agent | Accepted (Alex Place, 2026-07-02) |
+| [0008](0008-end-product-personal-ai-wrapper.md) | End product is a personal AI wrapper — capabilities are Tools + Skills | Accepted (Alex Place, 2026-07-02) |
+| [0009](0009-one-routing-contract-cloud-primary-coding.md) | One routing contract — cloud-primary coding | Accepted (Alex Place, 2026-06-28) |
+| [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Accepted (Alex Place, 2026-07-02) |
 | [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Proposed (awaiting Alex's approval) |
 | [0012](0012-nested-adaptive-reason.md) | Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model) | Proposed (awaiting Alex's approval) |
-| [0013](0013-subsystem-register-one-loop-gate.md) | Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction | Proposed (awaiting Alex's approval) |
+| [0013](0013-subsystem-register-one-loop-gate.md) | Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction | Accepted (Alex Place, 2026-07-02) |
 | [0014](0014-unisona-desktop-launcher.md) | unisona.ai desktop — a thin signed launcher over the one Core, not an Electron repackage | Accepted (Alex Place, 2026-07-02) |
+| [0015](0015-qwen-teacher-verified-distillation.md) | Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->
