@@ -249,6 +249,10 @@ module.exports = async (req, res, url, deps) => {
       // `finally`, an unhandled rejection that CRASHED the whole server after every
       // autonomous-work run (the real reason the Auto-Pull loop kept killing 4177).
       let workRoot = null, cleanupWorktree = null;
+      // Hoisted so the catch can log a TERMINAL record for this runId — without it a
+      // crashed fleet run has no `result` record and the /active feed (and the chat's
+      // background watcher) would show it as running until the 40-min cutoff.
+      let runId = null;
       try {
         const opts = JSON.parse(body || "{}");
         let issueNumber = parseInt(opts.issue, 10);
@@ -266,7 +270,6 @@ module.exports = async (req, res, url, deps) => {
         // but every step is still appended to data/autowork-runs/<date>.jsonl so the
         // autonomous loop's runs are reviewable. runId is set once the issue # is known.
         const { logStep, newRunId, researchIssue } = require("../lib/autowork-research");
-        let runId = null;
         const step = (phase, status, extra = {}) => logStep(runId, issueNumber, phase, status, extra);
 
         // Task-mode (parity with the stream route): a free-form { task } and no
@@ -301,7 +304,13 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
         runId = newRunId(issueNumber);
-        step("start", "start", { issue: issueNumber, mode: "fleet" });
+        // source + title let the chat UI's background-run watcher label who started
+        // this run (auto-dispatch daemon vs CI/fleet) when it surfaces it in-chat.
+        step("start", "start", {
+          issue: issueNumber, mode: "fleet",
+          source: typeof opts.source === "string" ? opts.source.slice(0, 40) : "fleet",
+          title: typeof opts.title === "string" ? opts.title.slice(0, 140) : undefined,
+        });
 
         // Code-mutating git ops run in `workRoot` (an isolated worktree), not the
         // live serving checkout (REPO_ROOT). Torn down in `finally`. (Declared above
@@ -610,7 +619,7 @@ module.exports = async (req, res, url, deps) => {
         });
       } catch (err) {
         // Don't leak err.stack in the response body (parity with the stream route).
-        try { require("../lib/autowork-research").logStep(null, null, "done", "error", { error: err.message }); } catch (_e) { /* ignore */ }
+        try { require("../lib/autowork-research").logStep(runId, null, "result", "failed", { error: err.message }); } catch (_e) { /* ignore */ }
         sendJson(res, { ok: false, error: err.message }, 500);
       } finally {
         // Always tear down the worktree — the branch (and any push) survives.
@@ -653,9 +662,58 @@ module.exports = async (req, res, url, deps) => {
         succeeded: result ? result.status === "ok" : null,
         prUrl: (result && result.prUrl) || null,
         message: (result && result.message) || null,
+        // Full step history so a client attaching to a run it didn't start (the
+        // background-run watcher) can replay the panel, not just show the tail.
+        steps: records.map((r) => ({
+          ts: r.ts, phase: r.phase, status: r.status,
+          detail: r.detail, error: r.error, attempt: r.attempt,
+          passed: r.passed, ran: r.ran, filesFound: r.filesFound, webSourcesFound: r.webSourcesFound,
+          prUrl: r.prUrl, issue: r.issue,
+        })),
       }, 200);
     } catch (e) {
       sendJson(res, { ok: false, error: e.message }, 200);
+    }
+    return true;
+  }
+
+  // GET /api/convergence/autonomous-work/active — every autowork run currently in
+  // flight, whoever started it (chat, auto-dispatch daemon, CI/fleet). This is the
+  // Observe surface that makes headless runs visible: the dream-chat background
+  // watcher polls it and attaches a live progress panel to any run it didn't start,
+  // so autowork always routes through the chat UX instead of running invisibly.
+  if (pathname === "/api/convergence/autonomous-work/active" && req.method === "GET") {
+    try {
+      const fsx = require("fs"); const px = require("path");
+      const dir = px.join(__dirname, "..", "..", "..", "data", "autowork-runs");
+      const days = [0, 1].map((d) => { const t = new Date(Date.now() - d * 86400000); return t.toISOString().slice(0, 10); });
+      const runs = new Map(); // runId → { runId, issue, source, title, startedAt, latestTs, latestPhase, latestStatus, done }
+      for (const day of days.reverse()) { // oldest file first so "latest" wins naturally
+        const fp = px.join(dir, `${day}.jsonl`);
+        if (!fsx.existsSync(fp)) continue;
+        for (const line of fsx.readFileSync(fp, "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          let r; try { r = JSON.parse(line); } catch { continue; }
+          if (!r.runId) continue;
+          let run = runs.get(r.runId);
+          if (!run) { run = { runId: r.runId, issue: r.issue || null, source: null, title: null, startedAt: r.ts, done: false }; runs.set(r.runId, run); }
+          if (r.issue && !run.issue) run.issue = r.issue;
+          if (r.source && !run.source) run.source = r.source;
+          if (r.title && !run.title) run.title = r.title;
+          run.latestTs = r.ts; run.latestPhase = r.phase; run.latestStatus = r.status;
+        }
+      }
+      // Terminal = an explicit result/done record, or a phase left in `error` (fleet
+      // aborts respond without a result record). Active additionally requires a
+      // heartbeat within the daemon's 40-min wall-clock ceiling (an older silent run
+      // is orphaned, not active — don't resurrect it).
+      const cutoff = Date.now() - 40 * 60 * 1000;
+      const active = [...runs.values()].filter((r) =>
+        r.latestPhase !== "result" && r.latestPhase !== "done" && r.latestStatus !== "error"
+        && r.latestTs && Date.parse(r.latestTs) > cutoff);
+      sendJson(res, { ok: true, active }, 200);
+    } catch (e) {
+      sendJson(res, { ok: false, error: e.message }, 500);
     }
     return true;
   }
@@ -786,6 +844,9 @@ module.exports = async (req, res, url, deps) => {
         // Tell the client the run id so it can re-attach via /autonomous-work/status
         // if the SSE drops mid-run.
         send("run", { runId: _runId, issue: issueNumber });
+        // Log a start record tagged source:"chat" so the background-run watcher knows
+        // this run already has a live panel in some chat client (it skips "chat" runs).
+        logStep(_runId, issueNumber, "start", "start", { issue: issueNumber, mode: "stream", source: "chat" });
 
         // ── 1. fetch issue ───────────────────────────────────────────────
         step("fetch_issue", "start", { issue: issueNumber });

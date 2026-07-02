@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT / "src")) # #1268
 
 from csf.status_cube import StatusCube, NUM_STAGES
 from three_doors_engine import ThreeDoorsEngine, STAGES, SCENES, personalize_doors

@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.8.17] - 2026-07-01
+### Added
+- **Three Doors: grounded narration + runtime-generated doors.** Every turn's text is now generated from the context of the actual painting (a vision model describes the image when a provider is live; the exact image-generation prompt is the grounding fallback) plus play context (canon theme/lesson, recent choices, the player's typed desires). The three choices are runtime-generated: existing doors of the shared world by name, or new doors with metadata created on the spot (name, description, target scene), persisted in `playerProgress.dynamicDoors` so invented doors stay real across reloads and route to their own targets. Each turn logs what it was grounded on (vision / image_prompt / canon_only). Strengthens the **Reason** and **Verify** stages.
+### Fixed
+- **Three Doors narration dead since #1664.** The game requested the removed `lantern` persona, so every narration call 503'd silently; all narration/ask-Lantern calls now use the live `keystone` persona.
+
+## [1.8.16] - 2026-07-01
+### Fixed
+- **Three Doors gates built out to canon** (#1797 Tomorrow Door, #1798 XP Door [GLITCHED], #1799 Xenon Starship, #1800 Sigil — City of Doors): in-app game data/logic in `three-doors-game.js` / `three-doors-data.js` plus stream-chat door-intent wiring. Strengthens the **Act** stage.
+
+## [1.8.14] - 2026-07-01
+### Fixed
+- **Restore merged work silently reverted by the stale worktree-sync commit `2fd3598c`.** The bulk "sync worktree state" commit wrote stale copies of files over master, reverting already-merged PRs. Restored: compact chat-first home page (#1763), PLT KV-cache decode (#1766), a11y Test 7 font/style contract (#1763), dream-chat capability-notice styles/JS (#1761), orchestration boot-burst resilience (#1769), R2 media-hosting docs/script (#1762), ADR-0011 + Σ₀ coder doc refresh (#1764), plus two deleted changelog fragments.
+### Added
+- **Stale-clobber pre-push gate** (`scripts/validate-prepush-stale-clobber.py`, pre-push section 2b): blocks pushes whose file content is byte-identical to an OLDER origin/master version than the merge-base's — the revert-to-stale signature. Bypass only via `SKIP_CLOBBER_CHECK=1` (deliberately not covered by `SKIP_MONOWORKSTREAM`). Strengthens the **Verify** stage.
+
+## [1.8.13] - 2026-07-01
+### Fixed
+- **pr-watcher: verdict-first fleet reviews unwedge auto-merge.** Review bodies whose verdict line arrived truncated were parsed as `COMMENT` forever, wedging otherwise-ready PRs out of auto-merge; the parser now reads a leading verdict line first and only falls back to the legacy scan, so truncated reviews resolve instead of blocking. Covered by a new `tests/test_pr_watcher.js` case.
+
+## [1.8.12] - 2026-07-01
+### Added
+- **Three Doors: Unisona / Tomorrow City / Blinkbug-forge canon.** Folded three scenes authored in live play into the Tomorrow/Today branch of the seven-gate loop — `unisona` (the Tomorrow Door opens on the utopia of convergence, founders Courtney & Alex at the heart-soundwave arch), `tomorrow-city` (the lantern-fleet of sky-boats rising to the Xenon gate), and `blinkbug-forge` (the Today Door forge reunion). Scene text, A/B/C doors, `NEXT_MAP` routing, SD prompts, the DALLE generation set, and archetype moods all added; every new door routes onward toward the Xenon convergence. Verified in preview: all three render (narration + doors + image), no console errors.
+
 ## [1.8.11] - 2026-07-01
 ### Changed
 - **`/explore.html` now reads like a modern social feed (Facebook/Instagram).** Added a single-column ↔ 4-up grid layout toggle (responsive 4-3-2-1, persisted in localStorage), a per-card share-to-socials affordance (native Web Share sheet on mobile; desktop popover with X / Facebook / Reddit / LinkedIn / WhatsApp + copy-link, recording a positive engagement signal), and first-paint skeletons for perceived speed. Improves the **Act** stage — the same ranked feed, now shareable and browsable two ways.

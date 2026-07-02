@@ -41,6 +41,24 @@ if [ "$SKIP_MONOWORKSTREAM" != "1" ] && [ "$SKIP_VERSION_CHECK" != "1" ]; then
   fi
 fi
 
+# ── 2b. Stale-clobber gate ───────────────────────────────────────────────────
+# Blocks pushes whose file contents are byte-identical to OLDER master versions
+# (a stale worktree "sync" silently reverting merged work — the 2fd3598c bug).
+# Deliberately NOT bypassed by SKIP_MONOWORKSTREAM (automation caused the bug).
+# Bypass: SKIP_CLOBBER_CHECK=1 git push ...
+if [ "$SKIP_CLOBBER_CHECK" != "1" ]; then
+  _root=$(git rev-parse --show-toplevel 2>/dev/null)
+  _clobber="$_root/scripts/validate-prepush-stale-clobber.py"
+  if [ -f "$_clobber" ]; then
+    _py=$(command -v python3 2>/dev/null || command -v python 2>/dev/null)
+    if [ -n "$_py" ]; then
+      if ! "$_py" "$_clobber"; then
+        exit 1
+      fi
+    fi
+  fi
+fi
+
 # ── 3. Per-agent workstream gate ─────────────────────────────────────────────
 if [ "$SKIP_MONOWORKSTREAM" = "1" ]; then exit 0; fi
 if ! command -v gh >/dev/null 2>&1; then exit 0; fi

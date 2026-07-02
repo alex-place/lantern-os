@@ -211,7 +211,8 @@ def _load_fleet_status() -> Dict[str, Any]:
     # Load designed slot count from agents config
     try:
         if _AGENTS_CONFIG_PATH.exists():
-            agents_cfg = json.loads(_AGENTS_CONFIG_PATH.read_text(encoding="utf-8"))
+            # utf-8-sig: tolerate the BOM PowerShell's Out-File prepends
+            agents_cfg = json.loads(_AGENTS_CONFIG_PATH.read_text(encoding="utf-8-sig"))
             designed_slots = agents_cfg.get("designedRingSlots", designed_slots)
             claim_boundary = agents_cfg.get("fleetClaimBoundary", claim_boundary)
     except Exception as exc:
@@ -220,7 +221,7 @@ def _load_fleet_status() -> Dict[str, Any]:
     # Load live status from fleet status file
     try:
         if _FLEET_STATUS_PATH.exists():
-            fleet = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8"))
+            fleet = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8-sig"))
             active_slots = fleet.get("activeSlots", 0)
             sleeping_slots = fleet.get("sleepingSlots", designed_slots)
             claim_boundary = fleet.get("fleetClaimBoundary", claim_boundary)
@@ -714,7 +715,7 @@ def _tool_fleet_status() -> Dict[str, Any]:
     slots_preview: List[Dict[str, Any]] = []
     try:
         if _FLEET_STATUS_PATH.exists():
-            raw = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8"))
+            raw = json.loads(_FLEET_STATUS_PATH.read_text(encoding="utf-8-sig"))
             slots_preview = raw.get("slots", [])[:5]  # first 5 for preview
     except Exception:
         pass
@@ -1707,4 +1708,13 @@ if __name__ == "__main__":
     logger.info("Lantern OS MCP Server starting on http://%s:%s", host, port)
     logger.info("Tools available: %s", list(TOOLS_REGISTRY.keys()))
     logger.info("Mesh mode: founder control + opt-in peer donations")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except OSError as exc:
+        # TOCTOU: port was free at the probe but taken by the time uvicorn bound.
+        # Same singleton semantics — one clean line, not a traceback.
+        logger.warning(
+            "MCP port %s:%s grabbed between probe and bind (%s) — exiting cleanly (singleton guard).",
+            host, port, exc,
+        )
+        sys.exit(0)

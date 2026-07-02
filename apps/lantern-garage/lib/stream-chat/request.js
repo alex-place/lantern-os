@@ -45,6 +45,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     user: "dreamer",
     requestedAgent: "",
     requestedProvider: "",
+    requestedModel: "",
     history: [],
     mcpFlag: false,
     routeIntent: "",
@@ -59,6 +60,8 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.user = normalizeDreamerUser(url.searchParams.get("user") || "dreamer");
     parsed.requestedAgent = String(url.searchParams.get("agent") || "").trim();
     parsed.requestedProvider = String(url.searchParams.get("provider") || "").trim().toLowerCase();
+    // Model pin (#1127): honoured only with a pinned provider AND an allowlisted id.
+    parsed.requestedModel = String(url.searchParams.get("model") || "").trim().slice(0, 80);
     parsed.routeIntent = String(url.searchParams.get("routeIntent") || "").trim();
     parsed.surface = String(url.searchParams.get("surface") || "").trim().toLowerCase();
     parsed.sessionId = String(url.searchParams.get("sessionId") || "").trim().slice(0, 64) || null;
@@ -89,6 +92,7 @@ async function parseStreamChatRequest(req, url, deps = {}) {
     parsed.user = normalizeDreamerUser(body.user || "dreamer");
     parsed.requestedAgent = String(body.agent || "").trim();
     parsed.requestedProvider = String(body.provider || "").trim().toLowerCase();
+    parsed.requestedModel = String(body.model || "").trim().slice(0, 80);
     parsed.history = sanitizeHistory(body.history);
     parsed.routeIntent = String(body.routeIntent || "").trim();
     parsed.surface = String(body.surface || "").trim().toLowerCase();

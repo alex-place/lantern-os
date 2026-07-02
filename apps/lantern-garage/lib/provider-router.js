@@ -90,7 +90,7 @@ const PROVIDER_CHAINS = {
     { provider: "mistral", models: ["mistral-large-latest"] },
     { provider: "openai", models: ["gpt-4o"] },
     { provider: "gemini", models: ["gemini-2.5-flash"] },
-    { provider: "cohere", models: ["command-r-plus"] },
+    { provider: "cohere", models: ["command-a-plus-05-2026"] },
     { provider: "ollama", models: ["lantern-csf-dream"] },
   ],
 

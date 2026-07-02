@@ -7,6 +7,7 @@ const _PROVIDER_ALIASES = {
   claude: "anthropic", "claude-sonnet": "anthropic", anthropic: "anthropic",
   google: "gemini", gemini: "gemini", openai: "openai", gpt: "openai",
   grok: "xai", xai: "xai", ollama: "ollama", local: "ollama",
+  cohere: "cohere", command: "cohere",
 };
 
 function _dispatchHasKey(p) {
@@ -16,13 +17,14 @@ function _dispatchHasKey(p) {
     case "gemini": return !!(e.GEMINI_API_KEY || e.GOOGLE_API_KEY);
     case "openai": return !!e.OPENAI_API_KEY;
     case "xai": return !!e.XAI_API_KEY;
+    case "cohere": return !!e.COHERE_API_KEY;
     case "ollama": return true;
     default: return false;
   }
 }
 
 function buildBrainOrder({ requestedProvider, hintProvider }) {
-  const DISPATCH = ["anthropic", "gemini", "openai", "xai", "ollama"];
+  const DISPATCH = ["anthropic", "gemini", "openai", "xai", "cohere", "ollama"];
   const norm = (p) => {
     const s = String(p || "").toLowerCase();
     if (s.startsWith("gemini-")) return "gemini";   // gemini-2.5-pro etc.

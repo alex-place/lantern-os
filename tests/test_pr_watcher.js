@@ -104,6 +104,11 @@ ok("verdict: REQUEST CHANGES (spaced)", PrWatcher._parseVerdict("Verdict: REQUES
 ok("verdict: bare COMMENT", PrWatcher._parseVerdict("Some notes. COMMENT") === "COMMENT");
 ok("verdict: disapprove never counts as approve", PrWatcher._parseVerdict("I disapprove of this approach") === "COMMENT");
 ok("verdict: empty -> COMMENT (fail closed)", PrWatcher._parseVerdict("") === "COMMENT");
+// Verdict-first tag survives truncation and wins over later bare tokens (#1794/#1807 wedge)
+ok("verdict: leading VERDICT: tag survives truncated body", PrWatcher._parseVerdict("VERDICT: APPROVE\nThis PR aims to") === "APPROVE");
+ok("verdict: VERDICT: tag beats later bare token", PrWatcher._parseVerdict("VERDICT: APPROVE\n...one comment: nit") === "APPROVE");
+ok("verdict: tagged REQUEST CHANGES (spaced) normalizes", PrWatcher._parseVerdict("verdict: request changes\nbody") === "REQUEST_CHANGES");
+ok("verdict: fleet header before tag still parses", PrWatcher._parseVerdict("🤖 **Fleet Auto-Review**\n\nVERDICT: COMMENT\nnotes") === "COMMENT");
 
 // ── protected-path gate: sensitive surfaces need a human, even when green (#1251) ──
 const greenPv = (files) => ({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green, files });

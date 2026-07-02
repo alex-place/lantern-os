@@ -31,16 +31,16 @@
       "kind": "game",
       "url": "/three-doors-game.html",
       "source": "Keystone Arcade",
-      "published": "2026-06-30",
+      "published": "2026-07-01",
       "topics": [
         "game",
         "play",
         "kingdome",
         "doors"
       ],
-      "thumb": "https://media.lantern-os.net/koh/ba0a53b095-t.webp",
-      "lore": "Seven stages, three doors each scene, no wrong choices. A dream journey through the Kingdome — each loop different.",
-      "why": "Keystone's own choose-your-path game, served locally — the Three Doors loop made playable",
+      "thumb": "https://media.lantern-os.net/koh/reference-lantern-t.webp",
+      "lore": "The King of Hearts and his companions — Lantern, Eclipse, Keystone — walk seven gates of doors. Three doors a scene, one painted picture a turn, no wrong choices. Death is imaginary; forever begins with 'let's play.'",
+      "why": "Alex's own choose-your-path game, served locally — the Three Doors loop made playable, now with the hand-drawn Kingdome cast and the King's creed as canon",
       "evidence_source": "local /three-doors-game.html · data/three-doors/scenes.json",
       "embed": {
         "provider": "local",

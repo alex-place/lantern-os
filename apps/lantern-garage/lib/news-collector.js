@@ -78,23 +78,36 @@ function parseRssItems(xml) {
   return items;
 }
 
-function fetchRss(symbols) {
-  const url = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbols.join(","))}&region=US&lang=en-US`;
-  return new Promise((resolve) => {
+function fetchRssOnce(url) {
+  return new Promise((resolve, reject) => {
     const req = https.get(url, { timeout: 8000 }, (res) => {
       let body = "";
       res.on("data", (chunk) => (body += chunk));
       res.on("end", () => resolve(body));
     });
-    req.on("error", (e) => {
-      console.error("[NewsCollector] Fetch error:", e.message);
-      resolve("");
-    });
+    req.on("error", reject);
     req.on("timeout", () => {
       req.destroy();
-      resolve("");
+      reject(new Error("timeout"));
     });
   });
+}
+
+async function fetchRss(symbols) {
+  const url = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbols.join(","))}&region=US&lang=en-US`;
+  // Yahoo's feed drops connections transiently ("socket hang up"); one retry
+  // with a short backoff recovers nearly all of them.
+  try {
+    return await fetchRssOnce(url);
+  } catch (e) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      return await fetchRssOnce(url);
+    } catch (e2) {
+      console.error("[NewsCollector] Fetch error (after retry):", e2.message);
+      return "";
+    }
+  }
 }
 
 // Fetch the dashboard's news JSON over localhost HTTP. Resolves to a parsed

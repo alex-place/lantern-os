@@ -1,0 +1,3 @@
+### Fixed
+- Restore merged work silently reverted by the stale worktree-sync commit `2fd3598c`: PLT KV-cache decode (#1766), a11y Test 7 font/style contract (#1763), dream-chat capability-notice styles/JS (#1761), orchestration boot-burst resilience (#1769), R2 media-hosting docs/script (#1762), ADR-0011 + Σ₀ coder doc refresh (#1764), plus the two deleted changelog fragments. Home page (#1763) restored in the same PR.
+- New pre-push gate `scripts/validate-prepush-stale-clobber.py` (pre-push section 2b): blocks pushes whose file content is byte-identical to an OLDER origin/master version than the merge-base's — the "sync worktree state" revert-to-stale signature. Bypass only via `SKIP_CLOBBER_CHECK=1` (not covered by SKIP_MONOWORKSTREAM).

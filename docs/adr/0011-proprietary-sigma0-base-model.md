@@ -22,6 +22,32 @@ superseded-by: none
 
 Proposed — awaiting approval from Alex Place.
 
+### Progress since proposal (as of 2026-07-01)
+
+The owned modeling code exists, partially clears Stage 0, and the model has been made the
+**sole local coder by operator decision** (still `verified:false` — see below). Status stays
+Proposed; only Alex flips it (founder gate [#1666](https://github.com/alex-place/lantern-os/issues/1666)).
+
+- **Own modeling code authored + merged.** [`models/keystone-sigma0-plt/`](../../models/keystone-sigma0-plt/README.md)
+  — pure-torch `modeling_keystone_plt.py` + `download_and_patch.py` + `check_parity.py` (Stage-0
+  gate) + `train_lora.py` + `serve_keystone_plt.py` (PR #1645; run-fixes #1668).
+- **Stage-0 4-bit smoke: PASS on the 8 GB 3070** — Apache-2.0 weights load through our forward
+  with **missing=0 / unexpected=0** and **2/3 coherent** generations, no OOM
+  ([`data/convergence/keystone-plt-parity-log.jsonl`](../../data/convergence/keystone-plt-parity-log.jsonl)).
+  Proves the module tree maps 1:1 — **not** yet the forward math.
+- **Speed: DONT_BUILD → BUILD.** An exact KV-cache decode (static + dynamic) took on-box decode
+  from 4.29 → **7.83 tok/s** (PR #1766). The full-forward path stays bit-exact (training/parity
+  depend on it); a committed CPU regression test (`tests/test_keystone_plt_kv_cache.py`) locks the
+  cached-vs-full-recompute equivalence. *(Note: #1766 was briefly clobbered by a stale
+  worktree-sync commit and restored — see [[stale-worktree-sync-clobber]].)*
+- **Promoted to sole local coder (#1758).** Registered in `local-model-registry.js` as
+  `keystone-sigma0-plt`, serving on its own shim (`serve_keystone_plt.py` → :11435), leading
+  `coding`/`reasoning`/`default`. Kept **`verified:false` honestly**: it leads because it is the
+  *only* local coder (no verified peer to displace), **not** because it won a reproduced eval.
+- **Still open (the real gates):** faithful parity (`top1_agree ≥ 0.99` vs a vLLM reference, needs
+  a ≥24 GB box) and the head-to-head eval win vs a frontier coder. Either failing keeps it
+  `verified:false`. Tracked in [#1743](https://github.com/alex-place/lantern-os/issues/1743).
+
 ## Context
 
 The owner's directive: **a proprietary Σ₀ model — weights we adjust in future design, that serves
@@ -108,9 +134,11 @@ not by depending on any vendor's serving path.**
   - Bootstrapping from a third-party checkpoint inherits its license (Apache-2.0 — compatible) and its
     biases until we adapt it.
 - **Follow-ups (staged, each gated by on-box evidence — none auto-promotes the model):**
-  - **Stage 0 — Parity.** Author `modeling_keystone_plt.py`; load the forked weights; reproduce the
-    vLLM-fork reference logits/outputs on a fixed prompt set. *Gate: token/logit parity within
-    tolerance.* Without this we own nothing — it is the first and blocking step.
+  - **Stage 0 — Parity.** ✅ *Authored + smoke-passed* (2026-06-30): `modeling_keystone_plt.py`
+    loaded the forked weights at 4-bit with 0 missing/unexpected keys + 2/3 coherent generations.
+    ⛔ *Still open (the blocking sub-step):* reproduce the vLLM-fork reference logits on a fixed
+    prompt set to `top1_agree ≥ 0.99` (run `colab_parity.ipynb` on a ≥24 GB box). Until the
+    faithful check passes we own the weight **layout** but not the forward **math**.
   - **Stage 1 — Fit.** 4-bit (bnb nf4) under the 8 GB budget; measure VRAM + tok/s
     (reuse `loopcoder_v2_4bit_probe.py` harness → `data/convergence/`).
   - **Stage 2 — Serve.** Ollama/OpenAI-compatible endpoint (the `ouro_serve.py` pattern); point the
@@ -149,3 +177,8 @@ not by depending on any vendor's serving path.**
 | Σ₀ council exists and runs on real decisions | #1598, [[dogfood-loop-reliable-and-council-wired]] | High | repo |
 | LoopCoder-V2 is Apache-2.0 (legal to fork weights) | `local-model-registry.js:147` note; model card license | Med | model card |
 | Looped/recurrent depth is the Σ₀ Reason lever | [[sigma0-coder-spiral-consolidation]], [[ouro-adaptive-compute-gate]] | Med | repo research |
+| Own modeling code authored + merged (`models/keystone-sigma0-plt/`) | PR #1645 (`4fb5d04`); run-fixes #1668 | High | this repo |
+| Stage-0 4-bit smoke **PASS**: 0 missing/unexpected keys, 2/3 coherent, no OOM | `data/convergence/keystone-plt-parity-log.jsonl` (2026-06-30) | High | this repo, on-box |
+| KV-cache decode flips probe DONT_BUILD → **BUILD** (4.29 → 7.83 tok/s); full-forward stays bit-exact | PR #1766 (`36bf7f0d`); `tests/test_keystone_plt_kv_cache.py` (equivalence gate) | High | this repo, on-box |
+| Faithful logit parity (`top1_agree ≥ 0.99` vs vLLM ref) **NOT yet run** | `colab_parity.ipynb` (#1757) is the path; needs ≥24 GB | High | this repo |
+| Registered as sole local coder, **`verified:false`** (leads by absence of a peer, not an eval win) | `local-model-registry.js` `keystone-sigma0-plt` (#1758) | High | repo |

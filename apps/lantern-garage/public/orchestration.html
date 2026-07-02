@@ -248,6 +248,8 @@
 
 <main class="orch-main" id="main-content">
 
+  <h1 class="visually-hidden">Orchestration — Control Center</h1>
+
   <!-- ── Slim status line ── -->
   <div class="orch-status">
     <span id="statusPill" class="pill"><span class="dot"></span> Checking…</span>
@@ -450,10 +452,27 @@
   let _cache = { providerData: null, gpuData: null };
 
   async function fetchJson(path, timeoutMs = 6000) {
-    try {
-      const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
-      return r.ok ? await r.json() : null;
-    } catch { return null; }
+    // Boot fires ~17 of these at once; the browser caps ~6 connections per host
+    // so the rest queue. AbortSignal.timeout() counts from the fetch() call — not
+    // from when the request hits the wire — so a request stuck behind slow ones
+    // (PR-lane / gh calls) can time out *while still queued* and abort before it
+    // is ever sent. The one-shot panels (reliance/merit/calibration/keystone/
+    // rollover) have no refresh interval, so that transient abort would leave a
+    // false "data unavailable" state until a manual reload. Retry once on a
+    // thrown error (network / timeout / abort) after a short backoff — by then
+    // the boot burst has drained a connection slot. Non-2xx responses fall
+    // through to `null` without a retry, so we never hammer a genuinely failing
+    // endpoint. Only used for idempotent GETs, so the retry is safe.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+        return r.ok ? await r.json() : null;
+      } catch {
+        if (attempt === 0) { await new Promise((res) => setTimeout(res, 400)); continue; }
+        return null;
+      }
+    }
+    return null;
   }
   function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
   function setHtml(id, val) { const el = $(id); if (el) el.innerHTML = val; }
@@ -1454,8 +1473,15 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
-    refreshWorkBoard();
-    renderRepoLearn();
+    // Order matters. The browser caps ~6 connections per host and
+    // AbortSignal.timeout() counts queue time, so whatever is requested first
+    // claims the connection slots. refreshWorkBoard() fans out to 5 sub-fetches
+    // and some (PR lanes) shell out to `gh` and hold a connection for seconds —
+    // firing it first starved the light one-shot panels below (reliance / merit
+    // / calibration / keystone / rollover), which then timed out *while queued*
+    // and — having no refresh interval — showed a permanent false "data
+    // unavailable" state. So request the light, fast, single-shot panels FIRST,
+    // then defer the heavy work-board a tick so its slow calls run behind them.
     renderLocalModel();
     refreshProviderStatus();
     renderTrainingSection();
@@ -1466,6 +1492,8 @@
     renderKeystoneTests();
     renderRollover();
     updateStatus();
+    renderRepoLearn();
+    setTimeout(refreshWorkBoard, 0);
 
     setInterval(refreshWorkBoard, 20000);
     setInterval(renderRepoLearn, 60000);

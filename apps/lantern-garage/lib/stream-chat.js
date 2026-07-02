@@ -10,7 +10,7 @@ const path = require("path");
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
-const { modelFor } = require("./provider-models");
+const { modelFor: defaultModelFor, isAllowedModel } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
@@ -29,7 +29,7 @@ const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
-const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
+const { resolveGrounding, formatGroundingForPrompt, generateXpDoorImagePrompt } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
 const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
@@ -38,7 +38,7 @@ const { analyzeImage } = require("./vision");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
 // #1012 boiling-frog defense: ms epoch of the last mandatory external-grounding tick.
-// Module-level so the cadence spans requests for this server process.
+// Module-level so the cadence spans requests for this server process. #1012
 let _lastGroundingTickMs = 0;
 const { generatePlan, generatePatch } = require("./self-edit-engine");
 const { selectProvider, selectKernelProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
@@ -49,7 +49,7 @@ const serving = require("./serving-modes");
 const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
-// Extracted helper modules (split out of this file for smaller-context editing):
+// Extracted helper modules (split out of this file for smaller-context editing): 
 const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
@@ -112,6 +112,25 @@ function _extractRunnable(reply) {
   return { language: "python", code, test };
 }
 
+// Verify-gated distillation flywheel: when KEYSTONE_LOCAL_FIRST=1, record cloud-solved + verified
+// coding episodes as a corpus for local model improvement. This is a persistent learning mechanism
+// via retrieval/experience, not weight retraining of the base model. It also triggers a local-adapter
+// refresh and measures the lift via CAP-1. This is enabled via an environment variable.
+const KEYSTONE_LOCAL_FIRST = process.env.KEYSTONE_LOCAL_FIRST === "1";
+const OURO_LOCAL_FIRST_CORPUS = path.resolve(repoRoot, "data/ouro-local-first-corpus.jsonl");
+async function keystoneLocalFirst(instruction, reply, result) {
+  if (!KEYSTONE_LOCAL_FIRST) return;
+  if (!result || !result.verified || !result.runnable) return;
+  try {
+    await appendJsonlQueued(OURO_LOCAL_FIRST_CORPUS, {
+      instruction: instruction.slice(0, 200),
+      code: result.runnable.code,
+      test: result.runnable.test,
+      source: "keystone-local-first", ts: Date.now(),
+    });
+  } catch (e) { console.error("[keystoneLocalFirst] failed to record:", e.message); }
+}
+
 // Per-request grounding (web search + live GitHub project context) is best-effort
 // enrichment that runs BEFORE the model is called. If the network or the `gh` CLI
 // is slow/hung, an unbounded await there stalls the ENTIRE chat reply (no tokens,
@@ -141,17 +160,26 @@ function withTimeout(promise, ms, fallback) {
 
 
 // Non-blocking image generation sidecar for Three Doors mode
-function triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh }) {
+function triggerImageGeneration({ cleanText, doors, suggestions, surfaceMode, symbolMesh, sceneType }) {
   if (surfaceMode !== "three-doors") return null;
-  
+  if (sceneType && sceneType !== "three-doors" && sceneType !== "future-doors") return null;
+
   const entryId = Date.now().toString();
-  generateDoorSceneImage({ cleanText, doors: suggestions, symbolMesh, entryId })
+  const doorList = doors || suggestions || [];
+
+  // XP Door glitch aesthetic: adjust prompt when present (guarded — helper may not exist)
+  let imagePrompt = cleanText;
+  if (typeof generateXpDoorImagePrompt === "function" && doorList.some(d => d && d.type === "xp-door")) {
+    imagePrompt = generateXpDoorImagePrompt(cleanText, doorList);
+  }
+
+  generateDoorSceneImage({ cleanText: imagePrompt, doors: doorList, symbolMesh, entryId, sceneType })
     .then(result => {
       // Image generation completes asynchronously; failure is non-blocking
     })
     .catch(err => {
       // Image generation errors are non-blocking
-    });
+    }); 
   
   return entryId;
 }
@@ -251,6 +279,18 @@ async function handleStreamChat(req, url, res) {
   });
   let { message, user, requestedAgent, requestedProvider, history, mcpFlag, routeIntent } = parsed;
   const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  // Model pin (#1127 work item 1): a UI-selected model is honoured only when the
+  // user ALSO pinned its provider and the id is on the provider-models allowlist —
+  // a stray/retired id can never hijack routing. This `modelFor` shadows the module
+  // import for every provider call site in this handler: pinned model for the pinned
+  // provider, normal default for everyone else (fallback providers keep their own
+  // defaults when the backstop chain walks past the pin).
+  const { _PROVIDER_ALIASES } = require("./stream-chat/provider-order");
+  const _pinnedInternal = _PROVIDER_ALIASES[String(requestedProvider || "").toLowerCase()] || null;
+  const _modelPin = (parsed.requestedModel && _pinnedInternal && isAllowedModel(_pinnedInternal, parsed.requestedModel))
+    ? { provider: _pinnedInternal, model: parsed.requestedModel }
+    : null;
+  const modelFor = (p) => (_modelPin && p === _modelPin.provider) ? _modelPin.model : defaultModelFor(p);
 
   // Remember-stage hook (#1429): a declarative personal-fact statement ("my kid's shoe size
   // is 7") gets persisted into the ONE canonical CSF memory, same pattern as recordConvergance
@@ -406,6 +446,90 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
+    if (cmd.name === "choose-future-door") {
+      // This command is triggered by the frontend when a Tomorrow Door path is chosen.
+      // It does not directly correspond to a user message, but rather an action.
+      const { doorName, currentScene, history, playerProgress } = JSON.parse(cmd.args);
+
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendImageId = (id) => sse.sendEvent(res, "image_id", { id });
+      const sendFutureAnalysis = (analysis) => sse.sendEvent(res, "future_analysis", { analysis });
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+
+      try {
+        // 1. Generate an image for the chosen future path
+        const imagePrompt = `A vivid, imaginative scene depicting the consequences or unfolding of choosing the "${doorName}" path, starting from the current situation: "${currentScene.description}". Focus on the immediate future, showing what might happen next.`;
+        const imageEntryId = Date.now().toString();
+        generateDoorSceneImage({
+          cleanText: imagePrompt,
+          doors: [{ name: doorName }],
+          symbolMesh: currentScene.symbolMesh,
+          entryId: imageEntryId,
+          sceneType: "future-doors",
+        }).then(result => {
+          if (result && result.id) {
+            sendImageId(result.id);
+          }
+        }).catch(err => {
+          console.error("Future Door image generation failed:", err);
+        });
+
+        // 2. Analyze the chosen future path and its implications
+        const analysisPrompt = `Given the user chose the "${doorName}" path from the Tomorrow Door, and the current scene is "${currentScene.description}", describe the likely immediate future in a "creed voice" and "true cast" manner. Focus on potential outcomes, challenges, and opportunities this choice opens up. Be evocative and slightly mysterious, hinting at branching possibilities. Incorporate elements from the generated image (if available) into the analysis.`;
+
+        // Use a dedicated agent for future analysis
+        const futureAgent = AGENT_PERSONAS.creed;
+        const futureSystemPrompt = `${futureAgent.systemPrompt}\n\nYour role is to analyze a chosen future path from the Tomorrow Door. Speak in a "creed voice" and "true cast" manner, offering evocative insights into the potential outcomes, challenges, and opportunities of this choice. Be slightly mysterious, hinting at branching possibilities.`;
+
+        const messages = [
+          { role: "system", content: futureSystemPrompt },
+          ...history,
+          { role: "user", content: analysisPrompt },
+        ];
+
+        const stream = unifiedAgentStreamSSE({
+          messages,
+          user,
+          modelFor,
+          logConversation,
+          agent: futureAgent,
+          provider: requestedProvider,
+          sessionId,
+          surfaceMode,
+        });
+
+        let fullAnalysisText = "";
+        stream.on("data", (data) => {
+          if (data.type === "token") {
+            fullAnalysisText += data.text;
+            sendToken(data.text);
+          } else if (data.type === "done") {
+            sendFutureAnalysis(fullAnalysisText); // Send the full analysis text as a separate event
+            sendDone("creed-future-analysis", {
+              agent: futureAgent.name,
+              provider: data.provider,
+              model: data.model,
+              online: true,
+              analysis: fullAnalysisText,
+            });
+          }
+        });
+
+        stream.on("error", (err) => {
+          console.error("Future Door analysis stream error:", err);
+          sendToken(`An error occurred during future analysis: ${err.message}`);
+          sendDone("error", { error: err.message });
+        });
+
+      } catch (e) {
+        console.error("Error processing choose-future-door:", e);
+        sendToken(`An unexpected error occurred: ${e.message}`);
+        sendDone("error", { error: e.message });
+      }
+      return;
+    }
+
     if (cmd.name === "search" || cmd.name === "web-search") {
       const searchQuery = cmd.args.trim() || message.replace(/!\w+\s*/, "").trim();
       if (!searchQuery) {
@@ -419,6 +543,11 @@ async function handleStreamChat(req, url, res) {
         "Connection": "keep-alive",
         "Access-Control-Allow-Origin": "*",
         "X-Accel-Buffering": "no",
+      });
+
+      const preamble = buildBehaviorPreamble(requestedAgent, message, history, {
+        surfaceMode,
+        threeDoorsPreamble: THREE_DOORS_PREAMBLE,
       });
       const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
       const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
@@ -436,6 +565,7 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Search failed: ${result.error || "unknown error"}\n`);
           sendDone("web_search", { agent: "WebSearch", online: false, error: result.error });
         }
+        // keystoneLocalFirst(issue, result.text, runnableResult); // This was a misplaced call, removed.
       } catch (e) {
         sendToken(`Search error: ${e.message}\n`);
         sendDone("web_search", { agent: "WebSearch", online: false, error: e.message });
@@ -443,15 +573,17 @@ async function handleStreamChat(req, url, res) {
       res.end();
       return;
     }
-
     // Keystone Kernel Mode: File-grounded, tool-driven code execution
     if (cmd.name === "keystone") {
       const issue = cmd.args.trim() || message.replace(/!keystone\s*/i, "").trim();
-
       if (!issue) {
         res.writeHead(400, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
         res.end(JSON.stringify({ error: "issue_required", message: "Usage: !keystone <issue description>" }));
         return;
+      }
+      // If KEYSTONE_LOCAL_FIRST is enabled, route through keystoneRun to enable the distillation flywheel
+      if (KEYSTONE_LOCAL_FIRST) {
+        return keystoneRun(req, url, res, issue, history, logConversation, keystoneLocalFirst);
       }
 
       res.writeHead(200, {
@@ -2042,8 +2174,11 @@ async function handleStreamChat(req, url, res) {
     try {
       const http = require("http");
       const { loopedReason } = require("./loop-reasoner");
-      const u = new URL(process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434");
       const loopModel = modelChain[0];
+      // Per-model endpoint (lib/local-model-registry.js): the sole local coder
+      // keystone-sigma0-plt serves on its own shim (:11435); the kernel/dream models
+      // stay on :11434. Falls back to OLLAMA_BASE_URL for unmanaged models.
+      const u = new URL(require("./local-model-registry").endpointFor(loopModel));
       const callLLM = (p, sys) => new Promise((resolve, reject) => {
         // #1609: the loop-reasoner local path was the one Ollama call site that
         // built its body with no `options`, so the served model ran with Ollama's
@@ -2114,7 +2249,9 @@ async function handleStreamChat(req, url, res) {
           // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
           options: serving.applyOllamaDecodeParams({}),
         });
-        const ollamaUrl = new URL(ollamaBase);
+        // Per-model endpoint routing (lib/local-model-registry.js): the sole local
+        // coder keystone-sigma0-plt serves on :11435; kernel/dream stay on :11434.
+        const ollamaUrl = new URL(require("./local-model-registry").endpointFor(ollamaModel));
         await new Promise((resolve, reject) => {
           const req2 = http.request({
             hostname: ollamaUrl.hostname,
@@ -2190,7 +2327,7 @@ async function handleStreamChat(req, url, res) {
               // Stream one follow-up Ollama turn, returning its text (tokens already sent).
               const streamOllamaFollow = (messages) => new Promise((resolve) => {
                 const fp = JSON.stringify({ model: ollamaModel, stream: true, messages, options: serving.applyOllamaDecodeParams({}) });
-                const fu = new URL(ollamaBase);
+                const fu = new URL(require("./local-model-registry").endpointFor(ollamaModel));
                 let t = "";
                 const r3 = http.request({ hostname: fu.hostname, port: fu.port || 11434, path: "/api/chat", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(fp) } }, (up) => {
                   if (up.statusCode !== 200) { up.resume(); resolve(""); return; }
@@ -2526,7 +2663,9 @@ async function handleStreamChat(req, url, res) {
   if (_p === "anthropic" && anthropicKey) {
     try {
       let claudeModel = "claude-haiku-4-5-20251001";
-      if (requestedProvider === "claude-sonnet") {
+      if (_modelPin && _modelPin.provider === "anthropic") {
+        claudeModel = _modelPin.model; // UI model pin (#1127) — validated allowlist id
+      } else if (requestedProvider === "claude-sonnet") {
         claudeModel = process.env.ANTHROPIC_SONNET_MODEL || "claude-sonnet-4-6";
       } else {
         claudeModel = process.env.ANTHROPIC_MODEL || claudeModel;
@@ -2966,6 +3105,123 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
+  // Provider: Cohere (streaming — via Cohere's OpenAI-compatible endpoint) (#cohere)
+  // Cohere's native /v2/chat SSE uses its own event shape; its OpenAI-compat surface
+  // (api.cohere.ai/compatibility/v1) speaks the exact choices[].delta.content wire the
+  // openai/xai paths already parse, so we reuse that machinery instead of a bespoke parser.
+  const cohereKey = process.env.COHERE_API_KEY;
+  if (_p === "cohere" && cohereKey) {
+    const COHERE_HOST = "api.cohere.ai";
+    const COHERE_PATH = "/compatibility/v1/chat/completions";
+    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — Cohere compat is
+    // OpenAI-shaped, so it reuses the same turn helper + registry/executor.
+    if (process.env.CHAT_TOOL_EXEC === "1") {
+      try {
+        const toolRunner = require("./tool-runner");
+        const { isOperatorRequest } = require("./request-auth");
+        const operator = isOperatorRequest(req);
+        const tools = toolRunner.openaiTools({ operator });
+        if (tools.length) {
+          const cohereModelName = modelFor("cohere");
+          const messages = buildProviderMessages(systemPrompt, compacted, message);
+          const MAX_TOOL_ITERS = 6;
+          let toolCalls = 0;
+          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
+            const turn = await openaiCompatibleToolTurn({
+              host: COHERE_HOST, path: COHERE_PATH, apiKey: cohereKey, model: cohereModelName,
+              messages, tools, onToken: (t) => { fullReply += t; sendToken(t); },
+            });
+            if (!turn.toolCalls.length) break;
+            messages.push(turn.assistantMessage);
+            for (const tc of turn.toolCalls) {
+              toolCalls++;
+              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
+              sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
+                ok: !!r.ok, status: r.status, reason_code: r.reason_code,
+                receipt: r.receipt, preview: String(out).slice(0, 240) });
+              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
+            }
+          }
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModelName, agent: doneAgentName } }).catch(() => {});
+          recordProviderSuccess("cohere");
+          recordProviderSuccessRouter("cohere");
+          const cohereReceipt = buildPcsfReceipt("cohere", cohereModelName, true);
+          sendReceipt(cohereReceipt);
+          sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: cohereModelName, online: true, cleanText, suggestions, webSuggestions, receipt: cohereReceipt, toolCalls });
+          return;
+        }
+      } catch (err) {
+        recordProviderFailure("cohere", `tool_loop: ${err.message}`);
+        if (fullReply) {
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          recordProviderSuccess("cohere");
+          sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: modelFor("cohere"), online: true, cleanText, suggestions, webSuggestions });
+          return;
+        }
+        if (_hardPin) { sendError(humanError(err)); sendFail(err.message); return; }
+        // else: fall through to single-shot
+      }
+    }
+    try {
+      const cohereModel = modelFor("cohere");
+      // Cohere compat accepts the OpenAI decode params (top_p + frequency_penalty).
+      // No per-token logprobs request — the compat surface does not expose them.
+      const payload = JSON.stringify(serving.applyOpenAIDecodeParams({
+        model: cohereModel, stream: true,
+        messages: buildProviderMessages(systemPrompt, compacted, message),
+      }));
+      await new Promise((resolve, reject) => {
+        const req2 = https.request({
+          agent: llmAgent,
+          hostname: COHERE_HOST, path: COHERE_PATH, method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${cohereKey}`, "Content-Length": Buffer.byteLength(payload) },
+        }, (upstream) => {
+          if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`cohere_status_${upstream.statusCode}`)); return; }
+          let buf = "";
+          upstream.on("data", (chunk) => {
+            buf += chunk.toString();
+            const lines = buf.split("\n"); buf = lines.pop();
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const raw = line.slice(6).trim();
+              if (raw === "[DONE]" || !raw) continue;
+              try { const evt = JSON.parse(raw); const t = evt.choices?.[0]?.delta?.content || ""; if (t) { fullReply += t; sendToken(t); } } catch { /* skip */ }
+            }
+          });
+          upstream.on("end", resolve); upstream.on("error", reject);
+        });
+        req2.on("error", reject);
+        req2.setTimeout(15000, () => { req2.destroy(); reject(new Error("cohere_timeout")); });
+        req2.write(payload); req2.end();
+      });
+      // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
+      if (isEmptyReply(fullReply)) throw new Error("cohere_empty_response");
+      const { cleanText: cohereClean, suggestions: cohereDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cohereClean.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModel, agent: doneAgentName } }).catch(() => {});
+      recordProviderSuccess("cohere");
+      recordProviderSuccessRouter("cohere");
+      await recordConvergenceSignature("cohere", cohereModel, cohereClean, true);
+      const cohereReceipt = buildPcsfReceipt("cohere", cohereModel, true);
+      sendReceipt(cohereReceipt);
+      sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: cohereModel, online: true, cleanText: cohereClean, suggestions: cohereDoors, webSuggestions, receipt: cohereReceipt });
+      return;
+    } catch (err) {
+      const errorCode = err.message.includes("cohere_status_") ? err.message : "unknown";
+      recordProviderFailure("cohere", err.message);
+      recordProviderFailureRouter("cohere", errorCode);
+      try { recordModelOutcome("cohere", leaderboardTaskType, false, Date.now() - _turnStart); } catch { /* never break a reply */ }
+      if (_hardPin) {
+        sendError(humanError(err));
+        sendFail(err.message);
+        return;
+      }
+      console.warn(`[stream-chat] cohere auto-cascade failed — trying next provider (${err.message})`);
+    }
+  }
+
   // Provider: Ollama (streaming) — last-resort
   if (_p === "ollama") {
     // Attempt 1: Unified Agent Connector (health-checked, provider-ranked, Python-side SSE)
@@ -3024,7 +3280,10 @@ async function handleStreamChat(req, url, res) {
         // FAST-mode anti-repetition decode params (issue #729). Suppresses ✅✅✅ loops.
         options: serving.applyOllamaDecodeParams({}),
       });
-      const ollamaUrl = new URL(ollamaBase);
+      // Per-model endpoint routing (endpointFor falls back to OLLAMA_BASE_URL when the
+      // model is unmanaged/undefined, so this is behavior-preserving except that the sole
+      // local coder keystone-sigma0-plt now correctly targets its :11435 shim).
+      const ollamaUrl = new URL(require("./local-model-registry").endpointFor(ollamaModel));
       const ollamaOpts = {
         hostname: ollamaUrl.hostname,
         port: ollamaUrl.port || 11434,

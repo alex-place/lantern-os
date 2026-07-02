@@ -83,14 +83,16 @@ function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTo
 }
 
 // ── OpenAI / xAI (Grok) — /v1/chat/completions function-calling ───────────────
-function openaiCompatibleToolTurn({ host, apiKey, model, messages, tools, decode, onToken }) {
+function openaiCompatibleToolTurn({ host, path, apiKey, model, messages, tools, decode, onToken }) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify({ model, stream: true, messages, tools, tool_choice: "auto", ...(decode || {}) });
+    const reqPath = path || "/v1/chat/completions";
+    const errTag = host.includes("x.ai") ? "xai" : host.includes("cohere") ? "cohere" : "openai";
     const req = https.request({
-      agent: llmAgent, hostname: host, path: "/v1/chat/completions", method: "POST",
+      agent: llmAgent, hostname: host, path: reqPath, method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}`, "Content-Length": Buffer.byteLength(payload) },
     }, (upstream) => {
-      if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`${host.includes("x.ai") ? "xai" : "openai"}_status_${upstream.statusCode}`)); return; }
+      if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`${errTag}_status_${upstream.statusCode}`)); return; }
       let buf = "", text = "", finishReason = null;
       const calls = []; // index → { id, name, args }
       upstream.on("data", (chunk) => {

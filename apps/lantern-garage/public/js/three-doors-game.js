@@ -1,5 +1,6 @@
 // ── Three Doors Game Logic ─────────────────────────────────────────────────────
 // Game state, progress management, prize system, and UI rendering
+//
 // Depends on three-doors-data.js for SCENES, STAGES, and constants
 
 // ── State ─────────────────────────────────────────────────────────
@@ -50,6 +51,14 @@ const DEFAULT_PROGRESS = {
   futurePathsVisited: 0,
   glitchesFound: 0,
   sigilLocationsVisited: 0,
+  walkedDoors: [], // New property to track walked door IDs
+  // Runtime-generated doors (name -> {description, target, scene, createdAt}).
+  // Created by the grounded narrator; persisted so a door invented for this
+  // player stays real across reloads — consistent shared world, not a one-off.
+  dynamicDoors: {},
+  // What the player has typed into the custom-door input — their authored
+  // desires; the narrator folds these into new doors (theirs outrank ours).
+  customDesires: [],
   loopCompleted: false,
 };
 
@@ -93,6 +102,11 @@ function validateProgress(data) {
   if (!Array.isArray(validated.prizes)) validated.prizes = ["first-steps"];
   if (!Array.isArray(validated.visited)) validated.visited = [];
   if (!Array.isArray(validated.completedChallenges)) validated.completedChallenges = [];
+  if (!Array.isArray(validated.walkedDoors)) validated.walkedDoors = []; // Validate walkedDoors
+  if (!Array.isArray(validated.customDesires)) validated.customDesires = [];
+  if (typeof validated.dynamicDoors !== "object" || validated.dynamicDoors === null || Array.isArray(validated.dynamicDoors)) {
+    validated.dynamicDoors = {};
+  }
   
   // Validate objects (check for null and non-object types)
   if (typeof validated.sceneVisits !== "object" || validated.sceneVisits === null || Array.isArray(validated.sceneVisits)) {
@@ -108,7 +122,6 @@ function validateProgress(data) {
   
   // Validate challenge-specific numbers
   if (typeof validated.shiniesFound !== "number" || isNaN(validated.shiniesFound)) validated.shiniesFound = 0;
-  if (typeof validated.futurePathsVisited !== "number" || isNaN(validated.futurePathsVisited)) validated.futurePathsVisited = 0;
   if (typeof validated.glitchesFound !== "number" || isNaN(validated.glitchesFound)) validated.glitchesFound = 0;
   if (typeof validated.sigilLocationsVisited !== "number" || isNaN(validated.sigilLocationsVisited)) validated.sigilLocationsVisited = 0;
   
@@ -231,6 +244,31 @@ function awardPrize(prizeId) {
   }
 }
 
+// Sigil — City of Doors: every threshold made visible. Builds the walked-paths
+// strip shown inside the sigil-city scene message (the skill's promise for this
+// gate: keys, markets, bridges — an inventory of the doors you have opened).
+function buildWalkedPathsHTML() {
+  const walked = playerProgress.walkedDoors || [];
+  if (!walked.length) return "";
+  const pills = walked.slice(-18).map(doorId => {
+    let fromSceneKey, name;
+    if (doorId.includes("::")) {
+      // Current format: "<scene_key>::<door name>"
+      [fromSceneKey, name] = [doorId.slice(0, doorId.indexOf("::")), doorId.slice(doorId.indexOf("::") + 2)];
+    } else {
+      // Legacy format: "<scene_key>-<label>" — resolve label against the scene
+      const cut = doorId.lastIndexOf("-");
+      fromSceneKey = doorId.slice(0, cut);
+      const doorLabel = doorId.slice(cut + 1);
+      const door = SCENES[fromSceneKey]?.doors?.find(d => d.label === doorLabel);
+      name = door ? door.name : doorLabel;
+    }
+    const from = fromSceneKey.replace(/-/g, " ");
+    return `<span class="history-pill" title="from ${from}">🚪 ${name}</span>`;
+  }).join("");
+  return `<div class="walked-paths"><div class="doors-kicker">Doors you have walked</div><div>${pills}</div></div>`;
+}
+
 function showPrizeToast(prizeId) {
   const prize = PRIZES[prizeId];
   if (!prize) return;
@@ -308,14 +346,15 @@ const CHALLENGES = {
   "kingdome-garden": [
     { id: "king-audience", name: "King's Audience", description: "Visit the Garden 3 times", reward: "synthesasia-badge", check: (p) => (p.sceneVisits?.["kingdome-garden"] || 0) >= 3 },
   ],
+  // XP Door challenges are defined in the XP Door scene logic
   "cloverfield": [
     { id: "lucky-find", name: "Lucky Find", description: "Find a shiny in the Cloverfield", reward: "lorekeeper-badge", check: (p) => p.shiniesFound >= 1 },
     { id: "four-leaf", name: "Four-Leaf Master", description: "Visit Cloverfield 5 times", reward: "speedwalker-badge", check: (p) => (p.sceneVisits?.["cloverfield"] || 0) >= 5 },
-  ],
+  ], // The Tomorrow Door
   "future-doors": [
     { id: "time-traveler", name: "Time Traveler", description: "Visit all Future Door sub-paths", reward: "xenon-navigator-badge", check: (p) => p.futurePathsVisited >= 3 },
   ],
-  "xp-door": [
+  "xp-door": [ // XP Door specific challenges
     { id: "glitch-hunter", name: "Glitch Hunter", description: "Find all XP Door corruption sequences", reward: "glitch-hunter-badge", check: (p) => p.glitchesFound >= 3 },
   ],
   "xenon-convergence": [
@@ -395,6 +434,7 @@ async function checkServer() {
   } finally {
     clearTimeout(t);
   }
+
   updateStatusLine();
   return serverAvailable;
 }
@@ -490,10 +530,32 @@ function normalizeDoorName(name) {
     .trim();
 }
 
+// Register a runtime-generated door in the shared world. Existing doors
+// (already in NEXT_MAP or this scene's static set) are left alone; new doors
+// get persistent metadata so they stay real across reloads.
+function registerDynamicDoor(sceneKey, door) {
+  const norm = normalizeDoorName(door.name);
+  if (!norm) return;
+  if (NEXT_MAP[norm]) return; // an existing door of the shared world
+  if (!playerProgress.dynamicDoors) playerProgress.dynamicDoors = {};
+  const existing = playerProgress.dynamicDoors[norm];
+  playerProgress.dynamicDoors[norm] = {
+    name: door.name,
+    description: door.description || existing?.description || "",
+    target: (door.target && SCENES[door.target]) ? door.target : (existing?.target || ""),
+    scene: sceneKey,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+  };
+  saveProgress();
+}
+
 // Primary destination for a door. Falls back to the next spine beat so every
 // door — including unmapped/custom ones — always advances the journey onward.
 function resolveDoorTarget(doorName, spineIndex) {
   const norm = normalizeDoorName(doorName);
+  // Runtime-created doors resolve first — they carry their own metadata.
+  const dyn = playerProgress.dynamicDoors?.[norm];
+  if (dyn && dyn.target && SCENES[dyn.target]) return dyn.target;
   let target = NEXT_MAP[norm];
   if (!target) {
     const noThe = norm.replace(/^the /, "");
@@ -504,6 +566,87 @@ function resolveDoorTarget(doorName, spineIndex) {
   }
   if (target && SCENES[target]) return target;
   return STAGES[(spineIndex + 1) % STAGES.length];   // onward fallback = next gate
+}
+
+// Xenon Starship specific logic
+function handleXenonStarship(doorName) {
+  // Placeholder for Xenon Starship specific logic, e.g., triggering image generation
+}
+
+/**
+ * Adds a door's ID to the player's walkedDoors array if not already present.
+ * @param {string} doorId - The unique identifier for the walked door (e.g., "scene-label").
+ */
+function addWalkedDoor(doorId) {
+  if (!playerProgress.walkedDoors.includes(doorId)) {
+    playerProgress.walkedDoors.push(doorId);
+    saveProgress();
+  }
+}
+
+// XP Door specific logic
+function handleXpDoorInteraction(doorName) {
+  // Check if the door is specifically the XP Door
+  if (normalizeDoorName(doorName).includes("xp door")) {
+    playerProgress.glitchesFound = (playerProgress.glitchesFound || 0) + 1;
+    saveProgress();
+    // Additional logic for XP Door, e.g., triggering visual glitches, special narration
+    console.log("XP Door interacted! Glitches found:", playerProgress.glitchesFound);
+    // Trigger a visual glitch effect
+    triggerXpGlitchEffect();
+
+    // Check for glitch-hunter badge
+    checkChallenges("xp-door", null, false); // Don't count as a scene visit, just an interaction
+  }
+}
+
+function triggerXpGlitchEffect() {
+  const body = document.body;
+  body.classList.add('xp-glitch-active');
+
+  // Randomly apply different glitch styles
+  const glitchTypes = ['scanline', 'color-shift', 'pixelate', 'static'];
+  const randomGlitch = glitchTypes[Math.floor(Math.random() * glitchTypes.length)];
+  body.classList.add(`xp-glitch-${randomGlitch}`);
+
+  // Add a temporary, subtle audio glitch
+  const audio = new Audio('/audio/glitch_short.mp3'); // Ensure you have a short glitch sound
+  audio.volume = 0.3;
+  audio.play().catch(e => console.warn("Audio glitch failed to play:", e));
+
+  // Remove glitch effects after a short duration
+  setTimeout(() => {
+    body.classList.remove('xp-glitch-active');
+    body.classList.remove(`xp-glitch-${randomGlitch}`);
+  }, 1500); // Glitch lasts for 1.5 seconds
+
+  // Add a temporary text corruption to the current scene description
+  const sceneDescriptionEl = document.getElementById("scene-description");
+  if (sceneDescriptionEl) {
+    const originalText = sceneDescriptionEl.innerHTML;
+    const corruptedText = corruptText(originalText);
+    sceneDescriptionEl.innerHTML = corruptedText;
+
+    setTimeout(() => {
+      sceneDescriptionEl.innerHTML = originalText; // Restore original text
+    }, 1000);
+  }
+}
+
+function corruptText(text) {
+  const chars = "▓▒░█▌▐▀▄─│┼═║╒╓╔╕╗╘╙╚╛╝╞╟╠╡╢╣╤╥╦╧╨╩"; // Glitchy characters
+  let corrupted = "";
+  for (let i = 0; i < text.length; i++) {
+    if (Math.random() < 0.1) { // 10% chance to corrupt a character
+      corrupted += chars[Math.floor(Math.random() * chars.length)];
+    } else if (Math.random() < 0.05) { // 5% chance to insert a random char
+      corrupted += chars[Math.floor(Math.random() * chars.length)] + text[i];
+    }
+    else {
+      corrupted += text[i];
+    }
+  }
+  return corrupted;
 }
 
 function navScore(c, ctx) {
@@ -527,6 +670,14 @@ function navigate(currentScene, doorName, state) {
   const beatsSinceSpine = state.beats_since_spine ?? 0;
   const nextBeat = STAGES[(spineIndex + 1) % STAGES.length];
   const mapped = resolveDoorTarget(doorName, spineIndex);
+
+  // Special handling for Xenon Starship
+  if (doorName === "xenon-convergence") {
+    handleXenonStarship(doorName);
+  }
+
+  // Handle XP Door specific interactions
+  handleXpDoorInteraction(doorName);
 
   // Candidate set: the chosen door's target, the next narrative gate, and the
   // *other* doors' targets as on-theme novel neighbors. Guarantees non-empty.
@@ -569,11 +720,27 @@ function navigate(currentScene, doorName, state) {
   return { scene: picked, spine_index: newSpine, beats_since_spine: newBeats, loop_completed: loopCompleted };
 }
 
+function renderImagePlaceholder(imageId) {
+  const chat = document.getElementById("chat");
+  const el = document.createElement("div");
+  el.className = "message agent";
+  el.innerHTML = `<div class="agent-avatar">🖼️</div><div class="message-content">
+    <div id="image-placeholder-${imageId}" class="image-placeholder">Generating image...</div>
+  </div>`;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+}
+
 // ── Inline engine fallback ────────────────────────────────────────
 function sceneState(sceneKey, spineIndex, loopCount, history, beatsSinceSpine) {
   const scene = SCENES[sceneKey] || SCENES["kingdome-garden"];
+  // The play contract is EXACTLY three doors, always labelled A/B/C (the
+  // skill's rule). Scenes that define more (the seven-gate Garden hub) get a
+  // random three relabelled A–C; SCENES[key].doors is untouched, so
+  // routing/novelty scoring still sees the full graph.
+  const doors = scene.doors.length > 3 ? pickThreeDoors(scene.doors) : scene.doors;
   return {
-    scene_key: sceneKey, text: scene.text, doors: scene.doors, fox_present: scene.fox,
+    scene_key: sceneKey, text: scene.text, doors, fox_present: scene.fox,
     history: history, stage_index: spineIndex, stage_count: STAGES.length,
     loop_count: loopCount, beats_since_spine: beatsSinceSpine, archetype: scene.archetype,
   };
@@ -592,13 +759,11 @@ function engineStart() {
     state.resumed = true;
     return state;
   }
-  const state = sceneState("kingdome-garden", 0, 0, ["Entered the Garden at the Beginning"], 0);
-  // First pass only: three immediate choices, not the full seven-gate menu —
-  // matches the "always exactly three meaningful choices" play contract.
-  // No real preference profile exists yet, so pick a random three of the
-  // seven and relabel them A–C; SCENES["kingdome-garden"].doors (all seven)
-  // is untouched, so routing/novelty scoring still sees the full graph.
-  state.doors = pickThreeDoors(state.doors);
+  // Fresh game opens where the skill opens: the castle balcony at night —
+  // Joy in the Doorwalker's arms, far doors glowing across the sea, and
+  // Lantern's "You came back." Its three doors (Wishing Rail / Brass
+  // Spyglass / Knee-High Door) route into the seven-gate world via NEXT_MAP.
+  const state = sceneState("castle-balcony", 0, 0, ["Night on the castle balcony"], 0);
   // Persist right away — otherwise a reload before the first door choice
   // never sees a saved currentScene, so it looks like a brand-new game every
   // time and re-counts the Garden as freshly visited (inflating challenge
@@ -669,7 +834,7 @@ async function apiNarrate(sceneKey, sceneText) {
     const r = await fetch("/api/dream/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: `Scene: ${sceneKey}. ${sceneText.replace(/\*\*/g,"").replace(/\*/g,"").slice(0, 280)}`, agent: "lantern", provider: "local" }),
+      body: JSON.stringify({ message: `Scene: ${sceneKey}. ${sceneText.replace(/\*\*/g,"").replace(/\*/g,"").slice(0, 280)}`, agent: "keystone", provider: "local" }),
       signal: ctrl.signal,
     });
     if (!r.ok) throw new Error("chat API " + r.status);
@@ -730,6 +895,10 @@ async function chooseDoor(label, name) {
   doorsLocked = true;
 
   logThreeDoorsEvent("door_choice", { label, name, sceneKey: gameState?.scene_key });
+  // Track the walked door by NAME (labels get remapped A/B/C per turn, so a
+  // label lookup can resolve to the wrong door). "::" separates scene from
+  // name; buildWalkedPathsHTML still tolerates legacy "<scene>-<label>" ids.
+  addWalkedDoor(`${gameState?.scene_key || "start"}::${name}`);
   writeCubeDelta('story_choice', [name.toLowerCase().replace(/\s+/g, '-')], 'explore:' + (gameState?.scene_key || ''), { coordinate: `explore:${gameState?.scene_key || ''}:${label}` });
 
   document.querySelectorAll(".door-chip").forEach(b => b.disabled = true);
@@ -782,6 +951,11 @@ function submitCustomDoor() {
   if (!input || !gameState) return;
   const val = input.value.trim();
   if (!val) return;
+  // Everything the player types is an authored desire — the grounded
+  // narrator folds these into future doors (their inventions outrank ours).
+  if (!playerProgress.customDesires) playerProgress.customDesires = [];
+  playerProgress.customDesires = [...playerProgress.customDesires, val].slice(-8);
+  saveProgress();
   const upper = val.toUpperCase();
   // Door label (A/B/C) or full door name — route to known door
   const knownDoor = gameState.doors?.find(d =>

@@ -194,7 +194,7 @@ def check_coder_output(text: str, grounded: bool = False) -> GateCheck:
     """
     text = text or ""
     sections: Dict[str, str] = {}
-    missing: List[str] = []
+    missing: List[str] = [] # noqa: F841
     for label in REQUIRED_SECTIONS:
         value = _extract_section(text, label)
         if value is None:

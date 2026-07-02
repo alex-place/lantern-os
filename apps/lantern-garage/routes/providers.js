@@ -51,7 +51,7 @@ const PROVIDER_CONFIGS = {
   gemini: { key: "GEMINI_API_KEY", model: "gemini-2.5-flash" },
   mistral: { key: "MISTRAL_API_KEY", model: "mistral-large-latest" },
   deepseek: { key: "DEEPSEEK_API_KEY", model: "deepseek-chat" },
-  cohere: { key: "COHERE_API_KEY", model: "command-r-plus" },
+  cohere: { key: "COHERE_API_KEY", model: "command-a-plus-05-2026" },
   perplexity: { key: "PERPLEXITY_API_KEY", model: "sonar-pro" },
   openrouter: { key: "OPENROUTER_API_KEY", model: "auto" },
   ollama: { key: null, model: "auto" },
@@ -142,7 +142,7 @@ const PROVIDER_CHAINS = {
     { provider: "mistral", models: ["mistral-large-latest"] },
     { provider: "openai", models: ["gpt-4o"] },
     { provider: "gemini", models: ["gemini-2.5-flash"] },
-    { provider: "cohere", models: ["command-r-plus"] },
+    { provider: "cohere", models: ["command-a-plus-05-2026"] },
   ],
   default: [
     { provider: "ollama", models: ["lantern-csf-dream", "qwen2.5-coder"] },
@@ -157,6 +157,22 @@ module.exports = async function providerRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
 
   _syncUserEnvKeys();
+
+  // ── GET /api/providers/models ──────────────────────────────────────────
+  // Per-provider model choices for the chat UI's model dropdown (#1127 work
+  // item 1). Keyed by the UI's provider names (claude/openai/gemini/grok);
+  // `default` is the effective modelFor() resolution (env override included)
+  // so the dropdown reflects what Auto would actually run.
+  if (req.method === "GET" && url.pathname === "/api/providers/models") {
+    const { CHAT_MODEL_OPTIONS, modelFor } = require("../lib/provider-models");
+    const UI_NAME = { anthropic: "claude", openai: "openai", gemini: "gemini", xai: "grok" };
+    const out = {};
+    for (const [internal, options] of Object.entries(CHAT_MODEL_OPTIONS)) {
+      out[UI_NAME[internal] || internal] = { default: modelFor(internal), options };
+    }
+    sendJson(res, { providers: out }, 200);
+    return true;
+  }
 
   // ── GET /api/providers/status ──────────────────────────────────────────
   if (req.method === "GET" && url.pathname === "/api/providers/status") {

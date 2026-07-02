@@ -199,7 +199,7 @@ function getLoopStatus() {
   const rank = (v) => v === "calibrated" ? 2 : v === "directional" ? 1 : 0;
   const overall = Object.values(allSignals).reduce((acc, s) => (s && rank(s.confidence) > rank(acc)) ? s.confidence : acc, "insufficient_data");
   const top = Object.entries(allSignals).filter(([, s]) => s && Number.isFinite(s.correlation)).sort((a, b) => Math.abs(b[1].correlation) - Math.abs(a[1].correlation)).slice(0, 3).map(([k, s]) => ({ feature: k, correlation: s.correlation, confidence: s.confidence, basis: s.basis }));
-  return {
+  return { // This is the object returned by getLoopStatus
     cycle: cp.cycle,
     metadataCollected: cp.metadataCollected,
     firstPartyVideos: cal && cal.first_party ? cal.first_party.samples : 0,

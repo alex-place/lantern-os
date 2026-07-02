@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 # Install-MonoworkstreamHooks.ps1
 # Installs monoworkstream pre-commit and pre-push hooks for single-dev workflow.
 
@@ -31,7 +31,9 @@ Write-Host "  - prepare-commit-msg: injects conventional commits template on bla
 Write-Host "  - pre-push:           per-agent check + master protection + STALENESS BLOCK (>50 behind master)"
 Write-Host "                        + CHANGE-RECORD GATE: a code-bearing branch must bump package.json"
 Write-Host "                          to a new X.X.X version and add a matching CHANGELOG.MD entry"
-Write-Host "  - post-merge:         after merging to master — lists stale branches + pending changelog fragments"
+Write-Host "                        + STALE-CLOBBER GATE (section 2b): blocks bulk worktree-sync pushes that"
+Write-Host "                          revert already-merged PRs (scripts/validate-prepush-stale-clobber.py)"
+Write-Host "  - post-merge:         after merging to master - lists stale branches + pending changelog fragments"
 Write-Host ""
 Write-Host "Each branch prefix is its own lane (one concurrent PR per lane):"
 Write-Host "  - agent prefixes:  claude/ gemini/ codex/ devin/ grok/ openai/"
@@ -40,4 +42,5 @@ Write-Host "  - unprefixed branches (no slash) share the fallback human lane."
 Write-Host ""
 Write-Host "Bypass workstream gate:    SKIP_MONOWORKSTREAM=1 git commit/push ..."
 Write-Host "Bypass change-record gate: SKIP_VERSION_CHECK=1 git push ..."
+Write-Host "Bypass stale-clobber gate: SKIP_CLOBBER_CHECK=1 git push ..."
 Write-Host "Override master push:      OVERRIDE_MERGE=1 git push origin master"

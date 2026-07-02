@@ -86,10 +86,13 @@ const DEFAULTS = [
     toolCalling: false,           // stock Σ₀ has no tool training (see memory)
     vramGB: 3,
     ctxTokens: 8192,
-    taskTypes: ["kernel", "reasoning", "coding", "default"],
+    taskTypes: ["kernel"],        // KERNEL-ONLY now: keystone-sigma0-plt is the sole local
+                                  // coder/default (the LoopCoder-lineage Σ₀ model). Ouro stays
+                                  // the strict Q-exit Convergence-Core kernel; it no longer
+                                  // competes on coding/reasoning/default.
     rank: 0,                      // kernel lead; rank-order escape via LOCAL_CAPABILITY_FIRST=0
     capabilityScore: 0.4,
-    note: "Recurrent-depth research front (#1292). No tools; no longer the universal coding default (capability-gated). Force Ouro-first with LOCAL_CAPABILITY_FIRST=0.",
+    note: "Recurrent-depth Σ₀ kernel (#1292). Kernel-only since the PLT coder became the sole local coding default.",
   },
   {
     id: "keystone-ft",
@@ -104,69 +107,32 @@ const DEFAULTS = [
     note: "Keystone kernel fine-tune of Ouro (kernel chain lead, #894).",
   },
   {
-    id: "qwen2.5-coder",
-    endpoint: DEFAULT_ENDPOINT,
-    selfConverges: false,         // single-pass → MUST be wrapped by loopedReason()
-    toolCalling: true,
-    vramGB: 5,                    // Q4_K_M ~4.7GB — fits the 8GB box
-    ctxTokens: 32768,
-    taskTypes: ["coding", "default"],
-    rank: 1,
-    capabilityScore: 0.8,         // strongest code model in the 8GB tier (2026)
-    note: "8GB-tier default coder: Qwen2.5-Coder-7B (Q4). Leads coding on an 8GB box; sits behind the 27B frontier on a ≥24GB box.",
-  },
-  {
-    id: "qwen3.6-27b",
-    endpoint: DEFAULT_ENDPOINT,
-    selfConverges: false,         // single-pass → wrapped by loopedReason()
-    toolCalling: true,            // native qwen3_coder tool format
-    vramGB: 18,                   // dense 27B @ Q4 ~17GB — needs a ≥24GB box; gated out of 8GB
-    ctxTokens: 262144,
-    taskTypes: ["coding", "reasoning", "default"],
-    rank: 0,
-    capabilityScore: 0.92,        // SWE-bench Verified 77.2% — consumer-frontier local (2026)
-    note: "Local FRONTIER coder (Qwen 3.6-27B dense). Leads only on a ≥24GB box. PENDING #1388: confirm exact served tag + measured VRAM.",
-  },
-  {
-    id: "loopcoder-v2",
-    endpoint: DEFAULT_ENDPOINT,
-    selfConverges: false,         // PLT loops internally for refinement (fixed 2-loop),
-                                  // but that is NOT a Q-exit convergence certificate →
-                                  // the Core still wraps it in loopedReason() (grounding
-                                  // by default). Only Ouro's learned Q-exit self-converges.
-    toolCalling: false,           // tool/function-calling not documented on the model card
-    vramGB: 6,                    // 7B PLT @ 4-bit — TARGETS the 8GB box; UNMEASURED (probe)
-    ctxTokens: 131072,            // max_position_embeddings 131072 (model card)
-    taskTypes: ["coding"],
-    rank: 2,
-    capabilityScore: 0.84,        // PREDICTED from vendor SWE-bench Verified 64.4 (two-loop);
-                                  // gated by verified:false until reproduced on-box.
-    verified: false,             // every number is vendor/predicted; custom IQuestPLTCoderForCausalLM
-                                  // arch may not load 4-bit. Run experiments/loopcoder_v2_4bit_probe.py
-                                  // (FIT/RUNS/SPEED → data/convergence/loopcoder-probe-log.jsonl),
-                                  // then flip true with the measured capabilityScore. Apache-2.0.
-    note: "Looped coder CANDIDATE (LoopCoder-v2, 7B PLT, arXiv 2606.18023). Evidence-gated: registered but cannot lead until the 4-bit box probe passes. See docs/research/2026-06-29-best-in-slot-local-coder.md.",
-  },
-  {
     id: "keystone-sigma0-plt",
-    endpoint: process.env.KEYSTONE_PLT_ENDPOINT || DEFAULT_ENDPOINT,
+    // The SOLE local coder/default. It serves on its own ollama-compatible shim
+    // (models/keystone-sigma0-plt/serve_keystone_plt.py → :11435), separate from the
+    // kernel/dream ollama on :11434. Per-model routing (endpointFor) honors this so the
+    // kernel (Ouro) and Three Doors (lantern-csf-dream) keep working on :11434.
+    endpoint: process.env.KEYSTONE_PLT_ENDPOINT || "http://127.0.0.1:11435",
     selfConverges: false,         // PLT loops internally (fixed 2-loop) but that is NOT a
                                   // Q-exit convergence certificate → Core still wraps it in
                                   // loopedReason() (grounding by default).
     toolCalling: false,
-    vramGB: 6,                    // 7.6B PLT @ 4-bit ≈ 5.71GB MEASURED on-box (RTX 3070, #1757).
+    vramGB: 6,                    // 7.6B PLT @ 4-bit ≈ 6.4GB MEASURED on-box (RTX 3070, #1757/serve).
     ctxTokens: 131072,
-    taskTypes: ["coding"],
-    rank: 3,
-    capabilityScore: 0.84,        // PREDICTED (vendor two-loop SWE-bench); gated by verified:false.
-    verified: false,             // OWNED proprietary PLT bootstrap (ADR-0011). Loads + generates
-                                  // correct code on-box (missing=0/unexpected=0), but is NOT yet
-                                  // faithful-parity verified (needs vLLM --ref top1≥0.99 on ≥24GB)
-                                  // and has no live serve path by default. Make it REACHABLE by
-                                  // running models/keystone-sigma0-plt/serve_keystone_plt.py and
-                                  // setting KEYSTONE_PLT_ENDPOINT (or OLLAMA_BASE_URL) at it. Cannot
-                                  // LEAD until parity + an on-box eval win flips this true.
-    note: "Proprietary Σ₀ PLT coder we own (ADR-0011). Gated: reachable only when serve_keystone_plt.py runs; never leads until faithful parity + eval win (External Reality Rule).",
+    taskTypes: ["coding", "reasoning", "default"],  // sole local coder AND general default
+    rank: 0,
+    capabilityScore: 0.84,        // vendor two-loop SWE-bench (predicted); it is the only local
+                                  // coder so it leads regardless — no verified peer to displace.
+    verified: false,             // OWNED proprietary PLT bootstrap from the LoopCoder-V2 Apache-2.0
+                                  // weights (ADR-0011). On-box (RTX 3070) it LOADS 4-bit (~6.4GB<8),
+                                  // serves ollama-compatible, and generates coherent code at ~5–6 tok/s
+                                  // (static KV cache). Kept `verified:false` honestly: it is the SOLE
+                                  // local coder by operator decision, not yet a reproduced eval WIN over
+                                  // a peer. The head-to-head vs a frontier coder (HumanEval) remains the
+                                  // gate to flip this true. Requires serve_keystone_plt.py running on
+                                  // :11435 (or KEYSTONE_PLT_ENDPOINT); if the shim is down the provider
+                                  // chain falls back to cloud (Claude), not to another local model.
+    note: "Sole local Σ₀ coder (ADR-0011, LoopCoder-V2 lineage). Default for coding/reasoning/default; kernel stays Ouro. Serve via models/keystone-sigma0-plt/serve_keystone_plt.py on :11435.",
   },
   {
     id: "lantern-csf-dream",
@@ -275,6 +241,16 @@ function getEntry(modelId) {
   if (hit) return hit;
   hit = reg.find((e) => id.startsWith(e.id.toLowerCase()) || e.id.toLowerCase().startsWith(id));
   return hit || null;
+}
+
+/** The ollama-compatible base URL this model is served at. The registry is the
+ *  source of truth for per-model routing: keystone-sigma0-plt lives on its own
+ *  shim (:11435) while the kernel + dream models stay on :11434. Falls back to
+ *  the global OLLAMA_BASE_URL for any model the registry has no opinion on, so an
+ *  operator custom pin still works. */
+function endpointFor(modelId) {
+  const e = getEntry(modelId);
+  return (e && e.endpoint) || DEFAULT_ENDPOINT;
 }
 
 /** Does this local model loop/Q-exit INTERNALLY? Unknown → false, so the Core
@@ -429,6 +405,7 @@ function resolveLocalLead(intent = "default", opts = {}) {
 module.exports = {
   loadRegistry,
   getEntry,
+  endpointFor,
   selfConverges,
   toolCalling,
   isVerified,

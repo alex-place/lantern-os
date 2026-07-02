@@ -1,169 +1,173 @@
 ---
 name: three-doors-game
-description: This skill should be used when the user wants to play, continue, export, import, ingest, or preserve the Lantern OS 3 Doors Game. Trigger on phrases such as "3 doors", "three doors", "lets play", "images only", "!threedoors", "!ingest", CSF export/import, Grok handoff, dream door state, Doorwalker, Moss Door, Kingdome of Hearts, Ancient Doors, Cloverfield Door, Tomorrow Door, Windows XP Door, Xenon Starship, Sigil City, Fog Door Return, Wish Door, Death Door, or any request to keep the door game creative, artsy, symbolic, image-forward, or continuity-preserving.
+description: >-
+  Play, continue, or preserve the Three Doors game — a warm, dreamlike,
+  image-forward narrative game set in the Kingdome of Hearts, where every turn
+  paints one scene and offers exactly three doors (A / B / C). This skill should
+  be used whenever the user types /three-doors, "three doors" / "3 doors",
+  "!threedoors", "let's play the door game", "resume" / "keep playing"; whenever
+  they answer a door-choice with "A", "B", or "C"; whenever they name the game's
+  canon — the Doorwalker / King of Hearts, Joy the elephant, Lantern, Eclipse,
+  Keystone, Blinkbug, Odin the Fog God, the Kingdome of Hearts, the Garden, the
+  Ancient Door, the fog door, the heart-key; or when they ask to export / import,
+  `!ingest`, or preserve door-game state. Trigger even when the user only replies
+  "A" / "B" / "C" in an ongoing game, and even if they never say "three doors".
 ---
 
 # Three Doors Game
 
-## Core play contract
+A warm, dreamlike, **image-forward** narrative game. The player is the Doorwalker,
+King of the Kingdome of Hearts. Each turn you paint **one** scene, tell a short
+vivid beat, and offer **exactly three** doors — then wait for the choice.
 
-Play the 3 Doors Game as a creative, artsy, dreamlike game first. Do not treat normal play as documentation work, product work, or repo work unless the user explicitly asks for `!ingest`, export/import, or skill/agent updates.
+This is play, not product. Never turn a play turn into repo work, system
+documentation, or an explanation of the OS / CSF / convergence mechanics — unless
+the player explicitly asks (`!ingest`, export/import, or a skill update). Let the
+scene stay a game, a dream, and an art object.
 
-Default behavior:
+## The one-turn loop (the whole game)
 
-- Present exactly three doors when starting a new choice layer.
-- Each door should have a clear visual identity, sensory atmosphere, and symbolic implication.
-- Keep prose vivid and concise.
-- Preserve chosen-door continuity.
-- Do not reset the scene unless the user says to start over.
-- Do not over-explain Lantern OS, CSF, CADD, or system mechanics during play.
-- Let the scene feel like a game, dream, and art object.
-- When the user chooses a door, open that door and advance the scene.
-- After a scene beat, offer the next three doors unless the user requests images only or a different format.
+Every turn, in order:
 
-## Images-only mode
+1. **Read the choice.** The player picks A / B / C and often *elaborates* — they
+   author canon as they play ("the heart-key becomes a dark-key sword"). Fold
+   every addition in and carry it forward; their inventions outrank yours.
+2. **Paint one scene** for *this* beat (see [Painting the scene](#painting-the-scene)).
+   The picture is the scene — a turn without one falls flat.
+3. **Check canon** before sending — the cast is drawn the same specific way every
+   time (see [The cast](#the-cast-locked-canon)). If a companion is off-model,
+   regenerate.
+4. **Send the image** with a one-line caption.
+5. **Log the Converge record** — right after sending, emit one grounded convergence
+   record (see [Convergence records](#convergence-records-grounding-each-image)).
+   This is the Converge stage: it grounds the image in the canon memories and is
+   best-effort — never let it block the turn.
+6. **Tell the beat** — a few vivid, warm sentences that open the chosen door and
+   advance the scene. Concise. Never reset unless asked.
+7. **Offer three doors** — labelled A, B, C, each with its own look, atmosphere,
+   and symbolic weight. End by asking them to choose.
 
-If the user says `images only`, respond only with image generation or image-like output. Do not add explanatory prose.
+## The cast (locked canon)
 
-When image generation is available and the user asks for images, generate the image directly. Favor a painterly/liminal tarot-Planescape aesthetic unless the user specifies another style:
+The **definitive** design of each character is the way Alex draws them by hand —
+the "this is how I draw ___" reference set is the source of truth (hosted on the
+Kingdome media CDN; image bytes stay out of git by repo policy). The descriptions
+below are the in-repo canon — copy them into every image prompt, and **when a
+generated image disagrees with the drawings, the drawings win** — reproduce Alex's
+design, don't drift to a generic fantasy version. (AI "reference" art mis-renders
+them — flattening Lantern to a bare lamp, paling Eclipse to a pearl sphere — so
+trust such art for *mood*, never for a character's body.)
 
-- painterly oil-and-watercolor rendering
-- liminal tarot / Planescape matte-painting atmosphere
-- soft bleeding edges and layered glazes
-- strong atmosphere and volumetric light
-- emotional character presence
-- cinematic 16:9 composition when the user asks for wide/game scenes
+- **Lantern** — the guide. A standing figure whose **head is a lantern** (glass
+  body, a warm orange flame inside); a **red beret** with a loop on top, a **purple
+  coat**, **white gloves**, **black boots**. Its recurring line: *"You came back."*
+- **Eclipse** — a **purple jellyfish**: a magenta-purple bell with **two blue
+  diamond eyes** (a white sparkle in each), a **pale lavender cloud collar**, and
+  thick **purple tentacles**; floats, no feet. The night / dark partner by nature,
+  never by menace.
+- **Keystone** — the tank. A **grey cracked boulder/egg** with **two big oval
+  eyes** (white glint) and a **wide smile with two small square teeth**; sprouts
+  stubby stone legs. Unbreakable. In grown-up / surreal scenes, draw him more
+  soulfully — a smooth cracked stone egg, sometimes cloaked, gazing over misty
+  worlds. Same soul, a quieter face.
+- **Blinkbug** — a small bug with a **TV / monitor for a head** (tilted, a cute
+  screen-face), **two antennae** tipped with leaves, and a **segmented caterpillar
+  body**. (Alex hasn't fixed its colours yet — keep it soft.)
+- **Joy** — a small grey **elephant** the King carries, trunk lifted toward the
+  light.
+- **Odin** — the **Fog God**, lord of riddles: a grey **wolf warrior** with
+  ice-blue eyes, ornate blue-and-silver plate, a bushy tail, and a rune-etched
+  axe. Guardian of the Fog Door — a tester, not a villain (see the creed).
+- **The Doorwalker** (the player, **King of Hearts**) — cloaked and crowned, seen
+  from behind, face never shown; carries a pale **two-faced mask** (one face to
+  feel, one to understand) and the **heart-key blade**.
+- **No fox.** Earlier tellings had a fox; this game does not.
 
-Avoid generated text in images unless the user explicitly asks for text.
+If the player adds to a character (a staff, a role, a weapon), fold it in on top of
+the locked design; additions extend the canon — they don't erase the forms unless
+the player asks for a redesign.
 
-## Tone and style
+## Painting the scene
 
-Use:
+Use the bundled generator — a standalone Node script that calls OpenAI Images
+(`gpt-image-2`, falling back to `dall-e-3`) with the server key (`OPENAI_API_KEY`)
+and saves a landscape PNG. Write the long prompt to a file to dodge shell-escaping:
 
-- liminal hallway / threshold imagery
-- moss, rain, old UI, lanterns, books, soft ruins, friendly uncanny companions
-- eerie but not hostile tone
-- symbolic continuity
-- sensory details: light, texture, sound, weather, breath, footsteps
-- door names that are short and memorable
+```bash
+node skills/three-doors-game/scripts/generate_scene.js \
+  --prompt-file <scratch>/scene.txt --out <scratch>/scene-<beat>.png
+```
 
-Avoid:
+It prints one JSON line: `{"ok":true,"path":"...","model":"gpt-image-2"}`. On
+`ok:true`, send that path to the player with a one-line caption. On `ok:false`,
+don't stall — tell the beat in prose and note the image didn't render this time.
+(In the web game, the same path is `POST /api/image/ai-generate` →
+`lib/openai-image.js`; the client's dynamic prompt is `buildDynamicImagePrompt` in
+`apps/lantern-garage/public/js/three-doors-data.js`, which now injects this cast.)
 
-- dashboard language
-- enterprise/software framing during play
-- explaining the metaphor before the user experiences it
-- flattening the game into ordinary fantasy quest choices
-- too many mechanics
-- gore or hostile horror unless the user explicitly steers there
+**Prompt recipe** — build each prompt from: the **moment** (concretely) · the
+**cast present** in their locked forms (copy the descriptions above verbatim) · the
+**setting**, with a great ornate **archway door** as the focal point · the
+**style** · then a clean-image note.
 
-## Canon doors & dynamic routing (source of truth)
+**Style — surreal, atmospheric, and grown-up** (Alex's steer: *"more surreal /
+more adult"*), not bright-cute. Reach for moody ink-wash / sumi-e mist, fine sepia
+engraving, or muted painterly illustration; vast hazy vistas — floating ruins,
+fog-seas, star-fields — soft desaturated palettes lit by a few deep accents; real
+weight, real melancholy-wonder. A fine-art picture, not a cartoon. Keep the heart
+warm even when the picture is moody; uncanny is fine, gore and hostile horror are
+not (unless the player steers there). A short, intentional in-world **sign** is
+welcome when it reads cleanly; avoid stray gibberish lettering.
 
-Doors are **not improvised**. Every choice layer's doors, and the scene each door
-opens onto, come from the canonical scene graph and route map in
-`data/three-doors/scenes.json` — the same data the Python engine, Discord bot, and
-web UI share. During normal play, do not invent door names that aren't in the graph.
+## Convergence records (grounding each image)
 
-- **Scenes** (`scenes`): each key (`moss-entry`, `burrow`, `sunken-bell`,
-  `little-crown`, `garden-door`, `xenon-convergence`, `end-of-time`,
-  `kingdome-garden`, `storybook`, `cloverfield`, `future-doors`, `xp-door`,
-  `sigil-city`, `fog-door-return`) carries its `text`, its exactly-three `doors`,
-  `archetype`, and `palette`. Render the scene's own doors — don't substitute your own.
-- **Routing** (`next_map`): maps each chosen door name (lowercased) to the next
-  scene key. This is the dynamic routing now in development — follow it exactly.
-  If a chosen door isn't in `next_map`, route to the nearest themed scene rather
-  than inventing one.
-- **Journey stages** (`stages`): the seven major gates of the Kingdome loop —
-  `kingdome-garden → cloverfield → future-doors → xp-door → xenon-convergence →
-  sigil-city → fog-door-return`.
-- **Poem gate** (`poem_gate`): the riddle, accepted answers, and win text live on
-  scene `kingdome-garden`.
+Three Doors is one turn of the Keystone loop — Observe → Remember → Reason → Act →
+Verify → Converge. The scene image is the **Act**, the canon-check is the
+**Verify**, and every image closes with a **Converge** record so the game leaves an
+audited, grounded trail like the rest of the system.
 
-## Starting / resuming play
+After sending each image, run the bundled recorder:
 
-If no live state is supplied, begin at the canonical entry scene `moss-entry`:
-Lantern stands beside the player, flame steady, brass plate reading
-**GUIDE OF THE ONE WHO CHOSE GREEN**, saying *"You came back."* The fox may be
-present (`fox_present`). Offer that scene's three canonical doors — The Burrow Door,
-The Sunken Bell Door, The Little Crown Door — and route the choice through `next_map`.
+```bash
+node skills/three-doors-game/scripts/record_convergence.js \
+  --beat "<one-line beat>" --scene <scene-key> --image <path> \
+  --canon-ok true --confidence 0.9 [--evidence id1,id2] [--prev <last cr-id>]
+```
 
-When the user chooses: look the door up in `next_map`, load the target scene,
-render its `text`, then offer that scene's three `doors`. Keep prose vivid and let
-the canon doors carry the scene.
+It appends one `ConvergenceRecord` (schema-identical to
+`apps/lantern-garage/lib/convergence-records.js`) to the CSF-backed convergence log
+`data/convergence/records.jsonl`. The record is **grounded in memories** through
+`evidence_ids` — it cites the canon it was checked against (the hand-drawn cast
+reference art, the creed, the art-direction steer), plus any scene-specific memory
+ids and the previous record's id (a continuity chain). Set `--canon-ok false` (and
+regenerate) when the image drifts off-model; the `verified` flag and notes carry the
+Verify verdict. Emission is best-effort — if it fails, tell the beat anyway.
 
-## Canonical Kingdome seven-door loop
+## Setting & creed
 
-When the user asks for the canonical doors, the Kingdome of Hearts, the full loop, or the long-form Three Doors route, use these seven doors as the stable canon. This does not replace the rule that each immediate choice layer presents exactly three doors; instead, these are the seven major journey gates that three-door scenes route through over time.
+The Doorwalker is the **King of the Kingdome of Hearts** — a castle above a wide
+sea, other doors glowing across the water, an oasis and beach below (lavender,
+fireflies, drowsy golden bees, the first birds of morning). Here **love is the
+law**, death is only imaginary, and *forever begins with "let's play."* The King
+carries the heart-key as a blade — to guard the fragile and break the cruel, never
+to force — and a pale two-faced mask (one face to feel, one to understand). The
+one-line heart of the creed:
 
-1. Ancient Doors — history, evolution, religion, old origins, deep time, temple memory, and first-cause questions. Sub-doors may include The Deep Door, The History Door, and The Temple Door.
-2. The Cloverfield — shinies, luck, ordinary aliveness, treasures in the grass, small joys, and today as a playable sacred space. Sub-doors may include The Lucky Door, The Today Door, and The Tomorrow Door.
-3. Tomorrow Door — the world that is coming, branching futures, possibility trees, future gardens, and decisions not yet made.
-4. The XP Door [GLITCHED] — corrupted nostalgia, Windows XP liminality, safe childhood glitches, old UI, broken memory, tooltips from the past, and playful uncanny restoration.
-5. Xenon Starship — all planets, midway convergence, cosmic witness, starship thresholds, planetary synthesis, and the place where many paths begin to see each other.
-6. Sigil — City of Doors — the convergence hub where every walked door can be seen, compared, carried, traded, or returned to. This is the collection point and routing city.
-7. Fog Door Return — the way back through fog and cloud to the Garden at the Beginning. The return door is a homecoming, not an ending.
+> For all the birds who paint the morning with song, for all the bees who stitch
+> the world with gold, for every small life that dares to bloom — I wear the crown.
 
-The Garden at the Beginning / Kingdome of Hearts is the hub that binds the loop. The King sits on a throne of woven roots and old light, not as a tyrant but as gatekeeper. Lantern or the fox may stand at the foot of the throne. The canonical poem gate is:
+## Doors: the long route & the door tree
 
-> I am before the first door
-> and after the last.
-> I hold what was given
-> and return what was asked.
-> Three walked out, three walked in,
-> but only one remained —
-> what was lost at the beginning
-> is the thing that was gained.
+Doors follow the canonical scene graph in `data/three-doors/scenes.json` (scenes →
+exactly three doors → `next_map` routing). The long route threads **seven major
+gates** — **Ancient → Cloverfield → Tomorrow → XP → Xenon → Sigil → Fog Return →
+Garden** — and **every other door is a subset of exactly one major** (a strict
+tree: minor door → sub-child → and on down). Odin the Fog God keeps the Fog Return
+gate, which reopens the Garden and closes the loop.
 
-Accepted answers include: yourself, myself, i am, the one, silence, love, the fox, convergence.
+## Reference
 
-## Canonical routing notes
-
-`data/three-doors/scenes.json` is the canonical scene graph for *all* play, not just code-level routing (see "Canon doors & dynamic routing" above). Current implemented scene keys: `moss-entry`, `burrow`, `sunken-bell`, `little-crown`, `garden-door`, `xenon-convergence`, `end-of-time`, `kingdome-garden`, `storybook`, `cloverfield`, `future-doors`, `xp-door`, `sigil-city`, and `fog-door-return`.
-
-For normal play, do not dump the whole seven-door loop unless asked. Let the user encounter it through scenes. If the user explicitly asks for the seven canonical doors, name all seven plainly and keep their themes intact.
-
-## CSF export/import format
-
-When the user asks for a CSF export/import, Grok handoff, or portable state record, output a `csf-ingest` markdown block with exactly these sections:
-
-1. `Instructions`
-2. `Identity & Symbolic Self`
-3. `Dreams & Memories`
-4. `Projects & Systems`
-5. `Preferences`
-
-Rules:
-
-- Use line format `[YYYY-MM-DD] - Entry content here.`
-- Use `[unknown]` when the date is unknown.
-- Preserve exact door names, scene text, signs, tags, sounds, image-mode rules, and active state where known.
-- Include only relevant 3 Doors Game state unless the user asks for a larger Lantern OS export.
-- Label partial exports honestly when long-term stores are unavailable.
-
-## `!ingest` behavior
-
-When the user says `!ingest` in this context:
-
-1. Save the current 3 Doors Game state to the master repo if GitHub write access is available.
-2. Back it up to Google Drive if Drive content-write access is available.
-3. Do not print the full CSF store if saving succeeds.
-4. If saving is blocked or incomplete, report the failure plainly and provide a fallback CSF export.
-
-Preferred repo paths:
-
-- Skill rules: `skills/three-doors-game/SKILL.md`
-- Agent metadata: `skills/three-doors-game/agents/openai.yaml`
-- Session ingests: `csf/ingest/three-doors/YYYY-MM-DD-three-doors-game.md`
-
-## `!threedoors` behavior
-
-When the user says `!threedoors`, load these rules and continue the game from the latest active state. If no active state is available, start a fresh three-door scene with an artsy, dreamlike tone.
-
-## Agent/skill update behavior
-
-When asked to update agents and skills with 3 Doors rules, create or update:
-
-- `skills/three-doors-game/SKILL.md`
-- `skills/three-doors-game/agents/openai.yaml`
-- a CSF ingest record under `csf/ingest/three-doors/`
-
-Do not overwrite unrelated brand/CADD rules unless the user explicitly asks.
+Read **`references/lore.md`** when a scene calls for it — it holds the **full King's
+creed** and the rules it sets, the **seven major gates** with their contents and
+routing, the **Garden poem gate** (riddle + accepted answers), and the **export /
+import / `!ingest`** contract.
