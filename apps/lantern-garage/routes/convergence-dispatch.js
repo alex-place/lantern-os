@@ -14,6 +14,7 @@ const convergenceAgent = require("../lib/convergence-agent");
 const { sendJson, collectRequestBody } = require("../lib/http-utils");
 const { appendConversationEntry } = require("../lib/conversation-store");
 const autoDispatch = require("../lib/auto-dispatch");
+const { VERIFIED_PASS_RATE_LEAK_ENABLED } = require("../lib/dream-chat");
 const maxConversationTextLength = 2000;
 
 // Turn a raw autowork failure into a grounded, actionable message instead of a bare
@@ -36,6 +37,10 @@ function describeAutoworkError(err, stage) {
   } else {
     hint = "unexpected failure — see the detail below; likely a code fault rather than a provider outage.";
   }
+  // Log metrics for verified-pass-rate leak A/B test
+  if (VERIFIED_PASS_RATE_LEAK_ENABLED) {
+    console.log(`[Metrics] AutoworkError: ${raw} (Leak Enabled: true)`);
+  }
   return { error: `Autowork failed${at}: ${hint}`, detail: raw.slice(0, 500), stage: stage || null };
 }
 
@@ -49,6 +54,10 @@ function humanizeApplyFailure(stats) {
   if (hunk) {
     const m = String(hunk.error).match(/near line (\d+)/i);
     return `the generated patch didn't match ${hunk.file}${m ? ` around line ${m[1]}` : ""} — its context lines weren't found in the real file (stale/hallucinated context).`;
+  }
+  // Log metrics for verified-pass-rate leak A/B test
+  if (VERIFIED_PASS_RATE_LEAK_ENABLED) {
+    console.log(`[Metrics] ApplyFailure: ${errs.map((e) => e.error).join("; ")} (Leak Enabled: true)`);
   }
   return errs.map((e) => `${e.file}: ${e.error}`).join("; ").slice(0, 240);
 }

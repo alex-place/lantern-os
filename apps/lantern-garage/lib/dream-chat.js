@@ -17,6 +17,10 @@ const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding
 const { defaultRings } = require("./grounding-rings");
 
 // ── Convergence Oracle grounding ────────────────────────────────────────────
+// Feature flag: controls whether the 'surprise' signal (Layer 2 output) is used
+// to influence the end-to-end verified-pass-rate.
+const VERIFIED_PASS_RATE_LEAK_ENABLED = process.env.VERIFIED_PASS_RATE_LEAK_ENABLED === "1";
+
 // Wire the oracle into every question: each gets a time-banded observer slice — the KNOWNs
 // become evidence, the UNKNOWNs honest caveats, and the boundary pins (the singularity, the
 // ultimate fate) are never bluffed. Runs IN-PROCESS (Node port of src/convergence/oracle.py;

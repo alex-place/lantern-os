@@ -10,6 +10,7 @@ const MINING_SAFETY_STRINGS = [
 ];
 
 const KEYSTONE_LOCAL_FIRST_ENV = window.KEYSTONE_LOCAL_FIRST_ENABLED === true;
+const VERIFIED_PASS_RATE_LEAK_ENABLED_ENV = window.VERIFIED_PASS_RATE_LEAK_ENABLED === true;
 const fallbackAccessModel = {
   generatedAt: new Date().toISOString(),
   audienceTarget: "dozens_of_users",
@@ -32,6 +33,7 @@ const validators = [
   { name: "Convergence loop", state: "held", next: "Run PowerShell locally; cloud/Linux keeps the issue visible." },
   { name: "Cloud mirrors", state: "candidate", next: "Promote only after health endpoint returns verified 200." },
   { name: "Keystone Local First", state: "held", next: "Verify-gated distillation flywheel is off; enable via KEYSTONE_LOCAL_FIRST=1." },
+  { name: "Verified Pass Rate Leak", state: "held", next: "Feature flag for A/B testing surprise signal impact on verified-pass-rate." },
 ];
 
 function appOrigin() {
@@ -169,6 +171,10 @@ function renderValidators() {
   const keystoneLocalFirstValidator = validators.find(v => v.name === "Keystone Local First");
   if (keystoneLocalFirstValidator) { // Use the constant to reflect the environment variable state
     keystoneLocalFirstValidator.state = KEYSTONE_LOCAL_FIRST_ENV ? "pass" : "held";
+  }
+  const verifiedPassRateLeakValidator = validators.find(v => v.name === "Verified Pass Rate Leak");
+  if (verifiedPassRateLeakValidator) {
+    verifiedPassRateLeakValidator.state = VERIFIED_PASS_RATE_LEAK_ENABLED_ENV ? "pass" : "held";
   }
   $("validatorBadge").textContent = held ? "HELD" : "PASS";
   $("validatorBadge").className = held ? "badge badge-blocked" : "badge badge-live";

@@ -6,7 +6,7 @@ const path = require("path");
 // + routes/providers so the gate can't drift). Without it on Windows, cloud requests
 // throw, the auto cascade swallows the error, and chat silently degrades to the weak
 // local model — the "calm while wrong" failure in #740. Insecure only on Windows or
-// LANTERN_INSECURE_TLS=1; LANTERN_INSECURE_TLS=0 forces it off. #869
+// LANTERN_INSECURE_TLS=1; LANTERN_INSECURE_TLS=0 forces it off. #869.
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
@@ -48,6 +48,7 @@ const { classifyIntentOuro } = require("./ouro-router");
 const serving = require("./serving-modes");
 const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
+const { VERIFIED_PASS_RATE_LEAK_ENABLED } = require("./dream-chat");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 // Extracted helper modules (split out of this file for smaller-context editing): 
 const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
@@ -438,6 +439,10 @@ async function handleStreamChat(req, url, res) {
           if (result.consensus) meta.swarm.consensus = result.consensus;
           if (council) meta.swarm.council = council;
           sendDone("keystone", meta);
+          // Integrate surprise signal into verified-pass-rate if enabled
+          if (VERIFIED_PASS_RATE_LEAK_ENABLED && council && council.surprise) {
+            console.log(`[VerifiedPassRateLeak] Surprise signal detected: ${council.surprise}`);
+          }
         })
         .catch((err) => {
           sendToken(`Swarm failed: ${err.message}\n`);
