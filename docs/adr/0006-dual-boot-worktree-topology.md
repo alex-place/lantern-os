@@ -1,10 +1,10 @@
 ---
 adr: 0006
 title: Dual-boot 4177/4178 worktree topology
-status: Proposed
+status: Accepted
 date: 2026-06-23
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---

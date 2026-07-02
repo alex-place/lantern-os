@@ -1,10 +1,10 @@
 ---
 adr: 0013
 title: Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction
-status: Proposed
+status: Accepted
 date: 2026-07-01
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---

@@ -1,10 +1,10 @@
 ---
 adr: 0008
 title: The end product is a personal AI wrapper — user capabilities are Tools + Skills in the one loop
-status: Proposed
+status: Accepted
 date: 2026-06-24
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---

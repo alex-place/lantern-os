@@ -1,7 +1,7 @@
 ---
 adr: 0010
 title: Distillation is a deferred last resort — verify-gated, benchmark-never-the-target, never removed
-status: Proposed
+status: Accepted
 date: 2026-06-29
 deciders: Alex Place
 approved-by: pending   # only Alex Place flips this; agents leave it `pending`
