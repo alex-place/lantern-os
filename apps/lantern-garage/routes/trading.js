@@ -358,28 +358,12 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, { positions: [], account: {} }, 503);
       return true;
     }
-    // #1231: don't let the trader page hang on the cold Python spawn + Alpaca call.
-    // getPositions() can take up to fastTimeout (7s) on a cold cache; that stalls the
-    // positions tile on every load. Bound the client-facing wait to a short deadline
-    // and, if it's exceeded, return a fast "warming" payload while the call keeps
-    // running in the background to populate the 60s cache — so the NEXT poll is instant
-    // and live data (when Alpaca is configured) still flows. getPositions() never
-    // rejects (it resolves to a graceful fallback), so no error branch is needed.
-    const POSITIONS_DEADLINE_MS = 2500;
-    const WARMING = Symbol('warming');
-    const pending = traderAgent.getPositions();
-    pending.catch(() => {}); // keep the background warm alive without unhandled rejection
-    let timer;
-    const deadline = new Promise((resolve) => { timer = setTimeout(() => resolve(WARMING), POSITIONS_DEADLINE_MS); });
-    const winner = await Promise.race([pending, deadline]);
-    clearTimeout(timer);
-    if (winner === WARMING) {
-      sendJson(res, {
-        positions: [], account: { equity: 0, cash: 0, buying_power: 0 },
-        available: false, loading: true, reason: 'warming positions cache',
-      }, 200);
-    } else {
-      sendJson(res, winner, 200);
+    try {
+      const positions = await traderAgent.getPositions();
+      sendJson(res, positions, 200);
+    } catch (error) {
+      console.error('[Trading] /positions error:', error.message);
+      sendJson(res, { positions: [], account: {} }, 500);
     }
     return true;
   }
@@ -1152,7 +1136,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         const suggest = require('../lib/kalshi-suggest');
         const { createKalshiEngine, engineResultToCard } = require('../lib/impossibility-engine');
         const { isShortWindowMarket } = require('../lib/kalshi-crypto-suggester');
-        const cryptoSuggest = require('../lib/kalshi-crypto-suggester');
+        // Crypto suggester cards intentionally REMOVED (no post-fee taker edge — see
+        // kalshi-no-taker-edge). isShortWindowMarket is still imported as a pure helper.
         const RegimeDetector = require('../lib/regime-detector');
         const performanceLogger = require('../lib/strategy-performance-logger');
         const strategyRegistry = require('../lib/strategy-registry');
@@ -1166,8 +1151,9 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
           // Initialize regime detector
           const regimeDetector = new RegimeDetector();
 
-          // Step 1: Get all suggestions in parallel
-          const [suggestions, ieCards, cryptoCards] = await Promise.all([
+          // Step 1: Get all suggestions in parallel (crypto suggester REMOVED — no
+          // post-fee taker edge; see kalshi-no-taker-edge).
+          const [suggestions, ieCards] = await Promise.all([
             suggest.getSuggestions({ limit: 100, collector }),
             (async () => {
               let markets = [];
@@ -1184,13 +1170,11 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
               const solved = engine.solveAll(markets);
               return solved.slice(0, 20).map(({ market, result }) => engineResultToCard(market, result));
             })(),
-            cryptoSuggest.getCryptoSuggestions({ limit: 15, collector }).catch(() => ({ cards: [] })),
           ]);
 
           // Step 2: Extract cards from suggestions (already includes exits + entries)
           const existingCards = suggestions.cards || [];
-          const cryptoCardsList = cryptoCards.cards || [];
-          const allSignals = [...existingCards, ...ieCards, ...cryptoCardsList];
+          const allSignals = [...existingCards, ...ieCards];
 
           // Step 3: Detect regime + score strategies per market
           const activeStrategies = strategyRegistry.getActiveStrategies();
@@ -1491,18 +1475,19 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       // GET — Paper deck: live candidate markets, paper-only, with honest fee-aware EV
       // (most negative). Empty when Kalshi markets are closed or creds are absent.
       if (url.pathname === '/api/trading/kalshi/paper-deck' && req.method === 'GET') {
-        const cryptoSuggest = require('../lib/kalshi-crypto-suggester');
+        // Crypto suggester intentionally REMOVED: the realized-PnL backtest showed no
+        // taker edge on short-window crypto after fees (see kalshi-no-taker-edge), so
+        // crypto cards no longer surface anywhere. The only profitable arm is the Σ₀
+        // weather edge (LIVE mode / grounded-deck); this paper deck keeps the broader
+        // non-crypto candidate markets for practice only.
         const suggest = require('../lib/kalshi-suggest');
         const fees = require('../lib/kalshi-fees');
         const kc = require('../lib/kalshi-council');
         const collector = deps.kalshiCollector || null;
         const limit = q.limit ? Number(q.limit) : 20;
         try {
-          const [cry, sug] = await Promise.all([
-            cryptoSuggest.getCryptoSuggestions({ limit, collector }).catch(() => ({ cards: [] })),
-            suggest.getSuggestions({ limit, collector }).catch(() => ({ cards: [] })),
-          ]);
-          const raw = [...(cry.cards || []), ...(sug.cards || [])]
+          const sug = await suggest.getSuggestions({ limit, collector }).catch(() => ({ cards: [] }));
+          const raw = [...(sug.cards || [])]
             .filter(c => c.kind !== 'exit' && c.kind !== 'position' && c.favAsk != null);
           const seen = new Set();
           const cards = [];
