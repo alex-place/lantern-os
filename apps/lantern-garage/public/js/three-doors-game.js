@@ -825,8 +825,13 @@ function renderImagePlaceholder(imageId) {
 // ── Inline engine fallback ────────────────────────────────────────
 function sceneState(sceneKey, spineIndex, loopCount, history, beatsSinceSpine) {
   const scene = SCENES[sceneKey] || SCENES["kingdome-garden"];
+  // The play contract is EXACTLY three doors, always labelled A/B/C (the
+  // skill's rule). Scenes that define more (the seven-gate Garden hub) get a
+  // random three relabelled A–C; SCENES[key].doors is untouched, so
+  // routing/novelty scoring still sees the full graph.
+  const doors = scene.doors.length > 3 ? pickThreeDoors(scene.doors) : scene.doors;
   return {
-    scene_key: sceneKey, text: scene.text, doors: scene.doors, fox_present: scene.fox,
+    scene_key: sceneKey, text: scene.text, doors, fox_present: scene.fox,
     history: history, stage_index: spineIndex, stage_count: STAGES.length,
     loop_count: loopCount, beats_since_spine: beatsSinceSpine, archetype: scene.archetype,
   };
@@ -845,13 +850,11 @@ function engineStart() {
     state.resumed = true;
     return state;
   }
-  const state = sceneState("kingdome-garden", 0, 0, ["Entered the Garden at the Beginning"], 0);
-  // First pass only: three immediate choices, not the full seven-gate menu —
-  // matches the "always exactly three meaningful choices" play contract.
-  // No real preference profile exists yet, so pick a random three of the
-  // seven and relabel them A–C; SCENES["kingdome-garden"].doors (all seven)
-  // is untouched, so routing/novelty scoring still sees the full graph.
-  state.doors = pickThreeDoors(state.doors);
+  // Fresh game opens where the skill opens: the castle balcony at night —
+  // Joy in the Doorwalker's arms, far doors glowing across the sea, and
+  // Lantern's "You came back." Its three doors (Wishing Rail / Brass
+  // Spyglass / Knee-High Door) route into the seven-gate world via NEXT_MAP.
+  const state = sceneState("castle-balcony", 0, 0, ["Night on the castle balcony"], 0);
   // Persist right away — otherwise a reload before the first door choice
   // never sees a saved currentScene, so it looks like a brand-new game every
   // time and re-counts the Garden as freshly visited (inflating challenge
