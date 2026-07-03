@@ -2445,7 +2445,14 @@ async function sendMessage(opts = {}) {
     /\b(find|show|view|read|open|get|look\s*up|summar|explain|describe|what'?s?|tell me about|details? (on|of|about))\b/i.test(text) &&
     /\b(issue|pr|pull request|ticket|bug report)\b\s*#?\d+/i.test(text) &&
     !/\b(fix|implement|add|change|edit|patch|refactor|rewrite|update the code|resolve|close|work on|build|create a)\b/i.test(text);
-  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup) {
+  // #1964: personal document work ("update my resume", "make me a cover letter")
+  // keyword-classifies as a code intent via change-verbs like "update" — but it is
+  // not repo work, so offering to file an issue + open a PR is nonsense there.
+  // Server-side the document_request intent now catches these; this is the belt
+  // for older servers / misclassified turns.
+  const _looksLikeDocument =
+    /\b(resume|cover letter|cover-letter|cv|docx|word (doc|document)|essay|memo|spreadsheet|presentation|slide deck)\b/i.test(text);
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup && !_looksLikeDocument) {
     const offer = document.createElement('div');
     offer.className = 'autowork-offer';
     offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';

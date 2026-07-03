@@ -87,10 +87,41 @@ async function main() {
 
   // ── generate_document tool ─────────────────────────────────────────────────
 
+  await check("generate_document defaults to a real .docx with a download link", async () => {
+    const env = await runTool("generate_document", {
+      template: "resume",
+      fields: { name: "Test User", email: "test@example.com" },
+    }, { operator: true });
+    assert.ok(env.ok, `expected ok, got: ${JSON.stringify(env)}`);
+    const result = r(env);
+    assert.ok(result.includes("workspace/resume.docx"), `unexpected: ${result}`);
+    assert.ok(result.includes("/api/workspace/download?file=resume.docx"), `no download link: ${result}`);
+    const docxPath = path.join(TMP_WS, "resume.docx");
+    assert.ok(fs.existsSync(docxPath), `docx not created at ${docxPath}`);
+    // Real Office file, not renamed HTML: docx is a ZIP container → "PK" magic.
+    const head = fs.readFileSync(docxPath).slice(0, 2).toString("latin1");
+    assert.strictEqual(head, "PK", `expected ZIP magic, got: ${head}`);
+  });
+
+  await check("generate_document docx cover-letter renders company", async () => {
+    const env = await runTool("generate_document", {
+      template: "cover-letter",
+      fields: { name: "Test User", company: "Acme", role: "Engineer" },
+      format: "docx",
+    }, { operator: true });
+    assert.ok(env.ok, `expected ok, got: ${JSON.stringify(env)}`);
+    const docxPath = path.join(TMP_WS, "cover-letter.docx");
+    assert.ok(fs.existsSync(docxPath));
+    // docx XML stores text in the zip; a raw scan still finds short literals.
+    const raw = fs.readFileSync(docxPath).toString("latin1");
+    assert.ok(raw.length > 500, "suspiciously small docx");
+  });
+
   await check("generate_document creates HTML resume in workspace", async () => {
     const env = await runTool("generate_document", {
       template: "resume",
       fields: { name: "Test User", email: "test@example.com" },
+      format: "html",
     }, { operator: true });
     assert.ok(env.ok, `expected ok, got: ${JSON.stringify(env)}`);
     const result = r(env);
@@ -129,6 +160,7 @@ async function main() {
       template: "resume",
       fields: { name: "X" },
       filename: "hint-test",
+      format: "html",
     }, { operator: true });
     assert.ok(r(env).includes("PDF"), `expected PDF hint, got: ${r(env)}`);
   });

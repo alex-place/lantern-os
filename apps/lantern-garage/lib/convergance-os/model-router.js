@@ -21,6 +21,16 @@ const INTENT_PATTERNS = {
     "door", "three doors", "bathhouse", "raven", "mosaic", "symbol",
     "journal", "feeling", "emotion", "lucid", "nightmare",
   ],
+  // Personal document work (resume, cover letter, essays, decks…). Listed BEFORE
+  // the code intents so a tie — e.g. "update my resume" also hits coding_change's
+  // "update" — resolves to documents: keyword ties keep the earlier intent, and
+  // document turns must not carry code labels or the "Run as autowork" offer
+  // (#1964 live-test finding).
+  document_request: [
+    "resume", "cover letter", "cv", "docx", "word doc", "word document",
+    "document", "letter", "essay", "memo", "spreadsheet", "xlsx",
+    "presentation", "pptx", "slide deck", "job application", "apply for",
+  ],
   convergance_action: [
     "!convergance", "!converge", "receipt", "promote", "hold", "reject",
     "validate", "inspect", "next action", "smallest action",
@@ -105,6 +115,7 @@ function kwMatch(lower, kw) {
 
 const INTENT_TO_PROFILE = {
   dream_chat: "lantern-csf-dream",
+  document_request: "keystone",
   three_doors: "lantern-csf-dream",
   convergance_action: "lantern-convergance",
   capacity_query: "lantern-pcsf",

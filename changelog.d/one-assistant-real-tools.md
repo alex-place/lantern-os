@@ -31,6 +31,23 @@ Reframed as conversational tools:
   substance in the first reply, at most one clarifying question, attachments
   are first-class, tools on the model's own initiative.
 
+Live-test round 2 (operator dogfood findings, Σ₀-council-reviewed and
+web-grounded — resumes are expected as .docx by employers/ATS, and frontier
+assistants deliver real document files):
+
+- generate_document now defaults to a REAL .docx (md→docx via the exported
+  document-builder renderDocx — ZIP/OOXML, not renamed HTML), writes it to the
+  user workspace, and returns a clickable download link served by the new
+  operator-gated GET /api/workspace/download route (workspace docs are PII).
+- New document_request intent (model-router) so "update my resume" no longer
+  keyword-ties into coding_change/technical_debug: document turns get the
+  "Keystone · documents" label and never surface the "Run as autowork" offer
+  (plus a client-side _looksLikeDocument belt in dream-chat-ui).
+- Prompt honesty: attachments are pre-extracted to text (docx/pdf/xlsx/pptx/
+  images) — the assistant must never claim it cannot read an attached file.
+
 Docs/tests updated: CLAUDE.md, docs/ARCHITECTURE.md, skills/job_application/
 SKILL.md, tests/test_dream_chat_routing.js (was asserting the removed 6-persona
-design and already failing), tests/regression/agent-compliance.js Rule 8.
+design and already failing; now also covers document_request classification),
+tests/regression/agent-compliance.js Rule 8, document-generation.test.js
+(docx-default + ZIP-magic + download-link cases).
