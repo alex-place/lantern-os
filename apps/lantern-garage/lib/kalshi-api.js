@@ -322,4 +322,5 @@ module.exports = {
   getBalance, getPositions, getOrders, getFills,
   placeOrder, cancelOrder, getConnection,
   hasCredentials, killSwitchActive, tradingEnabled, tradingPaused,
+  liveMaxContracts, liveScopeSources,
 };
