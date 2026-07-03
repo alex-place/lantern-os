@@ -178,14 +178,8 @@ const routes = [
   require("./routes/metrics"),          // #1411: outcome metrics (verified-patch / honesty / route-quality)
   require("./routes/doors"),            // Three Doors: canon + journey + Σ₀ turns (1.8.18)
   require("./routes/factcheck"),        // #1430: personal fact-check button
-  require("./routes/decisions"),        // #1436: decision journal + calibration
-  require("./routes/memory-decay"),     // #1422: confidence-decay memory
   require("./routes/drift"),            // #1428: drift-canary observability
-  require("./routes/learn"),            // #1438: learn-anything tutor + retention
   require("./routes/replay"),           // #1419: convergence replay / time-travel debugger
-  require("./routes/preferences"),      // #1426: retrieval-based personal preference model
-  require("./routes/finance"),          // #1434: personal financial reasoning cockpit
-  require("./routes/health"),           // #1435: symptom journal with calibrated honesty
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),
