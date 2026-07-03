@@ -45,6 +45,9 @@
     .panel h2 { margin: 0; font-size: 0.98rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 10px; flex-wrap: wrap; }
     .panel-sub { font-size: 0.78rem; color: var(--muted); margin: -2px 0 8px; line-height: 1.5; }
     .section-meta { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+    .band-title { font-size: 0.74rem; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); font-weight: 800; margin: 30px 2px 10px; opacity: .85; }
+    .band-title:first-of-type { margin-top: 6px; }
+    .subhead { font-size: 0.84rem; color: var(--accent); font-weight: 700; margin: 18px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
     .btn-secondary {
       width: auto !important; padding: 7px 13px;
@@ -236,7 +239,6 @@
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
-    <a href="/operations.html">Ops Hub</a>
     <a href="/orchestration.html" class="active">Orchestration</a>
     <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
@@ -259,6 +261,8 @@
     <span class="smeta">Training: <b id="statusTrain">—</b></span>
     <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
+
+  <p class="band-title">The loop, right now</p>
 
   <!-- ── Live Work Board (the team loop, real-time truth) ── -->
   <section class="panel" id="workBoardPanel">
@@ -283,6 +287,15 @@
     <div id="prLanesBody"><div class="placeholder">Loading PR lanes…</div></div>
   </section>
 
+  <!-- ── Agent Slots (who's working right now) ── -->
+  <section class="panel" id="agentSlotsPanel">
+    <h2>👥 Agent Slots <span class="section-meta" id="agentSlotsMeta"></span>
+      <button class="btn-secondary" onclick="renderAgentSlots()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">The roster from <code>.claude/agent-slots.json</code>, cross-referenced with the assigned queue — who's actively on an issue vs idle.</p>
+    <div id="agentSlotsBody" class="slot-grid"><div class="placeholder">Loading roster…</div></div>
+  </section>
+
   <!-- ── Auto-Pull Fleet (opt-in autonomous loop) ── -->
   <section class="panel" id="autoPullPanel">
     <h2>🤖 Auto-Pull Fleet <span class="section-meta" id="autoPullMeta">opt-in autonomous loop</span>
@@ -296,37 +309,14 @@
     <div id="autoPullBody"><div class="placeholder">Loading…</div></div>
   </section>
 
-  <!-- ── Pull Work moved to /work.html ── -->
+  <!-- ── Manual Work (slim link → /work.html) ── -->
   <section class="panel" id="pullWorkLink">
-    <h2>📥 Manual Work <span class="section-meta">choose &amp; hand off issues</span></h2>
-    <p class="panel-sub">Picking issues by hand, researching them, copying coding-agent handoffs, and the "Recently Landed" shipped log now live on their own page — so this dashboard stays focused on the autonomous loop above.</p>
-    <a class="btn-secondary" href="/work.html" style="display:inline-block;">📥 Open Work page →</a>
-  </section>
-
-  <!-- ── Agent Slots (who's working right now) ── -->
-  <section class="panel" id="agentSlotsPanel">
-    <h2>👥 Agent Slots <span class="section-meta" id="agentSlotsMeta"></span>
-      <button class="btn-secondary" onclick="renderAgentSlots()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    <h2>📥 Manual Work <span class="section-meta">pick &amp; hand off issues — Recently Landed lives there too</span>
+      <a class="btn-secondary" href="/work.html" style="margin-left:auto;">Open Work →</a>
     </h2>
-    <p class="panel-sub">The roster from <code>.claude/agent-slots.json</code>, cross-referenced with the assigned queue — who's actively on an issue vs idle.</p>
-    <div id="agentSlotsBody" class="slot-grid"><div class="placeholder">Loading roster…</div></div>
   </section>
 
-  <!-- Recently Landed moved to /work.html; its count still feeds the Work Board "Landed" stat. -->
-
-  <!-- ── Research Team: repo memory (grounds the fleet) ── -->
-  <section class="panel" id="repoLearnPanel">
-    <h2>🔬 Research Team · Repo Memory <span class="section-meta" id="repoLearnMeta"></span>
-      <button class="btn-secondary" id="repoLearnRunBtn" onclick="runRepoLearn()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">▶ Run learning pass</button>
-    </h2>
-    <p class="panel-sub">The fleet's grounding. Every doc + live module is learned into the <strong>one</strong> Convergence Memory as a grounded, evidence-cited record — so delegated agents and chat retrieve real repo facts instead of guessing. This is how "actually remember you" becomes true. Counts are read straight from the memory log; nothing is fabricated.</p>
-    <div class="board-grid" id="repoLearnStats">
-      <div class="stat"><div class="stat-label">Files Learned</div><div class="stat-value" id="rlFiles">—</div><div class="stat-sub">in repo manifest</div></div>
-      <div class="stat"><div class="stat-label">Grounded Memories</div><div class="stat-value muted" id="rlMems">—</div><div class="stat-sub">in Convergence Memory</div></div>
-      <div class="stat"><div class="stat-label">Last Pass</div><div class="stat-value muted" id="rlLast" style="font-size:1.1rem;">—</div><div class="stat-sub" id="rlLangs">—</div></div>
-    </div>
-    <div id="repoLearnResult" class="train-dispatch-result"></div>
-  </section>
+  <p class="band-title">Brain &amp; compute</p>
 
   <!-- ── Local / Offline Model (the wired-in brain) ── -->
   <section class="panel">
@@ -349,15 +339,6 @@
     <div id="trainRecentJobs" style="margin-top:12px;"></div>
   </section>
 
-  <!-- ── AI Provider Keys (editable) ── -->
-  <section class="panel">
-    <h2>🔑 AI Provider Keys <span class="section-meta" id="providerKeysSummary"></span>
-      <button class="btn-secondary" onclick="refreshProviderStatus()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">Paste an API key to connect a model. Saved to this computer's Windows user account only — never uploaded.</p>
-    <div id="providerKeysList" class="key-grid"><div class="placeholder">Loading…</div></div>
-  </section>
-
   <!-- ── GPU Account Keys (editable) ── -->
   <section class="panel">
     <h2>🖥️ GPU Account Keys <span class="section-meta" id="gpuKeysSummary"></span>
@@ -367,14 +348,21 @@
     <div id="gpuKeysList" class="key-grid"><div class="placeholder">Loading accounts…</div></div>
   </section>
 
-  <!-- ── Provider Chains (read-only reference) ── -->
+  <!-- ── AI Providers (keys + fallback chains, merged) ── -->
   <section class="panel">
-    <h2>🔗 Provider Chains <span class="section-meta" id="providersSummary"></span></h2>
-    <p class="panel-sub">Each task type tries providers in order — the first connected one wins. Set keys above to light these up.</p>
+    <h2>🔑 AI Providers <span class="section-meta" id="providerKeysSummary"></span>
+      <button class="btn-secondary" onclick="refreshProviderStatus()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">Paste an API key to connect a model. Saved to this computer's Windows user account only — never uploaded.</p>
+    <div id="providerKeysList" class="key-grid"><div class="placeholder">Loading…</div></div>
+    <h3 class="subhead">🔗 Fallback chains <span class="section-meta" id="providersSummary"></span></h3>
+    <p class="panel-sub">Each task type tries providers in order — the first connected one wins.</p>
     <div id="providerChains"><div class="placeholder">Loading…</div></div>
   </section>
 
-  <!-- ── Provider Reliance (consolidated) ── -->
+  <p class="band-title">How well it's working</p>
+
+  <!-- ── AI Provider Reliance (+ per-model chat reliability, merged) ── -->
   <section class="panel">
     <h2>🤖 AI Provider Reliance <span class="section-meta" id="relianceSummary">who's actually doing the work</span>
       <span style="margin-left:auto;display:flex;gap:6px;">
@@ -386,12 +374,8 @@
     </h2>
     <p class="panel-sub">Share of real AI work (Claude Code engineering turns + chat model calls). Reliance = how much each provider carries; reliability = its success rate. Local is bucketed under one Ollama row.</p>
     <div id="relianceList"><div class="placeholder">Loading…</div></div>
-  </section>
-
-  <!-- ── Leaderboard (read-only) ── -->
-  <section class="panel">
-    <h2>🏆 Chat Model Reliability <span class="section-meta">per-model success rate · last 14 days</span></h2>
-    <p class="panel-sub">Granular view of the local/cloud models that serve chat — the small sliver above. Ranked by success rate.</p>
+    <h3 class="subhead">🏆 Per-model chat reliability <span class="section-meta">success rate · last 14 days</span></h3>
+    <p class="panel-sub">The granular local/cloud models that serve chat — the small sliver above. Ranked by success rate.</p>
     <div class="merit-list" id="meritList"><div class="placeholder">Loading…</div></div>
   </section>
 
@@ -422,6 +406,20 @@
     <div id="rolloverBody"><div class="placeholder">Loading…</div></div>
   </section>
 
+  <!-- ── Research Team · Repo Memory (grounding telemetry) ── -->
+  <section class="panel" id="repoLearnPanel">
+    <h2>🔬 Research Team · Repo Memory <span class="section-meta" id="repoLearnMeta"></span>
+      <button class="btn-secondary" id="repoLearnRunBtn" onclick="runRepoLearn()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">▶ Run learning pass</button>
+    </h2>
+    <p class="panel-sub">The fleet's grounding. Every doc + live module is learned into the <strong>one</strong> Convergence Memory as a grounded, evidence-cited record — so delegated agents and chat retrieve real repo facts instead of guessing. This is how "actually remember you" becomes true. Counts are read straight from the memory log; nothing is fabricated.</p>
+    <div class="board-grid" id="repoLearnStats">
+      <div class="stat"><div class="stat-label">Files Learned</div><div class="stat-value" id="rlFiles">—</div><div class="stat-sub">in repo manifest</div></div>
+      <div class="stat"><div class="stat-label">Grounded Memories</div><div class="stat-value muted" id="rlMems">—</div><div class="stat-sub">in Convergence Memory</div></div>
+      <div class="stat"><div class="stat-label">Last Pass</div><div class="stat-value muted" id="rlLast" style="font-size:1.1rem;">—</div><div class="stat-sub" id="rlLangs">—</div></div>
+    </div>
+    <div id="repoLearnResult" class="train-dispatch-result"></div>
+  </section>
+
   <div class="refresh-time" id="footerTime">
     <span class="dot online" id="status-dot" title="Server status"></span>
     <span id="status-label">connecting…</span>
@@ -437,7 +435,6 @@
     <span class="sep">·</span>
     <a href="/">Home</a>
     <a href="/dream-chat.html">Chat</a>
-    <a href="/operations.html">Ops Hub</a>
     <a href="/orchestration.html">Orchestration</a>
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -451,7 +448,7 @@
   const $ = (id) => document.getElementById(id);
   let _cache = { providerData: null, gpuData: null };
 
-  async function fetchJson(path, timeoutMs = 6000) {
+  async function fetchJson(path, timeoutMs = 10000) {
     // Boot fires ~17 of these at once; the browser caps ~6 connections per host
     // so the rest queue. AbortSignal.timeout() counts from the fetch() call — not
     // from when the request hits the wire — so a request stuck behind slow ones
@@ -1472,28 +1469,30 @@
   window.refreshProviderStatus = refreshProviderStatus;
 
   // ── Boot ──────────────────────────────────────────────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
-    // Order matters. The browser caps ~6 connections per host and
-    // AbortSignal.timeout() counts queue time, so whatever is requested first
-    // claims the connection slots. refreshWorkBoard() fans out to 5 sub-fetches
-    // and some (PR lanes) shell out to `gh` and hold a connection for seconds —
-    // firing it first starved the light one-shot panels below (reliance / merit
-    // / calibration / keystone / rollover), which then timed out *while queued*
-    // and — having no refresh interval — showed a permanent false "data
-    // unavailable" state. So request the light, fast, single-shot panels FIRST,
-    // then defer the heavy work-board a tick so its slow calls run behind them.
-    renderLocalModel();
-    refreshProviderStatus();
-    renderTrainingSection();
-    renderGpuKeys();
-    renderReliance();
-    renderMerit();
-    renderCalibration();
-    renderKeystoneTests();
-    renderRollover();
-    updateStatus();
-    renderRepoLearn();
-    setTimeout(refreshWorkBoard, 0);
+  document.addEventListener("DOMContentLoaded", async () => {
+    // Boot in two phases to avoid connection-slot starvation. The browser caps
+    // ~6 connections/host and AbortSignal.timeout() counts queue time, so when
+    // all ~20 boot fetches raced in one tick the light one-shot analytics panels
+    // (reliance / merit / calibration / self-test / rollover / repo-memory)
+    // aborted *while still queued* behind the gh-backed work-board calls
+    // (PR lanes / recent-merges shell out to `gh` and hold a slot for seconds)
+    // and — having no refresh interval — showed a permanent false "unavailable".
+    //
+    // Phase 1: the light, one-shot panels — run in small concurrency-limited
+    // waves so a cold server's first (uncached) reads can't oversubscribe the
+    // ~6-connection pool and abort each other while queued. These panels have no
+    // refresh interval, so a single starved load left a permanent false
+    // "unavailable"; the batching + 10s timeout keep queued fetches alive.
+    const phase1 = [
+      renderLocalModel, refreshProviderStatus, renderTrainingSection, renderGpuKeys,
+      renderReliance, renderMerit, renderCalibration, renderKeystoneTests,
+      renderRollover, updateStatus, renderRepoLearn,
+    ];
+    for (let i = 0; i < phase1.length; i += 4) {
+      await Promise.allSettled(phase1.slice(i, i + 4).map((fn) => fn()));
+    }
+    // Phase 2: the heavy gh-backed work board (self-heals on its 20s interval).
+    refreshWorkBoard();
 
     setInterval(refreshWorkBoard, 20000);
     setInterval(renderRepoLearn, 60000);
