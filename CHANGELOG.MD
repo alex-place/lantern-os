@@ -3,6 +3,11 @@
 
 # Changelog
 
+## [1.8.30] - 2026-07-03
+### Added
+- **Web/desktop delivery split + cloud multi-tenancy (ADR-0018, Accepted).** The single Convergence Core gains one `resolveTenant(req)` seam (`apps/lantern-garage/lib/tenant.js`, guardrail W2) so it serves two delivery profiles without a fork: a `local` default that is byte-for-byte today's behaviour (single owner, `data/` tree, `process.env` keys — 4177/4178/desktop unchanged) and a `cloud` profile that namespaces memory under `data/tenants/<id>` and resolves bring-your-own keys per session, never leaking the host's env keys to a tenant. Behaviour-preserving: nothing routes through the seam yet. Strengthens **Remember** (per-tenant memory location) + **Act** (secure key handling). 6 hermetic unit tests.
+
+
 ## [1.8.29] - 2026-07-02
 - Move Admin entry from nav to profile page; ADR-review follow-up updates.
 
