@@ -1,0 +1,1 @@
+ADR-0017 (Proposed): Surprise-gated decoding — spend the surprise canary as a mid-decode grounding controller with three arms (CSF memory retrieval, web search, tool execution), rewind-and-resume on local models, post-hoc revise fallback on cloud. Evidence gate: >=20% relative hallucination reduction on a HaluEval-class set with no answer-quality regression.
