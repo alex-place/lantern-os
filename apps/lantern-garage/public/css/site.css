@@ -1,4 +1,4 @@
-/* ── Lantern OS Shared Site Styles ──────────────────────────────── */
+/* ── Unisona OS Shared Site Styles ──────────────────────────────── */
 /*  Loads on every surface. Keeps nav, footer, theme, and base     */
 /*  layout consistent across the entire app.                         */
 
@@ -136,6 +136,12 @@ html, body {
   transition: all 0.15s;
 }
 .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nav-btn svg { width: 18px; height: 18px; display: block; }
+/* Theme toggle icon: show a sun in dark mode (click → light) and a moon in
+   light mode (click → dark). Both live in the button; CSS reveals one. */
+#theme-toggle .icon-sun, #theme-toggle .icon-moon { display: none; }
+html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
+html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
 .nav-cta {
   font-size: 13px; font-weight: 600; padding: 7px 16px;
   background: var(--accent); color: #fff; border: none;

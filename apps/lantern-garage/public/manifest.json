@@ -1,6 +1,6 @@
 {
-  "name": "Keystone OS",
-  "short_name": "Keystone",
+  "name": "Unisona OS",
+  "short_name": "Unisona",
   "description": "A local-first AI assistant that remembers you — runs on your machine, works with any model.",
   "start_url": "/dream-chat.html",
   "display": "standalone",

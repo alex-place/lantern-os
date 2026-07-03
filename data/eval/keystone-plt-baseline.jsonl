@@ -1,0 +1,1 @@
+{"ts": "2026-07-01T22:02:33Z", "model": "D:/keystone-sigma0-plt-ckpt", "adapter": null, "n": 6, "pass@1": 0.5, "ece": 0.4667, "brier": 0.47, "n_conf": 6, "abstention_rate": 1.0, "format_adherence": 0.0}

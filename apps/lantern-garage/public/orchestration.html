@@ -395,7 +395,7 @@
 
   <!-- ── Rollover (read-only) ── -->
   <section class="panel">
-    <h2>🔀 Rollover · Keystone vs Claude <span class="section-meta">landed-work share</span>
+    <h2>🔀 Rollover · Unisona vs Claude <span class="section-meta">landed-work share</span>
       <span style="margin-left:auto;display:flex;gap:6px;">
         <button class="btn-secondary" id="band-24h" onclick="setRolloverBand('24h')" style="font-size:0.72rem;padding:4px 9px;">24h</button>
         <button class="btn-secondary" id="band-7d" onclick="setRolloverBand('7d')" style="font-size:0.72rem;padding:4px 9px;">7d</button>
@@ -543,7 +543,7 @@
         <div class="research-actions">
           <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
           <button class="research-action delegate" type="button" data-delegate="${escapeHtml(item.issueNumber)}" title="Hand this issue to the autonomous fleet — it works it in an isolated worktree and opens a draft PR">🛰️ Delegate to fleet</button>
-          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Keystone Chat</button>
+          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Unisona Chat</button>
           <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
           <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
         </div>
@@ -1184,7 +1184,7 @@
       <div class="info-box" style="margin-bottom:12px;"><strong>Git attribution</strong> — merged PRs by lane (${escapeHtml(data.band || "30d")})
         ${[
           { label: "claude/", n: git.claude || 0, color: "#06b6d4" },
-          { label: "auto/ (Keystone)", n: git.keystone || 0, color: "#a855f7" },
+          { label: "auto/ (Unisona)", n: git.keystone || 0, color: "#a855f7" },
           { label: "gemini/", n: git.gemini || 0, color: "#22c55e" },
           { label: "codex/", n: git.codex || 0, color: "#f59e0b" },
           { label: "human", n: git.human || 0, color: "#64748b" },

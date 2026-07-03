@@ -52,7 +52,7 @@
 
   function buildResearchPrompt(item) {
     return [
-      buildHandoff(item, "Keystone Chat"),
+      buildHandoff(item, "Unisona Chat"),
       "",
       "Research this issue before proposing a patch. Read the issue, identify dependencies and current implementation, separate verified facts from assumptions, then return a recommended bounded plan and a copy-ready Codex handoff. Do not write code yet.",
     ].join("\n");

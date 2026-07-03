@@ -100,14 +100,14 @@
 
   <div style="margin-bottom:14px;">
     <h1 style="margin:0 0 4px;font-size:1.3rem;">📥 Manual Work</h1>
-    <p class="panel-sub" style="margin:0;">Choose work deliberately. Pick an open issue, research it in Keystone Chat, copy a bounded coding-agent handoff, or hand it to the fleet. Nothing here is auto-dispatched — that's the
+    <p class="panel-sub" style="margin:0;">Choose work deliberately. Pick an open issue, research it in Unisona Chat, copy a bounded coding-agent handoff, or hand it to the fleet. Nothing here is auto-dispatched — that's the
       <a href="/orchestration.html" style="color:var(--accent);">Orchestration</a> page.</p>
   </div>
 
   <!-- ── Pull Work (manual issue selection) ── -->
   <section class="panel" id="researchHandoffPanel">
     <h2>📥 Pull Work <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>
-    <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Keystone Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
+    <p class="panel-sub">Open issues are the pending-work source. Choose one deliberately, research it in Unisona Chat, or copy a bounded coding-agent handoff. Nothing is auto-dispatched.</p>
     <div class="research-controls">
       <input id="researchSearch" type="search" placeholder="Search issue, title, or label" aria-label="Search open issues">
       <select id="researchPriority" aria-label="Filter by priority">
@@ -222,7 +222,7 @@
         <div class="research-actions">
           <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
           <button class="research-action delegate" type="button" data-delegate="${escapeHtml(item.issueNumber)}" title="Hand this issue to the autonomous fleet — isolated worktree, draft PR">🛰️ Delegate to fleet</button>
-          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Keystone Chat</button>
+          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Unisona Chat</button>
           <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
           <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
         </div>

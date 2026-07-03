@@ -1286,6 +1286,11 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
           // priority (not acting on a stop is itself a loss); within each group
           // Σ₀ score orders, with legacy decisionScore as the final tiebreaker.
           const scored = sigma0Deck.rankDeck(allCards, { riskAppetite });
+          // Step 5c: news → signal. Join the existing news feed onto each card
+          // (Observe→Reason) BEFORE the final sort so a fresh high-impact headline
+          // can nudge conviction. Deterministic ticker/title join; local, no LLM.
+          try { require('../lib/news-signal').enrichDeckWithNews(scored, { nowMs }); }
+          catch (e) { console.error('[Decisive Deck] news-signal skipped:', e.message); }
           scored.sort((a, b) => {
             const aExit = a.kind === 'exit' ? 0 : 1, bExit = b.kind === 'exit' ? 0 : 1;
             if (aExit !== bExit) return aExit - bExit;

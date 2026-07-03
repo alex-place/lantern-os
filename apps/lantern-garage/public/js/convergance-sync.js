@@ -1,5 +1,5 @@
 /*
- * Keystone Dream Chat command compatibility shim.
+ * Unisona Dream Chat command compatibility shim.
  *
  * Some operators type the older/misspelled !convergance command while asking
  * for a convergence sync. The canonical command remains !convergence because
