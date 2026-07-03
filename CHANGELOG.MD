@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.29] - 2026-07-02
+- Move Admin entry from nav to profile page; ADR-review follow-up updates.
+
+
 ## [1.8.26] - 2026-07-02
 ### Added
 - **Provider-agnostic OSS auth (ADR-0016).** One identity model (`req.session.user`) backed by a provider registry — local scrypt password auth plus Google, Discord, and Patreon OAuth — with verified-both account linking. Fixes #1876/#1877. Strengthens the **Act** stage (access control). See `apps/lantern-garage/lib/session-identity.js` and `role-hierarchy.js`.
