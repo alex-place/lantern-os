@@ -34,7 +34,7 @@ A surface that is neither **fails the contract test**. To add a surface you must
 | Reason | `dream-chat.html` |
 | Act | `orchestration.html`, `work.html`, `keystone-work.html`, `admin-flags.html` |
 | Verify | `proof.html`, `calibration.html`, `factcheck.html`, `grounding-diff.html` |
-| Converge | `operations.html`, `agent-status.html`, `agent-leaderboard.html`, `metrics.html` |
+| Converge | `agent-status.html`, `agent-leaderboard.html`, `metrics.html` |
 
 ### Extensions — optional capabilities (by module)
 | Module | Count | Flag | Surfaces |

@@ -44,7 +44,6 @@ const CORE = {
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
-  "operations.html":        "Converge",  // loop observability
   "agent-status.html":      "Converge",  // agent observability
   "agent-leaderboard.html": "Converge",  // agent convergence leaderboard
   "metrics.html":           "Converge",  // convergence metrics
