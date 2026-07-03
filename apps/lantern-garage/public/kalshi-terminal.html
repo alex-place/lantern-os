@@ -503,13 +503,13 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <script>
 const API='/api/trading/kalshi';
-const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000;
+const SYNC_MS=10000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000, PREFETCH_COOLDOWN_MS=8000;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
-let lastSyncMs=0, lastDetCount=null;
+let lastSyncMs=0, lastDetCount=null, lastPrefetchMs=0;
 // Trading MODE: 'live' (real 1-contract orders on the Σ₀ weather-edge, scope-gated)
 // or 'paper' (practice candidates, no real orders). Each mode has its OWN deck.
 // Switching forces a full reload so no state leaks across modes/decks.
-let MODE='live', lastGroundStats=null;
+let MODE='live', lastGroundStats=null, walletState=null;
 
 // switchMode — the mode buttons call this: persist the choice and hard-reload.
 function switchMode(m){
@@ -560,8 +560,10 @@ async function loadModeDeck(){
     markFresh(deck.length-idx);
     return;
   }
-  const have=new Set(deck.map(c=>c.ticker));
-  const add=cards.filter(c=>!have.has(c.ticker));
+  // Key by ticker+kind so an open-position card can join the deck alongside the
+  // (already-swiped) buy card for the same market.
+  const have=new Set(deck.map(c=>c.ticker+':'+(c.kind||'')));
+  const add=cards.filter(c=>!have.has(c.ticker+':'+(c.kind||'')));
   if(deck.length===0){ deck=add.slice(); idx=0; }
   else if(add.length){ deck.push(...add); }
   if(idx<deck.length){
@@ -709,8 +711,16 @@ function toggleAcct(){
 // ── right column: account balance + trade history ────────────────────────────
 function renderSide(){
   const bal=acctState.bal||{}, cn=acctState.conn||{};
-  const big=document.getElementById('balBig'); if(big) big.textContent=balStr(bal);
+  const big=document.getElementById('balBig');
   const sub=document.getElementById('balSub');
+  // Paper mode shows the VIRTUAL bankroll (cash spent down as you buy), not the
+  // real Kalshi balance — that's what the tinder game plays against.
+  if(MODE==='paper' && walletState){
+    if(big) big.textContent='$'+(walletState.cashCents/100).toFixed(2);
+    if(sub){ const pnl=walletState.realizedCents/100; sub.textContent=`Paper cash · ${walletState.openCount} open · P&L ${pnl>=0?'+':''}$${pnl.toFixed(2)}`; }
+    return;
+  }
+  if(big) big.textContent=balStr(bal);
   if(sub){
     const env=cn.error?'offline':(cn.canTradeLive?'LIVE tradable':(cn.credentials?'connected · dry-run':'no credentials'));
     sub.textContent=(MODE==='paper'?'Paper practice · ':'')+env;
@@ -743,6 +753,12 @@ async function loadHistory(){
     return `<div class="hist-row"><span class="tk" title="${String(t.ticker||'').replace(/"/g,'')}">${tk}</span>`
       +`<span class="rt"><span class="${sideCls}">${sd}</span> ${px} · ${right}</span></div>`;
   }).join('');
+}
+
+// ── paper wallet (virtual bankroll) — drives the cash HUD + "buy until broke" ──
+async function loadWallet(){
+  if(MODE!=='paper'){ walletState=null; return; }
+  try{ walletState=await j('/paper-wallet'); renderSide(); }catch(_){}
 }
 
 // ── syncDeck: re-poll the current mode's deck (both LIVE and PAPER load their own
@@ -782,12 +798,27 @@ async function maybePrefetch(){
   if(prefetching) return;
   const remaining=deck.length-idx;
   if(remaining>=PREFETCH_AT) return;
+  // The feed legitimately returns few cards, and stale cards are flushed on arrival,
+  // so `remaining` can sit at/near zero indefinitely. Without a hard cooldown the 1s
+  // countdown tick re-fetches the expensive, web-grounded deck ~once per second — the
+  // runaway the audit saw. Rate-limit ALL prefetch (even when empty); the 5s syncDeck
+  // interval already handles timely refills, so an empty deck waits at most ~5s.
+  if((Date.now()-lastPrefetchMs) < PREFETCH_COOLDOWN_MS) return;
   prefetching=true;
+  lastPrefetchMs=Date.now();
+  const before=deck.length;
   try {
     // Both modes refill from their own deck endpoint (loadModeDeck).
     await loadModeDeck();
   } catch(_){}
-  finally{ prefetching=false; }
+  finally{
+    prefetching=false;
+    // Futile-fetch backoff: today's grounded feed genuinely has only a few cards, so a
+    // refill that adds nothing shouldn't retry on the next tick. Push the cooldown out
+    // 3x so we stop hammering a feed with nothing new; the 10s syncDeck still refreshes,
+    // and any real new card resets this on the next successful add.
+    if(deck.length===before) lastPrefetchMs = Date.now() + PREFETCH_COOLDOWN_MS*2;
+  }
 }
 
 // Σ₀ end-state badge — predicted attractor, win/loss odds, capturable delta, EV,
@@ -1265,6 +1296,24 @@ async function act(dir,fromSwipe){
 
   const card=deck[idx];
 
+  // ── Position card (paper): TAKE = SELL (close for profit/loss). PASS = HOLD is
+  // handled above — passing just advances and leaves the position open.
+  if(card.kind==='position' && card.positionId){
+    busy=true;
+    try{
+      const res=await j('/paper-close',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:card.positionId, exitTag:'MANUAL', exitPriceCents:card.currentBid, pnlPct:card.pnlPct})});
+      const t=document.getElementById('toast');
+      if(res&&res.error){ t.className='toast err show'; t.textContent='✕ '+res.error; }
+      else{ const p=card.pnlPct||0, win=p>=0; t.className='toast '+(win?'live':'dry')+' show';
+        t.textContent=`PAPER · sold ${String(card.ticker||'').replace('KXHIGHNY-','NYC ')} @ ${card.currentBid}¢ · ${win?'+':''}${p}%`; }
+      clearTimeout(showResult._h); showResult._h=setTimeout(()=>t.classList.remove('show'),3200);
+      idx++; render(); loadHistory(); loadWallet();
+    }catch(e){ showResult({error:e.message},card); idx++; }
+    finally{ busy=false; }
+    return;
+  }
+
   // ── LIVE mode: place a REAL 1-contract order on the Σ₀ weather-edge card.
   // The server's scope gate caps size and refuses any non-weather-edge source, so an
   // out-of-scope or gated card comes back as a dry-run rather than a live fill.
@@ -1273,8 +1322,14 @@ async function act(dir,fromSwipe){
     if(card.favAsk==null){ blockTake('No live ask — cannot trade'); return; }
     busy=true;
     try{
+      // Live fill = REAL money → require an explicit per-order confirmation on top of
+      // the server's kill-switch/scope gates (defense-in-depth). When live isn't
+      // tradable this is a no-op; the server dry-runs regardless.
+      const canLive=!!(acctState.conn&&acctState.conn.canTradeLive);
+      const confirmLive = canLive ? window.confirm(`LIVE order — REAL money.\n\n${card.favSide==='yes'?'YES':'NO'} @ ${card.favAsk}¢ · 1 contract\n${card.ticker}\n\nPlace it?`) : false;
+      if(canLive && !confirmLive){ blockTake('Live order cancelled'); return; }
       const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
-        source:'kalshi-weather-edge', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
+        source:'kalshi-weather-edge', confirmLive, grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
       const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
       showResult(res,card);            // live / dry-run toast
       idx++; render();
@@ -1292,8 +1347,10 @@ async function act(dir,fromSwipe){
       const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
         source:'kalshi-paper', pPredicted:card.pPredicted};
       const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
+      if(res&&res.wallet) walletState=res.wallet;
       showPaperResult(res,card);
-      idx++; render(); loadHistory();
+      if(res&&res.error){ renderSide(); }          // out of cash → keep the card, don't advance
+      else { idx++; render(); loadHistory(); renderSide(); }
     }catch(e){ showResult({error:e.message},card); idx++; }
     finally{ busy=false; }
     return;
@@ -1316,7 +1373,7 @@ function showResult(res,card){
 
 function showPaperResult(res,card){
   const t=document.getElementById('toast');
-  if(res.error){ t.className='toast err show'; t.textContent='✕ '+res.error; }
+  if(res.error){ t.className='toast err show'; t.textContent = res.error==='insufficient_paper_cash' ? '✕ Out of paper cash — sell a position to free funds' : ('✕ '+res.error); }
   else{
     const lbl=(card.favSide==='yes'?'▲ YES':'▼ NO');
     t.className='toast dry show';
@@ -1432,9 +1489,9 @@ async function init(){
   const cn = await j('/connection'); conn = cn || {};
   let mode; try{ mode = localStorage.getItem('kx-mode'); }catch(_){}
   if(mode!=='live' && mode!=='paper') mode = (conn.canTradeLive || conn.credentials) ? 'live' : 'paper';
-  loadAccount(); setMode(mode); loadCouncil(); loadHistory();
+  loadAccount(); setMode(mode); loadCouncil(); loadHistory(); loadWallet();
   syncInterval=setInterval(syncDeck,SYNC_MS);
-  acctInterval=setInterval(()=>{loadAccount();loadCouncil();loadHistory();},30000);
+  acctInterval=setInterval(()=>{loadAccount();loadCouncil();loadHistory();loadWallet();},30000);
 
   // Pause/resume on tab visibility to save API quota + battery.
   document.addEventListener('visibilitychange',()=>{
