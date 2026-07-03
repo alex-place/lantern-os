@@ -5212,6 +5212,10 @@ def close_position(symbol: str, qty: float, reason: str,
                    notify_fn=None, entry: float = 0.0,
                    current: float = 0.0, pnl_pct: float = 0.0):
     import time
+    # Anti-churn: stamp the close so the entry gate blocks an immediate re-entry
+    # (the round-trip churn that bled the account). Recorded on close intent — if
+    # the close fails we still don't want to pile back in.
+    _last_close_time[symbol] = datetime.now()
     MAX_RETRIES = 3
 
     for attempt in range(1, MAX_RETRIES + 1):
@@ -5500,6 +5504,25 @@ _position_adjustments: dict = load_position_states()  # persisted across restart
 # Tickers that hit a stop loss today — blocked from re-entry until next market open.
 _session_stopped_tickers: set = set()
 _session_date: str = ""
+
+# ── Anti-churn re-entry cooldown ──────────────────────────────────────────────
+# After ANY close, block re-opening the SAME symbol for REENTRY_COOLDOWN_SEC. The
+# scanner was round-tripping the same names every 1-2 min (buy→sell→buy), bleeding
+# the bid/ask spread on huge notional turnover with ~zero edge — the dominant loss
+# driver observed 2026-07-03 (>$300k turnover in 11h on a ~$100k account). Tunable;
+# set REENTRY_COOLDOWN_SEC=0 to disable.
+_last_close_time: dict = {}
+REENTRY_COOLDOWN_SEC = int(os.getenv("REENTRY_COOLDOWN_SEC", "900"))  # 15 min default
+
+
+def _in_reentry_cooldown(ticker, now=None) -> bool:
+    """True if `ticker` was closed within REENTRY_COOLDOWN_SEC (anti-churn gate)."""
+    if REENTRY_COOLDOWN_SEC <= 0:
+        return False
+    lc = _last_close_time.get(ticker)
+    if lc is None:
+        return False
+    return ((now or datetime.now()) - lc).total_seconds() < REENTRY_COOLDOWN_SEC
 
 def _check_reset_session_cooldown():
     """Reset the stop-loss cooldown set when the calendar date changes (market open)."""
@@ -7795,6 +7818,15 @@ def scan_ticker(ticker: str, notify_fn=None, open_positions: dict = None,
     _check_reset_session_cooldown()
     if ticker in _session_stopped_tickers:
         _cd_reason = f"Session cooldown — {ticker} hit a stop loss earlier today, blocked until next market open"
+        log_agent("system", "COOLDOWN", f"{ticker} BLOCKED — {_cd_reason}")
+        return {"status": "skipped", "ticker": ticker, "reason": _cd_reason}
+
+    # ── Anti-churn re-entry cooldown ──────────────────────────────────────────
+    # Block re-opening a symbol within REENTRY_COOLDOWN_SEC of closing it — the guard
+    # against the buy→sell→buy round-trip churn that was the dominant loss driver.
+    if _in_reentry_cooldown(ticker):
+        _age = int((datetime.now() - _last_close_time[ticker]).total_seconds())
+        _cd_reason = f"Re-entry cooldown — {ticker} closed {_age}s ago (< {REENTRY_COOLDOWN_SEC}s), anti-churn"
         log_agent("system", "COOLDOWN", f"{ticker} BLOCKED — {_cd_reason}")
         return {"status": "skipped", "ticker": ticker, "reason": _cd_reason}
 
