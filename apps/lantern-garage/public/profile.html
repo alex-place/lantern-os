@@ -174,6 +174,12 @@
     .modal-actions .btn { flex: 1; justify-content: center; }
 
     .loading { text-align: center; color: var(--muted); padding: 80px 20px; font-size: 14px; }
+
+    .loop-stage-note {
+      text-align: center; color: var(--muted); font-size: 12px;
+      margin: 4px 0 0; opacity: .8;
+    }
+    .loop-stage-note strong { color: var(--muted); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -248,14 +254,28 @@ const TIER_LABELS = {
   admin:        { label: 'Synthesasia Guild — $200/mo', emoji: '⬡' },
 };
 
+// Feature access is role-laddered EXCEPT Trader, which is a per-account
+// opt-in entitlement (entitlements.trade), independent of tier — see
+// user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
 const FEATURES = [
   { emoji: '📖', label: 'Journal',     href: '/dream-chat.html',       req: 'guest' },
-  { emoji: '📈', label: 'Trader',      href: '/stock-trader.html', req: 'admin' },
+  { emoji: '📈', label: 'Trader',      href: '/stock-trader.html',     req: 'trade' },
   { emoji: '✏️', label: 'Create',      href: '/create.html',           req: 'deep_dreamer' },
   { emoji: '🗺️', label: 'Explore',     href: '/explore.html',          req: 'guest' },
   { emoji: '📚', label: 'Knowledge',   href: '/knowledgecenter.html',  req: 'guest' },
   { emoji: '📊', label: 'Crypto',      href: '/crypto-dashboard.html', req: 'guest' },
 ];
+
+// How each account source (metadata.source) presents as a sign-in method.
+// Identity is provider-agnostic (ADR-0005) — Patreon is one source among many.
+const SOURCE_LABELS = {
+  local:   { label: 'Email + password', emoji: '🔑' },
+  patreon: { label: 'Patreon',          emoji: '♥' },
+  discord: { label: 'Discord',          emoji: '🎮' },
+  google:  { label: 'Google',           emoji: 'ᴳ' },
+  oauth:   { label: 'OAuth',            emoji: '🔗' },
+  dev:     { label: 'Local dev bypass', emoji: '🛠️' },
+};
 
 let currentProfile = null;
 
@@ -274,8 +294,15 @@ function fmtDate(iso) {
   catch { return iso; }
 }
 
-function hasAccess(userRole, reqRole) {
-  return (ROLE_LEVEL[userRole] || 0) >= (ROLE_LEVEL[reqRole] || 0);
+function hasAccess(profile, reqRole) {
+  if (reqRole === 'trade') {
+    return profile.role === 'admin' || !!(profile.entitlements && profile.entitlements.trade);
+  }
+  return (ROLE_LEVEL[profile.role] || 0) >= (ROLE_LEVEL[reqRole] || 0);
+}
+
+function sourceOf(profile) {
+  return SOURCE_LABELS[profile.metadata?.source] || SOURCE_LABELS.local;
 }
 
 function renderProfile(profile) {
@@ -283,9 +310,13 @@ function renderProfile(profile) {
   const role = profile.role || 'guest';
   const tier = TIER_LABELS[role] || TIER_LABELS.guest;
 
+  const source = sourceOf(profile);
+
   const featureCards = FEATURES.map(f => {
-    const ok = hasAccess(role, f.req);
-    const reqLabel = f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '';
+    const ok = hasAccess(profile, f.req);
+    const reqLabel = f.req === 'trade'
+      ? 'Requires trading access (opt-in)'
+      : (f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '');
     return ok
       ? `<a class="access-card" href="${f.href}">
            <span class="access-icon">${f.emoji}</span>
@@ -323,15 +354,40 @@ function renderProfile(profile) {
         <div class="info-value">${fmtDate(profile.metadata?.createdAt)}</div>
       </div>
       <div class="info-cell">
-        <div class="info-label">Account ID</div>
-        <div class="info-value"><code>${escapeHtml(profile.id || '—')}</code></div>
+        <div class="info-label">Signed in with</div>
+        <div class="info-value">${source.emoji} ${escapeHtml(source.label)}</div>
       </div>
+      <div class="info-cell">
+        <div class="info-label">Account ID</div>
+        <div class="info-value"><code>${escapeHtml(profile.id || profile.patreonId || '—')}</code></div>
+      </div>
+      ${profile.discordId ? `
+      <div class="info-cell">
+        <div class="info-label">Linked accounts</div>
+        <div class="info-value">🎮 Discord</div>
+      </div>` : ''}
     </div>
 
     <div>
       <div class="section-title">Feature Access</div>
       <div class="access-grid">${featureCards}</div>
     </div>
+
+    ${role === 'admin' ? `
+    <div>
+      <div class="section-title">Administration</div>
+      <div class="access-grid">
+        <a class="access-card" href="/admin-flags.html">
+          <span class="access-icon">🛠️</span>
+          <div>
+            <div class="access-label">Feature Flags</div>
+            <div class="access-req">Admin control surface</div>
+          </div>
+        </a>
+      </div>
+    </div>` : ''}
+
+    <p class="loop-stage-note">Account surface — an <strong>extension</strong>, not a loop stage (ADR-0013).</p>
   `;
 }
 
