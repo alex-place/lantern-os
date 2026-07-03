@@ -5,7 +5,7 @@
  * The repo's North Star is anti-sprawl (CLAUDE.md): one loop, four objects,
  * "prefer extension over addition." Sprawl accretes as duplicate files, stray
  * scratch artifacts, and un-modernised code. The diff-scoped slop-check
- * (.github/workflows/slop-check.yml + scripts/hooks/pre-commit) catches *new*
+ * (.github/workflows/pr-gates.yml + scripts/hooks/pre-commit) catches *new*
  * slop; nothing scans the *whole tree* for accumulated debt. This does.
  *
  * It is one self-contained, dependency-free Node script (no eslint, no new

@@ -21,6 +21,15 @@ const { evaluateExit } = require("./kalshi-adaptive-exits");
 const STOP_LOSS_PCT  = -30;
 const TAKE_PROFIT_PCT = 40;
 
+// Paper bankroll: a virtual starting balance so the game can "buy until no cash".
+// Cash is DERIVED from the append-only ledger (single source of truth): you pay the
+// entry cost on open and receive the exit proceeds on close.
+const PAPER_START_CENTS = Number(process.env.KALSHI_PAPER_START_CENTS || 10000); // $100
+// Auto stop-loss: a paper position is auto-closed once it falls this far, so the
+// bankroll is protected without waiting for a manual swipe. Take-profit is NOT
+// auto-closed — the player chooses to sell for profit or hold.
+const AUTO_STOP_PCT = Number(process.env.KALSHI_PAPER_STOP_PCT || -25);
+
 function readAll() {
   if (!fs.existsSync(PAPER_FILE)) return [];
   return fs.readFileSync(PAPER_FILE, "utf8")
@@ -69,6 +78,44 @@ function getHistory(limit = 50) {
   // newest first by open time (fallback: keep insertion order reversed)
   rows.sort((a, b) => String(b.openedAt || '').localeCompare(String(a.openedAt || '')));
   return rows.slice(0, limit);
+}
+
+/**
+ * Virtual paper wallet, derived entirely from the append-only ledger.
+ *   cash = start − cost locked in still-open positions + net realized P&L of closed ones.
+ * Lets the tinder game spend down to zero and refuse buys when broke.
+ */
+function getWallet() {
+  const all = readAll();
+  const opens = new Map();
+  for (const e of all) if (e.event === "open") opens.set(e.id, e);
+  const closedIds = new Set();
+  let realizedCents = 0, investedCents = 0;
+  const costOf = (o) => {
+    const qty = Number(o.qty ?? o.count ?? 1) || 1;
+    const entry = Number(o.limitCents ?? o.entryCents ?? 50);
+    return entry * qty;
+  };
+  for (const e of all) {
+    if (e.event !== "close") continue;
+    closedIds.add(e.id);
+    const o = opens.get(e.id);
+    if (!o) continue;
+    const exit = Number(e.exitPriceCents ?? 0);
+    const qty = Number(o.qty ?? o.count ?? 1) || 1;
+    const entry = Number(o.limitCents ?? o.entryCents ?? 50);
+    realizedCents += (exit - entry) * qty;   // realized P&L on the round-trip
+  }
+  for (const [id, o] of opens) if (!closedIds.has(id)) investedCents += costOf(o);
+  const cashCents = Math.max(0, PAPER_START_CENTS + realizedCents - investedCents);
+  return {
+    startCents: PAPER_START_CENTS,
+    cashCents,
+    investedCents,
+    realizedCents,
+    openCount: opens.size - closedIds.size,
+    equityCents: cashCents + investedCents,  // cash + cost-basis still at risk
+  };
 }
 
 function openPosition(o) {
@@ -154,6 +201,17 @@ async function pollOpen() {
         continue;
       }
 
+      // AUTO STOP-LOSS: close the losing position now rather than only flagging it,
+      // so the paper bankroll is protected without the player catching a fast drop by
+      // hand. Take-profit is deliberately NOT auto-closed below — the player decides to
+      // sell for profit or hold.
+      if (pnlPct <= AUTO_STOP_PCT) {
+        closePosition(pos.id, { exitTag: "STOP-LOSS", exitPriceCents: currentBid, pnlPct });
+        results.push({ ...pos, title: market.title || pos.ticker, entryCents, currentAsk, currentBid,
+          pnlCents, pnlPct, autoExit: "STOP-LOSS", minsToClose, status: "stopped-out" });
+        continue;
+      }
+
       // Use adaptive exit logic (convergence-driven)
       const exitEval = evaluateExit(
         { side, limitCents: entryCents },
@@ -177,4 +235,4 @@ async function pollOpen() {
   return results;
 }
 
-module.exports = { openPosition, closePosition, getOpen, pollOpen, getHistory };
+module.exports = { openPosition, closePosition, getOpen, pollOpen, getHistory, getWallet };

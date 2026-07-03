@@ -1,11 +1,12 @@
-// Shared theme toggle logic for all Keystone OS pages
+// Shared theme toggle logic for all Unisona OS pages
 (function() {
   const stored = localStorage.getItem('lantern-theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = stored ? stored === 'dark' : prefersDark;
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   const btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  // Skip legacy emoji buttons; SVG-icon navs show sun/moon via CSS (data-theme).
+  if (btn && !btn.querySelector('svg')) btn.textContent = isDark ? '☀️' : '🌙';
 })();
 
 function toggleTheme() {
@@ -15,5 +16,5 @@ function toggleTheme() {
   html.setAttribute('data-theme', next);
   localStorage.setItem('lantern-theme', next);
   const btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
+  if (btn && !btn.querySelector('svg')) btn.textContent = next === 'dark' ? '☀️' : '🌙';
 }

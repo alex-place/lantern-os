@@ -229,6 +229,37 @@ if ($pythonExists) {
     Remove-Item env:MCP_SERVER_PORT -ErrorAction SilentlyContinue
 }
 
+# --- :11434 local Sigma0 model server (Ouro-1.4B, Ollama-compatible) ---------
+# Opt-in: set KEYSTONE_SERVE_OURO=1 in the persistent env to have quickboot bring up
+# the local Sigma0 model. scripts/ouro_serve.py binds :11434 and speaks the Ollama
+# HTTP API itself (NO Ollama binary needed); the chat reaches it via
+# OLLAMA_MODEL=ouro:latest. OURO_4BIT=1 keeps resident VRAM to ~1.85GB so it fits the
+# 8GB card. It loads at boot when free RAM is highest -- the mid-session fp16->4bit
+# LOAD transient (~4GB) is what OOMs an already-busy desktop, not the resident model.
+# The 7.6B models/keystone-sigma0-plt is deliberately NOT auto-served here: it needs a
+# >=24GB GPU box (see models/keystone-sigma0-plt/README.md) and thrashes this machine.
+# Best-effort: a model-server hiccup must never block the web servers from coming up.
+if ($env:KEYSTONE_SERVE_OURO -eq '1') {
+    $ouroPy     = Join-Path $RepoRoot '.venv-train\Scripts\python.exe'
+    $ouroScript = Join-Path $RepoRoot 'scripts\ouro_serve.py'
+    $ouroUp     = [bool](Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue)
+    if ($ouroUp) {
+        Write-Host "Local model server already up on :11434 - leaving it." -ForegroundColor DarkGray
+    } elseif ((Test-Path $ouroPy) -and (Test-Path $ouroScript)) {
+        Write-Host "Starting local Sigma0 model server (Ouro-1.4B, 4-bit) on :11434 from $RepoRoot ..." -ForegroundColor Blue
+        if (-not $env:HF_HOME) { $env:HF_HOME = 'D:\hf-cache' }
+        $env:OURO_4BIT = '1'; $env:OURO_PORT = '11434'
+        Start-Process -FilePath $ouroPy -ArgumentList $ouroScript `
+            -WorkingDirectory $RepoRoot -WindowStyle Hidden `
+            -RedirectStandardOutput (Join-Path $LogDir 'ouro-serve-11434.out.log') `
+            -RedirectStandardError  (Join-Path $LogDir 'ouro-serve-11434.err.log') | Out-Null
+        Remove-Item env:OURO_4BIT, env:OURO_PORT -ErrorAction SilentlyContinue
+        Write-Host "  (loads in ~30-60s; chat uses it when OLLAMA_MODEL=ouro:latest)" -ForegroundColor DarkGray
+    } else {
+        Write-Host "KEYSTONE_SERVE_OURO=1 but .venv-train or ouro_serve.py missing - skipping local model." -ForegroundColor Yellow
+    }
+}
+
 # --- Health check ------------------------------------------------------------
 Write-Host "Health check..." -ForegroundColor Yellow
 $stableOk = $false; $devOk = $false; $mcpOk = $false

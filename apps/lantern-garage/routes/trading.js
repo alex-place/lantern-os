@@ -1291,6 +1291,11 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
           // priority (not acting on a stop is itself a loss); within each group
           // Σ₀ score orders, with legacy decisionScore as the final tiebreaker.
           const scored = sigma0Deck.rankDeck(allCards, { riskAppetite });
+          // Step 5c: news → signal. Join the existing news feed onto each card
+          // (Observe→Reason) BEFORE the final sort so a fresh high-impact headline
+          // can nudge conviction. Deterministic ticker/title join; local, no LLM.
+          try { require('../lib/news-signal').enrichDeckWithNews(scored, { nowMs }); }
+          catch (e) { console.error('[Decisive Deck] news-signal skipped:', e.message); }
           scored.sort((a, b) => {
             const aExit = a.kind === 'exit' ? 0 : 1, bExit = b.kind === 'exit' ? 0 : 1;
             if (aExit !== bExit) return aExit - bExit;
@@ -1444,7 +1449,22 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         const paperLedger = require('../lib/kalshi-paper-ledger');
         const body = await collectRequestBody(req);
         const o = body ? JSON.parse(body) : {};
-        return sendJson(res, paperLedger.openPosition(o), 201), true;
+        // Cash gate: the tinder game spends a virtual bankroll down to zero. Refuse the
+        // buy when the paper wallet can't cover the entry cost (entry¢ × contracts).
+        const qty = Number(o.qty ?? o.count ?? 1) || 1;
+        const entry = Number(o.limitCents ?? o.entryCents ?? 50);
+        const costCents = entry * qty;
+        const wallet = paperLedger.getWallet();
+        if (costCents > wallet.cashCents) {
+          return sendJson(res, { error: 'insufficient_paper_cash', costCents, wallet }, 402), true;
+        }
+        const opened = paperLedger.openPosition(o);
+        return sendJson(res, { ...opened, wallet: paperLedger.getWallet() }, 201), true;
+      }
+      // GET — virtual paper wallet (cash / invested / realized) for the "buy until broke" HUD
+      if (url.pathname === '/api/trading/kalshi/paper-wallet' && req.method === 'GET') {
+        const paperLedger = require('../lib/kalshi-paper-ledger');
+        return sendJson(res, paperLedger.getWallet(), 200), true;
       }
       // GET — poll open paper positions with live P&L + auto-exit signals
       if (url.pathname === '/api/trading/kalshi/paper-positions' && req.method === 'GET') {
@@ -1571,11 +1591,35 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
             });
             if (cards.length >= limit) break;
           }
+          // ── Tinder-game composition ──────────────────────────────────────────
+          // Hide markets you already hold (no double-buys — "don't show them") and
+          // surface your open paper positions as SELL/HOLD cards, so the whole
+          // lifecycle (buy → hold → sell/stop) lives in one swipe deck.
+          const paperLedger = require('../lib/kalshi-paper-ledger');
+          const held = new Set(paperLedger.getOpen().map(p => p.ticker));
+          const buyCards = cards.filter(c => !held.has(c.ticker));
+          let positionCards = [];
+          try {
+            const polled = await paperLedger.pollOpen(); // live P&L + auto-stop already applied
+            positionCards = polled
+              .filter(p => p.status === 'open' || p.status === 'exit-pending')
+              .map(p => ({
+                kind: 'position', mode: 'paper',
+                ticker: p.ticker, title: p.title || p.ticker,
+                side: p.side, favSide: p.side,
+                entryCents: p.entryCents, favAsk: p.currentBid != null ? p.currentBid : p.entryCents,
+                currentBid: p.currentBid, pnlCents: p.pnlCents, pnlPct: p.pnlPct,
+                autoExit: p.autoExit, positionId: p.id, qty: p.qty || p.count || 1,
+                minsToClose: p.minsToClose,
+              }));
+          } catch (_) { /* positions optional */ }
+          const gameDeck = [...buyCards, ...positionCards];
           return sendJson(res, {
-            cards, count: cards.length, mode: 'paper',
-            weatherCards: wxCards.length,
+            cards: gameDeck, count: gameDeck.length, mode: 'paper',
+            weatherCards: wxCards.length, buyCards: buyCards.length, positionCards: positionCards.length,
+            wallet: paperLedger.getWallet(),
             generatedAt: new Date().toISOString(),
-            note: 'Paper deck — Σ₀ weather-edge (paper practice) + non-crypto candidates. No real orders; live trading remains paused.',
+            note: 'Paper deck — buy candidates (held markets hidden) + your open positions to sell/hold. No real orders; live trading remains paused.',
           }, 200), true;
         } catch (e) {
           return sendJson(res, { cards: [], count: 0, mode: 'paper', error: e.message }, 200), true;

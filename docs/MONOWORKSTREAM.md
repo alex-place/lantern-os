@@ -170,7 +170,7 @@ This is **a warning, not a blocker** (you can override with `SKIP_MONOWORKSTREAM
 
 ### CI (GitHub Actions Gate)
 
-**File:** `.github/workflows/monoworkstream-gate.yml`
+**File:** `.github/workflows/pr-gates.yml`
 
 Runs on every PR and **blocks merge** if violated:
 
@@ -388,7 +388,7 @@ See [AGENTS.md](AGENTS.md) for the full list.
 
 - **[AGENTS.md](AGENTS.md)** — Full agent lane assignments
 - **[CLAUDE.md](CLAUDE.md)** — Agent-specific guidance
-- **[.github/workflows/monoworkstream-gate.yml](.github/workflows/monoworkstream-gate.yml)** — CI enforcement
+- **[.github/workflows/pr-gates.yml](.github/workflows/pr-gates.yml)** — CI enforcement
 - **[scripts/Install-MonoworkstreamHooks.ps1](scripts/Install-MonoworkstreamHooks.ps1)** — Local hook setup
 - **GitHub Issue #636** — Auto-merge crisis (example of violation)
 - **GitHub Issue #638** — Monoworkstream enforcement implementation

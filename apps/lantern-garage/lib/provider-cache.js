@@ -8,7 +8,10 @@ const MAX_HISTORY = 10;
 // Canonical provider descriptors
 const PROVIDERS = [
   { id: "keystone-ft", env: ["ANTHROPIC_API_KEY"], managed: true }, // Trained Keystone agent w/ memory store
-  { id: "gemini",    env: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
+  // GEMINI_USE_VERTEX / VERTEX_PROJECT: Gemini is reachable keyless via Vertex AI
+  // (ADC, bills the Cloud project — the funded path). Counting them here keeps
+  // gemini "available" for PCSF routing when only Vertex credits are configured.
+  { id: "gemini",    env: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_USE_VERTEX", "VERTEX_PROJECT"] },
   { id: "anthropic", env: ["ANTHROPIC_API_KEY"] },
   { id: "openai",    env: ["OPENAI_API_KEY"] },
   { id: "xai",       env: ["XAI_API_KEY"] },

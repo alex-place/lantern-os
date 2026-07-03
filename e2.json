@@ -1,0 +1,2069 @@
+{
+  "entry": {
+    "id": "entry-1782551035791-ig7s5ls99",
+    "title": "Kingdome Of Hearts",
+    "description": "",
+    "project": "",
+    "tags": [],
+    "type": "video",
+    "createdAt": "2026-06-27T09:03:55.793Z",
+    "updatedAt": "2026-06-27T10:08:07.115Z",
+    "filePath": "data\\dreamer\\videos\\1782551035131-kingdome_of_hearts.mp4",
+    "facecamGuidance": null,
+    "thumbnail": "data\\creator\\entries\\entry-1782551035791-ig7s5ls99\\thumbnail.jpg",
+    "analysis": "analysis.json",
+    "renders": {
+      "highlight": null,
+      "variantA": null,
+      "variantB": null,
+      "variantC": null
+    },
+    "status": "ready",
+    "scoreV10": {
+      "version": "10.0",
+      "basis": "structural_heuristic",
+      "calibrated": false,
+      "viral": {
+        "viralScore": 0.628,
+        "confidence": 0.43,
+        "componentScores": {
+          "hook": {
+            "score": 1,
+            "weight": 0.15,
+            "confidence": 0.85,
+            "inputs": {
+              "timeToFirstEventSec": 0.2,
+              "targetMaxSec": 1.5
+            }
+          },
+          "retention": {
+            "score": 0.985,
+            "weight": 0.2,
+            "confidence": 0.4,
+            "inputs": {
+              "cutsPerMin": 293.979,
+              "coverage": 0.963
+            }
+          },
+          "emotion": {
+            "score": 0,
+            "weight": 0.15,
+            "confidence": 0.25,
+            "inputs": {
+              "audioActivityPerMin": 0,
+              "audioPeak": 0
+            }
+          },
+          "surprise": {
+            "score": 0.83,
+            "weight": 0.2,
+            "confidence": 0.4,
+            "inputs": {
+              "multiSignalSpikesPerMin": 4.983
+            }
+          },
+          "pacing": {
+            "score": 0.6,
+            "weight": 0.1,
+            "confidence": 0.4,
+            "inputs": {
+              "cutsPerMin": 293.979,
+              "gapCV": 1
+            }
+          },
+          "rewatch": {
+            "score": 0,
+            "weight": 0.1,
+            "confidence": 0.3,
+            "inputs": {
+              "endPayoff": 0,
+              "lateSurprise": 0
+            }
+          },
+          "visualClarity": {
+            "score": 1,
+            "weight": 0.05,
+            "confidence": 0.4,
+            "inputs": {
+              "excessMotionFraction": 0
+            }
+          },
+          "captionPotential": {
+            "score": 0.1,
+            "weight": 0.05,
+            "confidence": 0.3,
+            "inputs": {
+              "strongBeats": 1
+            }
+          }
+        },
+        "basis": "structural_heuristic",
+        "calibrated": false,
+        "priorInformed": false,
+        "priorSamples": 0,
+        "weightsSource": "research/viral_patterns.json",
+        "signals": {
+          "durationSec": 12.041667,
+          "durationMin": 0.20069445,
+          "highlightsCount": 1,
+          "hasAudioSignal": false,
+          "timeToFirstEventSec": 0.2,
+          "cutsPerMin": 293.979,
+          "cutsPerMinMeasured": true,
+          "avgShotLengthSec": 0.201,
+          "coverage": 0.9633217726416118,
+          "gapCV": 1,
+          "audioActivityPerMin": 0,
+          "audioPeak": 0,
+          "multiSignalSpikesPerMin": 4.982698824008337,
+          "endPayoff": 0,
+          "lateSurprise": 0,
+          "excessMotion": 0,
+          "strongBeats": 1,
+          "speechMeasured": false,
+          "wordsPerSec": null,
+          "speechCoverage": null,
+          "deadAirMaxSec": null,
+          "hookStyle": null,
+          "ctaPresent": null,
+          "ctaPosition": null
+        },
+        "computedAt": "2026-06-27T09:59:11.648Z"
+      },
+      "retention": {
+        "predictedCompletionRate": 0.887,
+        "predictedAverageWatchTimeSec": 10.681,
+        "predictedShareRate": 0.14,
+        "predictedRewatchRate": 0.133,
+        "display": {
+          "completion": "89% (structural estimate, not calibrated)",
+          "shareRate": "14% (structural estimate, not calibrated)",
+          "rewatchRate": "13% (structural estimate, not calibrated)"
+        },
+        "basis": "structural_heuristic",
+        "calibrated": false,
+        "disclaimer": "Structural estimate derived from this clip's measured signals — NOT an outcome-calibrated prediction of real-world performance. Calibrates only after >=100 outcome-labeled posts are recorded.",
+        "confidence": 0.351,
+        "inputs": {
+          "components": {
+            "hook": 1,
+            "retention": 0.985,
+            "emotion": 0,
+            "surprise": 0.83,
+            "pacing": 0.6,
+            "rewatch": 0,
+            "visualClarity": 1,
+            "captionPotential": 0.1
+          },
+          "durationSec": 12.042,
+          "outcomeLabeled": 0
+        },
+        "computedAt": "2026-06-27T09:59:11.653Z"
+      },
+      "editorGrade": {
+        "grade": "A",
+        "composite": 0.861,
+        "factors": {
+          "retention": 0.985,
+          "hook": 1,
+          "clarity": 1,
+          "captions": 0.1,
+          "safeZone": 1
+        },
+        "safeZoneCompliance": {
+          "value": 1,
+          "source": "no-crop",
+          "note": "no crop performed; nothing removed"
+        },
+        "confidence": 0.43,
+        "weights": {
+          "retention": 0.3,
+          "hook": 0.25,
+          "clarity": 0.15,
+          "captions": 0.15,
+          "safeZone": 0.15
+        },
+        "computedAt": "2026-06-27T09:59:11.653Z"
+      },
+      "computedAt": "2026-06-27T09:59:11.653Z",
+      "gaming": {
+        "gamingViralScore": 0.69,
+        "viralScore": 0.628,
+        "totalBonus": 0.062,
+        "bonusCapped": false,
+        "bonuses": {
+          "kill": {
+            "value": 0.062,
+            "proxy": 0.623,
+            "max": 0.1,
+            "inferred": true
+          },
+          "clutch": {
+            "value": 0,
+            "proxy": 0,
+            "max": 0.15,
+            "inferred": true
+          },
+          "reaction": {
+            "value": 0,
+            "proxy": 0,
+            "max": 0.1,
+            "inferred": true,
+            "requiresFacecam": true,
+            "facecamPresent": false
+          },
+          "victory": {
+            "value": 0,
+            "proxy": 0,
+            "max": 0.1,
+            "inferred": true
+          }
+        },
+        "confidence": 0.343,
+        "basis": "structural_heuristic",
+        "calibrated": false,
+        "detectabilityNote": "Kills, clutches and victories are INFERRED from audio/scene/motion surprise proxies — not from kill-feed OCR, game telemetry, or a trained vision model. Each is treated as a candidate with a measured confidence. Do not present these as ground-truth game events.",
+        "computedAt": "2026-06-27T09:59:11.654Z"
+      },
+      "headline": {
+        "viralScore": 0.628,
+        "gamingViralScore": 0.69,
+        "predictedCompletionRate": 0.887,
+        "predictedShareRate": 0.14,
+        "editorGrade": "A",
+        "confidence": 0.43
+      }
+    },
+    "variantsV10": [
+      {
+        "id": "variantA",
+        "strategy": "maximum_retention",
+        "label": "Maximum Retention",
+        "segments": [
+          {
+            "start": 0.2,
+            "end": 11.8,
+            "duration": 11.6,
+            "score": 0.55,
+            "tags": [
+              "motion",
+              "scene"
+            ]
+          },
+          {
+            "start": 1.405,
+            "end": 3.412,
+            "duration": 2.007,
+            "score": 0.5,
+            "tags": [
+              "fallback"
+            ]
+          }
+        ],
+        "durationSec": 13.607,
+        "introStrength": 0.55,
+        "dropoffPenalty": 0,
+        "score": {
+          "viralScore": 0.644,
+          "confidence": 0.48,
+          "componentScores": {
+            "hook": {
+              "score": 1,
+              "weight": 0.15,
+              "confidence": 0.85,
+              "inputs": {
+                "timeToFirstEventSec": 0,
+                "targetMaxSec": 1.5
+              }
+            },
+            "retention": {
+              "score": 0.841,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "coverage": 1
+              }
+            },
+            "emotion": {
+              "score": 0,
+              "weight": 0.15,
+              "confidence": 0.25,
+              "inputs": {
+                "audioActivityPerMin": 0,
+                "audioPeak": 0
+              }
+            },
+            "surprise": {
+              "score": 0.735,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "multiSignalSpikesPerMin": 4.409
+              }
+            },
+            "pacing": {
+              "score": 0.841,
+              "weight": 0.1,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "gapCV": 0
+              }
+            },
+            "rewatch": {
+              "score": 0.35,
+              "weight": 0.1,
+              "confidence": 0.65,
+              "inputs": {
+                "endPayoff": 0.5,
+                "lateSurprise": 0
+              }
+            },
+            "visualClarity": {
+              "score": 1,
+              "weight": 0.05,
+              "confidence": 0.4,
+              "inputs": {
+                "excessMotionFraction": 0
+              }
+            },
+            "captionPotential": {
+              "score": 0.2,
+              "weight": 0.05,
+              "confidence": 0.6,
+              "inputs": {
+                "strongBeats": 2
+              }
+            }
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "priorInformed": false,
+          "priorSamples": 0,
+          "weightsSource": "research/viral_patterns.json",
+          "signals": {
+            "durationSec": 13.607,
+            "durationMin": 0.2267833333333333,
+            "highlightsCount": 2,
+            "hasAudioSignal": false,
+            "timeToFirstEventSec": 0,
+            "cutsPerMin": 8.818990225619167,
+            "cutsPerMinMeasured": false,
+            "avgShotLengthSec": null,
+            "coverage": 1,
+            "gapCV": 0,
+            "audioActivityPerMin": 0,
+            "audioPeak": 0,
+            "multiSignalSpikesPerMin": 4.409495112809584,
+            "endPayoff": 0.5,
+            "lateSurprise": 0,
+            "excessMotion": 0,
+            "strongBeats": 2,
+            "speechMeasured": false,
+            "wordsPerSec": null,
+            "speechCoverage": null,
+            "deadAirMaxSec": null,
+            "hookStyle": null,
+            "ctaPresent": null,
+            "ctaPosition": null
+          },
+          "computedAt": "2026-06-27T09:59:11.656Z"
+        },
+        "gaming": {
+          "gamingViralScore": 0.824,
+          "viralScore": 0.644,
+          "totalBonus": 0.18,
+          "bonusCapped": false,
+          "bonuses": {
+            "kill": {
+              "value": 0.055,
+              "proxy": 0.551,
+              "max": 0.1,
+              "inferred": true
+            },
+            "clutch": {
+              "value": 0.075,
+              "proxy": 0.5,
+              "max": 0.15,
+              "inferred": true
+            },
+            "reaction": {
+              "value": 0,
+              "proxy": 0,
+              "max": 0.1,
+              "inferred": true,
+              "requiresFacecam": true,
+              "facecamPresent": false
+            },
+            "victory": {
+              "value": 0.05,
+              "proxy": 0.5,
+              "max": 0.1,
+              "inferred": true
+            }
+          },
+          "confidence": 0.367,
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "detectabilityNote": "Kills, clutches and victories are INFERRED from audio/scene/motion surprise proxies — not from kill-feed OCR, game telemetry, or a trained vision model. Each is treated as a candidate with a measured confidence. Do not present these as ground-truth game events.",
+          "computedAt": "2026-06-27T09:59:11.657Z"
+        },
+        "retention": {
+          "predictedCompletionRate": 0.894,
+          "predictedAverageWatchTimeSec": 12.169,
+          "predictedShareRate": 0.149,
+          "predictedRewatchRate": 0.228,
+          "display": {
+            "completion": "89% (structural estimate, not calibrated)",
+            "shareRate": "15% (structural estimate, not calibrated)",
+            "rewatchRate": "23% (structural estimate, not calibrated)"
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "disclaimer": "Structural estimate derived from this clip's measured signals — NOT an outcome-calibrated prediction of real-world performance. Calibrates only after >=100 outcome-labeled posts are recorded.",
+          "confidence": 0.386,
+          "inputs": {
+            "components": {
+              "hook": 1,
+              "retention": 0.841,
+              "emotion": 0,
+              "surprise": 0.735,
+              "pacing": 0.841,
+              "rewatch": 0.35,
+              "visualClarity": 1,
+              "captionPotential": 0.2
+            },
+            "durationSec": 13.607,
+            "outcomeLabeled": 0
+          },
+          "computedAt": "2026-06-27T09:59:11.657Z"
+        },
+        "editorGrade": {
+          "grade": "A",
+          "composite": 0.832,
+          "factors": {
+            "retention": 0.841,
+            "hook": 1,
+            "clarity": 1,
+            "captions": 0.2,
+            "safeZone": 1
+          },
+          "safeZoneCompliance": {
+            "value": 1,
+            "source": "no-crop",
+            "note": "no crop performed; nothing removed"
+          },
+          "confidence": 0.48,
+          "weights": {
+            "retention": 0.3,
+            "hook": 0.25,
+            "clarity": 0.15,
+            "captions": 0.15,
+            "safeZone": 0.15
+          },
+          "computedAt": "2026-06-27T09:59:11.657Z"
+        },
+        "headline": {
+          "viralScore": 0.644,
+          "gamingViralScore": 0.824,
+          "predictedCompletionRate": 0.894,
+          "predictedShareRate": 0.149,
+          "editorGrade": "A",
+          "confidence": 0.48
+        },
+        "renderPath": null,
+        "rank": 1
+      },
+      {
+        "id": "variantB",
+        "strategy": "maximum_excitement",
+        "label": "Maximum Excitement",
+        "segments": [
+          {
+            "start": 0.2,
+            "end": 11.8,
+            "duration": 11.6,
+            "score": 0.55,
+            "tags": [
+              "motion",
+              "scene"
+            ]
+          },
+          {
+            "start": 1.405,
+            "end": 3.412,
+            "duration": 2.007,
+            "score": 0.5,
+            "tags": [
+              "fallback"
+            ]
+          }
+        ],
+        "durationSec": 13.607,
+        "introStrength": 0.55,
+        "dropoffPenalty": 0,
+        "score": {
+          "viralScore": 0.644,
+          "confidence": 0.48,
+          "componentScores": {
+            "hook": {
+              "score": 1,
+              "weight": 0.15,
+              "confidence": 0.85,
+              "inputs": {
+                "timeToFirstEventSec": 0,
+                "targetMaxSec": 1.5
+              }
+            },
+            "retention": {
+              "score": 0.841,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "coverage": 1
+              }
+            },
+            "emotion": {
+              "score": 0,
+              "weight": 0.15,
+              "confidence": 0.25,
+              "inputs": {
+                "audioActivityPerMin": 0,
+                "audioPeak": 0
+              }
+            },
+            "surprise": {
+              "score": 0.735,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "multiSignalSpikesPerMin": 4.409
+              }
+            },
+            "pacing": {
+              "score": 0.841,
+              "weight": 0.1,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "gapCV": 0
+              }
+            },
+            "rewatch": {
+              "score": 0.35,
+              "weight": 0.1,
+              "confidence": 0.65,
+              "inputs": {
+                "endPayoff": 0.5,
+                "lateSurprise": 0
+              }
+            },
+            "visualClarity": {
+              "score": 1,
+              "weight": 0.05,
+              "confidence": 0.4,
+              "inputs": {
+                "excessMotionFraction": 0
+              }
+            },
+            "captionPotential": {
+              "score": 0.2,
+              "weight": 0.05,
+              "confidence": 0.6,
+              "inputs": {
+                "strongBeats": 2
+              }
+            }
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "priorInformed": false,
+          "priorSamples": 0,
+          "weightsSource": "research/viral_patterns.json",
+          "signals": {
+            "durationSec": 13.607,
+            "durationMin": 0.2267833333333333,
+            "highlightsCount": 2,
+            "hasAudioSignal": false,
+            "timeToFirstEventSec": 0,
+            "cutsPerMin": 8.818990225619167,
+            "cutsPerMinMeasured": false,
+            "avgShotLengthSec": null,
+            "coverage": 1,
+            "gapCV": 0,
+            "audioActivityPerMin": 0,
+            "audioPeak": 0,
+            "multiSignalSpikesPerMin": 4.409495112809584,
+            "endPayoff": 0.5,
+            "lateSurprise": 0,
+            "excessMotion": 0,
+            "strongBeats": 2,
+            "speechMeasured": false,
+            "wordsPerSec": null,
+            "speechCoverage": null,
+            "deadAirMaxSec": null,
+            "hookStyle": null,
+            "ctaPresent": null,
+            "ctaPosition": null
+          },
+          "computedAt": "2026-06-27T09:59:11.659Z"
+        },
+        "gaming": {
+          "gamingViralScore": 0.824,
+          "viralScore": 0.644,
+          "totalBonus": 0.18,
+          "bonusCapped": false,
+          "bonuses": {
+            "kill": {
+              "value": 0.055,
+              "proxy": 0.551,
+              "max": 0.1,
+              "inferred": true
+            },
+            "clutch": {
+              "value": 0.075,
+              "proxy": 0.5,
+              "max": 0.15,
+              "inferred": true
+            },
+            "reaction": {
+              "value": 0,
+              "proxy": 0,
+              "max": 0.1,
+              "inferred": true,
+              "requiresFacecam": true,
+              "facecamPresent": false
+            },
+            "victory": {
+              "value": 0.05,
+              "proxy": 0.5,
+              "max": 0.1,
+              "inferred": true
+            }
+          },
+          "confidence": 0.367,
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "detectabilityNote": "Kills, clutches and victories are INFERRED from audio/scene/motion surprise proxies — not from kill-feed OCR, game telemetry, or a trained vision model. Each is treated as a candidate with a measured confidence. Do not present these as ground-truth game events.",
+          "computedAt": "2026-06-27T09:59:11.660Z"
+        },
+        "retention": {
+          "predictedCompletionRate": 0.894,
+          "predictedAverageWatchTimeSec": 12.169,
+          "predictedShareRate": 0.149,
+          "predictedRewatchRate": 0.228,
+          "display": {
+            "completion": "89% (structural estimate, not calibrated)",
+            "shareRate": "15% (structural estimate, not calibrated)",
+            "rewatchRate": "23% (structural estimate, not calibrated)"
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "disclaimer": "Structural estimate derived from this clip's measured signals — NOT an outcome-calibrated prediction of real-world performance. Calibrates only after >=100 outcome-labeled posts are recorded.",
+          "confidence": 0.386,
+          "inputs": {
+            "components": {
+              "hook": 1,
+              "retention": 0.841,
+              "emotion": 0,
+              "surprise": 0.735,
+              "pacing": 0.841,
+              "rewatch": 0.35,
+              "visualClarity": 1,
+              "captionPotential": 0.2
+            },
+            "durationSec": 13.607,
+            "outcomeLabeled": 0
+          },
+          "computedAt": "2026-06-27T09:59:11.660Z"
+        },
+        "editorGrade": {
+          "grade": "A",
+          "composite": 0.832,
+          "factors": {
+            "retention": 0.841,
+            "hook": 1,
+            "clarity": 1,
+            "captions": 0.2,
+            "safeZone": 1
+          },
+          "safeZoneCompliance": {
+            "value": 1,
+            "source": "no-crop",
+            "note": "no crop performed; nothing removed"
+          },
+          "confidence": 0.48,
+          "weights": {
+            "retention": 0.3,
+            "hook": 0.25,
+            "clarity": 0.15,
+            "captions": 0.15,
+            "safeZone": 0.15
+          },
+          "computedAt": "2026-06-27T09:59:11.660Z"
+        },
+        "headline": {
+          "viralScore": 0.644,
+          "gamingViralScore": 0.824,
+          "predictedCompletionRate": 0.894,
+          "predictedShareRate": 0.149,
+          "editorGrade": "A",
+          "confidence": 0.48
+        },
+        "renderPath": null,
+        "rank": 2
+      },
+      {
+        "id": "variantC",
+        "strategy": "maximum_rewatch",
+        "label": "Maximum Rewatch",
+        "segments": [
+          {
+            "start": 0.2,
+            "end": 11.8,
+            "duration": 11.6,
+            "score": 0.55,
+            "tags": [
+              "motion",
+              "scene"
+            ]
+          },
+          {
+            "start": 1.405,
+            "end": 3.412,
+            "duration": 2.007,
+            "score": 0.5,
+            "tags": [
+              "fallback"
+            ]
+          }
+        ],
+        "durationSec": 13.607,
+        "introStrength": 0.55,
+        "dropoffPenalty": 0,
+        "score": {
+          "viralScore": 0.644,
+          "confidence": 0.48,
+          "componentScores": {
+            "hook": {
+              "score": 1,
+              "weight": 0.15,
+              "confidence": 0.85,
+              "inputs": {
+                "timeToFirstEventSec": 0,
+                "targetMaxSec": 1.5
+              }
+            },
+            "retention": {
+              "score": 0.841,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "coverage": 1
+              }
+            },
+            "emotion": {
+              "score": 0,
+              "weight": 0.15,
+              "confidence": 0.25,
+              "inputs": {
+                "audioActivityPerMin": 0,
+                "audioPeak": 0
+              }
+            },
+            "surprise": {
+              "score": 0.735,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "multiSignalSpikesPerMin": 4.409
+              }
+            },
+            "pacing": {
+              "score": 0.841,
+              "weight": 0.1,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "gapCV": 0
+              }
+            },
+            "rewatch": {
+              "score": 0.35,
+              "weight": 0.1,
+              "confidence": 0.65,
+              "inputs": {
+                "endPayoff": 0.5,
+                "lateSurprise": 0
+              }
+            },
+            "visualClarity": {
+              "score": 1,
+              "weight": 0.05,
+              "confidence": 0.4,
+              "inputs": {
+                "excessMotionFraction": 0
+              }
+            },
+            "captionPotential": {
+              "score": 0.2,
+              "weight": 0.05,
+              "confidence": 0.6,
+              "inputs": {
+                "strongBeats": 2
+              }
+            }
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "priorInformed": false,
+          "priorSamples": 0,
+          "weightsSource": "research/viral_patterns.json",
+          "signals": {
+            "durationSec": 13.607,
+            "durationMin": 0.2267833333333333,
+            "highlightsCount": 2,
+            "hasAudioSignal": false,
+            "timeToFirstEventSec": 0,
+            "cutsPerMin": 8.818990225619167,
+            "cutsPerMinMeasured": false,
+            "avgShotLengthSec": null,
+            "coverage": 1,
+            "gapCV": 0,
+            "audioActivityPerMin": 0,
+            "audioPeak": 0,
+            "multiSignalSpikesPerMin": 4.409495112809584,
+            "endPayoff": 0.5,
+            "lateSurprise": 0,
+            "excessMotion": 0,
+            "strongBeats": 2,
+            "speechMeasured": false,
+            "wordsPerSec": null,
+            "speechCoverage": null,
+            "deadAirMaxSec": null,
+            "hookStyle": null,
+            "ctaPresent": null,
+            "ctaPosition": null
+          },
+          "computedAt": "2026-06-27T09:59:11.662Z"
+        },
+        "gaming": {
+          "gamingViralScore": 0.824,
+          "viralScore": 0.644,
+          "totalBonus": 0.18,
+          "bonusCapped": false,
+          "bonuses": {
+            "kill": {
+              "value": 0.055,
+              "proxy": 0.551,
+              "max": 0.1,
+              "inferred": true
+            },
+            "clutch": {
+              "value": 0.075,
+              "proxy": 0.5,
+              "max": 0.15,
+              "inferred": true
+            },
+            "reaction": {
+              "value": 0,
+              "proxy": 0,
+              "max": 0.1,
+              "inferred": true,
+              "requiresFacecam": true,
+              "facecamPresent": false
+            },
+            "victory": {
+              "value": 0.05,
+              "proxy": 0.5,
+              "max": 0.1,
+              "inferred": true
+            }
+          },
+          "confidence": 0.367,
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "detectabilityNote": "Kills, clutches and victories are INFERRED from audio/scene/motion surprise proxies — not from kill-feed OCR, game telemetry, or a trained vision model. Each is treated as a candidate with a measured confidence. Do not present these as ground-truth game events.",
+          "computedAt": "2026-06-27T09:59:11.662Z"
+        },
+        "retention": {
+          "predictedCompletionRate": 0.894,
+          "predictedAverageWatchTimeSec": 12.169,
+          "predictedShareRate": 0.149,
+          "predictedRewatchRate": 0.228,
+          "display": {
+            "completion": "89% (structural estimate, not calibrated)",
+            "shareRate": "15% (structural estimate, not calibrated)",
+            "rewatchRate": "23% (structural estimate, not calibrated)"
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "disclaimer": "Structural estimate derived from this clip's measured signals — NOT an outcome-calibrated prediction of real-world performance. Calibrates only after >=100 outcome-labeled posts are recorded.",
+          "confidence": 0.386,
+          "inputs": {
+            "components": {
+              "hook": 1,
+              "retention": 0.841,
+              "emotion": 0,
+              "surprise": 0.735,
+              "pacing": 0.841,
+              "rewatch": 0.35,
+              "visualClarity": 1,
+              "captionPotential": 0.2
+            },
+            "durationSec": 13.607,
+            "outcomeLabeled": 0
+          },
+          "computedAt": "2026-06-27T09:59:11.662Z"
+        },
+        "editorGrade": {
+          "grade": "A",
+          "composite": 0.832,
+          "factors": {
+            "retention": 0.841,
+            "hook": 1,
+            "clarity": 1,
+            "captions": 0.2,
+            "safeZone": 1
+          },
+          "safeZoneCompliance": {
+            "value": 1,
+            "source": "no-crop",
+            "note": "no crop performed; nothing removed"
+          },
+          "confidence": 0.48,
+          "weights": {
+            "retention": 0.3,
+            "hook": 0.25,
+            "clarity": 0.15,
+            "captions": 0.15,
+            "safeZone": 0.15
+          },
+          "computedAt": "2026-06-27T09:59:11.662Z"
+        },
+        "headline": {
+          "viralScore": 0.644,
+          "gamingViralScore": 0.824,
+          "predictedCompletionRate": 0.894,
+          "predictedShareRate": 0.149,
+          "editorGrade": "A",
+          "confidence": 0.48
+        },
+        "renderPath": null,
+        "rank": 3
+      },
+      {
+        "id": "variantD",
+        "strategy": "story_arc",
+        "label": "Story Arc",
+        "segments": [
+          {
+            "start": 0.2,
+            "end": 11.8,
+            "duration": 11.6,
+            "score": 0.55,
+            "tags": [
+              "motion",
+              "scene"
+            ]
+          },
+          {
+            "start": 1.405,
+            "end": 3.412,
+            "duration": 2.007,
+            "score": 0.5,
+            "tags": [
+              "fallback"
+            ]
+          }
+        ],
+        "durationSec": 13.607,
+        "introStrength": 0.55,
+        "dropoffPenalty": 0,
+        "score": {
+          "viralScore": 0.644,
+          "confidence": 0.48,
+          "componentScores": {
+            "hook": {
+              "score": 1,
+              "weight": 0.15,
+              "confidence": 0.85,
+              "inputs": {
+                "timeToFirstEventSec": 0,
+                "targetMaxSec": 1.5
+              }
+            },
+            "retention": {
+              "score": 0.841,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "coverage": 1
+              }
+            },
+            "emotion": {
+              "score": 0,
+              "weight": 0.15,
+              "confidence": 0.25,
+              "inputs": {
+                "audioActivityPerMin": 0,
+                "audioPeak": 0
+              }
+            },
+            "surprise": {
+              "score": 0.735,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "multiSignalSpikesPerMin": 4.409
+              }
+            },
+            "pacing": {
+              "score": 0.841,
+              "weight": 0.1,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "gapCV": 0
+              }
+            },
+            "rewatch": {
+              "score": 0.35,
+              "weight": 0.1,
+              "confidence": 0.65,
+              "inputs": {
+                "endPayoff": 0.5,
+                "lateSurprise": 0
+              }
+            },
+            "visualClarity": {
+              "score": 1,
+              "weight": 0.05,
+              "confidence": 0.4,
+              "inputs": {
+                "excessMotionFraction": 0
+              }
+            },
+            "captionPotential": {
+              "score": 0.2,
+              "weight": 0.05,
+              "confidence": 0.6,
+              "inputs": {
+                "strongBeats": 2
+              }
+            }
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "priorInformed": false,
+          "priorSamples": 0,
+          "weightsSource": "research/viral_patterns.json",
+          "signals": {
+            "durationSec": 13.607,
+            "durationMin": 0.2267833333333333,
+            "highlightsCount": 2,
+            "hasAudioSignal": false,
+            "timeToFirstEventSec": 0,
+            "cutsPerMin": 8.818990225619167,
+            "cutsPerMinMeasured": false,
+            "avgShotLengthSec": null,
+            "coverage": 1,
+            "gapCV": 0,
+            "audioActivityPerMin": 0,
+            "audioPeak": 0,
+            "multiSignalSpikesPerMin": 4.409495112809584,
+            "endPayoff": 0.5,
+            "lateSurprise": 0,
+            "excessMotion": 0,
+            "strongBeats": 2,
+            "speechMeasured": false,
+            "wordsPerSec": null,
+            "speechCoverage": null,
+            "deadAirMaxSec": null,
+            "hookStyle": null,
+            "ctaPresent": null,
+            "ctaPosition": null
+          },
+          "computedAt": "2026-06-27T09:59:11.664Z"
+        },
+        "gaming": {
+          "gamingViralScore": 0.824,
+          "viralScore": 0.644,
+          "totalBonus": 0.18,
+          "bonusCapped": false,
+          "bonuses": {
+            "kill": {
+              "value": 0.055,
+              "proxy": 0.551,
+              "max": 0.1,
+              "inferred": true
+            },
+            "clutch": {
+              "value": 0.075,
+              "proxy": 0.5,
+              "max": 0.15,
+              "inferred": true
+            },
+            "reaction": {
+              "value": 0,
+              "proxy": 0,
+              "max": 0.1,
+              "inferred": true,
+              "requiresFacecam": true,
+              "facecamPresent": false
+            },
+            "victory": {
+              "value": 0.05,
+              "proxy": 0.5,
+              "max": 0.1,
+              "inferred": true
+            }
+          },
+          "confidence": 0.367,
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "detectabilityNote": "Kills, clutches and victories are INFERRED from audio/scene/motion surprise proxies — not from kill-feed OCR, game telemetry, or a trained vision model. Each is treated as a candidate with a measured confidence. Do not present these as ground-truth game events.",
+          "computedAt": "2026-06-27T09:59:11.664Z"
+        },
+        "retention": {
+          "predictedCompletionRate": 0.894,
+          "predictedAverageWatchTimeSec": 12.169,
+          "predictedShareRate": 0.149,
+          "predictedRewatchRate": 0.228,
+          "display": {
+            "completion": "89% (structural estimate, not calibrated)",
+            "shareRate": "15% (structural estimate, not calibrated)",
+            "rewatchRate": "23% (structural estimate, not calibrated)"
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "disclaimer": "Structural estimate derived from this clip's measured signals — NOT an outcome-calibrated prediction of real-world performance. Calibrates only after >=100 outcome-labeled posts are recorded.",
+          "confidence": 0.386,
+          "inputs": {
+            "components": {
+              "hook": 1,
+              "retention": 0.841,
+              "emotion": 0,
+              "surprise": 0.735,
+              "pacing": 0.841,
+              "rewatch": 0.35,
+              "visualClarity": 1,
+              "captionPotential": 0.2
+            },
+            "durationSec": 13.607,
+            "outcomeLabeled": 0
+          },
+          "computedAt": "2026-06-27T09:59:11.664Z"
+        },
+        "editorGrade": {
+          "grade": "A",
+          "composite": 0.832,
+          "factors": {
+            "retention": 0.841,
+            "hook": 1,
+            "clarity": 1,
+            "captions": 0.2,
+            "safeZone": 1
+          },
+          "safeZoneCompliance": {
+            "value": 1,
+            "source": "no-crop",
+            "note": "no crop performed; nothing removed"
+          },
+          "confidence": 0.48,
+          "weights": {
+            "retention": 0.3,
+            "hook": 0.25,
+            "clarity": 0.15,
+            "captions": 0.15,
+            "safeZone": 0.15
+          },
+          "computedAt": "2026-06-27T09:59:11.664Z"
+        },
+        "headline": {
+          "viralScore": 0.644,
+          "gamingViralScore": 0.824,
+          "predictedCompletionRate": 0.894,
+          "predictedShareRate": 0.149,
+          "editorGrade": "A",
+          "confidence": 0.48
+        },
+        "renderPath": null,
+        "rank": 4
+      },
+      {
+        "id": "variantE",
+        "strategy": "balanced",
+        "label": "Balanced",
+        "segments": [
+          {
+            "start": 0.2,
+            "end": 11.8,
+            "duration": 11.6,
+            "score": 0.55,
+            "tags": [
+              "motion",
+              "scene"
+            ]
+          },
+          {
+            "start": 1.405,
+            "end": 3.412,
+            "duration": 2.007,
+            "score": 0.5,
+            "tags": [
+              "fallback"
+            ]
+          }
+        ],
+        "durationSec": 13.607,
+        "introStrength": 0.55,
+        "dropoffPenalty": 0,
+        "score": {
+          "viralScore": 0.644,
+          "confidence": 0.48,
+          "componentScores": {
+            "hook": {
+              "score": 1,
+              "weight": 0.15,
+              "confidence": 0.85,
+              "inputs": {
+                "timeToFirstEventSec": 0,
+                "targetMaxSec": 1.5
+              }
+            },
+            "retention": {
+              "score": 0.841,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "coverage": 1
+              }
+            },
+            "emotion": {
+              "score": 0,
+              "weight": 0.15,
+              "confidence": 0.25,
+              "inputs": {
+                "audioActivityPerMin": 0,
+                "audioPeak": 0
+              }
+            },
+            "surprise": {
+              "score": 0.735,
+              "weight": 0.2,
+              "confidence": 0.4,
+              "inputs": {
+                "multiSignalSpikesPerMin": 4.409
+              }
+            },
+            "pacing": {
+              "score": 0.841,
+              "weight": 0.1,
+              "confidence": 0.4,
+              "inputs": {
+                "cutsPerMin": 8.819,
+                "gapCV": 0
+              }
+            },
+            "rewatch": {
+              "score": 0.35,
+              "weight": 0.1,
+              "confidence": 0.65,
+              "inputs": {
+                "endPayoff": 0.5,
+                "lateSurprise": 0
+              }
+            },
+            "visualClarity": {
+              "score": 1,
+              "weight": 0.05,
+              "confidence": 0.4,
+              "inputs": {
+                "excessMotionFraction": 0
+              }
+            },
+            "captionPotential": {
+              "score": 0.2,
+              "weight": 0.05,
+              "confidence": 0.6,
+              "inputs": {
+                "strongBeats": 2
+              }
+            }
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "priorInformed": false,
+          "priorSamples": 0,
+          "weightsSource": "research/viral_patterns.json",
+          "signals": {
+            "durationSec": 13.607,
+            "durationMin": 0.2267833333333333,
+            "highlightsCount": 2,
+            "hasAudioSignal": false,
+            "timeToFirstEventSec": 0,
+            "cutsPerMin": 8.818990225619167,
+            "cutsPerMinMeasured": false,
+            "avgShotLengthSec": null,
+            "coverage": 1,
+            "gapCV": 0,
+            "audioActivityPerMin": 0,
+            "audioPeak": 0,
+            "multiSignalSpikesPerMin": 4.409495112809584,
+            "endPayoff": 0.5,
+            "lateSurprise": 0,
+            "excessMotion": 0,
+            "strongBeats": 2,
+            "speechMeasured": false,
+            "wordsPerSec": null,
+            "speechCoverage": null,
+            "deadAirMaxSec": null,
+            "hookStyle": null,
+            "ctaPresent": null,
+            "ctaPosition": null
+          },
+          "computedAt": "2026-06-27T09:59:11.666Z"
+        },
+        "gaming": {
+          "gamingViralScore": 0.824,
+          "viralScore": 0.644,
+          "totalBonus": 0.18,
+          "bonusCapped": false,
+          "bonuses": {
+            "kill": {
+              "value": 0.055,
+              "proxy": 0.551,
+              "max": 0.1,
+              "inferred": true
+            },
+            "clutch": {
+              "value": 0.075,
+              "proxy": 0.5,
+              "max": 0.15,
+              "inferred": true
+            },
+            "reaction": {
+              "value": 0,
+              "proxy": 0,
+              "max": 0.1,
+              "inferred": true,
+              "requiresFacecam": true,
+              "facecamPresent": false
+            },
+            "victory": {
+              "value": 0.05,
+              "proxy": 0.5,
+              "max": 0.1,
+              "inferred": true
+            }
+          },
+          "confidence": 0.367,
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "detectabilityNote": "Kills, clutches and victories are INFERRED from audio/scene/motion surprise proxies — not from kill-feed OCR, game telemetry, or a trained vision model. Each is treated as a candidate with a measured confidence. Do not present these as ground-truth game events.",
+          "computedAt": "2026-06-27T09:59:11.667Z"
+        },
+        "retention": {
+          "predictedCompletionRate": 0.894,
+          "predictedAverageWatchTimeSec": 12.169,
+          "predictedShareRate": 0.149,
+          "predictedRewatchRate": 0.228,
+          "display": {
+            "completion": "89% (structural estimate, not calibrated)",
+            "shareRate": "15% (structural estimate, not calibrated)",
+            "rewatchRate": "23% (structural estimate, not calibrated)"
+          },
+          "basis": "structural_heuristic",
+          "calibrated": false,
+          "disclaimer": "Structural estimate derived from this clip's measured signals — NOT an outcome-calibrated prediction of real-world performance. Calibrates only after >=100 outcome-labeled posts are recorded.",
+          "confidence": 0.386,
+          "inputs": {
+            "components": {
+              "hook": 1,
+              "retention": 0.841,
+              "emotion": 0,
+              "surprise": 0.735,
+              "pacing": 0.841,
+              "rewatch": 0.35,
+              "visualClarity": 1,
+              "captionPotential": 0.2
+            },
+            "durationSec": 13.607,
+            "outcomeLabeled": 0
+          },
+          "computedAt": "2026-06-27T09:59:11.667Z"
+        },
+        "editorGrade": {
+          "grade": "A",
+          "composite": 0.832,
+          "factors": {
+            "retention": 0.841,
+            "hook": 1,
+            "clarity": 1,
+            "captions": 0.2,
+            "safeZone": 1
+          },
+          "safeZoneCompliance": {
+            "value": 1,
+            "source": "no-crop",
+            "note": "no crop performed; nothing removed"
+          },
+          "confidence": 0.48,
+          "weights": {
+            "retention": 0.3,
+            "hook": 0.25,
+            "clarity": 0.15,
+            "captions": 0.15,
+            "safeZone": 0.15
+          },
+          "computedAt": "2026-06-27T09:59:11.667Z"
+        },
+        "headline": {
+          "viralScore": 0.644,
+          "gamingViralScore": 0.824,
+          "predictedCompletionRate": 0.894,
+          "predictedShareRate": 0.149,
+          "editorGrade": "A",
+          "confidence": 0.48
+        },
+        "renderPath": null,
+        "rank": 5
+      }
+    ],
+    "captions": [
+      {
+        "text": "▶ MOMENT",
+        "startTime": 0.2,
+        "endTime": 1,
+        "duration": 0.8,
+        "style": {
+          "fontSize": 36,
+          "fontFamily": "Arial, sans-serif",
+          "color": "#87ceeb",
+          "backgroundColor": "rgba(0, 0, 0, 0.7)",
+          "borderRadius": 8,
+          "padding": "12px 16px",
+          "position": "bottom-center",
+          "safeMargin": 30,
+          "animation": "none"
+        }
+      },
+      {
+        "text": "ACTION",
+        "startTime": 5.7,
+        "endTime": 6.8,
+        "duration": 1.1,
+        "style": {
+          "fontSize": 48,
+          "fontFamily": "Arial, sans-serif",
+          "color": "#ffffff",
+          "backgroundColor": "rgba(255, 0, 0, 0.7)",
+          "borderRadius": 8,
+          "padding": "12px 16px",
+          "position": "bottom-center",
+          "safeMargin": 30,
+          "animation": "fadeInUp"
+        }
+      },
+      {
+        "text": "GG",
+        "startTime": 11.3,
+        "endTime": 11.8,
+        "duration": 0.5,
+        "style": {
+          "fontSize": 36,
+          "fontFamily": "Arial, sans-serif",
+          "color": "#87ceeb",
+          "backgroundColor": "rgba(0, 0, 0, 0.7)",
+          "borderRadius": 8,
+          "padding": "12px 16px",
+          "position": "bottom-center",
+          "safeMargin": 30,
+          "animation": "none"
+        }
+      }
+    ],
+    "stages": {
+      "analyzed": "2026-06-27T09:59:11.680Z",
+      "variants": "2026-06-27T09:59:11.680Z",
+      "captions": "2026-06-27T09:59:11.680Z"
+    },
+    "analysisRuns": [
+      {
+        "jobId": "job-1782554349161-d9yjs937a",
+        "status": "complete",
+        "startedAt": "2026-06-27T09:59:09.188Z",
+        "finishedAt": "2026-06-27T09:59:11.682Z",
+        "highlightCount": 2,
+        "durationSec": 12.041667,
+        "analysisCapped": false
+      }
+    ],
+    "validations": {
+      "variantA": {
+        "ok": false,
+        "checks": [
+          {
+            "name": "resolution",
+            "ok": true,
+            "expected": "1080x1920",
+            "actual": "1080x1920"
+          },
+          {
+            "name": "fps",
+            "ok": true,
+            "expected": ">=30",
+            "actual": "30.00"
+          },
+          {
+            "name": "video_codec",
+            "ok": true,
+            "expected": "h264",
+            "actual": "h264"
+          },
+          {
+            "name": "audio",
+            "ok": true,
+            "expected": "present",
+            "actual": "aac 2ch"
+          },
+          {
+            "name": "duration",
+            "ok": false,
+            "expected": "15-60s",
+            "actual": "13.6s"
+          }
+        ],
+        "blockedReasons": [
+          "duration: expected 15-60s, got 13.6s"
+        ],
+        "probedAt": "2026-06-27T10:08:06.902Z",
+        "encode": {
+          "outputPath": "C:\\dev\\lantern-os-stable\\data\\creator\\exports\\job-1782554816582-lvbh96wyt-9_16.mp4",
+          "segments": 2,
+          "durationTarget": 13.607,
+          "fit": "crop",
+          "hadAudioSource": false,
+          "cropPlan": {
+            "cropRect": {
+              "x": 0,
+              "y": 0,
+              "width": 1,
+              "height": 1
+            },
+            "mode": "none",
+            "preserved": [
+              "facecam"
+            ],
+            "excluded": [],
+            "sliced": [],
+            "pipRecommended": false,
+            "confidence": 1,
+            "regions": [
+              {
+                "type": "facecam",
+                "candidate": true,
+                "corner": "bottom_right",
+                "bounds": {
+                  "x": 0.75,
+                  "y": 0.125,
+                  "width": 0.25,
+                  "height": 0.75
+                },
+                "confidence": 0.754,
+                "cues": {
+                  "seam": 1,
+                  "activity": 0.617,
+                  "distinct": 0.145
+                },
+                "guided": false,
+                "needsDeclaration": false,
+                "priority": 1
+              }
+            ],
+            "framesSampled": 12
+          },
+          "captionsBurned": 3
+        }
+      },
+      "variantB": {
+        "ok": false,
+        "checks": [
+          {
+            "name": "resolution",
+            "ok": true,
+            "expected": "1080x1920",
+            "actual": "1080x1920"
+          },
+          {
+            "name": "fps",
+            "ok": true,
+            "expected": ">=30",
+            "actual": "30.00"
+          },
+          {
+            "name": "video_codec",
+            "ok": true,
+            "expected": "h264",
+            "actual": "h264"
+          },
+          {
+            "name": "audio",
+            "ok": true,
+            "expected": "present",
+            "actual": "aac 2ch"
+          },
+          {
+            "name": "duration",
+            "ok": false,
+            "expected": "15-60s",
+            "actual": "13.6s"
+          }
+        ],
+        "blockedReasons": [
+          "duration: expected 15-60s, got 13.6s"
+        ],
+        "probedAt": "2026-06-27T10:02:47.628Z",
+        "encode": {
+          "outputPath": "C:\\dev\\lantern-os-stable\\data\\creator\\exports\\job-1782554498294-y2rgjjzyt-9_16.mp4",
+          "segments": 2,
+          "durationTarget": 13.607,
+          "fit": "crop",
+          "hadAudioSource": false,
+          "cropPlan": {
+            "cropRect": {
+              "x": 0,
+              "y": 0,
+              "width": 1,
+              "height": 1
+            },
+            "mode": "none",
+            "preserved": [
+              "facecam"
+            ],
+            "excluded": [],
+            "sliced": [],
+            "pipRecommended": false,
+            "confidence": 1,
+            "regions": [
+              {
+                "type": "facecam",
+                "candidate": true,
+                "corner": "bottom_right",
+                "bounds": {
+                  "x": 0.75,
+                  "y": 0.125,
+                  "width": 0.25,
+                  "height": 0.75
+                },
+                "confidence": 0.754,
+                "cues": {
+                  "seam": 1,
+                  "activity": 0.617,
+                  "distinct": 0.145
+                },
+                "guided": false,
+                "needsDeclaration": false,
+                "priority": 1
+              }
+            ],
+            "framesSampled": 12
+          },
+          "captionsBurned": 3
+        }
+      },
+      "variantC": {
+        "ok": false,
+        "checks": [
+          {
+            "name": "resolution",
+            "ok": true,
+            "expected": "1080x1920",
+            "actual": "1080x1920"
+          },
+          {
+            "name": "fps",
+            "ok": true,
+            "expected": ">=30",
+            "actual": "30.00"
+          },
+          {
+            "name": "video_codec",
+            "ok": true,
+            "expected": "h264",
+            "actual": "h264"
+          },
+          {
+            "name": "audio",
+            "ok": true,
+            "expected": "present",
+            "actual": "aac 2ch"
+          },
+          {
+            "name": "duration",
+            "ok": false,
+            "expected": "15-60s",
+            "actual": "13.6s"
+          }
+        ],
+        "blockedReasons": [
+          "duration: expected 15-60s, got 13.6s"
+        ],
+        "probedAt": "2026-06-27T10:03:31.361Z",
+        "encode": {
+          "outputPath": "C:\\dev\\lantern-os-stable\\data\\creator\\exports\\job-1782554501864-qnags6e1i-9_16.mp4",
+          "segments": 2,
+          "durationTarget": 13.607,
+          "fit": "crop",
+          "hadAudioSource": false,
+          "cropPlan": {
+            "cropRect": {
+              "x": 0,
+              "y": 0,
+              "width": 1,
+              "height": 1
+            },
+            "mode": "none",
+            "preserved": [
+              "facecam"
+            ],
+            "excluded": [],
+            "sliced": [],
+            "pipRecommended": false,
+            "confidence": 1,
+            "regions": [
+              {
+                "type": "facecam",
+                "candidate": true,
+                "corner": "bottom_right",
+                "bounds": {
+                  "x": 0.75,
+                  "y": 0.125,
+                  "width": 0.25,
+                  "height": 0.75
+                },
+                "confidence": 0.754,
+                "cues": {
+                  "seam": 1,
+                  "activity": 0.617,
+                  "distinct": 0.145
+                },
+                "guided": false,
+                "needsDeclaration": false,
+                "priority": 1
+              }
+            ],
+            "framesSampled": 12
+          },
+          "captionsBurned": 3
+        }
+      },
+      "variantD": {
+        "ok": false,
+        "checks": [
+          {
+            "name": "resolution",
+            "ok": true,
+            "expected": "1080x1920",
+            "actual": "1080x1920"
+          },
+          {
+            "name": "fps",
+            "ok": true,
+            "expected": ">=30",
+            "actual": "30.00"
+          },
+          {
+            "name": "video_codec",
+            "ok": true,
+            "expected": "h264",
+            "actual": "h264"
+          },
+          {
+            "name": "audio",
+            "ok": true,
+            "expected": "present",
+            "actual": "aac 2ch"
+          },
+          {
+            "name": "duration",
+            "ok": false,
+            "expected": "15-60s",
+            "actual": "13.6s"
+          }
+        ],
+        "blockedReasons": [
+          "duration: expected 15-60s, got 13.6s"
+        ],
+        "probedAt": "2026-06-27T10:04:29.687Z",
+        "encode": {
+          "outputPath": "C:\\dev\\lantern-os-stable\\data\\creator\\exports\\job-1782554502448-b7ek2g5l4-9_16.mp4",
+          "segments": 2,
+          "durationTarget": 13.607,
+          "fit": "crop",
+          "hadAudioSource": false,
+          "cropPlan": {
+            "cropRect": {
+              "x": 0,
+              "y": 0,
+              "width": 1,
+              "height": 1
+            },
+            "mode": "none",
+            "preserved": [
+              "facecam"
+            ],
+            "excluded": [],
+            "sliced": [],
+            "pipRecommended": false,
+            "confidence": 1,
+            "regions": [
+              {
+                "type": "facecam",
+                "candidate": true,
+                "corner": "bottom_right",
+                "bounds": {
+                  "x": 0.75,
+                  "y": 0.125,
+                  "width": 0.25,
+                  "height": 0.75
+                },
+                "confidence": 0.754,
+                "cues": {
+                  "seam": 1,
+                  "activity": 0.617,
+                  "distinct": 0.145
+                },
+                "guided": false,
+                "needsDeclaration": false,
+                "priority": 1
+              }
+            ],
+            "framesSampled": 12
+          },
+          "captionsBurned": 3
+        }
+      },
+      "variantE": {
+        "ok": false,
+        "checks": [
+          {
+            "name": "resolution",
+            "ok": true,
+            "expected": "1080x1920",
+            "actual": "1080x1920"
+          },
+          {
+            "name": "fps",
+            "ok": true,
+            "expected": ">=30",
+            "actual": "30.00"
+          },
+          {
+            "name": "video_codec",
+            "ok": true,
+            "expected": "h264",
+            "actual": "h264"
+          },
+          {
+            "name": "audio",
+            "ok": true,
+            "expected": "present",
+            "actual": "aac 2ch"
+          },
+          {
+            "name": "duration",
+            "ok": false,
+            "expected": "15-60s",
+            "actual": "13.6s"
+          }
+        ],
+        "blockedReasons": [
+          "duration: expected 15-60s, got 13.6s"
+        ],
+        "probedAt": "2026-06-27T10:05:35.167Z",
+        "encode": {
+          "outputPath": "C:\\dev\\lantern-os-stable\\data\\creator\\exports\\job-1782554503773-gltcy472t-9_16.mp4",
+          "segments": 2,
+          "durationTarget": 13.607,
+          "fit": "crop",
+          "hadAudioSource": false,
+          "cropPlan": {
+            "cropRect": {
+              "x": 0,
+              "y": 0,
+              "width": 1,
+              "height": 1
+            },
+            "mode": "none",
+            "preserved": [
+              "facecam"
+            ],
+            "excluded": [],
+            "sliced": [],
+            "pipRecommended": false,
+            "confidence": 1,
+            "regions": [
+              {
+                "type": "facecam",
+                "candidate": true,
+                "corner": "bottom_right",
+                "bounds": {
+                  "x": 0.75,
+                  "y": 0.125,
+                  "width": 0.25,
+                  "height": 0.75
+                },
+                "confidence": 0.754,
+                "cues": {
+                  "seam": 1,
+                  "activity": 0.617,
+                  "distinct": 0.145
+                },
+                "guided": false,
+                "needsDeclaration": false,
+                "priority": 1
+              }
+            ],
+            "framesSampled": 12
+          },
+          "captionsBurned": 3
+        }
+      }
+    },
+    "renderRecords": [],
+    "analysisError": null,
+    "formattedDate": "Jun 27, 2026, 05:03 AM"
+  },
+  "analysis": {
+    "videoPath": "C:\\dev\\lantern-os-stable\\data\\dreamer\\videos\\1782551035131-kingdome_of_hearts.mp4",
+    "duration": 12.041667,
+    "fps": 5,
+    "highlights": [
+      {
+        "start": 0.2,
+        "end": 11.8,
+        "duration": 11.6,
+        "score": 0.55,
+        "reason": "motion + scene change",
+        "tags": [
+          "motion",
+          "scene"
+        ]
+      },
+      {
+        "start": 1.405,
+        "end": 3.412,
+        "duration": 2.007,
+        "score": 0.5,
+        "tags": [
+          "fallback"
+        ],
+        "reason": "fallback: sampled window (no signals)"
+      }
+    ],
+    "topHighlights": [
+      {
+        "start": 0.2,
+        "end": 11.8,
+        "duration": 11.6,
+        "score": 0.55,
+        "reason": "motion + scene change",
+        "tags": [
+          "motion",
+          "scene"
+        ]
+      }
+    ],
+    "metadata": {
+      "analyzedAt": "2026-06-27T09:59:09.440Z",
+      "version": "8.0",
+      "shotBoundaries": {
+        "count": 59,
+        "cutsPerMin": 293.979,
+        "avgShotLengthSec": 0.201,
+        "shotLengthCV": 0.027,
+        "durationSec": 12.04,
+        "source": "ffmpeg_scene_hsv",
+        "threshold": 0.3,
+        "measured": true
+      },
+      "debug": {
+        "videoDuration": 12.04,
+        "fps": 5,
+        "sampledMotionFrames": 59,
+        "sampledAudioFrames": 0,
+        "sceneChanges": 59,
+        "mergedHighlights": 1
+      },
+      "gameplayDensity": [
+        {
+          "time": 0,
+          "density": 0.269
+        },
+        {
+          "time": 1,
+          "density": 0.349
+        },
+        {
+          "time": 2,
+          "density": 0.38
+        },
+        {
+          "time": 3,
+          "density": 0.378
+        },
+        {
+          "time": 4,
+          "density": 0.498
+        },
+        {
+          "time": 5,
+          "density": 0.55
+        },
+        {
+          "time": 6,
+          "density": 0.538
+        },
+        {
+          "time": 7,
+          "density": 0.481
+        },
+        {
+          "time": 8,
+          "density": 0.402
+        },
+        {
+          "time": 9,
+          "density": 0.422
+        },
+        {
+          "time": 10,
+          "density": 0.388
+        },
+        {
+          "time": 11,
+          "density": 0.352
+        }
+      ],
+      "scoring": "gameplay_first_v10"
+    },
+    "debug": {
+      "videoDuration": 12.04,
+      "fps": 5,
+      "sampledMotionFrames": 59,
+      "sceneChanges": 59,
+      "candidateCount": 59,
+      "segmentCount": 2,
+      "variantCount": 5,
+      "captionCount": 3,
+      "usedFallback": true
+    }
+  }
+}

@@ -21,10 +21,9 @@
   var NAV_LINKS = [
     { href: "/dream-chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
-    { href: "/kalshi-terminal.html", label: "Kalshi" },
-    { href: "/create.html", label: "Create" },
+    { href: "/orchestration.html", label: "Orchestration" },
+    { href: "/work.html", label: "Work" },
     { href: "/explore.html", label: "Explore" },
-    { href: "/knowledgecenter.html", label: "Help" },
   ];
 
   function navHtml() {
@@ -35,18 +34,16 @@
       '<nav class="site-nav">\n' +
       '  <a class="nav-brand" href="/">\n' +
       '    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">\n' +
-      '    <span style="font-size:18px;font-weight:600">Keystone OS</span>\n' +
+      '    <span style="font-size:18px;font-weight:600">unisona.ai</span>\n' +
       "  </a>\n" +
       '  <div class="nav-links">\n    ' +
       links +
       "\n" +
-      '    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>\n' +
       "  </div>\n" +
       '  <div class="nav-actions">\n' +
-      '    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>\n' +
-      '    <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>\n' +
-      '    <button class="nav-btn" id="screenshot-btn" type="button" onclick="if(window.issueReporter)window.issueReporter.open()" title="Report an issue (screenshot → GitHub)" aria-label="Report an issue with a screenshot">📷</button>\n' +
-      '    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>\n' +
+      '    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>\n' +
+      '    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode"><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>\n' +
+      '    <button class="nav-btn" id="screenshot-btn" type="button" onclick="if(window.issueReporter)window.issueReporter.open()" title="Report an issue (screenshot → GitHub)" aria-label="Report an issue with a screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>\n' +
       "  </div>\n" +
       "</nav>"
     );
@@ -61,7 +58,7 @@
       '  <div class="footer-inner">\n' +
       '    <span class="footer-brand">\n' +
       '      <span class="dot online" id="status-dot" title="Server status"></span>\n' +
-      "      Keystone OS\n" +
+      "      Unisona OS\n" +
       "    </span>\n" +
       '    <span class="sep">·</span>\n' +
       '    <a href="/">Home</a>\n    ' +
@@ -113,8 +110,9 @@
     });
 
     // theme-toggle.js may have run before this nav existed; sync the glyph.
+    // Skip when the button uses SVG icons — CSS drives sun/moon via data-theme.
     var btn = document.getElementById("theme-toggle");
-    if (btn) {
+    if (btn && !btn.querySelector("svg")) {
       btn.textContent =
         document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
     }

@@ -350,6 +350,52 @@ function selectAgent(message) {
   return winner;
 }
 
+// ── Dynamic task agents ──────────────────────────────────────────────────────
+// The desk agent is synthesized per message: the Keystone base persona plus a
+// task lens, keyed by the SAME task-type taxonomy the PCSF provider leaderboard
+// ranks with (task-detector / provider.pcsf.json). The lens sharpens the Reason
+// stage for that intent and its taskType drives PCSF chain selection — an agent
+// stays {id, name, systemPrompt}, not a new subsystem.
+const TASK_LENSES = [
+  {
+    key: "summarize",
+    match: /\b(summari[sz]e|tl;?dr|recap|condense|digest|key points? (of|from))\b/i,
+    taskType: "reasoning",
+    name: "Keystone · Summarizer",
+    lens: `## Task lens: SUMMARIZE
+Ground the summary ONLY in material the user provided or that memory recall / attachments / the knowledge center surfaced. Structure it as: key points → decisions → open questions. Name each source you drew from; if no source material is available yet, ask for the notes instead of inventing a summary.`,
+  },
+  {
+    key: "plan",
+    match: /\b(plan (my|the|this|a)|schedule|calendar|week ahead|organi[sz]e my|prioriti[sz]e my)\b/i,
+    taskType: "reasoning",
+    name: "Keystone · Planner",
+    lens: `## Task lens: PLAN
+Build a concrete, time-boxed plan. Ask for the user's real constraints (deadlines, fixed commitments, energy) if unknown; pull known goals from memory recall. Output: ordered priorities, a day-by-day (or step-by-step) schedule, and one explicit "drop if overloaded" item. Every commitment in the plan must come from the user — never invent obligations.`,
+  },
+  {
+    key: "research",
+    match: /\b(research|investigate|deep[ -]dive|look into|find out about|what does the evidence say)\b/i,
+    taskType: "reasoning",
+    name: "Keystone · Researcher",
+    lens: `## Task lens: RESEARCH
+Use web search / grounding tools for every factual claim — external reality beats internal consistency. Cite each source as a clickable Markdown link, note the date of the evidence, distinguish established fact from speculation, and end with a confidence note on the overall answer.`,
+  },
+];
+
+function dynamicAgentFor(message, baseAgent) {
+  const base = baseAgent || _getPersonas().find((p) => p.id === "keystone") || _getPersonas()[0];
+  const lens = TASK_LENSES.find((l) => l.match.test(String(message || "")));
+  if (!lens || !base) return base;
+  return {
+    ...base,                       // keep id ("keystone") so debug/tooling gates still apply
+    name: lens.name,
+    dynamic: true,
+    taskType: lens.taskType,       // stream-chat feeds this to PCSF provider selection
+    systemPrompt: `${base.systemPrompt}\n\n${lens.lens}`,
+  };
+}
+
 function parseBangCommand(input) {
   const m = String(input || "").trim().match(/^!(\S+)(?:\s+(.*))?$/);
   if (!m) return null;
@@ -1512,6 +1558,8 @@ module.exports = {
   AGENT_PERSONAS,
   DREAM_DOORS,
   selectAgent,
+  dynamicAgentFor,
+  TASK_LENSES,
   parseBangCommand,
   handleConvergenceCommand,
   dreamChatReply,

@@ -9,7 +9,7 @@ const path = require("path");
 // LANTERN_INSECURE_TLS=1; LANTERN_INSECURE_TLS=0 forces it off. #869
 const { llmAgent } = require("./insecure-tls");
 
-const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
+const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, dynamicAgentFor, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
 const { modelFor: defaultModelFor, isAllowedModel } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
@@ -1186,11 +1186,14 @@ async function handleStreamChat(req, url, res) {
   // Dream Chat is Keystone-only: the desk agent is always Keystone.
   // Personas (Keystone et al.) live in the Three Doors game surface, where the
   // game may request a specific guide via body.agent (defaults to Keystone).
+  // The desk agent is DYNAMIC: Keystone base + a task lens (summarize/plan/
+  // research) synthesized per message; the lens's taskType feeds the PCSF
+  // provider ranking below so intent, agent, and model selection stay aligned.
   const agent = surfaceMode === "three-doors"
     ? (AGENT_PERSONAS.find((a) => a.id === (requestedAgent || "lantern"))
         || AGENT_PERSONAS.find((a) => a.id === "lantern")
         || selectAgent(message))
-    : (AGENT_PERSONAS.find((a) => a.id === "keystone") || selectAgent(message));
+    : dynamicAgentFor(message, AGENT_PERSONAS.find((a) => a.id === "keystone") || selectAgent(message));
 
   // ── Keystone debug mode ───────────────────────────────────────────────
   // When Keystone is selected, bypass persona/doors and talk raw to the model
@@ -1942,8 +1945,10 @@ async function handleStreamChat(req, url, res) {
     // leads with ollama, which is always "healthy" — so cloud was never reached for
     // any message on the main chat surface. Use the real per-message intent instead:
     // only the dream/journal-flavored intent gets the creative (local-first) chain.
-    // Ouro router (Auto mode) owns taskType when it classified; else keyword detect.
-    let taskType = ouroRoute ? ouroRoute.taskType : detectTaskType(message, { isCreative: converganceDecision?.intent === "dream_chat" && isRpMode });
+    // Ouro router (Auto mode) owns taskType when it classified; else the dynamic
+    // desk agent's task lens (summarize/plan/research); else keyword detect.
+    let taskType = ouroRoute ? ouroRoute.taskType
+      : (agent && agent.taskType) || detectTaskType(message, { isCreative: converganceDecision?.intent === "dream_chat" && isRpMode });
     leaderboardTaskType = taskType; // align leaderboard recording with routing taxonomy (#1236)
 
     // ── Router gate (opt-in via ROUTER_GATE=1) ────────────────────────────────

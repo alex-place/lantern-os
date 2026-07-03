@@ -6,7 +6,7 @@
     "settings": "Configuración"
   },
   "hero": {
-    "title": "Lantern OS",
+    "title": "Unisona OS",
     "tagline": "Un sistema de razonamiento persistente y local-first. Privado, rápido y completamente tuyo.",
     "subtext": "Convergence Core v1 · Ejecución Local · Sin Cuenta Requerida"
   },
@@ -24,10 +24,10 @@
     },
     "trade": {
       "label": "Trading",
-      "title": "Lantern Trader",
+      "title": "Unisona Trader",
       "description": "Centro de trading para mercados de predicción, análisis bursátil y noticias de mercado en vivo.",
       "cta": "Abrir Trading",
-      "ariaLabel": "Lantern Trader — Centro de trading para mercados de predicción"
+      "ariaLabel": "Unisona Trader — Centro de trading para mercados de predicción"
     },
     "create": {
       "label": "Crear",

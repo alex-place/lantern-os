@@ -71,9 +71,14 @@ module.exports = async function operatorRoutes(req, res, url, deps) {
         continue;
       }
       let s = byId.get(r.sessionId);
-      if (!s) { s = { sessionId: r.sessionId, title: "", lastActivity: "", turnCount: 0 }; byId.set(r.sessionId, s); }
+      if (!s) { s = { sessionId: r.sessionId, title: "", preview: "", lastActivity: "", turnCount: 0 }; byId.set(r.sessionId, s); }
       s.turnCount += 1;
       if (r.recordedAt && r.recordedAt > s.lastActivity) s.lastActivity = r.recordedAt;
+      // rows are chronological, so the last chat turn seen wins: the session's
+      // latest message becomes its sidebar description.
+      if ((r.role === "operator" || r.role === "lantern") && r.text) {
+        s.preview = String(r.text).replace(/\s+/g, " ").trim().slice(0, 120);
+      }
       // rows are chronological within the window, so the first operator turn seen
       // for a session is its opening message — the natural title.
       if (!s.title && r.role === "operator" && r.text) s.title = String(r.text).replace(/\s+/g, " ").trim().slice(0, 80);

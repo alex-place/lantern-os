@@ -1,0 +1,1 @@
+Dream-chat sidebar cleanup: removed the in-chat Settings modal (providers & API keys live in Profile → Orchestrator), removed the operator "Clear all history" button, and reworked Recents — each session is now its own bordered panel with a wrapped title, a latest-message description, and a "Show more" expander after the first 10.

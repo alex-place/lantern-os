@@ -1,4 +1,4 @@
-/* ── Lantern OS Shared Site Styles ──────────────────────────────── */
+/* ── Unisona OS Shared Site Styles ──────────────────────────────── */
 /*  Loads on every surface. Keeps nav, footer, theme, and base     */
 /*  layout consistent across the entire app.                         */
 
@@ -30,6 +30,7 @@
   --accent: #0ea5e9;
   --accent-dim: #cffafe;
   --accent-hover: #06b6d4;
+  --accent-strong: #0369a1; /* AA-compliant (≥4.5:1) as text on --surface */
   --green: #10b981;
   --gold: #f59e0b;
   --danger: #ef4444;
@@ -48,6 +49,7 @@
   --accent: #06b6d4;
   --accent-dim: #164e63;
   --accent-hover: #0891b2;
+  --accent-strong: #06b6d4; /* AA-compliant (≥4.5:1) as text on --surface */
   --green: #34d399;
   --gold: #fbbf24;
   --danger: #ef4444;
@@ -108,7 +110,7 @@ html, body {
   white-space: nowrap;
 }
 .nav-links a:hover { color: var(--text); background: var(--surface2); }
-.nav-links a.active { color: var(--accent); font-weight: 600; }
+.nav-links a.active { color: var(--accent-strong); font-weight: 600; }
 /* On narrow screens, keep the nav reachable: compact, horizontally scrollable
    row instead of hiding it entirely (there is no hamburger menu). */
 @media (max-width: 580px) {
@@ -136,6 +138,12 @@ html, body {
   transition: all 0.15s;
 }
 .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nav-btn svg { width: 18px; height: 18px; display: block; }
+/* Theme toggle icon: show a sun in dark mode (click → light) and a moon in
+   light mode (click → dark). Both live in the button; CSS reveals one. */
+#theme-toggle .icon-sun, #theme-toggle .icon-moon { display: none; }
+html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
+html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
 .nav-cta {
   font-size: 13px; font-weight: 600; padding: 7px 16px;
   background: var(--accent); color: #fff; border: none;

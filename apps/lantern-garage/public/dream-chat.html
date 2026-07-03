@@ -116,53 +116,24 @@
     <button class="sidebar-new-chat" id="new-chat-btn">+ &nbsp;New chat</button>
     <div class="sidebar-section-label">Recents</div>
     <div class="sessions-list" id="sessions-list"></div>
-    <div class="sidebar-foot">
-      <button class="clear-all-btn" id="clear-all-btn" onclick="clearAllHistory()" style="display:none;">Clear all history (operator)</button>
-      <div class="sidebar-foot-actions">
-        <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="toggleTheme()">☀</button>
-        <button class="nav-btn" id="skin-toggle" title="Toggle terminal (CRT) skin" aria-label="Toggle terminal CRT skin" aria-pressed="false" onclick="toggleSkin()">▚</button>
-        <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
-        <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
-        <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
-        <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
-      </div>
-    </div>
   </aside>
 
   <div class="app-main">
-
-    <!-- Header -->
-    <nav class="site-nav">
-      <button class="nav-btn sidebar-toggle" id="sidebar-toggle-btn" aria-label="Toggle chat sidebar" title="Chats">☰</button>
-      <a class="nav-brand" href="/">
-        <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-        <span style="font-size:18px;font-weight:600">unisona.ai</span>
-      </a>
-      <div class="nav-links">
-        <a href="/dream-chat.html" class="active">Chat</a>
-        <a href="/stock-trader.html">Trader</a>
-        <a href="/create.html">Create</a>
-        <a href="/explore.html">Explore</a>
-        <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
-      </div>
-      <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" onclick="if(window.issueReporter)window.issueReporter.open()" title="Report an issue (screenshot → GitHub)">📷</button>
-    </nav>
+    <!-- Header/footer are the shared site chrome, injected by /js/site-chrome.js;
+         chat-specific buttons (☰ sidebar, ▚ skin, 🔊 narrate) are added to it
+         top-right by the augment script near the end of this file. -->
 
     <!-- Chat area -->
     <div class="chat-container" id="messages" role="log" aria-label="Conversation messages" aria-live="polite">
       <div class="empty-state" id="empty-state">
-        <div style="text-align:center;padding:40px 20px">
-          <div style="margin-bottom:12px"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:64px;height:64px"></div>
-          <h1 style="font-size:26px;font-weight:600;margin-bottom:6px;color:var(--text)">Keystone Desk</h1>
+        <div class="hero">
+          <img class="hero-mark" src="/mandala.svg" alt="" aria-hidden="true">
+          <h1 class="hero-title">unisona.ai</h1>
+          <p class="hero-tagline">Your local AI that remembers you.</p>
           <div class="starter-chips">
-            <button class="starter-chip" onclick="fillAndSend('!issues')">⚡ What needs doing?</button>
-            <button class="starter-chip" onclick="fillAndSend('!convergence')">⚡ How's the system?</button>
-            <button class="starter-chip" onclick="fillAndSend('!help')">⚡ Get started</button>
-            <button class="starter-chip" onclick="fillAndSend('Tell me a story')">⚡ Tell me a story</button>
-            <button class="starter-chip" onclick="fillAndSend('Help me learn something new')">⚡ Teach me</button>
-            <button class="starter-chip" onclick="fillAndSend('Write a Python function to parse a CSV file')">⚡ Write code</button>
+            <button class="starter-chip" onclick="fillAndSend('Summarize my notes')">📄 Summarize notes</button>
+            <button class="starter-chip" onclick="fillAndSend('Help me plan my week')">📅 Plan my week</button>
+            <button class="starter-chip" onclick="fillPrompt('Research this topic for me: ')">🔍 Research a topic</button>
           </div>
         </div>
       </div>
@@ -175,7 +146,7 @@
         <button id="attach-btn" class="attach-btn" type="button" aria-label="Upload a file" onclick="lanternAttach.pickAny()" title="Upload a file">+</button>
         <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text (Ctrl+Shift+M)" aria-pressed="false" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text) · Ctrl/Cmd+Shift+M">🎙️</button>
         <textarea id="input" class="input-field" placeholder="Write something, ask a question…" rows="1" aria-label="Message input" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
-        <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send">↑</button>
+        <button class="send-button" id="send-btn" aria-label="Send message" onclick="sendMessage()" title="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg></button>
       </div>
       <input type="file" id="attach-pdf-input" accept=".pdf" multiple style="display:none" aria-label="Attach PDF files">
       <input type="file" id="attach-docx-input" accept=".docx" style="display:none" aria-label="Attach Word document">
@@ -241,90 +212,8 @@
   <div class="perf-row"><span class="perf-label">Latency:</span><span class="perf-value" id="perf-latency">0ms</span></div>
 </div>
 
-<!-- Settings modal -->
-<div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onclick="if(event.target===event.currentTarget) closeSettings()">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2 id="settings-title">Settings</h2>
-      <button class="modal-close" aria-label="Close settings" onclick="closeSettings()">×</button>
-    </div>
-    <div class="modal-body">
-
-      <div class="form-group">
-        <label class="form-label" for="provider-select">AI Provider</label>
-        <select id="provider-select" class="form-input">
-          <option value="">Auto (pick best)</option>
-          <option value="claude">Claude</option>
-          <option value="openai">ChatGPT</option>
-          <option value="gemini">Gemini</option>
-          <option value="grok">Grok</option>
-          <option value="ollama">Local Σ₀ Loop (Ouro)</option>
-          <option value="keystone-ft">Keystone FT (Haiku + Memory)</option>
-        </select>
-      </div>
-
-      <!-- Model pin (#1127): shown only for cloud providers with choices; "Default"
-           lets the server's modelFor() resolution (env override included) decide. -->
-      <div class="form-group" id="model-select-group" style="display:none">
-        <label class="form-label" for="model-select">Model</label>
-        <select id="model-select" class="form-input">
-          <option value="">Default</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">API Keys</label>
-        <div class="setting-card">
-          <span class="setting-card-icon">✦</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">Claude</div>
-            <div class="setting-card-status" id="status-claude">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-claude" class="form-input" placeholder="ANTHROPIC_API_KEY" aria-label="Claude API key" onchange="saveKey('claude','ANTHROPIC_API_KEY','key-claude')">
-        <a href="https://console.anthropic.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-      <div class="form-group">
-        <div class="setting-card">
-          <span class="setting-card-icon">🌐</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">Gemini</div>
-            <div class="setting-card-status" id="status-gemini">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-gemini" class="form-input" placeholder="GEMINI_API_KEY" aria-label="Gemini API key" onchange="saveKey('gemini','GEMINI_API_KEY','key-gemini')">
-        <a href="https://aistudio.google.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-      <div class="form-group">
-        <div class="setting-card">
-          <span class="setting-card-icon">◈</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">ChatGPT</div>
-            <div class="setting-card-status" id="status-openai">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-openai" class="form-input" placeholder="OPENAI_API_KEY" aria-label="OpenAI API key" onchange="saveKey('openai','OPENAI_API_KEY','key-openai')">
-        <a href="https://platform.openai.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-      <div class="form-group">
-        <div class="setting-card">
-          <span class="setting-card-icon">𝕏</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">Grok</div>
-            <div class="setting-card-status" id="status-grok">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-grok" class="form-input" placeholder="XAI_API_KEY" aria-label="Grok API key" onchange="saveKey('grok','XAI_API_KEY','key-grok')">
-        <a href="https://console.x.ai" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-
-    </div>
-  </div>
-</div>
+<!-- Settings (provider pick + API keys) moved to Profile → Orchestrator (#1904);
+     the in-chat Settings modal was removed with it. -->
 
 <!-- Screenshot → GitHub issue modal -->
 <div class="modal-overlay" id="issue-modal" role="dialog" aria-modal="true" aria-labelledby="issue-title" onclick="if(event.target===event.currentTarget) window.issueReporter.close()">
@@ -335,7 +224,7 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone writes the report from this</span></label>
+        <label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Unisona writes the report from this</span></label>
         <div id="issue-dropzone" tabindex="0" style="border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2)">
           <img id="issue-shot-preview" alt="Screenshot preview" style="display:none;width:100%;border-radius:8px;max-height:38vh;object-fit:contain">
           <div id="issue-dropzone-empty">
@@ -352,10 +241,10 @@
         </div>
         <input type="file" id="issue-file-input" accept="image/*" style="display:none">
       </div>
-      <!-- Keystone writes the title + description from the screenshot; the user
+      <!-- Unisona writes the title + description from the screenshot; the user
            just reviews this read-only summary before filing. No manual fields. -->
       <div class="form-group" id="issue-summary-group" style="display:none">
-        <label class="form-label">Keystone's report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>
+        <label class="form-label">Unisona's report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>
         <div id="issue-summary" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface2)">
           <div id="issue-summary-title" style="font-weight:600;font-size:14px;color:var(--text)"></div>
           <div id="issue-summary-body" style="color:var(--muted);font-size:13px;margin-top:6px;white-space:pre-wrap;line-height:1.5"></div>
@@ -433,23 +322,33 @@
       sendBtn.disabled = !plan.canChat;
       input.placeholder = plan.canChat
         ? "Write something, ask a question…"
-        : "Sign in with Patreon to unlock Keystone Desk…";
+        : "Sign in with Patreon to unlock Unisona Desk…";
     }
 
-    // Provider dropdown role filtering.
-    const provider = document.getElementById("provider-select");
-    if (provider) {
-      [...provider.options].forEach((option) => {
-        const value = option.value || "auto";
-        const allowed = role === "admin"
-          || value === "auto"
-          || value === "ollama"
-          || plan.modelAccess.includes(value)
-          || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
-        option.disabled = !allowed;
-      });
-    }
+    // Provider dropdown role filtering. Extracted + exposed so the dynamic option
+    // builder (buildProviderDropdown, dream-chat-ui.js) can re-apply it after it
+    // (re)populates the <select> — whichever runs last, the options end up gated.
+    _lastPlanState = { role, plan };
+    gateProviderOptions();
   }
+
+  let _lastPlanState = null;
+  function gateProviderOptions() {
+    if (!_lastPlanState) return;
+    const { role, plan } = _lastPlanState;
+    const provider = document.getElementById("provider-select");
+    if (!provider) return;
+    [...provider.options].forEach((option) => {
+      const value = option.value || "auto";
+      const allowed = role === "admin"
+        || value === "auto"
+        || value === "ollama"
+        || plan.modelAccess.includes(value)
+        || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
+      option.disabled = !allowed;
+    });
+  }
+  window.gateProviderOptions = gateProviderOptions;
 
   async function refreshPatreonSession() {
     try {
@@ -524,7 +423,64 @@
 <script src="/vendor/html2canvas/html2canvas.min.js"></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>
 <script src="js/convergance-sync.js"></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
+<script>
+/* ── Chat-specific chrome buttons ──────────────────────────────────────────
+   site-chrome.js injects the shared header (brand, links, profile/theme/📷
+   top-right). Chat adds: ☰ sidebar toggle (leftmost, mobile drawer) and the
+   ▚ terminal-skin + 🔊 narrate toggles into .nav-actions (top right).
+   site-chrome's DOMContentLoaded listener registers after parse but before
+   this inline listener fires its setTimeout, so the nav exists by then. */
+(function () {
+  function augmentNav() {
+    var nav = document.querySelector('nav.site-nav');
+    var actions = nav && nav.querySelector('.nav-actions');
+    if (!nav || !actions) { setTimeout(augmentNav, 50); return; }
+    if (document.getElementById('sidebar-toggle-btn')) return; // idempotent
+
+    var burger = document.createElement('button');
+    burger.className = 'nav-btn sidebar-toggle';
+    burger.id = 'sidebar-toggle-btn';
+    burger.title = 'Chats';
+    burger.setAttribute('aria-label', 'Toggle chat sidebar');
+    burger.textContent = '☰';
+    burger.addEventListener('click', function () {
+      var sb = document.getElementById('chat-sidebar');
+      if (!sb) return;
+      if (sb.classList.contains('open')) window.closeSessions(); else window.openSessions();
+    });
+    nav.insertBefore(burger, nav.firstChild);
+
+    var skin = document.createElement('button');
+    skin.className = 'nav-btn';
+    skin.id = 'skin-toggle';
+    skin.title = 'Toggle terminal (CRT) skin';
+    skin.setAttribute('aria-label', 'Toggle terminal CRT skin');
+    skin.setAttribute('aria-pressed', document.documentElement.getAttribute('data-skin') === 'terminal' ? 'true' : 'false');
+    skin.textContent = '▚';
+    skin.addEventListener('click', function () { if (window.toggleSkin) window.toggleSkin(); });
+
+    var voice = document.createElement('button');
+    voice.className = 'nav-btn';
+    voice.id = 'voice-btn';
+    voice.title = 'Narrate replies aloud';
+    voice.setAttribute('aria-label', 'Narrate replies aloud');
+    voice.setAttribute('aria-pressed', 'false');
+    voice.textContent = '🔊';
+    voice.addEventListener('click', function () {
+      window.narrateReplies = !window.narrateReplies;
+      voice.setAttribute('aria-pressed', window.narrateReplies ? 'true' : 'false');
+      voice.style.color = window.narrateReplies ? '#a78bfa' : '';
+      if (!window.narrateReplies && window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+    });
+
+    actions.insertBefore(voice, actions.firstChild);
+    actions.insertBefore(skin, actions.firstChild);
+  }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(augmentNav, 0); });
+})();
+</script>
 <script>
 /* ── File drag-and-drop + cross-page handoff from index.html ── */
 (function () {

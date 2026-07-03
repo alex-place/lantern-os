@@ -86,6 +86,8 @@ data/research-tasks/
 # queue.jsonl / pending.jsonl ledgers stay; the transient per-issue JSON the
 # dispatcher writes/deletes as it claims work is pure runtime state.
 data/agent-work-queue/**/issue-*.json
+# Append-only audit log of the boot/on-demand stale-claim reconcile sweep.
+data/agent-work-queue/reconcile-log.jsonl
 
 # Σ₀ council review records (lib/council-review.js append-only log). Runtime
 # observability feeding experiments/council_escalation_backtest.py — like
