@@ -172,7 +172,6 @@ async function runA11yTests() {
   const htmlFiles = [
     path.join(PUBLIC_DIR, 'index.html'),
     path.join(PUBLIC_DIR, 'dream-chat.html'),
-    path.join(PUBLIC_DIR, 'operations.html'),
     path.join(PUBLIC_DIR, 'explore.html'),
     path.join(PUBLIC_DIR, 'stock-trader.html'),
     path.join(PUBLIC_DIR, 'kalshi-terminal.html')

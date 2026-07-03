@@ -35,7 +35,6 @@ const CORE = {
   "knowledgecenter.html":   "Remember",  // grounding knowledge base
   "rag-house.html":         "Remember",  // RAG document house
   "wide-search.html":       "Remember",  // cross-archive search
-  "memory-decay.html":      "Remember",  // forgetting curve over the memory archive (retriever trust)
   "proof.html":             "Verify",    // claims / evidence / proof surface
   "calibration.html":       "Verify",    // grounding calibration
   "factcheck.html":         "Verify",    // fact-check / grounding gate
@@ -44,7 +43,6 @@ const CORE = {
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
-  "operations.html":        "Converge",  // loop observability
   "agent-status.html":      "Converge",  // agent observability
   "agent-leaderboard.html": "Converge",  // agent convergence leaderboard
   "metrics.html":           "Converge",  // convergence metrics
@@ -75,12 +73,6 @@ const EXTENSION = {
   "hff.html":                      ["flourishing", "HFF_ENABLED"],
   // outreach
   "outreach.html":                 ["outreach", "OUTREACH_ENABLED"],
-  // personal life-cockpit tools (local-first, beside the agent loop)
-  "decisions.html":                ["life", null],
-  "finance.html":                  ["life", null],
-  "health.html":                   ["life", null],
-  "learn.html":                    ["life", null],
-  "preferences.html":              ["life", null],
   // account / auth / billing
   "auth.html":                     ["account", null],
   "entry.html":                    ["account", null],
@@ -91,6 +83,7 @@ const EXTENSION = {
   // project meta
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
+  "faq.html":                      ["meta", null],
   // visualization
   "observer-mesh-cube.html":       ["viz", null],
 };

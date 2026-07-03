@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="manifest" href="/manifest.json">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid a flash of the wrong theme
+       (matches index.html / knowledgecenter.html). theme-toggle.js re-affirms this
+       + the button label after load. */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+  <title>FAQ — Frequently Asked Questions — unisona.ai</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    /* ── FAQ: a curated hero + grouped question/answer accordions. Uses only
+       site.css tokens (--bg/--surface/--border/--text/--muted/--accent/--radius)
+       so it stays in lock-step with the rest of unisona.ai. ── */
+    .faq-page { max-width: 820px; margin: 0 auto; padding: 12px 24px 96px; }
+
+    /* Hero — same centred treatment as knowledgecenter.html / explore.html */
+    .faq-hero { text-align: center; padding: 40px 0 8px; }
+    .faq-eyebrow {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .faq-hero h1 {
+      font-size: clamp(1.9rem, 5vw, 2.6rem); font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1.15; margin: 10px 0 12px;
+    }
+    .faq-hero p {
+      font-size: 1.04rem; color: var(--muted); line-height: 1.6;
+      max-width: 600px; margin: 0 auto;
+    }
+
+    /* Grouped sections + eyebrow heading */
+    .faq-group { margin: 40px 0 0; }
+    .faq-group > .label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 12px;
+    }
+
+    /* One question = one native <details>, so keyboard + screen readers work for free */
+    .faq-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      margin-bottom: 10px; overflow: hidden;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .faq-item[open] { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+    .faq-item:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+    .faq-item > summary {
+      list-style: none; cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 18px; font-size: 1rem; font-weight: 600; color: var(--text);
+    }
+    .faq-item > summary::-webkit-details-marker { display: none; }
+    /* Rotating chevron cue on the right */
+    .faq-item > summary::after {
+      content: "›"; margin-left: auto; font-size: 1.4rem; line-height: 1;
+      color: var(--accent); transform: rotate(90deg); transition: transform 0.2s;
+    }
+    .faq-item[open] > summary::after { transform: rotate(-90deg); }
+    .faq-item > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .faq-q-ico {
+      flex: none; width: 30px; height: 30px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .faq-a { padding: 0 18px 16px 60px; color: var(--muted); line-height: 1.6; font-size: 0.92rem; }
+    .faq-a p { margin: 0 0 8px; }
+    .faq-a p:last-child { margin-bottom: 0; }
+    .faq-a a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .faq-a a:hover { text-decoration: underline; }
+
+    /* Closing call-to-action */
+    .faq-cta {
+      margin: 44px 0 0; padding: 26px 24px; text-align: center;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .faq-cta h2 { font-size: 1.15rem; font-weight: 700; color: var(--text); margin: 0 0 6px; }
+    .faq-cta p { font-size: 0.9rem; color: var(--muted); margin: 0 0 16px; line-height: 1.5; }
+    .faq-cta a.btn {
+      display: inline-block; padding: 11px 20px; border-radius: 10px;
+      background: var(--accent); color: #fff; font-weight: 600; text-decoration: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .faq-cta a.btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    @media (max-width: 560px) { .faq-a { padding-left: 18px; } }
+  </style>
+</head>
+<body>
+
+<!-- Site nav injected by /js/site-chrome.js -->
+
+<main class="faq-page">
+
+  <!-- ── Hero ── -->
+  <div class="faq-hero">
+    <div class="faq-eyebrow">Help</div>
+    <h1>Frequently asked questions</h1>
+    <p>Quick, honest answers about what unisona.ai is, how your data is handled,
+       what it costs, and what it can (and can't) do yet.</p>
+  </div>
+
+  <!-- ── Getting started ── -->
+  <section class="faq-group">
+    <span class="label">Getting started</span>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">✦</span>What is Keystone / unisona.ai?</summary>
+      <div class="faq-a">
+        <p>unisona.ai is a personal, local-first reasoning system — a chat-first "cockpit"
+           that remembers what matters to you, reasons over it, takes actions with tools,
+           and verifies its answers against real evidence.</p>
+        <p>The plain-English overview is in <a href="/repo/README.md">What is Keystone?</a></p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">🔑</span>Do I need an account or an API key to try it?</summary>
+      <div class="faq-a">
+        <p>No. You can <a href="/dream-chat.html">open Keystone Chat</a> and start right away —
+           no account and no API key required. Signing in and adding your own keys unlocks more,
+           but they're never needed just to try it.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">🚀</span>How do I run it on my own computer?</summary>
+      <div class="faq-a">
+        <p>Keystone is local-first — it's built to run on your own machine. The
+           <a href="/repo/QUICKSTART.md">Quick Start guide</a> gets it running in a few minutes.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── Privacy & your data ── -->
+  <section class="faq-group">
+    <span class="label">Privacy &amp; your data</span>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">🔒</span>Is my data private?</summary>
+      <div class="faq-a">
+        <p>Yes — local-first by default. Your memories and private notes are stored on your own
+           machine by design, not on someone else's server. See the
+           <a href="/repo/docs/PRIVACY_GOVERNANCE.md">Privacy Governance policy</a> for the details.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">🗄️</span>Where is my data actually stored?</summary>
+      <div class="faq-a">
+        <p>As plain, append-only JSONL logs plus a compressed CSF archive on your machine.
+           Nothing is silently deleted — your memory is something you own and can inspect.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── How it works ── -->
+  <section class="faq-group">
+    <span class="label">How it works</span>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">🧠</span>What AI models does it use?</summary>
+      <div class="faq-a">
+        <p>It's model-agnostic. Models plug into a provider chain — Anthropic, OpenAI, Gemini,
+           xAI, and local models — as interchangeable replacements, so no single vendor is
+           hard-wired in. The full chain is documented in
+           <a href="/repo/PROVIDERS.md">the provider guide</a>.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">📋</span>What can it actually do — and not do yet?</summary>
+      <div class="faq-a">
+        <p>Chat, memory, document search, reasoning, tool use, a trading terminal, and creator
+           tools all work today. For an honest, evidence-tagged list of the current limits, read
+           <a href="/repo/docs/KEYSTONE-LIMITATIONS.md">What It Can't Do (Yet)</a>.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">📚</span>Where do I find the guides and documentation?</summary>
+      <div class="faq-a">
+        <p>Everything lives in the <a href="/knowledgecenter.html">Knowledge Center</a> —
+           a single, searchable library of every guide, research note, architecture decision,
+           and report.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── Plans & billing ── -->
+  <section class="faq-group">
+    <span class="label">Plans &amp; billing</span>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">💳</span>Is it free? What are the plans?</summary>
+      <div class="faq-a">
+        <p>There's a free tier you can use without paying. Paid tiers add more and are billed
+           through Patreon. See the <a href="/pricing.html">pricing page</a> for the current tiers.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">📈</span>Is this equity or an investment?</summary>
+      <div class="faq-a">
+        <p>No. These are service subscriptions — no equity, tokens, or profit share.</p>
+      </div>
+    </details>
+
+    <details class="faq-item">
+      <summary><span class="faq-q-ico">✖️</span>Can I cancel?</summary>
+      <div class="faq-a">
+        <p>Yes — cancel anytime. Your local data stays yours.</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ── Closing CTA ── -->
+  <div class="faq-cta">
+    <h2>Still have a question?</h2>
+    <p>Ask Keystone directly — it can answer in its own words, grounded in these guides.</p>
+    <a class="btn" href="/dream-chat.html">Open Keystone Chat →</a>
+  </div>
+
+</main>
+
+<!-- Site footer injected by /js/site-chrome.js -->
+
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+</body>
+</html>

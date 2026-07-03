@@ -1,4 +1,6 @@
 ## [1.8.31] - 2026-07-03
+### Added
+- **Hosted-subset surface gate (ADR-0018, W4).** A deployment capability profile (`apps/lantern-garage/lib/deployment-profile.js`), driven by the tenancy seam (`lib/tenant.js`): in the `cloud` profile the static catch-all (`routes/surfaces.js`) serves only the hosted subset (chat / explore / help + the account & landing shell) and redirects every local-only surface (trading, autowork, admin, the life tools, …) to the hosted home; assets still pass so allowed pages render. No-op in `local` (the full app is unchanged). Verified over real HTTP against the actual route handler in both profiles.
 ### Fixed
 - **Real IBKR Client Portal Web API (CPAPI) via the local gateway (ADR-0019).** Replaced the fabricated `api.ibkr.com` bearer-token path (which returned null 100% of the time) and the hardcoded static market quotes (`sp500: '$5,843.25'`, `vix: '14.32'`) with `lib/ibkr-cpapi.js`, a **read-only** client that talks to the local Client Portal Gateway, keeps the session warm via `/tickle`, and reports honest, evidence-bearing status at `GET /api/trading/ibkr/status`. The settings badge now reflects a real probe instead of a hardcoded `true`, and the broken settings-save wiring (`ibkr_password` → nowhere) is fixed. Grounded against IBKR's CPAPI docs, Voyz/IBeam, @stoqey/ib, and ib_async; covered by a 13-check test suite. Strengthens the **Observe** stage (real broker data) and **Verify** (no fabricated green).
 
@@ -6,6 +8,17 @@
 - ADR-0017 accepted + implemented (flag-gated, default OFF): surprise-gated decoding — SURPRISE_INTERVENE=1 turns high-surprise spans into grounding rounds (KC memory / verified tool / web search) and a grounded revise pass on the OpenAI and xAI chat paths (lib/surprise-intervene.js + stream-chat hooks, 14 unit tests).
 
 # Changelog
+
+## [1.8.31] - 2026-07-03
+### Added
+- **FAQ page, and the Knowledge Center now leads with it.** New `/faq.html` — a grouped, accordion FAQ (Getting started · Privacy & your data · How it works · Plans & billing) built entirely from `site.css` tokens, with nav/footer via `site-chrome.js` and native `<details>` accordions for keyboard + screen-reader access. Every answer links to an existing, verified guide (README, QUICKSTART, PROVIDERS, KEYSTONE-LIMITATIONS, PRIVACY_GOVERNANCE, pricing). The Knowledge Center "Start here" grid now leads with an FAQ card; "What's new" is kept as the second card so the release note retains its only entry point. `faq.html` registered as an EXTENSION (`meta`) surface so the surface-boundary contract test stays green. Strengthens **Remember** — grounded, self-serve help in one place.
+### Changed
+- **Knowledge Center "Start here" trimmed to orientation.** Removed the "Open Keystone Chat" and "Take the tour" cards — both duplicated the top nav — leaving FAQ · What's new · Quick Start · What is Keystone. Light copy pass on the hero, the section intro, and the release card (de-jargoned "a user-facing surface at every stage of the loop").
+
+## [1.8.30] - 2026-07-03
+### Added
+- **Web/desktop delivery split + cloud multi-tenancy (ADR-0018, Accepted).** The single Convergence Core gains one `resolveTenant(req)` seam (`apps/lantern-garage/lib/tenant.js`, guardrail W2) so it serves two delivery profiles without a fork: a `local` default that is byte-for-byte today's behaviour (single owner, `data/` tree, `process.env` keys — 4177/4178/desktop unchanged) and a `cloud` profile that namespaces memory under `data/tenants/<id>` and resolves bring-your-own keys per session, never leaking the host's env keys to a tenant. Behaviour-preserving: nothing routes through the seam yet. Strengthens **Remember** (per-tenant memory location) + **Act** (secure key handling). 6 hermetic unit tests.
+
 
 ## [1.8.29] - 2026-07-02
 - Move Admin entry from nav to profile page; ADR-review follow-up updates.

@@ -22,7 +22,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
 DEPLOYMENT_CONFIG = REPO_ROOT / "apps/lantern-garage/deployment.json"
-HEALTH_CHECK = REPO_ROOT / "apps/lantern-garage/routes/health.js"
+HEALTH_CHECK = REPO_ROOT / "apps/lantern-garage/routes/status.js"
 QUICKSTART = REPO_ROOT / "QUICKSTART.md"
 
 # Files that affect deployment
