@@ -503,9 +503,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 <script>
 const API='/api/trading/kalshi';
-const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000;
+const SYNC_MS=5000, DECK_TARGET=20, PREFETCH_AT=10, MAX_AGE_MS=60000, PREFETCH_COOLDOWN_MS=8000;
 let conn={}, deck=[], idx=0, busy=false, dragging=false, liveMap={}, prefetching=false;
-let lastSyncMs=0, lastDetCount=null;
+let lastSyncMs=0, lastDetCount=null, lastPrefetchMs=0;
 // Trading MODE: 'live' (real 1-contract orders on the Σ₀ weather-edge, scope-gated)
 // or 'paper' (practice candidates, no real orders). Each mode has its OWN deck.
 // Switching forces a full reload so no state leaks across modes/decks.
@@ -782,7 +782,14 @@ async function maybePrefetch(){
   if(prefetching) return;
   const remaining=deck.length-idx;
   if(remaining>=PREFETCH_AT) return;
+  // The feed legitimately returns few cards, so `remaining` can sit below
+  // PREFETCH_AT indefinitely. Without a cooldown the 1s countdown tick (which
+  // calls maybePrefetch every second when the deck is short) re-fetches the
+  // expensive, web-grounded deck ~once per second — the runaway the audit saw.
+  // Rate-limit the refill; only a truly empty deck may fetch immediately.
+  if(remaining>0 && (Date.now()-lastPrefetchMs) < PREFETCH_COOLDOWN_MS) return;
   prefetching=true;
+  lastPrefetchMs=Date.now();
   try {
     // Both modes refill from their own deck endpoint (loadModeDeck).
     await loadModeDeck();

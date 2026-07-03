@@ -1444,7 +1444,22 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         const paperLedger = require('../lib/kalshi-paper-ledger');
         const body = await collectRequestBody(req);
         const o = body ? JSON.parse(body) : {};
-        return sendJson(res, paperLedger.openPosition(o), 201), true;
+        // Cash gate: the tinder game spends a virtual bankroll down to zero. Refuse the
+        // buy when the paper wallet can't cover the entry cost (entry¢ × contracts).
+        const qty = Number(o.qty ?? o.count ?? 1) || 1;
+        const entry = Number(o.limitCents ?? o.entryCents ?? 50);
+        const costCents = entry * qty;
+        const wallet = paperLedger.getWallet();
+        if (costCents > wallet.cashCents) {
+          return sendJson(res, { error: 'insufficient_paper_cash', costCents, wallet }, 402), true;
+        }
+        const opened = paperLedger.openPosition(o);
+        return sendJson(res, { ...opened, wallet: paperLedger.getWallet() }, 201), true;
+      }
+      // GET — virtual paper wallet (cash / invested / realized) for the "buy until broke" HUD
+      if (url.pathname === '/api/trading/kalshi/paper-wallet' && req.method === 'GET') {
+        const paperLedger = require('../lib/kalshi-paper-ledger');
+        return sendJson(res, paperLedger.getWallet(), 200), true;
       }
       // GET — poll open paper positions with live P&L + auto-exit signals
       if (url.pathname === '/api/trading/kalshi/paper-positions' && req.method === 'GET') {
