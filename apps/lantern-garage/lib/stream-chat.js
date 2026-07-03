@@ -24,6 +24,7 @@ const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
 const streamSurprise = require("./stream-surprise");
+const surpriseIntervene = require("./surprise-intervene"); // ADR-0017 — flag-gated, default OFF
 const { councilReview } = require("./council-review");
 const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
@@ -2936,6 +2937,19 @@ async function handleStreamChat(req, url, res) {
       });
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("openai_empty_response");
+      // ADR-0017: surprise-gated intervention (SURPRISE_INTERVENE=1, default OFF).
+      // High-surprise spans → grounding round (memory/tool/web) → grounded revise.
+      // Any failure keeps fullReply unchanged — never worse than baseline.
+      if (surpriseIntervene.enabled()) {
+        try {
+          const iv = await surpriseIntervene.maybeIntervene({
+            perToken: surprise.value(), fullReply,
+            callLLM: surpriseIntervene.openaiCompatibleReviser({ host: "api.openai.com", apiKey: openaiKey, model: modelFor("openai") }),
+            emit: (d) => sse.writeData(res, d),
+          });
+          if (iv.revisedReply) fullReply = iv.revisedReply;
+        } catch { /* intervention must never break a reply */ }
+      }
       const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       await logConversation({
         recordedAt: new Date().toISOString(),
@@ -3054,6 +3068,17 @@ async function handleStreamChat(req, url, res) {
       });
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("xai_empty_response");
+      // ADR-0017: surprise-gated intervention — same contract as the openai branch.
+      if (surpriseIntervene.enabled()) {
+        try {
+          const iv = await surpriseIntervene.maybeIntervene({
+            perToken: surprise.value(), fullReply,
+            callLLM: surpriseIntervene.openaiCompatibleReviser({ host: "api.x.ai", apiKey: xaiKey, model: xaiModel }),
+            emit: (d) => sse.writeData(res, d),
+          });
+          if (iv.revisedReply) fullReply = iv.revisedReply;
+        } catch { /* intervention must never break a reply */ }
+      }
       const { cleanText: xaiClean, suggestions: xaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
       await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModel, agent: doneAgentName } }).catch(() => {});
       recordProviderSuccess("xai");
