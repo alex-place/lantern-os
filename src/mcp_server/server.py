@@ -248,7 +248,9 @@ _STARTED_AT = datetime.now(timezone.utc).isoformat()
 # is rebuilt by replaying data/queue/task-ledger.jsonl on startup.
 import queue_ledger
 _LEDGER_PATH = REPO_ROOT / "data" / "queue" / "task-ledger.jsonl"
-_task_queue: List[Dict[str, Any]] = queue_ledger.replay(_LEDGER_PATH)
+# One-time startup rebuild — opt into auto-compaction so an oversized ledger is
+# collapsed to its live task set here (single writer, no concurrent mutations).
+_task_queue: List[Dict[str, Any]] = queue_ledger.replay(_LEDGER_PATH, auto_compact=True)
 
 
 def _ledger(event: str, **payload: Any) -> None:

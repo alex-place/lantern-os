@@ -44,9 +44,22 @@ def append_event(ledger_path: Path, event: str, **payload: Any) -> bool:
         return False
 
 
-def replay(ledger_path: Path) -> List[Dict[str, Any]]:
+# Auto-compact once the ledger's dead-event history dwarfs the live task set.
+# The ledger is append-only (one event per queue mutation), so a long-lived
+# server accumulates status/deleted/cleared events that replay() must re-parse
+# on every restart. Compaction rewrites it to one 'enqueued' per live task.
+_COMPACT_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def replay(ledger_path: Path, auto_compact: bool = False) -> List[Dict[str, Any]]:
     """Rebuild the live task list from the ledger. Returns tasks sorted by priority.
-    Orphaned active tasks are requeued to pending."""
+    Orphaned active tasks are requeued to pending.
+
+    Set ``auto_compact=True`` ONLY from a one-time startup rebuild (a single
+    writer, no concurrent mutations): when the on-disk ledger exceeds
+    ``_COMPACT_BYTES`` it is rewritten from the just-replayed live set. Runtime
+    observers (e.g. supervisor.observe_queue) must leave it False so a frequent
+    poll never rewrites the file underneath the live writer."""
     if not ledger_path.exists():
         return []
 
@@ -91,7 +104,25 @@ def replay(ledger_path: Path) -> List[Dict[str, Any]]:
             task["status"] = "pending"
             task["requeued_from"] = "active"
 
-    return sorted(tasks.values(), key=lambda t: _PRIORITY.get(t.get("priority"), 1))
+    live = sorted(tasks.values(), key=lambda t: _PRIORITY.get(t.get("priority"), 1))
+
+    if auto_compact:
+        try:
+            if ledger_path.stat().st_size >= _COMPACT_BYTES:
+                _rewrite(ledger_path, live)
+        except Exception:
+            pass  # compaction is best-effort upkeep; never fail startup over it
+
+    return live
+
+
+def _rewrite(ledger_path: Path, live: List[Dict[str, Any]]) -> None:
+    """Atomically rewrite the ledger as one 'enqueued' event per live task."""
+    tmp = ledger_path.with_suffix(".jsonl.compact")
+    with open(tmp, "w", encoding="utf-8") as f:
+        for task in live:
+            f.write(json.dumps({"ts": _now(), "event": "enqueued", "task": task}, default=str) + "\n")
+    tmp.replace(ledger_path)
 
 
 def compact(ledger_path: Path) -> int:
@@ -99,11 +130,7 @@ def compact(ledger_path: Path) -> int:
     (drops dead history). Returns the number of live tasks kept. Optional upkeep."""
     live = replay(ledger_path)
     try:
-        tmp = ledger_path.with_suffix(".jsonl.compact")
-        with open(tmp, "w", encoding="utf-8") as f:
-            for task in live:
-                f.write(json.dumps({"ts": _now(), "event": "enqueued", "task": task}, default=str) + "\n")
-        tmp.replace(ledger_path)
+        _rewrite(ledger_path, live)
     except Exception:
         pass
     return len(live)

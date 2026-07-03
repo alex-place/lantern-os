@@ -7,19 +7,16 @@
 // and returns a compact live summary for the dream-chat observability panel.
 // Read-only; never throws (returns a zeroed summary on any failure).
 
-const fs = require("fs");
 const path = require("path");
 const { RECORDS_PATH } = require("./convergence-records");
+const { readJsonlCached } = require("./jsonl-cache");
 
 const PATTERNS_PATH = path.resolve(__dirname, "..", "..", "..", "data/convergence/patterns.jsonl");
 
+// mtime-cached: both logs are append-only, so a status poll that hasn't seen a
+// new record re-uses the parsed array instead of re-reading the files (#1890).
 function readJsonl(p) {
-  try {
-    return fs.readFileSync(p, "utf8")
-      .trim().split("\n").filter(Boolean)
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter(Boolean);
-  } catch { return []; }
+  return readJsonlCached(p);
 }
 
 // Aggregate the record log into the loop's live state.

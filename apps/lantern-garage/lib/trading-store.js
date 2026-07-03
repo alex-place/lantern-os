@@ -12,10 +12,10 @@
  * avoid concurrent-write corruption.
  */
 
-const fs = require("fs");
 const path = require("path");
 
 const { appendJsonlQueued } = require("./file-queue");
+const { readJsonlCached } = require("./jsonl-cache");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
@@ -34,23 +34,11 @@ function agentLogPath() {
   return path.join(dataDir(), "agent-log.jsonl");
 }
 
+// mtime-cached: orders.jsonl / agent-log.jsonl only change via appendJsonlQueued,
+// so re-parsing the whole file on every dashboard GET is wasted work (#1889).
+// Returns a shared read-only array; listOrders/listLogEntries copy via .slice.
 function _readAll(filePath) {
-  try {
-    const text = fs.readFileSync(filePath, "utf8");
-    return text
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((line) => {
-        try {
-          return JSON.parse(line);
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
+  return readJsonlCached(filePath);
 }
 
 /** Append a single order to the local store. Returns the stored order. */

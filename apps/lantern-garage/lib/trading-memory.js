@@ -13,6 +13,7 @@
 const path = require("path");
 const crypto = require("crypto");
 const { appendJsonlQueued } = require("./file-queue");
+const { readJsonlCached } = require("./jsonl-cache");
 const tradingStore = require("./trading-store");
 const csfWriter = require("./csf-memory-writer");
 
@@ -24,8 +25,21 @@ function _registryPath() {
   return path.join(csfWriter._csfMemoryPath(), "raw.jsonl");
 }
 
+// Dedup sets are bounded so a long-running server can't leak memory as
+// orders/signals accumulate forever (#1889). Sets preserve insertion order, so
+// once past the cap we evict the oldest key (FIFO) — the only cost is that a
+// re-submission of a very old id would re-write once, which downstream memory_id
+// dedup absorbs. `_remember` returns whether the key was newly seen.
+const _SEEN_MAX = 10000;
 const _seenOrders = new Set();
 const _seenSignals = new Set();
+
+function _remember(set, key) {
+  if (set.has(key)) return false;
+  set.add(key);
+  if (set.size > _SEEN_MAX) set.delete(set.values().next().value); // evict oldest
+  return true;
+}
 
 function _now() {
   return new Date().toISOString();
@@ -89,8 +103,7 @@ function _toArray(payload, keys = []) {
  */
 async function recordOrder(order) {
   const key = String(order.id || order.order_id || JSON.stringify(order)).slice(0, 64);
-  if (_seenOrders.has(key)) return order;
-  _seenOrders.add(key);
+  if (!_remember(_seenOrders, key)) return order;
 
   const memId = `trading_order_${_shortHash(key)}`;
   const rec = _csfRecord(
@@ -121,8 +134,7 @@ async function recordSignal(signal) {
   const key = String(
     signal.id || signal.signal_id || signal.timestamp || JSON.stringify(signal)
   ).slice(0, 64);
-  if (_seenSignals.has(key)) return signal;
-  _seenSignals.add(key);
+  if (!_remember(_seenSignals, key)) return signal;
 
   const memId = `trading_signal_${_shortHash(key)}`;
   const rec = _csfRecord(
@@ -202,22 +214,18 @@ async function queryRecent({ limit = 50, kind } = {}) {
  * @returns {object[]}
  */
 function queryRecentTradingRecords(limit = 50, kind) {
-  const fs = require("fs");
-  try {
-    const lines = fs.readFileSync(_registryPath(), "utf8").trim().split("\n").filter(Boolean);
-    return lines
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter((r) => {
-        if (!r || !Array.isArray(r.tags) || !r.tags.includes("trading")) return false;
-        if (kind === "order") return r.tags.includes("order");
-        if (kind === "signal") return r.tags.includes("signal");
-        return true;
-      })
-      .slice(-limit)
-      .reverse();
-  } catch {
-    return [];
-  }
+  // mtime-cached parse of the append-only CSF registry — previously this read +
+  // JSON.parsed the entire raw.jsonl (potentially 100k+ lines) just to return
+  // the last ~20 records, on every GET /api/trading/csf-records (#1889).
+  return readJsonlCached(_registryPath())
+    .filter((r) => {
+      if (!r || !Array.isArray(r.tags) || !r.tags.includes("trading")) return false;
+      if (kind === "order") return r.tags.includes("order");
+      if (kind === "signal") return r.tags.includes("signal");
+      return true;
+    })
+    .slice(-limit)
+    .reverse();
 }
 
 /**
@@ -225,18 +233,23 @@ function queryRecentTradingRecords(limit = 50, kind) {
  */
 async function ingestTradingData({ orders = [], signals = [] } = {}) {
   const results = { orders_written: 0, signals_written: 0, errors: [] };
+  // Count newness up front (size-delta is unreliable once the bounded set starts
+  // evicting: a new add + an eviction leaves size unchanged). Mirrors the key
+  // derivation in recordOrder/recordSignal.
   for (const o of orders) {
     try {
-      const before = _seenOrders.size;
+      const key = String(o.id || o.order_id || JSON.stringify(o)).slice(0, 64);
+      const isNew = !_seenOrders.has(key);
       await recordOrder(o);
-      if (_seenOrders.size > before) results.orders_written++;
+      if (isNew) results.orders_written++;
     } catch (e) { results.errors.push(e.message); }
   }
   for (const s of signals) {
     try {
-      const before = _seenSignals.size;
+      const key = String(s.id || s.signal_id || s.timestamp || JSON.stringify(s)).slice(0, 64);
+      const isNew = !_seenSignals.has(key);
       await recordSignal(s);
-      if (_seenSignals.size > before) results.signals_written++;
+      if (isNew) results.signals_written++;
     } catch (e) { results.errors.push(e.message); }
   }
   return results;

@@ -13,6 +13,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { readJsonlCached } = require("./jsonl-cache");
 
 const SNAPSHOTS = path.resolve(__dirname, "..", "..", "..", "data", "kalshi", "price-snapshots.jsonl");
 
@@ -33,11 +34,9 @@ function getKalshiStats() {
   const latest = {};   // ticker -> row
   const points = {};   // ticker -> count
   let updatedAt = "";
-  for (const line of fs.readFileSync(SNAPSHOTS, "utf8").split("\n")) {
-    const s = line.trim();
-    if (!s) continue;
-    let r;
-    try { r = JSON.parse(s); } catch { continue; }
+  // mtime-cached parse: the snapshots file is append-only (the collector loop
+  // owns it), so re-reading + re-parsing every request was wasted work (#1889).
+  for (const r of readJsonlCached(SNAPSHOTS)) {
     const t = r.ticker;
     if (!t) continue;
     points[t] = (points[t] || 0) + 1;

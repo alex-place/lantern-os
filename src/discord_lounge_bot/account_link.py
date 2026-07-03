@@ -30,8 +30,10 @@ def _latest(jsonl_path: Path, match_key: str, match_val: str) -> Optional[dict]:
     """Return the last record in jsonl_path whose record[match_key] == match_val."""
     if not jsonl_path.exists():
         return None
-    latest = None
-    for line in jsonl_path.read_text(encoding="utf-8").splitlines():
+    # Scan newest→oldest and return on the first match: the "last matching
+    # record" is by definition the newest, so we stop as soon as we find it
+    # instead of JSON-parsing every earlier line in a growing file (#1890).
+    for line in reversed(jsonl_path.read_text(encoding="utf-8").splitlines()):
         line = line.strip()
         if not line:
             continue
@@ -40,8 +42,8 @@ def _latest(jsonl_path: Path, match_key: str, match_val: str) -> Optional[dict]:
         except json.JSONDecodeError:
             continue
         if str(rec.get(match_key)) == str(match_val):
-            latest = rec
-    return latest
+            return rec
+    return None
 
 
 def get_link(discord_id: str, repo_root: Optional[Path] = None) -> Optional[dict]:
