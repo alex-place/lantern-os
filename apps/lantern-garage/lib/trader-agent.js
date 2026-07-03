@@ -316,20 +316,35 @@ class TraderAgent {
           reason: (status.evidence && status.evidence[status.evidence.length - 1]) || 'IBKR gateway not connected',
         };
       }
-      const [summary, rawPos] = await Promise.all([
+      const [summary, rawPos, pnl] = await Promise.all([
         this.ibkr.getAccountSummary(),
         this.ibkr.getPositions(),
+        this.ibkr.getPnl().catch(() => null), // day P&L is best-effort — never fail the panel on it
       ]);
       const positions = (rawPos || []).map((p) => ({
         symbol: p.symbol, qty: p.qty, avg_entry_price: p.avgPrice,
         current_price: p.currentPrice, side: (p.qty >= 0 ? 'long' : 'short'),
         market_value: p.marketValue, unrealized_pl: p.unrealizedPnl,
       }));
+      const equity = (summary && summary.equity) || 0;
+      // Broker-authoritative P&L (IBKR /pnl/partitioned): `dpl` is the DAY change (reconciles
+      // with equity − prior-close), `upl` is today's unrealized. So the panel adds up:
+      //   Realized(today) + Unrealized = (dpl − upl) + upl = dpl = Day P&L.
+      // Falls back to the summary's unrealized when the pnl endpoint is unavailable.
+      const dayPnl = pnl && Number.isFinite(pnl.dailyPnl) ? pnl.dailyPnl : null;
+      const unrealized = (pnl && Number.isFinite(pnl.unrealizedPnl))
+        ? pnl.unrealizedPnl
+        : ((summary && summary.unrealizedPnl) || 0);
+      const realizedToday = (dayPnl != null && Number.isFinite(unrealized))
+        ? Math.round((dayPnl - unrealized) * 100) / 100 : null;
       const account = {
-        equity: (summary && summary.equity) || 0,
+        equity,
         cash: (summary && summary.cash) || 0,
         buying_power: (summary && (summary.buyingPower != null ? summary.buyingPower : summary.cash)) || 0,
-        unrealized: (summary && summary.unrealizedPnl) || 0,
+        unrealized,
+        pnl_today: dayPnl,          // header + panel Day P&L
+        realized_today: realizedToday, // panel Realized P&L (reconciles: R + U = Day)
+        day_pnl_pct: (dayPnl != null && equity) ? Math.round((dayPnl / equity) * 10000) / 100 : null,
         mode: status.mode,
       };
       const result = { positions, account, source: 'ibkr', available: true };

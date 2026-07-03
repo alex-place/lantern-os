@@ -2403,12 +2403,12 @@ async function loadPortfolio(){
     const d  = await r.json();
     const a  = d.account||{};
     document.getElementById('hEquity').textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
-    const pnl= a.pnl_today||0;
+    const pnl= a.pnl_today;
     const pe = document.getElementById('hDayPnl');
-    pe.textContent = (pnl>=0?'+':'')+'$'+fmt(Math.abs(pnl),0);
-    pe.className   = 'v '+(pnl>=0?'pos':'neg');
+    if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }          // unavailable → honest dash, not +$0
+    else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
     document.getElementById('hPos').textContent = (d.positions||[]).length;
-    s0Status.equity = a.equity; s0Status.pnl = pnl; s0Status.positions = (d.positions||[]).length;
+    s0Status.equity = a.equity; s0Status.pnl = pnl || 0; s0Status.positions = (d.positions||[]).length;
     renderSigma0Signals();
     renderTpSummary(a);                     // #1712
     renderPositionsTable(d.positions||[]);
