@@ -491,6 +491,12 @@ sitting in the working tree, and never `git stash` or commit to `master` to "par
 - A local **Stop hook** (`scripts/hooks/stop-warn-uncommitted.sh`, wired via `.claude/settings.json`)
   nudges you at end-of-turn when tracked code files are left uncommitted. It is a reminder, not a gate
   (the tree's ambient churn makes a hard block impractical).
+- A second **Stop hook** (`scripts/hooks/require-pr-before-stop.sh`) *gates* stopping on unpushed
+  commits / a pushed lane branch with no open PR. It is concurrency-aware: state is per-session
+  (`$GIT_DIR/claude-session-state/`), it never blocks a session that created no commits (a
+  concurrent session's in-flight work is theirs to land), it auto-passes branches whose tip is a
+  squash-**merged** PR head ("spent" branches), and each gate blocks at most once per
+  (session, HEAD). Tests: `bash scripts/hooks/test-stop-hooks.sh`.
 
 ### Before starting work
 ```bash
