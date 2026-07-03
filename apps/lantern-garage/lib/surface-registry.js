@@ -91,6 +91,7 @@ const EXTENSION = {
   // project meta
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
+  "faq.html":                      ["meta", null],
   // visualization
   "observer-mesh-cube.html":       ["viz", null],
 };
