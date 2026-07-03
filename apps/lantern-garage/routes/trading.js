@@ -227,6 +227,24 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         sendJson(res, { zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }, 200);
         return true;
       }
+      // A cached scan that FAILED (#1861) is not "warming up" — surface the honest
+      // reason so the chart shows an unavailable state instead of eternal warm-up
+      // or silently-empty overlays. scanMarket() already backs off (short fail
+      // TTL), so re-poll to trigger a retry only once the backoff has elapsed.
+      if (cacheEntry.data.error) {
+        const failStale = (Date.now() - cacheEntry.time) >= (traderAgent._scanFailTtl || 30000);
+        if (failStale) traderAgent.scanMarket().catch(() => {}); // background retry
+        // Surface the meaningful cause, not the traceback header: prefer the last
+        // Error/Exception line (e.g. the Alpaca "Key ID must be given" ValueError),
+        // fall back to the first line. Strip CRs so the message stays one line.
+        const lines = String(cacheEntry.data.error).replace(/\r/g, '').split('\n').map((s) => s.trim()).filter(Boolean);
+        const cause = [...lines].reverse().find((l) => /error|exception/i.test(l)) || lines[0] || 'backend error';
+        sendJson(res, {
+          zones: {}, available: false, failed: true,
+          reason: 'market data unavailable — ' + cause.slice(0, 160),
+        }, 200);
+        return true;
+      }
       const scanFresh = (Date.now() - cacheEntry.time) < traderAgent.cacheExpiry;
       if (!scanFresh) traderAgent.scanMarket().catch(() => {}); // refresh in background, serve stale now
       const scan = cacheEntry.data;
