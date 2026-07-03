@@ -1,3 +1,7 @@
+## [1.8.32] - 2026-07-03
+### Fixed
+- **Real IBKR Client Portal Web API (CPAPI) via the local gateway (ADR-0019).** Replaced the fabricated `api.ibkr.com` bearer-token path (which returned null 100% of the time) and the hardcoded static market quotes (`sp500: '$5,843.25'`, `vix: '14.32'`) with `lib/ibkr-cpapi.js`, a **read-only** client that talks to the local Client Portal Gateway, keeps the session warm via `/tickle`, and reports honest, evidence-bearing status at `GET /api/trading/ibkr/status`. The settings badge now reflects a real probe instead of a hardcoded `true`, and the broken settings-save wiring (`ibkr_password` → nowhere) is fixed. Grounded against IBKR's CPAPI docs, Voyz/IBeam, @stoqey/ib, and ib_async; covered by a 13-check test suite. Strengthens the **Observe** stage (real broker data) and **Verify** (no fabricated green).
+
 ## [1.8.31] - 2026-07-03
 ### Added
 - **Hosted-subset surface gate (ADR-0018, W4).** A deployment capability profile (`apps/lantern-garage/lib/deployment-profile.js`), driven by the tenancy seam (`lib/tenant.js`): in the `cloud` profile the static catch-all (`routes/surfaces.js`) serves only the hosted subset (chat / explore / help + the account & landing shell) and redirects every local-only surface (trading, autowork, admin, the life tools, …) to the hosted home; assets still pass so allowed pages render. No-op in `local` (the full app is unchanged). Verified over real HTTP against the actual route handler in both profiles.
