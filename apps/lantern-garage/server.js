@@ -584,6 +584,13 @@ server.listen(port, host, () => {
   cryptoCollector.start(10000); // 10s (#1697: tighter so 24/7 crypto price ticks are visible/flash)
   deps.cryptoCollector = cryptoCollector; // Make available to routes
 
+  // Sync Windows User-env financial/market-data keys into process.env NOW, so the
+  // news collector below sees FINNHUB_API_KEY / ALPHA_VANTAGE_API_KEY / FRED_API_KEY
+  // and pulls those sources instead of silently falling back to Yahoo-only.
+  try { require("./routes/financial-keys").syncUserEnvKeys(); } catch (e) {
+    console.warn("[Keys] startup sync failed:", e.message);
+  }
+
   // ── Market News Collector (10-min polling, watchlist + broad market RSS) ──
   const NewsCollector = require("./lib/news-collector");
   const newsCollector = new NewsCollector();

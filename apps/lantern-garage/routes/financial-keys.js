@@ -92,3 +92,9 @@ module.exports = async function financialKeysRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Exposed so the server can sync Windows User-env keys into process.env at STARTUP —
+// not just lazily when the keys route is first hit. Without this, a freshly-started
+// server has no FINNHUB_API_KEY etc., so the news collector silently falls back to
+// Yahoo-only and the market-data (Finnhub/AlphaVantage/FRED) sources go dark.
+module.exports.syncUserEnvKeys = _syncUserEnvKeys;
