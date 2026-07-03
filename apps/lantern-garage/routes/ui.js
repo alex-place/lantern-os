@@ -27,10 +27,14 @@ function writeUiSettings(repoRoot, settings) {
 module.exports = async (req, res, url, deps) => {
   const { sendJson, repoRoot } = deps;
 
-  // GET /api/ui/theme — retrieve current theme preference
+  // GET /api/ui/theme — retrieve current theme preference.
+  // NOTE: sendJson signature is (res, data, status=200) — pass the payload first, and
+  // return `true` (sendJson returns undefined; `return sendJson(...)` would report the
+  // route as unhandled and let the server fall through — a double-send hazard).
   if (req.method === "GET" && url.pathname === "/api/ui/theme") {
     const settings = readUiSettings(repoRoot);
-    return sendJson(res, 200, { theme: settings.theme });
+    sendJson(res, { theme: settings.theme }, 200);
+    return true;
   }
 
   // POST /api/ui/theme — save theme preference
@@ -39,15 +43,18 @@ module.exports = async (req, res, url, deps) => {
     try {
       const { theme } = JSON.parse(body);
       if (!["dark", "light"].includes(theme)) {
-        return sendJson(res, 400, { error: "invalid theme" });
+        sendJson(res, { error: "invalid theme" }, 400);
+        return true;
       }
       const settings = readUiSettings(repoRoot);
       settings.theme = theme;
       settings.updatedAt = new Date().toISOString();
       writeUiSettings(repoRoot, settings);
-      return sendJson(res, 200, { theme, saved: true });
+      sendJson(res, { theme, saved: true }, 200);
+      return true;
     } catch (e) {
-      return sendJson(res, 400, { error: e.message });
+      sendJson(res, { error: e.message }, 400);
+      return true;
     }
   }
 

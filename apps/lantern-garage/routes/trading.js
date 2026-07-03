@@ -108,7 +108,10 @@ function callAITrader(path, method = 'GET', body = null) {
 
     const req = http.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', chunk => {
+        data += chunk;
+        if (data.length > 8e6) { req.destroy(); reject(new Error('trader service response too large')); }
+      });
       res.on('end', () => {
         try {
           resolve({
@@ -151,7 +154,10 @@ function callDashboard(path) {
 
     const req = http.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', chunk => {
+        data += chunk;
+        if (data.length > 8e6) { req.destroy(); reject(new Error('trader service response too large')); }
+      });
       res.on('end', () => {
         try {
           resolve(JSON.parse(data));
