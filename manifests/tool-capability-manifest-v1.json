@@ -588,6 +588,65 @@
       "execution_enabled": false,
       "execution_disabled_reason": "chat_tool_exec_disabled",
       "result_receipt_schema_version": 1
+    },
+    {
+      "name": "trader_market_status",
+      "description": "Get the current live market state — VIX level + volatility regime, S&P 500 (SPY) 1-day/5-day trend, and whether the US equity session is open. Use whenever the user asks about 'the market', volatility, the VIX, or overall conditions. Data is live from the trader's keyless feed — cite it as evidence, don't answer from memory.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "trader_quote",
+      "description": "Get live price, returns, and technicals for a stock or crypto ticker (e.g. AAPL, NVDA, BTCUSD): current price, 1M/3M/YTD/1Y returns, volume vs average, 20/50-day moving averages, and a technical rating. Use whenever the user asks about a specific ticker's price, performance, or whether it looks like a buy — reason from THIS evidence, not memory.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "description": "Ticker symbol, e.g. AAPL or BTCUSD"
+          }
+        },
+        "required": [
+          "ticker"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "trader_positions",
+      "description": "Get the operator's current paper-trading positions and account (equity, cash, buying power, day P&L). Use whenever the user asks about 'my positions', 'my portfolio', 'how am I doing', or their P&L. If the broker isn't connected, report that honestly — never invent holdings.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
     }
   ]
 }
