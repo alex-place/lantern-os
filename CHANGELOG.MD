@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.8.30] - 2026-07-03
+- Rebrand all user-visible "Keystone"/"Lantern" text to Unisona across the web UI (identifiers, paths, URLs, and Three Doors canon unchanged).
+- Remove starter life-module surfaces (decisions/finance/health/learn/memory-decay/preferences/operations) and their routes/tests.
+
 ## [1.8.29] - 2026-07-02
 - Move Admin entry from nav to profile page; ADR-review follow-up updates.
 
