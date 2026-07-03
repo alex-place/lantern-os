@@ -149,6 +149,13 @@ function StartServer {
   # every boot). Set explicitly here so it holds even if .env.local is lost (belt-and-suspenders;
   # matches Start-DualServers.ps1).
   [System.Environment]::SetEnvironmentVariable('LANTERN_CLOUDFLARE_TUNNEL', 'false', 'Process')
+  # The chat assistant's capabilities are tool calls (lib/tool-runner.js) gated by CHAT_TOOL_EXEC.
+  # Force it ON so every model can use tools on the PUBLIC server too, instead of depending on the
+  # User-env value hydrated above -- a lost .env.local / unset User var must not silently boot the
+  # assistant toolless (belt-and-suspenders; matches Start-DualServers.ps1). Also keep the shared
+  # MCP tool surface (:8771) enabled explicitly.
+  [System.Environment]::SetEnvironmentVariable('CHAT_TOOL_EXEC', '1', 'Process')
+  [System.Environment]::SetEnvironmentVariable('LANTERN_MCP_SERVER', 'true', 'Process')
   # Launch with the ABSOLUTE entry path (not relative) so StopServer/ReapZombies can
   # identify this instance later. WorkingDirectory stays $STABLE, so __dirname and
   # process.cwd() are unchanged -- behaviour is identical to the relative invocation.

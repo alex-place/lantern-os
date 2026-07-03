@@ -164,6 +164,18 @@ foreach ($scope in 'Machine','User') {
 # every start. Inherited by both Start-Process children below.
 $env:LANTERN_CLOUDFLARE_TUNNEL = 'false'
 
+# The chat assistant's capabilities ARE tool calls (apps/lantern-garage/lib/tool-runner.js):
+# web search/fetch, files, repo/GitHub, market data, and the live system_status probe all run
+# through the native tool-use loop, which is gated by CHAT_TOOL_EXEC. Force it ON here so EVERY
+# model (Claude / GPT / Gemini / Grok / local) can actually use tools -- otherwise the assistant
+# boots "toolless" and fabricates instead of measuring. Belt-and-suspenders (matches the
+# LANTERN_CLOUDFLARE_TUNNEL line above): the tool loop must not be left to the ambient env.
+$env:CHAT_TOOL_EXEC = '1'
+# The MCP server (:8771) is the shared tool surface -- external agents (Claude Code) plus the
+# chat's own live status/skills context (keystone-context.js) and the system_status tool.
+# server.js spawns it as a singleton when this is not 'false'; keep it explicitly enabled.
+$env:LANTERN_MCP_SERVER = 'true'
+
 # Absolute entry paths so each instance is identifiable by its command line -- this is
 # what lets the reap below (and the stable auto-deploy) clean leaked ZOMBIES, not just
 # the current port owner.
