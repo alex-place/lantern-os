@@ -3,6 +3,10 @@
 
 # Changelog
 
+## [1.8.31] - 2026-07-03
+### Added
+- **FAQ page, and the Knowledge Center now leads with it.** New `/faq.html` — a grouped, accordion FAQ (Getting started · Privacy & your data · How it works · Plans & billing) built entirely from `site.css` tokens, with nav/footer via `site-chrome.js` and native `<details>` accordions for keyboard + screen-reader access. Every answer links to an existing, verified guide (README, QUICKSTART, PROVIDERS, KEYSTONE-LIMITATIONS, PRIVACY_GOVERNANCE, pricing). The Knowledge Center "Start here" grid now leads with an FAQ card; "What's new" is kept as the second card so the release note retains its only entry point. `faq.html` registered as an EXTENSION (`meta`) surface so the surface-boundary contract test stays green. Strengthens **Remember** — grounded, self-serve help in one place.
+
 ## [1.8.30] - 2026-07-03
 ### Added
 - **Web/desktop delivery split + cloud multi-tenancy (ADR-0018, Accepted).** The single Convergence Core gains one `resolveTenant(req)` seam (`apps/lantern-garage/lib/tenant.js`, guardrail W2) so it serves two delivery profiles without a fork: a `local` default that is byte-for-byte today's behaviour (single owner, `data/` tree, `process.env` keys — 4177/4178/desktop unchanged) and a `cloud` profile that namespaces memory under `data/tenants/<id>` and resolves bring-your-own keys per session, never leaking the host's env keys to a tenant. Behaviour-preserving: nothing routes through the seam yet. Strengthens **Remember** (per-tenant memory location) + **Act** (secure key handling). 6 hermetic unit tests.
