@@ -94,197 +94,38 @@ function _loadPersonasFromFile() {
 
 const AGENT_PERSONAS = _loadPersonasFromFile();
 
-// Inline fallback if MCP resource is missing (last resort, not the primary path)
+// Inline fallback if data/contexts/personas.json is missing (last resort, not
+// the primary path). ONE assistant — same contract as personas.json.
 const _DEFAULT_PERSONAS = [
   {
     id: "keystone",
     name: "Keystone",
-    symbol: "technical guide, code expert, engineering support",
-    systemPrompt: `You are Keystone — a direct technical assistant grounded in GitHub issues, repository tasks, real code execution, and external tools.
-
-## Core Behavior: Repository Grounding
-
-When you receive a request that references GitHub, an issue number, PR, or implementation work:
-1. Recognize it as an executable repository task, NOT RP or persona input.
-2. If a GitHub issue is referenced (e.g., "work on issue 350", "fix #350"), fetch and inspect that issue first.
-3. Summarize the issue in plain language: what is the problem/request, what are the concrete requirements?
-4. Identify the specific product and engineering requirements.
-5. Propose implementation steps with file paths and components to inspect.
-6. Return actionable next steps grounded in the repository state.
-7. Include the GitHub issue hyperlink in your response.
-8. If you have code access, begin by inspecting relevant files and producing a patch plan.
-9. If you lack access, provide the grounded plan anyway.
-
-## Research Library (CSF Tesseract)
-
-You have access to a local research library of indexed PDFs stored in the CSF tesseract archive (data/tesseract/research-pool.csf). When relevant documents are retrieved they appear under "Research library:" in your context. Use them to:
-- Ground technical or scientific claims in source material
-- Cite specific papers by title and publication date
-- Surface relevant background when answering research questions
-
-## Tool Access (Σ₀ Framework Integration)
-
-You have access to:
-- **Web Search**: Research external documentation, frameworks, best practices
-- **PowerShell/Bash**: Execute local commands, verify system state, run tests
-- **GitHub CLI (gh)**: Fetch issues, PRs, check status, create workflows
-- **MCP Tools**: Access file systems, execute complex operations
-
-Special context: The Σ₀ Collapse Certificate framework (docs/SIGMA0-QUANTUM-RELATIVITY-ANALYSIS.md) documents ungrounded self-referential systems. Use this when:
-- Debugging circular dependencies or infinite loops
-- Analyzing system convergence issues
-- Designing grounding mechanisms for autonomous agents
-- Explaining why certain unifications fail (apply to code architecture)
-
-## Generic Helpfulness Rule
-
-When the user gives an underspecified but actionable request, do the most useful grounded thing available:
-- "work on issue 350" → fetch issue #350, understand it, propose/begin the work
-- "what should I tackle first" → inspect open issues, prioritize, explain why
-- "fix this" → identify the failure from context, inspect evidence, propose a patch
-- "proceed" → continue the last concrete task, don't switch to persona mode
-- "research X" → use web search to gather current info, synthesize findings
-- "test Y" → use appropriate tool (PowerShell/Bash) to validate
-
-## Making Real Code Changes
-
-When you identify code changes needed, output using this format:
-\`\`\`
-[APPLY_CODE]
-{"filePath": "relative/path.js", "changes": "full new file content", "message": "git commit message"}
-[/APPLY_CODE]
-\`\`\`
-
-## When to Use Persona Flavor
-
-Only use RP/persona/Three Doors/Dream Journal language when the user explicitly asks for it. When the request contains engineering, GitHub, issue, PR, test, route, bug, patch, server, log, or implementation language, route to grounded technical execution.
-
-## Tone
-
-Be helpful, flexible, and best-effort. Ask a question only when genuinely blocked. Explain WHY changes are needed, not just WHAT. Keep responses concise but complete.`,
-  },
-  {
-    id: "trader",
-    name: "Trader",
-    symbol: "market analysis, portfolio management, signal generation",
-    systemPrompt: `You are the Trader — an AI agent focused on quantitative market analysis, portfolio management, and signal generation. You monitor market zones, regime classification, and trading signals.
-
-## Core Capabilities
-
-You have access to:
-- **Market Zones**: /api/trading/zones, /api/trading/ai-trader/zones — support/resistance levels, market structure
-- **Trading Signals**: /api/trading/ai-trader/signals — AI-generated trading signals with confidence scores
-- **Portfolio Status**: /api/trading/ai-trader/portfolio, /api/trading/ai-trader/status — open positions, P&L, risk metrics
-- **Watchlist**: /api/trading/ai-trader/watchlist — monitored tickers and market data
-- **Price Feeds**: /api/trading/price-feed/watchlist — live prices, OHLCV bars
-
-## User Queries You Handle
-
-Respond naturally to market/trading questions:
-- "What's the current regime?" → Analyze market zones, classify market state
-- "Show my active zones" → Fetch zones data, summarize support/resistance
-- "What are today's signals?" → Fetch AI signals, rank by confidence
-- "Close BTCUSD" → Interpret as a close position command (acknowledge, don't execute)
-- "What's my P&L?" → Query portfolio status, show open position P&L
-- "Should I buy/sell?" → Analyze regime, signals, and risk; provide analysis-backed perspective
-
-## Tone
-
-Be direct, analytical, and data-driven. Use numerical precision when discussing prices, percentages, and metrics. Reference specific zones, regimes, and signal confidence levels. When interpreting trading commands, acknowledge the request and explain what data you'd need to execute safely.
-
-## Integration with Dream System
-
-Trading queries are valid dream/persona requests — they represent the financial aspect of the dreamer's waking life and portfolio. Blend quantitative analysis with reflective language when appropriate.`,
-  },
-  {
-    id: "engineer",
-    name: "Claude Code",
-    symbol: "direct, structured, plain language code coordination",
-    systemPrompt: `You are Claude Code — a plain-language software engineering agent. You respond to code change requests with structured, actionable instructions.
-
-## Style
-- No RP, no character, no metaphor. Plain technical language only.
-- Respond as if preparing work for a coding agent or Claude Code CLI.
-- Structured sections: Problem, Approach, Changes, Verification, Notes.
-
-## Key behaviors
-- Detect repo context from the user's message (file paths, branch names, PR numbers).
-- Prepare complete, copy-paste-ready instructions for code changes.
-- When asked to "make changes", generate a precise engineering plan.
-- When asked to "fix a PR", analyze what's blocKing it and propose fixes.
-- When asked for a "handoff to Claude Code", format as a self-contained work packet.
-- Always ground in the actual lantern-os repository structure and recent work.
-
-## Output format for code changes
-When asked to make repo changes, structure as:
-
-\`\`\`
-## Problem
-[What needs to change and why]
-
-## Approach
-[How you'll accomplish this]
-
-## Files to Change
-- path/to/file.js: [description of change]
-- path/to/file.py: [description of change]
-
-## Changes
-[Inline diffs, copy-paste commands, git instructions, or exact code blocks]
-
-## Verification
-[How to test the change works]
-
-## Notes
-[Anything Claude Code or a developer needs to know]
-\`\`\`
-
-Keep it concise and actionable.`,
-  },
-  {
-    id: "job_application",
-    name: "Job Application Assistant",
-    symbol: "job search, resume, cover letter, interview prep",
-    systemPrompt: `You are the Job Application Assistant — a practical, grounded career coach inside Keystone OS.
-You help the user research job postings, tailor their resume, and write cover letters.
-You never fabricate experience or invent skills the user has not mentioned. (Σ₀ External Reality Rule)
+    symbol: "the single Unisona assistant — grounded, conversational, tool-using",
+    systemPrompt: `You are Keystone — the single Unisona assistant. There are no separate personas, modes, or scripted skill flows: one assistant handles everyday help, writing and documents, research, engineering, and market questions, adapting to each request the way a first-class AI assistant (Claude, ChatGPT, Gemini) does.
 
 ## How you work
 
-1. **Research** — When given a job posting URL or text, use \`web_fetch\` or \`web_search\` to retrieve and analyze it. Extract: role, company, required skills, key responsibilities, culture signals.
-2. **Tailor** — Ask the user for their background (name, skills, experience bullets). Match their background to the posting's requirements. Identify matched skills and honest gaps.
-3. **Generate** — Use \`generate_document\` with template=resume or cover-letter to write the final document to their workspace. Always pass the user's actual background fields and the cover_letter_opening from your tailoring analysis.
-4. **Honest gap report** — Always tell the user which required skills were NOT found in their background. Never silently omit a gap.
+1. Understand what the user actually wants, then deliver substance in your FIRST reply — a draft, an answer, an analysis, a fix — built from whatever is already available: their message, attachments, conversation history, memory, and tool results.
+2. Never reply with a form. Do not demand a checklist of fields or block on missing details: make reasonable assumptions, mark real gaps inline (e.g. "[add phone]"), and invite corrections after delivering something useful.
+3. Ask at most ONE clarifying question per reply, only when the answer genuinely changes the work, and place it after the useful content — never before it.
+4. Attachments are first-class input: read them and use them; never re-ask for information they already contain.
+5. Follow the user when they change direction. Never drag the conversation back to a workflow step.
 
-## User flows
+## Real tools, your own initiative
 
-- "Help me apply for [job URL/description]" → fetch + analyze posting → ask for background
-- "Write a cover letter for [company]" → ask for name, role, background fields → generate_document
-- "Tailor my resume for this job" → compare background to posting → suggest tailored bullets → generate_document
-- "What should I say in my interview?" → based on the posting analysis, suggest talking points
+Your capabilities are real tools (web search and fetch, document generation, user workspace files, market data, GitHub and repo access — whatever this deployment advertises). Call them yourself whenever they would improve the answer; don't ask permission for read-only lookups. Tools serve the conversation: a tool's input schema is what it ACCEPTS, not what you must collect from the user. Example: "help me with my resume" → give concrete feedback or a tailored draft from what you already know, then offer to generate the document file — never respond with the template's field list.
 
-## Evidence rule
+## Grounding (Σ₀ External Reality Rule)
 
-Every resume bullet and cover letter sentence must come from what the user told you.
-If you don't have a user background field, ask for it — never fill it in from assumptions.`,
-  },
-  {
-    id: "keystone-sigma0",
-    name: "Keystone Σ₀",
-    symbol: "verification-first coding agent, evidence chain, confidence scoring",
-    systemPrompt: `You are Keystone Σ₀ — a verification-first coding agent. Every response you produce must follow the Σ₀ framework:
+External reality beats internal consistency. Ground important claims in evidence (tool results, cited sources, files you actually read); give honest confidence; say "I don't know" plainly rather than improvise. Never fabricate user facts — experience, credentials, numbers — and never invent sources or URLs. Assumptions are fine when marked; fabrications never.
 
-<REQUIREMENT>State the exact requirement you are fulfilling</REQUIREMENT>
-<EVIDENCE>List specific files, line numbers, function names, or data you examined to ground your answer</EVIDENCE>
-<CODE>Provide the implementation (complete, copy-paste ready)</CODE>
-<VERIFICATION>Explain exactly how to verify this change works — test command, expected output, or assertion</VERIFICATION>
-<CONFIDENCE>[0-100]</CONFIDENCE>
+## Engineering requests
 
-Rules:
-- Never emit code without EVIDENCE of having read the relevant source.
-- When confidence < 60: State that you cannot proceed and list what evidence is missing.
-- No RP, no persona flavor. Plain technical language only.
-- Cite file paths and line numbers in EVIDENCE.`,
+When a request references GitHub, an issue number, a PR, or implementation work, treat it as an executable repository task: fetch the referenced issue, inspect the real code, summarize the problem in plain language, and propose grounded next steps with file paths. Include issue/PR hyperlinks. No persona flavor in technical replies.
+
+## Tone
+
+Warm, direct, and concrete. Explain WHY, not just WHAT. Concise for simple asks, comprehensive for substantive ones. Ask a question only when genuinely blocked.`,
   },
 ];
 
@@ -341,85 +182,20 @@ function _getPersonas() {
   return AGENT_PERSONAS.length > 0 ? AGENT_PERSONAS : _DEFAULT_PERSONAS;
 }
 
-function selectAgent(message) {
-  // Σ₀ Fix: Dust (message) flows through routing decision.
-  // Score all personas against message keywords; return highest.
+function selectAgent(_message) {
+  // ONE assistant — no keyword-persona routing (replaced with real tool calls).
+  // The model decides how to handle a message, and its capabilities are native
+  // tools (lib/tool-runner.js); scoring regex tables against the text turned
+  // ordinary asks like "help me work on my resume" into scripted form-filling
+  // flows. Kept as a function because every chat path resolves THE assistant
+  // through it.
   const personas = _getPersonas();
-
-  const agentKeywords = {
-    keystone: ["github", "code", "issue", "pr", "fix", "bug", "technical", "engineering", "repo", "#", "implement", "broken", "needs work", "what's broken", "what needs", "build", "deploy", "refactor", "debug", "merge", "branch", "commit", "test", "ci", "endpoint", "api", "error", "crash", "stack trace", "work on"],
-    trader: ["market", "trade", "buy", "sell", "price", "p&l", "pnl", "portfolio", "zone", "signal", "regime", "ticker", "stock", "btc", "eth", "crypto", "close position", "watchlist", "active zones"],
-    job_application: ["job", "resume", "cv", "cover letter", "apply", "application", "interview", "hiring", "recruiter", "linkedin", "offer letter", "job posting", "job description", "tailored resume", "write a resume", "help me apply"]
-  };
-
-  const scores = {};
-  const lowerMsg = message.toLowerCase();
-
-  for (const persona of personas) {
-    const keywords = agentKeywords[persona.id] || [];
-    scores[persona.id] = keywords.reduce((sum, kw) => sum + (lowerMsg.includes(kw) ? 10 : 0), 1);
-  }
-
-  // Find persona with highest score
-  const winner = personas.reduce((best, p) =>
-    (scores[p.id] > scores[best.id]) ? p : best
-  );
-
-  // Σ₀ default: an unmatched message (every persona still at the baseline score) must NOT
-  // fall through to the first/dream persona — route it to the grounded Σ₀ agent instead.
-  if (scores[winner.id] <= 1) {
-    const sigma0 = personas.find((p) => p.id === "keystone-sigma0") || personas.find((p) => p.id === "keystone");
-    if (sigma0) { console.log(`[selectAgent] no keyword match → Σ₀ default (${sigma0.id})`); return sigma0; }
-  }
-  console.log(`[selectAgent] Scored message "${message.slice(0, 60)}..." → ${winner.id} (score: ${scores[winner.id]})`);
-  return winner;
+  return personas.find((p) => p.id === "keystone") || personas[0];
 }
 
-// ── Dynamic task agents ──────────────────────────────────────────────────────
-// The desk agent is synthesized per message: the Keystone base persona plus a
-// task lens, keyed by the SAME task-type taxonomy the PCSF provider leaderboard
-// ranks with (task-detector / provider.pcsf.json). The lens sharpens the Reason
-// stage for that intent and its taskType drives PCSF chain selection — an agent
-// stays {id, name, systemPrompt}, not a new subsystem.
-const TASK_LENSES = [
-  {
-    key: "summarize",
-    match: /\b(summari[sz]e|tl;?dr|recap|condense|digest|key points? (of|from))\b/i,
-    taskType: "reasoning",
-    name: "Keystone · Summarizer",
-    lens: `## Task lens: SUMMARIZE
-Ground the summary ONLY in material the user provided or that memory recall / attachments / the knowledge center surfaced. Structure it as: key points → decisions → open questions. Name each source you drew from; if no source material is available yet, ask for the notes instead of inventing a summary.`,
-  },
-  {
-    key: "plan",
-    match: /\b(plan (my|the|this|a)|schedule|calendar|week ahead|organi[sz]e my|prioriti[sz]e my)\b/i,
-    taskType: "reasoning",
-    name: "Keystone · Planner",
-    lens: `## Task lens: PLAN
-Build a concrete, time-boxed plan. Ask for the user's real constraints (deadlines, fixed commitments, energy) if unknown; pull known goals from memory recall. Output: ordered priorities, a day-by-day (or step-by-step) schedule, and one explicit "drop if overloaded" item. Every commitment in the plan must come from the user — never invent obligations.`,
-  },
-  {
-    key: "research",
-    match: /\b(research|investigate|deep[ -]dive|look into|find out about|what does the evidence say)\b/i,
-    taskType: "reasoning",
-    name: "Keystone · Researcher",
-    lens: `## Task lens: RESEARCH
-Use web search / grounding tools for every factual claim — external reality beats internal consistency. Cite each source as a clickable Markdown link, note the date of the evidence, distinguish established fact from speculation, and end with a confidence note on the overall answer.`,
-  },
-];
-
-function dynamicAgentFor(message, baseAgent) {
-  const base = baseAgent || _getPersonas().find((p) => p.id === "keystone") || _getPersonas()[0];
-  const lens = TASK_LENSES.find((l) => l.match.test(String(message || "")));
-  if (!lens || !base) return base;
-  return {
-    ...base,                       // keep id ("keystone") so debug/tooling gates still apply
-    name: lens.name,
-    dynamic: true,
-    taskType: lens.taskType,       // stream-chat feeds this to PCSF provider selection
-    systemPrompt: `${base.systemPrompt}\n\n${lens.lens}`,
-  };
-}
+// Per-message "task lens" prompt synthesis (regex → prompt suffix) was removed
+// with the keyword personas: the one assistant + real tool calls covers those
+// intents, and PCSF provider ranking gets its taskType from detectTaskType.
 
 function parseBangCommand(input) {
   const m = String(input || "").trim().match(/^!(\S+)(?:\s+(.*))?$/);
@@ -429,29 +205,6 @@ function parseBangCommand(input) {
 
 const _CODING_PATTERNS = /\b(fix|patch|implement|refactor|write|generate|create|add|remove|debug|test|lint|route|function|class|import|export|PR|issue|bug|error|file|script|module|API|endpoint|migration)\b/i;
 function _isCodingRequest(text) { return _CODING_PATTERNS.test(text || ""); }
-
-function _extractConfidence(content) {
-  const m = String(content).match(/<CONFIDENCE>\s*(\d+)\s*<\/CONFIDENCE>/i)
-    || String(content).match(/confidence[:\s]+(\d+)/i);
-  if (m) return Math.min(100, Math.max(0, parseInt(m[1], 10)));
-  return null;
-}
-
-function _emitSigmaRecord({ text, content, confidence, agentId, source }) {
-  try {
-    const repoRoot = path.resolve(__dirname, "../../..");
-    const workPath = path.join(repoRoot, "data", "convergence-autonomous-work.jsonl");
-    const record = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      agent: agentId || "keystone-sigma0",
-      source,
-      request: String(text || "").slice(0, 200),
-      confidence: confidence ?? null,
-      accepted: source !== "ollama-sigma0-rejected",
-    });
-    fs.appendFileSync(workPath, record + "\n", "utf8");
-  } catch {}
-}
 
 // Derive a concise web-search query from the salient themes of recent entries.
 // Deterministic (no extra LLM call): tokenize, drop stopwords/short words, rank by
@@ -797,76 +550,11 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     }
   }
 
-  // ── Trading Context (literal market data) ───────────────────────────
-  let tradingContext = "";
-  const tradingKeywords = /\b(buy|sell|trade|portfolio|shares?|market|signal|position|order|aapl|tsla|spy|crypto|stock|invest|execute|portfolio)\b/i;
-  if (tradingKeywords.test(text)) {
-    try {
-      // Fetch trading data from native microservice (port 5050)
-      const tradingData = {};
-
-      // Get portfolio/positions
-      try {
-        const posRes = await new Promise((resolve) => {
-          http.get("http://127.0.0.1:5050/api/positions", (res) => {
-            let data = "";
-            res.on("data", (c) => (data += c));
-            res.on("end", () => {
-              try { resolve(JSON.parse(data)); } catch { resolve({}); }
-            });
-          }).on("error", () => resolve({}));
-        });
-        if (posRes && posRes.account) tradingData.account = posRes.account;
-      } catch { }
-
-      // Get market status
-      try {
-        const mktRes = await new Promise((resolve) => {
-          http.get("http://127.0.0.1:5050/api/market-status", (res) => {
-            let data = "";
-            res.on("data", (c) => (data += c));
-            res.on("end", () => {
-              try { resolve(JSON.parse(data)); } catch { resolve({}); }
-            });
-          }).on("error", () => resolve({}));
-        });
-        if (mktRes) tradingData.market = mktRes;
-      } catch { }
-
-      // Get trading signals
-      try {
-        const sigRes = await new Promise((resolve) => {
-          http.get("http://127.0.0.1:5050/api/ai-trader/signals?limit=3", (res) => {
-            let data = "";
-            res.on("data", (c) => (data += c));
-            res.on("end", () => {
-              try { resolve(JSON.parse(data)); } catch { resolve({}); }
-            });
-          }).on("error", () => resolve({}));
-        });
-        if (sigRes && sigRes.signals) tradingData.signals = sigRes.signals;
-      } catch { }
-
-      // Format trading context
-      if (Object.keys(tradingData).length > 0) {
-        const parts = [];
-        if (tradingData.account) {
-          const acc = tradingData.account;
-          parts.push(`Account: $${(acc.equity || 0).toLocaleString()} equity, $${(acc.cash || 0).toLocaleString()} cash, P&L ${acc.pnl_pct > 0 ? '+' : ''}${(acc.pnl_pct || 0).toFixed(2)}%`);
-        }
-        if (tradingData.market) {
-          const mkt = tradingData.market;
-          parts.push(`Market ${mkt.market_open ? 'OPEN' : 'CLOSED'}: SPY ${mkt.spy_1d > 0 ? '+' : ''}${(mkt.spy_1d || 0).toFixed(2)}% (1D), VIX ${(mkt.vix || 0).toFixed(2)}`);
-        }
-        if (tradingData.signals && tradingData.signals.length > 0) {
-          parts.push(`Recent signals: ${tradingData.signals.map(s => `${s.symbol} ${s.type} (${Math.round(s.confidence * 100)}%)`).join(", ")}`);
-        }
-        tradingContext = parts.join("\n");
-      }
-    } catch (e) {
-      console.error("[trading-context] fetch failed (non-fatal):", e.message);
-    }
-  }
+  // Trading context is a REAL tool now, not keyword-triggered prompt stuffing:
+  // the model calls trader_market_status / trader_quote / trader_positions
+  // (lib/tool-runner.js) when a message actually needs market data. The old
+  // regex block here pre-fetched from the removed port-5050 Python trader
+  // (#1959) and silently injected nothing.
 
   // Convergence Oracle — ground every question in its cosmic-time observer slice (fail-safe).
   let oracleContext = "";
@@ -889,7 +577,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     } catch (_) { meshGroundContext = ""; }
   }
 
-  const userPrompt = `${meshGroundContext ? meshGroundContext + "\n\n" : ""}${oracleContext ? oracleContext + "\n\n" : ""}${groundingContext ? groundingContext + "\n\n" : ""}${tradingContext ? "Trading data:\n" + tradingContext + "\n\n" : ""}${text}`;
+  const userPrompt = `${meshGroundContext ? meshGroundContext + "\n\n" : ""}${oracleContext ? oracleContext + "\n\n" : ""}${groundingContext ? groundingContext + "\n\n" : ""}${text}`;
 
   let rp = String(requestedProvider || "").toLowerCase().trim();
 
@@ -910,7 +598,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   // ── Keystone: Task-aware provider selection using performance leaderboard ──
   let primaryProviderHint = null;
   try {
-    let taskType = detectTaskType(text, { isTradingQuery: tradingContext.length > 0 });
+    let taskType = detectTaskType(text);
 
     // ── Router gate (opt-in via ROUTER_GATE=1) ────────────────────────────────
     // Conversation-dynamics escalation: if this turn breaks genuinely new ground
@@ -972,7 +660,6 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   const ollamaModel = process.env.OLLAMA_MODEL || "ouro:latest";
   if (!rp || rp === "ollama" || rp === "local" || rp === "sigma0") {
     const isCoding = rp === "sigma0" || _isCodingRequest(text);
-    const sigma0Persona = _getPersonas().find(p => p.id === "keystone-sigma0") || _DEFAULT_PERSONAS.find(p => p.id === "keystone-sigma0");
 
     // #1050: in degraded/offline mode (no cloud keys + provider not explicitly set)
     // the tiny local model cannot follow rich persona prompts — it produces in-persona
@@ -992,12 +679,8 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     // Ollama block, which means cloud auto-routing fell through — use the
     // minimal prompt regardless of key presence so Ouro gives factual answers.
     const _useOfflinePrompt = !rp && !isCoding;
-    const ollamaSystemPrompt = isCoding && sigma0Persona
-      ? sigma0Persona.systemPrompt
-      : (_useOfflinePrompt ? _offlinePrompt : agent.systemPrompt);
-    const ollamaUserPrompt = isCoding
-      ? `REQUIREMENT TO VERIFY: ${text}\n\nConfirm what files/lines you read, then respond in the <REQUIREMENT><EVIDENCE><CODE><VERIFICATION><CONFIDENCE> format.`
-      : userPrompt;
+    const ollamaSystemPrompt = _useOfflinePrompt ? _offlinePrompt : agent.systemPrompt;
+    const ollamaUserPrompt = userPrompt;
     try {
       const payload = JSON.stringify({
         model: ollamaModel,
@@ -1050,17 +733,6 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
         req2.end();
       });
       if (reply && reply.content) {
-        if (isCoding) {
-          const confidence = _extractConfidence(reply.content);
-          if (confidence !== null && confidence < 60) {
-            _emitSigmaRecord({ text, content: reply.content, confidence, agentId: "keystone-sigma0", source: "ollama-sigma0-rejected" });
-            return { reply: `Σ₀ gate: confidence ${confidence}/100 — cannot deliver. Missing evidence: ${reply.content.slice(0, 300)}`, agent: "Keystone Σ₀", suggestions, online: true, source: "ollama-sigma0-rejected", confidence };
-          }
-          _emitSigmaRecord({ text, content: reply.content, confidence, agentId: "keystone-sigma0", source: "ollama-sigma0" });
-          const ollamaSuggestions = reply.doors && reply.doors.length > 0 ? reply.doors : suggestions;
-          recordProviderSuccessRouter("ollama");
-          return { reply: reply.content, agent: "Keystone Σ₀", suggestions: ollamaSuggestions, online: true, source: "ollama-sigma0", confidence, webSuggestions };
-        }
         const ollamaSuggestions = reply.doors && reply.doors.length > 0 ? reply.doors : suggestions;
         recordProviderSuccessRouter("ollama"); // Log to provider-router for performance tracking
         const offlineBanner = _useOfflinePrompt ? "\n\n---\n⚠ Running offline on local model — factual accuracy may be limited." : "";
@@ -1583,8 +1255,6 @@ module.exports = {
   AGENT_PERSONAS,
   DREAM_DOORS,
   selectAgent,
-  dynamicAgentFor,
-  TASK_LENSES,
   parseBangCommand,
   handleConvergenceCommand,
   dreamChatReply,

@@ -162,15 +162,17 @@ if (agentsMd) {
   assert("AGENTS.md has build commands", agentsMd.includes("npm start") || agentsMd.includes("node"));
 }
 
-// ── Rule 8: Dream Journal chat must have personas ────────────────────────────
-console.log("\n=== Rule 8 — Dream Journal persona integrity ===");
-if (serverJs) {
-  const personaCount = (serverJs.match(/id:\s*"/g) || []).length;
-  assert("At least 3 personas defined", personaCount >= 3,
-    `found ${personaCount} personas`);
-  assert("selectAgent function exists", serverJs.includes("function selectAgent"));
-  assert("Persona systemPrompts are present",
-    serverJs.includes("systemPrompt") && serverJs.includes("You are"));
+// ── Rule 8: One chat assistant — no keyword-persona routing ──────────────────
+// The chat is a single grounded assistant whose capabilities are real tool
+// calls (lib/tool-runner.js), not a set of keyword-routed personas.
+console.log("\n=== Rule 8 — Single-assistant chat integrity ===");
+const dreamChatLib = readFile("apps/lantern-garage/lib/dream-chat.js");
+if (dreamChatLib) {
+  assert("selectAgent function exists", dreamChatLib.includes("function selectAgent"));
+  assert("selectAgent does not keyword-score personas",
+    !dreamChatLib.includes("agentKeywords"));
+  assert("Assistant systemPrompt is present",
+    dreamChatLib.includes("systemPrompt") && dreamChatLib.includes("You are"));
 }
 
 // ── Rule 9: No overengineering claims ──────────────────────────────────────
