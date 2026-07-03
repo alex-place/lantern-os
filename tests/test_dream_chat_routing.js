@@ -8,33 +8,40 @@ function test(name, fn) {
   catch (err) { console.error(`  ✗ ${name}\n    ${err.message}`); failed++; }
 }
 
-function detectIntent(message) {
-  const lower = String(message || "").toLowerCase();
-  if (/\b(buy|sell|trade|market|stock|invest|portfolio)\b/.test(lower)) return "trading";
-  if (/\b(play|game|doors|kingdome|three.?doors?)\b/.test(lower)) return "rp_game";
-  if (/\b(export|archive|csf|compress)\b/.test(lower)) return "memory_export";
-  if (/^!convergence/.test(lower)) return "convergence";
-  return "unknown";
-}
+// One assistant, real tool calls: selectAgent no longer keyword-routes between
+// personas — every message resolves to THE keystone assistant, and capabilities
+// (documents, market data, web, repo) are native tools in lib/tool-runner.js.
 
-function supportsConvergence(intent) {
-  return ["trading", "memory_export", "convergence"].includes(intent);
-}
-
-console.log("\nTest: Trading Query");
-test('should route "buy aapl shares"', () => {
-  const agent = selectAgent("buy aapl shares");
-  assert.strictEqual(agent.id, "keystone");
+console.log("\nTest: One assistant for every message");
+test('trading ask resolves to the one assistant ("buy aapl shares")', () => {
+  assert.strictEqual(selectAgent("buy aapl shares").id, "keystone");
+});
+test('document ask resolves to the one assistant ("help me work on my resume")', () => {
+  assert.strictEqual(selectAgent("help me work on my resume").id, "keystone");
+});
+test("empty message resolves to the one assistant", () => {
+  assert.strictEqual(selectAgent("").id, "keystone");
 });
 
-console.log("\nTest: Intent Detection");
-test("should detect trading intent", () => {
-  assert.strictEqual(detectIntent("buy stock"), "trading");
+console.log("\nTest: Assistant contract");
+test("exactly one persona is defined (no keyword-routed persona set)", () => {
+  assert.strictEqual(AGENT_PERSONAS.length, 1);
+  assert.strictEqual(AGENT_PERSONAS[0].id, "keystone");
+});
+test("assistant prompt is conversational + tool-using, not a scripted flow", () => {
+  const prompt = AGENT_PERSONAS[0].systemPrompt || "";
+  assert.ok(/real tools/i.test(prompt), "prompt should tell the model its capabilities are real tools");
+  assert.ok(/never reply with a form/i.test(prompt), "prompt should forbid form-filling behavior");
 });
 
-console.log("\nTest: Agent Personas");
-test("should have 6+ agents", () => {
-  assert.ok(AGENT_PERSONAS.length >= 6);
+console.log("\nTest: Bang command parsing");
+test("parseBangCommand extracts name and args", () => {
+  const cmd = parseBangCommand("!search current weather");
+  assert.strictEqual(cmd.name, "search");
+  assert.strictEqual(cmd.args, "current weather");
+});
+test("plain text is not a bang command", () => {
+  assert.strictEqual(parseBangCommand("hello there"), null);
 });
 
 console.log("\n" + "=".repeat(50));
