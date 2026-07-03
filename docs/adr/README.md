@@ -74,5 +74,6 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0014](0014-unisona-desktop-launcher.md) | unisona.ai desktop — a thin signed launcher over the one Core, not an Electron repackage | Accepted (Alex Place, 2026-07-02) |
 | [0015](0015-qwen-teacher-verified-distillation.md) | Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record | Proposed (awaiting Alex's approval) |
 | [0016](0016-provider-agnostic-oss-auth.md) | Provider-agnostic OSS auth — one identity + provider registry (local scrypt + Google + Discord + Patreon), verified-both linking | Accepted (Alex Place, 2026-07-02) |
+| [0017](0017-surprise-gated-decoding.md) | Surprise-gated decoding — mid-generation grounding intervention (CSF retrieval + web search + tool call) when rolling surprise crosses calibrated threshold | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->

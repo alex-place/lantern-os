@@ -152,6 +152,12 @@
       border-radius: 16px; padding: 32px; max-width: 440px; width: 90%;
     }
     .modal h2 { margin: 0 0 24px; font-size: 18px; }
+    .form-error {
+      margin-bottom: 16px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(220, 38, 38, 0.12);
+      border: 1px solid rgba(220, 38, 38, 0.45);
+      color: #dc2626; font-size: 13px; line-height: 1.4;
+    }
     .form-row { margin-bottom: 16px; }
     .form-row label {
       display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em;
@@ -168,6 +174,12 @@
     .modal-actions .btn { flex: 1; justify-content: center; }
 
     .loading { text-align: center; color: var(--muted); padding: 80px 20px; font-size: 14px; }
+
+    .loop-stage-note {
+      text-align: center; color: var(--muted); font-size: 12px;
+      margin: 4px 0 0; opacity: .8;
+    }
+    .loop-stage-note strong { color: var(--muted); font-weight: 700; }
   </style>
 </head>
 <body>
@@ -212,6 +224,7 @@
   <div class="modal">
     <h2>Edit Profile</h2>
     <form id="edit-form" onsubmit="saveProfile(event)">
+      <div id="edit-error" class="form-error" role="alert" hidden></div>
       <div class="form-row">
         <label>Display Name</label>
         <input type="text" id="edit-name" maxlength="80" autocomplete="name">
@@ -241,14 +254,28 @@ const TIER_LABELS = {
   admin:        { label: 'Synthesasia Guild — $200/mo', emoji: '⬡' },
 };
 
+// Feature access is role-laddered EXCEPT Trader, which is a per-account
+// opt-in entitlement (entitlements.trade), independent of tier — see
+// user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
 const FEATURES = [
   { emoji: '📖', label: 'Journal',     href: '/dream-chat.html',       req: 'guest' },
-  { emoji: '📈', label: 'Trader',      href: '/stock-trader.html', req: 'admin' },
+  { emoji: '📈', label: 'Trader',      href: '/stock-trader.html',     req: 'trade' },
   { emoji: '✏️', label: 'Create',      href: '/create.html',           req: 'deep_dreamer' },
   { emoji: '🗺️', label: 'Explore',     href: '/explore.html',          req: 'guest' },
   { emoji: '📚', label: 'Knowledge',   href: '/knowledgecenter.html',  req: 'guest' },
   { emoji: '📊', label: 'Crypto',      href: '/crypto-dashboard.html', req: 'guest' },
 ];
+
+// How each account source (metadata.source) presents as a sign-in method.
+// Identity is provider-agnostic (ADR-0005) — Patreon is one source among many.
+const SOURCE_LABELS = {
+  local:   { label: 'Email + password', emoji: '🔑' },
+  patreon: { label: 'Patreon',          emoji: '♥' },
+  discord: { label: 'Discord',          emoji: '🎮' },
+  google:  { label: 'Google',           emoji: 'ᴳ' },
+  oauth:   { label: 'OAuth',            emoji: '🔗' },
+  dev:     { label: 'Local dev bypass', emoji: '🛠️' },
+};
 
 let currentProfile = null;
 
@@ -267,8 +294,15 @@ function fmtDate(iso) {
   catch { return iso; }
 }
 
-function hasAccess(userRole, reqRole) {
-  return (ROLE_LEVEL[userRole] || 0) >= (ROLE_LEVEL[reqRole] || 0);
+function hasAccess(profile, reqRole) {
+  if (reqRole === 'trade') {
+    return profile.role === 'admin' || !!(profile.entitlements && profile.entitlements.trade);
+  }
+  return (ROLE_LEVEL[profile.role] || 0) >= (ROLE_LEVEL[reqRole] || 0);
+}
+
+function sourceOf(profile) {
+  return SOURCE_LABELS[profile.metadata?.source] || SOURCE_LABELS.local;
 }
 
 function renderProfile(profile) {
@@ -276,9 +310,13 @@ function renderProfile(profile) {
   const role = profile.role || 'guest';
   const tier = TIER_LABELS[role] || TIER_LABELS.guest;
 
+  const source = sourceOf(profile);
+
   const featureCards = FEATURES.map(f => {
-    const ok = hasAccess(role, f.req);
-    const reqLabel = f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '';
+    const ok = hasAccess(profile, f.req);
+    const reqLabel = f.req === 'trade'
+      ? 'Requires trading access (opt-in)'
+      : (f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '');
     return ok
       ? `<a class="access-card" href="${f.href}">
            <span class="access-icon">${f.emoji}</span>
@@ -316,19 +354,57 @@ function renderProfile(profile) {
         <div class="info-value">${fmtDate(profile.metadata?.createdAt)}</div>
       </div>
       <div class="info-cell">
-        <div class="info-label">Account ID</div>
-        <div class="info-value"><code>${escapeHtml(profile.id || '—')}</code></div>
+        <div class="info-label">Signed in with</div>
+        <div class="info-value">${source.emoji} ${escapeHtml(source.label)}</div>
       </div>
+      <div class="info-cell">
+        <div class="info-label">Account ID</div>
+        <div class="info-value"><code>${escapeHtml(profile.id || profile.patreonId || '—')}</code></div>
+      </div>
+      ${profile.discordId ? `
+      <div class="info-cell">
+        <div class="info-label">Linked accounts</div>
+        <div class="info-value">🎮 Discord</div>
+      </div>` : ''}
     </div>
 
     <div>
       <div class="section-title">Feature Access</div>
       <div class="access-grid">${featureCards}</div>
     </div>
+
+    ${role === 'admin' ? `
+    <div>
+      <div class="section-title">Administration</div>
+      <div class="access-grid">
+        <a class="access-card" href="/admin-flags.html">
+          <span class="access-icon">🛠️</span>
+          <div>
+            <div class="access-label">Feature Flags</div>
+            <div class="access-req">Admin control surface</div>
+          </div>
+        </a>
+      </div>
+    </div>` : ''}
+
+    <p class="loop-stage-note">Account surface — an <strong>extension</strong>, not a loop stage (ADR-0013).</p>
   `;
 }
 
+function showEditError(msg) {
+  const el = document.getElementById('edit-error');
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+function clearEditError() {
+  const el = document.getElementById('edit-error');
+  el.textContent = '';
+  el.hidden = true;
+}
+
 function openEdit() {
+  clearEditError();
   document.getElementById('edit-name').value = currentProfile?.name || '';
   document.getElementById('edit-bio').value  = currentProfile?.bio  || '';
   document.getElementById('edit-modal').classList.add('open');
@@ -342,6 +418,7 @@ async function saveProfile(e) {
   e.preventDefault();
   const btn = e.submitter || e.target.querySelector('[type=submit]');
   btn.textContent = 'Saving…'; btn.disabled = true;
+  clearEditError();
   try {
     const res = await fetch('/api/profiles/me', {
       method: 'PUT', credentials: 'include',
@@ -351,12 +428,19 @@ async function saveProfile(e) {
         bio:  document.getElementById('edit-bio').value.trim(),
       }),
     });
-    if (!res.ok) throw new Error('Save failed');
+    if (!res.ok) {
+      let detail = `Save failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body && (body.error || body.message)) detail = body.error || body.message;
+      } catch { /* non-JSON body; keep status-based message */ }
+      throw new Error(detail);
+    }
     currentProfile = await res.json();
     closeEdit();
     renderProfile(currentProfile);
   } catch (err) {
-    alert('Could not save: ' + err.message);
+    showEditError(err.message || 'Could not save your changes.');
   } finally {
     btn.textContent = 'Save'; btn.disabled = false;
   }

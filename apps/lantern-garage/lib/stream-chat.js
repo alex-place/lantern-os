@@ -1455,7 +1455,7 @@ async function handleStreamChat(req, url, res) {
   // cloud providers are unavailable) a correct, concrete answer to "what is this?" so new
   // users get an orientation instead of improvised dream-journal filler. The journal block
   // is explicitly labelled background so the model does not narrate it as if it were the app.
-  const ROUTER_PROMPT = `You are Keystone Σ₀ — the grounded reasoning and engineering agent for Keystone OS, a local-first private journaling and reasoning app that runs on the user's own machine with no account required. You run the convergence loop (Observe → Remember → Reason → Act → Verify → Converge), and external reality beats internal consistency: ground every important claim in evidence, give an honest confidence, and say "I don't know" rather than improvise. Answer directly, technically, and concretely. You are a precise technical agent — never use roleplay, mystical, or poetic language. For code, give complete, correct, copy-paste-ready implementations grounded in real files/APIs and state exactly how to verify (test command or expected output). Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?" or "what can you do?", give a plain one- or two-sentence description of Keystone OS. IMPORTANT: Your very first token must be substantive content — never output only your name or any greeting. Go straight to the answer.\n\n${_realtimeCtx}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}`;
+  const ROUTER_PROMPT = `You are Keystone Σ₀ — the grounded reasoning and engineering agent for Keystone OS, a local-first private journaling and reasoning app that runs on the user's own machine with no account required. You run the convergence loop (Observe → Remember → Reason → Act → Verify → Converge), and external reality beats internal consistency: ground every important claim in evidence, give an honest confidence, and say "I don't know" rather than improvise. Answer directly, technically, and concretely. You are a precise technical agent — never use roleplay, mystical, or poetic language. For code, give complete, correct, copy-paste-ready implementations grounded in real files/APIs and state exactly how to verify (test command or expected output). Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Web search: you have \`web_search\` and \`web_fetch\` tools — use them the way a competent assistant does, on your own initiative. Do NOT answer from memory when the answer depends on current, recent, or fast-changing information (news, prices, weather, sports scores, releases/versions, anything phrased as "latest / current / today / this week", or the present status/role of a person, company, or project), or when you are not confident your training knowledge is complete and up to date — search first. Prefer one or two targeted queries over guessing, and open the most relevant result with \`web_fetch\` when a snippet is not enough to answer well. Cite whatever you actually used as clickable Markdown links. If search is unavailable or you still cannot verify a claim, say so plainly and give your confidence — never invent a fact or a source. Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?" or "what can you do?", give a plain one- or two-sentence description of Keystone OS. IMPORTANT: Your very first token must be substantive content — never output only your name or any greeting. Go straight to the answer.\n\n${_realtimeCtx}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}`;
 
   // Grounded identity (#1242). The underlying foundation model (Gemini/Claude/
   // OpenAI/xAI/Ouro) must never leak its vendor identity through the Keystone
@@ -2112,57 +2112,19 @@ async function handleStreamChat(req, url, res) {
     modelChain = [_swapLead, ...modelChain.filter((x) => x !== _swapLead)];
   }
 
-  // ── Tier 0: cheap Knowledge Center answer before any model ($0, no LLM) ──
-  // Only short-circuit informational queries with a confident KB hit. Coding,
-  // convergence/work, roleplay, explicit-provider, and keystone paths are never
-  // short-circuited — they fall through to the model chain below.
-  // $0 short-circuit threshold. Default favors quality: only very strong near hits
-  // (or exact deterministic ones) answer without the LLM; weaker hits still GROUND
-  // the LLM (better answers). Lower KB_ANSWER_MIN (e.g. 0.2) for cost-aggressive $0.
-  const KB_ANSWER_MIN = parseFloat(process.env.KB_ANSWER_MIN || "0.3");
-  // Live/stateful queries must NOT be answered from a static doc — they need the
-  // LLM with live project context (GitHub/MCP). Only static knowledge short-circuits.
-  const wantsLiveData = /\b(current|currently|now|today|latest|recent|open (issues?|prs?|pull)|status|right now|this (week|sprint)|what'?s? (open|happening|next))\b/i.test(message);
-  // Greetings / social chitchat must NOT short-circuit to a doc section — "hello"
-  // or "who are you" scored a spurious near-hit against an arbitrary doc (e.g.
-  // CLAUDE.md#Node.js) and rendered that section's raw text (an empty ```bash
-  // fence) instead of an actual reply. These belong to the model, not the KB.
-  // Identity/social questions ("who are you", "how are you") are about the
-  // assistant itself, never a doc, so they match anywhere in a short message
-  // (covers "Hello, who are you?"); pure greetings/thanks only count when the
-  // whole short message is the pleasantry.
-  const _msgT = message.trim();
-  const _wordCount = _msgT.split(/\s+/).length;
-  const _isIdentityOrSocial = /\b(who (are|r) (you|u|ya)|what (are|r) (you|u)|how (are|r) (you|u|ya)|what'?s up)\b/i.test(_msgT);
-  // Capability questions ("what can you do", "what do you do", "how can you
-  // help", "what are you capable of") are about the assistant's own abilities —
-  // they must be answered by the model (which can enumerate real skills), never
-  // by a raw doc section. "what can you do" scored a spurious near-hit against
-  // CLAUDE.md#Node.js and rendered its empty ```bash fence instead (#1778).
-  const _isCapabilityQuery = /\b(what|how)\b.{0,20}\b(can|could|do|are)\b.{0,20}\b(you|u)\b.{0,20}\b(do|help|capable|able|good at|offer|assist)\b/i.test(_msgT)
-    || /\bwhat('?s| is| are)?\b.{0,20}\byour\b.{0,20}\b(capabilit|skill|feature|abilit|function)/i.test(_msgT);
-  const _isPureGreeting = /^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening)|thanks?|thank you|ty|np|ok(ay)?|cool|nice|lol)\b[\s!.?,]*$/i.test(_msgT)
-    || (/^(hi|hey+|hello|yo|sup|howdy|greetings|good (morning|afternoon|evening))\b/i.test(_msgT) && _wordCount <= 6);
-  const isGreetingOrChitchat = _isIdentityOrSocial || _isCapabilityQuery || _isPureGreeting;
-  if (kbAnswer && kbAnswer.hit && !isKeystoneDebug && !isRpMode && !requestedProvider && !wantsLiveData
-      && !isGreetingOrChitchat
-      && !routeDecision.requires_convergence
-      && (kbAnswer.tier === "deterministic" || kbAnswer.score >= KB_ANSWER_MIN)) {
-    const ans = `${kbAnswer.text}\n\n— from the Knowledge Center: ${kbAnswer.source}`;
-    sendToken(ans);
-    await logConversation({
-      recordedAt: new Date().toISOString(), surface: "dream-chat-stream",
-      role: "lantern", text: ans.slice(0, maxConversationTextLength),
-      meta: { provider: "knowledge", model: "knowledge-center", agent: doneAgentName },
-    }).catch(() => {});
-    try { recordProviderSuccess("knowledge"); } catch (_e) {}
-    sendDone("knowledge", {
-      agent: doneAgentName, online: true, cleanText: ans, suggestions: [],
-      model: "knowledge-center", source: "knowledge",
-      tier: kbAnswer.tier, score: kbAnswer.score,
-    });
-    return;
-  }
+  // ── Knowledge Center: retrieval GROUNDS the model, it never replaces it ──
+  // There is deliberately NO "$0, answer from the KB before any model" short-circuit
+  // here. Serving a retrieved doc section verbatim as the answer is not what a
+  // competent assistant does: keyword/TF-IDF retrieval has no comprehension, so it
+  // repeatedly dumped off-topic or degenerate sections as "answers" (an empty
+  // ```bash fence for "what can you do" #1778, for greetings, and for "is ollama
+  // running"). Each miss spawned another hand-written regex blocklist — an
+  // un-winnable game. The fix is architectural: the top KB section is injected into
+  // `groundingContext` above (see ~L1323), and EVERY query is answered by the model,
+  // which judges relevance, synthesizes a natural-language reply, cites the source,
+  // and can say "that's not in the docs." Retrieval score gates whether context is
+  // included, not whether the model runs. Do not reintroduce a verbatim-answer path;
+  // if answer caching is ever needed, cache MODEL-generated answers, not doc chunks.
 
   // ── Ouro looped reasoning: adaptive depth + Q-exit CDF (arXiv 2510.25741) ──
   // Implements the paper at the API level on OUR local model: refine across loops,
