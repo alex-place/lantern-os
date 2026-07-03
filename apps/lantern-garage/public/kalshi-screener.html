@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Σ₀ Screener — Kalshi markets ranked by grounded edge</title>
+<script>(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})();</script>
+<style>
+  :root{
+    --bg0:#080d14;--bg1:#0c1420;--bg2:#111c2b;--border:#1c2a3a;--border2:#26384c;
+    --text0:#dfeaf6;--text1:#aebdcf;--text2:#7d90a6;--green:#2bff88;--red:#ff7a3c;--accent:#38bdf8;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  html.light{--bg0:#f4f6fa;--bg1:#fff;--bg2:#eef2f7;--border:#d7dfea;--border2:#c3cede;--text0:#0f1722;--text1:#3a4a5c;--text2:#65788c;--green:#12a150;--red:#d9480f;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg0);color:var(--text0);font-family:var(--mono);font-size:13px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+  h1{font-size:18px;margin:6px 0 2px;letter-spacing:.02em}
+  .sub{color:var(--text2);font-size:12px;margin-bottom:16px}
+  .sub b{color:var(--accent)}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .controls input[type=search]{background:var(--bg1);border:1px solid var(--border);color:var(--text0);
+    border-radius:8px;padding:7px 10px;font-family:var(--mono);font-size:12px;min-width:180px}
+  .chip{background:var(--bg1);border:1px solid var(--border);color:var(--text1);border-radius:16px;
+    padding:6px 12px;font-size:11.5px;cursor:pointer;user-select:none}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#04121c;font-weight:700}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .seg button{background:var(--bg1);border:0;border-right:1px solid var(--border);color:var(--text1);
+    padding:6px 11px;font-size:11.5px;cursor:pointer;font-family:var(--mono)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--bg2);color:var(--text0);font-weight:700}
+  .meta{margin-left:auto;color:var(--text2);font-size:11px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{position:sticky;top:0;background:var(--bg1);border-bottom:1px solid var(--border2);
+    text-align:right;padding:8px 10px;color:var(--text2);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+  thead th.l{text-align:left}
+  tbody td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+  tbody td.l{text-align:left;white-space:normal;max-width:420px}
+  tbody tr:hover{background:var(--bg1)}
+  .tkr{color:var(--text2);font-size:10px}
+  .ttl{color:var(--text0)}
+  .ev{font-weight:800}.ev.pos{color:var(--green)}.ev.neg{color:var(--red)}
+  .side{font-weight:700;font-size:10px;padding:1px 5px;border-radius:4px}
+  .side.YES{background:rgba(43,255,136,.12);color:var(--green)}
+  .side.NO{background:rgba(255,122,60,.12);color:var(--red)}
+  .py{color:var(--text0)} .mk{color:var(--text2)}
+  .brier{color:var(--text1)}
+  .none{color:var(--text2);opacity:.6}
+  .empty{padding:40px;text-align:center;color:var(--text2)}
+  a.back{color:var(--accent);text-decoration:none;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/kalshi-terminal.html">← Terminal</a>
+  <h1>Σ₀ Screener</h1>
+  <div class="sub">Every open market, ranked by <b>our grounded edge</b> — not just volume. The top of the board is where our web-grounded P(YES) disagrees with the market <b>past the fee hurdle</b>. Ungrounded markets list below (no edge claimed).</div>
+
+  <div class="controls">
+    <input type="search" id="q" placeholder="Search ticker / title…" autocomplete="off">
+    <div class="seg" id="sortSeg">
+      <button data-sort="edge" class="on">Edge</button>
+      <button data-sort="volume">Volume</button>
+      <button data-sort="close">Closing</button>
+    </div>
+    <span class="chip" id="chipGrounded" data-flag="grounded">Grounded only</span>
+    <span class="chip" id="chipPos" data-flag="pos">+EV only</span>
+    <span class="meta" id="meta">loading…</span>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th class="l">Market</th>
+      <th>Mkt price</th>
+      <th>Our P(YES)</th>
+      <th>Side</th>
+      <th>Edge (¢, net)</th>
+      <th>Brier</th>
+      <th>Volume</th>
+      <th>Closes</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="empty">Loading markets…</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+const API='/api/trading/kalshi/screener';
+const state={ sort:'edge', groundedOnly:false, posOnly:false, q:'' };
+const $=s=>document.querySelector(s);
+
+function fmtClose(t){ if(!t) return '—'; const d=new Date(t); if(isNaN(d)) return '—';
+  const mins=Math.round((d-Date.now())/60000);
+  if(mins<0) return 'closed'; if(mins<60) return mins+'m'; if(mins<1440) return Math.round(mins/60)+'h'; return Math.round(mins/1440)+'d'; }
+function fmtVol(v){ v=Number(v)||0; return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'k':String(v); }
+function pct(x){ return x==null?'—':Math.round(x*100)+'%'; }
+
+function rowHTML(r){
+  const e=r.edge||{};
+  const grounded=e.grounded && e.edgeCents!=null;
+  const evCls=grounded?(e.positive?'pos':'neg'):'';
+  const evTxt=grounded?((e.edgeCents>0?'+':'')+e.edgeCents+'¢'):'<span class="none">—</span>';
+  const side=grounded?`<span class="side ${e.side}">${e.side}</span>`:'<span class="none">—</span>';
+  const py=grounded?`<span class="py">${pct(e.p_yes)}</span>`:'<span class="none">—</span>';
+  const brier=(grounded&&e.brier!=null)?`<span class="brier">${e.brier.toFixed(2)}${e.n?'·'+e.n:''}</span>`:'<span class="none">—</span>';
+  const mk=r.yes_ask!=null?r.yes_ask+'¢':'—';
+  return `<tr>
+    <td class="l"><div class="ttl">${(r.title||r.ticker||'').replace(/</g,'&lt;')}</div><div class="tkr">${(r.ticker||'')}</div></td>
+    <td class="mk">${mk}</td>
+    <td>${py}</td>
+    <td>${side}</td>
+    <td class="ev ${evCls}">${evTxt}</td>
+    <td>${brier}</td>
+    <td>${fmtVol(r.volume)}</td>
+    <td>${fmtClose(r.close_time)}</td>
+  </tr>`;
+}
+
+async function load(){
+  const p=new URLSearchParams({ sort:state.sort });
+  if(state.groundedOnly) p.set('groundedOnly','1');
+  if(state.posOnly) p.set('minEdge','0.1');
+  if(state.q) p.set('q',state.q);
+  $('#meta').textContent='loading…';
+  try{
+    const d=await fetch(API+'?'+p.toString(),{cache:'no-store'}).then(r=>r.json());
+    const rows=d.rows||[];
+    $('#rows').innerHTML = rows.length ? rows.map(rowHTML).join('')
+      : `<tr><td colspan="8" class="empty">${d.note||'No markets match.'}</td></tr>`;
+    const grounded=rows.filter(r=>r.edge&&r.edge.grounded).length;
+    $('#meta').textContent=`${rows.length} shown · ${grounded} grounded · ${d.total??'—'} open · ${new Date(d.generatedAt||Date.now()).toLocaleTimeString()}`;
+  }catch(e){ $('#rows').innerHTML=`<tr><td colspan="8" class="empty">Screener offline — ${e.message}</td></tr>`; $('#meta').textContent=''; }
+}
+
+$('#sortSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  state.sort=b.dataset.sort; [...$('#sortSeg').children].forEach(x=>x.classList.toggle('on',x===b)); load(); });
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  const f=c.dataset.flag; if(f==='grounded')state.groundedOnly=!state.groundedOnly; if(f==='pos')state.posOnly=!state.posOnly;
+  c.classList.toggle('on'); load(); }));
+let qt; $('#q').addEventListener('input',e=>{ clearTimeout(qt); state.q=e.target.value.trim(); qt=setTimeout(load,250); });
+
+load();
+setInterval(load, 15000);
+</script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+</body>
+</html>

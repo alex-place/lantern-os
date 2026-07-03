@@ -218,9 +218,10 @@
     }
     .feed-card .fc-thumb.is-logo-light { background: #f4f6fa; }
     .feed-card .fc-thumb.is-logo-dark  { background: #0f1722; }
-    /* Logo PNG that ships its OWN background (opaque) — fill the tile like a photo
-       instead of padding it, so it doesn't read as a small image on a mismatched tile. */
-    .feed-card .fc-thumb.is-logo-filled { object-fit: cover; padding: 0; background: transparent; }
+    /* Logo PNG that ships its OWN (opaque) background — still CONTAIN it (cover-cropping
+       a small brand mark upscales + crops it, which reads as zoomed-in and pixelated).
+       Tighter padding than a transparent mark since its own background fills the edges. */
+    .feed-card .fc-thumb.is-logo-ownbg { padding: 18px; }
     /* Generated lead thumbnail for cards with no (or a broken) source image —
        docs, image-less reads, beliefs. A type-tinted gradient block with the type
        glyph, so EVERY card has a consistent lead visual instead of reading as a
@@ -1489,8 +1490,16 @@ document.addEventListener('DOMContentLoaded', () => {
         a += al;
       }
       const avg = a ? lum / a : 128;
-      if (total && opaque / total > 0.9) im.classList.add('is-logo-filled'); // baked bg → fill
-      else im.classList.add(avg >= 140 ? 'is-logo-dark' : 'is-logo-light');
+      // ALWAYS contain the mark — cover-cropping a small company logo upscales and
+      // crops it, which reads as "zoomed in and pixelated". Only the TILE shade changes.
+      if (total && opaque / total > 0.9) {
+        // Opaque logo ships its own background → sit it on a tile MATCHING that
+        // background's brightness so it blends seamlessly (contained, not cropped).
+        im.classList.add(avg >= 140 ? 'is-logo-light' : 'is-logo-dark', 'is-logo-ownbg');
+      } else {
+        // Transparent mark → CONTRASTING tile so it stays visible.
+        im.classList.add(avg >= 140 ? 'is-logo-dark' : 'is-logo-light');
+      }
     } catch (e) {
       im.classList.add('is-logo-light'); // tainted canvas → safe default
     }
@@ -1653,7 +1662,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fb = safeImg(c.imageFallback || '');
         thumb.addEventListener('error', () => {
           if (fb && thumb.src.indexOf('/api/explore/thumb.svg') === -1) {
-            thumb.classList.remove('is-logo', 'is-logo-light', 'is-logo-dark', 'is-logo-filled');
+            thumb.classList.remove('is-logo', 'is-logo-light', 'is-logo-dark', 'is-logo-ownbg');
             thumb.crossOrigin = null; thumb.src = fb;
           } else thumb.replaceWith(placeholderThumb(c.type));
         });

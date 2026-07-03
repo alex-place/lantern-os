@@ -85,9 +85,17 @@ In-chat **Approve / Rework / Discard** for autowork draft PRs (#1503), with the
 
 ## Point releases since 1.8.0
 
-1.8 shipped on 2026-06-30 and kept moving. The 1.8.1–1.8.6 point releases added
+1.8 shipped on 2026-06-30 and kept moving. The 1.8.1–1.8.7 point releases added
 real user-facing surface and tightened the dev loop underneath:
 
+- **Cloud-free model crystallization (1.8.7)** — the Σ₀ continual-training flywheel can now
+  improve the local looped coder **without any cloud teacher**. The verified-capable local
+  **Qwen2.5-Coder-7B** acts as the teacher: it solves coding tasks under the Σ₀ prompt, each
+  solution is **executed against its asserts**, and only the green ones are distilled into the
+  small **Ouro-1.4B** student — then eval-gated on HumanEval before the live adapter swaps.
+  One box, no key, no rate limit; teacher quality is self-limiting because only code that
+  *runs* trains. See
+  [the crystallization writeup](research/2026-07-02-qwen-teacher-ouro-crystallization.md).
 - **Three Doors, regenerated (1.8.6)** — the Kingdome of Hearts Explore game is
   reworked end to end: every scene keeps a fixed theme + meta-lesson while the
   prose is regenerated per visit, each turn offers exactly three randomized
