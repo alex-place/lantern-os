@@ -1,3 +1,6 @@
+## [1.8.30] - 2026-07-02
+- ADR-0017 accepted + implemented (flag-gated, default OFF): surprise-gated decoding — SURPRISE_INTERVENE=1 turns high-surprise spans into grounding rounds (KC memory / verified tool / web search) and a grounded revise pass on the OpenAI and xAI chat paths (lib/surprise-intervene.js + stream-chat hooks, 14 unit tests).
+
 # Changelog
 
 ## [1.8.29] - 2026-07-02
