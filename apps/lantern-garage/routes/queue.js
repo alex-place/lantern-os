@@ -66,6 +66,105 @@ function loadAgentSlots(repoRoot) {
   };
 }
 
+// A claim in assigned/ (or in_progress/) is considered genuinely in-flight only
+// while it is fresh AND its issue is still open. Autowork is chat-only + serialized
+// with a ~20-min budget, so nothing legitimately holds a claim for hours — a claim
+// older than this whose issue is still open means the claiming run died mid-flight.
+// Closed-issue claims are stale regardless of age (the work merged or was abandoned).
+const ASSIGNED_STALE_MS = 6 * 60 * 60 * 1000; // 6h
+
+/**
+ * Read the local assigned/ + in_progress/ claim files and classify each as a
+ * genuinely in-flight claim ("live") or stale cruft ("stale").
+ *
+ * These files leak: auto-dispatch's markAssigned() writes one per issue it opens a
+ * draft PR for and never removes it, so when the issue later closes the claim
+ * lingers forever and inflates the dashboard's "In Progress" count. External
+ * reality (the open-issue backlog) beats the local claim file.
+ *
+ * A claim is STALE when either:
+ *   - its issue is no longer open (merged/closed/deleted), or
+ *   - it is older than `staleAfterMs` (the claiming run died mid-flight).
+ *
+ * `openIssueNumbers` is a Set of currently-open issue numbers, or null when the
+ * GitHub backlog is unavailable (gh missing/not authed). When null we cannot prove
+ * an issue closed, so only the age gate applies — a conservative choice that never
+ * hides real in-flight work during a gh outage. Unparseable / in-flight-write files
+ * are skipped entirely (neither counted nor swept) to avoid deleting a partial write.
+ *
+ * @returns {{ live: Array, stale: Array }} each entry:
+ *   { file, dir, path, issueNumber, assignedAt, ageMs, reason }
+ */
+function loadAssignedClaims(repoRoot, { openIssueNumbers = null, staleAfterMs = ASSIGNED_STALE_MS } = {}) {
+  const fs = require("fs");
+  const path = require("path");
+  const now = Date.now();
+  const live = [];
+  const stale = [];
+
+  for (const dir of ["assigned", "in_progress"]) {
+    const dirPath = path.join(repoRoot, "data", "agent-work-queue", dir);
+    let files = [];
+    try {
+      if (!fs.existsSync(dirPath)) continue;
+      files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".json"));
+    } catch { continue; }
+
+    for (const file of files) {
+      const filePath = path.join(dirPath, file);
+      let item;
+      try { item = JSON.parse(fs.readFileSync(filePath, "utf8")); } catch { continue; } // partial write / corrupt → leave it
+      const issueNumber = item.issueNumber ?? null;
+      const assignedAt = item.assignedAt || null;
+      const ageMs = assignedAt ? (now - new Date(assignedAt).getTime()) : Infinity;
+
+      let reason = null;
+      if (openIssueNumbers && issueNumber != null && !openIssueNumbers.has(issueNumber)) {
+        reason = "issue_not_open";           // external reality: the issue merged/closed
+      } else if (ageMs > staleAfterMs) {
+        reason = "stale_ttl";                // claiming run died mid-flight
+      }
+
+      const rec = { file, dir, path: filePath, issueNumber, assignedAt, ageMs, reason };
+      if (reason) stale.push(rec); else live.push(rec);
+    }
+  }
+  return { live, stale };
+}
+
+/**
+ * Garbage-collect stale assigned/in_progress claim files (see loadAssignedClaims).
+ * Deletes each stale file and appends an append-only audit record to
+ * data/agent-work-queue/reconcile-log.jsonl (nothing silently vanishes). Best-effort:
+ * a file that races away / is locked is skipped, never fatal. `dryRun` reports what
+ * WOULD be swept without touching disk. @returns {Array} the swept records.
+ */
+function sweepStaleAssigned(repoRoot, { openIssueNumbers = null, staleAfterMs = ASSIGNED_STALE_MS, dryRun = false } = {}) {
+  const fs = require("fs");
+  const path = require("path");
+  const { stale } = loadAssignedClaims(repoRoot, { openIssueNumbers, staleAfterMs });
+  const logPath = path.join(repoRoot, "data", "agent-work-queue", "reconcile-log.jsonl");
+  const swept = [];
+  for (const c of stale) {
+    const rec = {
+      sweptAt: new Date().toISOString(),
+      issueNumber: c.issueNumber,
+      dir: c.dir,
+      reason: c.reason,
+      assignedAt: c.assignedAt,
+      ageHours: c.ageMs === Infinity ? null : Math.round((c.ageMs / 3.6e6) * 10) / 10,
+      ...(dryRun ? { dryRun: true } : {}),
+    };
+    if (dryRun) { swept.push(rec); continue; }
+    try {
+      fs.unlinkSync(c.path);
+      try { fs.appendFileSync(logPath, JSON.stringify(rec) + "\n"); } catch { /* audit best-effort */ }
+      swept.push(rec);
+    } catch { /* vanished / locked — skip */ }
+  }
+  return swept;
+}
+
 // CLAUDE.md monoworkstream lanes — one open PR lane per agent prefix.
 const LANE_PREFIXES = ["claude", "gemini", "codex", "devin", "grok", "openai", "sigma0"];
 
@@ -166,21 +265,20 @@ function loadOpenIssues(repoRoot) {
     );
     issues = JSON.parse(out || "[]");
   } catch (err) {
-    const data = { items: [], source: "github", error: "gh_unavailable", message: String(err.message || err).slice(0, 200) };
+    const data = { items: [], openNumbers: null, source: "github", error: "gh_unavailable", message: String(err.message || err).slice(0, 200) };
     _openIssuesCache = { ts: now, data };
     return data;
   }
 
-  // Exclude issues already claimed by an agent (tracked locally in assigned/).
-  const claimed = new Set();
-  try {
-    const assignedDir = path.join(repoRoot, "data", "agent-work-queue", "assigned");
-    if (fs.existsSync(assignedDir)) {
-      for (const f of fs.readdirSync(assignedDir).filter((x) => x.endsWith(".json"))) {
-        try { claimed.add(JSON.parse(fs.readFileSync(path.join(assignedDir, f), "utf8")).issueNumber); } catch { /* skip */ }
-      }
-    }
-  } catch { /* no assigned dir */ }
+  const openNumbers = issues.map((i) => i.number);
+
+  // Exclude issues with a *live* claim in assigned/ (tracked locally). Only live
+  // claims count — a stale claim (issue closed, or the run died) must NOT hide an
+  // open issue from the backlog forever (the "failed never de-queue" starvation jam).
+  const openSet = new Set(openNumbers);
+  const claimed = new Set(
+    loadAssignedClaims(repoRoot, { openIssueNumbers: openSet }).live.map((c) => c.issueNumber)
+  );
 
   const items = issues
     .filter((i) => !claimed.has(i.number))
@@ -197,7 +295,7 @@ function loadOpenIssues(repoRoot) {
     }))
     .sort((a, b) => (b.priority - a.priority) || (new Date(b.updatedAt) - new Date(a.updatedAt)));
 
-  const data = { items, source: "github", generatedAt: new Date().toISOString() };
+  const data = { items, openNumbers, source: "github", generatedAt: new Date().toISOString() };
   _openIssuesCache = { ts: now, data };
   return data;
 }
@@ -294,9 +392,17 @@ module.exports = async function queueRoutes(req, res, url, deps) {
         return fs.readdirSync(d).filter((f) => f.endsWith(".json")).length;
       };
       // Pending = open GitHub issues (source of truth), not local files.
-      // assigned/completed/failed remain local in-flight execution state.
-      const pending = (loadOpenIssues(repoRoot).items || []).length;
-      const assigned = countJson("assigned") + countJson("in_progress");
+      // "In Progress" (assigned) is reconciled against that same reality: a claim
+      // file whose issue has closed — or that has gone stale — is cruft, not
+      // in-flight work, so it is excluded from the count (and surfaced separately
+      // as staleAssigned). This stops closed-issue claim leaks from inflating the
+      // dashboard's "In Progress" stat. completed/failed remain raw local counts.
+      const open = loadOpenIssues(repoRoot);
+      const pending = (open.items || []).length;
+      const openIssueNumbers = open.openNumbers ? new Set(open.openNumbers) : null;
+      const { live, stale } = loadAssignedClaims(repoRoot, { openIssueNumbers });
+      const assigned = live.length;
+      const staleAssigned = stale.length;
       const completed = countJson("completed");
       const failed = countJson("failed");
       const total = pending + assigned + completed + failed;
@@ -305,13 +411,41 @@ module.exports = async function queueRoutes(req, res, url, deps) {
       sendJson(res, {
         ok: true,
         message: "Queue system online",
-        queue: { pending, assigned, completed, failed, total },
+        queue: { pending, assigned, staleAssigned, completed, failed, total },
         agents: loadAgentSlots(repoRoot).stats,
         successRate: settled > 0 ? Math.round((completed / settled) * 100) : 0,
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
       console.error("[Queue] Status error:", err);
+      sendJson(res, { error: err.message }, 500);
+    }
+    return true;
+  }
+
+  // ── POST /api/queue/reconcile ── (garbage-collect stale assigned claims)
+  // Deletes claim files whose issue has closed/merged or that have gone stale, and
+  // appends an audit record per sweep to reconcile-log.jsonl. Pass ?dryRun=1 to see
+  // what WOULD be swept without deleting. Complements the read-time reconciliation in
+  // /api/queue/status — this one actually reclaims the disk + bounds unbounded growth.
+  if (url.pathname === "/api/queue/reconcile" && req.method === "POST") {
+    try {
+      const open = loadOpenIssues(repoRoot);
+      const openIssueNumbers = open.openNumbers ? new Set(open.openNumbers) : null;
+      const dryRun = url.searchParams.get("dryRun") === "1";
+      const swept = sweepStaleAssigned(repoRoot, { openIssueNumbers, dryRun });
+      // Bust the open-issues cache so a just-unblocked open issue reappears in pending.
+      if (!dryRun && swept.length) _openIssuesCache = null;
+      sendJson(res, {
+        ok: true,
+        dryRun,
+        swept: swept.length,
+        ghAvailable: !!openIssueNumbers,
+        items: swept,
+        message: `${dryRun ? "Would sweep" : "Swept"} ${swept.length} stale assigned claim(s)`,
+      });
+    } catch (err) {
+      console.error("[Queue] Reconcile error:", err);
       sendJson(res, { error: err.message }, 500);
     }
     return true;
@@ -665,3 +799,7 @@ module.exports.loadOpenIssues = loadOpenIssues;
 module.exports.priorityFromLabels = priorityFromLabels;
 // Exposed for the auto-pull loop's one-PR-per-lane guard (lib/auto-dispatch.js).
 module.exports.loadPrLanes = loadPrLanes;
+// Exposed for the boot-time queue reconcile (server.js) + tests: classify/GC stale
+// assigned claims so the "In Progress" stat and pending backlog reflect reality.
+module.exports.loadAssignedClaims = loadAssignedClaims;
+module.exports.sweepStaleAssigned = sweepStaleAssigned;
