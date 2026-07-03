@@ -2629,25 +2629,89 @@ document.getElementById('input').addEventListener('input', e => {
   } catch (e) { /* no-op */ }
 })();
 
-// ── Provider selection handoff (?provider=) ─────────────────────────────────────
-// Allows orchestration.html to route chat through a specific AI provider.
-// Non-auto selections override the router's fallback chain for this session.
-(function applyProviderSelection() {
-  try {
-    const provider = new URLSearchParams(location.search).get('provider');
-    const select = document.getElementById('provider-select');
-    if (provider && select) {
-      // Try to set the selected provider
-      if (select.querySelector(`option[value="${provider}"]`)) {
-        select.value = provider;
-      } else if (provider !== 'auto') {
-        // Provider not available; log but don't break
-        console.warn(`[dream-chat] Requested provider '${provider}' not available, using router default`);
+// ── Provider dropdown: built dynamically from /api/providers/status ─────────────
+// The provider list is NOT hardcoded. It is built from what the running server can
+// actually dispatch to, so a provider only appears when its key is live, and the
+// local Σ₀ (Ouro) option appears only when a model is really being served on :11434
+// — labeled with the real model, never a static fiction. Auto is always present and
+// the default. This also absorbs the old ?provider= handoff (from home/orchestration):
+// the requested provider is honored only if it is a live option now.
+(function buildProviderDropdown() {
+  const select = document.getElementById('provider-select');
+  if (!select) return;
+  // dropdown value → { label, bucket } where bucket is the /api/providers/status key.
+  // keystone-ft is a local fine-tune served through ollama, so it shares that bucket
+  // (and is only offered when a matching tag is actually being served).
+  const CATALOG = [
+    { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
+    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
+    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
+    { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
+    { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama', local: true },
+    { value: 'keystone-ft', label: 'Keystone FT', bucket: 'ollama', local: true },
+  ];
+
+  function applyRequestedProvider() {
+    // Honor ?provider= handoff, but only if that provider is a live option now;
+    // otherwise fall back to Auto/router default rather than dispatch-failing.
+    try {
+      const provider = new URLSearchParams(location.search).get('provider');
+      if (provider) {
+        if (select.querySelector(`option[value="${provider}"]`)) select.value = provider;
+        else if (provider !== 'auto') console.warn(`[dream-chat] Requested provider '${provider}' not live, using router default`);
       }
-      // Dispatch change event so any listeners update
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch { /* no-op */ }
+    select.dispatchEvent(new Event('change', { bubbles: true })); // let the Model sub-dropdown + gating update
+  }
+
+  // The page's boot burst can abort a single status fetch (connection-pool
+  // starvation), so retry a few times before giving up — otherwise the dropdown
+  // silently falls back to the full catalog on every load, reintroducing the very
+  // fake "Local Σ₀" option this is meant to remove.
+  async function fetchStatus() {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch('/api/providers/status', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (r.ok) return (await r.json()).providers || null;
+      } catch { /* boot-burst abort / status down — retry */ }
+      await new Promise((res) => setTimeout(res, 300 * (attempt + 1)));
     }
-  } catch (e) { /* no-op */ }
+    return null;
+  }
+
+  async function build() {
+    const providers = await fetchStatus();
+    select.innerHTML = '<option value="">Auto (pick best)</option>';
+    for (const entry of CATALOG) {
+      const p = providers && providers[entry.bucket];
+      // With status: show only what's genuinely available. Without it (rare, after
+      // retries): show cloud providers optimistically (dispatch falls back if needed)
+      // but NEVER an unconfirmed local option — advertising one is the fake-option bug.
+      const isLive = providers ? !!(p && p.available) : !entry.local;
+      if (!isLive) continue;
+      let label = entry.label;
+      if (entry.bucket === 'ollama' && p) {
+        if (entry.value === 'ollama') {
+          const m = p.active_model || p.model;
+          label = (m && m !== 'auto') ? `Local Σ₀ (${m})` : 'Local Σ₀';
+        } else if (entry.value === 'keystone-ft') {
+          // Only offer keystone-ft when a matching tag is actually served.
+          const served = (p.served_models || []).map((s) => String(s).toLowerCase());
+          if (!served.some((s) => s.includes('keystone') || s.includes('-ft'))) continue;
+        }
+      }
+      const o = document.createElement('option');
+      o.value = entry.value;
+      o.textContent = label;
+      const model = p && p.model;
+      if (model && model !== 'auto') o.title = model; // concrete model id on hover
+      select.appendChild(o);
+    }
+    applyRequestedProvider();
+    if (typeof window.gateProviderOptions === 'function') window.gateProviderOptions();
+  }
+
+  build();
 })();
 
 // ── Model dropdown (#1127 work item 1) ──────────────────────────────────────
