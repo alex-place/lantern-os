@@ -41,6 +41,49 @@ def _flt(v, default=0.0):
         return default
 
 
+def _realized_today_ledger():
+    """Realized P&L for trades CLOSED today, from the local trade_history ledger.
+    FALLBACK ONLY — this ledger under-reports (unlogged fills/fees), so the shown
+    Day P&L drifted far from the real equity change. Prefer the equity-anchored
+    figure in _day_pnl()."""
+    import sqlite3
+    try:
+        from agents import LESSONS_DB as _DB
+        con = sqlite3.connect(_DB)
+        today = datetime.now().strftime('%Y-%m-%d')
+        row = con.execute(
+            "SELECT COALESCE(SUM(pnl_usd),0) FROM trade_history "
+            "WHERE status='closed' AND pnl_usd IS NOT NULL "
+            "AND COALESCE(closed_ts, ts) LIKE ?", (today + '%',)).fetchone()
+        con.close()
+        return round(float(row[0] or 0), 2)
+    except Exception as e:  # noqa: BLE001
+        log.warning("realized-today ledger query failed: %s", e)
+        return 0.0
+
+
+def _day_pnl(account, unrealized_intraday):
+    """Day P&L and its realized split, ANCHORED to the account's real equity change
+    so the panel always reconciles with Equity:
+
+        Realized + Unrealized == Day P&L == equity - last_equity
+
+    `equity - last_equity` is Alpaca's own ground truth for the day's change; realized
+    is DERIVED (the day's equity move not explained by open positions' intraday
+    unrealized = actual realized incl. fees). Falls back to the activity ledger only
+    when last_equity is unavailable (rare pre-market edge). Returns (day_pnl, realized)."""
+    if account is None:
+        realized = _realized_today_ledger()
+        return round(unrealized_intraday + realized, 2), realized
+    equity = _flt(getattr(account, 'equity', 0))
+    last_equity = _flt(getattr(account, 'last_equity', 0))
+    if last_equity > 0:
+        day_pnl = round(equity - last_equity, 2)
+        return day_pnl, round(day_pnl - unrealized_intraday, 2)
+    realized = _realized_today_ledger()
+    return round(unrealized_intraday + realized, 2), realized
+
+
 # Import trading agents
 try:
     from agents import (
@@ -205,14 +248,12 @@ def action_get_market_status(args):
             pass
 
         # Get portfolio equity
+        account = None
         try:
             account = alpaca.get_account()
             equity = float(account.equity)
-            last_equity = float(account.last_equity)
-            day_pnl_pct = ((equity - last_equity) / last_equity * 100) if last_equity > 0 else 0
         except:
             equity = 0
-            day_pnl_pct = 0
 
         # SPY 1-day / 5-day % change
         spy_1d = 0.0
@@ -227,11 +268,9 @@ def action_get_market_status(args):
         except:
             pass
 
-        # Honest day P&L from activity (#1691), not equity-vs-last_equity; and the
-        # market regime from SPY (the real market), not the account's frozen P&L.
-        # TODAY-only unrealized (intraday) + realized bucketed by close date so a
-        # multi-day hold never drags a prior session's P&L into today.
-        import sqlite3 as _sql
+        # Day P&L anchored to the real equity change (equity - last_equity) so it
+        # reconciles with Equity — the old activity-ledger sum under-reported and
+        # drifted. Market regime still comes from SPY, not the account P&L.
         unrealized = 0.0
         try:
             unrealized = sum(
@@ -240,20 +279,7 @@ def action_get_market_status(args):
                 for p in alpaca.list_positions())
         except Exception:
             pass
-        realized_today = 0.0
-        try:
-            from agents import LESSONS_DB as _DB
-            _con = _sql.connect(_DB)
-            _row = _con.execute(
-                "SELECT COALESCE(SUM(pnl_usd),0) FROM trade_history "
-                "WHERE status='closed' AND pnl_usd IS NOT NULL "
-                "AND COALESCE(closed_ts, ts) LIKE ?",
-                (datetime.now().strftime('%Y-%m-%d') + '%',)).fetchone()
-            _con.close()
-            realized_today = float(_row[0] or 0)
-        except Exception:
-            pass
-        day_pnl_usd = round(unrealized + realized_today, 2)
+        day_pnl_usd, _realized = _day_pnl(account, unrealized)
         day_pnl_pct = round(day_pnl_usd / equity * 100, 2) if equity else 0
         return {
             'market_open': market_open,
@@ -395,26 +421,13 @@ def action_get_positions(args):
         #   • unrealized uses the intraday figure so a position opened yesterday
         #     doesn't drag yesterday's move into today's Day P&L.
         # When flat with no trades today this is exactly $0.
-        import sqlite3 as _sql
-        from datetime import datetime as _dt
         unrealized_today = sum(p['unrealized_intraday_pl'] for p in positions)
         unrealized_total = sum(p['unrealized_pl'] for p in positions)
-        realized_today = 0.0
-        try:
-            from agents import LESSONS_DB as _DB
-            _con = _sql.connect(_DB)
-            _today = _dt.now().strftime('%Y-%m-%d')
-            _row = _con.execute(
-                "SELECT COALESCE(SUM(pnl_usd),0) FROM trade_history "
-                "WHERE status='closed' AND pnl_usd IS NOT NULL "
-                "AND COALESCE(closed_ts, ts) LIKE ?",
-                (_today + '%',)).fetchone()
-            _con.close()
-            realized_today = float(_row[0] or 0)
-        except Exception as _e:
-            log.warning("realized-today query failed: %s", _e)
         equity = round(float(account.equity), 2)
-        day_pnl = round(unrealized_today + realized_today, 2)
+        # Day P&L anchored to the real equity change (equity - last_equity) so the
+        # panel reconciles with Equity; realized is derived (see _day_pnl). The old
+        # trade_history ledger under-reported realized and made Day P&L drift.
+        day_pnl, realized_today = _day_pnl(account, unrealized_today)
         return {
             'positions': positions,
             'account': {
