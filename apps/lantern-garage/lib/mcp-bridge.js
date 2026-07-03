@@ -20,7 +20,7 @@ const mcpClient = require("./mcp-client");
  * @param {Object} args - Tool arguments
  * @returns {Promise<any|null>} Tool result, or null if MCP unavailable
  */
-async function callMcpTool(toolName, args = {}) {
+async function callMcpTool(toolName, args = {}, timeoutMs = 30000) {
   try {
     // Check if MCP is available
     const available = await mcpClient.isAvailable();
@@ -29,8 +29,9 @@ async function callMcpTool(toolName, args = {}) {
       return null;
     }
 
-    // Call the tool
-    const result = await mcpClient.callTool(toolName, args);
+    // Call the tool. Forward the caller's timeout so a hung MCP can't stall the
+    // chat turn (keystone-context passes 6000ms; the default stays 30s).
+    const result = await mcpClient.callTool(toolName, args, timeoutMs);
 
     // If result is an error, return null instead of the error object
     // (keystone-context expects null for graceful degradation)

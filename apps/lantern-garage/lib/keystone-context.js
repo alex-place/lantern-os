@@ -13,7 +13,7 @@
  */
 const { execFile } = require("child_process");
 const path = require("path");
-const { callMcpTool } = require("./mcp-bridge");
+const { callMcpTool, isMcpAvailable } = require("./mcp-bridge");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const GH_REPO = process.env.GH_REPO || "alex-place/lantern-os";
@@ -52,12 +52,15 @@ async function gatherProjectContext({ maxItems = 8 } = {}) {
     }
   } catch { /* skip */ }
 
-  // MCP tool inventory + status (the "project tools")
-  const [status, skills] = await Promise.all([
-    callMcpTool("get_status", {}, 6000),
-    callMcpTool("list_skills", {}, 6000),
-  ]);
-  if (status || skills) {
+  // MCP tool inventory + status (the "project tools"). The ONLINE/offline line is
+  // driven by the REAL /health probe (isMcpAvailable), NOT by whether a specific
+  // tool call returns data — conflating the two is what injected "MCP server:
+  // offline" into the chat context while port 8771 was answering 200, which the
+  // model then faithfully repeated. Skill inventory is best-effort enrichment
+  // layered on top of a confirmed-online server.
+  const online = await isMcpAvailable();
+  if (online) {
+    const skills = await callMcpTool("list_skills", {}, 6000);
     const skillNames = skills && (skills.skills || skills.result?.skills);
     parts.push("MCP server: ONLINE." +
       (Array.isArray(skillNames) ? ` Skills: ${skillNames.map((s) => s.name || s).slice(0, 12).join(", ")}.` : "") +

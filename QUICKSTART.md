@@ -135,7 +135,12 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 
 - **Port 4177** — your stable copy (the `master` branch)
 - **Port 4178** — your playground (your current branch, auto-reloads as you change files)
-- **Port 8771** — MCP server (shared, tools for Claude Code) *(requires Python)*
+- **Port 8771** — MCP server — the shared tool surface (external agents like Claude Code, plus the chat's own live status/skills) *(requires Python)*
+
+The launcher also turns the assistant's **tool-calling** on (`CHAT_TOOL_EXEC=1`) so **every** model
+(Claude / GPT / Gemini / Grok / local) can actually *use* its tools — web search/fetch, files,
+repo/GitHub, market data, and a live `system_status` check — instead of only talking. It's forced on
+by the launcher, so a fresh boot is never "toolless"; you don't set anything.
 
 On startup this also installs the **monoworkstream git hooks** (contributors only) — the
 dynamic per-lane PR gate: `alex/`, `kriskin/`, `mookman11/`, or any `<name>/` branch each
@@ -231,15 +236,22 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 ```
 
 This launches:
-- **Port 8771** — MCP server (shared by both web servers, tools for Claude Code)
+- **Port 8771** — MCP server (shared by both web servers)
+
+The MCP server exposes Keystone's tools over the Model Context Protocol so **external** agents
+(the Claude Code IDE extension / web app) can call them. It also backs two things the chat itself
+uses: the live **status/skills** injected into each turn's context, and the `system_status` tool
+(a real `/health` probe) — which is why the launcher keeps it enabled by default.
+
+> **Note:** the chat assistant's *own* tools run **in-process** in the Node server (gated by
+> `CHAT_TOOL_EXEC`, which the launcher forces on) — they do **not** require the Python MCP server to
+> be up. The MCP server is for external agents plus the chat's live status/skills context.
 
 If you want to run the MCP server standalone on port 8771:
 
 ```bash
 python src/mcp_server/server.py
 ```
-
-The MCP server lets coding assistants like Claude Code call Keystone's tools — you only need it if you're using the Claude Code IDE extension or web app with this project.
 
 ### Share it on the internet (advanced)
 

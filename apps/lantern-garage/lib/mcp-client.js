@@ -37,7 +37,7 @@ async function isAvailable() {
       timeout: HEALTH_CHECK_TIMEOUT_MS,
     });
 
-    lastAvailability = response.status === 200;
+    lastAvailability = response.ok;
   } catch (err) {
     lastAvailability = false;
   }
@@ -53,7 +53,7 @@ async function isAvailable() {
  * @param {Object} args - Tool arguments
  * @returns {Promise<Object>} Tool result or { status: 'unavailable', reason: 'mcp_offline' }
  */
-async function callTool(toolName, args = {}) {
+async function callTool(toolName, args = {}, timeoutMs = 30000) {
   if (!(await isAvailable())) {
     return {
       status: "unavailable",
@@ -67,18 +67,18 @@ async function callTool(toolName, args = {}) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(args),
-      timeout: 30000,
+      timeout: timeoutMs,
     });
 
     if (!response.ok) {
       return {
         status: "error",
         reason_code: "mcp_tool_error",
-        error: `MCP returned ${response.status}: ${response.statusText}`,
+        error: `MCP returned ${response.statusCode}: ${response.statusText}`,
       };
     }
 
-    return await response.json();
+    return response.json();
   } catch (err) {
     return {
       status: "error",
@@ -94,7 +94,33 @@ async function callTool(toolName, args = {}) {
 function _fetchWithTimeout(url, options = {}) {
   return new Promise((resolve, reject) => {
     const timeout = options.timeout || 5000;
-    const req = http.request(url, { method: options.method || "GET" }, resolve);
+    // http.request()'s callback yields a raw IncomingMessage — NOT a fetch()
+    // Response. It exposes `.statusCode` (not `.status`), has no `.ok`, and no
+    // `.json()`. Reading `.status`/`.ok`/`.json()` off it (as this file used to)
+    // silently made isAvailable() ALWAYS false and callTool() ALWAYS error, even
+    // when the MCP server was healthy and returning 200. Buffer the body and
+    // resolve a small fetch-like shape so callers can use `.ok`/`.statusCode`/
+    // `.json()` correctly.
+    const req = http.request(
+      url,
+      { method: options.method || "GET", headers: options.headers || {} },
+      (res) => {
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          const statusCode = res.statusCode || 0;
+          resolve({
+            statusCode,
+            ok: statusCode >= 200 && statusCode < 300,
+            statusText: res.statusMessage || "",
+            text: () => data,
+            json: () => JSON.parse(data),
+          });
+        });
+        res.on("error", reject);
+      }
+    );
 
     req.setTimeout(timeout, () => {
       req.destroy();
