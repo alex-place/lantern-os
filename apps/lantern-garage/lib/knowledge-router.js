@@ -25,6 +25,18 @@ function tokenize(s) {
   return (s || "").toLowerCase().match(/[a-z0-9_]{3,}/g)?.filter((t) => !STOP.has(t)) || [];
 }
 
+/**
+ * A section is servable/retrievable only if it carries real prose. Guards against
+ * degenerate index records (e.g. a bare code fence "```bash", or a heading-only
+ * stub) that must never be surfaced verbatim as a chat answer.
+ */
+function hasProse(text) {
+  const t = (text || "").replace(/```[a-z0-9]*|~~~/gi, "").trim();
+  // strip fenced code so we judge the human-readable content, then require a few words
+  const words = t.match(/[A-Za-z]{2,}/g) || [];
+  return words.length >= 5;
+}
+
 function _load() {
   let stat;
   try { stat = fs.statSync(INDEX_PATH); } catch { return null; }
@@ -66,6 +78,7 @@ function retrieve(query, k = 3) {
   if (!q.length) return [];
   const qnorm = q.length;
   const scored = idx.recs
+    .filter((r) => hasProse(r.text))
     .map((r) => ({ r, score: _score(q, r, idx.idf) / qnorm }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -86,8 +99,8 @@ function answer(query) {
 
   // 1. deterministic: query matches a heading (case-insensitive substring)
   const ql = (query || "").toLowerCase().trim();
-  const exact = idx.recs.find((r) => ql && r.heading.toLowerCase() === ql)
-    || (ql.length > 6 ? idx.recs.find((r) => r.heading.toLowerCase().includes(ql)) : null);
+  const exact = idx.recs.find((r) => ql && r.heading.toLowerCase() === ql && hasProse(r.text))
+    || (ql.length > 6 ? idx.recs.find((r) => r.heading.toLowerCase().includes(ql) && hasProse(r.text)) : null);
   if (exact) {
     return { tier: "deterministic", hit: true, source: exact.path, heading: exact.heading, text: exact.text, score: 1 };
   }

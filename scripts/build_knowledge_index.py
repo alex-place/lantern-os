@@ -74,11 +74,23 @@ def strip_frontmatter(md: str) -> str:
 
 
 def split_sections(md: str):
-    """Split markdown into (level, heading, body) sections by ATX headings."""
+    """Split markdown into (level, heading, body) sections by ATX headings.
+
+    Fenced code blocks are tracked so that `#` comment lines *inside* a ```code```
+    block (e.g. `# Run the tests`) are NOT mistaken for markdown headings. Without
+    this, real sections got truncated to a bare opening fence (`text: "```bash"`,
+    1 token) and bogus headings were minted from shell comments / URLs, which then
+    leaked into chat answers as junk ("is ollama running\n```bash")."""
     lines = md.splitlines()
     sections, cur_head, cur_level, buf = [], "(intro)", 0, []
+    in_fence = False
+    fence_re = re.compile(r"^\s*(```|~~~)")
     for ln in lines:
-        m = re.match(r"^(#{1,4})\s+(.*)", ln)
+        if fence_re.match(ln):
+            in_fence = not in_fence
+            buf.append(ln)
+            continue
+        m = None if in_fence else re.match(r"^(#{1,4})\s+(.*)", ln)
         if m:
             if buf:
                 sections.append((cur_level, cur_head, "\n".join(buf).strip()))
