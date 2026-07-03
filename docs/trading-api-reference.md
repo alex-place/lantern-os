@@ -3,6 +3,16 @@
 All endpoints are served by `apps/lantern-garage/routes/trading.js` at `http://127.0.0.1:4177`.
 Kalshi endpoints that require credentials are gated behind API key presence; unauthenticated calls return `{"error":"credentials_required"}`.
 
+> **Broker = IBKR (Alpaca removed).** The stock broker is now the **IBKR Client
+> Portal Web API** via a local gateway — read-only account/positions plus **gated,
+> dry-by-default** order placement (`lib/trading-guard.js`; see
+> [ADR-0019](adr/0019-ibkr-connectivity-client-portal-gateway.md) +
+> [ADR-0020](adr/0020-ibkr-live-order-placement.md)). Market data is **keyless Yahoo**
+> (`lib/market-data-yahoo.js`) and signals come from the **Node signal-engine**
+> (`lib/signal-engine/`) — there is no Python trading service anymore. The former
+> Alpaca AI-trader microservice and its `alpaca-trade-api` dependency have been removed;
+> the `/api/trading/ai-trader/*` routes below are legacy compatibility shims.
+
 ---
 
 ## General Trading
@@ -126,12 +136,16 @@ Kalshi endpoints that require credentials are gated behind API key presence; una
 
 ---
 
-## AI Trader (Alpaca)
+## AI Trader (legacy shims)
+
+> Alpaca has been removed. These paths are kept for backward compatibility; portfolio /
+> positions now resolve through the IBKR bridge (`lib/trading-api-bridge.js` →
+> `lib/ibkr-cpapi.js`), not Alpaca.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/trading/ai-trader/status` | AI trader process health |
-| `GET` | `/api/trading/ai-trader/portfolio` | Current portfolio from Alpaca |
+| `GET` | `/api/trading/ai-trader/portfolio` | Current portfolio (via IBKR bridge) |
 | `GET` | `/api/trading/ai-trader/trades` | Recent AI-executed trades |
 | `POST` | `/api/trading/ai-trader/trades` | Record a manual trade |
 | `GET` | `/api/trading/ai-trader/metrics` | Performance metrics |
