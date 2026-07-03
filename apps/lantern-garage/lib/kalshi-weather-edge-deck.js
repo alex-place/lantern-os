@@ -2,8 +2,13 @@
 
 /**
  * Σ₀ weather-edge deck — the Act-prep stage that turns the calibrated ceiling model
- * (kalshi-weather-edge) + the LIVE NWS forecast (kalshi-nws) + the LIVE Kalshi
+ * (kalshi-weather-edge) + the LIVE NBS MOS forecast (kalshi-mos) + the LIVE Kalshi
  * KXHIGHNY board into swipe cards, in real time, with NO LLM and NO provider key.
+ *
+ * Forecast source is NBS MOS (kalshi-mos), NOT the gridded NWS forecast (kalshi-nws), because
+ * the oracle's distribution constants are calibrated against settled NWS-CLI highs USING NBS
+ * MOS as the forecast input (#1871). Serving from the same source the constants were fit
+ * against is required — otherwise the ~1.5°F MOS→CLI bias correction is mis-applied.
  *
  * This replaces the never-completing LLM "grounded" path (which returned cards stuck
  * "pending" forever whenever a provider was unfunded) with a deterministic,
@@ -15,7 +20,7 @@
  */
 
 const kalshi = require("./kalshi-api");
-const nws = require("./kalshi-nws");
+const nws = require("./kalshi-mos"); // NBS MOS forecast source (calibration-matched — #1871)
 const model = require("./kalshi-weather-edge");
 const { sizePosition } = require("./kalshi-kelly");
 const { getCalibrator } = require("./kalshi-calibration");
