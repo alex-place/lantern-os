@@ -90,6 +90,72 @@ def _stability_gates(A_tensor):
         return None
 
 
+def assemble_reason_verdict(out):
+    """ADR-0012 step 1 — package the loop's already-computed telemetry into one
+    normalized ReasonVerdict (pure observability, no behavior change).
+
+    The nested-adaptive-Reason design (docs/adr/0012-nested-adaptive-reason.md)
+    uses one shared ReasonVerdict so the within-model Q-exit loop and the
+    cross-model fidelity ladder read the SAME convergence signal. This is the
+    additive step-1 slice: it only reshapes fields ``generate()`` already returns —
+    it changes no exit or escalation behavior. Steps 2-4 (inner break, outer
+    trigger, JS serving-path close) consume this struct in later PRs.
+
+    ``out`` is the dict returned by ``Sigma0LoopLM.generate()``. Returns::
+
+        { converged, depth, proximity, grounded, stable, reason }
+
+    Honesty notes about what this layer can and cannot know:
+      - ``grounded`` is None here: groundedness is judged by the JS-side
+        groundedness-canary at serving time, not inside the token loop. ADR step 4
+        fills it; None (not a fabricated 1.0) is deliberate.
+      - ``converged`` is None when the stability certificate had too few tokens to
+        decide — honest-unknown over a fabricated False (and None is falsy, so the
+        ADR's converge-door safely declines to accept when unsure → escalates).
+      - ``reason`` is a GENERATE-level summary, not the per-token door reason. The
+        per-token reasons (threshold_met / fixed_point / accel_fixed_point /
+        max_depth) live in qexit_step/converge_step/accel_step; the aggregate loop
+        keeps only the coarse mode-level ``exit_reason``, so this maps to the
+        closest verdict reason, with escalation-relevant signals taking priority.
+    """
+    gates = out.get("stability_gates") if isinstance(out.get("stability_gates"), dict) else {}
+    dichotomy = gates.get("dichotomy") if isinstance(gates.get("dichotomy"), dict) else {}
+    fate = str(dichotomy.get("fate") or "").upper()
+    signal = out.get("canary_signal", "none")
+
+    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}
+    if gates.get("proven_contracting"):
+        stable = "contract"
+    elif fate == "DIVERGE":
+        stable = "diverge"
+    elif fate in ("COLLAPSE", "MARGINAL"):
+        stable = "spiral"
+    else:
+        stable = None  # too few tokens / no certificate — honest unknown, not a guess
+
+    # reason — escalation-relevant fates win; else fall back to the mode's exit_reason
+    if signal and signal != "none":
+        reason = "collapse"          # decode-canary caught surface collapse (echo/repeat)
+    elif stable == "diverge":
+        reason = "divergence"        # latent dynamics running away
+    elif stable == "spiral":
+        reason = "collapse"          # latent collapse onto the slow manifold / metastable
+    elif out.get("exit_reason") == "convergence_exit":
+        reason = "fixed_point"
+    else:  # "adaptive_qexit" and any other mode-level label
+        reason = "threshold_met"
+
+    accepted = out.get("stability_accepted")
+    return {
+        "converged": (bool(accepted) if accepted is not None else None),
+        "depth": out.get("mean_depth"),
+        "proximity": out.get("canary_max_proximity"),
+        "grounded": None,  # filled by the JS groundedness-canary at serving (ADR step 4)
+        "stable": stable,
+        "reason": reason,
+    }
+
+
 def _lazy():
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -451,6 +517,12 @@ class Sigma0LoopLM:
             # mean contraction delta across tokens: < eps ⇒ loop genuinely converges (E2)
             out["eps"] = eps
             out["mean_contraction"] = round(sum(exit_deltas) / len(exit_deltas), 4) if exit_deltas else None
+        # ADR-0012 step 1: surface the normalized ReasonVerdict alongside the raw
+        # telemetry. Best-effort — a verdict bug must never break generation.
+        try:
+            out["reason_verdict"] = assemble_reason_verdict(out)
+        except Exception:
+            out["reason_verdict"] = None
         return out
 
 

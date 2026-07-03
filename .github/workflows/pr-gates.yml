@@ -1,0 +1,560 @@
+name: PR Gates
+
+# Consolidated PR-only gate workflows (all shared the identical trigger:
+# pull_request → master). Job names are preserved from the original files so
+# check names stay stable for pr-watcher and any tooling keyed on them.
+# Absorbed workflows:
+#   anti-sprawl.yml              → job: anti-sprawl
+#   sprawl-tripwire.yml          → job: sprawl-tripwire
+#   monoworkstream-gate.yml      → job: gate
+#   slop-check.yml               → jobs: secrets-scan, debug-pollution,
+#                                        security-basics, diff-size,
+#                                        boilerplate-check, slop-summary
+#   code-review-gate.yml         → job: code-ratio-check
+#   orchestration-challenge-ci.yml → jobs: workflow-inventory, mcp-contract,
+#                                        action-pool-contract,
+#                                        science-report-contract, summary
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: ["master"]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  MAX_NEW_FILES: 25
+  MAX_NEW_MARKDOWN: 12
+  ALLOWED_TOP_LEVEL: src,apps,docs,tests,scripts,config,data,ops,integrations,skills,manifests,surfaces,archive,experiments,csf,lore,reports,research,assets,caad,.github,changelog.d
+
+jobs:
+  # ── Anti-Sprawl Gate ────────────────────────────────────────────────────────
+  anti-sprawl:
+    name: Enforce anti-sprawl rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin master
+
+      - name: Analyze PR changes
+        id: analyze
+        shell: bash
+        run: |
+          echo "=== Anti-Sprawl Analysis ==="
+          echo "Base: origin/master"
+          echo ""
+
+          # New files (handle empty-string so wc -l returns 0 not 1)
+          NEW_FILES=$(git diff --name-only --diff-filter=A origin/master...HEAD)
+          if [ -z "$NEW_FILES" ]; then
+            NEW_FILE_COUNT=0
+          else
+            NEW_FILE_COUNT=$(echo "$NEW_FILES" | wc -l)
+          fi
+          echo "new_file_count=$NEW_FILE_COUNT" >> $GITHUB_OUTPUT
+
+          # New top-level directories — skip root-level files (no "/" in path)
+          # e.g. .clauderules, .gitignore, CLAUDE.md live at root and are not dirs
+          NEW_TOP_LEVEL=""
+          if [ -n "$NEW_FILES" ]; then
+            NEW_TOP_LEVEL=$(echo "$NEW_FILES" | { grep '/' || true; } | cut -d/ -f1 | sort -u | { grep -vE "^(${ALLOWED_TOP_LEVEL//,/|})$" || true; })
+          fi
+          echo "new_top_level_dirs<<EOF" >> $GITHUB_OUTPUT
+          echo "$NEW_TOP_LEVEL" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # New markdown files (guard grep so pipefail doesn't fire on no matches)
+          NEW_MD=0
+          if [ -n "$NEW_FILES" ]; then
+            NEW_MD=$(echo "$NEW_FILES" | { grep -E '\.md$' || true; } | wc -l)
+          fi
+          echo "new_markdown_count=$NEW_MD" >> $GITHUB_OUTPUT
+
+      - name: Check new top-level directories
+        if: steps.analyze.outputs.new_top_level_dirs != ''
+        run: |
+          echo "❌ BLOCKED: New top-level directories detected"
+          echo ""
+          echo "${{ steps.analyze.outputs.new_top_level_dirs }}"
+          echo ""
+          echo "Only the following top-level directories are allowed:"
+          echo "${{ env.ALLOWED_TOP_LEVEL }}"
+          exit 1
+
+      - name: Check file count
+        if: fromJSON(steps.analyze.outputs.new_file_count) > fromJSON(env.MAX_NEW_FILES)
+        run: |
+          echo "❌ BLOCKED: Too many new files (${{ steps.analyze.outputs.new_file_count }})"
+          echo "Maximum allowed per PR: ${{ env.MAX_NEW_FILES }}"
+          echo "Please split this change into smaller PRs."
+          exit 1
+
+      - name: Check markdown file count
+        if: fromJSON(steps.analyze.outputs.new_markdown_count) > fromJSON(env.MAX_NEW_MARKDOWN)
+        run: |
+          echo "❌ BLOCKED: Too many new markdown files (${{ steps.analyze.outputs.new_markdown_count }})"
+          echo "Maximum allowed per PR: ${{ env.MAX_NEW_MARKDOWN }}"
+          exit 1
+
+      - name: Pass
+        run: |
+          echo "✅ Anti-sprawl checks passed"
+          echo "New files: ${{ steps.analyze.outputs.new_file_count }}"
+          echo "New markdown: ${{ steps.analyze.outputs.new_markdown_count }}"
+
+  # ── Sprawl Tripwire ─────────────────────────────────────────────────────────
+  # Every NEW public surface (page) added in a PR must declare which loop stage
+  # it strengthens — Observe / Remember / Reason / Act / Verify / Converge — via
+  #   <meta name="loop-stage" content="...">  or  <!-- loop-stage: ... -->
+  # Existing pages are grandfathered (only added-in-PR surfaces are checked) (#1561).
+  sprawl-tripwire:
+    name: New surfaces must justify a loop stage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: git fetch origin master
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Run sprawl tripwire
+        run: node scripts/sprawl-tripwire.mjs --base origin/master
+
+  # ── Monoworkstream Gate ─────────────────────────────────────────────────────
+  # Enforces the per-agent workstream rule: each agent prefix (claude/ gemini/
+  # codex/ devin/ grok/ openai/) gets ONE concurrent open-PR lane; branches
+  # without a recognised prefix share the "human" lane.
+  # ZIPPER EXEMPTION: PRs labeled `auto-merge` are excluded from the per-lane
+  # count — the single in-process zipper merger (apps/lantern-garage/lib/
+  # pr-watcher.js) serialises those. See AGENTS.md / CLAUDE.md for full rules.
+  gate:
+    name: Single-workstream check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Enforce per-agent lane (max 1 open PR per agent prefix)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Group open PRs targeting master by agent lane and fail only if a single
+          # lane has more than one open PR. Exempt: gh-pages (deploy branch) and
+          # PRs labeled `auto-merge` (the in-process merger's managed queue — see header).
+          # Branches without a recognised agent prefix share the "human" lane.
+          offenders=$(gh pr list --state open --json number,title,headRefName,baseRefName,labels --jq '
+            [ .[]
+              | select(.baseRefName == "master" and .headRefName != "gh-pages")
+              | select((.labels | map(.name) | index("auto-merge")) | not)
+              | .lane = (.headRefName | split("/")[0])
+              | .lane = (if (.lane | IN("claude","gemini","codex","devin","grok","openai")) then .lane else "human" end)
+            ]
+            | group_by(.lane)
+            | map(select(length > 1))
+            | map({lane: .[0].lane, prs: map("#\(.number) \(.title) [\(.headRefName)]")})
+          ')
+          echo "Open PRs grouped by lane:"
+          gh pr list --state open --json number,headRefName,baseRefName --jq '
+            [ .[] | select(.baseRefName == "master" and .headRefName != "gh-pages") ]
+            | group_by(.headRefName | split("/")[0])
+            | map("  \(.[0].headRefName | split("/")[0]): \(length) PR(s)")[]' || true
+          if [ "$offenders" != "[]" ] && [ -n "$offenders" ]; then
+            echo "::error::Monoworkstream violation — an agent lane has more than one open PR targeting master:"
+            echo "$offenders" | jq -r '.[] | "  lane \(.lane):", (.prs[] | "    \(.)")'
+            echo "Each agent prefix may keep only one open PR. Either merge/close the others,"
+            echo "or label the staged PRs 'auto-merge' to put them in the managed zipper queue (exempt from this gate)."
+            exit 1
+          fi
+          echo "Monoworkstream gate passed — at most one open PR per agent lane."
+
+  # ── Slop Check ──────────────────────────────────────────────────────────────
+  secrets-scan:
+    name: Hardcoded secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan diff for hardcoded secrets
+        run: |
+          set +e
+          diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py' '*.sh' '*.mjs' '*.env.example')
+          hits=$(echo "$diff" | grep -iE \
+            "(api_key|apikey|api_secret|secret_key|password|passwd|access_token|auth_token|private_key)\s*[=:]\s*['\"][a-zA-Z0-9/+_\-]{12,}['\"]" \
+            | grep '^+' | grep -v '^+++')
+          if [ -n "$hits" ]; then
+            echo "::error::Possible hardcoded credential detected in diff:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No hardcoded secrets found."
+
+  debug-pollution:
+    name: Debug statement check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check for committed debug statements
+        run: |
+          set +e
+          # Exempt code where console.* is the intended interface, not a debug leak:
+          #   - test files anywhere (top-level tests/, colocated apps/**/test/, *.test.*,
+          #     *.spec.*, test_*) — console.log is the test reporter
+          #   - scripts/ and experiments/ — CLI / research tools whose stdout IS console.log
+          # The old list only matched top-level tests/ + test_*, so colocated
+          # apps/**/test/*.test.js and scripts/*.mjs CLIs tripped the gate falsely (#1561).
+          # Real leaks in shipped lib/ routes/ public/ code are still caught.
+          diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py' '*.mjs' \
+            ':(exclude,glob)**/tests/**' ':(exclude,glob)**/test/**' \
+            ':(exclude,glob)**/*.test.*' ':(exclude,glob)**/*.spec.*' \
+            ':(exclude,glob)**/test_*.py' ':(exclude,glob)**/test_*.js' ':(exclude,glob)**/test_*.ts' \
+            ':(exclude,glob)scripts/**' ':(exclude,glob)experiments/**')
+          hits=$(echo "$diff" | grep -E \
+            '^\+(.*)(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\))' \
+            | grep -v '^+++')
+          if [ -n "$hits" ]; then
+            echo "::error::Debug statements found in PR diff (test files exempt):"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No debug pollution found."
+
+  security-basics:
+    name: OWASP basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check for eval / shell injection patterns
+        run: |
+          set +e
+          diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py' '*.sh')
+          hits=$(echo "$diff" | grep -E \
+            '^\+.*(eval\(|exec\(|os\.system\(|subprocess\.call\([^,]*shell\s*=\s*True)' \
+            | grep -v '^+++')
+          if [ -n "$hits" ]; then
+            echo "::error::Unsafe eval/exec pattern found:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No unsafe exec patterns found."
+      - name: Check for SQL string concatenation
+        run: |
+          set +e
+          diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py')
+          hits=$(echo "$diff" | grep -iE \
+            '^\+.*(SELECT|INSERT|UPDATE|DELETE).*\+\s*(req\.|params\.|query\.|body\.|args\.)' \
+            | grep -v '^+++')
+          if [ -n "$hits" ]; then
+            echo "::error::Possible SQL injection via string concatenation:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "No SQL injection patterns found."
+
+  diff-size:
+    name: Commit size gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Block oversized PRs (> 5000 added lines of source)
+        run: |
+          added=$(git diff origin/master...HEAD --numstat -- '*.js' '*.ts' '*.py' '*.sh' \
+            | awk '{sum += $1} END {print sum+0}')
+          echo "Source lines added: $added"
+          if [ "$added" -gt 5000 ]; then
+            echo "::error::PR adds $added lines of source code. Split into smaller atomic PRs (limit: 5000)."
+            exit 1
+          fi
+
+  boilerplate-check:
+    name: Boilerplate / duplication check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check new files don't duplicate existing ones
+        shell: python3 {0}
+        run: |
+          import subprocess, sys, os, pathlib
+
+          # Get list of new files added in this PR
+          result = subprocess.run(
+            ["git", "diff", "--name-status", "--diff-filter=A", "origin/master...HEAD"],
+            capture_output=True, text=True
+          )
+          new_files = [line.split("\t")[1] for line in result.stdout.strip().splitlines() if line.startswith("A")]
+
+          # Standard filenames that are legitimately repeated everywhere
+          UBIQUITOUS = {
+            "__init__.py", "README.md", "README.rst", "setup.py",
+            "conftest.py", "pytest.ini", "pyproject.toml", "setup.cfg",
+            ".gitignore", ".gitkeep", "index.html", "index.js",
+          }
+
+          slop = []
+          for f in new_files:
+            name = pathlib.Path(f).name
+            if name in UBIQUITOUS:
+              continue  # standard boilerplate — not a duplicate signal
+            # Find files with the same name anywhere in the repo
+            existing = subprocess.run(
+              ["git", "ls-files", "--", f"**/{name}", name],
+              capture_output=True, text=True
+            ).stdout.strip().splitlines()
+            dupes = [e for e in existing if e != f]
+            if dupes:
+              slop.append(f"  {f} duplicates: {', '.join(dupes)}")
+
+          if slop:
+            print("::error::Possible duplicate files added (check before creating new files):")
+            for s in slop:
+              print(s)
+            sys.exit(1)
+
+          print(f"Checked {len(new_files)} new file(s) — no duplicates found.")
+
+  slop-summary:
+    name: Slop gate summary
+    runs-on: ubuntu-latest
+    needs: [secrets-scan, debug-pollution, security-basics, diff-size, boilerplate-check]
+    steps:
+      - name: All slop checks passed
+        run: |
+          echo "secrets-scan=${{ needs.secrets-scan.result }}"
+          echo "debug-pollution=${{ needs.debug-pollution.result }}"
+          echo "security-basics=${{ needs.security-basics.result }}"
+          echo "diff-size=${{ needs.diff-size.result }}"
+          echo "boilerplate-check=${{ needs.boilerplate-check.result }}"
+          echo "Slop gate: clean."
+
+  # ── Code Review Gate ────────────────────────────────────────────────────────
+  # Prevents data-file fraud: flags PRs where the changes are overwhelmingly data
+  # files rather than actual code. feat:/fix: PRs must have meaningful code
+  # changes. Weighs both file counts AND added source LINES (numstat). #650 #646.
+  code-ratio-check:
+    name: Code/data ratio check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check PR code/data ratio
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+
+          # Data-file regex: anything under data/ or apps/data/, plus data extensions anywhere.
+          DATA_RE='^(data|apps/data)/|\.(jsonl|ndjson|csv|tsv|sqlite|parquet)$'
+          # Code-file regex: real source extensions (json is intentionally NOT code).
+          CODE_RE='\.(js|mjs|cjs|jsx|ts|tsx|py|html|css|scss|yml|yaml|sh|ps1|rs|go|java|rb|c|cpp|h|hpp)$'
+
+          # Helper: count non-empty lines without tripping grep's exit-1-on-no-match.
+          count() { printf '%s\n' "$1" | grep -cE "$2" 2>/dev/null || true; }
+
+          # --- file-level view ---
+          FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          TOTAL=$(printf '%s\n' "$FILES" | grep -c . 2>/dev/null || true); TOTAL=${TOTAL:-0}
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "No changed files detected — skipping ratio check."
+            exit 0
+          fi
+          DATA=$(count "$FILES" "$DATA_RE"); DATA=${DATA:-0}
+          CODE=$(printf '%s\n' "$FILES" | grep -E "$CODE_RE" 2>/dev/null | grep -vE '^(data|apps/data)/' | grep -c . 2>/dev/null || true); CODE=${CODE:-0}
+          DATA_PCT=$(( DATA * 100 / TOTAL ))
+
+          # --- line-level view (added lines via numstat; binary files report '-') ---
+          NUMSTAT=$(git diff --numstat "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || git diff --numstat HEAD~1 HEAD)
+          DATA_ADDED=0; CODE_ADDED=0
+          while IFS=$'\t' read -r added removed path; do
+            [ -z "${path:-}" ] && continue
+            [ "$added" = "-" ] && continue   # binary
+            if printf '%s' "$path" | grep -qE "$DATA_RE"; then
+              DATA_ADDED=$(( DATA_ADDED + added ))
+            elif printf '%s' "$path" | grep -qE "$CODE_RE"; then
+              CODE_ADDED=$(( CODE_ADDED + added ))
+            fi
+          done <<< "$NUMSTAT"
+
+          echo "Files: total=$TOTAL data=$DATA code=$CODE (data ${DATA_PCT}%)"
+          echo "Added lines: data=$DATA_ADDED code=$CODE_ADDED"
+
+          # Determine if this is a feature/fix PR
+          IS_FEAT_FIX=false
+          if printf '%s' "$PR_TITLE" | grep -qiE '^(feat|fix|feature)\b'; then
+            IS_FEAT_FIX=true
+          fi
+          echo "Is feat/fix PR: $IS_FEAT_FIX"
+
+          FAIL=false
+          REASON=""
+          if [ "$IS_FEAT_FIX" = "true" ]; then
+            # Signal 1 (original): mostly data files and <2 code files.
+            if [ "$DATA_PCT" -gt 80 ] && [ "$CODE" -lt 2 ]; then
+              FAIL=true
+              REASON="feat/fix PR has ${DATA_PCT}% data files and only ${CODE} code file(s)."
+            fi
+            # Signal 2 (new, line-based): negligible code added while data dominates.
+            # Closes the "1 cosmetic code line + a 2nd code file" bypass.
+            if [ "$CODE_ADDED" -lt 10 ] && [ "$DATA_ADDED" -gt 50 ] && [ "$DATA_ADDED" -gt $(( CODE_ADDED * 3 )) ]; then
+              FAIL=true
+              REASON="feat/fix PR added ${DATA_ADDED} data line(s) but only ${CODE_ADDED} code line(s) — looks like a data-only change wearing a feat/fix title."
+            fi
+          fi
+
+          # Non-failing advisory: PR title names a source file that isn't in the diff.
+          for tok in $(printf '%s' "$PR_TITLE" | grep -oE '[A-Za-z0-9_.-]+\.(js|py|ts|tsx|rs|go)' || true); do
+            if ! printf '%s\n' "$FILES" | grep -qF "$tok"; then
+              echo "::warning::PR title mentions '$tok' but that file is not in the diff."
+            fi
+          done
+
+          if [ "$FAIL" = "true" ]; then
+            echo ""
+            echo "❌ Code Review Gate FAILED: $REASON"
+            echo ""
+            echo "This PR appears to be primarily data with a feat/fix title."
+            echo "Ensure the PR title accurately reflects the changes, or add real code."
+            echo ""
+            echo "Files changed:"
+            echo "$FILES"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ Code Review Gate passed (data ${DATA_PCT}% of files, +${CODE_ADDED} code lines)"
+
+  # ── Orchestration challenge ─────────────────────────────────────────────────
+  workflow-inventory:
+    name: Workflow inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify workflow surfaces
+        shell: python
+        run: |
+          from pathlib import Path
+          required = [
+              '.github/workflows/static-surface-ci.yml',
+              '.github/workflows/release-provenance.yml',
+              '.github/workflows/pr-gates.yml',
+          ]
+          missing = [path for path in required if not Path(path).exists()]
+          if missing:
+              raise SystemExit(f'Missing workflows: {missing}')
+
+  mcp-contract:
+    name: MCP contract guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify local-first MCP verifier contract
+        shell: python
+        run: |
+          from pathlib import Path
+          docs = Path('docs/MCP-CONNECTOR.md').read_text(encoding='utf-8')
+          script = Path('scripts/Test-LanternMcpConnector.ps1').read_text(encoding='utf-8')
+          required_docs = [
+              'Use `http://127.0.0.1:8771`',
+              'List tools, inspect descriptors, verify parameters, then invoke the minimum safe tool.',
+              'remote tunnels as untrusted',
+          ]
+          required_script = [
+              '$isLoopback',
+              '-AllowRemote',
+              'remote_endpoint_blocked',
+              'loopbackOnlyDefault',
+              'remoteRequiresAllowRemote',
+              '/tools',
+              '/mcp/tools',
+          ]
+          missing = [x for x in required_docs if x not in docs] + [x for x in required_script if x not in script]
+          if missing:
+              raise SystemExit(f'Missing MCP anchors: {missing}')
+
+  action-pool-contract:
+    name: Action pool contract guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify action pooling and search trigger policy
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('docs/ACTION-POOLING-AND-BATCHING.md').read_text(encoding='utf-8')
+          required = [
+              'Remote search should happen from typed natural-language intent',
+              'Action batching means executing independent, low-risk actions together after they are classified.',
+              'Purchases, account actions, hardware mutation, payment actions, boot changes, and public publication do not batch automatically.',
+              'Human-in-the-loop CAPTCHA completion is allowed only for normal manual use',
+              'Do not automate CAPTCHA solving',
+          ]
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit(f'Missing action-pool anchors: {missing}')
+
+  science-report-contract:
+    name: COMET LEAP report contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify science-only report anchors
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('reports/COMET-LEAP-ORCH-CHALLENGE-SCIENCE-FIRST.md').read_text(encoding='utf-8').lower()
+          required = [
+              'status: candidate',
+              'science-only frame',
+              'door and fog/cloud chamber language',
+              'no mania',
+              'no hyperconfidence',
+              'markdown is source; pdf and art are deliverables',
+              'typed natural-language intent',
+              'parallel ci lanes',
+          ]
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit(f'Missing report anchors: {missing}')
+
+  # The full pytest suite runs once, in ci.yml (the authoritative gate).
+
+  summary:
+    name: Orchestration challenge summary
+    runs-on: ubuntu-latest
+    needs: [workflow-inventory, mcp-contract, action-pool-contract, science-report-contract]
+    steps:
+      - name: Summarize challenge lanes
+        run: |
+          echo "workflow-inventory=${{ needs.workflow-inventory.result }}"
+          echo "mcp-contract=${{ needs.mcp-contract.result }}"
+          echo "action-pool-contract=${{ needs.action-pool-contract.result }}"
+          echo "science-report-contract=${{ needs.science-report-contract.result }}"
+          echo "Orchestration challenge complete."

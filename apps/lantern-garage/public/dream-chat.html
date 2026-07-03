@@ -325,20 +325,30 @@
         : "Sign in with Patreon to unlock Unisona Desk…";
     }
 
-    // Provider dropdown role filtering.
-    const provider = document.getElementById("provider-select");
-    if (provider) {
-      [...provider.options].forEach((option) => {
-        const value = option.value || "auto";
-        const allowed = role === "admin"
-          || value === "auto"
-          || value === "ollama"
-          || plan.modelAccess.includes(value)
-          || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
-        option.disabled = !allowed;
-      });
-    }
+    // Provider dropdown role filtering. Extracted + exposed so the dynamic option
+    // builder (buildProviderDropdown, dream-chat-ui.js) can re-apply it after it
+    // (re)populates the <select> — whichever runs last, the options end up gated.
+    _lastPlanState = { role, plan };
+    gateProviderOptions();
   }
+
+  let _lastPlanState = null;
+  function gateProviderOptions() {
+    if (!_lastPlanState) return;
+    const { role, plan } = _lastPlanState;
+    const provider = document.getElementById("provider-select");
+    if (!provider) return;
+    [...provider.options].forEach((option) => {
+      const value = option.value || "auto";
+      const allowed = role === "admin"
+        || value === "auto"
+        || value === "ollama"
+        || plan.modelAccess.includes(value)
+        || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
+      option.disabled = !allowed;
+    });
+  }
+  window.gateProviderOptions = gateProviderOptions;
 
   async function refreshPatreonSession() {
     try {

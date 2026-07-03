@@ -108,7 +108,10 @@ function callAITrader(path, method = 'GET', body = null) {
 
     const req = http.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', chunk => {
+        data += chunk;
+        if (data.length > 8e6) { req.destroy(); reject(new Error('trader service response too large')); }
+      });
       res.on('end', () => {
         try {
           resolve({
@@ -151,7 +154,10 @@ function callDashboard(path) {
 
     const req = http.request(options, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', chunk => {
+        data += chunk;
+        if (data.length > 8e6) { req.destroy(); reject(new Error('trader service response too large')); }
+      });
       res.on('end', () => {
         try {
           resolve(JSON.parse(data));
@@ -225,6 +231,24 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       if (!cacheEntry || !cacheEntry.data) {
         traderAgent.scanMarket().catch(() => {}); // background warm
         sendJson(res, { zones: {}, available: false, reason: 'market scan warming up — data not ready yet' }, 200);
+        return true;
+      }
+      // A cached scan that FAILED (#1861) is not "warming up" — surface the honest
+      // reason so the chart shows an unavailable state instead of eternal warm-up
+      // or silently-empty overlays. scanMarket() already backs off (short fail
+      // TTL), so re-poll to trigger a retry only once the backoff has elapsed.
+      if (cacheEntry.data.error) {
+        const failStale = (Date.now() - cacheEntry.time) >= (traderAgent._scanFailTtl || 30000);
+        if (failStale) traderAgent.scanMarket().catch(() => {}); // background retry
+        // Surface the meaningful cause, not the traceback header: prefer the last
+        // Error/Exception line (e.g. the Alpaca "Key ID must be given" ValueError),
+        // fall back to the first line. Strip CRs so the message stays one line.
+        const lines = String(cacheEntry.data.error).replace(/\r/g, '').split('\n').map((s) => s.trim()).filter(Boolean);
+        const cause = [...lines].reverse().find((l) => /error|exception/i.test(l)) || lines[0] || 'backend error';
+        sendJson(res, {
+          zones: {}, available: false, failed: true,
+          reason: 'market data unavailable — ' + cause.slice(0, 160),
+        }, 200);
         return true;
       }
       const scanFresh = (Date.now() - cacheEntry.time) < traderAgent.cacheExpiry;
@@ -832,25 +856,43 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/ibkr/account
-  // Returns IBKR account details
+  // Returns IBKR account details (account is null when the gateway is not
+  // connected; the accompanying status explains why).
   if (url.pathname === '/api/trading/ibkr/account' && req.method === 'GET') {
     try {
-      const account = await bridge.getIBKRAccount();
-      sendJson(res, { account }, 200);
+      const [account, status] = await Promise.all([
+        bridge.getIBKRAccount(),
+        bridge.getIBKRStatus(),
+      ]);
+      sendJson(res, { account, status }, 200);
     } catch (error) {
-      sendJson(res, { error: 'IBKR Gateway not available', details: error.message }, 503);
+      sendJson(res, { error: 'IBKR gateway error', details: error.message }, 503);
     }
     return true;
   }
 
   // GET /api/trading/ibkr/positions
-  // Returns IBKR open positions
+  // Returns IBKR open positions ([] when the gateway is not connected)
   if (url.pathname === '/api/trading/ibkr/positions' && req.method === 'GET') {
     try {
       const positions = await bridge.getIBKRPositions();
       sendJson(res, { positions }, 200);
     } catch (error) {
       sendJson(res, { error: 'Failed to fetch positions', details: error.message }, 503);
+    }
+    return true;
+  }
+
+  // GET /api/trading/ibkr/status
+  // Honest, evidence-bearing IBKR Client Portal gateway status — a real probe of
+  // the local gateway, not a hardcoded flag. Always 200; connected:false + the
+  // reason in `evidence` when the gateway is down or unauthenticated.
+  if (url.pathname === '/api/trading/ibkr/status' && req.method === 'GET') {
+    try {
+      const status = await bridge.getIBKRStatus();
+      sendJson(res, status, 200);
+    } catch (error) {
+      sendJson(res, { connected: false, reachable: false, source: 'ibkr-cpapi', error: error.message }, 200);
     }
     return true;
   }
@@ -2090,21 +2132,24 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/settings
-  // Get API key status (shows which are configured, no secrets exposed)
-  // IBKR is always true — configured via Claude Code MCP (read-only market data)
+  // Get API key status (shows which are configured, no secrets exposed).
+  // IBKR status is a REAL probe of the Client Portal gateway, not a hardcoded true:
+  // it reads connected only when the gateway is up AND authenticated.
   if (url.pathname === '/api/trading/settings' && req.method === 'GET') {
+    const ibkrStatus = await bridge.getIBKRStatus().catch(() => null);
     const providers = {
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       openai: !!process.env.OPENAI_API_KEY,
       gemini: !!process.env.GEMINI_API_KEY,
-      ibkr: true, // Always configured via Claude Code MCP
+      ibkr: !!(ibkrStatus && ibkrStatus.connected),
       alpaca: !!process.env.ALPACA_API_KEY,
       kalshi: !!process.env.KALSHI_API_KEY,
     };
     sendJson(res, {
       configured: providers,
+      ibkr: ibkrStatus || null,
       mcp: {
-        ibkr: 'Claude Code MCP: Live quotes, positions, orderbook, account risk (read-only)',
+        ibkr: `IBKR Client Portal Web API — local gateway at ${ibkrStatus ? ibkrStatus.gatewayUrl : 'https://localhost:5000/v1/api'} (read-only account + positions)`,
         alpaca: 'Alpaca MCP Server: Stocks, options, crypto, portfolio management'
       }
     }, 200);
@@ -2144,10 +2189,19 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         process.env.ALPACA_SECRET_KEY = payload.alpaca.secret;
         updated.push('alpaca');
       }
-      if (payload.ibkr_account && payload.ibkr_password) {
-        process.env.IBKR_ACCOUNT_ID = payload.ibkr_account;
-        process.env.IBKR_PASSWORD = payload.ibkr_password;
+      // trading.html posts { ibkr: { account_id, api_key, api_secret } }. CPAPI
+      // auth is gateway/session-based, so only the account id (+ optional gateway
+      // URL) are meaningful; api_key/secret are no-ops for the gateway path. The
+      // old code read payload.ibkr_account/ibkr_password (never sent) and wrote
+      // IBKR_PASSWORD (never read) — so saving IBKR settings silently did nothing.
+      const ibkrCfg = payload.ibkr || {};
+      if (ibkrCfg.account_id || payload.ibkr_account) {
+        process.env.IBKR_ACCOUNT_ID = ibkrCfg.account_id || payload.ibkr_account;
         updated.push('ibkr');
+      }
+      if (ibkrCfg.gateway_url || payload.ibkr_gateway_url) {
+        process.env.IBKR_GATEWAY_URL = ibkrCfg.gateway_url || payload.ibkr_gateway_url;
+        if (!updated.includes('ibkr')) updated.push('ibkr');
       }
 
       sendJson(res, {

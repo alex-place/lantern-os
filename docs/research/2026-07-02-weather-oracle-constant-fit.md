@@ -95,6 +95,27 @@ official max already). Promoting on that skew is internal-consistency-over-reali
 Either way, gate on `validate-weather-oracle-fit.js` showing the fitted set still beats default
 OOS *with the served forecast source*. Until then the oracle runs on defaults.
 
+## Promotion executed (2026-07-02) — path 1: align serving to NBS MOS
+
+Took path 1. New `apps/lantern-garage/lib/kalshi-mos.js` is now the deck's forecast source
+(replacing `kalshi-nws`), owning the **exact** forecast-high definition the fit used (fit/validate
+tools import the pure helpers from it, so **fit == serve by construction**). Live probe confirmed
+real output (2026-07-02: 7-2 100°F, 7-3 101°F).
+
+With train == serve the OOS gate holds (fitted −39% RPS, PIT 94→6), so
+`validate-weather-oracle-fit.js --promote` wrote `data/kalshi/weather-oracle-params.json`
+(coolBiasF −1.43, regressionK 0.018, sigmaBaseF 2.11, sigmaNowcastF 1.84; ceiling kept). The
+oracle now loads it (`params: fitted 2026-07-03`).
+
+**Material behavior change (flagged for review).** The fitted calibration says NBS MOS runs ~1.4°F
+cold vs the CLI, so on a 96°F forecast the model now centers ~98°F and will **trade mid-ladder
+buckets** where the default (mis-calibrated) constants stood down. More accurate (the point of the
+fit), but a real live shift. Guards: ships via **PR** (reversible — delete the file → defaults);
+live placement still needs the stable box's `KALSHI_LIVE_SCOPE`, capped 1 contract; the paper
+ledger + `kalshi-weather-verify` (#1895) keep grading it. The oracle **self-test now tests
+DEFAULT_PARAMS logic** (param-injected), so a future re-fit can't silently break the smoke test.
+Recommended: a short paper-observation window on real settled days before trusting the live leg.
+
 ## Sources
 Live 2026-07-02: [IEM MOS](https://mesonet.agron.iastate.edu/cgi-bin/request/mos.py?station=KNYC&model=NBS&sts=2025-07-01T00:00Z&ets=2025-07-02T00:00Z&format=csv),
 [IEM ASOS](https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?help=),

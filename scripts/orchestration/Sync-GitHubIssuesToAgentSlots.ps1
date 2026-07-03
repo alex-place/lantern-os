@@ -96,6 +96,13 @@ Write-Host "Found $($targetIssues.Count) open dream-journal agent-task issues" -
 
 # Read existing slots
 $existingSlots = Get-Content -LiteralPath $SlotsPath -Raw | ConvertFrom-Json
+if (-not $existingSlots.PSObject.Properties['slots']) {
+    # The manifest was migrated to the v2 schema (work_items/tracks) and no
+    # longer carries a `slots` array. Writing back would clobber that schema,
+    # so treat the sync as a no-op rather than crash under strict mode.
+    Write-Host "Slots manifest uses a newer schema (no 'slots' property) — skipping sync." -ForegroundColor Yellow
+    exit 0
+}
 $existingSlotsMap = @{}
 foreach ($slot in $existingSlots.slots) {
     $existingSlotsMap[$slot.id] = $slot

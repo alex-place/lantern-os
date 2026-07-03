@@ -272,7 +272,7 @@
     <p class="panel-sub">Real-time state straight from GitHub + the on-disk queue — nothing cached or hand-edited. Open issues are pending work; PR lanes are in review; merged PRs are landed.</p>
     <div class="board-grid" id="boardStats">
       <div class="stat"><div class="stat-label">Open Issues</div><div class="stat-value" id="bStatPending">—</div><div class="stat-sub">unclaimed backlog</div></div>
-      <div class="stat"><div class="stat-label">In Progress</div><div class="stat-value muted" id="bStatProgress">—</div><div class="stat-sub">claimed locally</div></div>
+      <div class="stat"><div class="stat-label">In Progress</div><div class="stat-value muted" id="bStatProgress">—</div><div class="stat-sub" id="bStatProgressSub">in-flight (live)</div></div>
       <div class="stat"><div class="stat-label">Open PRs</div><div class="stat-value muted" id="bStatPRs">—</div><div class="stat-sub">awaiting review/merge</div></div>
       <div class="stat"><div class="stat-label">Landed</div><div class="stat-value" id="bStatLanded">—</div><div class="stat-sub">recent merges</div></div>
       <div class="stat"><div class="stat-label">Active Agents</div><div class="stat-value muted" id="bStatAgents">—</div><div class="stat-sub" id="bStatAgentsSub">of — slots</div></div>
@@ -1212,6 +1212,8 @@
     if (status && status.queue) {
       setText("bStatPending", status.queue.pending);
       setText("bStatProgress", status.queue.assigned);
+      const staleAssigned = status.queue.staleAssigned || 0;
+      setText("bStatProgressSub", staleAssigned > 0 ? `in-flight · ${staleAssigned} stale` : "in-flight (live)");
       const ag = status.agents || {};
       setText("bStatAgents", ag.activeCount ?? "—");
       setText("bStatAgentsSub", `of ${ag.totalSlots ?? "—"} slots`);

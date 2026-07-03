@@ -81,7 +81,7 @@ jobs:
             raise SystemExit("Missing HTML targets: " + ", ".join(missing))
 
   # The full pytest suite runs once, in ci.yml (the authoritative gate). It was
-  # previously duplicated here and in orchestration-challenge-ci.yml, tripling
+  # previously duplicated here and in pr-gates.yml, tripling
   # runner time and making one flaky test turn three workflows red at once.
 
   workflow-shape:

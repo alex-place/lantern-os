@@ -1,6 +1,6 @@
 # ADR-0017: Surprise-Gated Decoding — grounded intervention (CSF + web search + tool call)
 
-- Status: Proposed
+- Status: Accepted (Alex Place, 2026-07-02)
 - Date: 2026-07-02
 - Deciders: Alex Place (approval required per ADR-0001 gate)
 - Loop stage: Verify → Act coupling (strengthens Verify; spends the canary in Act)
@@ -75,7 +75,7 @@ that maximizes intervention precision at recall ≥ 0.5 on the labeled
 hallucination set. Threshold, window, and arm-order live in config, logged in
 every receipt.
 
-## Evidence gate (Σ₀ — the ADR is not Accepted until these numbers exist)
+## Evidence gate (Σ₀ — the flag stays default-OFF until these numbers exist)
 
 | Metric | Baseline | Target |
 |---|---|---|

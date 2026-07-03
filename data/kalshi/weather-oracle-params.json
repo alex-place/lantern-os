@@ -1,0 +1,44 @@
+{
+  "coolBiasF": -1.432,
+  "regressionK": 0.018,
+  "n": 1818,
+  "sigmaNowcastF": 1.839,
+  "sigmaBaseF": 2.108,
+  "sigmaPerLeadF": 0.352,
+  "diagnostics": {
+    "perLeadSupport": [
+      [
+        0,
+        458
+      ],
+      [
+        1,
+        458
+      ],
+      [
+        2,
+        453
+      ],
+      [
+        3,
+        449
+      ]
+    ],
+    "ceilingSupport": []
+  },
+  "fittedAt": "2026-07-03",
+  "source": "IEM NBS MOS (forecast) + NWS CLI (settled, authoritative), summer",
+  "validation": {
+    "default": {
+      "meanRPS": 0.0504,
+      "pitChi2": 93.98,
+      "n": 723
+    },
+    "fitted": {
+      "meanRPS": 0.0309,
+      "pitChi2": 6.36,
+      "n": 723
+    },
+    "rpsGainPct": 38.6
+  }
+}

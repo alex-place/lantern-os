@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-23
-updated: 2026-07-02
+updated: 2026-07-03
 ---
 
 # Architecture Decision Records (ADRs)
@@ -74,6 +74,7 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0014](0014-unisona-desktop-launcher.md) | unisona.ai desktop — a thin signed launcher over the one Core, not an Electron repackage | Accepted (Alex Place, 2026-07-02) |
 | [0015](0015-qwen-teacher-verified-distillation.md) | Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record | Proposed (awaiting Alex's approval) |
 | [0016](0016-provider-agnostic-oss-auth.md) | Provider-agnostic OSS auth — one identity + provider registry (local scrypt + Google + Discord + Patreon), verified-both linking | Accepted (Alex Place, 2026-07-02) |
-| [0017](0017-surprise-gated-decoding.md) | Surprise-gated decoding — mid-generation grounding intervention (CSF retrieval + web search + tool call) when rolling surprise crosses calibrated threshold | Proposed (awaiting Alex's approval) |
+| [0017](0017-surprise-gated-decoding.md) | Surprise-gated decoding — mid-generation grounding intervention (CSF retrieval + web search + tool call) when rolling surprise crosses calibrated threshold | Accepted (Alex Place, 2026-07-02) |
+| [0019](0019-ibkr-connectivity-client-portal-gateway.md) | IBKR connectivity — Client Portal Web API via local gateway, read-only (replaces the fabricated api.ibkr.com bearer-token path) | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->

@@ -23,6 +23,10 @@ class TraderAgent {
     this.pythonPath = path.join(__dirname, '../../../src/trading_agents');
     this.cache = {};
     this.cacheExpiry = config.cacheExpiry || 60000; // 60s default
+    // Backoff TTL for a FAILED market scan (#1861): shorter than cacheExpiry so
+    // a transient failure recovers quickly, but long enough that a persistently
+    // broken backend isn't re-spawning the 90s scan on every GET.
+    this._scanFailTtl = config.scanFailTtl || 30000; // 30s
     this.pythonTimeout = config.pythonTimeout || 30000; // 30s timeout (scans)
     // Fast-fail budget for interactive reads (market-status / zones / bars /
     // watchlist) so a slow/broken data provider returns quickly instead of
@@ -113,8 +117,14 @@ class TraderAgent {
    */
   async scanMarket() {
     const cacheKey = 'market_scan';
-    if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < this.cacheExpiry) {
-      return this.cache[cacheKey].data;
+    const entry = this.cache[cacheKey];
+    if (entry && entry.data) {
+      // A *failed* scan is cached with a short TTL (#1861) so a persistently
+      // broken backend is distinguishable from a still-warming one and we back
+      // off instead of re-spawning a doomed 90s scan on every poll + the 60s
+      // loop. A *good* scan keeps the normal cacheExpiry window.
+      const ttl = entry.failed ? this._scanFailTtl : this.cacheExpiry;
+      if (Date.now() - entry.time < ttl) return entry.data;
     }
 
     try {
@@ -133,13 +143,17 @@ class TraderAgent {
       return result;
     } catch (error) {
       console.error('[TraderAgent] Market scan failed:', error.message);
-      // Return fallback with empty data
-      return {
+      const fallback = {
         signals: [],
         zones: {},
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: error.message,
       };
+      // Cache the FAILURE (#1861): the zones route reads this to serve an honest
+      // "scan unavailable — <reason>" instead of an eternal "warming up", and
+      // the short TTL means the next poll after the backoff window retries.
+      this.cache[cacheKey] = { data: fallback, time: Date.now(), failed: true };
+      return fallback;
     }
   }
 
@@ -187,17 +201,37 @@ class TraderAgent {
   // cache it for an hour and filter per query in the route (not per-call Python).
   async getAllAssets() {
     const cacheKey = 'all_assets';
-    if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < 3600000) {
-      return this.cache[cacheKey].data;
+    const entry = this.cache[cacheKey];
+    if (entry && Date.now() - entry.time < 3600000) {
+      return entry.data;
     }
     // The full tradable-asset universe lives behind Alpaca. Without creds, don't
     // pay the 45s doomed spawn — return empty fast; the search route falls back
     // to a keyless exact-ticker validation so "+ Add symbol" still works (#1860).
     if (!this._brokerConfigured()) return [];
-    const result = await this._callPython('list_assets', {}, 45000); // big call
-    const assets = (result && Array.isArray(result.assets)) ? result.assets : [];
-    if (assets.length) this.cache[cacheKey] = { data: assets, time: Date.now() };
-    return assets;
+    // Never BLOCK a search request on the 45s list_assets spawn (#1859): when the
+    // broker IS configured but the call is slow (or returns empty and so is never
+    // cached), every keystroke re-spawned Python and the queue serialized until
+    // the browser timed out. Warm the cache in the background instead and serve
+    // whatever we have now ([] on a cold cache → the search route's keyless Yahoo
+    // exact-ticker fallback fires, so "+ Add symbol" is instant). The full fuzzy
+    // list appears on a later poll once the warm completes.
+    this._warmAllAssets();
+    return (entry && entry.data) || [];
+  }
+
+  // Background single-flight warm of the tradable-asset universe (#1859). Kept
+  // separate so getAllAssets() never awaits the slow spawn.
+  _warmAllAssets() {
+    if (this._assetsWarming) return;
+    this._assetsWarming = true;
+    this._callPython('list_assets', {}, 45000)
+      .then((result) => {
+        const assets = (result && Array.isArray(result.assets)) ? result.assets : [];
+        if (assets.length) this.cache['all_assets'] = { data: assets, time: Date.now() };
+      })
+      .catch((e) => { console.error('[TraderAgent] asset-universe warm failed:', e.message); })
+      .finally(() => { this._assetsWarming = false; });
   }
 
   /**

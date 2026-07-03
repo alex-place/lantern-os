@@ -168,7 +168,7 @@ module.exports = async (req, res, url, deps) => {
   // per-loop fast-weight adjustment: append-only, reversible, no neural change.
   if (pathname === "/api/convergence/grounding" && req.method === "POST") {
     let body = "";
-    req.on("data", (chunk) => (body += chunk));
+    req.on("data", (chunk) => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", () => {
       try {
         const { recordGrounding } = require("../lib/grounding-calibration");
@@ -186,7 +186,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/route-intent — Route a message intent
   if (pathname === "/api/convergence/route-intent" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       try {
         const { message, context } = JSON.parse(body);
@@ -211,7 +211,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/agent — Deterministic answer + actions (no LLM)
   if (pathname === "/api/convergence/agent" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       try {
         const { message } = JSON.parse(body || "{}");
@@ -242,7 +242,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/autonomous-work — Work an issue autonomously
   if (pathname === "/api/convergence/autonomous-work" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       // Declared OUTSIDE the try so the `finally` worktree-teardown can reference them.
       // A `let` inside the try is block-scoped → `cleanupWorktree is not defined` in the
@@ -726,7 +726,7 @@ module.exports = async (req, res, url, deps) => {
   // { dryRun:true } streams the plan + diff and stops before touching any file.
   if (pathname === "/api/convergence/autonomous-work/stream" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       res.writeHead(200, {
         "Content-Type": "text/event-stream; charset=utf-8",
@@ -1297,7 +1297,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/route-task — Route a task
   if (pathname === "/api/convergence/route-task" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       try {
         const { taskType, payload } = JSON.parse(body);
@@ -1322,7 +1322,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/route-market — Route market search
   if (pathname === "/api/convergence/route-market" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       try {
         const { ticker } = JSON.parse(body);
@@ -1347,7 +1347,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/route-code — Route code generation
   if (pathname === "/api/convergence/route-code" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       try {
         const { fileType, scope, keywords } = JSON.parse(body);
@@ -1371,7 +1371,7 @@ module.exports = async (req, res, url, deps) => {
   // POST /api/convergence/keystone-test — Σ₀ 6-stage code generation chain (#631)
   if (pathname === "/api/convergence/keystone-test" && req.method === "POST") {
     let body = "";
-    req.on("data", chunk => body += chunk);
+    req.on("data", chunk => { body += chunk; if (body.length > 1e6) req.destroy(); });
     req.on("end", async () => {
       try {
         const { requirement } = JSON.parse(body || "{}");

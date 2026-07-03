@@ -1,0 +1,88 @@
+name: Convergence CI
+
+# Consolidation of convergence-validation.yml + convergence-manager.yml (they
+# overlapped on push/PR to master). Job names are preserved so check names stay
+# stable. Triggers are the union of the two originals; the extra runs (e.g.
+# `validate` on dev pushes) are harmless.
+
+on:
+  push:
+    branches: [ master, main, dev, 'codex/**' ]
+  pull_request:
+    branches: [ master, main, dev ]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# Least-privilege default token: checkout + run + upload-artifact only.
+permissions:
+  contents: read
+
+concurrency:
+  group: convergence-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run Convergence Loop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\scripts\Invoke-LanternConvergenceLoop.ps1 -Root . -Output manifests\evidence\convergence-ci.json -CloudVirtualization
+          $results = Get-Content manifests\evidence\convergence-ci.json | ConvertFrom-Json
+          if ($results.issues.Count -gt 0) {
+            Write-Host "::warning:: $($results.issues.Count) convergence issues found"
+            $results.issues | ForEach-Object { Write-Host "::warning:: $($_.severity): $($_.summary)" }
+          }
+          if ($results.issues | Where-Object { $_.severity -eq 'HIGH' }) {
+            throw "HIGH severity convergence issues found. Fix before merge."
+          }
+          exit 0
+
+      - name: Upload Convergence Results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: convergence-results
+          path: manifests/evidence/convergence-ci.json
+
+  convergence-scan:
+    name: Convergence scan (anti-sprawl + repo health)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Run convergence manager
+        id: scan
+        run: |
+          set +e
+          node scripts/convergence-manager.js --json
+          exit_code=$?
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload convergence receipt
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: convergence-receipt
+          path: manifests/validation/CONVERGENCE-MANAGER-LATEST.json
+
+      - name: Enforce clean on master
+        if: github.ref == 'refs/heads/master'
+        run: |
+          if [ "${{ steps.scan.outputs.exit_code }}" -ne 0 ]; then
+            echo "Convergence Manager found blocking issues; see the uploaded receipt."
+            exit 1
+          fi

@@ -118,16 +118,17 @@
     }
     .home-chat select:hover { color: var(--text); }
     .home-chat select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-    /* submit — filled accent pill at the right end of the bar */
+    /* submit — round accent send button (paper plane) at the right end of the bar */
     .home-chat button[type="submit"] {
       flex-shrink: 0;
-      margin-left: 4px; padding: 9px 18px;
+      margin-left: 4px; width: 42px; height: 42px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
       border: none; border-radius: 9999px;
       background: var(--accent); color: #fff;
-      font-size: 0.92rem; font-weight: 600;
-      cursor: pointer; white-space: nowrap;
+      cursor: pointer;
       transition: background .18s, transform .12s;
     }
+    .home-chat button[type="submit"] svg { width: 18px; height: 18px; display: block; }
     .home-chat button[type="submit"]:hover { background: var(--accent-hover); transform: scale(1.03); }
     .home-chat button[type="submit"]:active { transform: scale(0.97); }
     /* ── "+" attach — borderless icon button on the left ── */
@@ -172,6 +173,24 @@
       flex-shrink: 0;
     }
     .home-file-chip button:hover { color: var(--text); }
+    /* ── Suggestion chips under the search bar ── */
+    .home-suggest {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+      max-width: 620px; margin: 18px auto 0;
+    }
+    .home-suggest-chip {
+      padding: 9px 16px;
+      border: 1px solid var(--border); border-radius: 9999px;
+      background: var(--bg); color: var(--text);
+      font-size: 0.9rem; cursor: pointer; white-space: nowrap;
+      transition: border-color .18s, background .18s, transform .12s;
+    }
+    .home-suggest-chip:hover {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+      transform: translateY(-1px);
+    }
+    .home-suggest-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* One-line footer: keep the whole row (brand · nav · GitHub · edition/version)
        on a single line. `nowrap` stops the flex row from stacking; the
@@ -199,7 +218,9 @@
       .home-chat { max-width: 100%; padding: 4px 5px; }
       .home-chat input { padding: 10px 8px; font-size: 0.95rem; }
       .home-chat select { display: none; }           /* Auto is the mobile default */
-      .home-chat button[type="submit"] { margin-left: 2px; padding: 9px 15px; }
+      .home-chat button[type="submit"] { margin-left: 2px; width: 38px; height: 38px; }
+      .home-suggest { gap: 8px; margin-top: 14px; }
+      .home-suggest-chip { font-size: 0.82rem; padding: 8px 13px; }
       .home-attach-btn { width: 34px; height: 34px; font-size: 20px; }
       .home-file-chip { max-width: 100%; }
       .footer-meta { font-size: 0.72rem; }
@@ -217,7 +238,7 @@
     }
   </style>
   <title>unisona.ai</title>
-  <meta name="description" content="unisona.ai — your AI that actually remembers you. Local, private, and free.">
+  <meta name="description" content="unisona.ai — your local AI that remembers you. Private and free.">
   <link rel="canonical" href="https://www.unisona.ai/">
   <!-- Social share — canonical home is www.unisona.ai -->
   <meta property="og:type" content="website">
@@ -284,9 +305,17 @@
              dynamically from /api/providers/status by buildProviderPin(). -->
         <option value="">Auto</option>
       </select>
-      <button type="submit">Chat ✦</button>
+      <button type="submit" aria-label="Send" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
+      </button>
     </form>
     <input type="file" id="home-file-input" multiple style="display:none">
+    <!-- ── Suggestion chips (mockup): one-click starter prompts ── -->
+    <div class="home-suggest" role="group" aria-label="Suggested prompts">
+      <button type="button" class="home-suggest-chip" data-q="Summarize my notes">📄 Summarize notes</button>
+      <button type="button" class="home-suggest-chip" data-q="Plan my week">📅 Plan my week</button>
+      <button type="button" class="home-suggest-chip" data-q="Research a topic: ">🔍 Research a topic</button>
+    </div>
     <div class="home-file-chip" id="home-file-chip">
       <span id="home-file-chip-name">📄 file.docx</span>
       <button type="button" onclick="clearHomeDocx()" aria-label="Remove file">✕</button>
@@ -579,6 +608,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (docx) setDocxChip(docx);
     if (rest.length) forwardAttach(rest);
   }
+
+  /* Suggestion chips → complete prompts go straight to chat; open-ended ones
+     (data-q ending in ": ") prefill the bar and focus it for the user to finish. */
+  document.querySelectorAll('.home-suggest-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const q = chip.dataset.q || '';
+      const input = document.getElementById('home-chat-input');
+      if (/[:\s]$/.test(q)) {
+        input.value = q;
+        input.focus();
+        return;
+      }
+      window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q) + pinnedProviderQS();
+    });
+  });
 
   /* "+" attach button → native file picker */
   const fileInput = document.getElementById('home-file-input');
