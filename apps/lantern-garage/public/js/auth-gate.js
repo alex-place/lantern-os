@@ -68,21 +68,13 @@
     document.dispatchEvent(new CustomEvent('lantern-flags-ready', { detail: { flags } }));
   }
 
-  // Admins get an Admin link into the page's primary nav (and any opt-in
-  // [data-admin-only] elements revealed). Reuses the session we already fetched
-  // — no second /api/auth/session round-trip.
+  // Admins reveal any opt-in [data-admin-only] elements on the page. The Admin
+  // control-surface entry point (admin-flags.html) intentionally lives ONLY on
+  // the profile page now — it is no longer injected into every page's top nav.
+  // Reuses the session we already fetched — no second /api/auth/session round-trip.
   function injectAdminLink(session) {
     if (!session || session.role !== 'admin') return;
     document.querySelectorAll('[data-admin-only]').forEach((el) => { el.style.display = ''; });
-    const links = document.querySelector('.nav-links') || document.querySelector('nav');
-    if (links && !links.querySelector('a[href="/admin-flags.html"]')) {
-      const a = document.createElement('a');
-      a.href = '/admin-flags.html';
-      a.textContent = 'Admin';
-      a.className = 'nav-admin-link';
-      const anchor = links.querySelector('.sep') || links.querySelector('.nav-support');
-      if (anchor) links.insertBefore(a, anchor); else links.appendChild(a);
-    }
   }
 
   // Best-effort: a fetch failure leaves the nav fully visible (fail-open for UX;
