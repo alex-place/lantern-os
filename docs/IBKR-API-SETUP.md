@@ -1,138 +1,149 @@
 ---
 author: Alex Place
 created: 2026-06-11
-updated: 2026-06-20
+updated: 2026-07-03
 ---
 
-# IBKR API Integration — Direct REST API Setup
+# IBKR API Integration — Client Portal Web API (local gateway)
 
-**No Gateway needed.** Connect directly with API credentials.
+> **Correction (2026-07-03).** Earlier revisions of this doc claimed you could connect
+> to IBKR "directly with API credentials, no Gateway needed" using a bearer token against
+> `https://api.ibkr.com/v1`. **That endpoint does not exist** — IBKR has no Alpaca-style
+> bearer-token REST API, so that path silently returned nothing 100% of the time. This
+> doc now describes the real connectivity model. See
+> [ADR-0019](adr/0019-ibkr-connectivity-client-portal-gateway.md) for the decision.
+
+Keystone talks to Interactive Brokers over the **Client Portal Web API (CPAPI)**, served
+by a **gateway you run locally**. The integration is **read-only**: it reads your account
+summary and open positions. It does **not** place orders.
 
 ---
 
-## Setup (5 minutes)
+## How it actually works
 
-### 1. Get Your IBKR API Credentials
-
-Go to https://www.interactivebrokers.com/en/accounts/ibkr-account.php
-
-- **Account ID:** Your 8-digit IBKR account number (e.g., `U12345678`)
-- **API Key:** Generate in Account Settings → API → Create Key
-- **API Secret:** Provided when API Key is created
-
-### 2. Add to `.env` File
-
-Create or edit `.env` in the repo root:
-
-```bash
-# IBKR Direct REST API (no Gateway required)
-IBKR_ACCOUNT_ID=U12345678
-IBKR_API_KEY=your_api_key_here
-IBKR_API_SECRET=your_api_secret_here
-IBKR_BASE_URL=https://api.ibkr.com/v1
+```
+Browser dashboard
+   │  GET /api/trading/ibkr/status | /account | /positions
+   ▼
+Keystone server (routes/trading.js → lib/trading-api-bridge.js)
+   ▼
+lib/ibkr-cpapi.js  ── HTTPS ──▶  Client Portal Gateway  (https://localhost:5000/v1/api)
+                                       │  authenticated browser SSO session
+                                       ▼
+                                 Interactive Brokers
 ```
 
-### 3. Restart the Server
-
-```bash
-npm start --prefix apps/lantern-garage
-```
-
-### 4. Verify Connection
-
-Open http://127.0.0.1:4177/trading.html
-
-- Dashboard should show: **✓ IBKR • Connected** (green dot)
-- Portfolio displays real equity, cash, P&L
-- Positions show live holdings
+The gateway holds an **authenticated session**. Keystone keeps it warm with `POST /tickle`
+and checks `iserver.authStatus` before every read. No session ⇒ Keystone honestly reports
+**disconnected** (it never fabricates numbers).
 
 ---
 
-## What You Get
+## Setup
+
+### 1. Run the Client Portal Gateway
+
+Two supported options:
+
+- **Manual gateway** — download IBKR's *Client Portal Gateway* (the small Java app),
+  unzip, and run `bin/run.sh root/conf.yaml` (or `bin\run.bat`). It listens on
+  `https://localhost:5000`.
+- **Headless / always-on** — [Voyz/IBeam](https://github.com/Voyz/ibeam) is a Docker
+  image that runs the gateway *and* re-authenticates it automatically. Recommended if you
+  want the connection to survive reboots without manual logins.
+
+### 2. Authenticate
+
+Open **https://localhost:5000** in a browser and log in with your IBKR username/password
+(+ 2FA). The browser will warn about the self-signed certificate — that is expected for a
+local gateway; proceed. Once you see "Client login succeeds", the session is live.
+
+> **Paper trading:** log in with your paper credentials. Paper accounts have ids beginning
+> `DU`; live accounts begin `U`. Keystone infers and reports `mode: paper|live` from the id.
+
+### 3. (Optional) Configure Keystone
+
+All optional — the defaults work for a standard local gateway. Add to `.env` at repo root:
+
+```bash
+# IBKR Client Portal Web API (local gateway)
+IBKR_GATEWAY_URL=https://localhost:5000/v1/api   # default; override for a remote gateway
+IBKR_ACCOUNT_ID=DU1234567                         # optional — auto-discovered if omitted
+IBKR_TIMEOUT_MS=6000                              # optional per-request timeout
+# IBKR_TLS_INSECURE=1                             # only if using a non-loopback self-signed gateway
+```
+
+There is **no** API key or secret — CPAPI auth is the gateway session, not a token.
+
+### 4. Verify
+
+```bash
+curl -s http://127.0.0.1:4177/api/trading/ibkr/status | jq
+```
+
+```jsonc
+{
+  "connected": true,
+  "reachable": true,
+  "authenticated": true,
+  "accountId": "DU1234567",
+  "mode": "paper",
+  "gatewayUrl": "https://localhost:5000/v1/api",
+  "source": "ibkr-cpapi",
+  "evidence": ["gateway reachable at https://localhost:5000/v1/api", "session authenticated", "account DU1234567 (paper)"],
+  "checkedAt": "2026-07-03T..."
+}
+```
+
+The trading settings badge (`/trading.html` → Settings) reads this same status, so it now
+shows **Not configured** when the gateway is down and **✓ Configured** only when a real
+session is authenticated.
+
+---
+
+## What you get
 
 | Feature | Status |
-|---------|--------|
-| Real Portfolio Value | ✅ Live |
-| Cash Balance | ✅ Live |
-| Open Positions | ✅ Live |
-| P&L (Today) | ✅ Live |
-| Stock Prices (watchlist) | Use Alpaca API separately |
-| Trading Signals | Enable Claude MCP |
+|---|---|
+| Account summary (net-liq, cash, buying power, unrealized P&L) | ✅ `GET /api/trading/ibkr/account` |
+| Open positions | ✅ `GET /api/trading/ibkr/positions` |
+| Honest connection status + evidence | ✅ `GET /api/trading/ibkr/status` |
+| Order placement | ❌ Not implemented (read-only by design — see ADR-0019) |
+| Live index/quote feed | ❌ Not wired (the dashboard's fabricated static quotes were removed) |
 
 ---
 
 ## Troubleshooting
 
-### "Still showing offline"
-1. Check `.env` has correct credentials
-2. Verify `IBKR_ACCOUNT_ID` is 8 digits (e.g., `U12345678`)
-3. Restart: `npm start --prefix apps/lantern-garage`
-4. Refresh browser: Ctrl+R
+**`connected: false, reachable: false`** — the gateway isn't running (or `IBKR_GATEWAY_URL`
+is wrong). Start the Client Portal Gateway / IBeam and retry. On loopback this fails fast
+(connection refused), so the dashboard won't hang.
 
-### "Authorization failed"
-- API Key or Secret is incorrect
-- Check IBKR Account Settings → API
-- Regenerate keys if needed
+**`reachable: true, authenticated: false`** — the gateway is up but the session isn't logged
+in (or it expired — CPAPI sessions time out after inactivity). Re-open https://localhost:5000
+and log in again, or let IBeam re-auth.
 
-### "Can't connect to IBKR API"
-- Check internet connection
-- IBKR might be down (rare)
-- Try different `IBKR_BASE_URL`:
-  ```bash
-  IBKR_BASE_URL=https://api-live.ibkr.com/v1  # Alternative endpoint
-  ```
+**Certificate errors on a remote gateway** — the gateway's cert is self-signed. Keystone skips
+verification only for loopback hosts. For a non-loopback gateway you trust, set
+`IBKR_TLS_INSECURE=1` (understand the risk) or install the gateway cert.
 
 ---
 
-## How It Works
+## Security notes
 
-```
-Browser Dashboard
-       ↓
-Trading Service (port 5050)
-       ↓
-Trading API Bridge
-       ↓
-IBKR REST API ← API Key Auth (no Gateway!)
-       ↓
-Real Account Data
-```
-
-No local Gateway app needed. Direct HTTPS connection to IBKR.
+- Read-only: no order-placement code path exists in `lib/ibkr-cpapi.js`.
+- No secrets in code or logs; the account id is the only IBKR value Keystone stores (in `.env`).
+- TLS verification is skipped **only** for loopback (the gateway's self-signed cert); remote
+  hosts are verified unless you explicitly opt out.
+- `.env` must stay in `.gitignore`.
 
 ---
 
-## API Integration Pattern
+## References (grounding)
 
-The dashboard now uses the **same pattern as Alpaca**:
+- IBKR Client Portal Web API — `interactivebrokers.github.io/cpwebapi`
+- Voyz/IBeam (headless gateway auth) — https://github.com/Voyz/ibeam
+- `@stoqey/ib` (Node TWS client, the socket alternative) — https://github.com/stoqey/ib
+- `ib_async` (maintained `ib_insync` successor) — https://github.com/ib-api-reloaded/ib_async
 
-✅ REST API with credentials  
-✅ Direct HTTPS calls (no Gateway)  
-✅ Automatic fallback to zeros if disconnected  
-✅ Data refreshes every 30 seconds  
-✅ Portfolio, positions, real P&L  
-
----
-
-## Security Notes
-
-- API credentials stored in `.env` (not in code)
-- `.env` should be in `.gitignore` (don't commit)
-- API calls use HTTPS (encrypted)
-- Credentials never logged or exposed
-
----
-
-## Next Steps
-
-1. ✅ Add `IBKR_ACCOUNT_ID`, `IBKR_API_KEY`, `IBKR_API_SECRET` to `.env`
-2. ✅ Restart server
-3. ✅ Open dashboard, check for green "Connected" dot
-4. ✅ See real portfolio data
-
-**Optional:** Add Alpaca API keys for stock prices (same `.env` setup)
-
----
-
-**Dashboard:** http://127.0.0.1:4177/trading.html  
-**Status:** Ready to connect IBKR API directly
+**Dashboard:** http://127.0.0.1:4177/trading.html
