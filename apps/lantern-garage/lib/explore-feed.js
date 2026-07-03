@@ -315,7 +315,11 @@ function docCards() {
 function financeCards(ctx) {
   let records = [];
   try {
-    records = tradingNews.queryRecentNews({ limit: 200 });
+    // Deep pool so the Finance feed carries hundreds of articles across all
+    // sources (Benzinga, Reuters, Finnhub wires, …) and keeps loading on scroll
+    // — a 200 cap let the fresh-news flood push older sources (e.g. Benzinga) out
+    // of the window. diversityRerank spreads sources; pagedFeed paginates 9/scroll.
+    records = tradingNews.queryRecentNews({ limit: 1000 });
   } catch {
     return [];
   }
