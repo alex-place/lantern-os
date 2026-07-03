@@ -95,16 +95,6 @@ html[data-skin="terminal"] .empty-state h2 {
   text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
-/* ── Starter chips → tracked, uppercase, phosphor edge on hover ─────────────── */
-html[data-skin="terminal"] .starter-chip {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-radius: 7px;
-}
-html[data-skin="terminal"] .starter-chip:hover {
-  box-shadow: inset 0 0 14px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
 /* ── New-chat button: phosphor gradient (via tokens) needs dark ink on top ──── */
 html[data-skin="terminal"] .sidebar-new-chat {
   color: #04140b;

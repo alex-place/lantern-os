@@ -498,20 +498,6 @@
 }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-/* Quick-start chips */
-.starter-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
-.starter-chip {
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--muted); font-size: 0.82rem; font-family: inherit;
-  padding: 7px 16px; border-radius: 20px; cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-.starter-chip:hover {
-  border-color: var(--accent); color: var(--text);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
-}
-
 /* Error / muted agent text */
 .message.agent.error .message-content { color: var(--muted); font-style: italic; }
 
