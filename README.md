@@ -11,15 +11,11 @@ updated: 2026-06-26
 [![Automated Tests](https://github.com/alex-place/lantern-os/actions/workflows/automated-tests.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/automated-tests.yml)
 [![CodeQL Advanced](https://github.com/alex-place/lantern-os/actions/workflows/codeql.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/codeql.yml)
 [![CSF Rust](https://github.com/alex-place/lantern-os/actions/workflows/csf-rust.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/csf-rust.yml)
-[![Code Review Gate](https://github.com/alex-place/lantern-os/actions/workflows/code-review-gate.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/code-review-gate.yml)
+[![PR Gates](https://github.com/alex-place/lantern-os/actions/workflows/pr-gates.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/pr-gates.yml)
 
 <!-- Convergence / repo-health gates -->
-[![Convergence Validation](https://github.com/alex-place/lantern-os/actions/workflows/convergence-validation.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/convergence-validation.yml)
-[![Convergence Manager](https://github.com/alex-place/lantern-os/actions/workflows/convergence-manager.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/convergence-manager.yml)
+[![Convergence CI](https://github.com/alex-place/lantern-os/actions/workflows/convergence-ci.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/convergence-ci.yml)
 [![Smart Convergence Loop](https://github.com/alex-place/lantern-os/actions/workflows/smart-convergence-loop.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/smart-convergence-loop.yml)
-[![Anti-Sprawl Gate](https://github.com/alex-place/lantern-os/actions/workflows/anti-sprawl.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/anti-sprawl.yml)
-[![Monoworkstream Gate](https://github.com/alex-place/lantern-os/actions/workflows/monoworkstream-gate.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/monoworkstream-gate.yml)
-[![Slop Check](https://github.com/alex-place/lantern-os/actions/workflows/slop-check.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/slop-check.yml)
 [![OSS Repository Validation](https://github.com/alex-place/lantern-os/actions/workflows/oss-repo-validation.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/oss-repo-validation.yml)
 
 <!-- Surface / integration / reporting -->
@@ -27,7 +23,6 @@ updated: 2026-06-26
 [![Site Audit & A11y Tests](https://github.com/alex-place/lantern-os/actions/workflows/a11y-audit.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/a11y-audit.yml)
 [![System Integration Validation](https://github.com/alex-place/lantern-os/actions/workflows/validate-system-integration.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/validate-system-integration.yml)
 [![Validate Dream Journal](https://github.com/alex-place/lantern-os/actions/workflows/validate-dream-journal.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/validate-dream-journal.yml)
-[![Orchestration challenge CI](https://github.com/alex-place/lantern-os/actions/workflows/orchestration-challenge-ci.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/orchestration-challenge-ci.yml)
 [![Report Generation](https://github.com/alex-place/lantern-os/actions/workflows/report-generation.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/report-generation.yml)
 
 <!-- Release / deploy -->
