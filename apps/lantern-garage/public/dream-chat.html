@@ -117,13 +117,11 @@
     <div class="sidebar-section-label">Recents</div>
     <div class="sessions-list" id="sessions-list"></div>
     <div class="sidebar-foot">
-      <button class="clear-all-btn" id="clear-all-btn" onclick="clearAllHistory()" style="display:none;">Clear all history (operator)</button>
       <div class="sidebar-foot-actions">
         <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="toggleTheme()">☀</button>
         <button class="nav-btn" id="skin-toggle" title="Toggle terminal (CRT) skin" aria-label="Toggle terminal CRT skin" aria-pressed="false" onclick="toggleSkin()">▚</button>
         <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
-        <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
-        <button class="nav-btn" id="settings-btn" aria-label="Open settings" onclick="openSettings()" title="Settings">⚙️</button>
+        <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile · providers &amp; API keys live in Profile → Orchestrator" aria-label="View your profile">👤</a>
         <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
       </div>
     </div>
@@ -231,90 +229,8 @@
   <div class="perf-row"><span class="perf-label">Latency:</span><span class="perf-value" id="perf-latency">0ms</span></div>
 </div>
 
-<!-- Settings modal -->
-<div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onclick="if(event.target===event.currentTarget) closeSettings()">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2 id="settings-title">Settings</h2>
-      <button class="modal-close" aria-label="Close settings" onclick="closeSettings()">×</button>
-    </div>
-    <div class="modal-body">
-
-      <div class="form-group">
-        <label class="form-label" for="provider-select">AI Provider</label>
-        <select id="provider-select" class="form-input">
-          <option value="">Auto (pick best)</option>
-          <option value="claude">Claude</option>
-          <option value="openai">ChatGPT</option>
-          <option value="gemini">Gemini</option>
-          <option value="grok">Grok</option>
-          <option value="ollama">Local Σ₀ Loop (Ouro)</option>
-          <option value="keystone-ft">Keystone FT (Haiku + Memory)</option>
-        </select>
-      </div>
-
-      <!-- Model pin (#1127): shown only for cloud providers with choices; "Default"
-           lets the server's modelFor() resolution (env override included) decide. -->
-      <div class="form-group" id="model-select-group" style="display:none">
-        <label class="form-label" for="model-select">Model</label>
-        <select id="model-select" class="form-input">
-          <option value="">Default</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">API Keys</label>
-        <div class="setting-card">
-          <span class="setting-card-icon">✦</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">Claude</div>
-            <div class="setting-card-status" id="status-claude">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-claude" class="form-input" placeholder="ANTHROPIC_API_KEY" aria-label="Claude API key" onchange="saveKey('claude','ANTHROPIC_API_KEY','key-claude')">
-        <a href="https://console.anthropic.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-      <div class="form-group">
-        <div class="setting-card">
-          <span class="setting-card-icon">🌐</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">Gemini</div>
-            <div class="setting-card-status" id="status-gemini">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-gemini" class="form-input" placeholder="GEMINI_API_KEY" aria-label="Gemini API key" onchange="saveKey('gemini','GEMINI_API_KEY','key-gemini')">
-        <a href="https://aistudio.google.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-      <div class="form-group">
-        <div class="setting-card">
-          <span class="setting-card-icon">◈</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">ChatGPT</div>
-            <div class="setting-card-status" id="status-openai">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-openai" class="form-input" placeholder="OPENAI_API_KEY" aria-label="OpenAI API key" onchange="saveKey('openai','OPENAI_API_KEY','key-openai')">
-        <a href="https://platform.openai.com" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-      <div class="form-group">
-        <div class="setting-card">
-          <span class="setting-card-icon">𝕏</span>
-          <div class="setting-card-info">
-            <div class="setting-card-title">Grok</div>
-            <div class="setting-card-status" id="status-grok">Not configured</div>
-          </div>
-        </div>
-        <input type="password" id="key-grok" class="form-input" placeholder="XAI_API_KEY" aria-label="Grok API key" onchange="saveKey('grok','XAI_API_KEY','key-grok')">
-        <a href="https://console.x.ai" target="_blank" style="font-size:0.75rem;color:var(--muted)">Get key →</a>
-      </div>
-
-
-    </div>
-  </div>
-</div>
+<!-- Settings (provider pick + API keys) moved to Profile → Orchestrator (#1904);
+     the in-chat Settings modal was removed with it. -->
 
 <!-- Screenshot → GitHub issue modal -->
 <div class="modal-overlay" id="issue-modal" role="dialog" aria-modal="true" aria-labelledby="issue-title" onclick="if(event.target===event.currentTarget) window.issueReporter.close()">

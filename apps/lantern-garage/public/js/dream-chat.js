@@ -327,7 +327,6 @@
   }
   window.switchSession = switchSession;
 
-  let sessionsOperator = false;
   async function loadSessions() {
     const listEl = document.getElementById("sessions-list");
     if (!listEl) return;
@@ -335,24 +334,26 @@
     try {
       const r = await fetch(`${serverBase}/api/conversations/sessions`, { signal: AbortSignal.timeout(4000) });
       const data = r.ok ? await r.json() : { sessions: [] };
-      sessionsOperator = !!data.operator;
       renderSessions(data.sessions || []);
     } catch {
       listEl.innerHTML = '<div class="sessions-empty">Could not load sessions.</div>';
     }
   }
 
+  // Recents render a bounded list with a "Show more" expander instead of one
+  // endless scroll (#1953 follow-up); each session is its own bordered panel.
+  const SESSIONS_PAGE = 10;
+  let sessionsShowAll = false;
   function renderSessions(sessions) {
     const listEl = document.getElementById("sessions-list");
     if (!listEl) return;
-    const clearAllBtn = document.getElementById("clear-all-btn");
-    if (clearAllBtn) clearAllBtn.style.display = sessionsOperator ? "" : "none";
     if (!sessions.length) {
       listEl.innerHTML = '<div class="sessions-empty">No saved sessions yet. Start chatting to create one.</div>';
       return;
     }
     listEl.innerHTML = "";
-    for (const s of sessions) {
+    const visible = sessionsShowAll ? sessions : sessions.slice(0, SESSIONS_PAGE);
+    for (const s of visible) {
       const isCurrent = s.sessionId === chatSessionId;
       const when = s.lastActivity
         ? new Date(s.lastActivity).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
@@ -368,10 +369,17 @@
       const title = document.createElement("span");
       title.className = "session-title";
       title.textContent = s.title || "(untitled session)";
+      open.appendChild(title);
+      // Short description: the session's latest message snippet (server `preview`).
+      if (s.preview && s.preview !== s.title) {
+        const desc = document.createElement("span");
+        desc.className = "session-desc";
+        desc.textContent = s.preview;
+        open.appendChild(desc);
+      }
       const meta = document.createElement("span");
       meta.className = "session-meta";
       meta.textContent = `${when}${s.turnCount ? " · " + s.turnCount + " turns" : ""}${isCurrent ? " · current" : ""}`;
-      open.appendChild(title);
       open.appendChild(meta);
       open.addEventListener("click", () => switchSession(s.sessionId));
       // ⋯ menu button (and right-click anywhere on the row) opens the context menu.
@@ -392,6 +400,18 @@
       row.appendChild(open);
       row.appendChild(menuBtn);
       listEl.appendChild(row);
+    }
+    if (sessions.length > SESSIONS_PAGE) {
+      const more = document.createElement("button");
+      more.className = "sessions-show-more";
+      more.textContent = sessionsShowAll
+        ? "Show less"
+        : `Show ${sessions.length - SESSIONS_PAGE} more`;
+      more.addEventListener("click", () => {
+        sessionsShowAll = !sessionsShowAll;
+        renderSessions(sessions);
+      });
+      listEl.appendChild(more);
     }
   }
 
@@ -480,18 +500,6 @@
     if (id === chatSessionId) newChat();
     loadSessions();
   }
-
-  // Clearing ALL history is operator-gated server-side (loopback / OPERATOR_TOKEN).
-  async function clearAllHistory() {
-    if (!confirm("Clear ALL chat history across every session? This archives, then wipes the whole log.")) return;
-    try {
-      const r = await fetch(`${serverBase}/api/conversations`, { method: "DELETE" });
-      if (r.status === 403) { alert("Clearing all history requires operator access (run Keystone locally)."); return; }
-    } catch { /* best-effort */ }
-    newChat();
-    loadSessions();
-  }
-  window.clearAllHistory = clearAllHistory;
 
   // The sidebar is permanently visible on desktop; on narrow screens it's an
   // off-canvas drawer toggled by the ☰ button (CSS: .chat-sidebar.open).
@@ -1536,7 +1544,7 @@
           connBadge.className = `connector-card-status ${configured ? "ok" : "err"}`;
         }
       }
-      document.getElementById("settings-btn").classList.toggle("has-error", anyMissing && data._any === false);
+      document.getElementById("settings-btn")?.classList.toggle("has-error", anyMissing && data._any === false);
       // Discord Bot status
       const discordToken = !!(data["DISCORD_BOT_TOKEN"]);
       const discordGuild = !!(data["LANTERN_DISCORD_GUILD_ID"]);

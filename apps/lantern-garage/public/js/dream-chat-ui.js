@@ -135,10 +135,6 @@ function updatePersonalInsights(cube) {
 loadPersonalCube();
 setInterval(loadPersonalCube, 300000);
 
-// ── Modal controls ────────────────────────────────────────────────────────────
-function openSettings() { document.getElementById('settings-modal').classList.add('open'); }
-function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
-
 function startVoiceInput() {
   if (!window.voiceMode || !window.recognition) return;
   try { window.recognition.start(); } catch (e) { console.error('Failed to start recognition:', e); }
@@ -264,10 +260,6 @@ async function testWebSearch() {
   } catch (e) { alert('Web search test failed: ' + e.message); }
   finally { btn.textContent = original; btn.disabled = false; }
 }
-
-// Refresh connector statuses when settings opens
-const _origOpenSettings = openSettings;
-openSettings = function() { _origOpenSettings(); updateConnectorStatuses(); };
 
 // Broken / hallucinated image URLs used to hide themselves with display:none.
 // When the answer is image-ONLY (model replied with just `![alt](url)`), that
@@ -441,11 +433,11 @@ function hideStopButton() {
 }
 
 const FALLBACKS = [
-  "No AI providers are set up. Add an API key in Settings (⚙) to get started.",
-  "All providers offline. Check Settings to add an API key or start a local model.",
-  "Connection quiet. Try again in a moment, or check Settings for API keys.",
-  "No provider answered. Open Settings (⚙) to configure Gemini, Claude, or OpenAI.",
-  "AI unavailable. Add a provider key in Settings, or run: ollama serve for local mode.",
+  "No AI providers are set up. Add an API key in Profile → Orchestrator to get started.",
+  "All providers offline. Check Profile → Orchestrator to add an API key or start a local model.",
+  "Connection quiet. Try again in a moment, or check Profile → Orchestrator for API keys.",
+  "No provider answered. Open Profile → Orchestrator to configure Gemini, Claude, or OpenAI.",
+  "AI unavailable. Add a provider key in Profile → Orchestrator, or run: ollama serve for local mode.",
 ];
 
 // ── Quick-start chip helpers ──────────────────────────────────────────────────
