@@ -169,9 +169,12 @@ jobs:
           )
 
           echo "Checking required environment variables in $ENV_FILE..."
+          # Providers are optional by design (models are interchangeable), so a
+          # commented-out `# VAR=` line counts: the var must be DOCUMENTED in
+          # .env.example, not necessarily enabled.
           fail=0
           for var in "${REQUIRED_VARS[@]}"; do
-            if grep -q "^$var" "$ENV_FILE"; then
+            if grep -qE "^#? *$var" "$ENV_FILE"; then
               echo "✓ $var is defined"
             else
               echo "❌ $var is MISSING from $ENV_FILE"
