@@ -68,6 +68,7 @@ body > nav.site-nav, body > footer.site-footer { flex-shrink: 0; }
   display: flex;
   align-items: stretch;
   gap: 2px;
+  flex-shrink: 0; /* children of the flex-column list — without this they squash to fit the viewport */
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 10px;
@@ -98,19 +99,21 @@ body > nav.site-nav, body > footer.site-footer { flex-shrink: 0; }
   flex-direction: column;
   gap: 3px;
 }
-/* Titles wrap instead of truncating (capped at 2 lines). */
+/* Bold panel headers that wrap instead of truncating — capped at ~2 lines via
+   max-height (the -webkit-box line-clamp clipped single-line titles mid-glyph). */
 .session-title {
-  font-size: 13px; font-weight: 500; line-height: 1.35;
+  font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--text);
   overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  display: block; max-height: 2.7em; overflow: hidden;
 }
 .session-desc {
   font-size: 11.5px; color: var(--muted); line-height: 1.35;
   overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  display: block; max-height: 2.7em; overflow: hidden;
 }
 .session-meta { font-size: 11px; color: var(--muted); opacity: .85; }
 .sessions-show-more {
+  flex-shrink: 0;
   background: transparent; border: 1px dashed var(--border); color: var(--muted);
   font-size: 12px; padding: 7px 10px; border-radius: 10px; cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
@@ -168,7 +171,7 @@ body > nav.site-nav, body > footer.site-footer { flex-shrink: 0; }
   margin-bottom: 6px;
 }
 /* `.hero .hero-tagline` out-specifies the `.empty-state p` muted styling. */
-.hero .hero-tagline { color: var(--text); font-size: 1rem; line-height: 1.55; max-width: 560px; margin: 0 auto 22px; }
+.hero .hero-tagline { color: var(--text); font-style: italic; font-size: 0.9rem; line-height: 1.55; max-width: 560px; margin: 0 auto 22px; }
 html[data-theme="dark"] .hero-title { text-shadow: 0 2px 26px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .4); }
 html[data-theme="dark"] .hero-tagline { text-shadow: 0 1px 3px rgba(0, 0, 0, .55); }
 .starter-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
