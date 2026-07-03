@@ -1586,11 +1586,35 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
             });
             if (cards.length >= limit) break;
           }
+          // ── Tinder-game composition ──────────────────────────────────────────
+          // Hide markets you already hold (no double-buys — "don't show them") and
+          // surface your open paper positions as SELL/HOLD cards, so the whole
+          // lifecycle (buy → hold → sell/stop) lives in one swipe deck.
+          const paperLedger = require('../lib/kalshi-paper-ledger');
+          const held = new Set(paperLedger.getOpen().map(p => p.ticker));
+          const buyCards = cards.filter(c => !held.has(c.ticker));
+          let positionCards = [];
+          try {
+            const polled = await paperLedger.pollOpen(); // live P&L + auto-stop already applied
+            positionCards = polled
+              .filter(p => p.status === 'open' || p.status === 'exit-pending')
+              .map(p => ({
+                kind: 'position', mode: 'paper',
+                ticker: p.ticker, title: p.title || p.ticker,
+                side: p.side, favSide: p.side,
+                entryCents: p.entryCents, favAsk: p.currentBid != null ? p.currentBid : p.entryCents,
+                currentBid: p.currentBid, pnlCents: p.pnlCents, pnlPct: p.pnlPct,
+                autoExit: p.autoExit, positionId: p.id, qty: p.qty || p.count || 1,
+                minsToClose: p.minsToClose,
+              }));
+          } catch (_) { /* positions optional */ }
+          const gameDeck = [...buyCards, ...positionCards];
           return sendJson(res, {
-            cards, count: cards.length, mode: 'paper',
-            weatherCards: wxCards.length,
+            cards: gameDeck, count: gameDeck.length, mode: 'paper',
+            weatherCards: wxCards.length, buyCards: buyCards.length, positionCards: positionCards.length,
+            wallet: paperLedger.getWallet(),
             generatedAt: new Date().toISOString(),
-            note: 'Paper deck — Σ₀ weather-edge (paper practice) + non-crypto candidates. No real orders; live trading remains paused.',
+            note: 'Paper deck — buy candidates (held markets hidden) + your open positions to sell/hold. No real orders; live trading remains paused.',
           }, 200), true;
         } catch (e) {
           return sendJson(res, { cards: [], count: 0, mode: 'paper', error: e.message }, 200), true;
