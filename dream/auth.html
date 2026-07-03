@@ -318,8 +318,11 @@
 </div>
 
 <script>
+  // `guest` (level 0) is the authenticated FREE tier, not an anonymous visitor
+  // (#1879) — label it "Free" to match profile.html and avoid the "logged out"
+  // misread. The role KEY stays `guest` (persisted on existing sessions).
   const LANTERN_ROLES = {
-    guest:        { label: "Guest",        canAccess: true },
+    guest:        { label: "Free",         canAccess: true },
     supporter:    { label: "Supporter",    canAccess: true },
     deep_dreamer: { label: "Deep Dreamer", canAccess: true },
     founder:      { label: "Deep Dreamer", canAccess: true }, // legacy alias (#698)
