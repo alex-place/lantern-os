@@ -2056,6 +2056,7 @@ async function removeWatchlistTicker(ticker, evt){
 
 // ── Data loaders ─────────────────────────────────────────────────────────────
 let zonesLoading = false;
+let zonesStatus = { available: true, failed: false, reason: '' }; // #1861 zone availability
 async function loadZones(){
   if(zonesLoading) return;
   zonesLoading = true;
@@ -2063,6 +2064,9 @@ async function loadZones(){
     const r = await fetch('/api/trading/zones');
     const data = await r.json();
     zonesData = data.zones || {};
+    // Track zone availability (#1861) so the chart/signals panel can show an
+    // honest "unavailable — <reason>" state instead of silently-empty overlays.
+    zonesStatus = { available: data.available !== false, failed: !!data.failed, reason: data.reason || '' };
     wlPrices.forEach(t=>{
       renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
       const el = document.getElementById('cp-'+t.ticker);
@@ -2148,7 +2152,17 @@ function renderSigma0Signals(){
     </div>`).join('');
 
   if(!enters.length && !watching.length){
-    el.innerHTML = statusHtml + '<div class="s0-empty">Scanning every minute — no setups forming yet.</div>';
+    // Distinguish "backend unavailable" from "scanning, nothing yet" (#1861) so
+    // the panel is honest instead of implying an active scan that can't run.
+    let msg;
+    if(zonesStatus.failed){
+      msg = `⚠ Market data unavailable${zonesStatus.reason?` — ${newsEsc(zonesStatus.reason.replace(/^market data unavailable — /i,''))}`:''}. Zone overlays paused until the data backend reconnects.`;
+    } else if(!zonesStatus.available){
+      msg = 'Warming up the market scan — zone overlays and signals appear once the first scan completes.';
+    } else {
+      msg = 'Scanning every minute — no setups forming yet.';
+    }
+    el.innerHTML = statusHtml + `<div class="s0-empty">${msg}</div>`;
     return;
   }
   el.innerHTML = statusHtml + entersHtml
