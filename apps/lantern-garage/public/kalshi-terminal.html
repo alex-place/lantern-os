@@ -782,12 +782,12 @@ async function maybePrefetch(){
   if(prefetching) return;
   const remaining=deck.length-idx;
   if(remaining>=PREFETCH_AT) return;
-  // The feed legitimately returns few cards, so `remaining` can sit below
-  // PREFETCH_AT indefinitely. Without a cooldown the 1s countdown tick (which
-  // calls maybePrefetch every second when the deck is short) re-fetches the
-  // expensive, web-grounded deck ~once per second — the runaway the audit saw.
-  // Rate-limit the refill; only a truly empty deck may fetch immediately.
-  if(remaining>0 && (Date.now()-lastPrefetchMs) < PREFETCH_COOLDOWN_MS) return;
+  // The feed legitimately returns few cards, and stale cards are flushed on arrival,
+  // so `remaining` can sit at/near zero indefinitely. Without a hard cooldown the 1s
+  // countdown tick re-fetches the expensive, web-grounded deck ~once per second — the
+  // runaway the audit saw. Rate-limit ALL prefetch (even when empty); the 5s syncDeck
+  // interval already handles timely refills, so an empty deck waits at most ~5s.
+  if((Date.now()-lastPrefetchMs) < PREFETCH_COOLDOWN_MS) return;
   prefetching=true;
   lastPrefetchMs=Date.now();
   try {
