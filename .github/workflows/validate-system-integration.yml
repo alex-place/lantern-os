@@ -46,11 +46,11 @@ jobs:
 
       - name: Run MCP server tests
         run: |
-          python -m pytest tests/test_mcp_server.py -v --tb=short || true
+          python -m pytest tests/test_mcp_server.py -v --tb=short
 
       - name: Test OAuth endpoints
         run: |
-          python -m pytest tests/test_oauth_server.py -v --tb=short || true
+          python -m pytest tests/test_oauth_server.py -v --tb=short
 
   # ── Node.js Dream Chat & API Tests ────────────────────────────────────────
   node-server-tests:
@@ -72,7 +72,7 @@ jobs:
       - name: Validate server.js syntax
         run: |
           node --check apps/lantern-garage/server.js
-          node --check apps/lantern-garage/cloud-server.js 2>/dev/null || true
+          node --check apps/lantern-garage/cloud-server.js
 
       - name: Validate environment configuration
         run: |
@@ -85,31 +85,13 @@ jobs:
           grep -q "MCP_PUBLIC_BASE_URL" .env.example
           echo "✓ Environment configuration valid"
 
-      - name: Run Node.js unit tests
-        run: npm run test:api --prefix apps/lantern-garage 2>/dev/null || true
+      # The Node API tests need a live server on 4177; ci.yml starts one and runs
+      # them for real. The copy here ran with `|| true`, so it could never fail
+      # and only pretended to test — removed.
 
-  # ── Tunnel Configuration Validation ────────────────────────────────────────
-  tunnel-config-validation:
-    name: Cloudflare Tunnel Configuration
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Validate tunnel configuration file
-        shell: bash
-        run: |
-          # Check if cloudflared config would exist at ~/.cloudflared/config.yml
-          CONFIG_TEMPLATE_PATH="${{ github.workspace }}/manifests/cloudflare-config.yml"
-          if [ -f "$CONFIG_TEMPLATE_PATH" ]; then
-            echo "✓ Tunnel config template found"
-            grep -q "mcp.lantern-os.net" "$CONFIG_TEMPLATE_PATH" && echo "✓ MCP hostname configured"
-            grep -q "lantern-os.net" "$CONFIG_TEMPLATE_PATH" && echo "✓ Primary hostname configured"
-            grep -q "localhost:8772" "$CONFIG_TEMPLATE_PATH" && echo "✓ OAuth port configured"
-            grep -q "localhost:4177" "$CONFIG_TEMPLATE_PATH" && echo "✓ Garage port configured"
-          else
-            echo "⚠ Tunnel config template not found (expected at $CONFIG_TEMPLATE_PATH)"
-          fi
+  # (The former tunnel-config-validation job checked manifests/cloudflare-config.yml,
+  # which does not exist in the repo — the tunnel config is machine-local — so the
+  # job was a permanent no-op and has been removed.)
 
   # ── Dream Chat Agent Validation ────────────────────────────────────────────
   dream-chat-validation:
@@ -127,31 +109,14 @@ jobs:
       - name: Validate agent configuration
         shell: bash
         run: |
-          # Check that all 6 agents have system prompts defined
-          AGENTS=("keystone" "waterfall" "xenon" "blinkbug" "comet_leap" "founder")
-          AGENT_FILE="apps/lantern-garage/lib/dream-chat.js"
-
-          for agent in "${AGENTS[@]}"; do
-            if grep -q "\"$agent\"" "$AGENT_FILE"; then
-              echo "✓ Agent '$agent' configured"
-            else
-              echo "⚠ Agent '$agent' not found in dream-chat.js"
-            fi
-          done
-
-      - name: Validate Dream Journal data structure
-        shell: bash
-        run: |
-          # Check that data directories exist and are properly structured
-          [ -d "data/dream-journals" ] && echo "✓ Dream journals directory exists" || echo "⚠ Dream journals directory missing"
-          [ -d "data/conversations" ] && echo "✓ Conversations directory exists" || echo "⚠ Conversations directory missing"
-
-          # Verify that .gitignore protects sensitive data
-          if grep -q "data/\*\.json" .gitignore; then
-            echo "✓ Data files are gitignored"
-          else
-            echo "⚠ Consider adding data files to .gitignore"
+          # The chat persona is the single grounded agent `keystone` (#1664 removed
+          # the RP personas). The old check looped over 6 agents and only warned,
+          # so it passed even though 5 of them no longer exist.
+          if ! grep -q '"keystone"' apps/lantern-garage/lib/dream-chat.js; then
+            echo "❌ Agent 'keystone' not found in dream-chat.js"
+            exit 1
           fi
+          echo "✓ Agent 'keystone' configured"
 
   # ── OAuth2 Endpoint Validation ─────────────────────────────────────────────
   oauth-endpoint-validation:
@@ -166,17 +131,21 @@ jobs:
         run: |
           OAUTH_FILE="src/mcp_server/server_oauth.py"
 
-          # Check required OAuth endpoints
-          echo "Checking OAuth2 endpoints..."
-          grep -q "well-known/oauth-authorization-server" "$OAUTH_FILE" && echo "✓ OAuth discovery endpoint implemented" || echo "❌ Missing OAuth discovery endpoint"
-          grep -q "/oauth/authorize" "$OAUTH_FILE" && echo "✓ Authorization endpoint implemented" || echo "⚠ Authorization endpoint may be missing"
-          grep -q "/oauth/token" "$OAUTH_FILE" && echo "✓ Token endpoint implemented" || echo "⚠ Token endpoint may be missing"
-
-          # Check PKCE support
-          grep -q "code_challenge" "$OAUTH_FILE" && echo "✓ PKCE support detected" || echo "⚠ PKCE support may be missing"
-
-          # Check JWT handling
-          grep -q "JWT\|jwt" "$OAUTH_FILE" && echo "✓ JWT token support detected" || echo "⚠ JWT token support may be missing"
+          # These were echo-only (❌/⚠ then exit 0) and could never fail — now they gate.
+          fail=0
+          for anchor in "well-known/oauth-authorization-server" "/oauth/authorize" "/oauth/token" "code_challenge"; do
+            if grep -q -- "$anchor" "$OAUTH_FILE"; then
+              echo "✓ $anchor present"
+            else
+              echo "❌ Missing OAuth anchor: $anchor"
+              fail=1
+            fi
+          done
+          if ! grep -qi "jwt" "$OAUTH_FILE"; then
+            echo "❌ Missing JWT token support"
+            fail=1
+          fi
+          exit $fail
 
   # ── Environment Variables Check ────────────────────────────────────────────
   env-check:
@@ -200,19 +169,22 @@ jobs:
           )
 
           echo "Checking required environment variables in $ENV_FILE..."
+          fail=0
           for var in "${REQUIRED_VARS[@]}"; do
             if grep -q "^$var" "$ENV_FILE"; then
               echo "✓ $var is defined"
             else
               echo "❌ $var is MISSING from $ENV_FILE"
+              fail=1
             fi
           done
+          exit $fail
 
   # ── Integration Summary ────────────────────────────────────────────────────
   integration-summary:
     name: System Integration Summary
     runs-on: ubuntu-latest
-    needs: [mcp-server-tests, node-server-tests, tunnel-config-validation, dream-chat-validation, oauth-endpoint-validation, env-check]
+    needs: [mcp-server-tests, node-server-tests, dream-chat-validation, oauth-endpoint-validation, env-check]
     if: always()
 
     steps:
@@ -248,9 +220,16 @@ jobs:
 
       - name: Determine overall status
         run: |
-          if [ "${{ needs.mcp-server-tests.result }}" == "failure" ] || \
-             [ "${{ needs.node-server-tests.result }}" == "failure" ]; then
-            echo "⚠️  Some tests failed (expected in CI environment without full service setup)"
-            exit 0
+          # Previously exited 0 even when jobs failed, so the summary was green
+          # regardless of results. A failed lane now fails the workflow.
+          FAILED=""
+          [ "${{ needs.mcp-server-tests.result }}" != "success" ] && FAILED="$FAILED mcp-server-tests(${{ needs.mcp-server-tests.result }})"
+          [ "${{ needs.node-server-tests.result }}" != "success" ] && FAILED="$FAILED node-server-tests(${{ needs.node-server-tests.result }})"
+          [ "${{ needs.dream-chat-validation.result }}" != "success" ] && FAILED="$FAILED dream-chat-validation(${{ needs.dream-chat-validation.result }})"
+          [ "${{ needs.oauth-endpoint-validation.result }}" != "success" ] && FAILED="$FAILED oauth-endpoint-validation(${{ needs.oauth-endpoint-validation.result }})"
+          [ "${{ needs.env-check.result }}" != "success" ] && FAILED="$FAILED env-check(${{ needs.env-check.result }})"
+          if [ -n "$FAILED" ]; then
+            echo "❌ Failed lanes:$FAILED"
+            exit 1
           fi
           echo "✓ System integration validation complete"
