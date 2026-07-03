@@ -10,17 +10,34 @@
   (function(){
     try{
       var stored=localStorage.getItem('lantern-theme');
-      var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute('data-theme',(stored?stored==='dark':prefersDark)?'dark':'light');
+      /* Trading terminal defaults to the dark phosphor (green-on-black RobCo) look
+         unless the user explicitly chose light. */
+      document.documentElement.setAttribute('data-theme',(stored?stored==='dark':true)?'dark':'light');
     }catch(e){ document.documentElement.setAttribute('data-theme','dark'); }
+    /* Pip-Boy / phosphor terminal skin (shared with dream-chat). This IS the
+       terminal's native look — default ON here unless the user toggled it off. */
+    try{
+      if(localStorage.getItem('keystone-skin')!=='default') document.documentElement.setAttribute('data-skin','terminal');
+    }catch(e){ document.documentElement.setAttribute('data-skin','terminal'); }
   })();
 </script>
 <link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/dream-chat-terminal.css"><!-- RobCo/Pip-Boy phosphor skin (data-skin=terminal) -->
 <link rel="stylesheet" href="/vendor/fonts/fonts.css"><!-- #861: vendored local-first (was Google Fonts CDN) -->
 <title>Kalshi Terminal — unisona.ai</title>
 <style>
 /* Canonical site.css tokens — NO palette override, so this page matches home + chat
    in both themes and stays WCAG-AA (metadata uses --muted, never --accent-dim as text). */
+/* Pip-Boy phosphor palette — pinned with enough specificity to win over site.css's
+   :root[data-theme] tokens, so the terminal is green-on-black in dark and mint in light. */
+html[data-skin="terminal"][data-theme="dark"]{
+  --bg:#050e08;--surface:#08140d;--surface2:#0c1f14;--border:#14301f;
+  --text:#cdefd8;--muted:#6fbf90;--accent:#2bff88;--accent-hover:#57ffa3;--accent-dim:#0f2a1b;
+}
+html[data-skin="terminal"][data-theme="light"]{
+  --bg:#dfece1;--surface:#e9f3ea;--surface2:#d6e8da;--border:#a9c6b4;
+  --text:#0f3524;--muted:#33604a;--accent:#0e6b3b;--accent-hover:#0b5730;--accent-dim:#c3ddca;
+}
 html,body{height:100%;background:var(--bg);color:var(--text)}
 body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 .site-nav{flex-shrink:0}
@@ -114,6 +131,11 @@ body{min-height:100vh;overflow:hidden;display:flex;flex-direction:column}
 /* progress + end screen */
 .progress{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:center;padding:3px}
 .end{text-align:center;color:var(--muted);font-size:15px;display:none;flex-direction:column;gap:12px;align-items:center}
+.scan-idle{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;letter-spacing:.22em;
+  color:var(--accent);text-shadow:0 0 10px color-mix(in srgb,var(--accent) 45%,transparent);
+  animation:scanpulse 1.6s ease-in-out infinite}
+@keyframes scanpulse{0%,100%{opacity:.45}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.scan-idle{animation:none}}
 .reload{font-size:12px;padding:8px 20px;border-radius:8px;border:1px solid var(--accent);
   background:rgba(6,182,212,.1);color:var(--accent);cursor:pointer;font-weight:600}
 
@@ -154,8 +176,35 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   font-family:'IBM Plex Mono',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ══ Device console — polished frame (fallout-radio inspired, theme-adaptive) ══ */
-.kx-console{flex:1;min-height:0;display:flex;flex-direction:column;
-  width:min(560px,96vw);margin:10px auto 12px;
+/* ── main row: console (left) + side column (right) ─────────── */
+.kx-main{flex:1;min-height:0;display:flex;justify-content:center;align-items:stretch;
+  gap:16px;width:100%;padding:0 12px;box-sizing:border-box}
+.kx-side{flex:0 0 300px;display:flex;flex-direction:column;gap:12px;margin:10px 0 12px;min-height:0}
+.side-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:12px 14px;box-shadow:var(--shadow)}
+.side-h{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px}
+.bal-big{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:30px;font-weight:700;
+  color:var(--text);line-height:1.1}
+.bal-sub{font-size:12px;color:var(--muted);margin-top:5px}
+.side-hist{flex:1;min-height:0;display:flex;flex-direction:column}
+.hist-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;margin:0 -4px;padding:0 4px}
+.hist-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--border)}
+.hist-row:last-child{border-bottom:none}
+.hist-row .tk{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.hist-row .rt{text-align:right;font-size:12px;white-space:nowrap}
+.hist-row .side-y{color:var(--green)} .hist-row .side-n{color:var(--gold)}
+.hist-row .pnl.pos{color:var(--green);font-weight:700} .hist-row .pnl.neg{color:var(--danger);font-weight:700}
+.hist-row .st{font-size:10.5px;color:var(--muted);letter-spacing:.06em}
+@media (max-width:820px){
+  .kx-main{flex-direction:column;align-items:center;gap:10px}
+  .kx-side{flex:0 0 auto;width:min(560px,96vw);order:2}
+  .side-hist{max-height:38vh}
+}
+.kx-console{flex:0 1 560px;max-width:min(560px,96vw);min-height:0;display:flex;flex-direction:column;
+  margin:10px 0 12px;
   background:linear-gradient(180deg,var(--surface2),var(--surface));
   border:1px solid var(--border);border-radius:20px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -6px 16px rgba(0,0,0,.10),var(--shadow-hover);
@@ -394,10 +443,13 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
     <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
     <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="toggleTheme()">☀</button>
+    <button class="nav-btn" id="skin-toggle" title="Toggle terminal (Pip-Boy) skin" aria-label="Toggle terminal skin" aria-pressed="true" onclick="toggleSkin()">▚</button>
     <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" title="Report an issue (screenshot → GitHub)" onclick="if(window.issueReporter)window.issueReporter.open()">📷</button>
   </div>
 </nav>
 
+<!-- Console + side column (account balance + trade history) -->
+<div class="kx-main">
 <!-- Device console — polished frame (bezel + recessed screen + tactile controls) -->
 <div class="kx-console">
 <!-- Deck mode — on-screen segmented switch -->
@@ -412,7 +464,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <div class="end" id="end" role="status" aria-label="No cards available">
     <div>No cards right now</div>
     <div style="font-size:12px;color:var(--muted)">Checking automatically…</div>
-    <button class="btn-ghost" onclick="syncDeck()">↻ Refresh</button>
   </div>
   <p class="progress" id="progress" aria-live="polite" aria-label="Deck progress" role="status"></p>
   <div class="actions" role="group" aria-label="Card actions">
@@ -423,6 +474,21 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </main>
 
 </div><!-- /kx-console -->
+
+<!-- Right column: account balance + trade history -->
+<aside class="kx-side" id="kxSide" aria-label="Account balance and trade history">
+  <div class="side-card">
+    <div class="side-h">Account balance</div>
+    <div class="bal-big" id="balBig">—</div>
+    <div class="bal-sub" id="balSub">connecting…</div>
+  </div>
+  <div class="side-card side-hist">
+    <div class="side-h">Trade history <span class="mut" id="histCount"></span></div>
+    <div class="hist-list" id="histList"><div class="mut" style="padding:4px 2px">Loading…</div></div>
+  </div>
+</aside>
+
+</div><!-- /kx-main -->
 
 <div class="toast" id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
@@ -504,12 +570,9 @@ function showModeEnd(d){
   const stage=document.getElementById('stage'); if(stage) stage.innerHTML='';
   if(!end) return;
   end.style.display='flex';
-  const note = (d&&d.note)||(MODE==='live'
-    ? 'No band-robust winning edge live right now — standing down is the correct output.'
-    : 'No practice candidates right now (Kalshi closed or no creds).');
-  end.innerHTML=`<div style="color:var(--gold);font-weight:700">${MODE==='live'?'● LIVE':'📝 PAPER'} — ${idx} swiped</div>`
-    +`<div style="font-size:12px;color:var(--muted);max-width:340px">${note}</div>`
-    +`<button class="btn-ghost" onclick="setMode('${MODE}')">↻ Reload deck</button>`;
+  // Cards load continuously — no counter, no reload button, no verbose note.
+  // Just a quiet phosphor "scanning" idle state until the next card arrives.
+  end.innerHTML=`<div class="scan-idle">◉ SCANNING FEED…</div>`;
 }
 
 // Σ₀ council readout — realized after-fee truth, shown prominently (honesty surface).
@@ -584,6 +647,7 @@ function renderAccount(){
     +(noEdge?`<span class="acct-sep">·</span><span class="acct-edge">⛔ no proven edge</span>`:'');
   const panel=document.getElementById('acctPanel');
   if(panel&&acctOpen) panel.innerHTML=renderAcctPanel();
+  renderSide();
 }
 
 function renderAcctPanel(){
@@ -632,6 +696,45 @@ function toggleAcct(){
   if(caret) caret.textContent=acctOpen?'▾':'▴';
   const sec=document.querySelector('.acct'); if(sec) sec.classList.toggle('open',acctOpen);
   if(acctOpen){ if(!acctState.posLoaded) loadPositions(); renderAccount(); }
+}
+
+// ── right column: account balance + trade history ────────────────────────────
+function renderSide(){
+  const bal=acctState.bal||{}, cn=acctState.conn||{};
+  const big=document.getElementById('balBig'); if(big) big.textContent=balStr(bal);
+  const sub=document.getElementById('balSub');
+  if(sub){
+    const env=cn.error?'offline':(cn.canTradeLive?'LIVE tradable':(cn.credentials?'connected · dry-run':'no credentials'));
+    sub.textContent=(MODE==='paper'?'Paper practice · ':'')+env;
+  }
+}
+
+async function loadHistory(){
+  const list=document.getElementById('histList'); if(!list) return;
+  let trades=[];
+  try{
+    if(MODE==='live'){
+      const f=await j('/fills?limit=50');
+      const arr=(f&&(f.fills||(f.data&&f.data.fills)))||[];
+      trades=arr.map(x=>({ticker:x.ticker,side:x.side,entryCents:(x.yes_price!=null?x.yes_price:x.no_price),status:'filled',pnlPct:null}));
+    } else {
+      const h=await j('/paper-history?limit=50');
+      trades=(h&&h.trades)||[];
+    }
+  }catch(_){ trades=[]; }
+  const cnt=document.getElementById('histCount'); if(cnt) cnt.textContent=trades.length?`· ${trades.length}`:'';
+  if(!trades.length){ list.innerHTML='<div class="mut" style="padding:6px 2px">No trades yet — take a card to log one.</div>'; return; }
+  list.innerHTML=trades.map(t=>{
+    const sideCls=String(t.side||'').toLowerCase()==='yes'?'side-y':'side-n';
+    const sd=String(t.side||'').toUpperCase();
+    const px=t.entryCents!=null?`@${t.entryCents}¢`:'';
+    let right;
+    if(t.pnlPct!=null){ const pos=t.pnlPct>=0; right=`<span class="pnl ${pos?'pos':'neg'}">${pos?'+':''}${t.pnlPct}%</span>`; }
+    else right=`<span class="st">${String(t.status||'open').toUpperCase()}</span>`;
+    const tk=String(t.ticker||'').replace('KXHIGHNY-','NYC ');
+    return `<div class="hist-row"><span class="tk" title="${String(t.ticker||'').replace(/"/g,'')}">${tk}</span>`
+      +`<span class="rt"><span class="${sideCls}">${sd}</span> ${px} · ${right}</span></div>`;
+  }).join('');
 }
 
 // ── syncDeck: re-poll the current mode's deck (both LIVE and PAPER load their own
@@ -1147,7 +1250,7 @@ async function act(dir,fromSwipe){
       const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
       showResult(res,card);            // live / dry-run toast
       idx++; render();
-      if(res.mode==='live') loadBalance();
+      loadHistory(); if(res.mode==='live') loadBalance();
     }catch(e){ showResult({error:e.message},card); idx++; }
     finally{ busy=false; }
     return;
@@ -1158,10 +1261,11 @@ async function act(dir,fromSwipe){
     if(card.favAsk==null){ blockTake('No live ask — cannot paper-trade'); return; }
     busy=true;
     try{
-      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk, source:'kalshi-paper'};
+      const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
+        source:'kalshi-paper', pPredicted:card.pPredicted};
       const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
       showPaperResult(res,card);
-      idx++; render();
+      idx++; render(); loadHistory();
     }catch(e){ showResult({error:e.message},card); idx++; }
     finally{ busy=false; }
     return;
@@ -1300,17 +1404,17 @@ async function init(){
   const cn = await j('/connection'); conn = cn || {};
   let mode; try{ mode = localStorage.getItem('kx-mode'); }catch(_){}
   if(mode!=='live' && mode!=='paper') mode = (conn.canTradeLive || conn.credentials) ? 'live' : 'paper';
-  loadAccount(); setMode(mode); loadCouncil();
+  loadAccount(); setMode(mode); loadCouncil(); loadHistory();
   syncInterval=setInterval(syncDeck,SYNC_MS);
-  acctInterval=setInterval(()=>{loadAccount();loadCouncil();},30000);
+  acctInterval=setInterval(()=>{loadAccount();loadCouncil();loadHistory();},30000);
 
   // Pause/resume on tab visibility to save API quota + battery.
   document.addEventListener('visibilitychange',()=>{
     clearInterval(syncInterval); clearInterval(acctInterval);
     const slow=document.hidden;
     syncInterval=setInterval(syncDeck,slow?30000:SYNC_MS);
-    acctInterval=setInterval(()=>{loadAccount();loadCouncil();},slow?60000:30000);
-    if(!slow){ syncDeck(); loadAccount(); loadCouncil(); }
+    acctInterval=setInterval(()=>{loadAccount();loadCouncil();loadHistory();},slow?60000:30000);
+    if(!slow){ syncDeck(); loadAccount(); loadCouncil(); loadHistory(); }
   });
 }
 document.addEventListener('DOMContentLoaded',init);
@@ -1339,6 +1443,7 @@ document.addEventListener('DOMContentLoaded',init);
 <script src="/vendor/html2canvas/html2canvas.min.js" defer></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach" defer></script>
 <script src="/js/theme-toggle.js"></script>
+<script src="/js/terminal-skin.js?v=20260630-terminal"></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

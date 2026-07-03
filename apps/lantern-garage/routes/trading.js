@@ -1403,6 +1403,13 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         const positions = await paperLedger.pollOpen();
         return sendJson(res, { count: positions.length, positions }, 200), true;
       }
+      // GET — paper trade history (opened + closed, newest first) for the terminal column
+      if (url.pathname === '/api/trading/kalshi/paper-history' && req.method === 'GET') {
+        const paperLedger = require('../lib/kalshi-paper-ledger');
+        const limit = q.limit ? Number(q.limit) : 50;
+        const trades = paperLedger.getHistory(limit);
+        return sendJson(res, { count: trades.length, trades }, 200), true;
+      }
       // POST — close a paper position  { id, exitTag?, exitPriceCents?, pnlPct? }
       if (url.pathname === '/api/trading/kalshi/paper-close' && req.method === 'POST') {
         const paperLedger = require('../lib/kalshi-paper-ledger');
@@ -1475,25 +1482,33 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       // GET — Paper deck: live candidate markets, paper-only, with honest fee-aware EV
       // (most negative). Empty when Kalshi markets are closed or creds are absent.
       if (url.pathname === '/api/trading/kalshi/paper-deck' && req.method === 'GET') {
-        // Crypto suggester intentionally REMOVED: the realized-PnL backtest showed no
-        // taker edge on short-window crypto after fees (see kalshi-no-taker-edge), so
-        // crypto cards no longer surface anywhere. The only profitable arm is the Σ₀
-        // weather edge (LIVE mode / grounded-deck); this paper deck keeps the broader
-        // non-crypto candidate markets for practice only.
+        // Crypto suggester intentionally REMOVED (no post-fee taker edge — see
+        // kalshi-no-taker-edge). The paper deck is the PRACTICE surface for the one
+        // profitable arm: it leads with the Σ₀ weather-edge cards (same model the LIVE
+        // deck executes, but paper-only) and backfills with any non-crypto candidate
+        // suggestions so there is always something to practice on.
         const suggest = require('../lib/kalshi-suggest');
+        const weatherDeck = require('../lib/kalshi-weather-edge-deck');
         const fees = require('../lib/kalshi-fees');
         const kc = require('../lib/kalshi-council');
         const collector = deps.kalshiCollector || null;
         const limit = q.limit ? Number(q.limit) : 20;
         try {
-          const sug = await suggest.getSuggestions({ limit, collector }).catch(() => ({ cards: [] }));
-          const raw = [...(sug.cards || [])]
+          const [wx, sug] = await Promise.all([
+            weatherDeck.getWeatherEdgeDeck({ limit }).catch(() => ({ cards: [] })),
+            suggest.getSuggestions({ limit, collector }).catch(() => ({ cards: [] })),
+          ]);
+          // Weather-edge cards first (the profitable strat), then non-crypto suggestions.
+          const wxCards = (wx.cards || []).map(c => ({ ...c, mode: 'paper' }));
+          const sugCards = (sug.cards || [])
             .filter(c => c.kind !== 'exit' && c.kind !== 'position' && c.favAsk != null);
           const seen = new Set();
           const cards = [];
-          for (const c of raw) {
+          for (const c of [...wxCards, ...sugCards]) {
             if (seen.has(c.ticker)) continue;
             seen.add(c.ticker);
+            // Weather cards already carry a full sigma0 (+ sizing/pPredicted); only
+            // synthesize a sigma0 for the plain suggestion cards.
             const pWin = kc.pWinModel(c.favAsk);
             const ev = fees.netEvCents(c.favAsk, pWin);
             cards.push({
@@ -1509,8 +1524,9 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
           }
           return sendJson(res, {
             cards, count: cards.length, mode: 'paper',
+            weatherCards: wxCards.length,
             generatedAt: new Date().toISOString(),
-            note: 'Paper deck — live candidate markets, paper-only (no real orders). Honest fee-EV shown; live trading remains paused.',
+            note: 'Paper deck — Σ₀ weather-edge (paper practice) + non-crypto candidates. No real orders; live trading remains paused.',
           }, 200), true;
         } catch (e) {
           return sendJson(res, { cards: [], count: 0, mode: 'paper', error: e.message }, 200), true;
@@ -1531,6 +1547,21 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
           return sendJson(res, out, 200), true;
         } catch (e) {
           return sendJson(res, { cards: [], count: 0, mode: 'grounded', error: e.message }, 200), true;
+        }
+      }
+
+      // GET — PAPER MLB run-total weather deck. Sibling of grounded-deck for KXMLBTOTAL:
+      // NWS game-time conditions per ballpark → run-total tilt (wind/temp/roof/precip) →
+      // paper hypotheses on weather TAILS only, net of fees. NOT in live scope (live stays
+      // weather-edge-only); logs to data/kalshi/mlb-weather-paper-ledger.jsonl for calibration.
+      if (url.pathname === '/api/trading/kalshi/mlb-weather-deck' && req.method === 'GET') {
+        const mlbDeck = require('../lib/kalshi-mlb-weather-deck');
+        const limit = q.limit ? Number(q.limit) : 12;
+        try {
+          const out = await mlbDeck.getMlbWeatherDeck({ limit });
+          return sendJson(res, out, 200), true;
+        } catch (e) {
+          return sendJson(res, { cards: [], count: 0, mode: 'paper', live: false, error: e.message }, 200), true;
         }
       }
 

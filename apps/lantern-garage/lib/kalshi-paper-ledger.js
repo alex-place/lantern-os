@@ -40,6 +40,37 @@ function getOpen() {
   return all.filter(e => e.event === "open" && !closedIds.has(e.id));
 }
 
+/**
+ * Full trade history: every opened paper position joined with its close (if any),
+ * newest first. Used by the terminal's trade-history column.
+ * → [{ id, ticker, side, entryCents, qty, status:'open'|'closed', exitTag, pnlPct, openedAt, closedAt }]
+ */
+function getHistory(limit = 50) {
+  const all = readAll();
+  const closes = new Map();
+  for (const e of all) if (e.event === 'close') closes.set(e.id, e);
+  const rows = [];
+  for (const e of all) {
+    if (e.event !== 'open') continue;
+    const c = closes.get(e.id);
+    rows.push({
+      id: e.id,
+      ticker: e.ticker || e.market_ticker || '',
+      side: e.side || (e.favSide) || '',
+      entryCents: e.limitCents ?? e.entryCents ?? null,
+      qty: e.qty ?? e.count ?? 1,
+      status: c ? 'closed' : 'open',
+      exitTag: c ? (c.exitTag || null) : null,
+      pnlPct: c ? (c.pnlPct ?? null) : null,
+      openedAt: e.ts || null,
+      closedAt: c ? (c.closedAt || null) : null,
+    });
+  }
+  // newest first by open time (fallback: keep insertion order reversed)
+  rows.sort((a, b) => String(b.openedAt || '').localeCompare(String(a.openedAt || '')));
+  return rows.slice(0, limit);
+}
+
 function openPosition(o) {
   const id = o.id || `paper_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const entry = { event: "open", id, ts: new Date().toISOString(), ...o };
@@ -146,4 +177,4 @@ async function pollOpen() {
   return results;
 }
 
-module.exports = { openPosition, closePosition, getOpen, pollOpen };
+module.exports = { openPosition, closePosition, getOpen, pollOpen, getHistory };
