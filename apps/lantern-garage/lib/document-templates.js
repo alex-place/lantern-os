@@ -40,6 +40,50 @@ ${body}
 </html>`;
 }
 
+// ── Field-shape lenience (Postel's law for tool inputs) ───────────────────────
+// The chat model passes fields in whatever shape is natural for the content it
+// extracted — grouped skills objects, experience with description/years instead
+// of bullets/dates, education with institution/years. Rendering must accept all
+// of them: live finding on PR #1968, a generated resume printed a literal
+// "[object Object]" skills section and dropped every experience bullet.
+function _skillList(s) {
+  if (!s) return [];
+  if (Array.isArray(s)) return s.flat().map((x) => String(x).trim()).filter(Boolean);
+  if (typeof s === "object") {
+    return Object.values(s)
+      .flatMap((v) => (Array.isArray(v) ? v : String(v).split(",")))
+      .map((x) => String(x).trim()).filter(Boolean);
+  }
+  return String(s).split(",").map((x) => x.trim()).filter(Boolean);
+}
+function _expNorm(e) {
+  const o = e || {};
+  let bullets = o.bullets != null ? o.bullets : (o.description != null ? o.description : o.details);
+  bullets = bullets == null ? [] : (Array.isArray(bullets) ? bullets : [bullets]);
+  return {
+    title: o.title || o.role || "",
+    company: o.company || o.employer || "",
+    dates: o.dates || o.years || o.period || "",
+    bullets: bullets.map((b) => String(b).trim()).filter(Boolean),
+  };
+}
+function _eduNorm(e) {
+  const o = e || {};
+  return {
+    degree: o.degree || o.program || "",
+    school: o.school || o.institution || "",
+    year: o.year || o.years || o.dates || "",
+    description: o.description || "",
+  };
+}
+// "**Title** — Company (dates)" with every part optional — no literal
+// "Title"/"Company"/"Year" placeholder defaults leaking into the document.
+function _headline(title, company, dates, bold) {
+  const main = [title, company].filter(Boolean).join(" — ") || "Experience";
+  const b = bold ? `**${main}**` : main;
+  return dates ? `${b} *(${dates})*` : b;
+}
+
 // ── Resume template ───────────────────────────────────────────────────────────
 const resumeTemplate = {
   fields: [
@@ -70,22 +114,23 @@ const resumeTemplate = {
       }
       if (Array.isArray(f.experience) && f.experience.length) {
         md += `## Experience\n`;
-        for (const e of f.experience) {
-          md += `**${e.title || "Title"}** — ${e.company || "Company"} *(${e.dates || "Dates"})*\n`;
-          if (Array.isArray(e.bullets)) {
-            for (const b of e.bullets) md += `- ${b}\n`;
-          }
+        for (const raw of f.experience) {
+          const e = _expNorm(raw);
+          md += `${_headline(e.title, e.company, e.dates, true)}\n`;
+          for (const b of e.bullets) md += `- ${b}\n`;
           md += "\n";
         }
       }
       if (Array.isArray(f.education) && f.education.length) {
         md += `## Education\n`;
-        for (const e of f.education) {
-          md += `**${e.degree || "Degree"}** — ${e.school || "School"} *(${e.year || "Year"})*\n`;
+        for (const raw of f.education) {
+          const e = _eduNorm(raw);
+          md += `${_headline(e.degree, e.school, e.year, true)}\n`;
+          if (e.description) md += `- ${e.description}\n`;
         }
         md += "\n";
       }
-      const skills = Array.isArray(f.skills) ? f.skills : (f.skills ? String(f.skills).split(",").map(s => s.trim()) : []);
+      const skills = _skillList(f.skills);
       if (skills.length) {
         md += `## Skills\n${skills.join(", ")}\n\n`;
       }
@@ -108,20 +153,22 @@ const resumeTemplate = {
     }
     if (Array.isArray(f.experience) && f.experience.length) {
       body += `<h2>Experience</h2>\n`;
-      for (const e of f.experience) {
-        body += `<p><strong>${esc(e.title || "Title")}</strong> — ${esc(e.company || "Company")} <em>(${esc(e.dates || "")})</em></p>\n`;
-        if (Array.isArray(e.bullets) && e.bullets.length) {
+      for (const raw of f.experience) {
+        const e = _expNorm(raw);
+        body += `<p><strong>${esc([e.title, e.company].filter(Boolean).join(" — ") || "Experience")}</strong>${e.dates ? ` <em>(${esc(e.dates)})</em>` : ""}</p>\n`;
+        if (e.bullets.length) {
           body += `<ul>${e.bullets.map(b => `<li>${esc(b)}</li>`).join("")}</ul>\n`;
         }
       }
     }
     if (Array.isArray(f.education) && f.education.length) {
       body += `<h2>Education</h2>\n`;
-      for (const e of f.education) {
-        body += `<p><strong>${esc(e.degree || "Degree")}</strong> — ${esc(e.school || "School")} <em>(${esc(e.year || "")})</em></p>\n`;
+      for (const raw of f.education) {
+        const e = _eduNorm(raw);
+        body += `<p><strong>${esc([e.degree, e.school].filter(Boolean).join(" — ") || "Education")}</strong>${e.year ? ` <em>(${esc(e.year)})</em>` : ""}${e.description ? `<br>${esc(e.description)}` : ""}</p>\n`;
       }
     }
-    const skills = Array.isArray(f.skills) ? f.skills : (f.skills ? String(f.skills).split(",").map(s => s.trim()) : []);
+    const skills = _skillList(f.skills);
     if (skills.length) {
       body += `<h2>Skills</h2><p>${skills.map(esc).join(", ")}</p>\n`;
     }
@@ -158,8 +205,10 @@ const coverLetterTemplate = {
     const company = f.company || "Company";
     const role = f.role || "the role";
     const date = f.date || new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const salutation = f.hiring_manager
-      ? `Dear ${f.hiring_manager},`
+    // Models pass the addressee under several natural names — accept them all.
+    const hiringManager = f.hiring_manager || f.recipient_name || f.recipient || "";
+    const salutation = hiringManager && !/^hiring (manager|team)$/i.test(hiringManager)
+      ? `Dear ${hiringManager},`
       : "Dear Hiring Team,";
     const opening = f.opening
       || `I am writing to express my strong interest in the ${role} position at ${company}.`;
@@ -175,7 +224,7 @@ const coverLetterTemplate = {
       if (f.email) md += `${f.email}\n`;
       if (f.phone) md += `${f.phone}\n`;
       md += `${date}\n\n`;
-      if (f.hiring_manager) md += `${f.hiring_manager}\n${company}\n\n`;
+      if (hiringManager) md += `${hiringManager}\n${company}\n\n`;
       md += `${salutation}\n\n`;
       md += `${opening}\n\n`;
       for (const p of bodyParas) md += `${p}\n\n`;
@@ -188,7 +237,7 @@ const coverLetterTemplate = {
     if (f.email) body += `<br>${esc(f.email)}`;
     if (f.phone) body += `<br>${esc(f.phone)}`;
     body += `<br>${esc(date)}</p>\n`;
-    if (f.hiring_manager) body += `<p>${esc(f.hiring_manager)}<br>${esc(company)}</p>\n`;
+    if (hiringManager) body += `<p>${esc(hiringManager)}<br>${esc(company)}</p>\n`;
     body += `<p>${esc(salutation)}</p>\n`;
     body += `<p>${esc(opening)}</p>\n`;
     for (const p of bodyParas) body += `<p>${esc(p)}</p>\n`;
