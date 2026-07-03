@@ -19,6 +19,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
+  # Derived from the repo so nothing breaks on a fork/rename (was hardcoded
+  # alex-place.github.io/lantern-os in four places).
+  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+  PAGES_PATH: /${{ github.event.repository.name }}
 
 jobs:
   # ── Guard: block RC / prerelease deployments from master ────────────────────
@@ -56,17 +60,17 @@ jobs:
           mkdir -p _site/dream
           cp -r apps/lantern-garage/public/. _site/dream/
 
-          # Root redirect → /dream
-          cat > _site/index.html <<'HTML'
+          # Root redirect → /dream (heredoc is unquoted so ${PAGES_PATH} expands)
+          cat > _site/index.html <<HTML
           <!doctype html>
           <html>
           <head>
             <meta charset="utf-8">
             <title>Lantern OS — Dream Journal</title>
-            <meta http-equiv="refresh" content="0;url=/lantern-os/dream/">
+            <meta http-equiv="refresh" content="0;url=${PAGES_PATH}/dream/">
           </head>
           <body>
-            <p>Redirecting to <a href="/lantern-os/dream/">Dream Journal</a>…</p>
+            <p>Redirecting to <a href="${PAGES_PATH}/dream/">Dream Journal</a>…</p>
           </body>
           </html>
           HTML
@@ -84,7 +88,7 @@ jobs:
       - name: Smoke test deployed URL
         run: |
           sleep 15
-          curl -sfL "https://alex-place.github.io/lantern-os/" \
+          curl -sfL "${PAGES_URL}/" \
             -o /dev/null \
             -w "HTTP %{http_code} — %{size_download} bytes\n" \
             || echo "Smoke test skipped (DNS propagation may take time)"
@@ -104,11 +108,12 @@ jobs:
       - name: Smoke test static endpoints
         run: |
           python3 - << 'EOF'
-          import urllib.request, sys
+          import os, urllib.request, sys
+          base = os.environ["PAGES_URL"]
           urls = [
-              "https://alex-place.github.io/lantern-os/",
-              "https://alex-place.github.io/lantern-os/dream/",
-              "https://alex-place.github.io/lantern-os/dream/dream-chat.html",
+              f"{base}/",
+              f"{base}/dream/",
+              f"{base}/dream/dream-chat.html",
           ]
           ok = 0
           for url in urls:
@@ -135,7 +140,7 @@ jobs:
       - name: Print deploy targets
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✓ GitHub Pages: https://alex-place.github.io/lantern-os/"
-          echo "✓ Dream Journal UI: https://alex-place.github.io/lantern-os/dream/"
-          echo "✓ Dream Chat: https://alex-place.github.io/lantern-os/dream/dream-chat.html"
+          echo "✓ GitHub Pages: ${PAGES_URL}/"
+          echo "✓ Dream Journal UI: ${PAGES_URL}/dream/"
+          echo "✓ Dream Chat: ${PAGES_URL}/dream/dream-chat.html"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

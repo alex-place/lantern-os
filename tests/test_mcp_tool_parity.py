@@ -26,8 +26,10 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
         "Read", "LS", "Glob", "Grep", "Bash", "PowerShell",
         "Write", "Edit", "web_search", "github_issue", "web_fetch",
         "workspace_write", "workspace_read", "workspace_list",
+        "generate_document", "list_document_templates",
         "create_document", "local_eval_keystone_run",
         "list_creator_projects", "analyze_video", "creator_job_status",
+        "trader_market_status", "trader_quote", "trader_positions",
     ]
     assert all(tool["surface_availability"] == {"dream_chat": True, "mcp": True}
                for tool in manifest["tools"])
@@ -80,7 +82,7 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
         lambda: (_ for _ in ()).throw(shared_tool_bridge.SharedToolBridgeError("missing")),
     )
     fallback = shared_tool_bridge.load_manifest()
-    assert len(fallback["tools"]) == 19
+    assert len(fallback["tools"]) == 24
     assert fallback["execution"]["reason"] == "node_bridge_unavailable"
     unavailable = shared_tool_bridge.execute_tool("Read", {"file_path": "package.json"})
     assert unavailable["status"] == "unavailable"

@@ -44,14 +44,16 @@ jobs:
         continue-on-error: true
 
       - name: Validate HFF Repository
-        # Advisory only: this runs lantern's convergence loop against EXTERNAL
-        # repos (human-flourishing-frameworks, etc.) that do not carry lantern's
-        # required surfaces, so a HIGH there must not fail lantern-os CI. The
-        # repo checkouts above are already continue-on-error for the same reason.
-        continue-on-error: true
+        # Findings stay advisory: this runs lantern's convergence loop against
+        # EXTERNAL repos (human-flourishing-frameworks, etc.) that do not carry
+        # lantern's required surfaces, so a HIGH there must not fail lantern-os CI.
+        # But the step no longer hides behind continue-on-error — it now fails when
+        # it validated NOTHING, because previously every checkout could fail and
+        # the workflow still reported success while having done zero work.
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $validated = 0
           $ragIndex = Get-Content lantern-os/manifests/TMP-REPO-RAG-INDEX.json | ConvertFrom-Json
           foreach ($repo in $ragIndex.ciCdCheckout) {
             $localPath = $repo.path
@@ -66,14 +68,19 @@ jobs:
                   Write-Host "::warning:: $($repo.repo): $($results.issues.Count) issues found"
                 }
                 if ($results.issues | Where-Object { $_.severity -eq 'HIGH' }) {
-                  throw "HIGH severity issues in $($repo.repo). Fix before claiming convergence."
+                  Write-Host "::warning:: HIGH severity issues in $($repo.repo) (advisory - external repo)."
                 }
+                $validated++
                 cd ..
               }
             } else {
               Write-Host "::warning:: $($repo.repo) not checked out. Skipping validation."
             }
           }
+          if ($validated -eq 0) {
+            throw "No external repos were validated - every checkout failed or was skipped."
+          }
+          Write-Host "Validated $validated external repo(s)."
 
       - name: Upload Validation Results
         uses: actions/upload-artifact@v7

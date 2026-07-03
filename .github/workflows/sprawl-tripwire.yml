@@ -10,6 +10,10 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: sprawl-tripwire-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sprawl-tripwire:
     name: New surfaces must justify a loop stage
@@ -20,7 +24,7 @@ jobs:
           fetch-depth: 0
       - name: Fetch base branch
         run: git fetch origin master
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
       - name: Run sprawl tripwire

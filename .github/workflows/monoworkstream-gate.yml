@@ -23,6 +23,10 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+concurrency:
+  group: monoworkstream-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gate:
     name: Single-workstream check
