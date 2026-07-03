@@ -5,7 +5,7 @@
  * concerns:
  *
  *   1. Feature flags  — named on/off switches an admin can create and toggle.
- *      Consumed client-side via `data-flag="<key>"` elements (see shared-header.js)
+ *      Consumed client-side via `data-flag="<key>"` elements (see auth-gate.js)
  *      and server-side via isFlagEnabled(key).
  *
  *   2. Navigation visibility — per-page { hidden, disabled } overrides for the
@@ -31,8 +31,10 @@ const STORE_PATH = path.join(STORE_DIR, "feature-flags.json");
 
 /**
  * Canonical navigation pages, keyed by the href the global header renders.
- * The admin page lists exactly these, so the page set stays in lock-step with
- * the links in public/js/shared-header.js. Add a page here + a link there.
+ * The admin page lists exactly these. This set must stay in lock-step with the
+ * links the header renders — the inline `.nav-links` in public/index.html.
+ * assertNavInSync() (called at server startup) warns at boot if they drift (#1880).
+ * Add a page here + a link there.
  */
 const NAV_PAGES = [
   { path: "/dream-chat.html",        label: "Chat" },
@@ -271,6 +273,63 @@ function normalizeKey(key) {
   return RESERVED_KEYS.has(k) ? "" : k;
 }
 
+/**
+ * Extract the canonical nav entries the global header actually renders — the
+ * internal-page anchors inside `<div class="nav-links">…</div>` in index.html.
+ * Returns [{ path, label }]. External links (Patreon) are skipped. This is the
+ * one source the header renders from, so NAV_PAGES is validated against it
+ * rather than against a hand-kept second copy. Returns null if index.html or
+ * the nav-links block can't be read (assertion then no-ops, fail-open).
+ */
+function readHeaderNavEntries() {
+  try {
+    const indexPath = path.join(REPO_ROOT, "apps", "lantern-garage", "public", "index.html");
+    const html = fs.readFileSync(indexPath, "utf8");
+    const block = html.match(/<div class="nav-links">([\s\S]*?)<\/div>/i);
+    if (!block) return null;
+    const entries = [];
+    const anchorRe = /<a\s+href="(\/[^"]*\.html)"[^>]*>([^<]*)<\/a>/gi;
+    let m;
+    while ((m = anchorRe.exec(block[1])) !== null) {
+      entries.push({ path: m[1], label: m[2].trim() });
+    }
+    return entries;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Startup assertion (#1880): warn if NAV_PAGES has drifted out of lock-step with
+ * the links the global header renders (index.html .nav-links). Non-fatal — logs
+ * the specific drift so a page added to one list but not the other is caught at
+ * boot instead of silently breaking nav visibility / flag gating.
+ * Returns { ok, problems[] } for testability.
+ */
+function assertNavInSync(log = console.warn) {
+  const header = readHeaderNavEntries();
+  if (!header) return { ok: true, problems: [], skipped: true };
+
+  const problems = [];
+  const navByPath = new Map(NAV_PAGES.map((p) => [p.path, p.label]));
+  const hdrByPath = new Map(header.map((p) => [p.path, p.label]));
+
+  for (const { path: p, label } of header) {
+    if (!navByPath.has(p)) problems.push(`header link ${p} ("${label}") missing from NAV_PAGES`);
+    else if (navByPath.get(p) !== label) {
+      problems.push(`label drift for ${p}: header "${label}" vs NAV_PAGES "${navByPath.get(p)}"`);
+    }
+  }
+  for (const { path: p, label } of NAV_PAGES) {
+    if (!hdrByPath.has(p)) problems.push(`NAV_PAGES entry ${p} ("${label}") has no header link in index.html`);
+  }
+
+  if (problems.length) {
+    log(`[feature-flags] NAV_PAGES out of sync with header nav (#1880):\n  - ${problems.join("\n  - ")}`);
+  }
+  return { ok: problems.length === 0, problems };
+}
+
 /** Test/maintenance hook: drop the in-memory cache so the next read re-loads. */
 function _resetCache() {
   _cache = null;
@@ -291,5 +350,7 @@ module.exports = {
   isPageDisabled,
   setNavEntry,
   normalizeKey,
+  readHeaderNavEntries,
+  assertNavInSync,
   _resetCache,
 };

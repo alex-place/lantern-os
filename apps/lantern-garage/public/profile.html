@@ -152,6 +152,12 @@
       border-radius: 16px; padding: 32px; max-width: 440px; width: 90%;
     }
     .modal h2 { margin: 0 0 24px; font-size: 18px; }
+    .form-error {
+      margin-bottom: 16px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(220, 38, 38, 0.12);
+      border: 1px solid rgba(220, 38, 38, 0.45);
+      color: #dc2626; font-size: 13px; line-height: 1.4;
+    }
     .form-row { margin-bottom: 16px; }
     .form-row label {
       display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em;
@@ -212,6 +218,7 @@
   <div class="modal">
     <h2>Edit Profile</h2>
     <form id="edit-form" onsubmit="saveProfile(event)">
+      <div id="edit-error" class="form-error" role="alert" hidden></div>
       <div class="form-row">
         <label>Display Name</label>
         <input type="text" id="edit-name" maxlength="80" autocomplete="name">
@@ -328,7 +335,20 @@ function renderProfile(profile) {
   `;
 }
 
+function showEditError(msg) {
+  const el = document.getElementById('edit-error');
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+function clearEditError() {
+  const el = document.getElementById('edit-error');
+  el.textContent = '';
+  el.hidden = true;
+}
+
 function openEdit() {
+  clearEditError();
   document.getElementById('edit-name').value = currentProfile?.name || '';
   document.getElementById('edit-bio').value  = currentProfile?.bio  || '';
   document.getElementById('edit-modal').classList.add('open');
@@ -342,6 +362,7 @@ async function saveProfile(e) {
   e.preventDefault();
   const btn = e.submitter || e.target.querySelector('[type=submit]');
   btn.textContent = 'Saving…'; btn.disabled = true;
+  clearEditError();
   try {
     const res = await fetch('/api/profiles/me', {
       method: 'PUT', credentials: 'include',
@@ -351,12 +372,19 @@ async function saveProfile(e) {
         bio:  document.getElementById('edit-bio').value.trim(),
       }),
     });
-    if (!res.ok) throw new Error('Save failed');
+    if (!res.ok) {
+      let detail = `Save failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body && (body.error || body.message)) detail = body.error || body.message;
+      } catch { /* non-JSON body; keep status-based message */ }
+      throw new Error(detail);
+    }
     currentProfile = await res.json();
     closeEdit();
     renderProfile(currentProfile);
   } catch (err) {
-    alert('Could not save: ' + err.message);
+    showEditError(err.message || 'Could not save your changes.');
   } finally {
     btn.textContent = 'Save'; btn.disabled = false;
   }
