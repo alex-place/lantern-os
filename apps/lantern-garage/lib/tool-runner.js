@@ -420,6 +420,47 @@ const REGISTRY = {
     },
   },
 
+  // ── System status (Observe/Verify) — a LIVE, guest-safe health probe ────────
+  // Closes the Σ₀ fabricated-grounding gap: before this, "is the MCP server
+  // connected?" had NO tool to call, so the model guessed ("offline") from the
+  // docs while the port was actually up — and the UI stamped "grounded" on it.
+  // This MEASURES instead: a real GET /health of the MCP server (127.0.0.1:8771
+  // via mcp-client), the chat server's own uptime, and which providers hold
+  // credentials (presence booleans only — never secret values). No secrets are
+  // exposed → guest_safe like web_fetch. The model must cite THIS result.
+  system_status: {
+    policy: "read",
+    guest_safe: true,
+    desc: "Report the LIVE health of this system: whether the MCP server (127.0.0.1:8771) is up (real /health probe), the chat server's own uptime, and which AI providers have credentials configured (presence booleans only — never secret values). Use this WHENEVER the user asks whether the server, the MCP server, a provider, or the system is connected / up / online / running / working / healthy. It performs a real check — answer from THIS result, never from memory or documentation.",
+    schema: { type: "object", properties: {} },
+    async run() {
+      const lines = [];
+      // 1) MCP server — real GET /health on 127.0.0.1:8771 (2s timeout, 5s cache).
+      let mcpUp = false;
+      try { mcpUp = await require("./mcp-client").isAvailable(); }
+      catch { mcpUp = false; }
+      lines.push(`MCP server (127.0.0.1:8771): ${mcpUp
+        ? "UP — /health responded"
+        : "DOWN — /health did not respond (start it with: python src/mcp_server/server.py)"}`);
+      // 2) This chat server — if this tool is running, the Node server is up.
+      const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
+      lines.push(`Chat server (127.0.0.1:${port}): UP — uptime ${Math.round(process.uptime())}s`);
+      // 3) Provider credentials — presence booleans only (mirrors status.js api_keys).
+      const providers = {
+        anthropic: !!process.env.ANTHROPIC_API_KEY,
+        openai: !!process.env.OPENAI_API_KEY,
+        gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+        xai: !!process.env.XAI_API_KEY,
+      };
+      const on = Object.keys(providers).filter((k) => providers[k]);
+      const off = Object.keys(providers).filter((k) => !providers[k]);
+      lines.push(`AI providers with credentials: ${on.length ? on.join(", ") : "none"}${off.length ? ` · missing: ${off.join(", ")}` : ""}`);
+      // 4) Chat tool execution state (this very loop).
+      lines.push(`Chat tool execution (CHAT_TOOL_EXEC): ${process.env.CHAT_TOOL_EXEC === "1" ? "ON" : "OFF"}`);
+      return lines.join("\n");
+    },
+  },
+
   // ── ADR-0008 user workspace tools ──────────────────────────────────────────
   workspace_write: {
     policy: "mutating",
