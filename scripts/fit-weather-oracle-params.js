@@ -33,7 +33,6 @@ const path = require("path");
 const https = require("https");
 
 const OUT_PATH = path.resolve(__dirname, "../data/kalshi/weather-oracle-params.json");
-const EASTERN_SUMMER_OFFSET_H = -4; // EDT; fit window is summer only, so a fixed offset is fine.
 
 // Normals mirror kalshi-weather-edge.NORMAL_HIGH_F for the anomaly term (extended flat = 84).
 const NORMAL_HIGH_F = {
@@ -43,46 +42,9 @@ const NORMAL_HIGH_F = {
 const DEFAULT_NORMAL = 84.0;
 const normalFor = (mmdd) => (NORMAL_HIGH_F[mmdd] == null ? DEFAULT_NORMAL : NORMAL_HIGH_F[mmdd]);
 
-// ── CSV parsing (pure) ─────────────────────────────────────────────────────────
-
-function parseCsv(text) {
-  const lines = String(text || "").trim().split(/\r?\n/).filter((l) => l && !l.startsWith("#"));
-  if (lines.length < 2) return [];
-  const head = lines[0].split(",").map((h) => h.trim());
-  return lines.slice(1).map((ln) => {
-    const cells = ln.split(",");
-    const row = {};
-    head.forEach((h, i) => { row[h] = cells[i] == null ? "" : cells[i].trim(); });
-    return row;
-  });
-}
-
-/** Shift an ISO/space UTC timestamp by offsetH hours and return the local YYYY-M-D and mmdd. */
-function localDayOf(tsUtc, offsetH = EASTERN_SUMMER_OFFSET_H) {
-  const s = String(tsUtc).replace(" ", "T").replace(/Z?$/, "Z");
-  const t = Date.parse(s);
-  if (!Number.isFinite(t)) return null;
-  const d = new Date(t + offsetH * 3600 * 1000);
-  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, day = d.getUTCDate();
-  return { key: `${y}-${m}-${day}`, mmdd: `${m}-${day}`, y, m, day };
-}
-
-/** MOS NBS rows -> {runtimeKey -> {targetDayKey -> forecastHigh}} (max hourly tmp per local day). */
-function mosForecastHighs(rows) {
-  const byRun = new Map();
-  for (const r of rows) {
-    const tmp = parseFloat(r.tmp);
-    if (!Number.isFinite(tmp)) continue;
-    const run = localDayOf(r.runtime);
-    const tgt = localDayOf(r.ftime);
-    if (!run || !tgt) continue;
-    if (!byRun.has(run.key)) byRun.set(run.key, { run, days: new Map() });
-    const days = byRun.get(run.key).days;
-    const cur = days.get(tgt.key);
-    if (!cur || tmp > cur.high) days.set(tgt.key, { tgt, high: tmp });
-  }
-  return byRun;
-}
+// CSV/day/MOS parsing lives in the serving lib (kalshi-mos) so fit == serve BY CONSTRUCTION —
+// the fit and the live deck use one identical forecast-high definition.
+const { parseCsv, localDayOf, mosForecastHighs } = require("../apps/lantern-garage/lib/kalshi-mos");
 
 /** ASOS hourly tmpf rows -> {localDayKey -> settledHigh}. Accepts columns station,valid,tmpf. */
 function asosDailyHighs(rows) {

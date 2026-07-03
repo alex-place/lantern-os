@@ -80,15 +80,7 @@ function loadParams(file = PARAMS_PATH) {
 }
 
 const PARAMS = loadParams();
-
-const COOL_BIAS_F = PARAMS.coolBiasF;
-const REGRESSION_K = PARAMS.regressionK;
-const SIGMA_BASE_F = PARAMS.sigmaBaseF;
-const SIGMA_PER_LEAD_F = PARAMS.sigmaPerLeadF;
-const SIGMA_NOWCAST_F = PARAMS.sigmaNowcastF;
-const MEAN_UNC_F = PARAMS.meanUncF;
-const SIGMA_LO = PARAMS.sigmaLo, SIGMA_HI = PARAMS.sigmaHi;
-const CEILING_TABLE = PARAMS.ceilingTable;
+const CEILING_TABLE = PARAMS.ceilingTable; // exported for callers that inspect the live ceiling
 
 // ── math (no deps) ────────────────────────────────────────────────────────────
 function erf(x) {
@@ -114,14 +106,14 @@ function normalHigh(month, day) {
   return v == null ? DEFAULT_SUMMER_NORMAL_F : v;
 }
 
-function calibratedMean(forecastHigh, month, day) {
+function calibratedMean(forecastHigh, month, day, P = PARAMS) {
   const anomaly = forecastHigh - normalHigh(month, day);
-  return forecastHigh - COOL_BIAS_F - REGRESSION_K * Math.max(0, anomaly);
+  return forecastHigh - P.coolBiasF - P.regressionK * Math.max(0, anomaly);
 }
 
-function sigmaForLead(leadDays) {
-  if (leadDays <= 0) return SIGMA_NOWCAST_F;
-  return SIGMA_BASE_F + SIGMA_PER_LEAD_F * (leadDays - 1);
+function sigmaForLead(leadDays, P = PARAMS) {
+  if (leadDays <= 0) return P.sigmaNowcastF;
+  return P.sigmaBaseF + P.sigmaPerLeadF * (leadDays - 1);
 }
 
 function bucketJustBelow100(ladder) {
@@ -133,7 +125,7 @@ function bucketJustBelow100(ladder) {
 }
 
 /** P(high in bucket) for an explicit (mean, sigma), with the >=100 F ceiling enforced. */
-function distribution(mean, sigma, ladder, forecastHigh) {
+function distribution(mean, sigma, ladder, forecastHigh, P = PARAMS) {
   const band = (lo, hi) => {
     const plo = lo != null ? normCdf(((lo - 0.5) - mean) / sigma) : 0;
     const phi = hi != null ? normCdf(((hi + 0.5) - mean) / sigma) : 1;
@@ -142,7 +134,7 @@ function distribution(mean, sigma, ladder, forecastHigh) {
   const dist = {};
   for (const [lbl, lo, hi] of ladder) dist[lbl] = band(lo, hi);
 
-  const ceiling = interp(CEILING_TABLE, forecastHigh);
+  const ceiling = interp(P.ceilingTable, forecastHigh);
   const above = ladder.filter(([, lo]) => lo != null && lo >= 100).map(([lbl]) => lbl);
   const rawAbove = above.reduce((s, l) => s + dist[l], 0);
   if (above.length && rawAbove > ceiling) {
@@ -158,15 +150,15 @@ function distribution(mean, sigma, ladder, forecastHigh) {
   return out;
 }
 
-function calibratedDistribution(forecastHigh, leadDays, ladder, month = 7, day = 1) {
-  return distribution(calibratedMean(forecastHigh, month, day), sigmaForLead(leadDays), ladder, forecastHigh);
+function calibratedDistribution(forecastHigh, leadDays, ladder, month = 7, day = 1, P = PARAMS) {
+  return distribution(calibratedMean(forecastHigh, month, day, P), sigmaForLead(leadDays, P), ladder, forecastHigh, P);
 }
 
-function calibrationBand(forecastHigh, leadDays, month, day) {
-  const m = calibratedMean(forecastHigh, month, day), s = sigmaForLead(leadDays);
+function calibrationBand(forecastHigh, leadDays, month, day, P = PARAMS) {
+  const m = calibratedMean(forecastHigh, month, day, P), s = sigmaForLead(leadDays, P);
   const out = [[m, s]];
-  for (const dm of [-MEAN_UNC_F, 0, MEAN_UNC_F]) {
-    for (const fs of [SIGMA_LO, SIGMA_HI]) out.push([m + dm, s * fs]);
+  for (const dm of [-P.meanUncF, 0, P.meanUncF]) {
+    for (const fs of [P.sigmaLo, P.sigmaHi]) out.push([m + dm, s * fs]);
   }
   return out;
 }
@@ -187,9 +179,9 @@ function bestSideNet(fair, ask) {
  * only if the side is identical across all band scenarios AND the worst-case net edge
  * still clears fees + minEdgeCents. worst_c is what you can rely on; best_c the corner.
  */
-function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, day = 1, minEdgeCents = 5) {
-  const scen = calibrationBand(forecastHigh, leadDays, month, day);
-  const dists = scen.map(([m, s]) => distribution(m, s, ladder, forecastHigh));
+function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, day = 1, minEdgeCents = 5, P = PARAMS) {
+  const scen = calibrationBand(forecastHigh, leadDays, month, day, P);
+  const dists = scen.map(([m, s]) => distribution(m, s, ladder, forecastHigh, P));
   const nominal = dists[0];
   const rows = [], actionable = [];
   for (const [lbl] of ladder) {
@@ -239,23 +231,35 @@ function selfTest() {
   const JUL1_ASK = { "<=91": .09, "92-93": .27, "94-95": .45, "96-97": .20, "98-99": .06, ">=100": .01 };
   const HOT_ASK = { "<=95": .05, "96-97": .12, "98-99": .18, "100-101": .40, ">=102": .18 };
 
-  const d1 = calibratedDistribution(96, 1, JUL1);
-  if (!(d1[">=100"] < 0.03)) fails.push(`Jul1 P(>=100)=${d1[">=100"].toFixed(3)} not <0.03`);
+  // Test the MODEL LOGIC against the ORIGINAL hand-anchored constants (DEFAULT_PARAMS),
+  // independent of whatever fitted params are deployed — otherwise a promoted params file
+  // (which legitimately shifts behavior) would break this smoke test. Deployed-params
+  // behavior is validated out-of-sample by scripts/validate-weather-oracle-fit.js instead.
+  const D = DEFAULT_PARAMS;
+
+  const d1 = calibratedDistribution(96, 1, JUL1, 7, 1, D);
+  if (!(d1[">=100"] < 0.031)) fails.push(`Jul1 P(>=100)=${d1[">=100"].toFixed(3)} not <0.031`);
   const modal1 = Object.keys(d1).reduce((a, b) => d1[a] >= d1[b] ? a : b);
   if (modal1 !== "94-95") fails.push(`Jul1 modal=${modal1} not 94-95`);
 
-  const r1 = robustEdgeReport(96, 1, JUL1, JUL1_ASK);
+  const r1 = robustEdgeReport(96, 1, JUL1, JUL1_ASK, 7, 1, 5, D);
   if (r1.actionable.length) fails.push(`Jul1 should be no-edge, got ${r1.verdict}`);
 
-  const d3 = calibratedDistribution(102, 3, HOT);
+  const d3 = calibratedDistribution(102, 3, HOT, 7, 1, D);
   const p100 = d3["100-101"] + d3[">=102"];
   if (!(p100 > 0.05 && p100 < 0.20)) fails.push(`Jul3 P(>=100)=${p100.toFixed(3)} outside (0.05,0.20)`);
 
-  const r3 = robustEdgeReport(102, 3, HOT, HOT_ASK);
+  const r3 = robustEdgeReport(102, 3, HOT, HOT_ASK, 7, 1, 5, D);
   const fade = r3.actionable.find((r) => r.bucket === "100-101");
   if (!(fade && fade.side === "no" && fade.worst_c > 15)) fails.push(`hot-day fade not robust: ${JSON.stringify(fade)}`);
 
   if (kalshiFeeCents(0.40) !== 2 || kalshiFeeCents(0.09) !== 1) fails.push("fee formula off");
+
+  // Params MUST flow through: a warmer coolBias raises the calibrated mean.
+  const warm = { ...D, coolBiasF: -1.5 };
+  if (!(calibratedMean(96, 7, 1, warm) > calibratedMean(96, 7, 1, D) + 2)) {
+    fails.push("params override not threaded into calibratedMean");
+  }
 
   return { ok: fails.length === 0, fails };
 }
