@@ -1322,8 +1322,14 @@ async function act(dir,fromSwipe){
     if(card.favAsk==null){ blockTake('No live ask — cannot trade'); return; }
     busy=true;
     try{
+      // Live fill = REAL money → require an explicit per-order confirmation on top of
+      // the server's kill-switch/scope gates (defense-in-depth). When live isn't
+      // tradable this is a no-op; the server dry-runs regardless.
+      const canLive=!!(acctState.conn&&acctState.conn.canTradeLive);
+      const confirmLive = canLive ? window.confirm(`LIVE order — REAL money.\n\n${card.favSide==='yes'?'YES':'NO'} @ ${card.favAsk}¢ · 1 contract\n${card.ticker}\n\nPlace it?`) : false;
+      if(canLive && !confirmLive){ blockTake('Live order cancelled'); return; }
       const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
-        source:'kalshi-weather-edge', grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
+        source:'kalshi-weather-edge', confirmLive, grounded_confidence:card.grounded_confidence, grounded_p_yes:card.grounded_p_yes};
       const res=await j('/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
       showResult(res,card);            // live / dry-run toast
       idx++; render();

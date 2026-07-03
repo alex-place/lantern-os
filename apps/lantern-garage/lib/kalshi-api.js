@@ -258,6 +258,18 @@ async function placeOrder(o) {
   const scope = liveScopeSources();
   if (scope && !scope.has(o.source)) {
     blockers.push(`out_of_live_scope (source=${o.source || "none"}; live-allowed=${[...scope].join(",")})`);
+  } else if (o.source === "kalshi-weather-edge" && !/^KXHIGH/i.test(String(o.ticker || ""))) {
+    // Defense-in-depth: `source` is a CLIENT-supplied label, so a mislabeled order
+    // could otherwise borrow the weather-edge live allowance for an arbitrary market.
+    // Independently verify server-side that the ticker really is a weather market.
+    blockers.push(`source_ticker_mismatch (source=kalshi-weather-edge but ticker='${o.ticker}' is not a KXHIGH* weather market)`);
+  }
+
+  // Explicit-confirm gate: a LIVE fill must carry confirmLive:true, set by the caller
+  // only after a deliberate confirmation. The global kill switch is no longer the ONLY
+  // thing between a stray/auto/mislabeled request and a real order (fails safe to dry-run).
+  if (o.confirmLive !== true) {
+    blockers.push("live_confirm_required (order must carry confirmLive:true, set only after explicit confirmation)");
   }
 
   // Hard contract cap for live orders — a live order is clamped to at most this many.
