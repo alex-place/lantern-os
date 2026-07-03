@@ -81,6 +81,11 @@ jobs:
             throw "No external repos were validated - every checkout failed or was skipped."
           }
           Write-Host "Validated $validated external repo(s)."
+          # Invoke-LanternConvergenceLoop.ps1 exits 1 when a repo has findings,
+          # which leaves $LASTEXITCODE=1 and fails the step even though external
+          # findings are advisory by design. Reset it: reaching here means the
+          # step's own contract (validated >= 1) was met.
+          exit 0
 
       - name: Upload Validation Results
         uses: actions/upload-artifact@v7

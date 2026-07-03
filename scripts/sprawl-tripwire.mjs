@@ -3,7 +3,7 @@
  * sprawl-tripwire — every NEW public surface must justify itself with a loop stage (#1561).
  *
  * The grade card flagged: "nothing stops scope from silently regrowing after a cleanup."
- * anti-sprawl.yml already caps new file / top-level-dir counts; find-orphan-pages.mjs finds
+ * pr-gates.yml (anti-sprawl job) already caps new file / top-level-dir counts; find-orphan-pages.mjs finds
  * unlinked pages. The missing piece is *justification*: a PR that adds a new public page
  * (a new surface) must say which stage of the loop — Observe / Remember / Reason / Act /
  * Verify / Converge — that surface strengthens. A page with no declared loop stage is
