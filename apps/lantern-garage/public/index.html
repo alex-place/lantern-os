@@ -53,14 +53,11 @@
     }
     /* Top zone — brand sits near the top */
     .home-top { align-self: start; width: 100%; text-align: center; padding-top: clamp(8px, 3vh, 36px); }
-    /* Middle zone — the search bar, vertically centered in the screen */
+    /* Middle zone — the search bar, vertically centered in the screen.
+       The former bottom zone (duplicate version meta + Trader/Create/Explore
+       quick-links) was merged into the single site footer below, so the grid's
+       third 1fr track is now an empty spacer that keeps the chat centered. */
     .home-mid { align-self: center; width: 100%; }
-    /* Bottom zone — version meta + quick links settle toward the footer */
-    .home-bottom {
-      align-self: end; width: 100%;
-      display: flex; flex-direction: column; gap: 14px;
-      padding-bottom: clamp(6px, 2vh, 24px);
-    }
     .hero { position: relative; text-align: center; padding: 0; }
     /* Hero mandala — the same self-contained animated SVG used in the header,
        sized up and centered above the title. Renders reliably in Chrome
@@ -164,30 +161,11 @@
       flex-shrink: 0;
     }
     .home-file-chip button:hover { color: var(--text); }
-    /* ── Quick links — compact destinations beneath the chat.
-       Replaces the oversized secondary card panels: the home is chat-first,
-       so Trader / Create / Explore are now a small de-emphasized link row that
-       sits inside the vertically-centered hero stack. ── */
-    .home-links {
-      display: flex; flex-wrap: wrap;
-      justify-content: center; align-items: center;
-      gap: 6px 24px;
-    }
-    .home-links a {
-      display: inline-flex; align-items: center; gap: 7px;
-      color: var(--muted); text-decoration: none;
-      font-size: 0.95rem; font-weight: 500; letter-spacing: 0.01em;
-      padding: 5px 4px;
-      border-bottom: 1.5px solid transparent;
-      transition: color .16s, border-color .16s;
-    }
-    .home-links a:hover { color: var(--text); border-bottom-color: var(--tile, var(--accent)); }
-    .home-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-    .home-links .glyph { color: var(--tile, var(--accent)); font-size: 0.8rem; line-height: 1; }
-    .home-links .tile-trader  { --tile: #10b981; }   /* emerald — markets */
-    .home-links .tile-create  { --tile: #a78bfa; }   /* violet  — studio  */
-    .home-links .tile-explore { --tile: #06b6d4; }   /* cyan    — archive */
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
+    /* Footer version/edition line — sits under the nav row as a second, more
+       muted line so the footer carries the meta that used to live in a
+       separate .home-bottom block above it. */
+    .footer-meta { flex-basis: 100%; text-align: center; font-size: 0.78rem; margin-top: 2px; }
     /* ── Narrow viewports (phones) ──
        The one-line pill can't hold attach + input + provider-pin + submit at
        ~360px, so the submit button slid off-screen (clipped by overflow:hidden).
@@ -204,8 +182,7 @@
       .home-chat button[type="submit"] { margin-left: 2px; padding: 9px 15px; }
       .home-attach-btn { width: 34px; height: 34px; font-size: 20px; }
       .home-file-chip { max-width: 100%; }
-      .home-links { gap: 6px 20px; }
-      .home-links a { font-size: 0.9rem; }
+      .footer-meta { font-size: 0.72rem; }
     }
     /* Fallback: on short viewports (small laptops, phones) let the page scroll
        and stack the three zones naturally instead of forcing the centered grid. */
@@ -292,16 +269,6 @@
     </div>
   </div>
 
-  <!-- ── Bottom: version meta + quick links (moved down) ── -->
-  <div class="home-bottom">
-    <p class="sub" style="text-align:center;margin:0;"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></p>
-    <nav class="home-links" aria-label="More from unisona.ai">
-      <a class="tile-trader" href="/stock-trader.html"><span class="glyph" aria-hidden="true">▲</span>Trader</a>
-      <a class="tile-create" href="/create.html"><span class="glyph" aria-hidden="true">✦</span>Create</a>
-      <a class="tile-explore" href="/explore.html"><span class="glyph" aria-hidden="true">◎</span>Explore</a>
-    </nav>
-  </div>
-
 </main>
 
 <!-- ── Site footer ── -->
@@ -321,6 +288,7 @@
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
     <span class="visually-hidden" id="status-label">connecting…</span>
+    <span class="footer-meta"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></span>
   </div>
 </footer>
 <script src="/js/theme-toggle.js"></script>
