@@ -582,6 +582,25 @@ server.listen(port, host, () => {
     console.error("[auto-dispatch] failed to start (non-fatal):", e && e.message);
   }
 
+  // ── Boot-time queue reconcile: sweep stale assigned claims ──
+  // auto-dispatch writes a claim file per issue it opens a draft PR for and never
+  // removes it; when the issue later closes the claim lingers and inflates the
+  // orchestration dashboard's "In Progress" count (75 leaked closed-issue claims was
+  // the trigger for this). Sweep closed/stale claims once at boot. Deferred off the
+  // critical boot path so the `gh` open-issue lookup never blocks the listen.
+  setTimeout(() => {
+    try {
+      const q = require("./routes/queue");
+      const rr = require("path").resolve(__dirname, "../..");
+      const open = q.loadOpenIssues(rr);
+      const openNums = open && open.openNumbers ? new Set(open.openNumbers) : null;
+      const swept = q.sweepStaleAssigned(rr, { openIssueNumbers: openNums });
+      if (swept.length) console.log(`[queue] boot reconcile: swept ${swept.length} stale assigned claim(s) (${openNums ? "issue-closed + age" : "age-only, gh unavailable"})`);
+    } catch (e) {
+      console.error("[queue] boot reconcile failed (non-fatal):", e && e.message);
+    }
+  }, 8000);
+
   // ── Market/trading background loops ─────────────────────────────────────────
   // These 24/7 collectors + convergence loops start on every boot. The desktop
   // launcher (docs/adr/0014) runs the Core purely for chat and sets
