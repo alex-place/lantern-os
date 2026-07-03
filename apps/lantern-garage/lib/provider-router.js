@@ -116,7 +116,9 @@ function providerHasKey(provider) {
   switch (String(provider || "").toLowerCase()) {
     case "anthropic": return !!env.ANTHROPIC_API_KEY;
     case "openai": return !!env.OPENAI_API_KEY;
-    case "gemini": return !!(env.GEMINI_API_KEY || env.GOOGLE_API_KEY);
+    // Gemini is also reachable keyless via Vertex AI (ADC billing to the Cloud
+    // project — the funded path); see lib/gemini-transport.js useVertex().
+    case "gemini": return !!(env.GEMINI_API_KEY || env.GOOGLE_API_KEY || env.GEMINI_USE_VERTEX === "1" || env.VERTEX_PROJECT);
     case "xai": case "grok": return !!env.XAI_API_KEY;
     case "mistral": return !!env.MISTRAL_API_KEY;
     case "cohere": return !!env.COHERE_API_KEY;
