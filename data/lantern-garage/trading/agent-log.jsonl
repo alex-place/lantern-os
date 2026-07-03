@@ -744,3 +744,32 @@
 {"id":"scan_2026-06-28T02:56:17.975026Z_summary","agent":"scanner","action":"Scanned 16 tickers — 0 signals","symbol":"","timestamp":"2026-06-28T02:56:17.975026Z"}
 {"id":"scan_2026-06-28T02:57:23.891755Z_summary","agent":"scanner","action":"Scanned 16 tickers — 0 signals","symbol":"","timestamp":"2026-06-28T02:57:23.891755Z"}
 {"id":"scan_2026-06-28T02:57:23.891755Z_summary","agent":"scanner","action":"Scanned 16 tickers — 0 signals","symbol":"","timestamp":"2026-06-28T02:57:23.891755Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_summary","agent":"scanner","action":"Scanned 16 tickers — 13 signals","symbol":"","timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_SPY","agent":"scanner","action":"BULLISH","symbol":"SPY","confidence":100,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_NVDA","agent":"scanner","action":"BULLISH","symbol":"NVDA","confidence":100,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_AMD","agent":"scanner","action":"BULLISH","symbol":"AMD","confidence":100,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_AMZN","agent":"scanner","action":"BEARISH","symbol":"AMZN","confidence":100,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_SHOP","agent":"scanner","action":"BULLISH","symbol":"SHOP","confidence":93,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_META","agent":"scanner","action":"BULLISH","symbol":"META","confidence":93,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_GLD","agent":"scanner","action":"BULLISH","symbol":"GLD","confidence":91,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_BTCUSD","agent":"scanner","action":"BEARISH","symbol":"BTCUSD","confidence":71,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_SOLUSD","agent":"scanner","action":"BEARISH","symbol":"SOLUSD","confidence":68,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_MSFT","agent":"scanner","action":"BULLISH","symbol":"MSFT","confidence":63,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_JPM","agent":"scanner","action":"BEARISH","symbol":"JPM","confidence":63,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_TSLA","agent":"scanner","action":"BEARISH","symbol":"TSLA","confidence":58,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T17:27:26.024Z_INTC","agent":"scanner","action":"BEARISH","symbol":"INTC","confidence":58,"timestamp":"2026-07-03T17:27:26.024Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_summary","agent":"scanner","action":"Scanned 16 tickers — 14 signals","symbol":"","timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_SPY","agent":"scanner","action":"BULLISH","symbol":"SPY","confidence":100,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_NVDA","agent":"scanner","action":"BULLISH","symbol":"NVDA","confidence":100,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_AMD","agent":"scanner","action":"BULLISH","symbol":"AMD","confidence":100,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_AMZN","agent":"scanner","action":"BEARISH","symbol":"AMZN","confidence":100,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_SHOP","agent":"scanner","action":"BULLISH","symbol":"SHOP","confidence":93,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_META","agent":"scanner","action":"BULLISH","symbol":"META","confidence":93,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_GLD","agent":"scanner","action":"BULLISH","symbol":"GLD","confidence":91,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_MSFT","agent":"scanner","action":"BULLISH","symbol":"MSFT","confidence":63,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_JPM","agent":"scanner","action":"BEARISH","symbol":"JPM","confidence":63,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_SOLUSD","agent":"scanner","action":"BEARISH","symbol":"SOLUSD","confidence":63,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_ETHUSD","agent":"scanner","action":"BEARISH","symbol":"ETHUSD","confidence":61,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_TSLA","agent":"scanner","action":"BEARISH","symbol":"TSLA","confidence":58,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_INTC","agent":"scanner","action":"BEARISH","symbol":"INTC","confidence":58,"timestamp":"2026-07-03T18:18:12.816Z"}
+{"id":"scan_2026-07-03T18:18:12.816Z_BTCUSD","agent":"scanner","action":"BEARISH","symbol":"BTCUSD","confidence":47,"timestamp":"2026-07-03T18:18:12.816Z"}

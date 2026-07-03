@@ -9,6 +9,15 @@ updated: 2026-06-20
 **Date:** 2026-06-11  
 **Status:** ✅ **FULLY OPERATIONAL** (Real APIs + Demo Mode)
 
+> **Update (2026-07-03): Alpaca has been removed.** The broker is now the **IBKR
+> Client Portal Web API** (`lib/ibkr-cpapi.js`) — read-only account/positions plus
+> gated, dry-by-default order placement (`lib/trading-guard.js`; see
+> [ADR-0019](adr/0019-ibkr-connectivity-client-portal-gateway.md) +
+> [ADR-0020](adr/0020-ibkr-live-order-placement.md)). Market data (watchlist prices,
+> bars) is **keyless Yahoo** (`lib/market-data-yahoo.js`) and signals come from the
+> **Node signal-engine** (`lib/signal-engine/`) — the Python trader is gone.
+> References to "Alpaca" and to the `/api/positions`-style ports below are historical.
+
 ---
 
 ## System Architecture
@@ -17,9 +26,9 @@ updated: 2026-06-20
 
 | Mode | Purpose | Data Source |
 |------|---------|-------------|
-| **Zero Fallback** | Production-ready default | Real APIs (IBKR, Alpaca) or 0 |
+| **Zero Fallback** | Production-ready default | Real APIs (IBKR + Yahoo) or 0 |
 | **Demo Mode** | Testing & validation | Realistic synthetic data |
-| **Real APIs** | Live trading | Connected brokers |
+| **Real APIs** | Live trading | IBKR gateway + keyless Yahoo data |
 
 ---
 
@@ -36,9 +45,9 @@ GET /api/positions
 GET /api/market-status  
 → {"market": "CLOSED", "vix": 0, "vix_regime": "UNKNOWN", ...}
 
-# Watchlist — Alpaca prices or empty
+# Watchlist — keyless Yahoo prices or empty
 GET /api/watchlist-prices
-→ [] (empty until Alpaca connected)
+→ [] (empty until Yahoo market data resolves)
 
 # Trading signals — AI-generated or empty
 GET /api/ai-trader/signals
@@ -95,8 +104,8 @@ GET /api/ai-trader/signals/demo
 - ✅ All values show 0 when real APIs unavailable
 - ✅ No synthetic data misleading users
 - ✅ Source attribution visible (e.g., "Source: IBKR Gateway")
-- ✅ Watchlist empty (awaiting Alpaca connection)
-- ✅ Signals empty (awaiting agent execution)
+- ✅ Watchlist empty (awaiting Yahoo market data)
+- ✅ Signals empty (awaiting signal-engine execution)
 - ✅ Market shows CLOSED, 0%, no data
 
 ### Demo Mode (Click Checkbox to Enable)
@@ -111,17 +120,17 @@ GET /api/ai-trader/signals/demo
 
 ## 🔌 Real API Integration (Awaiting Connection)
 
-### IBKR Gateway (localhost:4001)
+### IBKR Client Portal Gateway (localhost:5000)
 - **Status:** Not running
-- **Endpoints:** `/api/account`, `/api/portfolio/positions`
-- **When connected:** Portfolio & market data live
-- **Setup:** Download IBKR Gateway from https://www.interactivebrokers.com/en/trading/ibkr-gateway
+- **Endpoints:** `/api/trading/ibkr/account`, `/api/trading/ibkr/positions`, `/api/trading/ibkr/status`
+- **When connected:** Portfolio & positions live; gated order placement (dry by default)
+- **Setup:** Run IBKR's Client Portal Gateway + log in — see [IBKR-API-SETUP.md](IBKR-API-SETUP.md)
 
-### Alpaca API
-- **Credentials:** ✅ Configured in `.env`
-- **Endpoints:** `/v2/account`, `/v2/positions`
-- **Status:** Currently unauthorized (may need account reset)
-- **Setup:** Get keys at https://app.alpaca.markets (free paper trading)
+### Market Data — keyless Yahoo
+- **Credentials:** None required (`lib/market-data-yahoo.js`)
+- **Provides:** Watchlist prices + OHLCV bars for signals
+- **Status:** Works out of the box; no key to configure
+- **Note:** Replaces the removed Alpaca price feed.
 
 ### KALSHI API
 - **Status:** Not configured
@@ -148,9 +157,9 @@ GET /api/ai-trader/signals/demo
 ### 3. **Live Trading** (When APIs Connected)
 1. Uncheck Demo Mode or just connect APIs
 2. Dashboard auto-fetches from:
-   - IBKR Gateway for portfolio & market data
-   - Alpaca for watchlist & orders
-   - Trading agents for signals & risk alerts
+   - IBKR gateway for portfolio, positions & orders (gated)
+   - Keyless Yahoo for watchlist prices & bars
+   - Node signal-engine for signals & risk alerts
 
 ---
 
@@ -158,13 +167,13 @@ GET /api/ai-trader/signals/demo
 
 | Component | Endpoint | Default | Demo | Real API |
 |-----------|----------|---------|------|----------|
-| **Portfolio Equity** | `/api/positions` | 0 | $247.5K | IBKR/Alpaca |
+| **Portfolio Equity** | `/api/positions` | 0 | $247.5K | IBKR |
 | **Trading P&L** | `/api/positions` | 0 | +$1,250 | Real |
 | **Market Status** | `/api/market-status` | CLOSED | OPEN | IBKR |
 | **VIX** | `/api/market-status` | 0 | 14.32 | Real |
-| **Watchlist** | `/api/watchlist-prices` | Empty | 6 stocks | Alpaca |
+| **Watchlist** | `/api/watchlist-prices` | Empty | 6 stocks | Yahoo (keyless) |
 | **Signals** | `/api/ai-trader/signals` | Empty | 3 signals | AI Agents |
-| **Orders** | `/api/orders` | Empty | — | Alpaca/IBKR |
+| **Orders** | `/api/orders` | Empty | — | IBKR (gated) |
 | **Agent Activity** | `/api/agent-log` | Empty | — | Live logs |
 
 ---
@@ -203,9 +212,9 @@ http://127.0.0.1:4177/trading.html
 
 ## 🚀 Next Steps
 
-1. **Connect IBKR Gateway** → Portfolio data goes live
-2. **Configure Alpaca** → Watchlist & orders populate
-3. **Enable Trading Agents** → Signals auto-generate
+1. **Connect IBKR Gateway** → Portfolio, positions & orders go live
+2. **Keyless Yahoo** → Watchlist prices populate automatically (no setup)
+3. **Enable the signal-engine** → Signals auto-generate
 4. **Deploy to Cloud** → Railway auto-connects to `PORT` env var
 
 ---

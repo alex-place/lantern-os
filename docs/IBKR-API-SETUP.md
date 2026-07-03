@@ -14,8 +14,16 @@ updated: 2026-07-03
 > [ADR-0019](adr/0019-ibkr-connectivity-client-portal-gateway.md) for the decision.
 
 Keystone talks to Interactive Brokers over the **Client Portal Web API (CPAPI)**, served
-by a **gateway you run locally**. The integration is **read-only**: it reads your account
-summary and open positions. It does **not** place orders.
+by a **gateway you run locally**. It reads your account summary and open positions, and
+(as of [ADR-0020](adr/0020-ibkr-live-order-placement.md)) can also **place orders — but
+those are DRY by default and hard-gated**: no real order is sent unless the kill-switch is
+absent, `TRADER_LIVE=1`, the order is within `MAX_ORDER_QTY` / `MAX_ORDER_NOTIONAL`, and
+(for a live `U*` account) `TRADER_ALLOW_LIVE_ACCOUNT=1`. Blocked orders return an honest
+`{status:'dry_run', reason}`; the gateway session is never assumed and fills are never
+fabricated.
+
+> Alpaca has been removed — it was the previous stock broker (and the deleted Python
+> trading subsystem's order path). IBKR CPAPI is now the only brokerage integration.
 
 ---
 
@@ -71,6 +79,12 @@ IBKR_GATEWAY_URL=https://localhost:5000/v1/api   # default; override for a remot
 IBKR_ACCOUNT_ID=DU1234567                         # optional — auto-discovered if omitted
 IBKR_TIMEOUT_MS=6000                              # optional per-request timeout
 # IBKR_TLS_INSECURE=1                             # only if using a non-loopback self-signed gateway
+
+# Order-placement gate (ADR-0020) — DRY by default; leave unset to stay paper/dry:
+# TRADER_LIVE=0                    # master arm switch — 1 to allow real orders
+# MAX_ORDER_QTY=100                # per-order share cap
+# MAX_ORDER_NOTIONAL=2000          # per-order $ cap (qty × price)
+# TRADER_ALLOW_LIVE_ACCOUNT=0      # extra opt-in required for a live (U*) account
 ```
 
 There is **no** API key or secret — CPAPI auth is the gateway session, not a token.
@@ -108,7 +122,8 @@ session is authenticated.
 | Account summary (net-liq, cash, buying power, unrealized P&L) | ✅ `GET /api/trading/ibkr/account` |
 | Open positions | ✅ `GET /api/trading/ibkr/positions` |
 | Honest connection status + evidence | ✅ `GET /api/trading/ibkr/status` |
-| Order placement | ❌ Not implemented (read-only by design — see ADR-0019) |
+| Order placement | ⚠️ Gated + **dry by default** (`lib/trading-guard.js` — see [ADR-0020](adr/0020-ibkr-live-order-placement.md)); needs `TRADER_LIVE=1` + caps + auth'd gateway |
+| Market data (watchlist prices, bars) | ✅ Keyless **Yahoo** (`lib/market-data-yahoo.js`) — no key required |
 | Live index/quote feed | ❌ Not wired (the dashboard's fabricated static quotes were removed) |
 
 ---
@@ -131,7 +146,10 @@ verification only for loopback hosts. For a non-loopback gateway you trust, set
 
 ## Security notes
 
-- Read-only: no order-placement code path exists in `lib/ibkr-cpapi.js`.
+- Order placement exists in `lib/ibkr-cpapi.js` but is **dry by default** and cannot fire a
+  real order unless every gate in `lib/trading-guard.js` passes (kill-switch absent,
+  `TRADER_LIVE=1`, within `MAX_ORDER_QTY`/`MAX_ORDER_NOTIONAL`, live account opt-in) — see
+  [ADR-0020](adr/0020-ibkr-live-order-placement.md).
 - No secrets in code or logs; the account id is the only IBKR value Keystone stores (in `.env`).
 - TLS verification is skipped **only** for loopback (the gateway's self-signed cert); remote
   hosts are verified unless you explicitly opt out.

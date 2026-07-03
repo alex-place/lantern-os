@@ -428,51 +428,11 @@ startMcpChild({
   enabled: process.env.LANTERN_MCP_OAUTH !== "false",
 });
 
-// ── Trading Microservice (Lantern OS Native) ──
-// Set LANTERN_DISABLE_TRADING=1 to skip the trading microservice + AI trader.
-const tradingDisabled = process.env.LANTERN_DISABLE_TRADING === "1";
-let tradingService = null;
-const tradingServiceScript = path.join(__dirname, "start-trading-service.js");
-if (tradingDisabled) {
-  console.log("[Trading Service] Skipped (LANTERN_DISABLE_TRADING=1)");
-} else if (fs.existsSync(tradingServiceScript)) {
-  tradingService = spawn("node", [tradingServiceScript], {
-    stdio: "inherit",
-    cwd: __dirname,
-    env: { ...process.env, AI_TRADER_DASHBOARD_PORT: 5050 },
-  });
-  tradingService.on("error", (err) => {
-    console.error(`[Trading Service] Failed to start: ${err.message}`);
-  });
-  tradingService.on("exit", (code) => {
-    console.log(`[Trading Service] Exited with code ${code}`);
-  });
-  console.log(`[Trading Service] Starting on port 5050...`);
-} else {
-  console.warn(`[Trading Service] Script not found: ${tradingServiceScript}`);
-}
-
-// ── AI Trader Process (autonomous trading system) ──
-const aiTraderStartupScript = path.join(__dirname, "..", "..", "scripts", "start-ai-trader.js");
-let aiTraderProcess = null;
-if (tradingDisabled) {
-  console.log("[AI Trader] Skipped (LANTERN_DISABLE_TRADING=1)");
-} else if (fs.existsSync(aiTraderStartupScript)) {
-  aiTraderProcess = spawn("node", [aiTraderStartupScript], {
-    stdio: "inherit",
-    cwd: repoRoot,
-    env: { ...process.env },
-  });
-  aiTraderProcess.on("error", (err) => {
-    console.error(`[AI Trader] Failed to start: ${err.message}`);
-  });
-  aiTraderProcess.on("exit", (code) => {
-    console.log(`[AI Trader] Process manager exited with code ${code}`);
-  });
-  console.log(`[AI Trader] Started process manager`);
-} else {
-  console.log(`[AI Trader] Using native Lantern OS Trading Microservice`);
-}
+// ── Trading ──
+// The autonomous Python trader (scripts/start-ai-trader.js → src/trading_agents,
+// Alpaca) and the port-5050 trading microservice were removed. Trading now runs
+// in-process via routes/trading.js + the Node signal-engine (lib/signal-engine)
+// with broker access through IBKR (lib/ibkr-cpapi.js) — nothing to spawn here.
 
 // ── Cloudflare Tunnel (optional, for public access) ──
 let cloudflaredProcess = null;
@@ -533,12 +493,6 @@ function shutdown(signal) {
   // Tree-kill MCP children FIRST (before server.close, which can hang on open
   // SSE) so the python grandchild can't be left orphaned holding 8771.
   for (const child of mcpChildren) killMcpChild(child);
-  if (tradingService && !tradingService.killed) {
-    tradingService.kill("SIGTERM");
-  }
-  if (aiTraderProcess && !aiTraderProcess.killed) {
-    aiTraderProcess.kill("SIGTERM");
-  }
   if (cloudflaredProcess && !cloudflaredProcess.killed) {
     cloudflaredProcess.kill("SIGTERM");
   }

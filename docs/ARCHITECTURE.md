@@ -105,13 +105,16 @@ Grouped by loop stage / domain:
 | **Media / creator** (Act) | `image-generation.js`, `caption-engine.js`, `facecam-v3.js`, `video-pipeline-*.js`, `thumbnail-generator.js` |
 | **Safety / gates** | `consent-gate.js`, `consequence-gate.js`, `command-allowlist.js`, `safe-exec` (via `safe-exec.js`), `auth-middleware.js`, `session-secret.js` |
 
-### Persona routing
+### One assistant (no persona routing)
 
-Agent personas are defined in [`dream-chat.js`](../apps/lantern-garage/lib/dream-chat.js) with
-per-persona `systemPrompt`s: `lantern`, `blinkbug`, `keystone`, `waterfall`, `xenon`, `founder`,
-plus task-specific `trader`, `claude-code`, and a verification-first **Σ₀** persona (`:256`).
-`selectAgent()` ([`:300`](../apps/lantern-garage/lib/dream-chat.js)) scores inbound messages by
-keyword; with no match it falls back to the Σ₀ default (`:332`).
+The chat is a single assistant: the `keystone` agent loaded from
+[`data/contexts/personas.json`](../data/contexts/personas.json) (inline fallback in
+[`dream-chat.js`](../apps/lantern-garage/lib/dream-chat.js)). `selectAgent()` always resolves
+that one assistant — the earlier keyword-scored persona set (trader / engineer /
+job-application / Σ₀) and per-message task-lens prompts were removed. Capabilities are
+**native tool calls** from [`tool-runner.js`](../apps/lantern-garage/lib/tool-runner.js)
+(web search/fetch, document generation, workspace files, market data, repo/GitHub),
+invoked by the model on its own initiative.
 
 ---
 

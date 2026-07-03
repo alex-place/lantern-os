@@ -1,20 +1,26 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Ingest Alpaca (and optionally Kalshi/IBKR) API keys into the repo .env file.
+    Ingest trading config (IBKR account + optional Kalshi key) into the repo .env file.
 
 .DESCRIPTION
-    Prompts for trading API credentials and upserts them into .env at the repo root.
+    Prompts for trading settings and upserts them into .env at the repo root.
     Existing values are updated in-place; new keys are appended under a Trading APIs block.
     The .env file is never committed — it is in .gitignore.
 
+    NOTE: Alpaca has been removed. The broker is now IBKR via the Client Portal
+    Gateway (see docs/IBKR-API-SETUP.md + ADR-0019/ADR-0020). IBKR CPAPI has NO
+    API key/secret — the local gateway holds the authenticated session — so this
+    script only records the (optional) IBKR_ACCOUNT_ID and IBKR_GATEWAY_URL.
+    Order placement is armed separately via TRADER_LIVE / MAX_ORDER_* env flags,
+    which this script intentionally does not touch.
+
 .EXAMPLE
     .\scripts\Set-TradingKeys.ps1
-    .\scripts\Set-TradingKeys.ps1 -Kalshi -IBKR
+    .\scripts\Set-TradingKeys.ps1 -Kalshi
 #>
 param(
-    [switch]$Kalshi,   # also prompt for Kalshi API key
-    [switch]$IBKR      # also prompt for IBKR host/port overrides
+    [switch]$Kalshi    # also prompt for Kalshi API key
 )
 
 Set-StrictMode -Version Latest
@@ -73,18 +79,23 @@ function Get-CurrentValue([string]$Key) {
     return ''
 }
 
-# ── Alpaca ───────────────────────────────────────────────────────────────────
+# ── IBKR (broker) ────────────────────────────────────────────────────────────
+# Alpaca is removed. IBKR CPAPI has no key/secret — the local Client Portal
+# Gateway holds the authenticated session. We only record the (optional) account
+# id and gateway URL; both auto-fall back to sensible defaults if left blank.
 
 Write-Host ''
-Write-Host '=== Alpaca Paper Trading ===' -ForegroundColor Cyan
-Write-Host 'Get your keys at: https://app.alpaca.markets → Home → Generate New Key'
+Write-Host '=== IBKR (Interactive Brokers) ===' -ForegroundColor Cyan
+Write-Host 'Run the Client Portal Gateway locally and log in at https://localhost:5000'
+Write-Host 'first. See docs/IBKR-API-SETUP.md. There is NO API key — leave blank to'
+Write-Host 'use the defaults (account id is auto-discovered from the gateway session).'
 Write-Host ''
 
-$alpacaKey    = Prompt-Secret 'ALPACA_API_KEY'    (Get-CurrentValue 'ALPACA_API_KEY')
-$alpacaSecret = Prompt-Secret 'ALPACA_SECRET_KEY' (Get-CurrentValue 'ALPACA_SECRET_KEY')
+$ibkrAccount = Prompt-Secret 'IBKR_ACCOUNT_ID (e.g. DU1234567; blank = auto)' (Get-CurrentValue 'IBKR_ACCOUNT_ID')
+$ibkrUrl     = Prompt-Secret 'IBKR_GATEWAY_URL (blank = https://localhost:5000/v1/api)' (Get-CurrentValue 'IBKR_GATEWAY_URL')
 
-if ($alpacaKey)    { $lines = Upsert-EnvKey $lines 'ALPACA_API_KEY'    $alpacaKey }
-if ($alpacaSecret) { $lines = Upsert-EnvKey $lines 'ALPACA_SECRET_KEY' $alpacaSecret }
+if ($ibkrAccount) { $lines = Upsert-EnvKey $lines 'IBKR_ACCOUNT_ID'  $ibkrAccount }
+if ($ibkrUrl)     { $lines = Upsert-EnvKey $lines 'IBKR_GATEWAY_URL' $ibkrUrl }
 
 # ── Kalshi (optional) ────────────────────────────────────────────────────────
 
@@ -95,19 +106,6 @@ if ($Kalshi) {
     Write-Host ''
     $kalshiKey = Prompt-Secret 'KALSHI_API_KEY' (Get-CurrentValue 'KALSHI_API_KEY')
     if ($kalshiKey) { $lines = Upsert-EnvKey $lines 'KALSHI_API_KEY' $kalshiKey }
-}
-
-# ── IBKR (optional) ──────────────────────────────────────────────────────────
-
-if ($IBKR) {
-    Write-Host ''
-    Write-Host '=== IBKR Gateway ===' -ForegroundColor Cyan
-    Write-Host 'TWS / IBKR Gateway must be running and Client Portal API enabled.'
-    Write-Host ''
-    $ibkrHost = Prompt-Secret 'IBKR_HOST (default: localhost)' (Get-CurrentValue 'IBKR_HOST')
-    $ibkrPort = Prompt-Secret 'IBKR_PORT (default: 4001)'      (Get-CurrentValue 'IBKR_PORT')
-    if ($ibkrHost) { $lines = Upsert-EnvKey $lines 'IBKR_HOST' $ibkrHost }
-    if ($ibkrPort) { $lines = Upsert-EnvKey $lines 'IBKR_PORT' $ibkrPort }
 }
 
 # ── write back ───────────────────────────────────────────────────────────────

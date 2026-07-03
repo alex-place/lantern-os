@@ -47,7 +47,7 @@ updated: 2026-06-20
   Try the dashboard with realistic data.
 
 ⚙️ Connect Real Data
-  Install IBKR Gateway or add Alpaca API keys.
+  Run the IBKR Client Portal Gateway (prices are keyless Yahoo — no key needed).
 
 💡 Tip
   Click any panel title to see its data source.
@@ -123,7 +123,7 @@ Source: 📋 Example | AI Analysis (depending on mode)
 - All titles are now clickable (shows data source)
 - Hover effect with opacity change
 - Tooltip on hover showing what will happen
-- Example: "Click for data source", "Connect IBKR or Alpaca for real data"
+- Example: "Click for data source", "Connect IBKR for real portfolio data"
 
 ### Signal Cards
 - Dynamic color based on signal type
@@ -162,9 +162,9 @@ Keystone OS | Journal | Trading | News | Dashboard | Help
 4. See 3 trading recommendations
 
 ### Connect Real Data
-1. **For Portfolio:** Install IBKR Gateway (localhost:4001)
-2. **For Prices:** Add Alpaca API keys to .env
-3. **For Signals:** Enable Claude MCP agent routing
+1. **For Portfolio:** Run the IBKR Client Portal Gateway (localhost:5000) — see IBKR-API-SETUP.md
+2. **For Prices:** Nothing to do — market data is keyless Yahoo (Alpaca removed)
+3. **For Signals:** Enable the Node signal-engine
 4. Uncheck demo mode to use real APIs
 
 ### Learn More

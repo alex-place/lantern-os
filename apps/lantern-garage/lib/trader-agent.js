@@ -8,7 +8,6 @@
  * No external ports or services required — everything runs locally.
  */
 
-const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 // Keyless Node-native price/bar source. Replaces the per-call Python→Alpaca
@@ -16,42 +15,28 @@ const fs = require('fs');
 // failed entirely without Alpaca keys), so the charts never loaded. Order
 // placement + broker account still go through Python/Alpaca below.
 const yahoo = require('./market-data-yahoo');
+// Node deterministic signal engine (SR zones, RSI, candle patterns, market
+// structure, tesseract) — replaces the Python scan_market/get_zones subprocess.
+// All TA now runs in-process from Yahoo bars; no python spawn, no Alpaca.
+const signalEngine = require('./signal-engine');
+// IBKR Client Portal Web API client — broker reads (account/positions/orders)
+// + GATED order placement. Replaces the Python/Alpaca broker path.
+const IbkrCpapi = require('./ibkr-cpapi');
 
 class TraderAgent {
   constructor(config = {}) {
     this.config = config;
-    this.pythonPath = path.join(__dirname, '../../../src/trading_agents');
     this.cache = {};
     this.cacheExpiry = config.cacheExpiry || 60000; // 60s default
     // Backoff TTL for a FAILED market scan (#1861): shorter than cacheExpiry so
     // a transient failure recovers quickly, but long enough that a persistently
-    // broken backend isn't re-spawning the 90s scan on every GET.
+    // broken backend isn't re-scanning on every GET.
     this._scanFailTtl = config.scanFailTtl || 30000; // 30s
-    this.pythonTimeout = config.pythonTimeout || 30000; // 30s timeout (scans)
-    // Fast-fail budget for interactive reads (market-status / zones / bars /
-    // watchlist) so a slow/broken data provider returns quickly instead of
-    // hanging the page for the full 30s (#1227).
-    this.fastTimeout = config.fastTimeout || parseInt(process.env.TRADER_PYTHON_FAST_TIMEOUT || '7000', 10);
-    this.alpacaKey = process.env.ALPACA_API_KEY;
-    this.alpacaSecret = process.env.ALPACA_SECRET_KEY;
     this.watchlistPath = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
     this.watchlist = this._loadWatchlist();
-
-    // Limit concurrent Python subprocesses — running too many at once (e.g. on
-    // initial dashboard load, which fires ~6 calls simultaneously) makes each
-    // one slow enough to blow past pythonTimeout even though a single call
-    // normally finishes in well under it.
-    this._pyQueue = [];
-    this._pyActive = 0;
-    this._pyConcurrency = config.pythonConcurrency || 3;
-  }
-
-  // Is a live broker (Alpaca) configured? Without creds, get_positions /
-  // get_orders / place_order can only fail — and the *failure* is a ~7s cold
-  // Python spawn that hangs the header (#1860). Short-circuit to an honest
-  // "not connected" instead of paying that timeout on every poll.
-  _brokerConfigured() {
-    return !!(this.alpacaKey && this.alpacaSecret);
+    // Broker (IBKR Client Portal gateway) — fail-soft; reads return an honest
+    // "not connected" when the gateway is down. Order placement is hard-gated.
+    this.ibkr = new IbkrCpapi();
   }
 
   _parseWatchlist(envString) {
@@ -128,12 +113,10 @@ class TraderAgent {
     }
 
     try {
-      // Scanning the full watchlist (16 tickers, technical analysis per
-      // ticker) regularly takes 45-60s — well beyond the default
-      // pythonTimeout, so give it its own longer budget.
-      const result = await this._callPython('scan_market', {
-        watchlist: this.watchlist
-      }, 90000);
+      // Deterministic Node scan (SR zones + RSI + candles + structure +
+      // tesseract) over the watchlist — runs in-process in well under a second,
+      // replacing the old 45-60s Python→Alpaca subprocess.
+      const result = await signalEngine.scanAll(this.watchlist);
 
       this.cache[cacheKey] = {
         data: result,
@@ -168,7 +151,7 @@ class TraderAgent {
     }
 
     try {
-      const result = await this._callPython('get_zones', { ticker }, this.fastTimeout);
+      const result = await signalEngine.getZones(ticker);
 
       this.cache[cacheKey] = {
         data: result,
@@ -205,33 +188,12 @@ class TraderAgent {
     if (entry && Date.now() - entry.time < 3600000) {
       return entry.data;
     }
-    // The full tradable-asset universe lives behind Alpaca. Without creds, don't
-    // pay the 45s doomed spawn — return empty fast; the search route falls back
-    // to a keyless exact-ticker validation so "+ Add symbol" still works (#1860).
-    if (!this._brokerConfigured()) return [];
-    // Never BLOCK a search request on the 45s list_assets spawn (#1859): when the
-    // broker IS configured but the call is slow (or returns empty and so is never
-    // cached), every keystroke re-spawned Python and the queue serialized until
-    // the browser timed out. Warm the cache in the background instead and serve
-    // whatever we have now ([] on a cold cache → the search route's keyless Yahoo
-    // exact-ticker fallback fires, so "+ Add symbol" is instant). The full fuzzy
-    // list appears on a later poll once the warm completes.
-    this._warmAllAssets();
-    return (entry && entry.data) || [];
-  }
-
-  // Background single-flight warm of the tradable-asset universe (#1859). Kept
-  // separate so getAllAssets() never awaits the slow spawn.
-  _warmAllAssets() {
-    if (this._assetsWarming) return;
-    this._assetsWarming = true;
-    this._callPython('list_assets', {}, 45000)
-      .then((result) => {
-        const assets = (result && Array.isArray(result.assets)) ? result.assets : [];
-        if (assets.length) this.cache['all_assets'] = { data: assets, time: Date.now() };
-      })
-      .catch((e) => { console.error('[TraderAgent] asset-universe warm failed:', e.message); })
-      .finally(() => { this._assetsWarming = false; });
+    // The full fuzzy asset universe used to come from Alpaca's list_assets. IBKR's
+    // read-only CPAPI has no bulk symbol dump, so we no longer ship a universe here
+    // — the search route's keyless Yahoo exact-ticker probe (validateSymbol)
+    // resolves "+ Add symbol" instantly without it.
+    void entry;
+    return [];
   }
 
   /**
@@ -239,12 +201,9 @@ class TraderAgent {
    * Returns: { symbol, action, reason, confidence, timestamp }
    */
   async analyzeSignal(signal) {
-    try {
-      return await this._callPython('analyze_signal', signal);
-    } catch (error) {
-      console.error('[TraderAgent] Signal analysis failed:', error.message);
-      return null;
-    }
+    // Signal enrichment is handled inline by the Node scan engine now; the old
+    // Python 'analyze_signal' path never existed as a cli.py handler. No-op.
+    return (signal && signal.symbol) ? { ...signal, analyzed: false } : null;
   }
 
   /**
@@ -255,17 +214,6 @@ class TraderAgent {
     const cacheKey = 'market_status';
     if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < 30000) { // 30s
       return this.cache[cacheKey].data;
-    }
-
-    // #1231: get_market_status runs through cli.py → agents.py, which instantiates
-    // an Alpaca REST client at import and raises without creds — after the full
-    // fastTimeout (7s). #1860 gave positions/orders this guard but not market-status,
-    // so the VIX/regime tile still hung ~7s. Return an honest "unavailable" instantly.
-    if (!this._brokerConfigured()) {
-      return this._staleOr(cacheKey, {
-        market_open: false, vix: 0, vix_regime: 'UNAVAILABLE',
-        available: false, reason: 'broker not configured',
-      });
     }
 
     try {
@@ -332,12 +280,19 @@ class TraderAgent {
     if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < 45000) {
       return this.cache[cacheKey].data;
     }
-    // No broker configured → no orders, and don't pay the 7–20s doomed spawn (#1860).
-    if (!this._brokerConfigured()) {
-      return { orders: [], count: 0, available: false, reason: 'broker not configured' };
-    }
     try {
-      const result = await this._callPython('get_orders', { limit }, 20000);
+      const status = await this.ibkr.getStatus();
+      if (!status.connected) {
+        return { orders: [], count: 0, available: false, source: 'ibkr',
+          reason: (status.evidence && status.evidence[status.evidence.length - 1]) || 'IBKR gateway not connected' };
+      }
+      const live = await this.ibkr.getLiveOrders();
+      const orders = live.map((o) => ({
+        id: o.orderId, symbol: o.symbol, side: String(o.side || '').toLowerCase(),
+        qty: o.qty, filled_qty: o.filledQty, type: String(o.orderType || '').toLowerCase(),
+        status: o.status, limit_price: o.price, filled_avg_price: o.avgPrice,
+      }));
+      const result = { orders, count: orders.length, source: 'ibkr', available: true };
       this.cache[cacheKey] = { data: result, time: Date.now() };
       return result;
     } catch (error) {
@@ -352,37 +307,39 @@ class TraderAgent {
       return this.cache[cacheKey].data;
     }
 
-    // No broker configured → honest empty account instantly, not a 7s Python
-    // timeout that leaves the header's Equity/Positions stuck at "—" (#1860).
-    if (!this._brokerConfigured()) {
-      return {
-        positions: [],
-        account: { equity: 0, cash: 0, buying_power: 0 },
-        available: false,
-        reason: 'broker not configured',
-      };
-    }
-
     try {
-      const result = await this._callPython('get_positions', {
-        alpaca_key: this.alpacaKey,
-        alpaca_secret: this.alpacaSecret
-      }, this.fastTimeout);
-
-      this.cache[cacheKey] = {
-        data: result,
-        time: Date.now()
+      const status = await this.ibkr.getStatus();
+      if (!status.connected) {
+        return {
+          positions: [], account: { equity: 0, cash: 0, buying_power: 0 },
+          available: false, source: 'ibkr',
+          reason: (status.evidence && status.evidence[status.evidence.length - 1]) || 'IBKR gateway not connected',
+        };
+      }
+      const [summary, rawPos] = await Promise.all([
+        this.ibkr.getAccountSummary(),
+        this.ibkr.getPositions(),
+      ]);
+      const positions = (rawPos || []).map((p) => ({
+        symbol: p.symbol, qty: p.qty, avg_entry_price: p.avgPrice,
+        current_price: p.currentPrice, side: (p.qty >= 0 ? 'long' : 'short'),
+        market_value: p.marketValue, unrealized_pl: p.unrealizedPnl,
+      }));
+      const account = {
+        equity: (summary && summary.equity) || 0,
+        cash: (summary && summary.cash) || 0,
+        buying_power: (summary && (summary.buyingPower != null ? summary.buyingPower : summary.cash)) || 0,
+        unrealized: (summary && summary.unrealizedPnl) || 0,
+        mode: status.mode,
       };
-
+      const result = { positions, account, source: 'ibkr', available: true };
+      this.cache[cacheKey] = { data: result, time: Date.now() };
       return result;
     } catch (error) {
       console.error('[TraderAgent] Get positions failed:', error.message);
-      // Honest "not connected" — don't present 0 equity as live truth (#1230).
       return this._staleOr(cacheKey, {
-        positions: [],
-        account: { equity: 0, cash: 0, buying_power: 0 },
-        available: false,
-        reason: this._shortReason(error),
+        positions: [], account: { equity: 0, cash: 0, buying_power: 0 },
+        available: false, reason: this._shortReason(error),
       });
     }
   }
@@ -413,17 +370,33 @@ class TraderAgent {
   }
 
   /**
-   * Place a manual paper order (buy/sell) via Alpaca, optionally with a
-   * stop-loss / take-profit bracket.
-   * Returns: { status: 'placed'|'error', order_id, ticker, side, qty, type, submitted_at }
+   * Place an order via IBKR — HARD-GATED and DRY BY DEFAULT (lib/trading-guard.js).
+   * With TRADER_LIVE unset this returns { status:'dry_run', dry:true, reason } and
+   * never contacts the broker. stop_loss/take_profit are passed through as metadata
+   * only for now (CPAPI bracket legs are a follow-up; not auto-placed here).
+   * Returns: { status:'placed'|'dry_run'|'error', order_id, ticker, side, qty, type, dry, reason, mode }.
    */
   async placeOrder({ ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit }) {
-    const result = await this._callPython('place_order', {
-      ticker, side, qty, type, limit_price: limitPrice, time_in_force: timeInForce,
-      stop_loss: stopLoss, take_profit: takeProfit,
+    const r = await this.ibkr.placeOrder({
+      symbol: ticker,
+      side,
+      qty,
+      orderType: String(type || 'market').toLowerCase() === 'limit' ? 'LMT' : 'MKT',
+      price: limitPrice,
+      tif: String(timeInForce || 'day').toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
     });
-    if (result && result.status === 'placed') this.clearCache();
-    return result;
+    const out = {
+      status: r.status === 'submitted' ? 'placed' : r.status, // placed | dry_run | error
+      order_id: r.orderId || null,
+      ticker, side, qty, type: type || 'market',
+      dry: !!r.dry,
+      reason: r.note || r.error || (r.gate && r.gate.reason) || null,
+      mode: r.gate && r.gate.mode,
+      stop_loss: stopLoss || null,
+      take_profit: takeProfit || null,
+    };
+    if (r.status === 'submitted') this.clearCache();
+    return out;
   }
 
   /**
@@ -459,15 +432,7 @@ class TraderAgent {
     this.cache = {};
   }
 
-  /**
-   * Call Python trading agent via subprocess, queued so that at most
-   * `_pyConcurrency` subprocesses run at once.
-   *
-   * @param {string} action - Function to call (e.g., 'scan_market', 'get_zones')
-   * @param {object} args - Arguments to pass to the function
-   * @returns {Promise<object>} Parsed JSON response from Python
-   */
-  // Collapse a multi-line Python traceback into a single short reason so an
+  // Collapse a multi-line error into a single short reason so an
   // endpoint never returns a raw traceback in its body (#1226). Prefer the last
   // non-empty stderr line (the actual exception), strip our own wrapper noise.
   _shortReason(error) {
@@ -492,102 +457,6 @@ class TraderAgent {
     return fallback;
   }
 
-  _callPython(action, args, timeoutMs) {
-    return new Promise((resolve, reject) => {
-      this._pyQueue.push({ action, args, timeoutMs, resolve, reject });
-      this._drainPyQueue();
-    });
-  }
-
-  _drainPyQueue() {
-    while (this._pyActive < this._pyConcurrency && this._pyQueue.length > 0) {
-      const job = this._pyQueue.shift();
-      this._pyActive++;
-      this._runPython(job.action, job.args, job.timeoutMs)
-        .then(job.resolve, job.reject)
-        .finally(() => {
-          this._pyActive--;
-          this._drainPyQueue();
-        });
-    }
-  }
-
-  /**
-   * Spawn a Python process that imports the trading agents module, calls the
-   * requested function with arguments, and returns JSON output.
-   */
-  _runPython(action, args, timeoutMs) {
-    const effectiveTimeout = timeoutMs || this.pythonTimeout;
-    return new Promise((resolve, reject) => {
-      // Validate Python path exists
-      if (!fs.existsSync(this.pythonPath)) {
-        return reject(new Error(`Python trading_agents path not found: ${this.pythonPath}`));
-      }
-
-      // Build Python command
-      const pythonScript = path.join(__dirname, '../../../src/trading_agents/cli.py');
-      if (!fs.existsSync(pythonScript)) {
-        return reject(new Error(`Python CLI script not found: ${pythonScript}`));
-      }
-
-      // Prepare environment
-      const env = {
-        ...process.env,
-        PYTHONPATH: this.pythonPath,
-        ALPACA_API_KEY: this.alpacaKey,
-        ALPACA_SECRET_KEY: this.alpacaSecret,
-        PYTHONUNBUFFERED: '1'
-      };
-
-      // Spawn Python process
-      let timedOut = false;
-      const timeout = setTimeout(() => {
-        timedOut = true;
-        proc.kill('SIGTERM');
-      }, effectiveTimeout);
-
-      const proc = spawn('python', [pythonScript, action, JSON.stringify(args)], {
-        env,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: effectiveTimeout
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      proc.on('close', (code) => {
-        clearTimeout(timeout);
-
-        if (timedOut) {
-          return reject(new Error(`Python process timeout (${effectiveTimeout}ms) for action: ${action}`));
-        }
-
-        if (code !== 0) {
-          return reject(new Error(`Python error (${action}): ${stderr || stdout}`));
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result);
-        } catch (parseError) {
-          reject(new Error(`Failed to parse Python output for ${action}: ${parseError.message}\nOutput: ${stdout.slice(0, 200)}`));
-        }
-      });
-
-      proc.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(new Error(`Failed to spawn Python process: ${error.message}`));
-      });
-    });
-  }
 }
 
 module.exports = TraderAgent;

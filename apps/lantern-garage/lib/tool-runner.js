@@ -477,11 +477,11 @@ const REGISTRY = {
   // ── ADR-0008 document generation (#1097) ────────────────────────────────────
   // Renders resume / cover-letter templates to the user workspace — HTML (print
   // to PDF from the browser) or Markdown. Backed by document-templates.js, the
-  // single template library. This is what the Job Application Assistant persona
-  // calls to produce the tailored resume + cover letter.
+  // single template library. The assistant calls this directly in conversation
+  // (there is no persona or scripted skill flow in front of it).
   generate_document: {
     policy: "mutating",
-    desc: 'Generate a tailored document from a template and save it to the user workspace. template: "resume" or "cover-letter". format: "html" (default — open in browser, Print → Save as PDF) or "markdown". Pass structured fields matching the template. Returns the workspace path. Operator only.',
+    desc: 'Generate a resume or cover-letter and save it to the user workspace. template: "resume" or "cover-letter". format: "html" (default — open in browser, Print → Save as PDF) or "markdown". Every field is optional at render time: pass whatever you already know from the conversation and attachments; missing fields are omitted or given neutral defaults. Draft first and refine in conversation — never make the user fill in a field list, and never invent user facts (leave a visible "[add …]" gap instead). Returns the workspace path. Operator only.',
     schema: {
       type: "object",
       properties: {
@@ -521,15 +521,15 @@ const REGISTRY = {
   list_document_templates: {
     policy: "read",
     guest_safe: true, // read-only template metadata (no I/O) — safe for non-operators (#1213)
-    desc: "List available document templates (resume, cover-letter) and their input fields. Required fields are marked with *.",
+    desc: "List available document templates (resume, cover-letter) and the field names each accepts. Every field is optional — generate_document renders whatever subset you pass, so build fields from the conversation and attachments instead of asking the user for this list.",
     schema: { type: "object", properties: {} },
     run() {
-      return listDocTemplates()
-        .map((t) => {
-          const fields = (t.fields || []).map((f) => (f.required ? `${f.name}*` : f.name)).join(", ");
-          return `${t.name}: ${fields}`;
-        })
-        .join("\n");
+      const lines = listDocTemplates().map((t) => {
+        const fields = (t.fields || []).map((f) => f.name).join(", ");
+        return `${t.name} — accepts: ${fields}`;
+      });
+      lines.push("All fields are optional: missing ones are omitted or defaulted at render time. Draft from what the conversation and attachments already contain — don't ask the user to fill in this list.");
+      return lines.join("\n");
     },
   },
   // ── workspace tools (ADR-0008 §Decision 4): user-artifact area outside the repo ────
