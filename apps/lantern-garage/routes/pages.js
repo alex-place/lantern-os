@@ -5,7 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { requireAuth, requireRole, requireEntitlement, isAdmin } = require("../lib/auth-middleware");
+const { requireAuth, requireRole, requireEntitlement, hasEntitlement, isAdmin } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
 
 // Public pages — no auth required
@@ -20,6 +20,9 @@ const PUBLIC_PAGES = {
   // "no account needed" promise holds (#739). dream-chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).
   "/dream-chat.html":     "dream-chat.html",
+  // Logged-out read-only market view (charts + quotes, no trading UI). Directly
+  // reachable, and served as the guest fallback for /stock-trader.html below.
+  "/stock-charts.html":   "stock-charts.html",
 };
 
 // Protected pages — { file, role } where role is minimum required, OR
@@ -32,7 +35,9 @@ const PROTECTED_PAGES = {
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
   "/trading.html":        { file: "trading.html",           entitlement: "trade" },
   "/trading-news.html":   { file: "trading-news.html",      entitlement: "trade" },
-  "/stock-trader.html":   { file: "stock-trader.html",      entitlement: "trade" },
+  // Guests without the trade entitlement get the read-only charts page instead of
+  // a login bounce — a public storefront for the terminal, with a sign-in CTA.
+  "/stock-trader.html":   { file: "stock-trader.html",      entitlement: "trade", publicFallback: "stock-charts.html" },
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
@@ -80,6 +85,16 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   // Explicitly protected pages (role-specific)
   const page = PROTECTED_PAGES[pathname];
   if (page) {
+    // Public fallback: a viewer lacking the entitlement (guest or a paid tier
+    // without "trade") gets the read-only page served in place — no login bounce.
+    if (page.publicFallback && page.entitlement && !hasEntitlement(req, page.entitlement)) {
+      const fbPath = path.join(deps.publicRoot, page.publicFallback);
+      if (fs.existsSync(fbPath)) {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(fs.readFileSync(fbPath, "utf-8"));
+        return true;
+      }
+    }
     if (!requireAuth(req, res)) return true;
     if (page.entitlement) {
       if (!requireEntitlement(req, res, page.entitlement)) return true;

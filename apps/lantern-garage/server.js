@@ -188,6 +188,7 @@ const routes = [
   require("./routes/training"),
   require("./routes/gpu-training"),
   require("./routes/token-audit"),
+  require("./routes/public-market"),  // keyless read-only quotes/bars for the logged-out chart view
   require("./routes/trading"),
   require("./routes/agent-performance"),
   require("./routes/leaderboard"),

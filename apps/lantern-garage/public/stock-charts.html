@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markets — live charts · Unisona</title>
+<script>(function(){try{if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');}catch(e){}})();</script>
+<style>
+  :root{--bg0:#080d14;--bg1:#0c1420;--bg2:#111c2b;--border:#1c2a3a;--border2:#26384c;
+    --text0:#dfeaf6;--text1:#aebdcf;--text2:#7d90a6;--green:#26d17f;--red:#ff5f6d;--accent:#38bdf8;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;}
+  html.light{--bg0:#f4f6fa;--bg1:#fff;--bg2:#eef2f7;--border:#d7dfea;--border2:#c3cede;--text0:#0f1722;--text1:#3a4a5c;--text2:#65788c;--green:#12a150;--red:#d9480f;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg0);color:var(--text0);font-family:var(--mono);font-size:13px;height:100vh;overflow:hidden}
+  .app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+  /* Header */
+  .hdr{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--bg1);border-bottom:1px solid var(--border)}
+  .logo{font-weight:800;font-size:15px;letter-spacing:.02em}.logo span{color:var(--accent)}
+  .badge{font-size:9.5px;letter-spacing:.12em;font-weight:700;color:var(--text2);border:1px solid var(--border2);border-radius:5px;padding:2px 7px}
+  .hstat{font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:1px;min-width:70px}
+  .hstat .l{color:var(--text2);font-size:8px;text-transform:uppercase;letter-spacing:.1em}
+  .signin{margin-left:auto;background:var(--accent);color:#04121c;font-weight:700;border:0;border-radius:8px;
+    padding:9px 16px;font-family:var(--mono);font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block}
+  .signin:hover{filter:brightness(1.08)}
+  .themebtn{background:var(--bg2);border:1px solid var(--border);color:var(--text1);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:13px}
+  /* Body */
+  .body{display:grid;grid-template-columns:210px 1fr;min-height:0}
+  .watch{border-right:1px solid var(--border);overflow-y:auto;background:var(--bg0)}
+  .wl-hd{padding:8px 12px;color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)}
+  .wl-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border)}
+  .wl-row:hover{background:var(--bg1)}.wl-row.on{background:var(--bg2);box-shadow:inset 3px 0 0 var(--accent)}
+  .wl-t{font-weight:700}.wl-p{font-size:11px;color:var(--text1)}
+  .wl-c{font-size:10px}.up{color:var(--green)}.down{color:var(--red)}
+  .main{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .chart-hd{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)}
+  .sym{font-size:18px;font-weight:800}
+  .ohlc{color:var(--text2);font-size:11px;display:flex;gap:10px;flex-wrap:wrap}
+  .ohlc b{color:var(--text1);font-weight:600}
+  .tf{margin-left:auto;display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .tf button{background:var(--bg1);border:0;border-right:1px solid var(--border);color:var(--text1);padding:6px 11px;font-size:11.5px;cursor:pointer;font-family:var(--mono)}
+  .tf button:last-child{border-right:0}.tf button.on{background:var(--bg2);color:var(--text0);font-weight:700}
+  .chart-wrap{flex:1;position:relative;min-height:0;padding:6px 8px}
+  canvas{position:absolute;inset:6px 8px;width:calc(100% - 16px);height:calc(100% - 12px)}
+  .cta{padding:10px 16px;border-top:1px solid var(--border);color:var(--text2);font-size:11.5px;display:flex;align-items:center;gap:10px;background:var(--bg1)}
+  .cta a{color:var(--accent);text-decoration:none;font-weight:700}
+  @media (max-width:720px){.body{grid-template-columns:1fr}.watch{display:none}.ohlc{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <div class="logo">Unisona<span>Markets</span></div>
+    <div class="badge">LIVE · READ-ONLY</div>
+    <div class="hstat"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
+    <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
+    <button class="themebtn" id="themeBtn" title="Toggle light/dark" aria-label="Toggle theme">◐</button>
+    <a class="signin" id="signinBtn" href="/auth.html?returnTo=%2Fstock-trader.html">Sign in to trade →</a>
+  </div>
+  <div class="body">
+    <div class="watch">
+      <div class="wl-hd">Watchlist</div>
+      <div id="wl"></div>
+    </div>
+    <div class="main">
+      <div class="chart-hd">
+        <span class="sym" id="sym">—</span>
+        <div class="ohlc" id="ohlc"></div>
+        <div class="tf" id="tf">
+          <button data-tf="5m" class="on">5m</button>
+          <button data-tf="15m">15m</button>
+          <button data-tf="1h">1h</button>
+          <button data-tf="1d">1D</button>
+          <button data-tf="5d">5D</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div class="cta">📈 Read-only market view. <a href="/auth.html?returnTo=%2Fstock-trader.html">Sign in</a> to unlock the Σ₀ trading terminal — signals, positions, and one-tap orders.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WATCH=['SPY','AAPL','TSLA','NVDA','AMD','AMZN','META','MSFT','GOOGL','QQQ'];
+let sel='NVDA', tf='5m', quotes={}, barsCache={};
+const $=s=>document.querySelector(s);
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+document.getElementById('themeBtn').onclick=()=>{ document.documentElement.classList.toggle('light');
+  try{localStorage.setItem('theme',document.documentElement.classList.contains('light')?'light':'dark');}catch(e){} draw(); };
+
+function fmt(n,d=2){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}); }
+
+function renderWatch(){
+  $('#wl').innerHTML=WATCH.map(t=>{
+    const q=quotes[t]||{}; const chg=q.chg_pct; const cls=chg>0?'up':chg<0?'down':'';
+    return `<div class="wl-row ${t===sel?'on':''}" data-t="${t}">
+      <div><div class="wl-t">${t}</div><div class="wl-c ${cls}">${chg==null?'':(chg>0?'+':'')+fmt(chg,2)+'%'}</div></div>
+      <div class="wl-p">${q.price!=null?'$'+fmt(q.price,2):'—'}</div></div>`;
+  }).join('');
+  document.querySelectorAll('.wl-row').forEach(r=>r.onclick=()=>{ sel=r.dataset.t; renderWatch(); loadBars(); });
+}
+
+async function loadQuotes(){
+  try{ const d=await fetch('/api/market/quotes?tickers='+WATCH.join(','),{cache:'no-store'}).then(r=>r.json());
+    (d.quotes||[]).forEach(q=>{ quotes[q.ticker||q.symbol]=q; }); renderWatch(); }catch(e){}
+}
+async function loadStatus(){
+  try{ const s=await fetch('/api/market/status',{cache:'no-store'}).then(r=>r.json());
+    $('#hVix').textContent=s.vix!=null?fmt(s.vix,2)+(s.vix_regime?' '+s.vix_regime:''):'—';
+    $('#hMkt').textContent=s.market_open?'OPEN':(s.available===false?'—':'CLOSED'); }catch(e){}
+}
+async function loadBars(){
+  $('#sym').textContent=sel;
+  try{
+    const d=await fetch('/api/market/bars?ticker='+sel+'&timeframe='+tf,{cache:'no-store'}).then(r=>r.json());
+    barsCache[sel]=d.bars||[]; draw();
+  }catch(e){ barsCache[sel]=[]; draw(); }
+}
+
+function draw(){
+  const cv=$('#chart'), bars=barsCache[sel]||[]; if(!cv) return;
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  if(!bars.length){ ctx.fillStyle=cssv('--text2'); ctx.font='12px monospace'; ctx.fillText('No data',12,20); return; }
+  const padR=64, padB=20, padT=8, plotW=w-padR, plotH=h-padB-padT;
+  const N=Math.min(bars.length, Math.floor(plotW/6)); const view=bars.slice(-N);
+  let lo=Infinity,hi=-Infinity; view.forEach(b=>{ lo=Math.min(lo,b.low); hi=Math.max(hi,b.high); });
+  const pad=(hi-lo)*0.06||1; lo-=pad; hi+=pad;
+  const x=i=>i*(plotW/view.length)+ (plotW/view.length)/2;
+  const y=p=>padT+plotH-((p-lo)/(hi-lo))*plotH;
+  // grid + price axis
+  ctx.strokeStyle=cssv('--border'); ctx.fillStyle=cssv('--text2'); ctx.font='10px monospace'; ctx.textBaseline='middle';
+  for(let g=0;g<=4;g++){ const p=lo+(hi-lo)*g/4, yy=y(p);
+    ctx.globalAlpha=.5; ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(plotW,yy); ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillText('$'+fmt(p,2), plotW+6, yy); }
+  // candles
+  const cw=Math.max(1,(plotW/view.length)*0.62);
+  const up=cssv('--green'), down=cssv('--red');
+  view.forEach((b,i)=>{ const xi=x(i), col=b.close>=b.open?up:down;
+    ctx.strokeStyle=col; ctx.fillStyle=col;
+    ctx.beginPath(); ctx.moveTo(xi,y(b.high)); ctx.lineTo(xi,y(b.low)); ctx.stroke();
+    const yo=y(b.open), yc=y(b.close); ctx.fillRect(xi-cw/2, Math.min(yo,yc), cw, Math.max(1,Math.abs(yc-yo))); });
+  // last price marker
+  const last=view[view.length-1];
+  ctx.fillStyle=last.close>=last.open?up:down;
+  ctx.fillRect(plotW, y(last.close)-8, padR, 16);
+  ctx.fillStyle='#04121c'; ctx.textAlign='left'; ctx.fillText(fmt(last.close,2), plotW+4, y(last.close));
+  ctx.textAlign='start';
+  // OHLC header
+  $('#ohlc').innerHTML=`O <b>${fmt(last.open,2)}</b> H <b>${fmt(last.high,2)}</b> L <b>${fmt(last.low,2)}</b> C <b>${fmt(last.close,2)}</b>`;
+}
+
+document.querySelectorAll('#tf button').forEach(b=>b.onclick=()=>{ tf=b.dataset.tf;
+  document.querySelectorAll('#tf button').forEach(x=>x.classList.toggle('on',x===b)); loadBars(); });
+window.addEventListener('resize', draw);
+
+renderWatch(); loadStatus(); loadQuotes(); loadBars();
+setInterval(loadQuotes, 15000); setInterval(loadBars, 15000); setInterval(loadStatus, 60000);
+</script>
+</body>
+</html>
