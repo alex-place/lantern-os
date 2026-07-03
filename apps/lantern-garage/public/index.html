@@ -179,6 +179,7 @@
       max-width: 620px; margin: 18px auto 0;
     }
     .home-suggest-chip {
+      display: inline-flex; align-items: center; gap: 7px;
       padding: 9px 16px;
       border: 1px solid var(--border); border-radius: 9999px;
       background: var(--bg); color: var(--text);
@@ -191,6 +192,9 @@
       transform: translateY(-1px);
     }
     .home-suggest-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* chip icons — same feather stroke idiom as the nav buttons (no emoji) */
+    .home-suggest-chip svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted); transition: color .18s; }
+    .home-suggest-chip:hover svg { color: var(--accent); }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
     /* One-line footer: keep the whole row (brand · nav · GitHub · edition/version)
        on a single line. `nowrap` stops the flex row from stacking; the
@@ -310,11 +314,20 @@
       </button>
     </form>
     <input type="file" id="home-file-input" multiple style="display:none">
-    <!-- ── Suggestion chips (mockup): one-click starter prompts ── -->
+    <!-- ── Suggestion chips: one-click starter prompts (SVG icons, no emoji) ── -->
     <div class="home-suggest" role="group" aria-label="Suggested prompts">
-      <button type="button" class="home-suggest-chip" data-q="Summarize my notes">📄 Summarize notes</button>
-      <button type="button" class="home-suggest-chip" data-q="Plan my week">📅 Plan my week</button>
-      <button type="button" class="home-suggest-chip" data-q="Research a topic: ">🔍 Research a topic</button>
+      <button type="button" class="home-suggest-chip" data-q="Build my resume">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Resume builder
+      </button>
+      <button type="button" class="home-suggest-chip" data-q="Search for job openings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Job search
+      </button>
+      <button type="button" class="home-suggest-chip" data-q="Check today's news">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+        Check the news
+      </button>
     </div>
     <div class="home-file-chip" id="home-file-chip">
       <span id="home-file-chip-name">📄 file.docx</span>
