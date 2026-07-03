@@ -253,13 +253,12 @@
       <div class="form-group">
         <label class="form-label" for="provider-select">AI Provider</label>
         <select id="provider-select" class="form-input">
+          <!-- Options are built dynamically by buildProviderDropdown() in
+               dream-chat-ui.js from /api/providers/status, so the list reflects the
+               providers the running server can actually dispatch to (and the local
+               Σ₀ model only when one is really being served). Auto is the
+               always-present default. -->
           <option value="">Auto (pick best)</option>
-          <option value="claude">Claude</option>
-          <option value="openai">ChatGPT</option>
-          <option value="gemini">Gemini</option>
-          <option value="grok">Grok</option>
-          <option value="ollama">Local Σ₀ Loop (Ouro)</option>
-          <option value="keystone-ft">Keystone FT (Haiku + Memory)</option>
         </select>
       </div>
 
@@ -436,20 +435,30 @@
         : "Sign in with Patreon to unlock Keystone Desk…";
     }
 
-    // Provider dropdown role filtering.
-    const provider = document.getElementById("provider-select");
-    if (provider) {
-      [...provider.options].forEach((option) => {
-        const value = option.value || "auto";
-        const allowed = role === "admin"
-          || value === "auto"
-          || value === "ollama"
-          || plan.modelAccess.includes(value)
-          || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
-        option.disabled = !allowed;
-      });
-    }
+    // Provider dropdown role filtering. Extracted + exposed so the dynamic option
+    // builder (buildProviderDropdown, dream-chat-ui.js) can re-apply it after it
+    // (re)populates the <select> — whichever runs last, the options end up gated.
+    _lastPlanState = { role, plan };
+    gateProviderOptions();
   }
+
+  let _lastPlanState = null;
+  function gateProviderOptions() {
+    if (!_lastPlanState) return;
+    const { role, plan } = _lastPlanState;
+    const provider = document.getElementById("provider-select");
+    if (!provider) return;
+    [...provider.options].forEach((option) => {
+      const value = option.value || "auto";
+      const allowed = role === "admin"
+        || value === "auto"
+        || value === "ollama"
+        || plan.modelAccess.includes(value)
+        || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
+      option.disabled = !allowed;
+    });
+  }
+  window.gateProviderOptions = gateProviderOptions;
 
   async function refreshPatreonSession() {
     try {

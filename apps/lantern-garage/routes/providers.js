@@ -66,6 +66,45 @@ const PROVIDER_CONFIGS = {
 const _envAtStartup = {};
 for (const k of PROVIDER_KEY_ALLOWLIST) _envAtStartup[k] = !!process.env[k];
 
+// ── Local model liveness (honest "ollama" availability) ─────────────────────
+// /api/providers/status must tell the truth about the local Σ₀ model: it is
+// "available" only when a model is actually being served on :11434, not merely
+// configured. The status handler is synchronous (making it async would return a
+// Promise for unmatched paths and break the (req,res)=>bool routing contract), so
+// we keep a short-TTL cache refreshed by a NON-blocking background probe rather
+// than awaiting a network call per request. Mirrors routes/status.js probeLocalModel.
+const _LOCAL_TTL_MS = 4000;
+let _localModel = { serving: false, served_models: [], active_model: null, pinned: null, pinned_served: false, ts: 0 };
+let _localProbeInFlight = false;
+function _refreshLocalModel() {
+  if (_localProbeInFlight || Date.now() - _localModel.ts < _LOCAL_TTL_MS) return;
+  const base = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
+  const pinned = process.env.OLLAMA_MODEL || null;
+  let u;
+  try { u = new URL(base); } catch { return; }
+  _localProbeInFlight = true;
+  const done = (patch) => {
+    _localModel = Object.assign(
+      { serving: false, served_models: [], active_model: null, pinned, pinned_served: false },
+      patch, { ts: Date.now() });
+    _localProbeInFlight = false;
+  };
+  const r = require("http").request(
+    { hostname: u.hostname, port: u.port || 11434, path: "/api/tags", method: "GET" },
+    (up) => { let d = ""; up.on("data", (c) => (d += c)); up.on("end", () => {
+      let served = [];
+      try { served = (JSON.parse(d).models || []).map((m) => String(m.name || "")).filter(Boolean); } catch { /* bad json → no models */ }
+      const norm = (s) => String(s || "").replace(/:latest$/, "").toLowerCase();
+      const pinnedServed = !!pinned && served.some((m) => norm(m) === norm(pinned));
+      done({ serving: true, served_models: served, pinned_served: pinnedServed,
+             active_model: pinnedServed ? pinned : (served[0] || null) });
+    }); });
+  r.on("error", () => done({ serving: false }));
+  r.setTimeout(800, () => { r.destroy(); });   // never hang the status endpoint
+  r.end();
+}
+_refreshLocalModel(); // warm the cache at module load
+
 // Probe the OS registry for ALL allowlisted keys in ONE PowerShell call (per-key
 // spawns were ~20 serial processes — slow enough to hang the status endpoint).
 // User scope preferred, then Machine — Start-DualServers.ps1 hydrates BOTH at
@@ -181,9 +220,19 @@ module.exports = async function providerRoutes(req, res, url, deps) {
     const warnings = [];
 
     for (const [provider, cfg] of Object.entries(PROVIDER_CONFIGS)) {
-      if (!cfg.key) { // ollama / keyless
+      if (!cfg.key) { // ollama — the local Σ₀ model server (keyless)
+        _refreshLocalModel(); // non-blocking; returns the cached probe result
+        const L = _localModel;
         providers[provider] = {
-          hasKey: false, available: true, model: cfg.model,
+          hasKey: false,
+          // Honest: "available" only when a model is genuinely being served on
+          // :11434, not merely configured (was hardcoded true — the fake-option bug).
+          available: L.serving && L.served_models.length > 0,
+          model: L.active_model || cfg.model,
+          serving: L.serving,
+          served_models: L.served_models,
+          pinned: L.pinned,
+          pinned_served: L.pinned_served,
           inProcessEnv: false, startedWithKey: false, inRegistry: false,
           registryScope: null, mismatch: false, lastCheck: new Date().toISOString(),
         };
