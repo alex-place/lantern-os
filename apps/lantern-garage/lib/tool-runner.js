@@ -79,6 +79,30 @@ function _globToRe(glob) {
   return new RegExp("^" + re + "$", "i");
 }
 
+// GET a JSON body from the server's OWN loopback /api/trading/* endpoint. The
+// trader tools run inside the same process as the trading routes, so this reuses
+// the exact live data path (and caches) the trader UI hits — no second data
+// source, no Python spawn of its own. Bounded timeout so a slow feed degrades to
+// an honest "unavailable" instead of hanging the chat turn (#1434 / #1560).
+function _localTradingGet(pathAndQuery, timeoutMs = 9000) {
+  const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
+  return new Promise((resolve, reject) => {
+    const req = http.get(
+      { host: "127.0.0.1", port, path: pathAndQuery, headers: { "x-keystone-internal": "1" } },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          try { resolve(JSON.parse(data)); }
+          catch (e) { reject(new Error("bad JSON from trading endpoint")); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error("trading endpoint timeout")));
+  });
+}
+
 function _runShell(command) {
   const cmd = String(command || "").trim();
   const resolved = resolveCommand(cmd);
@@ -808,6 +832,96 @@ const REGISTRY = {
         }
       }
       return JSON.stringify(out, null, 2);
+    },
+  },
+
+  // ── Trader tools (ADR-0008 / ADR-0013 / #1434 / #1560) ──────────────────────
+  // The stock trader is kept as a *Tool inside the one chat loop*, not a separate
+  // surface: chat can Observe live market state, a ticker's evidence, and the
+  // operator's positions, then Reason/Verify over them (External Reality Rule —
+  // reason from THIS evidence, cite it, never from memory). Each tool calls the
+  // server's own loopback /api/trading/* endpoint, so it reuses the exact live
+  // data path the trader UI uses (keyless + cached).
+  trader_market_status: {
+    policy: "read",
+    guest_safe: true, // public market data (VIX / SPY), no account info
+    desc: "Get the current live market state — VIX level + volatility regime, S&P 500 (SPY) 1-day/5-day trend, and whether the US equity session is open. Use whenever the user asks about 'the market', volatility, the VIX, or overall conditions. Data is live from the trader's keyless feed — cite it as evidence, don't answer from memory.",
+    schema: { type: "object", properties: {} },
+    async run() {
+      try {
+        const d = await _localTradingGet("/api/trading/market-status");
+        if (!d || d.available === false) {
+          return `[trader_market_status: live market data unavailable${d && d.reason ? ` — ${d.reason}` : ""}. Say so rather than guessing.]`;
+        }
+        const sign = (v) => (v >= 0 ? "+" : "") + v;
+        return [
+          `Market status (source: ${d.source || "trader feed"}):`,
+          `  US session: ${d.market_open ? "OPEN" : "CLOSED"}`,
+          `  VIX: ${d.vix} (${d.vix_regime})`,
+          `  SPY: 1d ${sign(d.spy_1d)}%, 5d ${sign(d.spy_5d)}% → ${d.market}`,
+        ].join("\n");
+      } catch (e) {
+        return `[trader_market_status error: ${e.message} — market feed unreachable; say so rather than answering from memory.]`;
+      }
+    },
+  },
+
+  trader_quote: {
+    policy: "read",
+    guest_safe: true, // public per-ticker market data
+    desc: "Get live price, returns, and technicals for a stock or crypto ticker (e.g. AAPL, NVDA, BTCUSD): current price, 1M/3M/YTD/1Y returns, volume vs average, 20/50-day moving averages, and a technical rating. Use whenever the user asks about a specific ticker's price, performance, or whether it looks like a buy — reason from THIS evidence, not memory.",
+    schema: {
+      type: "object",
+      properties: { ticker: { type: "string", description: "Ticker symbol, e.g. AAPL or BTCUSD" } },
+      required: ["ticker"],
+    },
+    async run(i) {
+      const t = String(i.ticker || "").trim().toUpperCase();
+      if (!t) return "[trader_quote error: a ticker is required]";
+      try {
+        const d = await _localTradingGet(`/api/trading/symbol-stats?ticker=${encodeURIComponent(t)}`);
+        if (!d || d.available === false) return `[trader_quote: no live data for ${t}. Say so rather than guessing.]`;
+        const r = d.returns || {};
+        const pct = (v) => (v == null ? "n/a" : `${v >= 0 ? "+" : ""}${v}%`);
+        const num = (v) => (v == null ? "?" : Number(v).toLocaleString("en-US"));
+        const px = (v) => (v == null ? "?" : Number(v).toFixed(2));
+        return [
+          `${d.ticker} — $${px(d.price)} (technical: ${d.technical})`,
+          `  Returns: 1M ${pct(r["1M"])}, 3M ${pct(r["3M"])}, YTD ${pct(r.YTD)}, 1Y ${pct(r["1Y"])}`,
+          `  Volume: ${num(d.volume)} (avg ${num(d.avgVolume)})`,
+          `  SMA20 $${d.sma20}, SMA50 $${d.sma50} — price is ${d.price > d.sma50 ? "above" : "below"} the 50-day`,
+        ].join("\n");
+      } catch (e) {
+        return `[trader_quote error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_positions: {
+    policy: "read", // operator-only (no guest_safe): private account data
+    desc: "Get the operator's current paper-trading positions and account (equity, cash, buying power, day P&L). Use whenever the user asks about 'my positions', 'my portfolio', 'how am I doing', or their P&L. If the broker isn't connected, report that honestly — never invent holdings.",
+    schema: { type: "object", properties: {} },
+    async run() {
+      try {
+        const d = await _localTradingGet("/api/trading/positions");
+        const acct = (d && d.account) || {};
+        if (!d || d.available === false) {
+          return `[trader_positions: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no live positions. Say so honestly; don't invent holdings.]`;
+        }
+        const pos = Array.isArray(d.positions) ? d.positions : [];
+        const head = `Account: equity $${acct.equity ?? 0}, cash $${acct.cash ?? 0}, buying power $${acct.buying_power ?? 0}` +
+          (acct.pnl_today != null ? `, day P&L ${acct.pnl_today >= 0 ? "+" : ""}$${acct.pnl_today}` : "");
+        if (!pos.length) return `${head}\nOpen positions: none.`;
+        const rows = pos.map((p) => {
+          const sym = p.symbol || p.ticker || "?";
+          const entry = p.avg_entry_price ?? p.avg_price ?? "?";
+          const pnl = p.unrealized_pl != null ? ` (P&L ${p.unrealized_pl >= 0 ? "+" : ""}$${p.unrealized_pl})` : "";
+          return `  ${sym}: ${p.qty ?? "?"} @ $${entry}${pnl}`;
+        });
+        return `${head}\nOpen positions (${pos.length}):\n${rows.join("\n")}`;
+      } catch (e) {
+        return `[trader_positions error: ${e.message}]`;
+      }
     },
   },
 };
