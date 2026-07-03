@@ -184,22 +184,8 @@
 </head>
 <body>
 
-<nav class="site-nav">
-  <a class="nav-brand" href="/">
-    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-    <span style="font-size:18px;font-weight:600">unisona.ai</span>
-  </a>
-  <div class="nav-links">
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/stock-trader.html">Trader</a>
-    <a href="/create.html">Create</a>
-    <a href="/explore.html">Explore</a>
-  </div>
-  <div class="nav-actions">
-    <a href="/profile.html" class="nav-btn active" title="Your profile" aria-label="View your profile">👤</a>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
-  </div>
-</nav>
+<!-- Header injected by /js/site-chrome.js (the single global header) -->
+
 
 <main>
   <div class="profile-wrap" id="profile-wrap">
@@ -337,7 +323,7 @@ function renderProfile(profile) {
         <span class="tier-badge ${escapeHtml(role)}">${tier.emoji} ${escapeHtml(tier.label)}</span>
         <div class="hero-actions">
           <button class="btn btn-primary" onclick="openEdit()">✏️ Edit</button>
-          <button class="btn btn-danger" onclick="logout()">🚪 Sign out</button>
+          <button class="btn btn-danger" onclick="logout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</button>
           <a class="btn" href="/">← Home</a>
         </div>
       </div>
@@ -377,6 +363,20 @@ function renderProfile(profile) {
     <div>
       <div class="section-title">Administration</div>
       <div class="access-grid">
+        <a class="access-card" href="/orchestration.html">
+          <span class="access-icon">🎛️</span>
+          <div>
+            <div class="access-label">Orchestration</div>
+            <div class="access-req">Fleet control center</div>
+          </div>
+        </a>
+        <a class="access-card" href="/work.html">
+          <span class="access-icon">📥</span>
+          <div>
+            <div class="access-label">Manual Work</div>
+            <div class="access-req">Pick &amp; hand off issues</div>
+          </div>
+        </a>
         <a class="access-card" href="/admin-flags.html">
           <span class="access-icon">🛠️</span>
           <div>
@@ -469,14 +469,15 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const toggle = document.getElementById('theme-toggle');
-  if (toggle && window.toggleTheme) toggle.addEventListener('click', toggleTheme);
+  // Theme toggle lives in the global header (site-chrome.js) with its own
+  // onclick; no per-page binding needed here.
   document.getElementById('edit-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeEdit();
   });
   init();
 });
 </script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

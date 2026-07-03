@@ -54,7 +54,7 @@ node scripts/test-a11y.js
 **Tested files:**
 - `index.html` (homepage)
 - `dream-chat.html` (journal interface)
-- `operations.html` (dashboard)
+- `explore.html` (Remember surface)
 
 ## GitHub Actions CI
 

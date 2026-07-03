@@ -59,7 +59,7 @@
     media: "🎬 Media search",
   };
 
-  // Agent is contextual — Keystone is default, others triggered by name in message
+  // Agent is contextual — Unisona is default, others triggered by name in message
   function detectAgent(msg) {
     const lower = (msg || "").toLowerCase();
     if (lower.includes("keystone") || lower.includes("debug")) return "keystone";
@@ -169,7 +169,7 @@
     .then(v => {
       if (v?.version) {
         const el = document.getElementById("app-version");
-        if (el) el.textContent = `Keystone OS v${v.version} · private · local`;
+        if (el) el.textContent = `Unisona OS v${v.version} · private · local`;
       }
     })
     .catch(() => {});
@@ -258,7 +258,7 @@
         if (!isUser && entry.meta && (entry.meta.provider || entry.meta.model)) {
           const pm = [entry.meta.provider, entry.meta.model].filter(Boolean).join("/");
           sig = `<div class="msg-route-sig" aria-label="model: ${escapeHtml(pm)}">` +
-            `<span>${escapeHtml(entry.meta.agent || "Keystone")} · chat${time ? " · " + time : ""}</span>` +
+            `<span>${escapeHtml(entry.meta.agent || "Unisona")} · chat${time ? " · " + time : ""}</span>` +
             `<details class="sig-debug" style="display:inline-block;margin-left:6px">` +
             `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none">▸ debug</summary>` +
             `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${escapeHtml(pm)}</span>` +
@@ -276,7 +276,7 @@
           const rich = window.renderToolReplay(entry.meta.tool);
           if (rich) bubbleHtml = rich;
         }
-        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Keystone"}${time ? " · " + time : ""}</div><div class="bubble">${bubbleHtml}</div>${sig}`;
+        row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Unisona"}${time ? " · " + time : ""}</div><div class="bubble">${bubbleHtml}</div>${sig}`;
         fragment.appendChild(row);
       }
       messagesEl.appendChild(fragment);
@@ -606,7 +606,7 @@
       inputEl.value = "";
       const sysRow = document.createElement("div");
       sysRow.className = "msg-row agent";
-      sysRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble" style="font-size:13px">Running convergence loop…</div>`;
+      sysRow.innerHTML = `<div class="msg-label">Unisona</div><div class="bubble" style="font-size:13px">Running convergence loop…</div>`;
       messagesEl.appendChild(sysRow);
       scrollToBottom();
 
@@ -693,7 +693,7 @@
       inputEl.value = "";
       const sysRow = document.createElement("div");
       sysRow.className = "msg-row agent";
-      sysRow.innerHTML = `<div class="msg-label">Keystone</div><div class="bubble">Logging issue…</div>`;
+      sysRow.innerHTML = `<div class="msg-label">Unisona</div><div class="bubble">Logging issue…</div>`;
       messagesEl.appendChild(sysRow);
       scrollToBottom();
       fetch(`${serverBase}/api/dream/chat`, {
@@ -772,7 +772,7 @@
     sendBtn.disabled = true;
     setThinking(true);
 
-    const agentName = directModeEnabled ? "Model" : (agents.find((a) => a.id === detectAgent(message))?.name || "Keystone");
+    const agentName = directModeEnabled ? "Model" : (agents.find((a) => a.id === detectAgent(message))?.name || "Unisona");
     const msgTime = new Date();
     const row = document.createElement("div");
     row.className = "msg-row agent";
@@ -1215,7 +1215,7 @@
       logBtn.onclick = async () => {
         logBtn.disabled = true;
         logBtn.textContent = "Saving…";
-        const fullConv = conversationHistory.map(h => `${h.role === "user" ? "You" : "Keystone"}: ${h.text}`).join("\n");
+        const fullConv = conversationHistory.map(h => `${h.role === "user" ? "You" : "Unisona"}: ${h.text}`).join("\n");
         try {
           const r = await fetch(`${serverBase}/api/dream/create`, {
             method: "POST",
@@ -1229,7 +1229,7 @@
       row.appendChild(logBtn);
     }
 
-    // Keystone MCP: extract code blocks as executable commands
+    // Unisona MCP: extract code blocks as executable commands
     if (directModeEnabled && text) {
       const codeBlocks = text.match(/```(?:bash|powershell|sh)?\n([\s\S]*?)```/g) || [];
       codeBlocks.forEach(block => {
@@ -1253,7 +1253,7 @@
             const outRow = document.createElement("div");
             outRow.className = "msg-row agent";
             const isErr = !d.ok;
-            const label = isErr ? "KEYSTONE EXEC ✗" : "KEYSTONE EXEC ✓";
+            const label = isErr ? "UNISONA EXEC ✗" : "UNISONA EXEC ✓";
             const color = isErr ? "#e05555" : "#4caf82";
             const bg = isErr ? "#1a0a0a" : "#0a1a0e";
             const border = isErr ? "#3d1a1a" : "#1a3d2a";

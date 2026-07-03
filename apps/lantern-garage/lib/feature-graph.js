@@ -43,7 +43,7 @@ const DEFAULT_FEATURES = [
   {
     id: "panels",
     label: "Agent Panels",
-    href: "/operations.html",
+    href: "/orchestration.html",
     icon: "⚙️",
     activation: { flag: "PANELS_ENABLED", minHealth: 0.5, maxLatencyMs: 5000, devOnly: true },
     implementation: "panels-v1",

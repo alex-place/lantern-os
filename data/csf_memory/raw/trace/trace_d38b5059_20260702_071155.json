@@ -1,0 +1,45 @@
+{
+  "memory_id": "trace_d38b5059_20260702_071155",
+  "tier": "trace",
+  "created_at": "2026-07-02T07:11:55.299Z",
+  "updated_at": "2026-07-02T07:11:55.299Z",
+  "content": {
+    "text": "Three Doors (kriskin, the Jester)'s xp-door: Chose the Little Warm Door; entered the XP dreamworld with Blinkbug | Chose: C · The Little Warm Door",
+    "session_id": "three-doors-kriskin",
+    "timestamp": "2026-07-02T07:11:55.299Z",
+    "surface": "three-doors",
+    "role": "user",
+    "raw_input": "Chose the Little Warm Door; entered the XP dreamworld with Blinkbug | Chose: C · The Little Warm Door",
+    "event": "life_fact",
+    "subject": "Three Doors (kriskin, the Jester)",
+    "attribute": "xp-door",
+    "value": "Chose the Little Warm Door; entered the XP dreamworld with Blinkbug | Chose: C · The Little Warm Door"
+  },
+  "confidence": 1,
+  "privacy_scope": "internal",
+  "source_surface": "three-doors",
+  "promoted_from": null,
+  "promotion_chain": [],
+  "cube_partition": "raw",
+  "tags": [
+    "life-memory",
+    "three-doors"
+  ],
+  "agents": [],
+  "checksum": "cb77826cda7b72cb11741dced8aa8fc434e4172b38e82ff4c30ec942228bd751",
+  "vector_embedding": null,
+  "keywords": [
+    "three-doors",
+    "kingdome-of-hearts",
+    "kriskin",
+    "jester",
+    "xp-door",
+    "xp"
+  ],
+  "entities": [],
+  "metadata": {},
+  "actor_id": "",
+  "actor_type": "system",
+  "confidence_reasoning": "",
+  "staleness_signals": []
+}

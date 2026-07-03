@@ -83,7 +83,7 @@
       '<div class="modal-content"><div class="modal-header"><h2 id="issue-title">📷 Report an issue</h2>' +
         '<button class="modal-close" aria-label="Close" onclick="window.issueReporter.close()">×</button></div>' +
       '<div class="modal-body">' +
-        '<div class="form-group"><label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone writes the report from this</span></label>' +
+        '<div class="form-group"><label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Unisona writes the report from this</span></label>' +
           '<div id="issue-dropzone" tabindex="0" style="border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2)">' +
             '<img id="issue-shot-preview" alt="Screenshot preview" style="display:none;width:100%;border-radius:8px;max-height:38vh;object-fit:contain">' +
             '<div id="issue-dropzone-empty"><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">' +
@@ -94,7 +94,7 @@
             '<button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:4px 10px" onclick="window.issueReporter.retake()">↻ Retake</button>' +
             '<button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:4px 10px;margin-left:6px" onclick="window.issueReporter.clearShot()">✕ Remove</button></div>' +
           '<input type="file" id="issue-file-input" accept="image/*" style="display:none"></div>' +
-        '<div class="form-group" id="issue-summary-group" style="display:none"><label class="form-label">Keystone\'s report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>' +
+        '<div class="form-group" id="issue-summary-group" style="display:none"><label class="form-label">Unisona\'s report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>' +
           '<div id="issue-summary" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface2)">' +
             '<div id="issue-summary-title" style="font-weight:600;font-size:14px;color:var(--text)"></div>' +
             '<div id="issue-summary-body" style="color:var(--muted);font-size:13px;margin-top:6px;white-space:pre-wrap;line-height:1.5"></div></div></div>' +
@@ -126,7 +126,7 @@
   }
 
   // Show a captured/pasted/uploaded image in the preview and remember it.
-  // Attaching a shot kicks off Keystone's auto-report; clearing it resets the report.
+  // Attaching a shot kicks off Unisona's auto-report; clearing it resets the report.
   function setShot(dataUrl, blob) {
     state.dataUrl = dataUrl;
     state.blob = blob || null;
@@ -145,8 +145,8 @@
   }
   function clearShot() { setShot(null, null); setStatus(""); }
 
-  // ── Keystone auto-report ────────────────────────────────────────────────────
-  // The user never fills out title/body — Keystone reads the screenshot and writes
+  // ── Unisona auto-report ────────────────────────────────────────────────────
+  // The user never fills out title/body — Unisona reads the screenshot and writes
   // both. The user only reviews the read-only summary and clicks File issue.
   function setReady(ready) {
     var btn = $("issue-submit-btn");
@@ -179,7 +179,7 @@
     group.id = "issue-userdesc-group";
     group.style.display = "none";
     group.innerHTML =
-      '<label class="form-label">Describe the issue <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone couldn\'t read the screenshot, so tell us what\'s wrong</span></label>' +
+      '<label class="form-label">Describe the issue <span style="text-transform:none;font-weight:400;color:var(--muted)">— Unisona couldn\'t read the screenshot, so tell us what\'s wrong</span></label>' +
       '<textarea id="issue-user-desc" class="form-input" rows="3" placeholder="What went wrong? What did you expect to happen?" style="resize:vertical;font-family:inherit"></textarea>';
     anchor.parentNode.insertBefore(group, anchor);
     var ta = group.querySelector("#issue-user-desc");
@@ -219,9 +219,9 @@
     if (!state.dataUrl || state.describing) return;
     state.describing = true;
     resetReport();
-    setStatus("Keystone is reading the screenshot and writing the report…");
+    setStatus("Unisona is reading the screenshot and writing the report…");
     var prompt =
-      "You are Keystone, an AI assistant filing a GitHub bug report for a user, based on a screenshot of the Keystone OS web app. " +
+      "You are Unisona, an AI assistant filing a GitHub bug report for a user, based on a screenshot of the Unisona OS web app. " +
       "Page: " + (location.href || "unknown") + ". " +
       "Look at the screenshot and write a concise developer-facing bug report. " +
       "Respond in EXACTLY this format, nothing else:\n" +
@@ -250,7 +250,7 @@
       })
       .then(function () { state.describing = false; });
   }
-  // If Keystone can't read the shot (no vision provider, etc.), still let the user
+  // If Unisona can't read the shot (no vision provider, etc.), still let the user
   // file — the screenshot is the main payload. Degrade to a page-derived report.
   function fallbackReport(reason) {
     var where = "";
@@ -267,7 +267,7 @@
     if (grp) grp.style.display = "";
     if (ta) { ta.value = ""; try { ta.focus(); } catch (e) { /* focus best-effort */ } }
     setReady(false);   // stays disabled until the user types a description
-    setStatus("Keystone couldn't read the screenshot (" + state.describeReason + "). Add a short description, then file.");
+    setStatus("Unisona couldn't read the screenshot (" + state.describeReason + "). Add a short description, then file.");
   }
 
   function blobToDataUrl(blob) {
@@ -479,14 +479,14 @@
   function submit() {
     var btn = $("issue-submit-btn");
     var title = (state.title || "").trim();
-    if (!state.dataUrl) { setStatus("Add a screenshot first — Keystone writes the report from it.", true); return; }
-    if (state.describing) { setStatus("Keystone is still writing the report — one moment.", true); return; }
+    if (!state.dataUrl) { setStatus("Add a screenshot first — Unisona writes the report from it.", true); return; }
+    if (state.describing) { setStatus("Unisona is still writing the report — one moment.", true); return; }
     if (!title) { setStatus("No report yet — try re-attaching the screenshot.", true); return; }
     // When AI couldn't read the screenshot, require the reporter's own words so we
     // don't file an empty, unactionable issue (#1567).
     var userBody = (state.body || "").trim();
     if (state.describeFailed && !userBody) {
-      setStatus("Add a short description first — Keystone couldn't read the screenshot.", true);
+      setStatus("Add a short description first — Unisona couldn't read the screenshot.", true);
       var ta = $("issue-user-desc"); if (ta) { try { ta.focus(); } catch (e) { /* best-effort */ } }
       return;
     }

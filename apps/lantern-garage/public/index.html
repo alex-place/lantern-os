@@ -44,20 +44,21 @@
     .home-main {
       flex: 1 1 auto;
       display: grid;
-      grid-template-rows: 1fr auto 1fr;   /* brand up · chat centered · meta down */
+      grid-template-rows: auto auto;      /* hero + chat, centered together as a group */
+      align-content: center;              /* balance empty space above & below the pair */
+      row-gap: clamp(16px, 3.5vh, 34px);
       max-width: 900px;
       width: 100%;
       margin: 0 auto;
       padding: 20px;
       overflow: hidden;
     }
-    /* Top zone — brand sits near the top */
-    .home-top { align-self: start; width: 100%; text-align: center; padding-top: clamp(8px, 3vh, 36px); }
-    /* Middle zone — the search bar, vertically centered in the screen.
-       The former bottom zone (duplicate version meta + Trader/Create/Explore
-       quick-links) was merged into the single site footer below, so the grid's
-       third 1fr track is now an empty spacer that keeps the chat centered. */
-    .home-mid { align-self: center; width: 100%; }
+    /* Brand/hero sits directly above the search bar; the two are centered
+       together as one group (see .home-main align-content) now that the former
+       bottom zone — duplicate version meta + Trader/Create/Explore quick-links —
+       was merged into the single site footer below. */
+    .home-top { width: 100%; text-align: center; }
+    .home-mid { width: 100%; }
     .hero { position: relative; text-align: center; padding: 0; }
     /* Hero mandala — the same self-contained animated SVG used in the header,
        sized up and centered above the title. Renders reliably in Chrome
@@ -69,7 +70,17 @@
       margin: 0 auto clamp(10px, 2vh, 20px);
       pointer-events: none; user-select: none;
     }
-    .hero h1 { margin-bottom: 6px; font-size: clamp(2rem, 6vw, 3.2rem); letter-spacing: -0.01em; }
+    /* Gothic hero wordmark — a geometric "gothic" sans (Century Gothic / Franklin
+       Gothic), heavy and rounded to match the design wireframe. NOT blackletter
+       (that read as illegible). These faces ship with Windows/Office; graceful
+       fallback to the heaviest system sans elsewhere. */
+    .hero h1 {
+      margin-bottom: 6px;
+      font-family: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif;
+      font-size: clamp(2.5rem, 10vw, 4rem);       /* large, prominent wordmark to match the wireframe */
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
     .hero .motto { font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
     .hero .tagline { color: var(--text); max-width: 560px; margin: 0 auto 20px; font-size: 1rem; line-height: 1.55; }
     html[data-theme="dark"] .hero h1 { text-shadow: 0 2px 26px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4); }
@@ -162,10 +173,19 @@
     }
     .home-file-chip button:hover { color: var(--text); }
     .site-footer { flex-shrink: 0; margin-top: 0; padding: 12px 20px; }
-    /* Footer version/edition line — sits under the nav row as a second, more
-       muted line so the footer carries the meta that used to live in a
-       separate .home-bottom block above it. */
-    .footer-meta { flex-basis: 100%; text-align: center; font-size: 0.78rem; margin-top: 2px; }
+    /* One-line footer: keep the whole row (brand · nav · GitHub · edition/version)
+       on a single line. `nowrap` stops the flex row from stacking; the
+       edition/version meta no longer claims `flex-basis:100%` (which used to push
+       it onto its own second line). On narrow viewports the row scrolls
+       horizontally instead of wrapping, and `safe center` keeps the start of the
+       row reachable when it overflows. */
+    .footer-inner {
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
+      justify-content: safe center;
+    }
+    .footer-meta { text-align: center; font-size: 0.78rem; }
     /* ── Narrow viewports (phones) ──
        The one-line pill can't hold attach + input + provider-pin + submit at
        ~360px, so the submit button slid off-screen (clipped by overflow:hidden).
@@ -185,11 +205,11 @@
       .footer-meta { font-size: 0.72rem; }
     }
     /* Fallback: on short viewports (small laptops, phones) let the page scroll
-       and stack the three zones naturally instead of forcing the centered grid. */
+       and stack the two zones naturally instead of forcing the centered grid. */
     @media (max-height: 740px) {
       body { overflow: auto; }
       .home-main {
-        grid-template-rows: auto auto auto;
+        grid-template-rows: auto auto;
         align-content: center; row-gap: clamp(18px, 4vh, 36px);
         overflow: visible;
       }
@@ -225,16 +245,21 @@
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
-    <a href="/create.html">Create</a>
+    <a href="/orchestration.html">Orchestration</a>
+    <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
-    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
   </div>
   <div class="nav-actions">
-    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
-    <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">☀</button>
-    <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" title="Report an issue (screenshot → GitHub)" onclick="if(window.issueReporter)window.issueReporter.open()">📷</button>
+    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </a>
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" title="Report an issue (screenshot → GitHub)" onclick="if(window.issueReporter)window.issueReporter.open()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    </button>
   </div>
 </nav>
 
@@ -246,7 +271,6 @@
       <img class="hero__mandala" src="/mandala.svg" alt="" aria-hidden="true" width="148" height="148">
       <h1>unisona.ai</h1>
       <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
-      <p class="tagline">Your AI that actually remembers you — local, private, and free.</p>
     </div>
   </div>
 
@@ -254,7 +278,7 @@
   <div class="home-mid">
     <form class="home-chat" id="home-chat-form" onsubmit="homeChat(event)" role="search" aria-label="Start a chat">
       <button type="button" class="home-attach-btn" id="home-attach-btn" onclick="homeAttachPick()" aria-label="Attach a file (PDF or Word .docx)" title="Attach a file — PDF or .docx">+</button>
-      <input id="home-chat-input" type="text" placeholder="Ask Keystone anything…" autocomplete="off" aria-label="Chat message">
+      <input id="home-chat-input" type="text" placeholder="Ask Unisona anything…" autocomplete="off" aria-label="Chat message">
       <select id="home-provider-pin" aria-label="Pin AI provider" title="Pin which AI provider answers (Auto = best-ranked)">
         <!-- Auto is the only static option; the live providers are loaded
              dynamically from /api/providers/status by buildProviderPin(). -->
@@ -275,7 +299,7 @@
 <footer class="site-footer">
   <div class="footer-inner">
     <span class="footer-brand">
-      <span class="dot online" id="status-dot" title="Server status"></span>
+      <span class="dot" id="status-dot" title="Checking status…"></span>
       unisona.ai
     </span>
     <span class="sep">·</span>
@@ -288,52 +312,18 @@
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
     <span class="visually-hidden" id="status-label">connecting…</span>
+    <span class="sep">·</span>
     <span class="footer-meta"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></span>
   </div>
 </footer>
 <script src="/js/theme-toggle.js"></script>
 <script>
-async function logoutUser() {
-  try {
-    const res = await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (res.ok) {
-      location.href = '/auth.html';
-    } else {
-      alert('Logout failed');
-    }
-  } catch (err) {
-    console.error('Logout error:', err);
-    alert('Logout error: ' + err.message);
-  }
-}
-
-async function updateAuthUI() {
-  try {
-    const res = await fetch('/api/auth/session', { credentials: 'include' });
-    if (res.ok) {
-      const session = await res.json();
-      const logoutBtn = document.getElementById('logout-btn');
-      if (session.authenticated && logoutBtn) {
-        logoutBtn.style.display = 'block';
-      }
-    }
-  } catch (err) {
-    console.error('Auth check error:', err);
-  }
-}
-
-/* Theme toggle event listener */
+/* Theme toggle event listener (logout lives on the profile page, not the nav) */
 document.addEventListener('DOMContentLoaded', () => {
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle && window.toggleTheme) {
     themeToggle.addEventListener('click', toggleTheme);
   }
-
-  // Check auth status and show logout button
-  updateAuthUI();
 });
 
 /* Real-time honest state loader */
@@ -360,15 +350,37 @@ document.addEventListener('DOMContentLoaded', () => {
       fetchJson('/api/serving/status'),
     ]);
 
-    // Server + local model status (footer dot)
+    // Footer light = Ollama health. /api/serving/status → local_model probes
+    // Ollama at :11434: `serving` = server reachable, `pinned_served` = the
+    // pinned model is actually loaded. RED when Ollama is down (or the web server
+    // itself is unreachable), GOLD when Ollama is up but the pinned model isn't
+    // served, GREEN when Ollama is up and ready.
     const serverOnline = !!(health && health.ok);
     const lm = serving?.local_model;
+    const ollamaUp = !!(lm && lm.serving);
+    const pinnedConfigured = !!(lm && lm.pinned);
     const modelUp = !!(lm && lm.pinned_served);
-    const modelNote = lm ? ` · local model ${modelUp ? 'up (' + (lm.active_model || lm.pinned) + ')' : 'offline'}` : '';
+    let dotState, statusText, statusTitle;
+    if (!serverOnline || !ollamaUp) {
+      dotState = 'offline';                                   // red — Ollama is down
+      statusText = serverOnline ? 'ollama offline' : 'server unreachable';
+      statusTitle = serverOnline
+        ? 'Ollama down' + (lm && lm.base ? ' (' + lm.base + ')' : '')
+        : 'Server unreachable';
+    } else if (pinnedConfigured && !modelUp) {
+      dotState = 'warn';                                      // gold — up but model not loaded
+      statusText = 'ollama online · model not loaded';
+      statusTitle = 'Ollama up · pinned model ' + lm.pinned + ' not served';
+    } else {
+      dotState = 'online';                                   // green — Ollama up and ready
+      statusText = 'ollama online';
+      const active = lm.active_model || lm.pinned;
+      statusTitle = 'Ollama up' + (active ? ' · ' + active : '');
+    }
     const dotEl = $('status-dot');
-    dotEl.className = serverOnline ? 'dot online' : 'dot';
-    dotEl.title = (serverOnline ? 'Server online' : 'Server unreachable') + modelNote;
-    $('status-label').textContent = serverOnline ? 'server online' : 'server unreachable';
+    dotEl.className = 'dot ' + dotState;
+    dotEl.title = statusTitle;
+    $('status-label').textContent = statusText;
 
     // Version + git (hero sub-line + clickable version badges)
     // /version.json can 500 in some checkouts; fall back to the git
@@ -415,7 +427,6 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
-<script src="/js/update-checker.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 <!-- Screenshot → GitHub issue reporter (📷 in the header). Modal + styles self-inject; report includes the page URL + captured DOM/console errors. -->
 <script src="/vendor/html2canvas/html2canvas.min.js" defer></script>
@@ -437,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.clearHomeDocx = function () {
     pendingDocx = null;
     document.getElementById('home-file-chip').classList.remove('visible');
-    document.getElementById('home-chat-input').placeholder = 'Ask Keystone anything…';
+    document.getElementById('home-chat-input').placeholder = 'Ask Unisona anything…';
   };
 
   // ── Provider pin: sticky choice forwarded to dream-chat via ?provider= ──────
@@ -468,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
       { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
       { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
       { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama'    },
-      { value: 'keystone-ft', label: 'Keystone FT', bucket: 'ollama'    },
+      { value: 'keystone-ft', label: 'Unisona FT', bucket: 'ollama'    },
     ];
 
     function addPinOption(entry, model) {

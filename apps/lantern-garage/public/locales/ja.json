@@ -6,7 +6,7 @@
     "settings": "設定"
   },
   "hero": {
-    "title": "Lantern OS",
+    "title": "Unisona OS",
     "tagline": "プライベートで高速な、ローカルファーストな推論システム。完全にあなたのもの。",
     "subtext": "Convergence Core v1 · ローカル実行 · アカウント不要"
   },
@@ -24,10 +24,10 @@
     },
     "trade": {
       "label": "トレーディング",
-      "title": "Lantern Trader",
+      "title": "Unisona Trader",
       "description": "予測市場、株式分析、ライブ市場ニュースのためのトレーディングハブ。",
       "cta": "トレーディングを開く",
-      "ariaLabel": "Lantern Trader — 予測市場トレーディングハブ"
+      "ariaLabel": "Unisona Trader — 予測市場トレーディングハブ"
     },
     "create": {
       "label": "作成",

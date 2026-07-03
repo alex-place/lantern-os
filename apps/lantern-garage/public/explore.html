@@ -1128,9 +1128,8 @@
 
     <!-- ── Single slim quick-links row — the feed is the page; everything else
          is a text link, not an engagement-less panel (#1217 single-pane). ── -->
-    <nav class="quick-links" aria-label="Jump to Keystone tools">
+    <nav class="quick-links" aria-label="Jump to Unisona tools">
       <a href="/fallout-radio.html">📻 Radio</a>
-      <a href="/operations.html">Operations</a>
       <a href="/orchestration.html">Work board</a>
       <a href="/knowledgecenter.html#library">Library</a>
       <a href="/knowledgecenter.html">Knowledge Center</a>
@@ -1343,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function doShare(btn) {
     const url = btn.dataset.url || (location.origin + '/explore.html');
-    const title = btn.dataset.title || 'Keystone Explore';
+    const title = btn.dataset.title || 'Unisona Explore';
     record(btn.dataset.key || '', 'like', 0);   // sharing = a strong positive signal
     if (navigator.share) {
       navigator.share({ title, url }).catch(() => {});
@@ -1670,7 +1669,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const shareBtn = el.querySelector('.fc-share');
     if (shareBtn) {
       shareBtn.dataset.url = shareUrlFor(c);
-      shareBtn.dataset.title = c.title || 'Keystone Explore';
+      shareBtn.dataset.title = c.title || 'Unisona Explore';
       if (c.key) shareBtn.dataset.key = c.key;
     }
 

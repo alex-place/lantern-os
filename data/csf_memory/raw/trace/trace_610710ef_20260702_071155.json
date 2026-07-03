@@ -1,0 +1,45 @@
+{
+  "memory_id": "trace_610710ef_20260702_071155",
+  "tier": "trace",
+  "created_at": "2026-07-02T07:11:55.303Z",
+  "updated_at": "2026-07-02T07:11:55.303Z",
+  "content": {
+    "text": "Three Doors (kriskin, the Jester)'s xp-bluescreen: Chose the Blue Screen; stood at the threshold of the unknown | Chose: B · The Blue Screen",
+    "session_id": "three-doors-kriskin",
+    "timestamp": "2026-07-02T07:11:55.303Z",
+    "surface": "three-doors",
+    "role": "user",
+    "raw_input": "Chose the Blue Screen; stood at the threshold of the unknown | Chose: B · The Blue Screen",
+    "event": "life_fact",
+    "subject": "Three Doors (kriskin, the Jester)",
+    "attribute": "xp-bluescreen",
+    "value": "Chose the Blue Screen; stood at the threshold of the unknown | Chose: B · The Blue Screen"
+  },
+  "confidence": 1,
+  "privacy_scope": "internal",
+  "source_surface": "three-doors",
+  "promoted_from": null,
+  "promotion_chain": [],
+  "cube_partition": "raw",
+  "tags": [
+    "life-memory",
+    "three-doors"
+  ],
+  "agents": [],
+  "checksum": "f51589dd06d61d44b7353297d4e26c58a355d82a8a280bc0bab04a1118b5d238",
+  "vector_embedding": null,
+  "keywords": [
+    "three-doors",
+    "kingdome-of-hearts",
+    "kriskin",
+    "jester",
+    "xp-bluescreen",
+    "xp"
+  ],
+  "entities": [],
+  "metadata": {},
+  "actor_id": "",
+  "actor_type": "system",
+  "confidence_reasoning": "",
+  "staleness_signals": []
+}

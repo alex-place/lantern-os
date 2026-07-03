@@ -9,7 +9,7 @@
   const isFlourishing = path.includes('flourishing');
 
   // Determine page title and logo
-  let pageTitle = 'Keystone OS';
+  let pageTitle = 'Unisona OS';
   let pageSubtitle = 'private · local';
   let pageLogo = '🔮';
 
@@ -57,7 +57,7 @@
     return `
       <footer class="common-footer">
         <div class="footer-left">
-          <span>© 2025 Keystone OS</span>
+          <span>© 2025 Unisona OS</span>
         </div>
         <div class="footer-right">
           <a href="/repo/README.md" target="_blank" class="footer-link">Docs</a>

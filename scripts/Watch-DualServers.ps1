@@ -189,8 +189,6 @@ function Write-Heartbeat($mode) {
     "$(Get-Date -Format 'u') mode=$mode pid=$PID" | Set-Content -Path $Heartbeat -Encoding ascii -ErrorAction SilentlyContinue
 }
 
-Log ("Watchdog starting (interval ${IntervalSeconds}s, restart after $FailuresBeforeRestart failed probes). Stable=$StableRoot Dev=$DevRoot")
-
 if ($Once) {
     Invoke-Sweep
     Write-Heartbeat "once"

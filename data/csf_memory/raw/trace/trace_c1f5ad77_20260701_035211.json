@@ -1,0 +1,57 @@
+{
+  "memory_id": "trace_c1f5ad77_20260701_035211",
+  "tier": "trace",
+  "created_at": "2026-07-01T03:52:11.814Z",
+  "updated_at": "2026-07-01T03:52:11.814Z",
+  "content": {
+    "text": "Convergence Q: small modular reactor deployment timelines 2026 → A: As of 2026, the deployment timelines of Small Modular Reactors (SMRs) vary significantly by region and project, with most still in licensing and early construction phases rather than full commercial operation.\n\nIn the United States, ambitious plans like the Carbon Free Power Project in Idaho, which sought to deploy six NuScale SMRs, were canceled, setting back near-term deployment prospects [14].",
+    "session_id": "chat",
+    "timestamp": "2026-07-01T03:52:11.814Z",
+    "surface": "dream-chat",
+    "role": "convergance",
+    "raw_input": "small modular reactor deployment timelines 2026",
+    "event": "convergance",
+    "question": "small modular reactor deployment timelines 2026",
+    "answer": "As of 2026, the deployment timelines of Small Modular Reactors (SMRs) vary significantly by region and project, with most still in licensing and early construction phases rather than full commercial operation.\n\nIn the United States, ambitious plans like the Carbon Free Power Project in Idaho, which sought to deploy six NuScale SMRs, were canceled, setting back near-term deployment prospects [14]. Therefore, no operational SMRs are expected imminently in the US by 2026.\n\nCanada, however, shows more active progress. Licensing efforts have resumed for initial SMR construction projects. Plans involve installing one SMR first, with intentions to expand up to three additional BWRX-300 SMRs later [13]. The Province of New Brunswick has injected $10 million into an advanced SMR Research Cluster, signaling strong governmental support that could help accelerate deployment timelines [5]. Nonetheless, even here, operational SMRs by 2026 remain limited or in the commissioning stage.\n\nGlobally, designs like TerraPower’s advanced fast-neutron reactors and Kairos Power’s molten-salt reactors are in development but face typical hurdles of regulatory review, construction, and testing that typically extend deployment timelines beyond 2026 [11].\n\nIn summary, while several SMR projects approach or are under initial licensing and construction phases by 2026, widespread commercial deployment of SMRs remains on the near horizon rather than a present reality. Expect operational units more likely within the late 2020s to early 2030s, depending on regulatory, financial, and technical milestones.\n\nFor more details:\n- Overview of SMR designs and status: [List of small modular reactor designs](https://en.wikipedia.org/wiki/List_of_small_modular_reactor_designs)\n- Licensing and development in Canada: [Nuclear power in Canada](https://en.wikipedia.org/wiki/Nuclear_power_in_Canada)\n- US SMR projects and cancellations: [Nuclear power in the United States](https://en.wikipedia.org/wiki/Nuclear_power_in_the_United_States)\n- Advanced reactor development examples: [TerraPower](https://en.wikipedia.org/wiki/TerraPower)",
+    "confidence": 0.85,
+    "providers": [
+      "openai",
+      "openai"
+    ],
+    "dissent": [],
+    "synthesizer": "openai/gpt-4.1-mini",
+    "convergence_record_id": "cr-mr1jhkit-0c35jk"
+  },
+  "confidence": 0.85,
+  "privacy_scope": "internal",
+  "source_surface": "dream-chat",
+  "promoted_from": null,
+  "promotion_chain": [],
+  "cube_partition": "raw",
+  "tags": [
+    "convergance",
+    "chat",
+    "council"
+  ],
+  "agents": [],
+  "checksum": "b1416a373382da0cfd953aac016adcb555e5c8e266407edd68b3b572b8ff9a17",
+  "vector_embedding": null,
+  "keywords": [
+    "convergance",
+    "small",
+    "modular",
+    "reactor",
+    "deployment",
+    "timelines",
+    "2026"
+  ],
+  "entities": [
+    "openai",
+    "openai"
+  ],
+  "metadata": {},
+  "actor_id": "",
+  "actor_type": "system",
+  "confidence_reasoning": "",
+  "staleness_signals": []
+}
