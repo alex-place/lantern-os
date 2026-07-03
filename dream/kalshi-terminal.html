@@ -385,6 +385,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .s0 .s0-pos{color:#2bff88}.s0 .s0-neg{color:#ff7a3c}
 .s0 .s0-v{margin-left:auto;font-weight:700;color:#2bff88;letter-spacing:.1em}
 .s0 .s0-v.SKIP_NEG_EV{color:#ff7a3c}.s0 .s0-v.LOW_CONFIDENCE{color:#ffb53b}
+/* news → signal badge */
+.news-sig{margin-top:6px;padding:5px 8px;border:1px solid #33321c;border-radius:6px;
+  background:rgba(255,213,74,.05);font-size:10px;letter-spacing:.02em;color:var(--muted);
+  font-family:ui-monospace,"Cascadia Mono",monospace;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.news-sig .news-tag{font-weight:700;color:#ffd54a}
+.news-sig .news-tag.hi{color:#ff7a3c}.news-sig .news-tag.med{color:#ffd54a}.news-sig .news-tag.lo{color:#9aa}
+.news-sig .news-sep{color:#33321c}
+.news-sig .news-cnt{color:var(--muted)}
+.news-sig .news-hl{flex:1 1 100%;color:#cfd6dd;text-decoration:none;opacity:.85;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.news-sig .news-hl:hover{opacity:1;text-decoration:underline}
 /* grounded evidence */
 .kx-console .grounded-box{font-family:inherit}
 .kx-console .grounded-box.ok{background:rgba(43,255,136,.05);border-color:#1c4a30}
@@ -432,12 +443,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
-    <a href="/kalshi-terminal.html" class="active" aria-current="page">Kalshi</a>
-    <a href="/create.html">Create</a>
+    <a href="/orchestration.html">Orchestration</a>
+    <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
-    <span class="sep" style="margin:0 4px">·</span>
-    <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Patreon ♥</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -802,6 +810,24 @@ function sigma0Badge(card){
     +`</div>`;
 }
 
+// News → signal badge: shows fresh headlines the deck joined onto this market
+// (data/lantern-garage/trading/news.jsonl → lib/news-signal). Empty when no match
+// (e.g. weather markets, which get no news join by design).
+function newsBadge(card){
+  const n=card.news; if(!n||!n.count) return '';
+  const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const impCls=n.impact>=66?'hi':n.impact>=40?'med':'lo';
+  const top=(n.headlines||[])[0];
+  const link=top&&top.url
+    ? `<a class="news-hl" href="${esc(top.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(top.headline)}</a>`
+    : '';
+  return `<div class="news-sig">`
+    +`<span class="news-tag ${impCls}">📰 ${esc(n.symbols.join('/'))} · impact ${n.impact}</span>`
+    +`<span class="news-sep">·</span><span class="news-cnt">${n.count} headline${n.count>1?'s':''}</span>`
+    +link
+    +`</div>`;
+}
+
 // Grounded-card extra: research status, rationale, evidence/sources, Re-ground.
 function groundedExtra(card){
   if(card.mode!=='grounded') return '';
@@ -992,6 +1018,7 @@ function cardInner(card){
         </div>
         <div class="reason">${card.reason||''}</div>
         ${sigma0Badge(card)}
+        ${newsBadge(card)}
         ${strategyReason}
         ${fitnessDisplay}
       </div>
@@ -1044,6 +1071,7 @@ function cardInner(card){
       </div>
       <div class="reason">${card.reason||''}</div>
       ${sigma0Badge(card)}
+      ${newsBadge(card)}
       ${groundedExtra(card)}
       ${strategyReason}
       ${fitnessDisplay}

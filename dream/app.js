@@ -31,7 +31,7 @@ const validators = [
   { name: "Founder controls", state: "held", next: "Require operator-machine auth proof before enabling remote dispatch." },
   { name: "Convergence loop", state: "held", next: "Run PowerShell locally; cloud/Linux keeps the issue visible." },
   { name: "Cloud mirrors", state: "candidate", next: "Promote only after health endpoint returns verified 200." },
-  { name: "Keystone Local First", state: "held", next: "Verify-gated distillation flywheel is off; enable via KEYSTONE_LOCAL_FIRST=1." },
+  { name: "Unisona Local First", state: "held", next: "Verify-gated distillation flywheel is off; enable via KEYSTONE_LOCAL_FIRST=1." },
 ];
 
 function appOrigin() {
@@ -165,8 +165,8 @@ function renderValidators() {
   const pass = validators.filter((validator) => validator.state === "pass").length;
   const held = validators.filter((validator) => validator.state === "held").length;
   $("validatorCounts").textContent = `${pass} pass | ${held} held | ${validators.length} total`;
-  // Update Keystone Local First validator state based on capabilities
-  const keystoneLocalFirstValidator = validators.find(v => v.name === "Keystone Local First");
+  // Update Unisona Local First validator state based on capabilities
+  const keystoneLocalFirstValidator = validators.find(v => v.name === "Unisona Local First");
   if (keystoneLocalFirstValidator) { // Use the constant to reflect the environment variable state
     keystoneLocalFirstValidator.state = KEYSTONE_LOCAL_FIRST_ENV ? "pass" : "held";
   }
@@ -314,7 +314,7 @@ function renderFlatHouse(house) {
   $("flatSources").textContent = String(sources.length || 0);
   $("flatRecords").textContent = String(house.ragRecordCount || 0);
   $("archiveMode").textContent = "manifest only; no repo deletion";
-  $("windowsHost").textContent = house.windowsSurface?.host || "Windows host, Keystone OS app";
+  $("windowsHost").textContent = house.windowsSurface?.host || "Windows host, Unisona OS app";
   $("bootMutation").textContent = house.windowsSurface?.defaultBootMutation || "blocked";
 
   const list = $("flatSourceList");
@@ -500,7 +500,7 @@ async function storeConversation(event) {
   waitingBubble.className = "chat-bubble pending";
   waitingBubble.setAttribute("aria-busy", "true");
   waitingBubble.classList.add("chat-message-text");
-  waitingBubble.textContent = "Waiting for Keystone response—queued for MCP/local reply.";
+  waitingBubble.textContent = "Waiting for Unisona response—queued for MCP/local reply.";
 
   updateBubble(waitingBubble, true);
 
@@ -674,7 +674,7 @@ async function tryMcpChatReply(messages, context) {
     context,
     queued: true,
     status: "waiting_for_mcp_response",
-    message: "Waiting for Keystone response—queued for MCP/local reply.",
+    message: "Waiting for Unisona response—queued for MCP/local reply.",
   };
   return reply;
 }

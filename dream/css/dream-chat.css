@@ -976,13 +976,6 @@
     .empty-state .icon { font-size: 48px; }
     .empty-state h2 { font-size: 1.2rem; color: var(--text); }
     .empty-state p { font-size: 0.88rem; max-width: 380px; }
-    .starter-chips {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 8px;
-    }
 
 /* ── Moon door empty state ── */
 .empty-state .moon-door {
