@@ -1,3 +1,7 @@
+## [1.8.31] - 2026-07-03
+### Added
+- **Hosted-subset surface gate (ADR-0018, W4).** A deployment capability profile (`apps/lantern-garage/lib/deployment-profile.js`), driven by the tenancy seam (`lib/tenant.js`): in the `cloud` profile the static catch-all (`routes/surfaces.js`) serves only the hosted subset (chat / explore / help + the account & landing shell) and redirects every local-only surface (trading, autowork, admin, the life tools, …) to the hosted home; assets still pass so allowed pages render. No-op in `local` (the full app is unchanged). Verified over real HTTP against the actual route handler in both profiles.
+
 ## [1.8.30] - 2026-07-02
 - ADR-0017 accepted + implemented (flag-gated, default OFF): surprise-gated decoding — SURPRISE_INTERVENE=1 turns high-surprise spans into grounding rounds (KC memory / verified tool / web search) and a grounded revise pass on the OpenAI and xAI chat paths (lib/surprise-intervene.js + stream-chat hooks, 14 unit tests).
 
