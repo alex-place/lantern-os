@@ -58,8 +58,47 @@ would be **internal consistency over external reality** — the opposite of Σ�
 Until then the oracle runs on defaults (unchanged). Promotion is one command once validated:
 `node scripts/fit-weather-oracle-params.js --years … && <verify> && commit the params file`.
 
+## Promotion validation (2026-07-02) — against the TRUE settlement source
+
+`scripts/validate-weather-oracle-fit.js` re-ran the fit with the **authoritative NWS CLI**
+settled leg (IEM `json/cli.py` — the KNYC Daily Climatological Report `high`, exactly what
+KXHIGHNY settles on), trained on 2021–23 and scored **out-of-sample** on 2024–25 with the
+distribution-level Verify (#1895):
+
+| | default constants | **fitted-on-CLI** |
+|---|---|---|
+| OOS mean RPS (2024–25, n=723) | 0.0504 | **0.0309** (−38.6%) |
+| OOS PIT χ²ᵣ | **93.98** (wildly mis-calibrated) | 6.36 (mild) |
+| coolBiasF | +1.2 | **−1.551** |
+
+- **The sign flip is real and larger against CLI.** ASOS max − CLI high = **−0.89 °F** (CLI, the
+  official settlement, runs *above* the ASOS max-of-hourly), so the ASOS proxy *understated* it;
+  the true bias is ≈ −1.55 °F. NBS MOS **under-predicts** the KNYC CLI daily max by ~1.5 °F.
+- The default constants are not just off, they are **badly mis-calibrated** (PIT χ² ≈ 94). The
+  fitted set cuts OOS RPS by 39% and PIT χ² by 15×. Strong, out-of-sample evidence.
+
+### Why it is STILL not promoted — the train/serve skew
+
+The fit's forecast leg is **NBS MOS**; the live deck's forecast leg is the **gridded NWS
+forecast** (`api.weather.gov/gridpoints/OKX/34,45`, via `kalshi-nws.getForecastHighs`). A −1.55 °F
+correction measured against *MOS point* input would be **mis-applied** to *gridded-NWS* input if
+the two forecast sources don't share MOS's cold bias (gridpoint highs often sit closer to the
+official max already). Promoting on that skew is internal-consistency-over-reality — the failure
+Σ₀ forbids, and it touches live (scoped) money.
+
+**Correct promotion path (pick one, then `--promote`):**
+1. **Align serving to the calibrated source** — switch the deck's forecast leg to NBS MOS
+   (archivable *and* now calibrated), so train == serve. Cleanest; makes the −1.55 valid.
+2. **Calibrate the served source directly** — accumulate paired (gridded-NWS forecast, CLI high)
+   day-by-day forward (gridded NWS is not archived historically) until n suffices, then promote.
+
+Either way, gate on `validate-weather-oracle-fit.js` showing the fitted set still beats default
+OOS *with the served forecast source*. Until then the oracle runs on defaults.
+
 ## Sources
 Live 2026-07-02: [IEM MOS](https://mesonet.agron.iastate.edu/cgi-bin/request/mos.py?station=KNYC&model=NBS&sts=2025-07-01T00:00Z&ets=2025-07-02T00:00Z&format=csv),
-[IEM ASOS](https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?help=).
+[IEM ASOS](https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?help=),
+[IEM NWS CLI](https://mesonet.agron.iastate.edu/json/cli.py?station=KNYC&year=2024).
 Related: [`kalshi-weather-edge.js`](../../apps/lantern-garage/lib/kalshi-weather-edge.js),
+[`kalshi-nws.js`](../../apps/lantern-garage/lib/kalshi-nws.js),
 [distribution Verify #1895](2026-06-30-sigma0-weather-oracle-kalshi-edge.md), issue #1871.

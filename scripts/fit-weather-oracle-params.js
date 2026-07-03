@@ -98,6 +98,22 @@ function asosDailyHighs(rows) {
   return byDay;
 }
 
+/** NWS CLI JSON rows -> {localDayKey -> {day, high}}. The AUTHORITATIVE KXHIGHNY settlement
+ *  source (NWS Daily Climatological Report daily max), not an ASOS proxy. CLI `valid` is
+ *  already the local calendar day; `results` = [{valid:"YYYY-MM-DD", high:Int|"M"}]. */
+function cliSettledHighs(results) {
+  const byDay = new Map();
+  for (const r of results || []) {
+    const high = Number(r.high);
+    if (!Number.isFinite(high)) continue;               // "M"/missing -> skip
+    const m = String(r.valid || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) continue;
+    const y = +m[1], mo = +m[2], day = +m[3];
+    byDay.set(`${y}-${mo}-${day}`, { day: { key: `${y}-${mo}-${day}`, mmdd: `${mo}-${day}`, y, m: mo, day }, high });
+  }
+  return byDay;
+}
+
 /** Join forecasts with settled highs into {forecast, settled, lead, mmdd, anomaly, posAnom}. */
 function pairData(byRun, settledByDay, { months = [6, 7, 8] } = {}) {
   const pairs = [];
@@ -206,7 +222,7 @@ function fitParams(pairs, opts = {}) {
 }
 
 module.exports = {
-  parseCsv, localDayOf, mosForecastHighs, asosDailyHighs, pairData,
+  parseCsv, localDayOf, mosForecastHighs, asosDailyHighs, cliSettledHighs, pairData,
   fitBiasRegression, fitSigmaByLead, fitCeiling, fitParams, normalFor,
 };
 

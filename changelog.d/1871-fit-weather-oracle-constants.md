@@ -22,6 +22,16 @@ promotion to the live params file is deliberately GATED on re-fitting against th
 settlement source and an out-of-sample RPS/PIT win (kalshi-weather-verify, #1895). This PR ships
 the mechanism only; the oracle keeps running on defaults.
 
-Verify: `node apps/lantern-garage/test/fit-weather-oracle-params.test.js` — 9 cases (fit
-recovers planted constants, IEM CSV parsers on real sample rows, oracle override + fallback).
-Weather-edge self-test still PASS on defaults. Strengthens the **Reason** stage.
+PROMOTION VALIDATION (scripts/validate-weather-oracle-fit.js): re-fit against the AUTHORITATIVE
+NWS CLI settlement (IEM json/cli.py — the KNYC daily-high KXHIGHNY settles on) and scored
+out-of-sample with kalshi-weather-verify (#1895). Trained 2021–23, tested 2024–25 (n=723):
+fitted-on-CLI cuts mean RPS 0.0504→0.0309 (−39%) and PIT χ²ᵣ 94→6 — the default constants are
+badly mis-calibrated; the sign flip is real (coolBias −1.55) and even larger against CLI (ASOS
+max ran 0.89°F BELOW CLI). STILL not promoted: the fit's forecast leg is NBS MOS but the live
+deck serves the gridded NWS forecast (kalshi-nws.getForecastHighs) — a train/serve skew that
+would mis-apply the −1.55°F correction. Promotion path documented in the research note; gate is
+an OOS win with the SERVED forecast source. Oracle stays on defaults.
+
+Verify: fit suite (9 cases) + validate suite (`test/validate-weather-oracle-fit.test.js`, 4
+cases: CLI parse, forward model normalization + ceiling + sign, RPS ranking). Weather-edge
+self-test still PASS on defaults. Strengthens the **Reason** + **Verify** stages.
