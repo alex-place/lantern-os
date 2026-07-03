@@ -377,6 +377,65 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "generate_document",
+      "description": "Generate a tailored document from a template and save it to the user workspace. template: \"resume\" or \"cover-letter\". format: \"html\" (default — open in browser, Print → Save as PDF) or \"markdown\". Pass structured fields matching the template. Returns the workspace path. Operator only.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "string",
+            "description": "\"resume\" or \"cover-letter\""
+          },
+          "fields": {
+            "type": "object",
+            "description": "Template-specific fields (name, email, experience, skills, company, role, …)"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "markdown"
+            ],
+            "description": "Output format (default: \"html\")"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Workspace-relative base name without extension (default: the template name)"
+          }
+        },
+        "required": [
+          "template",
+          "fields"
+        ]
+      },
+      "policy": "mutating",
+      "operator_required": true,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "list_document_templates",
+      "description": "List available document templates (resume, cover-letter) and their input fields. Required fields are marked with *.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "create_document",
       "description": "Create a formatted document (markdown, plaintext) in the user workspace. Returns the workspace-relative path.",
       "input_schema": {

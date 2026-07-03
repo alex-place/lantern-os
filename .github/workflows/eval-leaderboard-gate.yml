@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: eval-leaderboard-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   require-leaderboard-row:
     name: Require a new leaderboard row

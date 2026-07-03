@@ -253,7 +253,7 @@ async function run() {
       req.end();
     });
     assert.ok(r.body.includes("patreon.com"), "Landing page should link to Patreon");
-    assert.ok(r.body.includes("panel"), "Landing page should have panel elements");
+    assert.ok(r.body.includes("home-chat"), "Landing page should have the chat hero CTA");
   });
 
   // ── Summary ─────────────────────────────────────────────────────────────

@@ -17,6 +17,10 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+concurrency:
+  group: code-review-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   code-ratio-check:
     name: Code/data ratio check

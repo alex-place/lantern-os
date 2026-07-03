@@ -10,6 +10,10 @@ env:
   MAX_NEW_MARKDOWN: 12
   ALLOWED_TOP_LEVEL: src,apps,docs,tests,scripts,config,data,ops,integrations,skills,manifests,surfaces,archive,experiments,csf,lore,reports,research,assets,caad,.github,changelog.d
 
+concurrency:
+  group: anti-sprawl-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   anti-sprawl:
     name: Enforce anti-sprawl rules

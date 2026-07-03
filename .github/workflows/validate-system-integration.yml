@@ -20,6 +20,10 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+concurrency:
+  group: validate-system-integration-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── Python MCP Server Tests ────────────────────────────────────────────────
   mcp-server-tests:

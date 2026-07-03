@@ -20,6 +20,10 @@ env:
 permissions:
   contents: read
 
+concurrency:
+  group: a11y-audit-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   site-audit:
     name: Site Audit (Sitemap & Page Validation)
