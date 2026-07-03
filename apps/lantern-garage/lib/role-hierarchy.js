@@ -8,9 +8,18 @@
  *
  * `deep_dreamer` is the $20 web tier; `founder` is kept as a legacy alias at the
  * same level so sessions/profiles persisted before the #698 rename still resolve.
+ *
+ * NOTE on `guest` (#1879): the `guest` level (0) is the *authenticated free tier*
+ * — a signed-in user on no paid plan — NOT an anonymous visitor. "Can this page
+ * load without a login?" is a separate question answered upstream by whether the
+ * request carries a session at all (getSessionUser → session.id): requireRole
+ * treats a session-less caller as guest-level only when the auth gate is off, and
+ * otherwise redirects them to login. The name is retained (not renamed to `free`)
+ * because it is a persisted role value on existing sessions/profiles; renaming it
+ * is a founder-coordinated migration tracked in #1879 / #1876, not a code cleanup.
  */
 const ROLE_HIERARCHY = Object.freeze({
-  guest: 0,
+  guest: 0, // authenticated free tier (see note above) — NOT anonymous
   supporter: 1,
   deep_dreamer: 2,
   founder: 2, // legacy alias for deep_dreamer (#698)
