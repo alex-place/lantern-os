@@ -523,8 +523,9 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // POST /api/trading/orders/place
-  // Place a manual paper order (buy/sell) via Alpaca, routed through the
-  // local TraderAgent → cli.py → Alpaca paper account.
+  // Place an order (buy/sell) via the local TraderAgent → IBKR Client Portal.
+  // HARD-GATED + dry by default (lib/trading-guard.js): a blocked order returns
+  // status:'dry_run' (HTTP 200, not an error) carrying the reason.
   if (url.pathname === '/api/trading/orders/place' && req.method === 'POST') {
     if (!traderAgent) {
       sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
@@ -557,6 +558,10 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
           order_type: result.type,
         }]);
         sendJson(res, result, 201);
+      } else if (result && result.status === 'dry_run') {
+        // Blocked by the safety gate (TRADER_LIVE off / caps / kill-switch): a
+        // successful DRY run, not an error — the UI shows "paper/blocked — why".
+        sendJson(res, result, 200);
       } else {
         sendJson(res, result || { status: 'error', error: 'Unknown error' }, 400);
       }
@@ -1807,18 +1812,6 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     }
   }
 
-  // GET /api/trading/alpaca/account
-  // Returns Alpaca paper trading account
-  if (url.pathname === '/api/trading/alpaca/account' && req.method === 'GET') {
-    try {
-      const account = await bridge.getAlpacaAccount();
-      sendJson(res, { account }, 200);
-    } catch (error) {
-      sendJson(res, { error: 'Alpaca not available', details: error.message }, 503);
-    }
-    return true;
-  }
-
   // ── AI Trader Integration Routes ──────────────────────────────────────────
   // Proxies to the Independent AI Trader's REST API (port 5555, see
   // C:\Independant AI Trader\src\ai_trader_api.py). That service only
@@ -2137,15 +2130,13 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       openai: !!process.env.OPENAI_API_KEY,
       gemini: !!process.env.GEMINI_API_KEY,
       ibkr: !!(ibkrStatus && ibkrStatus.connected),
-      alpaca: !!process.env.ALPACA_API_KEY,
       kalshi: !!process.env.KALSHI_API_KEY,
     };
     sendJson(res, {
       configured: providers,
       ibkr: ibkrStatus || null,
       mcp: {
-        ibkr: `IBKR Client Portal Web API — local gateway at ${ibkrStatus ? ibkrStatus.gatewayUrl : 'https://localhost:5000/v1/api'} (read-only account + positions)`,
-        alpaca: 'Alpaca MCP Server: Stocks, options, crypto, portfolio management'
+        ibkr: `IBKR Client Portal Web API — local gateway at ${ibkrStatus ? ibkrStatus.gatewayUrl : 'https://localhost:5000/v1/api'} (read-only account + positions)`
       }
     }, 200);
     return true;
@@ -2171,18 +2162,9 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         process.env.GEMINI_API_KEY = payload.gemini;
         updated.push('gemini');
       }
-      if (payload.alpaca) {
-        process.env.ALPACA_API_KEY = payload.alpaca;
-        updated.push('alpaca');
-      }
       if (payload.kalshi) {
         process.env.KALSHI_API_KEY = payload.kalshi;
         updated.push('kalshi');
-      }
-      if (payload.alpaca && payload.alpaca.key && payload.alpaca.secret) {
-        process.env.ALPACA_API_KEY = payload.alpaca.key;
-        process.env.ALPACA_SECRET_KEY = payload.alpaca.secret;
-        updated.push('alpaca');
       }
       // trading.html posts { ibkr: { account_id, api_key, api_secret } }. CPAPI
       // auth is gateway/session-based, so only the account id (+ optional gateway

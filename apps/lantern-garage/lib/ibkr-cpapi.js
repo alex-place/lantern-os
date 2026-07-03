@@ -17,9 +17,11 @@
  * runtime. See docs/IBKR-API-SETUP.md and docs/adr/0019 for the decision.
  *
  * Design contract (Σ₀):
- *   - READ-ONLY. Account summary + positions only. No order placement — the
- *     live trader is paused (see data/kalshi kill-file posture); adding order
- *     endpoints here would be an un-reviewed Act-stage capability.
+ *   - Reads are unconditional; WRITES (order placement) are HARD-GATED. placeOrder
+ *     runs through lib/trading-guard.js and is a DRY run by default — it never
+ *     touches the broker unless TRADER_LIVE=1, the shared kill-switch is absent,
+ *     size/notional caps pass, and (for a live account) TRADER_ALLOW_LIVE_ACCOUNT=1.
+ *     See docs/adr/0020-ibkr-live-order-placement.md.
  *   - Fail-soft. Every method resolves to null / [] / {connected:false} when the
  *     gateway is absent or unauthenticated. It NEVER throws for "gateway down",
  *     and it NEVER fabricates a value — a disconnected gateway reports
@@ -41,6 +43,7 @@
 
 const http = require('http');
 const https = require('https');
+const { orderGate } = require('./trading-guard');
 
 const DEFAULT_GATEWAY = 'https://localhost:5000/v1/api';
 
@@ -242,6 +245,114 @@ class IbkrCpapi {
       if (r.json.length < 30) break; // short page → last page
     }
     return out;
+  }
+
+  // ── Contracts + orders (Act stage — gated) ─────────────────────────────────
+
+  /** POST /iserver/secdef/search → resolve a symbol to its primary conid. */
+  async searchContract(symbol, { secType = 'STK' } = {}) {
+    const sym = String(symbol || '').trim().toUpperCase();
+    if (!sym) return null;
+    const r = await this._request('POST', '/iserver/secdef/search', { symbol: sym, name: false, secType });
+    if (!r.ok || !Array.isArray(r.json) || r.json.length === 0) return null;
+    const match = r.json.find((c) => String(c.symbol || '').toUpperCase() === sym) || r.json[0];
+    return {
+      conid: match.conid != null ? Number(match.conid) : null,
+      symbol: match.symbol || sym,
+      description: match.description || match.companyName || '',
+    };
+  }
+
+  /**
+   * Place an order via CPAPI — GATED by lib/trading-guard.js. DRY BY DEFAULT:
+   * with TRADER_LIVE unset it returns {status:'dry_run'} and NEVER contacts the
+   * broker. Handles the CPAPI reply/confirm loop (POST /iserver/reply/{id}).
+   * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
+   */
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY' } = {}) {
+    const status = await this.getStatus();
+    const mode = status.mode; // 'paper' | 'live' | 'unknown'
+    const gate = orderGate({ mode, qty, price, symbol, side });
+    const order = {
+      symbol: symbol || null,
+      conid: conid != null ? Number(conid) : null,
+      side: String(side || '').toUpperCase(),
+      qty: Number(qty) || 0,
+      orderType,
+      price: price != null ? Number(price) : null,
+      tif,
+    };
+
+    // DRY: never touches the broker — surfaces the intent + why it wasn't sent.
+    if (!gate.allowed) {
+      return { status: 'dry_run', dry: true, gate, order, note: gate.reason };
+    }
+    if (!status.connected) {
+      return { status: 'error', dry: false, gate, order, error: 'ibkr gateway not connected/authenticated' };
+    }
+
+    let cid = order.conid;
+    if (cid == null && symbol) {
+      const c = await this.searchContract(symbol);
+      cid = c && c.conid;
+    }
+    if (cid == null) {
+      return { status: 'error', dry: false, gate, order, error: `could not resolve conid for ${symbol || '(none)'}` };
+    }
+    const accountId = await this.resolveAccountId();
+    if (!accountId) return { status: 'error', dry: false, gate, order, error: 'no account id' };
+
+    const leg = {
+      conid: Number(cid),
+      orderType,
+      side: order.side,
+      quantity: order.qty,
+      tif,
+    };
+    if (orderType === 'LMT' && order.price != null) leg.price = order.price;
+
+    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, { orders: [leg] });
+    // CPAPI often replies with confirmation questions [{id, message:[...]}]; answer them.
+    let confirms = 0;
+    while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
+      r = await this._request('POST', `/iserver/reply/${encodeURIComponent(r.json[0].id)}`, { confirmed: true });
+      confirms += 1;
+    }
+    if (!r.ok) return { status: 'error', dry: false, gate, order, error: r.error || 'order_rejected', ibkr: r.json };
+    const first = Array.isArray(r.json) ? r.json[0] : r.json;
+    return {
+      status: 'submitted',
+      dry: false,
+      gate,
+      order,
+      ibkr: first,
+      orderId: (first && (first.order_id || first.orderId || first.id)) || null,
+    };
+  }
+
+  /** GET /iserver/account/orders → normalized live/working orders ([] on failure). */
+  async getLiveOrders() {
+    const r = await this._request('GET', '/iserver/account/orders');
+    if (!r.ok || !r.json) return [];
+    const orders = Array.isArray(r.json.orders) ? r.json.orders : (Array.isArray(r.json) ? r.json : []);
+    return orders.map((o) => ({
+      orderId: o.orderId || o.order_id || o.id || null,
+      symbol: o.ticker || o.symbol || '',
+      side: o.side || '',
+      qty: firstNum(o.totalSize, o.quantity, o.qty) ?? 0,
+      filledQty: firstNum(o.filledQuantity, o.filled) ?? 0,
+      status: o.status || o.order_status || '',
+      orderType: o.orderType || o.order_type || '',
+      price: firstNum(o.price, o.limit_price),
+      avgPrice: firstNum(o.avgPrice, o.average_price),
+    }));
+  }
+
+  /** GET /iserver/account/order/status/{id} → raw status object, or null. */
+  async getOrderStatus(orderId) {
+    if (!orderId) return null;
+    const r = await this._request('GET', `/iserver/account/order/status/${encodeURIComponent(orderId)}`);
+    return r.ok ? r.json : null;
   }
 
   /**

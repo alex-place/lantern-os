@@ -17,10 +17,6 @@ class TradingAPIBridge {
     // soft when it isn't running. Constructed lazily via ibkr().
     this._ibkr = null;
 
-    // Alpaca API (for comparison/fallback)
-    this.alpacaApiKey = process.env.ALPACA_API_KEY || '';
-    this.alpacaSecret = process.env.ALPACA_SECRET_KEY || '';
-    this.alpacaBaseUrl = 'https://paper-api.alpaca.markets/v2';
 
     this.kalshiApiKey = process.env.KALSHI_API_KEY || '';
     this.anthropicKey = process.env.ANTHROPIC_API_KEY || '';
@@ -126,49 +122,6 @@ class TradingAPIBridge {
   }
 
   /**
-   * Get Alpaca account data (paper trading)
-   */
-  async getAlpacaAccount() {
-    if (!this.alpacaApiKey || !this.alpacaSecret) return null;
-
-    return new Promise((resolve) => {
-      const options = {
-        hostname: 'paper-api.alpaca.markets',
-        path: '/v2/account',
-        method: 'GET',
-        headers: {
-          'APCA-API-KEY-ID': this.alpacaApiKey,
-          'APCA-API-SECRET-KEY': this.alpacaSecret,
-          'Accept': 'application/json'
-        },
-        timeout: 5000
-      };
-
-      const req = https.request(options, (res) => {
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            // Alpaca returns {message: "..."} on auth failure
-            resolve(parsed.account_number ? parsed : null);
-          } catch (e) {
-            resolve(null);
-          }
-        });
-      });
-
-      req.on('error', err => {
-        console.error('Alpaca error:', err.message);
-        resolve(null);
-      });
-      req.on('timeout', () => { req.destroy(); resolve(null); });
-
-      req.end();
-    });
-  }
-
-  /**
    * Aggregate all API data into a single dashboard response.
    *
    * `marketData` is intentionally null. The previous version returned hardcoded
@@ -177,12 +130,11 @@ class TradingAPIBridge {
    * violation. Wire a real index/quote feed to populate it honestly.
    */
   async getDashboardData() {
-    const [ibkrStatus, ibkrAccount, ibkrPos, kalshiEvents, alpacaAccount] = await Promise.all([
+    const [ibkrStatus, ibkrAccount, ibkrPos, kalshiEvents] = await Promise.all([
       this.getIBKRStatus().catch(() => null),
       this.getIBKRAccount().catch(() => null),
       this.getIBKRPositions().catch(() => []),
-      this.getKALSHIEvents().catch(() => []),
-      this.getAlpacaAccount().catch(() => null)
+      this.getKALSHIEvents().catch(() => [])
     ]);
 
     return {
@@ -194,8 +146,7 @@ class TradingAPIBridge {
           account: ibkrAccount || null,
           positions: ibkrPos || []
         },
-        kalshi: { connected: kalshiEvents.length > 0, events: kalshiEvents || [] },
-        alpaca: { connected: !!alpacaAccount, account: alpacaAccount || null }
+        kalshi: { connected: kalshiEvents.length > 0, events: kalshiEvents || [] }
       },
       marketData: null
     };
