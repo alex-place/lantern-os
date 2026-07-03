@@ -1,0 +1,1 @@
+Dream-chat hero now matches the home page's brand treatment: gothic wordmark (Century Gothic stack, clamp-sized), clamp-sized mandala, dark-theme text shadows, and home-style suggestion chips. The chat input is now the same pill bar as the home search (accent focus ring, round paper-plane send button).
