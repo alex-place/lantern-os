@@ -1,10 +1,10 @@
 ---
 adr: 0012
 title: Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model)
-status: Proposed
+status: Accepted
 date: 2026-07-01
 deciders: Claude (agent), per issue #1527's own instruction to draft this ADR first
-approved-by: pending   # only Alex Place flips this; agents leave it `pending`
+approved-by: Alex Place (2026-07-02)
 supersedes: none
 superseded-by: none
 ---
@@ -19,7 +19,7 @@ superseded-by: none
 
 ## Status
 
-Proposed
+Accepted (2026-07-02, founder approval).
 
 ## Context
 
