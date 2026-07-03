@@ -5,7 +5,7 @@
 - Deciders: Alex Place (approval required)
 - approved-by: pending
 - Loop stage: Act (real broker orders enter the loop) + Verify (honest dry-run/blocked states, no fabricated fills)
-- Supersedes: the read-only posture of [ADR-0019](0019-ibkr-connectivity-client-portal-gateway.md) for the write path only
+- Supersedes: [ADR-0019](0019-ibkr-connectivity-client-portal-gateway.md) — both its read-only posture AND its local-gateway connectivity model. Per the operator, IBKR is reached via the **hosted Web API** (`https://api.ibkr.com/v1/api`) with an **OAuth bearer token** ("API key") + a `/tickle` session cookie, not the local Client Portal Gateway.
 
 ## Context
 
@@ -31,7 +31,8 @@ order is ever sent unless EVERY condition below is met:
    `qty·price ≤ MAX_ORDER_NOTIONAL` (default $2000).
 4. **Account tier** — a `paper` account (`DU*`) is allowed; a **live (real-money)
    account requires a second opt-in** `TRADER_ALLOW_LIVE_ACCOUNT=1`.
-5. **Authenticated gateway** — the CPAPI gateway must be reachable + logged in
+5. **Authenticated API** — the IBKR Web API (`api.ibkr.com`) must be reachable, the
+   bearer token valid, and a brokerage session established via `/tickle`
    (else `status:'error'`, never a fabricated fill).
 
 A blocked order returns `{status:'dry_run', dry:true, reason}` so the UI shows an
@@ -41,8 +42,8 @@ honest "paper / blocked — why" state. `trader-agent.placeOrder` and
 ## Consequences
 
 - **Safe-by-default**: shipping this does not enable live trading. Real orders need
-  a running/authenticated IBKR gateway **and** Alex to set `TRADER_LIVE=1` (and, on
-  a live account, `TRADER_ALLOW_LIVE_ACCOUNT=1`). Until then it is paper/dry only.
+  a valid IBKR bearer token + brokerage session **and** Alex to set `TRADER_LIVE=1`
+  (and, on a live account, `TRADER_ALLOW_LIVE_ACCOUNT=1`). Until then it is paper/dry only.
 - **Kill-switch parity**: the existing `LIVE-KILL-SWITCH` now halts stock orders too.
 - **Follow-ups (not in this ADR)**: CPAPI **bracket** orders (stop-loss/take-profit
   legs) — `placeOrder` currently passes those through as metadata only; and an

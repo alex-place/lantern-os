@@ -2136,7 +2136,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       configured: providers,
       ibkr: ibkrStatus || null,
       mcp: {
-        ibkr: `IBKR Client Portal Web API — local gateway at ${ibkrStatus ? ibkrStatus.gatewayUrl : 'https://localhost:5000/v1/api'} (read-only account + positions)`
+        ibkr: `IBKR Web API at ${ibkrStatus ? ibkrStatus.gatewayUrl : 'https://api.ibkr.com/v1/api'} (bearer key; account + positions + gated orders)`
       }
     }, 200);
     return true;

@@ -1,42 +1,40 @@
 /**
- * IBKR Client Portal Web API (CPAPI) client — READ-ONLY.
+ * IBKR Web API client — hosted REST at https://api.ibkr.com/v1/api.
  *
- * Grounds the Keystone trader's IBKR integration in the *real* Interactive
- * Brokers connectivity model, replacing the earlier fabricated "direct REST
- * API" (a `Bearer`-token call to `https://api.ibkr.com/v1` — an endpoint that
- * does not exist). IBKR exposes exactly two supported programmatic paths:
+ * Authenticates with an OAuth Bearer token (the "API key") sent on every
+ * request, plus the session cookie the Web API requires: a POST /tickle returns
+ * a `session` token which is echoed back as `Cookie: api={session}` on
+ * subsequent calls (see IBKR Web API docs → "Cookie Management"). This is the
+ * hosted path (direct to IBKR infrastructure) — NOT the local Client Portal
+ * Gateway. Set IBKR_BASE_URL to point at a local gateway
+ * (https://localhost:5000/v1/api) instead if desired; the endpoints are identical.
  *
- *   1. Client Portal Web API (CPAPI)  — REST/WebSocket via a *local gateway*
- *      at https://localhost:5000/v1/api, session-authenticated (browser SSO or
- *      a headless maintainer such as Voyz/IBeam), kept alive with POST /tickle.
- *   2. TWS socket API                 — ports 7496/7497 (TWS) or 4001/4002 (IB
- *      Gateway), requires the desktop app + a language client (@stoqey/ib,
- *      ib_async). Heavier: a Python/socket sidecar.
+ * Config (env):
+ *   IBKR_API_KEY        OAuth bearer token (a.k.a. IBKR_OAUTH_TOKEN)
+ *   IBKR_ACCOUNT_ID     account id (e.g. U1234567 live, DU… paper); else discovered
+ *   IBKR_BASE_URL       override base (default https://api.ibkr.com/v1/api)
+ *   IBKR_TIMEOUT_MS     per-request timeout (default 6000)
+ *   IBKR_TLS_INSECURE=1 skip TLS verification (loopback gateways are skipped anyway)
  *
- * This Node server already speaks HTTP, so CPAPI is the natural fit — no extra
- * runtime. See docs/IBKR-API-SETUP.md and docs/adr/0019 for the decision.
+ * Endpoints used (grounded against interactivebrokers.com/campus IBKR Web API docs):
+ *   POST /tickle                              session token (cookie) + auth status
+ *   GET  /portfolio/accounts                  accounts (call before other /portfolio)
+ *   GET  /portfolio/{acctId}/summary          equity / cash / pnl
+ *   GET  /portfolio/{acctId}/positions/{page} positions (0-indexed pages)
+ *   POST /iserver/secdef/search               symbol → conid
+ *   POST /iserver/account/{acctId}/orders     place order (array body)
+ *   POST /iserver/reply/{messageId}           confirm order reply ({confirmed:true})
+ *   GET  /iserver/account/orders              live/working orders
+ *   GET  /iserver/account/order/status/{id}   order status
  *
  * Design contract (Σ₀):
- *   - Reads are unconditional; WRITES (order placement) are HARD-GATED. placeOrder
- *     runs through lib/trading-guard.js and is a DRY run by default — it never
- *     touches the broker unless TRADER_LIVE=1, the shared kill-switch is absent,
- *     size/notional caps pass, and (for a live account) TRADER_ALLOW_LIVE_ACCOUNT=1.
- *     See docs/adr/0020-ibkr-live-order-placement.md.
+ *   - Reads are unconditional; WRITES (order placement) are HARD-GATED via
+ *     lib/trading-guard.js — placeOrder is DRY by default and never contacts the
+ *     broker unless TRADER_LIVE=1, the shared kill-switch is absent, size/notional
+ *     caps pass, and (for a live account) TRADER_ALLOW_LIVE_ACCOUNT=1. See ADR-0020.
  *   - Fail-soft. Every method resolves to null / [] / {connected:false} when the
- *     gateway is absent or unauthenticated. It NEVER throws for "gateway down",
- *     and it NEVER fabricates a value — a disconnected gateway reports
- *     disconnected, honestly, with evidence.
- *   - No hidden TLS bypass. The gateway serves a self-signed cert on loopback,
- *     so certificate verification is skipped *only* for loopback hosts (or an
- *     explicit IBKR_TLS_INSECURE=1). A remote gateway is verified normally.
- *
- * Endpoints (relative to /v1/api), grounded against interactivebrokers.github.io/cpwebapi
- * and the Voyz/IBeam + Voyz/ibind reference clients:
- *   POST /tickle                              keep-alive; nests iserver.authStatus
- *   POST /iserver/auth/status                 authentication status
- *   GET  /portfolio/accounts                  accounts (call before other /portfolio)
- *   GET  /portfolio/{acctId}/summary          net-liq / cash / pnl
- *   GET  /portfolio/{acctId}/positions/{page} positions (0-indexed pages)
+ *     API is unreachable or the token is missing/expired. It NEVER throws for
+ *     "not connected" and NEVER fabricates a value — an honest status with evidence.
  */
 
 'use strict';
@@ -45,7 +43,7 @@ const http = require('http');
 const https = require('https');
 const { orderGate } = require('./trading-guard');
 
-const DEFAULT_GATEWAY = 'https://localhost:5000/v1/api';
+const DEFAULT_BASE = 'https://api.ibkr.com/v1/api';
 
 /** True for loopback hostnames whose self-signed gateway cert can't be verified. */
 function isLoopback(hostname) {
@@ -54,7 +52,7 @@ function isLoopback(hostname) {
   return h === 'localhost' || h === '::1' || h === '0.0.0.0' || /^127\./.test(h);
 }
 
-/** Coerce a numeric-ish value (number, numeric string, or CPAPI {amount}) → number|null. */
+/** Coerce a numeric-ish value (number, numeric string, or {amount}) → number|null. */
 function pickAmount(obj, keys) {
   if (!obj || typeof obj !== 'object') return null;
   const lower = {};
@@ -77,7 +75,7 @@ function firstNum(...vals) {
   return null;
 }
 
-/** CPAPI /portfolio/{acct}/summary → normalized account shape (defensive: keys vary by gateway build). */
+/** /portfolio/{acct}/summary → normalized account shape (defensive: keys vary by build). */
 function normalizeSummary(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const equity = pickAmount(raw, ['netliquidation', 'netliquidationvalue', 'equitywithloanvalue', 'nlv']);
@@ -91,7 +89,7 @@ function normalizeSummary(raw) {
   return { equity, cash, buyingPower, unrealizedPnl, realizedPnl, excessLiquidity };
 }
 
-/** CPAPI position row → normalized position. */
+/** position row → normalized position. */
 function normalizePosition(p) {
   if (!p || typeof p !== 'object') return null;
   const symbol = p.ticker || p.contractDesc || p.symbol || (p.conid != null ? String(p.conid) : '');
@@ -108,7 +106,7 @@ function normalizePosition(p) {
   };
 }
 
-/** IBKR account ids: DU/DI = paper, U/F = live. */
+/** IBKR account ids: DU/DI/DF = paper, U/F = live. */
 function inferMode(accountId) {
   if (!accountId) return 'unknown';
   const id = String(accountId).toUpperCase();
@@ -119,17 +117,15 @@ function inferMode(accountId) {
 
 class IbkrCpapi {
   constructor(opts = {}) {
-    this.baseUrl = (opts.gatewayUrl || process.env.IBKR_GATEWAY_URL || DEFAULT_GATEWAY).replace(/\/+$/, '');
-    // IBKR_BASE_URL is the legacy var; honor it only if it points at a gateway path,
-    // never the fabricated api.ibkr.com default.
-    const legacy = process.env.IBKR_BASE_URL;
-    if (!opts.gatewayUrl && !process.env.IBKR_GATEWAY_URL && legacy && !/api\.ibkr\.com/i.test(legacy)) {
-      this.baseUrl = legacy.replace(/\/+$/, '');
-    }
+    // OAuth bearer token ("API key"). Reads honor the read-only session; trading
+    // (/iserver) additionally needs a brokerage session (established via /tickle).
+    this.apiKey = opts.apiKey || process.env.IBKR_API_KEY || process.env.IBKR_OAUTH_TOKEN || '';
+    this.baseUrl = (opts.baseUrl || opts.gatewayUrl || process.env.IBKR_BASE_URL || process.env.IBKR_GATEWAY_URL || DEFAULT_BASE).replace(/\/+$/, '');
     this.accountId = opts.accountId || process.env.IBKR_ACCOUNT_ID || '';
     this.timeoutMs = opts.timeoutMs || Number(process.env.IBKR_TIMEOUT_MS) || 6000;
     this.statusTtlMs = opts.statusTtlMs != null ? opts.statusTtlMs : 4000;
     this.tlsInsecure = process.env.IBKR_TLS_INSECURE === '1';
+    this._sessionToken = null; // from POST /tickle → sent back as Cookie: api={token}
     this._statusCache = null; // { at, value }
     this._accountsCache = null;
   }
@@ -141,6 +137,7 @@ class IbkrCpapi {
 
   /**
    * Low-level request. Resolves { ok, status, json, error } — never rejects.
+   * Attaches the OAuth Bearer token and (once obtained) the api= session cookie.
    */
   _request(method, apiPath, body) {
     return new Promise((resolve) => {
@@ -148,12 +145,14 @@ class IbkrCpapi {
       try {
         u = new URL(this.baseUrl + apiPath);
       } catch (e) {
-        return resolve({ ok: false, status: 0, json: null, error: 'bad_gateway_url' });
+        return resolve({ ok: false, status: 0, json: null, error: 'bad_base_url' });
       }
       const isHttps = u.protocol === 'https:';
       const lib = isHttps ? https : http;
       const payload = body != null ? JSON.stringify(body) : null;
-      const headers = { Accept: 'application/json', 'User-Agent': 'keystone-ibkr-cpapi/1.0' };
+      const headers = { Accept: 'application/json', 'User-Agent': 'keystone-ibkr-webapi/1.0' };
+      if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+      if (this._sessionToken) headers.Cookie = `api=${this._sessionToken}`;
       if (payload) {
         headers['Content-Type'] = 'application/json';
         headers['Content-Length'] = Buffer.byteLength(payload);
@@ -185,12 +184,13 @@ class IbkrCpapi {
     });
   }
 
-  /** POST /tickle — keep-alive; the most informative single probe. */
+  /** POST /tickle — captures the session token (cookie) + reports auth status. */
   async probe() {
     const r = await this._request('POST', '/tickle');
     if (!r.ok || !r.json) {
       return { reachable: r.status !== 0, sessionAlive: false, authenticated: false, error: r.error };
     }
+    if (r.json.session) this._sessionToken = r.json.session; // echoed as Cookie: api={session}
     const auth = (r.json.iserver && r.json.iserver.authStatus) || {};
     return {
       reachable: true,
@@ -264,9 +264,10 @@ class IbkrCpapi {
   }
 
   /**
-   * Place an order via CPAPI — GATED by lib/trading-guard.js. DRY BY DEFAULT:
-   * with TRADER_LIVE unset it returns {status:'dry_run'} and NEVER contacts the
-   * broker. Handles the CPAPI reply/confirm loop (POST /iserver/reply/{id}).
+   * Place an order — GATED by lib/trading-guard.js. DRY BY DEFAULT: with
+   * TRADER_LIVE unset it returns {status:'dry_run'} and NEVER contacts the broker.
+   * Body per the IBKR Web API: POST /iserver/account/{acct}/orders with a JSON
+   * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
   async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY' } = {}) {
@@ -288,7 +289,7 @@ class IbkrCpapi {
       return { status: 'dry_run', dry: true, gate, order, note: gate.reason };
     }
     if (!status.connected) {
-      return { status: 'error', dry: false, gate, order, error: 'ibkr gateway not connected/authenticated' };
+      return { status: 'error', dry: false, gate, order, error: 'ibkr not connected/authenticated (brokerage session required for orders)' };
     }
 
     let cid = order.conid;
@@ -302,17 +303,18 @@ class IbkrCpapi {
     const accountId = await this.resolveAccountId();
     if (!accountId) return { status: 'error', dry: false, gate, order, error: 'no account id' };
 
-    const leg = {
+    const ticket = {
       conid: Number(cid),
-      orderType,
-      side: order.side,
+      orderType, // 'MKT' | 'LMT'
+      side: order.side, // 'BUY' | 'SELL'
       quantity: order.qty,
       tif,
     };
-    if (orderType === 'LMT' && order.price != null) leg.price = order.price;
+    if (orderType === 'LMT' && order.price != null) ticket.price = order.price;
 
-    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, { orders: [leg] });
-    // CPAPI often replies with confirmation questions [{id, message:[...]}]; answer them.
+    // Body is a JSON ARRAY of tickets (IBKR Web API "New Order Example").
+    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, [ticket]);
+    // Order reply messages [{id, message, messageIds}] must be confirmed to proceed.
     let confirms = 0;
     while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
       r = await this._request('POST', `/iserver/reply/${encodeURIComponent(r.json[0].id)}`, { confirmed: true });
@@ -358,6 +360,8 @@ class IbkrCpapi {
   /**
    * Composite, honest, cached status. Always resolves; carries [claim, evidence,
    * source] provenance so the UI badge reflects reality instead of a hardcoded true.
+   * connected = the token authenticates AND a brokerage session is up; for reads
+   * alone, a successful /portfolio/accounts is also treated as reachable+usable.
    */
   async getStatus() {
     const now = Date.now();
@@ -366,15 +370,20 @@ class IbkrCpapi {
     }
     const probe = await this.probe();
     let accountId = null;
+    let readsOk = false;
     if (probe.reachable && (probe.authenticated || probe.sessionAlive)) {
       accountId = await this.resolveAccountId().catch(() => null);
+      readsOk = !!accountId;
     }
+    // Even without a full brokerage session, a valid token that lists accounts is
+    // usable for reads — reflect that honestly instead of a flat "not connected".
     const connected = !!(probe.reachable && probe.authenticated);
     const evidence = [];
-    if (!probe.reachable) evidence.push(`gateway unreachable at ${this.baseUrl} (${probe.error || 'no response'})`);
+    if (!this.apiKey) evidence.push('no IBKR_API_KEY / OAuth token set');
+    if (!probe.reachable) evidence.push(`IBKR Web API unreachable at ${this.baseUrl} (${probe.error || 'no response'})`);
     else {
-      evidence.push(`gateway reachable at ${this.baseUrl}`);
-      evidence.push(probe.authenticated ? 'session authenticated' : 'gateway up but NOT authenticated — log in via the Client Portal Gateway');
+      evidence.push(`IBKR Web API reachable at ${this.baseUrl}`);
+      evidence.push(probe.authenticated ? 'session authenticated' : (this.apiKey ? 'token present but NOT authenticated — token may be expired or need /tickle brokerage login' : 'not authenticated'));
       if (accountId) evidence.push(`account ${accountId} (${inferMode(accountId)})`);
     }
     const value = {
@@ -382,10 +391,11 @@ class IbkrCpapi {
       reachable: !!probe.reachable,
       authenticated: !!probe.authenticated,
       sessionAlive: !!probe.sessionAlive,
+      readsOk,
       accountId: accountId || null,
       mode: inferMode(accountId),
       gatewayUrl: this.baseUrl,
-      source: 'ibkr-cpapi',
+      source: 'ibkr-webapi',
       evidence,
       checkedAt: new Date().toISOString(),
     };
@@ -400,4 +410,4 @@ module.exports.pickAmount = pickAmount;
 module.exports.normalizeSummary = normalizeSummary;
 module.exports.normalizePosition = normalizePosition;
 module.exports.inferMode = inferMode;
-module.exports.DEFAULT_GATEWAY = DEFAULT_GATEWAY;
+module.exports.DEFAULT_BASE = DEFAULT_BASE;

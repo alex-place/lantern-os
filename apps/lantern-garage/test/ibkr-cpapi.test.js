@@ -1,16 +1,15 @@
-// Σ₀ external-reality gate for the IBKR Client Portal Web API client.
+// Σ₀ external-reality gate for the IBKR Web API client (hosted, bearer-key auth).
 //
-// The integration this replaces was fictional: a Bearer-token call to
-// api.ibkr.com/v1 (an endpoint that does not exist) plus hardcoded market
-// quotes. This suite pins the honest contract:
-//   1. Pure normalizers map real CPAPI payload shapes → the UI shape.
-//   2. TLS verification is skipped ONLY for loopback (self-signed gateway cert).
-//   3. When the gateway is absent, every method fails soft — null / [] /
+// The client talks to https://api.ibkr.com/v1/api with an OAuth bearer token +
+// the /tickle session cookie (see IBKR Web API docs). This suite pins the honest
+// contract:
+//   1. Pure normalizers map real payload shapes → the UI shape.
+//   2. TLS verification is skipped ONLY for loopback (a self-signed local gateway).
+//   3. When the API is unreachable, every method fails soft — null / [] /
 //      {connected:false} — and NEVER throws and NEVER fabricates a value.
 //
-// No live gateway required: the disconnected path is exercised against a closed
-// loopback port (instant ECONNREFUSED), which is exactly the state a box without
-// IB Gateway running is in.
+// No live API required: the disconnected path is exercised against a closed
+// loopback port (instant ECONNREFUSED).
 //
 // Run: node apps/lantern-garage/test/ibkr-cpapi.test.js
 'use strict';
@@ -102,14 +101,19 @@ check('inferMode: DU=paper, U=live, empty=unknown', () => {
   assert.strictEqual(inferMode(null), 'unknown');
 });
 
-// ── legacy env: the fabricated api.ibkr.com default must NOT be honored ───────
-check('constructor never adopts the fictional api.ibkr.com base', () => {
-  const saved = process.env.IBKR_BASE_URL;
-  process.env.IBKR_BASE_URL = 'https://api.ibkr.com/v1';
-  const c = new IbkrCpapi();
-  assert.ok(!/api\.ibkr\.com/i.test(c.baseUrl), `baseUrl should ignore api.ibkr.com, got ${c.baseUrl}`);
-  assert.ok(/localhost:5000/.test(c.baseUrl), `should fall back to the local gateway, got ${c.baseUrl}`);
-  if (saved === undefined) delete process.env.IBKR_BASE_URL; else process.env.IBKR_BASE_URL = saved;
+// ── config: hosted Web API base + bearer key, overridable ────────────────────
+check('constructor defaults to the hosted api.ibkr.com Web API + honors IBKR_API_KEY/BASE_URL', () => {
+  const savedB = process.env.IBKR_BASE_URL;
+  const savedK = process.env.IBKR_API_KEY;
+  delete process.env.IBKR_BASE_URL;
+  process.env.IBKR_API_KEY = 'tok_abc';
+  const def = new IbkrCpapi();
+  assert.ok(/api\.ibkr\.com\/v1\/api$/.test(def.baseUrl), `default base should be the hosted Web API, got ${def.baseUrl}`);
+  assert.strictEqual(def.apiKey, 'tok_abc');
+  const over = new IbkrCpapi({ baseUrl: 'https://localhost:5000/v1/api' });
+  assert.ok(/localhost:5000/.test(over.baseUrl), `baseUrl override should win, got ${over.baseUrl}`);
+  if (savedB === undefined) delete process.env.IBKR_BASE_URL; else process.env.IBKR_BASE_URL = savedB;
+  if (savedK === undefined) delete process.env.IBKR_API_KEY; else process.env.IBKR_API_KEY = savedK;
 });
 
 // ── fail-soft: gateway absent (closed loopback port) → honest disconnected ────
@@ -125,7 +129,7 @@ async function main() {
     const s = await client.getStatus();
     assert.strictEqual(s.connected, false);
     assert.strictEqual(s.reachable, false);
-    assert.strictEqual(s.source, 'ibkr-cpapi');
+    assert.strictEqual(s.source, 'ibkr-webapi');
     assert.ok(Array.isArray(s.evidence) && s.evidence.length > 0, 'status carries evidence');
     assert.ok(/unreachable/i.test(s.evidence.join(' ')), 'evidence explains the disconnect');
   });
