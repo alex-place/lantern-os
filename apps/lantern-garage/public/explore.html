@@ -1381,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let filter = 'all';
   let filterKind = 'type';           // 'type' (media type chip) | 'topic' (cross-cutting, e.g. finance)
   const seen = new Set();            // stable card ids already shown (dedup across pages)
-  let loading = false, totalShown = 0, cycles = 0;
+  let loading = false, totalShown = 0, cycles = 0, exhausted = false;
 
   // ── Single-active embed player (YouTube / TikTok-style) ──
   // Game / film / radio iframes are heavy: a live frame keeps emulating or
@@ -1751,6 +1751,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // posts. The feed keeps pulling fresh, unique cards until the whole catalog
       // has been shown once, then says you're caught up — never a duplicate.
       if (data && data.cycled) {
+        exhausted = true;
         if (io) io.unobserve(sentinel);
         if (statusEl) statusEl.textContent = totalShown
           ? (totalShown + (filter === 'all' ? '' : ' ' + filter) + " · you're all caught up")
@@ -1758,6 +1759,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (!cards.length) {
+        exhausted = true;
         if (io) io.unobserve(sentinel);
         // Small filtered category fully shown → say "caught up", don't blank or
         // re-stack duplicates (the server no longer cycles a single-page catalog).
@@ -1767,7 +1769,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       appendCards(cards);
+      requestAnimationFrame(fillWhileShort);               // keep filling if the page is too short to scroll
       if (cycles >= MAX_CYCLES) {                          // looped the catalog enough — stop pulling
+        exhausted = true;
         if (io) io.unobserve(sentinel);
         if (statusEl) statusEl.textContent = totalShown + " loaded · you're all caught up";
       } else if (statusEl) {
@@ -1784,6 +1788,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // IntersectionObserver only fires on ENTER transitions. A first page (or a sparse
+  // filtered category like Finance) that doesn't fill the viewport leaves the sentinel
+  // permanently on-screen, so it never re-fires and the feed stalls (e.g. stuck at
+  // "9 finance"). After each successful page, if the sentinel is still on-screen and
+  // the catalog isn't exhausted, pull another — until the content is tall enough to
+  // scroll. Runs on a rAF so `loading` has already been cleared in finally.
+  function fillWhileShort() {
+    if (loading || exhausted) return;
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    if (sentinel.getBoundingClientRect().top <= vh + 700) loadPage();
+  }
+
   const io = ('IntersectionObserver' in window)
     ? new IntersectionObserver((entries) => {
         if (entries.some(e => e.isIntersecting)) loadPage();
@@ -1792,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function reset() {
     filterEpoch++;
-    loading = false; totalShown = 0; cycles = 0;
+    loading = false; totalShown = 0; cycles = 0; exhausted = false;
     seen.clear();
     if (activeEmbed) deactivateEmbed(activeEmbed);   // stop any playing game/film/radio
     if (playObserver) playObserver.disconnect();
