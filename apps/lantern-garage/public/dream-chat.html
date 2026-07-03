@@ -116,42 +116,25 @@
     <button class="sidebar-new-chat" id="new-chat-btn">+ &nbsp;New chat</button>
     <div class="sidebar-section-label">Recents</div>
     <div class="sessions-list" id="sessions-list"></div>
-    <div class="sidebar-foot">
-      <div class="sidebar-foot-actions">
-        <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="toggleTheme()">☀</button>
-        <button class="nav-btn" id="skin-toggle" title="Toggle terminal (CRT) skin" aria-label="Toggle terminal CRT skin" aria-pressed="false" onclick="toggleSkin()">▚</button>
-        <button class="nav-btn" id="voice-btn" aria-label="Narrate replies aloud" aria-pressed="false" title="Narrate replies aloud" onclick="window.narrateReplies=!window.narrateReplies;this.setAttribute('aria-pressed',window.narrateReplies?'true':'false');this.style.color=window.narrateReplies?'#a78bfa':'';if(!window.narrateReplies&&window.speechSynthesis){try{window.speechSynthesis.cancel();}catch(e){}}">🔊</button>
-        <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile · providers &amp; API keys live in Profile → Orchestrator" aria-label="View your profile">👤</a>
-        <button class="nav-btn" id="logout-btn" onclick="logoutUser()" title="Logout" aria-label="Logout" style="display:none;">🚪</button>
-      </div>
-    </div>
   </aside>
 
   <div class="app-main">
-
-    <!-- Header -->
-    <nav class="site-nav">
-      <button class="nav-btn sidebar-toggle" id="sidebar-toggle-btn" aria-label="Toggle chat sidebar" title="Chats">☰</button>
-      <a class="nav-brand" href="/">
-        <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-        <span style="font-size:18px;font-weight:600">unisona.ai</span>
-      </a>
-      <div class="nav-links">
-        <a href="/dream-chat.html" class="active">Chat</a>
-        <a href="/stock-trader.html">Trader</a>
-        <a href="/orchestration.html">Orchestration</a>
-        <a href="/work.html">Work</a>
-        <a href="/explore.html">Explore</a>
-      </div>
-      <button class="nav-btn" id="screenshot-btn" type="button" aria-label="Report an issue with a screenshot" onclick="if(window.issueReporter)window.issueReporter.open()" title="Report an issue (screenshot → GitHub)">📷</button>
-    </nav>
+    <!-- Header/footer are the shared site chrome, injected by /js/site-chrome.js;
+         chat-specific buttons (☰ sidebar, ▚ skin, 🔊 narrate) are added to it
+         top-right by the augment script near the end of this file. -->
 
     <!-- Chat area -->
     <div class="chat-container" id="messages" role="log" aria-label="Conversation messages" aria-live="polite">
       <div class="empty-state" id="empty-state">
-        <div style="text-align:center;padding:40px 20px">
-          <div style="margin-bottom:12px"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:64px;height:64px"></div>
-          <h1 style="font-size:26px;font-weight:600;margin-bottom:6px;color:var(--text)">Keystone Desk</h1>
+        <div class="hero">
+          <img class="hero-mark" src="/mandala.svg" alt="" aria-hidden="true">
+          <h1 class="hero-title">unisona.ai</h1>
+          <p class="hero-tagline">Your local AI that remembers you.</p>
+          <div class="starter-chips">
+            <button class="starter-chip" onclick="fillAndSend('Summarize my notes')">📄 Summarize notes</button>
+            <button class="starter-chip" onclick="fillAndSend('Help me plan my week')">📅 Plan my week</button>
+            <button class="starter-chip" onclick="fillPrompt('Research this topic for me: ')">🔍 Research a topic</button>
+          </div>
         </div>
       </div>
     </div>
@@ -241,7 +224,7 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Keystone writes the report from this</span></label>
+        <label class="form-label">Screenshot <span style="text-transform:none;font-weight:400;color:var(--muted)">— Unisona writes the report from this</span></label>
         <div id="issue-dropzone" tabindex="0" style="border:1px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2)">
           <img id="issue-shot-preview" alt="Screenshot preview" style="display:none;width:100%;border-radius:8px;max-height:38vh;object-fit:contain">
           <div id="issue-dropzone-empty">
@@ -258,10 +241,10 @@
         </div>
         <input type="file" id="issue-file-input" accept="image/*" style="display:none">
       </div>
-      <!-- Keystone writes the title + description from the screenshot; the user
+      <!-- Unisona writes the title + description from the screenshot; the user
            just reviews this read-only summary before filing. No manual fields. -->
       <div class="form-group" id="issue-summary-group" style="display:none">
-        <label class="form-label">Keystone's report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>
+        <label class="form-label">Unisona's report <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-written)</span></label>
         <div id="issue-summary" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface2)">
           <div id="issue-summary-title" style="font-weight:600;font-size:14px;color:var(--text)"></div>
           <div id="issue-summary-body" style="color:var(--muted);font-size:13px;margin-top:6px;white-space:pre-wrap;line-height:1.5"></div>
@@ -339,7 +322,7 @@
       sendBtn.disabled = !plan.canChat;
       input.placeholder = plan.canChat
         ? "Write something, ask a question…"
-        : "Sign in with Patreon to unlock Keystone Desk…";
+        : "Sign in with Patreon to unlock Unisona Desk…";
     }
 
     // Provider dropdown role filtering.
@@ -430,7 +413,64 @@
 <script src="/vendor/html2canvas/html2canvas.min.js"></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>
 <script src="js/convergance-sync.js"></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
+<script>
+/* ── Chat-specific chrome buttons ──────────────────────────────────────────
+   site-chrome.js injects the shared header (brand, links, profile/theme/📷
+   top-right). Chat adds: ☰ sidebar toggle (leftmost, mobile drawer) and the
+   ▚ terminal-skin + 🔊 narrate toggles into .nav-actions (top right).
+   site-chrome's DOMContentLoaded listener registers after parse but before
+   this inline listener fires its setTimeout, so the nav exists by then. */
+(function () {
+  function augmentNav() {
+    var nav = document.querySelector('nav.site-nav');
+    var actions = nav && nav.querySelector('.nav-actions');
+    if (!nav || !actions) { setTimeout(augmentNav, 50); return; }
+    if (document.getElementById('sidebar-toggle-btn')) return; // idempotent
+
+    var burger = document.createElement('button');
+    burger.className = 'nav-btn sidebar-toggle';
+    burger.id = 'sidebar-toggle-btn';
+    burger.title = 'Chats';
+    burger.setAttribute('aria-label', 'Toggle chat sidebar');
+    burger.textContent = '☰';
+    burger.addEventListener('click', function () {
+      var sb = document.getElementById('chat-sidebar');
+      if (!sb) return;
+      if (sb.classList.contains('open')) window.closeSessions(); else window.openSessions();
+    });
+    nav.insertBefore(burger, nav.firstChild);
+
+    var skin = document.createElement('button');
+    skin.className = 'nav-btn';
+    skin.id = 'skin-toggle';
+    skin.title = 'Toggle terminal (CRT) skin';
+    skin.setAttribute('aria-label', 'Toggle terminal CRT skin');
+    skin.setAttribute('aria-pressed', document.documentElement.getAttribute('data-skin') === 'terminal' ? 'true' : 'false');
+    skin.textContent = '▚';
+    skin.addEventListener('click', function () { if (window.toggleSkin) window.toggleSkin(); });
+
+    var voice = document.createElement('button');
+    voice.className = 'nav-btn';
+    voice.id = 'voice-btn';
+    voice.title = 'Narrate replies aloud';
+    voice.setAttribute('aria-label', 'Narrate replies aloud');
+    voice.setAttribute('aria-pressed', 'false');
+    voice.textContent = '🔊';
+    voice.addEventListener('click', function () {
+      window.narrateReplies = !window.narrateReplies;
+      voice.setAttribute('aria-pressed', window.narrateReplies ? 'true' : 'false');
+      voice.style.color = window.narrateReplies ? '#a78bfa' : '';
+      if (!window.narrateReplies && window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+    });
+
+    actions.insertBefore(voice, actions.firstChild);
+    actions.insertBefore(skin, actions.firstChild);
+  }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(augmentNav, 0); });
+})();
+</script>
 <script>
 /* ── File drag-and-drop + cross-page handoff from index.html ── */
 (function () {

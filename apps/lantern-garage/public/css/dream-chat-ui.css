@@ -1,10 +1,21 @@
 #header-status { font-size: 11px; color: var(--muted); margin-left: 6px; }
 
+/* Page frame: global header (site-chrome) on top, chat app filling the middle,
+   global footer pinned below. The chat column scrolls internally. */
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* html,body {height:100%} chain (dream-chat.css) — not dvh, which mis-measures in emulated viewports */
+  overflow: hidden;
+}
+body > nav.site-nav, body > footer.site-footer { flex-shrink: 0; }
+
 /* Main container */
 .app {
   display: flex;
   flex-direction: row;
-  height: 100vh;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
 }
@@ -137,9 +148,23 @@
 .session-menu-item:hover { background: var(--surface2); }
 .session-menu-item.danger { color: #e25555; }
 .session-menu-item.danger:hover { background: rgba(226, 85, 85, .12); }
-.sidebar-foot { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
-.sidebar-foot-actions { display: flex; align-items: center; gap: 6px; }
-.sidebar-foot-actions .nav-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0, 0, 0, .2); }
+/* Hero (empty state) + quick-start chips */
+.hero { text-align: center; padding: 48px 20px; }
+.hero-mark { width: 72px; height: 72px; margin-bottom: 14px; }
+.hero-title { font-size: 30px; font-weight: 650; letter-spacing: -0.01em; color: var(--text); margin-bottom: 6px; }
+.hero-tagline { font-size: 15px; color: var(--muted); margin-bottom: 22px; }
+.starter-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.starter-chip {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-size: 0.9rem; font-family: inherit;
+  padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.starter-chip:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+}
 
 /* Brand glow + soft nav shadow (dream-chat only) */
 .site-nav { box-shadow: 0 1px 0 var(--border), 0 4px 16px rgba(0, 0, 0, .08); }
@@ -620,7 +645,7 @@
   letter-spacing: 0.04em;
 }
 /* Debug-route replies render their signature in black (per request) so the
-   "Keystone · debug route" label reads distinctly from the gold chat route. */
+   "Unisona · debug route" label reads distinctly from the gold chat route. */
 .msg-route-sig.route-debug {
   color: #000;
 }
