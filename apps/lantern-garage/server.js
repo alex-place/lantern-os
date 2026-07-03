@@ -566,6 +566,15 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
 
+  // ── Nav lock-step assertion (#1880): warn if NAV_PAGES has drifted from the
+  // links the global header renders (index.html .nav-links), so a page added to
+  // one list but not the other is caught at boot instead of silently breaking.
+  try {
+    require("./lib/feature-flags").assertNavInSync();
+  } catch (e) {
+    console.error("[feature-flags] nav-sync check failed (non-fatal):", e && e.message);
+  }
+
   // ── Gated auto-dispatch: auto-work the backlog into draft PRs (OFF unless AUTO_DISPATCH=1) ──
   try {
     require("./lib/auto-dispatch").start({ repoRoot: require("path").resolve(__dirname, "../.."), port });
