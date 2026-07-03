@@ -16,32 +16,79 @@
  * calibration band (sigma + downshift uncertainty) net of Kalshi fees — a point
  * estimate that flips sign across the band is noise, not signal.
  *
- * Pure + deterministic + no network. See the Python module + research note
+ * Pure + deterministic + no network at runtime (a one-time local params-file read at
+ * module init — no network). See the Python module + research note
  * docs/research/2026-06-30-sigma0-weather-oracle-kalshi-edge.md for provenance.
+ *
+ * CALIBRATION CONSTANTS: the distribution parameters below are DEFAULTS (the original
+ * hand-anchored estimates). When data/kalshi/weather-oracle-params.json exists — written by
+ * scripts/fit-weather-oracle-params.js from IEM forecast->settlement pairs (#1871) — each
+ * fitted field overrides its default. Per-field validation: a missing/non-finite/mis-shaped
+ * field silently keeps the default, so a bad params file can never break the oracle. With no
+ * file present (the repo default), behavior is byte-identical to the original constants.
  */
 
-// ── measured calibration constants (NCEI/NWS/WeatherSpark — see research note) ──
+const fs = require("fs");
+const path = require("path");
+
+const PARAMS_PATH = path.resolve(__dirname, "../../../data/kalshi/weather-oracle-params.json");
+
+// ── measured climatological normals (NCEI 1991-2020 — genuinely fixed, not fit) ──
 const NORMAL_HIGH_F = {
   "6-25": 82.5, "6-26": 82.7, "6-27": 82.9, "6-28": 83.2, "6-29": 83.4,
   "6-30": 83.6, "7-1": 83.8, "7-2": 83.9, "7-3": 84.1, "7-4": 84.3, "7-5": 84.4,
 };
 const DEFAULT_SUMMER_NORMAL_F = 84.0;
 
-const COOL_BIAS_F = 1.2;       // Central-Park sensor runs cool vs the gridded forecast
-const REGRESSION_K = 0.06;     // large positive anomalies verify less extreme
-const SIGMA_BASE_F = 2.4;      // day-ahead summer max-temp forecast sigma
-const SIGMA_PER_LEAD_F = 0.5;  // error spread grows with lead time
-const SIGMA_NOWCAST_F = 1.5;   // same-day high: much of the heating already observed
+// Defaults = the original hand-anchored estimates. fit-weather-oracle-params.js overrides.
+const DEFAULT_PARAMS = {
+  coolBiasF: 1.2,        // Central-Park sensor runs cool vs the gridded forecast
+  regressionK: 0.06,     // large positive anomalies verify less extreme
+  sigmaBaseF: 2.4,       // day-ahead summer max-temp forecast sigma
+  sigmaPerLeadF: 0.5,    // error spread grows with lead time
+  sigmaNowcastF: 1.5,    // same-day high: much of the heating already observed
+  meanUncF: 0.8,         // +/- downshift uncertainty (shrinks once IEM measures it)
+  sigmaLo: 0.6, sigmaHi: 1.30,  // band multipliers; 0.6*2.4=1.44F floor for a tight market
+  // P(actual KNYC high >= 100 F | NWS forecast high), from the >=100 record + the
+  // 2013-2025 near-miss streak (many 99 F, zero 100 F). Interpolated.
+  ceilingTable: [
+    [99.0, 0.03], [100.0, 0.08], [101.0, 0.13],
+    [102.0, 0.19], [103.0, 0.27], [104.0, 0.38],
+  ],
+};
 
-const MEAN_UNC_F = 0.8;        // +/- downshift uncertainty (until IEM measures it)
-const SIGMA_LO = 0.6, SIGMA_HI = 1.30;  // 0.6*2.4=1.44F floor covers a tight liquid market
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+function isCeilingTable(t) {
+  return Array.isArray(t) && t.length >= 2 &&
+    t.every((r) => Array.isArray(r) && r.length === 2 && isNum(r[0]) && isNum(r[1]) && r[1] >= 0 && r[1] <= 1);
+}
 
-// P(actual KNYC high >= 100 F | NWS forecast high), from the >=100 record + the
-// 2013-2025 near-miss streak (many 99 F, zero 100 F). Interpolated.
-const CEILING_TABLE = [
-  [99.0, 0.03], [100.0, 0.08], [101.0, 0.13],
-  [102.0, 0.19], [103.0, 0.27], [104.0, 0.38],
-];
+/** Load fitted params, overriding each DEFAULT field only when the file supplies a valid
+ *  value. Any read/parse error, or an invalid field, falls back silently to the default. */
+function loadParams(file = PARAMS_PATH) {
+  const p = { ...DEFAULT_PARAMS };
+  let raw;
+  try { raw = JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch { return { ...p, _source: "defaults" }; }
+  if (!raw || typeof raw !== "object") return { ...p, _source: "defaults" };
+  for (const k of ["coolBiasF", "regressionK", "sigmaBaseF", "sigmaPerLeadF", "sigmaNowcastF", "meanUncF", "sigmaLo", "sigmaHi"]) {
+    if (isNum(raw[k])) p[k] = raw[k];
+  }
+  if (isCeilingTable(raw.ceilingTable)) p.ceilingTable = raw.ceilingTable;
+  p._source = raw.fittedAt ? `fitted ${raw.fittedAt} (n=${raw.n ?? "?"})` : "params file";
+  return p;
+}
+
+const PARAMS = loadParams();
+
+const COOL_BIAS_F = PARAMS.coolBiasF;
+const REGRESSION_K = PARAMS.regressionK;
+const SIGMA_BASE_F = PARAMS.sigmaBaseF;
+const SIGMA_PER_LEAD_F = PARAMS.sigmaPerLeadF;
+const SIGMA_NOWCAST_F = PARAMS.sigmaNowcastF;
+const MEAN_UNC_F = PARAMS.meanUncF;
+const SIGMA_LO = PARAMS.sigmaLo, SIGMA_HI = PARAMS.sigmaHi;
+const CEILING_TABLE = PARAMS.ceilingTable;
 
 // ── math (no deps) ────────────────────────────────────────────────────────────
 function erf(x) {
@@ -216,11 +263,12 @@ function selfTest() {
 module.exports = {
   calibratedMean, sigmaForLead, calibratedDistribution, distribution,
   robustEdgeReport, kalshiFeeCents, parseBand, selfTest,
-  CEILING_TABLE,
+  CEILING_TABLE, loadParams, DEFAULT_PARAMS, paramsSource: () => PARAMS._source,
 };
 
 if (require.main === module) {
   const r = selfTest();
   process.stdout.write(`Σ₀ weather-edge self-test: ${r.ok ? "PASS" : "FAIL"}\n`);
+  process.stdout.write(`params: ${PARAMS._source}\n`);
   if (!r.ok) { for (const f of r.fails) process.stdout.write("  - " + f + "\n"); process.exit(1); }
 }
