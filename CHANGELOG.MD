@@ -1,3 +1,7 @@
+## [1.8.35] - 2026-07-03
+- **Dream-chat hero now wears the home-page brand treatment** — gothic wordmark, clamp-sized mandala mark, italic tagline, dark-theme text shadows — so the empty state matches index.html instead of the old generic hero.
+- **Sidebar session cards no longer squash to fit the viewport** (`flex-shrink: 0`), and their headers are bold and wrap up to ~2 lines via `max-height` instead of the `-webkit-box` line-clamp that clipped single-line titles mid-glyph.
+
 ## [1.8.34] - 2026-07-03
 - **Kalshi paper tinder-game.** The Kalshi terminal now plays as a full PAPER (dry-run) prediction-market swipe game: a virtual bankroll that spends down as you buy (buy until no cash), markets you already hold hidden from the buy deck, open positions surfaced as SELL (TAKE) / HOLD (PASS) cards, and an AUTO stop-loss that auto-closes a losing paper position at <= -25% (take-profit stays a manual sell-or-hold). A paper-cash HUD shows bankroll + open count + realized P&L. Improves the **Act** stage (honest, safe tool execution).
 - **Kalshi deck-polling runaway fixed** — an unconditional prefetch cooldown + futile-fetch backoff cut deck polling ~60/min -> ~15/min (browser-measured).
