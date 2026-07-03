@@ -102,12 +102,10 @@ def update_shared_state():
     except Exception as e:
         log.error(f"Failed to update shared state: {e}")
 
-alpaca = tradeapi.REST(
-    os.getenv("ALPACA_API_KEY"),
-    os.getenv("ALPACA_SECRET_KEY"),
-    "https://paper-api.alpaca.markets",
-    api_version="v2"
-)
+# Use the SAME broker client agents.py resolved through the live-trading gate — so the
+# orchestrator and the trading logic can never disagree on paper-vs-live (agents.py only
+# rebinds to LIVE when ALPACA_LIVE=1 AND the readiness gate passes; otherwise PAPER).
+from agents import alpaca
 
 watchlist  = list(DEFAULT_WATCHLIST)
 paused     = [False]

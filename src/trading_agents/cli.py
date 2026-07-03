@@ -759,6 +759,18 @@ def action_list_assets(args):
         return {'assets': [], 'error': str(e)}
 
 
+def action_graduation(args):
+    """
+    Live-trading readiness assessment (the paper→real-money gate).
+
+    Args: {}
+    Returns: get_graduation_analysis() — {ready, trades, win_rate, sharpe,
+             meets_trades, meets_winrate, meets_sharpe, reason, ...}
+    """
+    from agents import get_graduation_analysis
+    return get_graduation_analysis()
+
+
 def main():
     """Main CLI entry point"""
     if len(sys.argv) < 2:
@@ -804,6 +816,7 @@ def main():
         'evaluate_watchlist': action_evaluate_watchlist,
         'validate_symbol': action_validate_symbol,
         'list_assets': action_list_assets,
+        'graduation': action_graduation,
     }
 
     if action not in handlers:

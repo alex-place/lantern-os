@@ -139,6 +139,25 @@ class TraderAgent {
   }
 
   /**
+   * Live-trading readiness (the paper→real-money gate).
+   * Returns: { ready, trades, days_active, win_rate, sharpe, meets_*, reason, ... }
+   */
+  async getReadiness() {
+    const cacheKey = 'readiness';
+    if (this.cache[cacheKey] && Date.now() - this.cache[cacheKey].time < this.cacheExpiry) {
+      return this.cache[cacheKey].data;
+    }
+    try {
+      const result = await this._callPython('graduation', {}, this.fastTimeout);
+      this.cache[cacheKey] = { data: result, time: Date.now() };
+      return result;
+    } catch (error) {
+      console.error('[TraderAgent] Readiness check failed:', error.message);
+      return this._staleOr(cacheKey, { ready: false, reason: this._shortReason(error) });
+    }
+  }
+
+  /**
    * Get market zones for a specific ticker
    * Returns: { support, resistance, trend, volatility, strength, touches }
    */

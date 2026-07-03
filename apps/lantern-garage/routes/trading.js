@@ -618,6 +618,20 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     return true;
   }
 
+  // GET /api/trading/ai-trader/readiness — the paper→real-money gate. Surfaces
+  // get_graduation_analysis (30+ days, 20+ trades, win-rate ≥55%, Sharpe ≥1.0) so
+  // "how close to live" is observable. Read-only; nothing here flips to live.
+  if (url.pathname === '/api/trading/ai-trader/readiness' && req.method === 'GET') {
+    try {
+      if (!traderAgent) { sendJson(res, { ready: false, reason: 'TraderAgent not initialized' }, 503); return true; }
+      const data = await traderAgent.getReadiness();
+      sendJson(res, data, 200);
+    } catch (error) {
+      sendJson(res, { ready: false, reason: 'readiness check failed', details: error.message }, 500);
+    }
+    return true;
+  }
+
   // GET /api/trading/llm-usage — daily Σ₀ model-read tally (made vs saved by the
   // scan cache + grounding pre-gate), so the API-spend reduction is observable.
   if (url.pathname === '/api/trading/llm-usage' && req.method === 'GET') {

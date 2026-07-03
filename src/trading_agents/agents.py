@@ -1058,6 +1058,41 @@ def get_graduation_analysis() -> dict:
         }
 
 
+# ── Live-trading gate (real-money safety) ───────────────────────────────────────
+# `alpaca` is constructed on PAPER at import (top of file). Switching to REAL money
+# requires BOTH an explicit opt-in (env ALPACA_LIVE=1) AND a passing readiness
+# assessment (get_graduation_analysis: 30+ days, 20+ trades, win-rate ≥55%, Sharpe
+# ≥1.0). ANY failure — not opted in, not ready, or an error computing readiness —
+# stays on PAPER. The gate lives in code, not config, and every decision is logged
+# CRITICAL so a live switch is never silent.
+_PAPER_URL = "https://paper-api.alpaca.markets"
+_LIVE_URL = "https://api.alpaca.markets"
+
+
+def resolve_alpaca_base_url() -> str:
+    if os.getenv("ALPACA_LIVE", "0") != "1":
+        return _PAPER_URL
+    try:
+        grad = get_graduation_analysis()
+        ready = bool(grad.get("ready"))
+    except Exception as e:  # noqa: BLE001
+        log.critical("ALPACA_LIVE=1 but readiness check errored (%s) — REFUSING live, staying on PAPER", e)
+        return _PAPER_URL
+    if ready:
+        log.critical("ALPACA_LIVE=1 and readiness gate PASSED — switching to LIVE Alpaca endpoint")
+        return _LIVE_URL
+    log.critical("ALPACA_LIVE=1 but readiness gate FAILED (%s) — REFUSING live, staying on PAPER",
+                 grad.get("reason", "not ready"))
+    return _PAPER_URL
+
+
+# Apply the gate: rebind `alpaca` to LIVE only if it PASSES; otherwise it stays PAPER.
+_resolved_base_url = resolve_alpaca_base_url()
+if _resolved_base_url != _PAPER_URL:
+    alpaca = tradeapi.REST(os.getenv("ALPACA_API_KEY"), os.getenv("ALPACA_SECRET_KEY"),
+                           _resolved_base_url, api_version="v2")
+
+
 def save_lesson(symbol: str, pnl_pct: float,
                 lesson: str, avoid: str, pattern: str):
     con = sqlite3.connect(LESSONS_DB)

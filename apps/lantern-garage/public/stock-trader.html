@@ -424,6 +424,9 @@
     <span id="aiTraderDot" style="width:8px;height:8px;border-radius:50%;background:var(--text2);display:inline-block"></span>
     <span id="aiTraderLabel">AI: —</span>
   </button>
+  <div class="hstat" id="readinessCard" style="cursor:help;min-width:96px" title="Paper→live readiness — waiting for data">
+    <div class="l">Live-ready</div><div class="v" id="hReady">—</div>
+  </div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
     <option value="0">⊞ All</option>
@@ -2597,6 +2600,29 @@ function startDashboard(){
   setInterval(refreshOvernightScan, 60000);  // reflect the auto-reset at market open
   setInterval(refreshAiTrader,     30000);   // master AI-trader ON/OFF state
   refreshAiTrader();                          // show current state immediately
+  setInterval(refreshReadiness,    120000);  // paper→live readiness gate
+  refreshReadiness();
+}
+// ── Paper→live readiness gate (get_graduation_analysis) ─────────────────────
+async function refreshReadiness(){
+  const el=document.getElementById('hReady');
+  const card=document.getElementById('readinessCard');
+  if(!el||!card) return;
+  try{
+    const d=await (await fetch('/api/trading/ai-trader/readiness')).json();
+    const ready=!!d.ready;
+    el.textContent = ready ? 'READY' : 'NO';
+    el.className = 'v ' + (ready ? 'pos' : 'neg');
+    const chk=(ok)=>ok?'✓':'✗';
+    const pct=(n)=>(n==null?'—':(Math.round(n*10)/10)+'%');
+    card.title =
+      'Paper→live readiness (all must pass to trade real money):\n'+
+      `${chk(d.meets_trades)} Trades: ${d.trades ?? '—'} / 20\n`+
+      `${chk(d.meets_days)} Days active: ${d.days_active ?? '—'} / 30\n`+
+      `${chk(d.meets_winrate)} Win rate: ${pct(d.win_rate)} / 55%\n`+
+      `${chk(d.meets_sharpe)} Sharpe: ${d.sharpe ?? '—'} / 1.0\n`+
+      (d.reason ? ('\n'+d.reason) : '');
+  }catch(e){ el.textContent='—'; }
 }
 // ── Master AI-trader ON/OFF toggle ──────────────────────────────────────────
 function _setAiTraderUi(on){
