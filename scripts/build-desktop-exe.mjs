@@ -55,6 +55,25 @@ run(process.execPath, ["--experimental-sea-config", configPath], { cwd: desktopD
 copyFileSync(process.execPath, exePath);
 console.log(`[build] copied runtime → ${exeName} (${mb(exePath)} MB)`);
 
+// 2b. (Windows) Embed the Unisona icon NOW — BEFORE postject. rcedit rewrites the PE
+//     resource section; on a postject'd SEA exe (blob appended) it hangs, but on the
+//     clean node copy it's instant, and postject preserves the icon resource it added.
+if (isWin) {
+  const icoPath = join(desktopDir, "unisona.ico");
+  if (existsSync(icoPath)) {
+    const rceditExe = join(desktopDir, "node_modules", "rcedit", "bin", "rcedit-x64.exe");
+    if (!existsSync(rceditExe)) {
+      console.log("[build] installing rcedit (pinned build dep)…");
+      const npmCli = join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+      run(process.execPath, [npmCli, "install", "--no-audit", "--no-fund", "--no-save", "--prefix", desktopDir, "rcedit@4.0.1"]);
+    }
+    run(rceditExe, [exePath, "--set-icon", icoPath]);
+    console.log("[build] embedded unisona.ico into the exe.");
+  } else {
+    console.log("[build] (no unisona.ico found — skipping icon embed)");
+  }
+}
+
 // 3. Inject the blob into the copied binary. postject rewrites a PE/Mach-O/ELF
 //    resource; the copy's original code-signature (if any) is invalidated — that's
 //    expected, we re-sign in a later step. Node's own signature check is bypassed
