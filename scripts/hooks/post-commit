@@ -1,0 +1,12 @@
+#!/bin/sh
+# Repo-managed post-commit dispatcher.
+#
+# core.hooksPath now points at scripts/hooks, which REPLACES .git/hooks entirely.
+# The opt-in convergence loop (`npm run setup:convergance`) installs a machine-local
+# post-commit into .git/hooks; chain to it if present so the repo-managed switch
+# doesn't disable it. No-op for anyone without a legacy hook.
+legacy="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/post-commit"
+if [ -x "$legacy" ] && [ "$legacy" != "$0" ]; then
+  exec "$legacy" "$@"
+fi
+exit 0

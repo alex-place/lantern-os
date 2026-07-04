@@ -1,0 +1,13 @@
+#!/bin/sh
+# Repo-managed post-checkout dispatcher.
+#
+# core.hooksPath now points at scripts/hooks, which REPLACES .git/hooks entirely.
+# Some setups install a machine-local post-checkout into .git/hooks (the doc-reading
+# reminder, or the opt-in convergence loop from `npm run setup:convergance`). Chain
+# to it if present so switching to repo-managed hooks doesn't silently drop it.
+# No-op for anyone without a legacy hook.
+legacy="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/post-checkout"
+if [ -x "$legacy" ] && [ "$legacy" != "$0" ]; then
+  exec "$legacy" "$@"
+fi
+exit 0

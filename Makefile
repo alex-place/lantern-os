@@ -1,4 +1,4 @@
-.PHONY: test test-dream build-dream up-dream down-dream logs-dream pull-dream-model check-node convergence quickstart squeeze
+.PHONY: test test-dream build-dream up-dream down-dream logs-dream pull-dream-model check-node convergence quickstart squeeze hooks
 
 # Top-down "squeeze & consolidate" scan: duplicates, stray artifacts,
 # un-modernised code, and forbidden-subsystem sprawl across the whole tree.
@@ -28,6 +28,11 @@ pull-dream-model:
 
 check-node:
 	cd apps/lantern-garage && npm run check
+
+# Activate the repo-managed git hooks (core.hooksPath -> scripts/hooks).
+# Auto-runs on `npm install`; run this if you cloned without installing deps.
+hooks:
+	node scripts/setup-hooks.mjs
 
 lint-pages:
 	node scripts/lint-throwaway-pages.mjs

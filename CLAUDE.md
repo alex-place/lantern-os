@@ -371,14 +371,24 @@ successful autowork run satisfies both. Enforced by the single merger
 (`apps/lantern-garage/lib/pr-watcher.js`); held with `needs_convergance_record:#N` /
 `needs_autowork_verification:#N`.
 
-Install hooks:
+Hooks are **repo-managed**: `core.hooksPath` points git at the tracked
+`scripts/hooks/` directory, so every clone runs the same pre-commit / commit-msg /
+pre-push checks (per-lane workstream + slop + change-record + **sprawl tripwire**).
+They install **automatically** via the `prepare` npm script on `npm install`. To
+activate by hand (e.g. you cloned without installing deps):
+```bash
+make hooks        # or: npm run hooks   — both run scripts/setup-hooks.mjs
+```
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/Install-MonoworkstreamHooks.ps1
 ```
+CI re-runs every one of these gates, so a machine that skips local setup is still
+enforced at PR time — the hooks just move the failure left, to before you push.
 
 Bypasses:
 ```bash
 SKIP_MONOWORKSTREAM=1 git commit/push   # skip workstream + slop checks
+SKIP_SPRAWL_CHECK=1 git push            # skip only the new-surface loop-stage gate
 OVERRIDE_MERGE=1 git push origin master  # allow direct master push
 ```
 
