@@ -21,7 +21,7 @@
   // bounce here either.
   const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
-  const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/kalshi-terminal.html'];
+  const TRADE_PAGES = ['/trading.html', '/kalshi-terminal.html'];
   const pathname = window.location.pathname;
   const isPublic = PUBLIC.includes(pathname);
 

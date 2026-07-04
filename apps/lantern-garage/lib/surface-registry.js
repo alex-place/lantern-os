@@ -55,25 +55,15 @@ const CORE = {
 const EXTENSION = {
   // trading terminal cluster
   "trading.html":                  ["trading", "TRADING_ENABLED"],
-  "trading-news.html":             ["trading", "TRADING_ENABLED"],
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
-  "crypto-dashboard.html":         ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
-  "brainrot.html":                 ["creator", "CREATOR_ENABLED"],
-  "courtney.html":                 ["creator", "CREATOR_ENABLED"],
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
-  // games — playable surfaces beside the loop (linked from Explore as game cards)
-  "three-doors.html":              ["game", null],
-  "three-doors-game.html":         ["game", null],
-  // human-flourishing frameworks
-  "flourishing.html":              ["flourishing", "HFF_ENABLED"],
-  "hff.html":                      ["flourishing", "HFF_ENABLED"],
-  // outreach
-  "outreach.html":                 ["outreach", "OUTREACH_ENABLED"],
+  // game — playable surface beside the loop (linked from Explore as a game card)
+  "three-doors-game.html":         ["game", "GAMES_ENABLED"],
   // account / auth / billing
   "auth.html":                     ["account", null],
   "entry.html":                    ["account", null],
@@ -86,8 +76,6 @@ const EXTENSION = {
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
   "faq.html":                      ["meta", null],
-  // visualization
-  "observer-mesh-cube.html":       ["viz", null],
 };
 
 // ── SUBSYSTEMS — top-level NON-HTML subsystems (bots + background services) ──────
@@ -111,6 +99,21 @@ const SUBSYSTEMS = {
   "job-worker":       { tier: "extension", module: "creator",   entry: "apps/lantern-garage/lib/job-worker.js",       flag: "CREATOR_ENABLED" },
   "cloudflare-tunnel":{ tier: "extension", module: "ops",       entry: "apps/lantern-garage/server.js",               flag: "LANTERN_CLOUDFLARE_TUNNEL" },
 };
+
+// ── SPRAWL POLICY — teeth for the boundary (enforced by test/surface-boundary.test.js) ──
+// Classification alone only *labels* sprawl. Two rules push back on it so the North Star's
+// "name the loop stage you improve, or don't add it" is enforced, not just documented:
+//
+//   1. BUDGET — extensions may not outpace the core loop. When the extension:core ratio
+//      exceeds this cap the contract test FAILS: either add core value, or raise the cap
+//      deliberately (a one-line, reviewable edit that makes "we chose more sprawl" explicit
+//      instead of letting it accrete silently).
+const MAX_EXTENSION_RATIO = 0.95; // 17:19 ≈ 0.89 — reconciled onto master (#1980 kept kalshi-screener + reset-password).
+//
+//   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
+//      always-on shell modules below (login/account + project-meta pages that must always
+//      render). This makes "optional capability beside the loop" true in practice, not paper.
+const ALWAYS_ON_MODULES = new Set(["account", "meta"]);
 
 /** Classify one top-level surface filename. Returns null if unclassified. */
 function classify(surface) {
@@ -155,4 +158,4 @@ function summary() {
   };
 }
 
-module.exports = { LOOP_STAGES, CORE, EXTENSION, SUBSYSTEMS, classify, classifySubsystem, unclassified, summary };
+module.exports = { LOOP_STAGES, CORE, EXTENSION, SUBSYSTEMS, MAX_EXTENSION_RATIO, ALWAYS_ON_MODULES, classify, classifySubsystem, unclassified, summary };

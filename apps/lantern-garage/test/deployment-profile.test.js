@@ -3,7 +3,11 @@
 // chat/explore/help + account/landing subset.
 // Run: node apps/lantern-garage/test/deployment-profile.test.js
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 const { profile, isCloud, isSurfaceAllowed, HOSTED_SURFACES } = require("../lib/deployment-profile");
+const reg = require("../lib/surface-registry");
+const PUBLIC = path.resolve(__dirname, "../public");
 
 let failures = 0;
 function check(name, fn) {
@@ -13,7 +17,7 @@ function check(name, fn) {
 function local() { delete process.env.LANTERN_TENANCY; }
 function cloud() { process.env.LANTERN_TENANCY = "cloud"; }
 
-const HOSTED = ["index.html", "dream-chat.html", "explore.html", "help.html"];
+const HOSTED = ["index.html", "dream-chat.html", "explore.html", "faq.html"];
 const LOCAL_ONLY = ["kalshi-terminal.html", "trading.html", "work.html", "admin-flags.html",
   "create.html", "orchestration.html", "knowledgecenter.html"];
 
@@ -42,11 +46,22 @@ check("cloud profile BLOCKS every local-only surface", () => {
 
 check("hosted subset is chat + explore + help + a minimal account/landing shell", () => {
   // Guard against silent subset creep: the product surfaces + the login/landing shell.
-  for (const s of ["dream-chat.html", "explore.html", "help.html"]) {
+  for (const s of ["dream-chat.html", "explore.html", "faq.html"]) {
     assert.ok(HOSTED_SURFACES.has(s), `${s} must be hosted`);
   }
   // Local-only clusters must NOT leak into the hosted subset.
   for (const s of LOCAL_ONLY) assert.ok(!HOSTED_SURFACES.has(s), `${s} must stay local-only`);
+});
+
+check("hosted subset is HONEST — every hosted surface exists on disk and is classified", () => {
+  // The drift-killer: the two surface lists (deployment-profile HOSTED_SURFACES and the
+  // surface-registry) must stay reconciled. A hosted entry pointing at a missing or
+  // unclassified file (e.g. the former dangling "help.html") fails here instead of shipping.
+  const onDisk = new Set(fs.readdirSync(PUBLIC).filter((f) => f.toLowerCase().endsWith(".html")));
+  for (const s of HOSTED_SURFACES) {
+    assert.ok(onDisk.has(s), `hosted surface "${s}" does not exist in public/ (dangling entry)`);
+    assert.ok(reg.classify(s) !== null, `hosted surface "${s}" is not classified in lib/surface-registry.js`);
+  }
 });
 
 if (failures) { console.error(`\n${failures} deployment-profile test(s) failed`); process.exit(1); }

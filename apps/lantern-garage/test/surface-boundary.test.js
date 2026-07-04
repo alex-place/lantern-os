@@ -90,6 +90,27 @@ check("SUBSYSTEMS: every declared entry artifact exists on disk (no fabricated/s
   }
 });
 
+check("SPRAWL BUDGET — extension:core ratio within the declared cap", () => {
+  const s = reg.summary();
+  assert.ok(
+    s.ratio <= reg.MAX_EXTENSION_RATIO,
+    `extension:core ratio ${s.ratio} exceeds cap ${reg.MAX_EXTENSION_RATIO} (${s.extension} ext : ${s.core} core) — ` +
+    `add core value, or raise MAX_EXTENSION_RATIO in lib/surface-registry.js as a deliberate, reviewable decision`
+  );
+});
+
+check("every EXTENSION is gateable — names a flag, or is an always-on shell module", () => {
+  const offenders = Object.entries(reg.EXTENSION)
+    .filter(([, [module, flag]]) => !flag && !reg.ALWAYS_ON_MODULES.has(module))
+    .map(([surface, [module]]) => `${surface} (${module})`)
+    .sort();
+  assert.strictEqual(
+    offenders.length, 0,
+    `ungateable extension(s) — add an env flag, or move to an always-on shell module ` +
+    `(${[...reg.ALWAYS_ON_MODULES].join(", ")}):\n      ${offenders.join("\n      ")}`
+  );
+});
+
 const s = reg.summary();
 console.log(`\nSurface boundary: ${s.core} core · ${s.extension} extension (ratio ${s.ratio}:1)`);
 console.log(`Extensions by module: ${JSON.stringify(s.byModule)}`);

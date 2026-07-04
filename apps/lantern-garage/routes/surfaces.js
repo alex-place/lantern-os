@@ -1,4 +1,4 @@
-// Hub, surfaces directory, HFF alias, and static file catch-all
+// Hub, surfaces directory, and static file catch-all
 const { isSurfaceAllowed } = require("../lib/deployment-profile");
 module.exports = async function surfaceRoutes(req, res, url, deps) {
   const { fs, path, sendJson, sendFile, repoRoot, publicRoot, __dirname: dir } = deps;
@@ -7,12 +7,6 @@ module.exports = async function surfaceRoutes(req, res, url, deps) {
     // Hub redirects to home
     res.writeHead(302, { Location: "/" });
     res.end();
-    return true;
-  }
-
-  if (url.pathname === "/hff" || url.pathname === "/hff/") {
-    // HFF dashboard
-    sendFile(res, path.resolve(publicRoot, "flourishing.html"));
     return true;
   }
 

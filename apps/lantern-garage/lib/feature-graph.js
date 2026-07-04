@@ -74,15 +74,6 @@ const DEFAULT_FEATURES = [
     priority: 8,
   },
   {
-    id: "flourishing",
-    label: "Flourishing",
-    href: "/flourishing.html",
-    icon: "🌱",
-    activation: { flag: "HFF_ENABLED", minHealth: 0.0, maxLatencyMs: 60000, devOnly: false },
-    implementation: "hff-v1",
-    priority: 7,
-  },
-  {
     id: "debug",
     label: "Debug View",
     href: "/debug.html",
