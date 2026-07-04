@@ -2635,10 +2635,14 @@ document.getElementById('input').addEventListener('input', e => {
   // keystone-ft is a local fine-tune served through ollama, so it shares that bucket
   // (and is only offered when a matching tag is actually being served).
   const CATALOG = [
-    { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
-    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
-    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
-    { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
+    { value: 'claude',      label: 'Claude',      bucket: 'anthropic'  },
+    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'     },
+    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'     },
+    { value: 'grok',        label: 'Grok',        bucket: 'xai'        },
+    { value: 'deepseek',    label: 'DeepSeek',    bucket: 'deepseek'   },
+    { value: 'mistral',     label: 'Mistral',     bucket: 'mistral'    },
+    { value: 'perplexity',  label: 'Perplexity',  bucket: 'perplexity' },
+    { value: 'cohere',      label: 'Cohere',      bucket: 'cohere'     },
     { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama', local: true },
     { value: 'keystone-ft', label: 'Keystone FT', bucket: 'ollama', local: true },
   ];

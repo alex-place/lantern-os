@@ -395,19 +395,12 @@
 
   let _lastPlanState = null;
   function gateProviderOptions() {
-    if (!_lastPlanState) return;
-    const { role, plan } = _lastPlanState;
+    // Every AI model is available on the free tier — the dropdown only ever lists
+    // providers the server can actually dispatch to (buildProviderDropdown), so
+    // there is nothing to lock. (Per-role limits are message counts, not models.)
     const provider = document.getElementById("provider-select");
     if (!provider) return;
-    [...provider.options].forEach((option) => {
-      const value = option.value || "auto";
-      const allowed = role === "admin"
-        || value === "auto"
-        || value === "ollama"
-        || plan.modelAccess.includes(value)
-        || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
-      option.disabled = !allowed;
-    });
+    [...provider.options].forEach((option) => { option.disabled = false; });
   }
   window.gateProviderOptions = gateProviderOptions;
 
@@ -497,7 +490,7 @@
   const label  = document.getElementById('mp-label');
   if (!select || !picker || !btn || !menu || !label) return;
 
-  const EMOJI = { '': '✦', auto: '✦', claude: '◆', openai: '✺', gemini: '✧', grok: '𝕏', ollama: '🜁', 'keystone-ft': '⬡' };
+  const EMOJI = { '': '✦', auto: '✦', claude: '◆', openai: '✺', gemini: '✧', grok: '𝕏', deepseek: '🐋', mistral: '🌬', perplexity: '❖', cohere: '⌘', ollama: '🜁', 'keystone-ft': '⬡' };
   const emojiFor = (v) => EMOJI[v] ?? '◈';
 
   function syncLabel() {
