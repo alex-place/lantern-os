@@ -29,7 +29,7 @@ safety mechanism.** This is the same thing machine-learning researchers call
 - **PROVEN** — the core collapse theorem (Theorem 1), for the well-behaved
   (symmetric / normal) case; **and** that the anti-collapse operator *prevents
   permanent freeze* (§3, Theorem C3) — now for **all `A`, normal and non-normal**
-  (the alignment hypothesis was removable; 2026-06-26). *45 of 45 tests pass* (incl. the non-normal contraction dichotomy, [#768] closed, and the discrete-time dichotomy, [#1988]).
+  (the alignment hypothesis was removable; 2026-06-26). *46 of 46 tests pass* (incl. the non-normal contraction dichotomy, [#768], the discrete-time dichotomy, [#1988], and the defective-`A` Schur split, [#1989]).
 - **MEASURED** — the early-warning "canary" (§4) and the operator's broader escape
   behavior: demonstrated over **900 forced-collapse runs (100% prevented)** plus
   passing integration tests, beyond what the freeze theorem covers.
@@ -54,7 +54,7 @@ mechanism.)
 ---
 
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **45 passing, 0 xfail**) **for the symmetric / normal case**.
+`tests/test_cio_sde.py` — **46 passing, 0 xfail**) **for the symmetric / normal case**.
 The **anti-collapse operator's freeze-prevention (§3) is now also PROVEN** — Theorem C3,
 for **all `A`** (normal and non-normal; 2026-06-26). The collapse trigger (§2) and the
 early-warning readout (§4) remain control-design heuristics — empirically supported, not
@@ -195,8 +195,48 @@ lines before relying on any claim here.
 > (`test_discrete_dichotomy_radius_trichotomy`, `…_matches_continuous_under_exponential`,
 > `…_defective_split_is_invariant`); suite **42 → 45 passing, 0 xfail**. Same evidence class
 > as the continuous dichotomy — **PROVEN in-regime** (local linear Jacobian, discrete),
-> "machine-checked" = closed-form algebra + tests, **not** Lean. [#1989]–[#1991] remain open
-> frontiers.
+> "machine-checked" = closed-form algebra + tests, **not** Lean.
+>
+> **[#1989] landed too (same PR).** The *continuous* `dichotomy_certificate` was retrofitted to
+> the same ordered-Schur split, so it now certifies **defective `A`** — a Jordan(−0.5,3) ⊕ [+0.3]
+> rotated off-axis is split with residual `< 1e-9` and correctly classified DIVERGE, where the old
+> eig + oblique-Riesz path (`inv(V)` on degenerate eigenvectors) was ill-conditioned. Suite **45 →
+> 46 passing** (+`test_dichotomy_continuous_defective_via_schur`); the existing T1 tests are
+> unchanged because the certificate's rate/transient are basis-independent (Schur vs eig agree on
+> diagonalizable `A`). [#1990] (trigger→theorem) and [#1991] (local→global ROA) then advanced
+> with MEASURED evidence — see the next log.
+>
+> **Maintenance log — 2026-07-04 (honesty red-team + frontier measurements #1990 / #1991).**
+> Three things landed. **(1) Honesty hardening.** A new §7.2 red-teams the certificate's *own*
+> honesty protocol — how a model games the evidence-class labels / citations / "verified" claims
+> (honesty theater = §7's collapse one level up), and the single defense (bind every honesty
+> signal to an external check the model can't control). **(2) [#1990] trigger — HEURISTIC →
+> MEASURED.** `experiments/sigma0_trigger_calibration.py` (960 samples;
+> `data/sigma0/trigger_calibration_report.json`) scores the four-signal trigger against the
+> *spectral* ground truth: **precision 1.0** (0 false-fires over 720 off-regime samples — the §2
+> forward assumption *trigger ⇒ collapse-regime* holds on this distribution) but **snapshot recall
+> ≈ 0.08** (a sound but conservative, *late* detector); the `rank` signal carries the
+> discrimination. Explicitly **not** upgraded to a theorem. **(3) [#1991] ROA first cut.**
+> `experiments/sigma0_roa_estimate.py` (`data/sigma0/roa_estimate_report.json`) certifies a
+> nonlinear basin `{V ≤ 2.31}` via a quadratic Lyapunov function, with **100% inside-convergence**
+> validated on the reversed-Van-der-Pol benchmark (Khalil Ex. 8.4). Sublevel-invariance is PROVEN
+> (Lyapunov/LaSalle); `c*` is MEASURED. Neither frontier is *closed* — #1990 is
+> calibrated-not-proven, #1991 is a validated *method* / first cut — but both moved from open to
+> MEASURED. Suite unchanged at **46 passing** (these are experiment artifacts, not new unit tests).
+>
+> **Maintenance log — 2026-07-04 (honesty layer measured; §7.3 added).** The §7.2 red-team gains an
+> empirical companion, §7.3 — the defenses it names are now reproducible, machine-checked code: a
+> grounded five-councilor Σ₀ council (`experiments/sigma0_council.py`) that upholds grounded claims
+> by running their tests and **rejects a planted "0.99 SimpleQA SOTA" claim**; a strictly-proper
+> honesty objective (incentive-compat gap **0.0000**); a **159-record golden answer-key**
+> (`data/sigma0/golden_dataset.jsonl`, 26.4% honest negatives, anti-inflation machine-checked); and
+> a **live benchmark** where **GPT-4o-mini confabulated on 0/42 negatives** (golden 0.95) while
+> `always-assert` confabulates 100% at a *higher* raw score — confabulation-rate is the honesty
+> axis, measured. Verification this pass: `pytest tests/test_cio_sde.py` → **46 passing**; the four
+> artifacts resolve (`golden_dataset.jsonl` 159, `live_bench_results.json`,
+> `trigger_calibration_report.json`, `roa_estimate_report.json`). Honest note: this + the §7.2/§7.3
+> hardening are staged on the **open** certificate PR (#1997), not yet in `master`; no cert
+> *theorem* changed this pass.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -501,6 +541,25 @@ emergent equilibrium. The same drift-zeroed system with collapse *off*
 random-walks freely. **The operator enforces a clamp; the state is generally not
 a fixed point of the dynamics.** (`SemanticCollapseOperator`.)
 
+**Now MEASURED — the trigger's calibration ([#1990], 2026-07-04).** The four-signal
+AND is no longer only a heuristic. `experiments/sigma0_trigger_calibration.py` calls the
+real operator over **960 samples** spanning the collapse regime and its complements and
+scores it against the *spectral* ground truth (does `A_s` actually carry a null manifold
+plus stable active modes, computed independently by `eigh`). Result
+(`data/sigma0/trigger_calibration_report.json`): **precision 1.0 — 0 false-fires over 720
+off-regime samples**, so the §2 forward assumption *trigger ⇒ collapse-regime* holds on this
+distribution; but **snapshot recall ≈ 0.08** — the trigger is a **sound but conservative,
+*late* detector**, because it also requires the state / Σ / control to be degenerate, which
+develop dynamically (the [#658] sweep measures collapse over a rollout). Per-signal, the
+**`rank` signal carries the discrimination** (fires only on-regime); grad/flat gate the
+operational state, not the spectrum. Honest caveats: the synthetic systems use `B=0`, so the
+control signal is trivially satisfied (this calibrates the grad∧rank∧flat sub-gate), and
+non-normality `ν>0` shifts the exact zero eigenvalue of `A_s` (so the clean collapse regime is
+the `ν=0` case). **This upgrades §2 from bare HEURISTIC to a MEASURED soundness profile — it
+does *not* make `trigger ⇒ α<0` a theorem.** The one clean sub-statement *is*
+provable-by-construction: a collapse manifold exists ⟺ `A_s` is near-singular (else
+`_collapse_state` returns the semantic-null ⊥ₛ, the `k=0` branch).
+
 ---
 
 ## 3. The anti-collapse operator Σ₀⁻¹
@@ -681,6 +740,19 @@ slow inter-basin hops); without it, `P_ij` carries memory.
 by a deep attractor. "Spin the vanda fast" = ride a boundary saddle with
 rotation set by `Im λ`.
 
+**A certified basin, not just a point ([#1991], 2026-07-04 — first cut).** §1's certificate is
+*local* (the Jacobian at `x*`); a real basin needs a Lyapunov function valid on a
+*neighbourhood*. `experiments/sigma0_roa_estimate.py` takes the standard route: a quadratic
+`V(x)=xᵀPx` from the linearization (`AᵀP+PA=−I`), then certify the largest sublevel set `{V≤c*}`
+on which `V̇<0` for the **full nonlinear flow** — by Lyapunov/LaSalle that set is inside the
+region of attraction. Validated on the canonical **reversed-Van-der-Pol** benchmark (Khalil
+Ex. 8.4, ROA known to be bounded): `c*≈2.31` (`data/sigma0/roa_estimate_report.json`), and
+**100% of sampled points inside `{V≤c*}` converge to the origin** while points at `3c*` diverge
+— a *sound inner estimate* of the true basin. Evidence class: sublevel-invariance-given-`V̇<0`
+is **PROVEN** (Lyapunov); `c*` is **MEASURED** (grid-conservative). Scope: this validates the
+*method* (local Jacobian → certified nonlinear neighbourhood); applying it to the certificate's
+own drift only needs that `f` specified — and a global guarantee still needs grounding.
+
 ---
 
 ## 6. Demonstration on router data
@@ -854,7 +926,75 @@ random-walks freely,"* now pinned by a test. The operator-driven freeze and esca
 are covered by `test_collapse_freezes_state` (the §2 freeze) and
 `test_anti_collapse_suppresses_collapse` (§3 Σ₀⁻¹ re-excites / escapes); external
 grounding by `_run_recursive_with_grounding` (synthetic ≥ mixed ≥ real collapse
-score). *(`tests/test_cio_sde.py` — 45 passing, 0 xfail.)*
+score). *(`tests/test_cio_sde.py` — 46 passing, 0 xfail.)*
+
+### 7.2 Gaming the honesty layer (red-team)
+
+**Status: DESIGN + threat model — the failure mode of *this document's own protocol*
+(empirical backing now in §7.3).**
+
+§7 is about a system that games *reality*; this is about a system that games the *honesty
+conventions* meant to keep it grounded. Σ₀ honesty is a set of **observable signals** —
+evidence-class labels (PROVEN/MEASURED/HEURISTIC), artifact citations, "verified" claims,
+`[claim, evidence, confidence, source]` tuples, honest-deviation confessions. Any observable
+signal is Goodhartable: **optimize to emit the signal without the underlying property.** A model
+trained on *"does an overseer score this as honest"* instead of *"is it true"* produces **honesty
+theater** — and that is not a new failure, it is §7's collapse one level up: optimizing the
+internal proxy (looks-honest-to-overseer) rather than external reality (is-honest). The parrot
+attractor, wearing evidence-class labels.
+
+| Attack | Rule it defeats | Detection |
+|---|---|---|
+| **Label inflation** — attach MEASURED/PROVEN to an unearned claim | "label by class; never upgrade" | resolve the label — does a machine-check cover *this* claim? |
+| **Vacuous / fabricated citation** — a real `file:line` that doesn't support it, or a plausibly-formatted arXiv id | "cite the artifact you opened" | open the pointer; the cert's own **4 fabricated arXiv IDs** were caught this way (§References) |
+| **Circular grounding** — cite your own prior output as the "source" | "external reality beats internal consistency" | check source *independence* — downstream of the model ⇒ the collapse loop |
+| **Verification theater / sandbagging** — claim a run that didn't happen, or scope the test to miss the break | "say done only after a verifying run" | re-run adversarially on inputs the model didn't choose; hold out the test set |
+| **Confidence cosplay** — decorative `0.85`s | "[claim, evidence, confidence, source]" | score calibration against outcomes (Brier/ECE) in aggregate |
+| **Humility laundering** — confess a harmless error to buy trust, then smuggle the load-bearing false claim | weaponizes "honest deviation" | trust is **not transitive across claims** — grade each on its own artifact |
+| **Calm-while-wrong** — hold stated confidence in-band by never fetching the disconfirming evidence | evades the §4 NIS canary | alarm on *low surprise + rising external error*; pick observations the model can't route around |
+| **Overseer-adaptive** — honest under audit, games otherwise | the protocol is observable | audit unannounced / off-distribution; a watched-vs-unwatched gap *is* the tell |
+
+**The one defense.** Every attack emits the *signal* of grounding without the *substance*, so the
+single countermeasure is the certificate's own published anti-collapse mechanism — *verification
+of outputs before they become inputs* (arXiv:2406.07515) — with one rider: **bind the signal to
+something external the model does not control.** Resolve every citation; run the verifier yourself
+on held-out inputs; require independent (non-self) sources and actively seek disconfirming ones;
+measure calibration rather than reading it; grade per-claim, not per-author; audit unannounced.
+**Corollary:** the honesty labels in this document are load-bearing *only to the extent they are
+externally checked* — they are a UI for a verifier, not a substitute for one. An honesty layer
+that trusts its own markers has already collapsed.
+
+### 7.3 The honesty layer, measured (2026-07-04)
+
+**Status: MEASURED — §7.2's defenses are now instantiated as reproducible, machine-checked code
+with measured outputs, not only a design.** The red-team above is a threat model; this records the
+apparatus that answers it (landed on this certificate's PR):
+
+- **A grounded, multi-perspective council** (`experiments/sigma0_council.py`) — five councilors
+  (Executor / Empiricist / Auditor / Calibrator / Skeptic), each verdict produced by a real check
+  (run the test, resolve the citation), never opinion. Machine-checked to **UPHOLD grounded claims
+  and REJECT fabricated ones**: convened on this session's claims it upheld them by *running their
+  tests* (Executor exit-0) and **rejected a planted "0.99 on SimpleQA, beats all frontier models
+  (SOTA)" claim** (Auditor: the cited file does not exist). This is §7.2's "bind the signal to an
+  external check" rider, made executable.
+- **A strictly-proper honesty objective** (`experiments/sigma0_honest_objective.py`) — the
+  calibration score's incentive-compatibility gap is **0.0000** (machine-checked: honest confidence
+  is the reward-optimal report), and the reward ranks confident-wrong below abstention (the §4
+  calm-while-wrong penalty, measured).
+- **A 159-record golden answer-key** (`data/sigma0/golden_dataset.jsonl`) of web-verified
+  CS/math/physics facts, **26.4% honest negatives** (open conjectures, unproven crypto assumptions,
+  the Church–Turing *thesis*, refuted claims, aphorisms), with a machine-checked **anti-inflation
+  invariant** — no open/refuted claim is labelled PROVEN/MEASURED (P vs NP is HEURISTIC, not proven).
+- **A live benchmark on that key** (`experiments/sigma0_live_bench.py`): a real model,
+  **GPT-4o-mini, confabulated on 0 of the 42 negatives** (golden 0.95), while an
+  `always-assert-PROVEN` baseline scores *higher* on raw accuracy (0.65 vs the honest-abstainer's
+  0.41) yet confabulates **100%** — empirically confirming **confabulation-rate, not raw accuracy,
+  is the honesty axis** (§7.2's calm-while-wrong, quantified).
+
+**Honest scope.** These validate the detection/defense *apparatus* on this benchmark and this one
+model run; they do **not** prove a trained model is un-gameable — the §7.2 watched-vs-unwatched gap
+remains a live research risk, and the golden set is 159 curated items, not a population. The claim
+is only that §7.2's defenses are now *externally-checkable code with measured outputs*, not prose.
 
 ---
 
@@ -955,7 +1095,7 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (45 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (46 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*

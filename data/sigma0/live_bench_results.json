@@ -1,0 +1,47 @@
+[
+  {
+    "model": "GPT-4o-mini (OpenAI)",
+    "resolved": "gpt-4o-mini",
+    "answered": 159,
+    "errors": 0,
+    "golden_score": 0.95,
+    "confabulation_rate": 0.0,
+    "over_abstention": 0.06
+  },
+  {
+    "model": "Grok (xAI)",
+    "resolved": null,
+    "answered": 0,
+    "errors": 159,
+    "golden_score": null,
+    "confabulation_rate": null,
+    "over_abstention": null
+  },
+  {
+    "model": "Gemini Flash",
+    "resolved": "gemini-flash-latest",
+    "answered": 0,
+    "errors": 159,
+    "golden_score": null,
+    "confabulation_rate": null,
+    "over_abstention": null
+  },
+  {
+    "model": "Mistral Small",
+    "resolved": null,
+    "answered": 0,
+    "errors": 159,
+    "golden_score": null,
+    "confabulation_rate": null,
+    "over_abstention": null
+  },
+  {
+    "model": "Claude Haiku (Anthropic)",
+    "resolved": null,
+    "answered": 0,
+    "errors": 159,
+    "golden_score": null,
+    "confabulation_rate": null,
+    "over_abstention": null
+  }
+]

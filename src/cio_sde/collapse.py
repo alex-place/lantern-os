@@ -487,48 +487,47 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
     stability_gates(), applied to the active block Aᴹ.
 
     `delta ≥ 0` is the split threshold; use a value inside a spectral gap so the
-    Riesz projector stays well-conditioned (a near-split-line eigenvalue inflates
-    `invariance_residual`). Never raises on degeneracy — returns −inf abscissae and
-    inf transient for the empty/ill-posed blocks.
+    Schur reordering stays well-conditioned (a near-split-line eigenvalue inflates
+    `invariance_residual`). Robust on DEFECTIVE A (orthonormal Schur basis, no
+    eigenvector inverse; #1989). Never raises on degeneracy — returns −inf abscissae
+    and inf transient for the empty/ill-posed blocks.
     """
     import numpy as np
     Abar = A.mean(0) if A.dim() == 3 else A
     M = Abar.detach().cpu().numpy().astype(float)
     n = M.shape[0]
 
-    w, V = np.linalg.eig(M)
+    # eigenvalues (values only) for the split counts + abscissae; the SUBSPACE comes
+    # from an ordered Schur factorization below, never from these eigenvectors
+    w = np.linalg.eigvals(M)
     active_mask = w.real < -delta
     n_active = int(active_mask.sum())
     n_slow = n - n_active
     active_abscissa = float(w.real[active_mask].max()) if n_active else float("-inf")
     slow_abscissa = float(w.real[~active_mask].max()) if n_slow else float("-inf")
 
-    # oblique Riesz projector onto the active invariant subspace, then an ORTHONORMAL
-    # basis of its range (SVD) — evolving/measuring in this basis stays inside the
-    # invariant subspace, so the slow (possibly divergent) modes never contaminate it.
-    Pi_M = np.real_if_close(
-        V @ np.diag(active_mask.astype(complex)) @ np.linalg.inv(V), tol=1000).real
-    U, s, _ = np.linalg.svd(Pi_M)
-    r = int((s > 1e-9).sum())
-    B = U[:, :r] if r > 0 else np.zeros((n, 0))
-
-    # invariance residual: M is A-invariant ⟺ (I−BBᵀ)A B = 0 (the vanishing cross-term)
-    invariance_residual = (
-        float(np.linalg.norm((np.eye(n) - B @ B.T) @ M @ B)) if r > 0 else 0.0)
-
-    # active decay: reduced Lyapunov P on Aᴹ=BᵀAB (the SAME metric as stability_gates)
+    # invariant-subspace split via ORDERED REAL SCHUR (orthonormal Z; #1989): the
+    # leading sdim columns span the active invariant subspace EXACTLY (block-triangular
+    # T ⇒ (I−BBᵀ)MB = 0 to machine eps), with NO eigenvector inverse — robust even for
+    # DEFECTIVE A, where the old eig + oblique-Riesz split was ill-conditioned / abstained.
+    invariance_residual = 0.0
     rate, transient = 0.0, float("nan")
-    if r > 0:
-        A_M = B.T @ M @ B
-        try:
-            from scipy.linalg import solve_continuous_lyapunov
+    try:
+        from scipy.linalg import schur, solve_continuous_lyapunov
+        T, Z, sdim = schur(M, output="real", sort=lambda z: z.real < -delta)
+        r = int(sdim)
+        if 0 < r <= n:
+            B = Z[:, :r]
+            invariance_residual = float(np.linalg.norm((np.eye(n) - B @ B.T) @ M @ B))
+            A_M = T[:r, :r]                       # active block of the ordered Schur form
+            # reduced Lyapunov P on Aᴹ (the SAME metric as stability_gates): AᴹᵀP+PAᴹ=−I
             P = solve_continuous_lyapunov(A_M.T, -np.eye(r))
             pe = np.linalg.eigvalsh(0.5 * (P + P.T))
             if float(pe.min()) > 0:
                 rate = float(1.0 / (2.0 * pe.max()))            # finite-t Lyapunov rate
                 transient = float(np.sqrt(pe.max() / pe.min())) # √cond(P) overshoot
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     # fate — decided purely by the slow block's abscissa β (no third option)
     if slow_abscissa > tol:
