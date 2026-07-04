@@ -27,13 +27,28 @@ function enabled() {
   return process.env.SURPRISE_INTERVENE === "1";
 }
 
-function _cfg() {
+// #1940 (ADR-0017 "+ calibration"): the window-mean surprise boundary between a guessed
+// and a grounded span is MODEL-SPECIFIC. A small model's per-token bits run < 1, so the
+// fixed 5-bit default never fires on it — the same magnitude bug #1681 fixed for the
+// uncertainty scalar (qwen halluc/correct midpoint ≈1.09 bits, mistral ≈0.34). Derive the
+// trigger from the model's calibrated midpoint (token-surprise.calibrationFor().center);
+// an UNKNOWN model resolves to the default center 5 (behaviour unchanged), and an explicit
+// SURPRISE_INTERVENE_BITS env override still wins over both.
+function calibratedThresholdBits(model) {
+  const { calibrationFor, DEFAULT_CALIBRATION } = require("./token-surprise");
+  const c = calibrationFor(model);
+  return c && Number.isFinite(c.center) ? c.center : DEFAULT_CALIBRATION.center;
+}
+
+function _cfg(model) {
   const n = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
+  const envBits = Number(process.env.SURPRISE_INTERVENE_BITS);
   return {
     window: n(process.env.SURPRISE_INTERVENE_WINDOW, 16),
-    // Trigger when the WINDOW MEAN surprise (bits/token) crosses this. The Layer-1
+    // Trigger when the WINDOW MEAN surprise (bits/token) crosses this. Explicit env wins;
+    // else the per-model calibrated threshold (#1940); else default 5. The Layer-1
     // separation lives in mean/p90 (tailMass degenerate) — mean is the stable one.
-    thresholdBits: n(process.env.SURPRISE_INTERVENE_BITS, 5),
+    thresholdBits: Number.isFinite(envBits) && envBits > 0 ? envBits : calibratedThresholdBits(model),
     maxRounds: n(process.env.SURPRISE_INTERVENE_ROUNDS, 2),
     armDeadlineMs: n(process.env.SURPRISE_INTERVENE_ARM_MS, 4000),
   };
@@ -44,7 +59,7 @@ function _cfg() {
 // mean surprise crosses the threshold. Returns spans sorted by mean, capped at
 // maxRounds — these are the claims the model was most likely guessing.
 function findTriggerSpans(perToken, opts = {}) {
-  const { window: W, thresholdBits, maxRounds } = { ..._cfg(), ...opts };
+  const { window: W, thresholdBits, maxRounds } = { ..._cfg(opts.model), ...opts };
   const toks = (perToken || []).filter((t) => t && Number.isFinite(t.bits));
   if (toks.length < W) return [];
   const spans = [];
@@ -157,10 +172,10 @@ async function groundSpan(span, deps = {}) {
 // supplied by the provider branch. emit(obj) surfaces SSE progress (optional).
 // Returns { intervened, revisedReply, rounds, field } — revisedReply null when
 // no trigger, no grounding, or the revise call failed (caller keeps original).
-async function maybeIntervene({ perToken, fullReply, callLLM, emit, arms } = {}) {
+async function maybeIntervene({ perToken, fullReply, callLLM, emit, arms, model } = {}) {
   const none = { intervened: false, revisedReply: null, rounds: [], field: null };
   if (!enabled() || !Array.isArray(perToken) || !perToken.length || !fullReply) return none;
-  const spans = findTriggerSpans(perToken);
+  const spans = findTriggerSpans(perToken, { model });
   if (!spans.length) return none;
 
   const rounds = [];
@@ -242,5 +257,6 @@ module.exports = {
   maybeIntervene,
   withDeadline,
   armOrder,
+  calibratedThresholdBits,
   _safeArith,
 };
