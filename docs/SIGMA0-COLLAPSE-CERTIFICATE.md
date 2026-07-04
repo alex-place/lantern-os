@@ -234,9 +234,20 @@ lines before relying on any claim here.
 > `always-assert` confabulates 100% at a *higher* raw score — confabulation-rate is the honesty
 > axis, measured. Verification this pass: `pytest tests/test_cio_sde.py` → **46 passing**; the four
 > artifacts resolve (`golden_dataset.jsonl` 159, `live_bench_results.json`,
-> `trigger_calibration_report.json`, `roa_estimate_report.json`). Honest note: this + the §7.2/§7.3
-> hardening are staged on the **open** certificate PR (#1997), not yet in `master`; no cert
-> *theorem* changed this pass.
+> `trigger_calibration_report.json`, `roa_estimate_report.json`). No cert *theorem* changed this pass.
+>
+> **Maintenance log — 2026-07-04 (merge reconciliation + re-verification).** [#1997] **merged**, so
+> everything the logs above describe — §7.2/§7.3, the [#1990]/[#1991] measurements, the four honesty
+> artifacts — is now in `master` (this doc is read from `master`, no longer "staged on an open PR").
+> Re-verified this pass: `pytest tests/test_cio_sde.py` → **46 passed, 0 xfail** (38.9 s); all eleven
+> referenced artifacts resolve (the three `experiments/sigma0_*` calibration/ROA/council scripts +
+> `trigger_calibration_report.json`, `roa_estimate_report.json`, `golden_dataset.jsonl` [159 records],
+> `live_bench_results.json`, both `router_*` scripts, `collapse.py`, the `.tex`), and the §6 encoder
+> `ρ=1.064` figure now carries its control-check (a fitting artifact — see §6). The two frontiers stay
+> **honestly open**, unchanged: **[#1990]** trigger→theorem is calibrated-not-proven (precision 1.0,
+> recall ≈0.08 over 960 samples), **[#1991]** local→global ROA is a validated first cut
+> (sublevel-invariance PROVEN via LaSalle; `c*` MEASURED, not certified). Nothing was fabricated to
+> force a closure; upgrading either to PROVEN needs a machine-checked theorem this pass does not claim.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -309,6 +320,7 @@ status cannot silently drift.
 [#1989]: https://github.com/alex-place/lantern-os/issues/1989
 [#1990]: https://github.com/alex-place/lantern-os/issues/1990
 [#1991]: https://github.com/alex-place/lantern-os/issues/1991
+[#1997]: https://github.com/alex-place/lantern-os/pull/1997
 
 ---
 
