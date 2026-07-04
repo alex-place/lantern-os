@@ -30,18 +30,10 @@ const { spawn } = require("child_process");
 // DNS-rebind/CSRF page (same loopback IP, no token) cannot. Fresh every launch.
 const localToken = crypto.randomBytes(24).toString("hex");
 
-// ── Configuration ───────────────────────────────────────────────────────────
-// serverDir defaults to the garage app that ships beside this launcher
-// (apps/lantern-garage). UNISONA_SERVER_DIR overrides it — used both by the
-// packaged app (points at the unpacked resources) and for dev-testing this
-// launcher from a worktree against a checkout that has node_modules installed.
-const args = parseArgs(process.argv.slice(2));
-
+// ── SEA detection + Core location (needed by BOTH the launcher and core mode) ──
 // Are we running as a packaged Single Executable Application (Node SEA)? If so,
-// process.execPath is unisona.exe — a SEA whose EMBEDDED entry is THIS launcher,
-// not a generic node — so `unisona.exe server.js` would just re-run the launcher,
-// and __dirname is not a real on-disk path. Both must change under SEA. Env vars
-// override either. (See scripts/build-desktop-exe.mjs + docs/adr/0014.)
+// process.execPath is unisona.exe — a SEA whose EMBEDDED entry is THIS file, not a
+// generic node — and __dirname is not a real on-disk path.
 let isSea = false;
 try { isSea = require("node:sea").isSea(); } catch { /* Node <20 / no node:sea */ }
 
@@ -54,15 +46,20 @@ const defaultServerDir = isSea
 const serverDir = path.resolve(process.env.UNISONA_SERVER_DIR || defaultServerDir);
 const serverEntry = path.join(serverDir, "server.js");
 
-// The node runtime used to SPAWN the Core. Dev: process.execPath IS node, so it's
-// correct. Packaged: a real node(.exe) shipped beside unisona.exe — NEVER the SEA
-// itself (which would re-enter the launcher). UNISONA_NODE_EXE overrides.
-const nodeExe =
-  process.env.UNISONA_NODE_EXE ||
-  (isSea
-    ? path.join(path.dirname(process.execPath), process.platform === "win32" ? "node.exe" : "node")
-    : process.execPath);
+// ── Core mode (single-exe trick) ──────────────────────────────────────────────
+// A SEA can only ever run its OWN embedded entry (this file), so to boot the Core
+// from the SAME single unisona.exe — with NO second bundled node runtime — the
+// launcher re-execs itself with UNISONA_CORE=1, and here we hand off to the on-disk
+// server.js. createRequire loads it as a normal CJS module: its real __dirname and
+// node_modules resolve against serverDir, so the Core runs exactly as `node
+// server.js` would. (In dev the child is plain `node server.js` and never gets here.)
+if (process.env.UNISONA_CORE === "1") {
+  require("node:module").createRequire(serverEntry)(serverEntry);
+  return; // CommonJS top-level return — must NOT fall through into the launcher
+}
 
+// ── Configuration ───────────────────────────────────────────────────────────
+const args = parseArgs(process.argv.slice(2));
 const host = "127.0.0.1"; // loopback only — never exposed
 const landingPage = args.page || process.env.UNISONA_LANDING_PAGE || "/";
 const openBrowser = !args["no-open"] && process.env.UNISONA_NO_OPEN !== "1";
@@ -79,16 +76,6 @@ let shuttingDown = false;
     fail(
       `Cannot find the Core server at:\n    ${serverEntry}\n` +
         `Set UNISONA_SERVER_DIR to the folder that contains server.js.`
-    );
-    return;
-  }
-
-  // Packaged (SEA): we spawn a real node shipped beside the exe, not the SEA itself.
-  // If it's missing, say so plainly rather than failing deep in spawn().
-  if (nodeExe !== process.execPath && !fs.existsSync(nodeExe)) {
-    fail(
-      `Cannot find the Node runtime to run the Core at:\n    ${nodeExe}\n` +
-        `The installer must ship node(.exe) beside unisona.exe, or set UNISONA_NODE_EXE.`
     );
     return;
   }
@@ -167,9 +154,20 @@ function spawnServer(port) {
     // per-boot loopback token so loopback ≠ admin (G4). All three are now wired.
     UNISONA_DESKTOP: "1",
     UNISONA_LOCAL_TOKEN: localToken,
+    // Tell the Core child where the app tree is (it re-derives serverEntry here).
+    UNISONA_SERVER_DIR: serverDir,
   });
 
-  const proc = spawn(nodeExe, [serverEntry], {
+  // The Core child. Packaged (SEA): re-enter THIS same unisona.exe with
+  // UNISONA_CORE=1 — the embedded entry then hands off to server.js, so ONE runtime
+  // serves both roles (no second bundled node). Dev: process.execPath IS node, so
+  // run server.js directly.
+  const [coreCmd, coreArgs] = isSea
+    ? [process.execPath, []]
+    : [process.execPath, [serverEntry]];
+  if (isSea) env.UNISONA_CORE = "1";
+
+  const proc = spawn(coreCmd, coreArgs, {
     cwd: serverDir,
     env,
     stdio: "inherit", // surface the Core's own logs to the console

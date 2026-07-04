@@ -77,5 +77,6 @@ if (isMac) postjectArgs.push("--macho-segment-name", "NODE_SEA");
 run(process.execPath, postjectArgs);
 
 console.log(`\n✓ Built ${exePath} (${mb(exePath)} MB)`);
-console.log("  Next: sign it (Azure Trusted Signing), then ship node(.exe) + the");
-console.log("  apps/lantern-garage tree beside it (installer = step 3/4, ADR-0014).");
+console.log("  One binary — it runs the launcher AND (re-execed with UNISONA_CORE=1)");
+console.log("  the Core; no separate node is shipped. Next: sign it (Azure Trusted");
+console.log("  Signing), then ship the apps/lantern-garage tree beside it (step 3/4).");
