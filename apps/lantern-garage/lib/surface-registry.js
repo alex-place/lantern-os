@@ -57,6 +57,7 @@ const EXTENSION = {
   "trading.html":                  ["trading", "TRADING_ENABLED"],
   "trading-news.html":             ["trading", "TRADING_ENABLED"],
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
+  "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "crypto-dashboard.html":         ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
   // creator / document tooling
@@ -77,6 +78,7 @@ const EXTENSION = {
   "auth.html":                     ["account", null],
   "entry.html":                    ["account", null],
   "profile.html":                  ["account", null],
+  "reset-password.html":           ["account", null],
   "pricing.html":                  ["account", null],
   "upgrade-lab.html":              ["account", null],
   "api-keys-settings.html":        ["account", null],
@@ -86,6 +88,28 @@ const EXTENSION = {
   "faq.html":                      ["meta", null],
   // visualization
   "observer-mesh-cube.html":       ["viz", null],
+};
+
+// ── SUBSYSTEMS — top-level NON-HTML subsystems (bots + background services) ──────
+// ADR-0013 follow-up (#1948): the surface boundary must cover more than
+// public/*.html. These are the background services server.js manages plus the
+// bot/MCP processes it spawns — classified by the SAME rule: CORE names a loop
+// stage; EXTENSION names a module. `entry` cites the artifact (verified to exist by
+// the contract test, so entries can't be fabricated or go stale); `flag` is the env
+// gate in server.js (null = not env-gated here). Grounded against server.js spawns.
+const SUBSYSTEMS = {
+  // CORE — background services that ARE a loop stage
+  "mcp-server":       { tier: "core", stage: "Act",      entry: "src/mcp_server/server.py",           flag: "LANTERN_MCP_SERVER" },
+  "auto-dispatch":    { tier: "core", stage: "Act",      entry: "apps/lantern-garage/lib/auto-dispatch.js", flag: "AUTO_DISPATCH" },
+  "pr-watcher":       { tier: "core", stage: "Converge", entry: "apps/lantern-garage/lib/pr-watcher.js",    flag: null },
+
+  // EXTENSION — optional capabilities beside the loop
+  "discord-bot":      { tier: "extension", module: "community", entry: "src/discord_lounge_bot/bot_v2.py",         flag: "DISCORD_BOT_TOKEN" },
+  "news-collector":   { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/news-collector.js",   flag: "TRADING_ENABLED" },
+  "kalshi-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/kalshi-collector.js", flag: "TRADING_ENABLED" },
+  "crypto-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/crypto-collector.js", flag: "KALSHI_CRYPTO_OBSERVER" },
+  "job-worker":       { tier: "extension", module: "creator",   entry: "apps/lantern-garage/lib/job-worker.js",       flag: "CREATOR_ENABLED" },
+  "cloudflare-tunnel":{ tier: "extension", module: "ops",       entry: "apps/lantern-garage/server.js",               flag: "LANTERN_CLOUDFLARE_TUNNEL" },
 };
 
 /** Classify one top-level surface filename. Returns null if unclassified. */
@@ -105,13 +129,30 @@ function unclassified(htmlFilenames) {
   return htmlFilenames.filter((f) => classify(f) === null).sort();
 }
 
+/** Classify one non-HTML subsystem by name. Returns null if unregistered. */
+function classifySubsystem(name) {
+  const s = Object.prototype.hasOwnProperty.call(SUBSYSTEMS, name) ? SUBSYSTEMS[name] : null;
+  if (!s) return null;
+  return s.tier === "core"
+    ? { tier: "core", stage: s.stage, entry: s.entry, flag: s.flag || null }
+    : { tier: "extension", module: s.module, entry: s.entry, flag: s.flag || null };
+}
+
 /** Registry summary: counts + the extension:core ratio (the sprawl number to watch). */
 function summary() {
   const core = Object.keys(CORE).length;
   const ext = Object.keys(EXTENSION).length;
   const byModule = {};
   for (const [, [module]] of Object.entries(EXTENSION)) byModule[module] = (byModule[module] || 0) + 1;
-  return { core, extension: ext, ratio: +(ext / Math.max(1, core)).toFixed(2), byModule };
+  const subCore = Object.values(SUBSYSTEMS).filter((s) => s.tier === "core").length;
+  const subExt = Object.values(SUBSYSTEMS).filter((s) => s.tier === "extension").length;
+  return {
+    core,
+    extension: ext,
+    ratio: +(ext / Math.max(1, core)).toFixed(2),
+    byModule,
+    subsystems: { core: subCore, extension: subExt, total: subCore + subExt },
+  };
 }
 
-module.exports = { LOOP_STAGES, CORE, EXTENSION, classify, unclassified, summary };
+module.exports = { LOOP_STAGES, CORE, EXTENSION, SUBSYSTEMS, classify, classifySubsystem, unclassified, summary };

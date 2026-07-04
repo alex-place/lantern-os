@@ -61,9 +61,39 @@ check("every loop stage is served by at least one core surface", () => {
   assert.strictEqual(uncovered.length, 0, `loop stages with no core surface: ${uncovered.join(", ")}`);
 });
 
+// ── Non-HTML subsystems (#1948: bots + background services) ──────────────────────
+const REPO_ROOT = path.resolve(__dirname, "../../..");
+
+check("SUBSYSTEMS: every entry is classified core|extension with the right shape", () => {
+  for (const [name, meta] of Object.entries(reg.SUBSYSTEMS)) {
+    assert.ok(meta && (meta.tier === "core" || meta.tier === "extension"), `${name} → bad tier "${meta && meta.tier}"`);
+    if (meta.tier === "core") {
+      assert.ok(reg.LOOP_STAGES.includes(meta.stage), `${name} → core subsystem needs a valid loop stage (got "${meta.stage}")`);
+    } else {
+      assert.ok(meta.module && typeof meta.module === "string", `${name} → extension subsystem needs a module`);
+    }
+  }
+});
+
+check("SUBSYSTEMS: classifySubsystem round-trips and rejects unknowns", () => {
+  for (const name of Object.keys(reg.SUBSYSTEMS)) {
+    assert.ok(reg.classifySubsystem(name), `classifySubsystem(${name}) should classify`);
+  }
+  assert.strictEqual(reg.classifySubsystem("does-not-exist"), null);
+});
+
+check("SUBSYSTEMS: every declared entry artifact exists on disk (no fabricated/stale entries)", () => {
+  for (const [name, meta] of Object.entries(reg.SUBSYSTEMS)) {
+    assert.ok(meta.entry && typeof meta.entry === "string", `${name} → missing entry citation`);
+    const abs = path.resolve(REPO_ROOT, meta.entry);
+    assert.ok(fs.existsSync(abs), `${name} → entry not found on disk: ${meta.entry}`);
+  }
+});
+
 const s = reg.summary();
 console.log(`\nSurface boundary: ${s.core} core · ${s.extension} extension (ratio ${s.ratio}:1)`);
 console.log(`Extensions by module: ${JSON.stringify(s.byModule)}`);
+console.log(`Subsystems: ${s.subsystems.core} core · ${s.subsystems.extension} extension (${s.subsystems.total} total)`);
 
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nAll surface-boundary tests passed.");
