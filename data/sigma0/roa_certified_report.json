@@ -1,0 +1,35 @@
+{
+  "issue": 1991,
+  "claim": "certified inner region-of-attraction estimate {V <= c_L} for the reversed-VdP benchmark",
+  "system": "xdot=[-x2, x1+(x1^2-1)x2]  (Khalil Ex.8.4)",
+  "V": "3*x1**2/2 - x1*x2 + x2**2",
+  "Vdot": "-x1**3*x2 + 2*x1**2*x2**2 - x1**2 - x2**2",
+  "certified_c_L": 2.25,
+  "certified": true,
+  "method": "interval branch-and-bound (mpmath.iv, prec=60 bits, min_w=0.001) over [-2,2]^2",
+  "boxes": 2323,
+  "undecided": 0,
+  "certify_seconds": 0.33,
+  "inner_ball_lemma": {
+    "delta": 0.1,
+    "max_norm_sq_on_box": 0.02,
+    "threshold": 0.3333333333333333,
+    "holds": true,
+    "argument": "|N(x)| <= 3||x||^4, so Vdot <= -||x||^2(1-3||x||^2) < 0 for 0<||x||^2<1/3"
+  },
+  "grid_measured_c_star": 2.30735,
+  "tightness": 0.9751,
+  "control_teeth": {
+    "c_L": 2.5,
+    "certified": false,
+    "undecided_boxes": 576,
+    "note": "2.5 > true c* ~= 2.307, so certification MUST fail \u2014 it does (undecided>0)",
+    "seconds": 0.54
+  },
+  "evidence_class": {
+    "sublevel_ROA_{V<=2.25}": "PROVEN (machine-checked: analytic inner-ball lemma + rigorous interval B&B)",
+    "sublevel_invariance_given_Vdot<0": "PROVEN (Lyapunov/LaSalle)",
+    "gap_to_grid_c_star": "certified 2.25 vs grid-measured 2.307 (~2.5% conservative)"
+  },
+  "honest_scope": "This upgrades #1991 from MEASURED to PROVEN for THIS benchmark f: {V<=2.25} is a machine-checked inner ROA. The certified c_L=2.25 is a rigorous lower bound on the true c*~=2.307 (interval overestimation near the tangency prevents certifying the last ~2.5%). Applying it to the collapse certificate's own drift needs that f specified; GLOBAL guarantees still require grounding, per the North Star."
+}

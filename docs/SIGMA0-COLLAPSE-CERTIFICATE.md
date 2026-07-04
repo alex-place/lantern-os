@@ -248,6 +248,18 @@ lines before relying on any claim here.
 > recall ≈0.08 over 960 samples), **[#1991]** local→global ROA is a validated first cut
 > (sublevel-invariance PROVEN via LaSalle; `c*` MEASURED, not certified). Nothing was fabricated to
 > force a closure; upgrading either to PROVEN needs a machine-checked theorem this pass does not claim.
+>
+> **Maintenance log — 2026-07-04 (#1991 ROA certification: MEASURED → PROVEN).** The step the entry
+> above deferred is now done: the grid-measured basin `c*≈2.307` is a **machine-checked** inner region
+> of attraction. `experiments/sigma0_roa_certify.py` proves `V̇ < 0` on `{V ≤ 2.25}` via an exact
+> origin-ball lemma (`|N| ≤ 3‖x‖⁴`) plus rigorous **interval branch-and-bound** (`mpmath.iv`,
+> directed rounding — **2323 boxes, 0 undecided**), with a control at `c_L = 2.5` (above `c*`) correctly
+> **failing** to certify (teeth). So `{V ≤ 2.25}` is **PROVEN** (97.5% of the grid optimum; the last
+> ~2.5% is interval overestimation near the tangency, not a rigor gap). New
+> `tests/test_sigma0_roa_certified.py` (4 tests, `data/sigma0/roa_certified_report.json`) ⇒ **50 cert
+> tests** (46 `test_cio_sde` + 4). §5 updated. This closes the *certification* half of [#1991] for the
+> benchmark `f`; **[#1990]** (trigger→theorem) stays honestly open — a heuristic min-gate does not
+> obviously imply the spectral condition, and may not be provable in general.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -761,9 +773,23 @@ region of attraction. Validated on the canonical **reversed-Van-der-Pol** benchm
 Ex. 8.4, ROA known to be bounded): `c*≈2.31` (`data/sigma0/roa_estimate_report.json`), and
 **100% of sampled points inside `{V≤c*}` converge to the origin** while points at `3c*` diverge
 — a *sound inner estimate* of the true basin. Evidence class: sublevel-invariance-given-`V̇<0`
-is **PROVEN** (Lyapunov); `c*` is **MEASURED** (grid-conservative). Scope: this validates the
+is **PROVEN** (Lyapunov); `c*≈2.31` is **MEASURED** (grid-conservative). Scope: this validates the
 *method* (local Jacobian → certified nonlinear neighbourhood); applying it to the certificate's
 own drift only needs that `f` specified — and a global guarantee still needs grounding.
+
+**Now machine-checked ([#1991], 2026-07-04 — MEASURED → PROVEN).** The grid value is upgraded to a
+rigorous certificate. `experiments/sigma0_roa_certify.py` proves `V̇ < 0` on `{V ≤ 2.25}` by (a) an
+exact analytic lemma on an origin box `[-0.1, 0.1]²` (`|N(x)| ≤ 3‖x‖⁴`, so
+`V̇ ≤ −‖x‖²(1 − 3‖x‖²) < 0` for `0 < ‖x‖² < 1/3`; on the box `max‖x‖² = 0.02`), and (b) **interval
+branch-and-bound** over the shell with directed-rounding interval arithmetic (`mpmath.iv`,
+**2323 boxes, 0 undecided**). So `{V ≤ 2.25}` is a **PROVEN** inner region of attraction — 97.5% of
+the grid optimum `c*≈2.307`, the last ~2.5% being interval overestimation near the tangency, not a
+gap in rigor. **Teeth:** a control at `c_L = 2.5` (above `c*`) correctly **fails** to certify (there
+genuinely exist `V̇ ≥ 0` points inside `{V ≤ 2.5}`). Machine-checked by
+`tests/test_sigma0_roa_certified.py` (4 tests, `data/sigma0/roa_certified_report.json`); suite
+**46 → 50 passing**. Evidence class for `{V ≤ 2.25}`: **PROVEN** (was MEASURED). This closes the
+*certification* half of [#1991] for the benchmark `f`; the local→global reach for the certificate's
+own drift is unchanged and still needs that `f` specified.
 
 ---
 
@@ -1140,7 +1166,8 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (46 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (46 passing, 0 xfail) + `tests/test_sigma0_roa_certified.py` (4 passing —
+the [#1991] machine-checked ROA certificate, `experiments/sigma0_roa_certify.py`); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*
