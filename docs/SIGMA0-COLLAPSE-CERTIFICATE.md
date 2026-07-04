@@ -29,7 +29,7 @@ safety mechanism.** This is the same thing machine-learning researchers call
 - **PROVEN** — the core collapse theorem (Theorem 1), for the well-behaved
   (symmetric / normal) case; **and** that the anti-collapse operator *prevents
   permanent freeze* (§3, Theorem C3) — now for **all `A`, normal and non-normal**
-  (the alignment hypothesis was removable; 2026-06-26). *45 of 45 tests pass* (incl. the non-normal contraction dichotomy, [#768] closed, and the discrete-time dichotomy, [#1988]).
+  (the alignment hypothesis was removable; 2026-06-26). *46 of 46 tests pass* (incl. the non-normal contraction dichotomy, [#768], the discrete-time dichotomy, [#1988], and the defective-`A` Schur split, [#1989]).
 - **MEASURED** — the early-warning "canary" (§4) and the operator's broader escape
   behavior: demonstrated over **900 forced-collapse runs (100% prevented)** plus
   passing integration tests, beyond what the freeze theorem covers.
@@ -54,7 +54,7 @@ mechanism.)
 ---
 
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **45 passing, 0 xfail**) **for the symmetric / normal case**.
+`tests/test_cio_sde.py` — **46 passing, 0 xfail**) **for the symmetric / normal case**.
 The **anti-collapse operator's freeze-prevention (§3) is now also PROVEN** — Theorem C3,
 for **all `A`** (normal and non-normal; 2026-06-26). The collapse trigger (§2) and the
 early-warning readout (§4) remain control-design heuristics — empirically supported, not
@@ -195,7 +195,15 @@ lines before relying on any claim here.
 > (`test_discrete_dichotomy_radius_trichotomy`, `…_matches_continuous_under_exponential`,
 > `…_defective_split_is_invariant`); suite **42 → 45 passing, 0 xfail**. Same evidence class
 > as the continuous dichotomy — **PROVEN in-regime** (local linear Jacobian, discrete),
-> "machine-checked" = closed-form algebra + tests, **not** Lean. [#1989]–[#1991] remain open
+> "machine-checked" = closed-form algebra + tests, **not** Lean.
+>
+> **[#1989] landed too (same PR).** The *continuous* `dichotomy_certificate` was retrofitted to
+> the same ordered-Schur split, so it now certifies **defective `A`** — a Jordan(−0.5,3) ⊕ [+0.3]
+> rotated off-axis is split with residual `< 1e-9` and correctly classified DIVERGE, where the old
+> eig + oblique-Riesz path (`inv(V)` on degenerate eigenvectors) was ill-conditioned. Suite **45 →
+> 46 passing** (+`test_dichotomy_continuous_defective_via_schur`); the existing T1 tests are
+> unchanged because the certificate's rate/transient are basis-independent (Schur vs eig agree on
+> diagonalizable `A`). [#1990] (trigger→theorem) and [#1991] (local→global ROA) remain open
 > frontiers.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
@@ -854,7 +862,7 @@ random-walks freely,"* now pinned by a test. The operator-driven freeze and esca
 are covered by `test_collapse_freezes_state` (the §2 freeze) and
 `test_anti_collapse_suppresses_collapse` (§3 Σ₀⁻¹ re-excites / escapes); external
 grounding by `_run_recursive_with_grounding` (synthetic ≥ mixed ≥ real collapse
-score). *(`tests/test_cio_sde.py` — 45 passing, 0 xfail.)*
+score). *(`tests/test_cio_sde.py` — 46 passing, 0 xfail.)*
 
 ---
 
@@ -955,7 +963,7 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (45 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (46 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*
