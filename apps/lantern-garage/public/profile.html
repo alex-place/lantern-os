@@ -356,12 +356,16 @@ const TIER_LABELS = {
 // Feature access is role-laddered EXCEPT Trader, which is a per-account
 // opt-in entitlement (entitlements.trade), independent of tier — see
 // user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
+// Feature access is tier-laddered. Trader (manual stocks + Kalshi + AI
+// suggestions) unlocks at the $20 Deep Dreamer tier; the autonomous AI Trader
+// unlocks at the $200 Synthesasia Guild tier.
 const FEATURES = [
-  { emoji: '📖', label: 'Journal',     href: '/dream-chat.html',       req: 'guest' },
-  { emoji: '📈', label: 'Trader',      href: '/stock-trader.html',     req: 'trade' },
-  { emoji: '✏️', label: 'Create',      href: '/create.html',           req: 'deep_dreamer' },
-  { emoji: '🗺️', label: 'Explore',     href: '/explore.html',          req: 'guest' },
-  { emoji: '📚', label: 'Knowledge',   href: '/knowledgecenter.html',  req: 'guest' },
+  { emoji: '📖', label: 'Journal',    href: '/dream-chat.html',      req: 'guest',        note: '' },
+  { emoji: '📈', label: 'Trader',     href: '/stock-trader.html',    req: 'deep_dreamer', note: 'Trade stocks & Kalshi + AI suggestions' },
+  { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'admin',        note: 'Autonomous AI trading' },
+  { emoji: '✏️', label: 'Create',     href: '/create.html',          req: 'deep_dreamer', note: '' },
+  { emoji: '🗺️', label: 'Explore',    href: '/explore.html',         req: 'guest',        note: '' },
+  { emoji: '📚', label: 'Knowledge',  href: '/knowledgecenter.html', req: 'guest',        note: '' },
 ];
 
 // How each provider presents as a sign-in method. Identity is provider-agnostic
@@ -476,17 +480,15 @@ function renderProfile(profile) {
 
   const featureCards = FEATURES.map(f => {
     const ok = hasAccess(profile, f.req);
-    const reqLabel = f.req === 'trade'
-      ? 'Trading not enabled on your account'
-      : (f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '');
+    const reqLabel = f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '';
     return ok
       ? `<a class="access-card" href="${f.href}">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div></div>
+           <div><div class="access-label">${f.label}</div>${f.note ? `<div class="access-req">${escapeHtml(f.note)}</div>` : ''}</div>
          </a>`
       : `<div class="access-card locked" title="${escapeHtml(reqLabel)}">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(reqLabel)}</div></div>
+           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)}</div></div>
          </div>`;
   }).join('');
 

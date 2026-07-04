@@ -194,6 +194,15 @@ function hasEntitlement(req, key) {
   if (!session?.id) return false;
   if (session.role === "admin") return true;
 
+  // Tier unlocks (product model):
+  //   • "trade"     — stocks + Kalshi + AI suggestions — unlocked by the $20
+  //                   Deep Dreamer tier and up.
+  //   • "ai_trader" — the autonomous AI trader — unlocked by the $200 tier
+  //                   (admin, handled by the role check above).
+  // The per-account entitlement below remains an override (admins can grant it
+  // to a specific free/lower-tier account).
+  if (key === "trade" && roleLevel(session.role) >= roleLevel("deep_dreamer")) return true;
+
   const profile = getProfile(session.id);
   return !!(profile && profile.entitlements && profile.entitlements[key] === true);
 }
