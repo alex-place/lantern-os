@@ -63,8 +63,9 @@ function _wTextFromXml(xml) {
   let m;
   while ((m = re.exec(xml))) out.push(m[1]);
   return out.join(' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ').trim();
 }
 
@@ -162,7 +163,7 @@ async function extractPptxText(filePath) {
       const xml = await zip.file(slideNames[i]).async('string');
       const runs = (xml.match(/<a:t>([\s\S]*?)<\/a:t>/g) || [])
         .map(t => t.replace(/<\/?a:t>/g, ''))
-        .map(s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'"))
+        .map(s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&'))
         .filter(Boolean);
       if (runs.length) parts.push(`# Slide ${i + 1}\n${runs.join('\n')}`);
     }
