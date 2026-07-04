@@ -79,6 +79,25 @@ function fresh(rel) {
     }
   });
 
+  // ── step 2: the CSF memory archive relocates too ──────────────────────────────
+  await check("csf-memory-writer: recordLifeFact writes the archive under a relocated state dir", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "unisona-csf-"));
+    const saved = process.env.UNISONA_STATE_DIR;
+    process.env.UNISONA_STATE_DIR = dir;
+    try {
+      const writer = fresh("../lib/csf-memory-writer");
+      const rec = await writer.recordLifeFact({ value: "csf relocation", attribute: "test", sessionId: "mig" });
+      assert.ok(rec, "recordLifeFact should write a record");
+      const csfDir = path.join(dir, "data", "csf_memory");
+      assert.ok(fs.existsSync(csfDir), `CSF archive should live under the state dir: ${csfDir}`);
+      assert.ok(fs.existsSync(path.join(csfDir, "raw.jsonl")), "raw.jsonl should be under the state dir");
+    } finally {
+      if (saved === undefined) delete process.env.UNISONA_STATE_DIR; else process.env.UNISONA_STATE_DIR = saved;
+      fresh("../lib/csf-memory-writer");
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   if (failures) { console.error(`\nappdata-migration: ${failures} FAILED`); process.exit(1); }
   console.log("\nappdata-migration: all checks passed");
 })();

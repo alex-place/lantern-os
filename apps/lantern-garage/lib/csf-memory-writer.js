@@ -33,6 +33,7 @@ const crypto = require("crypto");
 const { appendJsonlQueued } = require("./file-queue");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
+const { dataRoot } = require("./app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
 
 // Tickers the trading UI watches by default, plus common index/ETF
 // tickers. Used to disambiguate real tickers from other all-caps tokens
@@ -67,7 +68,7 @@ function extractTickers(texts, limit = 5) {
 function _csfMemoryPath(basePath) {
   if (basePath) return path.resolve(basePath);
   if (process.env.CSF_MEMORY_PATH) return path.resolve(process.env.CSF_MEMORY_PATH);
-  return path.join(repoRoot, "data", "csf_memory");
+  return path.join(dataRoot(), "csf_memory");
 }
 
 function _nowIso() {
