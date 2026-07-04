@@ -9,6 +9,7 @@ from src.cio_sde import (
     SemanticCollapseOperator, CollapseOutcome,
     collapse_certificate, lyapunov_value, AntiCollapseOperator,
     dichotomy_certificate,
+    discrete_dichotomy_certificate,
     InterventionPolicy,
     SurpriseMonitor,
 )
@@ -822,6 +823,57 @@ def test_t1_nonnormal_dichotomy():
     assert d_cert.fate == "DIVERGE" and not d_cert.collapses
     assert d_cert.slow_abscissa > 0 > c_cert.active_abscissa
     assert d_cert.active_decay_rate > 0                     # active contracts despite divergence
+
+
+# ── #1988 discrete-time dichotomy — collapse in ρ(A)<1, matching §6's spectral radius ──
+
+def test_discrete_dichotomy_radius_trichotomy():
+    """Discrete fate keys off the spectral radius ρ(A), NOT the abscissa: ρ<1 COLLAPSE,
+    ρ>1 DIVERGE, |λ|=1 rotation MARGINAL — the three discrete-time fates, no fourth."""
+    import numpy as np
+    contract = torch.tensor(np.diag([0.5, 0.3, -0.2, 0.1]), dtype=torch.float64)   # ρ=0.5
+    expand = torch.tensor(np.diag([1.3, 0.4, 0.2, -0.1]), dtype=torch.float64)     # ρ=1.3
+    rot = torch.tensor([[0.0, -1.0], [1.0, 0.0]], dtype=torch.float64)             # |λ|=1
+    assert discrete_dichotomy_certificate(contract).fate == "COLLAPSE"
+    assert discrete_dichotomy_certificate(expand).fate == "DIVERGE"
+    assert discrete_dichotomy_certificate(rot).fate == "MARGINAL"
+
+
+def test_discrete_dichotomy_matches_continuous_under_exponential():
+    """Parity: discretizing a continuous flow as A_d = e^{A·dt} must not change the
+    fate — |e^{λ dt}| < 1 ⟺ Re λ < 0. Ties the discrete cert to the continuous one on
+    genuinely non-normal A (collapse and one-RHP-mode diverge)."""
+    pytest.importorskip("scipy")
+    from scipy.linalg import expm
+    cases = [
+        (_nonnormal_from_spectrum([-0.5, -0.6, -0.7, -0.8], [], cond=40.0, seed=2), "COLLAPSE"),
+        (_nonnormal_from_spectrum([-0.8, -1.2, -2.0, 0.3], [], cond=40.0, seed=3), "DIVERGE"),
+    ]
+    for A, expect in cases:
+        cont = dichotomy_certificate(A, delta=0.25)
+        disc = discrete_dichotomy_certificate(torch.tensor(expm(A.numpy() * 0.1), dtype=torch.float64))
+        assert cont.fate == expect                         # continuous flow
+        assert disc.fate == expect                         # its discretization agrees
+
+
+def test_discrete_dichotomy_defective_split_is_invariant():
+    """Robustness on a DEFECTIVE (non-diagonalizable) A: a 3×3 Jordan block at 0.6 ⊕ a
+    0.4 mode. The eig-based split would be ill-conditioned here; the ORDERED SCHUR split
+    stays A-invariant to machine precision and the active block carries a finite
+    certified per-step contraction and transient overshoot."""
+    pytest.importorskip("scipy")
+    J = torch.tensor([[0.6, 1.0, 0.0, 0.0],
+                      [0.0, 0.6, 1.0, 0.0],
+                      [0.0, 0.0, 0.6, 0.0],
+                      [0.0, 0.0, 0.0, 0.4]], dtype=torch.float64)   # ρ=0.6, defective
+    assert (J @ J.T - J.T @ J).norm() > 0.5                # genuinely non-normal
+    cert = discrete_dichotomy_certificate(J, delta=0.05)
+    assert cert.fate == "COLLAPSE" and cert.collapses      # ρ=0.6 < 1
+    assert cert.invariance_residual < 1e-9                 # Schur split exact even when defective
+    assert cert.active_dim == 4 and cert.slow_dim == 0
+    assert 0.0 <= cert.active_decay_factor < 1.0           # provable per-step contraction
+    assert cert.transient_bound >= 1.0                     # finite non-normal overshoot
+    assert cert.kreiss_bound >= 1.0                        # discrete Kreiss lower bound valid
 
 
 # ── Σ₀-K1 component 8: collapse certificate + NIS canary, end-to-end (#852) ──

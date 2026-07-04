@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-06-29
+updated: 2026-07-04
 ---
 
 # Σ₀ — The Collapse Certificate
@@ -29,7 +29,7 @@ safety mechanism.** This is the same thing machine-learning researchers call
 - **PROVEN** — the core collapse theorem (Theorem 1), for the well-behaved
   (symmetric / normal) case; **and** that the anti-collapse operator *prevents
   permanent freeze* (§3, Theorem C3) — now for **all `A`, normal and non-normal**
-  (the alignment hypothesis was removable; 2026-06-26). *42 of 42 tests pass* (incl. the non-normal contraction dichotomy, [#768] closed).
+  (the alignment hypothesis was removable; 2026-06-26). *45 of 45 tests pass* (incl. the non-normal contraction dichotomy, [#768] closed, and the discrete-time dichotomy, [#1988]).
 - **MEASURED** — the early-warning "canary" (§4) and the operator's broader escape
   behavior: demonstrated over **900 forced-collapse runs (100% prevented)** plus
   passing integration tests, beyond what the freeze theorem covers.
@@ -54,7 +54,7 @@ mechanism.)
 ---
 
 Status: **Theorem 1 is proven and machine-checked** (`src/cio_sde/collapse.py`,
-`tests/test_cio_sde.py` — **42 passing, 0 xfail**) **for the symmetric / normal case**.
+`tests/test_cio_sde.py` — **45 passing, 0 xfail**) **for the symmetric / normal case**.
 The **anti-collapse operator's freeze-prevention (§3) is now also PROVEN** — Theorem C3,
 for **all `A`** (normal and non-normal; 2026-06-26). The collapse trigger (§2) and the
 early-warning readout (§4) remain control-design heuristics — empirically supported, not
@@ -151,6 +151,52 @@ lines before relying on any claim here.
 > `src/cio_sde/surprise.py`. Nothing had drifted since the 2026-06-26 closures (both halves of
 > [#768] remain closed in-regime; §3 PROVEN for all `A`). Frontmatter `updated:` bumped
 > 2026-06-20 → 2026-06-29 to reflect this check; no frontier changes.
+>
+> **Maintenance log — 2026-07-04 (external-reality reconcile).** Verification pass against the
+> repo; **no claims changed**. Fresh run this pass, not only the committed report:
+> `pytest tests/test_cio_sde.py` → **42 passed, 0 xfail** (30.8s), and the §2/§3/§7.1
+> proof-regression tests are among the 42 and green — `test_c3_no_consecutive_freeze`,
+> `test_l4_floor_lifts_anisotropy`, `test_g13_no_zero_rank_bump`,
+> `test_c3_nonnormal_covariance_lift` (C3 for all `A`), `test_collapse_is_nonexpansive_projection`
+> (§2 / [#661]), and `test_sigma_zero_freezes_sigma_positive_explores` (§7.1 σ-axis) — so the
+> load-bearing claims carry a live green run, not just a checked-in artifact.
+> `data/sigma0_regime_sweep_report.json` → `collapse_prone_trials_total=900`,
+> `headline_conditional_prevention_rate=1.0` (unchanged). Every cited cross-reference resolves:
+> `collapse_certificate` / `stability_gates` / `dichotomy_certificate` / `lyapunov_value` /
+> `AntiCollapseOperator` / `SemanticCollapseOperator` in `src/cio_sde/collapse.py`,
+> `SurpriseMonitor` + `CovarianceField` in `src/cio_sde/surprise.py` (also `engine.py`), the four
+> sibling proofs (T1-dichotomy, C3, L2, anti-collapse-hardening), all six `experiments/` drivers,
+> and both `data/sigma0/*.jsonl` outputs. **Provenance check (new this pass):** `git log` shows the
+> last commit touching this certificate *is* the 2026-06-29 reconcile itself (`34deba2f`, #1574) and
+> the last `src/cio_sde/` change is #768's non-normal-contraction close on 2026-06-26 (`6b446b90`) —
+> no commit since the last pass touched the source, tests, or this doc, so the match is structural,
+> not coincidental. Both halves of [#768] remain closed in-regime; §3 PROVEN for all `A`. Frontmatter
+> `updated:` bumped 2026-06-29 → 2026-07-04; no frontier changes.
+>
+> **Maintenance log — 2026-07-04 (frontier work: discrete-time certificate landed).**
+> Beyond the reconcile above, this pass **opened four tracked frontiers and closed one**.
+> Reviewing the proof↔evidence surface surfaced two concrete gaps: (a) every theorem is
+> **continuous-time** (`e^{tA}`, `solve_continuous_lyapunov`, split by `Re λ`), yet §6's
+> own evidence is **discrete-time** (spectral radius `ρ≈1.064`) — the theorem did not
+> certify the quantity the demonstration measures; (b) the dichotomy's eig-based Riesz
+> split **abstains on defective `A`** (Jordan blocks — `inv(V)` ill-conditioned). Filed as
+> [#1988] (discrete-time dichotomy), [#1989] (defective-`A` via ordered Schur), [#1990]
+> (the §2 trigger→theorem gap — the unproven *entry* condition to the whole chain), and
+> [#1991] (local→global region-of-attraction). **[#1988] landed this pass:**
+> `discrete_dichotomy_certificate` + `DiscreteDichotomyCertificate` (`src/cio_sde/collapse.py`)
+> split `A` at `|z|=1−δ` via an **ordered real Schur** factorization (defective-safe, no
+> eigenvector inverse), certify the active block with the **discrete Lyapunov/Stein** metric
+> `AᴹᵀPAᴹ−P=−I` (`P⪰I` ⇒ per-step decay `√(1−1/λ_max(P))`, transient `√cond(P)`),
+> lower-bound the **discrete Kreiss** constant, and decide the fate by the slow block's
+> spectral radius `ρ_N` (>1 DIVERGE, <1 COLLAPSE, ≈1 MARGINAL — no third fate). For normal
+> `A` it reduces to `ρ(A)<1 ⟺ collapse`; discretizing a continuous flow as `e^{A·dt}`
+> preserves the fate (parity test). On a defective Jordan block the Schur split residual is
+> machine-zero where the continuous eig path abstains. Machine-checked by three new tests
+> (`test_discrete_dichotomy_radius_trichotomy`, `…_matches_continuous_under_exponential`,
+> `…_defective_split_is_invariant`); suite **42 → 45 passing, 0 xfail**. Same evidence class
+> as the continuous dichotomy — **PROVEN in-regime** (local linear Jacobian, discrete),
+> "machine-checked" = closed-form algebra + tests, **not** Lean. [#1989]–[#1991] remain open
+> frontiers.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -219,6 +265,10 @@ status cannot silently drift.
 [#766]: https://github.com/alex-place/lantern-os/issues/766
 [#767]: https://github.com/alex-place/lantern-os/issues/767
 [#768]: https://github.com/alex-place/lantern-os/issues/768
+[#1988]: https://github.com/alex-place/lantern-os/issues/1988
+[#1989]: https://github.com/alex-place/lantern-os/issues/1989
+[#1990]: https://github.com/alex-place/lantern-os/issues/1990
+[#1991]: https://github.com/alex-place/lantern-os/issues/1991
 
 ---
 
@@ -660,6 +710,15 @@ The mean spectral radius sitting just above 1 (with a third of windows locally
 expanding) is the expected signature of a system perched near its stability
 boundary rather than resting in a deep contracting basin.
 
+> **Now certified in the matching time domain (2026-07-04, [#1988]).** `ρ` is a
+> *discrete-time* quantity — the step map `x_{k+1}=A x_k` contracts iff `ρ(A) < 1` —
+> whereas Theorem 1 and the dichotomy certify the *continuous* flow (`max Re λ(A) < 0`),
+> a different object. `discrete_dichotomy_certificate` (`src/cio_sde/collapse.py`) closes
+> that mismatch: it splits the Jacobian at `|z| = 1 − δ` via an ordered-Schur
+> factorization and classifies the fate by `ρ` itself (`ρ<1` COLLAPSE, `ρ>1` DIVERGE,
+> `ρ≈1` MARGINAL), with a certified per-step decay factor and transient bound. So a
+> window like this `ρ≈1.064` one is now *certified* near-boundary, not merely described.
+
 **Reservoir `G` result** (`router_reservoir_G.py` — echo-state network, size 50,
 spectral radius 0.9, ridge readout, 80/20 split):
 
@@ -795,7 +854,7 @@ random-walks freely,"* now pinned by a test. The operator-driven freeze and esca
 are covered by `test_collapse_freezes_state` (the §2 freeze) and
 `test_anti_collapse_suppresses_collapse` (§3 Σ₀⁻¹ re-excites / escapes); external
 grounding by `_run_recursive_with_grounding` (synthetic ≥ mixed ≥ real collapse
-score). *(`tests/test_cio_sde.py` — 42 passing, 0 xfail.)*
+score). *(`tests/test_cio_sde.py` — 45 passing, 0 xfail.)*
 
 ---
 
@@ -896,7 +955,7 @@ the hand-entered claims in this appendix are kept only for provenance.
 ---
 
 *Source of record: `src/cio_sde/collapse.py` (Theorem 1, Σ₀, Σ₀⁻¹);
-`tests/test_cio_sde.py` (42 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
+`tests/test_cio_sde.py` (45 passing, 0 xfail); framework `docs/sigma0-collapse-certificate.tex`.
 The router demonstration scripts `experiments/router_sigma0_encoder.py` and
 `experiments/router_reservoir_G.py` are **committed and reproducible** — see §6
 for produced results and Appendix A for the original design sketch.*
