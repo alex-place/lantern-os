@@ -74,13 +74,14 @@ const { JobWorker } = require("./lib/job-worker");
 const { PrWatcher } = require("./lib/pr-watcher");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
+const { dataRoot } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
 const publicRoot = path.join(__dirname, "public");
 const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177);
 const host = process.env.LANTERN_GARAGE_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
-const conversationLogPath = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
-const flatRagHousePath = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");
+const conversationLogPath = path.join(dataRoot(), "conversations", "garage-conversations.jsonl");
+const flatRagHousePath = path.join(dataRoot(), "rag-house", "flat-rag-house-latest.json");
 const flatRagHouseManifestPath = path.join(repoRoot, "manifests", "FLAT-RAG-HOUSE-LATEST.md");
-const operatorNotesPath = path.join(repoRoot, "data", "operator-notes", "notes.jsonl");
+const operatorNotesPath = path.join(dataRoot(), "operator-notes", "notes.jsonl");
 const cloudMirrorsPath = path.join(repoRoot, "manifests", "cloud-mirrors.json");
 const cloudMirrorUrls = process.env.LANTERN_CLOUD_MIRROR_URLS || "";
 const openaiApiKey = process.env.OPENAI_API_KEY || "";
@@ -783,7 +784,7 @@ server.listen(port, host, () => {
     const { execFile } = require("child_process");
     const fs = require("fs");
     const path = require("path");
-    const manifest = path.join(repoRoot, "data", "tesseract", "manifest.json");
+    const manifest = path.join(dataRoot(), "tesseract", "manifest.json");
     const script   = path.join(repoRoot, "scripts", "csf_research_tesseract.py");
     let stale = true;
     try {

@@ -4,21 +4,26 @@ const { readFileViaMcp } = require("./mcp-resource-client");
 const csfWriter = require("./csf-memory-writer");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
+// #1946 G2: writable state roots at dataRoot() — <repoRoot>/data on servers
+// (unchanged), %APPDATA%\unisona\data on the desktop app. csf-memory reads via
+// absolute paths (_readText), so no readJsonl/path.relative coupling. Repo artifacts
+// (csf/ingest) stay at repoRoot.
+const { dataRoot } = require("./app-paths");
 
 // CSF_MEMORY_PATH honors the same env override as the WRITER (csf-memory-writer.js::
 // _csfMemoryPath) so reader and writer always agree on the store location — and so this
-// read path is testable against a fixture dir. Defaults to data/csf_memory unchanged.
+// read path is testable against a fixture dir. Defaults to dataRoot()/csf_memory unchanged.
 const CSF_MEMORY_PATH = process.env.CSF_MEMORY_PATH
   ? path.resolve(process.env.CSF_MEMORY_PATH)
-  : path.join(repoRoot, "data", "csf_memory");
+  : path.join(dataRoot(), "csf_memory");
 const CSF_INGEST_PATH = path.join(repoRoot, "csf", "ingest");
-const DREAM_JOURNAL_PATH = path.join(repoRoot, "data", "dream_journal");
-const TESSERACT_MANIFEST = path.join(repoRoot, "data", "tesseract", "manifest.json");
+const DREAM_JOURNAL_PATH = path.join(dataRoot(), "dream_journal");
+const TESSERACT_MANIFEST = path.join(dataRoot(), "tesseract", "manifest.json");
 const DOOR_STATE_PATH = path.join(DREAM_JOURNAL_PATH, "door_state.json");
-const RAG_HOUSE_PATH = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");
+const RAG_HOUSE_PATH = path.join(dataRoot(), "rag-house", "flat-rag-house-latest.json");
 const CONVERSATION_LOG_PATH = process.env.KEYSTONE_CONVERSATION_LOG
   ? path.resolve(process.env.KEYSTONE_CONVERSATION_LOG)
-  : path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
+  : path.join(dataRoot(), "conversations", "garage-conversations.jsonl");
 
 let _cache = { memories: null, ingest: null, ts: 0 };
 const CACHE_TTL_MS = 10_000;

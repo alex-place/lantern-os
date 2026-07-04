@@ -4,9 +4,15 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { readJsonl } = require("./file-queue");
 
+// NOTE: this `repoRoot` is the apps/ dir (2 levels up) — used intentionally as a
+// source root by repoSources() below. The WRITABLE OUTPUT paths, however, must live
+// under the real repo-root data/manifests dirs (app-paths), not apps/. Before #1946
+// they were mis-rooted to apps/data + apps/manifests (which don't exist) — this fixes
+// that AND routes the data output through the desktop state seam (dataRoot()).
 const repoRoot = path.resolve(__dirname, "..", "..");
-const flatRagHousePath = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");
-const flatRagHouseManifestPath = path.join(repoRoot, "manifests", "FLAT-RAG-HOUSE-LATEST.md");
+const appPaths = require("./app-paths");
+const flatRagHousePath = path.join(appPaths.dataRoot(), "rag-house", "flat-rag-house-latest.json");
+const flatRagHouseManifestPath = path.join(appPaths.repoRoot, "manifests", "FLAT-RAG-HOUSE-LATEST.md");
 
 function repoSources() {
   return [
