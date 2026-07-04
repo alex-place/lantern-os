@@ -28,10 +28,8 @@ const PUBLIC_PAGES = {
 // Deep Dreamer (deep_dreamer) does NOT get trading access unless explicitly granted.
 const PROTECTED_PAGES = {
   "/profile.html":        { file: "profile.html",           role: "guest" },
-  "/crypto-dashboard.html":{ file: "crypto-dashboard.html", role: "guest" },
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
   "/trading.html":        { file: "trading.html",           entitlement: "trade" },
-  "/trading-news.html":   { file: "trading-news.html",      entitlement: "trade" },
   "/stock-trader.html":   { file: "stock-trader.html",      entitlement: "trade" },
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.

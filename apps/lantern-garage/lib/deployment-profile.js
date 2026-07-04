@@ -27,7 +27,7 @@ const HOSTED_SURFACES = new Set([
   "index.html", // landing / home
   "dream-chat.html", // chat — the product
   "explore.html", // explore — loop demo (logged-out) / own memory (logged-in)
-  "help.html", // help / getting-started (+ "download the desktop app")
+  "faq.html", // help / FAQ / getting-started (+ "download the desktop app")
   "auth.html", // login
   "entry.html", // post-login entry
   "profile.html", // account

@@ -5,7 +5,7 @@ Enforced by: [`apps/lantern-garage/test/surface-boundary.test.js`](../apps/lante
 
 ## Why this exists
 
-The [Σ₀ briefing](CONVERGANCE-SIGMA0-BRIEFING.md) and [CLAUDE.md](../CLAUDE.md) forbid architectural sprawl: *"name the loop stage you improve, or don't add it."* With ~48 public HTML surfaces, that rule had no teeth — nothing declared which surfaces **are** the
+The [Σ₀ briefing](CONVERGANCE-SIGMA0-BRIEFING.md) and [CLAUDE.md](../CLAUDE.md) forbid architectural sprawl: *"name the loop stage you improve, or don't add it."* With 40-odd public HTML surfaces, that rule had no teeth — nothing declared which surfaces **are** the
 `Observe → Remember → Reason → Act → Verify → Converge` loop and which are optional capabilities sitting beside it. The result reads as undifferentiated sprawl even when much of it is legitimate.
 
 This boundary draws the line explicitly so it is **auditable and gateable** instead of implicit. It does not delete anything — it classifies. The fix for sprawl is not amputation; it is a declared boundary plus a contract test that stops new sprawl from landing silently.
@@ -22,9 +22,16 @@ Every top-level `public/*.html` surface is exactly one of:
 
 A surface that is neither **fails the contract test**. To add a surface you must classify it; to promote/demote one you edit the registry deliberately.
 
+Classification alone only *labels* sprawl, so the contract test also enforces two rules that push back on it:
+
+- **BUDGET** — the `extension : core` ratio may not exceed `MAX_EXTENSION_RATIO` (currently **0.85**). Adding an extension without adding core value trips the gate; the fix is to grow the core loop, or to raise the cap as a **deliberate, reviewable one-line edit** — never silent accretion.
+- **GATEABLE** — every extension must be switch-off-able (name an env `flag`), **except** the always-on shell modules (`account`, `meta`) that must always render. This makes "optional capability beside the loop" true in practice, not just on paper.
+
+The hosted **cloud** profile ([`lib/deployment-profile.js`](../apps/lantern-garage/lib/deployment-profile.js)) is a second, tighter list — and its contract test now cross-checks that every hosted surface **exists on disk and is classified here**, so the two lists can't drift apart (that check would have caught the former dangling `help.html`).
+
 ## Current boundary (measured)
 
-`18 core : 30 extension` — ratio **1.67 : 1**. (The numbers come from `surface-registry.summary()`, not an estimate.)
+`19 core : 15 extension` — ratio **0.79 : 1** (cap **0.85**). The numbers come from `surface-registry.summary()` via `npm run test:boundary`, not an estimate.
 
 ### Core — the convergence loop
 | Stage | Surfaces |
@@ -32,27 +39,25 @@ A surface that is neither **fails the contract test**. To add a surface you must
 | Observe | `index.html` |
 | Remember | `explore.html`, `knowledgecenter.html`, `rag-house.html`, `wide-search.html` |
 | Reason | `dream-chat.html` |
-| Act | `orchestration.html`, `work.html`, `keystone-work.html`, `admin-flags.html` |
-| Verify | `proof.html`, `calibration.html`, `factcheck.html`, `grounding-diff.html` |
-| Converge | `agent-status.html`, `agent-leaderboard.html`, `metrics.html` |
+| Act | `orchestration.html`, `work.html`, `admin-flags.html` |
+| Verify | `proof.html`, `calibration.html`, `factcheck.html`, `grounding-diff.html`, `drift.html` |
+| Converge | `agent-status.html`, `agent-leaderboard.html`, `metrics.html`, `systems.html`, `replay.html` |
 
 ### Extensions — optional capabilities (by module)
 | Module | Count | Flag | Surfaces |
 |---|---|---|---|
-| trading | 10 | `TRADING_ENABLED` | `trading`, `trading-news`, `kalshi-terminal`, `kalshi-dashboard`, `kalshi-crypto-deck`, `kalshi-optimal-window`, `kalshi-realtime-positions`, `crypto-dashboard`, `stock-trader`, `test_deck_demo` |
-| account | 6 | — | `auth`, `entry`, `profile`, `pricing`, `upgrade-lab`, `api-keys-settings` |
-| creator | 5 | `CREATOR_ENABLED` | `create`, `creator-intake`, `document-studio`, `brainrot`, `courtney` |
-| legacy | 3 | — | `dream-chat-v1`, `dream-chat-orion`, `ops` |
-| flourishing | 2 | `HFF_ENABLED` | `flourishing`, `hff` |
+| account | 6 | — (always-on shell) | `auth`, `entry`, `profile`, `pricing`, `upgrade-lab`, `api-keys-settings` |
+| trading | 3 | `TRADING_ENABLED` | `trading`, `kalshi-terminal`, `stock-trader` |
+| meta | 3 | — (always-on shell) | `changelog`, `whats-new`, `faq` |
+| game | 1 | `GAMES_ENABLED` | `three-doors-game` |
+| creator | 1 | `CREATOR_ENABLED` | `create` |
 | media | 1 | `RADIO_ENABLED` | `fallout-radio` |
-| outreach | 1 | `OUTREACH_ENABLED` | `outreach` |
-| meta | 1 | — | `changelog` |
-| viz | 1 | — | `observer-mesh-cube` |
 
 ## What this buys
 
-- **Honest accounting.** The sprawl is now a number (1.67:1), not a vibe. Trading is the single largest extension cluster (10 surfaces).
-- **No silent sprawl.** A new unclassified `public/*.html` fails `npm run test:boundary` — you must say what loop stage it serves, or mark it an extension.
-- **A gate to shrink behind.** Extensions already carry feature flags; the `legacy` module marks superseded surfaces that are candidates for removal.
+- **Honest accounting.** The sprawl is a number (0.79:1) with a **cap that fails CI** (0.85), not a vibe. Setting aside the account/meta shell (9 surfaces), no feature cluster exceeds 3 surfaces (trading).
+- **No silent sprawl.** A new unclassified `public/*.html` fails `npm run test:boundary` — you must name the loop stage it serves, or declare it an extension.
+- **Back-pressure, not just labels.** A new extension that isn't offset by core value trips the budget; every extension is switch-off-able (a `flag`) unless it's the account/meta shell. The sprawl can be *turned off*, not just *counted*.
+- **No list drift.** The cloud hosted subset is cross-checked against disk + this registry, so a hosted entry can't point at a missing or unclassified file.
 
-This complements the existing governance scripts — `find-orphan-pages.mjs` (reachability) and `lint-throwaway-pages.mjs` (throwaway/test pages). Those ask "is it reachable / is it junk?"; this asks "does it belong to the loop, or is it a declared extension?"
+This complements the existing governance scripts — `find-orphan-pages.mjs` (reachability) and `lint-throwaway-pages.mjs` (throwaway/test pages). Those ask "is it reachable / is it junk?"; this asks "does it belong to the loop, or is it a declared, gated, budgeted extension?"

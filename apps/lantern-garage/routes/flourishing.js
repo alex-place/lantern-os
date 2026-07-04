@@ -93,14 +93,9 @@ function emptyWorldStatus() {
 }
 
 module.exports = async function flourishingRoutes(req, res, url, deps) {
-  const { sendJson, sendFile, publicRoot } = deps;
+  const { sendJson } = deps;
 
-  // Dashboard page
-  if (url.pathname === "/flourishing" || url.pathname === "/flourishing/") {
-    sendFile(res, path.resolve(publicRoot, "flourishing.html"));
-    return true;
-  }
-
+  // Page surface removed (surface-registry cut); only the /api/flourishing/* backend remains.
   if (!url.pathname.startsWith("/api/flourishing/")) return false;
 
   const snap = readSnapshot();

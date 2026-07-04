@@ -56,7 +56,7 @@ function genThumb(type, title, source) {
 
 // archive.org item cover/screenshot from an /embed/<identifier> URL.
 function archiveThumb(embedSrc) {
-  const m = /archive\.org\/embed\/([^/?#]+)/i.exec(embedSrc || "");
+  const m = (embedSrc || "").match(/archive\.org\/embed\/([^/?#]+)/i);
   return m ? "https://archive.org/services/img/" + m[1] : "";
 }
 
@@ -231,7 +231,7 @@ async function beliefCards() {
       }
       // A real grounded thumbnail: the Our World in Data chart PNG for this very
       // metric (the source we already fuse). Falls back to a generated cover.
-      const owid = (b.sources || []).map((s) => /ourworldindata\.org\/grapher\/([a-z0-9-]+)/i.exec(s.source || "")).find(Boolean);
+      const owid = (b.sources || []).map((s) => (s.source || "").match(/ourworldindata\.org\/grapher\/([a-z0-9-]+)/i)).find(Boolean);
       const beliefImg = owid ? "https://ourworldindata.org/grapher/" + owid[1] + ".png" : genThumb("belief", title, "Good news, grounded");
       const providers = (b.sources || []).map((s) => s.provider).filter(Boolean).join(" + ") || "fused public feeds";
       const corroboration = b.n_sources >= 2
@@ -241,7 +241,7 @@ async function beliefCards() {
         id: "belief:" + b.entity,
         type: "belief",
         title,
-        url: "/flourishing.html",
+        url: "/explore.html",
         source: "Good news, grounded",
         published: null,
         topics: ["world-model", b.domain].filter(Boolean),
