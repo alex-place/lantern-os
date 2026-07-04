@@ -80,12 +80,26 @@ Build steps (ADR-0014 §Follow-ups):
    `postject` (a pinned build dep) injects the blob. *Verified:* the built exe
    boots the Core end-to-end (SEA runs → spawns real node → `server.js` answers on
    loopback in chat-only hardened mode).
-3. **Sign** with Azure Trusted Signing (~$10/mo) — `postject` invalidates the
-   copied runtime's original signature, so signing here is what makes the exe
-   trusted. Note: EV certs no longer bypass SmartScreen (Microsoft removed that in
-   2024) — reputation builds over download volume regardless.
-4. **Installer** (Inno Setup / MSIX) that lays the app into `%LOCALAPPDATA%\unisona`,
-   ships `node.exe` beside `unisona.exe`, and (optionally) sets `UNISONA_SERVER_DIR`.
+3. **Sign — pick a channel** (`postject` invalidates the copied runtime's original
+   signature, so the exe/package MUST be (re)signed to be trusted). Research
+   2026-07-04 (Alex) settled the channels — **we ship BOTH:**
+   - **Microsoft Store (MSIX) — primary, $0, no warning.** Package as MSIX and ship
+     through the Store; Microsoft **re-signs on certification**, so users see **no
+     SmartScreen warning on first launch** and there is no cert to manage. Store
+     registration is now free (individuals since Sep 2025, companies since May 2026).
+   - **SignPath Foundation — direct download off unisona.ai, $0.** Free OSS OV
+     signing; this repo is **public → eligible**. Two caveats: the SmartScreen
+     publisher reads **"SignPath Foundation"** (not "Unisona"), and — like every
+     cert path — it builds reputation over downloads before the warning clears.
+   - **NOT Azure Trusted / Artifact Signing.** It is *paid* (requires a paid Azure
+     sub) and, since **EV certs stopped granting instant SmartScreen reputation in
+     2024**, it buys the *same* reputation ramp as the free options — strictly worse.
+     Dropped. (Cloudflare and Google/Vertex credits cannot sign a Windows exe
+     either — different certificate type.)
+4. **Installer / package** — **MSIX** for the Store channel (Microsoft handles
+   install + update); **Inno Setup** for the SignPath direct-download channel,
+   laying the app into `%LOCALAPPDATA%\unisona`, shipping `node.exe` beside
+   `unisona.exe`, and (optionally) setting `UNISONA_SERVER_DIR`.
 
 ## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 
