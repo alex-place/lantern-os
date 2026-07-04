@@ -18,10 +18,11 @@ const {
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
-const { sendVerificationEmail } = require("./mailer");
+const { sendVerificationEmail, smtpConfigured } = require("./mailer");
 
 // Fire-and-forget: email the new account a confirmation link (dev fallback logs
-// it). Never blocks or fails registration.
+// it). Never blocks or fails registration. Returns "sent" when SMTP is configured
+// or "logged" when the link only went to the server log/outbox (no SMTP).
 function sendSignupVerification(req, profile) {
   try {
     const host = (req.headers && req.headers.host) || "127.0.0.1";
@@ -31,7 +32,10 @@ function sendSignupVerification(req, profile) {
     const token = createToken("verify_email", profile.id, null);
     const link = `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
     sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
-  } catch (_) { /* best-effort */ }
+    return smtpConfigured() ? "sent" : "logged";
+  } catch (_) {
+    return "logged"; // best-effort
+  }
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -128,8 +132,10 @@ async function handleLocalRegister(req, res) {
   const result = createLocalAccount(email, password, name);
   if (result.error === "email_taken") return _json(res, 409, { error: "email_taken" });
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
-  sendSignupVerification(req, result.profile); // confirmation email (non-blocking)
-  return _establish(req, res, result.profile, 201);
+  const delivery = sendSignupVerification(req, result.profile); // confirmation email
+  // Hard email gate: the account is created but NOT signed in. It cannot log in
+  // until the confirmation link is clicked (see handleLocalLogin).
+  return _json(res, 202, { ok: true, pendingVerification: true, email, emailDelivery: delivery });
 }
 
 /** POST /api/auth/local/login { email, password } */
@@ -147,6 +153,10 @@ async function handleLocalLogin(req, res) {
     return _json(res, 401, { error: "invalid_credentials" });
   }
   clearFailures(req, email);
+  // Hard email gate: a local account with an unconfirmed email cannot sign in.
+  if (profile.emailVerified !== true) {
+    return _json(res, 403, { error: "email_unverified", email });
+  }
   return _establish(req, res, profile, 200);
 }
 
