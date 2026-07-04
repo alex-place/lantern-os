@@ -2445,7 +2445,14 @@ async function sendMessage(opts = {}) {
     /\b(find|show|view|read|open|get|look\s*up|summar|explain|describe|what'?s?|tell me about|details? (on|of|about))\b/i.test(text) &&
     /\b(issue|pr|pull request|ticket|bug report)\b\s*#?\d+/i.test(text) &&
     !/\b(fix|implement|add|change|edit|patch|refactor|rewrite|update the code|resolve|close|work on|build|create a)\b/i.test(text);
-  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup) {
+  // #1964: personal document work ("update my resume", "make me a cover letter")
+  // keyword-classifies as a code intent via change-verbs like "update" — but it is
+  // not repo work, so offering to file an issue + open a PR is nonsense there.
+  // Server-side the document_request intent now catches these; this is the belt
+  // for older servers / misclassified turns.
+  const _looksLikeDocument =
+    /\b(resume|cover letter|cover-letter|cv|docx|word (doc|document)|essay|memo|spreadsheet|presentation|slide deck)\b/i.test(text);
+  if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup && !_looksLikeDocument) {
     const offer = document.createElement('div');
     offer.className = 'autowork-offer';
     offer.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
@@ -2527,6 +2534,48 @@ async function sendMessage(opts = {}) {
     msg.appendChild(speakBtn);
     // Global narrate toggle (🔊 nav button sets window.narrateReplies): speak automatically.
     if (window.narrateReplies) startSpeaking();
+  }
+
+  // Per-message feedback (#1965) — the Observe-stage preference signal. Each verdict is
+  // attributable to the provider/model that actually served this turn (done receipt), so
+  // per-provider win rates are measurable from the ledger. Best-effort: never breaks chat.
+  if (!didError && fullText) {
+    const fbTurnIndex = history.length; // this assistant turn's transcript index (user turn already pushed)
+    const fbRow = document.createElement('div');
+    fbRow.className = 'msg-feedback';
+    fbRow.style.cssText = 'display:flex;gap:2px;margin-top:2px;';
+    const fbBtn = (verdict, glyph, label) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'feedback-btn';
+      b.dataset.verdict = verdict;
+      b.style.cssText = 'background:none;border:none;cursor:pointer;font-size:13px;opacity:0.6;padding:2px 4px;';
+      b.textContent = glyph;
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        for (const o of fbRow.querySelectorAll('.feedback-btn')) { o.style.opacity = '0.6'; o.setAttribute('aria-pressed', 'false'); }
+        b.style.opacity = '1';
+        b.setAttribute('aria-pressed', 'true');
+        fetch('/api/dream/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            verdict,
+            turnIndex: fbTurnIndex,
+            sessionId: localStorage.getItem('lantern_chat_session') || undefined,
+            provider: doneProvider, model: doneModel, intent: doneIntent, routeLabel,
+            userPreview: text.slice(0, 160), replyPreview: fullText.slice(0, 160),
+            surface: 'dream-chat',
+          }),
+        }).catch(() => {}); // ledger append is best-effort; a miss must never break the chat
+      });
+      return b;
+    };
+    fbRow.appendChild(fbBtn('up', '👍', 'Good reply'));
+    fbRow.appendChild(fbBtn('down', '👎', 'Bad reply'));
+    msg.appendChild(fbRow);
   }
 
   if (!didError) history.push({ role: 'assistant', text: fullText });

@@ -31,6 +31,40 @@ Reframed as conversational tools:
   substance in the first reply, at most one clarifying question, attachments
   are first-class, tools on the model's own initiative.
 
+Live-test round 2 (operator dogfood findings, Σ₀-council-reviewed and
+web-grounded — resumes are expected as .docx by employers/ATS, and frontier
+assistants deliver real document files):
+
+- generate_document now defaults to a REAL .docx (md→docx via the exported
+  document-builder renderDocx — ZIP/OOXML, not renamed HTML), writes it to the
+  user workspace, and returns a clickable download link served by the new
+  operator-gated GET /api/workspace/download route (workspace docs are PII).
+- New document_request intent (model-router) so "update my resume" no longer
+  keyword-ties into coding_change/technical_debug: document turns get the
+  "Keystone · documents" label and never surface the "Run as autowork" offer
+  (plus a client-side _looksLikeDocument belt in dream-chat-ui).
+- Prompt honesty: attachments are pre-extracted to text (docx/pdf/xlsx/pptx/
+  images) — the assistant must never claim it cannot read an attached file.
+
+New-user attachment dogfood (round 3) — three more real defects found by
+replaying "new user attaches their resume docx" through the actual upload
+pipeline, all fixed:
+
+- docx extraction now includes HEADERS/FOOTERS (mammoth skips them by design;
+  the operator's real resume keeps name/phone/email ONLY in word/header1.xml,
+  so drafts came out nameless with "[add phone]" gaps for data that was in the
+  file). jszip-based, fail-safe to body-only.
+- resume/cover-letter templates accept the model's natural field shapes
+  (grouped skills objects, description/years experience, institution/years
+  education, recipient_name) — a generated resume had printed a literal
+  "[object Object]" skills section, dropped every experience bullet, and
+  leaked "School (Year)" placeholders.
+- prompt honesty clause: the assistant may not claim it drafted/generated/
+  saved a file unless the tool call ran THIS turn — it had replied "I've
+  drafted an initial resume for you" with no tool call and no artifact.
+
 Docs/tests updated: CLAUDE.md, docs/ARCHITECTURE.md, skills/job_application/
 SKILL.md, tests/test_dream_chat_routing.js (was asserting the removed 6-persona
-design and already failing), tests/regression/agent-compliance.js Rule 8.
+design and already failing; now also covers document_request classification),
+tests/regression/agent-compliance.js Rule 8, document-generation.test.js
+(docx-default + ZIP-magic + download-link + natural-field-shape cases; 19/19).

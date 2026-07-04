@@ -179,6 +179,7 @@ const routes = [
   require("./routes/factcheck"),        // #1430: personal fact-check button
   require("./routes/drift"),            // #1428: drift-canary observability
   require("./routes/replay"),           // #1419: convergence replay / time-travel debugger
+  require("./routes/feedback"),         // #1965: per-message 👍/👎 → chat-feedback ledger (Observe)
   require("./routes/memory"),
   require("./routes/research-repo"),    // Research Team: repo→Convergence-Memory learning
   require("./routes/flourishing"),

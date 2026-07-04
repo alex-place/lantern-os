@@ -115,6 +115,25 @@ module.exports = async function documentRoutes(req, res, url, deps) {
     return true;
   }
 
+  // GET /api/workspace/download?file=<name> — download a user-workspace artifact
+  // (the resume/cover-letter .docx etc. that generate_document writes). Operator
+  // only: workspace files are the user's private documents (PII) — guests on a
+  // public deployment get 403. Filenames may contain spaces; path separators and
+  // traversal are rejected, and the resolved path must stay inside the workspace.
+  if (url.pathname === "/api/workspace/download" && req.method === "GET") {
+    const { isOperatorRequest } = require("../lib/request-auth");
+    if (!isOperatorRequest(req)) { sendJson(res, { error: "operator_required" }, 403); return true; }
+    const file = String(url.searchParams.get("file") || "");
+    if (!file || /[\\/]/.test(file) || file.includes("..")) { sendJson(res, { error: "invalid file" }, 400); return true; }
+    const root = require("../lib/user-workspace").getWorkspaceRoot();
+    const fp = path.resolve(root, file);
+    if (fp !== root && !fp.startsWith(root + path.sep)) { sendJson(res, { error: "invalid file" }, 400); return true; }
+    if (!fs.existsSync(fp)) { sendJson(res, { error: "not found" }, 404); return true; }
+    res.setHeader("Content-Disposition", `attachment; filename="${file.replace(/"/g, "")}"`);
+    sendFile(res, fp);
+    return true;
+  }
+
   // GET /api/documents/file?id=<id> — download a processed document
   if (url.pathname === "/api/documents/file" && req.method === "GET") {
     const id = (url.searchParams.get("id") || "").replace(/[^a-zA-Z0-9_-]/g, "");

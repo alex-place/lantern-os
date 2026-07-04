@@ -143,6 +143,18 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     });
     return true;
   }
+  // Traction / adoption — evidence-classed aggregate over the wallet + traction
+  // ledgers. Turns the "unverifiable in-repo" traction claims into MEASURED vs
+  // OPERATOR_REPORTED numbers with sources (Observe + Verify).
+  if (url.pathname === "/api/traction") {
+    try {
+      const { getTractionSummary } = require("../lib/traction");
+      sendJson(res, { ok: true, ...getTractionSummary() });
+    } catch (e) {
+      sendJson(res, { ok: false, error: e.message }, 500);
+    }
+    return true;
+  }
   if (url.pathname === "/api/readiness") {
     sendJson(res, getReadiness());
     return true;

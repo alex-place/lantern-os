@@ -441,7 +441,7 @@ const REGISTRY = {
       catch { mcpUp = false; }
       lines.push(`MCP server (127.0.0.1:8771): ${mcpUp
         ? "UP — /health responded"
-        : "DOWN — /health did not respond (start it with: python src/mcp_server/server.py)"}`);
+        : "DOWN — /health did not respond on 127.0.0.1:8771"}`);
       // 2) This chat server — if this tool is running, the Node server is up.
       const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
       lines.push(`Chat server (127.0.0.1:${port}): UP — uptime ${Math.round(process.uptime())}s`);
@@ -476,6 +476,27 @@ const REGISTRY = {
     run(i) {
       const abs = workspaceWrite(String(i.path || ""), String(i.content || ""));
       return `wrote workspace:${i.path} (${String(i.content || "").length} bytes)\nfull path: ${abs}`;
+    },
+  },
+
+  // ── Remember stage: agent-invoked memory recall (the "Grep" for user memory) ──
+  // Retrieval is NOT a keyword gate in front of the model — the model DECIDES to recall,
+  // calls this, and reasons over the result, exactly like Read/Grep over the repo. Backed
+  // by the ONE canonical CSF memory + conversation log (lib/csf-memory.js::recallMemory) —
+  // no new store. operator-only (not guest_safe): it reads the user's personal memory.
+  recall_memory: {
+    policy: "read",
+    desc: "Recall what you ALREADY KNOW about THIS user across past sessions — their stated personal facts, background, preferences, and relevant excerpts from earlier conversations. Call this WHENEVER the user asks what you know or remember about them, says 'use what you know about me', refers to something you 'discussed before', or when personalizing help (job search, resume, planning) would benefit from prior context. Pass a `query` to focus the recall (e.g. 'job search preferences', 'family', 'resume'); OMIT it to get a general profile of recent facts + conversation topics. The result is memory you genuinely have — rely on it as prior context, do not treat it as a guess. If it returns 'no stored memories', say that honestly; never claim you 'cannot see past sessions' without calling this first.",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Optional topic to focus recall on. Omit for a general 'what do you know about me' profile." },
+      },
+      required: [],
+    },
+    run(i) {
+      const { recallMemory } = require("./csf-memory");
+      return recallMemory({ query: String((i && i.query) || ""), limit: 8 });
     },
   },
 
@@ -522,24 +543,26 @@ const REGISTRY = {
   // (there is no persona or scripted skill flow in front of it).
   generate_document: {
     policy: "mutating",
-    desc: 'Generate a resume or cover-letter and save it to the user workspace. template: "resume" or "cover-letter". format: "html" (default — open in browser, Print → Save as PDF) or "markdown". Every field is optional at render time: pass whatever you already know from the conversation and attachments; missing fields are omitted or given neutral defaults. Draft first and refine in conversation — never make the user fill in a field list, and never invent user facts (leave a visible "[add …]" gap instead). Returns the workspace path. Operator only.',
+    desc: 'Generate a resume or cover-letter and save it to the user workspace. template: "resume" or "cover-letter". format: "docx" (default — a real, submit-ready Word file; employers/ATS expect .docx) | "html" (open in browser, Print → Save as PDF) | "markdown". Every field is optional at render time: pass whatever you already know from the conversation and attachments; missing fields are omitted or given neutral defaults. Draft first and refine in conversation — never make the user fill in a field list, and never invent user facts (leave a visible "[add …]" gap instead). Returns a download link — repeat it in your reply as a Markdown link so the user can click it. Operator only.',
     schema: {
       type: "object",
       properties: {
         template: { type: "string", description: '"resume" or "cover-letter"' },
         fields: { type: "object", description: "Template-specific fields (name, email, experience, skills, company, role, …)" },
-        format: { type: "string", enum: ["html", "markdown"], description: 'Output format (default: "html")' },
+        format: { type: "string", enum: ["docx", "html", "markdown"], description: 'Output format (default: "docx")' },
         filename: { type: "string", description: "Workspace-relative base name without extension (default: the template name)" },
       },
       required: ["template", "fields"],
     },
-    run(i) {
+    async run(i) {
       if (!i.template) return "[error: template is required]";
       if (!i.fields || typeof i.fields !== "object") return "[error: fields must be an object]";
-      const format = i.format === "markdown" ? "markdown" : "html";
+      const format = ["html", "markdown", "docx"].includes(i.format) ? i.format : "docx";
       let rendered;
       try {
-        rendered = renderDocument(String(i.template), i.fields, format);
+        // docx renders the template's markdown through the shared md→docx engine
+        // (lib/document-builder.js) — a real Word file, not renamed HTML.
+        rendered = renderDocument(String(i.template), i.fields, format === "docx" ? "markdown" : format);
       } catch (e) {
         const tmplList = listDocTemplates().map((t) => `  ${t.name}`).join("\n");
         return `[generate_document error: ${e.message}]\n\nAvailable templates:\n${tmplList}`;
@@ -547,12 +570,32 @@ const REGISTRY = {
       _ensureWorkspace();
       const base = String(i.filename || i.template)
         .replace(/\.+\//g, "")
-        .replace(/\.(html|md|markdown)$/i, "");
-      const finalName = base + rendered.extension;
-      const p = _safeWs(finalName);
-      fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, rendered.content, "utf8");
-      const lines = [`created workspace/${finalName} (${Buffer.byteLength(rendered.content)} bytes)`];
+        .replace(/\.(html|md|markdown|docx)$/i, "");
+      let finalName, bytes;
+      if (format === "docx") {
+        const { renderDocx } = require("./document-builder");
+        // Title feeds the docx TITLE paragraph; for resumes use the bare name so
+        // the template's leading "# Name" heading dedupes instead of doubling.
+        const title = String(i.template) === "resume"
+          ? String(i.fields.name || "Resume")
+          : [i.fields.name, "Cover Letter", i.fields.company ? `(${i.fields.company})` : ""].filter(Boolean).join(" — ").replace(" — (", " (");
+        const buffer = await renderDocx(rendered.content, title);
+        finalName = base + ".docx";
+        const p = _safeWs(finalName);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, buffer);
+        bytes = buffer.length;
+      } else {
+        finalName = base + rendered.extension;
+        const p = _safeWs(finalName);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, rendered.content, "utf8");
+        bytes = Buffer.byteLength(rendered.content);
+      }
+      const lines = [
+        `created workspace/${finalName} (${bytes} bytes)`,
+        `Download link — give this to the user as a Markdown link: [${finalName}](/api/workspace/download?file=${encodeURIComponent(finalName)})`,
+      ];
       if (format === "html") {
         lines.push("Tip: open it in the browser and use Print → Save as PDF to produce a submittable PDF.");
       }

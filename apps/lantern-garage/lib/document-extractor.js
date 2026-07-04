@@ -56,12 +56,56 @@ async function extractPdfText(filePath) {
   }
 }
 
-// Extract text from a Word .docx (mammoth → raw text; preserves paragraphs)
+// Pull the visible <w:t> runs out of a WordprocessingML part.
+function _wTextFromXml(xml) {
+  const out = [];
+  const re = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
+  let m;
+  while ((m = re.exec(xml))) out.push(m[1]);
+  return out.join(' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim();
+}
+
+// mammoth ignores docx HEADERS/FOOTERS by design — but resumes very commonly put
+// the name + contact line in the header (live finding on PR #1968: the operator's
+// real resume carries "Alexander Place" ONLY in word/header1.xml, so extraction
+// lost the name and the drafted resume came out nameless). Read header*/footer*
+// parts straight from the zip (jszip ships transitively with the docx/exceljs
+// deps). Best-effort: any failure → body-only extraction, exactly as before.
+async function _docxHeaderFooterText(filePath) {
+  try {
+    const JSZip = require('jszip');
+    const zip = await JSZip.loadAsync(fs.readFileSync(filePath));
+    const heads = [], feet = [];
+    for (const name of Object.keys(zip.files).sort()) {
+      const m = name.match(/^word\/(header|footer)\d*\.xml$/);
+      if (!m) continue;
+      const text = _wTextFromXml(await zip.files[name].async('string'));
+      if (text) (m[1] === 'header' ? heads : feet).push(text);
+    }
+    return { header: heads.join('\n'), footer: feet.join('\n') };
+  } catch {
+    return { header: '', footer: '' };
+  }
+}
+
+// Extract text from a Word .docx (mammoth → raw text; preserves paragraphs).
+// Headers are PREPENDED (that's where a resume's name/contact live) and footers
+// appended, deduped against the body in case the document repeats them.
 async function extractDocxText(filePath) {
   try {
     const mammoth = require('mammoth');
     const { value, messages } = await mammoth.extractRawText({ path: filePath });
-    const text = (value || '').trim();
+    const body = (value || '').trim();
+    const hf = await _docxHeaderFooterText(filePath);
+    const pieces = [];
+    if (hf.header && !body.includes(hf.header.slice(0, 40))) pieces.push(hf.header);
+    if (body) pieces.push(body);
+    if (hf.footer && !body.includes(hf.footer.slice(0, 40))) pieces.push(hf.footer);
+    const text = pieces.join('\n\n').trim();
     return {
       method: 'mammoth',
       content: text,
@@ -119,7 +163,7 @@ async function extractPptxText(filePath) {
       const xml = await zip.file(slideNames[i]).async('string');
       const runs = (xml.match(/<a:t>([\s\S]*?)<\/a:t>/g) || [])
         .map(t => t.replace(/<\/?a:t>/g, ''))
-        .map(s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'"))
+        .map(s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&'))
         .filter(Boolean);
       if (runs.length) parts.push(`# Slide ${i + 1}\n${runs.join('\n')}`);
     }

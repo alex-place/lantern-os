@@ -108,7 +108,7 @@ const _DEFAULT_PERSONAS = [
 1. Understand what the user actually wants, then deliver substance in your FIRST reply — a draft, an answer, an analysis, a fix — built from whatever is already available: their message, attachments, conversation history, memory, and tool results.
 2. Never reply with a form. Do not demand a checklist of fields or block on missing details: make reasonable assumptions, mark real gaps inline (e.g. "[add phone]"), and invite corrections after delivering something useful.
 3. Ask at most ONE clarifying question per reply, only when the answer genuinely changes the work, and place it after the useful content — never before it.
-4. Attachments are first-class input: read them and use them; never re-ask for information they already contain.
+4. Attachments are first-class input: they arrive pre-extracted as plain text (docx, pdf, xlsx, pptx and images are parsed for you), so never claim you cannot open or read an attached file type — use its content, and never re-ask for information it already contains.
 5. Follow the user when they change direction. Never drag the conversation back to a workflow step.
 
 ## Real tools, your own initiative
@@ -117,7 +117,7 @@ Your capabilities are real tools (web search and fetch, document generation, use
 
 ## Grounding (Σ₀ External Reality Rule)
 
-External reality beats internal consistency. Ground important claims in evidence (tool results, cited sources, files you actually read); give honest confidence; say "I don't know" plainly rather than improvise. Never fabricate user facts — experience, credentials, numbers — and never invent sources or URLs. Assumptions are fine when marked; fabrications never.
+External reality beats internal consistency. Ground important claims in evidence (tool results, cited sources, files you actually read); give honest confidence; say "I don't know" plainly rather than improvise. Never fabricate user facts — experience, credentials, numbers — and never invent sources or URLs. Assumptions are fine when marked; fabrications never. The same applies to your own actions: never claim you drafted, generated, saved, or updated something unless the tool call actually ran this turn and returned a result — do it, show it inline, or say what you WILL do; no imaginary artifacts.
 
 ## Engineering requests
 
@@ -478,6 +478,36 @@ const DREAM_DOORS = _doorsData.doors || {
   },
 };
 
+// ── Honest provider-failure surfacing (Verify stage) ────────────────────────
+// A cloud LLM endpoint signals credit/auth/quota problems with a NON-200 whose
+// body is a JSON error ENVELOPE, not content. The non-stream dispatch below used
+// to JSON.parse that envelope, find no text, resolve("") and fall through with
+// ZERO logging — so a depleted key surfaced to the user as "no_provider_configured"
+// and /api/providers/status still read "ok" (the "calm-while-wrong" bug). This
+// parses the envelope into a structured record { provider, status, code, type,
+// message } so the failure can be logged, recorded to the provider-router, and
+// threaded into the final error return. Envelope shapes covered:
+//   anthropic {type:"error",error:{type,message}}   openai/xai {error:{message,type,code}}
+//   gemini    {error:{code,message,status}}          plain-text / non-JSON bodies
+function parseUpstreamProviderError(provider, statusCode, rawBody) {
+  const code = `${provider}_status_${statusCode}`;
+  let type = `http_${statusCode}`;
+  let message = "";
+  try {
+    const j = JSON.parse(rawBody);
+    const e = j && j.error;
+    if (e && typeof e === "object") {
+      type = e.type || e.status || e.code || type;
+      message = e.message || "";
+    } else if (typeof e === "string") {
+      message = e;                       // xAI sometimes returns {error:"..."}
+    } else if (j && typeof j.message === "string") {
+      message = j.message;
+    }
+  } catch { message = String(rawBody || "").slice(0, 300); }
+  return { provider, status: statusCode, code, type: String(type), message: String(message).slice(0, 300) };
+}
+
 async function dreamChatReply(message, recentDreams, requestedAgent = "", requestedProvider = "") {
   console.log("[dreamChatReply] Called with agent:", requestedAgent, "provider:", requestedProvider);
   const text = String(message || "").trim();
@@ -655,6 +685,19 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     // Continue with default fallback if router fails
   }
 
+  // Last cloud-provider failure seen this turn, threaded into the final error
+  // return so routes/dream.js surfaces the REAL reason (e.g. "credit balance too
+  // low") instead of a blanket "no_provider_configured". HTTP-status failures
+  // (from the on("end") handlers) are authoritative; a later network/timeout
+  // error must not clobber a more informative 4xx already recorded.
+  let lastProviderError = null;
+  const noteNetworkError = (provider, err) => {
+    if (!lastProviderError || lastProviderError.status === 0) {
+      lastProviderError = { provider, status: 0, code: `${provider}_error`, type: "network",
+        message: String((err && err.message) || err || "unknown").slice(0, 300) };
+    }
+  };
+
   // PRIORITY 1: Ollama (Local-first — no API keys, full privacy, control)
   const ollamaBase = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
   const ollamaModel = process.env.OLLAMA_MODEL || "ouro:latest";
@@ -775,6 +818,18 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           let data = "";
           upstream.on("data", (c) => (data += c));
           upstream.on("end", () => {
+            const status = upstream.statusCode || 0;
+            // Non-200 = a credit/auth/quota error envelope, NOT content. Surface it
+            // (log + record the router failure + remember the reason) instead of
+            // resolving "" and silently falling through to no_provider_configured.
+            if (status !== 200) {
+              const perr = parseUpstreamProviderError("anthropic", status, data);
+              console.error(`[dream-chat] Claude API error: status=${status} type=${perr.type} — ${perr.message}`);
+              recordProviderFailureRouter("anthropic", perr.code);
+              lastProviderError = perr;
+              resolve("");
+              return;
+            }
             try {
               const json = JSON.parse(data);
               const replyText = String(json.content?.[0]?.text || json.completion || "").trim();
@@ -809,6 +864,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     } catch (err) {
       console.error("Claude API error:", err.message);
       recordProviderFailureRouter("anthropic", err.message.includes("anthropic_status_") ? err.message : "unknown"); // Log to provider-router
+      noteNetworkError("anthropic", err); // network/timeout — surface if no 4xx already recorded
     }
   }
 
@@ -829,18 +885,27 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
     for (const geminiModel of geminiModels) {
       try {
+        // gemini-2.5 spends part of maxOutputTokens on a hidden "thinking" phase, so even
+        // a 2048 cap still starved long code answers — the reply ended mid-docstring with
+        // no function body ever arriving (2026-07-03 gemini eval). Disable thinking on
+        // thinking-capable models so the whole budget is visible output, and give code
+        // answers ample room. Mirrors the stream path (stream-chat.js) + self-edit-engine
+        // + swarm-orchestrator, which already run thinkingBudget:0 on 2.5-flash. #1376
+        const supportsThinking = /gemini-(2\.5|3)/.test(geminiModel);
         const payload = JSON.stringify({
           contents: [{ role: "user", parts: [{ text: `${agent.systemPrompt}\n\n${userPrompt}` }] }],
-          // gemini-2.5 spends part of the output budget on internal "thinking" tokens,
-          // so 256 truncated real replies to a bare preamble (no PR-review verdict). 2048
-          // leaves room for a complete answer after thinking. #1376
-          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
+          generationConfig: {
+            maxOutputTokens: 4096,
+            temperature: 0.7,
+            // thinkingBudget:0 only on 2.5/3.x — the gemini-1.5 fallbacks 400 on thinkingConfig.
+            ...(supportsThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          },
           // Web-search grounding only on the AI-Studio wire — the Vertex tool schema
           // differs by model and a mismatch 400s the whole call.
           ...(geminiOnVertex ? {} : { tools: [{ google_search_retrieval: {} }] }),
         });
         const transport = await geminiTransport({ model: geminiModel, method: "generateContent", streaming: false });
-        const reply = await new Promise((resolve, reject) => {
+        const { text: reply, finishReason } = await new Promise((resolve, reject) => {
           const req2 = https.request({
             hostname: transport.hostname,
             path: transport.path,
@@ -850,10 +915,24 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
             let data = "";
             upstream.on("data", (c) => (data += c));
             upstream.on("end", () => {
+              const status = upstream.statusCode || 0;
+              // Non-200 = a quota/billing/key error envelope (the AI-Studio free tier
+              // is credit-depleted), NOT content — surface it instead of resolving "".
+              if (status !== 200) {
+                const perr = parseUpstreamProviderError("gemini", status, data);
+                console.error(`[dream-chat] Gemini (${geminiModel}) API error: status=${status} type=${perr.type} — ${perr.message}`);
+                recordProviderFailureRouter("gemini", perr.code);
+                lastProviderError = perr;
+                resolve("");
+                return;
+              }
               try {
                 const json = JSON.parse(data);
-                resolve(String(json.candidates?.[0]?.content?.parts?.[0]?.text || "").trim());
-              } catch { resolve(""); }
+                const cand = json.candidates?.[0];
+                // Join every text part so nothing is dropped if the model splits its answer.
+                const text = String((cand?.content?.parts || []).map(p => p && p.text).filter(Boolean).join("")).trim();
+                resolve({ text, finishReason: cand?.finishReason || null });
+              } catch { resolve({ text: "", finishReason: null }); }
             });
             upstream.on("error", reject);
           });
@@ -863,9 +942,19 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           req2.end();
         });
         if (reply && reply.length >= 20) {
-          return { reply, agent: agent.name, suggestions, online: true, source: `gemini${geminiOnVertex ? "-vertex" : ""}:${geminiModel}`, webSuggestions };
+          // Surface truncation instead of silently returning a cut-off answer: MAX_TOKENS
+          // means the visible reply is incomplete. finishReason rides the result object
+          // (the route spreads it into the JSON response) so callers can see it. #1376
+          if (finishReason === "MAX_TOKENS") {
+            console.warn(`Gemini (${geminiModel}) hit MAX_TOKENS — reply may be truncated (${reply.length} chars)`);
+          }
+          return { reply, agent: agent.name, suggestions, online: true, source: `gemini${geminiOnVertex ? "-vertex" : ""}:${geminiModel}`, webSuggestions, finishReason };
         }
-      } catch (err) { console.error(`Gemini (${geminiModel}) error:`, err.message); }
+      } catch (err) {
+        console.error(`Gemini (${geminiModel}) error:`, err.message);
+        recordProviderFailureRouter("gemini", err.message.includes("gemini_status_") ? err.message : "unknown");
+        noteNetworkError("gemini", err);
+      }
     }
   }
 
@@ -895,6 +984,17 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           let data = "";
           upstream.on("data", (c) => (data += c));
           upstream.on("end", () => {
+            const status = upstream.statusCode || 0;
+            // Non-200 = an auth/quota error envelope, NOT content — surface it
+            // instead of resolving "" and silently falling through.
+            if (status !== 200) {
+              const perr = parseUpstreamProviderError("openai", status, data);
+              console.error(`[dream-chat] OpenAI API error: status=${status} type=${perr.type} — ${perr.message}`);
+              recordProviderFailureRouter("openai", perr.code);
+              lastProviderError = perr;
+              resolve("");
+              return;
+            }
             try {
               const json = JSON.parse(data);
               const replyText = String(json.choices?.[0]?.message?.content || "").trim();
@@ -929,6 +1029,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     } catch (err) {
       console.error("OpenAI API error:", err.message);
       recordProviderFailureRouter("openai", err.message.includes("openai_status_") ? err.message : "unknown"); // Log to provider-router
+      noteNetworkError("openai", err);
     }
   }
 
@@ -958,6 +1059,15 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           let data = "";
           upstream.on("data", (c) => (data += c));
           upstream.on("end", () => {
+            const status = upstream.statusCode || 0;
+            if (status !== 200) {
+              const perr = parseUpstreamProviderError("xai", status, data);
+              console.error(`[dream-chat] Grok (xAI) API error: status=${status} type=${perr.type} — ${perr.message}`);
+              recordProviderFailureRouter("xai", perr.code);
+              lastProviderError = perr;
+              resolve("");
+              return;
+            }
             try {
               const json = JSON.parse(data);
               resolve(String(json.choices?.[0]?.message?.content || "").trim());
@@ -976,14 +1086,36 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
       }
     } catch (err) {
       console.error("Grok (xAI) API error:", err.message);
-      recordProviderFailureRouter("xai", "unknown");
+      recordProviderFailureRouter("xai", err.message.includes("xai_status_") ? err.message : "unknown");
+      noteNetworkError("xai", err);
     }
   }
 
+  // No usable reply. Distinguish "a configured provider was tried and FAILED"
+  // (surface the real reason — a depleted key, bad auth, rate limit) from "nothing
+  // was configured at all" (the setup-help case). Previously every path collapsed
+  // to a bare "no_provider_configured", hiding e.g. Anthropic's "credit balance too
+  // low" behind a generic message and a silent server log.
+  if (lastProviderError) {
+    return {
+      reply: null,
+      error: lastProviderError.code,          // e.g. "anthropic_status_400"
+      errorDetail: lastProviderError,         // { provider, status, type, message }
+      agent: agent.name,
+      suggestions,
+      online: false,
+      source: "none",
+      webSuggestions,
+      help: `${lastProviderError.provider} failed`
+        + (lastProviderError.status ? ` (HTTP ${lastProviderError.status})` : " (network)")
+        + `: ${lastProviderError.message || lastProviderError.type}. Check the key/account balance, or configure another provider.`,
+    };
+  }
   // No provider available — return clear error with setup instructions
   return {
     reply: null,
     error: "no_provider_configured",
+    errorDetail: null,
     agent: agent.name,
     suggestions,
     online: false,
@@ -1249,6 +1381,7 @@ module.exports = {
   parseBangCommand,
   handleConvergenceCommand,
   dreamChatReply,
+  parseUpstreamProviderError,
   verifyResponse,
   isVerifyEnabled,
   calibrationEventsFor,

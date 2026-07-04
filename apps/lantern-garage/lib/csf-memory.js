@@ -5,13 +5,20 @@ const csfWriter = require("./csf-memory-writer");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
-const CSF_MEMORY_PATH = path.join(repoRoot, "data", "csf_memory");
+// CSF_MEMORY_PATH honors the same env override as the WRITER (csf-memory-writer.js::
+// _csfMemoryPath) so reader and writer always agree on the store location — and so this
+// read path is testable against a fixture dir. Defaults to data/csf_memory unchanged.
+const CSF_MEMORY_PATH = process.env.CSF_MEMORY_PATH
+  ? path.resolve(process.env.CSF_MEMORY_PATH)
+  : path.join(repoRoot, "data", "csf_memory");
 const CSF_INGEST_PATH = path.join(repoRoot, "csf", "ingest");
 const DREAM_JOURNAL_PATH = path.join(repoRoot, "data", "dream_journal");
 const TESSERACT_MANIFEST = path.join(repoRoot, "data", "tesseract", "manifest.json");
 const DOOR_STATE_PATH = path.join(DREAM_JOURNAL_PATH, "door_state.json");
 const RAG_HOUSE_PATH = path.join(repoRoot, "data", "rag-house", "flat-rag-house-latest.json");
-const CONVERSATION_LOG_PATH = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
+const CONVERSATION_LOG_PATH = process.env.KEYSTONE_CONVERSATION_LOG
+  ? path.resolve(process.env.KEYSTONE_CONVERSATION_LOG)
+  : path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
 
 let _cache = { memories: null, ingest: null, ts: 0 };
 const CACHE_TTL_MS = 10_000;
@@ -411,6 +418,136 @@ function queryConversationMemory(message, limit = 4) {
   return scored.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
+// ── Agent-invoked recall (the Remember-stage "Grep") ────────────────────────────
+// The automatic pre-injection below (formatCSFContextForPrompt) is intentionally gated:
+// it only surfaces memory with strong keyword overlap to the CURRENT message, so
+// off-topic turns stay quiet. But that gate must NOT be the ONLY path to memory — a gate
+// in front of the model can't answer "use what you already know about me" (no distinctive
+// keywords to match), and the model then wrongly concludes it has no memory at all. So we
+// ALSO expose recall as a TOOL the model calls on demand (tool-runner.js::recall_memory),
+// exactly like Read/Grep: the model decides to look, we return what is on file, it reasons
+// over the result. Same ONE canonical CSF memory + conversation log — no new store.
+
+// Most-recent life-memory facts (tag "life-memory", written by recordLifeFact) from the
+// raw registry, newest first. Scans from the end filtering by tag because raw.jsonl is
+// dominated by trading traces (see readMemoryRecords note) that would otherwise shadow
+// the facts under any per-file line cap.
+function readLifeFacts(limit = 12) {
+  const text = _readText(path.join(CSF_MEMORY_PATH, "raw.jsonl"));
+  if (!text) return [];
+  const lines = text.trim().split("\n").filter(Boolean);
+  const out = [];
+  const seen = new Set();
+  for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
+    let r; try { r = JSON.parse(lines[i]); } catch { continue; }
+    if (!r || !Array.isArray(r.tags) || !r.tags.includes("life-memory")) continue;
+    // Exclude Three Doors game state: the game skill writes XP/canon records tagged
+    // "life-memory" (surface "three-doors"), but game progress is NOT a personal fact
+    // about the user — it has its own door-state store. Surfacing it under "facts about
+    // you" is actively misleading. (The looser extractFact over-capture of typed eval/
+    // trading prompts is a separate capture-side bug, reported not silently filtered.)
+    if (r.tags.includes("three-doors") || (r.content && r.content.surface === "three-doors")) continue;
+    const t = r.content && r.content.text ? String(r.content.text).trim() : "";
+    if (!t) continue;
+    const key = t.slice(0, 80).toLowerCase();
+    if (seen.has(key)) continue;           // de-dup near-identical facts
+    seen.add(key);
+    out.push({ text: t, at: r.created_at || "" });
+  }
+  return out;
+}
+
+// Most-recent USER turns across ALL sessions (newest first, de-duplicated) — the
+// "what have we been talking about" digest for a general profile recall. The human's
+// turns are logged as role "operator" (loopback/admin) OR "user" — NOT a single value —
+// while the assistant is "lantern"; filter to the human roles, not a guessed "user".
+const _HUMAN_ROLES = new Set(["user", "operator"]);
+function recentUserTurns(limit = 8) {
+  const text = _readText(CONVERSATION_LOG_PATH);
+  if (!text) return [];
+  const lines = text.trim().split("\n").filter(Boolean);
+  const out = [];
+  const seen = new Set();
+  for (let i = lines.length - 1; i >= 0 && out.length < limit; i--) {
+    let e; try { e = JSON.parse(lines[i]); } catch { continue; }
+    const t = e && typeof e.text === "string" ? e.text.trim() : "";
+    if (!t || !_HUMAN_ROLES.has(e.role)) continue;
+    const key = t.slice(0, 80).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ role: "user", text: t, at: e.recordedAt || "" });
+  }
+  return out;
+}
+
+// Permissive conversation search for the agent-invoked tool. Unlike
+// queryConversationMemory (auto-injection), there is NO >=2-distinct-hit gate: the model
+// explicitly asked, so rank past turns by relevance and return the best matches, letting
+// the model discount a coincidental one. Any positive overlap qualifies.
+function searchConversation(query, limit = 8) {
+  const text = _readText(CONVERSATION_LOG_PATH);
+  if (!text) return [];
+  const lines = text.trim().split("\n").filter(Boolean);
+  const window = lines.slice(-1200);
+  const cur = String(query || "").trim().toLowerCase();
+  const seen = new Set();
+  const scored = [];
+  for (const line of window) {
+    let e; try { e = JSON.parse(line); } catch { continue; }
+    const t = e && typeof e.text === "string" ? e.text.trim() : "";
+    if (!t || e.role === "system" || e.role === "note") continue;
+    if (t.toLowerCase() === cur) continue;
+    const score = relevanceScore(t, query);
+    if (score <= 0) continue;
+    const key = t.slice(0, 80).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    scored.push({ role: e.role, text: t, score });
+  }
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+// Agent-invoked memory recall. Returns a compact, human-readable digest of what we
+// actually have on file about the user: query-focused when `query` is given, a general
+// profile (recent facts + recent conversation) when it is omitted. Fail-safe — returns an
+// honest "nothing on file" message rather than throwing, so the model can say so plainly
+// instead of confabulating a reason it "can't" remember.
+function recallMemory({ query = "", limit = 8 } = {}) {
+  const q = String(query || "").trim();
+  const parts = [];
+
+  const facts = readLifeFacts(12);
+  if (facts.length) {
+    parts.push("Personal facts on file (from earlier conversations):\n" +
+      facts.map((f) => `- ${f.text}`).join("\n"));
+  }
+
+  const convo = q ? searchConversation(q, limit) : recentUserTurns(limit);
+  if (convo.length) {
+    const header = q
+      ? `Earlier conversation excerpts related to "${q.slice(0, 60)}" (across sessions):`
+      : "Recent things the user has told you (most recent first, across sessions):";
+    parts.push(header + "\n" + convo.map((c) =>
+      `- ${c.role === "lantern" ? "You said" : "User said"}: ${String(c.text).slice(0, 240)}`).join("\n"));
+  }
+
+  if (q) {
+    const mems = queryMemories(q, 4);
+    if (mems.length) {
+      parts.push("Related stored memories:\n" + mems.map((m) => {
+        const t = (m.content && (m.content.text || m.content.raw_input)) || "";
+        return `- ${String(t).slice(0, 160)}`;
+      }).join("\n"));
+    }
+  }
+
+  if (!parts.length) {
+    return "No stored personal facts or prior conversations found for this user yet. " +
+      "This is likely a new user or nothing memorable has been recorded — ask the user directly rather than guessing or claiming you cannot remember.";
+  }
+  return parts.join("\n\n");
+}
+
 // New: query-time relevance-filtered context — compact, ~500-1500 chars max
 //
 // `opts.memories` lets a caller inject an already-resolved memory list (e.g. the
@@ -551,4 +688,8 @@ module.exports = {
   buildCSFContext,
   formatCSFContextForPrompt,
   formatCSFContextForPromptAsync,
+  readLifeFacts,
+  recentUserTurns,
+  searchConversation,
+  recallMemory,
 };

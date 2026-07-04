@@ -72,17 +72,23 @@ Planned build (tracked as a follow-up, see ADR-0014 §Follow-ups):
    download volume regardless.
 4. Installer (Inno Setup / MSIX) that lays the app into `%LOCALAPPDATA%\unisona`.
 
-## What Phase 1 does NOT do yet (see ADR-0014, "Phase 0" hardening)
+## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 
 These are Core changes that must land **before** a public `.exe` ships. They are
-not launcher concerns — they harden the Core for everyone:
+not launcher concerns — they harden the Core for everyone. The three **seams** are
+now in place and behaviour-preserving (default off); the remaining work is routing
+call sites through them and flipping the launcher on.
 
-- **State relocation** — the Core still reads/writes `data/` and `.env` relative
-  to the repo root. A shipped app must relocate writable state to
-  `%APPDATA%\unisona\`. (Until then, the launcher only makes sense on a checkout.)
-- **First-run key onboarding + OS credential vault** — keys must come from
-  Windows Credential Manager / DPAPI (`safeStorage`), user-supplied, never a
-  plaintext `.env` and never embedded in the binary.
-- **Loopback ≠ admin** — the Core currently grants admin to loopback requests.
-  On a desktop the user *is* loopback, so this must require an explicit local
-  token before shipping.
+- **State relocation (G2)** — ✅ seam landed: [`lib/app-paths.js`](../lib/app-paths.js)
+  is the one place that decides where writable state lives. Default is
+  `<repoRoot>/data` (unchanged); `UNISONA_DESKTOP=1` relocates to
+  `%APPDATA%\unisona\data`. `lib/tenant.js` already sources its `DATA_ROOT` here.
+  *Remaining:* route the remaining direct `data/` call sites (server.js,
+  dreamer-store, …) through it.
+- **OS credential vault (G3)** — ✅ landed: [`lib/key-vault.js`](../lib/key-vault.js)
+  stores keys DPAPI-encrypted at `<stateRoot>/keys.vault.json`; `tenant.js` reads
+  it as a fallback when no env key is present. *Remaining:* first-run key-onboarding
+  UI.
+- **Loopback ≠ admin (G4)** — ✅ mechanism landed: [`lib/request-auth.js`](../lib/request-auth.js)
+  gates operator trust on a per-boot `UNISONA_LOCAL_TOKEN` when set. *Remaining:*
+  client fetch-header adoption, then have the launcher mint + pass the token.

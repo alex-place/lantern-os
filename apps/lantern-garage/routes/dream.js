@@ -359,7 +359,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
           metadata: { source: result.source || "unknown", threeDoors: !!result.threeDoors, isConvergence: result.source === "convergence" },
         });
       } catch { /* provenance non-critical */ }
-      if (!result.reply) { sendJson(res, { error: result.error || "no_provider_configured", agent: result.agent, online: false, help: result.help || "", suggestions: result.suggestions || [] }, 503); return true; }
+      if (!result.reply) { sendJson(res, { error: result.error || "no_provider_configured", errorDetail: result.errorDetail || null, agent: result.agent, online: false, help: result.help || "", suggestions: result.suggestions || [] }, 503); return true; }
       // wq-005: emit a ConvergenceRecord for this reasoning cycle (Reason → Act).
       // Single point — catches both the !convergence command and normal reply paths.
       // Guarded: a failed record must never break the reply.

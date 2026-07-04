@@ -66,7 +66,8 @@ async function gatherProjectContext({ maxItems = 8 } = {}) {
       (Array.isArray(skillNames) ? ` Skills: ${skillNames.map((s) => s.name || s).slice(0, 12).join(", ")}.` : "") +
       " GitHub tools available via MCP (issues, PRs, repo ops).");
   } else {
-    parts.push("MCP server: offline (start: python src/mcp_server/server.py). GitHub still reachable via gh CLI.");
+    parts.push("MCP project tools are temporarily unavailable; GitHub operations still work. " +
+      "If the user asks, say the project tools are reconnecting — never tell them to run a terminal command.");
   }
 
   // Current branch
