@@ -83,6 +83,33 @@ function hedgeDamping(text) {
   return Math.min(1, hits * 0.5);
 }
 
+// Self-declared ungroundedness — the reply EXPLICITLY admits it did not ground its
+// claims: no access to the referent, or it is filling in a placeholder / assumption.
+// This is distinct from the assertiveness×(1−anchor) risk axis, which only catches
+// *confident* unanchored claims (the 42-state). A reply that honestly hedges
+// ("I don't have direct access to its codebase… I'll create a placeholder") scores
+// LOW risk (hedging damps assertiveness) yet is self-evidently ungrounded. The council
+// must never stamp such a reply "✓ Σ₀ grounded" (#1924) — absence of confident
+// over-claiming is not the same as presence of evidence. High-precision, first-person
+// framed to avoid flagging legitimate technical uses ("use a placeholder value").
+const SELF_UNGROUNDED = new RegExp(
+  [
+    "\\bi (?:don'?t|do not|can'?t|cannot|didn'?t|did not) (?:have |get )?(?:direct |real |live |actual )?access\\b",
+    "\\bwithout (?:direct |real |live )?access to\\b",
+    "\\bi (?:can'?t|cannot|couldn'?t|could not) (?:see|read|open|reach|access|view|inspect) (?:the|your|its|this|their)\\b",
+    "\\b(?:i'?ll|i will|let me|i'?m going to|i am going to|going to) (?:create|make|use|add|put|insert|generate) (?:a |an )?placeholder\\b",
+    "\\bplaceholder (?:entry|value|record|data|content|answer|response)\\b",
+    "\\bas a placeholder\\b",
+    "\\bi'?ll assume\\b", "\\bi will assume\\b", "\\bi'?m assuming\\b", "\\bi am assuming\\b",
+    "\\b(?:making|based on|i'?m making) (?:an? )?assumption\\b",
+  ].join("|"),
+  "i",
+);
+
+function selfDeclaredUngrounded(text) {
+  return SELF_UNGROUNDED.test(String(text || ""));
+}
+
 // In-text anchors: markdown links, bare URLs, or file:line / src-path citations.
 const MD_LINK = /\[[^\]]+\]\(\s*(?:https?:\/\/|\/|\.{0,2}\/)[^)]+\)/;
 const BARE_URL = /\bhttps?:\/\/\S+/;
@@ -125,10 +152,19 @@ function scoreReplyGroundedness(text, opts = {}) {
     inTextAnchor: 0,
     anchor: 0,
     modelUncertainty: 0,
+    selfUngrounded: false,
   };
 
+  // Self-declared ungroundedness is checked FIRST and independently of length: a short
+  // "I don't have access to the repo, so I'll use a placeholder" is exactly the reply
+  // the #1924 badge must not call grounded, even below the assertiveness MIN_TOKENS floor.
+  signals.selfUngrounded = selfDeclaredUngrounded(text);
+
   if (tokens.length < MIN_TOKENS) {
-    return { risk: 0, ungrounded: false, anchored: false, signals, reason: "too_short" };
+    return {
+      risk: 0, ungrounded: false, anchored: false,
+      selfUngrounded: signals.selfUngrounded, signals, reason: "too_short",
+    };
   }
 
   signals.assertionDensity = assertionDensity(sentences);
@@ -160,6 +196,7 @@ function scoreReplyGroundedness(text, opts = {}) {
     risk: Number(risk.toFixed(4)),
     ungrounded: risk >= threshold,
     anchored: signals.anchor > 0,
+    selfUngrounded: signals.selfUngrounded,
     signals,
   };
 }
@@ -208,5 +245,6 @@ module.exports = {
   scoreReplyGroundedness,
   ungroundedSignal,
   groundednessRoutingHint,
+  selfDeclaredUngrounded,
   MIN_TOKENS,
 };

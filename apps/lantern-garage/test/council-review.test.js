@@ -115,6 +115,38 @@ check("execVerdict {ran:false} → text gate unchanged", () => {
   assert.strictEqual(r.groundedBy, "low_delta");
 });
 
+// #1924: a reply that EXPLICITLY disclaims grounding (no access / placeholder / assumption)
+// must NOT be stamped grounded, even though hedging keeps its Δ low. Self-consistency between
+// the two faces is not evidence — route it to the honest unverified state (seam_open).
+const SELF_DISCLAIMED =
+  "I don't have direct access to its codebase, so I can't inspect the actual files. " +
+  "Based on the name lantern-os, I will create a placeholder entry describing what such a " +
+  "project probably contains, and you can correct it once you share the real repository.";
+check("self-declared ungrounded (placeholder/assumption) → seam_open, NOT grounded", () => {
+  const r = councilReview(SELF_DISCLAIMED, { emit: false });
+  assert.ok(r.delta < 0.5, `hedged reply keeps Δ low: delta=${r.delta}`);
+  assert.strictEqual(r.grounded.selfUngrounded, true, "canary must flag the self-disclaimer");
+  assert.strictEqual(r.verdict, "seam_open", "must not be grounded");
+  assert.notStrictEqual(r.groundedBy, "low_delta");
+});
+
+// Same self-disclaimed reply, operator unreachable → PIN (still not grounded), no escalation.
+check("self-declared ungrounded + unreachable → pin, not grounded", () => {
+  const r = councilReview(SELF_DISCLAIMED, { emit: false, reachable: false });
+  assert.strictEqual(r.verdict, "pin");
+  assert.strictEqual(r.escalated, false);
+});
+
+// A genuinely grounded reply with a real anchor is unaffected: the guard is scoped to the
+// self-disclaimer, so honest cited answers still earn the green "✓ Σ₀ grounded" badge.
+check("anchored reply is still grounded (no over-flagging)", () => {
+  const r = councilReview(HEALTHY, {
+    emit: false, groundingContext: "Repo README: the convergence loop is Observe→Reason→Act→Verify→Converge.",
+  });
+  assert.strictEqual(r.verdict, "grounded");
+  assert.strictEqual(r.grounded.selfUngrounded, false);
+});
+
 // The record path is the canonical convergence sink and points at the council log.
 check("council review log path is data/convergence/council-reviews.jsonl", () => {
   assert.ok(/data[\\/]convergence[\\/]council-reviews\.jsonl$/.test(COUNCIL_REVIEWS), COUNCIL_REVIEWS);

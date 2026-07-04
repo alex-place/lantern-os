@@ -5,7 +5,7 @@
 //
 // Run: node apps/lantern-garage/test/groundedness-canary.test.js
 const assert = require("assert");
-const { scoreReplyGroundedness, ungroundedSignal } = require("../lib/groundedness-canary");
+const { scoreReplyGroundedness, ungroundedSignal, selfDeclaredUngrounded } = require("../lib/groundedness-canary");
 
 let failures = 0;
 function check(name, fn) {
@@ -135,6 +135,39 @@ check("anchored reply + high model uncertainty: still not flagged", () => {
 check("reflective reply + high model uncertainty: still healthy", () => {
   const s = scoreReplyGroundedness(HEALTHY, { tokenSurprise: 0.95 });
   assert.strictEqual(s.ungrounded, false, `risk=${s.risk}`);
+});
+
+// ── #1924: self-declared ungroundedness ──
+// A reply that admits it has no access / is using a placeholder / is assuming is
+// self-evidently ungrounded, even though hedging keeps its 42-state RISK low. The
+// selfUngrounded flag is what the council reads to refuse the "✓ Σ₀ grounded" badge.
+const SELF_DISCLAIMED =
+  "I don't have direct access to its codebase, so I can't inspect the actual files. " +
+  "Based on the name lantern-os, I will create a placeholder entry describing what such a " +
+  "project probably contains, and you can correct it once you share the real repository.";
+check("self-disclaimed reply: selfUngrounded true, but low 42-state risk (hedged)", () => {
+  const s = scoreReplyGroundedness(SELF_DISCLAIMED);
+  assert.strictEqual(s.selfUngrounded, true, "must flag the explicit disclaimer");
+  assert.strictEqual(s.ungrounded, false, `hedging keeps 42-state risk low: risk=${s.risk}`);
+});
+check("selfDeclaredUngrounded detects the disclaimer families", () => {
+  assert.ok(selfDeclaredUngrounded("I don't have access to the repo."));
+  assert.ok(selfDeclaredUngrounded("I cannot see your codebase."));
+  assert.ok(selfDeclaredUngrounded("I'll create a placeholder entry for now."));
+  assert.ok(selfDeclaredUngrounded("I'm assuming the default config here."));
+  assert.ok(selfDeclaredUngrounded("Without access to the file, this is a guess."));
+});
+check("selfDeclaredUngrounded does NOT flag legitimate technical prose", () => {
+  assert.strictEqual(selfDeclaredUngrounded(HEALTHY), false);
+  assert.strictEqual(selfDeclaredUngrounded(
+    "Use a template with the value filled in at render time."), false);
+  assert.strictEqual(selfDeclaredUngrounded(
+    "The access token is validated on every request."), false);
+});
+// A too-short self-disclaimer is still flagged (checked before the MIN_TOKENS floor).
+check("short self-disclaimer: selfUngrounded still true", () => {
+  const s = scoreReplyGroundedness("I don't have access, so here's a placeholder.");
+  assert.strictEqual(s.selfUngrounded, true);
 });
 
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
