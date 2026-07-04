@@ -141,8 +141,26 @@ const deps = {
 // reach /api/trading/* directly. Runs before routes/trading. Admins and the
 // local bypass pass through (see auth-middleware.requireEntitlement).
 const { requireEntitlement } = require("./lib/auth-middleware");
+// Read-only market-data GETs with NO account/order state — served to everyone so
+// the logged-out chart view (guest-mode stock-trader.html) renders from the exact
+// same endpoints the live terminal uses (a true 1:1 copy, no duplicated data
+// layer). Everything NOT on this list (positions, orders, order placement,
+// agent-log, calibration, overnight-scan, all mutations) stays trade-gated.
+const PUBLIC_TRADING_READS = new Set([
+  "/api/trading/watchlist",         // GET → server default watchlist (not per-user)
+  "/api/trading/watchlist-prices",  // live quotes
+  "/api/trading/bars-multi",        // OHLCV for the charts
+  "/api/trading/market-status",     // VIX / regime / SPY trend / session
+  "/api/trading/zones",             // S/R zones (derived from bars)
+  "/api/trading/symbols/search",    // symbol-search popup (broker asset universe)
+  "/api/trading/symbol-stats",      // Yahoo returns/technicals
+  "/api/trading/symbol-info",       // name/exchange/asset_class
+  "/api/trading/logo",              // brand-logo proxy
+  "/api/trading/news/recent",       // public news feed
+]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
+  if (req.method === "GET" && PUBLIC_TRADING_READS.has(url.pathname)) return false; // public read → fall through
   if (requireEntitlement(req, res, "trade")) return false;     // allowed → fall through
   return true;                                                  // blocked → 403/302 already sent
 }
@@ -188,7 +206,6 @@ const routes = [
   require("./routes/training"),
   require("./routes/gpu-training"),
   require("./routes/token-audit"),
-  require("./routes/public-market"),  // keyless read-only quotes/bars for the logged-out chart view
   require("./routes/trading"),
   require("./routes/agent-performance"),
   require("./routes/leaderboard"),
