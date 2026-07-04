@@ -2,7 +2,8 @@
 
 A **thin launcher** that lets a non-developer run the unisona.ai / Keystone OS
 Convergence Core locally: double-click → the Core boots on a private loopback
-port → your default browser opens at it. Your memory, your keys, your machine.
+port → a **standalone app window** opens at it (no console window). Your memory,
+your keys, your machine.
 
 > **Design decision:** [docs/adr/0014-unisona-desktop-launcher.md](../../../docs/adr/0014-unisona-desktop-launcher.md).
 > This is a **delivery channel** for the local-first principle, **not** a new
@@ -16,9 +17,14 @@ port → your default browser opens at it. Your memory, your keys, your machine.
   children, no trading microservice, no Cloudflare tunnel.
 - Binds **127.0.0.1 only** (it deletes `PORT` and sets `LANTERN_GARAGE_HOST` so
   the Core can never accidentally bind `0.0.0.0`).
-- Waits until the server actually answers, then opens your **default browser**
-  (no bundled Chromium — see ADR-0014, guardrail G5).
-- `Ctrl+C` tears down the **whole child-process tree** (`taskkill /T` on Windows).
+- Waits until the server actually answers, then opens the UI as a **standalone,
+  chromeless app window** — Edge/Chrome `--app` mode (the WebView2 engine already on
+  Windows; **no bundled Chromium** — ADR-0014 G5). Falls back to the default browser
+  if neither is found.
+- **Windowless**: the shipped exe is GUI-subsystem — **no console window** — so logs
+  go to `%LOCALAPPDATA%\unisona\logs\desktop.log`, not a terminal.
+- **Closing the app window** quits the app and tears down the **whole child-process
+  tree** (also `Ctrl+C` in dev). No orphaned headless server.
 
 It uses **only Node builtins** — zero dependencies — so it can be wrapped into a
 single executable later without dragging in a dependency tree.
@@ -105,10 +111,26 @@ Build steps (ADR-0014 §Follow-ups):
      2024**, it buys the *same* reputation ramp as the free options — strictly worse.
      Dropped. (Cloudflare and Google/Vertex credits cannot sign a Windows exe
      either — different certificate type.)
-4. **Installer / package** — **MSIX** for the Store channel (Microsoft handles
-   install + update); **Inno Setup** for the SignPath direct-download channel,
-   laying `unisona.exe` + the app tree into `%LOCALAPPDATA%\unisona` and (optionally)
-   setting `UNISONA_SERVER_DIR`. **No `node.exe`** — `unisona.exe` is the runtime.
+4. **Installer / package** — for the SignPath direct-download channel, ✅ **wired**
+   via **Inno Setup** ([`unisona.iss`](unisona.iss), driven by
+   [`scripts/build-desktop-installer.mjs`](../../../scripts/build-desktop-installer.mjs)):
+   ```bash
+   node scripts/build-desktop-installer.mjs
+   # or: npm run build:installer --prefix apps/lantern-garage/desktop
+   # → apps/lantern-garage/desktop/dist/Unisona-Setup-<version>.exe
+   ```
+   It stages the payload with the repo-mirroring layout (`resources/app` = the garage
+   app, `src/` + root `node_modules` at the install root, so the Core's
+   `../../../src` requires resolve), then compiles a **per-user** installer (no admin,
+   no UAC) that lays the app into `%LOCALAPPDATA%\unisona`. **No `node.exe`** —
+   `unisona.exe` is the runtime. A **completeness guard** fails the build if any
+   declared dependency is absent from the staged `node_modules`, so a bundle that
+   won't boot can't ship. *Verified on Windows:* build → silent-install → the
+   installed `unisona.exe` boots the Core (HTTP 200 on loopback) → clean uninstall.
+   **Build prereqs:** Inno Setup 6 (`winget install JRSoftware.InnoSetup`) and a
+   checkout with a complete `npm ci` — built from a checkout with **no running
+   server** (a live server holds `node_modules` handles and the copy skips them).
+   The **MSIX / Microsoft-Store** channel is separate (Store handles install+update).
 
 ## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 
