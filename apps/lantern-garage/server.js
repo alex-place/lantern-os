@@ -327,6 +327,23 @@ function withSession(req, res, handler) {
 async function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  // #1946 G4 desktop loopback token: when the launcher-opened page carries the
+  // per-boot ?__lt=<token> matching UNISONA_LOCAL_TOKEN, hand the browser a
+  // SameSite=Strict, HttpOnly session cookie so every SUBSEQUENT request (fetch,
+  // EventSource, asset) authenticates automatically — while a DNS-rebind / CSRF
+  // page cannot, because SameSite blocks the cookie cross-site and the attacker
+  // never learns the token. No-op unless the token is configured (servers unaffected).
+  const _localToken = process.env.UNISONA_LOCAL_TOKEN;
+  if (_localToken) {
+    const lt = url.searchParams.get("__lt");
+    if (lt && require("./lib/request-auth").tokensEqual(lt, _localToken)) {
+      res.setHeader(
+        "Set-Cookie",
+        `unisona_lt=${encodeURIComponent(_localToken)}; Path=/; SameSite=Strict; HttpOnly; Max-Age=31536000`
+      );
+    }
+  }
+
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
