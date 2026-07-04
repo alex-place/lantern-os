@@ -362,7 +362,6 @@ const FEATURES = [
   { emoji: '✏️', label: 'Create',      href: '/create.html',           req: 'deep_dreamer' },
   { emoji: '🗺️', label: 'Explore',     href: '/explore.html',          req: 'guest' },
   { emoji: '📚', label: 'Knowledge',   href: '/knowledgecenter.html',  req: 'guest' },
-  { emoji: '📊', label: 'Crypto',      href: '/crypto-dashboard.html', req: 'guest' },
 ];
 
 // How each provider presents as a sign-in method. Identity is provider-agnostic
@@ -478,7 +477,7 @@ function renderProfile(profile) {
   const featureCards = FEATURES.map(f => {
     const ok = hasAccess(profile, f.req);
     const reqLabel = f.req === 'trade'
-      ? 'Requires trading access (opt-in)'
+      ? 'Trading not enabled on your account'
       : (f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '');
     return ok
       ? `<a class="access-card" href="${f.href}">
@@ -548,51 +547,8 @@ function renderProfile(profile) {
       <div class="access-grid">${featureCards}</div>
     </div>
 
-    ${role === 'admin' ? `
-    <div>
-      <div class="section-title">Administration</div>
-      <div class="access-grid">
-        <a class="access-card" href="/orchestration.html">
-          <span class="access-icon">🎛️</span>
-          <div>
-            <div class="access-label">Orchestration</div>
-            <div class="access-req">Fleet control center</div>
-          </div>
-        </a>
-        <a class="access-card" href="/work.html">
-          <span class="access-icon">📥</span>
-          <div>
-            <div class="access-label">Manual Work</div>
-            <div class="access-req">Pick &amp; hand off issues</div>
-          </div>
-        </a>
-        <a class="access-card" href="/admin-flags.html">
-          <span class="access-icon">🛠️</span>
-          <div>
-            <div class="access-label">Feature Flags</div>
-            <div class="access-req">Admin control surface</div>
-          </div>
-        </a>
-        <a class="access-card" href="/orchestration.html">
-          <span class="access-icon">🕸️</span>
-          <div>
-            <div class="access-label">Orchestration</div>
-            <div class="access-req">Fleet + autowork control</div>
-          </div>
-        </a>
-        <a class="access-card" href="/work.html">
-          <span class="access-icon">📥</span>
-          <div>
-            <div class="access-label">Manual Work</div>
-            <div class="access-req">Pick &amp; hand off issues</div>
-          </div>
-        </a>
-      </div>
-    </div>` : ''}
     </div><!-- /col -->
     </div><!-- /profile-cols -->
-
-    <p class="loop-stage-note">Account surface — an <strong>extension</strong>, not a loop stage (ADR-0013).</p>
   `;
 }
 
