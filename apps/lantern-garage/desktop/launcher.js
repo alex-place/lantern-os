@@ -81,9 +81,8 @@ if (isSea) {
   } catch { /* logging is best-effort; never block boot on it */ }
 }
 
-// The dedicated Edge/Chrome profile our app window uses. Isolating it (a) keeps the
-// window out of the user's normal browser session, and (b) gives us a stable marker
-// to detect when the window is really closed (see watchAppWindow).
+// The dedicated Edge/Chrome profile our app window uses — keeps the window out of the
+// user's normal browser session and its own taskbar entry.
 const appProfileDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unisona", "app-profile");
 
 // ── Configuration ───────────────────────────────────────────────────────────
@@ -95,6 +94,7 @@ const readyTimeoutMs = Number(process.env.UNISONA_READY_TIMEOUT_MS || 45_000);
 
 let child = null;
 let shuttingDown = false;
+let coreReady = false;
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 (async function main() {
@@ -119,16 +119,21 @@ let shuttingDown = false;
 
   child = spawnServer(port);
 
-  // If the server dies during boot (e.g. missing node_modules), say so plainly
-  // instead of hanging on the readiness poll.
+  // The Core exiting means one of two things: it died during boot (missing deps →
+  // explain), or — once ready — the desktop heartbeat saw the app window close and the
+  // Core quit itself, so we quit too. That's the whole window-lifecycle now.
   child.on("exit", (code, signal) => {
     if (shuttingDown) return;
-    fail(
-      `The Core server exited before it was ready ` +
-        `(code=${code}, signal=${signal || "none"}).\n` +
-        `If this is a fresh checkout, install deps first:\n` +
-        `    npm install --prefix "${serverDir}"`
-    );
+    if (coreReady) {
+      shutdown("app window closed");
+    } else {
+      fail(
+        `The Core server exited before it was ready ` +
+          `(code=${code}, signal=${signal || "none"}).\n` +
+          `If this is a fresh checkout, install deps first:\n` +
+          `    npm install --prefix "${serverDir}"`
+      );
+    }
   });
 
   const ready = await waitForServer(host, port, readyTimeoutMs);
@@ -136,6 +141,7 @@ let shuttingDown = false;
     fail(`Server did not answer on ${host}:${port} within ${readyTimeoutMs} ms.`);
     return;
   }
+  coreReady = true;
 
   console.log(`[unisona] Ready → ${url}`);
   // G4: the app window must carry the per-boot token on first load so the Core can
@@ -146,13 +152,11 @@ let shuttingDown = false;
   if (openBrowser) {
     const appProc = openAppWindow(openUrl);
     if (appProc) {
-      // Do NOT tie shutdown to the process we spawned: when Edge/Chrome is already
-      // running, it hands our window to the existing browser and the spawned process
-      // exits IMMEDIATELY — which would look like "window closed" and kill the Core
-      // out from under a live window (the ERR_CONNECTION_REFUSED bug). Instead, watch
-      // for any browser process still using our dedicated profile; the app quits only
-      // when the real window is gone. No console to Ctrl+C, no orphaned headless server.
-      watchAppWindow(appProfileDir);
+      // The window's lifecycle is tracked by the Core, not by this spawned process
+      // (which daemonizes when Edge is already running). The served page beats
+      // /__unisona/beat while open and beacons on close, so the Core exits when the
+      // window is gone — and our child.on("exit") quits the launcher with it. No
+      // browser-process polling (that flashed console windows), no orphaned server.
       console.log("[unisona] Opened the app window.");
     } else {
       console.log("[unisona] Opened your default browser (no app-mode browser found).");
@@ -314,44 +318,6 @@ function findUnixBrowser() {
   return names.find((c) => { try { return fs.existsSync(c); } catch { return false; } }) || null;
 }
 
-// ── Watch the app window (browser-lifecycle-proof) ──────────────────────────────
-// A browser launched with `--user-data-dir=<profile>` keeps at least one process
-// alive (with that profile in its command line) for as long as the window is open —
-// regardless of whether OUR spawned process daemonized. So we poll for any browser
-// process using our profile: once none remain (after the window has actually shown),
-// the user closed it → shut down the Core. Windows-only; elsewhere we just stay up.
-function watchAppWindow(profileDir) {
-  if (process.platform !== "win32") return; // no reliable poll off Windows — leave the Core up
-  let sawOpen = false;
-  let misses = 0;
-  const timer = setInterval(() => {
-    if (shuttingDown) { clearInterval(timer); return; }
-    countBrowsersUsingProfile(profileDir, (n) => {
-      if (n < 0) return;                 // couldn't check this tick — try again
-      if (n > 0) { sawOpen = true; misses = 0; return; }
-      if (!sawOpen) return;              // window hasn't appeared yet — keep waiting
-      if (++misses >= 2) { clearInterval(timer); shutdown("app window closed"); }
-    });
-  }, 3000);
-}
-
-// Count msedge/chrome processes whose command line references our profile dir.
-// Uses PowerShell CIM (windowsHide so no flashing console). n<0 = check failed.
-function countBrowsersUsingProfile(profileDir, cb) {
-  const filter = "name='msedge.exe' or name='chrome.exe' or name='msedgewebview2.exe'";
-  const cmd =
-    `@(Get-CimInstance Win32_Process -Filter "${filter}" | ` +
-    `Where-Object { $_.CommandLine -like '*${profileDir}*' }).Count`;
-  let out = "";
-  try {
-    const ps = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", cmd],
-      { stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
-    ps.stdout.on("data", (d) => { out += d; });
-    ps.on("error", () => cb(-1));
-    ps.on("close", () => cb(Number.parseInt(String(out).trim(), 10) || 0));
-  } catch { cb(-1); }
-}
-
 // ── Graceful shutdown (kills the whole child tree) ──────────────────────────────
 function shutdown(reason) {
   if (shuttingDown) return;
@@ -361,7 +327,7 @@ function shutdown(reason) {
     if (process.platform === "win32") {
       // /T kills the process tree (server.js may spawn collectors/children);
       // /F forces it. Fire-and-forget, then exit.
-      spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
     } else {
       try {
         child.kill("SIGTERM");
