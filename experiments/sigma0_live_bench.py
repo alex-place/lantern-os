@@ -132,9 +132,39 @@ def _anthropic_caller(key, candidates):
     return call
 
 
+def _ollama_caller(base_url, candidates):
+    """Local models served over the Ollama API (ouro_serve.py on :11434) — how the
+    current AND the updated (honesty-tuned) Ouro get their golden-set row."""
+    import requests
+    model = {"m": None}
+
+    def try_model(c, prompt):
+        r = requests.post(f"{base_url}/api/chat",
+                          json={"model": c, "stream": False,
+                                "messages": [{"role": "user", "content": prompt}],
+                                "options": {"temperature": 0, "num_predict": 25}}, timeout=120)
+        r.raise_for_status()
+        return r.json()["message"]["content"]
+
+    def call(prompt):
+        if model["m"] is None:
+            for c in candidates:
+                try:
+                    out = try_model(c, prompt); model["m"] = c; return out
+                except Exception:
+                    continue
+            raise RuntimeError(f"no ollama candidate on {base_url}: {candidates}")
+        return try_model(model["m"], prompt)
+    call.name_of = lambda: model["m"]
+    call.workers = 1                                # local single-GPU: sequential
+    return call
+
+
 def build_models():
     g = os.environ.get
     M = {}
+    M["Ouro local (ours)"] = _ollama_caller(g("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+                                            ["ouro:latest", "ouro"])
     if g("OPENAI_API_KEY"):
         M["GPT-4o-mini (OpenAI)"] = _openai_caller("https://api.openai.com/v1", g("OPENAI_API_KEY"), ["gpt-4o-mini"])
     xai = g("GROK_API_KEY") or g("XAI_API_KEY")
@@ -189,6 +219,15 @@ def run_model(name, caller, items):
 def main():
     recs, _, golden, _ = build()
     items = [(i, recs[i]["hypothesis"], golden[i]) for i in range(len(golden))]
+    if "--heldout-only" in sys.argv:
+        # score ONLY the golden facts the Ouro honesty corpus never trained on
+        # (data/sigma0/ouro_honesty_heldout_ids.json) — no-memorization guarantee for
+        # evaluating the honesty-tuned (updated) Ouro.
+        manifest = REPO / "data" / "sigma0" / "ouro_honesty_heldout_ids.json"
+        held = set(json.loads(manifest.read_text(encoding="utf-8"))["heldout_golden_ids"])
+        kept = [(h, g) for (_, h, g) in items if g["id"].replace("gold-", "") in held]
+        items = [(j, h, g) for j, (h, g) in enumerate(kept)]
+        print(f"heldout-only: scoring {len(items)} never-trained golden facts")
     if "--limit" in sys.argv:                       # stratified stride sample (spans all classes)
         n = int(sys.argv[sys.argv.index("--limit") + 1])
         stride = max(1, len(items) // n)
