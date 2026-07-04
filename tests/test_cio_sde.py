@@ -825,6 +825,29 @@ def test_t1_nonnormal_dichotomy():
     assert d_cert.active_decay_rate > 0                     # active contracts despite divergence
 
 
+def test_dichotomy_continuous_defective_via_schur():
+    """#1989: the continuous dichotomy now builds its invariant-subspace split from an
+    ordered real Schur factorization, so a DEFECTIVE (non-diagonalizable) A is CERTIFIED,
+    not abstained on. Jordan(−0.5, 3) ⊕ [+0.3], rotated off-axis by a fixed orthogonal Q
+    so the split is non-trivial: the defective active block must be separated cleanly from
+    the +0.3 slow mode. The old eig+inv(V) split is ill-conditioned here (degenerate
+    eigenvectors) and inflates the invariance residual; the Schur split stays exact."""
+    pytest.importorskip("scipy")
+    import numpy as np
+    Jbd = np.array([[-0.5, 1.0, 0.0, 0.0],
+                    [0.0, -0.5, 1.0, 0.0],
+                    [0.0, 0.0, -0.5, 0.0],
+                    [0.0, 0.0, 0.0, 0.3]])                  # defective active block ⊕ RHP mode
+    Q, _ = np.linalg.qr(np.random.default_rng(11).standard_normal((4, 4)))
+    A = torch.tensor(Q.T @ Jbd @ Q, dtype=torch.float64)   # rotate the subspaces off the axes
+    assert (A @ A.T - A.T @ A).norm() > 0.5                 # genuinely non-normal (defective)
+    cert = dichotomy_certificate(A, delta=0.25)
+    assert cert.fate == "DIVERGE" and not cert.collapses    # the +0.3 slow mode
+    assert cert.active_dim == 3 and cert.slow_dim == 1
+    assert cert.invariance_residual < 1e-9                  # exact split even when defective
+    assert cert.active_decay_rate > 0                       # defective active block still contracts
+
+
 # ── #1988 discrete-time dichotomy — collapse in ρ(A)<1, matching §6's spectral radius ──
 
 def test_discrete_dichotomy_radius_trichotomy():
