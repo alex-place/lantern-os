@@ -1,9 +1,13 @@
-## [1.8.58] - 2026-07-04
+## [1.8.60] - 2026-07-04
 ### Added
 - **Per-model calibrated surprise-intervene trigger (ADR-0017, #1940).** The intervention controller (`lib/surprise-intervene.js`) previously used a fixed 5 bits/token window-mean gate, but small local models run < 1 bit/token (qwen2.5-coder halluc/correct midpoint ≈1.09, mistral ≈0.34), so the gate never fired on exactly the local models it exists to backstop — the same magnitude bug #1681 fixed for the uncertainty scalar. The trigger is now per-model calibrated. Covered by `test/surprise-intervene-calibration.test.js`. Strengthens **Verify**.
 
 ### Fixed
 - **Removed stale `test_lantern_outreach_program.py` assertions for the cut `outreach.html` surface.** The `outreach` surface was deleted in the surface-boundary "teeth" pass (9 sprawl surfaces cut), but the test still asserted `outreach.html` exists — failing the Python suite on every PR (`1 failed, 1214 passed`). Replaced the obsolete "exists" test with an anti-sprawl guard that the surface stays removed and no nav re-links it, and dropped the dead `cloud-server.js` / index-link tests (both retired surfaces). Python suite is green again. Strengthens **Converge** (anti-sprawl signal hygiene).
+
+## [1.8.58] - 2026-07-04
+### Fixed
+- **Desktop app died on launch with `ERR_CONNECTION_REFUSED` when a browser was already running (#1946).** The launcher opened the chromeless app window via `msedge --app` and shut the Core down when *that spawned process* exited. But when Edge/Chrome is already open, it hands the new window to the existing browser and the spawned process exits **immediately** — which the launcher misread as "window closed," killing the Core out from under a live window (confirmed from `desktop.log`: `Opened the app window` → `GET /` → `Shutting down (app window closed)` within a second). Fix: the launcher no longer trusts the spawned process; it **polls for any browser process still using our dedicated `--user-data-dir` profile** (`watchAppWindow`/`countBrowsersUsingProfile`, PowerShell CIM, `windowsHide`) and shuts down only once none remain after the window has actually shown — daemonization-proof, and still clean-quits on real window close. Also **ships `data/contexts/` in the installer** (personas/doors config the Core reads from `<install>/data/contexts` at boot) so it no longer falls back to defaults with a `personas.json` ENOENT. Strengthens **Act** (reliable desktop launch).
 
 ## [1.8.57] - 2026-07-04
 ### Added

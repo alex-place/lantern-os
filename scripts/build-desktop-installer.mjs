@@ -96,6 +96,10 @@ if (process.platform === "win32") {
   cpSync(join(repoRoot, "node_modules"), join(stagingDir, "node_modules"), { recursive: true, filter });
 }
 cpSync(join(repoRoot, "package.json"), join(stagingDir, "package.json"));
+// App-content config the Core reads at boot (personas.json, doors.json, …) — read
+// from <install>/data/contexts, NOT the relocated user state, so it must ship with
+// the app or the Core falls back to built-in defaults (the personas.json ENOENT).
+cpSync(join(repoRoot, "data", "contexts"), join(stagingDir, "data", "contexts"), { recursive: true });
 cpSync(exePath, join(stagingDir, "unisona.exe"));
 console.log("[installer] staged.");
 

@@ -876,12 +876,20 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const geminiOnVertex = useVertex();
   if ((geminiKey || geminiOnVertex) && (!rp || rp === "gemini" || rp === "google" || rp.startsWith("gemini-"))) {
+    // Fallback ids must be CURRENT on Vertex. The old gemini-1.5-* / gemini-2.0-flash
+    // ids all 404 in us-central1 (retired / not exposed); so do gemini-2.0-flash-001
+    // and the "-latest" aliases. Verified 2026-07-04 against project 843848914143:
+    // only gemini-2.5-flash, gemini-2.5-pro, and gemini-2.5-flash-lite return 200.
+    // The AI-Studio 1.5 free tier is credit-depleted anyway. #1376
     const geminiModels = rp.startsWith("gemini-") ? [rp] : [
       process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      "gemini-1.5-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-pro",
+      "gemini-2.5-pro",
+      "gemini-2.5-flash-lite",
     ];
+    // Preserve the FIRST real Gemini error across the fallback loop: if the first
+    // model 200s but its reply is rejected and later models are dead ids, we must
+    // NOT surface the last dead-model 404 as though the working model failed.
+    let geminiFirstError = null;
 
     for (const geminiModel of geminiModels) {
       try {
@@ -897,7 +905,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           generationConfig: {
             maxOutputTokens: 4096,
             temperature: 0.7,
-            // thinkingBudget:0 only on 2.5/3.x — the gemini-1.5 fallbacks 400 on thinkingConfig.
+            // thinkingBudget:0 only on 2.5/3.x — a caller-requested gemini-1.5 model 400s on thinkingConfig.
             ...(supportsThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           },
           // Web-search grounding only on the AI-Studio wire — the Vertex tool schema
@@ -922,7 +930,9 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
                 const perr = parseUpstreamProviderError("gemini", status, data);
                 console.error(`[dream-chat] Gemini (${geminiModel}) API error: status=${status} type=${perr.type} — ${perr.message}`);
                 recordProviderFailureRouter("gemini", perr.code);
-                lastProviderError = perr;
+                // Keep the FIRST error only — a later dead-model 404 must not clobber
+                // the genuine failure of the first (real) model in the fallback list.
+                if (!geminiFirstError) { geminiFirstError = perr; lastProviderError = perr; }
                 resolve("");
                 return;
               }
@@ -941,7 +951,11 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           req2.write(payload);
           req2.end();
         });
-        if (reply && reply.length >= 20) {
+        // Accept ANY non-empty reply — `reply` is already trimmed, so a valid short
+        // answer ("Yes.", a number, a one-liner) is a real success and must NOT be
+        // discarded into a fallthrough onto dead fallback models. A truly empty 200
+        // (reply === "") still falls through, as before.
+        if (reply) {
           // Surface truncation instead of silently returning a cut-off answer: MAX_TOKENS
           // means the visible reply is incomplete. finishReason rides the result object
           // (the route spreads it into the JSON response) so callers can see it. #1376
