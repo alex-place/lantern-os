@@ -330,9 +330,12 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
         // Σ₀ self-correction pass (only when SIGMA0_VERIFY=true and reply exists)
         if (result.reply && isVerifyEnabled()) {
           try {
-            const { verified, corrected, records } = await verifyResponse(result.reply, message, result.agent || "lantern");
+            const { verified, corrected, records, skipped } = await verifyResponse(result.reply, message, result.agent || "lantern");
             if (corrected) result.reply = verified;
             result.sigma0 = { corrected, claims: records.length, verified: records.filter(r => r.confidence >= 0.5).length };
+            // Surface "verification never ran" (no provider reachable) so the UI/logs
+            // don't read a silent zero-claims pass as "verified: nothing to correct".
+            if (skipped) result.sigma0.skipped = skipped;
           } catch { /* verification non-fatal */ }
         }
       }

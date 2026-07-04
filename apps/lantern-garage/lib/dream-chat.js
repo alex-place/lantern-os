@@ -1152,44 +1152,30 @@ function calibrationEventsFor(records, agentName) {
 }
 
 // ── Σ₀ Self-Correcting Verify Pass ──────────────────────────────────
-// Three grounding sources: (1) codebase grep, (2) web search via MCP,
+// Extracts + (when refuted) revises claims via callVerifyModel — the SAME
+// provider set the chat uses, WITH fallback — so the honesty net survives any
+// single provider being down (never hardcode a vendor in the Verify stage; this
+// used to no-op the instant ANTHROPIC_API_KEY was absent/depleted).
+// Three grounding sources stay as-is: (1) codebase grep, (2) web search via MCP,
 // (3) Gemini grounding API. Low-confidence claims trigger a revision pass.
 // Appends convergence records + feeds grounding calibration. ON by default
 // (see isVerifyEnabled); set SIGMA0_VERIFY=false or disable the chat_grounding
-// admin flag to turn off.
+// admin flag to turn off. When NO provider is reachable it returns
+// skipped:"no_provider" — a VISIBLE "verification never ran" signal, not a silent
+// zero-claims pass that reads like "verified: nothing to correct".
 async function verifyResponse(draft, userMessage, agentName) {
   if (!isVerifyEnabled()) return { verified: draft, records: [], corrected: false };
-
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) return { verified: draft, records: [], corrected: false };
 
   const fs = require("fs");
   const path = require("path");
   const { webSearchMcp } = require("./web-search-client");
+  const { callVerifyModel } = require("./verify-llm");
   const { execFile } = require("child_process");
   const execFileAsync = require("util").promisify(execFile);
   // lib/ → lantern-garage/ → apps/ → repo root (THREE levels). Records + the
   // codebase grep must resolve against the real repo root, not apps/.
   const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
   const RECORDS_PATH = path.join(REPO_ROOT, "data", "convergence", "records.jsonl");
-
-  // ── Helper: call Claude Haiku ─────────────────────────────────────
-  function callHaiku(prompt, maxTokens = 512) {
-    const payload = JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return new Promise((resolve, reject) => {
-      const req = https.request({
-        hostname: "api.anthropic.com", path: "/v1/messages", method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Length": Buffer.byteLength(payload) },
-      }, (res) => { let d = ""; res.on("data", c => d += c); res.on("end", () => resolve(d)); res.on("error", reject); });
-      req.on("error", reject);
-      req.setTimeout(10000, () => { req.destroy(); reject(new Error("timeout")); });
-      req.write(payload); req.end();
-    });
-  }
 
   // ── Helper: Gemini grounding check ───────────────────────────────
   // Tries web-grounded (googleSearch tool) first; on a billing/quota error
@@ -1244,15 +1230,20 @@ async function verifyResponse(draft, userMessage, agentName) {
   }
 
   // ── Step 1: extract claims ────────────────────────────────────────
+  // callVerifyModel returns null ONLY when no provider was reachable (every
+  // candidate down, or none configured). Surface that as skipped:"no_provider"
+  // so the UI/logs can tell "verification never ran" apart from "verification
+  // ran, nothing to correct" (records:[] with no skipped flag, below).
+  const extraction = await callVerifyModel(
+    `Extract factual claims from this AI response. Return JSON array only: [{"claim":"...","type":"fact|number|feature","needsWeb":true/false}]. Max 5 claims. needsWeb=true for claims about real-world facts, current events, or external APIs. needsWeb=false for code/file claims.\n\nResponse:\n${draft.slice(0, 1200)}`
+  );
+  if (!extraction) return { verified: draft, records: [], corrected: false, skipped: "no_provider" };
+
   let claims = [];
   try {
-    const raw = await callHaiku(
-      `Extract factual claims from this AI response. Return JSON array only: [{"claim":"...","type":"fact|number|feature","needsWeb":true/false}]. Max 5 claims. needsWeb=true for claims about real-world facts, current events, or external APIs. needsWeb=false for code/file claims.\n\nResponse:\n${draft.slice(0, 1200)}`
-    );
-    const content = JSON.parse(raw).content?.[0]?.text || "[]";
-    const m = content.match(/\[[\s\S]*\]/);
+    const m = extraction.text.match(/\[[\s\S]*\]/);
     claims = m ? JSON.parse(m[0]) : [];
-  } catch { return { verified: draft, records: [], corrected: false }; }
+  } catch { claims = []; }
 
   if (!claims.length) return { verified: draft, records: [], corrected: false };
 
@@ -1337,11 +1328,11 @@ async function verifyResponse(draft, userMessage, agentName) {
       const refutedClaims = records.filter(r => r.refuted)
         .map(r => `- "${r.claim}" → ${r.evidence} (confidence: ${r.confidence.toFixed(2)})`)
         .join("\n");
-      const raw2 = await callHaiku(
+      const rewrite = await callVerifyModel(
         `A fact-check pass found these claims in an AI response to be contradicted by evidence:\n${refutedClaims}\n\nOriginal response:\n${draft}\n\nRewrite the response to correct or qualify only the contradicted claims, using phrasing like "I believe...", "I'm not certain, but...", or "According to available sources...". Leave everything else unchanged.\n\nOutput ONLY the rewritten response text, exactly as it should be shown to the end user. Do not include any preamble, headers (e.g. "Revised response:"), meta-commentary about the rewrite, or notes about your own process.`,
-        1024
+        { maxTokens: 1024 }
       );
-      const revised = JSON.parse(raw2).content?.[0]?.text?.trim();
+      const revised = rewrite?.text?.trim();
       // Guard against the correction pass leaking its own scaffolding/meta-commentary
       // into the user-facing reply instead of a clean rewrite (#1268).
       const looksLikeMeta = revised && /^(revised response|note:|---|i appreciate the exercise|in actual practice)/i.test(revised);
