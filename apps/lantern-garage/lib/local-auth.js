@@ -67,8 +67,16 @@ function _readJson(req) {
     req.on("error", () => resolve(null));
   });
 }
+const { SIGNOUT_COOKIE } = require("./auth-middleware");
+
 function _json(res, status, obj) {
-  res.writeHead(status, { "Content-Type": "application/json" });
+  // Clear the explicit-signout marker on any successful auth response so the
+  // local/dev bypass is restored after the user logs back in (#auth-signout).
+  const headers = { "Content-Type": "application/json" };
+  if (status >= 200 && status < 300) {
+    headers["Set-Cookie"] = `${SIGNOUT_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
+  }
+  res.writeHead(status, headers);
   res.end(JSON.stringify(obj));
 }
 function _establish(req, res, profile, status) {

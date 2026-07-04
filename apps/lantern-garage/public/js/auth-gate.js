@@ -11,9 +11,13 @@
   // Keep in lock-step with PUBLIC_PAGES in routes/pages.js. '/' and '/index.html'
   // are served publicly there, so they must not bounce here either — a missing '/'
   // is why a guest landing on the home page got redirected to /auth.html?returnTo=%2F.
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html'];
+  // /stock-trader.html is public: guests (and paid tiers without "trade") get the
+  // SAME terminal in read-only "guest mode" — charts + watchlist + market data, no
+  // trading actions. So it must NOT bounce here, and is NOT a TRADE_PAGE (a
+  // logged-in non-trade user should see the read-only view, not be sent home).
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
-  const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/stock-trader.html', '/kalshi-terminal.html'];
+  const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/kalshi-terminal.html'];
   const pathname = window.location.pathname;
   const isPublic = PUBLIC.includes(pathname);
 

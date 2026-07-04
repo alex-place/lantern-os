@@ -250,7 +250,12 @@ async function handleOAuthCallback(providerId, req, res, query) {
           res.writeHead(500, { "Content-Type": "application/json", "Set-Cookie": clearCookie });
           return res.end(JSON.stringify({ error: "Session save failed" }));
         }
-        res.writeHead(302, { Location: returnTo, "Set-Cookie": clearCookie });
+        // Clear the OAuth flow cookie AND the explicit-signout marker (a fresh
+        // login restores the local/dev admin bypass). #auth-signout
+        res.writeHead(302, {
+          Location: returnTo,
+          "Set-Cookie": [clearCookie, "ln_signout=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"],
+        });
         res.end();
       }
     );

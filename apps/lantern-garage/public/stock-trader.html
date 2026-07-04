@@ -403,6 +403,27 @@
   .news-meta{font-family:var(--mono);font-size:8px;color:var(--text2);letter-spacing:.05em;text-transform:uppercase;margin-top:2px}
   .news-meta .news-impact{color:var(--amber)}
   .news-empty{font-family:var(--mono);font-size:9px;color:var(--text2)}
+  /* ── Guest (logged-out) mode ──────────────────────────────────────────────
+     The SAME terminal, served read-only to visitors without the "trade"
+     entitlement: every chart feature (multi-chart grid, candles, timeframes,
+     ranges, fullscreen, watchlist logos, info panel) stays; only the trading
+     ACTIONS + account panels are removed. The trade-gated data endpoints stay
+     blocked server-side too (tradeApiGuard) — this is defence-in-depth, not the
+     only gate. */
+  body.guest .footer,
+  body.guest .footer-resize,
+  body.guest .badge-paper,
+  body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
+  body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
+  body.guest .wl-add,              /* + Add symbol (POST /watchlist) */
+  body.guest .wl-remove,           /* remove from watchlist (DELETE) */
+  body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
+  body.guest #otBg{ display:none !important; }
+  /* No footer row for guests — the chart grid takes the full height. */
+  body.guest .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
+  .signin-cta{ background:var(--blue);color:#04121a;font-weight:700;border-color:var(--blue) }
+  .signin-cta:hover{ filter:brightness(1.08);color:#04121a;background:var(--blue) }
+  .guest-badge{ background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3) }
 </style>
 </head>
 <body>
@@ -413,10 +434,11 @@
 <div class="header" role="region" aria-label="Trading toolbar">
   <div class="logo">Unisona<span>Trader</span></div>
   <div class="badge badge-paper">PAPER</div>
-  <div class="hstat"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
-  <div class="hstat"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
+  <div class="badge guest-badge" id="guestBadge" style="display:none">READ-ONLY</div>
+  <div class="hstat acct"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
+  <div class="hstat acct"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
   <div class="hstat"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
-  <div class="hstat"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
+  <div class="hstat acct"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
   <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
@@ -450,6 +472,7 @@
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
+  <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none">Sign in to trade →</a>
 </div>
 
 <!-- Sidebar -->
@@ -1512,6 +1535,7 @@ function openOrderPanel(){
   requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 function openOrderTicket(ticker, side){
+  if(window.GUEST){ location.href='/auth.html?returnTo=%2Fstock-trader.html'; return; }   // read-only view → send to sign-in
   otSide = side; otOrderType = 'market';
   setOrderSymbol(ticker);
   openOrderPanel();
@@ -2177,6 +2201,7 @@ function renderSigma0Signals(){
 const COUNCIL_LABELS = { grok:'Grok', claude:'Claude', zone:'Zone', structure:'Structure',
   pattern:'Pattern', trend:'Trend', news:'News', llm:'LLM (legacy)' };
 async function loadCouncil(){
+  if(window.GUEST) return;   // council calibration is trade-gated
   const el = document.getElementById('sigma0Council');
   if(!el) return;
   let d;
@@ -2398,6 +2423,7 @@ function renderOrders(orders){
 }
 
 async function loadPortfolio(){
+  if(window.GUEST) return;   // account/positions are trade-gated; guest view is charts-only
   try{
     const r  = await fetch('/api/trading/positions');
     const d  = await r.json();
@@ -2435,6 +2461,7 @@ async function loadMarketStatus(){
 
 let lastLogLen = 0;
 async function loadAgentLog(){
+  if(window.GUEST) return;   // agent activity is trade-gated
   try{
     const r = await fetch('/api/trading/agent-log');
     const logs = await r.json();
@@ -2455,6 +2482,7 @@ async function loadAgentLog(){
 }
 
 async function loadOrders(){
+  if(window.GUEST) return;   // orders are trade-gated
   try{
     // Ask for the full broker-truth window (Alpaca caps a single page at 500).
     // Without an explicit limit the API defaulted to 50, so a busy session's
@@ -2585,7 +2613,7 @@ function startDashboard(){
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
-  setTimeout(()=>{ if(!otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); } }, 1600);
+  setTimeout(()=>{ if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); } }, 1600);
   // Restore the saved chart-grid layout (#1628).
   const ls = document.getElementById('chartLayoutSelect');
   if(ls){ ls.value = String(slotCount); }
@@ -2611,12 +2639,29 @@ function _setOvnBtn(on){
   b.classList.toggle('ovn-on', !!on);
 }
 async function refreshOvernightScan(){
+  if(window.GUEST) return;   // overnight-scan toggle is trade-gated
   try{ const j=await (await fetch('/api/trading/overnight-scan')).json(); _setOvnBtn(j.enabled); }catch(e){}
 }
 async function toggleOvernightScan(){
   try{ const j=await (await fetch('/api/trading/overnight-scan?set=toggle',{method:'POST'})).json(); _setOvnBtn(j.enabled); }catch(e){}
 }
-document.addEventListener('DOMContentLoaded', startDashboard);
+// Guest (logged-out) detection. A visitor without the "trade" entitlement gets
+// the SAME terminal in read-only mode: charts + watchlist + market data, with the
+// trading actions/account panels hidden (CSS body.guest) and their trade-gated
+// fetches skipped (window.GUEST guards). Fails closed → read-only on any error.
+async function detectGuestMode(){
+  try{
+    const s = await (await fetch('/api/auth/session',{cache:'no-store'})).json();
+    const ent = (s && s.entitlements) || {};
+    window.GUEST = !(s && (s.role === 'admin' || ent.trade === true));
+  }catch(e){ window.GUEST = true; }
+  if(window.GUEST){
+    document.body.classList.add('guest');
+    const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
+    const cta=document.getElementById('signinCta'); if(cta) cta.style.display='';
+  }
+}
+document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(); startDashboard(); });
 
 </script>
 <!-- Global header (#1579) + theme toggle (#1577). site-chrome injects the shared
