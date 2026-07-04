@@ -8,52 +8,57 @@
   <title>Profile — unisona.ai</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; }
-    main { flex: 1; padding: 48px 20px 64px; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+    main { flex: 1; display: flex; align-items: center; padding: 20px; overflow: hidden; }
+    /* When content is taller than the viewport (short/mobile), stop centering and
+       allow the page to scroll so nothing is clipped. */
+    @media (max-height: 820px) { main { align-items: flex-start; overflow: visible; } }
 
     .profile-wrap {
-      max-width: 720px;
+      max-width: 760px;
       margin: 0 auto;
+      width: 100%;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: clamp(10px, 1.6vh, 18px);
     }
 
     /* ── Hero card ── */
     .hero-card {
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 40px 36px;
+      border-radius: 18px;
+      padding: clamp(18px, 2.6vh, 26px) clamp(20px, 3vw, 30px);
       background:
         radial-gradient(circle at top left, rgba(6,182,212,.13), transparent 45%),
         radial-gradient(circle at bottom right, rgba(167,139,250,.10), transparent 40%),
         var(--surface);
       display: flex;
       align-items: center;
-      gap: 28px;
+      gap: 22px;
     }
     @media (max-width: 540px) {
-      .hero-card { flex-direction: column; text-align: center; padding: 28px 20px; }
+      .hero-card { flex-direction: column; text-align: center; padding: 22px 18px; gap: 14px; }
     }
 
     .avatar {
       flex-shrink: 0;
-      width: 80px; height: 80px;
+      width: 64px; height: 64px;
       border-radius: 50%;
       background: linear-gradient(135deg, #06b6d4, #7c3aed);
       display: flex; align-items: center; justify-content: center;
-      font-size: 28px; font-weight: 700; color: #fff;
+      font-size: 24px; font-weight: 700; color: #fff;
       letter-spacing: -.5px;
       border: 3px solid var(--border);
     }
 
     .hero-info { flex: 1; min-width: 0; }
     .hero-name {
-      font-size: 24px; font-weight: 700;
-      color: var(--text); margin: 0 0 4px;
+      font-size: 22px; font-weight: 700;
+      color: var(--text); margin: 0 0 3px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .hero-email { font-size: 14px; color: var(--muted); margin: 0 0 14px; }
+    .hero-email { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
 
     .tier-badge {
       display: inline-flex; align-items: center; gap: 6px;
@@ -68,7 +73,7 @@
     .tier-badge.admin    { background: rgba(167,139,250,.15); color: #a78bfa; border-color: rgba(167,139,250,.35); }
 
     .hero-actions {
-      display: flex; gap: 10px; margin-top: 18px;
+      display: flex; gap: 10px; margin-top: 14px;
       flex-wrap: wrap;
     }
     @media (max-width: 540px) { .hero-actions { justify-content: center; } }
@@ -87,24 +92,35 @@
     .btn-primary { background: rgba(6,182,212,.15); color: var(--accent); border-color: rgba(6,182,212,.4); }
     .btn-primary:hover { background: rgba(6,182,212,.25); border-color: var(--accent); }
 
+    /* ── Two-column body on wide screens so everything fits without scrolling;
+       stacks to one column on narrow/mobile. ── */
+    .profile-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(10px, 1.6vh, 18px);
+      align-items: start;
+    }
+    .col { display: flex; flex-direction: column; gap: clamp(10px, 1.6vh, 18px); }
+    @media (max-width: 720px) { .profile-cols { grid-template-columns: 1fr; } }
+
     /* ── Info grid ── */
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
     }
     @media (max-width: 540px) { .info-grid { grid-template-columns: 1fr; } }
 
     .info-cell {
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 16px 20px;
+      padding: 12px 16px;
       background: var(--surface);
     }
     .info-label {
-      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
       color: var(--accent); font-family: 'IBM Plex Mono', monospace;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .info-value {
       font-size: 14px; color: var(--text); word-break: break-word;
@@ -115,18 +131,18 @@
 
     /* ── Access grid ── */
     .section-title {
-      font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 12px;
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px;
     }
     .access-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
     }
     .access-card {
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 14px 16px;
+      padding: 11px 14px;
       background: var(--surface);
       display: flex; align-items: center; gap: 10px;
       text-decoration: none;
@@ -173,6 +189,62 @@
     .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
     .modal-actions .btn { flex: 1; justify-content: center; }
 
+    /* ── Connected accounts ── */
+    .link-list { display: flex; flex-direction: column; gap: 7px; }
+    .link-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      border: 1px solid var(--border); border-radius: 11px;
+      padding: 9px 14px; background: var(--surface);
+    }
+    .link-row.linked { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+    .link-name { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+    .link-emoji { font-size: 18px; }
+    .link-state { display: flex; align-items: center; gap: 10px; }
+    .link-badge {
+      font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      padding: 3px 9px; border-radius: 20px;
+    }
+    .link-btn {
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      padding: 7px 14px; border-radius: 9px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text);
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .link-btn.connect { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--accent); }
+    .link-btn.connect:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .link-btn.unlink:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,.08); }
+    .link-hint { font-size: 12px; color: var(--muted); font-style: italic; }
+    .link-note { font-size: 11.5px; color: var(--muted); margin: 7px 2px 0; line-height: 1.45; }
+
+    /* ── Verify banner ── */
+    .verify-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+      padding: 11px 16px; border-radius: 12px;
+      border: 1px solid color-mix(in srgb, #fbbf24 45%, transparent);
+      background: color-mix(in srgb, #fbbf24 12%, transparent);
+      color: var(--text); font-size: 13px; line-height: 1.4;
+    }
+    .verify-banner strong { color: var(--text); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+      max-width: 90%; padding: 12px 18px; border-radius: 12px; z-index: 200;
+      font-size: 14px; font-weight: 600; color: #fff;
+      opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+      box-shadow: 0 10px 40px rgba(0,0,0,.3);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast-ok    { background: linear-gradient(135deg, var(--accent), #7c3aed); }
+    .toast-error { background: #dc2626; }
+
+    @media (max-width: 540px) {
+      .link-row { flex-direction: column; align-items: stretch; gap: 10px; }
+      .link-state { justify-content: space-between; }
+    }
+
     .loading { text-align: center; color: var(--muted); padding: 80px 20px; font-size: 14px; }
 
     .loop-stage-note {
@@ -204,6 +276,47 @@
     <a href="/dream-chat.html">Chat</a>
   </div>
 </footer>
+
+<!-- Change email modal -->
+<div class="modal-backdrop" id="email-modal">
+  <div class="modal">
+    <h2>Change email</h2>
+    <form id="email-form" onsubmit="saveEmail(event)">
+      <div id="email-error" class="form-error" role="alert" hidden></div>
+      <div class="form-row">
+        <label>New email address</label>
+        <input type="email" id="new-email" autocomplete="email" required placeholder="you@email.com">
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:-4px 0 12px">We'll send a confirmation link. Your email changes only after you click it.</p>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Send confirmation</button>
+        <button type="button" class="btn" onclick="closeModal('email-modal')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Change password modal -->
+<div class="modal-backdrop" id="password-modal">
+  <div class="modal">
+    <h2 id="password-modal-title">Change password</h2>
+    <form id="password-form" onsubmit="savePassword(event)">
+      <div id="password-error" class="form-error" role="alert" hidden></div>
+      <div class="form-row" id="current-password-row">
+        <label>Current password</label>
+        <input type="password" id="current-password" autocomplete="current-password">
+      </div>
+      <div class="form-row">
+        <label>New password (min 8 characters)</label>
+        <input type="password" id="new-password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save password</button>
+        <button type="button" class="btn" onclick="closeModal('password-modal')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- Edit modal -->
 <div class="modal-backdrop" id="edit-modal">
@@ -243,17 +356,20 @@ const TIER_LABELS = {
 // Feature access is role-laddered EXCEPT Trader, which is a per-account
 // opt-in entitlement (entitlements.trade), independent of tier — see
 // user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
+// Feature access is tier-laddered. Trader (manual stocks + Kalshi + AI
+// suggestions) unlocks at the $20 Deep Dreamer tier; the autonomous AI Trader
+// unlocks at the $200 Synthesasia Guild tier.
 const FEATURES = [
-  { emoji: '📖', label: 'Journal',     href: '/dream-chat.html',       req: 'guest' },
-  { emoji: '📈', label: 'Trader',      href: '/stock-trader.html',     req: 'trade' },
-  { emoji: '✏️', label: 'Create',      href: '/create.html',           req: 'deep_dreamer' },
-  { emoji: '🗺️', label: 'Explore',     href: '/explore.html',          req: 'guest' },
-  { emoji: '📚', label: 'Knowledge',   href: '/knowledgecenter.html',  req: 'guest' },
-  { emoji: '📊', label: 'Crypto',      href: '/crypto-dashboard.html', req: 'guest' },
+  { emoji: '📖', label: 'Journal',    href: '/dream-chat.html',      req: 'guest',        note: '' },
+  { emoji: '📈', label: 'Trader',     href: '/stock-trader.html',    req: 'deep_dreamer', note: 'Trade stocks & Kalshi + AI suggestions' },
+  { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'admin',        note: 'Autonomous AI trading' },
+  { emoji: '✏️', label: 'Create',     href: '/create.html',          req: 'deep_dreamer', note: '' },
+  { emoji: '🗺️', label: 'Explore',    href: '/explore.html',         req: 'guest',        note: '' },
+  { emoji: '📚', label: 'Knowledge',  href: '/knowledgecenter.html', req: 'guest',        note: '' },
 ];
 
-// How each account source (metadata.source) presents as a sign-in method.
-// Identity is provider-agnostic (ADR-0005) — Patreon is one source among many.
+// How each provider presents as a sign-in method. Identity is provider-agnostic
+// (ADR-0005) — every provider is one identity among many on a single account.
 const SOURCE_LABELS = {
   local:   { label: 'Email + password', emoji: '🔑' },
   patreon: { label: 'Patreon',          emoji: '♥' },
@@ -263,7 +379,11 @@ const SOURCE_LABELS = {
   dev:     { label: 'Local dev bypass', emoji: '🛠️' },
 };
 
+// The OAuth providers a user can connect/disconnect from this page.
+const LINKABLE_PROVIDERS = ['discord', 'google', 'patreon'];
+
 let currentProfile = null;
+let currentSession = null;
 
 function initials(name) {
   if (!name) return '?';
@@ -287,8 +407,27 @@ function hasAccess(profile, reqRole) {
   return (ROLE_LEVEL[profile.role] || 0) >= (ROLE_LEVEL[reqRole] || 0);
 }
 
-function sourceOf(profile) {
-  return SOURCE_LABELS[profile.metadata?.source] || SOURCE_LABELS.local;
+function providerMeta(id) {
+  return SOURCE_LABELS[id] || { label: id, emoji: '🔗' };
+}
+
+// The method the user is CURRENTLY signed in with (this session), not how the
+// account was first created (#profile-provider-display).
+function currentSignInMethod() {
+  const p = currentSession?.provider || currentSession?.user?.provider;
+  if (p && p !== 'local-bypass') return providerMeta(p);
+  if (p === 'local-bypass') return SOURCE_LABELS.dev;
+  return providerMeta(currentProfile?.metadata?.source) || SOURCE_LABELS.local;
+}
+
+// All providers connected to this account, derived from identities[] (with a
+// legacy fallback to the denormalized *Id mirrors + metadata.source).
+function connectedProviders(profile) {
+  const set = new Set((profile.identities || []).map((i) => i.provider));
+  if (profile.discordId) set.add('discord');
+  if (profile.patreonId) set.add('patreon');
+  if (!set.size && profile.metadata?.source) set.add(profile.metadata.source);
+  return set;
 }
 
 function renderProfile(profile) {
@@ -296,21 +435,60 @@ function renderProfile(profile) {
   const role = profile.role || 'guest';
   const tier = TIER_LABELS[role] || TIER_LABELS.guest;
 
-  const source = sourceOf(profile);
+  const source = currentSignInMethod();
+  const connected = connectedProviders(profile);
+  // UX guard only — the server also refuses to remove the last login method.
+  const canUnlink = connected.size > 1;
+
+  const hasEmail = !!profile.email;
+  const emailVerified = profile.emailVerified === true;
+  const pendingEmail = profile.pendingEmail || null;
+  const hasPassword = profile.hasPassword !== false; // undefined (legacy) → assume yes
+
+  const verifyBanner = (!emailVerified && hasEmail) || pendingEmail
+    ? `<div class="verify-banner">
+         <span>${pendingEmail
+            ? `Confirm <strong>${escapeHtml(pendingEmail)}</strong> to finish changing your email.`
+            : `Please confirm your email <strong>${escapeHtml(profile.email)}</strong>.`}</span>
+         <button class="link-btn connect" onclick="resendVerification()">Resend email</button>
+       </div>`
+    : '';
+
+  const securityRows = `
+    <div class="link-row">
+      <span class="link-name"><span class="link-emoji">✉️</span> Email address</span>
+      <span class="link-state">${emailVerified ? '<span class="link-badge">Verified</span>' : ''}<button class="link-btn connect" onclick="openEmailModal()">Change</button></span>
+    </div>
+    <div class="link-row">
+      <span class="link-name"><span class="link-emoji">🔑</span> Password</span>
+      <span class="link-state"><button class="link-btn connect" onclick="openPasswordModal()">${hasPassword ? 'Change' : 'Set password'}</button></span>
+    </div>`;
+
+  const connectedRows = LINKABLE_PROVIDERS.map((id) => {
+    const meta = providerMeta(id);
+    const isLinked = connected.has(id);
+    const action = isLinked
+      ? (canUnlink
+          ? `<button class="link-btn unlink" onclick="disconnectProvider('${id}')">Disconnect</button>`
+          : `<span class="link-hint" title="Add another sign-in method first">Only method</span>`)
+      : `<button class="link-btn connect" onclick="connectProvider('${id}')">Connect</button>`;
+    return `<div class="link-row ${isLinked ? 'linked' : ''}">
+        <span class="link-name"><span class="link-emoji">${meta.emoji}</span> ${escapeHtml(meta.label)}</span>
+        <span class="link-state">${isLinked ? '<span class="link-badge">Connected</span>' : ''}${action}</span>
+      </div>`;
+  }).join('');
 
   const featureCards = FEATURES.map(f => {
     const ok = hasAccess(profile, f.req);
-    const reqLabel = f.req === 'trade'
-      ? 'Requires trading access (opt-in)'
-      : (f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '');
+    const reqLabel = f.req !== 'guest' ? `Requires ${TIER_LABELS[f.req]?.label || f.req}` : '';
     return ok
       ? `<a class="access-card" href="${f.href}">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div></div>
+           <div><div class="access-label">${f.label}</div>${f.note ? `<div class="access-req">${escapeHtml(f.note)}</div>` : ''}</div>
          </a>`
       : `<div class="access-card locked" title="${escapeHtml(reqLabel)}">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(reqLabel)}</div></div>
+           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)}</div></div>
          </div>`;
   }).join('');
 
@@ -323,12 +501,17 @@ function renderProfile(profile) {
         <span class="tier-badge ${escapeHtml(role)}">${tier.emoji} ${escapeHtml(tier.label)}</span>
         <div class="hero-actions">
           <button class="btn btn-primary" onclick="openEdit()">✏️ Edit</button>
+          <button class="btn" onclick="switchAccount()" title="Sign in as a different account">🔄 Switch account</button>
           <button class="btn btn-danger" onclick="logout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign out</button>
           <a class="btn" href="/">← Home</a>
         </div>
       </div>
     </div>
 
+    ${verifyBanner}
+
+    <div class="profile-cols">
+    <div class="col">
     <div class="info-grid">
       ${profile.bio ? `
         <div class="info-cell" style="grid-column:1/-1">
@@ -347,61 +530,27 @@ function renderProfile(profile) {
         <div class="info-label">Account ID</div>
         <div class="info-value"><code>${escapeHtml(profile.id || profile.patreonId || '—')}</code></div>
       </div>
-      ${profile.discordId ? `
-      <div class="info-cell">
-        <div class="info-label">Linked accounts</div>
-        <div class="info-value">🎮 Discord</div>
-      </div>` : ''}
     </div>
 
+    <div>
+      <div class="section-title">Connected Accounts</div>
+      <div class="link-list">${connectedRows}</div>
+      <p class="link-note">Connect multiple providers to sign in with any of them. You can't remove your only sign-in method.</p>
+    </div>
+
+    <div>
+      <div class="section-title">Security</div>
+      <div class="link-list">${securityRows}</div>
+    </div>
+    </div><!-- /col -->
+    <div class="col">
     <div>
       <div class="section-title">Feature Access</div>
       <div class="access-grid">${featureCards}</div>
     </div>
 
-    ${role === 'admin' ? `
-    <div>
-      <div class="section-title">Administration</div>
-      <div class="access-grid">
-        <a class="access-card" href="/orchestration.html">
-          <span class="access-icon">🎛️</span>
-          <div>
-            <div class="access-label">Orchestration</div>
-            <div class="access-req">Fleet control center</div>
-          </div>
-        </a>
-        <a class="access-card" href="/work.html">
-          <span class="access-icon">📥</span>
-          <div>
-            <div class="access-label">Manual Work</div>
-            <div class="access-req">Pick &amp; hand off issues</div>
-          </div>
-        </a>
-        <a class="access-card" href="/admin-flags.html">
-          <span class="access-icon">🛠️</span>
-          <div>
-            <div class="access-label">Feature Flags</div>
-            <div class="access-req">Admin control surface</div>
-          </div>
-        </a>
-        <a class="access-card" href="/orchestration.html">
-          <span class="access-icon">🕸️</span>
-          <div>
-            <div class="access-label">Orchestration</div>
-            <div class="access-req">Fleet + autowork control</div>
-          </div>
-        </a>
-        <a class="access-card" href="/work.html">
-          <span class="access-icon">📥</span>
-          <div>
-            <div class="access-label">Manual Work</div>
-            <div class="access-req">Pick &amp; hand off issues</div>
-          </div>
-        </a>
-      </div>
-    </div>` : ''}
-
-    <p class="loop-stage-note">Account surface — an <strong>extension</strong>, not a loop stage (ADR-0013).</p>
+    </div><!-- /col -->
+    </div><!-- /profile-cols -->
   `;
 }
 
@@ -466,16 +615,172 @@ async function logout() {
   else alert('Logout failed');
 }
 
+// ── Connected accounts: link / unlink ──
+function connectProvider(provider) {
+  // Kick off OAuth in link mode; the callback attaches the identity to THIS
+  // account and returns to /profile.html?linked=<provider>.
+  location.href = `/api/auth/${encodeURIComponent(provider)}/start?link=1`;
+}
+
+async function disconnectProvider(provider) {
+  const meta = providerMeta(provider);
+  if (!confirm(`Disconnect ${meta.label} from your account?`)) return;
+  try {
+    const res = await fetch('/api/profiles/me/unlink', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.error === 'last_login_method'
+        ? "That's your only way to sign in — connect another provider first."
+        : (data.error || `Couldn't disconnect (${res.status})`);
+      showToast(msg, 'error');
+      return;
+    }
+    currentProfile = data.profile;
+    renderProfile(currentProfile);
+    showToast(`${meta.label} disconnected.`, 'ok');
+  } catch (_) {
+    showToast('Network error — please try again.', 'error');
+  }
+}
+
+let toastTimer = null;
+function showToast(msg, kind) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = `toast show ${kind === 'error' ? 'toast-error' : 'toast-ok'}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 4000);
+}
+
+// Surface the outcome of a link-mode OAuth round-trip (?linked / ?error) and
+// clean the URL so a refresh doesn't re-toast.
+function surfaceLinkResult() {
+  const q = new URLSearchParams(location.search);
+  const linked = q.get('linked');
+  const error = q.get('error');
+  if (linked) showToast(`${providerMeta(linked).label} connected.`, 'ok');
+  else if (error === 'identity_in_use') {
+    showToast(`That ${providerMeta(q.get('provider')).label} account is already linked to another account.`, 'error');
+  } else if (error === 'oauth_failed') {
+    showToast("Couldn't connect that provider. Please try again.", 'error');
+  }
+  if (linked || error) history.replaceState(null, '', '/profile.html');
+
+  // Email-verification outcome (?verify=…) from the verify-email redirect.
+  const v = q.get('verify');
+  if (v === '1') showToast('Email confirmed. ✓', 'ok');
+  else if (v === 'invalid') showToast('That confirmation link is invalid or expired.', 'error');
+  else if (v === 'email_taken') showToast('That email is already used by another account.', 'error');
+  if (v) history.replaceState(null, '', '/profile.html');
+}
+
+// ── Switch account (distinct from Sign out): end this session and go to login. ──
+async function switchAccount() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+  location.href = '/auth.html?returnTo=/profile.html';
+}
+
+async function resendVerification() {
+  try {
+    const res = await fetch('/api/profiles/me/resend-verification', { method: 'POST', credentials: 'include' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) showToast(data.delivery === 'dev'
+      ? 'Confirmation link logged to the server console (no SMTP configured yet).'
+      : `Confirmation email sent to ${data.sentTo}.`, 'ok');
+    else showToast(data.error || "Couldn't send the email.", 'error');
+  } catch (_) { showToast('Network error — please try again.', 'error'); }
+}
+
+// ── Modal helpers ──
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openEmailModal() {
+  document.getElementById('email-error').hidden = true;
+  document.getElementById('new-email').value = '';
+  document.getElementById('email-modal').classList.add('open');
+}
+
+async function saveEmail(e) {
+  e.preventDefault();
+  const btn = e.submitter; btn.disabled = true; const prev = btn.textContent; btn.textContent = 'Sending…';
+  const errEl = document.getElementById('email-error'); errEl.hidden = true;
+  try {
+    const res = await fetch('/api/profiles/me/change-email', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: document.getElementById('new-email').value.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const map = { invalid_email: 'That doesn\'t look like a valid email.', email_taken: 'That email is already in use.' };
+      errEl.textContent = map[data.error] || 'Could not change email.'; errEl.hidden = false; return;
+    }
+    closeModal('email-modal');
+    showToast(data.delivery === 'dev'
+      ? `Confirmation link for ${data.pending} logged to the server console.`
+      : `Confirmation sent to ${data.pending}. Click it to finish.`, 'ok');
+    const pr = await fetch('/api/profiles/me', { credentials: 'include' });
+    if (pr.ok) { currentProfile = await pr.json(); renderProfile(currentProfile); }
+  } catch (_) { errEl.textContent = 'Network error.'; errEl.hidden = false; }
+  finally { btn.disabled = false; btn.textContent = prev; }
+}
+
+function openPasswordModal() {
+  document.getElementById('password-error').hidden = true;
+  document.getElementById('current-password').value = '';
+  document.getElementById('new-password').value = '';
+  const hasPassword = currentProfile?.hasPassword !== false;
+  document.getElementById('current-password-row').style.display = hasPassword ? '' : 'none';
+  document.getElementById('current-password').required = hasPassword;
+  document.getElementById('password-modal-title').textContent = hasPassword ? 'Change password' : 'Set a password';
+  document.getElementById('password-modal').classList.add('open');
+}
+
+async function savePassword(e) {
+  e.preventDefault();
+  const btn = e.submitter; btn.disabled = true; const prev = btn.textContent; btn.textContent = 'Saving…';
+  const errEl = document.getElementById('password-error'); errEl.hidden = true;
+  try {
+    const res = await fetch('/api/profiles/me/change-password', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentPassword: document.getElementById('current-password').value,
+        newPassword: document.getElementById('new-password').value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const map = { wrong_password: 'Your current password is incorrect.', weak_password: 'New password must be at least 8 characters.' };
+      errEl.textContent = map[data.error] || 'Could not update password.'; errEl.hidden = false; return;
+    }
+    closeModal('password-modal');
+    showToast(data.hadPassword ? 'Password changed.' : 'Password set — you can now sign in with email.', 'ok');
+    const pr = await fetch('/api/profiles/me', { credentials: 'include' });
+    if (pr.ok) { currentProfile = await pr.json(); renderProfile(currentProfile); }
+  } catch (_) { errEl.textContent = 'Network error.'; errEl.hidden = false; }
+  finally { btn.disabled = false; btn.textContent = prev; }
+}
+
 async function init() {
   try {
     const sr = await fetch('/api/auth/session', { credentials: 'include' });
     const session = sr.ok ? await sr.json() : null;
     if (!session?.authenticated) { location.href = '/auth.html?returnTo=/profile.html'; return; }
+    currentSession = session;
 
     const pr = await fetch('/api/profiles/me', { credentials: 'include' });
     const profile = pr.ok ? await pr.json() : { ...session.user, role: session.role };
     currentProfile = profile;
     renderProfile(profile);
+    surfaceLinkResult();
   } catch (err) {
     console.error(err);
     location.href = '/auth.html';
@@ -485,8 +790,9 @@ async function init() {
 document.addEventListener('DOMContentLoaded', () => {
   // Theme toggle lives in the global header (site-chrome.js) with its own
   // onclick; no per-page binding needed here.
-  document.getElementById('edit-modal').addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeEdit();
+  // Backdrop click closes any open modal.
+  document.querySelectorAll('.modal-backdrop').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === e.currentTarget) m.classList.remove('open'); });
   });
   init();
 });

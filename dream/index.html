@@ -304,11 +304,9 @@
     <form class="home-chat" id="home-chat-form" onsubmit="homeChat(event)" role="search" aria-label="Start a chat">
       <button type="button" class="home-attach-btn" id="home-attach-btn" onclick="homeAttachPick()" aria-label="Attach a file (PDF or Word .docx)" title="Attach a file — PDF or .docx">+</button>
       <input id="home-chat-input" type="text" placeholder="Ask Unisona anything…" autocomplete="off" aria-label="Chat message">
-      <select id="home-provider-pin" aria-label="Pin AI provider" title="Pin which AI provider answers (Auto = best-ranked)">
-        <!-- Auto is the only static option; the live providers are loaded
-             dynamically from /api/providers/status by buildProviderPin(). -->
-        <option value="">Auto</option>
-      </select>
+      <!-- Model selection now lives in the chat (dream-chat.html model picker),
+           not on the home bar. The pin-forwarding JS below is guarded on the
+           now-absent #home-provider-pin, so it stays inert. -->
       <button type="submit" aria-label="Send" title="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       </button>
