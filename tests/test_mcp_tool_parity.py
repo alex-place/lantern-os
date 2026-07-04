@@ -25,9 +25,9 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
     assert names == [
         "Read", "LS", "Glob", "Grep", "Bash", "PowerShell",
         "Write", "Edit", "web_search", "github_issue", "web_fetch",
-        "system_status",
-        "workspace_write", "workspace_read", "workspace_list",
+        "system_status", "recall_memory",
         "generate_document", "list_document_templates",
+        "workspace_read", "workspace_write", "workspace_list",
         "create_document", "local_eval_keystone_run",
         "list_creator_projects", "analyze_video", "creator_job_status",
         "trader_market_status", "trader_quote", "trader_positions",

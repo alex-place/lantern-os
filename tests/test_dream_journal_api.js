@@ -252,7 +252,10 @@ async function run() {
       req.on("error", reject);
       req.end();
     });
-    assert.ok(r.body.includes("patreon.com"), "Landing page should link to Patreon");
+    // The Patreon link moved off the landing hero (1be9d49f) — still site-wide via the
+    // shared nav. Assert internal CTA markers, not a bare external hostname (CodeQL flags
+    // host substrings as incomplete URL sanitization).
+    assert.ok(r.body.includes("/dream-chat.html"), "Landing page should link to the chat");
     assert.ok(r.body.includes("home-chat"), "Landing page should have the chat hero CTA");
   });
 
