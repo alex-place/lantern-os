@@ -48,6 +48,29 @@ check("extractFact rejects non-assertions with no catch-all fallback", () => {
   assert.strictEqual(lm.extractFact("x".repeat(400)), null); // too long
 });
 
+// #1978 pollution regression: the loose bare "X is Y" regex used to capture ANY sentence
+// containing is/are/was, so typed eval/trading/topic prompts landed in the personal-fact
+// store. These examples are pulled straight from the polluted data/csf_memory/raw.jsonl —
+// they must NOT match now that a bare subject requires a first-person anchor.
+check("extractFact rejects eval/trading/topic prompts that merely contain 'is'", () => {
+  assert.strictEqual(lm.extractFact("A Kalshi YES contract costs 37 cents and you believe the true probability is 45%"), null);
+  assert.strictEqual(lm.extractFact("hey can you look into how heat pump adoption is trending for US homeowners in 2026? curious what the real numbers look like"), null);
+  assert.strictEqual(lm.extractFact("hey can you look into what the best carbon capture technologies is looking like for 2026"), null);
+  assert.strictEqual(lm.extractFact("the true probability is 45 percent"), null); // no first-person anchor
+});
+
+// Serialized Three Doors game state (subject carries parentheses + a pipe). Even if such a
+// string were ever fed to extractFact, it is game progress, not a personal fact.
+check("extractFact rejects serialized Three Doors game state (parenthesized/pipe subject)", () => {
+  assert.strictEqual(lm.extractFact("Three Doors (kriskin, the Jester)'s xp-door is Chose the Little Warm Door; entered the XP dreamworld with Blinkbug | Chose: C · The Little Warm Door"), null);
+});
+
+// The anchor requirement must not throw the baby out: genuine first-person facts still parse.
+check("extractFact still captures genuine first-person facts", () => {
+  assert.strictEqual(lm.extractFact("my dog is named Rex").subject, "my dog");
+  assert.strictEqual(lm.extractFact("our anniversary is June 5").value, "June 5");
+});
+
 check("categorize buckets by keyword", () => {
   assert.strictEqual(lm.categorize("the landlord's name is Dana"), "people");
   assert.strictEqual(lm.categorize("the project deadline is April 5"), "dates");
