@@ -37,6 +37,19 @@ async function loadWallet() {
   }
 }
 
+async function loadTraction() {
+  try {
+    const data = await api("/api/traction");
+    $("tractionCleared").textContent = money(data.revenue?.clearedUsd);
+    $("tractionWorkflows").textContent = String(data.nonOperatorWorkflows?.count ?? "--");
+    $("tractionOutreach").textContent = String(data.outreach?.sends ?? "--");
+    const reported = data.operatorReportedUsage?.count ?? 0;
+    $("tractionReported").textContent = `${reported} (unverified)`;
+  } catch (e) {
+    $("tractionCleared").textContent = "--";
+  }
+}
+
 async function loadArc() {
   try {
     const data = await api("/api/arc-reactor");
@@ -88,7 +101,7 @@ async function loadDreamer() {
 }
 
 async function init() {
-  await Promise.all([loadHealth(), loadWallet(), loadArc(), loadLanes(), loadConvergence(), loadDreamer()]);
+  await Promise.all([loadHealth(), loadWallet(), loadTraction(), loadArc(), loadLanes(), loadConvergence(), loadDreamer()]);
 }
 
 if (document.readyState === "loading") {
