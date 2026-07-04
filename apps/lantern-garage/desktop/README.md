@@ -57,14 +57,21 @@ The launcher runs today via `node`. Turning it into a **signed, double-clickable
 `.exe`** is deliberately staged, because the Core depends on **native modules**
 (`sharp`, `tesseract.js`) that must match the bundling runtime's ABI. ADR-0014
 records the decision **against Electron** (native-module rebuild friction + a
-150 MB Chromium the user's browser already provides) in favour of shipping a
-**plain Node runtime + app directory + a small signed launcher**.
+150 MB Chromium the user's browser already provides) in favour of shipping **one
+Node runtime (the exe itself) + the app directory + a small signed launcher**.
+
+We ship **exactly one executable.** `unisona.exe` is a full Node runtime with the
+launcher embedded, so it can play both roles: the launcher, and — re-invoked with
+`UNISONA_CORE=1` — the Node runtime that runs the Core's `server.js`. No second
+`node.exe` is bundled. The app *code* (`server.js`, `lib/`, `public/`, and
+`node_modules` incl. the native `sharp`/`tesseract.js` binaries) still ships as
+files on disk, because native `.node` addons cannot live inside a SEA blob.
 
 Build steps (ADR-0014 §Follow-ups):
 
-1. **App resources** *(installer step — pending)*: ship `node.exe` (LTS) + the
-   `apps/lantern-garage` tree (incl. prebuilt `sharp`/`tesseract.js` binaries for
-   `win32-x64`) beside the exe.
+1. **App resources** *(installer step — pending)*: lay the `apps/lantern-garage`
+   tree (incl. prebuilt `sharp`/`tesseract.js` binaries for `win32-x64`) beside the
+   exe. **No `node.exe`** — `unisona.exe` is the runtime.
 2. **Compile `launcher.js` → `unisona.exe`** — ✅ **wired**, via Node **SEA** (not
    `pkg`, which is deprecated):
    ```bash
@@ -73,13 +80,15 @@ Build steps (ADR-0014 §Follow-ups):
    # → apps/lantern-garage/desktop/dist/unisona.exe
    ```
    Because a SEA's `process.execPath` **is** `unisona.exe` (its embedded entry is
-   the launcher, not a generic node), the launcher detects SEA mode (`node:sea`)
-   and spawns the Core with a **separate** real `node(.exe)` — shipped beside the
-   exe, or pointed to by `UNISONA_NODE_EXE`; `UNISONA_SERVER_DIR` points at the
-   bundled app tree. [`sea-config.json`](sea-config.json) holds the SEA config and
-   `postject` (a pinned build dep) injects the blob. *Verified:* the built exe
-   boots the Core end-to-end (SEA runs → spawns real node → `server.js` answers on
-   loopback in chat-only hardened mode).
+   the launcher, not a generic node), `unisona.exe server.js` can't run the Core.
+   So the launcher instead **re-execs itself** with `UNISONA_CORE=1`; that second
+   instance's embedded entry hands off to the on-disk `server.js` via
+   `createRequire` (its real `__dirname`/`node_modules` resolve against
+   `UNISONA_SERVER_DIR`). One binary, both roles. [`sea-config.json`](sea-config.json)
+   holds the SEA config and `postject` (a pinned build dep) injects the blob.
+   *Verified on Windows:* the built exe boots the Core end-to-end with **no separate
+   node** — `server.js` answers HTTP 200 on loopback in chat-only hardened mode, and
+   the Core child is a second `unisona.exe`, not a `node.exe`.
 3. **Sign — pick a channel** (`postject` invalidates the copied runtime's original
    signature, so the exe/package MUST be (re)signed to be trusted). Research
    2026-07-04 (Alex) settled the channels — **we ship BOTH:**
@@ -98,8 +107,8 @@ Build steps (ADR-0014 §Follow-ups):
      either — different certificate type.)
 4. **Installer / package** — **MSIX** for the Store channel (Microsoft handles
    install + update); **Inno Setup** for the SignPath direct-download channel,
-   laying the app into `%LOCALAPPDATA%\unisona`, shipping `node.exe` beside
-   `unisona.exe`, and (optionally) setting `UNISONA_SERVER_DIR`.
+   laying `unisona.exe` + the app tree into `%LOCALAPPDATA%\unisona` and (optionally)
+   setting `UNISONA_SERVER_DIR`. **No `node.exe`** — `unisona.exe` is the runtime.
 
 ## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 
