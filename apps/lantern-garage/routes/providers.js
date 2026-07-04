@@ -439,11 +439,18 @@ module.exports = async function providerRoutes(req, res, url, deps) {
 
   // ── GET /api/providers/keys ────────────────────────────────────────────
   if (req.method === "GET" && url.pathname === "/api/providers/keys") {
+    // #1946 G3: on the desktop app, a key stored in the DPAPI vault counts as "set"
+    // even when it isn't in process.env (tenant.js reads the vault as a fallback).
+    const keyVault = require("../lib/key-vault");
+    const appPaths = require("../lib/app-paths");
+    const vaultOn = appPaths.isDesktop() && keyVault.isSupported();
     const keys = PROVIDER_KEY_ALLOWLIST.map(k => {
       const reg = _probeRegistry(k);
+      const vaulted = vaultOn && keyVault.hasKey(k);
       return {
         env: k,
-        set: !!process.env[k],            // dispatch source of truth (process.env)
+        set: !!process.env[k] || vaulted, // dispatch source of truth (process.env) + vault
+        vaulted,
         startedWith: !!_envAtStartup[k],  // booted with it?
         inRegistry: reg.present,          // present in User/Machine env?
         registryScope: reg.scope,
@@ -478,21 +485,28 @@ module.exports = async function providerRoutes(req, res, url, deps) {
         return true;
       }
 
-      // Save to session env
+      // Save to session env so it's usable immediately.
       process.env[key] = value;
       _keysSynced = false; // re-sync on next check
 
-      // Try to save to Windows user environment (best-effort)
-      let persisted = false;
-      try {
-        const escaped = value.replace(/"/g, '`"');
-        execFileSync("powershell", [
-          "-NonInteractive", "-Command",
-          `[System.Environment]::SetEnvironmentVariable('${key}', "${escaped}", 'User')`,
-        ], { timeout: 10_000 });
-        persisted = true;
-      } catch {
-        // Silent fail; key is still in session
+      // #1946 G3: on the desktop app persist the key DPAPI-ENCRYPTED in the OS key
+      // vault — NEVER plaintext, so no Windows User-env write. lib/tenant.js already
+      // reads the vault as a fallback, so a vault-stored key survives restart.
+      // Servers keep the existing best-effort plaintext User-env persistence.
+      const keyVault = require("../lib/key-vault");
+      const appPaths = require("../lib/app-paths");
+      let persisted = false, vaulted = false;
+      if (appPaths.isDesktop() && keyVault.isSupported()) {
+        try { keyVault.setKey(key, value); vaulted = true; } catch { /* stays in session env */ }
+      } else {
+        try {
+          const escaped = value.replace(/"/g, '`"');
+          execFileSync("powershell", [
+            "-NonInteractive", "-Command",
+            `[System.Environment]::SetEnvironmentVariable('${key}', "${escaped}", 'User')`,
+          ], { timeout: 10_000 });
+          persisted = true;
+        } catch { /* Silent fail; key is still in session */ }
       }
 
       sendJson(res, {
@@ -500,6 +514,7 @@ module.exports = async function providerRoutes(req, res, url, deps) {
         provider,
         key,
         persisted,
+        vaulted,
         masked: maskValue(value),
       });
     } catch (err) {

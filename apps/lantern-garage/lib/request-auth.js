@@ -45,10 +45,39 @@ function tokensEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
-/** The operator token carried on a request, if any (Node lower-cases header names). */
+/** Parse the Cookie header into a { name: value } map (best-effort, tolerant). */
+function parseCookies(req) {
+  const raw = (req && req.headers && req.headers.cookie) || "";
+  const out = {};
+  for (const part of raw.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 1) continue;
+    const name = part.slice(0, i).trim();
+    if (!name) continue;
+    try { out[name] = decodeURIComponent(part.slice(i + 1).trim()); }
+    catch { out[name] = part.slice(i + 1).trim(); }
+  }
+  return out;
+}
+
+/**
+ * The operator token carried on a request, from any transport (Node lower-cases
+ * header names). Precedence: explicit header → the SameSite cookie the desktop app
+ * carries automatically → a `?__lt=` query param (the launch URL, and the only way
+ * EventSource — which cannot set headers — can authenticate). #1946 G4.
+ */
 function requestToken(req) {
   const h = (req && req.headers) || {};
-  return h["x-operator-token"] || h["x-unisona-token"] || "";
+  if (h["x-operator-token"]) return h["x-operator-token"];
+  if (h["x-unisona-token"]) return h["x-unisona-token"];
+  const cookies = parseCookies(req);
+  if (cookies.unisona_lt) return cookies.unisona_lt;
+  try {
+    const u = new URL(req.url || "/", `http://${(req.headers && req.headers.host) || "127.0.0.1"}`);
+    const q = u.searchParams.get("__lt");
+    if (q) return q;
+  } catch { /* non-URL req.url — ignore */ }
+  return "";
 }
 
 function isOperatorRequest(req, env = process.env) {
@@ -74,5 +103,6 @@ module.exports = {
   isProxied,
   tokensEqual,
   requestToken,
+  parseCookies,
   PROXY_HEADERS,
 };
