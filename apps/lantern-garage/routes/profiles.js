@@ -10,6 +10,7 @@ const {
   setUserRole,
   deleteProfile,
   linkDiscordAccount,
+  unlinkIdentity,
   exportToCSF,
   importFromCSF,
   publicProfile,
@@ -97,6 +98,40 @@ module.exports = async function profileRoutes(req, res, url, deps) {
         }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, link }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return true;
+  }
+
+  // POST /api/profiles/me/unlink — Disconnect a linked provider from the current
+  // account. Refuses to remove the last remaining login method (server-guarded).
+  if (method === "POST" && path === "/api/profiles/me/unlink") {
+    const userId = getSessionUserId(req);
+    if (!userId) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Not authenticated" }));
+    }
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; if (body.length > 1e6) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const { provider } = JSON.parse(body || "{}");
+        if (!provider) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "provider is required" }));
+        }
+        const result = unlinkIdentity(userId, String(provider));
+        if (result.error) {
+          const status = result.error === "last_login_method" ? 409
+            : result.error === "not_linked" ? 400 : 404;
+          res.writeHead(status, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: result.error }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, profile: publicProfile(result.profile) }));
       } catch (err) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: err.message }));

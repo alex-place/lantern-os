@@ -13,6 +13,7 @@
 
 const { getSessionInfo, handleLogout } = require("../lib/patreon-auth");
 const { handleOAuthStart, handleOAuthCallback } = require("../lib/oauth-core");
+const { getSessionUser } = require("../lib/session-identity");
 const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
 const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
@@ -61,8 +62,14 @@ module.exports = async function authRoutes(req, res, url, deps) {
   if (startMatch) {
     const provider = startMatch[1];
     if (!getProvider(provider)) return false; // unknown → fall through to 404
-    const returnTo = url.searchParams.get("returnTo") || "/";
-    handleOAuthStart(provider, req, res, returnTo);
+    // Link mode: a signed-in user connecting another provider to THIS account
+    // (?link=1). Only honored when there's an active session; the callback links
+    // the identity and returns to the profile page.
+    const linkMode = url.searchParams.get("link") === "1";
+    const sessionUser = linkMode ? getSessionUser(req) : null;
+    const linkTo = sessionUser && sessionUser.id ? sessionUser.id : null;
+    const returnTo = linkTo ? "/profile.html" : url.searchParams.get("returnTo") || "/";
+    handleOAuthStart(provider, req, res, returnTo, { linkTo });
     return true;
   }
 

@@ -448,6 +448,33 @@ function linkIdentity(profileId, provider, providerId, email, emailVerified) {
 }
 
 /**
+ * Remove a linked provider identity from a profile (ADR-0016). Refuses to remove
+ * the account's LAST remaining login method — a profile must always keep at least
+ * one way to sign back in (another OAuth identity, or a local password).
+ *
+ * @returns {{profile}|{error}} updated profile, or an error code
+ *   ('unknown_profile' | 'not_linked' | 'last_login_method')
+ */
+function unlinkIdentity(profileId, provider) {
+  const profile = loadProfileFromIndex(profileId);
+  if (!profile) return { error: "unknown_profile" };
+  const identities = profile.identities || [];
+  const has = identities.some((i) => i.provider === provider);
+  if (!has) return { error: "not_linked" };
+
+  const remaining = identities.filter((i) => i.provider !== provider);
+  // A local password (passwordHash) is also a login method even if there is no
+  // 'local' identity row, so it counts toward "can still sign in".
+  const canStillLogIn = remaining.length > 0 || !!profile.passwordHash;
+  if (!canStillLogIn) return { error: "last_login_method" };
+
+  const updates = { identities: remaining };
+  if (provider === "discord") updates.discordId = null;
+  if (provider === "patreon") updates.patreonId = null;
+  return { profile: updateProfile(profileId, updates) };
+}
+
+/**
  * Get-or-create a profile from ANY OAuth provider identity, applying the
  * ADR-0016 linking policy:
  *   1. Exact identity match (provider, providerId) → return it (idempotent login).
@@ -634,6 +661,7 @@ module.exports = {
   getProfileByIdentity,
   getProfileByEmail,
   linkIdentity,
+  unlinkIdentity,
   getOrCreateFromIdentity,
   hashPassword,
   verifyPassword,

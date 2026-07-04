@@ -14,7 +14,12 @@
 const crypto = require("crypto");
 const querystring = require("querystring");
 const { getProvider, resolveRole } = require("./auth-providers");
-const { getOrCreateFromIdentity, publicProfile } = require("./user-profiles");
+const {
+  getOrCreateFromIdentity,
+  getProfileByIdentity,
+  linkIdentity,
+  publicProfile,
+} = require("./user-profiles");
 const { establishSession } = require("./session-identity");
 
 const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
@@ -113,7 +118,7 @@ function _redirectWithError(res, code, provider) {
  * Start an OAuth flow for `providerId`. On misconfiguration it redirects back to
  * /auth.html with a friendly error instead of dumping a raw 500 (#1877).
  */
-function handleOAuthStart(providerId, req, res, returnTo) {
+function handleOAuthStart(providerId, req, res, returnTo, opts = {}) {
   const provider = getProvider(providerId);
   if (!provider) {
     _redirectWithError(res, "unknown_provider", providerId);
@@ -129,12 +134,17 @@ function handleOAuthStart(providerId, req, res, returnTo) {
   const { verifier, challenge } = generatePkce();
   const state = crypto.randomBytes(16).toString("hex");
   const rt = safeReturnTo(returnTo, "/");
+  // Link mode: an already-signed-in user connecting another provider to THIS
+  // account. Carry the target profile id through the flow so the callback links
+  // instead of switching/creating an account (#profile-link).
+  const linkTo = opts.linkTo || null;
 
   req.session.pkce_verifier = verifier;
   req.session.oauth_state = state;
   req.session.oauth_provider = providerId;
   req.session.return_to = rt;
   req.session.redirect_uri = redirectUri;
+  req.session.oauth_link_to = linkTo;
 
   const params = {
     response_type: "code",
@@ -152,6 +162,7 @@ function handleOAuthStart(providerId, req, res, returnTo) {
     provider: providerId,
     return_to: rt,
     redirect_uri: redirectUri,
+    link_to: linkTo,
     exp: Date.now() + 10 * 60 * 1000,
   });
   const secure = redirectUri.startsWith("https://") ? "; Secure" : "";
@@ -219,11 +230,34 @@ async function handleOAuthCallback(providerId, req, res, query) {
     return res.end(JSON.stringify({ error: "State mismatch" }));
   }
 
+  // Link mode: connecting this provider to an already-signed-in account.
+  const linkTo = req.session.oauth_link_to || (ck && ck.link_to) || null;
+
   try {
     const token = await exchangeCode(provider, code, verifier, redirectUri);
     const accessToken = token.access_token;
     const user = await provider.fetchUser(accessToken);
     const role = resolveRole(provider, user);
+
+    // ── Link mode ── attach this identity to the current profile instead of
+    // switching/creating. Refuse if the identity already belongs to a DIFFERENT
+    // account (would hijack/merge). Keeps the existing session as-is.
+    if (linkTo) {
+      const owner = getProfileByIdentity(providerId, String(user.providerId));
+      if (owner && owner.id !== linkTo) {
+        res.writeHead(302, {
+          "Set-Cookie": clearCookie,
+          Location: `/profile.html?error=identity_in_use&provider=${providerId}`,
+        });
+        return res.end();
+      }
+      linkIdentity(linkTo, providerId, user.providerId, user.email, user.emailVerified === true);
+      res.writeHead(302, {
+        "Set-Cookie": clearCookie,
+        Location: `/profile.html?linked=${providerId}`,
+      });
+      return res.end();
+    }
 
     const { profile } = getOrCreateFromIdentity(providerId, user, role);
 

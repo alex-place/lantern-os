@@ -173,6 +173,52 @@
     .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
     .modal-actions .btn { flex: 1; justify-content: center; }
 
+    /* ── Connected accounts ── */
+    .link-list { display: flex; flex-direction: column; gap: 8px; }
+    .link-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 16px; background: var(--surface);
+    }
+    .link-row.linked { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+    .link-name { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+    .link-emoji { font-size: 18px; }
+    .link-state { display: flex; align-items: center; gap: 10px; }
+    .link-badge {
+      font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      padding: 3px 9px; border-radius: 20px;
+    }
+    .link-btn {
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      padding: 7px 14px; border-radius: 9px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text);
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .link-btn.connect { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--accent); }
+    .link-btn.connect:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .link-btn.unlink:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,.08); }
+    .link-hint { font-size: 12px; color: var(--muted); font-style: italic; }
+    .link-note { font-size: 12px; color: var(--muted); margin: 10px 2px 0; line-height: 1.5; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+      max-width: 90%; padding: 12px 18px; border-radius: 12px; z-index: 200;
+      font-size: 14px; font-weight: 600; color: #fff;
+      opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+      box-shadow: 0 10px 40px rgba(0,0,0,.3);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast-ok    { background: linear-gradient(135deg, var(--accent), #7c3aed); }
+    .toast-error { background: #dc2626; }
+
+    @media (max-width: 540px) {
+      .link-row { flex-direction: column; align-items: stretch; gap: 10px; }
+      .link-state { justify-content: space-between; }
+    }
+
     .loading { text-align: center; color: var(--muted); padding: 80px 20px; font-size: 14px; }
 
     .loop-stage-note {
@@ -252,8 +298,8 @@ const FEATURES = [
   { emoji: '📊', label: 'Crypto',      href: '/crypto-dashboard.html', req: 'guest' },
 ];
 
-// How each account source (metadata.source) presents as a sign-in method.
-// Identity is provider-agnostic (ADR-0005) — Patreon is one source among many.
+// How each provider presents as a sign-in method. Identity is provider-agnostic
+// (ADR-0005) — every provider is one identity among many on a single account.
 const SOURCE_LABELS = {
   local:   { label: 'Email + password', emoji: '🔑' },
   patreon: { label: 'Patreon',          emoji: '♥' },
@@ -263,7 +309,11 @@ const SOURCE_LABELS = {
   dev:     { label: 'Local dev bypass', emoji: '🛠️' },
 };
 
+// The OAuth providers a user can connect/disconnect from this page.
+const LINKABLE_PROVIDERS = ['discord', 'google', 'patreon'];
+
 let currentProfile = null;
+let currentSession = null;
 
 function initials(name) {
   if (!name) return '?';
@@ -287,8 +337,27 @@ function hasAccess(profile, reqRole) {
   return (ROLE_LEVEL[profile.role] || 0) >= (ROLE_LEVEL[reqRole] || 0);
 }
 
-function sourceOf(profile) {
-  return SOURCE_LABELS[profile.metadata?.source] || SOURCE_LABELS.local;
+function providerMeta(id) {
+  return SOURCE_LABELS[id] || { label: id, emoji: '🔗' };
+}
+
+// The method the user is CURRENTLY signed in with (this session), not how the
+// account was first created (#profile-provider-display).
+function currentSignInMethod() {
+  const p = currentSession?.provider || currentSession?.user?.provider;
+  if (p && p !== 'local-bypass') return providerMeta(p);
+  if (p === 'local-bypass') return SOURCE_LABELS.dev;
+  return providerMeta(currentProfile?.metadata?.source) || SOURCE_LABELS.local;
+}
+
+// All providers connected to this account, derived from identities[] (with a
+// legacy fallback to the denormalized *Id mirrors + metadata.source).
+function connectedProviders(profile) {
+  const set = new Set((profile.identities || []).map((i) => i.provider));
+  if (profile.discordId) set.add('discord');
+  if (profile.patreonId) set.add('patreon');
+  if (!set.size && profile.metadata?.source) set.add(profile.metadata.source);
+  return set;
 }
 
 function renderProfile(profile) {
@@ -296,7 +365,24 @@ function renderProfile(profile) {
   const role = profile.role || 'guest';
   const tier = TIER_LABELS[role] || TIER_LABELS.guest;
 
-  const source = sourceOf(profile);
+  const source = currentSignInMethod();
+  const connected = connectedProviders(profile);
+  // UX guard only — the server also refuses to remove the last login method.
+  const canUnlink = connected.size > 1;
+
+  const connectedRows = LINKABLE_PROVIDERS.map((id) => {
+    const meta = providerMeta(id);
+    const isLinked = connected.has(id);
+    const action = isLinked
+      ? (canUnlink
+          ? `<button class="link-btn unlink" onclick="disconnectProvider('${id}')">Disconnect</button>`
+          : `<span class="link-hint" title="Add another sign-in method first">Only method</span>`)
+      : `<button class="link-btn connect" onclick="connectProvider('${id}')">Connect</button>`;
+    return `<div class="link-row ${isLinked ? 'linked' : ''}">
+        <span class="link-name"><span class="link-emoji">${meta.emoji}</span> ${escapeHtml(meta.label)}</span>
+        <span class="link-state">${isLinked ? '<span class="link-badge">Connected</span>' : ''}${action}</span>
+      </div>`;
+  }).join('');
 
   const featureCards = FEATURES.map(f => {
     const ok = hasAccess(profile, f.req);
@@ -347,11 +433,12 @@ function renderProfile(profile) {
         <div class="info-label">Account ID</div>
         <div class="info-value"><code>${escapeHtml(profile.id || profile.patreonId || '—')}</code></div>
       </div>
-      ${profile.discordId ? `
-      <div class="info-cell">
-        <div class="info-label">Linked accounts</div>
-        <div class="info-value">🎮 Discord</div>
-      </div>` : ''}
+    </div>
+
+    <div>
+      <div class="section-title">Connected Accounts</div>
+      <div class="link-list">${connectedRows}</div>
+      <p class="link-note">Connect multiple providers to sign in with any of them. You can't remove your only sign-in method.</p>
     </div>
 
     <div>
@@ -466,16 +553,79 @@ async function logout() {
   else alert('Logout failed');
 }
 
+// ── Connected accounts: link / unlink ──
+function connectProvider(provider) {
+  // Kick off OAuth in link mode; the callback attaches the identity to THIS
+  // account and returns to /profile.html?linked=<provider>.
+  location.href = `/api/auth/${encodeURIComponent(provider)}/start?link=1`;
+}
+
+async function disconnectProvider(provider) {
+  const meta = providerMeta(provider);
+  if (!confirm(`Disconnect ${meta.label} from your account?`)) return;
+  try {
+    const res = await fetch('/api/profiles/me/unlink', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.error === 'last_login_method'
+        ? "That's your only way to sign in — connect another provider first."
+        : (data.error || `Couldn't disconnect (${res.status})`);
+      showToast(msg, 'error');
+      return;
+    }
+    currentProfile = data.profile;
+    renderProfile(currentProfile);
+    showToast(`${meta.label} disconnected.`, 'ok');
+  } catch (_) {
+    showToast('Network error — please try again.', 'error');
+  }
+}
+
+let toastTimer = null;
+function showToast(msg, kind) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = `toast show ${kind === 'error' ? 'toast-error' : 'toast-ok'}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 4000);
+}
+
+// Surface the outcome of a link-mode OAuth round-trip (?linked / ?error) and
+// clean the URL so a refresh doesn't re-toast.
+function surfaceLinkResult() {
+  const q = new URLSearchParams(location.search);
+  const linked = q.get('linked');
+  const error = q.get('error');
+  if (linked) showToast(`${providerMeta(linked).label} connected.`, 'ok');
+  else if (error === 'identity_in_use') {
+    showToast(`That ${providerMeta(q.get('provider')).label} account is already linked to another account.`, 'error');
+  } else if (error === 'oauth_failed') {
+    showToast("Couldn't connect that provider. Please try again.", 'error');
+  }
+  if (linked || error) history.replaceState(null, '', '/profile.html');
+}
+
 async function init() {
   try {
     const sr = await fetch('/api/auth/session', { credentials: 'include' });
     const session = sr.ok ? await sr.json() : null;
     if (!session?.authenticated) { location.href = '/auth.html?returnTo=/profile.html'; return; }
+    currentSession = session;
 
     const pr = await fetch('/api/profiles/me', { credentials: 'include' });
     const profile = pr.ok ? await pr.json() : { ...session.user, role: session.role };
     currentProfile = profile;
     renderProfile(profile);
+    surfaceLinkResult();
   } catch (err) {
     console.error(err);
     location.href = '/auth.html';
