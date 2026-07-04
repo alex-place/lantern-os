@@ -28,9 +28,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 os.environ.setdefault("HF_HOME", "D:/hf-cache")
 
 import torch  # noqa: E402
+import transformers  # noqa: E402  (module handle for __version__ compat check)
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer  # noqa: E402
 
+from ouro_compat import transformers_cache_risk  # noqa: E402  (sibling; scripts/ is sys.path[0])
+
 MODEL_ID = os.environ.get("OURO_MODEL", "ByteDance/Ouro-1.4B-Thinking")
+
+# Guard: transformers>=4.56 silently breaks Ouro's recurrent KV cache unless the model's
+# remote code carries the Antizana/ouro-cache-fix patch. We can't introspect the patch
+# from here, so surface it loudly rather than run calm-while-wrong. Non-Ouro slots skip it.
+_cache_risk, _cache_msg = transformers_cache_risk(MODEL_ID, transformers.__version__)
+if _cache_risk:
+    if os.environ.get("OURO_STRICT_TRANSFORMERS") == "1":
+        raise RuntimeError("[ouro_serve] " + _cache_msg)
+    print("[ouro_serve] WARNING: " + _cache_msg, flush=True)
 # Serve a generic instruct model (e.g. Qwen2.5-Coder-7B as the local coder slot) — not
 # just Ouro. Ouro's QLoRA used the "### Instruction/### Response" format; any other
 # instruct model needs its OWN chat template, so auto-detect by model id. Override with

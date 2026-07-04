@@ -782,6 +782,39 @@ The mean spectral radius sitting just above 1 (with a third of windows locally
 expanding) is the expected signature of a system perched near its stability
 boundary rather than resting in a deep contracting basin.
 
+> **⚠ CONTROL CHECK (2026-07-04) — the ρ = 1.064 *mean* does not survive basic controls;
+> treat this row as an unreliable estimate, not evidence of near-boundary dynamics.**
+> `experiments/rho_controls.py` re-runs the *same* encoder + `fit_jacobian` functions with the
+> controls a spectral-radius estimate needs. (Reproducibility note: the certificate's
+> `apps/data/conversations` 2678-turn corpus is a **dead path** in the current checkout, and the
+> 830-turn `data/conversations/garage-conversations.jsonl` used below is **untracked runtime
+> data** absent from a clean clone — so the script falls back to a seeded 300-turn **synthetic**
+> corpus that anyone can reproduce. The *pattern* is dataset-independent.)
+>
+> **Reproducible (synthetic, in-repo), window 8:** unregularized mean ρ = **1.124** but median
+> **0.992** with a tail to max 4.48 — the mean already sits above its own median from tail
+> inflation; ridge 1e-2 → mean **0.652**, fraction(ρ>1) 0.47 → **0.06**; mean falls to **0.636**
+> at window 40; relative residual **0.44 → 0.80**; non-normality **~1.2**.
+> **Local 830-turn real chat log (measured, not repo-reproducible):** the same shape but far
+> more extreme — window-8 unregularized mean ≈ **25**, **max ρ ≈ 16,872** (near-singular design
+> matrix), median ≈ 1.00 → 0.85, ridge 1e-3 → mean ≈ 0.97. The blow-up is worse on real text
+> because it is higher-dimensional than the 10-sentence synthetic pool.
+>
+> Either way the conclusions hold: the **mean is tail-dominated** (use the median), **ridge
+> collapses ρ>1** (the expansion is noise amplification), the **linear fit is poor** (residual
+> 0.44–0.80 → eigenvalues weakly meaningful) and **strongly non-normal** (ρ is the wrong single
+> summary anyway). **Deepest caveat:** the state `x = [novelty, self_repeat, echo, length]` is
+> four **text-surface** features, NOT model hidden states — so ρ here measures surface-text
+> autocorrelation, not the Σ₀ latent loop's contraction. Even a clean ρ<1 here would not be the
+> certificate's α.
+>
+> The near-boundary *claim* may still hold for the real latent loop — but **this number is not
+> the evidence for it.** The load-bearing measurement is the loop Jacobian fitted on real Ouro
+> hidden states (via `StateABIShim`) with these controls applied — deferred to serving our own
+> model, and motivated by STARS (arXiv 2605.26733), which stabilizes looped-LM depth via
+> Jacobian spectral-radius regularization. See
+> [ADR-0021](adr/0021-serving-substrate-retain-ouro-custom-loop.md).
+
 > **Now certified in the matching time domain (2026-07-04, [#1988]).** `ρ` is a
 > *discrete-time* quantity — the step map `x_{k+1}=A x_k` contracts iff `ρ(A) < 1` —
 > whereas Theorem 1 and the dichotomy certify the *continuous* flow (`max Re λ(A) < 0`),
