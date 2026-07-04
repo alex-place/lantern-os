@@ -95,6 +95,51 @@ const runner = (byIndex) => async (_p, _m, i) => byIndex[i];
     assert.equal(r.providerUsed, null);
   });
 
+  // ── #1937 step 3 (ADR-0012 door-2): a canary/verdict instability signal escalates ──
+  await check("door-2: applied reply with a collapse routing hint → escalates (not lands)", async () => {
+    const r = await runKernelWithEscalation({
+      providers: CHAIN, requireVerified: false,
+      runOne: runner([
+        { status: "success", routeHint: { escalate: true, reason: "collapse" } }, // confidently-wrong local
+        { status: "success", tests: { success: true } },
+      ]),
+    });
+    assert.equal(r.escalations.length, 1, "a flagged reply must escalate, not silently land");
+    assert.equal(r.landedBy, "cloud");
+    assert.equal(r.escalations[0].failedProvider, "ollama");
+  });
+
+  await check("door-2: an ungrounded ReasonVerdict on an applied reply → escalates", async () => {
+    const r = await runKernelWithEscalation({
+      providers: CHAIN, requireVerified: false,
+      runOne: runner([
+        { status: "applied_unverified", verdict: { reason: "ungrounded" } },
+        { status: "success", tests: { success: true } },
+      ]),
+    });
+    assert.equal(r.escalations.length, 1);
+    assert.equal(r.landedBy, "cloud");
+  });
+
+  await check("door-2: a TEST-VERIFIED result still lands despite an escalate hint", async () => {
+    const r = await runKernelWithEscalation({
+      providers: CHAIN, requireVerified: true,
+      runOne: runner([{ status: "success", tests: { success: true }, routeHint: { escalate: true, reason: "ungrounded" } }]),
+    });
+    assert.equal(r.escalations.length, 0, "verification wins — a proven-correct result isn't second-guessed");
+    assert.equal(r.landedBy, "local");
+    assert.equal(r.verified, true);
+  });
+
+  await check("door-2: no hint/verdict → behaviour unchanged (plain success lands)", async () => {
+    const r = await runKernelWithEscalation({
+      providers: CHAIN, requireVerified: false,
+      runOne: runner([{ status: "success" }]),
+    });
+    assert.equal(r.escalations.length, 0);
+    assert.equal(r.landedBy, "local");
+  });
+
   await check("landedByOf: ollama=local, anthropic/openai=cloud, null=null", async () => {
     assert.equal(landedByOf({ provider: "ollama" }), "local");
     assert.equal(landedByOf({ provider: "anthropic" }), "cloud");

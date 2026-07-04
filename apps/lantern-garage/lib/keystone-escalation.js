@@ -52,8 +52,28 @@ function landedByOf(providerUsed) {
  * winning. When tests could not run at all (no `result.tests`), we accept the
  * unverified result rather than loop forever — but the caller still sees verified=false.
  */
+// #1937 step 3 (ADR-0012 door-2): the within-model failure becomes the cross-model
+// trigger. A reply carries an escalate signal when the collapse/groundedness canary
+// routing hint says so ({escalate:true}, #1937 step 4) OR a ReasonVerdict's reason is in
+// the unstable/ungrounded set. This adds "confidently wrong" to the escalate set — not
+// just "tests failed".
+const _VERDICT_ESCALATE = new Set(["collapse", "divergence", "ungrounded", "max_depth"]);
+function _escalateSignalled(result) {
+  if (!result) return false;
+  if (result.escalate === true) return true;
+  if (result.routeHint && result.routeHint.escalate === true) return true;
+  if (result.verdict && _VERDICT_ESCALATE.has(result.verdict.reason)) return true;
+  return false;
+}
+
 function _landed(result, requireVerified) {
   if (!result || !SUCCESS_STATUSES.has(result.status)) return false;
+  // #1937 step 3: an applied-but-UNVERIFIED reply that a canary/verdict flags as
+  // collapsing/diverging/ungrounded escalates instead of landing. A genuinely
+  // test-verified result (tests.success) still lands regardless of the hint. Purely
+  // additive — results with no hint/verdict are unaffected (all legacy callers).
+  const verified = !!(result.tests && result.tests.success);
+  if (!verified && _escalateSignalled(result)) return false;
   if (requireVerified && result.status === "applied_unverified" && result.tests) {
     return !!result.tests.success;
   }
