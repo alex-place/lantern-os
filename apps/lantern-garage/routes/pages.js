@@ -20,11 +20,6 @@ const PUBLIC_PAGES = {
   // "no account needed" promise holds (#739). dream-chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).
   "/dream-chat.html":     "dream-chat.html",
-  // The stock trader is served to everyone: entitled users get the full terminal,
-  // guests get the same page in read-only "guest mode" (trading actions hidden
-  // client-side; the trade-gated data endpoints stay blocked server-side by
-  // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
-  "/stock-trader.html":   "stock-trader.html",
 };
 
 // Protected pages — { file, role } where role is minimum required, OR
@@ -37,6 +32,7 @@ const PROTECTED_PAGES = {
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
   "/trading.html":        { file: "trading.html",           entitlement: "trade" },
   "/trading-news.html":   { file: "trading-news.html",      entitlement: "trade" },
+  "/stock-trader.html":   { file: "stock-trader.html",      entitlement: "trade" },
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
