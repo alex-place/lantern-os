@@ -29,10 +29,14 @@
 
 const path = require("path");
 const { getSessionUserId } = require("./session-identity");
+const appPaths = require("./app-paths");
 
-// <repoRoot>/data — identical rooting to lib/dreamer-store.js (lib/ is 3 up from root).
-const repoRoot = path.resolve(__dirname, "..", "..", "..");
-const DATA_ROOT = path.join(repoRoot, "data");
+// Writable-state root. Sourced from lib/app-paths.js (ADR-0014 G2) so the multi-
+// tenancy seam and the desktop state-root move share one anchor. On servers this
+// is byte-for-byte <repoRoot>/data (UNCHANGED); the desktop launcher relocates it
+// to %APPDATA%\unisona\data. `repoRoot` is kept for callers that still reference it.
+const repoRoot = appPaths.repoRoot;
+const DATA_ROOT = appPaths.dataRoot();
 const LOCAL_TENANT_ID = "local";
 
 // provider -> candidate env vars (first hit wins), mirroring lib/dream-chat.js's
@@ -82,6 +86,18 @@ function resolveProviderKey(req, provider, profile) {
   if (profile !== "cloud") {
     for (const env of PROVIDER_ENV[p] || []) {
       if (process.env[env]) return process.env[env];
+    }
+    // Desktop (ADR-0014 G3): fall back to the OS-encrypted vault when no plaintext
+    // env key is present. Env still wins, so servers with a .env are byte-for-byte
+    // unchanged; the vault is only consulted where a key would otherwise be absent.
+    try {
+      const vault = require("./key-vault");
+      for (const env of PROVIDER_ENV[p] || []) {
+        const v = vault.getKey(env);
+        if (v) return v;
+      }
+    } catch {
+      /* vault optional — never let a vault error break key resolution */
     }
     return null;
   }
