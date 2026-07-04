@@ -441,7 +441,7 @@ const REGISTRY = {
       catch { mcpUp = false; }
       lines.push(`MCP server (127.0.0.1:8771): ${mcpUp
         ? "UP — /health responded"
-        : "DOWN — /health did not respond (start it with: python src/mcp_server/server.py)"}`);
+        : "DOWN — /health did not respond on 127.0.0.1:8771"}`);
       // 2) This chat server — if this tool is running, the Node server is up.
       const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
       lines.push(`Chat server (127.0.0.1:${port}): UP — uptime ${Math.round(process.uptime())}s`);
