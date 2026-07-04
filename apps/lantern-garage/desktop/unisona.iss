@@ -38,6 +38,10 @@ OutputBaseFilename=Unisona-Setup-{#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; Brand icon for Setup.exe + the wizard + Add/Remove Programs. The shortcuts and app
+; taskbar entry get their icon from unisona.exe (embedded via rcedit at build time),
+; and the app window itself from the served favicon. Path is relative to this .iss.
+SetupIconFile=unisona.ico
 UninstallDisplayIcon={app}\unisona.exe
 UninstallDisplayName={#AppName}
 
