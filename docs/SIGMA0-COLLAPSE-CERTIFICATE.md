@@ -223,6 +223,20 @@ lines before relying on any claim here.
 > (Lyapunov/LaSalle); `c*` is MEASURED. Neither frontier is *closed* — #1990 is
 > calibrated-not-proven, #1991 is a validated *method* / first cut — but both moved from open to
 > MEASURED. Suite unchanged at **46 passing** (these are experiment artifacts, not new unit tests).
+>
+> **Maintenance log — 2026-07-04 (honesty layer measured; §7.3 added).** The §7.2 red-team gains an
+> empirical companion, §7.3 — the defenses it names are now reproducible, machine-checked code: a
+> grounded five-councilor Σ₀ council (`experiments/sigma0_council.py`) that upholds grounded claims
+> by running their tests and **rejects a planted "0.99 SimpleQA SOTA" claim**; a strictly-proper
+> honesty objective (incentive-compat gap **0.0000**); a **159-record golden answer-key**
+> (`data/sigma0/golden_dataset.jsonl`, 26.4% honest negatives, anti-inflation machine-checked); and
+> a **live benchmark** where **GPT-4o-mini confabulated on 0/42 negatives** (golden 0.95) while
+> `always-assert` confabulates 100% at a *higher* raw score — confabulation-rate is the honesty
+> axis, measured. Verification this pass: `pytest tests/test_cio_sde.py` → **46 passing**; the four
+> artifacts resolve (`golden_dataset.jsonl` 159, `live_bench_results.json`,
+> `trigger_calibration_report.json`, `roa_estimate_report.json`). Honest note: this + the §7.2/§7.3
+> hardening are staged on the **open** certificate PR (#1997), not yet in `master`; no cert
+> *theorem* changed this pass.
 
 **Status taxonomy & tracked gaps.** Each claim is one of: **PROVEN** (theorem +
 machine-checked), **MEASURED** (empirical, with a test/run pointer), **HEURISTIC**
@@ -916,7 +930,8 @@ score). *(`tests/test_cio_sde.py` — 46 passing, 0 xfail.)*
 
 ### 7.2 Gaming the honesty layer (red-team)
 
-**Status: DESIGN + threat model — the failure mode of *this document's own protocol*.**
+**Status: DESIGN + threat model — the failure mode of *this document's own protocol*
+(empirical backing now in §7.3).**
 
 §7 is about a system that games *reality*; this is about a system that games the *honesty
 conventions* meant to keep it grounded. Σ₀ honesty is a set of **observable signals** —
@@ -948,6 +963,38 @@ measure calibration rather than reading it; grade per-claim, not per-author; aud
 **Corollary:** the honesty labels in this document are load-bearing *only to the extent they are
 externally checked* — they are a UI for a verifier, not a substitute for one. An honesty layer
 that trusts its own markers has already collapsed.
+
+### 7.3 The honesty layer, measured (2026-07-04)
+
+**Status: MEASURED — §7.2's defenses are now instantiated as reproducible, machine-checked code
+with measured outputs, not only a design.** The red-team above is a threat model; this records the
+apparatus that answers it (landed on this certificate's PR):
+
+- **A grounded, multi-perspective council** (`experiments/sigma0_council.py`) — five councilors
+  (Executor / Empiricist / Auditor / Calibrator / Skeptic), each verdict produced by a real check
+  (run the test, resolve the citation), never opinion. Machine-checked to **UPHOLD grounded claims
+  and REJECT fabricated ones**: convened on this session's claims it upheld them by *running their
+  tests* (Executor exit-0) and **rejected a planted "0.99 on SimpleQA, beats all frontier models
+  (SOTA)" claim** (Auditor: the cited file does not exist). This is §7.2's "bind the signal to an
+  external check" rider, made executable.
+- **A strictly-proper honesty objective** (`experiments/sigma0_honest_objective.py`) — the
+  calibration score's incentive-compatibility gap is **0.0000** (machine-checked: honest confidence
+  is the reward-optimal report), and the reward ranks confident-wrong below abstention (the §4
+  calm-while-wrong penalty, measured).
+- **A 159-record golden answer-key** (`data/sigma0/golden_dataset.jsonl`) of web-verified
+  CS/math/physics facts, **26.4% honest negatives** (open conjectures, unproven crypto assumptions,
+  the Church–Turing *thesis*, refuted claims, aphorisms), with a machine-checked **anti-inflation
+  invariant** — no open/refuted claim is labelled PROVEN/MEASURED (P vs NP is HEURISTIC, not proven).
+- **A live benchmark on that key** (`experiments/sigma0_live_bench.py`): a real model,
+  **GPT-4o-mini, confabulated on 0 of the 42 negatives** (golden 0.95), while an
+  `always-assert-PROVEN` baseline scores *higher* on raw accuracy (0.65 vs the honest-abstainer's
+  0.41) yet confabulates **100%** — empirically confirming **confabulation-rate, not raw accuracy,
+  is the honesty axis** (§7.2's calm-while-wrong, quantified).
+
+**Honest scope.** These validate the detection/defense *apparatus* on this benchmark and this one
+model run; they do **not** prove a trained model is un-gameable — the §7.2 watched-vs-unwatched gap
+remains a live research risk, and the golden set is 159 curated items, not a population. The claim
+is only that §7.2's defenses are now *externally-checkable code with measured outputs*, not prose.
 
 ---
 

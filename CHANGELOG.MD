@@ -1,3 +1,7 @@
+## [1.8.54] - 2026-07-04
+### Changed
+- **Σ₀ collapse certificate: honesty red-team now has empirical backing (new §7.3).** The §7.2 red-team was a design/threat-model; §7.3 records the machine-checked apparatus that answers it — a grounded five-councilor council (`sigma0_council.py`, upholds grounded claims by running their tests, **rejects a planted "0.99 SimpleQA SOTA" claim**), a strictly-proper honesty objective (incentive-compat gap **0.0000**), a **159-record golden answer-key** (26.4% honest negatives, anti-inflation machine-checked), and a **live benchmark** where **GPT-4o-mini confabulated on 0/42 negatives** (golden 0.95) while `always-assert` confabulates 100% at a higher raw score — confabulation-rate is the honesty axis, measured. Dated maintenance log added; verified `tests/test_cio_sde.py` → 46 passing + the four artifacts resolve. No cert theorem changed. Strengthens **Verify**.
+
 ## [1.8.53] - 2026-07-04
 ### Added
 - **Σ₀ live benchmark runner (`experiments/sigma0_live_bench.py`).** Scores real frontier LLMs on the 159-record golden dataset with the same prompt/parser/scorer (OpenAI-compatible + Gemini REST + Anthropic). Live result: **GPT-4o-mini golden 0.95, confabulation 0.0%** (declined on all 42 negatives — never asserted an open conjecture/refuted claim as fact), over-abstention ~5%. Grok/Mistral/Anthropic-key/DeepSeek unavailable (account-side: xAI credits, invalid keys, zero balance); Gemini free-tier rate-limited beyond a timebox. Strengthens **Verify**.
