@@ -1,3 +1,7 @@
+## [1.8.61] - 2026-07-04
+### Fixed
+- **The `✓ Σ₀ grounded` badge no longer lights up on self-declared-ungrounded replies (#1924).** A reply whose own text disclaims grounding ("I don't have direct access… I'll create a placeholder entry") still carried the green grounded badge, because the Σ₀ council stamped `grounded` via `low_delta` (the two faces merely agreed) while hedging kept the 42-state risk low — absence of disagreement treated as presence of evidence, the move the collapse certificate forbids (§2). `lib/groundedness-canary.js` adds a high-precision `selfUngrounded` detector (no-access / placeholder / assumption admissions, first-person framed) and `lib/council-review.js` routes a self-disclaimed reply to the honest `seam_open` verdict instead of `grounded`. Genuinely anchored/executed replies are unaffected. Tests: `test/council-review.test.js` (+3), `test/groundedness-canary.test.js` (+4). Strengthens **Verify**. See `changelog.d/1924-grounded-badge-honesty.md`.
+
 ## [1.8.60] - 2026-07-04
 ### Added
 - **Per-model calibrated surprise-intervene trigger (ADR-0017, #1940).** The intervention controller (`lib/surprise-intervene.js`) previously used a fixed 5 bits/token window-mean gate, but small local models run < 1 bit/token (qwen2.5-coder halluc/correct midpoint ≈1.09, mistral ≈0.34), so the gate never fired on exactly the local models it exists to backstop — the same magnitude bug #1681 fixed for the uncertainty scalar. The trigger is now per-model calibrated. Covered by `test/surprise-intervene-calibration.test.js`. Strengthens **Verify**.

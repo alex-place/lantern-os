@@ -111,6 +111,15 @@ function councilReview(reply, opts = {}) {
   if (exec) {
     if (exec.passed) { verdict = "grounded"; recommend = "answer"; groundedBy = "execution"; }
     else { verdict = "refuted"; recommend = "retry"; groundedBy = "execution"; } // wrong, with proof
+  } else if (!contested && grounded.selfUngrounded) {
+    // #1924: the reply EXPLICITLY disclaims grounding (no access / placeholder /
+    // assumption). Low delta means the two faces agree, NOT that evidence was
+    // attached — self-consistency is not grounding (SIGMA0-COLLAPSE-CERTIFICATE §2).
+    // Never stamp "✓ Σ₀ grounded" on a self-declared-ungrounded reply; route it to the
+    // honest unverified state (seam_open when the operator is reachable, else pin).
+    verdict = reachable ? "seam_open" : "pin";
+    recommend = reachable ? "escalate" : "name_unknown";
+    groundedBy = "none";
   } else if (!contested) {
     verdict = "grounded"; recommend = "answer";
     groundedBy = grounded.anchored ? "anchor" : "low_delta";
