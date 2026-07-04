@@ -227,6 +227,9 @@
       <div class="local-toggle" id="local-toggle-wrap">
         New here? <a id="local-toggle">Create an account</a>
       </div>
+      <div class="local-toggle" id="forgot-wrap">
+        <a id="forgot-link">Forgot password?</a>
+      </div>
     </div>
 
     <div class="auth-divider">support</div>
@@ -439,9 +442,26 @@
     }
   }
 
+  async function requestPasswordReset() {
+    const email = (document.getElementById("local-email").value || "").trim()
+      || (prompt("Enter your account email to reset your password:") || "").trim();
+    if (!email) return;
+    const errEl = document.getElementById("local-error");
+    try {
+      await fetch("/api/auth/request-password-reset", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch (_) { /* swallow — response is intentionally uniform */ }
+    // Uniform response (no account enumeration).
+    errEl.style.color = "var(--accent)";
+    errEl.textContent = `If an account exists for ${email}, a reset link is on its way.`;
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     setLocalMode("login");
     document.getElementById("local-form").addEventListener("submit", submitLocal);
+    document.getElementById("forgot-link").addEventListener("click", requestPasswordReset);
     checkSession();
   });
 </script>

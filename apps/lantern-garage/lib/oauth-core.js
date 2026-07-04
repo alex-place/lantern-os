@@ -17,9 +17,11 @@ const { getProvider, resolveRole } = require("./auth-providers");
 const {
   getOrCreateFromIdentity,
   getProfileByIdentity,
+  getProfile,
   linkIdentity,
   publicProfile,
 } = require("./user-profiles");
+const { sendNewSignInEmail } = require("./mailer");
 const { establishSession } = require("./session-identity");
 
 const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
@@ -252,6 +254,11 @@ async function handleOAuthCallback(providerId, req, res, query) {
         return res.end();
       }
       linkIdentity(linkTo, providerId, user.providerId, user.email, user.emailVerified === true);
+      // Security notice: a new sign-in method was added to the account.
+      const acct = getProfile(linkTo);
+      if (acct && acct.email) {
+        sendNewSignInEmail(acct.email, acct.name, provider.displayName || providerId).catch(() => {});
+      }
       res.writeHead(302, {
         "Set-Cookie": clearCookie,
         Location: `/profile.html?linked=${providerId}`,
@@ -259,7 +266,12 @@ async function handleOAuthCallback(providerId, req, res, query) {
       return res.end();
     }
 
-    const { profile } = getOrCreateFromIdentity(providerId, user, role);
+    const { profile, linked } = getOrCreateFromIdentity(providerId, user, role);
+    // Auto-linked into an existing account (verified-email match) = a new sign-in
+    // method on an existing account → notify the owner.
+    if (linked && profile && profile.email) {
+      sendNewSignInEmail(profile.email, profile.name, provider.displayName || providerId).catch(() => {});
+    }
 
     // Resolve returnTo from the OLD session/cookie BEFORE regenerating the session
     // (regeneration drops the one-time flow state, which is what we want).

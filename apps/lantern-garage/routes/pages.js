@@ -12,6 +12,7 @@ const { isPageDisabled } = require("../lib/feature-flags");
 const PUBLIC_PAGES = {
   "/auth.html":           "auth.html",
   "/auth":                "auth.html",
+  "/reset-password.html": "reset-password.html",
   "/":                    "index.html",
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",

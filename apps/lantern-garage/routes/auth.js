@@ -17,6 +17,35 @@ const { getSessionUser } = require("../lib/session-identity");
 const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
 const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
+const { createToken, verifyToken } = require("../lib/auth-tokens");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("../lib/mailer");
+const {
+  getProfile,
+  getProfileByEmail,
+  updateProfile,
+  setLocalPassword,
+} = require("../lib/user-profiles");
+
+// Absolute origin of the current request (honors the tunnel's forwarded proto).
+function originOf(req) {
+  const host = (req.headers && req.headers.host) || "127.0.0.1";
+  const proto =
+    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
+    (req.socket && req.socket.encrypted ? "https" : "http");
+  return `${proto}://${host}`;
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
+    req.on("error", () => resolve(null));
+  });
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD = 8;
 
 const START_RE = /^\/api\/auth\/([a-z]+)\/start$/;
 const CALLBACK_RE = /^\/api\/auth\/([a-z]+)\/callback$/;
@@ -90,6 +119,69 @@ module.exports = async function authRoutes(req, res, url, deps) {
   if (method === "POST" && path === "/api/auth/logout") {
     handleLogout(req, res);
     return true;
+  }
+
+  // GET /api/auth/verify-email?token=… — confirm an email address (new account or
+  // a pending email change). Applies the pending email if the token carries one.
+  if (method === "GET" && path === "/api/auth/verify-email") {
+    const payload = verifyToken(url.searchParams.get("token"), "verify_email");
+    if (!payload) {
+      res.writeHead(302, { Location: "/profile.html?verify=invalid" });
+      return res.end();
+    }
+    const profile = getProfile(payload.sub);
+    if (!profile) {
+      res.writeHead(302, { Location: "/profile.html?verify=invalid" });
+      return res.end();
+    }
+    const updates = { emailVerified: true, pendingEmail: null };
+    // If the token was minted for a pending email change, apply it now (unless
+    // someone else claimed that email in the meantime).
+    if (payload.email && payload.email !== profile.email) {
+      const clash = getProfileByEmail(payload.email);
+      if (clash && clash.id !== profile.id) {
+        res.writeHead(302, { Location: "/profile.html?verify=email_taken" });
+        return res.end();
+      }
+      updates.email = payload.email;
+    }
+    updateProfile(profile.id, updates);
+    res.writeHead(302, { Location: "/profile.html?verify=1" });
+    return res.end();
+  }
+
+  // POST /api/auth/request-password-reset { email } — always 200 (no account
+  // enumeration); sends a reset link only if a local-capable account exists.
+  if (method === "POST" && path === "/api/auth/request-password-reset") {
+    const b = await readJsonBody(req);
+    const email = String((b && b.email) || "").trim().toLowerCase();
+    if (EMAIL_RE.test(email)) {
+      const profile = getProfileByEmail(email);
+      if (profile) {
+        const token = createToken("reset_password", profile.id, profile.email);
+        const link = `${originOf(req)}/reset-password.html?token=${encodeURIComponent(token)}`;
+        sendPasswordResetEmail(profile.email, profile.name, link).catch(() => {});
+      }
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // POST /api/auth/reset-password { token, newPassword }
+  if (method === "POST" && path === "/api/auth/reset-password") {
+    const b = await readJsonBody(req);
+    if (!b) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_json" })); }
+    const payload = verifyToken(b.token, "reset_password");
+    if (!payload) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_or_expired" })); }
+    const newPassword = String(b.newPassword || "");
+    if (newPassword.length < MIN_PASSWORD) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "weak_password", detail: `min ${MIN_PASSWORD} chars` }));
+    }
+    if (!getProfile(payload.sub)) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
+    setLocalPassword(payload.sub, newPassword);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true }));
   }
 
   return false;

@@ -640,6 +640,9 @@ function verifyLocalLogin(email, plaintext) {
 function publicProfile(profile) {
   if (!profile) return profile;
   const { credential, ...safe } = profile;
+  // Never expose the password hash, but tell the client whether one exists so the
+  // settings UI can require the current password (vs. "set a password").
+  safe.hasPassword = !!credential;
   return safe;
 }
 
