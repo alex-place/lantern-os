@@ -92,6 +92,18 @@ const landingPage = args.page || process.env.UNISONA_LANDING_PAGE || "/";
 const openBrowser = !args["no-open"] && process.env.UNISONA_NO_OPEN !== "1";
 const readyTimeoutMs = Number(process.env.UNISONA_READY_TIMEOUT_MS || 45_000);
 
+// Auto-update (packaged app only): keep the on-disk Core code in sync with GitHub
+// master, downloading ONLY the changed files (a delta, not the whole installer).
+// Staged in the background, applied at the next startup before the Core runs.
+// Disable with UNISONA_NO_UPDATE=1.
+const autoUpdate = isSea && process.env.UNISONA_NO_UPDATE !== "1";
+const installRoot = isSea ? path.dirname(process.execPath) : serverDir;
+function loadUpdater() {
+  // The launcher is a SEA — plain require can't reach an external file, so use
+  // createRequire against the on-disk app tree.
+  return require("node:module").createRequire(serverEntry)(path.join(serverDir, "lib", "desktop-updater.js"));
+}
+
 let child = null;
 let shuttingDown = false;
 let coreReady = false;
@@ -106,6 +118,14 @@ let coreReady = false;
         `Set UNISONA_SERVER_DIR to the folder that contains server.js.`
     );
     return;
+  }
+
+  // Apply any update staged on a previous run BEFORE the Core loads its code.
+  if (autoUpdate) {
+    try {
+      const n = loadUpdater().applyPending(installRoot);
+      if (n) console.log(`[unisona] Applied ${n} updated file(s).`);
+    } catch (e) { console.warn(`[unisona] update apply skipped: ${e.message}`); }
   }
 
   const port = args.port ? Number(args.port) : await findFreePort(host);
@@ -163,6 +183,22 @@ let coreReady = false;
     }
   } else {
     console.log(`[unisona] Open this URL in your browser (auto-open disabled):\n    ${openUrl}`);
+  }
+
+  // Background: check master for a newer Core and stage the changed files (delta) for
+  // the next launch. Never blocks the running app; failures are silent-ish.
+  if (autoUpdate) {
+    setTimeout(() => {
+      try {
+        loadUpdater().checkAndStage(installRoot, (err, r) => {
+          if (err) return console.warn(`[unisona] update check failed: ${err.message}`);
+          if (r && r.downloaded) {
+            console.log(`[unisona] Staged update — ${r.downloaded} file(s), applies on next launch.` +
+              (r.needsFullUpdate ? " (A full installer update is also available.)" : ""));
+          }
+        });
+      } catch (e) { console.warn(`[unisona] update check skipped: ${e.message}`); }
+    }, 5000);
   }
 })().catch((err) => fail(err && err.stack ? err.stack : String(err)));
 
