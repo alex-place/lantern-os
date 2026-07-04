@@ -95,6 +95,15 @@
     }
     .auth-error.show { display: block; }
     .field-error { color: #f87171; font-size: 12px; min-height: 14px; }
+    /* Success / info banner (email confirmation) */
+    .auth-notice {
+      display: none; margin-bottom: 16px; padding: 11px 14px; border-radius: 12px;
+      border: 1px solid color-mix(in srgb, #34d399 45%, transparent);
+      background: color-mix(in srgb, #34d399 12%, transparent);
+      color: #bbf7d0; font-size: 13px; line-height: 1.5;
+    }
+    .auth-notice.show { display: block; }
+    .auth-notice a { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
     /* Provider (OAuth) buttons */
     .auth-actions { display: flex; flex-direction: column; gap: 8px; }
@@ -210,6 +219,7 @@
     </p>
 
     <div class="auth-error" id="auth-error" role="alert"></div>
+    <div class="auth-notice" id="auth-notice" role="status"></div>
 
     <!-- OAuth provider buttons — rendered from the configured providers (ADR-0016) -->
     <div class="auth-actions" id="provider-buttons"></div>
@@ -338,15 +348,41 @@
     el.textContent = msg;
     el.classList.add("show");
   }
+  // Success/info banner. `html` may include a data-resend link.
+  function showNotice(html) {
+    const el = document.getElementById("auth-notice");
+    el.innerHTML = html;
+    el.classList.add("show");
+    const rs = el.querySelector("[data-resend]");
+    if (rs) rs.addEventListener("click", (e) => { e.preventDefault(); resendVerification(rs.getAttribute("data-resend")); });
+  }
+  function hideNotice() { document.getElementById("auth-notice").classList.remove("show"); }
+  function _safeEmail(s) { return String(s).replace(/["'<>&]/g, ""); }
   function surfaceQueryError() {
     try {
       const q = new URLSearchParams(location.search);
+      // Email-confirmation result (verify-email redirects here when signed out).
+      const v = q.get("verify");
+      if (v === "1") showNotice("Email confirmed ✓ — you can sign in now.");
+      else if (v === "invalid") showError("That confirmation link is invalid or has expired. Sign in and we can resend it.");
       const err = q.get("error");
       if (!err) return;
       const provider = q.get("provider");
       const base = ERROR_TEXT[err] || "Sign-in error.";
       showError(provider ? `${base} (${provider})` : base);
     } catch (_) {}
+  }
+
+  async function resendVerification(email) {
+    hideNotice();
+    try {
+      await fetch("/api/auth/resend-verification", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch (_) {}
+    showNotice("Confirmation email re-sent to <strong>" + _safeEmail(email) + "</strong>. Check your inbox.");
   }
 
   // ── Local email + password ──
@@ -395,7 +431,29 @@
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        // Registration is gated on email confirmation — do NOT navigate; show a
+        // "check your email" notice with a resend link instead.
+        if (data.pendingVerification) {
+          const dev = data.emailDelivery === "logged"
+            ? " (No mail server is configured here, so the link was written to the server log.)"
+            : "";
+          showNotice(
+            "Almost there — we sent a confirmation link to <strong>" + _safeEmail(email) +
+            "</strong>. Click it, then sign in." + dev +
+            ' <a href="#" data-resend="' + _safeEmail(email) + '">Resend</a>'
+          );
+          setLocalMode("login");
+          return;
+        }
         location.href = safeReturnTo();
+        return;
+      }
+      // Unconfirmed email → sign-in blocked, offer a resend.
+      if (data.error === "email_unverified") {
+        showNotice(
+          "Please confirm your email before signing in." +
+          ' <a href="#" data-resend="' + _safeEmail(email) + '">Resend confirmation</a>'
+        );
         return;
       }
       const map = {
