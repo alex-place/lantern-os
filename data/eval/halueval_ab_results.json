@@ -1,0 +1,12 @@
+{
+  "benchmark": "HaluEval-QA (RUCAIBox/HaluEval)",
+  "model": "gpt-4o-mini",
+  "n": 40,
+  "grading": "deterministic normalized-contains of gold right_answer",
+  "baseline_hallucination_rate": 0.55,
+  "grounded_hallucination_rate": 0.2,
+  "relative_reduction": 0.636,
+  "accept_gate_>=0.20": true,
+  "baseline_correct": 18,
+  "grounded_correct": 32
+}
