@@ -13,7 +13,6 @@ const { getRouter } = require("../lib/convergence-router");
 const convergenceAgent = require("../lib/convergence-agent");
 const { sendJson, collectRequestBody } = require("../lib/http-utils");
 const { appendConversationEntry } = require("../lib/conversation-store");
-const autoDispatch = require("../lib/auto-dispatch");
 const maxConversationTextLength = 2000;
 
 // Turn a raw autowork failure into a grounded, actionable message instead of a bare
@@ -88,33 +87,6 @@ module.exports = async (req, res, url, deps) => {
         cacheHitRatePercent: 70
       }
     }, 200);
-    return true;
-  }
-
-  // GET /api/convergence/auto-dispatch/status — autonomous auto-pull loop status
-  if (pathname === "/api/convergence/auto-dispatch/status" && req.method === "GET") {
-    try {
-      sendJson(res, { ok: true, ...autoDispatch.getStatus() }, 200);
-    } catch (err) {
-      sendJson(res, { ok: false, error: err.message }, 500);
-    }
-    return true;
-  }
-
-  // POST /api/convergence/auto-dispatch/toggle — runtime kill switch { enabled: bool }
-  if (pathname === "/api/convergence/auto-dispatch/toggle" && req.method === "POST") {
-    try {
-      const body = await collectRequestBody(req);
-      const { enabled } = JSON.parse(body || "{}");
-      if (typeof enabled !== "boolean") {
-        sendJson(res, { ok: false, error: "enabled_boolean_required" }, 400);
-        return true;
-      }
-      const now = autoDispatch.setEnabled(enabled);
-      sendJson(res, { ok: true, enabled: now, ...autoDispatch.getStatus() }, 200);
-    } catch (err) {
-      sendJson(res, { ok: false, error: err.message }, 500);
-    }
     return true;
   }
 
@@ -305,7 +277,7 @@ module.exports = async (req, res, url, deps) => {
         }
         runId = newRunId(issueNumber);
         // source + title let the chat UI's background-run watcher label who started
-        // this run (auto-dispatch daemon vs CI/fleet) when it surfaces it in-chat.
+        // this run (a background/CI run vs an interactive chat run) when it surfaces it in-chat.
         step("start", "start", {
           issue: issueNumber, mode: "fleet",
           source: typeof opts.source === "string" ? opts.source.slice(0, 40) : "fleet",
@@ -678,7 +650,7 @@ module.exports = async (req, res, url, deps) => {
   }
 
   // GET /api/convergence/autonomous-work/active — every autowork run currently in
-  // flight, whoever started it (chat, auto-dispatch daemon, CI/fleet). This is the
+  // flight, whoever started it (chat or a background/CI run). This is the
   // Observe surface that makes headless runs visible: the dream-chat background
   // watcher polls it and attaches a live progress panel to any run it didn't start,
   // so autowork always routes through the chat UX instead of running invisibly.
@@ -705,7 +677,7 @@ module.exports = async (req, res, url, deps) => {
       }
       // Terminal = an explicit result/done record, or a phase left in `error` (fleet
       // aborts respond without a result record). Active additionally requires a
-      // heartbeat within the daemon's 40-min wall-clock ceiling (an older silent run
+      // heartbeat within a 40-min wall-clock ceiling (an older silent run
       // is orphaned, not active — don't resurrect it).
       const cutoff = Date.now() - 40 * 60 * 1000;
       const active = [...runs.values()].filter((r) =>

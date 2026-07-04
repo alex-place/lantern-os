@@ -117,7 +117,7 @@ The route architecture is modular. **The authoritative list of what's registered
 
 | File | Routes / Responsibility |
 |------|------------------------|
-| [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) | ~764 lines — loads `.env` + shared deps, wires the `routes[]` array, then **spawns & supervises child processes** (Discord bot, MCP children on 8771/8772, trading microservice, AI trader, Cloudflare tunnel, crypto observer) and in-process collectors/monitors (Kalshi/crypto/news collectors, position monitor, convergence trainer/enhancer/LoRA, auto-dispatch). **Not just glue** — read it when debugging startup/child-process behavior. |
+| [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) | ~764 lines — loads `.env` + shared deps, wires the `routes[]` array, then **spawns & supervises child processes** (Discord bot, MCP children on 8771/8772, trading microservice, AI trader, Cloudflare tunnel, crypto observer) and in-process collectors/monitors (Kalshi/crypto/news collectors, position monitor, convergence trainer/enhancer/LoRA). **Not just glue** — read it when debugging startup/child-process behavior. |
 | [`apps/lantern-garage/routes/status.js`](apps/lantern-garage/routes/status.js) | `/api/health`, `/api/status`, wallet, readiness |
 | [`apps/lantern-garage/routes/rag.js`](apps/lantern-garage/routes/rag.js) | `/api/rag-cache`, flat-rag-house |
 | [`apps/lantern-garage/routes/operator.js`](apps/lantern-garage/routes/operator.js) | `/api/operator-notes`, conversations, actions |

@@ -183,7 +183,6 @@ const ADMIN_ONLY_CONTROL = {
   "/api/gpu-training/dispatch":              "*",  // fire a training job
   "/api/gpu-training/dispatch-all":          "*",
   "/api/gpu-training/poll":                  "*",
-  "/api/convergence/auto-dispatch/toggle":   "*",  // autonomous-fleet kill switch
   "/api/convergence/autonomous-work":        "*",  // run an issue autonomously
   "/api/convergence/autonomous-work/stream": "*",  // SSE autonomous work
   "/api/research/repo/learn":                "*",  // trigger repo→memory learning
@@ -613,16 +612,9 @@ server.listen(port, host, () => {
     console.error("[feature-flags] nav-sync check failed (non-fatal):", e && e.message);
   }
 
-  // ── Gated auto-dispatch: auto-work the backlog into draft PRs (OFF unless AUTO_DISPATCH=1) ──
-  try {
-    require("./lib/auto-dispatch").start({ repoRoot: require("path").resolve(__dirname, "../.."), port });
-  } catch (e) {
-    console.error("[auto-dispatch] failed to start (non-fatal):", e && e.message);
-  }
-
   // ── Boot-time queue reconcile: sweep stale assigned claims ──
-  // auto-dispatch writes a claim file per issue it opens a draft PR for and never
-  // removes it; when the issue later closes the claim lingers and inflates the
+  // A claim file is written per issue an autowork run opens a draft PR for and never
+  // removed; when the issue later closes the claim lingers and inflates the
   // orchestration dashboard's "In Progress" count (75 leaked closed-issue claims was
   // the trigger for this). Sweep closed/stale claims once at boot. Deferred off the
   // critical boot path so the `gh` open-issue lookup never blocks the listen.
