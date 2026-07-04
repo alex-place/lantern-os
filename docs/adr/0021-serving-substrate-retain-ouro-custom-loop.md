@@ -1,9 +1,9 @@
 # ADR-0021: Serving substrate — retain the Ouro/Σ₀ custom transformers loop; reject an engine port; defer a base-model swap
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-04
 - Deciders: Alex Place (approval required per ADR-0001 gate)
-- approved-by: pending
+- approved-by: Alex Place (2026-07-04)
 - Loop stage: Act (model execution) — with Verify/Remember hooks the substrate must preserve
 
 ## Context
