@@ -140,7 +140,7 @@ const deps = {
 // non-entitled account (e.g. Deep Dreamer/founder without trade access) cannot
 // reach /api/trading/* directly. Runs before routes/trading. Admins and the
 // local bypass pass through (see auth-middleware.requireEntitlement).
-const { requireEntitlement } = require("./lib/auth-middleware");
+const { requireEntitlement, isAdmin } = require("./lib/auth-middleware");
 // Read-only market-data GETs with NO account/order state — served to everyone so
 // the logged-out chart view (guest-mode stock-trader.html) renders from the exact
 // same endpoints the live terminal uses (a true 1:1 copy, no duplicated data
@@ -165,8 +165,41 @@ function tradeApiGuard(req, res, url) {
   return true;                                                  // blocked → 403/302 already sent
 }
 
+// ── Orchestration control gate (admin-only) ──────────────────────────────────
+// orchestration.html is a public read-only fleet view (guests + non-admins see
+// status panels only). Its CONTROL endpoints — save provider/GPU keys, dispatch
+// training, toggle the autonomous fleet, run autowork — carry NO auth of their
+// own, so making the page public would otherwise let anyone POST to them. We gate
+// them here to admin (the local owner passes via isLocalBypass; real admin
+// sessions pass). The key GETs are gated too: even masked, they leak which
+// providers are configured. Everything else (Work Board, PR Lanes, Agent Slots,
+// reliance, calibration, rollover) stays public read-only. Order matters: this
+// runs before the route handlers, which have no auth check themselves.
+const ADMIN_ONLY_CONTROL = {
+  // exact-path endpoints → set of methods that require admin ("*" = all methods)
+  "/api/providers/keys":                     "*",  // GET(masked)+POST(save key)
+  "/api/gpu-training/keys":                  "*",  // GET(masked)+POST(save key)
+  "/api/gpu-training/dispatch":              "*",  // fire a training job
+  "/api/gpu-training/dispatch-all":          "*",
+  "/api/gpu-training/poll":                  "*",
+  "/api/convergence/auto-dispatch/toggle":   "*",  // autonomous-fleet kill switch
+  "/api/convergence/autonomous-work":        "*",  // run an issue autonomously
+  "/api/convergence/autonomous-work/stream": "*",  // SSE autonomous work
+  "/api/research/repo/learn":                "*",  // trigger repo→memory learning
+};
+function orchestrationControlGuard(req, res, url) {
+  const rule = ADMIN_ONLY_CONTROL[url.pathname];
+  if (!rule) return false;                         // not a controlled endpoint → continue
+  if (rule !== "*" && rule !== req.method) return false;
+  if (isAdmin(req)) return false;                  // admin / local owner → allow
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "admin_required", detail: "Orchestration control is admin-only." }));
+  return true;                                      // blocked
+}
+
 const routes = [
   tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement
+  orchestrationControlGuard,            // gate orchestration control endpoints to admin
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)

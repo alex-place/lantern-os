@@ -15,7 +15,11 @@
   // SAME terminal in read-only "guest mode" — charts + watchlist + market data, no
   // trading actions. So it must NOT bounce here, and is NOT a TRADE_PAGE (a
   // logged-in non-trade user should see the read-only view, not be sent home).
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html'];
+  // /orchestration.html is public read-only too: guests/non-admins see the fleet
+  // STATUS panels; the control panels (keys, training, auto-pull) are hidden via
+  // body.is-guest and their endpoints are admin-gated server-side. So it must not
+  // bounce here either.
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/trading.html', '/trading-news.html', '/kalshi-terminal.html'];
   const pathname = window.location.pathname;
@@ -147,6 +151,13 @@
       updateNav(session);
       wireLogout();
       applyAdminControls(session);
+      // Expose auth state to page CSS. `is-admin` reveals admin-only control
+      // panels (e.g. orchestration keys/training/auto-pull); `is-guest` marks a
+      // logged-out visitor so pages can show a read-only banner. Both default to
+      // the safe (locked-down) state until the session resolves.
+      const isAdminUser = !!(session && session.authenticated && session.role === 'admin');
+      document.body.classList.toggle('is-admin', isAdminUser);
+      document.body.classList.toggle('is-guest', !(session && session.authenticated));
       const canTrade = !!(session && session.entitlements && session.entitlements.trade);
       if (!canTrade) hideTradeNav();
       // When an admin disables the Patreon gate (server reports authRequired:false),

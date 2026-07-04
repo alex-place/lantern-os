@@ -224,6 +224,25 @@
     .ap-guard { font-size: 0.66rem; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
     .ap-hist-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; margin-bottom: 4px; font-size: 0.78rem; }
     .ap-hist-row .ok { color: var(--green); } .ap-hist-row .no { color: #f87171; }
+
+    /* ── Read-only guest mode ──────────────────────────────────────────────
+       auth-gate.js tags <body> with .is-admin / .is-guest once the session
+       resolves. Admin-only control panels (keys, training, auto-pull) are hidden
+       for everyone EXCEPT admins, so a logged-out / non-admin visitor sees only
+       the read-only fleet status. Hidden by default (no class yet) so secrets
+       never flash before the session check completes. */
+    .admin-only { display: none; }
+    body.is-admin .admin-only { display: block; }
+    .guest-banner { display: none; }
+    body.is-guest .guest-banner {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin: 0 0 14px; padding: 11px 16px; border-radius: 12px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      color: var(--text); font-size: 0.86rem;
+    }
+    .guest-banner a { color: var(--accent); font-weight: 700; text-decoration: none; }
+    .guest-banner a:hover { text-decoration: underline; }
   </style>
   <title>Orchestration — unisona.ai</title>
 </head>
@@ -251,6 +270,12 @@
 <main class="orch-main" id="main-content">
 
   <h1 class="visually-hidden">Orchestration — Control Center</h1>
+
+  <!-- ── Read-only guest banner (shown only to logged-out visitors) ── -->
+  <div class="guest-banner" role="status">
+    <span>👁️ <strong>Read-only view.</strong> You're seeing live fleet status. Sign in as an admin to control training, keys, and the autonomous fleet.</span>
+    <a href="/auth.html?returnTo=%2Forchestration.html" style="margin-left:auto;">Sign in →</a>
+  </div>
 
   <!-- ── Slim status line ── -->
   <div class="orch-status">
@@ -297,7 +322,7 @@
   </section>
 
   <!-- ── Auto-Pull Fleet (opt-in autonomous loop) ── -->
-  <section class="panel" id="autoPullPanel">
+  <section class="panel admin-only" id="autoPullPanel">
     <h2>🤖 Auto-Pull Fleet <span class="section-meta" id="autoPullMeta">opt-in autonomous loop</span>
       <label class="ap-switch" style="margin-left:auto;" title="Kill switch — flip off any time">
         <input type="checkbox" id="autoPullToggle" onchange="toggleAutoPull(this.checked)" aria-label="Toggle the autonomous auto-pull loop">
@@ -326,7 +351,7 @@
   </section>
 
   <!-- ── Training Control (primary action) ── -->
-  <section class="panel">
+  <section class="panel admin-only">
     <h2>⚡ Training Control <span class="section-meta" id="trainSummary"></span></h2>
     <p class="panel-sub">Fire a self-improvement run on the free GPU providers. <b>Start</b> fans out to every automatable provider with quota; or dispatch one provider at a time.</p>
     <button class="train-start-btn" id="startTrainBtn" onclick="startTraining()">▶ Start Training Now — all providers</button>
@@ -340,7 +365,7 @@
   </section>
 
   <!-- ── GPU Account Keys (editable) ── -->
-  <section class="panel">
+  <section class="panel admin-only">
     <h2>🖥️ GPU Account Keys <span class="section-meta" id="gpuKeysSummary"></span>
       <button class="btn-secondary" onclick="renderGpuKeys()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
     </h2>
@@ -349,7 +374,7 @@
   </section>
 
   <!-- ── AI Providers (keys + fallback chains, merged) ── -->
-  <section class="panel">
+  <section class="panel admin-only">
     <h2>🔑 AI Providers <span class="section-meta" id="providerKeysSummary"></span>
       <button class="btn-secondary" onclick="refreshProviderStatus()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
     </h2>
