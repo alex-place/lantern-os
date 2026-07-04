@@ -329,9 +329,13 @@ If you check "no" for any of these, you have a Σ₀ paradox. Create a GitHub is
 
 ## Quality Gates & Automated Hooks (Critical)
 
-All agent commits are subject to **four automated quality checks** via git pre-commit hooks. See [`docs/HOOKS.md`](docs/HOOKS.md) for full reference.
+Commits and pushes run **repo-managed git hooks** — `core.hooksPath` points git at
+the tracked `scripts/hooks/`, auto-installed on `npm install` (`make hooks` to do it
+by hand). The default gate is a per-lane workstream + slop scan at **commit**, and
+the change-record, stale-clobber, and **new-surface sprawl tripwire** gates at
+**push**. See [`docs/HOOKS.md`](docs/HOOKS.md) for the full reference.
 
-### Four-Layer Validation (Automatic on Every Commit)
+### Additional validators (via `pre-commit-full-validation` / manual)
 
 | Validator | Enforces | Skip with |
 |-----------|----------|-----------|

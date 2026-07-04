@@ -7,6 +7,8 @@
   "scripts": {
     "setup": "node scripts/ensure-rust.js && node scripts/build-csf-rust.js",
     "postinstall": "npm run setup",
+    "prepare": "node scripts/setup-hooks.mjs",
+    "hooks": "node scripts/setup-hooks.mjs",
     "start": "node apps/lantern-garage/server.js",
     "dev": "node apps/lantern-garage/server.js",
     "convergance": "bash scripts/git-convergance-loop.sh foreground",
