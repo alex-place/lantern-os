@@ -462,6 +462,19 @@ function hideEmptyState() {
   if (el) el.style.display = 'none';
 }
 
+// #1926: route/model developer chrome is opt-in. ON when the operator sets
+// localStorage `lantern_chat_debug` = "1" (persists), or appends ?debug=1 to the URL
+// (one-off, also persists it so a refresh keeps it). OFF for every normal user, so
+// the default reply footer is just "Unisona · chat · <time>", no route internals.
+function debugChromeOn() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('debug') === '1') { localStorage.setItem('lantern_chat_debug', '1'); return true; }
+    if (params.get('debug') === '0') { localStorage.removeItem('lantern_chat_debug'); return false; }
+    return localStorage.getItem('lantern_chat_debug') === '1';
+  } catch { return false; }
+}
+
 function addUserBubble(text) {
   hideEmptyState();
   const container = document.getElementById('messages');
@@ -2412,7 +2425,13 @@ async function sendMessage(opts = {}) {
       }
       const routeTitle = routeReasonText ? ` title="routed: ${esc(routeReasonText)}"` : '';
       const routeDebug = routeReasonText ? `<div style="margin-top:2px">route: ${esc(routeReasonText)}</div>` : '';
-      if (pm) {
+      // #1926: the provider/model + route-reason disclosure is developer chrome — it
+      // reads as "debug route" internals to a normal user. Keep it available for
+      // operators (#1554 made routing observable on purpose) but OFF by default: render
+      // it only when the debug toggle is set (localStorage `lantern_chat_debug` = "1",
+      // or ?debug=1 on the URL). The visible label + swap chip (the cockpit "which model"
+      // signal) always show; only the route internals are gated.
+      if (pm && debugChromeOn()) {
         // Wrap provider/model + route reason in a disclosure so it's accessible but
         // not noisy; the visible label carries the reason as a hover tooltip (#1554).
         sig.innerHTML =
