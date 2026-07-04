@@ -81,6 +81,11 @@ if (isSea) {
   } catch { /* logging is best-effort; never block boot on it */ }
 }
 
+// The dedicated Edge/Chrome profile our app window uses. Isolating it (a) keeps the
+// window out of the user's normal browser session, and (b) gives us a stable marker
+// to detect when the window is really closed (see watchAppWindow).
+const appProfileDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unisona", "app-profile");
+
 // ── Configuration ───────────────────────────────────────────────────────────
 const args = parseArgs(process.argv.slice(2));
 const host = "127.0.0.1"; // loopback only — never exposed
@@ -141,11 +146,13 @@ let shuttingDown = false;
   if (openBrowser) {
     const appProc = openAppWindow(openUrl);
     if (appProc) {
-      // Dedicated app-window process: when the user closes the window, the app quits
-      // (stops the Core), so there's no orphaned headless server and no console to
-      // Ctrl+C. If the browser daemonized (appProc exits immediately while the window
-      // lives), we simply keep running — no worse than a browser tab.
-      appProc.on("exit", () => { if (!shuttingDown) shutdown("app window closed"); });
+      // Do NOT tie shutdown to the process we spawned: when Edge/Chrome is already
+      // running, it hands our window to the existing browser and the spawned process
+      // exits IMMEDIATELY — which would look like "window closed" and kill the Core
+      // out from under a live window (the ERR_CONNECTION_REFUSED bug). Instead, watch
+      // for any browser process still using our dedicated profile; the app quits only
+      // when the real window is gone. No console to Ctrl+C, no orphaned headless server.
+      watchAppWindow(appProfileDir);
       console.log("[unisona] Opened the app window.");
     } else {
       console.log("[unisona] Opened your default browser (no app-mode browser found).");
@@ -253,25 +260,22 @@ function findFreePort(h) {
 }
 
 // ── Open the app window (chromeless Edge/Chrome "--app" mode) ────────────────────
-// Returns the spawned browser process (so main() can quit when its window closes),
-// or null if we fell back to the plain default browser (no lifecycle handle).
+// Returns the spawned browser process (truthy) if app mode launched, or null if we
+// fell back to the plain default browser. main() watches the profile (not this
+// process) for the real window-close, so the return value is only a launched/fell-back
+// signal — the spawned process itself often exits right away when Edge is already up.
 function openAppWindow(url) {
-  // A dedicated profile dir makes this a fresh, isolated browser instance we can
-  // wait on — separate from the user's normal Edge/Chrome session and windows.
-  const profileDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unisona", "app-profile");
   const browser = process.platform === "win32" ? findWindowsBrowser() : findUnixBrowser();
   if (browser) {
     const args = [
       `--app=${url}`,
-      `--user-data-dir=${profileDir}`,
+      `--user-data-dir=${appProfileDir}`,
       "--window-size=1280,860",
       "--no-first-run",
       "--no-default-browser-check",
     ];
     try {
-      // NOT detached: with a fresh profile this process owns the window, so its exit
-      // signals the window closed. stdio ignored (windowless).
-      return spawn(browser, args, { stdio: "ignore" });
+      return spawn(browser, args, { stdio: "ignore", windowsHide: true });
     } catch (err) {
       console.warn(`[unisona] app-mode launch failed (${err.message}); falling back to default browser.`);
     }
@@ -308,6 +312,44 @@ function findUnixBrowser() {
        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
     : ["/usr/bin/microsoft-edge", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"];
   return names.find((c) => { try { return fs.existsSync(c); } catch { return false; } }) || null;
+}
+
+// ── Watch the app window (browser-lifecycle-proof) ──────────────────────────────
+// A browser launched with `--user-data-dir=<profile>` keeps at least one process
+// alive (with that profile in its command line) for as long as the window is open —
+// regardless of whether OUR spawned process daemonized. So we poll for any browser
+// process using our profile: once none remain (after the window has actually shown),
+// the user closed it → shut down the Core. Windows-only; elsewhere we just stay up.
+function watchAppWindow(profileDir) {
+  if (process.platform !== "win32") return; // no reliable poll off Windows — leave the Core up
+  let sawOpen = false;
+  let misses = 0;
+  const timer = setInterval(() => {
+    if (shuttingDown) { clearInterval(timer); return; }
+    countBrowsersUsingProfile(profileDir, (n) => {
+      if (n < 0) return;                 // couldn't check this tick — try again
+      if (n > 0) { sawOpen = true; misses = 0; return; }
+      if (!sawOpen) return;              // window hasn't appeared yet — keep waiting
+      if (++misses >= 2) { clearInterval(timer); shutdown("app window closed"); }
+    });
+  }, 3000);
+}
+
+// Count msedge/chrome processes whose command line references our profile dir.
+// Uses PowerShell CIM (windowsHide so no flashing console). n<0 = check failed.
+function countBrowsersUsingProfile(profileDir, cb) {
+  const filter = "name='msedge.exe' or name='chrome.exe' or name='msedgewebview2.exe'";
+  const cmd =
+    `@(Get-CimInstance Win32_Process -Filter "${filter}" | ` +
+    `Where-Object { $_.CommandLine -like '*${profileDir}*' }).Count`;
+  let out = "";
+  try {
+    const ps = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", cmd],
+      { stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+    ps.stdout.on("data", (d) => { out += d; });
+    ps.on("error", () => cb(-1));
+    ps.on("close", () => cb(Number.parseInt(String(out).trim(), 10) || 0));
+  } catch { cb(-1); }
 }
 
 // ── Graceful shutdown (kills the whole child tree) ──────────────────────────────
