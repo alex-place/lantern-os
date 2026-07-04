@@ -2,9 +2,14 @@ const path = require("path");
 const { appendJsonlQueued, readJsonl, rotateJsonlIfNeeded } = require("./file-queue");
 const { redactPII } = require("./redact");
 
+const { dataRoot, stateRoot } = require("./app-paths");
+// #1946 G2: writable state roots at dataRoot() — <repoRoot>/data on servers
+// (unchanged), %APPDATA%\unisona\data on the desktop app. readJsonl paths are made
+// relative to stateRoot() (not repoRoot) so reads resolve through file-queue's
+// data/-aware anchor in both profiles.
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
-const conversationLogPath = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
-const operatorNotesPath = path.join(repoRoot, "data", "operator-notes", "notes.jsonl");
+const conversationLogPath = path.join(dataRoot(), "conversations", "garage-conversations.jsonl");
+const operatorNotesPath = path.join(dataRoot(), "operator-notes", "notes.jsonl");
 const maxConversationTextLength = 4000;
 // #771 — bound the append-only conversation log. Rotate to timestamped archives past the
 // size cap and keep only the most recent N. Tunable via env.
@@ -97,7 +102,7 @@ function readConversationLog(limit = 50, sessionId = null) {
   // When scoped to a session, read a bounded larger window then filter,
   // so the last `limit` *session* turns survive interleaving from other sessions.
   const window = sessionId ? 2000 : limit;
-  const all = readJsonl(path.relative(repoRoot, conversationLogPath), window)
+  const all = readJsonl(path.relative(stateRoot(), conversationLogPath), window)
     .filter((entry) => !entry.parseError);
   if (!sessionId) return all;
   return all.filter((entry) => entry.sessionId === sessionId).slice(-limit);
@@ -135,14 +140,14 @@ function normalizeRagCacheItem(input) {
 
 async function appendExternalRagItem(input) {
   const record = normalizeRagCacheItem(input);
-  const cachePath = path.join(repoRoot, "data", "rag-intake", "external-llm-web-cache", "cache.jsonl");
+  const cachePath = path.join(dataRoot(), "rag-intake", "external-llm-web-cache", "cache.jsonl");
   await appendJsonlQueued(cachePath, record);
   return record;
 }
 
 function readOperatorQueue() {
   const items = [];
-  const notes = readJsonl(path.relative(repoRoot, operatorNotesPath), 50).filter(n => !n.parseError);
+  const notes = readJsonl(path.relative(stateRoot(), operatorNotesPath), 50).filter(n => !n.parseError);
   for (const note of notes) {
     items.push({ type: "note", title: note.text, priority: note.priority || "P2", owner: "operator", source: "local", createdAt: note.createdAt });
   }
