@@ -561,6 +561,45 @@ const REGISTRY = {
       return lines.join("\n");
     },
   },
+  // ── real binary export (#1923): Markdown → downloadable .docx / .pdf / .xlsx / .pptx ──
+  // generate_document (above) only renders the template library to HTML/Markdown in the
+  // workspace — it CANNOT make a Word file, so the model used to flatly refuse "export it
+  // as a word doc" despite the capability existing (document-builder.js, #1237). This tool
+  // exposes that real generator to chat: it takes the content the model already wrote
+  // (Markdown) and renders a true binary via the docx/exceljs/pptxgenjs libs, returning a
+  // clickable download link. Use it when the user asks to export/download something AS a
+  // specific file type (Word/.docx, PDF, Excel/.xlsx, PowerPoint/.pptx).
+  export_document: {
+    policy: "mutating",
+    desc: 'Export already-written content to a downloadable FILE and return a download link. Use when the user asks to "export as a word doc", "download as PDF", "make it a .docx/.xlsx/.pptx", etc. content: the document body in Markdown (headings, lists, and one table → a spreadsheet/slides). format: "docx" | "pdf" | "xlsx" | "pptx" | "html" | "md". title: optional document title. Returns a Markdown download link the user can click. Operator only.',
+    schema: {
+      type: "object",
+      properties: {
+        content: { type: "string", description: "The document body as Markdown (draft it from the conversation — do NOT ask the user to paste it)." },
+        format: { type: "string", enum: ["docx", "pdf", "xlsx", "pptx", "html", "md"], description: 'Target file type (e.g. "docx" for a Word document).' },
+        title: { type: "string", description: "Optional document title (defaults to the first H1 or 'document')." },
+      },
+      required: ["content", "format"],
+    },
+    async run(i) {
+      const content = String(i.content == null ? "" : i.content).trim();
+      if (!content) return "[error: content is required — draft the document body as Markdown first]";
+      const format = String(i.format || "").toLowerCase();
+      const { generateDocument } = require("./document-builder");
+      let result;
+      try {
+        result = await generateDocument({ markdown: content, title: String(i.title || ""), format });
+      } catch (e) {
+        return `[export_document error: ${e.message || String(e)}]`;
+      }
+      if (!result || !result.ok) {
+        return `[export_document failed: ${(result && result.error) || "unknown error"}]`;
+      }
+      // Chat renders Markdown → the link is clickable and downloads the real file.
+      return `Exported **${result.title}** as ${format.toUpperCase()} (${result.bytes} bytes).\n\n`
+        + `[⬇ Download ${result.filename}](${result.url})`;
+    },
+  },
   // ── workspace tools (ADR-0008 §Decision 4): user-artifact area outside the repo ────
   // User artifacts (resumes, exports, generated docs) are written to WORKSPACE, never into
   // the repo. Each tool uses _safeWs() to reject path-escape attempts before touching disk.
