@@ -2735,8 +2735,22 @@ async function handleStreamChat(req, url, res) {
           },
         }, (upstream) => {
           if (upstream.statusCode !== 200) {
-            upstream.resume();
-            reject(new Error(`anthropic_status_${upstream.statusCode}`));
+            // Read (don't discard) the error envelope so the REAL reason — e.g.
+            // Anthropic's "credit balance too low" — reaches the server log. The
+            // reject code stays the clean `anthropic_status_<code>` the cascade,
+            // provider-router, and humanError() key off (parity with the non-stream
+            // dispatch, which now surfaces the same detail to the client).
+            const _sc = upstream.statusCode;
+            let eb = "";
+            upstream.on("data", (c) => { if (eb.length < 2048) eb += c.toString(); });
+            upstream.on("end", () => {
+              let type = `http_${_sc}`, msg = "";
+              try { const e = JSON.parse(eb).error; if (e) { type = e.type || e.status || type; msg = e.message || ""; } }
+              catch { msg = eb.slice(0, 200); }
+              console.error(`[stream-chat] anthropic status=${_sc} type=${type} — ${msg}`);
+              reject(new Error(`anthropic_status_${_sc}`));
+            });
+            upstream.on("error", () => reject(new Error(`anthropic_status_${_sc}`)));
             return;
           }
           let buf = "";
