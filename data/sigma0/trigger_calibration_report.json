@@ -1,0 +1,547 @@
+{
+  "issue": 1990,
+  "claim_class_before": "HEURISTIC (SS2: 'a definition, not a consequence')",
+  "claim_class_after": "MEASURED (calibrated detector; this report)",
+  "ground_truth": "spectral collapse regime = A_s has a null eigenmode (manifold exists) AND all active modes stable; computed by eigh(A_s), independent of the trigger",
+  "n_samples": 960,
+  "confusion": {
+    "tp": 20,
+    "fp": 0,
+    "tn": 720,
+    "fn": 220
+  },
+  "precision": 1.0,
+  "recall": 0.0833,
+  "f1": 0.1538,
+  "accuracy": 0.7708,
+  "per_regime_firing": {
+    "rankdef_stable": {
+      "truth_collapse_fraction": 0.5,
+      "fired_rate": 0.0625,
+      "n": 320
+    },
+    "fullrank_stable": {
+      "truth_collapse_fraction": 0.0,
+      "fired_rate": 0.0,
+      "n": 160
+    },
+    "rankdef_diverge": {
+      "truth_collapse_fraction": 0.0,
+      "fired_rate": 0.0,
+      "n": 160
+    },
+    "fullrank_diverge": {
+      "truth_collapse_fraction": 0.0,
+      "fired_rate": 0.0,
+      "n": 160
+    },
+    "rotation_marginal": {
+      "truth_collapse_fraction": 0.5,
+      "fired_rate": 0.0,
+      "n": 160
+    }
+  },
+  "interpretation": "SOUND but CONSERVATIVE. Precision 1.0 (0 false-fires over 720 off-regime samples) MEASURES the SS2 forward assumption trigger=>collapse-regime on this distribution: the four-signal AND never fires outside a genuine collapse regime. Low snapshot recall means it is a SUFFICIENT-condition / LATE detector -- it also requires the state, covariance and control to be degenerate, which develop DYNAMICALLY (the regime sweep #658 measures collapse_rate=1.0 over a rollout on the collapse-prone cells). Per-signal, the RANK signal carries the regime discrimination (fires only on-regime); grad/flat gate the operational state, not the spectrum. CAVEAT: these synthetic systems use B=0 (no control authority), so the control-insensitivity signal is trivially satisfied and this run effectively calibrates the grad-and-rank-and-flat sub-gate. This UPGRADES SS2 from bare HEURISTIC to MEASURED (sound sufficient detector); it does NOT make trigger=>alpha<0 a theorem, and the null-manifold is destroyed by non-normality nu>0 (the exact zero eigenvalue of A_s shifts), so the collapse regime is the nu=0 diagonal case -- consistent with the regime sweep.",
+  "sub_lemma_manifold_exists": "PROVEN-by-construction: SemanticCollapseOperator._collapse_state projects onto {v: |lambda(A_s)|<eig_eps}; if that set is empty (A_s nonsingular) it returns the semantic-null BOTTOM, not a projection. So 'a collapse manifold exists' <=> 'A_s is near-singular' is a definitional consequence, not a spectral theorem.",
+  "per_signal_firing_rate": {
+    "grad": {
+      "on_collapse_regime": 0.5,
+      "off_regime": 0.5
+    },
+    "rank": {
+      "on_collapse_regime": 0.3333,
+      "off_regime": 0.0
+    },
+    "flat": {
+      "on_collapse_regime": 0.5,
+      "off_regime": 0.5
+    },
+    "ctrl": {
+      "on_collapse_regime": 1.0,
+      "off_regime": 1.0
+    }
+  },
+  "per_signal_note": "a well-calibrated signal fires MUCH more on-regime than off-regime; a signal that fires ~equally is uninformative to the AND -- this exposes which of the four carries the collapse information",
+  "cells": [
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.0,
+      "null_dim": 3,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": true,
+      "fired_rate": 1.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.0,
+      "null_dim": 3,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.0,
+      "null_dim": 3,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.0,
+      "null_dim": 3,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.5,
+      "null_dim": 3,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.5,
+      "null_dim": 3,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.5,
+      "null_dim": 3,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_stable",
+      "alpha": -0.2,
+      "nu": 0.5,
+      "null_dim": 3,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_stable",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rankdef_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 2,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "fullrank_diverge",
+      "alpha": 0.3,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.0,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": true,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.01,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.0,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    },
+    {
+      "regime": "rotation_marginal",
+      "alpha": -0.5,
+      "nu": 0.5,
+      "null_dim": 0,
+      "init": 0.5,
+      "aniso": 0.3,
+      "truth_collapse_regime": false,
+      "fired_rate": 0.0
+    }
+  ]
+}

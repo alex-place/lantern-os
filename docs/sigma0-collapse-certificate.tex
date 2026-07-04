@@ -55,11 +55,11 @@ numerical-range gate and a Lyapunov/similarity-metric gate, \S\ref{sec:gates768}
 that strictly widen the certified region.
 We pair the theorem with a semantic collapse operator $\Szero$ (a heuristic
 trigger plus projection onto the null manifold --- the ``42-state''), an
-anti-collapse operator $\Sigma_0^{-1}$ (empirically shown, not proven, to suppress
-collapse), and an early-warning signal. We read the construction as a small, honest
+anti-collapse operator $\Sigma_0^{-1}$ (proven for all $A$ to prevent permanent
+freeze --- Theorem C3, \#768), and an early-warning signal. We read the construction as a small, honest
 warning about recursively self-improving systems: absent external grounding, the
 linearized dynamics admit only collapse or divergence. Theorem~1 is machine-checked
-($42$ passing in \texttt{test\_cio\_sde.py}; \#506 resolved) for the symmetric case, with $14$
+($46$ passing in \texttt{test\_cio\_sde.py}) for the symmetric case, with $14$
 further tests for the non-normal gates (\texttt{test\_stability\_gates.py}). The other components
 are heuristics, labelled as such; the referenced router demonstration is now reproducible (its
 driver scripts are committed --- see \S6 of the Markdown certificate); the AI-safety reading is the keeper and
@@ -67,13 +67,26 @@ stands on its own.
 \end{abstract}
 
 \begin{caveatbox}
-\textbf{Per-section status.} \S1 theorem: \emph{proven under an explicit hypothesis,
-machine-checked for the symmetric case}. \S2 trigger: \emph{operational definition,
-not derived}. \S3 anti-collapse: \emph{heuristic, $N{=}1$ empirical}. \S4 canary:
-\emph{the eigenvalue readout is unimplemented; the correct signal (innovation
-surprise) is implemented in \texttt{surprise.py}}. \S5 graph: \emph{standard}.
-\S6 demonstration: \emph{not reproducible --- scripts absent}. \S7 AI-safety:
-\emph{the keeper}.
+\textbf{Per-section status.} \S1 theorem: \emph{proven; the non-normal contraction is
+closed in-regime by the spectral dichotomy (\#768), machine-checked}. \S2 trigger:
+\emph{operational definition; now MEASURED-calibrated (\#1990) --- sound (precision~1.0)
+but conservative}. \S3 anti-collapse: \emph{PROVEN for all $A$ (Theorem~C3,
+no-permanent-freeze; \#768)}. \S4 canary: \emph{the eigenvalue readout is unimplemented;
+the correct signal (innovation surprise) is implemented in \texttt{surprise.py}}. \S5
+graph: \emph{standard; a nonlinear ROA first cut is validated (\#1991)}. \S6
+demonstration: \emph{reproducible --- driver scripts committed}. \S7 AI-safety:
+\emph{the keeper; \S7.2 red-teams the honesty layer itself}.
+\end{caveatbox}
+
+\begin{caveatbox}
+\textbf{Update (2026-07-04) --- landed since this \LaTeX{} was last synced.} The
+discrete-time dichotomy (\#1988), the defective-$A$ ordered-Schur split for the continuous
+dichotomy (\#1989), the trigger calibration (\#1990: precision~$1.0$ / snapshot-recall~$0.08$),
+and a validated region-of-attraction first cut (\#1991: $\{V\le2.31\}$ with $100\%$
+inside-convergence on the reversed--Van-der-Pol benchmark) are detailed in the Markdown
+certificate (the living source of record) and in \texttt{experiments/sigma0\_*.py}. This
+\LaTeX{} formalization covers \S1--\S7 as summarized in each status line above; the Markdown
+carries the per-date maintenance log.
 \end{caveatbox}
 
 \tableofcontents
@@ -257,8 +270,9 @@ emergent attractor. (\texttt{SemanticCollapseOperator}.)
 % ====================================================================
 \section{The anti-collapse operator $\Sigma_0^{-1}$}
 \begin{caveatbox}
-\textbf{Status: control-design heuristic. Empirically shown ($N{=}1$) to suppress
-collapse. No sufficiency theorem --- unlike Theorem~1.}
+\textbf{Status: PROVEN for all $A$ (Theorem~C3, no-permanent-freeze; \#768). The
+$N{=}1$ observation is superseded by a $900$-run measured sweep and a closed-form proof
+(the alignment hypothesis L1 was removable via L2$'$).}
 \end{caveatbox}
 Where $\Szero$ projects \emph{onto} the null subspace, $\Sigma_0^{-1}$ injects
 energy \emph{along} it:
@@ -412,10 +426,12 @@ arXiv:2406.07515).
 \begin{itemize}
 \item \texttt{src/cio\_sde/collapse.py} --- \texttt{SemanticCollapseOperator},
   \texttt{CollapseCertificate}/\texttt{collapse\_certificate}, \texttt{AntiCollapseOperator},
-  \texttt{ReconstructionOperator}, \texttt{stability\_gates}/\texttt{StabilityGates} (\#768).
+  \texttt{ReconstructionOperator}, \texttt{stability\_gates} (\#768),
+  \texttt{dichotomy\_certificate} (\#768, ordered-Schur split incl.\ defective $A$, \#1989),
+  and \texttt{discrete\_dichotomy\_certificate} (\#1988).
 \item \texttt{src/cio\_sde/surprise.py} --- \texttt{SurpriseMonitor} and the Kalman
   measurement update (the missing inference step).
-\item \texttt{tests/test\_cio\_sde.py} --- 42 passing (\#506 resolved); Theorem~1
+\item \texttt{tests/test\_cio\_sde.py} --- 46 passing; Theorem~1
   exercised in the symmetric case only (the non-normal contraction dichotomy and the C3
   anti-freeze lemmas add their own tests here).
 \item \texttt{tests/test\_stability\_gates.py} --- 14 passing: the \#768 numerical-range

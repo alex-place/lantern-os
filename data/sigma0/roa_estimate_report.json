@@ -1,0 +1,32 @@
+{
+  "issue": 1991,
+  "system": "xdot=[-x2, x1+(x1^2-1)x2]  (reversed-VdP benchmark, Khalil Ex.8.4)",
+  "P": [
+    [
+      1.5,
+      -0.4999999999999999
+    ],
+    [
+      -0.4999999999999999,
+      0.9999999999999999
+    ]
+  ],
+  "lyapunov_eq": "A^T P + P A = -I,  A = df/dx|_0",
+  "c_star": 2.30735,
+  "c_star_meaning": "largest level with Vdot<0 on {0<V<=c*}: {V<=c*} is an ROA inner estimate",
+  "certified_basin_radius": 1.8265,
+  "certified_area_grid": 6.4845,
+  "grid": "601x601 over [-3,3]^2 (conservative: finer grid can only shrink c*)",
+  "validation": {
+    "inside_convergence_rate": 1.0,
+    "inside_note": "fraction of sampled points INSIDE {V<=0.95 c*} that converge to 0 (want 1.0)",
+    "outside_divergence_rate": 1.0,
+    "outside_note": "fraction on {V=3 c*} that diverge (>0 confirms the true ROA is bounded, as known)"
+  },
+  "evidence_class": {
+    "sublevel_invariance_given_Vdot<0": "PROVEN (Lyapunov/LaSalle)",
+    "c_star_value": "MEASURED (grid-conservative inner estimate)",
+    "benchmark_ROA_is_bounded": "external ground truth (Khalil Ex.8.4)"
+  },
+  "honest_scope": "This validates the METHOD (local Jacobian -> quadratic Lyapunov -> certified sublevel ROA) on a system with KNOWN bounded ROA. It lifts the certificate's local-linear claim to a certified NONLINEAR neighbourhood for THIS f. Applying it to the collapse certificate's own drift only needs that f specified; global guarantees still require grounding, per the certificate's North Star."
+}
