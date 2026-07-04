@@ -59,11 +59,19 @@ Effort goes **inside the loop**, not into a migration:
 2. **Monitoring (Verify)** — a forward hook on a **mid** layer + a linear probe feeding
    `runCanaries()`/ADR-0017, extending the existing canary rather than adding a subsystem.
 
-**Guardrail (landed with this ADR):** `scripts/ouro_compat.py` +
-`tests/test_ouro_compat.py` — Ouro's recurrent KV cache breaks silently under
-`transformers>=4.56` without the Antizana/ouro-cache-fix patch; the server now warns loudly
-(hard-fails under `OURO_STRICT_TRANSFORMERS=1`). **This environment already runs 4.57.6, past
-the pin** — the guard is needed today, not hypothetical.
+**Cache fix (landed + verified with this ADR):** `scripts/ouro_compat.py` +
+`tests/test_ouro_compat.py` (9 pass). **Correction to this ADR's first draft:** the "pin
+`transformers<4.56`" advice was *wrong* — reality contradicted it. Measured 2026-07-04:
+Ouro's current remote code (rev `3aaa2224`) assigns to `key_cache`/`value_cache`, which are
+**read-only properties on transformers ≥ 4.54**, so `generate()` raises `property has no
+setter`. **No stock version fits** — `< 4.54` lacks Ouro's other imports (`TransformersKwargs`,
+`check_model_inputs`, `GenericForQuestionAnswering`). The real fix is a runtime monkeypatch,
+`patch_universal_transformer_cache()` (effect-equivalent to Antizana/ouro-cache-fix), applied
+by `ouro_serve.py` after load, on transformers **4.55.0** (the model config's own version).
+Verified end-to-end: Ouro-1.4B-Thinking loads (25.9 s warm, 2.87 GB VRAM on the RTX 3070) and
+generates coherently — "The capital of France is" → " Paris." Environment recovery is scripted
+in `scripts/rebuild-train-venv.ps1` (the GPU venv + HF cache had been wiped by a D:-drive
+cleanup, which is why the model "used to load" and had stopped).
 
 **Defer a base-model swap.** Add **Qwen3.5-4B** to `local-model-registry.js` as a future
 *capability* node (served via llama.cpp/GGUF, whose logprobs cover FLARE-style surprise
@@ -76,8 +84,8 @@ gating), keeping the model-interchangeability rule intact. Ouro stays the latent
 - DEEP mode's ~1 s/token **cannot** be fixed by a runtime swap — no optimized engine exists
   or is coming for Ouro. Speed gains must come from the in-loop tricks above, whose wall-clock
   payoff is **unmeasured** (the papers publish none) — a HEURISTIC 2–4× hope, to be measured.
-- We own maintenance of the custom loop and the `transformers<4.56` pin (or the remote-code
-  cache fix) indefinitely.
+- We own maintenance of the custom loop and the runtime cache patch (a transformers version
+  pin does *not* work — see the cache-fix note above) indefinitely.
 - We forgo batching/throughput — acceptable: the target is single-user local latency.
 
 **Gain:**

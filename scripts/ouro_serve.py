@@ -31,18 +31,15 @@ import torch  # noqa: E402
 import transformers  # noqa: E402  (module handle for __version__ compat check)
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer  # noqa: E402
 
-from ouro_compat import transformers_cache_risk  # noqa: E402  (sibling; scripts/ is sys.path[0])
+from ouro_compat import transformers_cache_risk, patch_universal_transformer_cache  # noqa: E402  (sibling; scripts/ is sys.path[0])
 
 MODEL_ID = os.environ.get("OURO_MODEL", "ByteDance/Ouro-1.4B-Thinking")
 
-# Guard: transformers>=4.56 silently breaks Ouro's recurrent KV cache unless the model's
-# remote code carries the Antizana/ouro-cache-fix patch. We can't introspect the patch
-# from here, so surface it loudly rather than run calm-while-wrong. Non-Ouro slots skip it.
+# Heads-up: transformers>=4.54 makes Ouro's cache key_cache/value_cache read-only; the
+# runtime patch below (after load) makes them settable. This is just the early note.
 _cache_risk, _cache_msg = transformers_cache_risk(MODEL_ID, transformers.__version__)
 if _cache_risk:
-    if os.environ.get("OURO_STRICT_TRANSFORMERS") == "1":
-        raise RuntimeError("[ouro_serve] " + _cache_msg)
-    print("[ouro_serve] WARNING: " + _cache_msg, flush=True)
+    print("[ouro] note: " + _cache_msg, flush=True)
 # Serve a generic instruct model (e.g. Qwen2.5-Coder-7B as the local coder slot) — not
 # just Ouro. Ouro's QLoRA used the "### Instruction/### Response" format; any other
 # instruct model needs its OWN chat template, so auto-detect by model id. Override with
@@ -113,7 +110,7 @@ _tok = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
 # The recommended 8GB CC-scale config is `OURO_4BIT=1 OURO_UT_STEPS=2` (the depth lever
 # halves the recurrent KV cache — the real long-context hog); 15k prefill ~70s, fits.
 FOUR_BIT = os.environ.get("OURO_4BIT", "0") == "1"
-_load_kw = dict(trust_remote_code=True, dtype=torch.float16, device_map="auto")
+_load_kw = dict(trust_remote_code=True, torch_dtype=torch.float16, device_map="auto")  # torch_dtype: works on transformers<4.56 (Ouro pin) and newer
 if FOUR_BIT:
     from transformers import BitsAndBytesConfig
     _load_kw["quantization_config"] = BitsAndBytesConfig(
@@ -153,6 +150,18 @@ if _steps:
             if isinstance(getattr(_mod, attr, None), int):
                 setattr(_mod, attr, _n)
 _model.eval()
+
+# Ouro's remote UniversalTransformerCache assigns to key_cache/value_cache, which are
+# read-only properties on transformers>=4.54 — so stock transformers raises
+# "property has no setter" at generate() time. No stock version fixes this (older
+# transformers lacks Ouro's other imports), so patch the class to make them settable.
+# Idempotent, harmless if unneeded. See scripts/ouro_compat.py.
+_cache_patched = patch_universal_transformer_cache()
+if _cache_patched:
+    print("[ouro] UniversalTransformerCache cache-patch applied", flush=True)
+elif "ouro" in MODEL_ID.lower():
+    print("[ouro] WARNING: cache-patch found no UniversalTransformerCache to patch — "
+          "generation may fail if transformers>=4.54", flush=True)
 
 # Wrap the already-loaded model in the native Σ₀ Q-exit loop (no second load).
 _loop = None
