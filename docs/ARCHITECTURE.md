@@ -101,7 +101,7 @@ Grouped by loop stage / domain:
 | **Memory / stores** (Remember) | `conversation-store.js`, `dreamer-store.js`, `entry-store.js`, `file-queue.js`, `csf-memory*.js`, `cube-store.js`, `session-summary-store.js` |
 | **Convergence** (Verify/Converge) | `convergence-records.js`, `convergence-router.js`, `convergence-status.js`, `convergence-outcome-grader.js`, `grounding-policy.js`, `grounding-calibration.js`, `collapse-canary.js`, `contradiction-scanner.js` |
 | **Trading** (Act) | `kalshi-api.js`, `kalshi-collector.js`, `kalshi-suggest.js`, `trading-*.js`, `crypto-collector.js`, `strategy-registry.js` |
-| **Orchestration / fleet** (Act) | `auto-dispatch.js`, `swarm-orchestrator.js`, `autowork-worktree.js`, `auto-merge-resolver.js`, `job-queue.js`, `job-worker.js`, `training-dispatcher.js` |
+| **Orchestration / fleet** (Act) | `swarm-orchestrator.js`, `autowork-worktree.js`, `auto-merge-resolver.js`, `job-queue.js`, `job-worker.js`, `training-dispatcher.js` (the headless `auto-dispatch.js` daemon was removed — autowork is chat-only via `!work`, routed through `/api/convergence/autonomous-work/*`) |
 | **Media / creator** (Act) | `image-generation.js`, `caption-engine.js`, `facecam-v3.js`, `video-pipeline-*.js`, `thumbnail-generator.js` |
 | **Safety / gates** | `consent-gate.js`, `consequence-gate.js`, `command-allowlist.js`, `safe-exec` (via `safe-exec.js`), `auth-middleware.js`, `session-secret.js` |
 
