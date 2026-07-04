@@ -552,6 +552,162 @@ def dichotomy_certificate(A: Tensor, delta: float = 0.0,
     )
 
 
+def _discrete_kreiss_lower_bound(M, tol: float = 1e-7) -> float:
+    """Lower bound on the discrete Kreiss constant
+    K_d(A) = sup_{|z|>1} (|z|−1)·‖(zI−A)⁻¹‖₂, by sampling z just outside the unit
+    circle. Discrete Kreiss matrix theorem: K_d(A) ≤ sup_k‖Aᵏ‖ ≤ e·n·K_d(A), so this
+    rigorously LOWER-bounds the transient peak (complements the √cond(P) upper bound)."""
+    import numpy as np
+    n = M.shape[0]
+    Id = np.eye(n)
+    best = 1.0  # K_d ≥ 1 always (k=0: ‖A⁰‖ = ‖I‖ = 1)
+    for rr in (1.001, 1.01, 1.05, 1.2, 1.5, 2.0):
+        for th in np.linspace(0.0, np.pi, 24):  # upper half-plane suffices (real M)
+            z = rr * np.exp(1j * th)
+            try:
+                res = float(np.linalg.norm(np.linalg.inv(z * Id - M), 2))
+            except np.linalg.LinAlgError:
+                continue
+            best = max(best, (rr - 1.0) * res)
+    return float(best)
+
+
+@dataclass
+class DiscreteDichotomyCertificate:
+    """Discrete-time analogue of DichotomyCertificate for the iteration x_{k+1}=A x_k.
+
+    dichotomy_certificate certifies the CONTINUOUS flow e^{tA} (contraction ⟺
+    max Re λ(A) < 0). But the §6 router demonstration — and any step-by-step
+    generator — lives in DISCRETE time, where contraction is ρ(A) < 1: a different
+    condition on a different object (§6 measures spectral radius ρ≈1.064, not an
+    abscissa). This certifies the discrete condition by splitting A at the circle
+    |z| = 1 − δ:
+
+        active M = {|λ| < 1 − δ},  slow/center N = {|λ| ≥ 1 − δ}.
+
+    The split comes from an ORDERED REAL SCHUR factorization (orthonormal Z), so it
+    is A-invariant to machine precision even for DEFECTIVE A — no eigenvector inverse
+    (the eig-based continuous path abstains on Jordan blocks; see #1989). Then:
+
+      • (active) on M, A is Schur-stable (ρ ≤ 1 − δ). The reduced DISCRETE Lyapunov
+        metric P (AᴹᵀPAᴹ − P = −I, so P ⪰ I) gives ‖Aᴹᵏ x‖ ≤ √cond(P)·γ^{k/2}‖x‖
+        with γ = 1 − 1/λ_max(P) ∈ [0,1): the active modes ALWAYS decay, after a
+        bounded transient √cond(P).
+      • (fate) decided purely by the slow spectral radius ρ_N = max|λ(N)| = ρ(A):
+        ρ_N > 1 ⇒ DIVERGE; ρ_N < 1 ⇒ COLLAPSE (whole iteration Schur-stable);
+        ρ_N ≈ 1 ⇒ MARGINAL — bounded onto the unit-circle center (semisimple).
+        No third fate: the active part always dies, so only ρ_N decides.
+
+    For NORMAL A this reduces to "ρ(A) < 1 ⟺ collapse" exactly. HONEST SCOPE:
+    contraction of the LOCAL linear Jacobian's discrete iteration — NOT a global
+    guarantee; grounding remains the safety mechanism. See #1988 and
+    docs/SIGMA0-COLLAPSE-CERTIFICATE.md §6.
+    """
+    fate: str                    # "COLLAPSE" | "MARGINAL" | "DIVERGE"
+    collapses: bool              # active decays AND slow stays bounded (ρ_N ≤ 1+tol)
+    active_dim: int
+    slow_dim: int
+    active_radius: float         # max|λ| on M (≤ 1−δ by construction; 0 if empty)
+    slow_radius: float           # ρ_N = max|λ| on N — the quantity that decides the fate
+    active_decay_factor: float   # √γ = √(1−1/λ_max(P)): provable per-step contraction on M
+    transient_bound: float       # √cond(P): bound on sup_k ‖Aᴹᵏ‖ (nan if not Schur-stable)
+    kreiss_bound: float          # discrete Kreiss lower bound ≤ sup_k ‖Aᵏ‖
+    invariance_residual: float   # ‖(I−BBᵀ)A B‖ — split quality (→0 by Schur)
+    delta: float
+
+    def summary(self) -> str:
+        return (
+            f"discrete-dichotomy[#1988]: fate={self.fate} "
+            f"(active ρ={self.active_radius:.4f} on {self.active_dim} modes, "
+            f"slow ρ_N={self.slow_radius:.4f} on {self.slow_dim}) "
+            f"decay≤{self.active_decay_factor:.4f}/step transient≤{self.transient_bound:.3g} "
+            f"split-resid={self.invariance_residual:.2e}"
+        )
+
+
+@torch.no_grad()
+def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
+                                   tol: float = 1e-7) -> DiscreteDichotomyCertificate:
+    """Evaluate the discrete-time spectral dichotomy on A (iteration x_{k+1}=A x_k).
+
+    Discrete analogue of dichotomy_certificate: splits A by MODULUS at |z| = 1 − δ
+    (active = {|λ| < 1 − δ}) via an ORDERED REAL SCHUR factorization, certifies the
+    active block's per-step contraction with the discrete Lyapunov (Stein) metric,
+    and classifies the fate from the slow block's spectral radius ρ_N = ρ(A). Robust
+    on defective A (orthonormal Schur basis, no eigenvector inverse).
+
+    `delta ∈ [0,1)` shrinks the split circle; use a value inside a spectral gap so
+    the Schur reordering stays well-conditioned. Counts + fate are numpy-only (always
+    computed); the certified Lyapunov/Kreiss metrics need scipy and degrade to nan if
+    it is absent. Never raises on degeneracy.
+    """
+    import numpy as np
+    Abar = A.mean(0) if A.dim() == 3 else A
+    M = Abar.detach().cpu().numpy().astype(float)
+    n = M.shape[0]
+    radius = 1.0 - float(delta)
+
+    # eigen-moduli: split counts + slow-block radius (values only; the SUBSPACE comes
+    # from Schur below, never from these eigenvectors)
+    moduli = np.abs(np.linalg.eigvals(M))
+    active_mask = moduli < radius
+    n_active = int(active_mask.sum())
+    n_slow = n - n_active
+    active_radius = float(moduli[active_mask].max()) if n_active else 0.0
+    slow_radius = float(moduli[~active_mask].max()) if n_slow else 0.0
+
+    invariance_residual = float("nan")
+    rate_factor, transient, kreiss = 0.0, float("nan"), float("nan")
+    try:
+        from scipy.linalg import schur, solve_discrete_lyapunov
+        # ordered real Schur: active (|λ|<radius) eigenvalues to the top-left block.
+        # Z orthonormal ⇒ leading sdim columns span the active invariant subspace
+        # EXACTLY (block-triangular T ⇒ (I−BBᵀ)MB=0 to machine eps) — defective-safe.
+        T, Z, sdim = schur(M, output="real", sort=lambda z: abs(z) < radius)
+        r = int(sdim)
+        invariance_residual = 0.0
+        if 0 < r <= n:
+            B = Z[:, :r]
+            invariance_residual = float(np.linalg.norm((np.eye(n) - B @ B.T) @ M @ B))
+            A_M = T[:r, :r]                       # active block of the ordered Schur form
+            # discrete Lyapunov AᴹᵀPAᴹ − P = −I (scipy solves aXaᵀ−X+q=0 ⇒ a=Aᴹᵀ, q=I)
+            P = solve_discrete_lyapunov(A_M.T, np.eye(r))
+            P = 0.5 * (P + P.T)
+            pe = np.linalg.eigvalsh(P)
+            if float(pe.min()) > 0:
+                lam_max = float(pe.max())
+                gamma = min(max(1.0 - 1.0 / lam_max, 0.0), 1.0)  # per-step V-contraction
+                rate_factor = float(np.sqrt(gamma))
+                transient = float(np.sqrt(lam_max / float(pe.min())))
+        kreiss = _discrete_kreiss_lower_bound(M, tol)
+    except Exception:
+        pass
+
+    # fate — decided purely by the slow block's spectral radius ρ_N = ρ(A) (no third)
+    if n_slow == 0:
+        fate, collapses = "COLLAPSE", True           # every mode inside the split circle
+    elif slow_radius > 1.0 + tol:
+        fate, collapses = "DIVERGE", False
+    elif slow_radius < 1.0 - tol:
+        fate, collapses = "COLLAPSE", True
+    else:
+        fate, collapses = "MARGINAL", True           # bounded onto the unit circle
+
+    return DiscreteDichotomyCertificate(
+        fate=fate,
+        collapses=collapses,
+        active_dim=n_active,
+        slow_dim=n_slow,
+        active_radius=active_radius,
+        slow_radius=slow_radius,
+        active_decay_factor=rate_factor,
+        transient_bound=transient,
+        kreiss_bound=kreiss,
+        invariance_residual=invariance_residual,
+        delta=float(delta),
+    )
+
+
 @torch.no_grad()
 def lyapunov_value(x: Tensor, A: Tensor, eig_eps: float = 1e-2) -> float:
     """V(x) = ½‖P_M x‖² — energy in the active (non-null) subspace of A_s."""
