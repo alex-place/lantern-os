@@ -51,7 +51,7 @@ UNISONA_SERVER_DIR="C:/dev/lantern-os/apps/lantern-garage" node launcher.js
 | — | `UNISONA_SERVER_DIR` | Folder containing `server.js` |
 | — | `UNISONA_READY_TIMEOUT_MS` | Readiness-poll budget (default 45000) |
 
-## Building the shipped `.exe` (Phase 1 packaging — not yet wired)
+## Building the shipped `.exe`
 
 The launcher runs today via `node`. Turning it into a **signed, double-clickable
 `.exe`** is deliberately staged, because the Core depends on **native modules**
@@ -60,17 +60,32 @@ records the decision **against Electron** (native-module rebuild friction + a
 150 MB Chromium the user's browser already provides) in favour of shipping a
 **plain Node runtime + app directory + a small signed launcher**.
 
-Planned build (tracked as a follow-up, see ADR-0014 §Follow-ups):
+Build steps (ADR-0014 §Follow-ups):
 
-1. Ship `node.exe` (LTS) + the `apps/lantern-garage` tree (incl. prebuilt
-   `sharp`/`tesseract.js` binaries for `win32-x64`) as app resources.
-2. Compile `launcher.js` to `unisona.exe` (Node SEA, `--build-sea`; **not**
-   `pkg`, which is deprecated). The launcher points `UNISONA_SERVER_DIR` at the
-   bundled resources.
-3. **Sign** with Azure Artifact Signing (~$10/mo). Note: EV certs no longer
-   bypass SmartScreen (Microsoft removed that in 2024) — reputation builds over
-   download volume regardless.
-4. Installer (Inno Setup / MSIX) that lays the app into `%LOCALAPPDATA%\unisona`.
+1. **App resources** *(installer step — pending)*: ship `node.exe` (LTS) + the
+   `apps/lantern-garage` tree (incl. prebuilt `sharp`/`tesseract.js` binaries for
+   `win32-x64`) beside the exe.
+2. **Compile `launcher.js` → `unisona.exe`** — ✅ **wired**, via Node **SEA** (not
+   `pkg`, which is deprecated):
+   ```bash
+   node scripts/build-desktop-exe.mjs
+   # or: npm run build:exe --prefix apps/lantern-garage/desktop
+   # → apps/lantern-garage/desktop/dist/unisona.exe
+   ```
+   Because a SEA's `process.execPath` **is** `unisona.exe` (its embedded entry is
+   the launcher, not a generic node), the launcher detects SEA mode (`node:sea`)
+   and spawns the Core with a **separate** real `node(.exe)` — shipped beside the
+   exe, or pointed to by `UNISONA_NODE_EXE`; `UNISONA_SERVER_DIR` points at the
+   bundled app tree. [`sea-config.json`](sea-config.json) holds the SEA config and
+   `postject` (a pinned build dep) injects the blob. *Verified:* the built exe
+   boots the Core end-to-end (SEA runs → spawns real node → `server.js` answers on
+   loopback in chat-only hardened mode).
+3. **Sign** with Azure Trusted Signing (~$10/mo) — `postject` invalidates the
+   copied runtime's original signature, so signing here is what makes the exe
+   trusted. Note: EV certs no longer bypass SmartScreen (Microsoft removed that in
+   2024) — reputation builds over download volume regardless.
+4. **Installer** (Inno Setup / MSIX) that lays the app into `%LOCALAPPDATA%\unisona`,
+   ships `node.exe` beside `unisona.exe`, and (optionally) sets `UNISONA_SERVER_DIR`.
 
 ## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 

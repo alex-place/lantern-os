@@ -36,10 +36,33 @@ const localToken = crypto.randomBytes(24).toString("hex");
 // packaged app (points at the unpacked resources) and for dev-testing this
 // launcher from a worktree against a checkout that has node_modules installed.
 const args = parseArgs(process.argv.slice(2));
-const serverDir = path.resolve(
-  process.env.UNISONA_SERVER_DIR || path.join(__dirname, "..")
-);
+
+// Are we running as a packaged Single Executable Application (Node SEA)? If so,
+// process.execPath is unisona.exe — a SEA whose EMBEDDED entry is THIS launcher,
+// not a generic node — so `unisona.exe server.js` would just re-run the launcher,
+// and __dirname is not a real on-disk path. Both must change under SEA. Env vars
+// override either. (See scripts/build-desktop-exe.mjs + docs/adr/0014.)
+let isSea = false;
+try { isSea = require("node:sea").isSea(); } catch { /* Node <20 / no node:sea */ }
+
+// serverDir holds the Core (its server.js). Dev: the app dir beside this launcher.
+// Packaged: the app tree the installer lays beside the exe (resources/app), or an
+// explicit UNISONA_SERVER_DIR. The __dirname branch is never evaluated under SEA.
+const defaultServerDir = isSea
+  ? path.join(path.dirname(process.execPath), "resources", "app")
+  : path.join(__dirname, "..");
+const serverDir = path.resolve(process.env.UNISONA_SERVER_DIR || defaultServerDir);
 const serverEntry = path.join(serverDir, "server.js");
+
+// The node runtime used to SPAWN the Core. Dev: process.execPath IS node, so it's
+// correct. Packaged: a real node(.exe) shipped beside unisona.exe — NEVER the SEA
+// itself (which would re-enter the launcher). UNISONA_NODE_EXE overrides.
+const nodeExe =
+  process.env.UNISONA_NODE_EXE ||
+  (isSea
+    ? path.join(path.dirname(process.execPath), process.platform === "win32" ? "node.exe" : "node")
+    : process.execPath);
+
 const host = "127.0.0.1"; // loopback only — never exposed
 const landingPage = args.page || process.env.UNISONA_LANDING_PAGE || "/";
 const openBrowser = !args["no-open"] && process.env.UNISONA_NO_OPEN !== "1";
@@ -56,6 +79,16 @@ let shuttingDown = false;
     fail(
       `Cannot find the Core server at:\n    ${serverEntry}\n` +
         `Set UNISONA_SERVER_DIR to the folder that contains server.js.`
+    );
+    return;
+  }
+
+  // Packaged (SEA): we spawn a real node shipped beside the exe, not the SEA itself.
+  // If it's missing, say so plainly rather than failing deep in spawn().
+  if (nodeExe !== process.execPath && !fs.existsSync(nodeExe)) {
+    fail(
+      `Cannot find the Node runtime to run the Core at:\n    ${nodeExe}\n` +
+        `The installer must ship node(.exe) beside unisona.exe, or set UNISONA_NODE_EXE.`
     );
     return;
   }
@@ -136,7 +169,7 @@ function spawnServer(port) {
     UNISONA_LOCAL_TOKEN: localToken,
   });
 
-  const proc = spawn(process.execPath, [serverEntry], {
+  const proc = spawn(nodeExe, [serverEntry], {
     cwd: serverDir,
     env,
     stdio: "inherit", // surface the Core's own logs to the console
