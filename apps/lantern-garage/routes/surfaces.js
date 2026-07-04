@@ -30,6 +30,22 @@ module.exports = async function surfaceRoutes(req, res, url, deps) {
     res.end();
     return true;
   }
+  // #1946 desktop: inject the window-heartbeat into served HTML so the app quits
+  // itself when the window closes (lib/desktop-heartbeat). Non-desktop streams as-is.
+  const hb = require("../lib/desktop-heartbeat");
+  if (hb.enabled && /\.html?$/i.test(target)) {
+    fs.readFile(target, "utf8", (err, html) => {
+      if (err) { sendJson(res, { error: "not_found" }, 404); return; }
+      const body = hb.injectHeartbeat(html);
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      });
+      res.end(req && req.method === "HEAD" ? undefined : body);
+    });
+    return true;
+  }
   sendFile(res, target, req); // pass req so media (e.g. /radio/*.mp3) supports Range/seek + HEAD
   return true;
 };

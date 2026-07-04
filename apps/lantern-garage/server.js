@@ -343,6 +343,11 @@ async function route(req, res) {
     }
   }
 
+  // #1946 desktop: the app window pings /__unisona/beat while open (and beacons on
+  // close). When beats stop, the Core exits and the launcher quits with it — a
+  // flash-free window-lifecycle. No-op unless UNISONA_DESKTOP=1.
+  if (require("./lib/desktop-heartbeat").handleBeat(req, res, url)) return;
+
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
@@ -602,6 +607,10 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
+
+  // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
+  // beats stop). No-op unless UNISONA_DESKTOP=1.
+  try { require("./lib/desktop-heartbeat").startWatchdog(); } catch { /* non-fatal */ }
 
   // ── Nav lock-step assertion (#1880): warn if NAV_PAGES has drifted from the
   // links the global header renders (index.html .nav-links), so a page added to
