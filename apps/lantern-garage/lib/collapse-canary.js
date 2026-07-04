@@ -164,8 +164,40 @@ function antiCollapseSignal(score) {
   };
 }
 
+/**
+ * ADR-0012 step 4 — turn a collapse score into a serving-path routing hint.
+ *
+ * The nested-adaptive-Reason design (docs/adr/0012-nested-adaptive-reason.md) closes
+ * the loop by letting the JS canaries recommend escalation: a collapsing local reply
+ * should be routed to a stronger (cloud) tier instead of shipped. This is the PRODUCER
+ * side — a pure, additive translation of a score into `{ escalate, tier, reason }`. It
+ * changes nothing on its own; the serving path (stream-chat) consumes the hint behind a
+ * flag, and step 4's own note says that live-serving change needs traffic measurement
+ * before default-on.
+ *
+ * @param score  the object returned by scoreReplyCollapse()
+ * @param opts.routeThreshold  optional proximity to escalate at; when set, escalates on
+ *   proximity >= routeThreshold (proactive — can fire before full collapse). When omitted,
+ *   escalates exactly when the canary already flagged `collapsed`, so the module's own
+ *   threshold stays the single source of truth.
+ * @param opts.escalateTier  tier label to route to when escalating (default "cloud").
+ */
+function collapseRoutingHint(score, opts = {}) {
+  const prox = score && typeof score.proximity === "number" ? score.proximity : 0;
+  const escalate = opts.routeThreshold != null
+    ? prox >= opts.routeThreshold
+    : !!(score && score.collapsed);
+  return {
+    escalate,
+    tier: escalate ? (opts.escalateTier || "cloud") : "local",
+    reason: escalate ? "collapse" : "none",
+    proximity: prox,
+  };
+}
+
 module.exports = {
   scoreReplyCollapse,
   antiCollapseSignal,
+  collapseRoutingHint,
   MIN_TOKENS,
 };
