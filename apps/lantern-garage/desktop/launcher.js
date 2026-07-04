@@ -21,7 +21,14 @@ const http = require("http");
 const net = require("net");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const { spawn } = require("child_process");
+
+// Per-boot loopback token (ADR-0014 G4). Passed to the Core as UNISONA_LOCAL_TOKEN
+// and to the browser via the launch URL (?__lt=…); the Core turns that into a
+// SameSite=Strict cookie so the local UI authenticates automatically while a
+// DNS-rebind/CSRF page (same loopback IP, no token) cannot. Fresh every launch.
+const localToken = crypto.randomBytes(24).toString("hex");
 
 // ── Configuration ───────────────────────────────────────────────────────────
 // serverDir defaults to the garage app that ships beside this launcher
@@ -54,11 +61,12 @@ let shuttingDown = false;
   }
 
   const port = args.port ? Number(args.port) : await findFreePort(host);
+  // Clean display URL (token is added only to the URL we actually open, below).
   const url = `http://${host}:${port}${landingPage}`;
 
   console.log(`[unisona] Core server:  ${serverEntry}`);
   console.log(`[unisona] Binding:      ${host}:${port} (loopback only)`);
-  console.log(`[unisona] Mode:         chat-only (no MCP / trading / tunnel)`);
+  console.log(`[unisona] Mode:         chat-only, hardened (AppData state · vault keys · loopback token)`);
   console.log("");
 
   child = spawnServer(port);
@@ -82,11 +90,16 @@ let shuttingDown = false;
   }
 
   console.log(`[unisona] Ready → ${url}`);
+  // G4: the browser must carry the per-boot token on first load so the Core can hand
+  // back the SameSite cookie that authenticates every LATER request (fetch, EventSource,
+  // assets). Without this, UNISONA_LOCAL_TOKEN would lock the local UI out of all
+  // operator actions. The token rotates each launch; the durable carrier is the cookie.
+  const openUrl = `${url}${url.includes("?") ? "&" : "?"}__lt=${localToken}`;
   if (openBrowser) {
-    openInBrowser(url);
+    openInBrowser(openUrl);
     console.log("[unisona] Opened your default browser.");
   } else {
-    console.log("[unisona] Open this URL in your browser (auto-open disabled).");
+    console.log(`[unisona] Open this URL in your browser (auto-open disabled):\n    ${openUrl}`);
   }
   console.log("[unisona] Press Ctrl+C to stop.\n");
 })().catch((err) => fail(err && err.stack ? err.stack : String(err)));
@@ -116,6 +129,11 @@ function spawnServer(port) {
     LANTERN_DISABLE_TRADING: "1",
     TRADER_AUTOSCAN: "0",
     LANTERN_CLOUDFLARE_TUNNEL: "false",
+    // Desktop hardening (ADR-0014 Phase-0): relocate writable state to
+    // %APPDATA%\unisona (G2), read keys from the DPAPI vault (G3), and require the
+    // per-boot loopback token so loopback ≠ admin (G4). All three are now wired.
+    UNISONA_DESKTOP: "1",
+    UNISONA_LOCAL_TOKEN: localToken,
   });
 
   const proc = spawn(process.execPath, [serverEntry], {
