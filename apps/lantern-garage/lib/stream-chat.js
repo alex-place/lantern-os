@@ -2970,7 +2970,7 @@ async function handleStreamChat(req, url, res) {
       if (surpriseIntervene.enabled()) {
         try {
           const iv = await surpriseIntervene.maybeIntervene({
-            perToken: surprise.value(), fullReply,
+            perToken: surprise.value(), fullReply, model: modelFor("openai"), // #1940: per-model calibrated trigger
             callLLM: surpriseIntervene.openaiCompatibleReviser({ host: "api.openai.com", apiKey: openaiKey, model: modelFor("openai") }),
             emit: (d) => sse.writeData(res, d),
           });
@@ -3099,7 +3099,7 @@ async function handleStreamChat(req, url, res) {
       if (surpriseIntervene.enabled()) {
         try {
           const iv = await surpriseIntervene.maybeIntervene({
-            perToken: surprise.value(), fullReply,
+            perToken: surprise.value(), fullReply, model: xaiModel, // #1940: per-model calibrated trigger
             callLLM: surpriseIntervene.openaiCompatibleReviser({ host: "api.x.ai", apiKey: xaiKey, model: xaiModel }),
             emit: (d) => sse.writeData(res, d),
           });
