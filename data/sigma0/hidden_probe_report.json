@@ -1,0 +1,41 @@
+{
+  "task": "linear probe on Ouro hidden states \u2014 CONFOUND-CONTROLLED hallucination/truth detection",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "eval": "GroupKFold(5) split by fact/question (true+false of a fact never straddle train/test)",
+  "halueval_qa_NAIVE_confounded": {
+    "n_examples": 80,
+    "hidden_dim": 2048,
+    "probe_auroc_per_ut_step": {
+      "0": 0.9631,
+      "1": 0.9888,
+      "2": 0.9938,
+      "3": 0.9938
+    },
+    "probe_auroc_best": 0.9938,
+    "probe_best_ut_step": 2,
+    "answer_logprob_auroc": 0.5794,
+    "answer_length_confound_auroc": 0.9794,
+    "probe_signal_above_length_confound": 0.0144,
+    "note": "right answers are terse entities, hallucinated ones full sentences \u2014 the probe mostly rides ANSWER LENGTH (see length_confound_auroc), NOT truth. Baseline only."
+  },
+  "truefalse_matched_CLEAN": {
+    "n_examples": 96,
+    "hidden_dim": 2048,
+    "probe_auroc_per_ut_step": {
+      "0": 0.7921,
+      "1": 0.9792,
+      "2": 0.9922,
+      "3": 0.9939
+    },
+    "probe_auroc_best": 0.9939,
+    "probe_best_ut_step": 3,
+    "answer_logprob_auroc": 0.7665,
+    "answer_length_confound_auroc": 0.5002,
+    "probe_signal_above_length_confound": 0.4937,
+    "note": "minimal pairs: true/false differ only in the swapped fact, matched surface form. length_confound_auroc ~0.5 here, so probe signal IS truth, not form."
+  },
+  "prior_surprise_baseline_other_data": "0.76-0.81 (token-surprise, #1673/#1676 \u2014 different data)",
+  "evidence_class": "MEASURED (pilot; data/sigma0/hidden_probe_report.json)",
+  "honest_headline": "On the length-CONTROLLED set, Ouro's hidden states linearly separate true vs false at AUROC 0.9939 (best UT step 3), while the length confound is only 0.5002 and the model's own answer-logprob is 0.7665. The naive HaluEval number (0.9938) is inflated by answer length (0.9794) and is NOT a truth signal.",
+  "caveats": "n small (pilot), fp16, Ouro-1.4B (small model), self-authored matched facts (minimal-pair swaps), UT-step not intra-step layers."
+}
