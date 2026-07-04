@@ -479,6 +479,27 @@ const REGISTRY = {
     },
   },
 
+  // ── Remember stage: agent-invoked memory recall (the "Grep" for user memory) ──
+  // Retrieval is NOT a keyword gate in front of the model — the model DECIDES to recall,
+  // calls this, and reasons over the result, exactly like Read/Grep over the repo. Backed
+  // by the ONE canonical CSF memory + conversation log (lib/csf-memory.js::recallMemory) —
+  // no new store. operator-only (not guest_safe): it reads the user's personal memory.
+  recall_memory: {
+    policy: "read",
+    desc: "Recall what you ALREADY KNOW about THIS user across past sessions — their stated personal facts, background, preferences, and relevant excerpts from earlier conversations. Call this WHENEVER the user asks what you know or remember about them, says 'use what you know about me', refers to something you 'discussed before', or when personalizing help (job search, resume, planning) would benefit from prior context. Pass a `query` to focus the recall (e.g. 'job search preferences', 'family', 'resume'); OMIT it to get a general profile of recent facts + conversation topics. The result is memory you genuinely have — rely on it as prior context, do not treat it as a guess. If it returns 'no stored memories', say that honestly; never claim you 'cannot see past sessions' without calling this first.",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Optional topic to focus recall on. Omit for a general 'what do you know about me' profile." },
+      },
+      required: [],
+    },
+    run(i) {
+      const { recallMemory } = require("./csf-memory");
+      return recallMemory({ query: String((i && i.query) || ""), limit: 8 });
+    },
+  },
+
   workspace_read: {
     policy: "read",
     desc: "Read a file from the user workspace (~/.keystone/workspace/). Path must be relative.",
