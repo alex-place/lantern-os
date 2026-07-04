@@ -1,10 +1,10 @@
 ---
 adr: 0011
 title: Own a proprietary Σ₀ base model — fork the PLT architecture, adapter-only weights, council + CSF native
-status: Proposed
+status: Accepted
 date: 2026-06-29
 deciders: Alex Place
-approved-by: pending   # only Alex Place flips this; agents leave it `pending`
+approved-by: Alex Place (2026-07-04)
 supersedes: none
 superseded-by: none
 ---

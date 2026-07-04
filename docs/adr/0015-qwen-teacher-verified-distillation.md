@@ -1,10 +1,10 @@
 ---
 adr: 0015
 title: Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record
-status: Proposed
+status: Accepted
 date: 2026-07-02
 deciders: Alex Place
-approved-by: pending   # only Alex Place flips this; agents leave it `pending`
+approved-by: Alex Place (2026-07-04)
 supersedes: none
 superseded-by: none
 ---

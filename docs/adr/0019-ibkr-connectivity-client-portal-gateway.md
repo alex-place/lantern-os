@@ -1,9 +1,9 @@
 # ADR-0019: IBKR connectivity — Client Portal Web API via local gateway (read-only)
 
-- Status: Proposed (awaiting Alex's approval)
+- Status: Accepted (Alex Place, 2026-07-04)
 - Date: 2026-07-03
 - Deciders: Alex Place (approval required per ADR-0001 gate)
-- approved-by: pending
+- approved-by: Alex Place (2026-07-04)
 - Loop stage: Observe (real broker account/position data enters the loop) + Verify (honest, evidence-bearing connection status replaces a hardcoded green)
 
 ## Context

@@ -68,14 +68,14 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0008](0008-end-product-personal-ai-wrapper.md) | End product is a personal AI wrapper — capabilities are Tools + Skills | Accepted (Alex Place, 2026-07-02) |
 | [0009](0009-one-routing-contract-cloud-primary-coding.md) | One routing contract — cloud-primary coding | Accepted (Alex Place, 2026-06-28) |
 | [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Accepted (Alex Place, 2026-07-02) |
-| [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Proposed (awaiting Alex's approval) |
-| [0012](0012-nested-adaptive-reason.md) | Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model) | Proposed (awaiting Alex's approval) |
+| [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Accepted (Alex Place, 2026-07-04) |
+| [0012](0012-nested-adaptive-reason.md) | Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model) | Accepted (Alex Place, 2026-07-02) |
 | [0013](0013-subsystem-register-one-loop-gate.md) | Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction | Accepted (Alex Place, 2026-07-02) |
 | [0014](0014-unisona-desktop-launcher.md) | unisona.ai desktop — a thin signed launcher over the one Core, not an Electron repackage | Accepted (Alex Place, 2026-07-02) |
-| [0015](0015-qwen-teacher-verified-distillation.md) | Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record | Proposed (awaiting Alex's approval) |
+| [0015](0015-qwen-teacher-verified-distillation.md) | Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record | Accepted (Alex Place, 2026-07-04) |
 | [0016](0016-provider-agnostic-oss-auth.md) | Provider-agnostic OSS auth — one identity + provider registry (local scrypt + Google + Discord + Patreon), verified-both linking | Accepted (Alex Place, 2026-07-02) |
 | [0017](0017-surprise-gated-decoding.md) | Surprise-gated decoding — mid-generation grounding intervention (CSF retrieval + web search + tool call) when rolling surprise crosses calibrated threshold | Accepted (Alex Place, 2026-07-02) |
-| [0019](0019-ibkr-connectivity-client-portal-gateway.md) | IBKR connectivity — Client Portal Web API via local gateway, read-only (replaces the fabricated api.ibkr.com bearer-token path) | Proposed (awaiting Alex's approval) |
+| [0019](0019-ibkr-connectivity-client-portal-gateway.md) | IBKR connectivity — Client Portal Web API via local gateway, read-only (replaces the fabricated api.ibkr.com bearer-token path) | Accepted (Alex Place, 2026-07-04) |
 | [0021](0021-serving-substrate-retain-ouro-custom-loop.md) | Serving substrate — retain the Ouro/Σ₀ custom transformers loop; reject an engine port (no adaptive-depth/hidden-state serving exists); defer a Qwen3.5-4B base swap | Accepted (Alex Place, 2026-07-04) |
 
 <!-- Add new ADRs to this table on merge. -->
