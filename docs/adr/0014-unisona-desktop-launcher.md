@@ -87,8 +87,10 @@ toolchain + sidecar cost.
   local token so loopback is no longer implicitly admin. These are Core changes
   that benefit all deployments.
 - **Phase 1-package — the signed `.exe`.** Ship a plain Node runtime + app
-  directory + a Node-SEA-compiled `unisona.exe`; sign via Azure Artifact Signing;
-  wrap in an installer targeting `%LOCALAPPDATA%\unisona`.
+  directory + a Node-SEA-compiled `unisona.exe`; sign + distribute via the $0
+  channels in the **2026-07-04 Update** below (MSIX-via-Store primary + SignPath
+  Foundation for direct download — **not** Azure); wrap in an installer targeting
+  `%LOCALAPPDATA%\unisona`.
 
 **Guardrails (binding conditions):**
 
@@ -125,7 +127,8 @@ toolchain + sidecar cost.
 - **Follow-ups:**
   - Phase 0 hardening issues: AppData state relocation; Credential-Manager key
     onboarding UI; loopback local-token auth.
-  - Phase 1-package: Node SEA build + Azure Artifact Signing + installer.
+  - Phase 1-package: Node SEA build (✅ done, #1992) + signing/distribution via the
+    2026-07-04 Update channels (MSIX-Store + SignPath) + installer.
   - Optional tray icon (Stop / Restart / Open) — pure launcher polish.
   - Decide Phase 2 (Tauri window) yes/no once Phase 1 is in real use.
 
@@ -163,3 +166,35 @@ toolchain + sidecar cost.
 | Loopback requests are treated as local-admin (unsafe on an end-user box) | memory [[lantern-net-cloudflare-bypass]], [[api-auth-gaps-2026-06-20]] | Medium | memory |
 | EV certs no longer bypass SmartScreen (removed 2024) | Microsoft Learn — SmartScreen reputation (learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation) | High | web |
 | `vercel/pkg` deprecated; Node SEA is the current single-executable path | github.com/vercel/pkg; nodejs.org SEA docs | High | web |
+
+## Update — 2026-07-04: signing & distribution channel (research, Alex)
+
+The original "sign via Azure Artifact Signing (~$10/mo)" follow-up is **superseded**.
+Grounded research corrected two premises and settled the channels; **we ship both.**
+
+**Premise corrections:**
+- **EV certificates stopped granting instant SmartScreen reputation in 2024**, so
+  paying for EV/Azure buys a signature + a *slow reputation ramp*, not a
+  warning-free first launch. Azure Trusted Signing → renamed **Artifact Signing**
+  (GA ~Apr 2026) needs a **paid** Azure sub (free/sponsored subs blocked) and uses
+  that same ramp. **Azure is dropped** — strictly worse than the $0 options.
+- **Cloudflare and Google/Vertex credits cannot sign a Windows exe.** Cloudflare
+  issues *web* TLS certs only; Google CAS issues *private* (untrusted) CA certs and
+  Cloud HSM only stores keys. Code signing needs a cert chaining to Microsoft's
+  Trusted Root Program, which neither provides.
+
+**Decision — two $0 channels (repo is public → both eligible):**
+1. **Microsoft Store (MSIX) — primary.** $0; Microsoft **re-signs on
+   certification** so users see **no SmartScreen warning on first launch**; auto-
+   updates; no cert to manage. Store registration is free (individuals Sep 2025,
+   companies May 2026).
+2. **SignPath Foundation — for direct download off unisona.ai.** $0 free OSS OV
+   signing (key on their HSM, Sectigo cert). Caveats: SmartScreen publisher reads
+   **"SignPath Foundation"**, and reputation still ramps over downloads.
+
+| Claim | Evidence | Confidence | Source |
+|---|---|---|---|
+| EV certs no longer grant instant SmartScreen reputation (2024) | knowledge.digicert.com — EV-signed apps still show SmartScreen warnings | High | web |
+| MS Store re-signs MSIX → no first-launch warning; registration now free | learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options; blogs.windows.com (free registration Sep 2025 / May 2026) | High | web |
+| SignPath Foundation = free OSS signing; public repos eligible | signpath.org ; signpath.org/terms.html | High | web |
+| Cloudflare / Google credits don't cover Windows code signing | developers.cloudflare.com/ssl (web certs only); Google CAS = private CA | High | web + product scope |
