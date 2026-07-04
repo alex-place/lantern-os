@@ -156,6 +156,11 @@ function spawnServer(port) {
     UNISONA_LOCAL_TOKEN: localToken,
     // Tell the Core child where the app tree is (it re-derives serverEntry here).
     UNISONA_SERVER_DIR: serverDir,
+    // The bundled app declares a `file:../..` self-dep (lantern-os) that isn't
+    // symlinked in the packaged tree, so server.js's dependency preflight would
+    // false-positive on it and exit. Skip the preflight in the packaged app — the
+    // installer ships a complete node_modules, so the check is redundant here.
+    SKIP_DEP_PREFLIGHT: "1",
   });
 
   // The Core child. Packaged (SEA): re-enter THIS same unisona.exe with
