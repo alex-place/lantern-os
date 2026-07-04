@@ -51,6 +51,17 @@
       </article>
 
       <article class="panel">
+        <h2>Traction</h2>
+        <dl id="tractionPanel">
+          <div><dt>Cleared revenue</dt><dd id="tractionCleared">--</dd></div>
+          <div><dt>Non-operator workflows</dt><dd id="tractionWorkflows">--</dd></div>
+          <div><dt>Outreach sends</dt><dd id="tractionOutreach">--</dd></div>
+          <div><dt>Operator-reported</dt><dd id="tractionReported">--</dd></div>
+        </dl>
+        <a href="/api/traction">Open the evidence ledger</a>
+      </article>
+
+      <article class="panel">
         <h2>Arc Reactor</h2>
         <dl id="arcPanel">
           <div><dt>Phase</dt><dd id="arcPhase">--</dd></div>
@@ -90,6 +101,7 @@
       <ul>
         <li>The APIs are real and responding. <a href="/api/health">/api/health</a> is live.</li>
         <li>The wallet ledger is tracked locally. <a href="/api/wallet">/api/wallet</a> shows real state.</li>
+        <li>Traction is instrumented and evidence-classed. <a href="/api/traction">/api/traction</a> separates MEASURED numbers from operator-reported claims — no unverified figure counts as revenue.</li>
         <li>The convergence loop runs and reports. <a href="/api/status">/api/status</a> is inspectable.</li>
         <li>The dreamer journal stores private entries. <a href="/api/dreamer">/api/dreamer</a> is source-linked.</li>
         <li>Every panel links back to its JSON source. No mock data.</li>
