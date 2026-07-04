@@ -52,11 +52,22 @@ const PROXY_HEADERS = [
  * internet. We therefore deny the bypass outright whenever the request carries
  * any proxy/forwarding header; only a direct, un-proxied local hit qualifies.
  */
+const SIGNOUT_COOKIE = "ln_signout";
+
+/** True when the request carries the explicit-signout marker cookie. */
+function hasSignoutMarker(req) {
+  const raw = (req.headers && req.headers.cookie) || "";
+  return raw.split(/;\s*/).some((c) => c === `${SIGNOUT_COOKIE}=1`);
+}
+
 function isLocalBypass(req) {
   const headers = req.headers || {};
   for (const h of PROXY_HEADERS) {
     if (headers[h]) return false; // came through a proxy/tunnel → never "local"
   }
+  // Owner explicitly signed out → suppress the dev/loopback bypass so "Sign out"
+  // actually yields a logged-out session (else port-4178 re-logs-in "Dev").
+  if (hasSignoutMarker(req)) return false;
   if (req.socket?.localPort === 4178) return true;
   if (process.env.LANTERN_LOCAL_ADMIN !== "1") return false;
   const ip = req.socket?.remoteAddress || "";
@@ -183,6 +194,15 @@ function hasEntitlement(req, key) {
   if (!session?.id) return false;
   if (session.role === "admin") return true;
 
+  // Tier unlocks (product model):
+  //   • "trade"     — stocks + Kalshi + AI suggestions — unlocked by the $20
+  //                   Deep Dreamer tier and up.
+  //   • "ai_trader" — the autonomous AI trader — unlocked by the $200 tier
+  //                   (admin, handled by the role check above).
+  // The per-account entitlement below remains an override (admins can grant it
+  // to a specific free/lower-tier account).
+  if (key === "trade" && roleLevel(session.role) >= roleLevel("deep_dreamer")) return true;
+
   const profile = getProfile(session.id);
   return !!(profile && profile.entitlements && profile.entitlements[key] === true);
 }
@@ -255,6 +275,8 @@ module.exports = {
   hasEntitlement,
   requireEntitlement,
   isAdmin,
+  isLocalBypass,
+  SIGNOUT_COOKIE,
   protectStaticPage,
   attachProfile,
   patreonAuthEnabled,

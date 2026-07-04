@@ -77,6 +77,32 @@ external evidence**, per the Σ₀ rule (*nothing is accepted without evidence*)
    untouched. The decision is a pure, unit-tested function (`decide_promotion`); the
    incumbent is backed up to `final.bak-<ts>/` before any swap.
 
+## Teacher backends — cloud or LOCAL (crystallization)
+
+The distillation harvester `scripts/gen_sigma0_traces.py` (a TEACHER solves each task under
+the Σ₀ prompt; only execution-green solutions become training rows) now has a **pluggable
+teacher backend**:
+
+| Backend | Teacher | Use |
+|---|---|---|
+| `cloud` (default for `claude-*` ids) | Anthropic Messages API (frontier model) | strongest corpus; needs a key + network |
+| `local` (auto for ollama-style ids, e.g. `qwen2.5-coder:7b`) | any Ollama-compatible `/api/chat` server | **fully local crystallization** — no cloud, key, or rate limit |
+
+**Crystallization** = distilling the verified-capable local **Qwen2.5-Coder-7B** teacher's
+execution-green solutions into the small looped **Ouro-1.4B** student. The gate is unchanged:
+teacher quality is self-limiting because only code that *runs* trains — a weaker teacher just
+yields a smaller corpus, never wrong code. Run it:
+
+```bash
+# LOCAL Qwen teacher → Ouro student (offline)
+python scripts/gen_sigma0_traces.py --tasks data/distill/crystallize-tasks.jsonl \
+    --teacher qwen2.5-coder:7b --out data/distill/sigma0-traces.jsonl --limit 192
+# then train + eval-gate exactly as below (train on data/distill/sigma0-traces.jsonl)
+```
+
+Design + a measured seed run:
+[research/2026-07-02-qwen-teacher-ouro-crystallization.md](research/2026-07-02-qwen-teacher-ouro-crystallization.md).
+
 ## Harvest sources
 
 The harvester normalizes `{fn, instruction, code, asserts}` candidates from the system's

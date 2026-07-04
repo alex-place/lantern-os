@@ -17,6 +17,22 @@ const {
   publicProfile,
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
+const { createToken } = require("./auth-tokens");
+const { sendVerificationEmail } = require("./mailer");
+
+// Fire-and-forget: email the new account a confirmation link (dev fallback logs
+// it). Never blocks or fails registration.
+function sendSignupVerification(req, profile) {
+  try {
+    const host = (req.headers && req.headers.host) || "127.0.0.1";
+    const proto =
+      (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
+      (req.socket && req.socket.encrypted ? "https" : "http");
+    const token = createToken("verify_email", profile.id, null);
+    const link = `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+    sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
+  } catch (_) { /* best-effort */ }
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
@@ -67,8 +83,16 @@ function _readJson(req) {
     req.on("error", () => resolve(null));
   });
 }
+const { SIGNOUT_COOKIE } = require("./auth-middleware");
+
 function _json(res, status, obj) {
-  res.writeHead(status, { "Content-Type": "application/json" });
+  // Clear the explicit-signout marker on any successful auth response so the
+  // local/dev bypass is restored after the user logs back in (#auth-signout).
+  const headers = { "Content-Type": "application/json" };
+  if (status >= 200 && status < 300) {
+    headers["Set-Cookie"] = `${SIGNOUT_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
+  }
+  res.writeHead(status, headers);
   res.end(JSON.stringify(obj));
 }
 function _establish(req, res, profile, status) {
@@ -104,6 +128,7 @@ async function handleLocalRegister(req, res) {
   const result = createLocalAccount(email, password, name);
   if (result.error === "email_taken") return _json(res, 409, { error: "email_taken" });
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
+  sendSignupVerification(req, result.profile); // confirmation email (non-blocking)
   return _establish(req, res, result.profile, 201);
 }
 

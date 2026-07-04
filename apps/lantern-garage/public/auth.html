@@ -1,257 +1,211 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
+  <link rel="manifest" href="/manifest.json">
   <title>unisona.ai — Sign In</title>
+  <script>
+    /* Theme bootstrap — set before first paint to avoid a flash of wrong theme
+       (mirrors index.html / dream-chat.html). */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, rgba(6,182,212,.08) 0%, rgba(167,139,250,.06) 100%), var(--bg);
+    /* Shell — centers the card when it fits, scrolls cleanly when it doesn't
+       (short/mobile viewports). Uses dvh so mobile browser chrome doesn't clip. */
+    html, body { min-height: 100%; }
+    body {
+      display: flex; flex-direction: column;
+      min-height: 100vh; min-height: 100dvh;
     }
-    .auth-screen {
-      width: 100%;
-      max-width: 500px;
-      padding: 40px 20px;
-    }
-    .auth-hero {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    .auth-hero img {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 20px;
-      opacity: 0.9;
-    }
-    .auth-hero h1 {
-      font-size: 32px;
-      font-weight: 700;
-      margin: 0 0 12px;
-      color: var(--text);
-    }
-    .auth-hero p {
-      font-size: 16px;
-      color: var(--muted);
-      margin: 0;
-      line-height: 1.5;
-    }
-    .auth-gate {
-      margin: 40px auto 0;
-      max-width: 460px;
-      padding: 32px;
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      background:
-        radial-gradient(circle at top left, rgba(6,182,212,.12), transparent 40%),
-        radial-gradient(circle at bottom right, rgba(167,139,250,.10), transparent 35%),
-        rgba(10,15,25,.88);
-      box-shadow: 0 24px 80px rgba(0,0,0,.32);
-    }
-    .auth-gate-kicker {
-      color: var(--accent);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      font-weight: 600;
-    }
-    .auth-gate h2 {
-      margin: 0 0 12px;
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .auth-gate p {
-      margin: 0 0 24px;
-      font-size: 15px;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-    .role-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-      gap: 12px;
-      margin: 24px 0;
-    }
-    .role-card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-      background: rgba(255,255,255,.04);
-      text-align: center;
-    }
-    .role-card strong {
-      display: block;
-      color: var(--text);
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
-    .role-card span {
-      display: block;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    .auth-actions {
+    .site-nav { flex-shrink: 0; }
+
+    .auth-main {
+      flex: 1 1 auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      margin-top: 24px;
-    }
-    .btn-patreon-primary {
-      display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 10px;
+      /* `safe center` centers when the content fits but falls back to top-align
+         when it's taller than the viewport, so the hero is NEVER clipped above the
+         scroll region (plain `center` would hide it). */
+      justify-content: safe center;
+      gap: clamp(12px, 2.4vh, 22px);
       width: 100%;
-      border: none;
-      border-radius: 14px;
-      padding: 14px 20px;
-      background: #ff424d;
-      color: white;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-decoration: none;
+      max-width: 440px;
+      margin: 0 auto;
+      padding: clamp(14px, 3vh, 28px) 18px;
     }
-    .btn-patreon-primary:hover {
-      background: #ff5a63;
-      transform: translateY(-1px);
-    }
-    .btn-patreon-secondary {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 20px;
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.2s ease;
-    }
-    .btn-patreon-secondary:hover {
-      background: rgba(255,255,255,.08);
-      border-color: var(--accent);
-    }
-    .auth-status {
-      margin-top: 16px;
-      padding: 12px;
-      border-radius: 10px;
-      background: rgba(255,255,255,.03);
-      font-size: 13px;
-      color: var(--muted);
-      text-align: center;
-    }
-    .loading {
-      opacity: 0.6;
-      pointer-events: none;
-    }
-    .auth-divider {
-      text-align: center;
-      color: var(--muted);
-      font-size: 12px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      margin: 20px 0 16px;
-      position: relative;
-    }
-    .auth-divider::before, .auth-divider::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      width: 42%;
-      height: 1px;
-      background: var(--border);
-    }
-    .auth-divider::before { left: 0; }
-    .auth-divider::after  { right: 0; }
-    .guest-section { margin-bottom: 4px; }
-    .guest-label {
-      font-size: 12px; color: var(--muted);
-      text-align: center; margin: 0 0 12px;
-    }
-    .guest-links {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .guest-link {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 14px;
-      border: 1px solid var(--border); border-radius: 12px;
-      background: rgba(255,255,255,.03);
-      text-decoration: none;
-      transition: border-color .15s, background .15s;
-    }
-    .guest-link:hover { border-color: var(--accent); background: rgba(6,182,212,.06); }
-    .guest-link-icon { font-size: 20px; flex-shrink: 0; }
-    .guest-link-name { font-size: 13px; font-weight: 600; color: var(--text); }
-    .guest-link-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
-    /* Provider buttons (ADR-0016) */
+    /* ── Hero — gothic wordmark + mandala, matching index.html ── */
+    .auth-hero { text-align: center; }
+    .auth-hero__mandala {
+      display: block;
+      width: clamp(52px, 8.5vh, 92px);
+      height: auto; aspect-ratio: 1;
+      margin: 0 auto clamp(6px, 1.4vh, 14px);
+      pointer-events: none; user-select: none;
+    }
+    .auth-hero h1 {
+      margin: 0 0 4px;
+      font-family: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif;
+      font-size: clamp(1.7rem, 6vw, 2.6rem);
+      letter-spacing: -0.01em;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .auth-hero .motto {
+      font-size: clamp(0.62rem, 2.4vw, 0.78rem); letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--muted); margin: 0;
+    }
+    html[data-theme="dark"] .auth-hero h1 { text-shadow: 0 2px 26px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4); }
+
+    /* ── Sign-in card — surface panel like the home widgets ── */
+    .auth-card {
+      width: 100%;
+      padding: clamp(18px, 4vw, 28px);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 18px 60px rgba(0,0,0,.18);
+    }
+    html[data-theme="dark"] .auth-card { box-shadow: 0 24px 80px rgba(0,0,0,.32); }
+    .auth-card h2 {
+      margin: 0 0 4px; font-size: 20px; font-weight: 700; color: var(--text);
+    }
+    .auth-card .sub { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
+    /* Error banner */
+    .auth-error {
+      display: none; margin-bottom: 16px; padding: 11px 14px; border-radius: 12px;
+      border: 1px solid color-mix(in srgb, #ef4444 45%, transparent);
+      background: color-mix(in srgb, #ef4444 12%, transparent);
+      color: #fca5a5; font-size: 13px; line-height: 1.5;
+    }
+    .auth-error.show { display: block; }
+    .field-error { color: #f87171; font-size: 12px; min-height: 14px; }
+
+    /* Provider (OAuth) buttons */
+    .auth-actions { display: flex; flex-direction: column; gap: 8px; }
     .provider-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 100%; border: 1px solid var(--border); border-radius: 14px;
-      padding: 13px 20px; font-size: 15px; font-weight: 700; cursor: pointer;
-      color: #fff; text-decoration: none; transition: transform .15s, filter .15s, background .15s;
+      width: 100%; border: 1px solid var(--border); border-radius: 12px;
+      padding: 11px 16px; font-size: 14.5px; font-weight: 600; cursor: pointer;
+      color: #fff; text-decoration: none; transition: transform .15s, filter .15s;
     }
-    .provider-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    .provider-btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
     .provider-btn[data-provider="google"]  { background: #fff; color: #1f2937; border-color: #dadce0; }
     .provider-btn[data-provider="discord"] { background: #5865F2; border-color: transparent; }
     .provider-btn[data-provider="patreon"] { background: #ff424d; border-color: transparent; }
-    .provider-btn .pi { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
-    /* Local email/password form */
-    .local-form { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .provider-btn .pi { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+
+    /* Local email + password */
+    .local-form { display: flex; flex-direction: column; gap: 8px; }
     .local-form input {
-      width: 100%; box-sizing: border-box; padding: 12px 14px;
+      width: 100%; box-sizing: border-box; padding: 11px 14px;
       border: 1px solid var(--border); border-radius: 12px;
-      background: rgba(255,255,255,.04); color: var(--text); font-size: 14px;
+      background: var(--bg); color: var(--text); font-size: 16px; /* ≥16px: stops iOS zoom-on-focus */
+      transition: border-color .15s, box-shadow .15s;
     }
-    .local-form input:focus { outline: none; border-color: var(--accent); }
-    .local-form .btn-local {
+    .local-form input:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+    .btn-local {
       border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px;
-      font-weight: 700; cursor: pointer; color: #04121a;
-      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      font-weight: 700; cursor: pointer; color: #fff;
+      background: var(--accent); transition: background .15s, transform .12s;
     }
-    .local-toggle { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
+    .btn-local:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-local:active { transform: translateY(0); }
+    .btn-local { margin-top: 2px; }
+    .local-toggle { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
     .local-toggle a { color: var(--accent); cursor: pointer; text-decoration: underline; }
-    .auth-error {
-      display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 12px;
-      border: 1px solid rgba(248,113,113,.4); background: rgba(248,113,113,.10);
-      color: #fecaca; font-size: 13px; line-height: 1.5;
+
+    /* Secondary / ghost button (Patreon support, continue as guest) */
+    .btn-ghost {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 18px; background: transparent; color: var(--text);
+      font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: border-color .15s, background .15s;
     }
-    .auth-error.show { display: block; }
-    .field-error { color: #fca5a5; font-size: 12px; min-height: 14px; }
+    .btn-ghost:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+    /* Labelled dividers */
+    .auth-divider {
+      text-align: center; color: var(--muted); font-size: 11px;
+      letter-spacing: .1em; text-transform: uppercase;
+      margin: 14px 0 12px; position: relative;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border);
+    }
+    .auth-divider::before { left: 0; }
+    .auth-divider::after  { right: 0; }
+
+    /* ── Mobile ── */
+    @media (max-width: 520px) {
+      .auth-main { max-width: 100%; padding: 12px 14px 20px; gap: 10px; }
+      .auth-card { padding: 18px 16px; border-radius: 16px; }
+      .site-nav { padding-left: 14px; padding-right: 12px; }
+      /* Footer duplicates the nav brand + links; drop it on phones to reclaim
+         vertical space so the sign-in card needs little or no scroll. */
+      .site-footer { display: none; }
+      /* The nav already shows the wordmark, so shrink the hero on phones. */
+      .auth-hero__mandala { width: 48px; margin-bottom: 4px; }
+      .auth-hero h1 { font-size: 1.5rem; }
+      .auth-hero .motto { font-size: 0.6rem; }
+    }
+    /* Very short screens (landscape phones): trim the hero further so the card
+       and its buttons stay reachable without a long scroll. */
+    @media (max-height: 560px) {
+      .auth-hero__mandala { width: 44px; margin-bottom: 4px; }
+      .auth-hero h1 { font-size: 1.5rem; }
+      .auth-main { gap: 10px; padding-top: 10px; }
+    }
   </style>
 </head>
 <body>
-<div class="auth-screen">
+
+<!-- ── Site nav (matches index.html) ── -->
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">unisona.ai</span>
+  </a>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<main class="auth-main" id="main-content">
+
+  <!-- ── Hero ── -->
   <div class="auth-hero">
-    <img src="/mandala.svg" alt="" aria-hidden="true">
+    <img class="auth-hero__mandala" src="/mandala.svg" alt="" aria-hidden="true" width="116" height="116">
     <h1>unisona.ai</h1>
-    <p>Local-first personal operating system</p>
+    <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
   </div>
 
-  <div class="auth-gate" id="auth-gate">
-    <div class="auth-gate-kicker">Access Control</div>
+  <!-- ── Sign-in card ── -->
+  <div class="auth-card" id="auth-gate">
     <h2>Sign in</h2>
-    <p id="auth-message">
+    <p class="sub" id="auth-message">
       Choose how you'd like to continue. Your account is local-first — you own it.
     </p>
 
@@ -273,51 +227,46 @@
       <div class="local-toggle" id="local-toggle-wrap">
         New here? <a id="local-toggle">Create an account</a>
       </div>
-    </div>
-
-    <div class="auth-divider">support</div>
-    <div class="auth-actions">
-      <a class="btn-patreon-secondary" href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer">
-        View Patreon Tiers &amp; Support
-      </a>
-    </div>
-
-    <div class="auth-divider">or</div>
-
-    <div class="guest-section">
-      <p class="guest-label">Continue without an account</p>
-      <div class="guest-links">
-        <a href="/dream-chat.html" class="guest-link">
-          <span class="guest-link-icon">✦</span>
-          <div>
-            <div class="guest-link-name">Unisona Chat</div>
-            <div class="guest-link-desc">Talk to the Convergence Core — no account needed</div>
-          </div>
-        </a>
-        <a href="/explore.html" class="guest-link">
-          <span class="guest-link-icon">🗺️</span>
-          <div>
-            <div class="guest-link-name">Explore</div>
-            <div class="guest-link-desc">Kingdome, Three Doors &amp; more</div>
-          </div>
-        </a>
-        <a href="/knowledgecenter.html" class="guest-link">
-          <span class="guest-link-icon">📚</span>
-          <div>
-            <div class="guest-link-name">Help</div>
-            <div class="guest-link-desc">Docs, guides &amp; resources</div>
-          </div>
-        </a>
+      <div class="local-toggle" id="forgot-wrap">
+        <a id="forgot-link">Forgot password?</a>
       </div>
     </div>
 
-    <div class="auth-status" id="auth-status">
-      Checking session…
-    </div>
-  </div>
-</div>
+    <div class="auth-divider">support</div>
+    <a class="btn-ghost" href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener noreferrer">
+      View Patreon Tiers &amp; Support
+    </a>
 
+    <div class="auth-divider">or</div>
+    <a href="/" class="btn-ghost">Continue without an account</a>
+  </div>
+</main>
+
+<!-- ── Site footer (matches index.html) ── -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-brand">
+      <span class="dot" id="status-dot" title="Checking status…"></span>
+      unisona.ai
+    </span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/knowledgecenter.html">Help</a>
+    <span class="sep">·</span>
+    <span class="footer-meta"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span></span>
+  </div>
+</footer>
+
+<script src="/js/theme-toggle.js"></script>
 <script>
+  // Wire the header theme toggle (same helper the rest of the site uses).
+  (function () {
+    const t = document.getElementById('theme-toggle');
+    if (t && window.toggleTheme) t.addEventListener('click', window.toggleTheme);
+  })();
+
   // `guest` (level 0) is the authenticated FREE tier, not an anonymous visitor
   // (#1879) — label it "Free" to match profile.html and avoid the "logged out"
   // misread. The role KEY stays `guest` (persisted on existing sessions).
@@ -346,10 +295,15 @@
   // Provider display metadata (icon + label). Only providers the SERVER reports as
   // configured are actually rendered, so we never show a button that 500s (#1877).
   const PROVIDER_META = {
-    google:  { label: "Continue with Google",  icon: "G" },
-    discord: { label: "Continue with Discord", icon: "◈" },
-    patreon: { label: "Continue with Patreon", icon: "♥" },
+    discord: { label: "Connect with Discord", icon: "◈" },
+    google:  { label: "Connect with Google",  icon: "G" },
+    patreon: { label: "Connect with Patreon", icon: "♥" },
   };
+  // Always offer these three, in this order — even if the server hasn't got the
+  // client id/secret yet. An unconfigured one simply redirects back here with a
+  // friendly "not set up on this server" notice (surfaceQueryError) rather than
+  // being hidden, so the option is always visible.
+  const OAUTH_ORDER = ["discord", "google", "patreon"];
 
   function startOAuth(provider) {
     location.href = `/api/auth/${provider}/start?returnTo=${encodeURIComponent(safeReturnTo())}`;
@@ -358,25 +312,19 @@
   function renderProviders(providers) {
     const wrap = document.getElementById("provider-buttons");
     wrap.innerHTML = "";
-    let oauthCount = 0;
-    (providers || []).forEach((p) => {
-      if (p.id === "local") return; // local is the form, not a button
-      const meta = PROVIDER_META[p.id];
-      if (!meta) return;
-      oauthCount++;
+    // Render all three OAuth options every time, in the fixed order above.
+    OAUTH_ORDER.forEach((id) => {
+      const meta = PROVIDER_META[id];
       const btn = document.createElement("button");
       btn.className = "provider-btn";
-      btn.setAttribute("data-provider", p.id);
+      btn.setAttribute("data-provider", id);
       btn.innerHTML = `<span class="pi">${meta.icon}</span> ${meta.label}`;
-      btn.addEventListener("click", () => startOAuth(p.id));
+      btn.addEventListener("click", () => startOAuth(id));
       wrap.appendChild(btn);
     });
-    // Local block visibility.
+    // Local block visibility (email form).
     const hasLocal = (providers || []).some((p) => p.id === "local");
     document.getElementById("local-block").hidden = !hasLocal;
-    if (!oauthCount && !hasLocal) {
-      showError("No sign-in methods are configured on this server yet. You can still continue as a guest below.");
-    }
   }
 
   // ── Error surfacing (fixes #1877: no more blank 500s) ──
@@ -492,17 +440,28 @@
         renderProviders([]);
       }
     }
-    updateStatus("Ready to sign in");
   }
 
-  function updateStatus(message) {
-    const el = document.getElementById("auth-status");
-    if (el) el.textContent = message;
+  async function requestPasswordReset() {
+    const email = (document.getElementById("local-email").value || "").trim()
+      || (prompt("Enter your account email to reset your password:") || "").trim();
+    if (!email) return;
+    const errEl = document.getElementById("local-error");
+    try {
+      await fetch("/api/auth/request-password-reset", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch (_) { /* swallow — response is intentionally uniform */ }
+    // Uniform response (no account enumeration).
+    errEl.style.color = "var(--accent)";
+    errEl.textContent = `If an account exists for ${email}, a reset link is on its way.`;
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     setLocalMode("login");
     document.getElementById("local-form").addEventListener("submit", submitLocal);
+    document.getElementById("forgot-link").addEventListener("click", requestPasswordReset);
     checkSession();
   });
 </script>

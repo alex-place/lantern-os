@@ -14,7 +14,14 @@
 const crypto = require("crypto");
 const querystring = require("querystring");
 const { getProvider, resolveRole } = require("./auth-providers");
-const { getOrCreateFromIdentity, publicProfile } = require("./user-profiles");
+const {
+  getOrCreateFromIdentity,
+  getProfileByIdentity,
+  getProfile,
+  linkIdentity,
+  publicProfile,
+} = require("./user-profiles");
+const { sendNewSignInEmail } = require("./mailer");
 const { establishSession } = require("./session-identity");
 
 const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
@@ -113,7 +120,7 @@ function _redirectWithError(res, code, provider) {
  * Start an OAuth flow for `providerId`. On misconfiguration it redirects back to
  * /auth.html with a friendly error instead of dumping a raw 500 (#1877).
  */
-function handleOAuthStart(providerId, req, res, returnTo) {
+function handleOAuthStart(providerId, req, res, returnTo, opts = {}) {
   const provider = getProvider(providerId);
   if (!provider) {
     _redirectWithError(res, "unknown_provider", providerId);
@@ -129,12 +136,17 @@ function handleOAuthStart(providerId, req, res, returnTo) {
   const { verifier, challenge } = generatePkce();
   const state = crypto.randomBytes(16).toString("hex");
   const rt = safeReturnTo(returnTo, "/");
+  // Link mode: an already-signed-in user connecting another provider to THIS
+  // account. Carry the target profile id through the flow so the callback links
+  // instead of switching/creating an account (#profile-link).
+  const linkTo = opts.linkTo || null;
 
   req.session.pkce_verifier = verifier;
   req.session.oauth_state = state;
   req.session.oauth_provider = providerId;
   req.session.return_to = rt;
   req.session.redirect_uri = redirectUri;
+  req.session.oauth_link_to = linkTo;
 
   const params = {
     response_type: "code",
@@ -152,6 +164,7 @@ function handleOAuthStart(providerId, req, res, returnTo) {
     provider: providerId,
     return_to: rt,
     redirect_uri: redirectUri,
+    link_to: linkTo,
     exp: Date.now() + 10 * 60 * 1000,
   });
   const secure = redirectUri.startsWith("https://") ? "; Secure" : "";
@@ -219,13 +232,46 @@ async function handleOAuthCallback(providerId, req, res, query) {
     return res.end(JSON.stringify({ error: "State mismatch" }));
   }
 
+  // Link mode: connecting this provider to an already-signed-in account.
+  const linkTo = req.session.oauth_link_to || (ck && ck.link_to) || null;
+
   try {
     const token = await exchangeCode(provider, code, verifier, redirectUri);
     const accessToken = token.access_token;
     const user = await provider.fetchUser(accessToken);
     const role = resolveRole(provider, user);
 
-    const { profile } = getOrCreateFromIdentity(providerId, user, role);
+    // ── Link mode ── attach this identity to the current profile instead of
+    // switching/creating. Refuse if the identity already belongs to a DIFFERENT
+    // account (would hijack/merge). Keeps the existing session as-is.
+    if (linkTo) {
+      const owner = getProfileByIdentity(providerId, String(user.providerId));
+      if (owner && owner.id !== linkTo) {
+        res.writeHead(302, {
+          "Set-Cookie": clearCookie,
+          Location: `/profile.html?error=identity_in_use&provider=${providerId}`,
+        });
+        return res.end();
+      }
+      linkIdentity(linkTo, providerId, user.providerId, user.email, user.emailVerified === true);
+      // Security notice: a new sign-in method was added to the account.
+      const acct = getProfile(linkTo);
+      if (acct && acct.email) {
+        sendNewSignInEmail(acct.email, acct.name, provider.displayName || providerId).catch(() => {});
+      }
+      res.writeHead(302, {
+        "Set-Cookie": clearCookie,
+        Location: `/profile.html?linked=${providerId}`,
+      });
+      return res.end();
+    }
+
+    const { profile, linked } = getOrCreateFromIdentity(providerId, user, role);
+    // Auto-linked into an existing account (verified-email match) = a new sign-in
+    // method on an existing account → notify the owner.
+    if (linked && profile && profile.email) {
+      sendNewSignInEmail(profile.email, profile.name, provider.displayName || providerId).catch(() => {});
+    }
 
     // Resolve returnTo from the OLD session/cookie BEFORE regenerating the session
     // (regeneration drops the one-time flow state, which is what we want).
@@ -250,7 +296,12 @@ async function handleOAuthCallback(providerId, req, res, query) {
           res.writeHead(500, { "Content-Type": "application/json", "Set-Cookie": clearCookie });
           return res.end(JSON.stringify({ error: "Session save failed" }));
         }
-        res.writeHead(302, { Location: returnTo, "Set-Cookie": clearCookie });
+        // Clear the OAuth flow cookie AND the explicit-signout marker (a fresh
+        // login restores the local/dev admin bypass). #auth-signout
+        res.writeHead(302, {
+          Location: returnTo,
+          "Set-Cookie": [clearCookie, "ln_signout=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"],
+        });
         res.end();
       }
     );

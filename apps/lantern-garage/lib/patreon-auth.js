@@ -19,6 +19,7 @@ const { PROVIDERS } = require("./auth-providers");
 const { getProfile } = require("./user-profiles");
 const { getSessionUser } = require("./session-identity");
 const { roleLevel } = require("./role-hierarchy");
+const { SIGNOUT_COOKIE } = require("./auth-middleware");
 
 /** Start Patreon OAuth (delegates to the generic engine). */
 function handlePatreonStart(req, res, returnTo) {
@@ -61,14 +62,16 @@ function getSessionInfo(req) {
     };
   }
 
-  // Local-only admin bypass (matches auth-middleware isLocalBypass):
-  // dev port 4178, or LANTERN_LOCAL_ADMIN=1 on a loopback connection.
-  const devPort = req.socket && req.socket.localPort;
-  const ip = (req.socket && req.socket.remoteAddress) || "";
-  const loopbackAdmin =
-    process.env.LANTERN_LOCAL_ADMIN === "1" &&
-    (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1");
-  if (devPort === 4178 || loopbackAdmin) {
+  // Local-only admin bypass. Delegate to the SINGLE hardened check in
+  // auth-middleware (isLocalBypass) — it additionally denies the bypass whenever
+  // the request carries any proxy/tunnel header (cf-ray, x-forwarded-for, …), so
+  // public traffic reaching the local server through the Cloudflare tunnel is
+  // NOT auto-authenticated as admin. This previously had its own un-hardened copy
+  // that only checked the loopback socket, which made every unisona.ai visitor
+  // "Dev/admin" and made /auth.html redirect away before anyone could sign in.
+  // Lazy-required to avoid any module load-order cycle.
+  const { isLocalBypass } = require("./auth-middleware");
+  if (isLocalBypass(req)) {
     return {
       authenticated: true,
       role: "admin",
@@ -82,18 +85,25 @@ function getSessionInfo(req) {
 
 /** Logout: destroy the session. */
 function handleLogout(req, res) {
+  // Drop a short-lived marker so the local/dev-port admin bypass is suppressed —
+  // otherwise "Sign out" is a no-op on port 4178 (the bypass re-logs-in "Dev" on
+  // the next request). Cleared when the user logs back in. #auth-signout
+  const signoutCookie =
+    `${SIGNOUT_COOKIE}=1; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax`;
+  const done = (status, body) => {
+    res.writeHead(status, {
+      "Content-Type": "application/json",
+      "Set-Cookie": signoutCookie,
+    });
+    res.end(JSON.stringify(body));
+  };
   if (req.session) {
     req.session.destroy((err) => {
-      if (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ error: err.message }));
-      }
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true }));
+      if (err) return done(500, { error: err.message });
+      done(200, { ok: true });
     });
   } else {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true }));
+    done(200, { ok: true });
   }
 }
 

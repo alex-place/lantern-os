@@ -946,6 +946,29 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         return sendJson(res, await suggest.getSuggestions({ limit, collector }), 200), true;
       }
 
+      // GET — Screener: a broad market board sorted by OUR grounded edge (not just
+      // volume). Attaches the edge badge (cached grounding + fees + Brier) to every
+      // market; grounded/mispriced markets rank first. Verso sorts by what moved; we
+      // sort by what's WRONG. Filters: ?sort=edge|volume|close &groundedOnly=1
+      // &minEdge=<cents> &q=<search> &category=<substr> &rows=<n>.
+      if (url.pathname === '/api/trading/kalshi/screener' && req.method === 'GET') {
+        const screener = require('../lib/kalshi-screener');
+        const mr = await kalshi.getMarkets({ status: 'open', limit: Math.min(Number(q.limit) || 300, 1000) });
+        const markets = (mr.ok && mr.data && Array.isArray(mr.data.markets)) ? mr.data.markets : [];
+        const rows = screener.buildRows(markets, {
+          groundedOnly: q.groundedOnly === '1',
+          minEdge: q.minEdge != null && q.minEdge !== '' ? Number(q.minEdge) : undefined,
+          q: q.q, category: q.category, sort: q.sort,
+          limit: Math.min(Number(q.rows) || 150, 400),
+        });
+        return sendJson(res, {
+          count: rows.length, total: markets.length,
+          generatedAt: new Date().toISOString(),
+          note: markets.length ? undefined : 'no open markets returned (rate-limited or off-hours)',
+          rows,
+        }, 200), true;
+      }
+
       // GET — Convergence-optimized games (ideal time window + conviction + momentum)
       if (url.pathname === '/api/trading/kalshi/convergence-ranked' && req.method === 'GET') {
         const suggest = require('../lib/kalshi-suggest');
@@ -1306,6 +1329,12 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
 
           // Step 6: Return top 6 trades (focused, decisive deck)
           const decisive = scored.slice(0, 6);
+
+          // Attach the grounded EDGE badge (market price · our P(YES) · edge after fees ·
+          // Brier) — the moat surface. Uses CACHED grounding only, so no LLM call on the
+          // render path; ungrounded markets get { grounded:false }.
+          try { require('../lib/kalshi-edge').attachEdges(decisive); }
+          catch (e) { console.warn('[Decisive Deck] edge attach failed:', e.message); }
 
           return sendJson(res, {
             count: decisive.length,

@@ -230,6 +230,30 @@ class IbkrCpapi {
     return normalizeSummary(r.json);
   }
 
+  /** GET /iserver/account/pnl/partitioned → { dailyPnl, unrealizedPnl, realizedPnl } for
+   *  this account, or null. IBKR's `dpl` is the broker-authoritative DAY P&L (it reconciles
+   *  with the day's equity change); `upl`/`rpl` are today's unrealized/realized. Response
+   *  keys look like "U1234567.Core" and vary by build, so match defensively. */
+  async getPnl(accountId) {
+    const id = accountId || (await this.resolveAccountId());
+    if (!id) return null;
+    const r = await this._request('GET', '/iserver/account/pnl/partitioned');
+    if (!r.ok || !r.json || typeof r.json !== 'object') return null;
+    const rows = (r.json.upnl && typeof r.json.upnl === 'object') ? r.json.upnl : r.json;
+    let row = null;
+    for (const [k, v] of Object.entries(rows)) {
+      if (!v || typeof v !== 'object' || !('dpl' in v || 'upl' in v)) continue;
+      if (String(k).startsWith(id)) { row = v; break; } // our account's row wins
+      if (!row) row = v;                                 // else first PnL-shaped row
+    }
+    if (!row) return null;
+    return {
+      dailyPnl: firstNum(row.dpl),
+      unrealizedPnl: firstNum(row.upl),
+      realizedPnl: firstNum(row.rpl),
+    };
+  }
+
   /** GET /portfolio/{acct}/positions/{page} (paginated) → normalized positions[]. */
   async getPositions(accountId, { maxPages = 5 } = {}) {
     const id = accountId || (await this.resolveAccountId());

@@ -10,11 +10,35 @@ const {
   setUserRole,
   deleteProfile,
   linkDiscordAccount,
+  unlinkIdentity,
   exportToCSF,
   importFromCSF,
   publicProfile,
+  getProfileByEmail,
+  verifyPassword,
+  setLocalPassword,
 } = require("../lib/user-profiles");
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
+const { createToken } = require("../lib/auth-tokens");
+const { sendVerificationEmail } = require("../lib/mailer");
+
+const ACCOUNT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ACCOUNT_MIN_PW = 8;
+function accountOrigin(req) {
+  const host = (req.headers && req.headers.host) || "127.0.0.1";
+  const proto =
+    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
+    (req.socket && req.socket.encrypted ? "https" : "http");
+  return `${proto}://${host}`;
+}
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
+    req.on("error", () => resolve(null));
+  });
+}
 
 module.exports = async function profileRoutes(req, res, url, deps) {
   const path = url.pathname;
@@ -103,6 +127,103 @@ module.exports = async function profileRoutes(req, res, url, deps) {
       }
     });
     return true;
+  }
+
+  // POST /api/profiles/me/unlink — Disconnect a linked provider from the current
+  // account. Refuses to remove the last remaining login method (server-guarded).
+  if (method === "POST" && path === "/api/profiles/me/unlink") {
+    const userId = getSessionUserId(req);
+    if (!userId) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Not authenticated" }));
+    }
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; if (body.length > 1e6) req.destroy(); });
+    req.on("end", () => {
+      try {
+        const { provider } = JSON.parse(body || "{}");
+        if (!provider) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "provider is required" }));
+        }
+        const result = unlinkIdentity(userId, String(provider));
+        if (result.error) {
+          const status = result.error === "last_login_method" ? 409
+            : result.error === "not_linked" ? 400 : 404;
+          res.writeHead(status, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: result.error }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, profile: publicProfile(result.profile) }));
+      } catch (err) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return true;
+  }
+
+  // POST /api/profiles/me/change-password { currentPassword?, newPassword }
+  // If the account already has a password, currentPassword must match. If it has
+  // none (OAuth-only), this SETS one (no current required).
+  if (method === "POST" && path === "/api/profiles/me/change-password") {
+    const userId = getSessionUserId(req);
+    if (!userId) { res.writeHead(401, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "Not authenticated" })); }
+    const b = await readBody(req);
+    if (!b) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_json" })); }
+    const profile = getProfile(userId);
+    if (!profile) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
+    const newPassword = String(b.newPassword || "");
+    if (newPassword.length < ACCOUNT_MIN_PW) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "weak_password", detail: `min ${ACCOUNT_MIN_PW} chars` }));
+    }
+    if (profile.credential) {
+      if (!verifyPassword(String(b.currentPassword || ""), profile.credential)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "wrong_password" }));
+      }
+    }
+    setLocalPassword(userId, newPassword);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, hadPassword: !!profile.credential }));
+  }
+
+  // POST /api/profiles/me/change-email { email } — stores the new address as
+  // pending and emails a confirmation link; the address only becomes active once
+  // that link is clicked (routes/auth verify-email).
+  if (method === "POST" && path === "/api/profiles/me/change-email") {
+    const userId = getSessionUserId(req);
+    if (!userId) { res.writeHead(401, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "Not authenticated" })); }
+    const b = await readBody(req);
+    const email = String((b && b.email) || "").trim().toLowerCase();
+    if (!ACCOUNT_EMAIL_RE.test(email)) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_email" })); }
+    const profile = getProfile(userId);
+    if (!profile) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
+    const clash = getProfileByEmail(email);
+    if (clash && clash.id !== userId) { res.writeHead(409, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "email_taken" })); }
+    updateProfile(userId, { pendingEmail: email });
+    const token = createToken("verify_email", userId, email);
+    const link = `${accountOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const r = await sendVerificationEmail(email, profile.name, link);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, pending: email, delivery: r.transport }));
+  }
+
+  // POST /api/profiles/me/resend-verification — re-send the confirmation email to
+  // the account's (pending or current) address.
+  if (method === "POST" && path === "/api/profiles/me/resend-verification") {
+    const userId = getSessionUserId(req);
+    if (!userId) { res.writeHead(401, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "Not authenticated" })); }
+    const profile = getProfile(userId);
+    if (!profile) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
+    const target = profile.pendingEmail || profile.email;
+    if (!target) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "no_email" })); }
+    const token = createToken("verify_email", userId, profile.pendingEmail || null);
+    const link = `${accountOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const r = await sendVerificationEmail(target, profile.name, link);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, sentTo: target, delivery: r.transport }));
   }
 
   // GET /api/profiles/:userId — Get any user's public profile (admin-only)

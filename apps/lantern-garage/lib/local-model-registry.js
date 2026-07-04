@@ -92,7 +92,7 @@ const DEFAULTS = [
                                   // competes on coding/reasoning/default.
     rank: 0,                      // kernel lead; rank-order escape via LOCAL_CAPABILITY_FIRST=0
     capabilityScore: 0.4,
-    note: "Recurrent-depth Σ₀ kernel (#1292). Kernel-only since the PLT coder became the sole local coding default.",
+    note: "Recurrent-depth Σ₀ kernel (#1292). Kernel-only since the PLT coder became the sole local coding default. Its Σ₀ adapter is improved offline by the crystallization flywheel — a LOCAL Qwen2.5-Coder-7B teacher distills execution-verified traces into this student (scripts/gen_sigma0_traces.py --teacher qwen2.5-coder:7b; docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md), eval-gated on HumanEval before final/ swaps.",
   },
   {
     id: "keystone-ft",

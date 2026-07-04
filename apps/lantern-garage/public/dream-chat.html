@@ -102,6 +102,49 @@
   }
   #drop-overlay.active { display: flex; }
   #drop-overlay .drop-sub { font-size: 0.85rem; font-weight: 400; opacity: .75; }
+
+  /* ── Model picker (custom dropdown over a hidden <select>) ── */
+  .model-bar { display: flex; margin: 0 0 8px 2px; }
+  .mp-hidden-select { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .model-picker { position: relative; }
+  .model-picker-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 12px; border-radius: 9999px;
+    border: 1px solid var(--border); background: var(--surface, #111827);
+    color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .model-picker-btn:hover { border-color: var(--accent); }
+  .model-picker.open .model-picker-btn { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .mp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .mp-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-caret { color: var(--muted); transition: transform .18s; }
+  .model-picker.open .mp-caret { transform: rotate(180deg); }
+
+  .model-picker-menu {
+    position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 60;
+    min-width: 210px; max-height: 320px; overflow-y: auto;
+    padding: 6px; border-radius: 14px;
+    border: 1px solid var(--border); background: var(--surface, #111827);
+    box-shadow: 0 18px 50px rgba(0,0,0,.4);
+    opacity: 0; transform: translateY(6px) scale(.98); pointer-events: none;
+    transition: opacity .15s, transform .15s;
+  }
+  .model-picker.open .model-picker-menu { opacity: 1; transform: none; pointer-events: auto; }
+  .mp-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 11px; border-radius: 10px; cursor: pointer;
+    font-size: 13.5px; color: var(--text); line-height: 1.2;
+  }
+  .mp-item:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .mp-item .mp-item-emoji { width: 18px; text-align: center; flex-shrink: 0; }
+  .mp-item .mp-item-name { flex: 1; }
+  .mp-item .mp-check { color: var(--accent); opacity: 0; }
+  .mp-item.selected .mp-check { opacity: 1; }
+  .mp-item.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .mp-item.disabled { opacity: .4; cursor: not-allowed; }
+  .mp-item.disabled:hover { background: none; }
+  .mp-item.disabled .mp-lock { margin-left: auto; font-size: 11px; color: var(--muted); }
 </style>
 
 </head>
@@ -142,6 +185,24 @@
     <!-- Input area -->
     <div class="input-container">
       <div id="attach-chips" class="attach-chips" aria-live="polite"></div>
+
+      <!-- Model picker — a styled dropdown backed by the hidden #provider-select
+           that the provider machinery (dream-chat-ui.js) populates + gates. -->
+      <div class="model-bar">
+        <div class="model-picker" id="model-picker">
+          <button type="button" class="model-picker-btn" id="model-picker-btn"
+                  aria-haspopup="listbox" aria-expanded="false" title="Choose which AI answers">
+            <span class="mp-dot" aria-hidden="true"></span>
+            <span class="mp-label" id="mp-label">Auto</span>
+            <svg class="mp-caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="model-picker-menu" id="model-picker-menu" role="listbox" aria-label="AI model"></div>
+        </div>
+        <select id="provider-select" class="mp-hidden-select" aria-hidden="true" tabindex="-1">
+          <option value="">Auto</option>
+        </select>
+      </div>
+
       <div class="input-wrapper">
         <button id="attach-btn" class="attach-btn" type="button" aria-label="Upload a file" onclick="lanternAttach.pickAny()" title="Upload a file">+</button>
         <button id="voice-input-btn" class="attach-btn" type="button" aria-label="Speak — voice to text (Ctrl+Shift+M)" aria-pressed="false" onclick="if(window.toggleVoice)window.toggleVoice()" title="Speak (voice to text) · Ctrl/Cmd+Shift+M">🎙️</button>
@@ -334,19 +395,12 @@
 
   let _lastPlanState = null;
   function gateProviderOptions() {
-    if (!_lastPlanState) return;
-    const { role, plan } = _lastPlanState;
+    // Every AI model is available on the free tier — the dropdown only ever lists
+    // providers the server can actually dispatch to (buildProviderDropdown), so
+    // there is nothing to lock. (Per-role limits are message counts, not models.)
     const provider = document.getElementById("provider-select");
     if (!provider) return;
-    [...provider.options].forEach((option) => {
-      const value = option.value || "auto";
-      const allowed = role === "admin"
-        || value === "auto"
-        || value === "ollama"
-        || plan.modelAccess.includes(value)
-        || (value === "keystone-ft" && ["deep_dreamer", "founder", "admin"].includes(role));
-      option.disabled = !allowed;
-    });
+    [...provider.options].forEach((option) => { option.disabled = false; });
   }
   window.gateProviderOptions = gateProviderOptions;
 
@@ -423,6 +477,68 @@
 <script src="/vendor/html2canvas/html2canvas.min.js"></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>
 <script src="js/convergance-sync.js"></script>
+<script>
+// ── Custom model-picker UI over the hidden #provider-select ──────────────────
+// The select is still the source of truth (populated + tier-gated by
+// dream-chat-ui.js; read on send by dream-chat.js). This just gives it a nice,
+// on-brand dropdown and mirrors it both ways.
+(function modelPicker() {
+  const select = document.getElementById('provider-select');
+  const picker = document.getElementById('model-picker');
+  const btn    = document.getElementById('model-picker-btn');
+  const menu   = document.getElementById('model-picker-menu');
+  const label  = document.getElementById('mp-label');
+  if (!select || !picker || !btn || !menu || !label) return;
+
+  const EMOJI = { '': '✦', auto: '✦', claude: '◆', openai: '✺', gemini: '✧', grok: '𝕏', deepseek: '🐋', mistral: '🌬', perplexity: '❖', cohere: '⌘', ollama: '🜁', 'keystone-ft': '⬡' };
+  const emojiFor = (v) => EMOJI[v] ?? '◈';
+
+  function syncLabel() {
+    const opt = select.selectedOptions[0] || select.options[0];
+    label.textContent = opt ? opt.textContent.trim() : 'Auto';
+  }
+
+  function buildMenu() {
+    menu.innerHTML = '';
+    [...select.options].forEach((opt) => {
+      const item = document.createElement('div');
+      item.className = 'mp-item'
+        + (opt.selected ? ' selected' : '')
+        + (opt.disabled ? ' disabled' : '');
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', String(opt.selected));
+      item.innerHTML = `<span class="mp-item-emoji">${emojiFor(opt.value)}</span>`
+        + `<span class="mp-item-name"></span>`
+        + (opt.disabled ? `<span class="mp-lock">🔒 upgrade</span>` : `<span class="mp-check">✓</span>`);
+      item.querySelector('.mp-item-name').textContent = opt.textContent.trim();
+      if (!opt.disabled) {
+        item.addEventListener('click', () => {
+          select.value = opt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          syncLabel(); buildMenu(); close();
+        });
+      }
+      menu.appendChild(item);
+    });
+  }
+
+  function open()  { picker.classList.add('open');  btn.setAttribute('aria-expanded', 'true');  buildMenu(); }
+  function close() { picker.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
+  function toggle(){ picker.classList.contains('open') ? close() : open(); }
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+  document.addEventListener('click', (e) => { if (!picker.contains(e.target)) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+  // Keep the button label + (open) menu in sync when the select is repopulated or
+  // re-gated by dream-chat-ui.js, or changed programmatically (?provider= handoff).
+  select.addEventListener('change', () => { syncLabel(); if (picker.classList.contains('open')) buildMenu(); });
+  new MutationObserver(() => { syncLabel(); if (picker.classList.contains('open')) buildMenu(); })
+    .observe(select, { childList: true, subtree: true, attributes: true });
+
+  syncLabel();
+})();
+</script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>

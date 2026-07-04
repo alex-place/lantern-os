@@ -140,15 +140,87 @@ const deps = {
 // non-entitled account (e.g. Deep Dreamer/founder without trade access) cannot
 // reach /api/trading/* directly. Runs before routes/trading. Admins and the
 // local bypass pass through (see auth-middleware.requireEntitlement).
-const { requireEntitlement } = require("./lib/auth-middleware");
+const { requireEntitlement, isAdmin } = require("./lib/auth-middleware");
+// Read-only market-data GETs with NO account/order state — served to everyone so
+// the logged-out chart view (guest-mode stock-trader.html) renders from the exact
+// same endpoints the live terminal uses (a true 1:1 copy, no duplicated data
+// layer). Everything NOT on this list (positions, orders, order placement,
+// agent-log, calibration, overnight-scan, all mutations) stays trade-gated.
+const PUBLIC_TRADING_READS = new Set([
+  "/api/trading/watchlist",         // GET → server default watchlist (not per-user)
+  "/api/trading/watchlist-prices",  // live quotes
+  "/api/trading/bars-multi",        // OHLCV for the charts
+  "/api/trading/market-status",     // VIX / regime / SPY trend / session
+  "/api/trading/zones",             // S/R zones (derived from bars)
+  "/api/trading/symbols/search",    // symbol-search popup (broker asset universe)
+  "/api/trading/symbol-stats",      // Yahoo returns/technicals
+  "/api/trading/symbol-info",       // name/exchange/asset_class
+  "/api/trading/logo",              // brand-logo proxy
+  "/api/trading/news/recent",       // public news feed
+]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
+  if (req.method === "GET" && PUBLIC_TRADING_READS.has(url.pathname)) return false; // public read → fall through
   if (requireEntitlement(req, res, "trade")) return false;     // allowed → fall through
   return true;                                                  // blocked → 403/302 already sent
 }
 
+// ── Orchestration control gate (admin-only) ──────────────────────────────────
+// orchestration.html is a public read-only fleet view (guests + non-admins see
+// status panels only). Its CONTROL endpoints — save provider/GPU keys, dispatch
+// training, toggle the autonomous fleet, run autowork — carry NO auth of their
+// own, so making the page public would otherwise let anyone POST to them. We gate
+// them here to admin (the local owner passes via isLocalBypass; real admin
+// sessions pass). The key GETs are gated too: even masked, they leak which
+// providers are configured. Everything else (Work Board, PR Lanes, Agent Slots,
+// reliance, calibration, rollover) stays public read-only. Order matters: this
+// runs before the route handlers, which have no auth check themselves.
+const ADMIN_ONLY_CONTROL = {
+  // exact-path endpoints → set of methods that require admin ("*" = all methods)
+  "/api/providers/keys":                     "*",  // GET(masked)+POST(save key)
+  "/api/gpu-training/keys":                  "*",  // GET(masked)+POST(save key)
+  "/api/gpu-training/dispatch":              "*",  // fire a training job
+  "/api/gpu-training/dispatch-all":          "*",
+  "/api/gpu-training/poll":                  "*",
+  "/api/convergence/auto-dispatch/toggle":   "*",  // autonomous-fleet kill switch
+  "/api/convergence/autonomous-work":        "*",  // run an issue autonomously
+  "/api/convergence/autonomous-work/stream": "*",  // SSE autonomous work
+  "/api/research/repo/learn":                "*",  // trigger repo→memory learning
+};
+function orchestrationControlGuard(req, res, url) {
+  const rule = ADMIN_ONLY_CONTROL[url.pathname];
+  if (!rule) return false;                         // not a controlled endpoint → continue
+  if (rule !== "*" && rule !== req.method) return false;
+  if (isAdmin(req)) return false;                  // admin / local owner → allow
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "admin_required", detail: "Orchestration control is admin-only." }));
+  return true;                                      // blocked
+}
+
+// ── Autonomous AI-trader gate ($200 Synthesasia Guild tier / admin) ──────────
+// The $20 Deep Dreamer tier unlocks manual trading + AI *suggestions* (the whole
+// /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the
+// system records/executes trades on the user's behalf — is a $200 capability, so
+// its execution endpoint requires admin (the $200 Synthesasia Guild role; the
+// local owner passes via isLocalBypass, keeping the server-side autonomous loop
+// working). Runs after tradeApiGuard, so $20 users are already past the trade gate
+// and only get stopped here for autonomous execution.
+const AI_TRADER_ADMIN = {
+  "/api/trading/ai-trader/trades": "POST", // record/execute an autonomous trade
+};
+function aiTraderGuard(req, res, url) {
+  const rule = AI_TRADER_ADMIN[url.pathname];
+  if (!rule || rule !== req.method) return false;   // not a gated autonomous op → continue
+  if (isAdmin(req)) return false;                    // $200 tier / local owner → allow
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "tier_required", detail: "The autonomous AI trader requires the $200 tier." }));
+  return true;                                        // blocked
+}
+
 const routes = [
-  tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement
+  tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement ($20+)
+  aiTraderGuard,                        // gate autonomous AI-trader execution to $200/admin
+  orchestrationControlGuard,            // gate orchestration control endpoints to admin
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)

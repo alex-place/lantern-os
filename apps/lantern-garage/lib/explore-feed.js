@@ -42,6 +42,12 @@ const REPO_BLOB = "https://github.com/alex-place/lantern-os/blob/master/";
 
 const PER_SOURCE_TIMEOUT_MS = 8000;
 
+// Yahoo (and some aggregators) attach a GENERIC site banner as a headline item's
+// "image" (e.g. s.yimg.com/.../yahoo_finance_en-US_…png, a ~354×50 wordmark) — not an
+// article photo. Rendered as a cover it upscales + crops into an ugly zoom, so we
+// reject these and fall back to the ticker logo (contained) or the generated cover.
+const JUNK_NEWS_IMAGE = /yimg\.com\/(?:rz|cv|ny)\/|yahoo_finance|_placeholder|\/default[-_.]|(?:^|\/)logo[-_.]?\d*\.(?:png|jpe?g)(?:\?|$)/i;
+
 function keyForSource(source) {
   return "source:" + String(source || "unknown");
 }
@@ -354,7 +360,8 @@ function financeCards(ctx) {
     // ticker's company logo; (3) a clean minimal finance cover (glyph + source).
     // The browser loads (1)/(2) directly — same-origin TLS interception doesn't
     // affect <img>. A broken logo falls back to the minimal cover via imageFallback.
-    const realImg = r.image && /^https:\/\//i.test(r.image) ? r.image : "";
+    const realImg = (r.image && /^https:\/\//i.test(r.image) && !JUNK_NEWS_IMAGE.test(r.image))
+      ? r.image : "";
     const primary = (symbols[0] || "").toUpperCase();
     // Only A–Z tickers have a stock logo (skip crypto/FX like BTCUSD, indices stay
     // best-effort). Company-logo-by-ticker via Financial Modeling Prep (no key).
