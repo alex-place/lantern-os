@@ -852,6 +852,19 @@ boundary rather than resting in a deep contracting basin.
 > model, and motivated by STARS (arXiv 2605.26733), which stabilizes looped-LM depth via
 > Jacobian spectral-radius regularization. See
 > [ADR-0021](adr/0021-serving-substrate-retain-ouro-custom-loop.md).
+>
+> **✓ DONE (2026-07-04) — the real loop *is* measured, and it CONTRACTS.**
+> `experiments/sigma0_loop_jacobian.py` hooks Ouro-1.4B-Thinking's `OuroModel.forward` and reads the
+> **actual per-recurrent-step hidden-state trajectory** (`hidden_states_list`, dim 2048) — the real latent
+> loop, not a text-surface fit. Over 8 prompts × all token positions, run to depth **12** (3× the trained 4,
+> a STARS depth-scaling probe): **ρ_observed = geomean ‖Δh_{t+1}‖ / ‖Δh_t‖ = 0.88 < 1 → the loop CONTRACTS
+> toward a fixed point**, and keeps settling with depth (median last/first step-change ratio **0.15**). The
+> real answer is the *opposite* of the debunked `ρ=1.064` "near-boundary" reading — the loop is comfortably
+> contracting, and shows **no** STARS-style collapse when over-iterated here. Honest caveats: ~**34%** of
+> individual steps momentarily expand (the non-normal transient the §1.2 full-spectrum test exists for — the
+> aggregate still contracts), fp16, the "Thinking" variant, 8 prompts. Evidence class: **MEASURED**
+> (`data/sigma0/loop_jacobian_report.json`) — an observed convergence rate, not a certified Jacobian
+> eigenvalue. This retires the "deferred" status above.
 
 > **Now certified in the matching time domain (2026-07-04, [#1988]).** `ρ` is a
 > *discrete-time* quantity — the step map `x_{k+1}=A x_k` contracts iff `ρ(A) < 1` —

@@ -1,0 +1,152 @@
+{
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "hidden_dim": 2048,
+  "trained_depth": 4,
+  "probed_depth": 12,
+  "n_prompts": 8,
+  "rho_observed_geomean": 0.8796,
+  "rho_observed_meaning": "geometric-mean per-step contraction ratio ||dh_{t+1}||/||dh_t|| over all (prompt,token,step); <1 = loop contracts to a fixed point",
+  "fraction_steps_expanding": 0.337,
+  "median_first_to_last_delta_ratio": 0.149,
+  "first_to_last_meaning": "median of ||last step change|| / ||first step change||; <1 means the iteration settles as depth grows",
+  "vs_debunked_certificate_rho": "certificate rho=1.064 was a fit over 4 text-surface features (see rho_controls.py); this is the real latent loop, observed not fitted",
+  "per_prompt": [
+    {
+      "prompt": "The capital of France is",
+      "step_deltas_last_token": [
+        27.823,
+        17.894,
+        9.792,
+        6.124,
+        5.216,
+        2.711,
+        2.648,
+        2.302,
+        2.211,
+        2.35,
+        2.066
+      ],
+      "geomean_ratio_last_token": 0.771
+    },
+    {
+      "prompt": "Two plus two equals",
+      "step_deltas_last_token": [
+        27.177,
+        14.189,
+        8.239,
+        4.626,
+        2.943,
+        2.667,
+        3.198,
+        5.647,
+        4.682,
+        2.26,
+        2.652
+      ],
+      "geomean_ratio_last_token": 0.7924
+    },
+    {
+      "prompt": "The mitochondria is the powerhouse of the",
+      "step_deltas_last_token": [
+        27.313,
+        17.074,
+        11.223,
+        8.575,
+        6.451,
+        5.493,
+        5.492,
+        5.511,
+        5.644,
+        5.47,
+        5.799
+      ],
+      "geomean_ratio_last_token": 0.8564
+    },
+    {
+      "prompt": "In 1969, humans first landed on the",
+      "step_deltas_last_token": [
+        53.169,
+        21.275,
+        9.216,
+        5.907,
+        6.348,
+        5.536,
+        5.068,
+        10.048,
+        9.061,
+        5.486,
+        3.237
+      ],
+      "geomean_ratio_last_token": 0.7559
+    },
+    {
+      "prompt": "def add(a, b):\n    return",
+      "step_deltas_last_token": [
+        21.093,
+        12.331,
+        6.68,
+        6.472,
+        6.264,
+        4.921,
+        4.118,
+        8.311,
+        7.538,
+        3.828,
+        3.272
+      ],
+      "geomean_ratio_last_token": 0.83
+    },
+    {
+      "prompt": "The opposite of hot is",
+      "step_deltas_last_token": [
+        16.472,
+        23.204,
+        7.481,
+        4.566,
+        4.807,
+        3.205,
+        2.799,
+        2.871,
+        2.275,
+        2.482,
+        2.171
+      ],
+      "geomean_ratio_last_token": 0.8166
+    },
+    {
+      "prompt": "Water is made of hydrogen and",
+      "step_deltas_last_token": [
+        21.146,
+        9.929,
+        6.938,
+        6.686,
+        5.922,
+        5.939,
+        5.053,
+        11.818,
+        10.016,
+        11.511,
+        11.144
+      ],
+      "geomean_ratio_last_token": 0.938
+    },
+    {
+      "prompt": "She opened the door and saw",
+      "step_deltas_last_token": [
+        32.977,
+        9.933,
+        4.844,
+        3.763,
+        3.359,
+        3.279,
+        2.911,
+        2.617,
+        2.432,
+        2.731,
+        1.999
+      ],
+      "geomean_ratio_last_token": 0.7555
+    }
+  ],
+  "honest_scope": "Observed contraction of the REAL recurrent hidden-state trajectory (not a fitted Jacobian, so no fit-artifact). rho_observed is a geometric-mean linear convergence rate, robust to non-normal transients only in aggregate. Measured at probed depth 12 (> trained 4) to test STARS-style depth scaling on Ouro."
+}
