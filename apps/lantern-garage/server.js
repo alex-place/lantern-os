@@ -197,8 +197,29 @@ function orchestrationControlGuard(req, res, url) {
   return true;                                      // blocked
 }
 
+// ── Autonomous AI-trader gate ($200 Synthesasia Guild tier / admin) ──────────
+// The $20 Deep Dreamer tier unlocks manual trading + AI *suggestions* (the whole
+// /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the
+// system records/executes trades on the user's behalf — is a $200 capability, so
+// its execution endpoint requires admin (the $200 Synthesasia Guild role; the
+// local owner passes via isLocalBypass, keeping the server-side autonomous loop
+// working). Runs after tradeApiGuard, so $20 users are already past the trade gate
+// and only get stopped here for autonomous execution.
+const AI_TRADER_ADMIN = {
+  "/api/trading/ai-trader/trades": "POST", // record/execute an autonomous trade
+};
+function aiTraderGuard(req, res, url) {
+  const rule = AI_TRADER_ADMIN[url.pathname];
+  if (!rule || rule !== req.method) return false;   // not a gated autonomous op → continue
+  if (isAdmin(req)) return false;                    // $200 tier / local owner → allow
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "tier_required", detail: "The autonomous AI trader requires the $200 tier." }));
+  return true;                                        // blocked
+}
+
 const routes = [
-  tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement
+  tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement ($20+)
+  aiTraderGuard,                        // gate autonomous AI-trader execution to $200/admin
   orchestrationControlGuard,            // gate orchestration control endpoints to admin
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
