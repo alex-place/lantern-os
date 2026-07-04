@@ -10,7 +10,8 @@
   "scripts": {
     "start": "node launcher.js",
     "start:no-open": "node launcher.js --no-open",
-    "build:exe": "node ../../../scripts/build-desktop-exe.mjs"
+    "build:exe": "node ../../../scripts/build-desktop-exe.mjs",
+    "build:installer": "node ../../../scripts/build-desktop-installer.mjs"
   },
   "engines": {
     "node": ">=20"

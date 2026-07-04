@@ -105,10 +105,26 @@ Build steps (ADR-0014 §Follow-ups):
      2024**, it buys the *same* reputation ramp as the free options — strictly worse.
      Dropped. (Cloudflare and Google/Vertex credits cannot sign a Windows exe
      either — different certificate type.)
-4. **Installer / package** — **MSIX** for the Store channel (Microsoft handles
-   install + update); **Inno Setup** for the SignPath direct-download channel,
-   laying `unisona.exe` + the app tree into `%LOCALAPPDATA%\unisona` and (optionally)
-   setting `UNISONA_SERVER_DIR`. **No `node.exe`** — `unisona.exe` is the runtime.
+4. **Installer / package** — for the SignPath direct-download channel, ✅ **wired**
+   via **Inno Setup** ([`unisona.iss`](unisona.iss), driven by
+   [`scripts/build-desktop-installer.mjs`](../../../scripts/build-desktop-installer.mjs)):
+   ```bash
+   node scripts/build-desktop-installer.mjs
+   # or: npm run build:installer --prefix apps/lantern-garage/desktop
+   # → apps/lantern-garage/desktop/dist/Unisona-Setup-<version>.exe
+   ```
+   It stages the payload with the repo-mirroring layout (`resources/app` = the garage
+   app, `src/` + root `node_modules` at the install root, so the Core's
+   `../../../src` requires resolve), then compiles a **per-user** installer (no admin,
+   no UAC) that lays the app into `%LOCALAPPDATA%\unisona`. **No `node.exe`** —
+   `unisona.exe` is the runtime. A **completeness guard** fails the build if any
+   declared dependency is absent from the staged `node_modules`, so a bundle that
+   won't boot can't ship. *Verified on Windows:* build → silent-install → the
+   installed `unisona.exe` boots the Core (HTTP 200 on loopback) → clean uninstall.
+   **Build prereqs:** Inno Setup 6 (`winget install JRSoftware.InnoSetup`) and a
+   checkout with a complete `npm ci` — built from a checkout with **no running
+   server** (a live server holds `node_modules` handles and the copy skips them).
+   The **MSIX / Microsoft-Store** channel is separate (Store handles install+update).
 
 ## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 
