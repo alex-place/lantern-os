@@ -2,6 +2,11 @@
 // Verifies the four workspace tools (workspace_read, workspace_write, workspace_list,
 // create_document) and the _safeWs path-escape guard.
 //
+// All workspace tools are OPERATOR-ONLY (no guest_safe): WORKSPACE is a single shared
+// directory of personal artifacts, so #1213's filesystem-tool gate applies. Every runTool
+// call therefore passes { operator: true } — guest access would leak one user's files to
+// another on the public multi-tenant server. (Local users chat via loopback = operator.)
+//
 // Run: node apps/lantern-garage/test/workspace-tools.test.js
 const assert = require("assert");
 const fs = require("fs");
@@ -51,12 +56,12 @@ async function main() {
 
   await check("workspace_read returns file content", async () => {
     fs.writeFileSync(path.join(TMP_WS, "read-me.txt"), "content here", "utf8");
-    const env = await runTool("workspace_read", { file_path: "read-me.txt" }, { operator: false });
+    const env = await runTool("workspace_read", { file_path: "read-me.txt" }, { operator: true });
     assert.strictEqual(r(env), "content here");
   });
 
   await check("workspace_read returns error on missing file", async () => {
-    const env = await runTool("workspace_read", { file_path: "no-such.txt" }, { operator: false });
+    const env = await runTool("workspace_read", { file_path: "no-such.txt" }, { operator: true });
     assert.ok(!env.ok, "expected ok=false");
     assert.ok(/not.found|workspace/i.test(r(env)), `unexpected: ${r(env)}`);
   });
@@ -64,14 +69,14 @@ async function main() {
   // ── workspace_list ──────────────────────────────────────────────────────────
 
   await check("workspace_list returns file names", async () => {
-    const env = await runTool("workspace_list", {}, { operator: false });
+    const env = await runTool("workspace_list", {}, { operator: true });
     const result = r(env);
     assert.ok(result.includes("hello.txt"), `listing was: ${result}`);
   });
 
   await check("workspace_list returns (no files) for empty subdir", async () => {
     fs.mkdirSync(path.join(TMP_WS, "emptydir"), { recursive: true });
-    const env = await runTool("workspace_list", { path: "emptydir" }, { operator: false });
+    const env = await runTool("workspace_list", { path: "emptydir" }, { operator: true });
     assert.strictEqual(r(env), "(no files)");
   });
 
@@ -96,7 +101,7 @@ async function main() {
   // ── path-escape guard ───────────────────────────────────────────────────────
 
   await check("workspace_read rejects path escape attempt (..)", async () => {
-    const env = await runTool("workspace_read", { file_path: "../../etc/passwd" }, { operator: false });
+    const env = await runTool("workspace_read", { file_path: "../../etc/passwd" }, { operator: true });
     assert.ok(!env.ok, "expected ok=false");
     assert.ok(/unsafe|escape/i.test(r(env)), `expected escape error, got: ${r(env)}`);
   });

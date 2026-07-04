@@ -29,7 +29,6 @@ const https = require("https");
 const { tokenizeCommand, safeExec } = require("./safe-exec");
 const { resolveCommand } = require("./command-allowlist");
 const { webSearch } = require("./web-search-client");
-const { workspaceWrite, workspaceRead, workspaceList, getWorkspaceRoot } = require("./user-workspace");
 const { render: renderDocument, listTemplates: listDocTemplates } = require("./document-templates");
 const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
@@ -461,24 +460,6 @@ const REGISTRY = {
     },
   },
 
-  // ── ADR-0008 user workspace tools ──────────────────────────────────────────
-  workspace_write: {
-    policy: "mutating",
-    desc: "Write a file to the user workspace (~/.keystone/workspace/). Use for saving user artifacts: resumes, cover letters, documents. Path must be relative, no .. escapes. Operator only.",
-    schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Workspace-relative path, e.g. 'resumes/my-resume.md'" },
-        content: { type: "string", description: "File content to write" },
-      },
-      required: ["path", "content"],
-    },
-    run(i) {
-      const abs = workspaceWrite(String(i.path || ""), String(i.content || ""));
-      return `wrote workspace:${i.path} (${String(i.content || "").length} bytes)\nfull path: ${abs}`;
-    },
-  },
-
   // ── Remember stage: agent-invoked memory recall (the "Grep" for user memory) ──
   // Retrieval is NOT a keyword gate in front of the model — the model DECIDES to recall,
   // calls this, and reasons over the result, exactly like Read/Grep over the repo. Backed
@@ -497,42 +478,6 @@ const REGISTRY = {
     run(i) {
       const { recallMemory } = require("./csf-memory");
       return recallMemory({ query: String((i && i.query) || ""), limit: 8 });
-    },
-  },
-
-  workspace_read: {
-    policy: "read",
-    desc: "Read a file from the user workspace (~/.keystone/workspace/). Path must be relative.",
-    schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Workspace-relative path to read" },
-      },
-      required: ["path"],
-    },
-    run(i) {
-      const content = workspaceRead(String(i.path || ""));
-      return content.length > MAX_OUT ? content.slice(0, MAX_OUT) + "\n…[truncated]" : content;
-    },
-  },
-
-  workspace_list: {
-    policy: "read",
-    desc: "List files and directories in the user workspace (~/.keystone/workspace/) or a subdirectory.",
-    schema: {
-      type: "object",
-      properties: {
-        path: { type: "string", description: "Workspace-relative directory to list (default: root)" },
-      },
-      required: [],
-    },
-    run(i) {
-      const entries = workspaceList(String(i.path || ""));
-      const root = getWorkspaceRoot();
-      if (!entries.length) return `workspace:${i.path || "/"} is empty\nroot: ${root}`;
-      const lines = [`workspace:${i.path || "/"} — ${entries.length} entries (root: ${root})`];
-      entries.forEach((e) => lines.push(`  ${e.type === "dir" ? "[dir]" : "[file]"} ${e.name}${e.type === "file" ? ` (${e.size}B)` : ""}`));
-      return lines.join("\n");
     },
   },
 
@@ -619,6 +564,11 @@ const REGISTRY = {
   // ── workspace tools (ADR-0008 §Decision 4): user-artifact area outside the repo ────
   // User artifacts (resumes, exports, generated docs) are written to WORKSPACE, never into
   // the repo. Each tool uses _safeWs() to reject path-escape attempts before touching disk.
+  // Operator-only by design (no guest_safe): WORKSPACE is a SINGLE shared directory of
+  // personal artifacts, so #1213's filesystem-tool gate keeps public-server guests from
+  // enumerating or reading another user's files. Local users chat via loopback (operator)
+  // and keep full access. (These superseded the shadowed ./user-workspace.js copies that
+  // used a `path` param — removed, since duplicate object keys silently kept only these.)
   workspace_read: {
     policy: "read",
     desc: "Read a file from the user workspace (~/.keystone/workspace/). Use for user-owned artifacts: resumes, exports, generated docs.",
