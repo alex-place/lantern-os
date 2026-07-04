@@ -3,7 +3,8 @@
 // print-styled HTML → PDF via Playwright (already a dependency). Key stays server-side. Saves
 // to data/generated-docs/ and returns an /api/document/download URL. Fail-safe by contract.
 //
-// Formats: pdf | md | html. docx/pptx/xlsx need a generator lib (not installed) → ok:false.
+// Formats: pdf | md | html | docx | xlsx | pptx (docx/xlsx/pptx via the `docx`/
+// `exceljs`/`pptxgenjs` packages — real Office files, not renamed HTML).
 const fs = require("fs");
 const path = require("path");
 
@@ -295,4 +296,7 @@ async function generateDocument({ prompt = "", title = "", format = "pdf", markd
   }
 }
 
-module.exports = { generateDocument, mdToHtml, DOCS_DIR };
+// renderDocx is exported for the chat's generate_document tool: templated
+// resumes/cover-letters render their markdown through the same md→docx engine
+// so a "document file" ask produces a real, submit-ready .docx (#1964).
+module.exports = { generateDocument, renderDocx, mdToHtml, DOCS_DIR };

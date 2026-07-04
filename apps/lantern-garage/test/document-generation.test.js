@@ -67,6 +67,29 @@ async function main() {
     assert.ok(content.includes("Dear Alex Place"));
   });
 
+  check("resume render accepts the model's natural field shapes (#1968)", async () => {
+    // Grouped skills object, description/years experience, institution/years
+    // education — the shapes a chat model actually passes. Must never print
+    // "[object Object]" or literal Title/Company/School/Year placeholders.
+    const { content } = render("resume", {
+      name: "Alexander Place",
+      skills: { technical: ["Java", "Spring MVC"], practical: "Landscaping, Carpentry" },
+      experience: [{ title: "Software Engineer", company: "US Bank", years: "2016–2023", description: "Spearheaded test automation." }],
+      education: [{ degree: "CIS coursework", institution: "Sinclair Community College", years: "2013–2014" }],
+    }, "markdown");
+    assert.ok(!content.includes("[object Object]"), `object leak: ${content}`);
+    assert.ok(content.includes("Java") && content.includes("Landscaping"), "grouped skills flattened");
+    assert.ok(content.includes("Spearheaded test automation."), "description became a bullet");
+    assert.ok(content.includes("2016–2023"), "years accepted as dates");
+    assert.ok(content.includes("Sinclair Community College"), "institution accepted as school");
+    assert.ok(!/\b(School|Year|Title|Company)\b\s*[)*]/.test(content), `placeholder leak: ${content}`);
+  });
+
+  check("cover-letter accepts recipient_name for the salutation", async () => {
+    const { content } = render("cover-letter", { name: "A", company: "X", role: "Eng", recipient_name: "Dr. Smith" }, "markdown");
+    assert.ok(content.includes("Dear Dr. Smith"));
+  });
+
   check("render throws on unknown template", async () => {
     assert.throws(() => render("bio", {}, "html"), /Unknown template/);
   });
@@ -87,10 +110,41 @@ async function main() {
 
   // ── generate_document tool ─────────────────────────────────────────────────
 
+  await check("generate_document defaults to a real .docx with a download link", async () => {
+    const env = await runTool("generate_document", {
+      template: "resume",
+      fields: { name: "Test User", email: "test@example.com" },
+    }, { operator: true });
+    assert.ok(env.ok, `expected ok, got: ${JSON.stringify(env)}`);
+    const result = r(env);
+    assert.ok(result.includes("workspace/resume.docx"), `unexpected: ${result}`);
+    assert.ok(result.includes("/api/workspace/download?file=resume.docx"), `no download link: ${result}`);
+    const docxPath = path.join(TMP_WS, "resume.docx");
+    assert.ok(fs.existsSync(docxPath), `docx not created at ${docxPath}`);
+    // Real Office file, not renamed HTML: docx is a ZIP container → "PK" magic.
+    const head = fs.readFileSync(docxPath).slice(0, 2).toString("latin1");
+    assert.strictEqual(head, "PK", `expected ZIP magic, got: ${head}`);
+  });
+
+  await check("generate_document docx cover-letter renders company", async () => {
+    const env = await runTool("generate_document", {
+      template: "cover-letter",
+      fields: { name: "Test User", company: "Acme", role: "Engineer" },
+      format: "docx",
+    }, { operator: true });
+    assert.ok(env.ok, `expected ok, got: ${JSON.stringify(env)}`);
+    const docxPath = path.join(TMP_WS, "cover-letter.docx");
+    assert.ok(fs.existsSync(docxPath));
+    // docx XML stores text in the zip; a raw scan still finds short literals.
+    const raw = fs.readFileSync(docxPath).toString("latin1");
+    assert.ok(raw.length > 500, "suspiciously small docx");
+  });
+
   await check("generate_document creates HTML resume in workspace", async () => {
     const env = await runTool("generate_document", {
       template: "resume",
       fields: { name: "Test User", email: "test@example.com" },
+      format: "html",
     }, { operator: true });
     assert.ok(env.ok, `expected ok, got: ${JSON.stringify(env)}`);
     const result = r(env);
@@ -129,6 +183,7 @@ async function main() {
       template: "resume",
       fields: { name: "X" },
       filename: "hint-test",
+      format: "html",
     }, { operator: true });
     assert.ok(r(env).includes("PDF"), `expected PDF hint, got: ${r(env)}`);
   });

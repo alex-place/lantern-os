@@ -522,24 +522,26 @@ const REGISTRY = {
   // (there is no persona or scripted skill flow in front of it).
   generate_document: {
     policy: "mutating",
-    desc: 'Generate a resume or cover-letter and save it to the user workspace. template: "resume" or "cover-letter". format: "html" (default — open in browser, Print → Save as PDF) or "markdown". Every field is optional at render time: pass whatever you already know from the conversation and attachments; missing fields are omitted or given neutral defaults. Draft first and refine in conversation — never make the user fill in a field list, and never invent user facts (leave a visible "[add …]" gap instead). Returns the workspace path. Operator only.',
+    desc: 'Generate a resume or cover-letter and save it to the user workspace. template: "resume" or "cover-letter". format: "docx" (default — a real, submit-ready Word file; employers/ATS expect .docx) | "html" (open in browser, Print → Save as PDF) | "markdown". Every field is optional at render time: pass whatever you already know from the conversation and attachments; missing fields are omitted or given neutral defaults. Draft first and refine in conversation — never make the user fill in a field list, and never invent user facts (leave a visible "[add …]" gap instead). Returns a download link — repeat it in your reply as a Markdown link so the user can click it. Operator only.',
     schema: {
       type: "object",
       properties: {
         template: { type: "string", description: '"resume" or "cover-letter"' },
         fields: { type: "object", description: "Template-specific fields (name, email, experience, skills, company, role, …)" },
-        format: { type: "string", enum: ["html", "markdown"], description: 'Output format (default: "html")' },
+        format: { type: "string", enum: ["docx", "html", "markdown"], description: 'Output format (default: "docx")' },
         filename: { type: "string", description: "Workspace-relative base name without extension (default: the template name)" },
       },
       required: ["template", "fields"],
     },
-    run(i) {
+    async run(i) {
       if (!i.template) return "[error: template is required]";
       if (!i.fields || typeof i.fields !== "object") return "[error: fields must be an object]";
-      const format = i.format === "markdown" ? "markdown" : "html";
+      const format = ["html", "markdown", "docx"].includes(i.format) ? i.format : "docx";
       let rendered;
       try {
-        rendered = renderDocument(String(i.template), i.fields, format);
+        // docx renders the template's markdown through the shared md→docx engine
+        // (lib/document-builder.js) — a real Word file, not renamed HTML.
+        rendered = renderDocument(String(i.template), i.fields, format === "docx" ? "markdown" : format);
       } catch (e) {
         const tmplList = listDocTemplates().map((t) => `  ${t.name}`).join("\n");
         return `[generate_document error: ${e.message}]\n\nAvailable templates:\n${tmplList}`;
@@ -547,12 +549,32 @@ const REGISTRY = {
       _ensureWorkspace();
       const base = String(i.filename || i.template)
         .replace(/\.+\//g, "")
-        .replace(/\.(html|md|markdown)$/i, "");
-      const finalName = base + rendered.extension;
-      const p = _safeWs(finalName);
-      fs.mkdirSync(path.dirname(p), { recursive: true });
-      fs.writeFileSync(p, rendered.content, "utf8");
-      const lines = [`created workspace/${finalName} (${Buffer.byteLength(rendered.content)} bytes)`];
+        .replace(/\.(html|md|markdown|docx)$/i, "");
+      let finalName, bytes;
+      if (format === "docx") {
+        const { renderDocx } = require("./document-builder");
+        // Title feeds the docx TITLE paragraph; for resumes use the bare name so
+        // the template's leading "# Name" heading dedupes instead of doubling.
+        const title = String(i.template) === "resume"
+          ? String(i.fields.name || "Resume")
+          : [i.fields.name, "Cover Letter", i.fields.company ? `(${i.fields.company})` : ""].filter(Boolean).join(" — ").replace(" — (", " (");
+        const buffer = await renderDocx(rendered.content, title);
+        finalName = base + ".docx";
+        const p = _safeWs(finalName);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, buffer);
+        bytes = buffer.length;
+      } else {
+        finalName = base + rendered.extension;
+        const p = _safeWs(finalName);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, rendered.content, "utf8");
+        bytes = Buffer.byteLength(rendered.content);
+      }
+      const lines = [
+        `created workspace/${finalName} (${bytes} bytes)`,
+        `Download link — give this to the user as a Markdown link: [${finalName}](/api/workspace/download?file=${encodeURIComponent(finalName)})`,
+      ];
       if (format === "html") {
         lines.push("Tip: open it in the browser and use Print → Save as PDF to produce a submittable PDF.");
       }

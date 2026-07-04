@@ -34,6 +34,18 @@ test("assistant prompt is conversational + tool-using, not a scripted flow", () 
   assert.ok(/never reply with a form/i.test(prompt), "prompt should forbid form-filling behavior");
 });
 
+console.log("\nTest: Document asks are not code intents (#1964)");
+const { classifyIntent } = require("../apps/lantern-garage/lib/convergance-os/model-router");
+test('"update the resume and link both" classifies as document_request, not coding', () => {
+  assert.strictEqual(classifyIntent("update the resume and link both"), "document_request");
+});
+test('"update the cover letter based on my resume" classifies as document_request', () => {
+  assert.strictEqual(classifyIntent("update the cover letter based on my resume"), "document_request");
+});
+test("real code asks still classify as coding_change", () => {
+  assert.strictEqual(classifyIntent("refactor the streaming handler and open a pr"), "coding_change");
+});
+
 console.log("\nTest: Bang command parsing");
 test("parseBangCommand extracts name and args", () => {
   const cmd = parseBangCommand("!search current weather");
