@@ -177,8 +177,36 @@ function ungroundedSignal(score) {
   };
 }
 
+/**
+ * ADR-0012 step 4 — turn a groundedness score into a serving-path routing hint.
+ *
+ * Symmetric to collapse-canary's collapseRoutingHint: a confident-but-unanchored
+ * (ungrounded) local reply should escalate to a stronger (cloud) tier rather than ship.
+ * Pure and additive — the PRODUCER side of the ADR-0012 step-4 routing hint; the serving
+ * path consumes it behind a flag, with the live-serving cost/latency measured first.
+ *
+ * @param score  the object returned by scoreReplyGroundedness()
+ * @param opts.routeThreshold  optional risk to escalate at; when set, escalates on
+ *   risk >= routeThreshold. When omitted, escalates exactly when the canary already
+ *   flagged `ungrounded`, keeping the module's own threshold the single source of truth.
+ * @param opts.escalateTier  tier label to route to when escalating (default "cloud").
+ */
+function groundednessRoutingHint(score, opts = {}) {
+  const risk = score && typeof score.risk === "number" ? score.risk : 0;
+  const escalate = opts.routeThreshold != null
+    ? risk >= opts.routeThreshold
+    : !!(score && score.ungrounded);
+  return {
+    escalate,
+    tier: escalate ? (opts.escalateTier || "cloud") : "local",
+    reason: escalate ? "ungrounded" : "none",
+    risk,
+  };
+}
+
 module.exports = {
   scoreReplyGroundedness,
   ungroundedSignal,
+  groundednessRoutingHint,
   MIN_TOKENS,
 };
