@@ -297,7 +297,14 @@ async function handleStreamChat(req, url, res) {
   // is 7") gets persisted into the ONE canonical CSF memory, same pattern as recordConvergance
   // below — no dedicated store, no dedicated recall UI. formatCSFContextForPromptAsync (below)
   // already retrieves + IDF-ranks it into later turns automatically. Best-effort, non-blocking.
-  if (message) {
+  //
+  // Skip the Three Doors game surface (parsed.surface === "three-doors", the Ask-Lantern
+  // freeform chat): a player's in-character narration is game progress, not a personal fact
+  // about the user — the game keeps its own door-state store, and surfacing it under "facts
+  // about you" is misleading (#1978). This is also the only live path by which a "three-doors"
+  // message could still reach recordLifeFact — the dedicated game-fact writer that produced the
+  // historical life-memory/three-doors records was removed, so no other capture path remains.
+  if (message && parsed.surface !== "three-doors") {
     try {
       const fact = extractFact(message);
       if (fact) {
