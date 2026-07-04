@@ -40,6 +40,7 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 | **MBPP** (basic subset) | Act | Exec-graded function synthesis | `scripts/eval_coding.py` (+ `data/eval/mbpp-basic.jsonl`) | ✅ Run | `leaderboard.jsonl` / `data/eval/mbpp-basic.jsonl` |
 | **SWE-bench Lite** | Act / Verify | Real-repo issue → patch, resolved% (official Docker/Modal grader) | `scripts/eval_swebench_chat.py`, `scripts/swe_agent_loop.py`, `scripts/swe_agentic_run.py` | 🟡 Partial | Qwen single-shot **0/3** (2 applied-but-wrong); agentic propose→test→retry loop landed |
 | **LongMemEval** | Remember | Memory retrieval recall@k / MRR over long multi-session histories | `experiments/longmemeval_harness.py` | ✅ Run | Real `longmemeval_s` (n=189, k=5): multi-signal recall@5 **0.709** / MRR **0.486** vs keyword **0.222** / 0.098 — `data/longmemeval/runs.jsonl` (2026-07-01) |
+| **HaluEval-QA** | Verify | Hallucination rate; grounded A/B for the ADR-0017 accept gate (≥20% rel. reduction) | `experiments/halueval_ab.py` (+ `data/eval/halueval-qa-subset.jsonl`) | 🟡 Partial | Real HaluEval (RUCAIBox), GPT-4o-mini n=40: grounding cuts hallucination **55% → 20%** (**64% rel.**, ≥ 20% gate ✓) — `data/eval/halueval_ab_results.json` |
 | **SWE-bench Verified** | Act / Verify | Human-validated SWE-bench subset, resolved% | — (extend `eval_swebench_chat.py` `--dataset`) | 📋 Planned | reference target, `data/benchmarks/agi-capability-matrix.json` |
 | **PersonaMem** | Remember | Persona-consistent long-memory recall (MemOS comparison set) | — | 📋 Planned | paired with LongMemEval (MemOS publishes both) |
 | **ARC-AGI** | Reason | Fluid reasoning, no training data | — | 📋 Planned | `data/benchmarks/arc-agi.json` |
@@ -73,6 +74,13 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 - **Run it:** `LONGMEMEVAL_PATH=/path/to/longmemeval_s.json python experiments/longmemeval_harness.py --k 5 --limit 200`. Offline self-test (no env var) runs on a baked-in synthetic fixture.
 - **First real run (2026-07-01, `longmemeval_s`, 189 scored, k=5):** multi-signal recall@5 **0.709** / MRR **0.486**; keyword recall@5 **0.222** / MRR **0.098** (+0.487 recall for multi-signal). Ledger: `data/longmemeval/runs.jsonl`.
 - **Next:** raise multi-signal recall@5 toward MemOS-class numbers; measure the live JS chat path (nomic-embed rerank) as a *separate* row.
+
+### HaluEval-QA — 🟡 Partial
+- **Source:** `RUCAIBox/HaluEval` (`qa_data.json`) — factual QA where each item ships the gold `knowledge` passage + `right_answer` + a known `hallucinated_answer`. Subset in `data/eval/halueval-qa-subset.jsonl` (n=40).
+- **Why it exists:** the ADR-0017 surprise-gated-decoding accept gate — *"the ADR is not Accepted until these numbers exist"* (#1941). It measures whether injecting grounding when a model is uncertain reduces hallucination.
+- **A/B (grounding is the intervention's mechanism):** answer each question (A) with NO grounding vs (B) with the gold `knowledge` injected. Deterministic grading (normalized containment of the gold answer — no LLM judge). Run it: `python experiments/halueval_ab.py` (needs egress + `OPENAI_API_KEY`).
+- **First real run (GPT-4o-mini, n=40):** hallucination **55% → 20%** with grounding, **64% relative reduction** — clears the ≥20% gate. `data/eval/halueval_ab_results.json`.
+- **Honest scope:** this is the *mechanism* with **gold retrieval** (an upper bound). The production controller (`apps/lantern-garage/lib/surprise-intervene.js`) must also *detect* when to ground (surprise gate) and *retrieve* good evidence (CSF/web/tool arms), so its real-world reduction will be lower. **Next:** wire the live controller (`SURPRISE_CANARY=1` vs `SURPRISE_INTERVENE=1`) end-to-end on this set and record the full-controller row.
 
 ### Planned reference targets — 📋
 These are public marks tracked in `data/benchmarks/` as capability targets; no harness yet. Promote a row to ✅/🟡 the moment a harness produces a measured result.
