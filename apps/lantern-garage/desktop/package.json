@@ -9,9 +9,13 @@
   "main": "launcher.js",
   "scripts": {
     "start": "node launcher.js",
-    "start:no-open": "node launcher.js --no-open"
+    "start:no-open": "node launcher.js --no-open",
+    "build:exe": "node ../../../scripts/build-desktop-exe.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "postject": "1.0.0-alpha.6"
   }
 }

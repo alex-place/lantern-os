@@ -481,3 +481,6 @@ data/ingest-staging/
 # Memory recall benchmark — keep the fixture, ignore runtime output + real datasets
 data/longmemeval/*
 !data/longmemeval/fixture.json
+# Desktop SEA build output (unisona.exe + sea blob) — built via scripts/build-desktop-exe.mjs, never committed
+apps/lantern-garage/desktop/dist/
+*.blob
