@@ -2523,7 +2523,9 @@ async function handleStreamChat(req, url, res) {
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {
         contents: [{ role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] }],
-        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 1024, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } },
+        // Non-RP gets the same 4096 as the tool path (was 1024) — a 1024 cap truncated long
+        // code answers on this single-shot fallback too. thinkingBudget:0 keeps the budget visible.
+        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 4096, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } },
       };
       if (groundingEnabled) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];

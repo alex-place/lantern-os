@@ -829,18 +829,27 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
     for (const geminiModel of geminiModels) {
       try {
+        // gemini-2.5 spends part of maxOutputTokens on a hidden "thinking" phase, so even
+        // a 2048 cap still starved long code answers — the reply ended mid-docstring with
+        // no function body ever arriving (2026-07-03 gemini eval). Disable thinking on
+        // thinking-capable models so the whole budget is visible output, and give code
+        // answers ample room. Mirrors the stream path (stream-chat.js) + self-edit-engine
+        // + swarm-orchestrator, which already run thinkingBudget:0 on 2.5-flash. #1376
+        const supportsThinking = /gemini-(2\.5|3)/.test(geminiModel);
         const payload = JSON.stringify({
           contents: [{ role: "user", parts: [{ text: `${agent.systemPrompt}\n\n${userPrompt}` }] }],
-          // gemini-2.5 spends part of the output budget on internal "thinking" tokens,
-          // so 256 truncated real replies to a bare preamble (no PR-review verdict). 2048
-          // leaves room for a complete answer after thinking. #1376
-          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
+          generationConfig: {
+            maxOutputTokens: 4096,
+            temperature: 0.7,
+            // thinkingBudget:0 only on 2.5/3.x — the gemini-1.5 fallbacks 400 on thinkingConfig.
+            ...(supportsThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          },
           // Web-search grounding only on the AI-Studio wire — the Vertex tool schema
           // differs by model and a mismatch 400s the whole call.
           ...(geminiOnVertex ? {} : { tools: [{ google_search_retrieval: {} }] }),
         });
         const transport = await geminiTransport({ model: geminiModel, method: "generateContent", streaming: false });
-        const reply = await new Promise((resolve, reject) => {
+        const { text: reply, finishReason } = await new Promise((resolve, reject) => {
           const req2 = https.request({
             hostname: transport.hostname,
             path: transport.path,
@@ -852,8 +861,11 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
             upstream.on("end", () => {
               try {
                 const json = JSON.parse(data);
-                resolve(String(json.candidates?.[0]?.content?.parts?.[0]?.text || "").trim());
-              } catch { resolve(""); }
+                const cand = json.candidates?.[0];
+                // Join every text part so nothing is dropped if the model splits its answer.
+                const text = String((cand?.content?.parts || []).map(p => p && p.text).filter(Boolean).join("")).trim();
+                resolve({ text, finishReason: cand?.finishReason || null });
+              } catch { resolve({ text: "", finishReason: null }); }
             });
             upstream.on("error", reject);
           });
@@ -863,7 +875,13 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           req2.end();
         });
         if (reply && reply.length >= 20) {
-          return { reply, agent: agent.name, suggestions, online: true, source: `gemini${geminiOnVertex ? "-vertex" : ""}:${geminiModel}`, webSuggestions };
+          // Surface truncation instead of silently returning a cut-off answer: MAX_TOKENS
+          // means the visible reply is incomplete. finishReason rides the result object
+          // (the route spreads it into the JSON response) so callers can see it. #1376
+          if (finishReason === "MAX_TOKENS") {
+            console.warn(`Gemini (${geminiModel}) hit MAX_TOKENS — reply may be truncated (${reply.length} chars)`);
+          }
+          return { reply, agent: agent.name, suggestions, online: true, source: `gemini${geminiOnVertex ? "-vertex" : ""}:${geminiModel}`, webSuggestions, finishReason };
         }
       } catch (err) { console.error(`Gemini (${geminiModel}) error:`, err.message); }
     }
