@@ -29,6 +29,12 @@
 "use strict";
 
 // ── Default feature registry ───────────────────────────────────────────────────
+// Alignment note (ADR-0013 / #1948): this graph models UI FEATURE activation
+// (flags/health/latency). The Σ₀ boundary classification — which HTML surfaces and
+// which non-HTML subsystems (bots + background services) are CORE vs EXTENSION —
+// lives in lib/surface-registry.js (CORE / EXTENSION / SUBSYSTEMS) and is enforced
+// by test/surface-boundary.test.js. Keep the gate flags used here consistent with
+// the `flag` fields there (e.g. TRADING_ENABLED, CREATOR_ENABLED, HFF_ENABLED).
 
 const DEFAULT_FEATURES = [
   {
