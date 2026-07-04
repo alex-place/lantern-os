@@ -16,6 +16,10 @@ the Σ₀ external-reality rule applied to ourselves: a capability claim is only
 - [`data/longmemeval/runs.jsonl`](../data/longmemeval/runs.jsonl) — one row per memory-retrieval run (`recall@k` / `MRR`).
 - `data/eval/swebench/<label>-<ts>.jsonl` — SWE-bench predictions in official format (grade later).
 
+**Comparing two runs:** never conclude from two bare means. `scripts/eval_paired_diff.py <A.jsonl> <B.jsonl>`
+pairs the runs' per-problem detail files on `task_id` and reports the paired mean difference with SEM,
+95% CI, win/loss/tie counts, and an exact sign test (#1966, per arXiv:2411.00640 recs 1+4).
+
 ---
 
 ## Status legend

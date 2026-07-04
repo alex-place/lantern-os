@@ -2529,6 +2529,48 @@ async function sendMessage(opts = {}) {
     if (window.narrateReplies) startSpeaking();
   }
 
+  // Per-message feedback (#1965) — the Observe-stage preference signal. Each verdict is
+  // attributable to the provider/model that actually served this turn (done receipt), so
+  // per-provider win rates are measurable from the ledger. Best-effort: never breaks chat.
+  if (!didError && fullText) {
+    const fbTurnIndex = history.length; // this assistant turn's transcript index (user turn already pushed)
+    const fbRow = document.createElement('div');
+    fbRow.className = 'msg-feedback';
+    fbRow.style.cssText = 'display:flex;gap:2px;margin-top:2px;';
+    const fbBtn = (verdict, glyph, label) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'feedback-btn';
+      b.dataset.verdict = verdict;
+      b.style.cssText = 'background:none;border:none;cursor:pointer;font-size:13px;opacity:0.6;padding:2px 4px;';
+      b.textContent = glyph;
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        for (const o of fbRow.querySelectorAll('.feedback-btn')) { o.style.opacity = '0.6'; o.setAttribute('aria-pressed', 'false'); }
+        b.style.opacity = '1';
+        b.setAttribute('aria-pressed', 'true');
+        fetch('/api/dream/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            verdict,
+            turnIndex: fbTurnIndex,
+            sessionId: localStorage.getItem('lantern_chat_session') || undefined,
+            provider: doneProvider, model: doneModel, intent: doneIntent, routeLabel,
+            userPreview: text.slice(0, 160), replyPreview: fullText.slice(0, 160),
+            surface: 'dream-chat',
+          }),
+        }).catch(() => {}); // ledger append is best-effort; a miss must never break the chat
+      });
+      return b;
+    };
+    fbRow.appendChild(fbBtn('up', '👍', 'Good reply'));
+    fbRow.appendChild(fbBtn('down', '👎', 'Bad reply'));
+    msg.appendChild(fbRow);
+  }
+
   if (!didError) history.push({ role: 'assistant', text: fullText });
 }
 
