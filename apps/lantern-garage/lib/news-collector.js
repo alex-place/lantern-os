@@ -184,6 +184,17 @@ function fetchDashboardNews() {
   });
 }
 
+// #1945 — commercial-use legal gate. Finnhub's FREE tier PROHIBITS commercial use,
+// and unisona.ai is monetized, so a bare FINNHUB_API_KEY (which could be a free-tier
+// key) must NEVER feed a paid surface. Finnhub is therefore OFF unless the operator
+// EXPLICITLY asserts a paid/commercial license — presence of a key is not consent.
+//   FINNHUB_COMMERCIAL_LICENSED=1  operator holds a PAID Finnhub plan (allowed on paid surfaces)
+//   FINNHUB_DEV_ONLY=1             local-dev escape hatch — MUST NOT be set on the shipped/paid deploy
+// Default (neither set): skip Finnhub, use the compliant Yahoo/dashboard sources.
+function finnhubAllowed(env = process.env) {
+  return env.FINNHUB_COMMERCIAL_LICENSED === "1" || env.FINNHUB_DEV_ONLY === "1";
+}
+
 function loadWatchlist() {
   try {
     const raw = fs.readFileSync(WATCHLIST_PATH, "utf8");
@@ -260,14 +271,24 @@ class NewsCollector {
     return recorded;
   }
 
-  // Finnhub source (free /news + /company-news) — the reliable primary feed.
-  // Unlike Yahoo's RSS (which the machine's HTTPS interception starves) and the
-  // dashboard (usually offline), Finnhub is a stable keyed JSON API. Records
+  // Finnhub source (/news + /company-news) — a stable keyed JSON API. Records
   // general market news plus per-watchlist-ticker company news. Silent no-op when
-  // FINNHUB_API_KEY is unset (recordNewsItem dedups by id/url across sources, so
-  // this never double-counts headlines Yahoo/dashboard also carry).
+  // FINNHUB_API_KEY is unset OR when the #1945 commercial-license gate is closed
+  // (free tier prohibits commercial use). recordNewsItem dedups by id/url across
+  // sources, so this never double-counts headlines Yahoo/dashboard also carry.
   async _collectFromFinnhub() {
     if (!marketData.hasFinnhub()) return 0;
+    // Legal gate (#1945): a key alone is not consent to commercial use. Skip unless
+    // a paid license (or the dev-only flag) is explicitly asserted; log once.
+    if (!finnhubAllowed()) {
+      if (!this._finnhubGateLogged) {
+        console.warn("[NewsCollector] FINNHUB_API_KEY present but Finnhub is GATED OFF: its free tier " +
+          "prohibits commercial use and no paid license is asserted. Set FINNHUB_COMMERCIAL_LICENSED=1 " +
+          "only with a paid plan (or FINNHUB_DEV_ONLY=1 for local dev). Using Yahoo/dashboard sources (#1945).");
+        this._finnhubGateLogged = true;
+      }
+      return 0;
+    }
     let recorded = 0;
     const record = async (item, symbols) => {
       const rec = await tradingNews.recordNewsItem({
@@ -304,8 +325,9 @@ class NewsCollector {
   }
 
   async collectOnce() {
-    // Finnhub (free, reliable) is the primary source; the local Alpaca dashboard
-    // and Yahoo RSS remain as supplements/fallbacks. All three dedup by id/url.
+    // Yahoo + the local Alpaca dashboard are the DEFAULT compliant sources. Finnhub
+    // is a supplement that only runs when its #1945 commercial-license gate is open;
+    // otherwise it's a no-op. All sources dedup by id/url.
     let total = await this._collectFromFinnhub();
     total += await this._collectFromDashboard();
 
@@ -348,5 +370,9 @@ class NewsCollector {
     console.log("[NewsCollector] Stopped");
   }
 }
+
+// Exported for the #1945 legal-gate test (and any caller that needs to know whether
+// Finnhub is permitted on the current surface).
+NewsCollector.finnhubAllowed = finnhubAllowed;
 
 module.exports = NewsCollector;
