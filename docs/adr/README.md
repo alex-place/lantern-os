@@ -76,5 +76,6 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0016](0016-provider-agnostic-oss-auth.md) | Provider-agnostic OSS auth — one identity + provider registry (local scrypt + Google + Discord + Patreon), verified-both linking | Accepted (Alex Place, 2026-07-02) |
 | [0017](0017-surprise-gated-decoding.md) | Surprise-gated decoding — mid-generation grounding intervention (CSF retrieval + web search + tool call) when rolling surprise crosses calibrated threshold | Accepted (Alex Place, 2026-07-02) |
 | [0019](0019-ibkr-connectivity-client-portal-gateway.md) | IBKR connectivity — Client Portal Web API via local gateway, read-only (replaces the fabricated api.ibkr.com bearer-token path) | Proposed (awaiting Alex's approval) |
+| [0021](0021-serving-substrate-retain-ouro-custom-loop.md) | Serving substrate — retain the Ouro/Σ₀ custom transformers loop; reject an engine port (no adaptive-depth/hidden-state serving exists); defer a Qwen3.5-4B base swap | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->
