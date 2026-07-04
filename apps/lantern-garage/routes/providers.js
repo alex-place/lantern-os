@@ -10,6 +10,11 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { loadClaudeSessionUsage } = require("../lib/claude-session-usage");
+// The provider-router holds the in-process DISPATCH truth: which providers have
+// actually succeeded/failed on real calls this run. Presence of a key is not
+// validity — a key that 400s every call (depleted credits, revoked key) is
+// "hasKey:true" but failing. Folding these records in is the #calm-while-wrong fix.
+const { getProviderStatus } = require("../lib/provider-router");
 
 // Normalize a leaderboard agentId (a model OR provider name) to a provider
 // bucket so local models and cloud providers consolidate into one reliance
@@ -192,6 +197,35 @@ const PROVIDER_CHAINS = {
   ],
 };
 
+// Fold the provider-router's in-process dispatch state into an HONEST health
+// verdict for one provider. `hasKey`/`inProcessEnv` is presence; this is validity.
+// Precedence: no_key → blocked (rate-limited) → failing (last call failed, none since)
+// → ok (a real success on record) → untested (key present, nothing dispatched yet).
+function _computeDispatchHealth(rstate, inProcessEnv, nowMs) {
+  const st = rstate || {};
+  const now = typeof nowMs === "number" ? nowMs : Date.now();
+  const lastFailure = st.lastFailure || 0;
+  const lastSuccess = st.lastSuccess || 0;
+  const blocked = !!st.blockedUntil && st.blockedUntil > now;
+  let health;
+  if (!inProcessEnv) health = "no_key";
+  else if (blocked) health = "blocked";
+  else if (lastFailure > 0 && lastFailure >= lastSuccess) health = "failing";
+  else if (lastSuccess > 0) health = "ok";
+  else health = "untested";
+  return {
+    health,
+    // A caller that only wants a boolean: untested keys are optimistically usable;
+    // a recorded failure with no later success is NOT.
+    healthy: health === "ok" || health === "untested",
+    lastError: st.lastError || null,
+    consecutiveFailures: st.consecutiveFailures || 0,
+    lastFailureAt: lastFailure ? new Date(lastFailure).toISOString() : null,
+    lastSuccessAt: lastSuccess ? new Date(lastSuccess).toISOString() : null,
+    blockedUntil: blocked ? new Date(st.blockedUntil).toISOString() : null,
+  };
+}
+
 module.exports = async function providerRoutes(req, res, url, deps) {
   const { sendJson, collectRequestBody } = deps;
 
@@ -218,6 +252,12 @@ module.exports = async function providerRoutes(req, res, url, deps) {
     const providers = {};
     const chainsByType = {};
     const warnings = [];
+    // Snapshot the in-process dispatch record once (provider name keys match
+    // PROVIDER_CONFIGS: anthropic/openai/gemini/xai/…). Never let a router hiccup
+    // break the status endpoint.
+    let routerState = {};
+    try { routerState = getProviderStatus() || {}; } catch { routerState = {}; }
+    const nowMs = Date.now();
 
     for (const [provider, cfg] of Object.entries(PROVIDER_CONFIGS)) {
       if (!cfg.key) { // ollama — the local Σ₀ model server (keyless)
@@ -235,6 +275,12 @@ module.exports = async function providerRoutes(req, res, url, deps) {
           pinned_served: L.pinned_served,
           inProcessEnv: false, startedWithKey: false, inRegistry: false,
           registryScope: null, mismatch: false, lastCheck: new Date().toISOString(),
+          // Local model has no key; treat "is it serving" as its dispatch presence
+          // so a crashed-mid-serve local model reads as failing, not silently ok.
+          ...(() => {
+            const d = _computeDispatchHealth(routerState[provider], L.serving && L.served_models.length > 0, nowMs);
+            return { health: d.health, dispatch: d };
+          })(),
         };
         continue;
       }
@@ -246,9 +292,16 @@ module.exports = async function providerRoutes(req, res, url, deps) {
       const startedWithKey = !!_envAtStartup[cfg.key];
       const reg = _probeRegistry(cfg.key);
       const mismatch = reg.present && !startedWithKey;
+      // Validity, not just presence: fold in the last real dispatch outcome so a
+      // present-but-depleted/revoked key reads as health:"failing" (+ lastError),
+      // instead of the calm-while-wrong "ok". hasKey/available stay presence-based
+      // for back-compat; `health`/`dispatch` are the honest signal.
+      const dispatch = _computeDispatchHealth(routerState[provider], inProcessEnv, nowMs);
       providers[provider] = {
         hasKey: inProcessEnv,                 // back-compat: reflects process.env
         available: inProcessEnv,              // dispatch-ready only if the process can see the key
+        health: dispatch.health,              // no_key | blocked | failing | ok | untested
+        dispatch,                             // { lastError, consecutiveFailures, lastFailureAt, … }
         model: cfg.model,
         inProcessEnv,
         startedWithKey,
@@ -278,11 +331,38 @@ module.exports = async function providerRoutes(req, res, url, deps) {
     const available = Object.values(providers).filter(p => p.available).length;
     const hasKeys = Object.values(providers).filter(p => p.hasKey).length;
 
+    // envConsistent is the #1233 key/registry-mismatch signal ONLY — capture it
+    // before folding in dispatch-failure warnings so a bad key doesn't masquerade
+    // as an "inconsistent env".
+    const envConsistent = warnings.length === 0;
+    const failingProviders = Object.entries(providers)
+      .filter(([, p]) => p.health === "failing" || p.health === "blocked")
+      .map(([name]) => name);
+    // A present key that FAILS on dispatch is the calm-while-wrong case — surface it
+    // as a warning too, not only as a per-provider field.
+    for (const name of failingProviders) {
+      const p = providers[name];
+      warnings.push({
+        provider: name,
+        health: p.health,
+        lastError: p.dispatch && p.dispatch.lastError,
+        message: `${name} has a key but its last dispatch ${p.health === "blocked" ? "was rate-limited/blocked" : "FAILED"}`
+          + (p.dispatch && p.dispatch.lastError ? ` (${p.dispatch.lastError})` : "")
+          + " — key present is not key valid.",
+      });
+    }
+
     sendJson(res, {
       providers,
       chains: chainsByType,
       warnings,
-      summary: { available, hasKeys, total: Object.keys(providers).length, envConsistent: warnings.length === 0 },
+      summary: {
+        available, hasKeys,
+        failing: failingProviders.length,
+        total: Object.keys(providers).length,
+        envConsistent,
+        allHealthy: failingProviders.length === 0,
+      },
     });
     return true;
   }
@@ -430,3 +510,6 @@ module.exports = async function providerRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Exposed for unit testing (the calm-while-wrong health verdict is pure logic).
+module.exports._computeDispatchHealth = _computeDispatchHealth;
