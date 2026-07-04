@@ -3,17 +3,22 @@
 //
 // Boots the ONE unmodified Convergence Core server (apps/lantern-garage/server.js)
 // in clean chat-only mode on a free loopback port, waits until it answers, then
-// opens the user's default browser at it. Ctrl+C (or the tray, later) stops it and
-// tears down the whole child-process tree.
+// opens the UI as a STANDALONE APP WINDOW (Edge/Chrome "--app" mode — chromeless,
+// own taskbar icon), not a browser tab. Closing that window stops the Core and tears
+// down the whole child-process tree.
 //
 // Design contract: see docs/adr/0014-unisona-desktop-launcher.md.
 //   G1 — One Core: we spawn server.js UNMODIFIED. No forked server here.
-//   G5 — No Electron: we reuse the user's own browser; no bundled Chromium.
+//   G5 — No Electron: we reuse the WebView2/Edge engine already on Windows via app
+//     mode; no bundled Chromium. (Falls back to the default browser if neither Edge
+//     nor Chrome is found.)
 //   Loopback only: we set LANTERN_GARAGE_HOST=127.0.0.1 and never set PORT
 //     (setting PORT flips server.js to bind 0.0.0.0 — public — see server.js:79).
+//   Windowless: the shipped exe is GUI-subsystem (no console window), so logs go to
+//     a file, not stdout — see the log redirect below.
 //
-// This file uses ONLY Node builtins so it can be wrapped by pkg / Node SEA later
-// without pulling a dependency tree.
+// This file uses ONLY Node builtins so it can be wrapped by Node SEA without pulling
+// a dependency tree.
 
 "use strict";
 
@@ -21,6 +26,7 @@ const http = require("http");
 const net = require("net");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
 
@@ -56,6 +62,23 @@ const serverEntry = path.join(serverDir, "server.js");
 if (process.env.UNISONA_CORE === "1") {
   require("node:module").createRequire(serverEntry)(serverEntry);
   return; // CommonJS top-level return — must NOT fall through into the launcher
+}
+
+// ── Windowless logging ────────────────────────────────────────────────────────
+// The shipped exe is GUI-subsystem (no console — see build-desktop-exe.mjs), so
+// stdout/stderr have nowhere to go and writing to them can throw. When packaged,
+// redirect all launcher logs — and the Core child's output — to a rolling file.
+const logDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unisona", "logs");
+let logFd = null;
+if (isSea) {
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+    logFd = fs.openSync(path.join(logDir, "desktop.log"), "a");
+    const write = (...a) => { try { fs.writeSync(logFd, a.join(" ") + "\n"); } catch { /* best-effort */ } };
+    console.log = write;
+    console.error = write;
+    console.warn = write;
+  } catch { /* logging is best-effort; never block boot on it */ }
 }
 
 // ── Configuration ───────────────────────────────────────────────────────────
@@ -110,18 +133,26 @@ let shuttingDown = false;
   }
 
   console.log(`[unisona] Ready → ${url}`);
-  // G4: the browser must carry the per-boot token on first load so the Core can hand
-  // back the SameSite cookie that authenticates every LATER request (fetch, EventSource,
-  // assets). Without this, UNISONA_LOCAL_TOKEN would lock the local UI out of all
-  // operator actions. The token rotates each launch; the durable carrier is the cookie.
+  // G4: the app window must carry the per-boot token on first load so the Core can
+  // hand back the SameSite cookie that authenticates every LATER request (fetch,
+  // EventSource, assets). Without this, UNISONA_LOCAL_TOKEN would lock the UI out of
+  // all operator actions. The token rotates each launch; the durable carrier is the cookie.
   const openUrl = `${url}${url.includes("?") ? "&" : "?"}__lt=${localToken}`;
   if (openBrowser) {
-    openInBrowser(openUrl);
-    console.log("[unisona] Opened your default browser.");
+    const appProc = openAppWindow(openUrl);
+    if (appProc) {
+      // Dedicated app-window process: when the user closes the window, the app quits
+      // (stops the Core), so there's no orphaned headless server and no console to
+      // Ctrl+C. If the browser daemonized (appProc exits immediately while the window
+      // lives), we simply keep running — no worse than a browser tab.
+      appProc.on("exit", () => { if (!shuttingDown) shutdown("app window closed"); });
+      console.log("[unisona] Opened the app window.");
+    } else {
+      console.log("[unisona] Opened your default browser (no app-mode browser found).");
+    }
   } else {
     console.log(`[unisona] Open this URL in your browser (auto-open disabled):\n    ${openUrl}`);
   }
-  console.log("[unisona] Press Ctrl+C to stop.\n");
 })().catch((err) => fail(err && err.stack ? err.stack : String(err)));
 
 // ── Server process ────────────────────────────────────────────────────────────
@@ -172,10 +203,13 @@ function spawnServer(port) {
     : [process.execPath, [serverEntry]];
   if (isSea) env.UNISONA_CORE = "1";
 
+  // Windowless (packaged): no console to inherit — send the Core's output to the log
+  // file. Dev: inherit the terminal so `node launcher.js` shows the Core's logs.
+  const coreStdio = isSea ? ["ignore", logFd || "ignore", logFd || "ignore"] : "inherit";
   const proc = spawn(coreCmd, coreArgs, {
     cwd: serverDir,
     env,
-    stdio: "inherit", // surface the Core's own logs to the console
+    stdio: coreStdio,
   });
   proc.on("error", (err) => fail(`Failed to start the Core server: ${err.message}`));
   return proc;
@@ -218,21 +252,62 @@ function findFreePort(h) {
   });
 }
 
-// ── Open default browser (cross-platform, no deps) ──────────────────────────────
-function openInBrowser(url) {
-  try {
-    if (process.platform === "win32") {
-      // `start` is a cmd builtin; the empty "" is the window title (required when
-      // the URL is quoted). detached so closing the launcher never kills it.
-      spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true }).unref();
-    } else if (process.platform === "darwin") {
-      spawn("open", [url], { stdio: "ignore", detached: true }).unref();
-    } else {
-      spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
+// ── Open the app window (chromeless Edge/Chrome "--app" mode) ────────────────────
+// Returns the spawned browser process (so main() can quit when its window closes),
+// or null if we fell back to the plain default browser (no lifecycle handle).
+function openAppWindow(url) {
+  // A dedicated profile dir makes this a fresh, isolated browser instance we can
+  // wait on — separate from the user's normal Edge/Chrome session and windows.
+  const profileDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unisona", "app-profile");
+  const browser = process.platform === "win32" ? findWindowsBrowser() : findUnixBrowser();
+  if (browser) {
+    const args = [
+      `--app=${url}`,
+      `--user-data-dir=${profileDir}`,
+      "--window-size=1280,860",
+      "--no-first-run",
+      "--no-default-browser-check",
+    ];
+    try {
+      // NOT detached: with a fresh profile this process owns the window, so its exit
+      // signals the window closed. stdio ignored (windowless).
+      return spawn(browser, args, { stdio: "ignore" });
+    } catch (err) {
+      console.warn(`[unisona] app-mode launch failed (${err.message}); falling back to default browser.`);
     }
+  }
+  // Fallback: the platform default browser (a normal tab — no window lifecycle handle).
+  try {
+    if (process.platform === "win32") spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true }).unref();
+    else if (process.platform === "darwin") spawn("open", [url], { stdio: "ignore", detached: true }).unref();
+    else spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
   } catch (err) {
     console.warn(`[unisona] Could not auto-open a browser: ${err.message}`);
   }
+  return null;
+}
+
+// Locate an Edge (preferred — WebView2 engine, always on Win10/11) or Chrome exe.
+function findWindowsBrowser() {
+  const pf = process.env["ProgramFiles"] || "C:\\Program Files";
+  const pf86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+  const local = process.env.LOCALAPPDATA || "";
+  const candidates = [
+    path.join(pf86, "Microsoft", "Edge", "Application", "msedge.exe"),
+    path.join(pf, "Microsoft", "Edge", "Application", "msedge.exe"),
+    path.join(pf, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(pf86, "Google", "Chrome", "Application", "chrome.exe"),
+    local && path.join(local, "Google", "Chrome", "Application", "chrome.exe"),
+  ].filter(Boolean);
+  return candidates.find((c) => { try { return fs.existsSync(c); } catch { return false; } }) || null;
+}
+
+function findUnixBrowser() {
+  const names = process.platform === "darwin"
+    ? ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+    : ["/usr/bin/microsoft-edge", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"];
+  return names.find((c) => { try { return fs.existsSync(c); } catch { return false; } }) || null;
 }
 
 // ── Graceful shutdown (kills the whole child tree) ──────────────────────────────

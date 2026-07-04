@@ -16,7 +16,7 @@
 // Usage: node scripts/build-desktop-exe.mjs
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -76,7 +76,33 @@ const postjectArgs = [postjectCli, exePath, "NODE_SEA_BLOB", blobPath, "--sentin
 if (isMac) postjectArgs.push("--macho-segment-name", "NODE_SEA");
 run(process.execPath, postjectArgs);
 
+// 4. (Windows) Flip the PE subsystem from CONSOLE (3) to GUI (2) so double-clicking
+//    the exe never pops a console window — it's a standalone desktop app. The
+//    launcher already redirects its logs to a file when packaged (no stdout needed).
+//    This only rewrites one header field; the SEA blob + fuse are untouched. Signing
+//    happens after this, so it doesn't invalidate a signature we care about.
+if (isWin) {
+  setPeSubsystemGui(exePath);
+  console.log("[build] flipped PE subsystem → GUI (no console window).");
+}
+
 console.log(`\n✓ Built ${exePath} (${mb(exePath)} MB)`);
-console.log("  One binary — it runs the launcher AND (re-execed with UNISONA_CORE=1)");
-console.log("  the Core; no separate node is shipped. Next: sign it (Azure Trusted");
-console.log("  Signing), then ship the apps/lantern-garage tree beside it (step 3/4).");
+console.log("  One binary, windowless — runs the launcher AND (re-execed with");
+console.log("  UNISONA_CORE=1) the Core; opens a chromeless app window. Next: sign it");
+console.log("  (SignPath Foundation), then ship the apps/lantern-garage tree beside it.");
+
+// Rewrite the PE Optional Header's Subsystem field to IMAGE_SUBSYSTEM_WINDOWS_GUI (2).
+// Layout: e_lfanew (u32 @ 0x3C) → PE sig (4) + COFF header (20) → Optional Header;
+// Subsystem is a u16 at offset 68 within the Optional Header (same for PE32/PE32+).
+function setPeSubsystemGui(file) {
+  const buf = readFileSync(file);
+  if (buf.readUInt16LE(0) !== 0x5a4d) throw new Error("not a PE (no MZ)"); // 'MZ'
+  const peOff = buf.readUInt32LE(0x3c);
+  if (buf.readUInt32LE(peOff) !== 0x00004550) throw new Error("not a PE (no PE\\0\\0)"); // 'PE\0\0'
+  const subsystemOff = peOff + 4 + 20 + 68;
+  const GUI = 2;
+  if (buf.readUInt16LE(subsystemOff) !== GUI) {
+    buf.writeUInt16LE(GUI, subsystemOff);
+    writeFileSync(file, buf);
+  }
+}

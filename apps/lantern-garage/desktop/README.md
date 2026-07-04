@@ -2,7 +2,8 @@
 
 A **thin launcher** that lets a non-developer run the unisona.ai / Keystone OS
 Convergence Core locally: double-click → the Core boots on a private loopback
-port → your default browser opens at it. Your memory, your keys, your machine.
+port → a **standalone app window** opens at it (no console window). Your memory,
+your keys, your machine.
 
 > **Design decision:** [docs/adr/0014-unisona-desktop-launcher.md](../../../docs/adr/0014-unisona-desktop-launcher.md).
 > This is a **delivery channel** for the local-first principle, **not** a new
@@ -16,9 +17,14 @@ port → your default browser opens at it. Your memory, your keys, your machine.
   children, no trading microservice, no Cloudflare tunnel.
 - Binds **127.0.0.1 only** (it deletes `PORT` and sets `LANTERN_GARAGE_HOST` so
   the Core can never accidentally bind `0.0.0.0`).
-- Waits until the server actually answers, then opens your **default browser**
-  (no bundled Chromium — see ADR-0014, guardrail G5).
-- `Ctrl+C` tears down the **whole child-process tree** (`taskkill /T` on Windows).
+- Waits until the server actually answers, then opens the UI as a **standalone,
+  chromeless app window** — Edge/Chrome `--app` mode (the WebView2 engine already on
+  Windows; **no bundled Chromium** — ADR-0014 G5). Falls back to the default browser
+  if neither is found.
+- **Windowless**: the shipped exe is GUI-subsystem — **no console window** — so logs
+  go to `%LOCALAPPDATA%\unisona\logs\desktop.log`, not a terminal.
+- **Closing the app window** quits the app and tears down the **whole child-process
+  tree** (also `Ctrl+C` in dev). No orphaned headless server.
 
 It uses **only Node builtins** — zero dependencies — so it can be wrapped into a
 single executable later without dragging in a dependency tree.
