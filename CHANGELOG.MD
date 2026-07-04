@@ -1,3 +1,7 @@
+## [1.8.53] - 2026-07-04
+### Added
+- **Σ₀ live benchmark runner (`experiments/sigma0_live_bench.py`).** Scores real frontier LLMs on the 159-record golden dataset with the same prompt/parser/scorer (OpenAI-compatible + Gemini REST + Anthropic). Live result: **GPT-4o-mini golden 0.95, confabulation 0.0%** (declined on all 42 negatives — never asserted an open conjecture/refuted claim as fact), over-abstention ~5%. Grok/Mistral/Anthropic-key/DeepSeek unavailable (account-side: xAI credits, invalid keys, zero balance); Gemini free-tier rate-limited beyond a timebox. Strengthens **Verify**.
+
 ## [1.8.52] - 2026-07-04
 ### Added
 - **Σ₀ golden benchmark runner (`experiments/sigma0_golden_benchmark.py`).** Scores any model's answers on the 159-record golden dataset with the DeepEval-style scorer + real baselines. The honesty axis is confabulation_rate (fraction of the 42 negatives asserted as fact). Measured: oracle 1.00 (0% confab), always-assert-PROVEN 0.65 (100% confab), always-abstain 0.41 (0% confab), random 0.57 (52% confab) — empirically, raw score rewards the confident-liar over the honest-abstainer, so confabulation is the honesty signal. Strengthens **Verify**.
