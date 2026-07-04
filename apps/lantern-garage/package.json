@@ -29,6 +29,7 @@
     "test:tenant": "node test/tenant.test.js",
     "test:profile": "node test/deployment-profile.test.js",
     "test:desktop": "node test/desktop-phase0.test.js",
+    "test:mcp-msg": "node test/chat-mcp-message.test.js",
     "test:trade-gate": "node test/kalshi-fees-ev.test.js",
     "test:grounded": "node test/kalshi-grounded.test.js",
     "test:sigma0": "node test/surface-boundary.test.js && node test/kalshi-fees-ev.test.js && node test/kalshi-grounded.test.js && node test/tenant.test.js && node test/deployment-profile.test.js && node test/desktop-phase0.test.js",
