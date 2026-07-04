@@ -16,8 +16,10 @@ const path = require("path");
 const { appendJsonlQueued, readJsonl } = require("./file-queue");
 const { assembleBudgetedContext, contextWindowFor } = require("./stream-chat/context-budget");
 
+const { dataRoot, stateRoot } = require("./app-paths");
+// #1946 G2: state relocates via dataRoot() (servers unchanged; desktop → %APPDATA%).
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
-const summaryLogPath = path.join(repoRoot, "data", "conversations", "session-summaries.jsonl");
+const summaryLogPath = path.join(dataRoot(), "conversations", "session-summaries.jsonl");
 
 // How many global log rows to scan when reconstructing one session. The log is
 // shared across sessions/surfaces, so we read a generous window then filter.
@@ -35,7 +37,7 @@ function seedCacheOnce() {
   if (cacheSeeded) return;
   cacheSeeded = true;
   try {
-    const rows = readJsonl(path.relative(repoRoot, summaryLogPath), 2000).filter((r) => !r.parseError);
+    const rows = readJsonl(path.relative(stateRoot(), summaryLogPath), 2000).filter((r) => !r.parseError);
     for (const r of rows) {
       if (r && r.sessionId && typeof r.summary === "string") summaryCache.set(r.sessionId, r.summary);
     }
@@ -101,7 +103,7 @@ function readSessionSummary(sessionId) {
     return { sessionId, summary: summaryCache.get(sessionId) };
   }
   try {
-    const rows = readJsonl(path.relative(repoRoot, summaryLogPath), 2000).filter((r) => !r.parseError);
+    const rows = readJsonl(path.relative(stateRoot(), summaryLogPath), 2000).filter((r) => !r.parseError);
     for (let i = rows.length - 1; i >= 0; i--) {
       if (rows[i] && rows[i].sessionId === sessionId) {
         summaryCache.set(sessionId, rows[i].summary);

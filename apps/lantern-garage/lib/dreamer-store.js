@@ -3,9 +3,12 @@ const path = require("path");
 const { generateQutritId, generateEntryId } = require("./qutrit");
 const { readFileViaMcp } = require("./mcp-resource-client");
 
+const { dataRoot } = require("./app-paths");
+// #1946 G2: notebooks live under dataRoot() — <repoRoot>/data on servers (unchanged),
+// %APPDATA%\unisona\data on the desktop app. dreamer-store reads via absolute paths.
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const maxDreamerTextLength = 2000;
-const dreamerNotebookDir = path.join(repoRoot, "data", "dreamer", "notebooks");
+const dreamerNotebookDir = path.join(dataRoot(), "dreamer", "notebooks");
 
 // Helper: read file text via MCP resource client, falling back to fs.readFileSync
 function _readText(filePath) {
@@ -68,7 +71,7 @@ function readRecentDreams(limit = 5) {
   if (recentDreamsCache.limit >= limit && (now - recentDreamsCache.ts) < RECENT_DREAMS_TTL_MS) {
     return recentDreamsCache.entries.slice(0, limit);
   }
-  const dreamDir = path.join(repoRoot, "data", "dream_journal");
+  const dreamDir = path.join(dataRoot(), "dream_journal");
   if (!fs.existsSync(dreamDir)) return [];
   const files = fs.readdirSync(dreamDir).filter((f) => f.endsWith(".jsonl")).sort().reverse();
   const entries = [];

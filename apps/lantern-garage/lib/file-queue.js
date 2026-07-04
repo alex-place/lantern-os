@@ -1,7 +1,17 @@
 const fs = require("fs");
 const path = require("path");
+const appPaths = require("./app-paths");
 
 const writeQueues = new Map();
+
+// Where a relative read path is anchored (#1946 G2 desktop state relocation).
+// Writable-state reads (data/…) follow the state root, so the desktop app reads its
+// memory from %APPDATA%\unisona\data; repo artifacts (manifests/, reports/, …) stay
+// at the repo root. On servers stateRoot()===repoRoot, so this is byte-for-byte today.
+function readAnchor(relativePath) {
+  const first = String(relativePath || "").replace(/^[\\/]+/, "").split(/[\\/]/)[0];
+  return first === "data" ? appPaths.stateRoot() : appPaths.repoRoot;
+}
 
 function enqueueFileWrite(filePath, operation) {
   const previous = writeQueues.get(filePath) || Promise.resolve();
@@ -91,7 +101,7 @@ async function writeTextQueued(filePath, text) {
 
 function readText(relativePath, fallback = "") {
   try {
-    return fs.readFileSync(path.join(path.resolve(__dirname, "..", "..", ".."), relativePath), "utf8").replace(/^\uFEFF/, "");
+    return fs.readFileSync(path.join(readAnchor(relativePath), relativePath), "utf8").replace(/^\uFEFF/, "");
   } catch {
     return fallback;
   }
@@ -130,4 +140,5 @@ module.exports = {
   readText,
   readJson,
   readJsonl,
+  readAnchor,
 };
