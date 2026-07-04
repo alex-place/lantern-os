@@ -23,6 +23,10 @@
 
 const https = require("https");
 const http = require("http");
+const os = require("os");
+const fs = require("fs");
+const path = require("path");
+const { execFile } = require("child_process");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 
 // ── Expanded provider roster ──
@@ -71,6 +75,19 @@ const PROVIDER_CONFIG = {
     strengths: ["chat", "vision", "creative"],
     costTier: "medium",
     streamFormat: "openai",
+  },
+  // Grok via the local CLI (OIDC login in ~/.grok/auth.json), NOT the api.x.ai
+  // key path above. On machines where the XAI_API_KEY is out of credits but the
+  // user has run `grok login`, this is the ONLY working Grok transport — so the
+  // council reaches Grok through the binary instead of a dead API key.
+  xai_cli: {
+    transport: "cli",
+    bin: process.env.GROK_BIN || path.join(os.homedir(), ".grok", "bin", "grok.exe"),
+    defaultModel: "grok",
+    modelChain: ["grok"],
+    strengths: ["chat", "reasoning", "creative"],
+    costTier: "local", // OIDC session, no per-call API key
+    streamFormat: "cli",
   },
   ollama: {
     envKey: "OLLAMA_BASE_URL",
@@ -140,9 +157,9 @@ const PROVIDER_CONFIG = {
 
 // ── Job → best provider mapping (primary + 2 alternates) ──
 const JOB_ASSIGNMENTS = {
-  chat:      ["gemini", "openai", "anthropic"], // anthropic last = council synthesizer (Sonnet)
+  chat:      ["gemini", "xai_cli", "openai", "anthropic"], // anthropic last = council synthesizer (Sonnet); xai_cli = Grok member lens
   coding:    ["anthropic", "openai", "mistral"],
-  reasoning: ["openai", "deepseek", "anthropic"],
+  reasoning: ["openai", "xai_cli", "deepseek", "anthropic"], // Grok (xai_cli) takes a member lens; anthropic stays synthesizer
   vision:    ["gemini", "xai", "openai"],
   summarize: ["gemini", "cohere", "openai"],
   creative:  ["anthropic", "xai", "mistral"],
@@ -157,6 +174,12 @@ const COUNCIL_ROLES = {
 };
 
 function getApiKey(config) {
+  // CLI transport authenticates via the binary's own OIDC session, not an env
+  // key. "Availability" is: the binary exists on disk. Return the bin path so
+  // isProviderAvailable() treats a present binary as a usable credential.
+  if (config.transport === "cli") {
+    return fs.existsSync(config.bin) ? config.bin : undefined;
+  }
   if (config.envKey === "OLLAMA_BASE_URL") {
     return process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
   }
@@ -245,7 +268,52 @@ function makeTokenExtractor(providerId) {
 }
 
 // ── Single provider call ──
+// Grok-CLI transport. execFile with shell:false — the prompt is passed as ONE
+// discrete argv entry, so no shell ever re-interprets it (same safety property
+// as lib/safe-exec, but async so a multi-second CLI turn never blocks the loop).
+// Runs in a neutral cwd so the CLI answers as a plain council member instead of
+// scanning whatever repo the server happens to be in.
+function callCliProvider(providerId, model, systemPrompt, message, history) {
+  return new Promise((resolve, reject) => {
+    const config = PROVIDER_CONFIG[providerId];
+    const bin = getApiKey(config);
+    if (!bin) return reject(new Error(`${providerId}_no_binary`));
+
+    const parts = [];
+    if (systemPrompt) parts.push(systemPrompt);
+    for (const h of history || []) {
+      const role = h.role === "assistant" ? "Assistant" : "User";
+      parts.push(`${role}: ${h.content}`);
+    }
+    parts.push(`User: ${message}`);
+    const prompt = parts.join("\n\n");
+
+    const args = ["-p", prompt, "--output-format", "plain"];
+    execFile(bin, args, {
+      cwd: os.tmpdir(),
+      timeout: 90000,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+      shell: false,
+    }, (err, stdout) => {
+      const text = String(stdout || "").trim();
+      // Non-zero exit but usable stdout still counts (the CLI logs optional-MCP
+      // spawn warnings to stderr and can exit non-zero while the answer is on stdout).
+      if (err && !text) {
+        recordProviderFailure(providerId, err.message);
+        return reject(new Error(`${providerId}_cli_${err.code || "error"}`));
+      }
+      recordProviderSuccess(providerId);
+      resolve({ provider: providerId, model, text });
+    });
+  });
+}
+
 function callProvider(providerId, model, systemPrompt, message, history) {
+  const cfg = PROVIDER_CONFIG[providerId];
+  if (cfg && cfg.transport === "cli") {
+    return callCliProvider(providerId, model, systemPrompt, message, history);
+  }
   return new Promise((resolve, reject) => {
     const config = PROVIDER_CONFIG[providerId];
     const apiKey = getApiKey(config);
