@@ -1,3 +1,7 @@
+## [1.8.83] - 2026-07-05
+### Added
+- **LongMemEval now scores the live JS chat retriever, not just the Python engine** (`scripts/eval_longmemeval_js.js`). It drives `csf-memory.js::searchConversation` — the keyword retriever a real chat turn uses, which windows the last 1200 turns — over the LongMemEval haystack and writes a *separate* `runs.jsonl` row so the product number never gets conflated with the engine's. Measured on `longmemeval_s` (n=500, k=5): session-level recall@5 **0.884** / MRR **0.80**, 0/500 gold outside the window. Also flags `truncated_gold` (haystack larger than the window) as a real product limitation. Strengthens **Remember**. See `changelog.d/longmemeval-product-path.md` (#2111).
+
 ## [1.8.78] - 2026-07-05
 ### Changed
 - **The home "Check the news" chip now summarizes today's headlines instead of web-searching the word "news".** The chip sends "summarize the top world news headlines from today", and any news-intent chat is grounded on the real curated RSS discover feed (title, link, source, date, summary, and lead image). The model returns real, sourced panels in a fixed format — linked headline, an image when the source provides one, source · date, one-line takeaway — rather than a junk web search ("News Today" the newspaper, the "Today" TV show) or "I couldn't find the news". Strengthens **Observe**. See `changelog.d/news-chip-llm-summary.md`.
