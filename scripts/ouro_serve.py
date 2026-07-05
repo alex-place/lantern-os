@@ -101,6 +101,20 @@ TOP_P = float(os.environ.get("OURO_TOP_P", "0.9"))
 MERGE = os.environ.get("OURO_MERGE", "1") == "1"   # was "0" — safe: gated at :69-75 behind ADAPTER check
 ATTN = os.environ.get("OURO_ATTN", "sdpa")         # was "" — safe: try/except fallback at :62-67
 
+# RAM preflight (#781): refuse to load into an already-starved box (the 12 GB dev box
+# freezes when a load races other evals/agents). Import defensively — a path/import hiccup
+# must never block serving — but let a real MemoryError abort the starved load.
+try:
+    import sys as _sys
+    _src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+    if _src not in _sys.path:
+        _sys.path.insert(0, _src)
+    from sigma0.ram_guard import require_free_ram as _require_free_ram
+except Exception:
+    _require_free_ram = None
+if _require_free_ram is not None:
+    _require_free_ram(what=f"Ouro model '{MODEL_ID}'")
+
 print(f"[ouro] loading {MODEL_ID} (cuda={torch.cuda.is_available()})…", flush=True)
 _tok = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
 # OURO_4BIT=1: load the base in 4-bit (NF4) to free VRAM for long-context activations.
