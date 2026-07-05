@@ -1,3 +1,7 @@
+## [1.8.82] - 2026-07-05
+### Added
+- **HaluEval-QA gated harness can now answer with the local model, not just the gpt-4o-mini oracle** (`experiments/halueval_gated.py --answerer ollama --model ouro:latest`). The gate's surprise signal needs per-token logprobs, which the local serve path doesn't emit, so the gate degrades to "unavailable" (reported honestly, never faked) while the A/B hallucination measurement still runs. First measured on-model row: **Ouro-1.4B (honesty adapter), n=40 — grounding cuts hallucination 80% → 52%** (35% rel.), baseline accuracy 20%. Strengthens **Verify**. See `changelog.d/halueval-on-ouro.md` (#2112).
+
 ## [1.8.78] - 2026-07-05
 ### Changed
 - **The home "Check the news" chip now summarizes today's headlines instead of web-searching the word "news".** The chip sends "summarize the top world news headlines from today", and any news-intent chat is grounded on the real curated RSS discover feed (title, link, source, date, summary, and lead image). The model returns real, sourced panels in a fixed format — linked headline, an image when the source provides one, source · date, one-line takeaway — rather than a junk web search ("News Today" the newspaper, the "Today" TV show) or "I couldn't find the news". Strengthens **Observe**. See `changelog.d/news-chip-llm-summary.md`.
