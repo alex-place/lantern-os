@@ -294,6 +294,11 @@
     #broker .bgen-head{font-size:.9rem;margin-bottom:4px}#broker .bgen-sub{color:var(--text2);font-weight:400;font-size:.72rem}
     #broker .bgen-p{font-size:.78rem;color:var(--text1);line-height:1.55;margin:0 0 10px}
     #broker .bgen-msg{margin-left:10px;font-size:.76rem;color:#22c55e}
+    #broker .bgen-files{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+    #broker .bgen-files-h{font-size:.76rem;color:var(--text1);margin-bottom:2px}
+    #broker .bfile-btn{font-family:var(--mono);font-size:.76rem;text-align:left;padding:9px 12px;border-radius:8px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--text0);cursor:pointer;transition:background .15s}
+    #broker .bfile-btn:hover{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+    #broker .bfile-btn.done{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12);color:#bbf7d0;cursor:default}
     #broker .bgen-adv{margin-top:11px}#broker .bgen-adv summary{font-size:.74rem;color:var(--text2);cursor:pointer}
   </style>
   <section class="panel" id="broker">
@@ -308,6 +313,7 @@
       <p class="bgen-p">Click below and unisona makes your security keys right here in your browser and downloads <strong>3 files</strong>. You'll upload those to IBKR in step 2. The secret parts stay in this form — they never leave your computer except into unisona.</p>
       <button type="button" class="btn-primary" id="bgenerate">🔑 Generate my keys</button>
       <span id="bgenmsg" class="bgen-msg"></span>
+      <div id="bgenfiles" class="bgen-files" hidden></div>
       <details class="bgen-adv"><summary>Prefer the command line? (advanced)</summary>
         <p class="bgen-p" style="margin-top:8px">Run these, then paste the two <em>private</em> keys + DH prime yourself:</p>
         <pre style="white-space:pre-wrap;font-family:var(--mono);font-size:.7rem;background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:10px">openssl genrsa -out private_signature.pem 2048
@@ -1570,11 +1576,18 @@ openssl dhparam -out dhparam.pem 2048</pre>
     const msg=$('bgenmsg'); gen.disabled=true; const t=gen.textContent; gen.textContent='Generating…'; msg.textContent='';
     try{
       const k=await window.IbkrKeygen.generate();
-      window.IbkrKeygen.download('public_signature.pem', k.signPublicPem);
-      window.IbkrKeygen.download('public_encryption.pem', k.encPublicPem);
-      window.IbkrKeygen.download('dhparam.pem', k.dhParamPem);
+      // Auto-fill the private half into the form (stays in this tab).
       $('signaturePem').value=k.signPrivatePem; $('encryptionPem').value=k.encPrivatePem; $('dhPrime').value=k.dhPrimeHex;
-      msg.style.color='#22c55e'; msg.textContent='✓ Keys made + 3 files downloaded. Upload them to IBKR (step 2).';
+      // Browsers block 3 back-to-back auto-downloads — offer explicit buttons the
+      // user clicks (each click is a user gesture, so every file downloads).
+      const files=[['public_signature.pem',k.signPublicPem],['public_encryption.pem',k.encPublicPem],['dhparam.pem',k.dhParamPem]];
+      const box=$('bgenfiles'); box.hidden=false; box.innerHTML='<div class="bgen-files-h">Download all 3, then upload them to IBKR (step 2):</div>';
+      files.forEach(([name,content])=>{
+        const b=document.createElement('button'); b.type='button'; b.className='bfile-btn'; b.textContent='⬇ '+name;
+        b.addEventListener('click',()=>{ window.IbkrKeygen.download(name,content); b.classList.add('done'); b.textContent='✓ '+name+' (downloaded)'; });
+        box.appendChild(b);
+      });
+      msg.style.color='#22c55e'; msg.textContent='✓ Keys made. Download all 3 files below ↓';
     }catch(e){ msg.style.color='#ef4444'; msg.textContent='Couldn’t generate — '+(e.message||'use the command-line option.'); }
     finally{ gen.disabled=false; gen.textContent=t; }
   });
