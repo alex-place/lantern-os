@@ -278,6 +278,7 @@
     #broker .bdot{width:9px;height:9px;border-radius:50%;background:var(--text2)}
     #broker .bdot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}#broker .bdot.off{background:#ef4444}
     #broker .bdot.wait{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+    #broker .bsaved-note{margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:.76rem;line-height:1.5;border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.08);color:#bbf7d0}
     #broker .broker-gate{margin:0 0 12px;padding:10px 13px;border-radius:9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#fca5a5;font-size:.82rem}
     #broker .broker-gate a{color:var(--accent)}
     #broker .bfield{margin-bottom:10px}
@@ -327,6 +328,7 @@ openssl dhparam -out dhparam.pem 2048</pre>
 
     <form id="brokerForm">
       <div class="bbanner" id="bbanner"></div>
+      <div class="bsaved-note" id="bsavednote" hidden>✓ Your credentials are <strong>saved on file</strong> (encrypted). You don't need to re-enter them — refreshing is safe. Use <strong>Recheck connection</strong> to test again. Fill a field only to <em>replace</em> it.</div>
       <div class="brow">
         <div class="bfield"><label>Consumer key</label><input id="consumerKey" autocomplete="off"></div>
         <div class="bfield"><label>Account ID</label><input id="accountId" placeholder="DU1234567" autocomplete="off"><div class="bhint">DU… = paper · U… = live</div></div>
@@ -1550,6 +1552,10 @@ openssl dhparam -out dhparam.pem 2048</pre>
       : 'Not connected';
     $('bdisconnect').hidden=!has;
     $('brecheck').hidden=!has;
+    // Reassure that saved creds aren't lost on refresh: show the note + mark empty
+    // fields as "on file" rather than blank.
+    const note=$('bsavednote'); if(note) note.hidden=!has;
+    if(has){ ['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime'].forEach(f=>{ const el=$(f); if(el&&!el.value) el.placeholder='•••••••• saved — leave blank to keep'; }); }
   }
   // Shared: turn a live-probe result into a banner (used by Connect + Recheck).
   function showLive(live){
