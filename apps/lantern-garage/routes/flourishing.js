@@ -88,7 +88,7 @@ function emptyWorldStatus() {
     belief_count: 0, sensor_count: 0, flourishing: null,
     db_exists: fs.existsSync(WORLD_DB_PATH),
     snapshot_exists: fs.existsSync(SNAPSHOT_PATH),
-    message: "HFF world model not yet seeded — run integrations/human-flourishing-frameworks/seed_data.py to populate.",
+    message: "HFF world model not seeded: no snapshot at integrations/human-flourishing-frameworks/data/snapshot.json. This backend serves an empty-but-valid structure until a world-model snapshot is written there.",
   };
 }
 
