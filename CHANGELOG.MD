@@ -1,3 +1,7 @@
+## [1.8.84] - 2026-07-05
+### Fixed
+- **Convergence grade card no longer fabricates the Capability (CAP) score** (`src/convergence_io_engine.py`). It wrote a hardcoded `score: 1.0` report and fed that into the overall grade with no evidence (OH/SCOPE were genuinely measured), violating the External Reality Rule. It now runs the real `node tests/gaming-layout-suite/run.js` benchmark and parses its `Gameplay centred: p/t` result; when nothing is scorable or it errors, `cap_score` stays `None` ("not measured") — never faked to 1.0 nor falsely zeroed — and the overall average excludes unmeasured axes. Strengthens **Verify**. See `changelog.d/convergence-cap-no-fabrication.md` (#2093).
+
 ## [1.8.83] - 2026-07-05
 ### Added
 - **LongMemEval now scores the live JS chat retriever, not just the Python engine** (`scripts/eval_longmemeval_js.js`). It drives `csf-memory.js::searchConversation` — the keyword retriever a real chat turn uses, which windows the last 1200 turns — over the LongMemEval haystack and writes a *separate* `runs.jsonl` row so the product number never gets conflated with the engine's. Measured on `longmemeval_s` (n=500, k=5): session-level recall@5 **0.884** / MRR **0.80**, 0/500 gold outside the window. Also flags `truncated_gold` (haystack larger than the window) as a real product limitation. Strengthens **Remember**. See `changelog.d/longmemeval-product-path.md` (#2111).
