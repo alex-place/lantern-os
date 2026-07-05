@@ -282,7 +282,9 @@
     row.classList.toggle("done-ok", status === "done");
     row.querySelector(".fs-icon").textContent = FLEET_STEP_ICON[status] || "•";
     row.querySelector(".fs-phase").textContent = phase.replace(/_/g, " ");
-    const detail = extra.title || extra.error || extra.message || extra.branch || extra.files != null ? JSON.stringify(extra).slice(0, 200) : "";
+    const detail = extra.verdict
+      ? `verdict: ${extra.verdict}${extra.delta != null ? ` · Δ=${extra.delta}` : ""}${extra.groundedBy ? ` · via ${extra.groundedBy}` : ""}`
+      : (extra.title || extra.error || extra.message || extra.branch || extra.files != null ? JSON.stringify(extra).slice(0, 200) : "");
     row.querySelector(".fs-detail").textContent = detail;
     log.scrollTop = log.scrollHeight;
   }
@@ -320,7 +322,7 @@
           else if (event === "done") {
             const final = document.createElement("div"); final.className = "fleet-final";
             if (payload.ok && payload.prUrl) {
-              final.innerHTML = `<span style="color:var(--green);font-weight:700;">✓ Delegated successfully</span> — draft PR opened: <a href="${escapeHtml(payload.prUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.prUrl)}</a>${payload.testsPassed != null ? ` · tests ${payload.testsPassed ? "passed" : "failed"}` : ""}`;
+              final.innerHTML = `<span style="color:var(--green);font-weight:700;">✓ Delegated successfully</span> — draft PR opened: <a href="${escapeHtml(payload.prUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.prUrl)}</a>${payload.testsPassed != null ? ` · tests ${payload.testsPassed ? "passed" : "failed"}` : ""}${payload.councilVerdict ? ` · council: ${escapeHtml(payload.councilVerdict)}${payload.councilDelta != null ? ` (Δ=${escapeHtml(String(payload.councilDelta))})` : ""}` : ""}`;
               loadResearchQueue(); renderLanded();
             } else {
               final.innerHTML = `<span style="color:#f87171;font-weight:700;">Run stopped</span> at <b>${escapeHtml(payload.stoppedAt || "unknown")}</b>${payload.message ? ` — ${escapeHtml(payload.message)}` : ""}. Nothing was pushed.`;
