@@ -229,7 +229,7 @@
     .guest-banner a { color: var(--accent); font-weight: 700; text-decoration: none; }
     .guest-banner a:hover { text-decoration: underline; }
   </style>
-  <title>Orchestration — unisona.ai</title>
+  <title>Settings — unisona.ai</title>
 </head>
 <body>
 
@@ -243,7 +243,7 @@
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
-    <a href="/orchestration.html" class="active">Orchestration</a>
+    <a href="/orchestration.html" class="active">Settings</a>
     <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
   </div>
@@ -254,7 +254,7 @@
 
 <main class="orch-main" id="main-content">
 
-  <h1 class="visually-hidden">Orchestration — Control Center</h1>
+  <h1 class="visually-hidden">Settings — Control Center</h1>
 
   <!-- ── Read-only guest banner (shown only to logged-out visitors) ── -->
   <div class="guest-banner" role="status">
@@ -271,6 +271,53 @@
     <span class="smeta">Training: <b id="statusTrain">—</b></span>
     <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
+
+  <!-- ── Broker connection (IBKR) — per-user, ADR-0022 ── -->
+  <style>
+    #broker .broker-status{display:flex;align-items:center;gap:9px;font-size:.85rem;font-weight:600;margin:2px 0 12px}
+    #broker .bdot{width:9px;height:9px;border-radius:50%;background:var(--text2)}
+    #broker .bdot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}#broker .bdot.off{background:#ef4444}
+    #broker .broker-gate{margin:0 0 12px;padding:10px 13px;border-radius:9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#fca5a5;font-size:.82rem}
+    #broker .broker-gate a{color:var(--accent)}
+    #broker .bfield{margin-bottom:10px}
+    #broker label{display:block;font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+    #broker input,#broker textarea{width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg0);color:var(--text0);font-size:.82rem;font-family:inherit}
+    #broker textarea{min-height:78px;font-family:var(--mono);font-size:.72rem;resize:vertical}
+    #broker .brow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media(max-width:640px){#broker .brow{grid-template-columns:1fr}}
+    #broker .bhint{font-size:.68rem;color:var(--text2);margin-top:3px}
+    #broker .bbanner{display:none;margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:.78rem}
+    #broker .bbanner.show{display:block}#broker .bbanner.err{border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.1);color:#fca5a5}
+    #broker .bbanner.ok{border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);color:#bbf7d0}
+    #broker .bactions{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+  </style>
+  <section class="panel" id="broker">
+    <h2>🔗 Broker Connection <span class="section-meta">Interactive Brokers · your account</span></h2>
+    <p class="panel-sub">Trade your own IBKR account through unisona (self-service OAuth). Keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>). <a href="/ibkr-setup-guide.html">📖 Setup guide →</a></p>
+    <div class="broker-status"><span class="bdot" id="bdot"></span><span id="bstatusText">Checking…</span></div>
+    <div class="broker-gate" id="bgate" hidden>Trading requires the <strong>Deep Dreamer ($20/mo)</strong> tier. <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
+    <form id="brokerForm">
+      <div class="bbanner" id="bbanner"></div>
+      <div class="brow">
+        <div class="bfield"><label>Consumer key</label><input id="consumerKey" autocomplete="off"></div>
+        <div class="bfield"><label>Account ID</label><input id="accountId" placeholder="DU1234567" autocomplete="off"><div class="bhint">DU… = paper · U… = live</div></div>
+      </div>
+      <div class="brow">
+        <div class="bfield"><label>Access token</label><input id="accessToken" autocomplete="off"></div>
+        <div class="bfield"><label>Access token secret</label><input id="accessTokenSecret" autocomplete="off"></div>
+      </div>
+      <div class="bfield"><label>Signature private key (PEM)</label><textarea id="signaturePem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea></div>
+      <div class="bfield"><label>Encryption private key (PEM)</label><textarea id="encryptionPem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea></div>
+      <div class="brow">
+        <div class="bfield"><label>Diffie-Hellman prime (hex)</label><input id="dhPrime" autocomplete="off"></div>
+        <div class="bfield"><label>Realm</label><input id="realm" value="limited_poa" autocomplete="off"></div>
+      </div>
+      <div class="bactions">
+        <button type="submit" class="btn-primary" id="bconnect">Connect &amp; test</button>
+        <button type="button" class="btn-secondary" id="bdisconnect" hidden>Disconnect</button>
+      </div>
+    </form>
+  </section>
 
   <p class="band-title">The loop, right now</p>
 
@@ -432,7 +479,7 @@
     <span class="sep">·</span>
     <a href="/">Home</a>
     <a href="/dream-chat.html">Chat</a>
-    <a href="/orchestration.html">Orchestration</a>
+    <a href="/orchestration.html">Settings</a>
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
@@ -1455,6 +1502,50 @@
 })();
 </script>
 
+<script>
+// ── Broker connection (IBKR) — per-user (ADR-0022) ──
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const FIELDS=['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime','realm','accountId'];
+  const form=$('brokerForm'); if(!form) return;
+  function banner(m,k){ const b=$('bbanner'); b.textContent=m; b.className='bbanner show '+(k||'ok'); }
+  function setStatus(s){
+    const connected=s&&s.live&&s.live.connected, has=s&&s.hasCredentials;
+    $('bdot').className='bdot '+(connected?'on':has?'off':'');
+    $('bstatusText').textContent=connected?`Connected · ${s.accountId||'account'} (${s.mode||'?'})`:has?'Credentials saved but not connected — check keys / IBKR session':'Not connected';
+    $('bdisconnect').hidden=!has;
+  }
+  async function refresh(){
+    try{
+      const sess=await (await fetch('/api/auth/session',{credentials:'include'})).json();
+      const entitled=sess&&(sess.role==='admin'||(sess.entitlements&&sess.entitlements.trade));
+      $('bgate').hidden=!!entitled;
+      form.style.opacity=entitled?'1':'.5'; form.style.pointerEvents=entitled?'auto':'none';
+      if(!entitled){ setStatus({hasCredentials:false}); return; }
+      setStatus(await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json());
+    }catch(e){ setStatus({hasCredentials:false}); }
+  }
+  form.addEventListener('submit',async(e)=>{
+    e.preventDefault(); const body={}; FIELDS.forEach(f=>body[f]=$(f).value.trim());
+    const btn=$('bconnect'); btn.disabled=true; const t=btn.textContent; btn.textContent='Testing…';
+    try{
+      const r=await fetch('/api/trading/ibkr/connect',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const d=await r.json();
+      if(!r.ok) banner(({missing_consumerKey:'Consumer key is required',bad_signaturePem:'Signature key must be a PEM private key',bad_encryptionPem:'Encryption key must be a PEM private key',bad_dhPrime:'DH prime must be hex'}[d.error])||('Error: '+(d.error||r.status)),'err');
+      else if(d.live&&d.live.connected){ banner('Connected to IBKR — live session verified.','ok'); setStatus({...d.status,live:d.live}); }
+      else { banner('Credentials saved, but IBKR did not authenticate. Double-check the keys and that your IBKR OAuth consumer is active (can take up to 24h).','err'); setStatus({...d.status,live:d.live}); }
+    }catch(_){ banner('Network error — please try again.','err'); }
+    finally{ btn.disabled=false; btn.textContent=t; refresh(); }
+  });
+  $('bdisconnect').addEventListener('click',async()=>{
+    if(!confirm('Disconnect your IBKR account?')) return;
+    await fetch('/api/trading/ibkr/disconnect',{method:'POST',credentials:'include'});
+    FIELDS.forEach(f=>{ if(f!=='realm') $(f).value=''; }); banner('Disconnected.','ok'); refresh();
+  });
+  try{ const dh=sessionStorage.getItem('ibkr_dh_prime'); if(dh&&!$('dhPrime').value){ $('dhPrime').value=dh; sessionStorage.removeItem('ibkr_dh_prime'); } }catch(e){}
+  refresh();
+})();
+</script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
