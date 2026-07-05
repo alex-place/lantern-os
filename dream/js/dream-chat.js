@@ -282,7 +282,12 @@
         row.innerHTML = `<div class="msg-label">${isUser ? "You" : "Unisona"}${time ? " · " + time : ""}</div><div class="bubble">${bubbleHtml}</div>${sig}`;
         fragment.appendChild(row);
       }
-      messagesEl.appendChild(fragment);
+      // Insert at the TOP, not the bottom. The `?q=` auto-submit handler
+      // (dream-chat.html — home starter chips like "Check the news" navigate
+      // here with ?q=…) can fire before this async fetch resolves and append a
+      // live turn first; appending history then would drop older turns *below*
+      // the new one. Prepending keeps chronology correct regardless of the race.
+      messagesEl.insertBefore(fragment, messagesEl.firstChild);
       scrollToBottom();
     } catch { /* non-critical — fresh session is fine */ }
   }
