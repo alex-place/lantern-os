@@ -85,7 +85,7 @@ const DEFAULT_PROTECTED_PATHS = [
 ];
 
 class PrWatcher {
-  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeIgnorePatterns = null, mergeProtectedPaths = null, baseRef = "master" } = {}) {
+  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeIgnorePatterns = null, mergeProtectedPaths = null, baseRef = "master", requireChecks = true } = {}) {
     this.repoRoot = repoRoot;
     this.port = port;
     this.idleMs = idleMs;
@@ -93,6 +93,12 @@ class PrWatcher {
     // Off by default; the watcher only reviewed before. Enable per-host.
     this.autoMerge = autoMerge;
     this.baseRef = baseRef;
+    // Require CI to have actually RUN and passed before merging. Without this, a PR
+    // with an EMPTY status-check rollup (no workflow ran, or every check was on the
+    // ignore/deploy-preview lists) sailed through the rollup loop vacuously and merged
+    // on zero evidence. Merging must mean "CI ran and went green", not "CI said nothing".
+    // Override with PR_WATCHER_REQUIRE_CHECKS=0 for repos with no CI at all.
+    this.requireChecks = requireChecks;
     this._baseFailCache = null;   // Set<string> of checks failing on baseRef
     this._baseFailCacheAt = 0;    // when that cache was last refreshed
     this.mergeIgnoreChecks = new Set(mergeIgnoreChecks || DEFAULT_MERGE_IGNORE_CHECKS);
@@ -197,6 +203,7 @@ class PrWatcher {
 
     // Evaluate the status check rollup. Items are either CheckRun
     // ({ name, status, conclusion }) or StatusContext ({ context, state }).
+    let sawPassingCheck = false; // at least one real (non-ignored) check went green
     for (const c of (pv.statusCheckRollup || [])) {
       const name = c.name || c.context || "";
       if (this.mergeIgnoreChecks.has(name)) continue;
@@ -206,7 +213,13 @@ class PrWatcher {
       if (c.status && c.status !== "COMPLETED") return { merge: false, reason: `pending:${name || "?"}` };
       const conclusion = String(c.conclusion || c.state || "").toUpperCase();
       if (BLOCKING_CONCLUSIONS.has(conclusion)) return { merge: false, reason: `failed:${name || "?"}` };
+      if (conclusion === "SUCCESS") sawPassingCheck = true;
     }
+
+    // Require CI to have actually run and passed. An empty rollup (no workflow fired)
+    // or one made up entirely of ignored/deploy-preview checks leaves sawPassingCheck
+    // false — that is NOT a green PR, it is an unverified one, so it must not merge.
+    if (this.requireChecks && !sawPassingCheck) return { merge: false, reason: "no_passing_checks" };
 
     // Σ₀ assigned-issue convergence gate: a PR closing a human-assigned issue needs
     // a convergence record AND autowork verification before it merges. Agents/humans

@@ -108,6 +108,8 @@ const prWatcher = new PrWatcher({
   mergeIgnorePatterns: process.env.PR_WATCHER_MERGE_IGNORE_PATTERNS
     ? process.env.PR_WATCHER_MERGE_IGNORE_PATTERNS.split(",").map((s) => s.trim()).filter(Boolean)
     : null,
+  // CI must run + go green before auto-merge. Opt out only for CI-less repos.
+  requireChecks: process.env.PR_WATCHER_REQUIRE_CHECKS !== "0",
 });
 
 // Shared dependency bundle passed to every route module

@@ -55,6 +55,17 @@ ok("merge: pending check -> false", m._shouldMerge({ isDraft: false, mergeable: 
 ok("merge: StatusContext failure -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ context: "legacy", state: "FAILURE" }] }, reviewed, now).merge === false);
 ok("merge: disabled -> false", new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: false })._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now).merge === false);
 
+// ── require-checks: a PR whose CI never ran (empty / all-ignored rollup) must NOT
+// merge vacuously. This was the hole — the rollup loop only blocks on red/pending,
+// so zero real checks fell through to merge:true on no evidence at all. ──
+ok("merge: empty rollup -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [] }, reviewed, now).merge === false);
+ok("merge: empty rollup reason names it", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [] }, reviewed, now).reason === "no_passing_checks");
+ok("merge: missing rollup -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE" }, reviewed, now).merge === false);
+ok("merge: only-ignored checks -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "Python tests", status: "COMPLETED", conclusion: "SUCCESS" }] }, reviewed, now).merge === false);
+ok("merge: only deploy-preview success -> false", m._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [{ name: "netlify/site/deploy-preview", status: "COMPLETED", conclusion: "SUCCESS" }] }, reviewed, now).merge === false);
+// …but a repo that opts out (requireChecks:false) keeps the old lenient behaviour.
+ok("merge: requireChecks off + empty rollup -> true", new PrWatcher({ repoRoot: os.tmpdir(), idleMs: 1000, autoMerge: true, requireChecks: false })._shouldMerge({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: [] }, reviewed, now).merge === true);
+
 // ── ignore-list self-heal: aggregate gate + base-branch reds never block ──
 // The "All checks passed" roll-up is red whenever any constituent is red, so it
 // must never block (we recompute the constituents ourselves) — even when it is NOT
