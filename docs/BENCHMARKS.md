@@ -12,7 +12,7 @@ the Σ₀ external-reality rule applied to ourselves: a capability claim is only
 > are graded against by the outside world.
 
 **Evidence ledgers (the source of truth for results):**
-- [`data/eval/leaderboard.jsonl`](../data/eval/leaderboard.jsonl) — one row per coding/serving run (`pass@1` / `accuracy`). CI-gated: see [eval-leaderboard-gate.yml](../.github/workflows/eval-leaderboard-gate.yml).
+- [`data/eval/leaderboard.jsonl`](../data/eval/leaderboard.jsonl) — one row per coding/serving run (`pass@1` / `accuracy`). CI-gated: see [eval-leaderboard-gate.yml](../.github/workflows/eval-leaderboard-gate.yml). Every row is stamped with provenance — `git_sha`, `served_checkpoint` (the `OURO_*` model+adapter measured), and `campaign_id` (set `EVAL_CAMPAIGN_ID` to group a whole-suite run) — via `scripts/eval_ledger.append_leaderboard` (#2108), so rows are groupable by snapshot and a cross-benchmark read knows it's comparing one model, not two.
 - [`data/longmemeval/runs.jsonl`](../data/longmemeval/runs.jsonl) — one row per memory-retrieval run (`recall@k` / `MRR`).
 - `data/eval/swebench/<label>-<ts>.jsonl` — SWE-bench predictions in official format (grade later).
 

@@ -1,0 +1,2 @@
+### Added
+- Benchmark leaderboard rows now record provenance — `git_sha`, `served_checkpoint`, and `campaign_id` — via a shared `scripts/eval_ledger.append_leaderboard` helper, so runs are groupable by model snapshot and cross-benchmark (holistic) reads know which checkpoint produced each number (#2108). Wired into `eval_coding.py`, `eval_humaneval_ouro.py`, and `eval_humaneval_chat.py`; set `EVAL_CAMPAIGN_ID` to tag a whole-suite run.
