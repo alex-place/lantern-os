@@ -32,6 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Phase 3 (issue #1292): the reranker is stdlib-only and GPU-free, safe to import here.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from humaneval_rerank import rerank as rerank_candidates  # noqa: E402
+from eval_ledger import append_leaderboard  # noqa: E402  (#2108)
 os.environ.setdefault("HF_HOME", "D:/hf-cache")
 # canonical HumanEval completion stops: ONLY true top-level boundaries (column 0).
 # NB: do NOT stop on "\n#" or "\nprint(" — the model writes comments/prints INSIDE the
@@ -346,8 +347,7 @@ def main():
         "exit_at_step": a.exit_at_step, "weighted_exit": a.weighted_exit, "odd_only": a.odd_only,
     }
     # detail_path already written incrementally above; nothing more to write for per-problem rows
-    with open(os.path.join(ROOT, "data", "eval", "leaderboard.jsonl"), "a", encoding="utf-8") as f:
-        f.write(json.dumps(summary, ensure_ascii=False) + "\n")
+    append_leaderboard(summary)  # stamps git_sha/served_checkpoint/campaign_id (#2108)
     tag = "HumanEval" + ("-odd" if a.odd_only else "") + ("" if a.full else f"[first {n}]")
     print(f"\nVERDICT {tag} [{summary['method']}] pass@1 = {summary['pass@1']*100:.1f}%  ({n_ok}/{n_eval})  "
           f"{summary['sec_per_problem']}s/problem", flush=True)

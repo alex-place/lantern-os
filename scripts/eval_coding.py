@@ -29,6 +29,9 @@ import time
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from eval_ledger import append_leaderboard  # noqa: E402  (#2108)
+
 GOLDEN_PATH = os.path.join(ROOT, "data", "eval", "coding-golden.jsonl")
 
 
@@ -200,9 +203,7 @@ def main():
         for d in detail:
             f.write(json.dumps(d, ensure_ascii=False) + "\n")
 
-    lb_path = os.path.join(ROOT, "data", "eval", "leaderboard.jsonl")
-    with open(lb_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(summary, ensure_ascii=False) + "\n")
+    append_leaderboard(summary)  # stamps git_sha/served_checkpoint/campaign_id (#2108)
 
     print(f"\n{a.label}: pass@1={pass_at_1*100:.0f}%  assertion_rate={assertion_rate*100:.0f}%"
           f"  avg_latency={avg_lat}s  (n={n}, {n_correct_tasks} tasks fully correct)", flush=True)

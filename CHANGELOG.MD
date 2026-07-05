@@ -1,3 +1,7 @@
+## [1.8.81] - 2026-07-05
+### Added
+- **Benchmark leaderboard rows now carry provenance** — `git_sha`, `served_checkpoint` (the `OURO_*` model+adapter measured), and `campaign_id` (`EVAL_CAMPAIGN_ID` or a git-sha fallback) — via a shared `scripts/eval_ledger.append_leaderboard` helper wired into `eval_coding.py` / `eval_humaneval_ouro.py` / `eval_humaneval_chat.py`. Rows are groupable by model snapshot so a cross-benchmark read knows it's comparing one checkpoint, not two. Strengthens **Converge**. See `changelog.d/benchmarks-ledger-provenance.md` (#2108). (Re-land: the original commits were orphaned when PR #2106 auto-merged at its docs-only first commit.)
+
 ## [1.8.78] - 2026-07-05
 ### Changed
 - **The home "Check the news" chip now summarizes today's headlines instead of web-searching the word "news".** The chip sends "summarize the top world news headlines from today", and any news-intent chat is grounded on the real curated RSS discover feed (title, link, source, date, summary, and lead image). The model returns real, sourced panels in a fixed format — linked headline, an image when the source provides one, source · date, one-line takeaway — rather than a junk web search ("News Today" the newspaper, the "Today" TV show) or "I couldn't find the news". Strengthens **Observe**. See `changelog.d/news-chip-llm-summary.md`.
