@@ -12,6 +12,31 @@ const PROVIDER_KEYS = [
   "ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID",
 ];
 
+// Traction (#2040/#2041): a successful chat reply is a completed real workflow. Emit a
+// verified `workflow_used` event keyed on the user's identity so the existing traction
+// ledger (lib/traction.js → data/traction/events.jsonl) has MEASURED usage to compute
+// external activation + retention from — closing the "no funnel telemetry" report-card
+// gap without a second, competing traction system. Anonymous browsing is NOT an
+// activation signal, so it's skipped. Fire-and-forget + non-fatal — telemetry must
+// never break the reply.
+function recordChatUsage(req) {
+  try {
+    const user = require("../lib/session-identity").getSessionUser(req);
+    if (!user) return;
+    const actor = user.email || user.name || user.id;
+    if (!actor) return;
+    Promise.resolve(
+      require("../lib/traction").recordTractionEvent({
+        kind: "workflow_used",
+        actor,
+        verified: true,
+        source: "chat-reply",
+        evidence: "data/conversations/garage-conversations.jsonl",
+      })
+    ).catch(() => { /* non-fatal */ });
+  } catch { /* traction never breaks the reply */ }
+}
+
 module.exports = async function dreamRoutes(req, res, url, deps) {
   const { fs, path, sendJson, collectRequestBody, appendJsonlQueued,
     repoRoot, maxDreamerTextLength, maxConversationTextLength,
@@ -412,6 +437,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
         const claimFile = path.join(claimDir, `claim-packets.jsonl`);
         setImmediate(() => { try { fs.appendFileSync(claimFile, JSON.stringify(claimPacket) + "\n"); } catch {} });
       } catch { /* non-fatal */ }
+      if (result.reply) recordChatUsage(req); // #2040: first-value chat workflow completed
       sendJson(res, { ...result, generatedAt: new Date().toISOString() });
     } catch (error) { sendJson(res, { error: error.message, online: false }); }
     return true;
@@ -471,6 +497,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
       const result = origEnd(...args);
       res.write = origWrite; // restore in case of reuse
       _logInteraction('', null);
+      recordChatUsage(req); // #2040: streamed chat workflow completed
       return result;
     };
 

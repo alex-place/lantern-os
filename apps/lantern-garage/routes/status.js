@@ -1,12 +1,38 @@
 // Health, status, system metrics — read-only telemetry endpoints
 const { getRoutingSnapshot } = require("../lib/provider-cache");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
 // In-memory model metrics cache
 let _modelMetricsCache = { data: null, ts: 0 };
 const METRICS_CACHE_TTL_MS = 5000;
+
+// Which git branch/checkout is this server serving? Cached for 60s so a /api/health
+// probe (hit frequently by a watchdog) never shells out to git on every call. Returns
+// null if git is unavailable rather than throwing — health must never fail on this.
+let _branchCache = { value: null, ts: 0 };
+const BRANCH_CACHE_TTL_MS = 60_000;
+function currentBranch(repoRoot) {
+  const now = Date.now();
+  if (_branchCache.value !== null && (now - _branchCache.ts) < BRANCH_CACHE_TTL_MS) {
+    return _branchCache.value;
+  }
+  let branch = null;
+  try {
+    // Shell-free (execFileSync, no shell interpolation) per the repo's command-exec convention.
+    branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: repoRoot || process.cwd(),
+      encoding: "utf8",
+      timeout: 2000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim() || null;
+  } catch {
+    branch = null;
+  }
+  _branchCache = { value: branch, ts: now };
+  return branch;
+}
 
 // Probe the local Ollama-API model server (:11434 by default) to report the
 // actual offline model wired into the coder/agent path. OLLAMA_MODEL is the
@@ -125,7 +151,17 @@ module.exports = async function statusRoutes(req, res, url, deps) {
       }
       return true;
     }
-    sendJson(res, { ok: true, service: "lantern-garage", generatedAt: new Date().toISOString() });
+    // Bare liveness now also carries the identity a watchdog needs to decide "is the
+    // RIGHT server up on this port?": which branch/checkout it is, how long it has been
+    // up, and the pid to kill if it has to restart it (#2037, supports the #2038 probe).
+    sendJson(res, {
+      ok: true,
+      service: "lantern-garage",
+      branch: currentBranch(deps.repoRoot),
+      uptime_s: Math.round(process.uptime()),
+      pid: process.pid,
+      generatedAt: new Date().toISOString(),
+    });
     return true;
   }
   if (url.pathname === "/api/status") {
