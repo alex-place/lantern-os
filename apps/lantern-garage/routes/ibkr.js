@@ -13,7 +13,7 @@
 
 const store = require('../lib/ibkr-credentials');
 const IbkrCpapi = require('../lib/ibkr-cpapi');
-const { getSessionUserId } = require('../lib/session-identity');
+const { getEffectiveUserId } = require('../lib/session-identity');
 
 function _readJson(req) {
   return new Promise((resolve) => {
@@ -44,7 +44,7 @@ module.exports = async function ibkrRoutes(req, res, url) {
   const path = url.pathname;
   if (!OWNED.has(path)) return false; // account/positions/status live in routes/trading
 
-  const userId = getSessionUserId(req);
+  const userId = getEffectiveUserId(req);
   if (!userId) { _json(res, 401, { error: 'not_authenticated' }); return true; }
 
   // GET connection status
