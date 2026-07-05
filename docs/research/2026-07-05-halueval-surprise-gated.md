@@ -36,3 +36,25 @@ C_random at *equal budget* (grounding a random subset = the A->B line).
   If the Sigma0 hidden-state surprise canary (0.99 on matched pairs, earlier this cycle) or the
   council-Delta gates *better than logprob* on the same 40 items, that is the genuinely-owned
   contribution — falsifiable, one experiment away, hold-everything-else-fixed.
+
+## Follow-up (same day): the API-feasible gate bake-off
+
+The strict hidden-state canary **cannot** run on gpt-4o-mini (closed model, no internal states —
+which is *why* FLARE uses logprobs), so it moves to Ouro (open model) as a separate, heavier test.
+What *is* directly comparable now: race logprob against the other cheap gates the system leans on,
+same model, same 40 items (`experiments/halueval_gates_compare.py`).
+
+| gate | AUROC | edge-vs-random | prior art |
+|---|---|---|---|
+| logprob | 0.861 | **0.059** | FLARE |
+| self_consistency (K=5) | 0.851 | 0.056 | semantic entropy |
+| council_delta ({4o-mini,4o,3.5}) | **0.909** | 0.046 | SAC3 |
+
+- **No cheap signal clearly beats free logprob.** council-Delta's higher AUROC (+0.048) is inside
+  the n=40 noise band, and it **routes worst** — a 3-member Delta has only 3 values, so heavy ties
+  wreck greedy top-k routing even though the ranking is good. Edge tracks *granularity*
+  (continuous > 5-level > 3-level), not AUROC. Self-consistency is a wash (5x cost, no gain).
+- **Practical:** use the free logprob gate; the council's rank quality is a hint worth more n and a
+  *continuous* Delta (embedding-variance disagreement, more members), not a deployment win.
+- Still not novel (all three published). The owned, potentially-novel question — does the Sigma0
+  hidden-state canary beat logprob — remains open and needs Ouro.
