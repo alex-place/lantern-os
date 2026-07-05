@@ -36,6 +36,19 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 
 def load_model(base, adapter):
+    # RAM preflight (#781): from_pretrained materializes the weights in system RAM before
+    # moving to GPU, so a starved box paging-OOMs even for a CUDA load. Fail fast instead.
+    import os as _os, sys as _sys
+    _src = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "src")
+    if _src not in _sys.path:
+        _sys.path.insert(0, _src)
+    try:
+        from sigma0.ram_guard import require_free_ram as _require_free_ram
+    except Exception:
+        _require_free_ram = None
+    if _require_free_ram is not None:
+        _require_free_ram(what=f"Ouro model '{base}'")
+
     from datasets import Dataset  # noqa: F401  (import before torch on Windows: pyarrow/CUDA DLL)
     import torch
     from transformers import (AutoModelForCausalLM, AutoTokenizer, AutoConfig,

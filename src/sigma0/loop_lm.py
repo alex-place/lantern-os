@@ -181,6 +181,10 @@ class Sigma0LoopLM:
     # ── load ────────────────────────────────────────────────────────────────
     @classmethod
     def load(cls, base="ByteDance/Ouro-1.4B", adapter: str | None = None, dtype="float16"):
+        # RAM preflight (#781): fail fast with a clear message instead of driving the
+        # 12 GB box into the paging-file OOM spiral when a load races other evals/agents.
+        from .ram_guard import require_free_ram
+        require_free_ram(what=f"Ouro model '{base}'")
         torch, AutoModelForCausalLM, AutoTokenizer = _lazy()
         tok = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
         if tok.pad_token is None:
