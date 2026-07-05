@@ -1,3 +1,7 @@
+## [1.8.77] - 2026-07-05
+### Fixed
+- **Home starter chips (e.g. "Check the news") no longer inject the new turn above older history.** Chips deep-link into chat with `?q=…`, which auto-sends on load and races the async conversation-history restore. History was appended to the bottom, so the auto-sent turn ended up *above* the older restored conversation. History now prepends to the top of the transcript, keeping chronology correct regardless of which side wins the race. Strengthens **Remember**. See `changelog.d/fix-news-chip-history-order.md`.
+
 ## [1.8.76] - 2026-07-05
 ### Fixed
 - **Job-openings search no longer interrogates the user or falsely claims "no API access".** On "search for job openings" the single Keystone assistant demanded a checklist of details (industry, seniority, companies, exclusions) and then told the user it can't reach job boards — despite having a live `web_search` tool. The persona now treats a keyword + location as sufficient and runs a real board search immediately (`site:indeed.com`, LinkedIn, Glassdoor), returning actual listings as links. Strengthens **Act**. See `changelog.d/fix-job-openings-search.md`.
