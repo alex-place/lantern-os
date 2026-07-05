@@ -87,17 +87,23 @@ conflict=$(gh pr list --repo alex-place/lantern-os --state open \
   --json headRefName \
   --jq "[.[] | $lane_match] | length" 2>/dev/null)
 
-if [ "${conflict:-0}" -gt 0 ]; then
+# Concurrent-session cap: a lane (one user or agent) may keep up to
+# WORKSTREAM_MAX_OPEN_PRS open PRs at once, so a user can run several sessions in
+# parallel. `conflict` counts OTHER open PRs in the lane (this branch has no PR yet
+# — it exited above if it did). Set the cap to 1 to restore one-PR-per-lane.
+max_open=${WORKSTREAM_MAX_OPEN_PRS:-3}
+if [ "${conflict:-0}" -ge "$max_open" ]; then
   echo ""
-  echo "WORKSTREAM BLOCK: $lane_kind lane '$lane' already has an open PR."
+  echo "WORKSTREAM BLOCK: $lane_kind lane '$lane' already has $conflict open PRs (cap $max_open)."
   echo ""
   gh pr list --repo alex-place/lantern-os --state open \
     --json number,title,headRefName \
     --jq "[.[] | $lane_match] | .[] | \"  #\\(.number) \\(.title) [\\(.headRefName)]\"" \
     2>/dev/null
   echo ""
-  echo "Finish or close that PR before opening another lane for '$lane'."
-  echo "Bypass: SKIP_MONOWORKSTREAM=1 git commit ..."
+  echo "Close one of those PRs, or allow more concurrent sessions with"
+  echo "WORKSTREAM_MAX_OPEN_PRS=$((max_open+1)) git commit ..."
+  echo "Bypass entirely: SKIP_MONOWORKSTREAM=1 git commit ..."
   echo ""
   exit 1
 fi
