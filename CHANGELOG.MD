@@ -1,3 +1,7 @@
+## [1.8.83] - 2026-07-05
+### Added
+- **LongMemEval now scores the live JS chat retriever, not just the Python engine** (`scripts/eval_longmemeval_js.js`). It drives `csf-memory.js::searchConversation` — the keyword retriever a real chat turn uses, which windows the last 1200 turns — over the LongMemEval haystack and writes a *separate* `runs.jsonl` row so the product number never gets conflated with the engine's. Measured on `longmemeval_s` (n=500, k=5): session-level recall@5 **0.884** / MRR **0.80**, 0/500 gold outside the window. Also flags `truncated_gold` (haystack larger than the window) as a real product limitation. Strengthens **Remember**. See `changelog.d/longmemeval-product-path.md` (#2111).
+
 ## [1.8.82] - 2026-07-05
 ### Added
 - **HaluEval-QA gated harness can now answer with the local model, not just the gpt-4o-mini oracle** (`experiments/halueval_gated.py --answerer ollama --model ouro:latest`). The gate's surprise signal needs per-token logprobs, which the local serve path doesn't emit, so the gate degrades to "unavailable" (reported honestly, never faked) while the A/B hallucination measurement still runs. First measured on-model row: **Ouro-1.4B (honesty adapter), n=40 — grounding cuts hallucination 80% → 52%** (35% rel.), baseline accuracy 20%. Strengthens **Verify**. See `changelog.d/halueval-on-ouro.md` (#2112).
