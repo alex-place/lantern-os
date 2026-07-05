@@ -25,12 +25,24 @@ function recordChatUsage(req) {
     if (!user) return;
     const actor = user.email || user.name || user.id;
     if (!actor) return;
+    const traction = require("../lib/traction");
     Promise.resolve(
-      require("../lib/traction").recordTractionEvent({
+      traction.recordTractionEvent({
         kind: "workflow_used",
         actor,
         verified: true,
         source: "chat-reply",
+        evidence: "data/conversations/garage-conversations.jsonl",
+      })
+    ).catch(() => { /* non-fatal */ });
+    // #2040: a user's FIRST successful chat reply is the activation milestone.
+    // Fired once per actor ever (idempotent inside the ledger).
+    Promise.resolve(
+      traction.recordActivationOnce({
+        actor,
+        verified: true,
+        source: "chat-reply",
+        note: "first_chat_reply",
         evidence: "data/conversations/garage-conversations.jsonl",
       })
     ).catch(() => { /* non-fatal */ });

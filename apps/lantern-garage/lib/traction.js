@@ -56,10 +56,12 @@ const VALID_KINDS = new Set([
   "outreach",          // a send to a prospect (mirror of the wallet ledger's outreach_send)
   "creator_onboarded", // a creator profile was ingested
   "feedback",          // a user/customer/stakeholder feedback receipt
+  "daily_active",      // an actor was active on a given UTC day (retention signal, #2041)
   "churn",             // an actor lapsed
 ]);
 
-const USAGE_KINDS = new Set(["signup", "activation", "workflow_used", "feedback"]);
+// daily_active is a usage signal, so it feeds distinct-day retention below.
+const USAGE_KINDS = new Set(["signup", "activation", "workflow_used", "feedback", "daily_active"]);
 
 // Operator identity — so the operator's own dogfooding never inflates "external"
 // adoption. The whole report-card ask is "used by someone OTHER than the
@@ -117,6 +119,41 @@ async function recordTractionEvent(event = {}, opts = {}) {
   };
   await appendJsonlQueued(file, rec, { rotate: true });
   return rec;
+}
+
+/**
+ * #2040 — Activation, fired ONCE per actor ever. Records the first-value
+ * milestone (e.g. a user's first successful chat reply) exactly once, so
+ * repeated replies don't re-emit. Best-effort idempotency (reads the ledger for
+ * a prior activation by this actor); a race that slips a duplicate through is
+ * harmless because getTractionSummary dedupes activation by distinct actor.
+ * Returns the recorded event, or null if already activated / actor unknown.
+ */
+async function recordActivationOnce(event = {}, opts = {}) {
+  const file = opts.file || DEFAULTS.file;
+  const actor = String(event.actor || "").trim();
+  if (!actor || actor.toLowerCase() === "unknown") return null;
+  const prior = readAllJsonl(file).some((e) => e.kind === "activation" && e.actor === actor);
+  if (prior) return null;
+  return recordTractionEvent({ ...event, kind: "activation" }, opts);
+}
+
+/**
+ * #2041 — Daily-active retention signal, fired at most ONCE per actor per UTC
+ * day (deduped on actor+date). Enough to compute D1/D7 return offline. Same
+ * best-effort idempotency + Set-dedup safety net as recordActivationOnce.
+ * Returns the recorded event, or null if already recorded today / actor unknown.
+ */
+async function recordDailyActive(event = {}, opts = {}) {
+  const file = opts.file || DEFAULTS.file;
+  const actor = String(event.actor || "").trim();
+  if (!actor || actor.toLowerCase() === "unknown") return null;
+  const date = String(event.date || event.ts || new Date().toISOString()).slice(0, 10);
+  const prior = readAllJsonl(file).some(
+    (e) => e.kind === "daily_active" && e.actor === actor && String(e.ts || "").slice(0, 10) === date
+  );
+  if (prior) return null;
+  return recordTractionEvent({ ...event, kind: "daily_active", ts: event.ts }, opts);
 }
 
 /**
@@ -295,6 +332,8 @@ function getTractionSummary(opts = {}) {
 
 module.exports = {
   recordTractionEvent,
+  recordActivationOnce,
+  recordDailyActive,
   getTractionSummary,
   classifyActor,
   operatorSet,
