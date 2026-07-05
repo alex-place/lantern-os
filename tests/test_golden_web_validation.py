@@ -42,7 +42,7 @@ def validated_ids(manifest):
 
 def test_manifest_exists_and_parses(manifest):
     assert manifest["dataset"].endswith("SEED")
-    assert manifest["result"] == "clean"
+    assert manifest["result"].startswith("clean")  # the web pass was clean; later probes tracked separately
 
 
 def test_every_manifest_id_is_a_real_seed_fact(validated_ids):
@@ -87,7 +87,22 @@ def test_coverage_counts_are_honest(manifest, validated_ids):
     assert cov["individually_validated"] < len(SEED)
 
 
-def test_clean_result_has_no_corrections(manifest):
-    if manifest["result"] == "clean":
-        assert manifest["flags"] == 0
-        assert manifest["corrections"] == []
+def test_web_pass_record_is_intact(manifest):
+    """The web pass genuinely found zero flags -- that historical record stays exact."""
+    assert manifest["flags"] == 0
+    assert manifest["corrections"] == []
+
+
+def test_post_web_findings_reference_real_facts_and_stay_negatives(manifest):
+    """Anything a later probe found must name a real SEED id; a corrected negative
+    (e.g. continuum-hypothesis) must STILL be a HEURISTIC negative in SEED, so the fix
+    didn't quietly turn a negative into an asserted fact."""
+    findings = manifest.get("post_web_findings", [])
+    negatives = {t[0] for t in SEED if not t[3]}  # verified == False
+    for f in findings:
+        assert f["id"] in CLS_OF, f"post_web_finding names unknown id: {f['id']}"
+        assert {"found_by", "issue", "fix"} <= set(f), f"finding {f['id']} missing provenance"
+    # the one we know about: continuum-hypothesis was reworded but stays a HEURISTIC negative
+    if any(f["id"] == "continuum-hypothesis" for f in findings):
+        assert CLS_OF["continuum-hypothesis"] == "HEURISTIC"
+        assert "continuum-hypothesis" in negatives
