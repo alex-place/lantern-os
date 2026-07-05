@@ -605,6 +605,45 @@ function shutdown(signal) {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
+// Reap child services so a crash never leaves them orphaned holding ports (the
+// documented "children keep squatting ports" 502 failure mode, #2066).
+function reapChildren() {
+  try { if (discordBot && !discordBot.killed) discordBot.kill("SIGTERM"); } catch { /* best-effort */ }
+  try { for (const child of mcpChildren) killMcpChild(child); } catch { /* best-effort */ }
+  try { if (cloudflaredProcess && !cloudflaredProcess.killed) cloudflaredProcess.kill("SIGTERM"); } catch { /* best-effort */ }
+  try { if (deps.kalshiCollector) deps.kalshiCollector.stop(); } catch { /* best-effort */ }
+  try { if (deps.newsCollector) deps.newsCollector.stop(); } catch { /* best-effort */ }
+}
+
+// #2066: without these, a throw in any background loop/child-spawn (collectors,
+// mesh IIFE, trainModel, an unawaited promise) crashes the process while its
+// children keep squatting ports — exactly the recurring :4177 downtime.
+//
+// An unhandled REJECTION is usually a recoverable background slip; log it with a
+// stack and KEEP SERVING so one bad promise can't take down the listener.
+process.on("unhandledRejection", (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error(`[unhandledRejection] server staying up — ${err.stack || err.message}`);
+});
+
+// An uncaught EXCEPTION leaves the process in an undefined state, so we can't
+// safely keep serving. Log the stack, reap children so none are orphaned, then
+// exit(1) for the watchdog (Watch-DualServers.ps1, #2058) to relaunch cleanly —
+// a clean restart beats a wedged listener with zombie children squatting ports.
+let exiting = false;
+process.on("uncaughtException", (err) => {
+  if (exiting) return;
+  exiting = true;
+  console.error(`[uncaughtException] fatal — reaping children and exiting for restart: ${err && err.stack || err}`);
+  reapChildren();
+  try { prWatcher.stop(); } catch { /* best-effort */ }
+  try { server.close(); } catch { /* best-effort */ }
+  // Non-unref'd so it GUARANTEES a non-zero exit (the watchdog treats the dead
+  // port as a crash and relaunches) even after server.close() drains the loop;
+  // the short delay lets the error log + child SIGTERMs flush first.
+  setTimeout(() => process.exit(1), 250);
+});
+
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
 
