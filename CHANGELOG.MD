@@ -1,3 +1,7 @@
+## [1.8.79] - 2026-07-05
+### Added
+- **The Σ₀ council log now records outcomes, so verification-recall is computable.** Every review carries a stable `id`; when an execution check ran, its pass/fail is stamped as the review's outcome at record time (previously every one of 368 rows was `outcome: null`, making "did the council catch the model when it was wrong?" unmeasurable). New `labelCouncilOutcome(id, outcome)` appends a resolved outcome (revert / operator action) by id, and `foldCouncilOutcomes()` folds the append-only stream into `id → latest outcome` (later labels win). Strengthens **Verify**. See `changelog.d/council-outcome-writeback.md` (#2109).
+
 ## [1.8.78] - 2026-07-05
 ### Changed
 - **The home "Check the news" chip now summarizes today's headlines instead of web-searching the word "news".** The chip sends "summarize the top world news headlines from today", and any news-intent chat is grounded on the real curated RSS discover feed (title, link, source, date, summary, and lead image). The model returns real, sourced panels in a fixed format — linked headline, an image when the source provides one, source · date, one-line takeaway — rather than a junk web search ("News Today" the newspaper, the "Today" TV show) or "I couldn't find the news". Strengthens **Observe**. See `changelog.d/news-chip-llm-summary.md`.
