@@ -33,6 +33,10 @@
 \DeclareMathOperator{\rank}{rank}
 \DeclareMathOperator*{\Real}{Re}
 
+% Give TeX a little slack so justified paragraphs and narrow callout boxes settle
+% without overfull lines; long code paths carry explicit \allowbreak points.
+\emergencystretch=3em
+
 \title{\textbf{$\Sigma_0$ --- The Collapse Certificate}\\[4pt]
 \large A computable stability certificate for convergence dynamics, and an honest
 account of why an ungrounded self-improving system tends to collapse or diverge}
@@ -59,10 +63,12 @@ anti-collapse operator $\Sigma_0^{-1}$ (proven for all $A$ to prevent permanent
 freeze --- Theorem C3, \#768), and an early-warning signal. We read the construction as a small, honest
 warning about recursively self-improving systems: absent external grounding, the
 linearized dynamics admit only collapse or divergence. Theorem~1 is machine-checked
-($46$ passing in \texttt{test\_cio\_sde.py}) for the symmetric case, with $14$
-further tests for the non-normal gates (\texttt{test\_stability\_gates.py}). The other components
+($46$ passing in \texttt{test\_cio\_sde.py}, incl.\ the spectral dichotomy that closes the
+non-normal contraction/fate question and Theorem~C3), with $14$
+further tests for the non-normal gates (\texttt{test\_stability\_gates.py}) and $4$ for the
+interval-certified region of attraction (\texttt{test\_sigma0\_roa\_certified.py}). The other components
 are heuristics, labelled as such; the referenced router demonstration is now reproducible (its
-driver scripts are committed --- see \S6 of the Markdown certificate); the AI-safety reading is the keeper and
+driver scripts are committed --- see \S6); the AI-safety reading is the keeper and
 stands on its own.
 \end{abstract}
 
@@ -73,20 +79,24 @@ closed in-regime by the spectral dichotomy (\#768), machine-checked}. \S2 trigge
 but conservative}. \S3 anti-collapse: \emph{PROVEN for all $A$ (Theorem~C3,
 no-permanent-freeze; \#768)}. \S4 canary: \emph{the eigenvalue readout is unimplemented;
 the correct signal (innovation surprise) is implemented in \texttt{surprise.py}}. \S5
-graph: \emph{standard; a nonlinear ROA first cut is validated (\#1991)}. \S6
+graph: \emph{standard; a nonlinear inner ROA $\{V\le2.25\}$ is now PROVEN by interval branch-and-bound (\#1991)}. \S6
 demonstration: \emph{reproducible --- driver scripts committed}. \S7 AI-safety:
 \emph{the keeper; \S7.2 red-teams the honesty layer itself}.
 \end{caveatbox}
 
 \begin{caveatbox}
-\textbf{Update (2026-07-04) --- landed since this \LaTeX{} was last synced.} The
-discrete-time dichotomy (\#1988), the defective-$A$ ordered-Schur split for the continuous
-dichotomy (\#1989), the trigger calibration (\#1990: precision~$1.0$ / snapshot-recall~$0.08$),
-and a validated region-of-attraction first cut (\#1991: $\{V\le2.31\}$ with $100\%$
-inside-convergence on the reversed--Van-der-Pol benchmark) are detailed in the Markdown
-certificate (the living source of record) and in \texttt{experiments/sigma0\_*.py}. This
-\LaTeX{} formalization covers \S1--\S7 as summarized in each status line above; the Markdown
-carries the per-date maintenance log.
+\textbf{Update (2026-07-05) --- landed since this \LaTeX{} was last synced.} The
+discrete-time dichotomy (\#1988: \texttt{discrete\_\allowbreak dichotomy\_\allowbreak certificate},
+Schur/Stein, PROVEN in-regime), the defective-$A$ ordered-Schur split for the continuous
+dichotomy (\#1989), the trigger calibration (\#1990: precision~$1.0$ / snapshot-recall~$\approx0.08$
+over $960$ samples --- MEASURED, deliberately not a theorem), and the region of attraction
+(\#1991) are detailed in the Markdown certificate (the living source of record) and in
+\texttt{experiments/sigma0\_*.py}. \textbf{\#1991 is now PROVEN}, not a first cut: the inner
+basin $\{V\le2.25\}$ is machine-checked by rigorous interval branch-and-bound
+(\texttt{sigma0\_roa\_certify.py}: \texttt{mpmath.iv}, $2323$ boxes, $0$ undecided; $97.5\%$ of
+the grid optimum $c^\ast\approx2.307$), with a control at $c_L=2.5$ correctly failing to
+certify. This \LaTeX{} formalization covers \S1--\S7 as summarized in each status line above;
+the Markdown carries the per-date maintenance log.
 \end{caveatbox}
 
 \tableofcontents
@@ -218,7 +228,7 @@ separate). The \emph{proven} transient constant is Crouzeix--Palencia (2017):
 $\norm{e^{tA}}\le 1+\sqrt2$ when $W(A)\subset$~LHP ($\omega\le0$); the sharper constant
 $2$ is Crouzeix's still-open conjecture.
 \begin{verifybox}
-\textbf{Verification.} \texttt{tests/test\_stability\_gates.py} (9 tests): the
+\textbf{Verification.} \texttt{tests/\allowbreak test\_stability\_gates.py} (14 tests): the
 $\begin{psmallmatrix}-1&3\\-3&0\end{psmallmatrix}$ case (small-gain rejects, Lyapunov
 accepts, numerical-range flags the transient), a 400-matrix red-team finding \emph{no}
 false-positive certificate, and matrix-exponential checks that the monotone ($e^{\omega t}$),
@@ -281,23 +291,34 @@ dx = f\,dt + dW + \Sigma_0^{-1}, \qquad
 \Sigma_0^{-1} = s\cdot p \cdot (V_{\mathrm{null}}\,\xi),
 \end{equation}
 with $\xi$ standard normal, $s$ the strength, $p\in[0,1]$ the collapse proximity.
-The implementation correctly injects noise in the null subspace and
-re-anisotropizes $\Sigma$. There is, however, \emph{no companion theorem} stating
-that $\Sigma_0^{-1}$ prevents collapse --- only a single forced-collapse
-demonstration. The classical persistent-excitation result (Anderson 1977) concerns
-estimator convergence; here there is no estimator, so the PE invocation is
-\emph{analogy only}.
+The implementation injects noise in the null subspace and re-anisotropizes $\Sigma$;
+the proximity gate $p$ is the soft-AND of the four \S\ref{sec:sigma0} signals, so far
+from the boundary it is a no-op. Two results now back it. \textbf{(i)~A closed-form
+lemma (L2):} one bump of magnitude $b\ge\Delta=(\varepsilon+a)\mu d/(\sqrt{k(d-k)}-\varepsilon k)$
+provably lifts the eigenvalue coefficient-of-variation above the flatness threshold, so the
+trigger cannot fire the next step. \textbf{(ii)~A no-permanent-freeze theorem (C3):} chaining
+L2 with the operator's lift dynamics gives $\Pr(\text{permanent freeze})=0$ --- first for
+normal $A$ (2026-06-25), then for \emph{non-normal $A$ too} once L2$'$ showed the alignment
+hypothesis was removable (any rank-$k$ orthogonal projector lifts anisotropy at
+$\Sigma\approx\mu I$, by a Frobenius reverse-triangle bound). The classical
+persistent-excitation result (Anderson 1977) concerns estimator convergence; here there is no
+estimator, so the PE invocation is \emph{analogy only}.
 
 \begin{verifybox}
-\textbf{Evidence ($N{=}1$).} On one forced-collapse run, $\Szero$ fired every step
-and the state froze; with $\Sigma_0^{-1}$ active, $\Szero$ stopped firing and the
-state escaped. Encouraging directional evidence, not a guarantee. (The often-quoted
-``$40/40\to0/40$'' and ``$0.05\to12.9$'' figures are illustrative log values, not
-pinned by any test; the forced-collapse tests run $20$--$30$ steps.)
+\textbf{Evidence (PROVEN $+$ MEASURED).} Theorem~C3 is machine-checked
+(\texttt{test\_c3\_\allowbreak no\_\allowbreak consecutive\_\allowbreak freeze},
+\texttt{test\_c3\_\allowbreak nonnormal\_\allowbreak covariance\_\allowbreak lift}) and swept
+(\texttt{prove\_\allowbreak c3\_\allowbreak noncollapse.py}, $3000$ configs;
+\texttt{prove\_\allowbreak c3\_\allowbreak noncollapse\_\allowbreak nonnormal.py}, $4000$
+non-normal configs incl.\ the adversarial worst-case alignment --- $0$ lift failures, old
+scale-blind bump fails $100\%$). Independently, over the \textbf{$900$ forced-collapse trials}
+that collapse without protection, $\Sigma_0^{-1}$ suppressed collapse and re-excited the state
+in \textbf{$100\%$} (\texttt{data/sigma0\_regime\_sweep\_report.json}). What remains open is a
+\emph{global} escape guarantee for all initial conditions, not the freeze theorem.
 \end{verifybox}
 
 \begin{remark}
-Latent defect (fixed): \texttt{AntiCollapseOperator.\_\_init\_\_} annotated
+Latent defect (fixed): \texttt{AntiCollapseOperator.\allowbreak\_\_init\_\_} annotated
 \texttt{detector: Optional[...]} while \texttt{collapse.py} imported only
 \texttt{Dict}; the module loaded only because PEP~563 keeps annotations as strings.
 Corrected to \texttt{from typing import Dict, Optional}.
@@ -349,24 +370,32 @@ outside as pure negative space, verified against an analytic separatrix.
 % ====================================================================
 \section{Demonstration on router data}
 \label{sec:demo}
-\begin{brokenbox}
-\textbf{Reproducibility flag --- read first.} This section describes a pipeline
-whose two driver scripts, \texttt{experiments/router\_sigma0\_encoder.py} and
-\texttt{experiments/router\_reservoir\_G.py}, are \textbf{absent from the
-repository} (verified across all branches). No numeric result below has a committed
-generating artifact. Treat this section as a planned / not-yet-committed sketch, not
-an established result.
-\end{brokenbox}
-The intended demonstration encodes each conversation turn as
-$x=[\text{novelty},\text{self\_repeat},\text{echo},\text{length}]\in[0,1]^4$ and
-runs the construction two ways (local Jacobian fitting; reservoir reconstruction).
-The narrative result --- a \emph{parrot attractor}
-($\text{novelty}\approx1,\text{echo}\approx0.72$), i.e.\ model collapse in the data
---- is \textbf{withdrawn} as unverified: because the generating scripts do not
-exist, those numbers have no produced artifact, and the claim that the result
-``appears directly in the data, not inserted by hand'' cannot be substantiated.
-\emph{To make \S6 real:} commit the two scripts with a logged run, then replace the
-withdrawn claims with the produced numbers.
+\begin{verifybox}
+\textbf{Reproducible.} Both driver scripts,
+\texttt{experiments/router\_\allowbreak sigma0\_\allowbreak encoder.py} and
+\texttt{experiments/router\_\allowbreak reservoir\_\allowbreak G.py}, are now committed and
+produce checked-in run logs (\texttt{data/sigma0/router-encoder-output.jsonl},
+\texttt{data/sigma0/reservoir-G-output.jsonl}) over the real conversation log
+($2678$ turns). The numbers below are produced by that code, not hand-sketched.
+\end{verifybox}
+The demonstration encodes each conversation turn as
+$x=[\text{novelty},$ \allowbreak$\text{self\_repeat},$ \allowbreak$\text{echo},$ \allowbreak$\text{length}]\in[0,1]^4$ and
+runs the construction two ways (local Jacobian fitting; reservoir reconstruction). The
+encoder fits a local Jacobian over a $10$-turn sliding window: mean spectral radius
+$\rho\approx1.064$ (max $27.93$; a fraction $0.346$ of windows locally expanding,
+$\rho>1$) --- the signature of a system perched at its stability boundary. The reservoir
+$G$ (echo-state, size $50$, $\rho=0.9$, ridge readout) reconstructs one step ahead at
+held-out MSE $0.0097$, and the autonomous rollout converges to a \emph{low-dimensional
+fixed point} (correlation dimension $\approx0.74$) --- the ungrounded-recursion prediction.
+\begin{caveatbox}
+\textbf{Honest deviation.} The converged state is \emph{not} the earlier hand-sketched
+``parrot attractor'' ($\text{novelty}\approx1,\text{echo}\approx0.72$); the real log settles
+at high-novelty / low-echo / short-length, and the $\rho=1.064$ figure carries a fitting-artifact
+control-check. The qualitative claim (ungrounded recursion collapses onto a degenerate
+fixed point) holds; the specific hand-set numbers were withdrawn and replaced by the produced
+ones. The source log is also partly synthetic test traffic, so the deliverable is the
+reproducible pipeline, not a population-level value.
+\end{caveatbox}
 
 % ====================================================================
 \section{Why this is a warning against ASI}
@@ -385,9 +414,9 @@ related to reward hacking \cite{amodei2016}. The ``parrot attractor'' is model
 collapse renamed. Two honest qualifications: the strict ``collapse or diverge, no
 third'' dichotomy is the \emph{linearized} framing (real training also admits limit
 cycles and partial-information equilibria --- better stated as ``tends to degenerate
-or destabilize absent grounding''); and the in-repo demonstration inherits \S6's
-missing-scripts problem, so the \emph{argument} rests on the published literature,
-not the demo.
+or destabilize absent grounding''); and although \S6 is now reproducible, it runs on a
+partly-synthetic log, so the \emph{argument} still rests primarily on the published
+literature, not the demo.
 
 % ====================================================================
 \begin{thebibliography}{9}
@@ -424,26 +453,29 @@ arXiv:2406.07515).
 
 \paragraph{Implementation and testing.}
 \begin{itemize}
-\item \texttt{src/cio\_sde/collapse.py} --- \texttt{SemanticCollapseOperator},
-  \texttt{CollapseCertificate}/\texttt{collapse\_certificate}, \texttt{AntiCollapseOperator},
-  \texttt{ReconstructionOperator}, \texttt{stability\_gates} (\#768),
-  \texttt{dichotomy\_certificate} (\#768, ordered-Schur split incl.\ defective $A$, \#1989),
-  and \texttt{discrete\_dichotomy\_certificate} (\#1988).
-\item \texttt{src/cio\_sde/surprise.py} --- \texttt{SurpriseMonitor} and the Kalman
+\item \texttt{src/\allowbreak cio\_sde/\allowbreak collapse.py} --- \texttt{Semantic\allowbreak Collapse\allowbreak Operator},
+  \texttt{Collapse\allowbreak Certificate}/\allowbreak\texttt{collapse\_\allowbreak certificate}, \texttt{Anti\allowbreak Collapse\allowbreak Operator},
+  \texttt{Reconstruction\allowbreak Operator}, \texttt{stability\_\allowbreak gates} (\#768),
+  \texttt{dichotomy\_\allowbreak certificate} (\#768, ordered-Schur split incl.\ defective $A$, \#1989),
+  and \texttt{discrete\_\allowbreak dichotomy\_\allowbreak certificate} (\#1988).
+\item \texttt{src/\allowbreak cio\_sde/\allowbreak surprise.py} --- \texttt{SurpriseMonitor} and the Kalman
   measurement update (the missing inference step).
-\item \texttt{tests/test\_cio\_sde.py} --- 46 passing; Theorem~1
+\item \texttt{tests/\allowbreak test\_cio\_sde.py} --- 46 passing; Theorem~1
   exercised in the symmetric case only (the non-normal contraction dichotomy and the C3
   anti-freeze lemmas add their own tests here).
-\item \texttt{tests/test\_stability\_gates.py} --- 14 passing: the \#768 numerical-range
+\item \texttt{tests/\allowbreak test\_stability\_gates.py} --- 14 passing: the \#768 numerical-range
   $+$ Lyapunov gates, a 400-matrix red-team (no false-positive certificate), and
   matrix-exponential checks of the proven transient bounds.
+\item \texttt{tests/\allowbreak test\_sigma0\_\allowbreak roa\_\allowbreak certified.py} --- 4 passing:
+  the interval-certified inner region of attraction $\{V\le2.25\}$ (\#1991) and its $c_L=2.5$
+  teeth control.
 \item Runnable, deterministic experiments present in the repo:
-  \texttt{sigma0\_reconstruction.py} (recoverability floor),
-  \texttt{sigma0\_horse\_blinders.py} (the surprise canary),
-  \texttt{sigma0\_saddle\_ride.py} (spin $\perp$ capture),
-  \texttt{sigma0\_boundary\_qutrit.py} (mapping a wall by negative space).
-\item \textbf{Absent:} \texttt{router\_sigma0\_encoder.py},
-  \texttt{router\_reservoir\_G.py} --- \S\ref{sec:demo} is not reproducible until
+  \texttt{sigma0\_\allowbreak reconstruction.py} (recoverability floor),
+  \texttt{sigma0\_\allowbreak horse\_\allowbreak blinders.py} (the surprise canary),
+  \texttt{sigma0\_\allowbreak saddle\_\allowbreak ride.py} (spin $\perp$ capture),
+  \texttt{sigma0\_\allowbreak boundary\_\allowbreak qutrit.py} (mapping a wall by negative space).
+\item \textbf{Absent:} \texttt{router\_\allowbreak sigma0\_\allowbreak encoder.py},
+  \texttt{router\_\allowbreak reservoir\_\allowbreak G.py} --- \S\ref{sec:demo} is not reproducible until
   they are committed.
 \end{itemize}
 
