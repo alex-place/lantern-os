@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connect IBKR — unisona.ai</title>
+  <script>(function(){try{var s=localStorage.getItem('lantern-theme');var d=s?s==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    main{max-width:720px;margin:0 auto;padding:28px 20px 64px}
+    h1{font-size:24px;margin:0 0 4px}
+    .sub{color:var(--muted);font-size:14px;margin:0 0 20px;line-height:1.5}
+    .card{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:22px;margin-bottom:16px}
+    .status{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+    .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+    .dot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}
+    .dot.off{background:#ef4444}
+    label{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:14px 0 5px}
+    input,textarea,select{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit}
+    textarea{min-height:96px;font-family:'IBM Plex Mono',monospace;font-size:12px;resize:vertical}
+    .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:540px){.row{grid-template-columns:1fr}}
+    .btn{border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+    .actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+    .banner{display:none;margin:0 0 16px;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.5}
+    .banner.show{display:block}
+    .banner.err{border:1px solid color-mix(in srgb,#ef4444 45%,transparent);background:color-mix(in srgb,#ef4444 12%,transparent);color:#fca5a5}
+    .banner.ok{border:1px solid color-mix(in srgb,#22c55e 45%,transparent);background:color-mix(in srgb,#22c55e 12%,transparent);color:#bbf7d0}
+    .steps{font-size:13px;color:var(--muted);line-height:1.6;padding-left:18px}
+    .steps a{color:var(--accent)}
+    code{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text)}
+  </style>
+</head>
+<body>
+<nav class="site-nav">
+  <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">unisona.ai</span></a>
+  <div class="nav-actions"><a class="nav-btn" href="/stock-trader.html" title="Trader">📈</a></div>
+</nav>
+
+<main>
+  <h1>Connect Interactive Brokers</h1>
+  <p class="sub">Trade your own IBKR account through unisona via IBKR's self-service OAuth 1.0a. Your keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>).</p>
+
+  <div class="card">
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Checking…</span></div>
+  </div>
+
+  <div class="card" id="gate" hidden>
+    <div class="banner err show">Trading requires the <strong>Deep Dreamer ($20/mo)</strong> tier. <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
+  </div>
+
+  <div class="card" id="howto">
+    <strong>How to get your credentials (one-time, in IBKR)</strong>
+    <ol class="steps">
+      <li>Log in to <a href="https://www.interactivebrokers.com/" target="_blank" rel="noopener">IBKR Client Portal</a> → <em>Settings → API → Third Party / Self-Service OAuth</em>.</li>
+      <li>Register a consumer — you'll get a <code>consumer key</code>, <code>access token</code>, and <code>access token secret</code>.</li>
+      <li>Generate two RSA private keys (<code>private_signature.pem</code>, <code>private_encryption.pem</code>) and upload the matching <em>public</em> keys to IBKR.</li>
+      <li>Note the <code>Diffie-Hellman prime</code> (hex) from your <code>dhparam.pem</code>.</li>
+      <li>Use your <strong>paper</strong> account id (<code>DU…</code>) to start.</li>
+    </ol>
+  </div>
+
+  <form class="card" id="form">
+    <div class="banner" id="banner"></div>
+    <div class="row">
+      <div><label>Consumer key</label><input id="consumerKey" autocomplete="off"></div>
+      <div><label>Account ID</label><input id="accountId" placeholder="DU1234567" autocomplete="off"><div class="hint">DU… = paper, U… = live</div></div>
+    </div>
+    <div class="row">
+      <div><label>Access token</label><input id="accessToken" autocomplete="off"></div>
+      <div><label>Access token secret</label><input id="accessTokenSecret" autocomplete="off"><div class="hint">base64, RSA-encrypted by IBKR</div></div>
+    </div>
+    <label>Signature private key (PEM)</label>
+    <textarea id="signaturePem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea>
+    <label>Encryption private key (PEM)</label>
+    <textarea id="encryptionPem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea>
+    <div class="row">
+      <div><label>Diffie-Hellman prime (hex)</label><input id="dhPrime" autocomplete="off"></div>
+      <div><label>Realm</label><input id="realm" value="limited_poa" autocomplete="off"></div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary" id="connectBtn">Connect &amp; test</button>
+      <button type="button" class="btn btn-ghost" id="disconnectBtn" hidden>Disconnect</button>
+    </div>
+  </form>
+</main>
+
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const FIELDS = ['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime','realm','accountId'];
+
+function banner(msg, kind){ const b=$('banner'); b.textContent=msg; b.className='banner show '+(kind||'ok'); }
+function clearBanner(){ $('banner').className='banner'; }
+
+function setStatus(s){
+  const connected = s && s.live && s.live.connected;
+  const has = s && s.hasCredentials;
+  $('dot').className = 'dot ' + (connected ? 'on' : has ? 'off' : '');
+  $('statusText').textContent = connected
+    ? `Connected · ${s.accountId||'account'} (${s.mode||'?'})`
+    : has ? `Credentials saved but not connected — check keys / IBKR session`
+          : 'Not connected';
+  $('disconnectBtn').hidden = !has;
+}
+
+async function refresh(){
+  try{
+    const sess = await (await fetch('/api/auth/session',{credentials:'include'})).json();
+    const entitled = sess && (sess.role==='admin' || (sess.entitlements&&sess.entitlements.trade));
+    $('gate').hidden = !!entitled;
+    $('form').style.opacity = entitled ? '1':'0.5';
+    $('form').style.pointerEvents = entitled ? 'auto':'none';
+    if(!entitled){ setStatus({hasCredentials:false}); return; }
+    const st = await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json();
+    setStatus(st);
+  }catch(e){ setStatus({hasCredentials:false}); }
+}
+
+$('form').addEventListener('submit', async (e)=>{
+  e.preventDefault(); clearBanner();
+  const body = {}; FIELDS.forEach(f=> body[f] = $(f).value.trim());
+  const btn=$('connectBtn'); btn.disabled=true; const t=btn.textContent; btn.textContent='Testing…';
+  try{
+    const r = await fetch('/api/trading/ibkr/connect',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    if(!r.ok){ banner(({missing_consumerKey:'Consumer key is required',bad_signaturePem:'Signature key must be a PEM private key',bad_encryptionPem:'Encryption key must be a PEM private key',bad_dhPrime:'DH prime must be hex'}[d.error])||('Error: '+(d.error||r.status)),'err'); }
+    else if(d.live && d.live.connected){ banner('Connected to IBKR — live session verified.','ok'); setStatus(d.status && {...d.status, live:d.live}); }
+    else { banner('Credentials saved, but IBKR did not authenticate. Double-check the keys and that your IBKR session is active.','err'); setStatus({...d.status, live:d.live}); }
+  }catch(_){ banner('Network error — please try again.','err'); }
+  finally{ btn.disabled=false; btn.textContent=t; refresh(); }
+});
+
+$('disconnectBtn').addEventListener('click', async ()=>{
+  if(!confirm('Disconnect your IBKR account?')) return;
+  await fetch('/api/trading/ibkr/disconnect',{method:'POST',credentials:'include'});
+  FIELDS.forEach(f=>{ if(f!=='realm') $(f).value=''; });
+  banner('Disconnected.','ok'); refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>
