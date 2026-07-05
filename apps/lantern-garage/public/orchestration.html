@@ -342,6 +342,7 @@ openssl dhparam -out dhparam.pem 2048</pre>
       </div>
       <div class="bactions">
         <button type="submit" class="btn-primary" id="bconnect">Connect &amp; test</button>
+        <button type="button" class="btn-secondary" id="brecheck" hidden>Recheck connection</button>
         <button type="button" class="btn-secondary" id="bdisconnect" hidden>Disconnect</button>
       </div>
     </form>
@@ -1542,6 +1543,13 @@ openssl dhparam -out dhparam.pem 2048</pre>
     $('bdot').className='bdot '+(connected?'on':has?'off':'');
     $('bstatusText').textContent=connected?`Connected · ${s.accountId||'account'} (${s.mode||'?'})`:has?'Credentials saved but not connected — check keys / IBKR session':'Not connected';
     $('bdisconnect').hidden=!has;
+    $('brecheck').hidden=!has;
+  }
+  // Shared: turn a live-probe result into a banner (used by Connect + Recheck).
+  function showLive(live){
+    if(live&&live.connected){ banner('Connected to IBKR — live session verified.','ok'); return; }
+    const txt=(live&&live.reasonText)||'IBKR did not authenticate — check the keys and that your OAuth consumer is active (up to 24h).';
+    banner(txt, (live&&live.reason==='not_activated_or_unauthorized')?'ok':'err');
   }
   async function refresh(){
     try{
@@ -1560,10 +1568,21 @@ openssl dhparam -out dhparam.pem 2048</pre>
       const r=await fetch('/api/trading/ibkr/connect',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       const d=await r.json();
       if(!r.ok) banner(({missing_consumerKey:'Consumer key is required',bad_signaturePem:'Signature key must be a PEM private key',bad_encryptionPem:'Encryption key must be a PEM private key',bad_dhPrime:'DH prime must be hex'}[d.error])||('Error: '+(d.error||r.status)),'err');
-      else if(d.live&&d.live.connected){ banner('Connected to IBKR — live session verified.','ok'); setStatus({...d.status,live:d.live}); }
-      else { banner('Credentials saved. '+((d.live&&d.live.reasonText)||'IBKR did not authenticate — check the keys and that your OAuth consumer is active (up to 24h).'), (d.live&&d.live.reason==='not_activated_or_unauthorized')?'ok':'err'); setStatus({...d.status,live:d.live}); }
+      else { showLive(d.live); setStatus({...d.status,live:d.live}); }
     }catch(_){ banner('Network error — please try again.','err'); }
     finally{ btn.disabled=false; btn.textContent=t; refresh(); }
+  });
+  // Recheck — re-run the live probe against the stored (encrypted) credentials,
+  // no re-entry needed. Useful while waiting for IBKR to activate the consumer.
+  $('brecheck').addEventListener('click',async()=>{
+    const btn=$('brecheck'); btn.disabled=true; const t=btn.textContent; btn.textContent='Rechecking…';
+    try{
+      const s=await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json();
+      if(!s.hasCredentials){ banner('No saved credentials to recheck.','err'); }
+      else { showLive(s.live); }
+      setStatus(s);
+    }catch(_){ banner('Network error — please try again.','err'); }
+    finally{ btn.disabled=false; btn.textContent=t; }
   });
   $('bdisconnect').addEventListener('click',async()=>{
     if(!confirm('Disconnect your IBKR account?')) return;
