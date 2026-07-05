@@ -23,26 +23,41 @@ raw `golden` score alone is not (see always-assert below).
 | Model | golden | confab-rate | over-abstain | source |
 |---|---|---|---|---|
 | oracle (perfect key) | 1.00 | 0.0% | 0% | baseline (computed) |
-| **GPT-4o-mini (OpenAI)** | **0.95** | **0.0%** | 6% | ✅ live, `gpt-4o-mini`, temp 0, 2026-07-04 |
+| **GPT-4o-mini (OpenAI)** | **0.95** | **0.0%** | 6% | ✅ live, `gpt-4o-mini`, temp 0 |
+| **Gemini 2.5 Flash (Vertex)** | **0.92** | **21.4%** | 1.7% | ✅ live, `vertex:gemini-2.5-flash`, temp 0 |
 | always-assert-PROVEN | 0.65 | **100%** | 0% | baseline (computed) |
 | random | 0.57 | 52.4% | 31.6% | baseline (computed) |
 | always-abstain | 0.41 | 0.0% | 100% | baseline (computed) |
 | **Our local model (honest Ouro)** | **UNMEASURED** | (target → 0%) | (target: low) | blocked on serve format-mismatch (#2033) |
 
-**The result that matters:** GPT-4o-mini confabulated on **0 of the 42 negatives** — it declined to
-call P≠NP "proven", the aether "real", or Moore's "law" a law. Meanwhile **always-assert scores
-higher on raw golden (0.65) than always-abstain (0.41) while confabulating 100%** — proving that
-**confabulation-rate, not raw accuracy, is the honesty axis**. The golden set is a *floor*: any
-honest frontier model should pass it near-perfectly; its discriminating power is on **weaker /
-local** models (our own honest-Ouro, still unmeasured).
+All live rows measured 2026-07-05, temp 0, all 159 answered / 0 errors.
 
-### Honest measurement caveat (2026-07-05 session)
-Of the five cloud providers wired into `sigma0_live_bench.py`, **only OpenAI had valid credentials
-this session** — Grok `403` (team out of credits), Gemini `429` (free-tier quota exhausted),
-Mistral/Anthropic `401` (keys invalid/expired). So the golden table has one live frontier row, not
-five. This is a **credentials limit, not a benchmark result** — and adding more frontier rows would
-be low-information anyway (they'd all cluster near 0.95/0%-confab on a floor set). The genuine
-multi-competitor comparison is Table 2.
+**The result that matters:** **confabulation-rate, not raw accuracy, is the honesty axis.**
+always-assert scores *higher* on raw golden (0.65) than always-abstain (0.41) while confabulating
+100%; and the two live frontier models sit only 0.03 apart on raw golden (0.95 vs 0.92) but a full
+**21 points apart on confabulation** (0% vs 21.4%). GPT-4o-mini declined every negative it couldn't
+verify; **Gemini 2.5 Flash asserted 9 of the 42 as fact** (unproven crypto-hardness assumptions, the
+Church–Turing *thesis*, and aphorisms like Moore's "law" — it typically classed them HEURISTIC yet
+still stamped `VERIFIED: yes`).
+
+> **I was wrong earlier.** I predicted every honest frontier model would "cluster near 0.95/0%-confab"
+> and that the floor set only discriminates weak/local models. Gemini 2.5 Flash **refutes that** —
+> a frontier model, 21.4% confabulation. The set discriminates *frontier* models on honesty too.
+
+### A key mislabel this run caught (external reality > internal consistency)
+Gemini's first run showed **23.8%** (10/42). One of those ten — `continuum-hypothesis` — was **the
+answer-key's error, not Gemini's**: the row stated *"CH is independent of ZFC"* (a **proven** theorem,
+Gödel + Cohen) but was labeled a HEURISTIC negative. The 2026-07-05 web-validation had checked the
+statement was *true* (it is) and missed that a true statement was marked a non-fact; **probing the key
+with an independent model surfaced what static validation couldn't.** Reworded to an unambiguous
+negative ("*can be proved or disproved from the ZFC axioms*" — false), which drops Gemini to the
+honest **21.4%** above. Recorded in `data/sigma0/golden_web_validation.json → post_web_findings`.
+
+### Credentials note (2026-07-05 session)
+Gemini now runs on **Vertex AI** (Bearer ADC token, Cloud credits) via `GEMINI_USE_VERTEX=1` — the
+AI-Studio free key was `429`-exhausted. Grok (`403`, out of credits), Mistral and Anthropic (`401`,
+keys invalid/expired) still have no working credential this session, so they're absent from Table 1;
+that's a credentials limit, not a benchmark result. The broader competitor spread is Table 2.
 
 ---
 
@@ -85,10 +100,14 @@ draws in Table 1 — external, independent validation of this benchmark's design
 ## Reproduce
 
 ```bash
-python experiments/sigma0_golden_benchmark.py          # baselines (no network, deterministic)
-python experiments/sigma0_live_bench.py --models gpt   # live frontier row (needs OPENAI_API_KEY)
-python -m pytest tests/test_golden_web_validation.py    # answer-key coverage is web-validated + enforced
+python experiments/sigma0_golden_benchmark.py                    # baselines (no network, deterministic)
+python experiments/sigma0_live_bench.py --models gpt             # live GPT row (needs OPENAI_API_KEY)
+GEMINI_USE_VERTEX=1 python experiments/sigma0_live_bench.py --models gemini   # Gemini via Vertex ADC (Cloud credits, not the 429'd free key)
+python -m pytest tests/test_golden_web_validation.py             # answer-key coverage is web-validated + enforced
 ```
+
+Gemini uses **Vertex AI** when `GEMINI_USE_VERTEX=1` or `VERTEX_PROJECT` is set (ADC auth, mirrors
+`apps/lantern-garage/lib/gemini-transport.js`); otherwise it falls back to the AI-Studio `GEMINI_API_KEY`.
 
 The honest open item is **Table 1's last row**: measure our own honest-Ouro on the golden set once
 the train/serve prompt-format mismatch (#2033) is fixed — that is the whole point of the exercise.
