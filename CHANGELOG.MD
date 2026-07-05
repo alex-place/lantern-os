@@ -1,3 +1,7 @@
+## [1.8.78] - 2026-07-05
+### Added
+- **Benchmark leaderboard rows now carry provenance** — `git_sha`, `served_checkpoint` (the `OURO_*` model+adapter measured), and `campaign_id` (`EVAL_CAMPAIGN_ID` or a git-sha fallback) — stamped by a shared `scripts/eval_ledger.append_leaderboard` helper and wired into `eval_coding.py` / `eval_humaneval_ouro.py` / `eval_humaneval_chat.py`. Rows are now groupable by model snapshot, so a cross-benchmark ("holistic") read knows it's comparing one checkpoint, not two. Strengthens **Converge**. See `changelog.d/benchmarks-ledger-provenance.md` (#2108).
+
 ## [1.8.77] - 2026-07-05
 ### Fixed
 - **Home starter chips (e.g. "Check the news") no longer inject the new turn above older history.** Chips deep-link into chat with `?q=…`, which auto-sends on load and races the async conversation-history restore. History was appended to the bottom, so the auto-sent turn ended up *above* the older restored conversation. History now prepends to the top of the transcript, keeping chronology correct regardless of which side wins the race. Strengthens **Remember**. See `changelog.d/fix-news-chip-history-order.md`.
