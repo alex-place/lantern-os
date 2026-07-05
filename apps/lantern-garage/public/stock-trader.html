@@ -1475,10 +1475,38 @@ function openSymbolSearch(onPick, opts){
 function closeSymbolSearch(){ document.getElementById('symSearchBg').classList.add('hidden'); _symPick=null; }
 function setSymClass(c, btn){ _symClass=c; document.querySelectorAll('#symChips .sym-chip').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); runSymSearch(document.getElementById('symSearchInput').value); }
 function onSymSearchInput(){ clearTimeout(_symDebounce); _symDebounce=setTimeout(()=>runSymSearch(document.getElementById('symSearchInput').value), 170); }
+// Popular symbols shown when the search box is empty (the backend returns nothing
+// for an empty query), so the "Add symbol" popup shows clickable tickers on open
+// instead of "No matching symbols". Filtered by the active class chip. #sym-defaults
+const SYM_POPULAR = [
+  { symbol:'SPY',   name:'SPDR S&P 500 ETF',      class:'us_equity', exchange:'NYSEArca'  },
+  { symbol:'QQQ',   name:'Invesco QQQ Trust',     class:'us_equity', exchange:'NasdaqGM'  },
+  { symbol:'AAPL',  name:'Apple Inc.',            class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'NVDA',  name:'NVIDIA Corporation',    class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'TSLA',  name:'Tesla, Inc.',           class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'MSFT',  name:'Microsoft Corporation', class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'AMZN',  name:'Amazon.com, Inc.',      class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'META',  name:'Meta Platforms, Inc.',  class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'GOOGL', name:'Alphabet Inc.',         class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'AMD',   name:'Advanced Micro Devices',class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'BTCUSD',name:'Bitcoin',               class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'ETHUSD',name:'Ethereum',              class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'SOLUSD',name:'Solana',                class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'XRPUSD',name:'XRP',                   class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'DOGEUSD',name:'Dogecoin',             class:'crypto',    exchange:'CRYPTO'    },
+];
 async function runSymSearch(q){
+  const query = (q||'').trim();
   const ep = ++_symEpoch;   // ignore stale responses (a faster/earlier query resolving late)
+  // Empty box → curated popular list (filtered by class chip), so the popup is
+  // never blank / "No matching symbols" on open.
+  if(!query){
+    _symRows = SYM_POPULAR.filter(a => !_symClass || a.class===_symClass).slice(0,40);
+    _symSel = 0; renderSymResults();
+    return;
+  }
   try{
-    const url='/api/trading/symbols/search?limit=40&q='+encodeURIComponent(q)+(_symClass?'&class='+_symClass:'');
+    const url='/api/trading/symbols/search?limit=40&q='+encodeURIComponent(query)+(_symClass?'&class='+_symClass:'');
     const r=await fetch(url); const d=await r.json();
     if(ep!==_symEpoch) return;
     _symRows=d.results||[]; _symSel=0; renderSymResults();
