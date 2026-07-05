@@ -41,6 +41,8 @@
 // labeled history (experiments/council_escalation_backtest.py).
 
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 const { runCanaries } = require("./canary");
 const { appendJsonlQueued } = require("./file-queue");
 
@@ -146,8 +148,23 @@ function councilReview(reply, opts = {}) {
     dissent,
   };
 
+  // Stable id so a later signal (a revert, an operator action, a downstream exec result)
+  // can be attributed back to THIS review via labelCouncilOutcome(). Without an id the
+  // append-only log is unlabelable, which is exactly why verification-recall was 0/368.
+  const id = crypto.randomUUID();
+  review.id = id;
+
+  // Auto-label from execution when we already have ground truth: an exec check that RAN is
+  // a real outcome for this turn (passed → the reply verified; failed → refuted-with-proof).
+  // This turns every exec-verified review from outcome:null into a measurable label at the
+  // moment of record, without waiting on the backtest labeller. Text-only reviews stay null
+  // and are filled later via labelCouncilOutcome() when a downstream signal resolves them.
+  const outcome = exec ? (exec.passed ? "passed" : "failed") : null;
+  review.outcome = outcome;
+
   if (opts.emit !== false) {
     recordCouncilReview({
+      id,
       delta,
       verdict,
       recommend,
@@ -163,14 +180,74 @@ function councilReview(reply, opts = {}) {
       collapse: { proximity: collapse.proximity },
       grounded: { risk: grounded.risk, anchored: grounded.anchored },
       text_length: text.length,
-      // outcome is filled LATER by the backtest labeller (revert / operator action). This
-      // slot is what turns the append-only log into measurable escalation history.
-      outcome: null,
+      // Execution-grounded outcome when a check ran; otherwise null, to be filled later by
+      // labelCouncilOutcome() (revert / merge / operator action). This slot is what turns the
+      // append-only log into measurable escalation + verification-recall history.
+      outcome,
+      outcomeSource: outcome === null ? null : "exec",
       ...(opts.context || {}),
     });
   }
 
   return review;
+}
+
+/**
+ * Attribute a resolved outcome back to an earlier review, by id. Append-only: we do NOT
+ * mutate the original line (the log is immutable), we append a `council_outcome` label that
+ * readers fold over the reviews (last write wins). This is how a downstream signal — a PR
+ * revert, an operator thumbs-down, a later exec result — becomes verification-recall data.
+ *
+ * @param {string} id       the review id returned by councilReview()
+ * @param {"passed"|"failed"|"reverted"|"accepted"} outcome  what actually happened
+ * @param {{evidence?:string, source?:string}} [meta]
+ */
+function labelCouncilOutcome(id, outcome, meta = {}) {
+  if (!id || !outcome) return Promise.resolve();
+  try {
+    return appendJsonlQueued(COUNCIL_REVIEWS, {
+      ts: new Date().toISOString(),
+      type: "council_outcome",
+      ref: id,
+      outcome,
+      outcomeSource: meta.source || "label",
+      evidence: meta.evidence || null,
+    });
+  } catch {
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Fold the append-only stream into `id -> latest outcome`. Later `council_outcome` labels
+ * override the review's record-time outcome (last write wins), so a text-only review that was
+ * null at record time and later reverted reads as "reverted". Returns a Map; missing file or a
+ * corrupt line is skipped, never thrown — a reader must not crash on a partial log.
+ */
+function foldCouncilOutcomes(reviewsPath = COUNCIL_REVIEWS) {
+  const outcomes = new Map();
+  let raw;
+  try {
+    raw = fs.readFileSync(reviewsPath, "utf-8");
+  } catch {
+    return outcomes;
+  }
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    let rec;
+    try {
+      rec = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (rec.type === "council_review" && rec.id) {
+      if (rec.outcome != null) outcomes.set(rec.id, rec.outcome);
+      else if (!outcomes.has(rec.id)) outcomes.set(rec.id, null);
+    } else if (rec.type === "council_outcome" && rec.ref) {
+      outcomes.set(rec.ref, rec.outcome); // a later label always wins
+    }
+  }
+  return outcomes;
 }
 
 /**
@@ -189,4 +266,11 @@ function recordCouncilReview(rec) {
   }
 }
 
-module.exports = { councilReview, recordCouncilReview, COUNCIL_REVIEWS, DISSENT_SCALE };
+module.exports = {
+  councilReview,
+  recordCouncilReview,
+  labelCouncilOutcome,
+  foldCouncilOutcomes,
+  COUNCIL_REVIEWS,
+  DISSENT_SCALE,
+};
