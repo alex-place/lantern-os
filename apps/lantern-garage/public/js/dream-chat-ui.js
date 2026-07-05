@@ -2477,8 +2477,15 @@ async function sendMessage(opts = {}) {
   // not repo work, so offering to file an issue + open a PR is nonsense there.
   // Server-side the document_request intent now catches these; this is the belt
   // for older servers / misclassified turns.
+  // #1925: also cover the job-search vocabulary the transcript called out. A message
+  // like "review my job application" or "help me apply for this GitHub job" trips a
+  // code intent (via "review"/"github") yet is career work, not repo work. Kept
+  // narrow — bare "apply"/"application" is NOT matched (they mean apply-a-patch /
+  // web-application in real coding asks); only explicit job-search phrasing is.
   const _looksLikeDocument =
-    /\b(resume|cover letter|cover-letter|cv|docx|word (doc|document)|essay|memo|spreadsheet|presentation|slide deck)\b/i.test(text);
+    /\b(resume|cover letter|cover-letter|cv|docx|word (doc|document)|essay|memo|spreadsheet|presentation|slide deck|personal statement|letter of (intro|introduction|interest|recommendation))\b/i.test(text) ||
+    /\b(job (application|applications|posting|postings|search|hunt|offer)|interview prep)/i.test(text) ||
+    /\bapply(ing)? (for|to)\b.{0,40}?\b(job|position|role|internship|posting|opening|vacancy)\b/i.test(text);
   if (!didError && doneOnline !== false && CODING_INTENTS.includes(doneIntent) && !_looksLikeLookup && !_looksLikeDocument) {
     const offer = document.createElement('div');
     offer.className = 'autowork-offer';
