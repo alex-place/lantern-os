@@ -1,0 +1,22 @@
+{
+  "skill_name": "report-card",
+  "evals": [
+    {
+      "id": 0,
+      "name": "cold-grade-whole-app",
+      "prompt": "!report-card",
+      "expected_output": "A grounded letter-grade report card for Keystone OS: framing sentence, a Dimension|Grade|Evidence table with 5-8 rows where every evidence cell cites something real (a file, a log line, a number, an observed behavior), a 'what would raise it' note on weak rows, and a bold Overall grade + one candid synthesis paragraph. Grades should spread (not all B+), and weak dimensions named honestly.",
+      "files": [],
+      "assertions": [
+        {"text": "Output contains a markdown table with Dimension, Grade, and Evidence columns", "passed": null, "evidence": ""},
+        {"text": "Has 5-8 graded dimension rows", "passed": null, "evidence": ""},
+        {"text": "Every evidence cell cites something concrete (file path, log line, number, or observed behavior) rather than a vague feeling", "passed": null, "evidence": ""},
+        {"text": "Grades spread across at least 3 distinct letter levels (not clustered at one grade)", "passed": null, "evidence": ""},
+        {"text": "At least one weak grade (C+ or below) is present and named honestly", "passed": null, "evidence": ""},
+        {"text": "Weak rows include a 'what would raise it' note", "passed": null, "evidence": ""},
+        {"text": "Ends with a bold Overall: <grade> and one candid synthesis paragraph", "passed": null, "evidence": ""},
+        {"text": "No fabricated evidence — claims trace to things actually observable in the repo/session", "passed": null, "evidence": ""}
+      ]
+    }
+  ]
+}
