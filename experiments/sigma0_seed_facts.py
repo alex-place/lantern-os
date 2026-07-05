@@ -222,7 +222,7 @@ SEED = [
     ("proton-electron-ratio", "The proton-to-electron mass ratio is ~1836.15 (measured).", "MEASURED", True, 0.99, "MEASURED-UNCERTAIN", NIST, "physics"),
 
     # ============ additional NEGATIVES: independent / open ============
-    ("continuum-hypothesis", "The continuum hypothesis is INDEPENDENT of ZFC -- neither provable nor refutable there.", "HEURISTIC", False, 0.5, "INDEPENDENT", W+"Continuum_hypothesis", "math"),
+    ("continuum-hypothesis", "The continuum hypothesis can be proved or disproved from the ZFC axioms.", "HEURISTIC", False, 0.5, "INDEPENDENT", W+"Continuum_hypothesis", "math"),
     ("jacobian-conjecture", "The Jacobian conjecture -- OPEN.", "HEURISTIC", False, 0.5, "OPEN", W+"Jacobian_conjecture", "math"),
     ("hadamard-conjecture", "The Hadamard matrix conjecture -- OPEN.", "HEURISTIC", False, 0.5, "OPEN", W+"Hadamard_matrix", "math"),
 ]

@@ -106,6 +106,69 @@ def _gemini_caller(key, candidates):
     return call
 
 
+def _vertex_gemini_caller(candidates):
+    """Gemini over Vertex AI (Bearer ADC token) instead of the AI-Studio free key.
+
+    The AI-Studio wire (generativelanguage, ?key=) is free but 429s at ~20 req/day/model
+    and does NOT draw Cloud credits; Vertex bills the Cloud project and has real quota.
+    Auth = Application Default Credentials (`gcloud auth application-default login` or a
+    service-account key). Mirrors apps/lantern-garage/lib/gemini-transport.js (#1232)."""
+    import time
+    import requests
+    import google.auth
+    from google.auth.transport.requests import Request
+
+    creds, adc_project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    project = os.environ.get("VERTEX_PROJECT") or adc_project
+    loc = os.environ.get("VERTEX_LOCATION", "us-central1")
+    tok = {"v": None, "exp": 0.0}
+    model = {"m": None}
+
+    def token():
+        if not tok["v"] or time.time() > tok["exp"]:
+            creds.refresh(Request())
+            tok["v"] = creds.token
+            tok["exp"] = time.time() + 50 * 60      # ADC tokens live ~60 min; refresh at 50
+        return tok["v"]
+
+    def try_model(c, prompt):
+        url = (f"https://{loc}-aiplatform.googleapis.com/v1/projects/{project}"
+               f"/locations/{loc}/publishers/google/models/{c}:generateContent")
+        gen = {"temperature": 0, "maxOutputTokens": 64}
+        if "2.5" in c:                              # 2.5 "thinking" eats a tiny budget -> empty text
+            gen["thinkingConfig"] = {"thinkingBudget": 0}
+        body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": gen}
+        r = None
+        for attempt in range(5):
+            r = requests.post(url, headers={"Authorization": f"Bearer {token()}",
+                                            "Content-Type": "application/json"},
+                              json=body, timeout=30)
+            if r.status_code == 429:
+                time.sleep(2.0 * (attempt + 1)); continue
+            r.raise_for_status()
+            cands = r.json().get("candidates") or []
+            if not cands:
+                return ""
+            parts = (cands[0].get("content") or {}).get("parts") or []
+            return "".join(p.get("text", "") for p in parts)
+        r.raise_for_status()
+        return ""
+
+    def call(prompt):
+        if model["m"] is None:
+            for c in candidates:
+                try:
+                    out = try_model(c, prompt); model["m"] = c; return out
+                except Exception:
+                    continue
+            raise RuntimeError(f"no vertex gemini candidate works: {candidates}")
+        return try_model(model["m"], prompt)
+    call.name_of = lambda: (f"vertex:{model['m']}" if model["m"] else None)
+    call.workers = 4                                # Vertex has real quota -> more concurrency
+    return call
+
+
 def _anthropic_caller(key, candidates):
     import requests
     model = {"m": None}
@@ -170,7 +233,12 @@ def build_models():
     xai = g("GROK_API_KEY") or g("XAI_API_KEY")
     if xai:
         M["Grok (xAI)"] = _openai_caller("https://api.x.ai/v1", xai, ["grok-3", "grok-3-mini", "grok-4", "grok-2-latest"])
-    if g("GEMINI_API_KEY"):
+    # Prefer Vertex (Cloud credits, real quota) over the AI-Studio free key (429s daily).
+    # Vertex when GEMINI_USE_VERTEX=1 or VERTEX_PROJECT set (matches gemini-transport.js).
+    if g("GEMINI_USE_VERTEX") == "1" or g("VERTEX_PROJECT"):
+        M["Gemini (Vertex)"] = _vertex_gemini_caller(
+            ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-1.5-flash-002"])
+    elif g("GEMINI_API_KEY"):
         M["Gemini Flash"] = _gemini_caller(g("GEMINI_API_KEY"), ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"])
     if g("MISTRAL_API_KEY"):
         M["Mistral Small"] = _openai_caller("https://api.mistral.ai/v1", g("MISTRAL_API_KEY"), ["mistral-small-latest"])

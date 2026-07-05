@@ -156,6 +156,16 @@ def assemble_reason_verdict(out):
     }
 
 
+# ADR-0012 step 2 kill-switch: the door-2 inner break is OPT-IN and per-step revertible.
+# Default OFF ⇒ zero behavior change vs baseline until a bench proves compute-saved ≥ quality.
+DOOR2_DEFAULT_PATIENCE = 2
+
+
+def door2_enabled():
+    """True iff the ADR-0012 step-2 door-2 inner break is enabled (SIGMA0_DOOR2=1)."""
+    return os.environ.get("SIGMA0_DOOR2") == "1"
+
+
 def _lazy():
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -309,6 +319,42 @@ class Sigma0LoopLM:
                 else:
                     hits = 0
         return n, (deltas[-1] if deltas else 0.0), "max_depth", deltas
+
+    # ── ADR-0012 step 2: door-2 inner break on certified instability ─────────────
+    # The collapse certificate (`_stability_gates`) already reports the spectral fate
+    # (CONTRACT vs DIVERGE) of the latent loop but is "purely diagnostic; reported, not
+    # consumed by the gate" (loop_lm.py:73). Step 2 consumes it: stop spending recurrent
+    # depth on a token the certificate says will DIVERGE for `patience` consecutive steps —
+    # a strict compute saving, independent of steps 1/3/4. This is the pure DECISION core
+    # (a patience counter over per-step certificate verdicts), mirroring accel_step's
+    # patience pattern so it is unit-testable without the model. The per-step certificate
+    # (`_stability_gates` on each step's Jacobian, torch) and the required bench parity on
+    # bench_ouro_loop.py / eval_humaneval_ouro.py are the on-box completion — this primitive
+    # is what that wiring calls, and it is gated OFF by default (SIGMA0_DOOR2) so it can
+    # never change baseline behavior until a bench proves compute-saved ≥ baseline quality.
+    @staticmethod
+    def stability_break_step(contract_flags, patience: int = 2):
+        """Given per-step certificate verdicts, decide the door-2 break.
+
+        `contract_flags[k]` is the fate of recurrent step k: True = proven contracting,
+        False = certified non-contract (DIVERGE/spiral), None = uncertifiable (too few
+        tokens — honest-unknown). Break when NON-contract persists for `patience`
+        CONSECUTIVE steps; True or None resets the run (we only cut depth on a token the
+        certificate is *confirming* is diverging, never on an unknown — that stays a
+        max-depth ride, matching the ADR's "decline when unsure" stance).
+
+        Returns (break_step_1indexed, reason): the 1-indexed step at which the patience-th
+        consecutive non-contract lands and we break, or (None, "no_break") if never.
+        """
+        run = 0
+        for k, flag in enumerate(contract_flags or []):
+            if flag is False:
+                run += 1
+                if run >= patience:
+                    return k + 1, "certified_divergence"
+            else:  # True (contracting) or None (uncertifiable) → reset the consecutive run
+                run = 0
+        return None, "no_break"
 
     # ── generation with per-token adaptive depth ─────────────────────────────
     def generate(self, prompt: str, q: float = 0.5, max_new_tokens: int = 200, messages=None,

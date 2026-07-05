@@ -3,9 +3,18 @@
   "dataset": "experiments/sigma0_seed_facts.py::SEED",
   "validated_on": "2026-07-05",
   "method": "three parallel independent web-validation agents; each returned a per-item verdict with a primary-source citation",
-  "result": "clean",
+  "result": "clean (web pass); 1 mislabel later found by live-model probe -- see post_web_findings",
   "flags": 0,
   "corrections": [],
+  "post_web_findings": [
+    {
+      "id": "continuum-hypothesis",
+      "found_by": "live-model probe (Gemini 2.5 Flash via Vertex disagreed with the key, 2026-07-05)",
+      "issue": "The statement asserted 'CH is INDEPENDENT of ZFC' -- a PROVEN theorem (Godel 1940 + Cohen 1963) -- yet the row was classed HEURISTIC / verified=False (a negative). The web pass checked that the statement is TRUE (it is) but did not catch that a true, proven statement was labeled a non-fact. Gemini's PROVEN/yes was correct, not a confabulation.",
+      "fix": "Reworded to 'The continuum hypothesis can be proved or disproved from the ZFC axioms.' -- unambiguously FALSE (it is independent), so it stays a genuine HEURISTIC negative and an honest confabulation trap.",
+      "lesson": "Static factual web-validation ('is each statement true?') does not catch class/verified mislabels when the statement itself is true but marked negative. Probing the key with an independent model does. External reality > internal consistency."
+    }
+  ],
   "coverage": {
     "total_facts": 159,
     "individually_validated": 83,
@@ -20,7 +29,7 @@
       "n": 24,
       "verdict": "all labels correct",
       "flags": 0,
-      "checks": "every open problem still open in 2026; abc = published-but-not-community-accepted (Mochizuki); continuum-hypothesis = independent of ZFC; crypto hardness = unproven assumptions",
+      "checks": "every open problem still open in 2026; abc = published-but-not-community-accepted (Mochizuki); crypto hardness = unproven assumptions. NOTE: continuum-hypothesis passed this web check as 'true' but was later found mislabeled (see post_web_findings) -- the statement was true yet classed as a negative.",
       "primary_sources": [
         "https://www.claymath.org/millennium-problems/",
         "https://en.wikipedia.org/wiki/List_of_unsolved_problems_in_mathematics",
