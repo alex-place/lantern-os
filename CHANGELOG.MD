@@ -1,6 +1,6 @@
-## [1.8.86] - 2026-07-05
+## [1.8.84] - 2026-07-05
 ### Fixed
-- **`/api/flourishing/world/status` no longer instructs running a script that doesn't exist** (`apps/lantern-garage/routes/flourishing.js`). The empty-state message told users to run `integrations/human-flourishing-frameworks/seed_data.py`, but that file (and its directory) don't exist and the HFF page surface was already cut — so the endpoint was permanently stuck pointing at a phantom command. The message now honestly states the snapshot is absent and the backend serves an empty-but-valid structure until one is written. Strengthens **Verify** (honest surfaces). See `changelog.d/flourishing-honest-message.md` (#2094).
+- **Convergence grade card no longer fabricates the Capability (CAP) score** (`src/convergence_io_engine.py`). It wrote a hardcoded `score: 1.0` report and fed that into the overall grade with no evidence (OH/SCOPE were genuinely measured), violating the External Reality Rule. It now runs the real `node tests/gaming-layout-suite/run.js` benchmark and parses its `Gameplay centred: p/t` result; when nothing is scorable or it errors, `cap_score` stays `None` ("not measured") — never faked to 1.0 nor falsely zeroed — and the overall average excludes unmeasured axes. Strengthens **Verify**. See `changelog.d/convergence-cap-no-fabrication.md` (#2093).
 
 ## [1.8.83] - 2026-07-05
 ### Added

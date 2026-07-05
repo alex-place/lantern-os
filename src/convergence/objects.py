@@ -219,7 +219,9 @@ class GradeCardRecord:
     oh_score: float = 0.0
     # Capability (CAP) axis score: 0.0-1.0, higher is better.
     # Measures task completion rates, correctness, performance on benchmarks.
-    cap_score: float = 0.0
+    # None means "not measured" (e.g. the benchmark had nothing scorable) — an honest
+    # absence of evidence, never fabricated to a number.
+    cap_score: Optional[float] = 0.0
     # Scope (SCOPE) axis score: 0.0-1.0, higher is better.
     # Measures breadth of covered functionality, test coverage, feature completeness.
     scope_score: float = 0.0

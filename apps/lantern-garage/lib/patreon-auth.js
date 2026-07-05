@@ -46,7 +46,15 @@ function getSessionInfo(req) {
   if (user && user.id) {
     const role = user.role || "guest";
     const profile = getProfile(user.id);
-    const trade = role === "admin" || !!(profile && profile.entitlements && profile.entitlements.trade === true);
+    // Keep this IN LOCK-STEP with auth-middleware.hasEntitlement("trade"): trading
+    // is unlocked by the $20 Deep Dreamer tier and up (roleLevel), by admin, or by
+    // an explicit per-account entitlement override. If this drifts from the server
+    // gate, a paid trader gets the read-only UI while the API lets them trade (or
+    // vice-versa). #trade-entitlement-consistency
+    const trade =
+      role === "admin" ||
+      roleLevel(role) >= roleLevel("deep_dreamer") ||
+      !!(profile && profile.entitlements && profile.entitlements.trade === true);
     return {
       authenticated: true,
       role,

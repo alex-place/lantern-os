@@ -57,6 +57,18 @@ for (const { path: envPath, override } of candidateEnvFiles) {
 }
 
 const { sendJson, sendFile, sendHtml, collectRequestBody } = require("./lib/http-utils");
+
+// #2068: a 500 must never leak raw exception text (paths, stack, internals) to the
+// browser. Log the full error + stack server-side under a short id, and return only a
+// generic message plus that id, which the user can quote so an operator can find the
+// matching log line.
+function sendServerError(res, err, context) {
+  const errorId = "err_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  console.error(`[500 ${errorId}]${context ? " " + context : ""}: ${(err && err.stack) || err}`);
+  if (!res.headersSent) {
+    sendJson(res, { error: "Internal server error", errorId }, 500);
+  }
+}
 const { readJson, readJsonl, appendJsonlQueued } = require("./lib/file-queue");
 const { getStatus, getReadiness, getMiningLabStatus, getActionCapabilities, getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus, setTunnelState } = require("./lib/status");
 const { readConversationLog, normalizeConversationEntry, appendConversationEntry, appendExternalRagItem, readOperatorQueue } = require("./lib/conversation-store");
@@ -162,6 +174,11 @@ const PUBLIC_TRADING_READS = new Set([
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
   if (req.method === "GET" && PUBLIC_TRADING_READS.has(url.pathname)) return false; // public read → fall through
+  // Watchlist add/remove is available to everyone incl. read-only guests — it is
+  // "which symbols to chart", not a trade, so it isn't behind the trade gate.
+  // (The list is the shared server watchlist.) #guest-watchlist
+  if (url.pathname === "/api/trading/watchlist" && req.method === "POST") return false;
+  if (url.pathname.startsWith("/api/trading/watchlist/") && req.method === "DELETE") return false;
   if (requireEntitlement(req, res, "trade")) return false;     // allowed → fall through
   return true;                                                  // blocked → 403/302 already sent
 }
@@ -368,10 +385,7 @@ async function route(req, res) {
       const handled = await handler(req, res, url, deps);
       if (handled) return;
     } catch (e) {
-      console.error(`Route handler error for ${url.pathname}:`, e.message);
-      if (!res.headersSent) {
-        sendJson(res, { error: e.message }, 500);
-      }
+      sendServerError(res, e, `Route handler error for ${url.pathname}`);
       return;
     }
   }
@@ -379,11 +393,7 @@ async function route(req, res) {
 
 const server = http.createServer((req, res) => {
   withSession(req, res, () => route(req, res)).catch((error) => {
-    if (res.headersSent) {
-      console.error("Route error after response sent:", error.message);
-      return;
-    }
-    sendJson(res, { error: error.message }, 500);
+    sendServerError(res, error, "unhandled route error");
   });
 });
 
