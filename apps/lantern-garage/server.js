@@ -57,6 +57,18 @@ for (const { path: envPath, override } of candidateEnvFiles) {
 }
 
 const { sendJson, sendFile, sendHtml, collectRequestBody } = require("./lib/http-utils");
+
+// #2068: a 500 must never leak raw exception text (paths, stack, internals) to the
+// browser. Log the full error + stack server-side under a short id, and return only a
+// generic message plus that id, which the user can quote so an operator can find the
+// matching log line.
+function sendServerError(res, err, context) {
+  const errorId = "err_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+  console.error(`[500 ${errorId}]${context ? " " + context : ""}: ${(err && err.stack) || err}`);
+  if (!res.headersSent) {
+    sendJson(res, { error: "Internal server error", errorId }, 500);
+  }
+}
 const { readJson, readJsonl, appendJsonlQueued } = require("./lib/file-queue");
 const { getStatus, getReadiness, getMiningLabStatus, getActionCapabilities, getOperatorFeedbackMemory, getAccessModel, getCloudMirrorStatus, setTunnelState } = require("./lib/status");
 const { readConversationLog, normalizeConversationEntry, appendConversationEntry, appendExternalRagItem, readOperatorQueue } = require("./lib/conversation-store");
@@ -373,10 +385,7 @@ async function route(req, res) {
       const handled = await handler(req, res, url, deps);
       if (handled) return;
     } catch (e) {
-      console.error(`Route handler error for ${url.pathname}:`, e.message);
-      if (!res.headersSent) {
-        sendJson(res, { error: e.message }, 500);
-      }
+      sendServerError(res, e, `Route handler error for ${url.pathname}`);
       return;
     }
   }
@@ -384,11 +393,7 @@ async function route(req, res) {
 
 const server = http.createServer((req, res) => {
   withSession(req, res, () => route(req, res)).catch((error) => {
-    if (res.headersSent) {
-      console.error("Route error after response sent:", error.message);
-      return;
-    }
-    sendJson(res, { error: error.message }, 500);
+    sendServerError(res, error, "unhandled route error");
   });
 });
 
