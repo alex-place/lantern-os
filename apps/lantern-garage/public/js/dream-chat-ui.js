@@ -381,6 +381,12 @@ function renderMarkdown(text) {
   h = h.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})[^\s<>"')\x00]*/g, (_, vid) =>
     _put(`<iframe src="https://www.youtube-nocookie.com/embed/${vid}" width="100%" height="220" style="border:0;border-radius:8px;margin:6px 0;max-width:480px;display:block" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>`));
 
+  // Wiki-style [[label]](url) — some models double the brackets; collapse to one
+  // anchor. Must run before the single-bracket rule (whose label class excludes ']'
+  // so it can't match a doubled bracket) or the doubled form renders as raw text.
+  h = h.replace(/\[\[([^\]\n]+)\]\]\(((?:https?:\/\/|\/)[^\s)"]+)\)/g, (_, label, url) =>
+    _put(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
+
   // Markdown links [label](url) → new-tab anchors.
   h = h.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|\/)[^\s)"]+)\)/g, (_, label, url) =>
     _put(`<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">${label}</a>`));
