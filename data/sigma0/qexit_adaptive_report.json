@@ -1,0 +1,308 @@
+{
+  "task": "Is Ouro's trained Q-exit gate adaptive \u2014 more recurrent depth on harder inputs?",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "trained_depth": 4,
+  "n_prompts": 24,
+  "expected_exit_depth_by_tier": {
+    "easy": 3.392,
+    "medium": 3.461,
+    "hard": 3.354
+  },
+  "expected_exit_depth_range": 1.356,
+  "expected_exit_depth_overall_mean": 3.402,
+  "corr(exit_depth, next_token_entropy)": 0.477,
+  "verdict_adaptive": false,
+  "verdict_note": "E[depth] ~flat across difficulty => the adaptive-compute claim is WEAK on this model at the trained depth; it behaves closer to fixed-depth",
+  "evidence_class": "MEASURED (data/sigma0/qexit_adaptive_report.json)",
+  "caveats": "measured at trained depth 4 (gate undefined past it, so E[depth] range is bounded [1,4] and coarse), fp16, Ouro-1.4B-Thinking, 24 prompts, difficulty proxy = next-token entropy. Complements bench_ouro_loop.py (which measures global speed/quality, not per-input adaptivity).",
+  "rows": [
+    {
+      "tier": "easy",
+      "prompt": "The sky is",
+      "expected_exit_depth": 3.467,
+      "next_token_entropy": 4.321,
+      "exit_pdf": [
+        0.0,
+        0.026,
+        0.482,
+        0.493
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "2 + 2 =",
+      "expected_exit_depth": 2.568,
+      "next_token_entropy": 0.772,
+      "exit_pdf": [
+        0.207,
+        0.276,
+        0.259,
+        0.258
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "The opposite of up is",
+      "expected_exit_depth": 3.632,
+      "next_token_entropy": 0.426,
+      "exit_pdf": [
+        0.0,
+        0.0,
+        0.368,
+        0.632
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "Cats say",
+      "expected_exit_depth": 3.924,
+      "next_token_entropy": 4.633,
+      "exit_pdf": [
+        0.0,
+        0.001,
+        0.075,
+        0.925
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "One plus one equals",
+      "expected_exit_depth": 3.361,
+      "next_token_entropy": 3.562,
+      "exit_pdf": [
+        0.0,
+        0.101,
+        0.437,
+        0.462
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "The first letter of the alphabet is",
+      "expected_exit_depth": 3.185,
+      "next_token_entropy": 3.223,
+      "exit_pdf": [
+        0.0,
+        0.199,
+        0.417,
+        0.384
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "Roses are red, violets are",
+      "expected_exit_depth": 3.531,
+      "next_token_entropy": 1.284,
+      "exit_pdf": [
+        0.0,
+        0.057,
+        0.354,
+        0.589
+      ]
+    },
+    {
+      "tier": "easy",
+      "prompt": "The sun rises in the",
+      "expected_exit_depth": 3.464,
+      "next_token_entropy": 0.722,
+      "exit_pdf": [
+        0.0,
+        0.047,
+        0.442,
+        0.511
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The capital of Australia is",
+      "expected_exit_depth": 3.508,
+      "next_token_entropy": 2.452,
+      "exit_pdf": [
+        0.0,
+        0.0,
+        0.492,
+        0.508
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The chemical symbol for gold is",
+      "expected_exit_depth": 3.187,
+      "next_token_entropy": 1.497,
+      "exit_pdf": [
+        0.0,
+        0.2,
+        0.413,
+        0.387
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "World War Two ended in the year",
+      "expected_exit_depth": 3.562,
+      "next_token_entropy": 2.159,
+      "exit_pdf": [
+        0.0,
+        0.057,
+        0.323,
+        0.62
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The largest planet in the solar system is",
+      "expected_exit_depth": 3.267,
+      "next_token_entropy": 1.128,
+      "exit_pdf": [
+        0.0,
+        0.154,
+        0.426,
+        0.421
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The square root of one hundred forty-four is",
+      "expected_exit_depth": 3.48,
+      "next_token_entropy": 3.766,
+      "exit_pdf": [
+        0.0,
+        0.039,
+        0.441,
+        0.519
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The author of Romeo and Juliet is",
+      "expected_exit_depth": 3.715,
+      "next_token_entropy": 4.087,
+      "exit_pdf": [
+        0.0,
+        0.0,
+        0.285,
+        0.715
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The freezing point of water in Celsius is",
+      "expected_exit_depth": 3.468,
+      "next_token_entropy": 3.399,
+      "exit_pdf": [
+        0.0,
+        0.0,
+        0.532,
+        0.468
+      ]
+    },
+    {
+      "tier": "medium",
+      "prompt": "The number of continents on Earth is",
+      "expected_exit_depth": 3.502,
+      "next_token_entropy": 3.871,
+      "exit_pdf": [
+        0.0,
+        0.007,
+        0.484,
+        0.509
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "What is 17 multiplied by 23? The answer is",
+      "expected_exit_depth": 2.798,
+      "next_token_entropy": 0.731,
+      "exit_pdf": [
+        0.121,
+        0.266,
+        0.306,
+        0.306
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "If all bloops are razzies and all razzies are lazzies, then all bloops are",
+      "expected_exit_depth": 3.263,
+      "next_token_entropy": 0.262,
+      "exit_pdf": [
+        0.0,
+        0.164,
+        0.408,
+        0.428
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "The 12th prime number is",
+      "expected_exit_depth": 3.171,
+      "next_token_entropy": 1.87,
+      "exit_pdf": [
+        0.0,
+        0.216,
+        0.398,
+        0.386
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "The derivative of x cubed times sine x is",
+      "expected_exit_depth": 3.798,
+      "next_token_entropy": 2.447,
+      "exit_pdf": [
+        0.0,
+        0.0,
+        0.202,
+        0.798
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "A farmer has 17 sheep and all but 9 die; the number remaining is",
+      "expected_exit_depth": 3.841,
+      "next_token_entropy": 2.052,
+      "exit_pdf": [
+        0.0,
+        0.0,
+        0.158,
+        0.842
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "The integral of 1 over x with respect to x is",
+      "expected_exit_depth": 3.517,
+      "next_token_entropy": 1.774,
+      "exit_pdf": [
+        0.0,
+        0.003,
+        0.476,
+        0.52
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "The 9th Fibonacci number (starting 1,1) is",
+      "expected_exit_depth": 3.208,
+      "next_token_entropy": 1.171,
+      "exit_pdf": [
+        0.0,
+        0.2,
+        0.391,
+        0.409
+      ]
+    },
+    {
+      "tier": "hard",
+      "prompt": "Water boils at what temperature in Fahrenheit at sea level? The answer is",
+      "expected_exit_depth": 3.24,
+      "next_token_entropy": 1.224,
+      "exit_pdf": [
+        0.0,
+        0.206,
+        0.347,
+        0.446
+      ]
+    }
+  ]
+}
