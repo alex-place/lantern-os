@@ -1,3 +1,7 @@
+## [1.8.80] - 2026-07-05
+### Added
+- **Tolerant reader for the honesty eval ledgers** (`scripts/honesty_ledger.py`). The `epistemic/` and `halueval-local/` runs use different correctness fields (`class_ok`+`verified_ok` vs `ok`), so a consumer assuming one schema misread the other — the `/benchmarks` skill hit exactly this and refused to quote a number. `read_accuracy()` normalizes any known schema to one per-item correctness bool, returns None (not False) for unlabelable rows so an unscored file can't masquerade as 0%, and surfaces an `unscored` count. Recovers the real figures: halueval-local base 0.05 → adapter 0.40, epistemic base 0.0 → adapter 0.917. Strengthens **Converge**. See `changelog.d/honesty-ledger-reader.md` (#2110).
+
 ## [1.8.79] - 2026-07-05
 ### Added
 - **The Σ₀ council log now records outcomes, so verification-recall is computable.** Every review carries a stable `id`; when an execution check ran, its pass/fail is stamped as the review's outcome at record time (previously every one of 368 rows was `outcome: null`, making "did the council catch the model when it was wrong?" unmeasurable). New `labelCouncilOutcome(id, outcome)` appends a resolved outcome (revert / operator action) by id, and `foldCouncilOutcomes()` folds the append-only stream into `id → latest outcome` (later labels win). Strengthens **Verify**. See `changelog.d/council-outcome-writeback.md` (#2109).
