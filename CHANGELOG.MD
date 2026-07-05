@@ -1,3 +1,7 @@
+## [1.8.81] - 2026-07-05
+### Added
+- **Benchmark leaderboard rows now carry provenance** — `git_sha`, `served_checkpoint` (the `OURO_*` model+adapter measured), and `campaign_id` (`EVAL_CAMPAIGN_ID` or a git-sha fallback) — via a shared `scripts/eval_ledger.append_leaderboard` helper wired into `eval_coding.py` / `eval_humaneval_ouro.py` / `eval_humaneval_chat.py`. Rows are groupable by model snapshot so a cross-benchmark read knows it's comparing one checkpoint, not two. Strengthens **Converge**. See `changelog.d/benchmarks-ledger-provenance.md` (#2108). (Re-land: the original commits were orphaned when PR #2106 auto-merged at its docs-only first commit.)
+
 ## [1.8.80] - 2026-07-05
 ### Added
 - **Tolerant reader for the honesty eval ledgers** (`scripts/honesty_ledger.py`). The `epistemic/` and `halueval-local/` runs use different correctness fields (`class_ok`+`verified_ok` vs `ok`), so a consumer assuming one schema misread the other — the `/benchmarks` skill hit exactly this and refused to quote a number. `read_accuracy()` normalizes any known schema to one per-item correctness bool, returns None (not False) for unlabelable rows so an unscored file can't masquerade as 0%, and surfaces an `unscored` count. Recovers the real figures: halueval-local base 0.05 → adapter 0.40, epistemic base 0.0 → adapter 0.917. Strengthens **Converge**. See `changelog.d/honesty-ledger-reader.md` (#2110).

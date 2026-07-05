@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Reuse the canonical extractor + sandbox (importing does NOT pull torch/datasets;
 # those live inside eval_humaneval_ouro.main(), not at module top level).
 from eval_humaneval_ouro import make_candidate, run_test  # noqa: E402
+from eval_ledger import append_leaderboard  # noqa: E402  (#2108)
 
 # Strict wrapper: bias the chat to a coding turn (→ coder system prompt + local-first
 # routing) and to emit ONLY a fenced function that make_candidate can lift cleanly.
@@ -165,8 +166,7 @@ def run_eval(a):
     with open(os.path.join(ROOT, "data", "eval", "humaneval", f"{a.label}-{a.ts}.jsonl"), "w", encoding="utf-8") as f:
         for d in detail:
             f.write(json.dumps(d, ensure_ascii=False) + "\n")
-    with open(os.path.join(ROOT, "data", "eval", "leaderboard.jsonl"), "a", encoding="utf-8") as f:
-        f.write(json.dumps(summary, ensure_ascii=False) + "\n")
+    append_leaderboard(summary)  # stamps git_sha/served_checkpoint/campaign_id (#2108)
     tag = "HumanEval-chat" + ("" if a.full else f"[first {n}]")
     print(f"\nVERDICT {tag} pass@1 = {summary['pass@1']*100:.1f}%  ({n_ok}/{n})  "
           f"{summary['sec_per_problem']}s/problem  served={sources}", flush=True)
