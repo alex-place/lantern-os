@@ -304,21 +304,135 @@
       "result_receipt_schema_version": 1
     },
     {
-      "name": "workspace_write",
-      "description": "Write a file to the user workspace (~/.keystone/workspace/). Creates intermediate directories. Never writes to the repo.",
+      "name": "system_status",
+      "description": "Report the LIVE health of this system: whether the MCP server (127.0.0.1:8771) is up (real /health probe), the chat server's own uptime, and which AI providers have credentials configured (presence booleans only — never secret values). Use this WHENEVER the user asks whether the server, the MCP server, a provider, or the system is connected / up / online / running / working / healthy. It performs a real check — answer from THIS result, never from memory or documentation.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "recall_memory",
+      "description": "Recall what you ALREADY KNOW about THIS user across past sessions — their stated personal facts, background, preferences, and relevant excerpts from earlier conversations. Call this WHENEVER the user asks what you know or remember about them, says 'use what you know about me', refers to something you 'discussed before', or when personalizing help (job search, resume, planning) would benefit from prior context. Pass a `query` to focus the recall (e.g. 'job search preferences', 'family', 'resume'); OMIT it to get a general profile of recent facts + conversation topics. The result is memory you genuinely have — rely on it as prior context, do not treat it as a guess. If it returns 'no stored memories', say that honestly; never claim you 'cannot see past sessions' without calling this first.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "file_path": {
-            "type": "string"
+          "query": {
+            "type": "string",
+            "description": "Optional topic to focus recall on. Omit for a general 'what do you know about me' profile."
+          }
+        },
+        "required": []
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "generate_document",
+      "description": "Generate a resume or cover-letter and save it to the user workspace. template: \"resume\" or \"cover-letter\". format: \"docx\" (default — a real, submit-ready Word file; employers/ATS expect .docx) | \"html\" (open in browser, Print → Save as PDF) | \"markdown\". Every field is optional at render time: pass whatever you already know from the conversation and attachments; missing fields are omitted or given neutral defaults. Draft first and refine in conversation — never make the user fill in a field list, and never invent user facts (leave a visible \"[add …]\" gap instead). Returns a download link — repeat it in your reply as a Markdown link so the user can click it. Operator only.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "string",
+            "description": "\"resume\" or \"cover-letter\""
           },
-          "content": {
-            "type": "string"
+          "fields": {
+            "type": "object",
+            "description": "Template-specific fields (name, email, experience, skills, company, role, …)"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "html",
+              "markdown"
+            ],
+            "description": "Output format (default: \"docx\")"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Workspace-relative base name without extension (default: the template name)"
           }
         },
         "required": [
-          "file_path",
-          "content"
+          "template",
+          "fields"
+        ]
+      },
+      "policy": "mutating",
+      "operator_required": true,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "list_document_templates",
+      "description": "List available document templates (resume, cover-letter) and the field names each accepts. Every field is optional — generate_document renders whatever subset you pass, so build fields from the conversation and attachments instead of asking the user for this list.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "export_document",
+      "description": "Export already-written content to a downloadable FILE and return a download link. Use when the user asks to \"export as a word doc\", \"download as PDF\", \"make it a .docx/.xlsx/.pptx\", etc. content: the document body in Markdown (headings, lists, and one table → a spreadsheet/slides). format: \"docx\" | \"pdf\" | \"xlsx\" | \"pptx\" | \"html\" | \"md\". title: optional document title. Returns a Markdown download link the user can click. Operator only.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The document body as Markdown (draft it from the conversation — do NOT ask the user to paste it)."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf",
+              "xlsx",
+              "pptx",
+              "html",
+              "md"
+            ],
+            "description": "Target file type (e.g. \"docx\" for a Word document)."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional document title (defaults to the first H1 or 'document')."
+          }
+        },
+        "required": [
+          "content",
+          "format"
         ]
       },
       "policy": "mutating",
@@ -356,56 +470,21 @@
       "result_receipt_schema_version": 1
     },
     {
-      "name": "workspace_list",
-      "description": "List files in the user workspace (~/.keystone/workspace/) under an optional subdirectory.",
+      "name": "workspace_write",
+      "description": "Write a file to the user workspace (~/.keystone/workspace/). Creates intermediate directories. Never writes to the repo.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "path": {
+          "file_path": {
             "type": "string"
-          }
-        }
-      },
-      "policy": "read",
-      "operator_required": false,
-      "surface_availability": {
-        "dream_chat": true,
-        "mcp": true
-      },
-      "execution_enabled": false,
-      "execution_disabled_reason": "chat_tool_exec_disabled",
-      "result_receipt_schema_version": 1
-    },
-    {
-      "name": "generate_document",
-      "description": "Generate a tailored document from a template and save it to the user workspace. template: \"resume\" or \"cover-letter\". format: \"html\" (default — open in browser, Print → Save as PDF) or \"markdown\". Pass structured fields matching the template. Returns the workspace path. Operator only.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "template": {
-            "type": "string",
-            "description": "\"resume\" or \"cover-letter\""
           },
-          "fields": {
-            "type": "object",
-            "description": "Template-specific fields (name, email, experience, skills, company, role, …)"
-          },
-          "format": {
-            "type": "string",
-            "enum": [
-              "html",
-              "markdown"
-            ],
-            "description": "Output format (default: \"html\")"
-          },
-          "filename": {
-            "type": "string",
-            "description": "Workspace-relative base name without extension (default: the template name)"
+          "content": {
+            "type": "string"
           }
         },
         "required": [
-          "template",
-          "fields"
+          "file_path",
+          "content"
         ]
       },
       "policy": "mutating",
@@ -419,11 +498,15 @@
       "result_receipt_schema_version": 1
     },
     {
-      "name": "list_document_templates",
-      "description": "List available document templates (resume, cover-letter) and their input fields. Required fields are marked with *.",
+      "name": "workspace_list",
+      "description": "List files in the user workspace (~/.keystone/workspace/) under an optional subdirectory.",
       "input_schema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        }
       },
       "policy": "read",
       "operator_required": false,

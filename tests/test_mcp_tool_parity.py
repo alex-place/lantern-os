@@ -22,16 +22,22 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
     monkeypatch.setenv("CHAT_TOOL_EXEC", "1")
     manifest = shared_tool_bridge.load_manifest()
     names = [tool["name"] for tool in manifest["tools"]]
-    assert names == [
-        "Read", "LS", "Glob", "Grep", "Bash", "PowerShell",
-        "Write", "Edit", "web_search", "github_issue", "web_fetch",
-        "system_status", "recall_memory",
-        "generate_document", "list_document_templates",
-        "workspace_read", "workspace_write", "workspace_list",
-        "create_document", "local_eval_keystone_run",
-        "list_creator_projects", "analyze_video", "creator_job_status",
-        "trader_market_status", "trader_quote", "trader_positions",
-    ]
+    # The committed generated manifest is the single source of truth for the tool
+    # surface — regenerate it with `node scripts/tool-runner-bridge.js generate-manifest`
+    # whenever the registry in apps/lantern-garage/lib/tool-runner.js changes. Assert the
+    # live Node bridge manifest matches that golden file (by name/order) so a tool added
+    # to the registry without regenerating the golden file fails loudly here instead of
+    # drifting silently — no hand-maintained parallel list to fall out of date.
+    generated = json.loads(
+        (REPO_ROOT / "manifests" / "tool-capability-manifest-v1.json").read_text(encoding="utf-8")
+    )
+    assert names == [tool["name"] for tool in generated["tools"]], (
+        "Node bridge manifest drifted from the committed golden manifest — run "
+        "`node scripts/tool-runner-bridge.js generate-manifest` and commit the result."
+    )
+    # Belt-and-braces: a few load-bearing tools that must never silently vanish.
+    for required in ("Read", "Edit", "web_search", "generate_document", "trader_market_status"):
+        assert required in names, f"required tool {required!r} missing from the manifest"
     assert all(tool["surface_availability"] == {"dream_chat": True, "mcp": True}
                for tool in manifest["tools"])
 
@@ -83,7 +89,9 @@ def test_node_bridge_manifest_and_structured_outcomes(monkeypatch):
         lambda: (_ for _ in ()).throw(shared_tool_bridge.SharedToolBridgeError("missing")),
     )
     fallback = shared_tool_bridge.load_manifest()
-    assert len(fallback["tools"]) == 24
+    # The fallback serves the committed golden manifest verbatim, so its tool count is
+    # exactly the golden file's (derive it, don't hardcode a number that drifts).
+    assert len(fallback["tools"]) == len(generated["tools"])
     assert fallback["execution"]["reason"] == "node_bridge_unavailable"
     unavailable = shared_tool_bridge.execute_tool("Read", {"file_path": "package.json"})
     assert unavailable["status"] == "unavailable"

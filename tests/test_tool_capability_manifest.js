@@ -28,9 +28,14 @@ async function main() {
   assert.deepStrictEqual(bridged, direct);
   assert.deepStrictEqual(generated, toolRunner.capabilityManifest({ executionEnabled: false }));
   assert.strictEqual(direct.schema_version, 1);
+  // The committed golden manifest is the single source of truth for the tool surface
+  // (regenerate with `node scripts/tool-runner-bridge.js generate-manifest` after any
+  // registry change). Assert the live surface matches it by name instead of a
+  // hand-maintained literal that silently drifts every time a tool is added.
   assert.deepStrictEqual(
     direct.tools.map((tool) => tool.name),
-    ["Read", "LS", "Glob", "Grep", "Bash", "PowerShell", "Write", "Edit", "web_search", "github_issue", "web_fetch", "workspace_write", "workspace_read", "workspace_list", "create_document", "local_eval_keystone_run", "list_creator_projects", "analyze_video", "creator_job_status"]
+    generated.tools.map((tool) => tool.name),
+    "tool surface drifted from the golden manifest — run `node scripts/tool-runner-bridge.js generate-manifest`"
   );
   for (const tool of direct.tools) {
     assert.strictEqual(tool.surface_availability.dream_chat, true);
