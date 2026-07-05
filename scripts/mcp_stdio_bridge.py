@@ -38,12 +38,22 @@ def _ensure_server():
     except urllib.error.URLError:
         pass
 
-    # Start server in background
+    # Start server in background. Force CHAT_TOOL_EXEC=1 + MCP_SHARED_TOOL_OPERATOR=1
+    # so the canonical Dream Chat shared tools (Read/Grep/Write/Edit/Bash/…) actually
+    # EXECUTE with operator rights rather than returning proposal-only / denied stubs
+    # — this is what makes the MCP surface behave the same as keystone (dream) chat.
+    # A client may override by exporting either flag before launching the bridge.
+    server_env = {
+        **os.environ,
+        "CHAT_TOOL_EXEC": os.environ.get("CHAT_TOOL_EXEC", "1"),
+        "MCP_SHARED_TOOL_OPERATOR": os.environ.get("MCP_SHARED_TOOL_OPERATOR", "1"),
+    }
     proc = subprocess.Popen(
         [sys.executable, os.path.join(REPO_ROOT, "src", "mcp_server", "server.py")],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         cwd=REPO_ROOT,
+        env=server_env,
     )
     # Wait for it to come up
     for _ in range(30):
@@ -56,8 +66,8 @@ def _ensure_server():
     print(f"[mcp-bridge] Warning: server did not start on {MCP_URL}", file=sys.stderr)
 
 
-def _send_rpc(method: str, params: dict = None) -> dict:
-    payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}).encode()
+def _send_rpc(method: str, params: dict = None, req_id=1) -> dict:
+    payload = json.dumps({"jsonrpc": "2.0", "id": req_id, "method": method, "params": params or {}}).encode()
     req = urllib.request.Request(f"{MCP_URL}/messages", data=payload, headers={"Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -71,36 +81,47 @@ def _send_rpc(method: str, params: dict = None) -> dict:
 def main():
     _ensure_server()
 
-    # Send initialize response
-    init_response = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {"tools": {}},
-            "serverInfo": {"name": "lantern-os-mcp", "version": "1.0.0"},
-        },
-    }
-    print(json.dumps(init_response), flush=True)
-
+    # Client-driven: we do NOT emit an unsolicited initialize response. The client
+    # sends `initialize` as its first request and we answer it in the loop below,
+    # echoing its request id (see the `method == "initialize"` branch).
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
+        msg = {}
         try:
             msg = json.loads(line)
             method = msg.get("method", "")
             params = msg.get("params", {})
+            req_id = msg.get("id")
 
-            if method == "tools/list":
-                result = _send_rpc("tools/list", params)
-            elif method.startswith("tools/call"):
-                result = _send_rpc("tools/call", params)
-            else:
-                result = _send_rpc(method, params)
+            # JSON-RPC notifications (no id) — e.g. notifications/initialized.
+            # The spec forbids a response; forwarding one would desync the client.
+            if req_id is None:
+                continue
 
+            # Answer initialize locally so the protocolVersion/capabilities always
+            # match, echoing the client's request id, with no server round-trip.
+            if method == "initialize":
+                print(json.dumps({
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {"tools": {}, "resources": {}, "logging": {}},
+                        "serverInfo": {"name": "lantern-os-mcp", "version": "1.0.0"},
+                    },
+                }), flush=True)
+                continue
+
+            result = _send_rpc(method, params, req_id=req_id)
+            # Ensure the response id matches the client's request id exactly.
+            if isinstance(result, dict):
+                result["id"] = req_id
             print(json.dumps(result), flush=True)
         except Exception as e:
+            if msg.get("id") is None:
+                continue
             error = {"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32603, "message": str(e)}}
             print(json.dumps(error), flush=True)
 
