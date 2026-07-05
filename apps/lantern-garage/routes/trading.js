@@ -11,6 +11,7 @@ const tradingMemory = require('../lib/trading-memory');
 const tradingStore = require('../lib/trading-store');
 const { readJsonCached } = require('../lib/jsonl-cache');
 const tradingNews = require('../lib/trading-news');
+const { getSessionUserId } = require('../lib/session-identity'); // per-user IBKR (ADR-0022)
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
 const { TradingPriceFeed } = require('../lib/trader-price-feed');
 const { getStrategyFitness, logPerformance } = require('../lib/strategy-performance-logger');
@@ -865,9 +866,10 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // connected; the accompanying status explains why).
   if (url.pathname === '/api/trading/ibkr/account' && req.method === 'GET') {
     try {
+      const uid = getSessionUserId(req);
       const [account, status] = await Promise.all([
-        bridge.getIBKRAccount(),
-        bridge.getIBKRStatus(),
+        bridge.getIBKRAccount(uid),
+        bridge.getIBKRStatus(uid),
       ]);
       sendJson(res, { account, status }, 200);
     } catch (error) {
@@ -880,7 +882,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // Returns IBKR open positions ([] when the gateway is not connected)
   if (url.pathname === '/api/trading/ibkr/positions' && req.method === 'GET') {
     try {
-      const positions = await bridge.getIBKRPositions();
+      const positions = await bridge.getIBKRPositions(getSessionUserId(req));
       sendJson(res, { positions }, 200);
     } catch (error) {
       sendJson(res, { error: 'Failed to fetch positions', details: error.message }, 503);
@@ -894,7 +896,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   // reason in `evidence` when the gateway is down or unauthenticated.
   if (url.pathname === '/api/trading/ibkr/status' && req.method === 'GET') {
     try {
-      const status = await bridge.getIBKRStatus();
+      const status = await bridge.getIBKRStatus(getSessionUserId(req));
       sendJson(res, status, 200);
     } catch (error) {
       sendJson(res, { connected: false, reachable: false, source: 'ibkr-cpapi', error: error.message }, 200);

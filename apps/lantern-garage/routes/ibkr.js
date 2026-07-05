@@ -34,9 +34,15 @@ async function _probe(userId) {
   return { connected: !!(p && p.connected), authenticated: !!(p && p.authenticated), competing: !!(p && p.competing) };
 }
 
+const OWNED = new Set([
+  '/api/trading/ibkr/connect',
+  '/api/trading/ibkr/disconnect',
+  '/api/trading/ibkr/connection',
+]);
+
 module.exports = async function ibkrRoutes(req, res, url) {
   const path = url.pathname;
-  if (!path.startsWith('/api/trading/ibkr/')) return false;
+  if (!OWNED.has(path)) return false; // account/positions/status live in routes/trading
 
   const userId = getSessionUserId(req);
   if (!userId) { _json(res, 401, { error: 'not_authenticated' }); return true; }
