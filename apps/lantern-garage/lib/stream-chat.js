@@ -38,6 +38,10 @@ const { generateDoorSceneImage } = require("./image-generation");
 const { analyzeImage } = require("./vision");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
+// Real news source (RSS discover feed, cached). A bare "today's news" query is a poor
+// web-search term (DuckDuckGo returns "News Today" newspaper, the "Today" TV show, …),
+// so news-intent turns ground on the curated feed instead of a junk search.
+const discoverFeeds = require("../routes/discover-feeds");
 // #1012 boiling-frog defense: ms epoch of the last mandatory external-grounding tick.
 // Module-level so the cadence spans requests for this server process. #1012
 let _lastGroundingTickMs = 0;
@@ -1305,6 +1309,57 @@ async function handleStreamChat(req, url, res) {
       // Due but nothing to query — advance the clock + log so the cadence doesn't retry every turn.
       _lastGroundingTickMs = Date.now();
       console.warn(`[grounding-tick] due but no query extracted; cadence reset (cadence=${GROUNDING_TICK_MS}ms)`);
+    }
+  }
+
+  // ── News grounding (real RSS feed, not a junk web query) ────────────
+  // "check the news" / "today's headlines" / "what's in the news" ground the model
+  // on the curated discover feed (fresh, today-dated) so it summarizes REAL headlines
+  // instead of web-searching the literal word "news" and hedging "I couldn't find a
+  // summary". Any provider benefits — the feed lands in groundingContext like a search.
+  if (!isKeystoneDebug && message && /\b(news|headlines?)\b/i.test(message) && !/\bnews\s*letter\b/i.test(message)) {
+    try {
+      const feed = await withTimeout(discoverFeeds.load(), GROUNDING_TIMEOUT_MS, null);
+      const all = feed && Array.isArray(feed.items) ? feed.items : [];
+      // Freshest 8, but guarantee image-bearing items are represented — many
+      // sources (HN, blogs) ship no media, so a pure freshness slice can drop every
+      // photo and the panels render text-only. Fold in the newest 2 items that DO
+      // carry an image if the fresh slice missed them, so a picture actually shows.
+      const items = all.slice(0, 8);
+      if (!items.some((it) => it.image)) {
+        for (const withImg of all.filter((it) => it.image).slice(0, 2)) {
+          if (!items.includes(withImg)) items.push(withImg);
+        }
+      }
+      if (items.length) {
+        // Pass every field the feed carries — title, link, source, date, a short
+        // summary, and the article's lead image — so the model can render a rich
+        // panel per item (image is https-only, validated by firstImage()).
+        const lines = items.map((it, i) => {
+          const parts = [`[${i + 1}] title: ${it.title || "(untitled)"}`];
+          if (it.source) parts.push(`    source: ${it.source}`);
+          if (it.date) parts.push(`    date: ${String(it.date).slice(0, 10)}`);
+          if (it.link) parts.push(`    link: ${it.link}`);
+          if (it.summary) parts.push(`    summary: ${it.summary}`);
+          if (it.image) parts.push(`    image: ${it.image}`);
+          return parts.join("\n");
+        });
+        // Explicit per-panel format so every provider renders the same rich card:
+        // image (when present) → linked headline → source · date → one-line summary.
+        const newsBlock =
+          `Today's news headlines (curated RSS feed, ${feed.fetchedAt || "just now"}). ` +
+          `Summarize these REAL items — do NOT say you couldn't find the news, and do NOT invent items beyond this list.\n` +
+          `Format EACH item as its own panel, in this exact markdown shape:\n` +
+          `### [Headline](link)\n` +
+          `![](image)   ← include this line ONLY when an image url is given for that item\n` +
+          `*Source · YYYY-MM-DD*\n` +
+          `One-sentence takeaway from the summary.\n` +
+          `Separate panels with a \`---\` divider. Keep the model's own commentary out of the panels.\n\n` +
+          `Items:\n${lines.join("\n\n")}`;
+        groundingContext = groundingContext ? `${groundingContext}\n\n${newsBlock}` : newsBlock;
+      }
+    } catch (e) {
+      console.error("[news-grounding] failed (non-fatal):", e.message);
     }
   }
 
