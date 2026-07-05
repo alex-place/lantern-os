@@ -2668,17 +2668,49 @@ async function toggleOvernightScan(){
 // trading actions/account panels hidden (CSS body.guest) and their trade-gated
 // fetches skipped (window.GUEST guards). Fails closed → read-only on any error.
 async function detectGuestMode(){
+  let authed = false;
   try{
     const s = await (await fetch('/api/auth/session',{cache:'no-store'})).json();
     const ent = (s && s.entitlements) || {};
+    authed = !!(s && s.authenticated);
     window.GUEST = !(s && (s.role === 'admin' || ent.trade === true));
   }catch(e){ window.GUEST = true; }
   if(window.GUEST){
     document.body.classList.add('guest');
     const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
-    const cta=document.getElementById('signinCta'); if(cta) cta.style.display='';
+    const cta=document.getElementById('signinCta');
+    if(cta){
+      cta.style.display='';
+      if(authed){
+        // Logged in but without trade access → it's a tier/subscription gate, not
+        // a login gate. Point them at the upgrade, not the sign-in page.
+        cta.textContent = 'Upgrade to trade →';
+        cta.title = 'Trading unlocks with the Deep Dreamer ($20/mo) tier';
+        cta.href = 'https://www.patreon.com/c/lanterndreamjournal';
+        cta.target = '_blank'; cta.rel = 'noopener noreferrer';
+      } else {
+        cta.textContent = 'Sign in to trade →';
+        cta.href = '/auth.html?returnTo=%2Fstock-trader.html';
+      }
+    }
   }
 }
+// Re-render charts the instant the theme flips. The canvas grid/axis colors are
+// read from CSS at draw time (CHART_*_COLOR) and renderZoneLadder memoizes on
+// data/price, so without this the chart colors keep the old theme until the next
+// 5s price poll — the "slow to change price color" lag. Bust the memo + redraw. */
+(function watchThemeForChartColors(){
+  let last = document.documentElement.getAttribute('data-theme');
+  new MutationObserver(()=>{
+    const now = document.documentElement.getAttribute('data-theme');
+    if(now === last) return;
+    last = now;
+    for(const k in _ladderSig) delete _ladderSig[k];   // force redraw (memo bust)
+    try{ renderCards(); }catch(e){}
+    if(fullscreenTicker) try{ renderTicker(fullscreenTicker); }catch(e){}
+  }).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+})();
+
 document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(); startDashboard(); });
 
 </script>
