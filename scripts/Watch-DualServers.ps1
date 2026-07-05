@@ -12,10 +12,14 @@
     ReferenceError crash (issue #1785).
 
     This watchdog closes that gap. Every -IntervalSeconds it probes
-    :4177/api/version and :4178/api/version. If a server fails N consecutive
-    probes, it relaunches ONLY that server, reusing the same entry paths, env
-    hydration, and log files as Start-DualServers.ps1. Each restart is logged to
-    logs/watchdog.log. It never touches a server that is answering.
+    :4177/api/health and :4178/api/health. That endpoint carries branch+pid
+    identity (#2037), so a dead port (000/non-200) OR the wrong branch squatting
+    :4177 both count as unhealthy. If a server fails N consecutive probes, it
+    relaunches ONLY that server, reusing the same entry paths, env hydration, and
+    log files as Start-DualServers.ps1. It never touches a server that is
+    answering healthily. Human-readable actions go to logs/watchdog.log; a
+    structured append-only ledger ({ts, action, port, outcome}) goes to
+    data/boot-health.jsonl for offline aggregation (#2038).
 
     This EXTENDS the dual-boot system; it is not a new subsystem. Run it alongside
     (or after) Start-DualServers.ps1.
@@ -71,6 +75,26 @@ function Log($msg) {
     Add-Content -Path $WatchLog -Value $line -ErrorAction SilentlyContinue
 }
 
+# --- Structured boot-health ledger (#2038). The human-readable watchdog.log is for
+# eyeballs; this append-only JSONL is the machine record an operator / report-card can
+# aggregate ("how often did 4177 actually die and recover?"). One line per action:
+# { ts, action, port, outcome }. Never throws — telemetry must not break the sweep.
+$DataDir    = Join-Path $RepoRoot "data"
+New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
+$BootHealth = Join-Path $DataDir "boot-health.jsonl"
+function Write-BootHealth($action, $port, $outcome) {
+    try {
+        $rec = [ordered]@{
+            ts      = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            action  = "$action"
+            port    = "$port"
+            outcome = "$outcome"
+        }
+        $json = ($rec | ConvertTo-Json -Compress)
+        Add-Content -Path $BootHealth -Value $json -Encoding ascii -ErrorAction SilentlyContinue
+    } catch {}
+}
+
 # Absolute entry paths so a restart launches the SAME instance the launcher did,
 # and so it stays identifiable by command line (matches Start-DualServers.ps1).
 $StableEntry = Join-Path $StableRoot 'apps\lantern-garage\server.js'
@@ -89,38 +113,59 @@ $env:LANTERN_CLOUDFLARE_TUNNEL = 'false'
 $targets = @(
     @{
         Name  = 'stable :4177'
-        Url   = 'http://127.0.0.1:4177/api/version'
+        # /api/health (not /api/version): it carries branch+pid identity (#2037), so a
+        # 000/non-200 OR a wrong-branch answer both count as "the right server is not up".
+        Url   = 'http://127.0.0.1:4177/api/health'
         Entry = $StableEntry
         Root  = $StableRoot
         # server.js binds 0.0.0.0 when PORT is set (Cloudflare tunnel).
         Port  = '4177'
+        # Stable must be serving master. A different branch on :4177 means a stale/wrong
+        # checkout is squatting the port — treat it as unhealthy and relaunch stable.
+        ExpectBranch = 'master'
         OutLog = Join-Path $LogDir 'stable-4177.out.log'
         ErrLog = Join-Path $LogDir 'stable-4177.err.log'
         Fails = 0
     },
     @{
         Name  = 'dev :4178'
-        Url   = 'http://127.0.0.1:4178/api/version'
+        Url   = 'http://127.0.0.1:4178/api/health'
         Entry = $DevEntry
         Root  = $DevRoot
         # server-dev.js forces its own port/host; PORT must be UNSET for it.
         Port  = $null
+        # Dev serves whatever branch is checked out — no branch assertion.
+        ExpectBranch = $null
         OutLog = Join-Path $LogDir 'dev-4178.out.log'
         ErrLog = Join-Path $LogDir 'dev-4178.err.log'
         Fails = 0
     }
 )
 
-function Test-Healthy($url) {
+# Probe a target's /api/health. Returns $true only if it answers 200 AND (when the
+# target asserts a branch) reports the expected branch. A 000/timeout, a non-200, or a
+# wrong-branch answer all return $false so the sweep restarts the right server.
+function Test-Healthy($t) {
     try {
-        $r = Invoke-WebRequest $url -TimeoutSec 4 -UseBasicParsing -ErrorAction SilentlyContinue
-        return ($r.StatusCode -eq 200)
+        $r = Invoke-WebRequest $t.Url -TimeoutSec 4 -UseBasicParsing -ErrorAction SilentlyContinue
+        if ($r.StatusCode -ne 200) { return $false }
+        if ($t.ExpectBranch) {
+            try {
+                $body = $r.Content | ConvertFrom-Json
+                if ($body.branch -and ($body.branch -ne $t.ExpectBranch)) {
+                    Log ("  [WRONGBRANCH] {0} is serving '{1}', expected '{2}'" -f $t.Name, $body.branch, $t.ExpectBranch)
+                    return $false
+                }
+            } catch { }  # health without a parseable branch → treat 200 as alive
+        }
+        return $true
     } catch { return $false }
 }
 
 function Restart-Target($t) {
     if (-not (Test-Path $t.Entry)) {
         Log ("  [SKIP] {0}: entry not found ({1}) - worktree missing?" -f $t.Name, $t.Entry)
+        Write-BootHealth 'restart_skipped' $t.Port 'entry_missing'
         return
     }
     # Reap any half-dead instance of THIS entry (a zombie still holding child ports)
@@ -135,16 +180,23 @@ function Restart-Target($t) {
         -RedirectStandardOutput $t.OutLog -RedirectStandardError $t.ErrLog
     Remove-Item env:PORT -ErrorAction SilentlyContinue
     Log ("  [RESTART] {0} relaunched (pid {1}) from {2}" -f $t.Name, $p.Id, $t.Root)
+    Write-BootHealth 'restart' $t.Port ("relaunched pid " + $p.Id)
 }
 
 function Invoke-Sweep {
     foreach ($t in $targets) {
-        if (Test-Healthy $t.Url) {
-            if ($t.Fails -gt 0) { Log ("  [OK] {0} recovered" -f $t.Name) }
+        if (Test-Healthy $t) {
+            # Only log/record a recovery if it had been failing — a healthy sweep on an
+            # already-healthy server writes nothing (no thrash, no ledger noise).
+            if ($t.Fails -gt 0) {
+                Log ("  [OK] {0} recovered" -f $t.Name)
+                Write-BootHealth 'recover' $t.Port 'healthy'
+            }
             $t.Fails = 0
         } else {
             $t.Fails++
             Log ("  [DOWN] {0} failed probe {1}/{2}" -f $t.Name, $t.Fails, $FailuresBeforeRestart)
+            Write-BootHealth 'down_probe' $t.Port ("fail {0}/{1}" -f $t.Fails, $FailuresBeforeRestart)
             if ($t.Fails -ge $FailuresBeforeRestart) {
                 Restart-Target $t
                 $t.Fails = 0
