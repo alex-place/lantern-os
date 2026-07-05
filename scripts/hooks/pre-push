@@ -125,15 +125,22 @@ conflict=$(gh pr list --repo alex-place/lantern-os --state open \
   --json headRefName \
   --jq "[.[] | $lane_match] | length" 2>/dev/null)
 
-if [ "${conflict:-0}" -gt 0 ]; then
+# Concurrent-session cap: a lane (one user or agent) may keep up to
+# WORKSTREAM_MAX_OPEN_PRS open PRs at once, so a user can run several sessions in
+# parallel. `conflict` counts OTHER open PRs in the lane (this branch has no PR yet
+# — it exited above if it did), so opening one more is allowed while that total is
+# below the cap. Set the cap to 1 to restore the old one-PR-per-lane rule.
+max_open=${WORKSTREAM_MAX_OPEN_PRS:-3}
+if [ "${conflict:-0}" -ge "$max_open" ]; then
   echo ""
-  echo "WORKSTREAM BLOCK: $lane_kind lane '$lane' already has an open PR."
+  echo "WORKSTREAM BLOCK: $lane_kind lane '$lane' already has $conflict open PRs (cap $max_open)."
   gh pr list --repo alex-place/lantern-os --state open \
     --json number,title,headRefName \
     --jq "[.[] | $lane_match] | .[] | \"  #\\(.number) \\(.title) [\\(.headRefName)]\"" \
     2>/dev/null
   echo ""
-  echo "Bypass: SKIP_MONOWORKSTREAM=1 git push ..."
+  echo "Raise the cap for more concurrent sessions: WORKSTREAM_MAX_OPEN_PRS=$((max_open+1)) git push ..."
+  echo "Or bypass entirely: SKIP_MONOWORKSTREAM=1 git push ..."
   echo ""
   exit 1
 fi

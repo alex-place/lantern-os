@@ -333,9 +333,11 @@ Each test run logs:
 
 ## Per-Lane Workstream Rule (Critical)
 
-Each **lane** gets **one open PR at a time**. All lanes run concurrently. The lane key
-is the branch's **first path segment**: agent prefixes are fixed lanes, every other
-prefix is a **dynamic human lane** named after that prefix.
+Each **lane** may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default
+**3**), so one user or agent can run several concurrent sessions in parallel. All lanes
+run concurrently. The lane key is the branch's **first path segment**: agent prefixes are
+fixed lanes, every other prefix is a **dynamic human lane** named after that prefix. Set
+`WORKSTREAM_MAX_OPEN_PRS=1` to restore the old one-PR-per-lane behaviour.
 
 | Branch prefix | Lane | Kind |
 |---|---|---|
@@ -357,7 +359,7 @@ more than three) humans can work at once. `alex/`, `kriskin/`, `mookman11/` no l
 block each other.
 
 Rules:
-- A second branch in the same lane is blocked until its first PR is merged/closed
+- A lane is blocked from opening a **new** PR only once it already has `WORKSTREAM_MAX_OPEN_PRS` open (default 3); below that, concurrent session-branches are allowed
 - Commits/pushes to a branch **that already has an open PR** are always allowed
 - `gh-pages`, `master`, `dev` are exempt
 - Direct push to master is blocked — open a PR, or: `OVERRIDE_MERGE=1 git push origin master`

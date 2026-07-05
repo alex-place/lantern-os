@@ -427,9 +427,10 @@ their branches with their own name gets their own concurrent lane:
 - `alex/…`, `kriskin/…`, `mookman11/…` are the current human lanes — and **any new
   `<name>/…` prefix becomes a new lane automatically** (no code change, no roster edit).
   This supports more than one and more than three humans working at once.
-- Each human lane is still capped at **one open PR at a time** (focus per contributor):
-  `alex/` can have one PR open while `kriskin/` and `mookman11/` each have their own —
-  they no longer block each other.
+- Each lane may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default **3**),
+  so one contributor can run several concurrent sessions in parallel: `alex/` can have a
+  few PRs open while `kriskin/` and `mookman11/` each have their own — they never block
+  each other. Set `WORKSTREAM_MAX_OPEN_PRS=1` to restore strict one-PR-per-lane focus.
 - A branch with **no `/`** (ad-hoc, unprefixed) falls back to a single shared `human`
   lane, so stray branches can't spawn unlimited free lanes.
 

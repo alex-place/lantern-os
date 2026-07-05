@@ -1,0 +1,26 @@
+{
+  "skill_name": "benchmarks",
+  "evals": [
+    {
+      "id": 0,
+      "name": "check-standing-and-plan",
+      "prompt": "check the benchmarks — how's the local model doing on evals and what should we run next?",
+      "expected_output": "A grounded scorecard reading real numbers from data/eval/leaderboard.jsonl and data/longmemeval/runs.jsonl, distinguishing raw vs chat and subset vs full, set against a live SOTA search, plus a ranked 'run next' plan with exact commands. Should offer/note updating docs/BENCHMARKS.md.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "single-mark-swebench",
+      "prompt": "where do we stand on SWE-bench for the local coder?",
+      "expected_output": "Reads data/eval/swebench/ predictions and any graded leaderboard row, correctly reports that grading is Docker-outsourced and predictions may exist without a resolved-rate, contextualizes vs current SWE-bench leaderboard, and proposes the graded run command. Should not fabricate a resolved number.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "council-vs-local-honesty",
+      "prompt": "compare the local model to the council on honesty benchmarks and tell me what to benchmark next",
+      "expected_output": "Reads HaluEval/epistemic ledgers, treats the council as a verification axis (not a pass-rate), reports honestly where council outcome labels are missing, and gives a ranked next-run plan. Does not invent a council score.",
+      "files": []
+    }
+  ]
+}
