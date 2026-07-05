@@ -304,13 +304,10 @@
     width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
     box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
   @keyframes otSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-  /* While the ticket is docked, give the chart area room on the right so the
-     panel never overlaps the cards / fullscreen chart — the grid reflows into
-     the narrower space (TradingView-style). */
-  .main,.footer{transition:margin-right .18s ease}
-  body.ot-open .main,body.ot-open .footer{margin-right:340px}
-  body.ot-open .fs-bg{padding-right:340px}
-  @media (max-width:760px){ body.ot-open .main,body.ot-open .footer{margin-right:0} .ot-modal{max-width:100vw} }
+  /* The order ticket floats OVER the right edge as a drawer — it does NOT reflow
+     the chart grid (opening buy/sell used to shove every chart to the side). The
+     panel is translucent-backed + slides in, so the charts behind stay put. */
+  @media (max-width:760px){ .ot-modal{max-width:100vw} }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
   .ot-close{cursor:pointer;font-size:11px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
@@ -1179,11 +1176,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   let html = '';
 
-  // Read-only guests get a clean price chart only — the zone bands, P&L fill and
-  // entry/stop/TP markers are trade suggestions (a paid capability), so they are
-  // not drawn for logged-out visitors. #guest-clean-chart
-  const guestView = document.body.classList.contains('guest');
-  if(!guestView){
+  // Zone overlays (S/R zone bands, P&L fill, entry/stop/TP markers) are removed
+  // for ALL users per product decision — the charts show a clean price line only.
+  // Flip SHOW_ZONE_OVERLAYS back to true to restore them. #no-zone-overlays
+  const SHOW_ZONE_OVERLAYS = false;
+  if(SHOW_ZONE_OVERLAYS){
   // Zone bands
   for(let i=0;i<zones.length;i++){
     const z=zones[i]; if(!z.mid) continue;
@@ -1223,7 +1220,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'#ff5f6d');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
     html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'#00d4aa');
-  } // end !guestView (zone bands / P&L / entry-stop-TP)
+  } // end SHOW_ZONE_OVERLAYS (zone bands / P&L / entry-stop-TP)
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
