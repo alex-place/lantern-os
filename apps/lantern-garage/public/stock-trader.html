@@ -415,12 +415,19 @@
   body.guest .badge-paper,
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
-  body.guest .wl-add,              /* + Add symbol (POST /watchlist) */
-  body.guest .wl-remove,           /* remove from watchlist (DELETE) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
   body.guest #otBg{ display:none !important; }
+  /* Guests CAN edit the watchlist (add/remove tickers) — it's "which symbols to
+     chart", not a trade — so .wl-add / .wl-remove stay visible for them. */
   /* No footer row for guests — the chart grid takes the full height. */
   body.guest .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
+  /* Uniform chart grid for guests: no "open" state spanning two columns and no
+     per-state height changes, so every card is the same size. #guest-uniform-grid */
+  body.guest .card.state-open{ grid-column:auto; }
+  body.guest .card.state-quiet{ opacity:1; }
+  body.guest .zone-ladder,
+  body.guest .card.state-open .zone-ladder,
+  body.guest .card.state-quiet .zone-ladder{ height:200px; }
   .signin-cta{ background:var(--blue);color:#04121a;font-weight:700;border-color:var(--blue) }
   .signin-cta:hover{ filter:brightness(1.08);color:#04121a;background:var(--blue) }
   .guest-badge{ background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3) }
@@ -1172,6 +1179,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   let html = '';
 
+  // Read-only guests get a clean price chart only — the zone bands, P&L fill and
+  // entry/stop/TP markers are trade suggestions (a paid capability), so they are
+  // not drawn for logged-out visitors. #guest-clean-chart
+  const guestView = document.body.classList.contains('guest');
+  if(!guestView){
   // Zone bands
   for(let i=0;i<zones.length;i++){
     const z=zones[i]; if(!z.mid) continue;
@@ -1211,6 +1223,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'#ff5f6d');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
     html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'#00d4aa');
+  } // end !guestView (zone bands / P&L / entry-stop-TP)
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
@@ -1776,8 +1789,13 @@ function focusTicker(t){
   activeTicker = t;
   renderWatchlist();
   renderSymbolInfo(t);
-  setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
-  if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
+  // Read-only guests can't trade, so skip the order panel entirely — otherwise
+  // clicking a chart shoves the grid aside to make room for a panel they can't
+  // use. They just get the fullscreen chart. #guest-no-order-panel
+  if(!document.body.classList.contains('guest')){
+    setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
+    if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
+  }
   openFullscreenChart(t);
 }
 
