@@ -1,0 +1,24 @@
+{
+  "task": "does a cheap signal predict PR REJECTION (closed-unmerged)? \u2014 runnable cousin of the council backtest",
+  "ground_truth": "gh PR history: merged vs closed-unmerged (owner-only, private)",
+  "n": 1292,
+  "n_rejected": 222,
+  "reject_rate": 0.1718,
+  "n_authors": 7,
+  "eval": "GroupKFold(5) by author (must generalize across contributors, not memorize one)",
+  "per_feature_auroc": {
+    "additions": 0.533,
+    "deletions": 0.594,
+    "churn": 0.534,
+    "changed_files": 0.529,
+    "is_draft": 0.729,
+    "title_len": 0.619,
+    "title_slop": 0.502,
+    "n_labels": 0.531
+  },
+  "combined_auroc": 0.628,
+  "combined_auroc_without_draft_slop": 0.565,
+  "reading": "cheap metadata predicts rejection only WEAKLY and mostly via the near-tautological is_draft (drafts don't merge); the non-trivial structural signal is near chance. So structure does NOT flag which real PRs get rejected \u2014 a (near-)null that motivates logging the council's SEMANTIC \u0394, where predictive value would have to live.",
+  "council_backtest_status": "NULL \u2014 council-reviews.jsonl is empty (n=0); this is the runnable owner-only cousin, NOT the council-\u0394 number.",
+  "evidence_class": "MEASURED"
+}
