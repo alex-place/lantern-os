@@ -304,13 +304,10 @@
     width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
     box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
   @keyframes otSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-  /* While the ticket is docked, give the chart area room on the right so the
-     panel never overlaps the cards / fullscreen chart — the grid reflows into
-     the narrower space (TradingView-style). */
-  .main,.footer{transition:margin-right .18s ease}
-  body.ot-open .main,body.ot-open .footer{margin-right:340px}
-  body.ot-open .fs-bg{padding-right:340px}
-  @media (max-width:760px){ body.ot-open .main,body.ot-open .footer{margin-right:0} .ot-modal{max-width:100vw} }
+  /* The order ticket floats OVER the right edge as a drawer — it does NOT reflow
+     the chart grid (opening buy/sell used to shove every chart to the side). The
+     panel is translucent-backed + slides in, so the charts behind stay put. */
+  @media (max-width:760px){ .ot-modal{max-width:100vw} }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
   .ot-close{cursor:pointer;font-size:11px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
@@ -415,12 +412,19 @@
   body.guest .badge-paper,
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
-  body.guest .wl-add,              /* + Add symbol (POST /watchlist) */
-  body.guest .wl-remove,           /* remove from watchlist (DELETE) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
   body.guest #otBg{ display:none !important; }
+  /* Guests CAN edit the watchlist (add/remove tickers) — it's "which symbols to
+     chart", not a trade — so .wl-add / .wl-remove stay visible for them. */
   /* No footer row for guests — the chart grid takes the full height. */
   body.guest .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
+  /* Uniform chart grid for guests: no "open" state spanning two columns and no
+     per-state height changes, so every card is the same size. #guest-uniform-grid */
+  body.guest .card.state-open{ grid-column:auto; }
+  body.guest .card.state-quiet{ opacity:1; }
+  body.guest .zone-ladder,
+  body.guest .card.state-open .zone-ladder,
+  body.guest .card.state-quiet .zone-ladder{ height:200px; }
   .signin-cta{ background:var(--blue);color:#04121a;font-weight:700;border-color:var(--blue) }
   .signin-cta:hover{ filter:brightness(1.08);color:#04121a;background:var(--blue) }
   .guest-badge{ background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3) }
@@ -1172,6 +1176,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   let html = '';
 
+  // Zone overlays (S/R zone bands, P&L fill, entry/stop/TP markers) are removed
+  // for ALL users per product decision — the charts show a clean price line only.
+  // Flip SHOW_ZONE_OVERLAYS back to true to restore them. #no-zone-overlays
+  const SHOW_ZONE_OVERLAYS = false;
+  if(SHOW_ZONE_OVERLAYS){
   // Zone bands
   for(let i=0;i<zones.length;i++){
     const z=zones[i]; if(!z.mid) continue;
@@ -1211,6 +1220,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'#ff5f6d');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
     html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'#00d4aa');
+  } // end SHOW_ZONE_OVERLAYS (zone bands / P&L / entry-stop-TP)
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
@@ -1465,10 +1475,38 @@ function openSymbolSearch(onPick, opts){
 function closeSymbolSearch(){ document.getElementById('symSearchBg').classList.add('hidden'); _symPick=null; }
 function setSymClass(c, btn){ _symClass=c; document.querySelectorAll('#symChips .sym-chip').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); runSymSearch(document.getElementById('symSearchInput').value); }
 function onSymSearchInput(){ clearTimeout(_symDebounce); _symDebounce=setTimeout(()=>runSymSearch(document.getElementById('symSearchInput').value), 170); }
+// Popular symbols shown when the search box is empty (the backend returns nothing
+// for an empty query), so the "Add symbol" popup shows clickable tickers on open
+// instead of "No matching symbols". Filtered by the active class chip. #sym-defaults
+const SYM_POPULAR = [
+  { symbol:'SPY',   name:'SPDR S&P 500 ETF',      class:'us_equity', exchange:'NYSEArca'  },
+  { symbol:'QQQ',   name:'Invesco QQQ Trust',     class:'us_equity', exchange:'NasdaqGM'  },
+  { symbol:'AAPL',  name:'Apple Inc.',            class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'NVDA',  name:'NVIDIA Corporation',    class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'TSLA',  name:'Tesla, Inc.',           class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'MSFT',  name:'Microsoft Corporation', class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'AMZN',  name:'Amazon.com, Inc.',      class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'META',  name:'Meta Platforms, Inc.',  class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'GOOGL', name:'Alphabet Inc.',         class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'AMD',   name:'Advanced Micro Devices',class:'us_equity', exchange:'NasdaqGS'  },
+  { symbol:'BTCUSD',name:'Bitcoin',               class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'ETHUSD',name:'Ethereum',              class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'SOLUSD',name:'Solana',                class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'XRPUSD',name:'XRP',                   class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'DOGEUSD',name:'Dogecoin',             class:'crypto',    exchange:'CRYPTO'    },
+];
 async function runSymSearch(q){
+  const query = (q||'').trim();
   const ep = ++_symEpoch;   // ignore stale responses (a faster/earlier query resolving late)
+  // Empty box → curated popular list (filtered by class chip), so the popup is
+  // never blank / "No matching symbols" on open.
+  if(!query){
+    _symRows = SYM_POPULAR.filter(a => !_symClass || a.class===_symClass).slice(0,40);
+    _symSel = 0; renderSymResults();
+    return;
+  }
   try{
-    const url='/api/trading/symbols/search?limit=40&q='+encodeURIComponent(q)+(_symClass?'&class='+_symClass:'');
+    const url='/api/trading/symbols/search?limit=40&q='+encodeURIComponent(query)+(_symClass?'&class='+_symClass:'');
     const r=await fetch(url); const d=await r.json();
     if(ep!==_symEpoch) return;
     _symRows=d.results||[]; _symSel=0; renderSymResults();
@@ -1776,8 +1814,13 @@ function focusTicker(t){
   activeTicker = t;
   renderWatchlist();
   renderSymbolInfo(t);
-  setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
-  if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
+  // Read-only guests can't trade, so skip the order panel entirely — otherwise
+  // clicking a chart shoves the grid aside to make room for a panel they can't
+  // use. They just get the fullscreen chart. #guest-no-order-panel
+  if(!document.body.classList.contains('guest')){
+    setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
+    if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
+  }
   openFullscreenChart(t);
 }
 
@@ -2613,7 +2656,18 @@ function startDashboard(){
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
-  setTimeout(()=>{ if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); } }, 1600);
+  setTimeout(()=>{
+    // Default the symbol-info sidebar to SPY (or the first watchlist symbol) so it
+    // shows real data on load instead of being blank until a chart is clicked.
+    // Info-only: sets the active ticker + renders the panel, but does NOT open the
+    // order panel or zoom a chart (so it works for read-only users too).
+    if(wlPrices.length && !activeTicker){
+      activeTicker = wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
+      renderSymbolInfo(activeTicker);
+      renderWatchlist();
+    }
+    if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
+  }, 1600);
   // Restore the saved chart-grid layout (#1628).
   const ls = document.getElementById('chartLayoutSelect');
   if(ls){ ls.value = String(slotCount); }
@@ -2650,17 +2704,49 @@ async function toggleOvernightScan(){
 // trading actions/account panels hidden (CSS body.guest) and their trade-gated
 // fetches skipped (window.GUEST guards). Fails closed → read-only on any error.
 async function detectGuestMode(){
+  let authed = false;
   try{
     const s = await (await fetch('/api/auth/session',{cache:'no-store'})).json();
     const ent = (s && s.entitlements) || {};
+    authed = !!(s && s.authenticated);
     window.GUEST = !(s && (s.role === 'admin' || ent.trade === true));
   }catch(e){ window.GUEST = true; }
   if(window.GUEST){
     document.body.classList.add('guest');
     const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
-    const cta=document.getElementById('signinCta'); if(cta) cta.style.display='';
+    const cta=document.getElementById('signinCta');
+    if(cta){
+      cta.style.display='';
+      if(authed){
+        // Logged in but without trade access → it's a tier/subscription gate, not
+        // a login gate. Point them at the upgrade, not the sign-in page.
+        cta.textContent = 'Upgrade to trade →';
+        cta.title = 'Trading unlocks with the Deep Dreamer ($20/mo) tier';
+        cta.href = 'https://www.patreon.com/c/lanterndreamjournal';
+        cta.target = '_blank'; cta.rel = 'noopener noreferrer';
+      } else {
+        cta.textContent = 'Sign in to trade →';
+        cta.href = '/auth.html?returnTo=%2Fstock-trader.html';
+      }
+    }
   }
 }
+// Re-render charts the instant the theme flips. The canvas grid/axis colors are
+// read from CSS at draw time (CHART_*_COLOR) and renderZoneLadder memoizes on
+// data/price, so without this the chart colors keep the old theme until the next
+// 5s price poll — the "slow to change price color" lag. Bust the memo + redraw. */
+(function watchThemeForChartColors(){
+  let last = document.documentElement.getAttribute('data-theme');
+  new MutationObserver(()=>{
+    const now = document.documentElement.getAttribute('data-theme');
+    if(now === last) return;
+    last = now;
+    for(const k in _ladderSig) delete _ladderSig[k];   // force redraw (memo bust)
+    try{ renderCards(); }catch(e){}
+    if(fullscreenTicker) try{ renderTicker(fullscreenTicker); }catch(e){}
+  }).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+})();
+
 document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(); startDashboard(); });
 
 </script>
