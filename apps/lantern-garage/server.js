@@ -280,6 +280,7 @@ const routes = [
   require("./routes/training"),
   require("./routes/gpu-training"),
   require("./routes/token-audit"),
+  require("./routes/ibkr"),               // per-user IBKR connect/disconnect (ADR-0022)
   require("./routes/trading"),
   require("./routes/agent-performance"),
   require("./routes/leaderboard"),
