@@ -4,16 +4,19 @@
   `PROVEN | MEASURED | HEURISTIC` + `VERIFIED: yes|no` — against a fresh held-out set
   (`data/eval/epistemic-heldout.jsonl`, 24 statements) with a runtime contamination guard and
   deterministic exact-match grading. **MEASURED:** base Ouro-1.4B **0/24 (0%)** — never emits the
-  format; `ouro-honesty-balanced` adapter **22/24 (91.7%)** BOTH-correct, memorization ruled out
-  (held-out, guard passed). Residual failure mode: open conjectures (Riemann hypothesis) occasionally
-  promoted HEURISTIC→PROVEN.
+  format; honesty adapter **v1 (137 rows) 22/24 (91.7%)** → **v2 (147 rows, +conjectures) 23/24 (95.8%)**
+  BOTH-correct, memorization ruled out (held-out, guard passed). PROVEN 8/8 and MEASURED 8/8 on both;
+  the conjecture examples fixed one of v1's two HEURISTIC→PROVEN errors by generalization (P=NP/Goldbach/
+  twin-primes now correct despite being held out of training). Sole residual: the Riemann hypothesis is
+  still classified PROVEN.
 - **Local HaluEval-QA harness** (`experiments/halueval_local.py`) — closed-book base-vs-adapter over
   `data/eval/halueval-qa-subset.jsonl`.
 
 ### Fixed / Data quality
 - **Added conjecture examples to the HEURISTIC training slice** (Collatz, Hodge, BSD, Navier-Stokes,
   abc, Legendre, …; distinct from the held-out eval set) to correct the adapter's tendency to stamp
-  open conjectures as PROVEN. `data/sigma0/ouro_honesty_train_balanced.jsonl` 137→147 rows.
+  open conjectures as PROVEN. `data/sigma0/ouro_honesty_train_balanced.jsonl` 137→147 rows. Retrained
+  (4-bit QLoRA, r=16, 6 epochs) into adapter **v2**, which lifted held-out BOTH-accuracy 91.7%→95.8%.
 - **Removed changelog-message pollution from `data/sigma0/ouro_honesty_train.jsonl`** (343→103 rows;
   250 leaked git commit messages had been mislabeled `MEASURED/yes`). The *balanced* file used for
   the actual training run was already clean, so the shipped adapter was not affected.
