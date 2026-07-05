@@ -1,3 +1,7 @@
+## [1.8.85] - 2026-07-05
+### Fixed
+- **500 responses no longer leak raw internal exception text to clients** (`apps/lantern-garage/server.js`). The two central error handlers returned `{error: e.message}` verbatim — leaking paths, stack details, and internals to the browser. A new `sendServerError()` helper logs the full error + stack server-side under a short `errorId` and returns only a generic `{error: "Internal server error", errorId}` the user can quote. Strengthens **Act** (safe surfaces). See `changelog.d/no-500-error-leak.md` (#2068).
+
 ## [1.8.83] - 2026-07-05
 ### Added
 - **LongMemEval now scores the live JS chat retriever, not just the Python engine** (`scripts/eval_longmemeval_js.js`). It drives `csf-memory.js::searchConversation` — the keyword retriever a real chat turn uses, which windows the last 1200 turns — over the LongMemEval haystack and writes a *separate* `runs.jsonl` row so the product number never gets conflated with the engine's. Measured on `longmemeval_s` (n=500, k=5): session-level recall@5 **0.884** / MRR **0.80**, 0/500 gold outside the window. Also flags `truncated_gold` (haystack larger than the window) as a real product limitation. Strengthens **Remember**. See `changelog.d/longmemeval-product-path.md` (#2111).
