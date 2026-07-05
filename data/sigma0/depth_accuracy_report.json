@@ -1,0 +1,59 @@
+{
+  "task": "accuracy vs FORCED recurrent depth (does Ouro's loop compute help the output?)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "trained_depth": 4,
+  "depths": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    8
+  ],
+  "headline": "VALID (clean arith, matched-magnitude options): forcing more recurrent depth does NOT improve output accuracy \u2014 arith is flat 1.0->0.9333 across depths 1..8 (slight dip past trained depth 4). DISCARD facts logprob-comparison: it is base-rate CONFOUNDED (implausible-false 0.1667 < plausible-false 0.3542 < 0.5 \u2014 an absurd distractor beats the truth), so it does NOT measure truth. This is precisely why a supervised hidden-state PROBE (0.99, sigma0_hidden_probe) beats output logprobs.",
+  "facts_measure_confounded": true,
+  "accuracy_by_depth": {
+    "facts": {
+      "1": 0.3333,
+      "2": 0.3542,
+      "3": 0.3542,
+      "4": 0.3542,
+      "6": 0.3542,
+      "8": 0.3542
+    },
+    "arith": {
+      "1": 1.0,
+      "2": 1.0,
+      "3": 0.9333,
+      "4": 0.9333,
+      "6": 0.9333,
+      "8": 0.9333
+    }
+  },
+  "facts_trend": {
+    "at_depth_1": 0.3333,
+    "at_trained": 0.3542,
+    "at_max_depth": 0.3542,
+    "best": 0.3542,
+    "best_depth": 2,
+    "slope": 0.0018,
+    "helps_with_depth": true,
+    "collapses_past_trained": false
+  },
+  "arith_trend": {
+    "at_depth_1": 1.0,
+    "at_trained": 0.9333,
+    "at_max_depth": 0.9333,
+    "best": 1.0,
+    "best_depth": 1,
+    "slope": -0.0098,
+    "helps_with_depth": false,
+    "collapses_past_trained": false
+  },
+  "control_facts_plausible_false_acc": 0.3542,
+  "control_facts_implausible_false_acc": 0.1667,
+  "control_reading": "if implausible >> plausible, the output readout WORKS and the low plausible-false accuracy reflects distractor plausibility (a 1.4B model fooled by plausible alternatives), not a preference for falsehood; if implausible is also low, it is a genuine output readout gap.",
+  "connects": "hidden-state truth signal strengthens with depth 0.79->0.99 (sigma0_hidden_probe); this checks whether the OUTPUT does too, with real correctness (fixing sigma0_qexit_adaptive's entropy proxy).",
+  "evidence_class": "MEASURED (data/sigma0/depth_accuracy_report.json)",
+  "caveats": "scores fill log-prob given the prefix (fact, not length); facts are known / self-authored minimal pairs; arith = 15 2-digit products, false off by 10; fp16; Ouro-1.4B-Thinking; depths >4 exceed the trained operating point."
+}
