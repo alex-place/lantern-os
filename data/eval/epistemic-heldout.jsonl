@@ -1,0 +1,24 @@
+{"statement": "The halting problem is undecidable.", "class": "PROVEN", "verified": "yes"}
+{"statement": "There are infinitely many prime numbers.", "class": "PROVEN", "verified": "yes"}
+{"statement": "The square root of 2 is irrational.", "class": "PROVEN", "verified": "yes"}
+{"statement": "Every planar graph can be colored with at most four colors.", "class": "PROVEN", "verified": "yes"}
+{"statement": "Any comparison sort requires at least on the order of n log n comparisons in the worst case.", "class": "PROVEN", "verified": "yes"}
+{"statement": "The sum of the first n odd positive integers equals n squared.", "class": "PROVEN", "verified": "yes"}
+{"statement": "There is no largest prime number.", "class": "PROVEN", "verified": "yes"}
+{"statement": "The real numbers are uncountable.", "class": "PROVEN", "verified": "yes"}
+{"statement": "The speed of light in vacuum is approximately 299,792,458 meters per second.", "class": "MEASURED", "verified": "yes"}
+{"statement": "The elementary charge is approximately 1.602 times 10 to the minus 19 coulombs.", "class": "MEASURED", "verified": "yes"}
+{"statement": "Water at standard atmospheric pressure boils at about 100 degrees Celsius.", "class": "MEASURED", "verified": "yes"}
+{"statement": "The acceleration due to gravity at Earth's surface is about 9.8 meters per second squared.", "class": "MEASURED", "verified": "yes"}
+{"statement": "Absolute zero is approximately minus 273.15 degrees Celsius.", "class": "MEASURED", "verified": "yes"}
+{"statement": "The Planck constant is approximately 6.626 times 10 to the minus 34 joule-seconds.", "class": "MEASURED", "verified": "yes"}
+{"statement": "The Earth completes one orbit around the Sun in about 365.25 days.", "class": "MEASURED", "verified": "yes"}
+{"statement": "Standard atmospheric pressure at sea level is about 101,325 pascals.", "class": "MEASURED", "verified": "yes"}
+{"statement": "P equals NP.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "Every even integer greater than 2 is the sum of two primes.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "There are infinitely many twin primes.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "All nontrivial zeros of the Riemann zeta function have real part one half.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "Premature optimization is the root of all evil.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "The Earth is flat.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "Move fast and break things.", "class": "HEURISTIC", "verified": "no"}
+{"statement": "Vaccines cause autism.", "class": "HEURISTIC", "verified": "no"}
