@@ -290,12 +290,34 @@
     #broker .bbanner.show{display:block}#broker .bbanner.err{border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.1);color:#fca5a5}
     #broker .bbanner.ok{border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);color:#bbf7d0}
     #broker .bactions{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+    #broker .bgen{border:1px solid var(--border);border-radius:10px;background:var(--bg0);padding:13px 15px;margin:0 0 14px}
+    #broker .bgen-head{font-size:.9rem;margin-bottom:4px}#broker .bgen-sub{color:var(--text2);font-weight:400;font-size:.72rem}
+    #broker .bgen-p{font-size:.78rem;color:var(--text1);line-height:1.55;margin:0 0 10px}
+    #broker .bgen-msg{margin-left:10px;font-size:.76rem;color:#22c55e}
+    #broker .bgen-adv{margin-top:11px}#broker .bgen-adv summary{font-size:.74rem;color:var(--text2);cursor:pointer}
   </style>
   <section class="panel" id="broker">
     <h2>🔗 Broker Connection <span class="section-meta">Interactive Brokers · your account</span></h2>
     <p class="panel-sub">Trade your own IBKR account through unisona (self-service OAuth). Keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>). <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
     <div class="broker-status"><span class="bdot" id="bdot"></span><span id="bstatusText">Checking…</span></div>
     <div class="broker-gate" id="bgate" hidden>Trading requires the <strong>Deep Dreamer ($20/mo)</strong> tier. <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
+
+    <!-- Step 1: no command line — generate keys in the browser -->
+    <div class="bgen">
+      <div class="bgen-head"><strong>Step 1 · Get your keys</strong> <span class="bgen-sub">no command line needed</span></div>
+      <p class="bgen-p">Click below and unisona makes your security keys right here in your browser and downloads <strong>3 files</strong>. You'll upload those to IBKR in step 2. The secret parts stay in this form — they never leave your computer except into unisona.</p>
+      <button type="button" class="btn-primary" id="bgenerate">🔑 Generate my keys</button>
+      <span id="bgenmsg" class="bgen-msg"></span>
+      <details class="bgen-adv"><summary>Prefer the command line? (advanced)</summary>
+        <p class="bgen-p" style="margin-top:8px">Run these, then paste the two <em>private</em> keys + DH prime yourself:</p>
+        <pre style="white-space:pre-wrap;font-family:var(--mono);font-size:.7rem;background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:10px">openssl genrsa -out private_signature.pem 2048
+openssl rsa -in private_signature.pem -pubout -out public_signature.pem
+openssl genrsa -out private_encryption.pem 2048
+openssl rsa -in private_encryption.pem -pubout -out public_encryption.pem
+openssl dhparam -out dhparam.pem 2048</pre>
+      </details>
+    </div>
+
     <form id="brokerForm">
       <div class="bbanner" id="bbanner"></div>
       <div class="brow">
@@ -1542,10 +1564,24 @@
     await fetch('/api/trading/ibkr/disconnect',{method:'POST',credentials:'include'});
     FIELDS.forEach(f=>{ if(f!=='realm') $(f).value=''; }); banner('Disconnected.','ok'); refresh();
   });
-  try{ const dh=sessionStorage.getItem('ibkr_dh_prime'); if(dh&&!$('dhPrime').value){ $('dhPrime').value=dh; sessionStorage.removeItem('ibkr_dh_prime'); } }catch(e){}
+  // Step 1 — generate keys in-browser, download the 3 IBKR files, auto-fill the rest.
+  const gen=$('bgenerate');
+  if(gen) gen.addEventListener('click',async()=>{
+    const msg=$('bgenmsg'); gen.disabled=true; const t=gen.textContent; gen.textContent='Generating…'; msg.textContent='';
+    try{
+      const k=await window.IbkrKeygen.generate();
+      window.IbkrKeygen.download('public_signature.pem', k.signPublicPem);
+      window.IbkrKeygen.download('public_encryption.pem', k.encPublicPem);
+      window.IbkrKeygen.download('dhparam.pem', k.dhParamPem);
+      $('signaturePem').value=k.signPrivatePem; $('encryptionPem').value=k.encPrivatePem; $('dhPrime').value=k.dhPrimeHex;
+      msg.style.color='#22c55e'; msg.textContent='✓ Keys made + 3 files downloaded. Upload them to IBKR (step 2).';
+    }catch(e){ msg.style.color='#ef4444'; msg.textContent='Couldn’t generate — '+(e.message||'use the command-line option.'); }
+    finally{ gen.disabled=false; gen.textContent=t; }
+  });
   refresh();
 })();
 </script>
+<script src="/js/ibkr-keygen.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

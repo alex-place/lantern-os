@@ -8,121 +8,94 @@
   <script>(function(){try{var s=localStorage.getItem('lantern-theme');var d=s?s==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    main{max-width:760px;margin:0 auto;padding:28px 20px 72px}
+    main{max-width:720px;margin:0 auto;padding:28px 20px 72px}
     h1{font-size:26px;margin:0 0 4px}
-    .sub{color:var(--muted);font-size:14px;margin:0 0 22px;line-height:1.55}
+    .sub{color:var(--muted);font-size:15px;margin:0 0 22px;line-height:1.6}
     .step{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:20px 22px;margin-bottom:14px}
     .step h2{font-size:16px;margin:0 0 8px;display:flex;align-items:center;gap:10px}
-    .num{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
-    .step p,.step li{font-size:14px;line-height:1.6;color:var(--text)}
+    .num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+    .step p,.step li{font-size:15px;line-height:1.65;color:var(--text)}
+    .step li{margin-bottom:5px}
     .step a{color:var(--accent)}
-    .muted{color:var(--muted)}
-    pre{position:relative;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.6;margin:10px 0}
-    .copy{position:absolute;top:8px;right:8px;font-size:11px;padding:3px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
-    code{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:color-mix(in srgb,var(--accent) 10%,transparent);padding:1px 5px;border-radius:4px}
-    .callout{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:10px 14px;border-radius:0 10px 10px 0;font-size:13px;margin:10px 0;line-height:1.55}
+    .muted{color:var(--muted);font-size:13.5px}
+    code{font-family:'IBM Plex Mono',monospace;font-size:13px;background:color-mix(in srgb,var(--accent) 10%,transparent);padding:1px 6px;border-radius:4px}
+    .callout{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:11px 15px;border-radius:0 10px 10px 0;font-size:14px;margin:10px 0;line-height:1.6}
     .warn{border-left-color:#f59e0b;background:color-mix(in srgb,#f59e0b 8%,transparent)}
-    .tool textarea{width:100%;box-sizing:border-box;min-height:90px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:10px 12px}
-    .tool .out{margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;word-break:break-all;color:var(--muted)}
-    .cta{display:inline-block;margin-top:6px;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;padding:11px 20px;border-radius:11px}
-    .btn-sm{font-size:12px;padding:7px 12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+    .file{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text)}
+    .cta{display:inline-block;margin-top:8px;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:12px}
+    details{margin-top:12px}summary{font-size:13px;color:var(--muted);cursor:pointer}
+    pre{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;margin:8px 0;white-space:pre-wrap}
   </style>
 </head>
 <body>
 <nav class="site-nav">
   <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">unisona.ai</span></a>
-  <div class="nav-actions"><a class="nav-btn" href="/orchestration.html#broker" title="Connect IBKR">🔗</a></div>
 </nav>
 
 <main>
   <h1>Connect your IBKR account</h1>
-  <p class="sub">unisona trades <strong>your own</strong> Interactive Brokers account using IBKR's <strong>self-service OAuth</strong>. You generate the credentials once (about 10–15 minutes), paste them into unisona, and they're stored <strong>encrypted</strong> — they never leave the server. Start with a <strong>paper</strong> account. You'll need <a href="https://www.openssl.org/" target="_blank" rel="noopener">OpenSSL</a> (built into macOS/Linux; on Windows use Git Bash or WSL).</p>
+  <p class="sub">This links your own Interactive Brokers account so you can trade through unisona. It takes about <strong>10 minutes</strong> and you don't need to be technical — unisona makes the security keys for you. Do it with a <strong>paper</strong> (practice) account first.</p>
 
-  <div class="callout warn">⏳ Heads-up: IBKR can take <strong>up to 24 hours</strong> (sometimes a few days) to activate a new self-service OAuth consumer. Generate the keys now; if the first connection fails, wait and retry.</div>
-
-  <div class="step">
-    <h2><span class="num">1</span> Open IBKR's OAuth self-service portal</h2>
-    <p>Log in to IBKR, then open the OAuth setup page:</p>
-    <pre><span class="copy" data-copy>Copy</span>https://ndcdyn.interactivebrokers.com/sso/Login?action=OAUTH&RL=1</pre>
-    <p class="muted">Or from Client Portal, append <code>&action=OAUTH</code> to the portal URL. Read and accept the terms.</p>
-  </div>
+  <div class="callout warn">⏳ One heads-up: after you finish, IBKR can take <strong>up to a day</strong> to switch your access on. If the first "Connect" doesn't work, wait a bit and try again — it's not broken.</div>
 
   <div class="step">
-    <h2><span class="num">2</span> Generate your keys (in a terminal)</h2>
-    <p>This makes two RSA keypairs (signing + encryption) and the Diffie-Hellman parameters:</p>
-    <pre><span class="copy" data-copy>Copy</span>openssl genrsa -out private_signature.pem 2048
-openssl rsa -in private_signature.pem -pubout -out public_signature.pem
-openssl genrsa -out private_encryption.pem 2048
-openssl rsa -in private_encryption.pem -pubout -out public_encryption.pem
-openssl dhparam -out dhparam.pem 2048</pre>
-    <p class="muted">The <em>private</em> keys stay with you (you'll paste them into unisona). The <em>public</em> keys + dhparam go to IBKR. The <code>dhparam</code> step can take a minute.</p>
-  </div>
-
-  <div class="step">
-    <h2><span class="num">3</span> Fill the portal form</h2>
+    <h2><span class="num">1</span> Make your keys (on the unisona Settings page)</h2>
+    <p>On <a href="/orchestration.html#broker">Settings → Broker Connection</a>, click <strong>🔑 Generate my keys</strong>. unisona creates your security keys right in your browser and downloads <strong>three files</strong> to your computer:</p>
     <ul>
-      <li><strong>Consumer Key</strong> — a 9-character password <em>you</em> choose (letters become uppercase).</li>
-      <li><strong>Public Signing Key</strong> — upload <code>public_signature.pem</code></li>
-      <li><strong>Public Encryption Key</strong> — upload <code>public_encryption.pem</code></li>
-      <li><strong>Diffie-Hellman Parameters</strong> — upload <code>dhparam.pem</code></li>
+      <li><span class="file">public_signature.pem</span></li>
+      <li><span class="file">public_encryption.pem</span></li>
+      <li><span class="file">dhparam.pem</span></li>
+    </ul>
+    <p class="muted">The secret half of the keys stays filled in on the unisona page — leave that tab open. You'll only upload the three files above to IBKR.</p>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">2</span> Open IBKR's setup page</h2>
+    <p>Sign in to Interactive Brokers, then open their OAuth setup page:</p>
+    <p><a href="https://ndcdyn.interactivebrokers.com/sso/Login?action=OAUTH&RL=1" target="_blank" rel="noopener">Open the IBKR OAuth page →</a></p>
+    <p class="muted">Read and accept their terms if asked.</p>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">3</span> Fill in the IBKR form</h2>
+    <ul>
+      <li><strong>Consumer Key</strong> — make up a <strong>9-letter</strong> word (letters only — no numbers or symbols), e.g. <code>UNISONAAB</code>. Write it down; you'll need it in step 5.</li>
+      <li><strong>Public Signing Key</strong> — upload <span class="file">public_signature.pem</span></li>
+      <li><strong>Public Encryption Key</strong> — upload <span class="file">public_encryption.pem</span></li>
+      <li><strong>Diffie-Hellman Parameters</strong> — upload <span class="file">dhparam.pem</span></li>
     </ul>
   </div>
 
   <div class="step">
-    <h2><span class="num">4</span> Generate + save your tokens</h2>
-    <p>Click <strong>Generate Token</strong>. IBKR shows your <strong>Access Token</strong> and <strong>Access Token Secret</strong> <em>once</em> — copy both immediately (they won't reappear). Then toggle <strong>Enable OAuth Access</strong> at the top of the page.</p>
-    <div class="callout">🔒 You'll paste the Access Token + Secret + your two <em>private</em> PEM keys into unisona. They're encrypted at rest and never shown again or sent to your browser.</div>
-  </div>
-
-  <div class="step tool">
-    <h2><span class="num">5</span> Get your Diffie-Hellman prime (hex)</h2>
-    <p>unisona needs the DH <em>prime</em> as a hex string. Paste the contents of <code>dhparam.pem</code> below and we'll extract it for you (this runs in your browser; the prime is public parameters, not a secret):</p>
-    <textarea id="dhpem" placeholder="-----BEGIN DH PARAMETERS-----&#10;…&#10;-----END DH PARAMETERS-----" spellcheck="false"></textarea>
-    <div style="margin-top:8px"><button class="btn-sm" id="extract">Extract prime →</button></div>
-    <div class="out" id="dhout"></div>
-    <p class="muted" style="margin-top:10px">Prefer the command line? <code>openssl dhparam -in dhparam.pem -text</code> and copy the <code>prime:</code> hex (remove spaces and colons).</p>
+    <h2><span class="num">4</span> Get your two tokens</h2>
+    <p>Click <strong>Generate Token</strong> (or "Generate Access Token"). IBKR shows an <strong>Access Token</strong> and an <strong>Access Token Secret</strong> — copy <em>both</em> right away, because they disappear if you leave or refresh the page. Then flip <strong>Enable OAuth Access</strong> to <strong>on</strong>.</p>
+    <div class="callout">🔒 These are like passwords for your account. Keep them private — you'll paste them only into unisona in the next step.</div>
   </div>
 
   <div class="step">
-    <h2><span class="num">6</span> Connect on unisona</h2>
-    <p>Head to the connect page and paste: consumer key, access token, access token secret, both private PEM keys, the DH prime hex, and your <strong>paper</strong> account id (<code>DU…</code>). unisona runs a live test and shows a green dot when connected.</p>
-    <a class="cta" href="/orchestration.html#broker">Go to Connect IBKR →</a>
+    <h2><span class="num">5</span> Finish on unisona</h2>
+    <p>Go back to the unisona <strong>Settings</strong> tab (the keys are already filled in). Add:</p>
+    <ul>
+      <li>your <strong>Consumer Key</strong> (from step 3)</li>
+      <li>the <strong>Access Token</strong> and <strong>Access Token Secret</strong> (from step 4)</li>
+      <li>your <strong>paper account number</strong> — it starts with <code>DU</code></li>
+    </ul>
+    <p>Click <strong>Connect &amp; test</strong>. A <strong>green dot</strong> means you're connected. 🎉</p>
+    <a class="cta" href="/orchestration.html#broker">Go to Settings → Connect →</a>
   </div>
+
+  <details>
+    <summary>Prefer to make the keys yourself with the command line? (advanced)</summary>
+    <p class="muted" style="margin-top:8px">Instead of "Generate my keys", run these in a terminal (macOS/Linux, or Git Bash/WSL on Windows), upload the two <code>public_*.pem</code> + <code>dhparam.pem</code> to IBKR, and paste the two <em>private</em> keys into unisona. Get the DH prime with the extractor on the connect page.</p>
+    <pre>openssl genrsa -out private_signature.pem 2048
+openssl rsa -in private_signature.pem -pubout -out public_signature.pem
+openssl genrsa -out private_encryption.pem 2048
+openssl rsa -in private_encryption.pem -pubout -out public_encryption.pem
+openssl dhparam -out dhparam.pem 2048</pre>
+  </details>
 </main>
 
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/site-chrome.js" defer></script>
-<script>
-// copy buttons
-document.querySelectorAll('[data-copy]').forEach((b)=>b.addEventListener('click',()=>{
-  const pre=b.parentElement; const text=pre.textContent.replace(/^Copy/,'').trim();
-  navigator.clipboard.writeText(text).then(()=>{ b.textContent='Copied'; setTimeout(()=>b.textContent='Copy',1200); });
-}));
-
-// Extract the DH prime (first INTEGER of the DER SEQUENCE) from a pasted dhparam PEM.
-// dhparam DER = SEQUENCE { INTEGER prime, INTEGER generator }.
-function extractDhPrime(pem){
-  const b64=(pem.match(/-----BEGIN[^-]*-----([\s\S]*?)-----END/)||[])[1];
-  if(!b64) throw new Error('Not a PEM block');
-  const der=Uint8Array.from(atob(b64.replace(/\s+/g,'')), c=>c.charCodeAt(0));
-  let i=0;
-  const readLen=()=>{ let l=der[i++]; if(l&0x80){ const n=l&0x7f; l=0; for(let k=0;k<n;k++) l=(l<<8)|der[i++]; } return l; };
-  if(der[i++]!==0x30) throw new Error('Expected SEQUENCE'); readLen();          // SEQUENCE
-  if(der[i++]!==0x02) throw new Error('Expected INTEGER (prime)');              // INTEGER
-  const plen=readLen();
-  let bytes=der.slice(i, i+plen);
-  if(bytes[0]===0x00) bytes=bytes.slice(1);                                     // strip sign byte
-  return Array.from(bytes).map(x=>x.toString(16).padStart(2,'0')).join('');
-}
-document.getElementById('extract').addEventListener('click',()=>{
-  const out=document.getElementById('dhout');
-  try{
-    const hex=extractDhPrime(document.getElementById('dhpem').value.trim());
-    out.innerHTML='<strong style="color:var(--accent)">DH prime ('+(hex.length*4)+'-bit):</strong> '+hex+' <button class="btn-sm" id="cp">Copy</button>';
-    document.getElementById('cp').addEventListener('click',()=>navigator.clipboard.writeText(hex));
-    try{ sessionStorage.setItem('ibkr_dh_prime', hex); }catch(e){}
-  }catch(e){ out.textContent='Could not parse — make sure you pasted the full BEGIN/END DH PARAMETERS block. ('+e.message+')'; }
-});
-</script>
 </body>
 </html>
