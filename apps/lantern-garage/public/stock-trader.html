@@ -2631,7 +2631,18 @@ function startDashboard(){
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
-  setTimeout(()=>{ if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); } }, 1600);
+  setTimeout(()=>{
+    // Default the symbol-info sidebar to SPY (or the first watchlist symbol) so it
+    // shows real data on load instead of being blank until a chart is clicked.
+    // Info-only: sets the active ticker + renders the panel, but does NOT open the
+    // order panel or zoom a chart (so it works for read-only users too).
+    if(wlPrices.length && !activeTicker){
+      activeTicker = wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
+      renderSymbolInfo(activeTicker);
+      renderWatchlist();
+    }
+    if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
+  }, 1600);
   // Restore the saved chart-grid layout (#1628).
   const ls = document.getElementById('chartLayoutSelect');
   if(ls){ ls.value = String(slotCount); }
