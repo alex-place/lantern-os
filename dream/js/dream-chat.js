@@ -158,9 +158,12 @@
     }
   });
 
-  // On static hosts (GitHub Pages, file://) the API server isn't running.
-  // Point at the expected local address and surface a clear banner if unreachable.
-  const isStaticHost = window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost";
+  // On genuinely static hosts (GitHub Pages, file://) there is no backend at this
+  // origin, so fall back to the local dev server and surface a banner. Anywhere the
+  // page is served by the Node backend — localhost OR a real deploy (cloud VM behind
+  // Cloudflare, e.g. unisona.ai) — the API is same-origin, so use window.location.origin.
+  const isStaticHost = window.location.protocol === "file:" ||
+    window.location.hostname.endsWith("github.io");
   let serverBase = isStaticHost ? "http://127.0.0.1:4177" : window.location.origin;
 
   // Load version badge from version.json (bump minor in each PR)
