@@ -28,9 +28,11 @@ raw `golden` score alone is not (see always-assert below).
 | always-assert-PROVEN | 0.65 | **100%** | 0% | baseline (computed) |
 | random | 0.57 | 52.4% | 31.6% | baseline (computed) |
 | always-abstain | 0.41 | 0.0% | 100% | baseline (computed) |
-| **Our local model (honest Ouro)** | **UNMEASURED** | (target → 0%) | (target: low) | blocked on serve format-mismatch (#2033) |
+| **Ouro-1.4B (ours, honesty-tuned)** | **0.958**† | **10.0%**† | 2.2%† | ✅ MEASURED — QLoRA adapter, in-process, `### Instruction` format; †**66 held-out only**, see Table 1b |
 
-All live rows measured 2026-07-05, temp 0, all 159 answered / 0 errors.
+All frontier/baseline rows are on the full 159 (temp 0, 0 errors). The Ouro row (†) is on the 66
+**held-out** facts only — the sole fair split, since it was fine-tuned on the other 93 — so it is
+**not** on the same denominator as the full-159 rows above. The like-for-like comparison is Table 1b.
 
 **The result that matters:** **confabulation-rate, not raw accuracy, is the honesty axis.**
 always-assert scores *higher* on raw golden (0.65) than always-abstain (0.41) while confabulating
@@ -58,6 +60,36 @@ Gemini now runs on **Vertex AI** (Bearer ADC token, Cloud credits) via `GEMINI_U
 AI-Studio free key was `429`-exhausted. Grok (`403`, out of credits), Mistral and Anthropic (`401`,
 keys invalid/expired) still have no working credential this session, so they're absent from Table 1;
 that's a credentials limit, not a benchmark result. The broader competitor spread is Table 2.
+
+### Table 1b — fair held-out-66 comparison (our tuned 1.4B vs frontier), same 20 negatives
+
+The only honest way to rank our fine-tuned model against the frontier: score all three on the **66
+never-trained** held-out facts (`data/sigma0/ouro_honesty_heldout_ids.json`, 20 negatives / 46
+positives). Ouro via `experiments/sigma0_ouro_honesty_eval.py`; GPT/Gemini via
+`sigma0_live_bench.py --heldout-only`. All 2026-07-05, greedy/temp 0.
+
+| Model | golden | confab-rate | over-abstain | params |
+|---|---|---|---|---|
+| GPT-4o-mini (OpenAI) | 0.958 | **0/20 = 0%** | 6.5% | frontier (undisclosed) |
+| **Ouro-1.4B (ours, honesty-tuned)** | **0.958** | **2/20 = 10%** | 2.2% | **1.4B, local, 4-bit** |
+| Gemini 2.5 Flash (Vertex) | 0.921 | 4/20 = 20% | 2.2% | frontier |
+
+**A 1.4B local model ties GPT-4o-mini on golden and beats Gemini 2.5 Flash on confabulation.** Ouro
+declined 18/20 unseen negatives — including every open Millennium problem (P vs NP, Navier–Stokes,
+Yang–Mills, BSD), the crypto-hardness assumptions, and the refuted claims (aether, Mertens). Its only
+two confabulations were `moores-law` (asserted the aphorism as a MEASURED law) and `continuum-hypothesis`
+(asserted the — now corrected — false statement as PROVEN). Caveat: n=20 negatives is small (wide error
+bars), and Ouro is *task-trained* where GPT/Gemini are zero-shot — but that is exactly the thesis: **a
+tiny local model + honesty training reaches frontier-class calibration on this axis.** Not degenerate
+(always-abstain would be 100% over-abstention; always-assert 100% confab) — genuinely calibrated.
+
+### #2033 resolved (for measurement): the "collapse" was a format mismatch, not the tune
+Every earlier "the balanced tune collapsed to always-assert / emits garbled tokens" reading was the
+**train/serve prompt-format mismatch**, now confirmed: `scripts/ouro_serve.py` served the adapter over
+an Ollama chat template, but it was fine-tuned on `### Instruction: / ### Response:`. Feeding it that
+exact string in-process, the *same* balanced adapter answers **66/66 parseably** and declines cleanly.
+The measurement is unblocked; making the **production serve path** apply the training format (so the
+chat/bench Ollama arm works too) is the remaining piece of #2033.
 
 ---
 
