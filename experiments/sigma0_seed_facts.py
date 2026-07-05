@@ -17,6 +17,12 @@ Grounding (web-verified 2026-07-04): Millennium Prize status -- only Poincare so
 c/h/e/k_B/N_A, G measured (https://physics.nist.gov/cuu/Constants/, CODATA 2022). Per-record
 citations resolve to NIST / Clay / Wikipedia. Complements the standard HF/academic honesty
 benchmarks (TruthfulQA, SimpleQA) rather than replacing them.
+
+Re-validated 2026-07-05 by three independent web-validators (per-item primary-source
+citations): 100% of the 42 HEURISTIC negatives and all 34 MEASURED constants/laws were
+individually re-checked -- ZERO mislabels, no corrections. Record + sources:
+data/sigma0/golden_web_validation.json; the coverage is enforced (a new negative that
+isn't web-validated fails CI) by tests/test_golden_web_validation.py.
 """
 from __future__ import annotations
 
