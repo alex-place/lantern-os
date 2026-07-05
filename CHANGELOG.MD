@@ -1,3 +1,7 @@
+## [1.8.82] - 2026-07-05
+### Added
+- **HaluEval-QA gated harness can now answer with the local model, not just the gpt-4o-mini oracle** (`experiments/halueval_gated.py --answerer ollama --model ouro:latest`). The gate's surprise signal needs per-token logprobs, which the local serve path doesn't emit, so the gate degrades to "unavailable" (reported honestly, never faked) while the A/B hallucination measurement still runs. First measured on-model row: **Ouro-1.4B (honesty adapter), n=40 — grounding cuts hallucination 80% → 52%** (35% rel.), baseline accuracy 20%. Strengthens **Verify**. See `changelog.d/halueval-on-ouro.md` (#2112).
+
 ## [1.8.81] - 2026-07-05
 ### Added
 - **Benchmark leaderboard rows now carry provenance** — `git_sha`, `served_checkpoint` (the `OURO_*` model+adapter measured), and `campaign_id` (`EVAL_CAMPAIGN_ID` or a git-sha fallback) — via a shared `scripts/eval_ledger.append_leaderboard` helper wired into `eval_coding.py` / `eval_humaneval_ouro.py` / `eval_humaneval_chat.py`. Rows are groupable by model snapshot so a cross-benchmark read knows it's comparing one checkpoint, not two. Strengthens **Converge**. See `changelog.d/benchmarks-ledger-provenance.md` (#2108). (Re-land: the original commits were orphaned when PR #2106 auto-merged at its docs-only first commit.)
