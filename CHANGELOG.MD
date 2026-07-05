@@ -1,3 +1,7 @@
+## [1.8.78] - 2026-07-05
+### Changed
+- **The home "Check the news" chip now summarizes today's headlines instead of web-searching the word "news".** The chip sends "summarize the top world news headlines from today", and any news-intent chat is grounded on the real curated RSS discover feed (title, link, source, date, summary, and lead image). The model returns real, sourced panels in a fixed format — linked headline, an image when the source provides one, source · date, one-line takeaway — rather than a junk web search ("News Today" the newspaper, the "Today" TV show) or "I couldn't find the news". Strengthens **Observe**. See `changelog.d/news-chip-llm-summary.md`.
+
 ## [1.8.77] - 2026-07-05
 ### Fixed
 - **Home starter chips (e.g. "Check the news") no longer inject the new turn above older history.** Chips deep-link into chat with `?q=…`, which auto-sends on load and races the async conversation-history restore. History was appended to the bottom, so the auto-sent turn ended up *above* the older restored conversation. History now prepends to the top of the transcript, keeping chronology correct regardless of which side wins the race. Strengthens **Remember**. See `changelog.d/fix-news-chip-history-order.md`.
