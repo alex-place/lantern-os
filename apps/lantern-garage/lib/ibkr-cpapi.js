@@ -479,6 +479,10 @@ class IbkrCpapi {
       evidence.push(probe.authenticated ? 'session authenticated' : (this.apiKey ? 'token present but NOT authenticated — token may be expired or need /tickle brokerage login' : 'not authenticated'));
       if (accountId) evidence.push(`account ${accountId} (${inferMode(accountId)})`);
     }
+    // Map the OAuth1 handshake failure (if any) to a plain-English reason so the UI
+    // can tell "not activated yet" apart from a real key/config error.
+    const lstErr = this._lstError;
+    const reason = connected ? null : (lstErr && lstErr.code) || (probe.reachable ? 'not_authenticated' : 'unreachable');
     const value = {
       connected,
       reachable: !!probe.reachable,
@@ -489,11 +493,35 @@ class IbkrCpapi {
       mode: inferMode(accountId),
       gatewayUrl: this.baseUrl,
       source: 'ibkr-webapi',
+      reason,
+      reasonText: connected ? null : reasonText(reason, lstErr),
       evidence,
       checkedAt: new Date().toISOString(),
     };
     this._statusCache = { at: now, value };
     return value;
+  }
+}
+
+/** Plain-English reason for a not-connected IBKR status (drives the UI banner). */
+function reasonText(reason, lstErr) {
+  switch (reason) {
+    case 'not_activated_or_unauthorized':
+      return "IBKR rejected the OAuth handshake — your consumer isn't active yet. IBKR can take up to ~24h to enable a new one; try Recheck later.";
+    case 'lst_signature_mismatch':
+      return 'The keys/DH prime don’t match what IBKR has registered. Regenerate your keys, re-upload the 3 files to IBKR, and reconnect.';
+    case 'bad_key':
+      return 'The stored private key is not valid PEM.' + (lstErr && lstErr.detail ? ` (${lstErr.detail})` : '');
+    case 'no_dh_response':
+      return 'IBKR accepted the request but returned no handshake data — try again shortly.';
+    case 'unreachable':
+      return 'Could not reach the IBKR Web API (network/endpoint issue).';
+    case 'not_authenticated':
+      return 'Handshake succeeded but no brokerage session — usually clears on the next Recheck.';
+    default:
+      return reason && reason.startsWith('http_')
+        ? `IBKR returned an unexpected error (${reason.replace('http_', 'HTTP ')}).`
+        : 'IBKR did not authenticate yet — check the keys and that your OAuth consumer is active (up to 24h).';
   }
 }
 
