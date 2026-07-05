@@ -41,6 +41,7 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 | **SWE-bench Lite** | Act / Verify | Real-repo issue → patch, resolved% (official Docker/Modal grader) | `scripts/eval_swebench_chat.py`, `scripts/swe_agent_loop.py`, `scripts/swe_agentic_run.py` | 🟡 Partial | Qwen single-shot **0/3** (2 applied-but-wrong); agentic propose→test→retry loop landed |
 | **LongMemEval** | Remember | Memory retrieval recall@k / MRR over long multi-session histories | `experiments/longmemeval_harness.py` | ✅ Run | Real `longmemeval_s` (n=189, k=5): multi-signal recall@5 **0.709** / MRR **0.486** vs keyword **0.222** / 0.098 — `data/longmemeval/runs.jsonl` (2026-07-01) |
 | **HaluEval-QA** | Verify | Hallucination rate; grounded A/B for the ADR-0017 accept gate (≥20% rel. reduction) | `experiments/halueval_ab.py` (+ `data/eval/halueval-qa-subset.jsonl`) | 🟡 Partial | Real HaluEval (RUCAIBox), GPT-4o-mini n=40: grounding cuts hallucination **55% → 20%** (**64% rel.**, ≥ 20% gate ✓) — `data/eval/halueval_ab_results.json` |
+| **SimpleQA-Verified** | Verify | Short-form factual honesty: F1 of accuracy × attempt-rate on 1000 sourced Qs (rewards calibrated abstention over confabulation) | — (Kaggle dataset + F1/attempted/hedged grader; extend `sigma0_live_bench.py`) | 📋 Planned | Published leaderboard (Google DeepMind, [arXiv:2509.07968](https://arxiv.org/abs/2509.07968) Table 7): Gemini 2.5 Pro F1 **55.6** SOTA > GPT-5 52.3 > o3 51.9; **ours not yet run** |
 | **SWE-bench Verified** | Act / Verify | Human-validated SWE-bench subset, resolved% | — (extend `eval_swebench_chat.py` `--dataset`) | 📋 Planned | reference target, `data/benchmarks/agi-capability-matrix.json` |
 | **PersonaMem** | Remember | Persona-consistent long-memory recall (MemOS comparison set) | — | 📋 Planned | paired with LongMemEval (MemOS publishes both) |
 | **ARC-AGI** | Reason | Fluid reasoning, no training data | — | 📋 Planned | `data/benchmarks/arc-agi.json` |
@@ -81,6 +82,24 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 - **A/B (grounding is the intervention's mechanism):** answer each question (A) with NO grounding vs (B) with the gold `knowledge` injected. Deterministic grading (normalized containment of the gold answer — no LLM judge). Run it: `python experiments/halueval_ab.py` (needs egress + `OPENAI_API_KEY`).
 - **First real run (GPT-4o-mini, n=40):** hallucination **55% → 20%** with grounding, **64% relative reduction** — clears the ≥20% gate. `data/eval/halueval_ab_results.json`.
 - **Honest scope:** this is the *mechanism* with **gold retrieval** (an upper bound). The production controller (`apps/lantern-garage/lib/surprise-intervene.js`) must also *detect* when to ground (surprise gate) and *retrieve* good evidence (CSF/web/tool arms), so its real-world reduction will be lower. **Next:** wire the live controller (`SURPRISE_CANARY=1` vs `SURPRISE_INTERVENE=1`) end-to-end on this set and record the full-controller row.
+
+### SimpleQA-Verified — 📋 Planned
+- **Source:** Google DeepMind, [arXiv:2509.07968](https://arxiv.org/abs/2509.07968) (Sept 2025) — a 1,000-prompt cleaned/reconciled subset of OpenAI's SimpleQA (de-duplicated, topic-balanced, label-corrected). Dataset + grader on Kaggle. Public.
+- **What it measures:** short-form parametric factuality on **long-tail** facts, scored on two axes — accuracy **and** attempt-rate — combined as F1, so a model is rewarded for hedging ("I don't know") over confabulating. This is the **same honesty axis** as our own golden mark's confabulation-rate, on an externally-owned dataset.
+- **Published leaderboard (Table 7, values web-verified 2026-07-05):**
+
+  | Model | Accuracy | Attempted | Hedged | Acc.\|Attempted | **F1** |
+  |---|---|---|---|---|---|
+  | Gemini 2.5 Pro | 55.3 | 98.9 | 1.1 | 55.9 | **55.6** |
+  | GPT-5 | 50.9 | 94.6 | 5.4 | 53.8 | **52.3** |
+  | o3 | 51.6 | 99.3 | 0.7 | 52.0 | **51.9** |
+  | GPT-4.1 | 39.8 | 99.3 | 0.7 | 40.1 | **39.9** |
+  | GPT-4o | 34.4 | 97.0 | 3.0 | 35.5 | **34.9** |
+  | DeepSeek R1 | 32.7 | 96.4 | 3.6 | 33.9 | **33.3** |
+  | Claude Opus 4 | 19.2 | 35.5 | 64.5 | 54.1 | **28.3** |
+
+- **Relation to our golden mark (why they're complementary, NOT comparable):** our 159-fact golden set is *our own* mark (not in this registry) and tests the honesty axis on **famous** facts + **famous** negatives — easy knowledge, hard honesty. SimpleQA-Verified tests it on **obscure long-tail** facts — hard knowledge. A 0.95 on our set does **not** map to a ~0.55 F1 here; the difficulty distributions are opposite. What transfers is the *metric philosophy*: DeepMind's separate Attempted/Hedged/F1 columns independently validate the split behind our confab-rate-vs-golden-score — **Claude Opus 4 is the clearest case** (19.2% raw accuracy but 54.1% accuracy-given-attempted, because it hedges 64.5% instead of guessing; raw accuracy conflates honesty with knowledge, F1 separates them).
+- **To run it (next):** pull the Kaggle dataset, add a `--simpleqa-verified` path to `experiments/sigma0_live_bench.py` with the official F1/attempted/hedged grader (needs an LLM judge for answer-matching), record our model's row here.
 
 ### Planned reference targets — 📋
 These are public marks tracked in `data/benchmarks/` as capability targets; no harness yet. Promote a row to ✅/🟡 the moment a harness produces a measured result.
