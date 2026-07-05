@@ -1,0 +1,30 @@
+{
+  "benchmark": "HaluEval-QA",
+  "primary_model": "gpt-4o-mini",
+  "council": [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-3.5-turbo"
+  ],
+  "n": 40,
+  "A_baseline_hall": 0.55,
+  "B_grounded_hall": 0.2,
+  "gates": {
+    "logprob": {
+      "auroc": 0.861,
+      "edge_over_random": 0.0585
+    },
+    "self_consistency": {
+      "auroc": 0.851,
+      "edge_over_random": 0.0555
+    },
+    "council_delta": {
+      "auroc": 0.909,
+      "edge_over_random": 0.0457
+    }
+  },
+  "best_by_auroc": "council_delta",
+  "logprob_baseline_auroc": 0.861,
+  "note": "API-feasible gate cousins (all published: FLARE/semantic-entropy/SAC3); the strict Sigma0 hidden-state canary needs an open model (Ouro) and is not tested here.",
+  "evidence_class": "MEASURED"
+}
