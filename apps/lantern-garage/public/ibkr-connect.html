@@ -55,6 +55,7 @@
 
   <div class="card" id="howto">
     <strong>How to get your credentials (one-time, in IBKR)</strong>
+    <p style="margin:6px 0 0"><a href="/ibkr-setup-guide.html">📖 Full step-by-step setup guide</a> — OpenSSL commands, portal walkthrough, and a DH-prime extractor.</p>
     <ol class="steps">
       <li>Log in to <a href="https://www.interactivebrokers.com/" target="_blank" rel="noopener">IBKR Client Portal</a> → <em>Settings → API → Third Party / Self-Service OAuth</em>.</li>
       <li>Register a consumer — you'll get a <code>consumer key</code>, <code>access token</code>, and <code>access token secret</code>.</li>
@@ -143,6 +144,9 @@ $('disconnectBtn').addEventListener('click', async ()=>{
   FIELDS.forEach(f=>{ if(f!=='realm') $(f).value=''; });
   banner('Disconnected.','ok'); refresh();
 });
+
+// Prefill the DH prime if the setup guide's extractor stashed it.
+try{ const dh=sessionStorage.getItem('ibkr_dh_prime'); if(dh && !$('dhPrime').value){ $('dhPrime').value=dh; sessionStorage.removeItem('ibkr_dh_prime'); } }catch(e){}
 
 refresh();
 </script>
