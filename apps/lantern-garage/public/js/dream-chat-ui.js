@@ -162,23 +162,29 @@ function focusKey(inputId) {
   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
 }
 
+// The MCP connector talks to an MCP server on the operator's OWN machine
+// (127.0.0.1:8772), so it only makes sense when the page is served locally. On a
+// hosted deploy (cloud VM / unisona.ai) 127.0.0.1 is the visitor's box, not ours —
+// hide the card instead of firing pointless cross-origin requests at it.
+const isLocalHost = ['127.0.0.1', 'localhost', '::1'].includes(window.location.hostname);
+
 async function updateConnectorStatuses() {
-  try {
-    const r = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
-    const mcpStatus = document.getElementById('mcp-status');
-    const mcpBtn = document.getElementById('mcp-btn');
-    if (r.ok) {
-      mcpStatus.textContent = 'Connected';
-      mcpStatus.className = 'connector-card-status ok';
-      mcpBtn.textContent = 'Disconnect';
-      mcpBtn.onclick = disconnectMcp;
-      mcpBtn.classList.remove('primary');
-    } else { throw new Error('HTTP ' + r.status); }
-  } catch (e) {
-    const mcpStatus = document.getElementById('mcp-status');
-    const mcpBtn = document.getElementById('mcp-btn');
-    if (mcpStatus) { mcpStatus.textContent = 'Disconnected'; mcpStatus.className = 'connector-card-status pending'; }
-    if (mcpBtn) { mcpBtn.textContent = 'Connect'; mcpBtn.onclick = connectMcp; mcpBtn.classList.add('primary'); }
+  const mcpStatus = document.getElementById('mcp-status');
+  const mcpBtn = document.getElementById('mcp-btn');
+  if (!isLocalHost) {
+    const card = mcpBtn ? mcpBtn.closest('.connector-card') : null;
+    if (card) card.style.display = 'none';
+  } else {
+    try {
+      const r = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
+      if (r.ok) {
+        if (mcpStatus) { mcpStatus.textContent = 'Connected'; mcpStatus.className = 'connector-card-status ok'; }
+        if (mcpBtn) { mcpBtn.textContent = 'Disconnect'; mcpBtn.onclick = disconnectMcp; mcpBtn.classList.remove('primary'); }
+      } else { throw new Error('HTTP ' + r.status); }
+    } catch (e) {
+      if (mcpStatus) { mcpStatus.textContent = 'Disconnected'; mcpStatus.className = 'connector-card-status pending'; }
+      if (mcpBtn) { mcpBtn.textContent = 'Connect'; mcpBtn.onclick = connectMcp; mcpBtn.classList.add('primary'); }
+    }
   }
 
   // Provider connector badges — authoritative source is server /api/settings/providers.
@@ -212,6 +218,7 @@ async function updateConnectorStatuses() {
 }
 
 async function connectMcp() {
+  if (!isLocalHost) { alert('The MCP connector is a local-only feature — open this page from your own machine (http://127.0.0.1:4177) to connect.'); return; }
   const mcpStatus = document.getElementById('mcp-status');
   const mcpBtn = document.getElementById('mcp-btn');
   mcpStatus.textContent = 'Connecting…';
@@ -242,6 +249,7 @@ function disconnectMcp() {
 }
 
 async function testWebSearch() {
+  if (!isLocalHost) { alert('The MCP web-search test is a local-only feature — open this page from your own machine (http://127.0.0.1:4177) to use it.'); return; }
   const btn = event.target;
   const original = btn.textContent;
   btn.textContent = 'Testing…'; btn.disabled = true;
