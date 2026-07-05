@@ -1,3 +1,7 @@
+## [1.8.86] - 2026-07-05
+### Fixed
+- **`/api/flourishing/world/status` no longer instructs running a script that doesn't exist** (`apps/lantern-garage/routes/flourishing.js`). The empty-state message told users to run `integrations/human-flourishing-frameworks/seed_data.py`, but that file (and its directory) don't exist and the HFF page surface was already cut — so the endpoint was permanently stuck pointing at a phantom command. The message now honestly states the snapshot is absent and the backend serves an empty-but-valid structure until one is written. Strengthens **Verify** (honest surfaces). See `changelog.d/flourishing-honest-message.md` (#2094).
+
 ## [1.8.83] - 2026-07-05
 ### Added
 - **LongMemEval now scores the live JS chat retriever, not just the Python engine** (`scripts/eval_longmemeval_js.js`). It drives `csf-memory.js::searchConversation` — the keyword retriever a real chat turn uses, which windows the last 1200 turns — over the LongMemEval haystack and writes a *separate* `runs.jsonl` row so the product number never gets conflated with the engine's. Measured on `longmemeval_s` (n=500, k=5): session-level recall@5 **0.884** / MRR **0.80**, 0/500 gold outside the window. Also flags `truncated_gold` (haystack larger than the window) as a real product limitation. Strengthens **Remember**. See `changelog.d/longmemeval-product-path.md` (#2111).
