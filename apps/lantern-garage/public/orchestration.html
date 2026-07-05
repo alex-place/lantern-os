@@ -277,6 +277,7 @@
     #broker .broker-status{display:flex;align-items:center;gap:9px;font-size:.85rem;font-weight:600;margin:2px 0 12px}
     #broker .bdot{width:9px;height:9px;border-radius:50%;background:var(--text2)}
     #broker .bdot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}#broker .bdot.off{background:#ef4444}
+    #broker .bdot.wait{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
     #broker .broker-gate{margin:0 0 12px;padding:10px 13px;border-radius:9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#fca5a5;font-size:.82rem}
     #broker .broker-gate a{color:var(--accent)}
     #broker .bfield{margin-bottom:10px}
@@ -1539,9 +1540,14 @@ openssl dhparam -out dhparam.pem 2048</pre>
   const form=$('brokerForm'); if(!form) return;
   function banner(m,k){ const b=$('bbanner'); b.textContent=m; b.className='bbanner show '+(k||'ok'); }
   function setStatus(s){
-    const connected=s&&s.live&&s.live.connected, has=s&&s.hasCredentials;
-    $('bdot').className='bdot '+(connected?'on':has?'off':'');
-    $('bstatusText').textContent=connected?`Connected · ${s.accountId||'account'} (${s.mode||'?'})`:has?'Credentials saved but not connected — check keys / IBKR session':'Not connected';
+    const live=s&&s.live, connected=live&&live.connected, has=s&&s.hasCredentials;
+    const waiting=has&&!connected&&live&&live.reason==='not_activated_or_unauthorized';
+    $('bdot').className='bdot '+(connected?'on':waiting?'wait':has?'off':'');
+    $('bstatusText').textContent=connected
+      ? `Connected · ${s.accountId||(live&&live.accountId)||'account'} (${s.mode||'?'})`
+      : waiting ? 'Saved · waiting for IBKR to activate — retry later'
+      : has ? 'Saved · not connected — see the message below'
+      : 'Not connected';
     $('bdisconnect').hidden=!has;
     $('brecheck').hidden=!has;
   }
