@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -756,24 +757,43 @@ class TesseractEngine:
             metadata["oh_error"] = str(e)
             oh_score = 0.1 # Very low score if OH check fails
 
-        # 2. Capability (CAP) Check
-        cap_score = 0.0
+        # 2. Capability (CAP) Check — run the REAL benchmark and parse its result.
+        # cap_score stays None ("not measured") unless we get a real number; we never
+        # fabricate a score. Feeding a hardcoded 1.0 here (the previous behaviour)
+        # silently inflated the overall grade with no evidence, violating the External
+        # Reality Rule — a claim only counts with [evidence, source]. An unmeasured CAP
+        # is excluded from the average below rather than faked up (or falsely zeroed).
+        cap_score: Optional[float] = None
         try:
-            # Simulate CAP check by running a benchmark script (e.g., gaming-layout-suite)
-            # This is a placeholder; a real CAP check would run actual tests/benchmarks.
             cap_output_path = self.data_dir / "convergence" / "cap_benchmark_report.json"
             cap_output_path.parent.mkdir(parents=True, exist_ok=True)
-            # For now, just create a dummy report. In a real scenario, this would execute
-            # `node tests/gaming-layout-suite/run.js` and parse its output.
-            dummy_cap_report = {"benchmark": "gaming-layout-suite", "passed_tests": 10, "total_tests": 10, "score": 1.0}
+            proc = subprocess.run(
+                ["node", "tests/gaming-layout-suite/run.js"],
+                cwd=REPO_ROOT, capture_output=True, text=True, timeout=180,
+            )
+            out = (proc.stdout or "") + (proc.stderr or "")
+            # run.js reports "Gameplay centred: <passed>/<total>." only when scorable
+            # clips are present (the copyrighted reference clips are intentionally not
+            # bundled, so a bare checkout legitimately has nothing to score).
+            m = re.search(r"Gameplay centred:\s*(\d+)\s*/\s*(\d+)", out)
+            if m and int(m.group(2)) > 0:
+                passed, total = int(m.group(1)), int(m.group(2))
+                cap_score = passed / total
+                report = {"benchmark": "gaming-layout-suite", "measured": True,
+                          "passed": passed, "total": total, "score": cap_score}
+            else:
+                report = {"benchmark": "gaming-layout-suite", "measured": False,
+                          "reason": "no_scorable_clips", "exit_code": proc.returncode,
+                          "stdout_tail": out.strip()[-300:]}
+                metadata["cap_status"] = "not_measured"
             with open(cap_output_path, "w", encoding="utf-8") as f:
-                json.dump(dummy_cap_report, f, indent=2)
+                json.dump(report, f, indent=2)
             evidence_paths.append(str(cap_output_path.relative_to(REPO_ROOT)))
-            cap_score = dummy_cap_report["score"]
-            metadata["cap_details"] = dummy_cap_report
+            metadata["cap_details"] = report
         except Exception as e:
             metadata["cap_error"] = str(e)
-            cap_score = 0.1
+            metadata["cap_status"] = "not_measured"
+            cap_score = None
 
         # 3. Scope (SCOPE) Check
         scope_score = 0.0
@@ -797,7 +817,12 @@ class TesseractEngine:
             scope_score = 0.1
 
         # Calculate overall grade
-        avg_score = (oh_score + cap_score + scope_score) / 3.0
+        # Average only the axes we actually measured — an unmeasured axis (cap_score
+        # is None when the benchmark had nothing scorable) is excluded, never counted
+        # as a fabricated 1.0 nor as a misleading 0.0.
+        _measured = [s for s in (oh_score, cap_score, scope_score) if s is not None]
+        avg_score = (sum(_measured) / len(_measured)) if _measured else 0.0
+        metadata["axes_measured"] = len(_measured)
         if avg_score >= 0.9:
             overall_grade = "A"
         elif avg_score >= 0.7:

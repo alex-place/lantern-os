@@ -1,6 +1,6 @@
-## [1.8.85] - 2026-07-05
+## [1.8.84] - 2026-07-05
 ### Fixed
-- **500 responses no longer leak raw internal exception text to clients** (`apps/lantern-garage/server.js`). The two central error handlers returned `{error: e.message}` verbatim — leaking paths, stack details, and internals to the browser. A new `sendServerError()` helper logs the full error + stack server-side under a short `errorId` and returns only a generic `{error: "Internal server error", errorId}` the user can quote. Strengthens **Act** (safe surfaces). See `changelog.d/no-500-error-leak.md` (#2068).
+- **Convergence grade card no longer fabricates the Capability (CAP) score** (`src/convergence_io_engine.py`). It wrote a hardcoded `score: 1.0` report and fed that into the overall grade with no evidence (OH/SCOPE were genuinely measured), violating the External Reality Rule. It now runs the real `node tests/gaming-layout-suite/run.js` benchmark and parses its `Gameplay centred: p/t` result; when nothing is scorable or it errors, `cap_score` stays `None` ("not measured") — never faked to 1.0 nor falsely zeroed — and the overall average excludes unmeasured axes. Strengthens **Verify**. See `changelog.d/convergence-cap-no-fabrication.md` (#2093).
 
 ## [1.8.83] - 2026-07-05
 ### Added
