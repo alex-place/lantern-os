@@ -484,3 +484,6 @@ data/longmemeval/*
 # Desktop SEA build output (unisona.exe + sea blob) — built via scripts/build-desktop-exe.mjs, never committed
 apps/lantern-garage/desktop/dist/
 *.blob
+
+# Watchdog runtime health ledger (#2038) — machine-local, never committed
+data/boot-health.jsonl
