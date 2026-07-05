@@ -1,0 +1,1 @@
+- fix(chat): the Keystone assistant now runs a real web search for job openings on just a keyword + location, instead of demanding a checklist of details and then falsely claiming it has no access to job boards.

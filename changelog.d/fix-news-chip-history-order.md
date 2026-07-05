@@ -1,0 +1,1 @@
+- fix(chat): starter chips that deep-link into chat with `?q=` (e.g. "Check the news") no longer inject the new turn *above* older restored history. Conversation history now prepends to the top of the transcript, so it stays in chronological order regardless of whether the auto-sent turn or the async history fetch wins the race.

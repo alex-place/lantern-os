@@ -1,3 +1,11 @@
+## [1.8.77] - 2026-07-05
+### Fixed
+- **Home starter chips (e.g. "Check the news") no longer inject the new turn above older history.** Chips deep-link into chat with `?q=…`, which auto-sends on load and races the async conversation-history restore. History was appended to the bottom, so the auto-sent turn ended up *above* the older restored conversation. History now prepends to the top of the transcript, keeping chronology correct regardless of which side wins the race. Strengthens **Remember**. See `changelog.d/fix-news-chip-history-order.md`.
+
+## [1.8.76] - 2026-07-05
+### Fixed
+- **Job-openings search no longer interrogates the user or falsely claims "no API access".** On "search for job openings" the single Keystone assistant demanded a checklist of details (industry, seniority, companies, exclusions) and then told the user it can't reach job boards — despite having a live `web_search` tool. The persona now treats a keyword + location as sufficient and runs a real board search immediately (`site:indeed.com`, LinkedIn, Glassdoor), returning actual listings as links. Strengthens **Act**. See `changelog.d/fix-job-openings-search.md`.
+
 ## [1.8.75] - 2026-07-05
 ### Added
 - **RAM preflight guard on Ouro model loads — stops the eval OOM-freeze on the 12 GB box (#781 follow-up).** New `src/sigma0/ram_guard.py` `require_free_ram()` (default 3 GB floor; psutil else Windows `GlobalMemoryStatusEx` / Linux `/proc/meminfo`) raises a clear `MemoryError` instead of letting a model load drive the box into the paging-file OOM spiral when evals/agents race. Wired into `Sigma0LoopLM.load()`, `scripts/ouro_serve.py`, and `experiments/sigma0_ouro_honesty_eval.py`. Bypass `OURO_SKIP_RAM_GUARD=1`; tune `OURO_MIN_FREE_GB=<GB>`; no-op when RAM is unmeasurable. Tests: `tests/test_ram_guard.py` (6). Strengthens **Act**. See `changelog.d/ouro-eval-ram-guard.md`.
