@@ -1,0 +1,32 @@
+{
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "benchmark": "HaluEval-QA",
+  "n_with_signal": 40,
+  "baseline_hall": 0.675,
+  "grounded_hall": 0.375,
+  "unsupervised_gates": {
+    "logprob": {
+      "auroc": 0.564,
+      "edge": 0.0482
+    },
+    "canary_resid": {
+      "auroc": 0.661,
+      "edge": -0.0159
+    },
+    "canary_rho": {
+      "auroc": 0.661,
+      "edge": -0.0073
+    },
+    "canary_hnorm": {
+      "auroc": 0.519,
+      "edge": -0.0085
+    }
+  },
+  "supervised_cv_probe": {
+    "auroc": 0.567,
+    "edge": -0.003,
+    "note": "GroupKFold by item; needs labels (upper bound, not a fair unsup comparison)"
+  },
+  "logprob_baseline_auroc": 0.564,
+  "evidence_class": "MEASURED"
+}
