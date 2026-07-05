@@ -68,6 +68,22 @@ function setSessionUser(req, user) {
       expiresAt: user.expiresAt,
     };
   }
+  // #2041: an authenticated session start is a daily-active retention signal.
+  // Recorded at most once per actor per UTC day. Fire-and-forget + non-fatal —
+  // telemetry must never break login.
+  try {
+    const actor = (user && (user.email || user.name || user.id)) || "";
+    if (actor) {
+      Promise.resolve(
+        require("./traction").recordDailyActive({
+          actor,
+          verified: true,
+          source: "session-start",
+          evidence: "req.session.user",
+        })
+      ).catch(() => { /* non-fatal */ });
+    }
+  } catch { /* traction never breaks login */ }
 }
 
 /**
