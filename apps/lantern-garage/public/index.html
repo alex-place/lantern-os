@@ -513,13 +513,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // catalog: dropdown value → { label, bucket } where bucket is the
     // /api/providers/status key. keystone-ft is the local fine-tune, served
     // through ollama, so it shares the ollama bucket.
+    // Local-first: the on-device models lead the list, cloud providers follow.
     const PROVIDER_CATALOG = [
+      { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama'    },
+      { value: 'keystone-ft', label: 'Unisona FT', bucket: 'ollama'    },
       { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
       { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
       { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
       { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
-      { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama'    },
-      { value: 'keystone-ft', label: 'Unisona FT', bucket: 'ollama'    },
     ];
 
     function addPinOption(entry, model) {
@@ -531,17 +532,21 @@ document.addEventListener('DOMContentLoaded', () => {
       providerPin.appendChild(opt);
     }
 
-    function restorePin(available) {
-      let saved = '';
-      try { saved = localStorage.getItem('keystone.providerPin') || ''; } catch {}
-      // Keep the saved pin only if it's still a live option; otherwise a
-      // previously-pinned-but-now-offline provider would dispatch-fail, so we
-      // fall back to Auto and clear it.
+    function restorePin(available, localUp) {
+      // saved === null → never chosen (first visit): default to the local model when it's
+      //   confirmed up, so queries route on-device first. saved === '' → the user explicitly
+      //   picked Auto: respect it. saved === 'x' → an explicit provider: keep it if still live.
+      let saved = null;
+      try { saved = localStorage.getItem('keystone.providerPin'); } catch {}
       if (saved && available.has(saved)) {
-        providerPin.value = saved;
+        providerPin.value = saved;                       // explicit, still-live provider
+      } else if (saved === null && localUp && available.has('ollama')) {
+        providerPin.value = 'ollama';                    // first visit + local up → route local-first
       } else {
+        // Auto: an explicit Auto choice, or a previously-pinned provider that's now offline
+        // (which would dispatch-fail) — fall back to Auto and clear the stale pin.
         providerPin.value = '';
-        if (saved) { try { localStorage.setItem('keystone.providerPin', ''); } catch {} }
+        if (saved && !available.has(saved)) { try { localStorage.setItem('keystone.providerPin', ''); } catch {} }
       }
     }
 
@@ -562,7 +567,10 @@ document.addEventListener('DOMContentLoaded', () => {
         addPinOption(entry, p && p.model);
         available.add(entry.value);
       }
-      restorePin(available);
+      // Default to local only when status CONFIRMS it's up — not when status was merely
+      // unreachable and we optimistically listed the whole catalog (that route could fail).
+      const localUp = !!(providers && providers.ollama && providers.ollama.available);
+      restorePin(available, localUp);
     })();
   }
   function pinnedProviderQS() {
