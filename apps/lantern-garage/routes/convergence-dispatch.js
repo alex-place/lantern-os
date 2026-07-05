@@ -13,6 +13,7 @@ const { getRouter } = require("../lib/convergence-router");
 const convergenceAgent = require("../lib/convergence-agent");
 const { sendJson, collectRequestBody } = require("../lib/http-utils");
 const { appendConversationEntry } = require("../lib/conversation-store");
+const autoDispatch = require("../lib/auto-dispatch");
 const maxConversationTextLength = 2000;
 
 // Turn a raw autowork failure into a grounded, actionable message instead of a bare
@@ -87,6 +88,33 @@ module.exports = async (req, res, url, deps) => {
         cacheHitRatePercent: 70
       }
     }, 200);
+    return true;
+  }
+
+  // GET /api/convergence/auto-dispatch/status — autonomous auto-pull loop status
+  if (pathname === "/api/convergence/auto-dispatch/status" && req.method === "GET") {
+    try {
+      sendJson(res, { ok: true, ...autoDispatch.getStatus() }, 200);
+    } catch (err) {
+      sendJson(res, { ok: false, error: err.message }, 500);
+    }
+    return true;
+  }
+
+  // POST /api/convergence/auto-dispatch/toggle — runtime kill switch { enabled: bool }
+  if (pathname === "/api/convergence/auto-dispatch/toggle" && req.method === "POST") {
+    try {
+      const body = await collectRequestBody(req);
+      const { enabled } = JSON.parse(body || "{}");
+      if (typeof enabled !== "boolean") {
+        sendJson(res, { ok: false, error: "enabled_boolean_required" }, 400);
+        return true;
+      }
+      const now = autoDispatch.setEnabled(enabled);
+      sendJson(res, { ok: true, enabled: now, ...autoDispatch.getStatus() }, 200);
+    } catch (err) {
+      sendJson(res, { ok: false, error: err.message }, 500);
+    }
     return true;
   }
 
@@ -277,7 +305,7 @@ module.exports = async (req, res, url, deps) => {
         }
         runId = newRunId(issueNumber);
         // source + title let the chat UI's background-run watcher label who started
-        // this run (a background/CI run vs an interactive chat run) when it surfaces it in-chat.
+        // this run (auto-dispatch daemon vs CI/fleet) when it surfaces it in-chat.
         step("start", "start", {
           issue: issueNumber, mode: "fleet",
           source: typeof opts.source === "string" ? opts.source.slice(0, 40) : "fleet",
@@ -650,7 +678,7 @@ module.exports = async (req, res, url, deps) => {
   }
 
   // GET /api/convergence/autonomous-work/active — every autowork run currently in
-  // flight, whoever started it (chat or a background/CI run). This is the
+  // flight, whoever started it (chat, auto-dispatch daemon, CI/fleet). This is the
   // Observe surface that makes headless runs visible: the dream-chat background
   // watcher polls it and attaches a live progress panel to any run it didn't start,
   // so autowork always routes through the chat UX instead of running invisibly.
@@ -677,7 +705,7 @@ module.exports = async (req, res, url, deps) => {
       }
       // Terminal = an explicit result/done record, or a phase left in `error` (fleet
       // aborts respond without a result record). Active additionally requires a
-      // heartbeat within a 40-min wall-clock ceiling (an older silent run
+      // heartbeat within the daemon's 40-min wall-clock ceiling (an older silent run
       // is orphaned, not active — don't resurrect it).
       const cutoff = Date.now() - 40 * 60 * 1000;
       const active = [...runs.values()].filter((r) =>
@@ -1087,6 +1115,54 @@ module.exports = async (req, res, url, deps) => {
           return;
         }
 
+        // ── 6b. Σ₀ council gate ───────────────────────────────────────────
+        // Route the proposed change through the consolidated council (Δ + answerability
+        // verdict) so the fleet's plan/patch is scored by the SAME mechanism the chat loop
+        // uses, not just committed on a bare test pass. The test run is fed in as the
+        // EXECUTION verdict (ground truth — a green test overrides the text Δ ⇒ grounded);
+        // research + web evidence are the grounding context. The verdict is load-bearing:
+        //   grounded   → proceed to commit/push (verified, or low disagreement)
+        //   seam_open  → contested + no passing execution check → still open the draft PR
+        //                (never auto-merged) but flag it for operator review
+        //   pin        → unreachable/unknowable → hold before commit, name the unknown
+        // councilReview writes its own append-only record (context-tagged) for the backtest.
+        const councilText = [
+          `Issue #${issueNumber}: ${issueDetails.title}`,
+          plan && plan.summary ? `Plan: ${plan.summary}` : "",
+          diffText,
+        ].filter(Boolean).join("\n\n").slice(0, 8000);
+        step("council", "start");
+        let council;
+        try {
+          const { councilReview } = require("../lib/council-review");
+          council = councilReview(councilText, {
+            groundingContext: [researchContext, ...(webEvidence || []).map((e) => e && e.snippet || "")]
+              .filter(Boolean).join("\n").slice(0, 4000),
+            execVerdict: { ran: ranTests, passed: testsPassed, output: _failedTest.output },
+            reachable: true, // the operator is a reachable CallbackChannel for a code change
+            context: { surface: "autowork-stream", issue: issueNumber, runId: _runId, branch: branchName },
+          });
+          step("council", "done", { verdict: council.verdict, delta: council.delta,
+            recommend: council.recommend, groundedBy: council.groundedBy });
+        } catch (e) {
+          // Council scoring must never break the pipeline; fall through as ungated.
+          step("council", "error", { error: String(e && e.message || e) });
+          council = null;
+        }
+
+        // pin = no reachable external referent for a contested change → hold before commit.
+        if (council && council.verdict === "pin") {
+          await new Promise((resolve) =>
+            execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
+          receipt.applied = false;
+          receipt.stoppedAt = "council_pin";
+          step("rollback", "done", { reason: "council_pin", detail: "council could not reach an external check for a contested change — held before commit" });
+          send("done", { ok: false, ...receipt, councilVerdict: council.verdict, councilDelta: council.delta,
+            message: `Council held the change (verdict: pin, Δ=${council.delta}) — contested with no reachable external check. Nothing committed.` });
+          res.end();
+          return;
+        }
+
         // ── 7. commit (opt-in) ───────────────────────────────────────────
         if (!autoCommit) {
           receipt.stoppedAt = "before_commit";
@@ -1140,7 +1216,14 @@ module.exports = async (req, res, url, deps) => {
         step("pr", "start");
         // #933: surface verification state in the PR body rather than the title.
         const verifyLine = `_verified: ${verified}_ (tests ${ranTests ? (testsPassed ? "passed" : "failed") : "not run"})`;
-        const prUrl = openDraftPr(workRoot, branchName, commitTitle, `Fixes #${issueNumber}\n\n${verifyLine}\n\n${issueDetails.body}`);
+        // Surface the Σ₀ council verdict so a `seam_open` (contested, unverified) change is
+        // visibly flagged for review rather than reading as a clean auto-run.
+        const councilLine = council
+          ? `_council: **${council.verdict}**_ (Δ=${council.delta}, grounded-by: ${council.groundedBy})` +
+            (council.verdict === "seam_open" ? " — ⚠️ contested + no passing execution check; review before merge" : "")
+          : "";
+        const prUrl = openDraftPr(workRoot, branchName, commitTitle,
+          `Fixes #${issueNumber}\n\n${verifyLine}${councilLine ? "\n" + councilLine : ""}\n\n${issueDetails.body}`);
         receipt.prUrl = prUrl;
         step("pr", "done", { prUrl });
 
@@ -1193,7 +1276,12 @@ module.exports = async (req, res, url, deps) => {
             codebaseAnalysis: `Searched ${scopeFiles.length} relevant files`,
             testsRun: tests.length,
             testsPassed: ranTests ? (testsPassed ? 'all' : 'none') : 'n/a'
-          }
+          },
+          // Σ₀ council verdict for this change (grounded / seam_open / pin), recorded so the
+          // convergence log carries the answerability call, not just the confidence scalars.
+          council: council
+            ? { verdict: council.verdict, delta: council.delta, groundedBy: council.groundedBy, recommend: council.recommend }
+            : null,
         };
         step("convergence", "done", { record: convergenceRecord });
 
@@ -1234,6 +1322,8 @@ module.exports = async (req, res, url, deps) => {
         send("done", {
           ok: true,
           ...receipt,
+          councilVerdict: council ? council.verdict : null,
+          councilDelta: council ? council.delta : null,
           convergence: {
             hypothesis: convergenceRecord.hypothesis,
             confidence: {
