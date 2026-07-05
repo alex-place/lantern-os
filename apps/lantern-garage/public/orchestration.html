@@ -1561,7 +1561,7 @@ openssl dhparam -out dhparam.pem 2048</pre>
       const d=await r.json();
       if(!r.ok) banner(({missing_consumerKey:'Consumer key is required',bad_signaturePem:'Signature key must be a PEM private key',bad_encryptionPem:'Encryption key must be a PEM private key',bad_dhPrime:'DH prime must be hex'}[d.error])||('Error: '+(d.error||r.status)),'err');
       else if(d.live&&d.live.connected){ banner('Connected to IBKR — live session verified.','ok'); setStatus({...d.status,live:d.live}); }
-      else { banner('Credentials saved, but IBKR did not authenticate. Double-check the keys and that your IBKR OAuth consumer is active (can take up to 24h).','err'); setStatus({...d.status,live:d.live}); }
+      else { banner('Credentials saved. '+((d.live&&d.live.reasonText)||'IBKR did not authenticate — check the keys and that your OAuth consumer is active (up to 24h).'), (d.live&&d.live.reason==='not_activated_or_unauthorized')?'ok':'err'); setStatus({...d.status,live:d.live}); }
     }catch(_){ banner('Network error — please try again.','err'); }
     finally{ btn.disabled=false; btn.textContent=t; refresh(); }
   });

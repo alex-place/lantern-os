@@ -133,6 +133,7 @@ class IbkrCpapi {
     // Bearer token. Pass an IbkrOAuth1 instance as opts.oauth1.
     this.oauth1 = opts.oauth1 || null;
     this._lst = null; // { token, expiresAt } — cached Live Session Token
+    this._lstError = null; // last OAuth1 handshake failure reason (diagnostics)
   }
 
   _verifyTls(hostname) {
@@ -216,17 +217,30 @@ class IbkrCpapi {
     if (this._lst && this._lst.expiresAt > Date.now() + 5000) return this._lst.token;
     const url = this.baseUrl + '/oauth/live_session_token';
     let req, r, lst;
+    this._lstError = null;
     try {
       req = this.oauth1.buildLiveSessionTokenRequest(url);   // may throw on a bad key
-    } catch (e) { return null; }
+    } catch (e) { this._lstError = { code: 'bad_key', detail: e.message }; return null; }
     r = await this._rawRequest('POST', '/oauth/live_session_token', req.headers);
-    if (!r.ok || !r.json || !r.json.diffie_hellman_response) return null;
+    if (!r.ok) {
+      // The most common failure for a fresh consumer: IBKR rejects the handshake
+      // (401/403) until the OAuth consumer is activated (up to ~24h). Capture the
+      // real HTTP status + any IBKR message so the UI can say which it is.
+      const msg = (r.json && (r.json.error || r.json.message)) || r.error || null;
+      this._lstError = {
+        code: r.status === 401 || r.status === 403 ? 'not_activated_or_unauthorized' : (r.status ? `http_${r.status}` : 'unreachable'),
+        status: r.status, detail: msg,
+      };
+      return null;
+    }
+    if (!r.json || !r.json.diffie_hellman_response) { this._lstError = { code: 'no_dh_response' }; return null; }
     try {
       lst = this.oauth1.computeLiveSessionToken(r.json.diffie_hellman_response, req.dhRandom, req.prepend);
-    } catch (e) { return null; }
+    } catch (e) { this._lstError = { code: 'lst_compute_failed', detail: e.message }; return null; }
     if (r.json.live_session_token_signature &&
         !this.oauth1.validateLiveSessionToken(lst, r.json.live_session_token_signature)) {
-      return null; // server signature mismatch → refuse the token
+      this._lstError = { code: 'lst_signature_mismatch' }; // key/prime/consumer mismatch
+      return null;
     }
     const ttl = Number(r.json.live_session_token_expiration) || 10 * 60 * 1000;
     this._lst = { token: lst, expiresAt: Date.now() + Math.min(ttl, 10 * 60 * 1000) };

@@ -31,7 +31,21 @@ async function _probe(userId) {
   if (!signer) return { connected: false };
   const client = new IbkrCpapi({ oauth1: signer });
   const p = await client.probe();
-  return { connected: !!(p && p.connected), authenticated: !!(p && p.authenticated), competing: !!(p && p.competing) };
+  const out = { connected: !!(p && p.connected), authenticated: !!(p && p.authenticated), competing: !!(p && p.competing) };
+  // Surface WHY the OAuth handshake failed so the UI can distinguish "not
+  // activated yet" (normal for a new consumer) from a real key/config error.
+  if (!out.authenticated && client._lstError) {
+    out.reason = client._lstError.code;
+    const R = {
+      not_activated_or_unauthorized: 'IBKR rejected the OAuth handshake — your consumer is most likely not active yet (activation can take up to ~24h). Nothing to fix; retry later.',
+      lst_signature_mismatch: 'Handshake signature mismatch — the keys/DH prime in unisona don\'t match what was uploaded to IBKR. Regenerate keys, re-upload all 3 files to IBKR, and reconnect.',
+      bad_key: 'One of the private keys couldn\'t be read. Regenerate your keys and reconnect.',
+      no_dh_response: 'IBKR didn\'t return a Diffie-Hellman response — usually a not-yet-active consumer.',
+      unreachable: 'Couldn\'t reach IBKR\'s Web API. Check your connection and try again.',
+    };
+    out.reasonText = R[client._lstError.code] || ('IBKR handshake failed (' + client._lstError.code + ').');
+  }
+  return out;
 }
 
 const OWNED = new Set([
