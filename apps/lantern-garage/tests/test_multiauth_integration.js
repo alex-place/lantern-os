@@ -114,10 +114,30 @@ server.listen(0, "127.0.0.1", async () => {
     r = await c("GET", "/api/profiles/me");
     ok("anonymous /api/profiles/me is 401", r.status === 401);
 
-    // Local register → establishes session.
+    // Local register → hard email gate: account created, NO session, confirmation
+    // pending (email delivery is "logged" here since no SMTP is configured).
     r = await c("POST", "/api/auth/local/register", { email: "dev@example.com", password: "supersecret", name: "Dev" });
-    ok("local register 201", r.status === 201 && r.json.ok === true);
-    ok("register response strips credential", r.json.user && r.json.user.credential === undefined);
+    ok("local register 202 pending", r.status === 202 && r.json.ok === true && r.json.pendingVerification === true);
+    ok("register does not establish a session", r.json.user === undefined);
+
+    // Login is blocked until the email is confirmed.
+    r = await c("POST", "/api/auth/local/login", { email: "dev@example.com", password: "supersecret" });
+    ok("unverified login blocked 403", r.status === 403 && r.json.error === "email_unverified");
+
+    // Confirm the email through the REAL verify-email route (mint the signed token
+    // the confirmation link would carry).
+    const { mintToken } = require(path.join(LIB, "lib/email-verification"));
+    const { getProfileByEmail } = require(path.join(LIB, "lib/user-profiles"));
+    const prof = getProfileByEmail("dev@example.com");
+    const vtok = mintToken(prof.id, prof.email);
+    r = await c("GET", "/api/auth/verify-email?token=" + encodeURIComponent(vtok));
+    ok("verify-email redirects with success", r.status === 302 && /verify=success/.test(r.location || ""));
+    r = await c("GET", "/api/auth/verify-email?token=tampered.sig");
+    ok("verify-email rejects a bad token", r.status === 302 && /verify=invalid/.test(r.location || ""));
+
+    // Now login succeeds and establishes a session.
+    r = await c("POST", "/api/auth/local/login", { email: "dev@example.com", password: "supersecret" });
+    ok("verified login 200", r.status === 200 && r.json.ok === true);
 
     // #1876: /api/profiles/me now works for a LOCAL (non-Patreon) session.
     r = await c("GET", "/api/profiles/me");

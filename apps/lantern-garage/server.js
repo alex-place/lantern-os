@@ -152,6 +152,7 @@ const routes = [
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)
+  require("./routes/admin-traction"),   // Admin-only AARRR adoption/traction snapshot
   require("./routes/status"),
   require("./routes/ui"),
   require("./routes/media"), // Video/media streaming (range requests)

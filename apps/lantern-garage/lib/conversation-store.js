@@ -1,6 +1,7 @@
 const path = require("path");
 const { appendJsonlQueued, readJsonl, rotateJsonlIfNeeded } = require("./file-queue");
 const { redactPII } = require("./redact");
+const { track, EVENTS } = require("./metrics");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const conversationLogPath = path.join(repoRoot, "data", "conversations", "garage-conversations.jsonl");
@@ -77,6 +78,11 @@ function normalizeConversationEntry(input) {
 }
 
 async function appendConversationEntry(entry) {
+  // Human turns are the core-loop usage signal (activation). Human role is "operator"
+  // in this log (not "user"); count only those, keyed by session so guest chat counts too.
+  if (entry && entry.role === "operator") {
+    track(EVENTS.CHAT, { actorId: entry.sessionId || "anon", actorType: "session" });
+  }
   await appendJsonlQueued(conversationLogPath, entry);
   // #771: keep the file bounded — rotate + prune once it exceeds the cap (serialized
   // behind the append in the same per-path write queue).

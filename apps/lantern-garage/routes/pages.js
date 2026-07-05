@@ -7,6 +7,8 @@ const path = require("path");
 const fs = require("fs");
 const { requireAuth, requireRole, requireEntitlement, isAdmin } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
+const { track, EVENTS } = require("../lib/metrics");
+const { getSessionUserId } = require("../lib/session-identity");
 
 // Public pages — no auth required
 const PUBLIC_PAGES = {
@@ -34,6 +36,8 @@ const PROTECTED_PAGES = {
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
+  // Admin-only traction / adoption dashboard (exposes user + profile data).
+  "/traction.html":       { file: "traction.html",          role: "admin" },
 };
 
 // A nav page an admin flagged "disabled" is blocked for everyone except admins
@@ -63,6 +67,11 @@ module.exports = async function pagesRoute(req, res, url, deps) {
     res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
     res.end(renderDisabledPage(pathname));
     return true;
+  }
+
+  // Reaching the signup/login surface is an intent-to-use signal (activation, per spec).
+  if (pathname === "/auth.html" || pathname === "/auth") {
+    track(EVENTS.AUTH_VIEW, { actorId: getSessionUserId(req) || "anon" });
   }
 
   // Public — serve directly

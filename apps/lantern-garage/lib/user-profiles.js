@@ -609,6 +609,26 @@ function verifyLocalLogin(email, plaintext) {
   return okPassword ? profile : null;
 }
 
+/**
+ * Mark a profile's email as verified (email confirmation flow). Flips the
+ * top-level `emailVerified` flag and, if a matching local identity exists, its
+ * per-identity flag too. Idempotent. Returns the updated profile, or null if no
+ * profile / email mismatch.
+ */
+function markEmailVerified(profileId, email) {
+  const profile = loadProfileFromIndex(profileId);
+  if (!profile) return null;
+  // Guard: the token's email must still match the profile's current email, so a
+  // stale link can't verify an address the user has since changed.
+  if (email && profile.email && profile.email.toLowerCase() !== String(email).toLowerCase()) {
+    return null;
+  }
+  const identities = (profile.identities || []).map((i) =>
+    i.provider === "local" ? { ...i, emailVerified: true } : i
+  );
+  return updateProfile(profileId, { emailVerified: true, identities });
+}
+
 /** Strip secrets (credential) before sending a profile to any client. */
 function publicProfile(profile) {
   if (!profile) return profile;
@@ -640,5 +660,6 @@ module.exports = {
   setLocalPassword,
   createLocalAccount,
   verifyLocalLogin,
+  markEmailVerified,
   publicProfile,
 };

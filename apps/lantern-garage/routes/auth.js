@@ -13,7 +13,12 @@
 
 const { getSessionInfo, handleLogout } = require("../lib/patreon-auth");
 const { handleOAuthStart, handleOAuthCallback } = require("../lib/oauth-core");
-const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
+const {
+  handleLocalRegister,
+  handleLocalLogin,
+  handleVerifyEmail,
+  handleResendVerification,
+} = require("../lib/local-auth");
 const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 
@@ -53,6 +58,18 @@ module.exports = async function authRoutes(req, res, url, deps) {
   // POST /api/auth/local/login
   if (method === "POST" && path === "/api/auth/local/login") {
     await handleLocalLogin(req, res);
+    return true;
+  }
+
+  // GET /api/auth/verify-email?token=… — confirm email from the link
+  if (method === "GET" && path === "/api/auth/verify-email") {
+    handleVerifyEmail(req, res, url);
+    return true;
+  }
+
+  // POST /api/auth/resend-verification { email }
+  if (method === "POST" && path === "/api/auth/resend-verification") {
+    await handleResendVerification(req, res);
     return true;
   }
 

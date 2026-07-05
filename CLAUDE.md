@@ -89,7 +89,7 @@ Reject architectural sprawl. Prefer extension over addition. Maintain a single C
 
 ## Project Overview
 
-Keystone OS is a **persistent local-first reasoning system** built by a solo developer (Alex Place). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
+Keystone OS is a **persistent local-first reasoning system** built by a **team working in concurrent lanes** — human contributors (Alex Place plus `kriskin/`, `mookman11/`, and any other `<name>/` lane) and AI agent lanes (`claude/`, `gemini/`, `codex/`, `grok/`, …), each with its own PR at a time (see the Per-Lane Workstream Rule below). It is **not** a solo project. The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
 
 ## Quickstart (Read QUICKSTART.md First)
 

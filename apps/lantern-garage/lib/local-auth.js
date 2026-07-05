@@ -14,9 +14,13 @@
 const {
   createLocalAccount,
   verifyLocalLogin,
+  markEmailVerified,
+  getProfileByEmail,
   publicProfile,
 } = require("./user-profiles");
+const { track, EVENTS } = require("./metrics");
 const { establishSession } = require("./session-identity");
+const { sendVerificationEmail, verifyToken } = require("./email-verification");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
@@ -90,7 +94,13 @@ function _establish(req, res, profile, status) {
   );
 }
 
-/** POST /api/auth/local/register { email, password, name } */
+/**
+ * POST /api/auth/local/register { email, password, name }
+ *
+ * Hard email gate: registration creates the account but does NOT establish a
+ * session. A confirmation email is sent; the user cannot sign in until they click
+ * the link (see handleLocalLogin). Returns 202 { ok, pendingVerification: true }.
+ */
 async function handleLocalRegister(req, res) {
   if (process.env.LANTERN_LOCAL_AUTH === "0") return _json(res, 403, { error: "local_auth_disabled" });
   const b = await _readJson(req);
@@ -104,7 +114,20 @@ async function handleLocalRegister(req, res) {
   const result = createLocalAccount(email, password, name);
   if (result.error === "email_taken") return _json(res, 409, { error: "email_taken" });
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
-  return _establish(req, res, result.profile, 201);
+  track(EVENTS.SIGNUP, { actorId: result.profile.id, props: { source: "local" } });
+
+  const delivery = await sendVerificationEmail(req, result.profile).catch((e) => ({
+    ok: false,
+    error: e.message,
+  }));
+  return _json(res, 202, {
+    ok: true,
+    pendingVerification: true,
+    email,
+    // "logged" means no SMTP configured — surfaced so the owner knows the link is
+    // in the server log/outbox, not an inbox.
+    emailDelivery: delivery.delivery || (delivery.ok ? "sent" : "failed"),
+  });
 }
 
 /** POST /api/auth/local/login { email, password } */
@@ -122,7 +145,53 @@ async function handleLocalLogin(req, res) {
     return _json(res, 401, { error: "invalid_credentials" });
   }
   clearFailures(req, email);
+  // Hard gate: a local account with an unconfirmed email cannot sign in.
+  if (profile.emailVerified !== true) {
+    return _json(res, 403, { error: "email_unverified", email });
+  }
+  track(EVENTS.LOGIN, { actorId: profile.id, props: { source: "local" } });
   return _establish(req, res, profile, 200);
 }
 
-module.exports = { handleLocalRegister, handleLocalLogin };
+/**
+ * GET /api/auth/verify-email?token=… — confirm an email from the link. Flips the
+ * profile's emailVerified flag and redirects to the login page with a status. We
+ * intentionally do NOT auto-establish a session: the user then signs in normally,
+ * which keeps the email link from being a bearer credential.
+ */
+function handleVerifyEmail(req, res, url) {
+  const token = url.searchParams.get("token");
+  const payload = verifyToken(token);
+  const redirect = (q) => {
+    res.writeHead(302, { Location: `/auth.html?${q}` });
+    res.end();
+  };
+  if (!payload) return redirect("verify=invalid");
+  const updated = markEmailVerified(payload.pid, payload.email);
+  if (!updated) return redirect("verify=invalid");
+  return redirect("verify=success");
+}
+
+/**
+ * POST /api/auth/resend-verification { email } — re-send the confirmation email.
+ * Always returns a generic 200 (never reveals whether the email exists), and only
+ * actually sends for an existing, still-unverified local account.
+ */
+async function handleResendVerification(req, res) {
+  const b = await _readJson(req);
+  const email = String((b && b.email) || "").trim();
+  if (EMAIL_RE.test(email)) {
+    const profile = getProfileByEmail(email);
+    if (profile && profile.credential && profile.emailVerified !== true) {
+      await sendVerificationEmail(req, profile).catch(() => {});
+    }
+  }
+  return _json(res, 200, { ok: true });
+}
+
+module.exports = {
+  handleLocalRegister,
+  handleLocalLogin,
+  handleVerifyEmail,
+  handleResendVerification,
+};

@@ -46,6 +46,7 @@ const CORE = {
   "agent-status.html":      "Converge",  // agent observability
   "agent-leaderboard.html": "Converge",  // agent convergence leaderboard
   "metrics.html":           "Converge",  // convergence metrics
+  "traction.html":          "Converge",  // adoption/AARRR observability (admin) — does the loop reach real users
   "systems.html":           "Converge",  // systems-health observability
   "replay.html":            "Converge",  // git-bisect over past convergence records
 };

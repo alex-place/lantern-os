@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Traction — Adoption (admin)</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .trc-main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 64px; }
+    .trc-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+    .trc-head h1 { font-size:1.5rem; margin:0; }
+    .trc-sub { color:var(--muted,#9ca3af); font-size:.9rem; margin:2px 0 20px; }
+    .trc-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:24px; }
+    .trc-card { background:var(--surface,#131a26); border:1px solid var(--border,#243044); border-radius:12px; padding:16px; }
+    .trc-card .k { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted,#9ca3af); }
+    .trc-card .v { font-size:1.9rem; font-weight:700; margin-top:4px; line-height:1.1; }
+    .trc-card .sub { font-size:.8rem; color:var(--muted,#9ca3af); margin-top:4px; }
+    .trc-section { margin:28px 0 10px; font-size:1.05rem; font-weight:600; }
+    .funnel-row { display:flex; align-items:center; gap:12px; margin:8px 0; }
+    .funnel-label { flex:0 0 260px; font-size:.85rem; }
+    .funnel-bar { flex:1; background:var(--border,#243044); border-radius:6px; overflow:hidden; height:26px; position:relative; }
+    .funnel-fill { height:100%; background:linear-gradient(90deg,var(--accent,#06b6d4),#3b82f6); min-width:2px; }
+    .funnel-n { flex:0 0 90px; text-align:right; font-variant-numeric:tabular-nums; font-size:.85rem; }
+    table.trc { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.trc th, table.trc td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border,#243044); white-space:nowrap; }
+    table.trc th { color:var(--muted,#9ca3af); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; }
+    .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:.72rem; border:1px solid var(--border,#243044); }
+    .pill.paid { color:#22c55e; border-color:#22c55e55; }
+    .pill.yes { color:#22c55e; } .pill.no { color:#9ca3af; }
+    .note { background:var(--surface,#131a26); border:1px solid var(--border,#243044); border-left:3px solid #f59e0b; border-radius:8px; padding:12px 14px; font-size:.85rem; color:var(--muted,#c3ccd8); margin:16px 0; }
+    .scroll { overflow-x:auto; }
+    .muted { color:var(--muted,#9ca3af); }
+    #err { color:#ef4444; }
+  </style>
+</head>
+<body>
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">unisona.ai</span>
+  </a>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/orchestration.html">Orchestration</a>
+    <a href="/traction.html" class="active">Traction</a>
+    <a href="/work.html">Work</a>
+    <a href="/explore.html">Explore</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme && toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<main class="trc-main" id="main-content">
+  <div class="trc-head">
+    <h1>Traction &amp; Adoption</h1>
+    <span class="muted" id="gen"></span>
+  </div>
+  <p class="trc-sub">
+    AARRR funnel computed from real profiles + the append-only product-event log
+    (<code>data/metrics/events.jsonl</code>). Admin-only. Test/QE fixtures are separated so the
+    headline numbers stay honest.
+  </p>
+
+  <p id="err" hidden></p>
+
+  <div class="trc-grid" id="cards"></div>
+
+  <div class="trc-section">Funnel</div>
+  <div id="funnel"></div>
+
+  <div class="trc-section">Users <span class="muted" id="usercount"></span></div>
+  <div class="scroll"><table class="trc" id="usertable"><thead><tr>
+    <th>Name</th><th>Email</th><th>Role</th><th>Tier</th><th>Source</th>
+    <th>Verified</th><th>Activated</th><th>Paying</th><th>Last active</th><th>Created</th>
+  </tr></thead><tbody></tbody></table></div>
+
+  <div class="note" id="testnote"></div>
+  <div class="note" id="gapnote"></div>
+</main>
+
+<script src="/js/theme-toggle.js"></script>
+<script>
+function el(t, attrs, html){ const e=document.createElement(t); if(attrs) for(const k in attrs) e.setAttribute(k,attrs[k]); if(html!=null) e.innerHTML=html; return e; }
+function card(k, v, sub){ const c=el('div',{class:'trc-card'}); c.append(el('div',{class:'k'},k), el('div',{class:'v'},String(v)), el('div',{class:'sub'}, sub||'')); return c; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+async function load(){
+  let d;
+  try {
+    const r = await fetch('/api/admin/traction', { credentials:'same-origin' });
+    if (r.status === 403) { document.getElementById('err').hidden=false; document.getElementById('err').textContent='Admin access required.'; return; }
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    d = await r.json();
+  } catch (e) {
+    document.getElementById('err').hidden=false; document.getElementById('err').textContent='Failed to load traction: '+e.message; return;
+  }
+
+  document.getElementById('gen').textContent = 'as of ' + new Date(d.generatedAt).toLocaleString();
+
+  // headline cards
+  const cards = document.getElementById('cards');
+  cards.append(
+    card('Real users', d.totals.realProfiles, (d.totals.testProfiles||0)+' test fixtures excluded'),
+    card('Activation', d.activation.rate+'%', d.activation.count+' used it · '+d.activation.emailVerified+' verified'),
+    card('Guest chats', d.activation.anonymousChatSessions ?? 0, 'anonymous chat sessions'),
+    card('Retention 30d', d.retention.rate30d+'%', d.retention.active30d+' active · '+d.retention.active7d+' in 7d'),
+    card('Paying', d.revenue.payingUsers, d.revenue.rate+'% of real users'),
+    card('New (30d)', d.acquisition.signups30d, d.acquisition.signups7d+' in last 7d'),
+  );
+
+  // funnel
+  const top = Math.max(1, d.funnel[0].n);
+  const f = document.getElementById('funnel');
+  d.funnel.forEach(s=>{
+    const row = el('div',{class:'funnel-row'});
+    row.append(el('div',{class:'funnel-label'}, esc(s.stage)));
+    const bar = el('div',{class:'funnel-bar'});
+    bar.append(el('div',{class:'funnel-fill', style:'width:'+Math.round(100*s.n/top)+'%'}));
+    row.append(bar, el('div',{class:'funnel-n'}, s.n+' ('+s.pctOfTop+'%)'));
+    f.append(row);
+  });
+
+  // user table
+  const tb = document.querySelector('#usertable tbody');
+  document.getElementById('usercount').textContent = '('+d.users.length+')';
+  if (!d.users.length) tb.append(el('tr',null,'<td colspan="10" class="muted">No real users yet.</td>'));
+  d.users.forEach(u=>{
+    const la = u.lastActiveDays==null ? '<span class="muted">never</span>' : (u.lastActiveDays+'d ago');
+    tb.append(el('tr',null,
+      '<td>'+esc(u.name)+'</td><td class="muted">'+esc(u.email)+'</td>'+
+      '<td>'+esc(u.role)+'</td><td>'+esc(u.tier||'—')+'</td><td>'+esc(u.source)+'</td>'+
+      '<td class="pill '+(u.emailVerified?'yes':'no')+'">'+(u.emailVerified?'✓':'—')+'</td>'+
+      '<td class="pill '+(u.activated?'yes':'no')+'">'+(u.activated?'✓':'—')+'</td>'+
+      '<td>'+(u.paying?'<span class="pill paid">paid</span>':'<span class="muted">—</span>')+'</td>'+
+      '<td>'+la+'</td><td class="muted">'+esc((u.createdAt||'').slice(0,10))+'</td>'
+    ));
+  });
+
+  document.getElementById('testnote').innerHTML =
+    '<strong>'+(d.totals.testProfiles||0)+' test/QE fixtures</strong> excluded from every number above (matched on example.com / browsertest / +test). '+
+    (d.testUsers||[]).map(t=>esc(t.email)).join(', ');
+
+  document.getElementById('gapnote').innerHTML =
+    '<strong>Honest gaps:</strong> Referral is <em>not instrumented</em> — no referral event exists yet. '+
+    'Activation counts chat OR reaching the signup surface OR a prior login (per the agreed definition). '+
+    'Revenue reflects paid role/tier in the local profile store — Patreon-billed users only appear here once their profile carries a paid tier.';
+}
+load();
+</script>
+</body>
+</html>

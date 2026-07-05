@@ -238,6 +238,13 @@
     }
     .auth-error.show { display: block; }
     .field-error { color: #fca5a5; font-size: 12px; min-height: 14px; }
+    .auth-notice {
+      display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid rgba(52,211,153,.4); background: rgba(52,211,153,.10);
+      color: #bbf7d0; font-size: 13px; line-height: 1.5;
+    }
+    .auth-notice.show { display: block; }
+    .auth-notice a { color: var(--accent); cursor: pointer; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -256,6 +263,7 @@
     </p>
 
     <div class="auth-error" id="auth-error" role="alert"></div>
+    <div class="auth-notice" id="auth-notice" role="status"></div>
 
     <!-- OAuth provider buttons — rendered from the configured providers (ADR-0016) -->
     <div class="auth-actions" id="provider-buttons"></div>
@@ -345,10 +353,18 @@
 
   // Provider display metadata (icon + label). Only providers the SERVER reports as
   // configured are actually rendered, so we never show a button that 500s (#1877).
+  // Brand marks are inline SVGs (self-hosted, no external requests / CSP-safe).
+  // Google keeps its multi-color "G" (button is white); Discord/Patreon render
+  // as white monochrome marks on their brand-color buttons.
+  const PROVIDER_ICONS = {
+    google: '<svg class="pi" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.47.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>',
+    discord: '<svg class="pi" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M20.32 4.37A19.8 19.8 0 0 0 15.45 2.9a.07.07 0 0 0-.08.03c-.2.38-.44.87-.6 1.25a18.3 18.3 0 0 0-5.5 0c-.16-.39-.4-.87-.61-1.25a.08.08 0 0 0-.08-.03A19.7 19.7 0 0 0 3.7 4.37a.07.07 0 0 0-.03.03C.56 9.05-.3 13.6.12 18.1a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.23-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1 0-.13l.37-.29a.07.07 0 0 1 .08 0 14.2 14.2 0 0 0 12.06 0 .07.07 0 0 1 .08 0l.37.29a.08.08 0 0 1 0 .13c-.6.35-1.22.65-1.87.9a.08.08 0 0 0-.04.11c.36.7.78 1.36 1.23 2a.08.08 0 0 0 .08.03 19.8 19.8 0 0 0 6.01-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.7-3.55-13.7a.06.06 0 0 0-.03-.03zM8.02 15.36c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.22 0 2.18 1.1 2.16 2.42 0 1.34-.94 2.42-2.16 2.42z"/></svg>',
+    patreon: '<svg class="pi" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M15.39 2.03c-4.32 0-7.83 3.51-7.83 7.83 0 4.3 3.51 7.8 7.83 7.8 4.3 0 7.8-3.5 7.8-7.8 0-4.32-3.5-7.83-7.8-7.83zM.82 21.97h3.82V2.03H.82v19.94z"/></svg>',
+  };
   const PROVIDER_META = {
-    google:  { label: "Continue with Google",  icon: "G" },
-    discord: { label: "Continue with Discord", icon: "◈" },
-    patreon: { label: "Continue with Patreon", icon: "♥" },
+    google:  { label: "Continue with Google",  icon: PROVIDER_ICONS.google },
+    discord: { label: "Continue with Discord", icon: PROVIDER_ICONS.discord },
+    patreon: { label: "Continue with Patreon", icon: PROVIDER_ICONS.patreon },
   };
 
   function startOAuth(provider) {
@@ -367,7 +383,7 @@
       const btn = document.createElement("button");
       btn.className = "provider-btn";
       btn.setAttribute("data-provider", p.id);
-      btn.innerHTML = `<span class="pi">${meta.icon}</span> ${meta.label}`;
+      btn.innerHTML = `${meta.icon} ${meta.label}`;
       btn.addEventListener("click", () => startOAuth(p.id));
       wrap.appendChild(btn);
     });
@@ -390,15 +406,41 @@
     el.textContent = msg;
     el.classList.add("show");
   }
+  // Notice box (success / info). `html` allows an inline resend link.
+  function showNotice(html) {
+    const el = document.getElementById("auth-notice");
+    el.innerHTML = html;
+    el.classList.add("show");
+    const rs = el.querySelector("[data-resend]");
+    if (rs) rs.addEventListener("click", (e) => { e.preventDefault(); resendVerification(rs.getAttribute("data-resend")); });
+  }
+  function hideNotice() { document.getElementById("auth-notice").classList.remove("show"); }
   function surfaceQueryError() {
     try {
       const q = new URLSearchParams(location.search);
+      // Email-confirmation result (?verify=success|invalid).
+      const v = q.get("verify");
+      if (v === "success") showNotice("Email confirmed ✓ &mdash; you can sign in now.");
+      else if (v === "invalid") showError("That confirmation link is invalid or has expired. Sign in and we can resend it.");
       const err = q.get("error");
       if (!err) return;
       const provider = q.get("provider");
       const base = ERROR_TEXT[err] || "Sign-in error.";
       showError(provider ? `${base} (${provider})` : base);
     } catch (_) {}
+  }
+
+  async function resendVerification(email) {
+    hideNotice();
+    try {
+      await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch (_) {}
+    showNotice("Confirmation email re-sent to <strong>" + email.replace(/[<>&]/g, "") + "</strong>. Check your inbox.");
   }
 
   // ── Local email + password ──
@@ -447,7 +489,31 @@
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        // Registration is gated on email confirmation — do NOT navigate; show a
+        // "check your email" notice with a resend link instead.
+        if (data.pendingVerification) {
+          hideNotice();
+          const dev = data.emailDelivery === "logged"
+            ? " (No mail server is configured on this deployment, so the link was written to the server log.)"
+            : "";
+          showNotice(
+            "Almost there — we sent a confirmation link to <strong>" +
+            email.replace(/[<>&]/g, "") + "</strong>. Click it, then sign in." + dev +
+            ' <a href="#" data-resend="' + email.replace(/["<>&]/g, "") + '">Resend</a>'
+          );
+          setLocalMode("login");
+          return;
+        }
         location.href = safeReturnTo();
+        return;
+      }
+      // Unconfirmed email → block sign-in, offer a resend.
+      if (data.error === "email_unverified") {
+        hideNotice();
+        showNotice(
+          "Please confirm your email before signing in." +
+          ' <a href="#" data-resend="' + email.replace(/["<>&]/g, "") + '">Resend confirmation</a>'
+        );
         return;
       }
       const map = {
