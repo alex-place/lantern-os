@@ -16,6 +16,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
 
+# mpmath (rigorous interval arithmetic) is an OPTIONAL dep, absent in the minimal CI env — like
+# torch/discord elsewhere in this suite. Guard the transitive import so a missing mpmath SKIPS
+# this module cleanly instead of raising a collection ImportError that aborts the ENTIRE pytest
+# run (exit 2) and reds the "Python tests" gate on every PR.
+import pytest  # noqa: E402
+
+pytest.importorskip("mpmath")
+
 from sigma0_roa_certify import certify, verify_polynomial  # noqa: E402
 
 
