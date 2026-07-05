@@ -1,63 +1,80 @@
 {
-  "generated_at": "2026-07-05T20:31:25.757501+00:00",
+  "generated_at": "2026-07-05T20:44:52.280595+00:00",
   "client": "claude-code",
   "transport": "stdio -> http (scripts/mcp_stdio_bridge.py -> 127.0.0.1:8771)",
-  "connection": "live (mcp__lantern-os__* tools available in-session)",
+  "connection": "live",
   "server_health": {
     "status": "online",
-    "timestamp": "2026-07-05T20:31:25.727007+00:00",
+    "timestamp": "2026-07-05T20:44:52.267404+00:00",
     "active_slots": 0,
     "designed_ring_slots": 36,
     "claim_boundary": "active_slots = tasks currently in-flight through the Kernel loop (queue status=active); designed_ring_slots is a design contract",
     "queue_depth": 0,
     "mesh_peers": 1,
     "mesh_donors": 0,
-    "response_time_ms": 1.14
+    "response_time_ms": 2.01
   },
-  "parity": {
-    "chat_tool_exec": true,
-    "shared_tool_operator": true,
-    "execution_enabled": {
-      "enabled": true,
-      "reason": null
-    },
-    "verified_tools": {
-      "get_status": "healthy",
-      "list_skills": "5 skills",
-      "Grep": "executed",
-      "Read": "executed"
-    }
+  "capability_status": {
+    "ok": true,
+    "server": "lantern-os-mcp",
+    "capabilities": [
+      {
+        "capability": "node_tool_bridge",
+        "available": true,
+        "opt_in": false,
+        "blocker": null,
+        "next_action": null,
+        "detail": "C:\\Program Files\\nodejs\\node.EXE"
+      },
+      {
+        "capability": "shared_tool_execution",
+        "available": true,
+        "opt_in": false,
+        "blocker": null,
+        "next_action": null,
+        "detail": null
+      },
+      {
+        "capability": "operator_tools",
+        "available": true,
+        "opt_in": false,
+        "blocker": null,
+        "next_action": null,
+        "detail": null
+      },
+      {
+        "capability": "github_write",
+        "available": true,
+        "opt_in": false,
+        "blocker": null,
+        "next_action": null,
+        "detail": null
+      },
+      {
+        "capability": "local_runner",
+        "available": true,
+        "opt_in": false,
+        "blocker": null,
+        "next_action": null,
+        "detail": "C:\\dev\\lantern-os"
+      },
+      {
+        "capability": "sandboxed_executor",
+        "available": false,
+        "opt_in": true,
+        "blocker": "SUPERFLEET_EXECUTOR is not set (proposal path via task_run remains the default)",
+        "next_action": "set SUPERFLEET_EXECUTOR=1 to let execute_task commit fix branches",
+        "detail": null
+      }
+    ],
+    "ready_count": 5,
+    "total": 6,
+    "known_gaps": [],
+    "keystone_parity": true,
+    "tool_count": 121,
+    "timestamp": "2026-07-05T20:44:31.705296+00:00"
   },
-  "tool_count": 119,
-  "shared_keystone_tool_count": 26,
-  "shared_keystone_tools": [
-    "Bash",
-    "Edit",
-    "Glob",
-    "Grep",
-    "LS",
-    "PowerShell",
-    "Read",
-    "Write",
-    "analyze_video",
-    "create_document",
-    "creator_job_status",
-    "generate_document",
-    "github_issue",
-    "list_creator_projects",
-    "list_document_templates",
-    "local_eval_keystone_run",
-    "recall_memory",
-    "system_status",
-    "trader_market_status",
-    "trader_positions",
-    "trader_quote",
-    "web_fetch",
-    "web_search",
-    "workspace_list",
-    "workspace_read",
-    "workspace_write"
-  ],
+  "tool_count": 121,
   "all_tools": [
     "Bash",
     "Edit",
@@ -74,6 +91,7 @@
     "creator_job_status",
     "dispatch_work",
     "execute_task",
+    "export_document",
     "fleet_status",
     "generate_document",
     "get_recent_task_failures",
@@ -148,6 +166,7 @@
     "local_worktree_create",
     "local_worktree_destroy",
     "local_worktree_risk",
+    "mcp_capability_status",
     "mesh_donate",
     "mesh_prune",
     "mesh_register_peer",
