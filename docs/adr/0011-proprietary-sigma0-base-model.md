@@ -20,13 +20,13 @@ superseded-by: none
 
 ## Status
 
-Proposed — awaiting approval from Alex Place.
+**Accepted** — approved by Alex Place (2026-07-04), founder gate [#1666](https://github.com/alex-place/lantern-os/issues/1666). This reconciles the body with the frontmatter (`status: Accepted`, `approved-by: Alex Place (2026-07-04)`), which had already recorded the approval. Acceptance binds the *staged plan*; it does **not** promote the model — each stage still needs its own on-box evidence, and the model stays `verified:false` until Stage 3 measures a win.
 
 ### Progress since proposal (as of 2026-07-01)
 
 The owned modeling code exists, partially clears Stage 0, and the model has been made the
-**sole local coder by operator decision** (still `verified:false` — see below). Status stays
-Proposed; only Alex flips it (founder gate [#1666](https://github.com/alex-place/lantern-os/issues/1666)).
+**sole local coder by operator decision** (still `verified:false` — see below). The ADR is
+now Accepted (above); the model itself is still unpromoted pending the staged on-box gates.
 
 - **Own modeling code authored + merged.** [`models/keystone-sigma0-plt/`](../../models/keystone-sigma0-plt/README.md)
   — pure-torch `modeling_keystone_plt.py` + `download_and_patch.py` + `check_parity.py` (Stage-0
@@ -136,9 +136,13 @@ not by depending on any vendor's serving path.**
 - **Follow-ups (staged, each gated by on-box evidence — none auto-promotes the model):**
   - **Stage 0 — Parity.** ✅ *Authored + smoke-passed* (2026-06-30): `modeling_keystone_plt.py`
     loaded the forked weights at 4-bit with 0 missing/unexpected keys + 2/3 coherent generations.
-    ⛔ *Still open (the blocking sub-step):* reproduce the vLLM-fork reference logits on a fixed
-    prompt set to `top1_agree ≥ 0.99` (run `colab_parity.ipynb` on a ≥24 GB box). Until the
-    faithful check passes we own the weight **layout** but not the forward **math**.
+    ⛔ *Still open (the blocking sub-step):* reproduce the trusted reference logits on a fixed
+    prompt set to `top1_agree ≥ 0.99`. The reference capture is now **scripted** —
+    `capture_ref_logits.py` writes the exact `{input_ids, logits}` dict `check_parity --ref`
+    consumes, on the same imported `PROMPTS` (contract self-tested on CPU); run
+    `colab_parity.ipynb` §7 on a ≥24 GB box (L4/A100). The only remaining blocker is that
+    hardware. Until the faithful check passes we own the weight **layout** but not the forward
+    **math**.
   - **Stage 1 — Fit.** 4-bit (bnb nf4) under the 8 GB budget; measure VRAM + tok/s
     (reuse `loopcoder_v2_4bit_probe.py` harness → `data/convergence/`).
   - **Stage 2 — Serve.** Ollama/OpenAI-compatible endpoint (the `ouro_serve.py` pattern); point the

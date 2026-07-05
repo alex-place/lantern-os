@@ -56,7 +56,9 @@ python download_and_patch.py --out ./checkpoint
 # 2. STAGE-0 GATE — must pass before training
 python check_parity.py --model ./checkpoint --dtype 4bit
 #    truest check (needs 24 GB): --dtype bf16
-#    faithful parity vs vLLM:     --ref ref_logits.pt   (see below)
+#    faithful parity (needs 24 GB): capture the reference, then compare —
+python capture_ref_logits.py --ref-model ./checkpoint --out ref_logits.pt
+python check_parity.py --model ./checkpoint --dtype bf16 --ref ref_logits.pt
 
 # 3. train an adapter (only after Stage 0 PASS)
 python train_lora.py --model ./checkpoint --data data/sample_sft.jsonl --out ./adapter
@@ -69,7 +71,8 @@ python train_lora.py --model ./checkpoint --data data/sample_sft.jsonl --out ./a
 | `configuration_keystone_plt.py` | `KeystonePLTConfig` — PLT params + `auto_map` we own |
 | `modeling_keystone_plt.py` | `KeystonePLTForCausalLM` — the pure-torch PLT forward (the port) |
 | `download_and_patch.py` | fetch Apache-2.0 weights, drop our code in, patch `config.json` |
-| `check_parity.py` | **Stage-0 gate**: weight-key match + smoke gen + optional vLLM logit parity |
+| `check_parity.py` | **Stage-0 gate**: weight-key match + smoke gen + optional logit parity (`--ref`) |
+| `capture_ref_logits.py` | captures the trusted reference `ref_logits.pt` (`{input_ids, logits}`) `check_parity --ref` consumes; `--self-test` verifies the contract on CPU |
 | `train_lora.py` | QLoRA SFT, adapter-only / frozen base (ADR-0010) |
 | `data/sample_sft.jsonl` | tiny example dataset (prompt/completion or text) |
 
