@@ -36,7 +36,7 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 
 | Benchmark | Loop stage | What it measures | Harness | Status | Latest evidence |
 |---|---|---|---|---|---|
-| **HumanEval** | Act / Reason | Code pass@1 (164 problems) | `scripts/eval_humaneval_chat.py`, `scripts/eval_humaneval_ouro.py`, `experiments/humaneval_runner.py` | ✅ Run | Ouro full-164 pass@1 **0.427**; Qwen-base+Σ₀ subset **0.75** — `leaderboard.jsonl` |
+| **HumanEval** | Act / Reason | Code pass@1 (164 problems) | `scripts/eval_humaneval_chat.py`, `scripts/eval_humaneval_ouro.py`, `experiments/humaneval_runner.py` | ✅ Run | **Ouro** full-164 pass@1 **0.427**; the **0.75** subset row is **Qwen-3B base**+Σ₀ data (a ceiling probe, *not* our local model) — `leaderboard.jsonl` |
 | **MBPP** (basic subset) | Act | Exec-graded function synthesis | `scripts/eval_coding.py` (+ `data/eval/mbpp-basic.jsonl`) | ✅ Run | `leaderboard.jsonl` / `data/eval/mbpp-basic.jsonl` |
 | **SWE-bench Lite** | Act / Verify | Real-repo issue → patch, resolved% (official Docker/Modal grader) | `scripts/eval_swebench_chat.py`, `scripts/swe_agent_loop.py`, `scripts/swe_agentic_run.py` | 🟡 Partial | Qwen single-shot **0/3** (2 applied-but-wrong); agentic propose→test→retry loop landed |
 | **LongMemEval** | Remember | Memory retrieval recall@k / MRR over long multi-session histories | `experiments/longmemeval_harness.py` | ✅ Run | Real `longmemeval_s` (n=189, k=5): multi-signal recall@5 **0.709** / MRR **0.486** vs keyword **0.222** / 0.098 — `data/longmemeval/runs.jsonl` (2026-07-01) |
@@ -58,16 +58,22 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 - **Two layers we measure:** the **raw model** (`eval_humaneval_ouro.py` via in-process `generate()`) and the **whole chat product** (`eval_humaneval_chat.py`, which drives `POST /api/dream/chat/stream` exactly like the browser — provider routing, local-model adapter, loop-reasoner). One extractor + one sandbox shared; never fabricates a score (`humaneval_runner.py` returns `measured:false` if the package is missing).
 - **Provider-parametric:** `--provider ollama|anthropic|""` → local↔cloud parity on one execution-grounded mark.
 - **Run it:** `python scripts/eval_humaneval_chat.py --provider ollama --limit 10` (server + local model up), `--full` for all 164.
+- **Public SOTA (web-validated 2026-07-05, [llm-stats](https://llm-stats.com/benchmarks/humaneval)):** Claude Sonnet 4.5 **97.6%**, DeepSeek R1 **97.4%**; field average across 54 models **89.2%**. **Saturated** — every frontier model clears 90% and the set is in public training mixes, so read our **0.427** as an *absolute-capability* number for a 1.4B model, not a live competitive gap. Use SWE-bench / LiveCodeBench to differentiate the frontier.
+
+### HumanEval (chat product) — layer note
+- The full-chat layer (`eval_humaneval_chat.py`) has **no recent full-164 row** — only the raw-model `0.427` is fresh. Running it answers whether provider routing + the loop-reasoner deliver the raw number or lose some of it. This is the top HumanEval gap to fill.
 
 ### MBPP — ✅ Run
 - **Source:** Mostly-Basic-Python-Problems (Google). We run an exec-and-assert subset (`data/eval/mbpp-basic.jsonl`).
 - **Run it:** `python scripts/eval_coding.py --label ouro-fast --model lantern-sigma0-coder`.
+- **Public SOTA (web-validated 2026-07-05, [llm-stats](https://llm-stats.com/benchmarks/mbpp-pass@1)):** o4-mini **94.9%** (pass@1); top open-weight Sarvam-30B **92.7%**. Like HumanEval, **saturated** at the frontier — our subset accuracy is an absolute read, not a ranked gap.
 
 ### SWE-bench Lite — 🟡 Partial
 - **Source:** `princeton-nlp/SWE-bench_Lite` (plain) and `princeton-nlp/SWE-bench_Lite_bm25_13K` (BM25-retrieved `text` prompt). Grading is **execution-graded and delegated to the official `swebench` harness** (Docker or Modal/WSL) — we never report a resolved% we didn't measure.
 - **Single-shot vs agentic:** single-shot blind patches score ~0 (Qwen 0/3). The agentic loop (`swe_agent_loop.py`: propose → apply → run repo tests → feed failing test back → retry) closes that seam; `swe_agentic_run.py` runs it live (ollama propose on host, grade one instance in WSL).
 - **Run it:** `python scripts/eval_swebench_chat.py --provider ollama --limit 10 --dataset princeton-nlp/SWE-bench_Lite_bm25_13K --grade` (needs Docker). Predict-only without `--grade`, grade later.
 - **Next:** pull a real run with a 32k-context model (`LOCAL_CAPABILITY_FIRST=1`) so the 13K BM25 prompt isn't truncated; record the measured resolved% as a leaderboard row.
+- **Public SOTA (web-validated 2026-07-05, [SWE-bench Verified leaderboard](https://llm-stats.com/benchmarks/swe-bench-verified) / [steel.dev](https://leaderboard.steel.dev/leaderboards/swe-bench-verified/)):** Claude Mythos 5 **95.5%**, Claude Fable 5 **95.0%**, Claude Opus 4.8 **88.6%** resolved (Verified split; 103 models tracked, field avg ~70%). **This is the *unsaturated*, differentiating coding mark** — and it's exactly the one where we still have **no measured local number**. Closing that empty cell is the single highest-value coding run on the board.
 
 ### LongMemEval — ✅ Run
 - **Source:** `xiaowu0162/LongMemEval` (`longmemeval_s` / `_m` / `_oracle`). Measures whether the gold evidence turn is retrieved in top-k. We benchmark the canonical Python `MemoryEngine` (`src/csf/memory_engine.py`) in both `keyword` and `multi-signal` modes.
@@ -75,6 +81,7 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 - **Run it:** `LONGMEMEVAL_PATH=/path/to/longmemeval_s.json python experiments/longmemeval_harness.py --k 5 --limit 200`. Offline self-test (no env var) runs on a baked-in synthetic fixture.
 - **First real run (2026-07-01, `longmemeval_s`, 189 scored, k=5):** multi-signal recall@5 **0.709** / MRR **0.486**; keyword recall@5 **0.222** / MRR **0.098** (+0.487 recall for multi-signal). Ledger: `data/longmemeval/runs.jsonl`.
 - **Next:** raise multi-signal recall@5 toward MemOS-class numbers; measure the live JS chat path (nomic-embed rerank) as a *separate* row.
+- **Public SOTA (web-validated 2026-07-05, [mem0 memory-benchmarks](https://mem0.ai/blog/ai-memory-benchmarks-in-2026) / [ByteRover](https://www.byterover.dev/blog/benchmark_ai_agent_memory_real_production_byterover_top_market_accuracy_longmemeval)):** top production memory systems report **end-to-end QA accuracy ~92–94%** on LongMemEval-S (ByteRover 92.8%, EverMemOS-class ~94.4). **Not directly comparable to our 0.709** — theirs is answer *accuracy* on the full 500-item set; ours is retrieval *recall@5* on a 189-item slice. To rank against them, run the full-set end-to-end QA metric (retrieval → answer → grade), not retrieval recall alone.
 
 ### HaluEval-QA — 🟡 Partial
 - **Source:** `RUCAIBox/HaluEval` (`qa_data.json`) — factual QA where each item ships the gold `knowledge` passage + `right_answer` + a known `hallucinated_answer`. Subset in `data/eval/halueval-qa-subset.jsonl` (n=40).
