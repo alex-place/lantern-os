@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll for new Lantern OS releases (unisona.ai cloud VM)
+Documentation=https://github.com/alex-place/lantern-os/blob/master/docs/ops/gce-cloud-deploy-runbook.md
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

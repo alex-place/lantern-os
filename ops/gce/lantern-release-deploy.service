@@ -1,0 +1,10 @@
+[Unit]
+Description=Lantern OS release-gated self-update (unisona.ai cloud VM)
+Documentation=https://github.com/alex-place/lantern-os/blob/master/docs/ops/gce-cloud-deploy-runbook.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Live copy runs from /usr/local/bin so a tag checkout can't remove it mid-run.
+ExecStart=/usr/local/bin/lantern-release-deploy.sh

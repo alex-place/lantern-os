@@ -2,6 +2,18 @@
 ### Added
 - **HaluEval-QA gated harness can now answer with the local model, not just the gpt-4o-mini oracle** (`experiments/halueval_gated.py --answerer ollama --model ouro:latest`). The gate's surprise signal needs per-token logprobs, which the local serve path doesn't emit, so the gate degrades to "unavailable" (reported honestly, never faked) while the A/B hallucination measurement still runs. First measured on-model row: **Ouro-1.4B (honesty adapter), n=40 — grounding cuts hallucination 80% → 52%** (35% rel.), baseline accuracy 20%. Strengthens **Verify**. See `changelog.d/halueval-on-ouro.md` (#2112).
 
+## [1.8.81] - 2026-07-05
+### Added
+- **Benchmark leaderboard rows now carry provenance** — `git_sha`, `served_checkpoint` (the `OURO_*` model+adapter measured), and `campaign_id` (`EVAL_CAMPAIGN_ID` or a git-sha fallback) — via a shared `scripts/eval_ledger.append_leaderboard` helper wired into `eval_coding.py` / `eval_humaneval_ouro.py` / `eval_humaneval_chat.py`. Rows are groupable by model snapshot so a cross-benchmark read knows it's comparing one checkpoint, not two. Strengthens **Converge**. See `changelog.d/benchmarks-ledger-provenance.md` (#2108). (Re-land: the original commits were orphaned when PR #2106 auto-merged at its docs-only first commit.)
+
+## [1.8.80] - 2026-07-05
+### Added
+- **Tolerant reader for the honesty eval ledgers** (`scripts/honesty_ledger.py`). The `epistemic/` and `halueval-local/` runs use different correctness fields (`class_ok`+`verified_ok` vs `ok`), so a consumer assuming one schema misread the other — the `/benchmarks` skill hit exactly this and refused to quote a number. `read_accuracy()` normalizes any known schema to one per-item correctness bool, returns None (not False) for unlabelable rows so an unscored file can't masquerade as 0%, and surfaces an `unscored` count. Recovers the real figures: halueval-local base 0.05 → adapter 0.40, epistemic base 0.0 → adapter 0.917. Strengthens **Converge**. See `changelog.d/honesty-ledger-reader.md` (#2110).
+
+## [1.8.79] - 2026-07-05
+### Added
+- **The Σ₀ council log now records outcomes, so verification-recall is computable.** Every review carries a stable `id`; when an execution check ran, its pass/fail is stamped as the review's outcome at record time (previously every one of 368 rows was `outcome: null`, making "did the council catch the model when it was wrong?" unmeasurable). New `labelCouncilOutcome(id, outcome)` appends a resolved outcome (revert / operator action) by id, and `foldCouncilOutcomes()` folds the append-only stream into `id → latest outcome` (later labels win). Strengthens **Verify**. See `changelog.d/council-outcome-writeback.md` (#2109).
+
 ## [1.8.78] - 2026-07-05
 ### Changed
 - **The home "Check the news" chip now summarizes today's headlines instead of web-searching the word "news".** The chip sends "summarize the top world news headlines from today", and any news-intent chat is grounded on the real curated RSS discover feed (title, link, source, date, summary, and lead image). The model returns real, sourced panels in a fixed format — linked headline, an image when the source provides one, source · date, one-line takeaway — rather than a junk web search ("News Today" the newspaper, the "Today" TV show) or "I couldn't find the news". Strengthens **Observe**. See `changelog.d/news-chip-llm-summary.md`.
