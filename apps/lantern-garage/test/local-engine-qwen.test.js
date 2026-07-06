@@ -58,8 +58,8 @@ function tmp() {
     if (ip !== -1) assert(iq < ip, "qwen must sort ahead of the PLT coder");
   });
 
-  await check("Qwen is honestly UNVERIFIED (on-box eval #2173 is the gate) + non-self-converging", () => {
-    assert.strictEqual(reg.isVerified("qwen2.5-coder:latest"), false);
+  await check("Qwen is VERIFIED on-box (#2173: coding-golden exec pass@1 0.96) + non-self-converging", () => {
+    assert.strictEqual(reg.isVerified("qwen2.5-coder:latest"), true); // reproduced by us, not vendor-claimed
     assert.strictEqual(reg.toolCalling("qwen2.5-coder:latest"), true);
     assert.strictEqual(reg.selfConverges("qwen2.5-coder:latest"), false); // Core wraps it in loopedReason()
   });

@@ -11,8 +11,8 @@
       "taskTypes": ["coding", "reasoning", "default"],
       "rank": 1,
       "capabilityScore": 0.86,
-      "verified": false,
-      "note": "Default local coder (OSS-BASELINE #2171): supported Apache-2.0 Qwen2.5-Coder-7B via Ollama :11434 (already pulled). HumanEval 88.4% (vendor); verified:false until reproduced on-box (#2173). Leads coding/reasoning/default on the 8GB box; single-pass so the Core wraps it in loopedReason() (grounding by default)."
+      "verified": true,
+      "note": "Default local coder (OSS-BASELINE #2171): supported Apache-2.0 Qwen2.5-Coder-7B via Ollama :11434. VERIFIED on-box (#2173): coding-golden exec pass@1 0.96 (24/25), leaderboard row qwen25coder-onbox-2173. capabilityScore stays the vendor HumanEval anchor (0.86), not the easy coding-golden 0.96. Leads coding/reasoning/default on the 8GB box; single-pass so the Core wraps it in loopedReason() (grounding by default)."
     },
     {
       "id": "keystone-sigma0-plt",

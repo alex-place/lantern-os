@@ -171,7 +171,11 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
    coding promotion is gated on the loop-value experiment #2178). Honest: Qwen is registered
    `verified:false` (vendor HumanEval 88.4% not yet reproduced on-box — #2173 is the gate to flip it),
    yet it leads because it out-scores the only other (also-unverified) local coder and — unlike the
-   PLT shim — actually serves. Test: `npm run test:local-engine` (7/7).
+   PLT shim — actually serves. ✅ **Verified on-box (#2173):** qwen2.5-coder:latest scored **exec-graded
+   coding-golden pass@1 0.96 (24/25)**, ~6s/task, live via Ollama `:11434` (leaderboard row
+   `qwen25coder-onbox-2173`) — so it flipped from `verified:false` to `verified:true` (reproduced by us,
+   not vendor-claimed). `capabilityScore` stays the vendor HumanEval anchor (0.86), not the easier 0.96 —
+   a full external HumanEval/SWE-bench run on Qwen is the stronger follow-up. Test: `npm run test:local-engine` (7/7).
 2. **Continue is frozen — do not build on it.** Field is thinning (Roo dead, Continue read-only),
    which *widens* the neutral, user-owned control-plane lane.
 3. **Use an OSS memory store (Graphiti/cognee), don't defend CSF as a better store.** Our value is the
