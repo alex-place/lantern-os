@@ -190,9 +190,15 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
 **Landed:** the coding-backend control plane — `apps/lantern-garage/lib/coding-backend/`. A backend
 **proposes** a change, the control plane **holds it for approval** (consequence-gate pattern) and
 emits a **receipt** (task, backend, model, cost, files, patch-hash, why, status) that no raw coding
-agent produces; approve applies it, reject drops it. Backends: **mock** (tests) + **Aider** (#2171)
-+ **OpenHands** (#2172) — the real adapters activate when their CLI is installed and serve the
-registry-resolved local engine (Qwen2.5-Coder). Tested: `npm run test:coding-backend` (7/7).
+agent produces; approve applies it, reject drops it. Backends: **mock** (tests), **ollama** (direct
+Qwen2.5-Coder generation), **Aider**, **OpenHands** (#2172) — the agent adapters activate when their
+CLI is installed and serve the registry-resolved local engine. Tested: `npm run test:coding-backend` (7/7).
+
+**Wrapped-vs-raw benchmark (#2173, MEASURED):** `scripts/eval_coding_backend_ab.py` ran the 25 golden
+tasks **raw** (direct qwen) vs **wrapped** (through the control plane), same model. Result:
+**raw pass@1 1.00 = wrapped pass@1 1.00**, with **100% held-for-approval + 100% receipt coverage** —
+the control plane costs **zero accuracy** and adds full accountability that no raw agent provides.
+Report: `data/eval/coding-backend-ab-report.json`.
 
 **Backlog (filed from this baseline):**
 - #2171 — ship local engine on Qwen2.5-Coder; Ouro → research lane

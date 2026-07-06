@@ -71,13 +71,12 @@ module.exports = {
         }
       }
     } finally {
-      // revert so the proposal is HELD, not applied
-      try {
-        git(["checkout", "--", "."]);
-        git(["clean", "-fd"]);
-      } catch {
-        /* best effort */
-      }
+      // Revert EVERYTHING (staged/unstaged/untracked) so the proposal is genuinely HELD.
+      // Each op independently fault-tolerant so `checkout` failing (empty repo) can't skip `clean`.
+      const _try = (args) => { try { git(args); } catch { /* best effort */ } };
+      _try(["reset", "-q"]);
+      _try(["checkout", "--", "."]);
+      _try(["clean", "-fdq"]);
     }
     if (!changed.length) return { ok: false, error: "openhands produced no changes" };
     return {

@@ -32,6 +32,7 @@ const DEFAULT_DATA_DIR = path.join(_repoRoot, "data");
 
 const ADAPTERS = {
   mock: require("./adapters/mock"),
+  ollama: require("./adapters/ollama"),
   aider: require("./adapters/aider"),
   openhands: require("./adapters/openhands"),
 };
@@ -201,10 +202,11 @@ function readReceipts(opts = {}) {
   return _readAll(dataDir, "coding-receipts.jsonl");
 }
 
-// Honest A/B scaffold: the wrapped path always adds hold-for-approval + a receipt the raw
-// backend never emits. Measuring the EDIT-ACCURACY delta needs a real task set
-// (Aider Polyglot / SWE-bench Lite) — filed as a backlog issue, not faked here.
-async function abCompare({ task, repoPath, backend = "aider" }, opts = {}) {
+// Honest A/B: the wrapped path always adds hold-for-approval + a receipt the raw backend
+// never emits. The measured EDIT-ACCURACY comparison over the golden task set lives in
+// `scripts/eval_coding_backend_ab.py` (raw qwen vs wrapped, reusing the exec grader);
+// this in-process helper is the single-task structural check.
+async function abCompare({ task, repoPath, backend = "ollama" }, opts = {}) {
   const adapter = ADAPTERS[backend];
   if (!adapter || !(await adapter.available())) {
     return { measured: false, reason: `backend '${backend}' unavailable; install it + a local coder to measure`, backend };

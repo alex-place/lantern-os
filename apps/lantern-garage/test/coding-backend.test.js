@@ -27,9 +27,11 @@ function tmp() {
 }
 
 (async () => {
-  await check("listBackends includes mock, aider, and openhands", () => {
+  await check("listBackends includes mock, ollama, aider, openhands", () => {
     const b = cb.listBackends();
-    assert(b.includes("mock") && b.includes("aider") && b.includes("openhands"), "expected mock+aider+openhands backends");
+    for (const be of ["mock", "ollama", "aider", "openhands"]) {
+      assert(b.includes(be), `expected backend '${be}'`);
+    }
   });
 
   await check("mock: propose HOLDS the change (nothing applied) + emits receipt + pending", async () => {
