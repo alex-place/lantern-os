@@ -27,6 +27,7 @@
     "test:three-doors": "node ../../tests/test_three_doors_integration.spec.js",
     "test:showcase": "node test/static-mime.test.js && node test/showcase-manifest.test.js && node test/showcase-gallery-ui.test.js",
     "test:boundary": "node test/surface-boundary.test.js",
+    "test:coding-backend": "node test/coding-backend.test.js",
     "test:tenant": "node test/tenant.test.js",
     "test:profile": "node test/deployment-profile.test.js",
     "test:desktop": "node test/desktop-phase0.test.js",
