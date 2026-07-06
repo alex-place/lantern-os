@@ -1,0 +1,74 @@
+{
+  "claim": "certified basin (gamma, c, P) => anchor budget B < B*_inf has a computable escape deadline n*(B); bite governed by cond(P)",
+  "verification": "exact trust-region max of V(x_n+a) over ||a||<=B vs predicted deadline",
+  "cases": [
+    {
+      "label": "normal_well_conditioned",
+      "gamma": 0.64,
+      "cond_P": 1.8,
+      "B_star_inf": 1.2,
+      "V0": 3.6,
+      "budgets": [
+        {
+          "budget": 0.4,
+          "predicted_deadline": 1.58,
+          "measured_last_escape": 1,
+          "consistent": true
+        },
+        {
+          "budget": 0.6,
+          "predicted_deadline": 2.87,
+          "measured_last_escape": 2,
+          "consistent": true
+        },
+        {
+          "budget": 0.9,
+          "predicted_deadline": 5.98,
+          "measured_last_escape": 5,
+          "consistent": true
+        }
+      ],
+      "all_consistent": true
+    },
+    {
+      "label": "nonnormal_sliver",
+      "gamma": 1.0,
+      "cond_P": 626926.6,
+      "B_star_inf": 0.0024,
+      "V0": 3.6,
+      "budgets": [
+        {
+          "budget": 0.01,
+          "predicted_deadline": null,
+          "measured_last_escape": 14,
+          "consistent": true
+        },
+        {
+          "budget": 0.05,
+          "predicted_deadline": null,
+          "measured_last_escape": 14,
+          "consistent": true
+        },
+        {
+          "budget": 0.4,
+          "predicted_deadline": null,
+          "measured_last_escape": 14,
+          "consistent": true
+        }
+      ],
+      "all_consistent": true
+    },
+    {
+      "label": "ouro_projection",
+      "measured_rho": 0.88,
+      "sqrtV_half_life_steps": 5.4,
+      "gap_closed_at_depth_4": 0.4,
+      "gap_closed_at_depth_8": 0.64,
+      "regime": "sliver (measured strongly non-normal) -> weak Euclidean deadline",
+      "retrodicts": "anchoring null in experiments/ouro_canary_vs_logprob.py",
+      "note": "projection of a measured rate through the inequality \u2014 not a new measurement"
+    }
+  ],
+  "evidence_class": "PROVEN (synthetic maps, V-metric) + PROJECTION (Ouro)",
+  "all_synthetic_checks_consistent": true
+}
