@@ -27,6 +27,24 @@
 >   own headline confidence to ~0.55 pending E1 — that self-imposed downgrade is the discipline
 >   working, and E1 (de-gloss the 66, re-run the existing adapter, ~free) is promoted to the
 >   program's immediate next action.
+>
+> ---
+>
+> ### ⚑ E1 RESULT (2026-07-06) — the conditional resolved: shortcut CONFIRMED, headline retracted
+> E1 ran (`data/sigma0/e1_degloss_report.json`, MEASURED). Tier-A de-gloss (strip trailing
+> status clauses + status parentheticals, keep canonical names; 17 of 20 heldout negatives
+> changed), re-run the **same** adapter in-process:
+> - **Ouro:** golden 0.958 → **0.833**, confab **2/20 (10%) → 11/20 (55%)**, over-abstention 2.2% → 0.0%
+> - **GPT-4o-mini control:** confab **0/20 → 0/20** (unmoved), golden 0.964 → 0.976
+>
+> The GPT control is decisive: de-gloss does **not** make the task harder for a genuinely-honest
+> model, so Ouro's 5.5× confab spike is the **tune reading glosses, not honesty** — isolated to
+> the tune. The 9 newly-confabulated items are exactly the gloss-stripped ones (P≠NP, BSD,
+> Navier-Stokes, Yang-Mills, NP=coNP, P=BPP, RSA-hardness, OWF-exist, aether). **The design
+> survives (it predicted this and staged E1 first); the "10% confab / ties GPT-4o-mini" headline
+> is retracted.** Trainability of honesty at 1.4B is now OPEN, re-established only on **corpus-v2**
+> (D2) and confirmed on OSS marks (TruthfulQA / HaluEval / AbstentionBench), never on the leaked
+> v1 key. **Corpus-v2 (E4) is promoted from follow-up to critical path.**
 
 ---
 
@@ -122,7 +140,7 @@ The Σ₀ model is a **calibration artifact, not a knowledge artifact** — and 
 
 | Model | golden-v1 (66) g / confab [CI] / over-abst | golden-v2 de-glossed (≥100 neg) g / confab / over-abst | SimpleQA-Verified: Acc / Att / Acc\|Att / F1 | HaluEval-local: acc / gate-AUROC | TruthfulQA-MC |
 |---|---|---|---|---|---|
-| Σ₀-Ouro-1.4B SFT (current adapter) | ✅ 0.958 / 10% [1.2,31.7] / 2.2% | ▢ **E1 first on de-glossed v1** | ▢ (expect low Acc, target: calibrated hedge profile) | ▢ | ▢ |
+| Σ₀-Ouro-1.4B SFT (current adapter) | ✅ 0.958 / 10% [1.2,31.7] / 2.2% | ✅ **E1: 0.833 / 55% (11/20) / 0.0%** — shortcut CONFIRMED | ▢ (expect low Acc, target: calibrated hedge profile) | ▢ | ▢ |
 | + corpus-v2 SFT | ▢ | ▢ | ▢ | ▢ | ▢ |
 | + DPO | ▢ | ▢ | ▢ | ▢ | ▢ |
 | + logprob-gated grounding (T1+T2) | ▢ | ▢ | ▢ | ▢ | ▢ |
@@ -158,7 +176,7 @@ Given fully in D7 (protocol + skeleton). Cadence: golden-v1 (frozen) + golden-v2
 
 | # | Experiment | Cost | What it can falsify |
 |---|---|---|---|
-| **E1** | **De-gloss the 66 heldout statements (bare claims), re-run the existing adapter in-process** | ~1 h eng + minutes GPU | **The headline.** If confab jumps (e.g. 10% → >30%), the tune learned gloss-reading, not honesty → corpus v2 becomes the whole ballgame. If it holds, the result strengthens materially. Also re-run GPT/Gemini arms on the same de-glossed set for the frontier deltas. |
+| **E1 ✅ DONE (2026-07-06)** | **De-gloss the 66 heldout statements (bare claims), re-run the existing adapter in-process** | ~1 h eng + minutes GPU | **RESULT: confab 10% → 55% (Ouro), 0% → 0% (GPT-4o-mini control). Shortcut CONFIRMED — the headline was gloss-reading, not honesty.** Premise-invalidation triggered: corpus-v2 (E4) is now the critical path. Report: `data/sigma0/e1_degloss_report.json`. |
 | E2 | Fix `ouro_serve.py` train-format parity (#2033 open half); re-run `live_bench` Ollama arm | ~½ day eng | The serving-stack claim: served numbers must match in-process (66/66 parseable). Divergence = serving bug, blocks all production claims. |
 | E3 | Capture decision-token logprobs + `mean_depth` per heldout item; build risk-coverage; compute routing edges | ~½ day eng, minutes GPU | D4: no positive routing edge for logprob → gate refuted (fallback always-ground). Depth routing positively → my depth-is-telemetry claim refuted (update loudly). |
 | E4 | Corpus v2 (D2) + SFT retrain (local or L4) + de-glossed/LOSO eval | ~2–3 days eng + ≲1 GPU-h | D2: LOSO family >50% confab refutes cross-status generalization. Over-abstention gate breach refutes the ABSTAIN class addition. |

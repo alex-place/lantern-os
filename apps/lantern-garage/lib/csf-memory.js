@@ -622,6 +622,30 @@ function formatCSFContextForPrompt(message, opts = {}) {
     }
   }
 
+  // Recent AI research (arXiv, post-cutoff) — real, citable papers published after the
+  // model's knowledge cutoff, retrieved by BM25 from the local corpus on drive F:
+  // (built by scripts/arxiv_harvest.py + arxiv_build_index.py). Gated OFF until the
+  // corpus is built; the retrieval lib is itself fail-safe (returns [] on any error).
+  if (message && process.env.KEYSTONE_ARXIV_RETRIEVAL === "1") {
+    try {
+      const { queryArxiv } = require("./arxiv-index");
+      const papers = queryArxiv(message, 3);
+      if (papers.length > 0) {
+        const paperText = papers.map(p => {
+          const date = p.published ? `, ${p.published}` : "";
+          const snip = (p.snippet || "").trim();
+          return `- **${p.title}** (arXiv:${p.id}${date})${snip ? ": " + snip : ""}`;
+        }).join("\n");
+        parts.push(
+          "Recent AI research (arXiv, published after your training cutoff) — these are real " +
+          "papers retrieved from the local corpus. When you use one, cite it by its arXiv id " +
+          "exactly as shown (e.g. arXiv:2506.12345); do NOT invent or alter ids, and do not cite " +
+          "a paper that is not listed here:\n" + paperText
+        );
+      }
+    } catch { /* non-fatal: arXiv retrieval never blocks chat */ }
+  }
+
   // RAG house knowledge base — relevant external records
   if (message) {
     const ragRecords = queryRagHouse(message, 2);
