@@ -39,6 +39,9 @@ class Kernel:
             codebase_index_path: Optional path to codebase understanding
         """
         self.memory_path = Path(memory_path)
+        # #2084: persisted convergence-record log (Verify outcomes land here). Derived from the
+        # memory dir so a temp-memory kernel keeps its records isolated too.
+        self.records_path = self.memory_path.parent / "convergence-records.jsonl"
         self.codebase_index_path = codebase_index_path
         self.memory: Dict[str, Memory] = {}
         self.tools: Dict[str, Tool] = {}
@@ -255,15 +258,23 @@ class Kernel:
         record: ConvergenceRecord,
         actual_outcome: Any,
         success: bool,
-    ) -> None:
+        persist: bool = True,
+    ) -> ConvergenceRecord:
         """Verify that predicted outcome matches reality.
 
-        Updates confidence post-facto based on verification results.
+        Updates confidence post-facto based on verification results AND persists the outcome so
+        it flows back into the record store (#2084). Stage 5 previously updated confidence only
+        in memory — "test results don't flow back to update memory confidence"
+        (convergence-core-mapping.md). Now a verifiable action (autowork test, Kalshi resolution)
+        raises/lowers the originating record's confidence and writes it to `records_path`.
 
         Args:
-            record: ConvergenceRecord to verify
+            record: ConvergenceRecord to verify (its confidence is updated in place)
             actual_outcome: What actually happened
             success: Whether prediction was correct
+            persist: Append the verified record to the record log (default True)
+
+        Returns: the same record, now verified.
         """
         record.verified = True
         record.verification_notes = f"Predicted: {record.result}, Actual: {actual_outcome}, Success: {success}"
@@ -275,6 +286,12 @@ class Kernel:
         else:
             # Failed predictions → decrease confidence
             record.confidence = max(0.0, record.confidence - 0.2)
+
+        # #2084: store the verification OUTCOME as a ConvergenceRecord so the confidence update
+        # survives restart and Converge/compile_patterns can read verified history off disk.
+        if persist:
+            self.save_convergence_record(record, path=str(self.records_path))
+        return record
 
     # ========== Stage 6: Converge ==========
     def extract_patterns(self, min_confidence: float = 0.85) -> List[Dict[str, Any]]:
