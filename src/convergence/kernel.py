@@ -304,6 +304,40 @@ class Kernel:
 
         return patterns
 
+    PATTERN_SOURCE = "convergence_pattern"
+
+    def compile_patterns(self, min_confidence: float = 0.85) -> List[Memory]:
+        """Compile high-confidence convergence records into reusable pattern MEMORIES (#2085).
+
+        Closes the Converge→Remember→Reason feedback loop: `extract_patterns()` finds the
+        verified, high-confidence records, and this writes each as a ``Memory`` into the SAME
+        append-only store (``memory_path``) that ``reason()``/``query_memory()`` already read —
+        no new store, so Reason retrieves patterns exactly like any other memory.
+
+        Idempotent: a pattern whose hypothesis is already stored is skipped, so a periodic job
+        can run every cycle without duplicating. Returns the pattern memories written this call.
+        """
+        already = {
+            m.content.get("hypothesis")
+            for m in self.memory.values()
+            if m.source == self.PATTERN_SOURCE and isinstance(m.content, dict)
+        }
+        written: List[Memory] = []
+        for pat in self.extract_patterns(min_confidence):
+            if pat["hypothesis"] in already:
+                continue  # idempotent — already compiled into memory
+            mem = Memory(
+                id=f"pat-{datetime.now().timestamp()}-{uuid.uuid4().hex[:6]}",
+                timestamp=datetime.now(),
+                source=self.PATTERN_SOURCE,
+                confidence=pat["success_rate"],
+                content={"kind": "pattern", **pat},
+            )
+            self.append_memory(mem)          # -> self.memory + _append_to_disk (existing store)
+            already.add(pat["hypothesis"])
+            written.append(mem)
+        return written
+
     def get_convergence_metrics(self) -> Dict[str, Any]:
         """Get metrics on system convergence and learning.
 
@@ -363,3 +397,41 @@ class Kernel:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a") as f:
             f.write(record.to_jsonl() + "\n")
+
+    def load_records_from_disk(self, path: str = "data/convergence-records.jsonl") -> int:
+        """Load persisted ConvergenceRecords (written by ``save_convergence_record``) back into
+        ``self.convergence_records`` — the mirror of ``_load_memory_from_disk`` for records.
+
+        A periodic ``compile_patterns`` job needs the full record history, and records were
+        write-only until now (there was a saver but no loader, #2085). Returns count loaded.
+        """
+        p = Path(path)
+        if not p.exists():
+            return 0
+        loaded = 0
+        with open(p, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    d = json.loads(line)
+                    rec = ConvergenceRecord(
+                        id=d["id"],
+                        hypothesis=d["hypothesis"],
+                        evidence_ids=d.get("evidence_ids", []),
+                        result=d.get("result"),
+                        confidence=d.get("confidence", 0.5),
+                        reasoner=d.get("reasoner", ""),
+                    )
+                    rec.verified = bool(d.get("verified", False))
+                    rec.verification_notes = d.get("verification_notes")
+                    if d.get("timestamp"):
+                        try:
+                            rec.timestamp = datetime.fromisoformat(d["timestamp"])
+                        except (ValueError, TypeError):
+                            pass
+                    self.convergence_records.append(rec)
+                    loaded += 1
+                except (json.JSONDecodeError, KeyError):
+                    continue
+        return loaded
