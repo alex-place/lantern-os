@@ -16,7 +16,7 @@ The owned PLT is now the **sole local coder** (leads coding/reasoning/default in
 both need a **≥24 GB GPU** (not available on the 8 GB dev box): **faithful parity** and the
 **eval win vs a frontier coder**.
 
-## State of play (verified 2026-07-01)
+## State of play (verified 2026-07-05)
 
 | Gate | Status | Evidence |
 |---|---|---|
@@ -24,8 +24,10 @@ both need a **≥24 GB GPU** (not available on the 8 GB dev box): **faithful par
 | Stage-0 smoke — loads + generates | ✅ PASS | 4-bit, missing=0/unexpected=0, 2/3 coherent — `data/convergence/keystone-plt-parity-log.jsonl` |
 | Speed — interactive-usable | ✅ BUILD | KV cache 4.29 → 7.83 tok/s (static), PR #1766. Locked by `tests/test_keystone_plt_kv_cache.py` |
 | Serving + registry entry | ✅ landed | `serve_keystone_plt.py` (:11435) + sole-coder registry entry, #1758 |
+| First measured eval (internal) | ✅ **RUN 2026-07-05** | coding-golden-25, 4-bit @ :11435: **88% pass@1 (22/25)**, reproduced across 2 runs — `data/eval/leaderboard.jsonl` label `keystone-plt-golden25-4bit` (ts 1783298248 + 1783299024). Misses: caesar_cipher, anagram (1/3), roman_to_int (0/5). ~150 s/problem at 4-bit on a 12 GB 4070 SUPER (needs ≥24 GB for throughput). |
+| First **external** eval (HumanEval subset) | ✅ **RUN 2026-07-05** | HumanEval-20 via the chat path (routes local → PLT :11435): **55% pass@1 (11/20)** — `leaderboard.jsonl` label `keystone-plt-humaneval20-4bit`. **All 9 failures were `no-parse` = truncated, not wrong logic.** Root cause: model emits no stop token → greedy runs the full `num_predict`; at 256 tok (≈120 s) it fits the chat's ~120 s local timeout but truncates long solutions; raising to 640 tok pushed gen >300 s → chat times out → fallback → the `-640tok` row is a **0/20 infra artifact, not a capability read**. So 55% is a **timeout-bound floor on 12 GB**; true capability is higher. Fix = raise lantern local timeout or run bf16 on ≥24 GB. |
 | **Faithful parity (top1≥0.99 vs vLLM)** | ⛔ **PENDING** | needs ≥24 GB — `parity: null` in the log |
-| Eval win vs frontier coder | ⛔ pending | the gate to flip `verified:true` — not run |
+| Eval win vs frontier coder | ⛔ pending | internal golden-25 (88%) + external HumanEval-20 (55%, timeout-bound) done. **Local untruncated eval empirically shown NON-VIABLE (2026-07-05):** raising PLT_NUM_PREDICT→640 + OLLAMA_TIMEOUT_MS→500 s still failed — one 640-tok generation takes **>8 min** at 4-bit on 12 GB (~1.3 tok/s), past any timeout → no-parse. The full untruncated HumanEval-164 head-to-head **must** run bf16 on ≥24 GB (cloud L4/A100). Harness ready: **`scripts/eval_humaneval_plt_direct.py`** (hits the PLT shim directly, no lantern node) — runbook in its docstring. |
 | `verified:true` (earned lead) | ⛔ no | gated on parity **and** eval win (External Reality Rule) |
 | ADR-0011 founder decision | ⛔ Proposed | `#1666` — only Alex flips it |
 

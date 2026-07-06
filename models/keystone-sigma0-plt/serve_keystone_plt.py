@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,6 +40,12 @@ MODEL_NAME = "keystone-sigma0-plt"
 _TOK = None
 _MODEL = None
 _LOGPROBS = False
+
+# Default generation budget. 256 fits the lantern chat's default ~120 s local
+# timeout on a 12 GB box (see _generate note); raise via PLT_NUM_PREDICT together
+# with the caller's OLLAMA_TIMEOUT_MS when you own a longer timeout (e.g. an eval
+# host) so long solutions aren't truncated mid-body.
+_DEFAULT_NUM_PREDICT = int(os.environ.get("PLT_NUM_PREDICT", "256"))
 
 
 def _load(model_dir: str, dtype: str):
@@ -78,7 +85,16 @@ def _generate(messages, options):
     import torch
     prompt = _prompt_from_messages(messages)
     ids = _TOK(prompt, return_tensors="pt", return_token_type_ids=False).to(_MODEL.device)
-    max_new = int((options or {}).get("num_predict", 256))
+    # NOTE (measured 2026-07-05): this model emits no stop token, so greedy
+    # decoding always runs the FULL budget. On a 12GB 4070 SUPER at 4-bit,
+    # 256 tok ≈ 90–127 s (fits the lantern chat's default ~120 s local timeout →
+    # HumanEval-20 = 55%, 9 failures all no-parse = long solutions truncated).
+    # 640 tok ≈ >300 s → the default chat path times out → "no local model"
+    # fallback → 0/20. So with the DEFAULT timeout, 256 is the practical ceiling;
+    # to measure untruncated, raise PLT_NUM_PREDICT *and* the caller's
+    # OLLAMA_TIMEOUT_MS together, or run bf16 on ≥24GB. Per-request num_predict
+    # still overrides _DEFAULT_NUM_PREDICT.
+    max_new = int((options or {}).get("num_predict", _DEFAULT_NUM_PREDICT))
     gen_kw = dict(max_new_tokens=max_new, do_sample=False)
     if _LOGPROBS:
         gen_kw.update(output_scores=True, return_dict_in_generate=True)

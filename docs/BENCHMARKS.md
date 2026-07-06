@@ -22,6 +22,10 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 
 ---
 
+**Last review: 2026-07-05** (`/benchmarks`, issue #2135 follow-up). Competitor SOTA web-validated live: SWE-bench Verified — Claude Mythos 5 **95.5%** > Claude Fable 5 95% > Claude Opus 4.8 88.6% > DeepSeek-V4-Pro-Max 80.6% (llm-stats, Jul 4); MBPP — o4-mini **94.9%** (codesota, Dec 2025); HumanEval saturated (frontier >93%, retired as differentiator). **Serving-provenance finding:** on this box the only servable checkpoints are base `Ouro-1.4B` / `-Thinking` with **no coding LoRA on disk** — both emit near-empty completions, so a fresh coding-golden-25 run scored **0% pass@1** (`leaderboard.jsonl` label `ouro-thinking-base-golden25`, ts 1783296694). The `ck600` adapter that produced 0.427 is **not present here** — but the **owned `keystone-sigma0-plt` (~7.6B LoopCoder) full weights _are_ on disk** and serve fine in 4-bit on `:11435`. Its first measured eval landed the same session: **88% pass@1 (22/25) on coding-golden** (`leaderboard.jsonl` label `keystone-plt-golden25-4bit`, reproduced twice), ~150 s/problem at 4-bit on a 12 GB box. So the servable local coder is the PLT model, not Ouro; raw-capability is a real 88% on the internal set, with the external HumanEval-164 head-to-head still owed (≈13 h locally → cloud L4/A100). SWE-bench remains the single empty differentiating cell (needs Docker, unavailable locally).
+
+---
+
 ## Status legend
 
 | Status | Meaning |
