@@ -7,6 +7,7 @@
 const http = require('http');
 const https = require('https');
 const IbkrCpapi = require('./ibkr-cpapi');
+const ibkrCreds = require('./ibkr-credentials');
 
 class TradingAPIBridge {
   constructor() {
@@ -16,7 +17,9 @@ class TradingAPIBridge {
     // 100% of the time. lib/ibkr-cpapi.js talks to the actual gateway and fails
     // soft when it isn't running. Constructed lazily via ibkr().
     this._ibkr = null;
-
+    // Per-user IBKR clients (ADR-0022) — each keeps its own cached Live Session
+    // Token, so we reuse instances instead of re-handshaking every request.
+    this._userClients = new Map(); // userId -> { client, expiresAt }
 
     this.kalshiApiKey = process.env.KALSHI_API_KEY || '';
     this.anthropicKey = process.env.ANTHROPIC_API_KEY || '';
@@ -32,12 +35,45 @@ class TradingAPIBridge {
     return this._ibkr;
   }
 
+  /** A user's OWN IBKR client from their stored self-service creds, or null if
+   *  they haven't connected. Cached (LST lives on the instance). ADR-0022. */
+  ibkrForUser(userId) {
+    if (!userId) return null;
+    // Re-check the store on every resolve so a disconnect (creds file removed)
+    // takes effect immediately rather than lingering for the cache TTL.
+    if (!ibkrCreds.has(userId)) { this._userClients.delete(userId); return null; }
+    const hit = this._userClients.get(userId);
+    if (hit && hit.expiresAt > Date.now()) return hit.client;
+    const signer = ibkrCreds.buildSigner(userId);
+    if (!signer) { this._userClients.delete(userId); return null; }
+    const creds = ibkrCreds.load(userId);
+    const client = new IbkrCpapi({ oauth1: signer, accountId: creds && creds.accountId });
+    this._userClients.set(userId, { client, expiresAt: Date.now() + 15 * 60 * 1000 });
+    return client;
+  }
+
+  /**
+   * Resolve the IBKR client for a request context:
+   *   - a signed-in user → THEIR client (null if they haven't connected — we
+   *     must NEVER fall back to the operator's account for a real user);
+   *   - no user (server-side / operator / autonomous) → the env client.
+   * Drop the userId cache entry on disconnect via forgetUser().
+   */
+  _clientFor(userId) {
+    if (userId) return this.ibkrForUser(userId); // null when not connected
+    return this.ibkr();
+  }
+
+  /** Invalidate a user's cached client (call on disconnect / creds change). */
+  forgetUser(userId) { this._userClients.delete(userId); }
+
   /**
    * Account summary from the IBKR Client Portal gateway (CPAPI). Returns null
    * when the gateway is absent or unauthenticated — it never fabricates a value.
    */
-  async getIBKRAccount() {
-    const client = this.ibkr();
+  async getIBKRAccount(userId) {
+    const client = this._clientFor(userId);
+    if (!client) return null;                 // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return null;
     const summary = await client.getAccountSummary(status.accountId);
@@ -58,8 +94,9 @@ class TradingAPIBridge {
   /**
    * Open positions from the IBKR gateway (CPAPI). Returns [] when disconnected.
    */
-  async getIBKRPositions() {
-    const client = this.ibkr();
+  async getIBKRPositions(userId) {
+    const client = this._clientFor(userId);
+    if (!client) return [];                   // user context, not connected
     const status = await client.getStatus();
     if (!status.connected) return [];
     const positions = await client.getPositions(status.accountId);
@@ -74,9 +111,12 @@ class TradingAPIBridge {
     }));
   }
 
-  /** Honest, evidence-bearing IBKR connection status for UI badges + settings. */
-  async getIBKRStatus() {
-    return this.ibkr().getStatus();
+  /** Honest, evidence-bearing IBKR connection status for UI badges + settings.
+   *  Per-user when a userId is given (their own connection), else the env client. */
+  async getIBKRStatus(userId) {
+    const client = this._clientFor(userId);
+    if (!client) return { connected: false, authenticated: false, source: 'ibkr-cpapi', mode: 'unknown' };
+    return client.getStatus();
   }
 
   /**

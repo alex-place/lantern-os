@@ -43,6 +43,23 @@ function getSessionUserId(req) {
   return u ? u.id : null;
 }
 
+/**
+ * The user id to key per-user state (IBKR creds, etc.) on. Normally the session
+ * profile id; on the owner's own machine (local-admin bypass, which is OFF for any
+ * proxied/production request) it resolves to a stable "local-owner" so the operator
+ * can connect + test on the dev port without a full login. Never "local-owner" on
+ * the deployed multi-user site. Lazy-require avoids a circular dep with auth-middleware.
+ */
+function getEffectiveUserId(req) {
+  const id = getSessionUserId(req);
+  if (id) return id;
+  try {
+    const { isLocalBypass } = require("./auth-middleware");
+    if (isLocalBypass(req)) return "local-owner";
+  } catch (_) {}
+  return null;
+}
+
 /** Convenience: the resolved role for a request, or "guest". */
 function getSessionRole(req) {
   const u = getSessionUser(req);
@@ -105,4 +122,4 @@ function establishSession(req, user, done) {
   }
 }
 
-module.exports = { getSessionUser, getSessionUserId, getSessionRole, setSessionUser, establishSession };
+module.exports = { getSessionUser, getSessionUserId, getEffectiveUserId, getSessionRole, setSessionUser, establishSession };

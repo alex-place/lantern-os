@@ -17,6 +17,8 @@ const PUBLIC_PAGES = {
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",
   "/knowledgecenter.html":"knowledgecenter.html",
+  "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
+  "/ibkr-connect.html":   "ibkr-connect.html",       // redirect → /orchestration.html#broker
   // Primary interface: the chat must be reachable without a Patreon login so the
   // "no account needed" promise holds (#739). dream-chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).

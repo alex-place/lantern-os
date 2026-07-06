@@ -128,6 +128,12 @@ class IbkrCpapi {
     this._sessionToken = null; // from POST /tickle → sent back as Cookie: api={token}
     this._statusCache = null; // { at, value }
     this._accountsCache = null;
+    // Per-user self-service OAuth 1.0a (ADR-0022). When present, requests are
+    // signed with a Live Session Token (the retail-supported path) instead of the
+    // Bearer token. Pass an IbkrOAuth1 instance as opts.oauth1.
+    this.oauth1 = opts.oauth1 || null;
+    this._lst = null; // { token, expiresAt } — cached Live Session Token
+    this._lstError = null; // last OAuth1 handshake failure reason (diagnostics)
   }
 
   _verifyTls(hostname) {
@@ -135,11 +141,9 @@ class IbkrCpapi {
     return !isLoopback(hostname);
   }
 
-  /**
-   * Low-level request. Resolves { ok, status, json, error } — never rejects.
-   * Attaches the OAuth Bearer token and (once obtained) the api= session cookie.
-   */
-  _request(method, apiPath, body) {
+  /** Pure HTTP with caller-supplied headers. Resolves { ok, status, json, error }
+   *  — never rejects. (Auth-header assembly lives in _request.) */
+  _rawRequest(method, apiPath, headers, body) {
     return new Promise((resolve) => {
       let u;
       try {
@@ -150,19 +154,17 @@ class IbkrCpapi {
       const isHttps = u.protocol === 'https:';
       const lib = isHttps ? https : http;
       const payload = body != null ? JSON.stringify(body) : null;
-      const headers = { Accept: 'application/json', 'User-Agent': 'keystone-ibkr-webapi/1.0' };
-      if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
-      if (this._sessionToken) headers.Cookie = `api=${this._sessionToken}`;
+      const h = { Accept: 'application/json', 'User-Agent': 'keystone-ibkr-webapi/1.0', ...headers };
       if (payload) {
-        headers['Content-Type'] = 'application/json';
-        headers['Content-Length'] = Buffer.byteLength(payload);
+        h['Content-Type'] = 'application/json';
+        h['Content-Length'] = Buffer.byteLength(payload);
       }
       const options = {
         hostname: u.hostname,
         port: u.port || (isHttps ? 443 : 80),
         path: u.pathname + u.search,
         method,
-        headers,
+        headers: h,
         timeout: this.timeoutMs,
       };
       if (isHttps) options.rejectUnauthorized = this._verifyTls(u.hostname);
@@ -182,6 +184,73 @@ class IbkrCpapi {
       if (payload) req.write(payload);
       req.end();
     });
+  }
+
+  /**
+   * Low-level request. Resolves { ok, status, json, error } — never rejects.
+   * With OAuth 1.0a (per-user), obtains + caches a Live Session Token and signs
+   * each request HMAC-SHA256. Otherwise falls back to the Bearer token + api=
+   * session cookie (legacy/gateway path).
+   */
+  async _request(method, apiPath, body) {
+    let headers = {};
+    if (this.oauth1) {
+      const lst = await this._ensureLst();
+      if (!lst) return { ok: false, status: 0, json: null, error: 'ibkr_lst_unavailable' };
+      const [path, query] = String(apiPath).split('?');
+      const params = query ? Object.fromEntries(new URLSearchParams(query)) : null;
+      headers = this.oauth1.signRequest(this.baseUrl + path, method, lst, params);
+    } else {
+      if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
+      if (this._sessionToken) headers.Cookie = `api=${this._sessionToken}`;
+    }
+    return this._rawRequest(method, apiPath, headers, body);
+  }
+
+  /**
+   * Obtain (and cache) a Live Session Token via the OAuth 1.0a DH handshake, then
+   * initialize the brokerage session. Returns the LST string, or null on failure
+   * (fail-soft — the caller reports "disconnected", never fabricates).
+   */
+  async _ensureLst() {
+    if (!this.oauth1) return null;
+    if (this._lst && this._lst.expiresAt > Date.now() + 5000) return this._lst.token;
+    const url = this.baseUrl + '/oauth/live_session_token';
+    let req, r, lst;
+    this._lstError = null;
+    try {
+      req = this.oauth1.buildLiveSessionTokenRequest(url);   // may throw on a bad key
+    } catch (e) { this._lstError = { code: 'bad_key', detail: e.message }; return null; }
+    r = await this._rawRequest('POST', '/oauth/live_session_token', req.headers);
+    if (!r.ok) {
+      // The most common failure for a fresh consumer: IBKR rejects the handshake
+      // (401/403) until the OAuth consumer is activated (up to ~24h). Capture the
+      // real HTTP status + any IBKR message so the UI can say which it is.
+      const msg = (r.json && (r.json.error || r.json.message)) || r.error || null;
+      this._lstError = {
+        code: r.status === 401 || r.status === 403 ? 'not_activated_or_unauthorized' : (r.status ? `http_${r.status}` : 'unreachable'),
+        status: r.status, detail: msg,
+      };
+      return null;
+    }
+    if (!r.json || !r.json.diffie_hellman_response) { this._lstError = { code: 'no_dh_response' }; return null; }
+    try {
+      lst = this.oauth1.computeLiveSessionToken(r.json.diffie_hellman_response, req.dhRandom, req.prepend);
+    } catch (e) { this._lstError = { code: 'lst_compute_failed', detail: e.message }; return null; }
+    if (r.json.live_session_token_signature &&
+        !this.oauth1.validateLiveSessionToken(lst, r.json.live_session_token_signature)) {
+      this._lstError = { code: 'lst_signature_mismatch' }; // key/prime/consumer mismatch
+      return null;
+    }
+    const ttl = Number(r.json.live_session_token_expiration) || 10 * 60 * 1000;
+    this._lst = { token: lst, expiresAt: Date.now() + Math.min(ttl, 10 * 60 * 1000) };
+    // Best-effort brokerage session init (needed for /iserver reads + orders).
+    try {
+      const initHeaders = this.oauth1.signRequest(
+        this.baseUrl + '/iserver/auth/ssodh/init', 'POST', lst, { compete: 'true', publish: 'true' });
+      await this._rawRequest('POST', '/iserver/auth/ssodh/init?compete=true&publish=true', initHeaders);
+    } catch (e) { /* reads still work without it; fail-soft */ }
+    return this._lst.token;
   }
 
   /** POST /tickle — captures the session token (cookie) + reports auth status. */
@@ -410,6 +479,10 @@ class IbkrCpapi {
       evidence.push(probe.authenticated ? 'session authenticated' : (this.apiKey ? 'token present but NOT authenticated — token may be expired or need /tickle brokerage login' : 'not authenticated'));
       if (accountId) evidence.push(`account ${accountId} (${inferMode(accountId)})`);
     }
+    // Map the OAuth1 handshake failure (if any) to a plain-English reason so the UI
+    // can tell "not activated yet" apart from a real key/config error.
+    const lstErr = this._lstError;
+    const reason = connected ? null : (lstErr && lstErr.code) || (probe.reachable ? 'not_authenticated' : 'unreachable');
     const value = {
       connected,
       reachable: !!probe.reachable,
@@ -420,11 +493,35 @@ class IbkrCpapi {
       mode: inferMode(accountId),
       gatewayUrl: this.baseUrl,
       source: 'ibkr-webapi',
+      reason,
+      reasonText: connected ? null : reasonText(reason, lstErr),
       evidence,
       checkedAt: new Date().toISOString(),
     };
     this._statusCache = { at: now, value };
     return value;
+  }
+}
+
+/** Plain-English reason for a not-connected IBKR status (drives the UI banner). */
+function reasonText(reason, lstErr) {
+  switch (reason) {
+    case 'not_activated_or_unauthorized':
+      return "IBKR rejected the OAuth handshake — your consumer isn't active yet. IBKR can take up to ~24h to enable a new one; try Recheck later.";
+    case 'lst_signature_mismatch':
+      return 'The keys/DH prime don’t match what IBKR has registered. Regenerate your keys, re-upload the 3 files to IBKR, and reconnect.';
+    case 'bad_key':
+      return 'The stored private key is not valid PEM.' + (lstErr && lstErr.detail ? ` (${lstErr.detail})` : '');
+    case 'no_dh_response':
+      return 'IBKR accepted the request but returned no handshake data — try again shortly.';
+    case 'unreachable':
+      return 'Could not reach the IBKR Web API (network/endpoint issue).';
+    case 'not_authenticated':
+      return 'Handshake succeeded but no brokerage session — usually clears on the next Recheck.';
+    default:
+      return reason && reason.startsWith('http_')
+        ? `IBKR returned an unexpected error (${reason.replace('http_', 'HTTP ')}).`
+        : 'IBKR did not authenticate yet — check the keys and that your OAuth consumer is active (up to 24h).';
   }
 }
 
