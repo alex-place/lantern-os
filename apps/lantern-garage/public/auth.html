@@ -23,45 +23,58 @@
   </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    /* Shell — centers the card when it fits, scrolls cleanly when it doesn't
-       (short/mobile viewports). Uses dvh so mobile browser chrome doesn't clip. */
-    html, body { min-height: 100%; }
+    /* Shell — this page is locked to a single viewport (no scroll): the nav +
+       hero + sign-in card are sized to fit within 100dvh. Uses dvh so mobile
+       browser chrome doesn't clip. */
+    html, body { height: 100%; overflow: hidden; }
     body {
       display: flex; flex-direction: column;
-      min-height: 100vh; min-height: 100dvh;
+      height: 100vh; height: 100dvh;
+      overflow: hidden;
     }
     .site-nav { flex-shrink: 0; }
+    /* This page is a single-screen sign-in; the footer just duplicates the nav
+       brand + links, so drop it to keep everything on one screen. */
+    .site-footer { display: none; }
 
     .auth-main {
       flex: 1 1 auto;
+      min-height: 0;              /* let the flex child shrink instead of forcing overflow */
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
-      /* `safe center` centers when the content fits but falls back to top-align
-         when it's taller than the viewport, so the hero is NEVER clipped above the
-         scroll region (plain `center` would hide it). */
-      justify-content: safe center;
-      gap: clamp(12px, 2.4vh, 22px);
+      justify-content: center;
+      gap: clamp(8px, 1.2vh, 13px);
       width: 100%;
       max-width: 440px;
       margin: 0 auto;
-      padding: clamp(14px, 3vh, 28px) 18px;
+      padding: clamp(10px, 1.6vh, 18px) 18px;
+    }
+
+    /* Escape hatch — the page is locked to one screen (no scroll) wherever it fits.
+       On screens too short to hold the whole card (small phones, stubby laptop
+       windows) fall back to a clean scroll rather than clipping the buttons. */
+    @media (max-height: 945px) {
+      html, body { height: auto; min-height: 100%; overflow: visible; }
+      body { height: auto; min-height: 100dvh; overflow: visible; }
+      .auth-main { overflow: visible; justify-content: safe center; }
     }
 
     /* ── Hero — mandala logo + clean wordmark ── */
     .auth-hero { text-align: center; }
     .auth-hero__mandala {
       display: block;
-      width: clamp(72px, 12vh, 112px);
+      width: clamp(56px, 8vh, 84px);
       height: auto; aspect-ratio: 1;
-      margin: 0 auto clamp(10px, 1.8vh, 18px);
+      margin: 0 auto clamp(6px, 1.2vh, 12px);
       pointer-events: none; user-select: none;
       filter: drop-shadow(0 6px 20px color-mix(in srgb, var(--accent) 22%, transparent));
     }
     .auth-hero h1 {
-      margin: 0 0 6px;
+      margin: 0 0 5px;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: clamp(1.6rem, 5.4vw, 2.15rem);
+      font-size: clamp(1.5rem, 4.6vw, 1.9rem);
       letter-spacing: -0.02em;
       font-weight: 700;
       color: var(--text);
@@ -74,7 +87,7 @@
     /* ── Sign-in card — surface panel like the home widgets ── */
     .auth-card {
       width: 100%;
-      padding: clamp(18px, 4vw, 28px);
+      padding: clamp(16px, 3vw, 22px);
       border: 1px solid var(--border);
       border-radius: 18px;
       background: var(--surface);
@@ -106,11 +119,11 @@
     .auth-notice a { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
     /* Provider (OAuth) buttons */
-    .auth-actions { display: flex; flex-direction: column; gap: 8px; }
+    .auth-actions { display: flex; flex-direction: column; gap: 7px; }
     .provider-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
       width: 100%; border: 1px solid var(--border); border-radius: 12px;
-      padding: 11px 16px; font-size: 14.5px; font-weight: 600; cursor: pointer;
+      padding: 10px 16px; font-size: 14.5px; font-weight: 600; cursor: pointer;
       color: #fff; text-decoration: none; transition: transform .15s, filter .15s;
     }
     .provider-btn:hover { transform: translateY(-1px); filter: brightness(1.02); box-shadow: 0 6px 18px rgba(0,0,0,.12); }
@@ -121,9 +134,9 @@
     .provider-btn .pi svg { width: 100%; height: 100%; display: block; }
 
     /* Local email + password */
-    .local-form { display: flex; flex-direction: column; gap: 8px; }
+    .local-form { display: flex; flex-direction: column; gap: 7px; }
     .local-form input {
-      width: 100%; box-sizing: border-box; padding: 11px 14px;
+      width: 100%; box-sizing: border-box; padding: 10px 14px;
       border: 1px solid var(--border); border-radius: 12px;
       background: var(--bg); color: var(--text); font-size: 16px; /* ≥16px: stops iOS zoom-on-focus */
       transition: border-color .15s, box-shadow .15s;
@@ -133,21 +146,21 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
     }
     .btn-local {
-      border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px;
+      border: none; border-radius: 12px; padding: 11px 20px; font-size: 15px;
       font-weight: 700; cursor: pointer; color: #fff;
       background: var(--accent); transition: background .15s, transform .12s;
     }
     .btn-local:hover { background: var(--accent-hover); transform: translateY(-1px); }
     .btn-local:active { transform: translateY(0); }
     .btn-local { margin-top: 2px; }
-    .local-toggle { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
+    .local-toggle { text-align: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
     .local-toggle a { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
     /* Secondary / ghost button (Patreon support, continue as guest) */
     .btn-ghost {
       display: flex; align-items: center; justify-content: center;
       width: 100%; border: 1px solid var(--border); border-radius: 12px;
-      padding: 12px 18px; background: transparent; color: var(--text);
+      padding: 10px 18px; background: transparent; color: var(--text);
       font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
       transition: border-color .15s, background .15s;
     }
@@ -157,7 +170,7 @@
     .auth-divider {
       text-align: center; color: var(--muted); font-size: 11px;
       letter-spacing: .1em; text-transform: uppercase;
-      margin: 14px 0 12px; position: relative;
+      margin: 10px 0 8px; position: relative;
     }
     .auth-divider::before, .auth-divider::after {
       content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border);
