@@ -1,27 +1,50 @@
 ﻿<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid a flash of the wrong
+       theme, and respect the user's saved / system preference (this page used
+       to hardcode data-theme="dark", ignoring both). Mirrors index.html. */
+    (function() {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <title>Profile — unisona.ai</title>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
+    /* Scrolling, card-based profile shell that matches the index / dream-chat
+       look. The previous version forced everything into one non-scrolling
+       screen (main{overflow:hidden} + vertical centering + a squeezed 2-column
+       grid); on some viewports the content collided — the reported overlap of
+       the Account ID and the "Connect multiple providers" note (#2138). This
+       lets the page flow and breathe instead. */
+    html, body { margin: 0; padding: 0; }
     body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
-    main { flex: 1; display: flex; align-items: center; padding: 20px; overflow: hidden; }
-    /* When content is taller than the viewport (short/mobile), stop centering and
-       allow the page to scroll so nothing is clipped. */
-    @media (max-height: 820px) { main { align-items: flex-start; overflow: visible; } }
+    main {
+      flex: 1;
+      width: 100%;
+      padding: clamp(24px, 5vh, 48px) 20px clamp(40px, 6vh, 64px);
+      box-sizing: border-box;
+    }
 
     .profile-wrap {
-      max-width: 760px;
+      max-width: 860px;
       margin: 0 auto;
       width: 100%;
       display: flex;
       flex-direction: column;
-      gap: clamp(10px, 1.6vh, 18px);
+      gap: 20px;
     }
 
     /* ── Hero card ── */
@@ -97,11 +120,11 @@
     .profile-cols {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: clamp(10px, 1.6vh, 18px);
+      gap: 20px;
       align-items: start;
     }
-    .col { display: flex; flex-direction: column; gap: clamp(10px, 1.6vh, 18px); }
-    @media (max-width: 720px) { .profile-cols { grid-template-columns: 1fr; } }
+    .col { display: flex; flex-direction: column; gap: 22px; }
+    @media (max-width: 720px) { .profile-cols { grid-template-columns: 1fr; gap: 22px; } }
 
     /* ── Info grid ── */
     .info-grid {
