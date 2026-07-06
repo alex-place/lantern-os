@@ -61,6 +61,28 @@ check("every loop stage is served by at least one core surface", () => {
   assert.strictEqual(uncovered.length, 0, `loop stages with no core surface: ${uncovered.join(", ")}`);
 });
 
+check("every CORE surface's declared loop-stage tag matches its registry stage", () => {
+  // Same declaration forms scripts/sprawl-tripwire.mjs accepts (meta tag or comment),
+  // so a page can't tell the tripwire one stage and the registry another.
+  const drift = [];
+  for (const [surface, stage] of Object.entries(reg.CORE)) {
+    const file = path.join(PUBLIC, surface);
+    if (!fs.existsSync(file)) continue; // stale-entry check above owns missing files
+    const html = fs.readFileSync(file, "utf8");
+    const m = html.match(/<meta\s+name=["']loop-stage["']\s+content=["']([a-z]+)["']/i)
+           || html.match(/<!--\s*loop-stage:\s*([a-z]+)\s*-->/i);
+    if (!m) {
+      drift.push(`${surface} → no <meta name="loop-stage"> tag (registry: ${stage})`);
+    } else if (m[1].toLowerCase() !== stage.toLowerCase()) {
+      drift.push(`${surface} → page declares "${m[1]}" but registry says "${stage}"`);
+    }
+  }
+  assert.strictEqual(
+    drift.length, 0,
+    `loop-stage drift between page meta tags and lib/surface-registry.js:\n      ${drift.join("\n      ")}`
+  );
+});
+
 // ── Non-HTML subsystems (#1948: bots + background services) ──────────────────────
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 
