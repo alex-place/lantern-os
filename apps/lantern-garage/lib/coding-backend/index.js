@@ -33,6 +33,7 @@ const DEFAULT_DATA_DIR = path.join(_repoRoot, "data");
 const ADAPTERS = {
   mock: require("./adapters/mock"),
   aider: require("./adapters/aider"),
+  openhands: require("./adapters/openhands"),
 };
 
 function listBackends() {

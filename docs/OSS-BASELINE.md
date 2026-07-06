@@ -190,8 +190,9 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
 **Landed:** the coding-backend control plane — `apps/lantern-garage/lib/coding-backend/`. A backend
 **proposes** a change, the control plane **holds it for approval** (consequence-gate pattern) and
 emits a **receipt** (task, backend, model, cost, files, patch-hash, why, status) that no raw coding
-agent produces; approve applies it, reject drops it. Mock backend + Aider adapter (activates when
-`aider` is installed). Tested: `npm run test:coding-backend --prefix apps/lantern-garage` (6/6).
+agent produces; approve applies it, reject drops it. Backends: **mock** (tests) + **Aider** (#2171)
++ **OpenHands** (#2172) — the real adapters activate when their CLI is installed and serve the
+registry-resolved local engine (Qwen2.5-Coder). Tested: `npm run test:coding-backend` (7/7).
 
 **Backlog (filed from this baseline):**
 - #2171 — ship local engine on Qwen2.5-Coder; Ouro → research lane

@@ -27,9 +27,9 @@ function tmp() {
 }
 
 (async () => {
-  await check("listBackends includes mock and aider", () => {
+  await check("listBackends includes mock, aider, and openhands", () => {
     const b = cb.listBackends();
-    assert(b.includes("mock") && b.includes("aider"), "expected mock+aider backends");
+    assert(b.includes("mock") && b.includes("aider") && b.includes("openhands"), "expected mock+aider+openhands backends");
   });
 
   await check("mock: propose HOLDS the change (nothing applied) + emits receipt + pending", async () => {
@@ -73,19 +73,21 @@ function tmp() {
     assert.strictEqual(r.ok, false);
   });
 
-  await check("aider degrades gracefully when not installed", async () => {
-    const avail = await require("../lib/coding-backend/adapters/aider").available();
-    if (avail) {
-      console.log("    (aider installed — skipping unavailability assertions)");
-      return;
-    }
-    const r = await cb.runCodingTask({ task: "x", repoPath: tmp(), backend: "aider" }, { dataDir: tmp() });
-    assert.strictEqual(r.ok, false);
-    assert(/not available/.test(r.error), "should report unavailable");
-    assert(r.hint && /aider/.test(r.hint), "should give an install hint");
-    const ab = await cb.abCompare({ task: "x", repoPath: tmp(), backend: "aider" }, { dataDir: tmp() });
-    assert.strictEqual(ab.measured, false);
-  });
+  for (const be of ["aider", "openhands"]) {
+    await check(`${be} degrades gracefully when not installed`, async () => {
+      const avail = await require(`../lib/coding-backend/adapters/${be}`).available();
+      if (avail) {
+        console.log(`    (${be} installed — skipping unavailability assertions)`);
+        return;
+      }
+      const r = await cb.runCodingTask({ task: "x", repoPath: tmp(), backend: be }, { dataDir: tmp() });
+      assert.strictEqual(r.ok, false);
+      assert(/not available/.test(r.error), "should report unavailable");
+      assert(r.hint, "should give an install hint");
+      const ab = await cb.abCompare({ task: "x", repoPath: tmp(), backend: be }, { dataDir: tmp() });
+      assert.strictEqual(ab.measured, false);
+    });
+  }
 
   console.log(failures ? `\n${failures} FAILED` : "\nall coding-backend tests passed");
   process.exit(failures ? 1 : 0);
