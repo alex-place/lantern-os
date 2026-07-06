@@ -1,0 +1,24 @@
+{
+  "id": "contamination-ouro-sigma0-grounding-v1",
+  "adapter": "D:/lantern-train/ouro-sigma0-grounding-v1",
+  "trained": "2026-07-05T22:56 local",
+  "corpus": "data/sigma0/sigma0_grounding_train.jsonl (untracked v1 build, 840 rows)",
+  "verdict": "UNBENCHMARKABLE on the 66-fact heldout and on eval_sigma0_adapter abstention/ECE",
+  "hypothesis": "the v1 grounding corpus leaked the evaluation into training",
+  "evidence": [
+    "all 66/66 heldout golden statements (data/sigma0/ouro_honesty_heldout_ids.json, 'NEVER emitted as training rows') appear verbatim as training instructions",
+    "3 of 4 eval_sigma0_adapter NO_EVIDENCE_PROMPTS reproduced near-verbatim as abstention training rows (RETRY_BUDGET_MS, primary database table, staging-server port; only dark_launch escaped)",
+    "stale seed JSONL exports re-injected the continuum-hypothesis mislabel fixed in commit 4a8d33eb (2 rows teach declining a TRUE statement)",
+    "confidence: 0.85 taught on 379/840 rows (45%) — a monoculture that games ECE/Brier",
+    "global dedup collapsed the balanced epistemic slice 147->103, flipping its class balance (HEURISTIC 76->32)",
+    "84 one-word 'Fixed/Added/Changed' changelog rows with conflicting outputs (39 distinct outputs for instruction 'Fixed')"
+  ],
+  "confidence": 1.0,
+  "source": "contamination audit 2026-07-06; every claim recomputed against the corpus file (see PR for the audit transcript)",
+  "consequences": [
+    "any heldout/abstention/calibration score for ouro-sigma0-grounding-v1 measures memorization, not honesty — do not report or compare it",
+    "retraining is gated on the corpus-v2 de-glossed key (PR #2165) via scripts/build_sigma0_grounding_corpus.py, which now refuses the v1 key by default",
+    "the contamination gates are permanent CI: tests/test_sigma0_grounding_corpus.py"
+  ],
+  "loop_stage": "Verify"
+}
