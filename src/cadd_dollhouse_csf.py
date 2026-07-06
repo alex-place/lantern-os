@@ -57,20 +57,17 @@ class CsfSegmentBuilder:
         most_common = self.token_counter.most_common(max_symbols)
         self.dictionary = {token: idx for idx, (token, _) in enumerate(most_common)}
 
+    # Header: magic(8s) version(H) flags(H) segment_count(I) uncompressed_size(Q)
+    #         dictionary_offset(Q) index_offset(Q). Segment table: entry_count(I)
+    #         segment_size(Q) segment_flags(I). Footer: CRC32(I) over everything before it.
+    HEADER_FMT = ">8sHHIQQQ"
+    SEGMENT_TABLE_FMT = ">IQI"
+    FLAG_HAS_INDEX = 0x0001
+
     def encode(self) -> bytes:
         self.build_dictionary()
-        # Header: magic + version + flags + segment count + dict offset + index offset + checksum
-        header = struct.pack(
-            ">8sHHIQQQ",
-            b"CSFv1\x00\x00",  # magic
-            1,  # version
-            0x0001,  # flags: has index
-            1,  # segment count
-            0,  # uncompressed size placeholder
-            0,  # dictionary offset placeholder
-            0,  # index offset placeholder
-        )
-        # Body: JSON records compressed with dictionary hints
+        # Body: JSON records, zlib-compressed. Compute the blocks FIRST so the header
+        # can carry real sizes/offsets instead of zeroed placeholders (#2099).
         body_json = json.dumps({
             "segment_id": self.segment_id,
             "source": str(self.source_path.relative_to(REPO_ROOT)),
@@ -80,21 +77,65 @@ class CsfSegmentBuilder:
         }, ensure_ascii=False)
         body_bytes = body_json.encode("utf-8")
         compressed = zlib.compress(body_bytes, level=3)
-        # Dictionary block
+        # Dictionary block (length-prefixed, zlib-compressed)
         dict_json = json.dumps(self.dictionary, ensure_ascii=False).encode("utf-8")
         dict_compressed = zlib.compress(dict_json, level=3)
-        # Assemble
+
+        header_len = struct.calcsize(self.HEADER_FMT)
+        segment_table_len = struct.calcsize(self.SEGMENT_TABLE_FMT)
+        # The dictionary block (its >I length prefix) begins immediately after the
+        # fixed-size header + segment table — a real, seekable offset.
+        dict_offset = header_len + segment_table_len
+        # No standalone index block is written yet, so we advertise none: index_offset
+        # stays 0 and the has-index flag is cleared (was 0x0001 over a nonexistent index).
+        index_offset = 0
+        flags = 0x0000
+
+        header = struct.pack(
+            self.HEADER_FMT,
+            b"CSFv1\x00\x00",   # magic
+            1,                  # version
+            flags,              # flags: index NOT advertised until the writer exists
+            1,                  # segment count
+            len(body_bytes),    # real uncompressed body size
+            dict_offset,        # real dictionary-block offset
+            index_offset,       # 0 — no index block
+        )
         segment_table = struct.pack(
-            ">IQI",
+            self.SEGMENT_TABLE_FMT,
             len(self.records),  # entry count
-            len(compressed),  # segment size
-            0x0001,  # flags
+            len(compressed),    # segment (compressed body) size
+            flags,              # segment flags
         )
         assembled = header + segment_table + struct.pack(">I", len(dict_compressed)) + dict_compressed + compressed
-        # Footer checksum (simple CRC32 for now)
+        # Footer checksum (CRC32 over the whole preceding payload)
         crc = zlib.crc32(assembled) & 0xFFFFFFFF
         assembled += struct.pack(">I", crc)
         return assembled
+
+    @classmethod
+    def decode_header(cls, data: bytes) -> Dict[str, Any]:
+        """Parse a CSFv1 segment header. Lets a reader seek by the real offsets the
+        writer now records (dictionary_offset), rather than the old zeroed placeholders."""
+        magic, version, flags, seg_count, uncompressed_size, dict_offset, index_offset = struct.unpack(
+            cls.HEADER_FMT, data[: struct.calcsize(cls.HEADER_FMT)]
+        )
+        return {
+            "magic": magic,
+            "version": version,
+            "flags": flags,
+            "has_index": bool(flags & cls.FLAG_HAS_INDEX),
+            "segment_count": seg_count,
+            "uncompressed_size": uncompressed_size,
+            "dictionary_offset": dict_offset,
+            "index_offset": index_offset,
+        }
+
+    @staticmethod
+    def verify_crc(data: bytes) -> bool:
+        """True iff the trailing CRC32 footer matches the payload (integrity check)."""
+        payload, stored = data[:-4], struct.unpack(">I", data[-4:])[0]
+        return (zlib.crc32(payload) & 0xFFFFFFFF) == stored
 
 
 class CaddDollhouseCsf:
