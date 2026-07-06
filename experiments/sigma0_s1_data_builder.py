@@ -65,10 +65,27 @@ def _cap_confidence(conf, verified, allowed_max):
     return round(max(0.0, min(1.0, c)), 3)
 
 
+def _as_text(val) -> str:
+    """Schema-drift guard: 'result'/'hypothesis' were plain strings originally, but newer
+    writers (e.g. three-doors scene records, #2099-era tool records) emit structured dicts.
+    Flatten deterministically (sorted keys) so the honesty tuple survives the drift."""
+    if val is None:
+        return ""
+    if isinstance(val, str):
+        return val.strip()
+    if isinstance(val, dict):
+        parts = [f"{k}: {_as_text(v)}" for k, v in sorted(val.items())
+                 if v not in (None, "", [], {})]
+        return "; ".join(p for p in parts if p).strip()
+    if isinstance(val, (list, tuple)):
+        return " ".join(filter(None, (_as_text(v) for v in val))).strip()
+    return str(val).strip()
+
+
 def record_to_tuple(rec: dict):
     """Map a convergence record -> honesty tuple, or None to drop as noise."""
-    result = (rec.get("result") or "").strip()
-    hyp = (rec.get("hypothesis") or "").strip()
+    result = _as_text(rec.get("result"))
+    hyp = _as_text(rec.get("hypothesis"))
     verified = bool(rec.get("verified", False))
     evidence = rec.get("evidence") or rec.get("evidence_ids") or rec.get("applied_evidence") or []
     grounding = rec.get("grounding_signals") or []
