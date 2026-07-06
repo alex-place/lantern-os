@@ -230,6 +230,9 @@ Not a separate system.
   - Surprise monitor (NIS canary)
   - Collapse proximity detection
   - Re-grounding via verification
+- **JEPA world-model as a plausibility signal** (V-JEPA 2, LeWM — see [11] SSL anti-collapse)
+  - A latent world model that flags *implausible events* is a learned grounding/verification
+    signal; the video-SSL analogue of the surprise canary (predict-then-check in latent space)
 
 ### Integration
 - Unit tests → memory update
@@ -335,6 +338,62 @@ Memory.append(type=Pattern, confidence=X)
 - **Ouro LoopLM** ([arXiv:2510.25741](https://arxiv.org/abs/2510.25741)) — weight-tied recurrence + Q-exit; substrate the spiral extends
 - Lattice consolidation: [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) · [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
 
+### Self-supervised anti-collapse — the representation-learning twin of the collapse certificate
+The LeCun/FAIR non-generative-SSL lineage (DrLIM → JEPA → LeJEPA/LeWM) spends two decades
+fighting **representation collapse** — the same "frozen self-agreement" fate the [Σ₀ collapse
+certificate](SIGMA0-COLLAPSE-CERTIFICATE.md) formalizes for an ungrounded latent loop. The
+certificate's tool is **spectral** (bound the recurrent map's Jacobian, §1); this field's mature
+answer is **distributional** (condition the embedding covariance). The two are complementary
+anti-collapse conditions on the *same* object. Every ID below was web-verified 2026-07-06
+(arXiv API + primary sources); **0 corrections** — the list is clean. Relevance is to the loop,
+not a mandate to bolt a vision encoder onto the Core (that would be sprawl; the import is the
+*regularization idea*).
+
+- **Early SSL (predict-to-represent).** Becker & Hinton, *Self-organizing net … random-dot
+  stereograms* ([Nature 355:161, 1992](https://doi.org/10.1038/355161a0)); Becker, *Mutual
+  information maximization: models of cortical self-organization*
+  ([Network 7(1), 1996](https://doi.org/10.1080/0954898X.1996.11978653)); Schmidhuber,
+  *Learning Factorial Codes by Predictability Minimization*
+  ([Neural Computation 4(6), 1992](https://doi.org/10.1162/neco.1992.4.6.863)) — agreement /
+  mutual-information / predictability objectives; the ancestral form of "represent by predicting."
+- **Contrastive (pull-together / push-apart).** DrLIM ([CVPR 2006](https://doi.org/10.1109/CVPR.2006.100));
+  FaceNet/triplet ([arXiv:1503.03832](https://arxiv.org/abs/1503.03832)); CPC/InfoNCE
+  ([arXiv:1807.03748](https://arxiv.org/abs/1807.03748)) — the contrastive objective avoids
+  collapse by construction (negatives), at the cost of needing them.
+- **Scaling contrastive.** InstDisc ([arXiv:1805.01978](https://arxiv.org/abs/1805.01978)); MoCo
+  ([arXiv:1911.05722](https://arxiv.org/abs/1911.05722)); SimCLR
+  ([arXiv:2002.05709](https://arxiv.org/abs/2002.05709)); MoCo v2/v3
+  ([2003.04297](https://arxiv.org/abs/2003.04297) / [2104.02057](https://arxiv.org/abs/2104.02057)).
+- **Distillation without negatives (collapse-avoidance by asymmetry).** BYOL
+  ([arXiv:2006.07733](https://arxiv.org/abs/2006.07733)); SimSiam
+  ([arXiv:2011.10566](https://arxiv.org/abs/2011.10566)); DINO / v2 / v3
+  ([2104.14294](https://arxiv.org/abs/2104.14294) / [2304.07193](https://arxiv.org/abs/2304.07193)
+  / [2508.10104](https://arxiv.org/abs/2508.10104)) — EMA + stop-gradient prevent collapse. The
+  cautionary parallel for our **Qwen→Ouro distillation** (ADR-0015): asymmetry is load-bearing.
+- **Masked autoencoders.** MAE ([arXiv:2111.06377](https://arxiv.org/abs/2111.06377)); iBOT
+  ([arXiv:2111.07832](https://arxiv.org/abs/2111.07832)) — generative reconstruction; the branch
+  JEPA deliberately abandons for latent prediction.
+- **JEPA (predict in latent space — the world-model line).** Position paper: LeCun, *A Path Towards
+  Autonomous Machine Intelligence* ([OpenReview BZ5a1r-kVsf, 2022](https://openreview.net/pdf?id=BZ5a1r-kVsf));
+  I-JEPA ([arXiv:2301.08243](https://arxiv.org/abs/2301.08243)); V-JEPA
+  ([arXiv:2404.08471](https://arxiv.org/abs/2404.08471)); V-JEPA 2
+  ([arXiv:2506.09985](https://arxiv.org/abs/2506.09985)) — latent-predictive world models that
+  support planning; **maps onto Observe→Reason**, and V-JEPA 2 / LeWM's *implausible-event
+  detection* is a grounding signal for **[07] VERIFY** (see cross-ref).
+- **Regularization (the distributional anti-collapse condition — closest to us).** W-MSE
+  ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)); Barlow Twins
+  ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)); VICReg
+  ([arXiv:2105.04906](https://arxiv.org/abs/2105.04906)); **SIGReg / LeJEPA** (Balestriero & LeCun,
+  [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize embeddings toward an
+  **isotropic Gaussian**, heuristics-free (no stop-grad / EMA / scheduler), linear cost, one
+  hyperparameter. **LeWM** (Maes et al., [arXiv:2603.19312](https://arxiv.org/abs/2603.19312)) —
+  first *stable end-to-end* JEPA from pixels, prediction + one Gaussian regularizer, ~15M params,
+  plans 48× faster than foundation-model world models. **This is the payload for us:** SIGReg's
+  "force the latent distribution to be well-conditioned" is the distributional sibling of the
+  certificate's spectral bound — a candidate anti-collapse term for the Ouro latent loop, and a
+  falsifiable claim (does a covariance-conditioning regularizer reduce our measured collapse
+  proximity?). Watch: *When Does LeJEPA Learn a World Model?* ([arXiv:2605.26379](https://arxiv.org/abs/2605.26379)).
+
 ### Key Insight
 Never retrain. Accumulate.
 
@@ -385,6 +444,6 @@ Never retrain. Accumulate.
 4. **Remove entries when superseded by implementation or better alternative**
 5. **This is not a bookmarks list. It is the architecture research trail.**
 
-**Last Updated:** 2026-06-19 (3¹² lattice substrate + convergence-dynamics anchors — Comet Leap P2)  
+**Last Updated:** 2026-07-06 (SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
 **Maintained By:** Lantern OS team  
 **Immutability:** Read-only; update via PR + issue comment only
