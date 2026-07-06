@@ -189,10 +189,20 @@ Named honestly so they become follow-up issues, not surprises:
    Node serving path doesn't route every request through it; only the Kalshi path has closed
    Reason→Verify→Converge. *Debt: wiring, not building.* ([§3](#3-the-loop--the-four-objects-the-formal-core))
 2. **Skills are mostly design-contract-only.** 17 skill dirs, 5 real implementations (`job_application` added in #1098). Docs must not claim the others are live.
-3. **CSF codec claims vs. reality.** The public API docstring advertises `zstd-19+LDM`
-   ([`__init__.py:12`](../src/csf/__init__.py)); in practice the active paths have bottlenecked on
-   zlib / low-level zstd, leaving substantial ratio on the table vs. brotli/lzma/zstd-19. *Verify
-   actual codec before quoting ratios.*
+3. **CSF codec claim — reconciled (#2092).** The public API docstring advertises `zstd-19+LDM`
+   ([`__init__.py:12`](../src/csf/__init__.py)), and the active path now genuinely uses it:
+   `DEFAULT_CODEC` resolves to `zstd` with `ZSTD_LEVEL=19` + long-distance matching whenever the
+   `zstandard` package is importable, and `zstandard>=0.22.0` is a declared dependency
+   (`requirements.txt`), so the advertised codec is the one that runs — it silently falls back to
+   `zlib-9` only in a stripped environment without `zstandard`. **Measured** (2.6 MB of real
+   `data/**/*.jsonl` memory/audit logs, the CSF hot path): zstd-19 **17.97×** vs zlib-9 **12.25×**
+   — zstd is **31.8% smaller**, so no substantial ratio is being left on the table by the default.
+   Regression-pinned by `tests/test_csf_default_codec.py` (default codec is zstd-19 when
+   `zstandard` is present, and a packed archive actually records `codec="zstd"`). CSF-Omni
+   (`--codec omni`) still beats the zstd-19 default by 3–16% for cold/archival writes; zstd-19 is
+   kept as the hot-write default. *(This is an internal/synthetic compression ratio, so per
+   [`docs/BENCHMARKS.md`](BENCHMARKS.md) line 9 it is recorded here at the claim site, not in the
+   external-marks-only benchmark registry.)*
 4. **Declared-but-unwired providers** (Grok, Mistral, Cohere, Perplexity) appear in PCSF but not in
    the fallback chain — config implies capability the code doesn't yet have.
 5. **Orphaned nav modules.** `shared-header.js` / `header.js` are unused; live nav is `auth-gate.js`
