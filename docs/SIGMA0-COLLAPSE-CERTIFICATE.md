@@ -1080,6 +1080,46 @@ model run; they do **not** prove a trained model is un-gameable — the §7.2 wa
 remains a live research risk, and the golden set is 159 curated items, not a population. The claim
 is only that §7.2's defenses are now *externally-checkable code with measured outputs*, not prose.
 
+### 7.4 Update (2026-07-05): the apparatus produces a passing model — and caught a real label-inflation
+
+**Status: MEASURED — three extensions of §7.3, each with a run pointer.** They strengthen the same
+claim; none closes the §7.2 trained-gamer risk.
+
+1. **The honesty axis discriminates *frontier* models, not just weak ones.** `sigma0_live_bench.py`
+   now runs Gemini via Vertex ADC alongside GPT-4o-mini on the full 159. The two sit **0.03 apart on
+   raw golden** (0.95 vs 0.92) but **21 points apart on confabulation** — GPT-4o-mini **0/42**, Gemini
+   2.5 Flash **9/42 (21.4%)**. §7.2's "calm-while-wrong" is not a small-model artifact; a frontier
+   model asserts one unseen negative in five as fact. Externally corroborated by **SimpleQA-Verified**
+   (Google DeepMind, [arXiv:2509.07968](https://arxiv.org/abs/2509.07968)), whose separate
+   Accuracy / Attempted / Hedged / F1 columns are the same accuracy-vs-honesty split this key draws.
+   (`docs/SIGMA0-HONESTY-BENCHMARK.md`.)
+
+2. **The apparatus produced a model that itself passes — a detector *and* a trainable target.** A
+   QLoRA honesty-tune of the local **Ouro-1.4B**, scored on **66 never-trained** held-out facts
+   (`experiments/sigma0_ouro_honesty_eval.py`, ledger `data/sigma0/ouro_honesty_eval_results.json`):
+   golden **0.958**, confabulation **2/20 = 10%**, over-abstention 2.2% — it **ties GPT-4o-mini on
+   golden and beats Gemini on confabulation**, at 1.4B local params, declining every open Millennium
+   problem and refuted claim it had never seen. *Honest scope:* n=20 held-out negatives (wide error
+   bars); the model is task-trained where the frontier rows are zero-shot; and the number required
+   feeding the adapter its exact training format — the earlier "the tune collapsed to always-assert"
+   readings were a **train/serve prompt-format mismatch (#2033)**, not a real collapse (a §7.2
+   verification-theater confound in our own measurement, now removed).
+
+3. **§7.2's "label inflation" attack, caught in the wild — by an independent model, not by static
+   validation.** The golden key's `continuum-hypothesis` row asserted the *proven* independence of CH
+   from ZFC (Gödel + Cohen) yet was labelled a HEURISTIC negative — a **true statement wearing the
+   wrong class**. A three-agent web-validation that checked each statement's *truth* **passed it** (the
+   statement is true); the mislabel surfaced only when an independent model **disagreed with the key**.
+   The refinement for §7.2's "one defense": *truth-checking a claim ≠ checking its class*, and the
+   catch came exactly from its rider — **bind the label to an external check the author does not
+   control**. Corrected and recorded (`data/sigma0/golden_web_validation.json → post_web_findings`;
+   enforced by `tests/test_golden_web_validation.py`).
+
+**Net.** §7.3's apparatus now (a) discriminates frontier models on the honesty axis, (b) has produced
+a small *local* model that passes on held-out data, and (c) has caught one real label-inflation the
+way §7.2 prescribes — including one hiding in our *own* answer-key. The trained-gamer /
+watched-vs-unwatched gap (§7.2) is untouched by all three; it remains the open risk.
+
 ---
 
 ## References (lineage)
