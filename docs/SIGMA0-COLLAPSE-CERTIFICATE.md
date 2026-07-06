@@ -672,6 +672,70 @@ runtime annotation introspection — Pydantic, FastAPI, dataclass eval, Sphinx
 autodoc). Fixed: `collapse.py:33` now reads `from typing import Dict, Optional`.
 Recorded here so the resolution is not lost.
 
+### 3.1 Design implication: scheduled grounding from certificate quantities
+
+**Status: DESIGN NOTE — a scheduling consequence extracted from the certificate's own
+objects (γ, c, P). The core inequality is machine-checked on synthetic maps
+(`experiments/sigma0_grounding_deadline.py`); the mapping onto real token-level grounding
+is CONJECTURED. This is not a new theorem in dynamical systems — the math is
+corollary-grade (geometric decay + a P-norm triangle inequality); the value is the
+design consequence, stated below.**
+
+*In plain words:* the longer a self-feeding loop runs inside a basin, the more external
+evidence it takes to pull it out — and the certificate's own numbers say exactly how the
+window closes. So grounding should run on a **schedule set by the contraction rate**, not
+only when the alarm rings: by the time the alarm (the §4 canary) is reliable, the cheap
+part of the window is already gone.
+
+**The commitment inequality (PROVEN, machine-checked).** Inside a certified basin
+`{V ≤ c}` with `V(F(x)) ≤ γ V(x)`, `γ < 1` (`V = xᵀPx`), an anchor `a` with budget
+`‖a‖ ≤ B` can raise `√V` by at most `B·√λ_max(P)`, while `V(x_n) ≤ γⁿV₀` decays. Escape
+(`V(x_n + a) > c`) is therefore possible **only if**
+
+$$B \;>\; B^*(n) \;=\; \frac{\sqrt{c} - \gamma^{n/2}\sqrt{V_0}}{\sqrt{\lambda_{\max}(P)}}
+\;\xrightarrow{\;n\to\infty\;}\; B^*_\infty = \sqrt{c/\lambda_{\max}(P)}.$$
+
+The required budget rises **geometrically at the certified rate** and saturates. Inverting:
+any budget `B < B*_∞` stops working after a **computable deadline**
+`n*(B) = 2·ln[√V₀/(√c − B√λ_max(P))]/ln(1/γ)`. Verified by construction (exact
+trust-region maximization of `V(x_n+a)` over the budget ball) on a normal basin —
+predicted deadlines 1.6/2.9/6.0 vs measured last-escapes 1/2/5, conservative in the right
+direction (`data/sigma0/grounding_deadline_report.json`).
+
+**Where it bites (MEASURED caveat).** The deadline binds in the Euclidean norm only for
+**well-conditioned** basins. In a strongly non-normal "sliver" basin (`cond(P) ≈ 6·10⁵`)
+the ceiling `B*_∞` is tiny (~0.002), so any realistic anchor escapes at *every* depth —
+the deadline exists but has no practical bite. Ouro's measured loop is in this sliver
+regime (`experiments/sigma0_loop_jacobian.py`: ρ_obs ≈ 0.88, strong non-normality), which
+**retro-dicts** the measured anchoring null (`experiments/ouro_canary_vs_logprob.py`:
+grounding stayed cheap at all depths). Supporting evidence, **not** validation — a
+retrodiction of our own null, not a prospective test.
+
+**The design shift (the actionable part):**
+
+1. **Grounding is a schedule, not only an event.** Inject external evidence with a period
+   below the commitment half-life `ln 2 / ln(1/ρ)` — for Ouro's measured ρ ≈ 0.88, ~5.4
+   loop steps (PROJECTION: measured rate composed with the inequality, not a new
+   measurement).
+2. **The §4 canary is demoted from primary trigger to audit.** Critical slowing down is
+   detectable only *after* contraction is deep — precisely when `B*(n)` has saturated. In
+   well-conditioned basins, canary-triggered Σ₀⁻¹ fires at the expensive end of the window
+   by construction. (CONSISTENT with — not proven by — the measured rank≠route split:
+   early-curve signals routed grounding positively, the late-curve loop canary negatively;
+   see `data/eval/ouro_canary_vs_logprob_results.json`.)
+3. **Conditioning decides the regime.** `cond(P)` of the local basin tells you whether the
+   deadline is a hard constraint (well-conditioned) or soft (sliver). Measuring it is
+   cheap and should accompany any certified rate.
+
+**Honest limits.** The additive-anchor model is a simplification — real grounding enters
+as tokens through attention, not as a clean latent displacement. The qualitative
+phenomenon ("early intervention beats late; models commit") is independently published
+(e.g. arXiv:2604.23235 measures per-token commitment); the contribution here is only the
+*certified composition* — deadline and cadence computed from this certificate's own
+quantities. A prospective test needs a **well-conditioned** loop (e.g. STARS-trained,
+arXiv:2605.26733) where the deadline should bite; on Ouro the theory predicts its own
+null.
+
 ---
 
 ## 4. The early-warning scalar (the "canary")
