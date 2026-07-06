@@ -115,6 +115,40 @@ def test_build_examples_balanced_and_aligned():
         assert sum(e["y"] for e in rows) == len(rows) // 2, dom
 
 
+# ── the gate primitive (fit_truth_gate / truth_gate_score) ────────────────────────────────────
+def _synth_clean(seed=0, dim=12, n=120):
+    """Cleanly separable truth axis (no domain nuisance) — the right fixture for the gate primitive."""
+    rng = np.random.RandomState(seed)
+    v = np.zeros(dim); v[0] = 1.0
+    feats, y = [], []
+    for _ in range(n):
+        label = rng.randint(0, 2)
+        feats.append((2 * label - 1) * v + rng.randn(dim) * 0.3)   # true→+v, false→−v
+        y.append(label)
+    return np.array(feats), np.array(y)
+
+
+def test_truth_gate_scores_true_high_false_low():
+    feats, y = _synth_clean()
+    gate = X.fit_truth_gate(feats, y)
+    scores = np.array([X.truth_gate_score(gate, f) for f in feats])
+    assert scores.min() >= 0.0 and scores.max() <= 1.0                   # valid probabilities
+    assert scores[y == 1].mean() > 0.8 and scores[y == 0].mean() < 0.2   # true ≫ false
+    # the gate fires (low score) on false and not on true — the grounding-intervention condition
+    assert (scores[y == 0] < 0.5).mean() > 0.95
+    assert (scores[y == 1] > 0.5).mean() > 0.95
+
+
+def test_truth_gate_orientation_is_stable():
+    # even if the raw direction sign flips (false-centroid > true-centroid on some axis), fit
+    # re-orients so higher score always means "more true"
+    feats, y, doms = _synth_shared(seed=7)
+    gate = X.fit_truth_gate(feats, y)
+    hi = np.mean([X.truth_gate_score(gate, f) for f in feats[y == 1]])
+    lo = np.mean([X.truth_gate_score(gate, f) for f in feats[y == 0]])
+    assert hi > lo
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0
