@@ -23,6 +23,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const surfaceRegistry = require("./surface-registry");
 
 // lib/ → apps/lantern-garage/ → apps/ → repo root
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -192,10 +193,24 @@ function getNavConfig() {
   const { navigation } = loadConfig();
   return NAV_PAGES.map((page) => {
     const o = navigation[page.path] || {};
+    // Σ₀ boundary default (surface-registry): the DEFAULT app foregrounds the loop.
+    // An EXTENSION surface is hidden from the nav unless its gating flag is enabled,
+    // so trading/creator/etc. are opt-in, not equals of the loop. CORE surfaces and
+    // always-on shell modules (account/meta, flag === null) are never default-hidden.
+    // An explicit admin override (hidden set either way) always wins over this default.
+    const surface = page.path.replace(/^\//, "");
+    const cls = surfaceRegistry.classify(surface);
+    // An extension is "on" if its env gate is set (how deployments enable it) OR an
+    // admin toggled it on in the flag store — check both, not just the admin store.
+    const extEnabled = (flag) => !!process.env[flag] || isFlagEnabled(flag);
+    // NAV_FOREGROUND extensions (e.g. the trader) are a product mainstay — kept in
+    // the default nav even while gated (ADR-0023).
+    const defaultHidden = !!(cls && cls.tier === "extension" && cls.flag
+      && !extEnabled(cls.flag) && !surfaceRegistry.isNavForegrounded(surface));
     return {
       path: page.path,
       label: page.label,
-      hidden: !!o.hidden,
+      hidden: o.hidden !== undefined ? !!o.hidden : defaultHidden,
       disabled: !!o.disabled,
       updatedAt: o.updatedAt || null,
       updatedBy: o.updatedBy || null,

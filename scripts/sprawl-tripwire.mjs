@@ -24,10 +24,20 @@
  */
 import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import registry from "../apps/lantern-garage/lib/surface-registry.js";
 
 export const VALID_STAGES = ["observe", "remember", "reason", "act", "verify", "converge"];
+
+// A surface is ALSO justified if surface-registry.js already classifies it as CORE or
+// EXTENSION — that registry (with its contract test + sprawl-budget cap) is the
+// authoritative Σ₀ boundary, so an already-classified surface is not "silent" sprawl.
+// This reconciles the two gates onto one source of truth (ADR-0023). Top-level only,
+// matching the registry's scope.
+export function isRegistryClassified(relPath) {
+  return registry.classify(basename(relPath)) !== null;
+}
 const PUBLIC_PREFIX = "apps/lantern-garage/public/";
 
 // Pull the declared loop stage out of a page's HTML (meta tag or comment). Returns the
@@ -47,6 +57,7 @@ export function evaluateSurfaces(pages) {
   for (const p of pages || []) {
     const stage = extractLoopStage(p.content);
     if (stage) justified.push({ path: p.path, stage });
+    else if (isRegistryClassified(p.path)) justified.push({ path: p.path, stage: "registry" });
     else violations.push({ path: p.path });
   }
   return { ok: violations.length === 0, violations, justified };
@@ -54,9 +65,14 @@ export function evaluateSurfaces(pages) {
 
 // Is this added path a public, user-facing HTML surface? (skip partials/components)
 export function isPublicSurface(relPath) {
-  return relPath.startsWith(PUBLIC_PREFIX)
-    && relPath.endsWith(".html")
-    && !/\/(partials|components|fragments)\//.test(relPath);
+  if (!relPath.startsWith(PUBLIC_PREFIX) || !relPath.endsWith(".html")) return false;
+  if (/\/(partials|components|fragments)\//.test(relPath)) return false;
+  // Top-level surfaces only — the Σ₀ registry governs public/*.html, not nested
+  // bundled mini-apps (e.g. games/2048/index.html), which are gated at the cluster
+  // level by their extension module. A nested index.html is a bundle asset, not a
+  // first-class loop surface.
+  const rest = relPath.slice(PUBLIC_PREFIX.length);
+  return !rest.includes("/");
 }
 
 // ── CLI shell ───────────────────────────────────────────────────────────────────
