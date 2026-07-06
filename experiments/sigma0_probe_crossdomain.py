@@ -26,6 +26,8 @@ not memorize per-fact features" → all_pairs_transfer(); "larger, more diverse 
 """
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 # (domain, template, true_fill, false_fill) — every pair is unambiguously true/false and
@@ -131,6 +133,37 @@ def all_pairs_transfer(feats, y, domains):
         "mean_cross_domain_auroc": round(sum(offdiag) / len(offdiag), 4) if offdiag else None,
         "min_cross_domain_auroc": round(min(offdiag), 4) if offdiag else None,
     }
+
+
+# ── the gate primitive: turn the truth direction into a live grounding score ──────────────────
+# This is the seam the serving layer (ouro_serve.py, where hidden states exist) calls to REPLACE
+# the token-logprob signal (~0.77 AUROC) the JS surprise-gate rides today with the hidden-state
+# truth probe (cross-domain-generalizing ~0.97, data/sigma0/probe_crossdomain_report.json). Fit
+# once on a labeled reference set; then score each reply's last-token hidden state — a LOW score
+# means "likely ungrounded/false" and should trip the grounding intervention.
+def fit_truth_gate(feats, y):
+    """Fit a truth gate from labeled hidden states. Returns {direction, bias, scale} where a
+    projection onto `direction` is centered at the class midpoint and scaled to a logistic slope,
+    oriented so higher score = more likely TRUE."""
+    feats = np.asarray(feats, dtype=float)
+    y = np.asarray(y)
+    d = truth_direction(feats, y)
+    proj = feats @ d
+    mu_t, mu_f = proj[y == 1].mean(), proj[y == 0].mean()
+    sign = 1.0 if mu_t >= mu_f else -1.0                 # orient: true projects higher
+    d = d * sign
+    mu_t, mu_f = mu_t * sign, mu_f * sign
+    bias = -(mu_t + mu_f) / 2.0                          # decision boundary at the class midpoint
+    scale = 4.0 / (abs(mu_t - mu_f) + 1e-9)              # ≈ logistic slope: classes land near 0/1
+    return {"direction": d.tolist(), "bias": float(bias), "scale": float(scale)}
+
+
+def truth_gate_score(gate, feat):
+    """Truth probability in [0,1] for one hidden-state vector (higher = more likely true). The
+    grounding gate fires when this is LOW. Pure — safe to call per-reply in the serving loop."""
+    z = (float(np.asarray(feat, dtype=float) @ np.asarray(gate["direction"], dtype=float))
+         + gate["bias"]) * gate["scale"]
+    return 1.0 / (1.0 + math.exp(-z))
 
 
 if __name__ == "__main__":

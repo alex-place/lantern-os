@@ -1,0 +1,66 @@
+{
+  "task": "cross-domain truth-direction GENERALIZATION on Ouro hidden states (#2030)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "eval": "mean-difference truth direction fit on one domain, scored on a HELD-OUT domain (all pairs); numpy, no sklearn",
+  "domains": [
+    "geography",
+    "science",
+    "history",
+    "astronomy"
+  ],
+  "n_examples": 48,
+  "hidden_dim": 2048,
+  "best_ut_step": 3,
+  "cross_domain_transfer_best": {
+    "mean_cross_domain_auroc": 0.9699,
+    "min_cross_domain_auroc": 0.8611,
+    "matrix": {
+      "geography": {
+        "geography": 1.0,
+        "science": 1.0,
+        "history": 1.0,
+        "astronomy": 0.8889
+      },
+      "science": {
+        "geography": 1.0,
+        "science": 1.0,
+        "history": 1.0,
+        "astronomy": 0.8889
+      },
+      "history": {
+        "geography": 1.0,
+        "science": 1.0,
+        "history": 1.0,
+        "astronomy": 0.8611
+      },
+      "astronomy": {
+        "geography": 1.0,
+        "science": 1.0,
+        "history": 1.0,
+        "astronomy": 1.0
+      }
+    }
+  },
+  "cross_domain_transfer_per_ut_step": {
+    "0": {
+      "mean": 0.7292,
+      "min": 0.5
+    },
+    "1": {
+      "mean": 0.9444,
+      "min": 0.7778
+    },
+    "2": {
+      "mean": 0.9653,
+      "min": 0.8333
+    },
+    "3": {
+      "mean": 0.9699,
+      "min": 0.8611
+    }
+  },
+  "answer_logprob_auroc_same_data": 0.8125,
+  "evidence_class": "MEASURED (pilot; data/sigma0/probe_crossdomain_report.json)",
+  "honest_headline": "Fit on one domain, the truth direction transfers to HELD-OUT domains at mean cross-domain AUROC 0.9699 (min 0.8611, UT step 3) vs the answer-logprob baseline 0.8125 on the same data \u2014 so the hidden-state truth signal GENERALIZES, it is not per-fact memorization.",
+  "caveats": "n small (pilot), fp16, Ouro-1.4B, self-authored well-known facts across 4 domains; UT-step (not intra-step layers)."
+}
