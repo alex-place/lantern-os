@@ -30,9 +30,18 @@ not an essay. Follow the Σ₀ discipline (last section) in your OWN answer.
   A fresh program can adopt abstention-aware proper scoring FROM TOKEN ONE. The
   "honesty-native pretraining" slot is unoccupied (7 verified searches, 2026-07-06 —
   post-training honesty patches exist; pretraining-objective honesty at scale does not).
-[MEASURED] The property is trainable and cheap at small scale: our QLoRA honesty-tune of
-  Ouro-1.4B hits golden 0.958 / confab 10% / over-abstain 2.2% on 66 held-out — tying
-  GPT-4o-mini on golden, beating Gemini-2.5-Flash (21.4% confab). (sigma0_ouro_honesty_eval.py)
+[OPEN — was MEASURED, retracted 2026-07-06] Whether the property is trainable at small
+  scale is now OPEN. The prior evidence (QLoRA honesty-tune of Ouro-1.4B: golden 0.958 /
+  confab 10% / over-abstain 2.2% on 66 held-out) was CONFOUNDED by a benchmark leak: the
+  golden key's negatives announce their status in-text ("— OPEN (Millennium problem)",
+  "— REFUTED"). E1 (`data/sigma0/e1_degloss_report.json`, 2026-07-06) strips those glosses
+  and re-runs the SAME adapter: Ouro confab **10% → 55%** (2/20 → 11/20), golden 0.958 →
+  0.833 — while a GPT-4o-mini control is UNMOVED (0/20 → 0/20, golden 0.964 → 0.976),
+  proving de-gloss does not make the task harder and the spike is the tune reading glosses,
+  not honesty. Trainability at 1.4B must be re-established on **corpus-v2** (de-glossed,
+  6-status, perturbed-positives) and confirmed on OSS marks (TruthfulQA / HaluEval /
+  AbstentionBench), never on the leaked home-grown key. The design doc staged E1 first and
+  predicted this — the method survives, the number does not.
 [MEASURED] The failure modes are known and reproducible: corpus imbalance (94% positive)
   collapses the tune to always-assert; balancing negatives fixes it. Independently
   corroborated at RL scale: RFT erodes abstention ("Hallucination Tax", arXiv:2505.13988).
