@@ -47,6 +47,13 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 6. Honor the **External Reality Rule**: every important claim carries evidence — link to a
    real `file:line`, commit, or PR, with a confidence note.
 
+Numbering and index membership are enforced mechanically: the `ADR registry lint` PR gate
+(`node scripts/lint-adr-registry.mjs`) fails on duplicate 4-digit numbers, on an ADR file
+missing from the index table below, and on an index status cell that contradicts the file's
+own `status:` declaration. Numbers have collided three times under concurrent PRs
+(3×0001, 2×0008, 2×0023) — if the gate fires on your PR, renumber to the next free number
+against the *merged* master, not your branch's base.
+
 ## Status values
 
 - **Proposed** — drafted, under review, **not yet binding**. Default for any new ADR.
