@@ -165,9 +165,13 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
 
 ## Decisions this baseline forces
 
-1. **Ship the local engine on Qwen2.5-Coder (Apache-2.0), not Ouro.** A supported permissive coder
-   already beats Ouro-1.4B on coding, runs on 8GB via Ollama today, and is a drop-in. **Ouro →
-   research lane**, auditioning for the local slot via the loop-value experiment. Unblocks the product.
+1. **Ship the local engine on Qwen2.5-Coder (Apache-2.0), not Ouro.** ✅ **Landed (#2171):** the
+   model registry now leads coding/reasoning/default with `qwen2.5-coder:latest` (already pulled,
+   serves on the standard Ollama `:11434`) on the 8GB box; **Ouro stays kernel/research-only** (its
+   coding promotion is gated on the loop-value experiment #2178). Honest: Qwen is registered
+   `verified:false` (vendor HumanEval 88.4% not yet reproduced on-box — #2173 is the gate to flip it),
+   yet it leads because it out-scores the only other (also-unverified) local coder and — unlike the
+   PLT shim — actually serves. Test: `npm run test:local-engine` (7/7).
 2. **Continue is frozen — do not build on it.** Field is thinning (Roo dead, Continue read-only),
    which *widens* the neutral, user-owned control-plane lane.
 3. **Use an OSS memory store (Graphiti/cognee), don't defend CSF as a better store.** Our value is the

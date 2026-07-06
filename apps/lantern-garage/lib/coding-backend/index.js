@@ -39,6 +39,19 @@ function listBackends() {
   return Object.keys(ADAPTERS);
 }
 
+// The default LOCAL coding engine, resolved from the VRAM-gated model registry
+// (OSS-BASELINE #2171 → supported Qwen2.5-Coder on the 8GB box; kernel stays Ouro).
+// Local-serving backends (aider via Ollama) use this; the receipt records it.
+function defaultLocalEngine(intent = "coding") {
+  try {
+    const reg = require("../local-model-registry");
+    const r = reg.resolveLocalLead(intent);
+    return { lead: r.lead, endpoint: r.lead ? reg.endpointFor(r.lead) : null, reason: r.reason };
+  } catch (e) {
+    return { lead: null, endpoint: null, reason: `registry unavailable: ${e.message}` };
+  }
+}
+
 function _append(dataDir, file, obj) {
   fs.mkdirSync(dataDir, { recursive: true });
   fs.appendFileSync(path.join(dataDir, file), JSON.stringify(obj) + "\n");
@@ -82,9 +95,11 @@ async function runCodingTask({ task, repoPath, backend = "aider", why = "" }, op
     return { ok: false, backend, error: `backend '${backend}' not available`, hint: adapter.installHint || null };
   }
 
+  const localEngine = defaultLocalEngine("coding");
+  const model = opts.model || localEngine.lead || null;
   let proposal;
   try {
-    proposal = await adapter.propose({ task, repoPath });
+    proposal = await adapter.propose({ task, repoPath, model });
   } catch (e) {
     return { ok: false, backend, error: `propose failed: ${e.message}` };
   }
@@ -103,7 +118,8 @@ async function runCodingTask({ task, repoPath, backend = "aider", why = "" }, op
     ts: new Date().toISOString(),
     task,
     backend,
-    model: proposal.model || null,
+    model: proposal.model || model || null,
+    localEngine: localEngine.lead || null,
     costUsd: proposal.costUsd ?? null,
     filesChanged: files.map((f) => f.path),
     why,
@@ -129,6 +145,7 @@ async function runCodingTask({ task, repoPath, backend = "aider", why = "" }, op
     ok: true,
     status: "awaiting_approval",
     backend,
+    localEngine: localEngine.lead || null,
     pendingId,
     receiptId,
     receipt: { ...receipt },
@@ -212,4 +229,5 @@ module.exports = {
   readReceipts,
   abCompare,
   listBackends,
+  defaultLocalEngine,
 };

@@ -10,7 +10,7 @@ module.exports = {
   async available() {
     return true;
   },
-  async propose({ task }) {
+  async propose({ task, model }) {
     const slug =
       String(task || "task")
         .toLowerCase()
@@ -24,7 +24,7 @@ module.exports = {
     return {
       ok: true,
       backend: "mock",
-      model: "mock-1",
+      model: model || "mock-1", // echoes the registry-resolved local engine (#2171)
       costUsd: 0,
       filesChanged: [{ path: rel, content }],
       patchPreview,

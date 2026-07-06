@@ -1,6 +1,19 @@
 {
-  "_doc": "Σ₀ local-model adapter registry. Operator-editable overlay onto the built-in defaults in apps/lantern-garage/lib/local-model-registry.js (merged by id, TTL-cached ~60s). See docs/SIGMA0-MODEL-ADAPTER.md. keystone-sigma0-plt (the LoopCoder-V2-lineage owned PLT coder, ADR-0011) is now the SOLE local coder/default and serves on its own ollama-compatible shim at :11435 (models/keystone-sigma0-plt/serve_keystone_plt.py). The kernel stays Ouro/keystone-ft on :11434; Three Doors keeps lantern-csf-dream on :11434. Per-model endpoints are honored by endpointFor(). vramGB gates against the box (VRAM_BUDGET_GB, default 8).",
+  "_doc": "Σ₀ local-model adapter registry. Operator-editable overlay onto the built-in defaults in apps/lantern-garage/lib/local-model-registry.js (merged by id, TTL-cached ~60s). See docs/SIGMA0-MODEL-ADAPTER.md. DEFAULT LOCAL CODER (OSS-BASELINE 2026-07-06, #2171): the supported Apache-2.0 Qwen2.5-Coder-7B via the standard Ollama :11434 (already pulled) — it leads coding/reasoning/default on the 8GB box. The owned PLT coder (keystone-sigma0-plt, ADR-0011) is kept as a research coder on its :11435 shim but sorts BEHIND Qwen (unverified + shim-dependent) until its on-box HumanEval head-to-head (#2173) flips verified:true. Kernel stays Ouro/keystone-ft on :11434 (Ouro promotion to coding is gated on the loop-value experiment #2178); Three Doors keeps lantern-csf-dream on :11434. Per-model endpoints are honored by endpointFor(). vramGB gates against the box (VRAM_BUDGET_GB, default 8).",
   "models": [
+    {
+      "id": "qwen2.5-coder:latest",
+      "endpoint": "http://127.0.0.1:11434",
+      "selfConverges": false,
+      "toolCalling": true,
+      "vramGB": 6,
+      "ctxTokens": 32768,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 1,
+      "capabilityScore": 0.86,
+      "verified": false,
+      "note": "Default local coder (OSS-BASELINE #2171): supported Apache-2.0 Qwen2.5-Coder-7B via Ollama :11434 (already pulled). HumanEval 88.4% (vendor); verified:false until reproduced on-box (#2173). Leads coding/reasoning/default on the 8GB box; single-pass so the Core wraps it in loopedReason() (grounding by default)."
+    },
     {
       "id": "keystone-sigma0-plt",
       "endpoint": "http://127.0.0.1:11435",
@@ -12,7 +25,7 @@
       "rank": 0,
       "capabilityScore": 0.84,
       "verified": false,
-      "note": "Sole local Σ₀ coder (ADR-0011, LoopCoder-V2 lineage). Default for coding/reasoning/default. Serve: python models/keystone-sigma0-plt/serve_keystone_plt.py --model D:/keystone-sigma0-plt-ckpt --port 11435 --dtype 4bit. On-box (RTX 3070): loads 4-bit ~6.4GB<8, ~5-6 tok/s (static KV cache). verified:false kept honestly until an eval WIN over a frontier coder; if the shim is down the chain falls back to cloud, not another local model."
+      "note": "Owned PLT research coder (ADR-0011, LoopCoder-V2 lineage). Sorts BEHIND the Qwen2.5-Coder default (#2171) — unverified AND shim-dependent (:11435; falls back to cloud if down). Its on-box HumanEval head-to-head vs Qwen is the gate to lead again. Serve: python models/keystone-sigma0-plt/serve_keystone_plt.py --model D:/keystone-sigma0-plt-ckpt --port 11435 --dtype 4bit."
     },
     {
       "id": "ouro:latest",
@@ -24,7 +37,7 @@
       "taskTypes": ["kernel"],
       "rank": 0,
       "capabilityScore": 0.4,
-      "note": "Σ₀ Convergence-Core kernel — Ouro-1.4B, native Q-exit (arXiv 2510.25741). Kernel-only; no longer competes on coding/default."
+      "note": "Σ₀ Convergence-Core kernel — Ouro-1.4B, native Q-exit (arXiv 2510.25741). KERNEL/RESEARCH-ONLY; not a coding/default candidate. Promotion to the coding slot is gated on the loop-value experiment (#2178). Force Ouro-first (research) with LOCAL_CAPABILITY_FIRST=0."
     },
     {
       "id": "keystone-ft",

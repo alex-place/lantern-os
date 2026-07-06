@@ -92,7 +92,7 @@ const DEFAULTS = [
                                   // competes on coding/reasoning/default.
     rank: 0,                      // kernel lead; rank-order escape via LOCAL_CAPABILITY_FIRST=0
     capabilityScore: 0.4,
-    note: "Recurrent-depth Σ₀ kernel (#1292). Kernel-only since the PLT coder became the sole local coding default. Its Σ₀ adapter is improved offline by the crystallization flywheel — a LOCAL Qwen2.5-Coder-7B teacher distills execution-verified traces into this student (scripts/gen_sigma0_traces.py --teacher qwen2.5-coder:7b; docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md), eval-gated on HumanEval before final/ swaps.",
+    note: "Recurrent-depth Σ₀ kernel (#1292). KERNEL/RESEARCH-ONLY: not a coding/reasoning/default candidate — the supported Qwen2.5-Coder is the coding default (#2171), and Ouro's promotion to the coding slot is gated on the loop-value experiment (#2178). Force Ouro-first (research) with LOCAL_CAPABILITY_FIRST=0. Its Σ₀ adapter is improved offline by the crystallization flywheel — a LOCAL Qwen2.5-Coder-7B teacher distills execution-verified traces into this student (scripts/gen_sigma0_traces.py --teacher qwen2.5-coder:7b; docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md), eval-gated on HumanEval before final/ swaps.",
   },
   {
     id: "keystone-ft",
@@ -132,7 +132,28 @@ const DEFAULTS = [
                                   // gate to flip this true. Requires serve_keystone_plt.py running on
                                   // :11435 (or KEYSTONE_PLT_ENDPOINT); if the shim is down the provider
                                   // chain falls back to cloud (Claude), not to another local model.
-    note: "Sole local Σ₀ coder (ADR-0011, LoopCoder-V2 lineage). Default for coding/reasoning/default; kernel stays Ouro. Serve via models/keystone-sigma0-plt/serve_keystone_plt.py on :11435.",
+    note: "Owned PLT research coder (ADR-0011, LoopCoder-V2 lineage). Registered for coding/reasoning/default but now sorts BEHIND the supported Qwen2.5-Coder default (#2171) — it is unverified AND depends on the :11435 shim (falls back to cloud if down). Its HumanEval head-to-head vs Qwen is the gate to lead again. Serve via models/keystone-sigma0-plt/serve_keystone_plt.py on :11435.",
+  },
+  {
+    // Default local coder — OSS-BASELINE (2026-07-06) decision #2171: ship the local
+    // engine on a SUPPORTED Apache-2.0 coder, not the unproven PLT/Ouro path.
+    // Qwen2.5-Coder-7B is already pulled and serves on the standard Ollama :11434, so it
+    // actually works; it leads coding/reasoning/default on the 8GB box. Ouro stays
+    // kernel/research-only (see the ouro:latest entry).
+    id: "qwen2.5-coder:latest",
+    endpoint: DEFAULT_ENDPOINT,   // standard Ollama :11434 (already pulled + serving)
+    selfConverges: false,         // single-pass → Core wraps it in loopedReason() (grounding by default)
+    toolCalling: true,            // Qwen2.5-Coder is trained for tool/function calling
+    vramGB: 6,                    // 7B @ Q4 (ollama tag ~4.7GB on disk) fits the 8GB box
+    ctxTokens: 32768,
+    taskTypes: ["coding", "reasoning", "default"],
+    rank: 1,
+    capabilityScore: 0.86,        // HumanEval pass@1 88.4% (Qwen2.5-Coder-7B, vendor) — docs/OSS-BASELINE.md
+    verified: false,              // vendor-claimed, NOT yet reproduced on our box. #2173 (wrapped-vs-raw +
+                                  // on-box HumanEval) is the gate to flip true — honest per the External
+                                  // Reality Rule. It still LEADS coding: it out-scores the only other
+                                  // (also-unverified) local coder AND, unlike the PLT shim, actually serves.
+    note: "Default local coder (OSS-BASELINE #2171): supported Apache-2.0 Qwen2.5-Coder-7B via Ollama (:11434, already pulled). Leads coding/reasoning/default on the 8GB box; kernel stays Ouro. Ouro-1.4B promotion to the coding slot is gated on the loop-value experiment (#2178).",
   },
   {
     id: "lantern-csf-dream",

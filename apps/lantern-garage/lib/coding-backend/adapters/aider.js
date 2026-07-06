@@ -36,17 +36,17 @@ module.exports = {
   async available() {
     return _has("aider");
   },
-  async propose({ task, repoPath }) {
+  async propose({ task, repoPath, model }) {
     if (!_has("aider")) return { ok: false, error: "aider not installed" };
     const git = (args) => execFileSync("git", args, { cwd: repoPath, encoding: "utf8" });
     const changed = [];
+    // Serve the registry-resolved local engine (#2171 → Qwen2.5-Coder via Ollama).
+    const aiderModel = model ? `ollama_chat/${String(model).replace(/:latest$/, "")}` : null;
     try {
       // shell:false via execFile; no --auto-commit so nothing lands yet
-      await pexec(
-        "aider",
-        ["--message", String(task), "--yes", "--no-auto-commit"],
-        { cwd: repoPath, timeout: 180000, maxBuffer: 1 << 24 }
-      );
+      const args = ["--message", String(task), "--yes", "--no-auto-commit"];
+      if (aiderModel) args.push("--model", aiderModel);
+      await pexec("aider", args, { cwd: repoPath, timeout: 180000, maxBuffer: 1 << 24 });
       const status = git(["status", "--porcelain"]).split(/\r?\n/).filter(Boolean);
       for (const line of status) {
         const rel = line.slice(3).trim();
@@ -69,7 +69,7 @@ module.exports = {
     return {
       ok: true,
       backend: "aider",
-      model: "(aider-configured)",
+      model: aiderModel || "(aider-configured)",
       costUsd: null,
       filesChanged: changed,
       patchPreview: changed.map((c) => `+++ b/${c.path}`).join("\n"),
