@@ -134,6 +134,24 @@ jobs:
       - name: Run sprawl tripwire
         run: node scripts/sprawl-tripwire.mjs --base origin/master
 
+  # ── Surface Boundary Contract ───────────────────────────────────────────────
+  # ADR-0023 declares the Σ₀ surface boundary merge-enforced. This job makes that
+  # true: every public/*.html must be classified core|extension in
+  # lib/surface-registry.js, the sprawl budget must hold, and every CORE page's
+  # <meta name="loop-stage"> must match its registry stage. The tripwire above
+  # only checks surfaces ADDED in the PR; this contract test checks the whole
+  # boundary on every PR. No npm install needed — the test is dependency-free.
+  surface-boundary:
+    name: Surface boundary contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Run surface boundary contract test
+        run: npm run test:boundary --prefix apps/lantern-garage
+
   # ── ADR Registry Lint ───────────────────────────────────────────────────────
   # ADR numbers have collided three times (3×0001 #1813, 2×0008 #1126/#1144,
   # 2×0023 #2147/#2158): concurrent PRs pick the "next free number" off a stale
