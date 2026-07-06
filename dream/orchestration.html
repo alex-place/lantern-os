@@ -229,7 +229,7 @@
     .guest-banner a { color: var(--accent); font-weight: 700; text-decoration: none; }
     .guest-banner a:hover { text-decoration: underline; }
   </style>
-  <title>Orchestration — unisona.ai</title>
+  <title>Settings — unisona.ai</title>
 </head>
 <body>
 
@@ -243,7 +243,7 @@
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
-    <a href="/orchestration.html" class="active">Orchestration</a>
+    <a href="/orchestration.html" class="active">Settings</a>
     <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
   </div>
@@ -254,7 +254,7 @@
 
 <main class="orch-main" id="main-content">
 
-  <h1 class="visually-hidden">Orchestration — Control Center</h1>
+  <h1 class="visually-hidden">Settings — Control Center</h1>
 
   <!-- ── Read-only guest banner (shown only to logged-out visitors) ── -->
   <div class="guest-banner" role="status">
@@ -271,6 +271,85 @@
     <span class="smeta">Training: <b id="statusTrain">—</b></span>
     <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
   </div>
+
+  <!-- ── Broker connection (IBKR) — per-user, ADR-0022 ── -->
+  <style>
+    #broker .broker-status{display:flex;align-items:center;gap:9px;font-size:.85rem;font-weight:600;margin:2px 0 12px}
+    #broker .bdot{width:9px;height:9px;border-radius:50%;background:var(--text2)}
+    #broker .bdot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}#broker .bdot.off{background:#ef4444}
+    #broker .bdot.wait{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+    #broker .bsaved-note{margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:.76rem;line-height:1.5;border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.08);color:#bbf7d0}
+    #broker .broker-gate{margin:0 0 12px;padding:10px 13px;border-radius:9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#fca5a5;font-size:.82rem}
+    #broker .broker-gate a{color:var(--accent)}
+    #broker .bfield{margin-bottom:10px}
+    #broker label{display:block;font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+    #broker input,#broker textarea{width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg0);color:var(--text0);font-size:.82rem;font-family:inherit}
+    #broker textarea{min-height:78px;font-family:var(--mono);font-size:.72rem;resize:vertical}
+    #broker .brow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media(max-width:640px){#broker .brow{grid-template-columns:1fr}}
+    #broker .bhint{font-size:.68rem;color:var(--text2);margin-top:3px}
+    #broker .bbanner{display:none;margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:.78rem}
+    #broker .bbanner.show{display:block}#broker .bbanner.err{border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.1);color:#fca5a5}
+    #broker .bbanner.ok{border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);color:#bbf7d0}
+    #broker .bactions{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+    #broker .bgen{border:1px solid var(--border);border-radius:10px;background:var(--bg0);padding:13px 15px;margin:0 0 14px}
+    #broker .bgen-head{font-size:.9rem;margin-bottom:4px}#broker .bgen-sub{color:var(--text2);font-weight:400;font-size:.72rem}
+    #broker .bgen-p{font-size:.78rem;color:var(--text1);line-height:1.55;margin:0 0 10px}
+    #broker .bgen-msg{margin-left:10px;font-size:.76rem;color:#22c55e}
+    #broker .bgen-files{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+    #broker .bgen-files-h{font-size:.76rem;color:var(--text1);margin-bottom:2px}
+    #broker .bfile-btn{font-family:var(--mono);font-size:.76rem;text-align:left;padding:9px 12px;border-radius:8px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--text0);cursor:pointer;transition:background .15s}
+    #broker .bfile-btn:hover{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+    #broker .bfile-btn.done{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12);color:#bbf7d0;cursor:default}
+    #broker .bgen-adv{margin-top:11px}#broker .bgen-adv summary{font-size:.74rem;color:var(--text2);cursor:pointer}
+  </style>
+  <section class="panel" id="broker">
+    <h2>🔗 Broker Connection <span class="section-meta">Interactive Brokers · your account</span></h2>
+    <p class="panel-sub">Trade your own IBKR account through unisona (self-service OAuth). Keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>). <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
+    <div class="broker-status"><span class="bdot" id="bdot"></span><span id="bstatusText">Checking…</span></div>
+    <div class="broker-gate" id="bgate" hidden>Trading requires the <strong>Deep Dreamer ($20/mo)</strong> tier. <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
+
+    <!-- Step 1: no command line — generate keys in the browser -->
+    <div class="bgen">
+      <div class="bgen-head"><strong>Step 1 · Get your keys</strong> <span class="bgen-sub">no command line needed</span></div>
+      <p class="bgen-p">Click below and unisona makes your security keys right here in your browser and downloads <strong>3 files</strong>. You'll upload those to IBKR in step 2. The secret parts stay in this form — they never leave your computer except into unisona.</p>
+      <button type="button" class="btn-primary" id="bgenerate">🔑 Generate my keys</button>
+      <span id="bgenmsg" class="bgen-msg"></span>
+      <div id="bgenfiles" class="bgen-files" hidden></div>
+      <details class="bgen-adv"><summary>Prefer the command line? (advanced)</summary>
+        <p class="bgen-p" style="margin-top:8px">Run these, then paste the two <em>private</em> keys + DH prime yourself:</p>
+        <pre style="white-space:pre-wrap;font-family:var(--mono);font-size:.7rem;background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:10px">openssl genrsa -out private_signature.pem 2048
+openssl rsa -in private_signature.pem -pubout -out public_signature.pem
+openssl genrsa -out private_encryption.pem 2048
+openssl rsa -in private_encryption.pem -pubout -out public_encryption.pem
+openssl dhparam -out dhparam.pem 2048</pre>
+      </details>
+    </div>
+
+    <form id="brokerForm">
+      <div class="bbanner" id="bbanner"></div>
+      <div class="bsaved-note" id="bsavednote" hidden>✓ Your credentials are <strong>saved on file</strong> (encrypted). You don't need to re-enter them — refreshing is safe. Use <strong>Recheck connection</strong> to test again. Fill a field only to <em>replace</em> it.</div>
+      <div class="brow">
+        <div class="bfield"><label>Consumer key</label><input id="consumerKey" autocomplete="off"></div>
+        <div class="bfield"><label>Account ID</label><input id="accountId" placeholder="DU1234567" autocomplete="off"><div class="bhint">DU… = paper · U… = live</div></div>
+      </div>
+      <div class="brow">
+        <div class="bfield"><label>Access token</label><input id="accessToken" autocomplete="off"></div>
+        <div class="bfield"><label>Access token secret</label><input id="accessTokenSecret" autocomplete="off"></div>
+      </div>
+      <div class="bfield"><label>Signature private key (PEM)</label><textarea id="signaturePem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea></div>
+      <div class="bfield"><label>Encryption private key (PEM)</label><textarea id="encryptionPem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea></div>
+      <div class="brow">
+        <div class="bfield"><label>Diffie-Hellman prime (hex)</label><input id="dhPrime" autocomplete="off"></div>
+        <div class="bfield"><label>Realm</label><input id="realm" value="limited_poa" autocomplete="off"></div>
+      </div>
+      <div class="bactions">
+        <button type="submit" class="btn-primary" id="bconnect">Connect &amp; test</button>
+        <button type="button" class="btn-secondary" id="brecheck" hidden>Recheck connection</button>
+        <button type="button" class="btn-secondary" id="bdisconnect" hidden>Disconnect</button>
+      </div>
+    </form>
+  </section>
 
   <p class="band-title">The loop, right now</p>
 
@@ -432,7 +511,7 @@
     <span class="sep">·</span>
     <a href="/">Home</a>
     <a href="/dream-chat.html">Chat</a>
-    <a href="/orchestration.html">Orchestration</a>
+    <a href="/orchestration.html">Settings</a>
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
@@ -1455,6 +1534,98 @@
 })();
 </script>
 
+<script>
+// ── Broker connection (IBKR) — per-user (ADR-0022) ──
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const FIELDS=['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime','realm','accountId'];
+  const form=$('brokerForm'); if(!form) return;
+  function banner(m,k){ const b=$('bbanner'); b.textContent=m; b.className='bbanner show '+(k||'ok'); }
+  function setStatus(s){
+    const live=s&&s.live, connected=live&&live.connected, has=s&&s.hasCredentials;
+    const waiting=has&&!connected&&live&&live.reason==='not_activated_or_unauthorized';
+    $('bdot').className='bdot '+(connected?'on':waiting?'wait':has?'off':'');
+    $('bstatusText').textContent=connected
+      ? `Connected · ${s.accountId||(live&&live.accountId)||'account'} (${s.mode||'?'})`
+      : waiting ? 'Saved · waiting for IBKR to activate — retry later'
+      : has ? 'Saved · not connected — see the message below'
+      : 'Not connected';
+    $('bdisconnect').hidden=!has;
+    $('brecheck').hidden=!has;
+    // Reassure that saved creds aren't lost on refresh: show the note + mark empty
+    // fields as "on file" rather than blank.
+    const note=$('bsavednote'); if(note) note.hidden=!has;
+    if(has){ ['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime'].forEach(f=>{ const el=$(f); if(el&&!el.value) el.placeholder='•••••••• saved — leave blank to keep'; }); }
+  }
+  // Shared: turn a live-probe result into a banner (used by Connect + Recheck).
+  function showLive(live){
+    if(live&&live.connected){ banner('Connected to IBKR — live session verified.','ok'); return; }
+    const txt=(live&&live.reasonText)||'IBKR did not authenticate — check the keys and that your OAuth consumer is active (up to 24h).';
+    banner(txt, (live&&live.reason==='not_activated_or_unauthorized')?'ok':'err');
+  }
+  async function refresh(){
+    try{
+      const sess=await (await fetch('/api/auth/session',{credentials:'include'})).json();
+      const entitled=sess&&(sess.role==='admin'||(sess.entitlements&&sess.entitlements.trade));
+      $('bgate').hidden=!!entitled;
+      form.style.opacity=entitled?'1':'.5'; form.style.pointerEvents=entitled?'auto':'none';
+      if(!entitled){ setStatus({hasCredentials:false}); return; }
+      setStatus(await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json());
+    }catch(e){ setStatus({hasCredentials:false}); }
+  }
+  form.addEventListener('submit',async(e)=>{
+    e.preventDefault(); const body={}; FIELDS.forEach(f=>body[f]=$(f).value.trim());
+    const btn=$('bconnect'); btn.disabled=true; const t=btn.textContent; btn.textContent='Testing…';
+    try{
+      const r=await fetch('/api/trading/ibkr/connect',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const d=await r.json();
+      if(!r.ok) banner(({missing_consumerKey:'Consumer key is required',bad_signaturePem:'Signature key must be a PEM private key',bad_encryptionPem:'Encryption key must be a PEM private key',bad_dhPrime:'DH prime must be hex'}[d.error])||('Error: '+(d.error||r.status)),'err');
+      else { showLive(d.live); setStatus({...d.status,live:d.live}); }
+    }catch(_){ banner('Network error — please try again.','err'); }
+    finally{ btn.disabled=false; btn.textContent=t; refresh(); }
+  });
+  // Recheck — re-run the live probe against the stored (encrypted) credentials,
+  // no re-entry needed. Useful while waiting for IBKR to activate the consumer.
+  $('brecheck').addEventListener('click',async()=>{
+    const btn=$('brecheck'); btn.disabled=true; const t=btn.textContent; btn.textContent='Rechecking…';
+    try{
+      const s=await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json();
+      if(!s.hasCredentials){ banner('No saved credentials to recheck.','err'); }
+      else { showLive(s.live); }
+      setStatus(s);
+    }catch(_){ banner('Network error — please try again.','err'); }
+    finally{ btn.disabled=false; btn.textContent=t; }
+  });
+  $('bdisconnect').addEventListener('click',async()=>{
+    if(!confirm('Disconnect your IBKR account?')) return;
+    await fetch('/api/trading/ibkr/disconnect',{method:'POST',credentials:'include'});
+    FIELDS.forEach(f=>{ if(f!=='realm') $(f).value=''; }); banner('Disconnected.','ok'); refresh();
+  });
+  // Step 1 — generate keys in-browser, download the 3 IBKR files, auto-fill the rest.
+  const gen=$('bgenerate');
+  if(gen) gen.addEventListener('click',async()=>{
+    const msg=$('bgenmsg'); gen.disabled=true; const t=gen.textContent; gen.textContent='Generating…'; msg.textContent='';
+    try{
+      const k=await window.IbkrKeygen.generate();
+      // Auto-fill the private half into the form (stays in this tab).
+      $('signaturePem').value=k.signPrivatePem; $('encryptionPem').value=k.encPrivatePem; $('dhPrime').value=k.dhPrimeHex;
+      // Browsers block 3 back-to-back auto-downloads — offer explicit buttons the
+      // user clicks (each click is a user gesture, so every file downloads).
+      const files=[['public_signature.pem',k.signPublicPem],['public_encryption.pem',k.encPublicPem],['dhparam.pem',k.dhParamPem]];
+      const box=$('bgenfiles'); box.hidden=false; box.innerHTML='<div class="bgen-files-h">Download all 3, then upload them to IBKR (step 2):</div>';
+      files.forEach(([name,content])=>{
+        const b=document.createElement('button'); b.type='button'; b.className='bfile-btn'; b.textContent='⬇ '+name;
+        b.addEventListener('click',()=>{ window.IbkrKeygen.download(name,content); b.classList.add('done'); b.textContent='✓ '+name+' (downloaded)'; });
+        box.appendChild(b);
+      });
+      msg.style.color='#22c55e'; msg.textContent='✓ Keys made. Download all 3 files below ↓';
+    }catch(e){ msg.style.color='#ef4444'; msg.textContent='Couldn’t generate — '+(e.message||'use the command-line option.'); }
+    finally{ gen.disabled=false; gen.textContent=t; }
+  });
+  refresh();
+})();
+</script>
+<script src="/js/ibkr-keygen.js"></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

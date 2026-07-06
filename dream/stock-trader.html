@@ -410,6 +410,7 @@
   body.guest .footer,
   body.guest .footer-resize,
   body.guest .badge-paper,
+  body.guest #brokerLink,          /* broker connect — only for entitled traders */
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
@@ -476,6 +477,7 @@
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
+  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none" title="Connect your Interactive Brokers account to place real trades">🔗 <span id="brokerLabel">Connect broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none">Sign in to trade →</a>
 </div>
 
@@ -2729,7 +2731,26 @@ async function detectGuestMode(){
         cta.href = '/auth.html?returnTo=%2Fstock-trader.html';
       }
     }
+  } else {
+    // Entitled trader → surface the broker connection so they can link IBKR.
+    const link = document.getElementById('brokerLink');
+    if(link){
+      link.style.display='';
+      refreshBrokerStatus();
+    }
   }
+}
+// Live IBKR connection state in the header broker link.
+async function refreshBrokerStatus(){
+  const label = document.getElementById('brokerLabel');
+  const link = document.getElementById('brokerLink');
+  if(!label || !link) return;
+  try{
+    const s = await (await fetch('/api/trading/ibkr/connection',{cache:'no-store'})).json();
+    if(s && s.live && s.live.connected){ label.textContent = `IBKR · ${s.accountId||'connected'}`; link.style.color='var(--green)'; link.title='IBKR connected — click to manage'; }
+    else if(s && s.hasCredentials){ label.textContent='IBKR · reconnect'; link.style.color='var(--amber)'; link.title='Credentials saved but not connected — click to fix'; }
+    else { label.textContent='Connect broker'; link.style.color=''; link.title='Connect your Interactive Brokers account to place real trades'; }
+  }catch(e){ /* leave default */ }
 }
 // Re-render charts the instant the theme flips. The canvas grid/axis colors are
 // read from CSS at draw time (CHART_*_COLOR) and renderZoneLadder memoizes on
