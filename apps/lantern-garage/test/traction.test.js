@@ -50,6 +50,10 @@ test("classifyActor separates the operator from external users", () => {
   assert.equal(classifyActor("kriskin"), "external");
   assert.equal(classifyActor(""), "unknown");
   delete process.env.KEYSTONE_OPERATOR;
+  // Default set must classify the operator's Google-login gmail as operator, so the
+  // operator's own email-verification signups never inflate external adoption.
+  assert.equal(classifyActor("alex.place.7@gmail.com"), "operator");
+  assert.equal(classifyActor("newuser@example.com"), "external");
 });
 
 test("recordTractionEvent defaults to unverified and rejects unknown kinds", async () => {
