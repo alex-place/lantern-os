@@ -42,6 +42,10 @@
 \DeclareMathOperator{\spec}{spec}
 \DeclareMathOperator{\diag}{diag}
 
+% Give TeX a little slack so justified paragraphs and narrow callout boxes settle
+% without overfull/underfull lines; long code paths carry explicit \allowbreak points.
+\emergencystretch=3em
+
 \title{\textbf{$\Sigma_0$ --- The Collapse Certificate}\\[4pt]
 \large A computable stability certificate for convergence dynamics, and an honest
 account of why an ungrounded self-improving system tends to collapse or diverge}
@@ -62,16 +66,27 @@ that hypothesis: the general non-normal case is not covered by the energy argume
 the authoritative test is the full spectrum $\max\Real\lambda(A)<0$. For the non-normal
 regime we add two sufficient, provable contraction gates --- a numerical-range gate and a
 Lyapunov/similarity-metric gate (\S\ref{sec:gates}) --- that strictly widen the certified
-region, with provably-correct transient bounds. We pair the theorem with three control
+region, with provably-correct transient bounds; and we \emph{close} the non-normal
+contraction question outright with a spectral (Riesz) dichotomy (\S\ref{sec:dichotomy}):
+splitting by $A$'s own spectrum makes the cross term vanish by invariance, so the active
+block contracts and the slow block's spectral sign fixes the fate --- collapse or divergence,
+no third outcome --- with continuous and discrete-time forms that certify even defective
+$A$ via an ordered Schur split. We pair the theorem with three control
 constructs: a collapse operator $\Szero$ (a heuristic trigger plus projection onto the
 null manifold, the ``42-state''); an anti-collapse operator $\Sigma_0^{-1}$, for which we
-prove a closed-form \emph{one-step anisotropy-lift lemma} (\S\ref{sec:l2}) and report a
-$900$-run forced-collapse sweep ($100\%$ prevented); and a Kalman innovation-surprise
-``canary.'' Read together, the construction is a small, honest warning: absent external
+prove a closed-form \emph{one-step anisotropy-lift lemma} (\S\ref{sec:l2}) and, chaining it,
+that \emph{permanent freeze is impossible for all $A$} (Theorem~C3; the alignment hypothesis
+is removed via a Frobenius reverse-triangle bound), corroborated by a $900$-run
+forced-collapse sweep ($100\%$ prevented); and a Kalman innovation-surprise
+``canary.'' We add a machine-checked inner region of attraction that lifts the local
+guarantee to a certified basin (\S\ref{sec:roa}). Read together, the construction is a
+small, honest warning: absent external
 grounding, the linearized dynamics admit only collapse or divergence, and grounding is the
-safety mechanism --- the control-theoretic shadow of \emph{model collapse}. Theorem~1 and
-Lemma~L2 are machine-checked (\texttt{tests/test\_cio\_sde.py}, $34$ passing; the gates in
-\texttt{tests/test\_stability\_gates.py}, $14$ passing). Components that are heuristic are
+safety mechanism --- the control-theoretic shadow of \emph{model collapse}. Theorem~1, the
+dichotomy, Lemma~L2, and Theorem~C3 are machine-checked (\texttt{tests/test\_cio\_sde.py},
+$46$ passing; the gates in \texttt{tests/test\_stability\_gates.py}, $14$ passing; the
+region of attraction in \texttt{tests/test\_sigma0\_roa\_certified.py}, $4$ passing).
+Components that are heuristic are
 labelled as such; the AI-safety reading is the keeper and stands on the published
 model-collapse literature.
 \end{abstract}
@@ -81,11 +96,16 @@ model-collapse literature.
 \S\ref{sec:thm} theorem: \emph{proven under an explicit hypothesis, machine-checked for
 the symmetric case.}
 \S\ref{sec:gates} non-normal gates: \emph{proven sufficient (not necessary), machine-checked.}
-\S\ref{sec:sigma0} trigger: \emph{operational definition, not derived.}
-\S\ref{sec:l2}--\ref{sec:anti} anti-collapse: \emph{L2 lift proven closed-form; full
-sufficiency theorem open; suppression measured over $900$ runs.}
+\S\ref{sec:dichotomy} spectral dichotomy: \emph{proven in-regime (continuous + discrete,
+defective-$A$ safe), machine-checked --- closes the non-normal contraction/fate question.}
+\S\ref{sec:sigma0} trigger: \emph{operational definition, not derived; calibrated against the
+spectral ground truth (precision $1.0$, recall $\approx0.08$) --- sound but conservative, not a theorem.}
+\S\ref{sec:l2}--\ref{sec:anti} anti-collapse: \emph{L2 lift proven closed-form; no-permanent-freeze
+(Theorem~C3) now proven for all $A$; suppression corroborated over $900$ runs.}
 \S\ref{sec:canary} canary: \emph{eigenvalue readout retired; innovation-surprise signal
 implemented.}
+\S\ref{sec:roa} region of attraction: \emph{sublevel-invariance proven (LaSalle); inner basin
+$\{V\le2.25\}$ machine-checked by interval branch-and-bound.}
 \S\ref{sec:demo} demonstration: \emph{reproducible (scripts committed, real $2678$-turn run).}
 \S\ref{sec:asi} AI-safety: \emph{the keeper, on the model-collapse literature.}
 \end{caveatbox}
@@ -113,12 +133,22 @@ under an explicit invariance hypothesis, machine-checked for the symmetric case.
 numerical-range (matrix-measure) gate and a Lyapunov similarity-metric gate, each strictly
 wider than the small-gain bound, with provably-correct transient constants
 (Crouzeix--Palencia $1+\sqrt2$).
+\item A \textbf{spectral (Riesz) dichotomy that closes the non-normal case}
+(\S\ref{sec:dichotomy}): splitting by $A$'s own spectrum removes the cross term by
+invariance, certifying contraction of the active block and reading collapse-vs-divergence off
+the slow block --- no third fate. It has a \textbf{discrete-time analogue} (Schur/Stein, for
+the map $x_{t+1}=Ax_t$) and an \textbf{ordered-Schur variant that certifies defective $A$},
+where the eigenvector-inverse path is ill-conditioned; both machine-checked.
 \item A \textbf{closed-form one-step anisotropy-lift lemma} (Lemma~\ref{lem:l2},
-\S\ref{sec:l2}): one aligned anti-collapse bump of magnitude $\ge\Delta$ provably breaks
-the collapse trigger's flatness condition. This is the deductive core toward a
-non-collapse theorem; it is unconditionally true and machine-checked.
-\item An \textbf{empirical anti-collapse result} (\S\ref{sec:anti}): over $900$ trials that
-collapse without protection, $\Sigma_0^{-1}$ suppresses collapse in $100\%$.
+\S\ref{sec:l2}): one anti-collapse bump of magnitude $\ge\Delta$ provably breaks the
+collapse trigger's flatness condition, \emph{for any} rank-$k$ projector (the alignment
+hypothesis is removed by a Frobenius reverse-triangle bound), unconditionally true and
+machine-checked.
+\item A \textbf{no-permanent-freeze theorem for all $A$} (Theorem~C3, \S\ref{sec:anti}):
+chaining L2/L2$'$, $\Sigma_0^{-1}$ provably prevents permanent freeze for normal \emph{and}
+non-normal $A$; corroborated by a $900$-trial forced-collapse sweep ($100\%$ prevented).
+\item A \textbf{machine-checked region of attraction} (\S\ref{sec:roa}) that lifts the local
+certificate to a certified inner basin $\{V\le2.25\}$ via interval branch-and-bound.
 \item A \textbf{reproducible demonstration} on a real $2678$-turn conversation log
 (\S\ref{sec:demo}) showing ungrounded recursion settling onto a low-dimensional fixed
 point.
@@ -271,6 +301,61 @@ Lyapunov ($\sqrt{\kappa(P)}$), and Crouzeix--Palencia ($1+\sqrt2$) bounds each h
 \end{verifybox}
 
 % ====================================================================
+\section{The spectral dichotomy: closing the non-normal case}
+\label{sec:dichotomy}
+The gates of \S\ref{sec:gates} certify contraction of the \emph{full} Jacobian but
+over-reject, and the energy proof of \S\ref{sec:thm} needs the invariance hypothesis. The
+\emph{contraction-and-fate} question for arbitrary non-normal $A$ is closed exactly by a
+spectral (Riesz) dichotomy: rather than split by the symmetric part $A_s$, split by
+\emph{$A$'s own} spectrum. Partition $\spec(A)$ into an active set (real part
+$\Real\lambda<-\delta$) and a slow set, and let $M,N$ be the corresponding
+$A$-\emph{invariant} subspaces. Because each is $A$-invariant, the cross term
+$\PM A\PN$ vanishes \emph{by construction} --- the obstruction of \S\ref{sec:hypothesis}
+disappears --- so the active block contracts inside a certified Lyapunov envelope and the
+slow block's spectral sign fixes the outcome.
+
+\begin{theorem}[Contraction/fate dichotomy]
+\label{thm:dichotomy}
+Let $A=A|_M\oplus A|_N$ be the Riesz split above. The active block satisfies
+$\norm{e^{tA|_M}}\le\sqrt{\kappa(P)}\,e^{-\delta t}$ for the Lyapunov solution
+$A|_M^\top P+PA|_M=-I$, and the trajectory contracts onto $N$; on $N$ the abscissa
+$\max\Real\lambda(A|_N)$ decides the fate --- $<0$ \textbf{collapse}, $>0$
+\textbf{divergence}, $=0$ marginal --- with no third possibility. For normal $A$ the split
+reduces to \S\ref{sec:thm} exactly, so Theorem~\ref{thm:contraction} is its special case.
+\end{theorem}
+
+\paragraph{Discrete time.} The same construction certifies the map $x_{t+1}=Ax_t$: split
+at $|z|=1-\delta$, certify the active block with the discrete Lyapunov/Stein metric
+$A|_M^\top P A|_M-P=-I$ (per-step decay $\sqrt{1-1/\lambda_{\max}(P)}$, transient
+$\sqrt{\kappa(P)}$), lower-bound the discrete Kreiss constant, and read the fate off the
+slow block's spectral radius $\rho_N$ ($>1$ diverge, $<1$ collapse, $\approx1$ marginal).
+Discretizing a flow as $e^{A\,dt}$ preserves the fate (a parity check). This matters because
+the \S\ref{sec:demo} evidence is itself discrete-time (a spectral \emph{radius}), so the
+discrete certificate is the one that actually bounds the measured quantity.
+
+\paragraph{Defective $A$.} The eigenvector-based Riesz projector needs $V^{-1}$, which is
+ill-conditioned on Jordan blocks. Both certificates instead use an \emph{ordered real Schur}
+factorization (reordered so the active spectrum occupies the leading block), which is
+defective-safe: a $\mathrm{Jordan}(-0.5,3)\oplus[+0.3]$ rotated off-axis splits with
+invariance residual $<10^{-9}$ and is correctly classified, where the eigenvector path
+abstains.
+
+\begin{verifybox}
+\textbf{Verification.} \texttt{dichotomy\_certificate} and
+\texttt{discrete\_\allowbreak dichotomy\_\allowbreak certificate}
+(\texttt{src/cio\_sde/collapse.py}): a $600$-matrix sweep (worst invariance residual
+$6.7\times10^{-13}$, $0$ failures), a defective Jordan split (residual $<10^{-9}$ where the
+eig path fails), and a continuous$\leftrightarrow$discrete parity test under
+$A\mapsto e^{A\,dt}$. Machine-checked in \texttt{tests/test\_cio\_sde.py}
+(\texttt{test\_discrete\_dichotomy\_radius\_trichotomy},
+\texttt{\_\_matches\_continuous\_under\_exponential},
+\texttt{\_\_defective\_split\_is\_invariant},
+\texttt{test\_dichotomy\_continuous\_defective\_via\_schur}). ``Machine-checked'' means
+closed-form algebra $+$ numerical sweep $+$ pytest, \emph{not} a Lean/Mathlib proof; the
+guarantee is on the local linear Jacobian.
+\end{verifybox}
+
+% ====================================================================
 \section{The collapse trigger $\Sigma_0$}
 \label{sec:sigma0}
 \begin{caveatbox}
@@ -295,8 +380,19 @@ None of these four quantities is the spectral abscissa $\alpha$ of
 Theorem~\ref{thm:contraction}. They are an operational definition of ``underdetermined''
 --- a soft AND-gate $p=\min(p_\nabla,p_{\text{rank}},p_{\text{aniso}},p_{\text{ctrl}})$
 (a G\"odel t-norm) over four independent signs of degeneracy. The link between ``the four
-conditions fire'' and ``$\alpha<0$'' is a \emph{modeling assumption}, not a proof. When
-triggered, $\Szero$ projects the state onto the null eigenmodes of $A_s$,
+conditions fire'' and ``$\alpha<0$'' is a \emph{modeling assumption}, not a proof.
+
+\begin{verifybox}
+\textbf{Calibration (measured, not proven).} \texttt{experiments/\allowbreak sigma0\_\allowbreak trigger\_\allowbreak calibration.py}
+($960$ samples; \texttt{data/sigma0/\allowbreak trigger\_\allowbreak calibration\_\allowbreak report.json}) scores the
+four-signal trigger against the spectral ground truth: \textbf{precision $1.0$} ($0$ false
+fires over $720$ off-regime samples --- the forward assumption \emph{trigger}$\Rightarrow$\emph{collapse-regime}
+holds on this distribution) but \textbf{snapshot recall $\approx0.08$} --- a sound but
+conservative, \emph{late} detector, with the \texttt{rank} signal carrying the discrimination.
+This is empirical calibration of a heuristic; it is deliberately \emph{not} upgraded to a
+theorem (a min-gate need not imply the spectral condition in general).
+\end{verifybox}
+When triggered, $\Szero$ projects the state onto the null eigenmodes of $A_s$,
 \begin{equation}
 x^\ast = P x, \qquad P = V_{\mathrm{null}} V_{\mathrm{null}}^{\top},
 \end{equation}
@@ -352,8 +448,8 @@ step is an exact inequality, so $\Delta$ is a sufficient (conservative) threshol
 magnitude $b\ge\Delta$ lifts the anisotropy above threshold, so the trigger's flat
 condition is false on the next step and the four-condition AND-gate cannot fire --- the
 freeze is skipped that step. L2 is \emph{unconditionally true} and machine-checked
-(\texttt{experiments/prove\_l2\_anisotropy\_lift.py};
-\texttt{tests/test\_cio\_sde.py::test\_l2\_anisotropy\_lift}). It does \emph{not} by itself
+(\texttt{experiments/\allowbreak prove\_l2\_anisotropy\_lift.py};
+\texttt{tests/\allowbreak test\_cio\_sde.py::\allowbreak test\_l2\_anisotropy\_lift}). It does \emph{not} by itself
 prove non-collapse: that needs the alignment hypothesis (proven for normal $A$, open for
 non-normal) and a proximity floor (an engineered hypothesis). L2 is the part that is
 unconditionally true.
@@ -362,9 +458,13 @@ unconditionally true.
 \section{The anti-collapse operator $\Sigma_0^{-1}$}
 \label{sec:anti}
 \begin{caveatbox}
-\textbf{Status: measured over distribution ($900$-run sweep, $100\%$ prevented). L2
-(\S\ref{sec:l2}) is the proven lemma toward a sufficiency theorem; the full theorem ---
-non-normal $A$, all initial conditions --- is the one open frontier.}
+\textbf{Status: no permanent freeze is now PROVEN for all $A$} (Theorem~C3). L2
+(\S\ref{sec:l2}) is the load-bearing lemma; chaining it with the operator's lift dynamics
+gives $\Pr(\text{permanent freeze})=0$ first for normal $A$, then for non-normal $A$ once
+L2$'$ removed the alignment hypothesis (any rank-$k$ bump suffices, by a Frobenius
+reverse-triangle bound at $\Sigma\approx\mu I$). The $900$-run sweep ($100\%$ prevented) is
+now corroboration, not the primary evidence. A \emph{global} escape guarantee for all
+initial conditions remains the residual frontier.
 \end{caveatbox}
 Where $\Szero$ projects \emph{onto} the null subspace, $\Sigma_0^{-1}$ injects energy
 \emph{along} it:
@@ -389,8 +489,13 @@ suppressed collapse and re-excited the state in \textbf{$100\%$}
 \texttt{collapse\_prone\_trials\_total=900},
 \texttt{headline\_conditional\_prevention\_rate=1.0}). Honest caveat: in this construction
 the non-normal off-diagonal lifts the Jacobian's effective rank, so the collapse-prone
-cells are the diagonal ones; a sufficiency \emph{theorem} for all non-normal $A$ remains
-future work.
+cells are the diagonal ones. The no-permanent-freeze \emph{theorem} (C3) is closed for all
+$A$; machine-checked by \texttt{test\_c3\_\allowbreak no\_\allowbreak consecutive\_\allowbreak freeze},
+\texttt{test\_c3\_\allowbreak nonnormal\_\allowbreak covariance\_\allowbreak lift}, and the sweeps
+\texttt{prove\_c3\_\allowbreak noncollapse.py} ($3000$ configs) and
+\texttt{prove\_c3\_\allowbreak noncollapse\_\allowbreak nonnormal.py} ($4000$ configs, $0$
+lift failures). What remains open is a \emph{global} escape guarantee (all initial
+conditions), not the freeze theorem.
 \end{verifybox}
 
 \begin{remark}
@@ -443,13 +548,37 @@ with structured control (spin, the imaginary part $\Im\lambda$, is orthogonal to
 the real part).
 
 % ====================================================================
+\section{From local to certified: a region of attraction}
+\label{sec:roa}
+Every theorem above certifies the \emph{local} linear Jacobian. The honest gap is
+local$\to$global: a negative abscissa at a fixed point says nothing about how far the basin
+extends. We close a concrete instance of that gap with a machine-checked inner region of
+attraction. For a quadratic Lyapunov function $V$ on the reversed Van~der~Pol benchmark
+(Khalil, Ex.~8.4), sublevel-set invariance is \emph{proven} (Lyapunov/LaSalle: $\dot V<0$ on
+$\{V\le c\}\setminus\{0\}$ implies the set is an inner ROA), and the largest certified $c$ is
+established rigorously rather than sampled.
+
+\begin{verifybox}
+\textbf{Verification (proven $c$).} \texttt{experiments/\allowbreak sigma0\_\allowbreak roa\_\allowbreak certify.py}
+proves $\dot V<0$ on $\{V\le2.25\}$ via an exact origin-ball lemma ($|N|\le3\norm{x}^4$ for
+the cubic remainder) plus rigorous \emph{interval branch-and-bound} (\texttt{mpmath.iv},
+directed rounding: $2323$ boxes, $0$ undecided). A control at $c_L=2.5$ (above the grid
+optimum $c^\ast\approx2.307$) correctly \emph{fails} to certify --- the test has teeth. So
+$\{V\le2.25\}$ is a \textbf{proven} inner ROA ($97.5\%$ of the grid optimum; the residual
+$\sim2.5\%$ is interval overestimation near the tangency, not a rigor gap).
+\texttt{tests/\allowbreak test\_sigma0\_\allowbreak roa\_\allowbreak certified.py} ($4$ passing;
+\texttt{data/sigma0/\allowbreak roa\_\allowbreak certified\_\allowbreak report.json}). This certifies the
+basin for the benchmark $f$; a general local$\to$global lift is not claimed.
+\end{verifybox}
+
+% ====================================================================
 \section{Demonstration on router data}
 \label{sec:demo}
 \begin{verifybox}
 \textbf{Reproducible.} The two driver scripts are committed and the numbers below are
 produced from committed code over the real conversation log ($2678$ turns):
-\texttt{python experiments/router\_sigma0\_encoder.py} and
-\texttt{python experiments/router\_reservoir\_G.py}.
+\texttt{python experiments/\allowbreak router\_sigma0\_encoder.py} and
+\texttt{python experiments/\allowbreak router\_reservoir\_G.py}.
 \end{verifybox}
 Each turn is encoded as $x=[\text{novelty},\text{self\_repeat},\text{echo},\text{length}]
 \in[0,1]^4$, with a local Jacobian fitted over a $10$-turn sliding window by finite
@@ -520,18 +649,24 @@ model-collapse literature.
 \section{Limitations and open problems}
 \label{sec:limits}
 \begin{itemize}[leftmargin=1.4em]
-\item \textbf{The non-collapse theorem is open.} L2 (\S\ref{sec:l2}) proves one aligned bump
-breaks flatness; a closed-form proof that $\Sigma_0^{-1}$ \emph{always} prevents collapse,
-for non-normal $A$ and all initial conditions, is future work. The empirical support is a
-$900$-run distribution, not a theorem.
-\item \textbf{Alignment for non-normal $A$.} The bump-basis-aligns-with-$\eig(\Sigma)$
-hypothesis is proven only for normal $A$; the non-normal cross-term is the same debt as
-Theorem~\ref{thm:contraction}.
+\item \textbf{Closed since earlier drafts.} The non-normal \emph{contraction/fate} question
+(Theorem~\ref{thm:dichotomy}, continuous $+$ discrete $+$ defective-$A$), the
+\emph{no-permanent-freeze} theorem for all $A$ (Theorem~C3, \S\ref{sec:anti}), and the
+alignment hypothesis (removed via L2$'$) are no longer open --- each is machine-checked
+in-regime.
+\item \textbf{Global escape guarantee is open.} Theorem~C3 rules out \emph{permanent} freeze;
+a closed-form guarantee that $\Sigma_0^{-1}$ escapes from \emph{every} initial condition
+(not just the $900$-run measured distribution) is still future work.
+\item \textbf{Trigger$\to$theorem gap.} The four-signal trigger (\S\ref{sec:sigma0}) is
+MEASURED-calibrated (precision $1.0$, recall $\approx0.08$) but not proven to imply the
+spectral collapse condition; a min-gate need not entail it in general.
+\item \textbf{Local$\to$global in general.} \S\ref{sec:roa} certifies a basin for one
+benchmark $f$; a general lift from the local Jacobian to a global ROA is not claimed.
 \item \textbf{Safety $\ne$ capability.} The certificate bounds collapse; it says nothing
 about whether the bounded system is useful.
-\item \textbf{Mechanization.} Theorem~\ref{thm:contraction} and Lemma~\ref{lem:l2} are
-amenable to a Lean/Mathlib formalization (Weyl/interlacing $+$ a scalar CoV inequality); we
-have machine-checked numerics but not yet a proof assistant.
+\item \textbf{Mechanization.} The theorems are amenable to a Lean/Mathlib formalization;
+``machine-checked'' here means closed-form algebra $+$ numerical sweep $+$ pytest, not a
+proof assistant.
 \end{itemize}
 
 % ====================================================================
@@ -586,12 +721,18 @@ worth as much as its honesty.
 
 \paragraph{Reproducibility.}
 Code of record: \texttt{src/cio\_sde/collapse.py} (\texttt{SemanticCollapseOperator},
-\texttt{collapse\_certificate}, \texttt{AntiCollapseOperator}, \texttt{stability\_gates}),
-\texttt{src/cio\_sde/surprise.py} (\texttt{SurpriseMonitor} $+$ Kalman update). Tests:
-\texttt{tests/test\_cio\_sde.py} ($34$ passing; Theorem~1 and L2), \texttt{tests/test\_stability\_gates.py}
-($14$ passing). Experiments: \texttt{sigma0\_regime\_sweep.py} ($900$-run sweep),
-\texttt{prove\_l2\_anisotropy\_lift.py} (symbolic $+$ numerical L2),
-\texttt{router\_sigma0\_encoder.py}, \texttt{router\_reservoir\_G.py} (\S\ref{sec:demo}),
-\texttt{sigma0\_horse\_blinders.py} (the canary).
+\texttt{collapse\_certificate}, \texttt{stability\_gates}, \texttt{dichotomy\_certificate},
+\texttt{discrete\_\allowbreak dichotomy\_\allowbreak certificate}, \texttt{AntiCollapseOperator},
+\texttt{ReconstructionOperator}), \texttt{src/cio\_sde/surprise.py} (\texttt{SurpriseMonitor}
+$+$ Kalman update). Tests: \texttt{tests/\allowbreak test\_cio\_sde.py} ($46$ passing; Theorem~1,
+the dichotomy, L2, and Theorem~C3), \texttt{tests/\allowbreak test\_stability\_gates.py}
+($14$ passing), \texttt{tests/\allowbreak test\_sigma0\_\allowbreak roa\_\allowbreak certified.py}
+($4$ passing; the region of attraction). Experiments: \texttt{sigma0\_\allowbreak regime\_\allowbreak sweep.py} ($900$-run sweep),
+\texttt{prove\_\allowbreak l2\_\allowbreak anisotropy\_\allowbreak lift.py} (symbolic $+$ numerical L2),
+\texttt{prove\_\allowbreak c3\_\allowbreak noncollapse.py} / \texttt{\_\_nonnormal.py} (C3 sweeps),
+\texttt{sigma0\_\allowbreak roa\_\allowbreak certify.py} (interval-certified ROA),
+\texttt{sigma0\_\allowbreak trigger\_\allowbreak calibration.py} (trigger calibration),
+\texttt{router\_\allowbreak sigma0\_\allowbreak encoder.py}, \texttt{router\_\allowbreak reservoir\_\allowbreak G.py} (\S\ref{sec:demo}),
+\texttt{sigma0\_\allowbreak horse\_\allowbreak blinders.py} (the canary).
 
 \end{document}

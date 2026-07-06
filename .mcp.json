@@ -2,9 +2,7 @@
   "mcpServers": {
     "lantern-os": {
       "command": "python",
-      "args": [
-        "scripts/mcp_stdio_bridge.py"
-      ],
+      "args": ["scripts/mcp_stdio_bridge.py"],
       "env": {
         "MCP_SERVER_URL": "http://127.0.0.1:8771",
         "PYTHONPATH": "src",

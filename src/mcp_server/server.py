@@ -960,6 +960,103 @@ def _tool_research_status() -> Dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
+def _tool_mcp_capability_status() -> Dict[str, Any]:
+    """Self-diagnosing capability map for THIS MCP server — for each capability that
+    gates real work, report whether it is available, the blocker if not, and the
+    concrete next_action to enable it. An honest Observe/Verify surface (ported from
+    the orchestrator's get_mcp_capability_status): every field is read from live
+    process state — env flags, module-import success, the Node runtime — never
+    fabricated. Opt-in capabilities (off by design) are flagged and excluded from
+    known_gaps so a deliberate default isn't reported as a defect."""
+    caps: List[Dict[str, Any]] = []
+
+    def _cap(name, available, *, blocker=None, next_action=None, detail=None, opt_in=False):
+        caps.append({
+            "capability": name,
+            "available": bool(available),
+            "opt_in": opt_in,
+            "blocker": None if available else blocker,
+            "next_action": None if available else next_action,
+            "detail": detail,
+        })
+
+    # 1. Canonical shared tools via the Node tool-runner bridge (the keystone-chat surface)
+    node_ok, node_detail = False, None
+    exec_enabled = operator = False
+    try:
+        import shared_tool_bridge
+        try:
+            node_detail = shared_tool_bridge._node_binary()
+            node_ok = True
+        except Exception as exc:
+            node_detail = str(exc)
+        exec_enabled = shared_tool_bridge.execution_enabled()
+        operator = shared_tool_bridge.operator_authorized()
+    except Exception as exc:
+        node_detail = f"shared_tool_bridge unavailable: {exc}"
+    _cap("node_tool_bridge", node_ok,
+         blocker="node runtime or scripts/tool-runner-bridge.js unavailable",
+         next_action="install Node and ensure scripts/tool-runner-bridge.js is present",
+         detail=node_detail)
+    _cap("shared_tool_execution", exec_enabled,
+         blocker="CHAT_TOOL_EXEC is not '1' — shared tools are proposal-only",
+         next_action="set CHAT_TOOL_EXEC=1 in .env.local or the launch env, then restart the server")
+    _cap("operator_tools", operator,
+         blocker="MCP_SHARED_TOOL_OPERATOR is not '1' — Read/Write/Edit/Bash/Grep are denied",
+         next_action="set MCP_SHARED_TOOL_OPERATOR=1 (founder/loopback operator parity), then restart")
+
+    # 2. GitHub write tools
+    gh_write = False
+    try:
+        import github_tools
+        gh_write = bool(getattr(github_tools, "WRITE_ENABLED", False))
+    except Exception:
+        pass
+    _cap("github_write", gh_write,
+         blocker="github tools not loaded or write disabled",
+         next_action="auth the gh CLI and ensure GITHUB_WRITE_ENABLED is on")
+
+    # 3. Worktree-sandboxed local runner (the local execution layer)
+    lr_ok, lr_detail = False, None
+    try:
+        import local_runner
+        lr_root = getattr(local_runner, "REPO_ROOT", None)
+        lr_ok = bool(lr_root and Path(str(lr_root)).exists())
+        lr_detail = str(lr_root)
+    except Exception as exc:
+        lr_detail = str(exc)
+    _cap("local_runner", lr_ok,
+         blocker="local_runner not loaded or repo root missing",
+         next_action="verify git is installed and the repo checkout is intact",
+         detail=lr_detail)
+
+    # 4. Sandboxed executor — intentionally opt-in (default path is the proposal generator)
+    ex_on = False
+    try:
+        import executor as _ex
+        ex_on = _ex.executor_enabled()
+    except Exception:
+        pass
+    _cap("sandboxed_executor", ex_on, opt_in=True,
+         blocker="SUPERFLEET_EXECUTOR is not set (proposal path via task_run remains the default)",
+         next_action="set SUPERFLEET_EXECUTOR=1 to let execute_task commit fix branches")
+
+    ready = sum(1 for c in caps if c["available"])
+    # A gap is an unavailable capability that is NOT opt-in-by-design.
+    gaps = [c["capability"] for c in caps if not c["available"] and not c["opt_in"]]
+    return {
+        "ok": True,
+        "server": "lantern-os-mcp",
+        "capabilities": caps,
+        "ready_count": ready,
+        "total": len(caps),
+        "known_gaps": gaps,
+        "keystone_parity": exec_enabled and operator and node_ok,
+        "tool_count": len(TOOLS_REGISTRY),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ── JSON-RPC Dispatch ──
 
 TOOLS_REGISTRY = {
@@ -985,6 +1082,7 @@ TOOLS_REGISTRY = {
     "research_intake": _tool_research_intake,
     "research_run_next": _tool_research_run_next,
     "research_status": _tool_research_status,
+    "mcp_capability_status": _tool_mcp_capability_status,
 }
 TOOL_DESCRIPTORS: Dict[str, Dict[str, Any]] = {}
 SHARED_TOOL_MANIFEST: Dict[str, Any] = {
