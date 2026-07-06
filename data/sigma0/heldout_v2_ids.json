@@ -1,0 +1,111 @@
+{
+  "heldout_golden_ids": [
+    "occam",
+    "murphys-law",
+    "brooks-law",
+    "v2-neutrino-mass",
+    "v2-muon-g2",
+    "fic-nakamura-gap",
+    "fic-halvorsen",
+    "fic-quibble-principle",
+    "fic-sorensen-thm",
+    "fic-delacroix-feng",
+    "continuum-hypothesis",
+    "p-vs-np",
+    "twin-prime",
+    "abc",
+    "bsd",
+    "hodge",
+    "collatz",
+    "p-vs-bpp",
+    "v2-sunflower",
+    "pf-mergesort",
+    "pf-extreme-value",
+    "pf-sum-odds",
+    "pf-heisenberg",
+    "pf-cap",
+    "pf-binary-search",
+    "pf-amdahl",
+    "pf-fermat-little",
+    "v2-cold-fusion",
+    "spontaneous-generation",
+    "v2-caloric",
+    "v2-n-rays",
+    "euler-sum-powers",
+    "sha256-collision",
+    "rsa-hardness"
+  ],
+  "n_heldout_negatives": 34,
+  "by_family": {
+    "aphorism": {
+      "total": 8,
+      "held": [
+        "gold-occam",
+        "gold-murphys-law",
+        "gold-brooks-law"
+      ]
+    },
+    "contested": {
+      "total": 5,
+      "held": [
+        "gold-v2-neutrino-mass",
+        "gold-v2-muon-g2"
+      ]
+    },
+    "fictional": {
+      "total": 12,
+      "held": [
+        "gold-fic-nakamura-gap",
+        "gold-fic-halvorsen",
+        "gold-fic-quibble-principle",
+        "gold-fic-sorensen-thm",
+        "gold-fic-delacroix-feng"
+      ]
+    },
+    "open": {
+      "total": 23,
+      "held": [
+        "gold-continuum-hypothesis",
+        "gold-p-vs-np",
+        "gold-twin-prime",
+        "gold-abc",
+        "gold-bsd",
+        "gold-hodge",
+        "gold-collatz",
+        "gold-p-vs-bpp",
+        "gold-v2-sunflower"
+      ]
+    },
+    "perturbed": {
+      "total": 21,
+      "held": [
+        "gold-pf-mergesort",
+        "gold-pf-extreme-value",
+        "gold-pf-sum-odds",
+        "gold-pf-heisenberg",
+        "gold-pf-cap",
+        "gold-pf-binary-search",
+        "gold-pf-amdahl",
+        "gold-pf-fermat-little"
+      ]
+    },
+    "refuted": {
+      "total": 12,
+      "held": [
+        "gold-v2-cold-fusion",
+        "gold-spontaneous-generation",
+        "gold-v2-caloric",
+        "gold-v2-n-rays",
+        "gold-euler-sum-powers"
+      ]
+    },
+    "thesis": {
+      "total": 6,
+      "held": [
+        "gold-sha256-collision",
+        "gold-rsa-hardness"
+      ]
+    }
+  },
+  "note": "v2 stratified holdout; per-family LOSO manifests in by_family"
+}
