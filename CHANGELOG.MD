@@ -1,3 +1,7 @@
+## [1.8.88] - 2026-07-05
+### Added
+- **Per-user IBKR connection via self-service OAuth 1.0a** (ADR-0022). Each user connects their own IBKR account (DH → live_session_token → HMAC-SHA256 request signing, dependency-free), credentials AES-256-GCM at rest, trade-gated and per-user; a no-creds user is disconnected, never the operator account. Order placement stays behind `trading-guard.js` (dry by default). New connect surfaces (`ibkr-connect.html`, `ibkr-setup-guide.html`) are tagged `loop-stage=act`. Strengthens **Act** (#2133).
+
 ## [1.8.84] - 2026-07-05
 ### Fixed
 - **Convergence grade card no longer fabricates the Capability (CAP) score** (`src/convergence_io_engine.py`). It wrote a hardcoded `score: 1.0` report and fed that into the overall grade with no evidence (OH/SCOPE were genuinely measured), violating the External Reality Rule. It now runs the real `node tests/gaming-layout-suite/run.js` benchmark and parses its `Gameplay centred: p/t` result; when nothing is scorable or it errors, `cap_score` stays `None` ("not measured") — never faked to 1.0 nor falsely zeroed — and the overall average excludes unmeasured axes. Strengthens **Verify**. See `changelog.d/convergence-cap-no-fabrication.md` (#2093).
