@@ -499,6 +499,26 @@ These **extend the proven region of §1; they do not make the system globally un
 
 [#768]: https://github.com/alex-place/lantern-os/issues/768
 
+#### 1.2.2 Scope limit: routed (mixture-of-experts) loops are SWITCHED systems
+
+**Status: SCOPE NOTE — nothing in §1 certifies a routed loop.** Top-k expert routing makes
+the recurrent map **piecewise**: each routing pattern is its own smooth map, and the system
+*switches* between them as selections change. Everything above (α, `spectral_abscissa`, the
+§1.2.1 gates) then holds only **within a fixed routing region**; across route switches the
+correct tools are the switched/hybrid-systems literature — common or multiple Lyapunov
+functions and **average dwell-time** conditions (converse results: arXiv:2405.03560;
+LP-computable dwell-time bounds via multiple Lyapunov functions: arXiv:2303.17858; learned
+Lyapunov functions for piecewise-affine systems: arXiv:2008.06546). Practical consequences
+for any future MoE-recurrent Σ₀ (design home: SIGMA0-FRONTIER-TRAIN-BRIEF.md D2/D6):
+(1) **route-switch frequency is part of the stability object** — measure frozen-route
+contraction *and* the dwell-time statistics the model actually induces (tracked as a
+milestone issue); (2) **expert-choice routing** (arXiv:2202.09368: experts pick tokens →
+fixed capacity, balance by design) is the lower-discontinuity comparator to token-choice
+top-k; (3) do not quote §1 numbers for a routed loop without naming the routing regime.
+*In plain words:* a mixture-of-experts loop keeps swapping which sub-network is running;
+this certificate currently proves things about one sub-network at a time, and "how often it
+swaps" becomes a stability quantity of its own.
+
 ### 1.3 What the test actually checks
 
 **Verification.** The shipped test uses `A = −0.8·I`, which is **symmetric**
