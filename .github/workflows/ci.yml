@@ -135,6 +135,11 @@ jobs:
       - name: Install dependencies
         run: cd apps/lantern-garage && npm ci --prefer-offline
 
+      - name: Run Node unit tests (no server)
+        run: |
+          node tests/test_session_secret.js
+          node tests/test_auth_tokens_failclosed.js
+
       - name: Start server
         run: node apps/lantern-garage/server.js &
 
