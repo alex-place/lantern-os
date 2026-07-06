@@ -170,5 +170,22 @@ check("short self-disclaimer: selfUngrounded still true", () => {
   assert.strictEqual(s.selfUngrounded, true);
 });
 
+// #2075 — context present but UNCITED: an assertive reply that ignores the supplied evidence must
+// NOT be credited as grounded just because context existed. The anchor now tracks actual use.
+const OFFTOPIC_CTX =
+  "Web search: photosynthesis converts sunlight in chloroplasts via the Calvin cycle to produce glucose in plants.";
+const uncited = scoreReplyGroundedness(CONFIDENT_UNANCHORED, { groundingContext: OFFTOPIC_CTX });
+check("#2075 context present but uncited (reply ignores it): flagged, not anchored", () => {
+  assert.strictEqual(uncited.signals.externalGrounding, true, "context WAS supplied");
+  assert.ok(uncited.signals.contextUsage < 0.1, `reply doesn't use it, usage=${uncited.signals.contextUsage}`);
+  assert.strictEqual(uncited.anchored, false, "must not be badged grounded on unused context");
+  assert.strictEqual(uncited.ungrounded, true, `risk=${uncited.risk}`);
+});
+check("#2075 context present AND used: still anchored (no false negative)", () => {
+  // grounded (from earlier) supplies Westphalia context that the reply actually echoes
+  assert.strictEqual(grounded.anchored, true);
+  assert.ok(grounded.signals.contextUsage > 0.5, `usage=${grounded.signals.contextUsage}`);
+});
+
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nall groundedness-canary checks passed");

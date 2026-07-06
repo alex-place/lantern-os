@@ -122,6 +122,21 @@ function inTextAnchor(text) {
   return 0;
 }
 
+// #2075 — how much of the SUPPLIED grounding context did the reply actually use? Fraction of the
+// context's distinctive content words (len ≥ 4, incl. numeric facts) that reappear in the reply,
+// scaled so USAGE_TARGET (~a quarter) of the context echoed = full credit. A confident reply that
+// IGNORES the provided evidence overlaps ~0 and must NOT be credited as anchored just because
+// context existed. Heuristic, cheap, and pure — same spirit as inTextAnchor.
+const USAGE_TARGET = 0.25;
+function contextUsage(text, ctx) {
+  const ctxTerms = new Set(tokenize(String(ctx || "")).filter((w) => w.length >= 4));
+  if (ctxTerms.size === 0) return 0;
+  const replyTerms = new Set(tokenize(String(text || "")).filter((w) => w.length >= 4));
+  let hits = 0;
+  for (const w of ctxTerms) if (replyTerms.has(w)) hits += 1;
+  return Math.min(1, hits / ctxTerms.size / USAGE_TARGET);
+}
+
 /**
  * Score a completed reply for 42-state proximity (confident + unanchored).
  *
@@ -150,6 +165,7 @@ function scoreReplyGroundedness(text, opts = {}) {
     assertiveness: 0,
     externalGrounding: false,
     inTextAnchor: 0,
+    contextUsage: 0,
     anchor: 0,
     modelUncertainty: 0,
     selfUngrounded: false,
@@ -176,7 +192,12 @@ function scoreReplyGroundedness(text, opts = {}) {
   const ext = !!(opts.groundingContext && String(opts.groundingContext).trim().length);
   signals.externalGrounding = ext;
   signals.inTextAnchor = inTextAnchor(text);
-  signals.anchor = Math.max(ext ? 0.85 : 0, signals.inTextAnchor);
+  // #2075: external grounding only anchors to the extent the reply ACTUALLY drew on the supplied
+  // context. Previously `ext ? 0.85 : 0` credited any reply the moment context existed, so an
+  // assertive reply that ignored the evidence still scored grounded and showed the badge.
+  signals.contextUsage = ext ? contextUsage(text, opts.groundingContext) : 0;
+  const extAnchor = 0.85 * signals.contextUsage;
+  signals.anchor = Math.max(extAnchor, signals.inTextAnchor);
 
   // Optional model-internal corroboration. High token-surprise on a confident,
   // unanchored reply = the model was uncertain about the very specifics it asserted
