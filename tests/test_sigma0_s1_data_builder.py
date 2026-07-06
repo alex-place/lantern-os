@@ -37,6 +37,32 @@ def test_verified_record_with_evidence_is_measured_positive():
     assert t["provenance"]["independent"] is True
 
 
+def test_dict_typed_result_survives_schema_drift():
+    """Newer writers (three-doors scene records) emit 'result' as a structured dict --
+    the builder must flatten it deterministically instead of crashing (#2054-era drift)."""
+    rec = {"id": "cr-drift", "hypothesis": "Scene image depicts the canon.",
+           "result": {"kind": "three-doors-scene-image", "scene": "ancient-doors",
+                      "beat": "a spell opens the door", "image": "D:/tmp/scene.png"},
+           "evidence_ids": ["three-doors:cast-canon"], "confidence": 0.88,
+           "verified": True, "grounding_signals": []}
+    t = record_to_tuple(rec)
+    assert t is not None
+    assert "scene: ancient-doors" in t["response"]
+    assert t["claims"][0]["class"] in {"MEASURED", "PROVEN"}
+    # flatten is deterministic: same dict, same text
+    assert record_to_tuple(rec)["response"] == t["response"]
+
+
+def test_none_and_list_results_survive_schema_drift():
+    assert record_to_tuple({"id": "n3", "hypothesis": "x", "result": None,
+                            "evidence": [], "verified": False}) is None
+    t = record_to_tuple({"id": "l1", "hypothesis": "check outputs",
+                         "result": ["step one done", {"detail": "test passed"}],
+                         "evidence": ["run-log"], "verified": True})
+    assert t is not None
+    assert "step one done" in t["response"] and "detail: test passed" in t["response"]
+
+
 def test_noise_rows_are_dropped():
     assert record_to_tuple({"id": "n", "hypothesis": "chat", "result": "I am still here.",
                             "evidence": [], "verified": False}) is None

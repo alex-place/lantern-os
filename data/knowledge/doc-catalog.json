@@ -1,5 +1,17 @@
 [
  {
+  "path": "docs/ARXIV-CORPUS.md",
+  "title": "arXiv Recent-Research Corpus",
+  "category": "architecture",
+  "description": "Local corpus of post-cutoff AI/LLM arXiv papers (abstracts + metadata) on drive F:, retrieved by BM25 to ground chat answers in research published after the model's training cutoff. Strengthens the Remember stage.",
+  "status": "Living",
+  "updated": "2026-07-06",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Documents the arXiv harvest/index/retrieval pipeline and how to enable it (KEYSTONE_ARXIV_RETRIEVAL)."
+ },
+ {
   "path": "AGENTS.md",
   "title": "Agents & Contributor Guide",
   "category": "guides",
