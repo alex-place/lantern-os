@@ -134,6 +134,23 @@ jobs:
       - name: Run sprawl tripwire
         run: node scripts/sprawl-tripwire.mjs --base origin/master
 
+  # ── ADR Registry Lint ───────────────────────────────────────────────────────
+  # ADR numbers have collided three times (3×0001 #1813, 2×0008 #1126/#1144,
+  # 2×0023 #2147/#2158): concurrent PRs pick the "next free number" off a stale
+  # base and nothing mechanical caught it at merge. This gate enforces unique
+  # NNNN prefixes, README index membership, and index-status ↔ file-status
+  # agreement (mechanical enforcement suggested in ADR-0001's review).
+  adr-registry:
+    name: ADR registry lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Lint ADR numbering + index
+        run: node scripts/lint-adr-registry.mjs
+
   # ── Monoworkstream Gate ─────────────────────────────────────────────────────
   # Enforces the per-agent workstream rule: each agent prefix (claude/ gemini/
   # codex/ devin/ grok/ openai/) gets ONE concurrent open-PR lane; branches

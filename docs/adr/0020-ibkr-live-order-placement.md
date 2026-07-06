@@ -5,7 +5,8 @@
 - Deciders: Alex Place (approval required)
 - approved-by: pending
 - Loop stage: Act (real broker orders enter the loop) + Verify (honest dry-run/blocked states, no fabricated fills)
-- Supersedes: [ADR-0019](0019-ibkr-connectivity-client-portal-gateway.md) — both its read-only posture AND its local-gateway connectivity model. Per the operator, IBKR is reached via the **hosted Web API** (`https://api.ibkr.com/v1/api`) with an **OAuth bearer token** ("API key") + a `/tickle` session cookie, not the local Client Portal Gateway.
+- Supersedes: [ADR-0019](0019-ibkr-connectivity-client-portal-gateway.md) — both its read-only posture AND its local-gateway connectivity model. Per the operator, IBKR is reached via the **hosted Web API** (`https://api.ibkr.com/v1/api`) + a `/tickle` session cookie, not the local Client Portal Gateway.
+- Refined by: [ADR-0022](0022-ibkr-per-user-self-service-oauth.md) (Accepted 2026-07-05) — the connection model of record is **per-user self-service OAuth 1.0a** (LST + HMAC-SHA256 request signing); the operator **Bearer token** ("API key") survives only as the legacy fallback (`lib/ibkr-cpapi.js:197-204` prefers an injected OAuth1 signer).
 
 ## Context
 
@@ -29,10 +30,12 @@ order is ever sent unless EVERY condition below is met:
 2. **`TRADER_LIVE=1`** — master arm switch; unset/`0` ⇒ `status:'dry_run'`.
 3. **Caps** — `qty ≤ MAX_ORDER_QTY` (default 100) and
    `qty·price ≤ MAX_ORDER_NOTIONAL` (default $2000).
-4. **Account tier** — a `paper` account (`DU*`) is allowed; a **live (real-money)
+4. **Account tier** — a `paper` account (`DU`/`DI`/`DF`-prefixed, per `inferMode` in
+   `lib/ibkr-cpapi.js:109-116`) is allowed; a **live (real-money)
    account requires a second opt-in** `TRADER_ALLOW_LIVE_ACCOUNT=1`.
-5. **Authenticated API** — the IBKR Web API (`api.ibkr.com`) must be reachable, the
-   bearer token valid, and a brokerage session established via `/tickle`
+5. **Authenticated API** — the IBKR Web API (`api.ibkr.com`) must be reachable, a valid
+   authenticated session established (per-user **OAuth 1.0a** per ADR-0022, or the legacy
+   operator Bearer token), and a brokerage session established via `/tickle`
    (else `status:'error'`, never a fabricated fill).
 
 A blocked order returns `{status:'dry_run', dry:true, reason}` so the UI shows an
@@ -42,10 +45,35 @@ honest "paper / blocked — why" state. `trader-agent.placeOrder` and
 ## Consequences
 
 - **Safe-by-default**: shipping this does not enable live trading. Real orders need
-  a valid IBKR bearer token + brokerage session **and** Alex to set `TRADER_LIVE=1`
+  a valid authenticated IBKR session (OAuth 1.0a per ADR-0022, or legacy Bearer) +
+  brokerage session **and** Alex to set `TRADER_LIVE=1`
   (and, on a live account, `TRADER_ALLOW_LIVE_ACCOUNT=1`). Until then it is paper/dry only.
 - **Kill-switch parity**: the existing `LIVE-KILL-SWITCH` now halts stock orders too.
 - **Follow-ups (not in this ADR)**: CPAPI **bracket** orders (stop-loss/take-profit
   legs) — `placeOrder` currently passes those through as metadata only; and an
   admin feature-flag AND-gate mirroring `kalshi_live_trading`.
-- Reversible: delete the order methods + guard to return to ADR-0019's read-only.
+- Reversible: delete the order methods + guard to return to a **read-only posture**
+  (the hosted-connectivity model stays — ADR-0022 has since built on it, so a full
+  reversion to ADR-0019's local gateway is no longer a realistic path).
+
+## Alternatives considered
+
+- **Stay read-only (status quo per ADR-0019):** rejected — the operator explicitly
+  requested order placement; read-only leaves the Act stage without a broker path.
+- **TWS-socket sidecar (e.g. `@stoqey/ib`):** a second long-running process beside the
+  gateway; heavier ops surface for the same capability. Deferred, consistent with
+  ADR-0019's original reasoning.
+- **Ungated order methods, safety in the caller:** rejected — real-money irreversibility
+  demands one hard chokepoint (`trading-guard.js`), not per-caller discipline.
+
+## Evidence
+
+| Claim | Evidence (file:line / commit / PR) | Confidence | Source |
+|---|---|---|---|
+| Decision is implemented and merged | PR #1959 (merged 2026-07-03, commit 418a078e) added the guard, order methods, and this ADR | High | repo |
+| Gates as described (kill-switch, TRADER_LIVE, caps, account tier) | `apps/lantern-garage/lib/trading-guard.js:45-65` | High | code |
+| Order methods + CPAPI reply/confirm loop | `apps/lantern-garage/lib/ibkr-cpapi.js:346-451` | High | code |
+| Dry-run/blocked state surfaced verbatim to the UI | `apps/lantern-garage/routes/trading.js:528-562` | High | code |
+| Paper-account prefixes DU/DI/DF | `apps/lantern-garage/lib/ibkr-cpapi.js:109-116` (`inferMode`) | High | code |
+| OAuth 1.0a preferred, Bearer fallback | `apps/lantern-garage/lib/ibkr-cpapi.js:131-134, 197-204`; ADR-0022 / PR #2133 | High | code |
+| Python/Alpaca order path removed | PR #1959 (trading_agents deletion) | High | repo |
