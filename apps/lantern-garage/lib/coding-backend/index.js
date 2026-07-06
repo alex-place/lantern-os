@@ -87,8 +87,11 @@ function _fold(records) {
 }
 
 // Run a coding task through the control plane: propose, HOLD for approval, emit a receipt.
-async function runCodingTask({ task, repoPath, backend = "aider", why = "" }, opts = {}) {
+async function runCodingTask({ task, repoPath, backend = "aider", why = "", repo, taskType }, opts = {}) {
   const dataDir = opts.dataDir || DEFAULT_DATA_DIR;
+  const _router = require("./router");
+  const repoId = _router.repoIdOf(repoPath, repo); // per-repo outcome key (#2175)
+  const _taskType = taskType || _router.taskTypeOf(task);
   const adapter = ADAPTERS[backend];
   if (!adapter) return { ok: false, error: `unknown backend '${backend}'`, backends: listBackends() };
 
@@ -119,6 +122,8 @@ async function runCodingTask({ task, repoPath, backend = "aider", why = "" }, op
     id: receiptId,
     ts: new Date().toISOString(),
     task,
+    repo: repoId, // per-repo outcome key (#2175)
+    taskType: _taskType,
     backend,
     model: proposal.model || model || null,
     localEngine: localEngine.lead || null,
@@ -224,8 +229,23 @@ async function abCompare({ task, repoPath, backend = "ollama" }, opts = {}) {
   };
 }
 
+// Route by measured per-repo outcome (#2175), then run. When there's no outcome signal
+// yet, route() returns the defaultBackend with hasSignal:false — the answer-first cascade.
+async function routeCodingTask({ task, repoPath, candidates, defaultBackend = "ollama", why = "" }, opts = {}) {
+  const router = require("./router");
+  const decision = router.route({ task, repoPath, candidates, defaultBackend }, opts);
+  const r = await runCodingTask(
+    { task, repoPath, backend: decision.backend, why: why || `route:${decision.hasSignal ? "outcome" : "cold-start"}` },
+    opts
+  );
+  return { ...r, routing: decision };
+}
+
+const _router = require("./router");
+
 module.exports = {
   runCodingTask,
+  routeCodingTask,
   approveCodingPatch,
   rejectCodingPatch,
   listCodingPending,
@@ -233,4 +253,10 @@ module.exports = {
   abCompare,
   listBackends,
   defaultLocalEngine,
+  // outcome-based routing (#2175)
+  route: _router.route,
+  outcomeStats: _router.outcomeStats,
+  recordOutcome: _router.recordOutcome,
+  taskTypeOf: _router.taskTypeOf,
+  repoIdOf: _router.repoIdOf,
 };

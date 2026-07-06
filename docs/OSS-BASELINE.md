@@ -205,7 +205,7 @@ Report: `data/eval/coding-backend-ab-report.json`.
 - #2172 — OpenHands adapter (headless, LiteLLM)
 - #2173 — real wrapped-vs-raw benchmark (Aider Polyglot / SWE-bench Lite)
 - #2174 — verification-decides layer (SWE-bench tests + MiniCheck entailment)
-- #2175 — outcome-based per-repo routing (LiteLLM + outcome history)
+- #2175 — outcome-based per-repo routing ✅ **LANDED** (`lib/coding-backend/router.js`: routes by measured per-(repo,backend,taskType) success fed from receipts; cold-starts + cascade fallback; `npm run test:coding-router`)
 - #2176 — evaluate Graphiti/cognee as the memory store
 - #2177 — unify coding-backend approvals with the consequence-gate surface
 - #2178 — loop-value experiment (Ouro audition for the local slot)
