@@ -57,11 +57,19 @@ input, not an assumed constraint (2026-07-06). The evidence base assembled this 
    R-Tuning arXiv:2311.09677); **honesty-native pretraining at scale does not** (7 verified
    searches, 2026-07-06). A new program can adopt abstention-aware proper scoring from
    token one.
-2. **The property is trainable and measurable small.** Our QLoRA honesty-tune of
-   Ouro-1.4B: golden 0.958 / confab 10% / over-abstain 2.2% on 66 held-out — ties
-   GPT-4o-mini on golden, beats Gemini-2.5-Flash on confabulation (MEASURED,
-   `experiments/sigma0_ouro_honesty_eval.py`). Known failure modes: corpus imbalance
-   collapses to always-assert (MEASURED); RFT erodes abstention (arXiv:2505.13988).
+2. **The property is trainable and measurable small — now OPEN, not established.**
+   Our QLoRA honesty-tune of Ouro-1.4B initially measured golden 0.958 / confab 10% /
+   over-abstain 2.2% on 66 held-out (`experiments/sigma0_ouro_honesty_eval.py`).
+   **E1 retraction (2026-07-06, MEASURED — `data/sigma0/e1_degloss_report.json`):**
+   stripping the status glosses the golden negatives carry in-text ("— OPEN", "— REFUTED")
+   and re-running the same adapter moves confab **10% → 55%** (golden 0.958 → 0.833),
+   while the GPT-4o-mini control is unmoved (0% → 0%) — the headline was substantially
+   the tune reading the glosses, not honesty. Trainability-at-1.4B is therefore OPEN
+   pending corpus-v2 (de-glossed, perturbed positives) and OSS marks (TruthfulQA /
+   HaluEval / AbstentionBench). Known failure modes: gloss-shortcut overfitting (E1,
+   MEASURED); corpus imbalance collapses to always-assert (MEASURED); RFT erodes
+   abstention (arXiv:2505.13988). Phase 1's pilot gate is precisely the honest test of
+   this premise.
 3. **The architecture family scales.** Ouro pretrained recurrent-depth to 7.7T tokens
    (arXiv:2510.25741); MoEUT made shared-layer UTs parameter- and compute-competitive to 1B
    (arXiv:2405.16039). Learned halting is the weak leg (MoEUT's ACT ablation + our Q-exit
@@ -139,7 +147,8 @@ D1 tiers and cluster shape; dense-recurrent vs MoE-UT (D2); the exact objective 
 | Operator directive: frontier training in scope, budget a decision input | Operator statement 2026-07-06; recorded in [SIGMA0-FRONTIER-TRAIN-BRIEF.md](../SIGMA0-FRONTIER-TRAIN-BRIEF.md) | High | operator |
 | 0-1-scored evals reward guessing → hallucination persists | Kalai et al., arXiv:2509.04664 | High | external paper |
 | Honesty post-training exists; honesty-native *pretraining* does not | TruthRL arXiv:2509.25760; R-Tuning arXiv:2311.09677; 7 verified searches 2026-07-06 (brief §survey) | Medium-High | external survey |
-| Honesty trainable + measurable small: golden 0.958 / confab 10% / over-abstain 2.2% (66 held-out) | `experiments/sigma0_ouro_honesty_eval.py`; QLoRA honesty-tune run | High (MEASURED) | in-repo eval |
+| Honesty trainable + measurable small (golden 0.958 / confab 10%) | `experiments/sigma0_ouro_honesty_eval.py` — **RETRACTED as headline by E1**: substantially gloss leakage | **Open** (was High) | in-repo eval |
+| E1 de-gloss: confab 10%→55%, GPT-4o-mini control unmoved 0%→0% | `data/sigma0/e1_degloss_report.json` (2026-07-06; landing via the design-brief workstream) | High (MEASURED) | in-repo eval |
 | Frontier comparison floor: GPT-4o-mini 0.958 golden / Gemini-2.5-Flash 21.4% confab | golden-bench runs (Vertex ADC), data/eval | High (MEASURED) | in-repo eval |
 | Recurrent-depth family scales: Ouro 7.7T tokens; MoEUT competitive to 1B | arXiv:2510.25741; arXiv:2405.16039 | High | external papers |
 | Learned halting weak | MoEUT ACT ablation (arXiv:2405.16039) + in-repo Q-exit nulls | High (MEASURED both) | external + in-repo |
