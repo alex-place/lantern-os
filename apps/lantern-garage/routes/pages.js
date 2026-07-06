@@ -18,7 +18,6 @@ const PUBLIC_PAGES = {
   "/explore.html":        "explore.html",
   "/knowledgecenter.html":"knowledgecenter.html",
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
-  "/ibkr-connect.html":   "ibkr-connect.html",       // redirect → /orchestration.html#broker
   // Primary interface: the chat must be reachable without a Patreon login so the
   // "no account needed" promise holds (#739). dream-chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).
@@ -51,6 +50,13 @@ const PROTECTED_PAGES = {
 // A nav page an admin flagged "disabled" is blocked for everyone except admins
 // (who keep preview access). `hidden`-only pages are NOT blocked here — hiding
 // merely drops the nav link; the page stays directly reachable.
+// Permanent redirects for surfaces that MOVED. Kept server-side so old links /
+// bookmarks don't 404, without carrying a dead stub .html file in public/ (a
+// redirect is not a public surface — it must not inflate the Σ₀ surface count).
+const REDIRECTS = {
+  "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
+};
+
 function renderDisabledPage(pathname) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -69,6 +75,13 @@ module.exports = async function pagesRoute(req, res, url, deps) {
 
   if (!pathname.match(/\.html$/) && pathname !== "/") return false;
   if (res.headersSent) return true;
+
+  // Moved surfaces: 302 to the canonical location (see REDIRECTS).
+  if (REDIRECTS[pathname]) {
+    res.writeHead(302, { Location: REDIRECTS[pathname] });
+    res.end();
+    return true;
+  }
 
   // Admin kill-switch: a nav page flagged "disabled" is blocked for non-admins.
   if (isPageDisabled(pathname) && !isAdmin(req)) {

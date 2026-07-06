@@ -48,7 +48,10 @@
   // Apply { path: { hidden, disabled } } overrides to every nav link.
   function applyNavVisibility(navigation) {
     if (!navigation) return;
-    document.querySelectorAll('nav a[href]').forEach((a) => {
+    // Covers the header <nav> AND the site footer, so an extension hidden from the
+    // loop-foregrounded default (e.g. Trader/Create when their flag is off) doesn't
+    // reappear in the footer. Links not in the nav-config map are left untouched.
+    document.querySelectorAll('nav a[href], .site-footer a[href]').forEach((a) => {
       const cfg = navigation[hrefPath(a.getAttribute('href'))];
       if (!cfg) return;
       if (cfg.hidden) { a.style.display = 'none'; return; }
