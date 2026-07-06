@@ -68,7 +68,7 @@ const USAGE_KINDS = new Set(["signup", "activation", "workflow_used", "feedback"
 // operator", so this seam is load-bearing. Env-overridable, comma-separated.
 function operatorSet() {
   const raw = process.env.KEYSTONE_OPERATOR
-    || "alex place,alex,alex-place,founder,founder@lantern-os.net,operator,keystone";
+    || "alex place,alex,alex-place,founder,founder@lantern-os.net,alex.place.7@gmail.com,operator,keystone";
   return new Set(raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
 }
 
