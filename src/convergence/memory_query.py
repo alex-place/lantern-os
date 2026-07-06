@@ -24,11 +24,14 @@ def main():
     parser.add_argument("--order-by", choices=["timestamp", "confidence"], help="Sort by field")
     parser.add_argument("--source-filter", help="Filter by source")
     parser.add_argument("--limit", type=int, default=10, help="Max results")
+    parser.add_argument("--memory-dir", default="data",
+                        help="Directory the MemoryStore reads (default: data). Lets the Node seam "
+                             "and tests point at an isolated store; #2081.")
 
     args = parser.parse_args()
 
-    # Initialize Memory store (reads from data/)
-    memory = MemoryStore(memory_dir="data")
+    # Initialize Memory store (reads from --memory-dir, default data/)
+    memory = MemoryStore(memory_dir=args.memory_dir)
 
     # Execute query
     results = memory.query(

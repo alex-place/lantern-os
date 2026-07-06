@@ -27,6 +27,9 @@ async function queryMemory(params) {
     if (params.source_filter) {
       args.push("--source-filter", params.source_filter);
     }
+    if (params.memory_dir) {
+      args.push("--memory-dir", params.memory_dir);  // #2081: isolate the store (tests / alt roots)
+    }
 
     const proc = spawn("python", [script, ...args], {
       cwd: path.join(__dirname, "..", "..", ".."),
@@ -128,3 +131,8 @@ module.exports = async (req, res, url, deps) => {
 
   return false;
 };
+
+// #2081: expose the seam's query helpers so reasoners/tests can call the Remember-stage read
+// interface directly (the HTTP route stays the primary entry). queryMemory spawns memory_query.py.
+module.exports.queryMemory = queryMemory;
+module.exports.queryMemoryCached = queryMemoryCached;
