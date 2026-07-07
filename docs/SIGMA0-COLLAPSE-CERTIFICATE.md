@@ -1392,6 +1392,8 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 - **arXiv:2503.01595** — *STAR: Stability-Inducing Weight Perturbation for Continual Learning* — worst-case weight perturbation for stability (§7.1).
 - **arXiv:2509.22764** — Kang et al., *In-Context Learning can Perform Continual Learning Like Humans* — continual learning in-context (zero parameter updates), beats gradient-based CL; the `σ_weights=0` escape (§7.1).
 - **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into [`RESEARCH-CANON.md`](RESEARCH-CANON.md) [11].
+- **arXiv:2310.01798** — Huang, Chen, Mishra, Zheng, Yu, Song & Zhou, *Large Language Models Cannot Self-Correct Reasoning Yet* (ICLR 2024) — the **inference-time twin** of §7's collapse claim: intrinsic self-correction *without external feedback* degrades reasoning (GPT-4 95.5→91.5 on GSM8K). The model-collapse citations above are the *training-time* version of the same "no contact with outside reality → degradation" mechanism; this is the same law one timescale down, and the escape (external feedback) matches §7's grounding. Title/authors/venue verified against arXiv 2026-07-07.
+- **arXiv:2406.15927** — Kossen et al., *Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs* (2024) — a **linear probe on a single generation's hidden state** predicting semantic entropy; nearest prior for §7.3's confabulation-detection honesty layer. The §7.2 rule "bind every honesty signal to an external check" is the product-form guard around exactly this internal signal. Verified against arXiv 2026-07-07.
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated
@@ -1682,6 +1684,25 @@ for produced results and Appendix A for the original design sketch.*
 > tests** (46 `test_cio_sde` + 4). §5 updated. This closes the *certification* half of [#1991] for the
 > benchmark `f`; **[#1990]** (trigger→theorem) stays honestly open — a heuristic min-gate does not
 > obviously imply the spectral condition, and may not be provable in general.
+>
+> **Maintenance log — 2026-07-07 (external-novelty audit — nearest-prior for Part I).** A
+> reviewer-style "what do you add over the nearest paper" pass on Part I's *inference-time* claim
+> (Part II's Σ_θ novelty search already landed 2026-07-07 — see §8's close-prior-art bullet). Two
+> verified nearest-prior citations were missing and are now in References (lineage): **Huang et al.,
+> ICLR 2024 (arXiv:2310.01798)** — intrinsic self-correction *without external feedback* degrades
+> reasoning — the inference-time twin of §7's collapse-without-grounding claim (its *training-time*
+> twin, Feng/Dohmatob, was already cited); and **Semantic Entropy Probes (Kossen et al.,
+> arXiv:2406.15927)** as the nearest prior for §7.3's honesty probe. Both IDs verified against arXiv
+> this pass (title/authors/venue), per this doc's no-unverified-ID rule. **Honest positioning, stated
+> plainly so it cannot be laundered: the certificate claims no novel *mechanism*.** "Ungrounded
+> self-reference degrades; external verification is the escape" is established prior art (Huang 2024 at
+> inference; Feng 2024 / Shumailov 2024 at training). The certificate's actual contribution is (a) a
+> **machine-checked in-repo formalization** of that result as a computable stability certificate
+> (Theorems 1 / C3, the discrete + defective-`A` dichotomies — **50 passing tests**) and (b) **honest
+> negative results** (e.g. §8.4's strong O(1) fresh-flow law **REFUTED → `n`-graded**). Framed as
+> *novel AI* the nearest-paper question sinks it; framed as *disciplined formalization + honest
+> measurement* it stands — which is what §7.2 (honesty-not-theater) demands. No theorem changed this
+> pass; two arXiv-verified citations added.
 
 ### Closed-gap history
 
