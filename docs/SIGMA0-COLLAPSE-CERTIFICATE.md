@@ -1314,7 +1314,10 @@ adds a positive-improvement requirement and two operational guards. A candidate 
 
 Honest label: this is a **conditional release certificate — a checklist, not a theorem** of safe
 self-improvement. It inherits every soundness caveat of §8.3–§8.4; conditions 1/6/7 are the
-convergent additions.
+convergent additions. **IMPLEMENTED (2026-07-07, #2228):** all seven conditions + the A/B/C decision
+tree run GPU-free in `experiments/sigma_theta_abc/harness.py` (`--self-test`;
+`tests/test_sigma_theta_gate.py`, 8/8, including the planted-failure rejections); arm-C GRPO math
+landed in #2230. Implementation ≠ validation: the checklist has never gated a *real* training run.
 
 ### 8.2 The fates, corrected (review hit #1)
 
@@ -1376,10 +1379,35 @@ lands.
 
 **Net:** the surviving requirement is **fresh flow > fixed set, with an `n`-graded (not O(1))
 staleness penalty that is worst when sourcing is slow** — and, per the theory correction above, a
-third road exists the sim did not test: a **formal reusable-holdout mechanism (Thresholdout-class)**
-whose noise/threshold discipline stretches a fixed set with proven guarantees. [Naive-reuse decay:
-MEASURED-by-simulation (shape, not a closed-form constant); Thresholdout reuse: PROVEN, external;
-the budget for *this* uncontrolled gating protocol: measured in-sim, unproven in general.]
+third road exists: a **formal reusable-holdout mechanism (Thresholdout-class)** whose
+noise/threshold discipline stretches a fixed set with proven guarantees. [Naive-reuse decay:
+MEASURED-by-simulation (shape, not a closed-form constant); Thresholdout reuse: PROVEN, external.]
+
+**[MEASURED 2026-07-07 — the third road, same harness, third arm + pool ablation
+(`experiments/sigma_update_holdout_staleness.py`, 32 seeds;
+`data/sigma0/holdout_staleness_thresholdout_report.json`; regression
+`tests/test_sigma_theta_thresholdout.py`, 7 tests).]** A Thresholdout wrapper (Dwork
+arXiv:1506.02629 mapped onto this gate: answer from a *burned* exploration pool unless it deviates
+from the fixed verified holdout by `> T + Lap`, then answer holdout + **fresh** Laplace noise and
+spend overfit budget `n/4`; constants at holdout-noise scale — shape is the claim, not constants).
+The result **decomposes the third road into two separate effects**:
+
+- **VALIDITY — the mechanism's real win.** The champion's reported-vs-true gap stays below *both*
+  other arms at every `n ≤ 2000`: at `n=50`, fixed 0.482 vs thresholdout **0.187** (fresh 0.194);
+  at `n=200`, fixed 0.176 vs **0.048** (fresh 0.088). The gate's promotion evidence stays
+  near-honest on a fixed verified set — fresh per-query noise breaks the sticky-luck ratchet.
+- **EXTRACTION — bought by the burned pool, not the mechanism.** Ablation at pool=`n` (no
+  accumulated data): extraction collapses to the naive fixed arm (0.74 vs 0.78 at `n=50`) — **the
+  mechanism alone does not rescue extraction; the fresh-flow law holds.** But with an accumulated
+  burned pool (4`n` — realistic, since retired promotion sets accumulate), the managed arm **beats
+  the same-`n` fresh flow for `n ≥ 100`** (21.8 vs 18.0 at `n=100`; 36.4 vs 25.4 at `n=200`) while
+  staying *more* honest than fresh.
+
+**Design consequence (the compounding law):** retire each used promotion set into the burned
+exploration pool and let a Thresholdout-class mechanism arbitrate pool-vs-holdout. Fresh verified
+truth then **compounds** instead of being spent once — extraction scales with *accumulated* verified
+data while validity stays certified. Fresh sourcing still rate-limits the promotion set itself (the
+ablation is the proof); what changes is that every sourced problem keeps paying after retirement.
 
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
@@ -1395,8 +1423,11 @@ incoming verified tasks → continually replenish the promotion pool (the flow)
 The release decision (§8.1.2) is made against the **fresh promotion set**, retired after use; the
 sourcing rate of *incoming verified tasks* is the rate limit on safe updates. (Naïve repeated reuse
 of one visible holdout overfits it — Dwork et al., arXiv:1506.02629, *Generalization in Adaptive
-Data Analysis and Holdout Reuse*.) **[HEURISTIC operational design; the overfitting result it rests
-on is PROVEN.]**
+Data Analysis and Holdout Reuse*.) **Retired promotion sets are not dead:** they feed the
+`exploration` tier, and the third-road measurement above shows a Thresholdout-arbitrated burned pool
+compounds extraction while the fixed verified set keeps validity — so the tiers form a cycle, not a
+one-way conveyor. **[HEURISTIC operational design; the overfitting result it rests on is PROVEN;
+the compounding effect is MEASURED-by-simulation.]**
 
 ### 8.5 What is and isn't claimed
 
@@ -1411,20 +1442,31 @@ treating "passed the holdout" as unconditional evidence — without the §8.4 fr
 ### 8.6 Minimal falsification path (before trusting any of this)
 
 1. Implement `D`, `G`, and the KL trust region as a gate around one RLVR/distill step.
+   **✅ GATE LOGIC DONE (2026-07-07, #2228):** the §8.1.2 seven-condition release gate + A/B/C
+   decision tree are implemented and self-tested with no GPU in
+   `experiments/sigma_theta_abc/harness.py` (`--self-test`; `tests/test_sigma_theta_gate.py`, 8/8) —
+   planted reward-hack, forgetting regression, instability, and over-budget drift are each rejected,
+   and the "none beat retrieval → stop updating weights" branch resolves. Arm-C's GRPO math is
+   implemented + self-tested (#2230). *Still open: running the gate around a REAL RLVR/distill step
+   (cloud L4) — gate logic ≠ gated training.*
 2. **Reward-hacking teeth:** plant an update that games the verifier (`Ĵ↑`, `R_H↓`); confirm leg 1/3
    rejects where a Part-I-only (collapse) gate accepts. *(If Part I already caught it, Σ_θ is
-   redundant — this is the whole point.)*
-3. **Forgetting teeth:** plant a held-out regression; confirm leg 1 rejects.
+   redundant — this is the whole point.)* **Gate-logic level: ✅ #2228 (planted hack rejected in
+   self-test); real-model level: open, needs the L4 A/B/C run.**
+3. **Forgetting teeth:** plant a held-out regression; confirm leg 1 rejects. **Gate-logic level:
+   ✅ #2228; real-model level: open.**
 4. **Budget teeth:** gate repeatedly against a fixed `H`; measure the true generalization gap growing
    as adaptive gates accumulate; confirm a fixed holdout goes stale, and characterise the rate.
    **✅ DONE (2026-07-07, `experiments/sigma_update_holdout_staleness.py`, 32 seeds):** a fresh-flow
    holdout **strictly dominates** a fixed one at every `n`, with a **severe small-`n` penalty (22× less
    true quality extracted at `n=50`), closing to <10% only at `n ≥ 2000`. This **refutes the strong
    "O(1) regardless of size"** wording (the budget is `n`-graded) while **confirming the operational
-   fresh-flow law** — see the MEASURED block in §8.4. *(Follow-up worth one run: the same harness with
-   a Thresholdout wrapper, to measure how far the PROVEN controlled-reuse mechanism stretches the
-   fixed set in this protocol. Legs 1–3 still require the model-training A/B/C harness on cloud L4 —
-   this box cannot train locally; that is the remaining empirical gap.)*
+   fresh-flow law** — see the MEASURED block in §8.4. **✅ Thresholdout follow-up DONE (2026-07-07,
+   third arm + pool ablation, same harness):** the mechanism buys **validity**, the burned pool buys
+   **extraction**, and the mechanism is what makes reusing the pool safe — see the third-road
+   MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. *(Steps 1–3 at real-model
+   level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
+   remaining empirical gap.)*
 5. **Incremental-validity teeth (the strongest genuine research question here):** does the Part I
    fast-state signal **add detection power** for bad checkpoints over the external gate alone —
    catching more, earlier, at acceptable false-positive cost? (`external gate` vs `external + Σ₀`

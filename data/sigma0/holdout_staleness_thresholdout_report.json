@@ -1,0 +1,115 @@
+{
+ "rows": [
+  {
+   "n": 50,
+   "fixed_true": 0.78,
+   "thresh_true": 8.54,
+   "fresh_true": 12.85,
+   "fixed_gap": 0.482,
+   "thresh_gap": 0.187,
+   "fresh_gap": 0.194,
+   "thresh_budget_spent": 12,
+   "budget": 12
+  },
+  {
+   "n": 100,
+   "fixed_true": 2.42,
+   "thresh_true": 21.83,
+   "fresh_true": 18.0,
+   "fixed_gap": 0.316,
+   "thresh_gap": 0.081,
+   "fresh_gap": 0.134,
+   "thresh_budget_spent": 25,
+   "budget": 25
+  },
+  {
+   "n": 200,
+   "fixed_true": 8.02,
+   "thresh_true": 36.41,
+   "fresh_true": 25.39,
+   "fixed_gap": 0.176,
+   "thresh_gap": 0.048,
+   "fresh_gap": 0.088,
+   "thresh_budget_spent": 50,
+   "budget": 50
+  },
+  {
+   "n": 500,
+   "fixed_true": 26.9,
+   "thresh_true": 49.98,
+   "fresh_true": 37.11,
+   "fixed_gap": 0.07,
+   "thresh_gap": 0.023,
+   "fresh_gap": 0.049,
+   "thresh_budget_spent": 125,
+   "budget": 125
+  },
+  {
+   "n": 1000,
+   "fixed_true": 41.92,
+   "thresh_true": 54.2,
+   "fresh_true": 46.13,
+   "fixed_gap": 0.031,
+   "thresh_gap": 0.011,
+   "fresh_gap": 0.02,
+   "thresh_budget_spent": 250,
+   "budget": 250
+  },
+  {
+   "n": 2000,
+   "fixed_true": 52.23,
+   "thresh_true": 55.96,
+   "fresh_true": 53.39,
+   "fixed_gap": 0.011,
+   "thresh_gap": 0.003,
+   "fresh_gap": 0.011,
+   "thresh_budget_spent": 500,
+   "budget": 500
+  },
+  {
+   "n": 5000,
+   "fixed_true": 59.19,
+   "thresh_true": 59.35,
+   "fresh_true": 59.33,
+   "fixed_gap": 0.003,
+   "thresh_gap": 0.011,
+   "fresh_gap": 0.005,
+   "thresh_budget_spent": 747.4,
+   "budget": 1250
+  }
+ ],
+ "ablation_pool_mult_1": [
+  {
+   "n": 50,
+   "thresh_pool1_true": 0.74,
+   "thresh_pool1_gap": 0.485,
+   "fresh_true": 12.85,
+   "fixed_true": 0.78
+  },
+  {
+   "n": 100,
+   "thresh_pool1_true": 2.88,
+   "thresh_pool1_gap": 0.323,
+   "fresh_true": 18.0,
+   "fixed_true": 2.42
+  },
+  {
+   "n": 500,
+   "thresh_pool1_true": 27.05,
+   "thresh_pool1_gap": 0.066,
+   "fresh_true": 37.11,
+   "fixed_true": 26.9
+  }
+ ],
+ "protocol": {
+  "k": 8,
+  "rounds": 400,
+  "seeds": 32,
+  "thresholdout": {
+   "T": "2*sigma_H",
+   "noise": "Lap(sigma_H)",
+   "exploration_pool": "pool_mult*n burned (default 4n)",
+   "budget": "n/4"
+  }
+ }
+}
