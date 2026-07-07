@@ -240,15 +240,48 @@ class TradingAPIBridge {
     const status = await client.getStatus();
     if (!status.connected) return [];
     const positions = await client.getPositions(status.accountId);
-    return positions.map((p) => ({
-      symbol: p.symbol,
-      qty: p.qty,
-      avg_fill_price: p.avgPrice != null ? p.avgPrice : 0,
-      current_price: p.currentPrice != null ? p.currentPrice : 0,
-      unrealized_pl: p.unrealizedPnl != null ? p.unrealizedPnl : 0,
-      conid: p.conid,
-      asset_class: p.assetClass,
-    }));
+    return positions.map((p) => {
+      const qty = Number(p.qty) || 0;
+      const avg = p.avgPrice != null ? p.avgPrice : 0;
+      const cur = p.currentPrice != null ? p.currentPrice : 0;
+      const upl = p.unrealizedPnl != null ? p.unrealizedPnl : 0;
+      const cost = Math.abs(qty) * avg;
+      const mktVal = p.marketValue != null ? p.marketValue : qty * cur;
+      return {
+        symbol: p.symbol,
+        qty,
+        side: qty < 0 ? 'short' : 'long',        // was missing → UI mislabeled shorts as "Long"
+        avg_entry_price: avg,                     // the name the UI reads (was avg_fill_price → "$—")
+        avg_fill_price: avg,                      // back-compat alias
+        current_price: cur,
+        unrealized_pl: upl,
+        pnl_pct: cost > 0 ? (upl / cost) * 100 : 0, // was missing → UI showed +0.00%
+        trade_value: cost,                          // |qty|·avg — was $0.00
+        market_value: mktVal,                       // was $—
+        conid: p.conid,
+        asset_class: p.assetClass,
+      };
+    });
+  }
+
+  /** Working/open IBKR orders for a user ([] when disconnected). */
+  async getIBKROpenOrders(userId) {
+    const client = this._clientFor(userId);
+    if (!client) return [];
+    const status = await client.getStatus();
+    if (!status.connected) return [];
+    return client.getLiveOrders();
+  }
+
+  /** Cancel a working IBKR order (e.g. an orphaned protective stop). */
+  async cancelIBKROrder(userId, orderId) {
+    const client = this._clientFor(userId);
+    if (!client) return { ok: false };
+    const status = await client.getStatus();
+    if (!status.connected) return { ok: false };
+    const r = await client.cancelOrder(orderId);
+    if (r.ok) this._invalidateUser(userId);
+    return r;
   }
 
   /** Honest, evidence-bearing IBKR connection status for UI badges + settings.

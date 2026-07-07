@@ -47,6 +47,19 @@ function cfg() {
   };
 }
 
+/** Cancel any working orders for a symbol (chiefly a protective stop) so a stale
+ *  stop can't fire on a flat/closed position and open an unintended short. */
+async function cancelRestingStops(bridge, userId, sym) {
+  try {
+    const orders = await bridge.getIBKROpenOrders(userId);
+    for (const o of (orders || [])) {
+      if (String(o.symbol || '').toUpperCase() === sym && o.orderId && /submit|pending|presubmit/i.test(o.status || '')) {
+        await bridge.cancelIBKROrder(userId, o.orderId);
+      }
+    }
+  } catch (_e) { /* fail-soft — a missed cancel is caught by the never-short guard */ }
+}
+
 /** Protective stop trigger price for a long entry: `stopPct` below entry. */
 function stopPriceFor(entry, stopPct) {
   const e = Number(entry);
@@ -123,35 +136,40 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     // + cash-qty orders) — skip so the autopilot doesn't churn on un-tradable names.
     if (/^[A-Z]{2,5}USD$/.test(sym)) { out.skipped.push({ ...record, why: 'crypto not tradable on this account' }); continue; }
 
-    // BEARISH + we hold a long → SELL to close (signal-based exit).
-    if (!bullish && held > 0) {
-      const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-      out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
-      _lastOrderAt.set(sym, now);
+    // ── BEARISH: only ever CLOSE a long we already hold. NEVER open or deepen a
+    //    short (longs-only). Critically, cancel the resting protective stop when we
+    //    close — an orphaned GTC stop would otherwise fire on the now-flat position
+    //    and open an unintended short (this is what put JPM/META short). ──
+    if (!bullish) {
+      if (held > 0) {
+        const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+        await cancelRestingStops(bridge, userId, sym);
+        out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
+        _lastOrderAt.set(sym, now);
+      } else {
+        out.skipped.push({ ...record, why: held < 0 ? 'already short — not deepening (longs-only)' : 'bearish, no long to exit' });
+      }
       continue;
     }
-    // BEARISH + no long → skip unless shorts are explicitly allowed.
-    if (!bullish && !(held < 0) && !c.allowShorts) { out.skipped.push({ ...record, why: 'bearish, no long to exit; shorts disabled' }); continue; }
-    // Already hold this symbol on the signal's side → no pyramiding.
-    if (bullish && held > 0) { out.skipped.push({ ...record, why: 'already long' }); continue; }
-    // Daily-loss circuit breaker halts NEW entries (exits above already ran).
+
+    // ── BULLISH: open a long only if flat. Never pyramid; never sell. ──
+    if (held > 0) { out.skipped.push({ ...record, why: 'already long' }); continue; }
     if (haltEntries) { out.skipped.push({ ...record, why: `daily-loss limit hit (day P&L ${Math.round(dayPnl)})` }); continue; }
-    // Cooldown.
     const last = _lastOrderAt.get(sym) || 0;
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
-    // Per-scan new-position cap.
     if (opened >= c.maxNewPerScan) { out.skipped.push({ ...record, why: 'max new/scan reached' }); continue; }
+    // Defensive: on a stray short, clear any stale resting orders before re-entering.
+    if (held < 0) await cancelRestingStops(bridge, userId, sym);
 
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxNotional, maxQty });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
-    const side = bullish ? 'buy' : 'sell';
-    const r = await bridge.placeIBKROrder(userId, { ticker: sym, side, qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-    const exec = { ...record, action: bullish ? 'open_long' : 'open_short', qty, notional: Math.round(qty * price), result: r };
-    // Attach a broker-side protective stop on a filled/placed long — the hard
-    // stop-loss the position keeps even if the scan loop dies. SELL STP below entry.
-    if (bullish && r && r.status === 'placed') {
+    const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'buy', qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+    const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
+    // Attach a broker-side protective stop on the placed long — the hard stop the
+    // position keeps even if the scan loop dies. Cancelled on the signal exit above.
+    if (r && r.status === 'placed') {
       const stop = stopPriceFor(price, c.stopPct);
       if (stop) {
         const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc' }).catch((e) => ({ status: 'error', reason: e.message }));
