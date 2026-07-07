@@ -1305,19 +1305,20 @@ adds a positive-improvement requirement and two operational guards. A candidate 
 2. **Retention** — historic verified suite drops ≤ `ε` (= leg 1).
 3. **Reward integrity** — proxy `Ĵ` may rise only if the independent held-out score does not fall
    (= leg 3, stated as the promotion form).
-4. **Drift budget** — `D_KL(prior‖θ')` **and adapter-norm** below limits (= leg 2, + norm cap).
+4. **Drift budget** — `D_KL(π_prior‖π_θ')` **and adapter-norm** below limits (= leg 2, + norm cap).
 5. **Fast-state stability** — Part I's collapse monitor shows no degeneration (Gate-0 early-abort).
 6. **Data integrity** — no held-out contamination; full provenance on every training trace. *(New:
    the provenance/leakage guard §8.4 needs to hold.)*
 7. **Rollback** — the prior adapter/checkpoint stays instantly redeployable. *(New: one bad run must
    never be permanent — this is what makes a *low-rate certified exception* actually safe.)*
 
-Honest label: this is a **conditional release certificate — a checklist, not a theorem** of safe
-self-improvement. It inherits every soundness caveat of §8.3–§8.4; conditions 1/6/7 are the
-convergent additions. **IMPLEMENTED (2026-07-07, #2228):** all seven conditions + the A/B/C decision
-tree run GPU-free in `experiments/sigma_theta_abc/harness.py` (`--self-test`;
-`tests/test_sigma_theta_gate.py`, 8/8, including the planted-failure rejections); arm-C GRPO math
-landed in #2230. Implementation ≠ validation: the checklist has never gated a *real* training run.
+Honest label: this is a **conditional release gate**: a checklist, not a theorem of safe
+self-improvement. It inherits every soundness caveat in §8.3–§8.4; conditions 1, 6, and 7 are the
+convergent additions. **IMPLEMENTED (2026-07-07, #2228):** all seven checks and the A/B/C decision
+tree are implemented in `experiments/sigma_theta_abc/harness.py` and can be self-tested without a
+GPU (`--self-test`; `tests/test_sigma_theta_gate.py`, 8/8, including planted-failure rejections).
+Arm-C GRPO math landed in #2230. Implementation is not validation: this gate has not yet controlled
+a real training run.
 
 ### 8.2 The fates, corrected (review hit #1)
 
@@ -1347,14 +1348,16 @@ on a failure path *as measured against the anchor*. Certification is a veto, not
 ### 8.4 The load-bearing open problem — holdout theater (review hit #3, the sharpest)
 
 "**Iff `H` remains a valid external anchor**" is the crux, and the exact parallel of §7.2's honesty
-theater. The tempting tool — Dwork et al.'s **reusable holdout** (Science 349, 2015; arXiv:1411.2664:
-`n` samples answer `B` adaptive scalar queries at error `~√(log B/n)`) — **does not apply here.** An
-accept/reject gate on a whole **model** is high-leakage **selection**: each acceptance conditions all
-future training on "passed `H`," and each *rejected* candidate still leaks `H` into the optimizer.
-That is sequential model selection, not `B` bounded scalar queries — so the anchor cannot be a
-fixed set: it must be a **flow of genuinely fresh verified problems**, and *the safe update rate is
-bounded by the fresh-ground-truth sourcing rate.* This is Part I's "grounding is the safety
-mechanism" **with a rate attached** — a real, harsh, falsifiable design constraint.
+theater. The reusable-holdout literature (Dwork et al., Science 349, 2015; arXiv:1411.2664: `n`
+samples answer `B` adaptive scalar queries at error `~√(log B/n)`) does **not directly certify**
+this high-leakage, model-level promotion process in its standard scalar-query form. A fixed
+promotion set can leak through both acceptance and rejection feedback, creating a
+sequential-selection problem. Two candidate safeguards are therefore: a flow of genuinely fresh
+verified promotion tasks, or a formally managed reusable-holdout mechanism with explicit information
+and overfitting budgets. The Thresholdout-style adaptation below is supported here by external
+theory and a measured simulation; it is not a general proof for model-level promotion gating. This
+is Part I's "grounding is the safety mechanism" with a rate attached — a real, harsh, falsifiable
+design constraint.
 
 **Second-review theory correction (2026-07-07): the "O(1)" wording was an overstatement in BOTH
 directions, and Dwork cuts both ways.** (a) *Naive, feedback-rich* reuse overfits the holdout
@@ -1387,10 +1390,12 @@ MEASURED-by-simulation (shape, not a closed-form constant); Thresholdout reuse: 
 (`experiments/sigma_update_holdout_staleness.py`, 32 seeds;
 `data/sigma0/holdout_staleness_thresholdout_report.json`; regression
 `tests/test_sigma_theta_thresholdout.py`, 7 tests).]** A Thresholdout wrapper (Dwork
-arXiv:1506.02629 mapped onto this gate: answer from a *burned* exploration pool unless it deviates
-from the fixed verified holdout by `> T + Lap`, then answer holdout + **fresh** Laplace noise and
-spend overfit budget `n/4`; constants at holdout-noise scale — shape is the claim, not constants).
-The result **decomposes the third road into two separate effects**:
+arXiv:1506.02629 mapped onto this gate). Here `Lap(b)` denotes zero-mean Laplace noise of scale `b`.
+Procedure per query: answer from a *burned* exploration pool unless the pool estimate and the fixed
+verified holdout estimate disagree by more than `T + Lap(σ_H)`; in that case return the holdout
+estimate plus fresh `Lap(σ_H)` noise and spend one unit of the overfit budget (`n/4` total).
+Constants sit at the holdout-noise scale — shape is the claim, not the constants. The result
+**decomposes the third road into two separate effects**:
 
 - **VALIDITY — the mechanism's real win.** The champion's reported-vs-true gap stays below *both*
   other arms at every `n ≤ 2000`: at `n=50`, fixed 0.482 vs thresholdout **0.187** (fresh 0.194);
@@ -1399,15 +1404,16 @@ The result **decomposes the third road into two separate effects**:
 - **EXTRACTION — bought by the burned pool, not the mechanism.** Ablation at pool=`n` (no
   accumulated data): extraction collapses to the naive fixed arm (0.74 vs 0.78 at `n=50`) — **the
   mechanism alone does not rescue extraction; the fresh-flow law holds.** But with an accumulated
-  burned pool (4`n` — realistic, since retired promotion sets accumulate), the managed arm **beats
+  burned pool (4n — realistic, since retired promotion sets accumulate), the managed arm **beats
   the same-`n` fresh flow for `n ≥ 100`** (21.8 vs 18.0 at `n=100`; 36.4 vs 25.4 at `n=200`) while
   staying *more* honest than fresh.
 
-**Design consequence (the compounding law):** retire each used promotion set into the burned
-exploration pool and let a Thresholdout-class mechanism arbitrate pool-vs-holdout. Fresh verified
-truth then **compounds** instead of being spent once — extraction scales with *accumulated* verified
-data while validity stays certified. Fresh sourcing still rate-limits the promotion set itself (the
-ablation is the proof); what changes is that every sourced problem keeps paying after retirement.
+**Design consequence (the compounding law):** after use, retire each promotion set into the burned
+exploration pool and let a Thresholdout-style mechanism arbitrate pool-versus-holdout feedback. In
+this simulation, accumulated verified examples improve extraction while the reported-versus-true gap
+remains lower than the fresh-arm comparison through the measured range. Fresh sourcing still
+rate-limits genuinely hidden promotion tasks; the result suggests that previously used verified
+tasks can remain useful after retirement, rather than becoming worthless.
 
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
@@ -1424,20 +1430,21 @@ The release decision (§8.1.2) is made against the **fresh promotion set**, reti
 sourcing rate of *incoming verified tasks* is the rate limit on safe updates. (Naïve repeated reuse
 of one visible holdout overfits it — Dwork et al., arXiv:1506.02629, *Generalization in Adaptive
 Data Analysis and Holdout Reuse*.) **Retired promotion sets are not dead:** they feed the
-`exploration` tier, and the third-road measurement above shows a Thresholdout-arbitrated burned pool
-compounds extraction while the fixed verified set keeps validity — so the tiers form a cycle, not a
+`exploration` tier, and in the third-road simulation a Thresholdout-arbitrated burned pool improved
+extraction while the reported-versus-true gap stayed low — so the tiers form a cycle, not a
 one-way conveyor. **[HEURISTIC operational design; the overfitting result it rests on is PROVEN;
 the compounding effect is MEASURED-by-simulation.]**
 
 ### 8.5 What is and isn't claimed
 
-**Claimed:** a computable three-leg gate anchored entirely to an external holdout; a proven
-monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao); the
-correct diagnosis that the anchor must be a fresh-data flow. **NOT claimed:** any in-repo proof or
-machine-check (there is none); that "two fates" is exhaustive (§8.2); that the reusable-holdout bound
-governs model-gating (§8.4); that a single potential is *proven* monotone (§8.3). **The trap:**
-treating "passed the holdout" as unconditional evidence — without the §8.4 fresh-flow discipline,
-Σ_θ is holdout theater, the same collapse it exists to prevent, one level up.
+**Claimed:** a computable three-leg gate anchored to an external holdout; a proven
+monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao); and
+evidence that naïve fixed-holdout reuse degrades under adaptive selection. **NOT claimed:** an
+in-repo theorem for the full gate; real-model validation of its training behavior; that "two fates"
+is exhaustive (§8.2); that scalar-query reusable-holdout guarantees automatically govern model-level
+promotion (§8.4); or that a single potential is proven monotone (§8.3). **The trap:** treating
+"passed the holdout" as unconditional evidence — without the §8.4 freshness-or-controlled-reuse
+discipline, Σ_θ is holdout theater, the same collapse it exists to prevent, one level up.
 
 ### 8.6 Minimal falsification path (before trusting any of this)
 
@@ -1456,15 +1463,15 @@ treating "passed the holdout" as unconditional evidence — without the §8.4 fr
 3. **Forgetting teeth:** plant a held-out regression; confirm leg 1 rejects. **Gate-logic level:
    ✅ #2228; real-model level: open.**
 4. **Budget teeth:** gate repeatedly against a fixed `H`; measure the true generalization gap growing
-   as adaptive gates accumulate; confirm a fixed holdout goes stale, and characterise the rate.
+   as adaptive gates accumulate; confirm a fixed holdout goes stale, and characterize the rate.
    **✅ DONE (2026-07-07, `experiments/sigma_update_holdout_staleness.py`, 32 seeds):** a fresh-flow
    holdout **strictly dominates** a fixed one at every `n`, with a **severe small-`n` penalty (22× less
    true quality extracted at `n=50`), closing to <10% only at `n ≥ 2000`. This **refutes the strong
    "O(1) regardless of size"** wording (the budget is `n`-graded) while **confirming the operational
    fresh-flow law** — see the MEASURED block in §8.4. **✅ Thresholdout follow-up DONE (2026-07-07,
    third arm + pool ablation, same harness):** the mechanism buys **validity**, the burned pool buys
-   **extraction**, and the mechanism is what makes reusing the pool safe — see the third-road
-   MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. *(Steps 1–3 at real-model
+   **extraction**, and in this harness the mechanism supports safe reuse of the pool — see the
+   third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. *(Steps 1–3 at real-model
    level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
    remaining empirical gap.)*
 5. **Incremental-validity teeth (the strongest genuine research question here):** does the Part I
@@ -1478,13 +1485,15 @@ treating "passed the holdout" as unconditional evidence — without the §8.4 fr
 
 Per the Σ₀ protocol (anchor a self-referential construction before trusting it), an outside theory
 review attacked Σ_θ and landed four hits — three fatal to the strong version, all folded in above:
-(1) "two fates" isn't exhaustive → §8.2; (2) leg 3 is weak/laggy → §8.1.1; (3) Dwork is the wrong
-tool, model-gating is O(1)-leaky → §8.4; (4) it's a gate, not a certificate, no potential proven
-monotone → §8.3. **What survives, and it is sharper than what walked in:** (i) the right object is
-the θ-flow, not the x-Jacobian — Part I provably can't see hacking/forgetting; (ii) Σ_θ is an honest
-**veto** with an imported partial guarantee; (iii) the surviving design constraint — *non-Goodharting cannot be
-certified with a fixed finite holdout; the slow-scale anchor must renew as fast as the loop learns.*
-That is Part I's principle, one axis harder. **This is the protocol working: a critic turned an
+(1) "two fates" isn't exhaustive → §8.2; (2) leg 3 is weak/laggy → §8.1.1; (3) naïve, high-feedback
+model gating can exhaust a fixed holdout, and scalar-query reusable-holdout results do not
+automatically cover model-level promotion → §8.4; (4) it's a gate, not a certificate, no potential
+proven monotone → §8.3. **What survives, and it is sharper than what walked in:** (i) the right
+object is the θ-flow, not the x-Jacobian — Part I provably can't see hacking/forgetting; (ii) Σ_θ is
+an honest **veto** with an imported partial guarantee; (iii) the surviving design constraint —
+*non-Goodharting cannot be certified by **naïvely** reusing a fixed finite holdout; the slow-scale
+anchor must either renew through fresh verified tasks or enforce controlled reuse under an explicit
+information and leakage budget.* That is Part I's principle, one axis harder. **This is the protocol working: a critic turned an
 overclaimed certificate into an honest gate plus one falsifiable design constraint — the intended outcome. A second review then corrected the constraint's own overstatement (the "O(1) gates" claim, §8.4) — the protocol applied to itself.**
 
 ### 8.8 Part II sources
@@ -1516,7 +1525,8 @@ Ex. 8.4), the fast and slow flows can be certified **separately and composed**:
 This is why Σ₀ and Σ_θ are **two faces of one certificate over one object at two timescales**, not
 two subsystems — the completion of Part I along the `θ`-axis it deferred in §0. Honest caveat: with
 Part II only a gate (§8.3) and (c) unproven, the composition is a *design target*, not a theorem —
-the whole system's safety still rests on the fresh-anchor requirement (§8.4), i.e. on grounding.
+the whole system's safety still rests on the fresh-or-controlled-reuse external-anchor requirement
+(§8.4), i.e. on grounding.
 
 ---
 
