@@ -136,6 +136,13 @@ def make_candidate(text, entry_point, he_prompt):
         if i >= 0:               # model re-emitted the whole function → use prompt preamble + it
             di = he_prompt.find(f"def {entry_point}")
             preamble = he_prompt[:di] if di >= 0 else ""
+            # Hoist any module-level imports the model wrote ABOVE the function
+            # (e.g. `import math`, `from functools import reduce`). Keeping only
+            # c[i:] silently dropped them → NameError at exec time, understating
+            # the score by counting correct-but-import-missing solutions wrong (#2194).
+            hoisted = [ln.rstrip() for ln in c[:i].splitlines()
+                       if re.match(r"\s*(import\s+\S|from\s+\S+\s+import\s)", ln)]
+            imports = ("\n".join(hoisted) + "\n") if hoisted else ""
             lines = c[i:].splitlines()
             blk = [lines[0]]
             for ln in lines[1:]:
@@ -143,7 +150,7 @@ def make_candidate(text, entry_point, he_prompt):
                     blk.append(ln)
                 else:
                     break
-            cand = (preamble + "\n".join(blk).rstrip()).replace("\t", "    ")
+            cand = (imports + preamble + "\n".join(blk).rstrip()).replace("\t", "    ")
             try:
                 compile(cand, "<c>", "exec"); return cand
             except SyntaxError:
