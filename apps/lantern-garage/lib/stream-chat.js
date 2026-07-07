@@ -2723,7 +2723,27 @@ async function handleStreamChat(req, url, res) {
           const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
           const { isOperatorRequest } = require("./request-auth");
           const operator = isOperatorRequest(req);
-          const tools = toolRunner.anthropicTools({ operator });
+          let tools = toolRunner.anthropicTools({ operator });
+          // If the user has connected their Indeed account, attach Indeed's official
+          // remote MCP server so Claude can search real Indeed jobs on their behalf
+          // (Anthropic executes it server-side via the MCP-connector beta). Gated on a
+          // valid token → normal chat is untouched when nobody has connected Indeed.
+          let indeedMcpServers = null;
+          try {
+            const uid = require("./session-identity").getEffectiveUserId(req);
+            if (uid) {
+              const host = (req.headers && req.headers.host) || "127.0.0.1";
+              const proto = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim()
+                || (req.socket && req.socket.encrypted ? "https" : "http");
+              const redirectUri = `${proto}://${host}/api/job/indeed/callback`;
+              const token = await require("./indeed-token-store").getValidAccessToken(uid, redirectUri);
+              if (token) {
+                const indeedOauth = require("./indeed-oauth");
+                indeedMcpServers = [{ type: "url", url: indeedOauth.MCP_URL, name: "indeed", authorization_token: token }];
+                tools = [...tools, { type: "mcp_toolset", mcp_server_name: "indeed" }];
+              }
+            }
+          } catch (e) { /* Indeed is best-effort — never break chat */ }
           if (tools.length) {
             const system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
             const convo = [...compacted.map(h => ({ role: h.role, content: h.text })), { role: "user", content: message }];
@@ -2734,6 +2754,8 @@ async function handleStreamChat(req, url, res) {
                 anthropicKey, model: claudeModel, system, messages: convo, tools,
                 maxTokens: isRpMode ? 2048 : 4096, // #1210: room for multi-call tool reasoning + answer
                 onToken: (t) => { fullReply += t; sendToken(t); },
+                mcpServers: indeedMcpServers, // Indeed connector (null unless connected)
+                onMcpTool: (name, server) => sse.writeData(res, { type: "tool", phase: "call", name, input: { via: server || "indeed" } }),
               });
               if (!toolUses.length || stopReason !== "tool_use") break; // model gave its answer
               convo.push({ role: "assistant", content: assistantContent });
