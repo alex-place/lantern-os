@@ -283,6 +283,9 @@
         <strong id="verify-email-addr"></strong>. Open it, then come back here to sign in.
       </p>
       <div class="auth-notice" id="verify-notice" role="status"></div>
+      <!-- Dev-only: shown only when the server (loopback + no mail server) returns a
+           confirmation link, so local testing can complete the flow without email. -->
+      <a id="verify-dev-link" class="btn-ghost" href="#" hidden style="margin-bottom:8px; color:var(--accent)">🔧 Dev: open confirmation link (no mail server)</a>
       <div class="auth-actions" style="margin-top:4px">
         <button type="button" class="btn-local" id="verify-continue">I've confirmed my email — sign in</button>
         <button type="button" class="btn-ghost" id="verify-resend">Resend confirmation</button>
@@ -472,26 +475,52 @@
   // is confirmed. Reached after a fresh signup (pendingVerification) or when a
   // login is blocked because the email is still unconfirmed.
   let verifyEmail = "";
-  function showVerifyScreen(email, delivery) {
+  let verifyDevLink = "";
+  // opts: { delivery: "sent"|"logged", devLink?: string, reason?: "unverified" }
+  function showVerifyScreen(email, opts) {
+    opts = opts || {};
     verifyEmail = email;
+    verifyDevLink = opts.devLink || "";
     document.getElementById("verify-email-addr").textContent = email;
     const vn = document.getElementById("verify-notice");
-    if (delivery === "logged") {
-      vn.textContent = "No mail server is configured here, so the confirmation link was written to the server log.";
-      vn.classList.add("show");
-    } else {
-      vn.textContent = "";
-      vn.classList.remove("show");
+    let msg = "";
+    if (opts.reason === "unverified") {
+      // Login was blocked because the address still isn't confirmed — say so,
+      // rather than silently bouncing back to the same screen.
+      msg = "This email isn't confirmed yet. Open the confirmation link we sent (check your spam), then sign in — or resend it below.";
+    } else if (opts.delivery === "logged") {
+      msg = "No mail server is configured here, so the confirmation link was written to the server log.";
     }
+    if (msg) { vn.textContent = msg; vn.classList.add("show"); }
+    else { vn.textContent = ""; vn.classList.remove("show"); }
+    // Dev-only self-service confirm link (server returns it on loopback + no SMTP).
+    setDevLink(verifyDevLink);
     // Clear any stale sign-in banners, then hide the whole sign-in view.
     document.getElementById("auth-error").classList.remove("show");
     hideNotice();
     document.getElementById("signin-view").hidden = true;
     document.getElementById("verify-view").hidden = false;
   }
+  function setDevLink(href) {
+    const dl = document.getElementById("verify-dev-link");
+    if (href) { dl.href = href; dl.hidden = false; }
+    else { dl.hidden = true; dl.removeAttribute("href"); }
+  }
   function showSigninScreen() {
     document.getElementById("verify-view").hidden = true;
     document.getElementById("signin-view").hidden = false;
+  }
+  // Brief "you're in" banner shown on the sign-in view right before we redirect
+  // into the app, so a successful login is acknowledged and never looks like a no-op.
+  function showSignedIn() {
+    document.getElementById("verify-view").hidden = true;
+    document.getElementById("signin-view").hidden = false;
+    document.getElementById("auth-error").classList.remove("show");
+    const submit = document.getElementById("local-submit");
+    submit.disabled = true;
+    submit.textContent = "Signed in ✓";
+    hideNotice();
+    showNotice("Signed in successfully ✓ — welcome back! Taking you in…");
   }
 
   async function submitLocal(e) {
@@ -501,6 +530,7 @@
     const name = document.getElementById("local-name").value.trim();
     const errEl = document.getElementById("local-error");
     const submit = document.getElementById("local-submit");
+    let signedIn = false;        // set on a successful login → keep the button parked
     errEl.style.color = "";      // reset (forgot-password recolors this to the accent)
     errEl.textContent = "";
 
@@ -530,15 +560,19 @@
         // "check your email" notice with a resend link instead.
         if (data.pendingVerification) {
           // Swap the whole card for the dedicated "confirm your email" screen.
-          showVerifyScreen(email, data.emailDelivery);
+          showVerifyScreen(email, { delivery: data.emailDelivery, devLink: data.devVerifyLink });
           return;
         }
-        location.href = safeReturnTo();
+        // Signed in — confirm with a success banner, then continue to the app.
+        signedIn = true;
+        showSignedIn();
+        setTimeout(() => { location.href = safeReturnTo(); }, 1200);
         return;
       }
-      // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen.
+      // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen
+      // with a clear reason (and the dev confirm link when the server supplies it).
       if (data.error === "email_unverified") {
-        showVerifyScreen(email);
+        showVerifyScreen(email, { reason: "unverified", devLink: data.devVerifyLink });
         return;
       }
       const map = {
@@ -553,8 +587,9 @@
     } catch (_) {
       errEl.textContent = "Network error. Please try again.";
     } finally {
-      submit.disabled = false;
-      submit.textContent = prev;
+      // On a successful sign-in we keep the button parked ("Signed in ✓") while the
+      // brief success banner shows and we redirect — don't re-enable it.
+      if (!signedIn) { submit.disabled = false; submit.textContent = prev; }
     }
   }
 
@@ -621,15 +656,21 @@
       document.getElementById("local-password").focus();
     });
     // Re-send the confirmation link, reporting back in the verify screen's own banner.
-    document.getElementById("verify-resend").addEventListener("click", () => {
+    document.getElementById("verify-resend").addEventListener("click", async () => {
       const vn = document.getElementById("verify-notice");
-      fetch("/api/auth/resend-verification", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: verifyEmail }),
-      }).catch(() => {});
+      let data = {};
+      try {
+        const r = await fetch("/api/auth/resend-verification", {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: verifyEmail }),
+        });
+        data = await r.json().catch(() => ({}));
+      } catch (_) {}
       vn.textContent = "Confirmation email re-sent to " + verifyEmail + ". Check your inbox (and spam).";
       vn.classList.add("show");
+      // Dev (loopback + no mail server): the resend hands back a fresh link.
+      if (data.devVerifyLink) { verifyDevLink = data.devVerifyLink; setDevLink(verifyDevLink); }
     });
 
     checkSession();
