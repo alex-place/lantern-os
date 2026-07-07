@@ -204,7 +204,7 @@ Report: `data/eval/coding-backend-ab-report.json`.
 - #2171 — ship local engine on Qwen2.5-Coder; Ouro → research lane
 - #2172 — OpenHands adapter (headless, LiteLLM)
 - #2173 — real wrapped-vs-raw benchmark (Aider Polyglot / SWE-bench Lite)
-- #2174 — verification-decides layer (SWE-bench tests + MiniCheck entailment)
+- #2174 — verification-decides layer ✅ **LANDED** (`lib/coding-backend/verifier.js` + `verifiers/{tests-run,entailment}.js`: a verifier — not a model vote — judges the held proposal; verdict fills `receipt.test` (the #2175 router reads it); apply blocked on an enforced, decisive failure; `npm run test:coding-verifier`)
 - #2175 — outcome-based per-repo routing ✅ **LANDED** (`lib/coding-backend/router.js`: routes by measured per-(repo,backend,taskType) success fed from receipts; cold-starts + cascade fallback; `npm run test:coding-router`)
 - #2176 — evaluate Graphiti/cognee as the memory store
 - #2177 — unify coding-backend approvals with the consequence-gate surface

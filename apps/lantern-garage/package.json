@@ -30,6 +30,7 @@
     "test:coding-backend": "node test/coding-backend.test.js",
     "test:local-engine": "node test/local-engine-qwen.test.js",
     "test:coding-router": "node test/coding-router.test.js",
+    "test:coding-verifier": "node test/coding-verifier.test.js",
     "test:tenant": "node test/tenant.test.js",
     "test:profile": "node test/deployment-profile.test.js",
     "test:desktop": "node test/desktop-phase0.test.js",
