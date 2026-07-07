@@ -44,6 +44,69 @@ def test_served_checkpoint_none_when_unset(monkeypatch):
     assert eval_ledger.served_checkpoint() is None
 
 
+def test_non_ouro_engine_ignores_ouro_env(monkeypatch):
+    """Regression: leaderboard row qwen25coder-onbox-2173 (benchmark coding, engine
+    http, model qwen2.5-coder:latest) was stamped served_checkpoint=ouro@checkpoint-600
+    because the box's OURO_* serving env was read unconditionally. A non-Ouro engine
+    must stamp the run's own --model arg, not the serving config."""
+    monkeypatch.setenv("OURO_MODEL", "ouro")
+    monkeypatch.setenv("OURO_ADAPTER", "/models/ck/checkpoint-600")
+    row = {"benchmark": "coding", "engine": "http", "model": "qwen2.5-coder:latest"}
+    eval_ledger.stamp_provenance(row)
+    assert row["served_checkpoint"] == "qwen2.5-coder:latest"
+
+
+def test_ouro_engines_still_inherit_env(monkeypatch):
+    monkeypatch.setenv("OURO_MODEL", "ByteDance/Ouro-1.4B")
+    monkeypatch.setenv("OURO_ADAPTER", "/models/ck/checkpoint-600")
+    for engine in ("loop", "ouro-fast-cached"):
+        row = {"benchmark": "coding", "engine": engine, "model": "ouro:latest"}
+        eval_ledger.stamp_provenance(row)
+        assert row["served_checkpoint"] == "ByteDance/Ouro-1.4B@checkpoint-600", engine
+
+
+def test_ouro_engine_env_unset_falls_back_to_base_model(monkeypatch):
+    for var in ("OURO_MODEL", "KEYSTONE_SERVE_OURO_MODEL", "OURO_ADAPTER"):
+        monkeypatch.delenv(var, raising=False)
+    row = {"benchmark": "humaneval", "engine": "ouro-fast-cached",
+           "base_model": "ByteDance/Ouro-1.4B"}
+    eval_ledger.stamp_provenance(row)
+    assert row["served_checkpoint"] == "ByteDance/Ouro-1.4B"
+
+
+def test_chat_row_unanimous_served_models(monkeypatch):
+    monkeypatch.setenv("OURO_MODEL", "ouro")
+    monkeypatch.setenv("OURO_ADAPTER", "/models/ck/checkpoint-600")
+    row = {"benchmark": "humaneval-chat", "engine": "keystone-chat",
+           "served_models": {"qwen2.5-coder:latest": 164}}
+    eval_ledger.stamp_provenance(row)
+    assert row["served_checkpoint"] == "qwen2.5-coder:latest"
+
+
+def test_chat_row_mixed_served_models_not_stamped(monkeypatch):
+    monkeypatch.setenv("OURO_MODEL", "ouro")
+    row = {"benchmark": "humaneval-chat", "engine": "keystone-chat",
+           "served_models": {"qwen2.5-coder:latest": 100, "gpt-4o-mini": 64}}
+    eval_ledger.stamp_provenance(row)
+    # A mixed serve has no single checkpoint — don't invent one; the histogram stays.
+    assert "served_checkpoint" not in row
+
+
+def test_signal_less_row_keeps_env_fallback(monkeypatch):
+    monkeypatch.setenv("OURO_MODEL", "ByteDance/Ouro-1.4B")
+    monkeypatch.delenv("OURO_ADAPTER", raising=False)
+    row = {"benchmark": "misc"}
+    eval_ledger.stamp_provenance(row)
+    assert row["served_checkpoint"] == "ByteDance/Ouro-1.4B"
+
+
+def test_caller_set_served_checkpoint_not_clobbered(monkeypatch):
+    monkeypatch.setenv("OURO_MODEL", "ouro")
+    row = {"engine": "loop", "served_checkpoint": "replayed@ck123"}
+    eval_ledger.stamp_provenance(row)
+    assert row["served_checkpoint"] == "replayed@ck123"
+
+
 def test_caller_set_value_not_clobbered():
     row = {"git_sha": "deadbeef", "campaign_id": "mine"}
     eval_ledger.stamp_provenance(row)
