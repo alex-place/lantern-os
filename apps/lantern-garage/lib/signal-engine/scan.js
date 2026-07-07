@@ -23,6 +23,7 @@ const { checkMarketStructureShift } = require("./market-structure");
 const tesseract = require("./tesseract");
 const ev = require("./convergence-ev");
 const { targetR } = require("./profiles");
+const tradingNews = require("../trading-news"); // directional news sentiment (external anchor)
 
 // Derive a candidate trade direction from zone posture, falling back to RSI
 // mean-reversion. (In the Python flow Grok proposed the direction; here it's
@@ -124,11 +125,15 @@ function candleGrade(candle) {
 }
 
 // Σ₀ EV verdict for a signal — the deterministic ENTER/SKIP + Kelly-style sizing
-// that replaced the Python Grok/Claude entry loop. Pure over the computed TA;
-// LLM council inputs (grok/claude/news) stay neutral in the deterministic path.
-function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus }) {
+// that replaced the Python Grok/Claude entry loop. Pure over the computed TA plus
+// (optionally) real news sentiment; the grok/claude council inputs stay neutral.
+// `news_sentiment` ∈ [-1,1] is an EXTERNAL anchor (Σ₀): the EV layer signs it to
+// the direction and weights it lightly (WEIGHTS.news), so one headline can nudge
+// but never dominate the TA evidence.
+function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0 }) {
   const evInput = {
     direction,
+    news_sentiment,
     in_zone: sr.in_zone,
     zone_strength: sr.zone_strength,
     zone_touches: (sr.nearest_zone && sr.nearest_zone.touches) || sr.touches || 0,
@@ -221,7 +226,13 @@ async function scanAll(watchlist) {
     zones[t] = { mid: sr.mid, top: sr.resistance, bottom: sr.support, type: sr.type, strength: sr.strength, touches: sr.touches, triggered_entry: gate.approved };
 
     if (gate.actionable) {
-      const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus });
+      // External anchor (Σ₀): directional news sentiment for this ticker, signed
+      // into the EV verdict. Impact-weighted score in [-100,100] → [-1,1]. Only
+      // computed for gate-passing tickers (cheap; a few per scan).
+      let newsSent = { label: "neutral", impact_weighted_score: 0, n: 0 };
+      try { newsSent = tradingNews.symbolSentiment(t, { windowHours: 48 }); } catch (_e) { /* fail-soft */ }
+      const news_sentiment = (Number(newsSent.impact_weighted_score) || 0) / 100;
+      const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment });
       signals.push({
         symbol: t,
         direction,
@@ -236,6 +247,7 @@ async function scanAll(watchlist) {
         candle: candle.pattern || null,
         tesseract: tess.action || null,
         convergence, // Σ₀ EV verdict: { decision:'ENTER'|'SKIP', p_win, ev_r, size_mult }
+        news: { label: newsSent.label, score: newsSent.impact_weighted_score, n: newsSent.n }, // external anchor
         reasons: gate.reason,
       });
     }
