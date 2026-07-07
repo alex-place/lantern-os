@@ -15,6 +15,7 @@ const {
   createLocalAccount,
   verifyLocalLogin,
   publicProfile,
+  updateProfile,
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
@@ -55,6 +56,19 @@ function sendSignupVerification(req, profile) {
 function devVerifyLink(req, profile) {
   if (smtpConfigured() || !isLoopback(req)) return null;
   return verifyLinkFor(req, profile);
+}
+
+// One-time operator warning: on a mailer-less deploy we admit local signups
+// WITHOUT email verification (see #2065). Email-ownership is therefore unproven —
+// configure SMTP to restore the confirmation gate.
+let _warnedNoMailerAdmit = false;
+function warnNoMailerAdmit() {
+  if (_warnedNoMailerAdmit) return;
+  _warnedNoMailerAdmit = true;
+  console.warn(
+    "[auth] SMTP is not configured — admitting local signups without email verification " +
+    "(#2065). Set SMTP_* to require confirmed emails."
+  );
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -151,6 +165,19 @@ async function handleLocalRegister(req, res) {
   const result = createLocalAccount(email, password, name);
   if (result.error === "email_taken") return _json(res, 409, { error: "email_taken" });
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
+
+  // No-mailer lockout guard (#2065): with SMTP unconfigured the confirmation link
+  // can never reach a real (proxied/public) user, so the hard email gate would
+  // permanently lock every signup out of a self-hosted deploy. We cannot verify
+  // the address, so don't pretend to — mark it verified and sign the user in.
+  // Loopback requests are exempt: the operator keeps the real confirm-email flow
+  // (and dev link) so it stays testable locally.
+  if (!smtpConfigured() && !isLoopback(req)) {
+    warnNoMailerAdmit();
+    updateProfile(result.profile.id, { emailVerified: true });
+    return _establish(req, res, { ...result.profile, emailVerified: true }, 201);
+  }
+
   const { delivery } = sendSignupVerification(req, result.profile); // confirmation email
   // Hard email gate: the account is created but NOT signed in. It cannot log in
   // until the confirmation link is clicked (see handleLocalLogin).
@@ -177,6 +204,15 @@ async function handleLocalLogin(req, res) {
   clearFailures(req, email);
   // Hard email gate: a local account with an unconfirmed email cannot sign in.
   if (profile.emailVerified !== true) {
+    // No-mailer lockout guard (#2065): rescue accounts created before this fix on
+    // a mailer-less deploy — a real (proxied/public) user could never clear the
+    // gate, so admit them rather than lock them out forever. Loopback stays gated
+    // so the operator keeps the testable confirm-email flow.
+    if (!smtpConfigured() && !isLoopback(req)) {
+      warnNoMailerAdmit();
+      updateProfile(profile.id, { emailVerified: true });
+      return _establish(req, res, { ...profile, emailVerified: true }, 200);
+    }
     const body = { error: "email_unverified", email };
     const devLink = devVerifyLink(req, profile);
     if (devLink) body.devVerifyLink = devLink; // loopback + no-SMTP only
