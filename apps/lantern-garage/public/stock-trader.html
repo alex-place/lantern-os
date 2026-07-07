@@ -171,8 +171,11 @@
   .wl-remove{font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
-  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s}
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;grid-auto-rows:352px}
+  /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
+     flexes to fill, so watching/quiet/breakout cards no longer render at
+     different heights with shorter charts. */
+  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s;display:flex;flex-direction:column;min-height:0}
   .card:hover{border-color:rgba(255,255,255,.12)}
   .card.state-open{border-color:rgba(0,212,170,.35);grid-column:span 2}
   .card.state-watching{border-color:rgba(74,158,255,.25)}
@@ -222,9 +225,7 @@
   .pnl-pos{background:rgba(0,212,170,.15);color:var(--green)}
   .pnl-neg{background:rgba(255,95,109,.15);color:var(--red)}
   /* Zone ladder */
-  .zone-ladder{position:relative;height:220px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
-  .card.state-open .zone-ladder{height:280px}
-  .card.state-quiet .zone-ladder{height:130px}
+  .zone-ladder{position:relative;flex:1 1 auto;min-height:80px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
   /* Order ticket trigger row */
   .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
   .order-ticket button{flex:1;font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
