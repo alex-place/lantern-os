@@ -1124,7 +1124,9 @@ RLVR/distillation step. `Ĵ(θ)` = **proxy** reward (training verifier: exec pas
 
 `θ→θ'=U(θ)` is **admissible** iff all hold: **(1) Retention non-regression** `R_H(θ')≥R_H(θ)−τ` —
 rejects forgetting/correct-set-turnover by construction. **(2) Trust-region** `D_KL(π_θ‖π_θ')≤δ`,
-cumulative `D_KL(π_base‖π_θ)≤Δ` — the mechanism behind RLVR's measured forgetting-robustness.
+cumulative `D_KL(π_base‖π_θ)≤Δ` — the mechanism behind RLVR's measured forgetting-robustness
+(primary: RL's Razor, arXiv:2509.04259 — forgetting tracks KL-from-base; robustness is relative,
+not absolute: arXiv:2607.04364).
 **(3) Goodhart-gap non-growth** `G(θ')≤G(θ)+η` — if `Ĵ` rises but `R_H` doesn't, refuse. **Honest
 weakness of leg 3 (review hit #2):** given leg 1 it is a capped proxy-inflation rule and **cannot
 catch a hack that games `Ĵ` without *yet* moving `R_H`** — the latent hack. Leg 3 is a laggy
@@ -1339,6 +1341,7 @@ overclaimed certificate into an honest gate plus one falsifiable design constrai
 - Gao, Schulman, Hilton, *Scaling Laws for Reward Model Overoptimization*, arXiv:2210.10760 (2023) — gold score as a function of KL-from-base (sets the budget `Δ`).
 - Dwork, Feldman, Hardt, Pitassi, Reingold, Roth, *The reusable holdout*, Science 349 (2015); *Generalization in Adaptive Data Analysis and Holdout Reuse*, arXiv:1506.02629; arXiv:1411.2664 — both directions of §8.4: naive reuse overfits, **and** Thresholdout validates exponentially many queries at overfitting budget `B ≈ τ²n`.
 - EvalStop (arXiv:2606.04145, 2026); Provably Mitigating Overoptimization (arXiv:2510.05526); Wasserstein-DRO RLHF (arXiv:2605.00155) — post-cutoff corroboration that gating on *world feedback / held-out eval* (not the proxy) is the live direction.
+- **Primary SOTA for the RLVR-forgetting premise (added 2026-07-08 research pass; all ids title-verified against the local arXiv corpus):** *RL's Razor: Why Online RL Forgets Less* (arXiv:2509.04259 — on-policy updates are KL-minimal w.r.t. the base; forgetting is predicted by KL-from-base); *Reinforcement Fine-Tuning Naturally Mitigates Forgetting in Continual Post-Training* (arXiv:2507.05386); *Mechanistic origins of catastrophic forgetting: why RL preserves circuits better than SFT* (arXiv:2605.28860). **Counterpoint, same pass:** *RL Forgets! Towards Continual Policy Optimization* (arXiv:2607.04364 — RL still forgets in continual settings; drift control needed) and *The Choice of Divergence* (arXiv:2509.07430 — divergence choice governs diversity collapse). The gate assumes only the relative advantage, not immunity.
 - Close prior art surfaced by the harder novelty search (2026-07-07, all corpus/web-verified): ADOWIP budgeted when-to-update gating (arXiv:2606.25068); Uncertainty-Guided Checkpoint Selection for RL finetuning (arXiv:2511.09864); *Signed Compression Progress on a Sealed Audit is Goodhart-Resistant* (arXiv:2606.11417) — nearest neighbor to the §8.4 sealed-promotion-set discipline; *Learning, Fast and Slow* (arXiv:2605.12484) — prior art for the fast/slow timescale framing itself.
 - Backing research: [data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md](../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md); decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
 - *Citations verified 2026-07-07 (TRPO/Gao IDs confirmed via search; Dwork by venue). Per this doc's own §References caution — an earlier draft once carried four fabricated arXiv IDs — no Part II id is cited unverified.*
@@ -1381,6 +1384,7 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 - **arXiv:2406.07515** (2024) — Feng, Dohmatob, Yang, Charton & Kempe, *Beyond Model Collapse: Scaling Up with Synthesized Data Requires Verification* (ICML 2024); verification prevents collapse — published analogue of external grounding (§7).
 - J. Wolfers & E. Zitzewitz (2004), *Prediction Markets*, J. Economic Perspectives 18(2):107–126 — prediction-market accuracy; rationale for markets as an external grounding signal (Kalshi grounding, §6).
 - I. Shumailov et al., *Nature* (2024) — model collapse under recursive training on synthetic data (§7).
+- **2025–26 model-collapse corroboration (title-verified in local corpus, 2026-07-08):** arXiv:2509.16499 (*A Closer Look at Model Collapse: From a Generalization-to-Memorization Perspective*); arXiv:2509.04796 (*Knowledge Collapse in LLMs: fluency survives, facts fail under recursive synthetic training*); arXiv:2602.10531 (*From Collapse to Improvement: statistical perspectives on iterative training on contaminated sources*) — the phenomenon §7 warns about remains actively measured, and the escape routes match §7's verification/grounding mechanism.
 - D. Amodei et al. (2016); J. Skalse et al. (2022) — reward hacking / specification gaming (§7).
 - **arXiv:2211.15661** — Akyürek et al., *What learning algorithm is in-context learning?* — ICL realized as ridge/least-squares; the data-noise σ axis, σ=0 = exact regression (§7.1).
 - **arXiv:2306.04637** — Bai et al., *Transformers as Statisticians* (NeurIPS 2023) — provable in-context algorithm selection vs. noise level σ (§7.1).

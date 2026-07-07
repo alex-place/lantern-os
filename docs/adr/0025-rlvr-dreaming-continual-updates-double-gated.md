@@ -37,7 +37,7 @@ Research this cycle ([report](../../data/research/reports/20260707T180737-rlvr-c
 
 1. **RLVR is the right update rule** because on-policy sampling keeps updates in a low reverse-KL
    region near the base, making RL structurally forgetting-robust vs SFT — and the KL penalty is
-   *not* what does it (Wolfe 2026, MEASURED). But RLVR has *intra-task* forgetting — "correct-set
+   *not* what does it (RL's Razor arXiv:2509.04259; RFT-mitigates-forgetting arXiv:2507.05386; mechanistic arXiv:2605.28860 — MEASURED; robustness is relative, not absolute: arXiv:2607.04364). But RLVR has *intra-task* forgetting — "correct-set
    turnover" (arXiv:2606.03087, MEASURED).
 2. **"Dreaming" is generative replay in an offline phase**, not a separate engine: replay the
    verified JSONL/CSF buffer (+ generic anchor data) during the update (Dream2Learn arXiv:2603.01935;
@@ -145,7 +145,7 @@ cheapest test of whether weight updates earn their keep at all.
 
 | Claim | Evidence | Confidence | Source |
 |---|---|---|---|
-| RL/RLVR forgetting-robust vs SFT via on-policy low-reverse-KL; KL penalty not the cause | Wolfe 2026 (cameronrwolfe.substack.com/p/rl-continual-learning) | High (MEASURED) | external |
+| RL/RLVR forgetting-robust vs SFT via on-policy KL-minimal updates; KL penalty not the cause | arXiv:2509.04259 (RL's Razor), 2507.05386, 2605.28860 (mechanistic); counterpoint 2607.04364 (not absolute); synthesis: Wolfe 2026 | High (MEASURED, multiple independent papers) | external |
 | RLVR intra-task forgetting (correct-set turnover) | arXiv:2606.03087 | High (MEASURED) | external |
 | Dreaming = generative replay / sleep-time consolidation | arXiv:2603.01935, 2606.03979, 2504.13171, 2603.04964 | High (MEASURED) | external |
 | Stability cert = hidden-state contraction only; late detector; instrument↔actuator gap | SIGMA0-COLLAPSE-CERTIFICATE.md §1/§2 (#1990, #766) | High (repo doc) | in-repo |
