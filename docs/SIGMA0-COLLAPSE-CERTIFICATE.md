@@ -336,10 +336,15 @@ sufficient, provable** contraction certificates — each strictly wider than sma
    gives a rigorous **lower** bound on the transient peak (continuous Kreiss matrix theorem:
    `K(A) ≤ sup_t‖e^{tA}‖ ≤ e·n·K(A)`), complementing the `√cond(P)` / `1+√2` upper bounds.
 
-**Acceptance gate.** `loop_lm.generate()` now **consumes** the certificate (it was previously
-computed but unused): it surfaces `stability_accepted = proven_contracting` on the empirical
-exit-depth Jacobian, so a generation's latent trajectory carries an explicit
-convergence-accept/reject verdict (`None` when too few tokens to certify).
+**Acceptance gate.** `loop_lm.generate()` **consumes** the certificate (it was previously
+computed but unused): a generation's latent trajectory carries an explicit
+convergence-accept/reject verdict (`None` when too few tokens to certify). As of 2026-07-07
+the **primary** acceptance criterion is the *discrete* JSRR gate `ρ(A) < 1` (§1.2.3); the
+continuous `proven_contracting` above is demoted to diagnostic telemetry + acceptance
+**fallback**. The two answer different questions — the continuous gates certify `e^{tA}`
+contraction and over-reject non-normal `A` with transient growth, while the loop is a
+*discrete* iteration whose asymptotic stability is governed by the spectral **radius** `ρ(A)`,
+not the abscissa.
 
 **Honest scope.** Sufficient, not necessary; they certify the **full Jacobian's**
 contraction, not collapse-onto-manifold (the L1 alignment gap is separate). The PROVEN
@@ -372,6 +377,61 @@ top-k; (3) do not quote §1 numbers for a routed loop without naming the routing
 *In plain words:* a mixture-of-experts loop keeps swapping which sub-network is running;
 this certificate currently proves things about one sub-network at a time, and "how often it
 swaps" becomes a stability quantity of its own.
+
+#### 1.2.3 The discrete acceptance gate: JSRR (`ρ(A) < 1`), externally validated
+
+**Status: ADOPTED external method; the gate's verdict is MACHINE-CHECKED, not a new theorem.**
+The §1.2.1 gates are *continuous-time* — they certify contraction of `e^{tA}`. But the serve
+loop is a **discrete iteration** `h_{k+1} = f(h_k)`, whose fixed point `h*` is asymptotically
+stable **iff the spectral radius `ρ(J(h*)) < 1`** — the abscissa is the wrong invariant, and a
+pure rotation (`ρ = |λ| = 1`, `Re λ = 0`) that the continuous numerical-range gate can wave
+through is correctly rejected by `ρ < 1`.
+
+This is exactly the criterion **STARS** regularises toward on *real* looped LLMs —
+*Stabilizing Recurrent Dynamics for Test-Time Scalable Latent Reasoning in Looped Language
+Models* ([arXiv:2605.26733](https://arxiv.org/abs/2605.26733)) — via its Jacobian Spectral
+Radius Regularization loss `ℒ_JSRR = (1/N)Σ‖J v‖₂²` (single-step power iteration on a
+Jacobian-vector product). We adopt it as the loop's **acceptance** gate rather than re-derive
+a competitor:
+
+- `cio_sde.collapse.jsrr_certificate(A, margin)` — the exact discrete spectral radius
+  `ρ(A) = max|λ(A)|` of the empirical exit-depth Jacobian, plus STARS' single-step
+  power-iteration surrogate `‖Av‖₂²` (their Eq. 3, reusable as a training regulariser).
+  numpy-only, so it gates acceptance even in the minimal inference venv where scipy (the
+  §1.2.1 Lyapunov/Kreiss legs) is absent.
+- `loop_lm.generate()` accepts iff `ρ(A) < 1 − margin` (`margin` via `SIGMA0_JSRR_MARGIN`,
+  default `0` = STARS' literal `ρ<1`; CART, [arXiv:2606.01495](https://arxiv.org/abs/2606.01495),
+  found trained gates settle `ρ∈[0.79,0.83]`, comfortably inside a `0.05` band).
+
+**Machine-checked:** `tests/test_sigma0_jsrr_gate.py` (12 cases) validates the verdict on
+synthetic operators with analytically-known `ρ` (contraction `ρ=0.9` accept; divergent
+`ρ=1.2` reject; scaled rotation `ρ=1.3` reject; the `ρ=1` boundary rejected; the margin band;
+nan-safety), agreement with the matvec twin `experiments/sigma0_jacobian_stability.py` (#2029),
+and the `_stability_gates`/`_accept_stability`/`assemble_reason_verdict` wiring. The four
+adjacent suites (`test_cio_sde`, `test_stability_gates`, `test_reason_verdict`,
+`test_collapse_canary_e2e`) are unchanged and green — **98 passing total**.
+
+**Honest scope — three caveats, none upgraded.** (1) What is machine-checked is the gate's
+**verdict** (`ρ<1` computed correctly, accept/reject on a known matrix), *not* that JSRR
+improves generation quality — CART reports a **null** result (its learned-stability gate did
+not beat a parameter-matched dense baseline), so `ρ<1` is validated as the *right stability
+object*, not as a quality win. (2) The gate runs on the code's **empirical-Jacobian proxy**
+(the mean-outer-product transition matrix in `generate()`), not the true Jacobian of the
+recurrent map; a faithful `ρ` needs the autograd-JVP of the update map at the reasoning state
+(the matvec path in #2029, deferred to a GPU run). (3) This is **adoption**, not novelty — the
+looped-LM spectral-radius / peak-then-collapse result is now published externally on real
+models (STARS; PLDR self-organized criticality, [arXiv:2603.23539](https://arxiv.org/abs/2603.23539));
+the Σ₀ contribution is engineering rigor, not a new law.
+
+**Tracked-open frontier (the honesty leg, [#2236]).** The one lane the 2026-07-07 literature
+check left arguably open is tying this spectral / criticality signal to **factual honesty
+(hallucination)** rather than reasoning accuracy — a loop-stability signal only becomes a
+*factuality* signal once an **external grounding** signal is supplied, which is the Σ₀
+grounding thesis itself. That study is **not done**, so **nothing about honesty AUROC is
+claimed here**; it is tracked as [#2236] and, per the audit discipline, will only enter this
+document as MEASURED with a run pointer once tested.
+
+[#2236]: https://github.com/alex-place/lantern-os/issues/2236
 
 ### 1.3 What the test actually checks
 
@@ -1682,6 +1742,26 @@ for produced results and Appendix A for the original design sketch.*
 > tests** (46 `test_cio_sde` + 4). §5 updated. This closes the *certification* half of [#1991] for the
 > benchmark `f`; **[#1990]** (trigger→theorem) stays honestly open — a heuristic min-gate does not
 > obviously imply the spectral condition, and may not be provable in general.
+>
+> **Maintenance log — 2026-07-07 (discrete JSRR acceptance gate adopted; external validation).**
+> A 2026-07-07 literature check found the looped-LM spectral-radius / peak-then-collapse result
+> now published externally on **real** models — STARS (JSRR, arXiv:2605.26733), PLDR
+> self-organized criticality (arXiv:2603.23539), and a fixed-point/attractor cluster — so the
+> §1 object is externally corroborated, and its *novelty* is closed (adoption, not a new law).
+> Acting on it: the serve-loop **acceptance gate is now the discrete criterion `ρ(A)<1`** (§1.2.3),
+> the invariant appropriate to a discrete iteration, with the §1.2.1 continuous `proven_contracting`
+> demoted to diagnostic + fallback. New `cio_sde.collapse.jsrr_certificate` (exact `ρ` + STARS'
+> `‖Av‖₂²` single-step surrogate, numpy-only so it survives the minimal inference venv);
+> `loop_lm.generate()` accepts iff `ρ<1−margin` (`SIGMA0_JSRR_MARGIN`, default 0). Machine-checked
+> by `tests/test_sigma0_jsrr_gate.py` (12 cases) + four unchanged adjacent suites ⇒ **98 passing**.
+> Evidence class is deliberately narrow: the gate's **verdict** is machine-checked, NOT a quality
+> win (CART, arXiv:2606.01495, reports a null result), and it runs on the **empirical-Jacobian
+> proxy** (true-JVP `ρ` deferred to a GPU run, #2029 matvec path). PR #2237. **Honesty leg NOT
+> written:** the grounding-honesty study ([#2236] — spectral loop-stability → *factual* honesty,
+> gated on external grounding) is untested, so no honesty AUROC is claimed here; it enters the doc
+> only when MEASURED with a run pointer. Frontmatter `updated:` → 2026-07-07.
+
+[#2237]: https://github.com/alex-place/lantern-os/pull/2237
 
 ### Closed-gap history
 
