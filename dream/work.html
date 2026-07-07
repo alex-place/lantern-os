@@ -134,6 +134,15 @@
     <div id="fleetRunLog" class="fleet-log"></div>
   </section>
 
+  <!-- ── Held Coding Changes (propose → verify → approve; #2185) ── -->
+  <section class="panel" id="codingApprovalsPanel">
+    <h2>⏳ Held Coding Changes <span class="section-meta" id="codingApprovalsMeta">verified, awaiting approval</span>
+      <button class="btn-secondary" onclick="renderCodingApprovals()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
+    </h2>
+    <p class="panel-sub">Code changes the assistant proposed and the verifier checked — <strong>held, not applied</strong>. Approve to apply, or reject to drop. Operator only.</p>
+    <div id="codingApprovalsBody"><div class="placeholder">Loading…</div></div>
+  </section>
+
   <!-- ── Recently Landed (truth of "done") ── -->
   <section class="panel" id="landedPanel">
     <h2>✅ Recently Landed <span class="section-meta" id="landedMeta">merged PRs</span>
@@ -356,12 +365,56 @@
   }
   window.renderLanded = renderLanded;
 
+  // ── Held Coding Changes (#2185): the coding control plane's approvals, inline ──
+  function codingVerdict(v) {
+    if (!v) return '<span class="lane-chip">held</span>';
+    if (v.decisive && v.passed === false) return '<span class="lane-chip" style="color:#d0563a;">verify failed</span>';
+    if (v.decisive && v.passed === true) return '<span class="lane-chip" style="color:#1f8f63;">verified</span>';
+    return '<span class="lane-chip">held · guard only</span>';
+  }
+  async function decideCoding(pendingId, action, override) {
+    setText("codingApprovalsMeta", action === "approve" ? "applying…" : "rejecting…");
+    let ok = false, body = {};
+    try {
+      const r = await fetch(action === "approve" ? "/api/coding/approve" : "/api/coding/reject",
+        { method: "POST", headers: { "content-type": "application/json" }, cache: "no-store",
+          body: JSON.stringify({ pendingId, overrideVerification: !!override }) });
+      ok = r.ok; body = await r.json().catch(() => ({}));
+    } catch (e) { body = { error: e.message }; }
+    if (!ok) setText("codingApprovalsMeta", "failed: " + (body.error || "error"));
+    renderCodingApprovals();
+    renderLanded();
+  }
+  window.decideCoding = decideCoding;
+  async function renderCodingApprovals() {
+    const el = $("codingApprovalsBody");
+    const data = await fetchJson("/api/coding/pending", 8000);
+    if (!data) { if (el) el.innerHTML = '<div class="research-state">Coding backend unavailable.</div>'; setText("codingApprovalsMeta", ""); return; }
+    const list = data.pending || [];
+    setText("codingApprovalsMeta", list.length ? `${list.length} awaiting approval` : "none held");
+    if (!list.length) { if (el) el.innerHTML = '<div class="placeholder">No coding changes awaiting approval.</div>'; return; }
+    if (el) el.innerHTML = list.map((p) => {
+      const blocked = p.verification && p.verification.blocked;
+      return `<div class="landed-row" data-id="${escapeHtml(p.pendingId)}" style="flex-wrap:wrap;gap:6px;">
+        <span class="landed-title">${escapeHtml(p.description || "coding change")}</span>
+        <span class="landed-meta"><span class="lane-chip">${escapeHtml(p.backend || "?")}</span> ${codingVerdict(p.verification)} · ${escapeHtml((p.files || []).join(", ") || "no files")}</span>
+        <span style="display:flex;gap:8px;width:100%;">
+          <button class="btn-secondary" style="font-size:0.72rem;padding:4px 10px;" onclick="decideCoding('${escapeHtml(p.pendingId)}','approve',${blocked ? "true" : "false"})" aria-label="Approve and apply this change">${blocked ? "Override & apply" : "Approve"}</button>
+          <button class="btn-secondary" style="font-size:0.72rem;padding:4px 10px;" onclick="decideCoding('${escapeHtml(p.pendingId)}','reject',false)" aria-label="Reject and drop this change">Reject</button>
+        </span>
+      </div>`;
+    }).join("");
+  }
+  window.renderCodingApprovals = renderCodingApprovals;
+
   document.addEventListener("DOMContentLoaded", () => {
     bindResearchQueue();
     loadResearchQueue();
     renderLanded();
+    renderCodingApprovals();
     setInterval(loadResearchQueue, 60000);
     setInterval(renderLanded, 60000);
+    setInterval(renderCodingApprovals, 30000);
   });
 })();
 </script>
