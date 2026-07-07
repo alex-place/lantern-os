@@ -7,20 +7,30 @@ const https = require("https");
 const { llmAgent } = require("../insecure-tls");
 
 // ── Anthropic (Claude) — /v1/messages with tool_use blocks ────────────────────
-function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTokens, onToken }) {
+// `mcpServers` (optional): remote MCP connectors (e.g. Indeed) that Anthropic connects
+// to and executes server-side — passed as the `mcp_servers` param under the MCP-connector
+// beta. When present, the model calls those tools autonomously (streamed as mcp_tool_use/
+// mcp_tool_result blocks we surface but don't execute). `onMcpTool(name)` fires per call.
+function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTokens, onToken, mcpServers, onMcpTool }) {
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ model, max_tokens: maxTokens, stream: true, system, messages, tools });
+    const useMcp = Array.isArray(mcpServers) && mcpServers.length > 0;
+    const payload = JSON.stringify({
+      model, max_tokens: maxTokens, stream: true, system, messages, tools,
+      ...(useMcp ? { mcp_servers: mcpServers } : {}),
+    });
+    const headers = {
+      "Content-Type": "application/json",
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Length": Buffer.byteLength(payload),
+    };
+    if (useMcp) headers["anthropic-beta"] = "mcp-client-2025-11-20";
     const req = https.request({
       agent: llmAgent,
       hostname: "api.anthropic.com",
       path: "/v1/messages",
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Length": Buffer.byteLength(payload),
-      },
+      headers,
     }, (upstream) => {
       if (upstream.statusCode !== 200) {
         upstream.resume();
@@ -41,9 +51,18 @@ function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTo
           let evt; try { evt = JSON.parse(raw); } catch { continue; }
           if (evt.type === "content_block_start") {
             const cb = evt.content_block || {};
-            blocks[evt.index] = cb.type === "tool_use"
-              ? { type: "tool_use", id: cb.id, name: cb.name, jsonbuf: "" }
-              : { type: "text", text: "" };
+            if (cb.type === "tool_use") {
+              blocks[evt.index] = { type: "tool_use", id: cb.id, name: cb.name, jsonbuf: "" };
+            } else if (cb.type === "mcp_tool_use") {
+              // Anthropic executes this server-side (e.g. Indeed). We don't run it; just
+              // note it and surface progress. Skipped from assistantContent below.
+              blocks[evt.index] = { type: "mcp_tool_use", name: cb.name, server: cb.server_name };
+              if (onMcpTool && cb.name) onMcpTool(cb.name, cb.server_name);
+            } else if (cb.type === "mcp_tool_result") {
+              blocks[evt.index] = { type: "mcp_tool_result" };
+            } else {
+              blocks[evt.index] = { type: "text", text: "" };
+            }
           } else if (evt.type === "content_block_delta") {
             const b = blocks[evt.index];
             if (evt.delta?.type === "text_delta") {
@@ -64,12 +83,14 @@ function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTo
           if (!b) continue;
           if (b.type === "text") {
             if (b.text) assistantContent.push({ type: "text", text: b.text });
-          } else {
+          } else if (b.type === "tool_use") {
             let input = {};
             try { input = b.jsonbuf ? JSON.parse(b.jsonbuf) : {}; } catch { input = {}; }
             assistantContent.push({ type: "tool_use", id: b.id, name: b.name, input });
             toolUses.push({ id: b.id, name: b.name, input });
           }
+          // mcp_tool_use / mcp_tool_result: executed server-side by Anthropic — not our
+          // job to run or echo back. Skip (these turns end with stop_reason=end_turn).
         }
         resolve({ assistantContent, toolUses, stopReason });
       });

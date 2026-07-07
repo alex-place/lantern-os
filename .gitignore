@@ -487,3 +487,6 @@ apps/lantern-garage/desktop/dist/
 
 # Watchdog runtime health ledger (#2038) — machine-local, never committed
 data/boot-health.jsonl
+
+# Indeed connector: registered OAuth client + per-user encrypted tokens (secrets)
+data/indeed/

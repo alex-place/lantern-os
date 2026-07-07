@@ -33,6 +33,7 @@ const { render: renderDocument, listTemplates: listDocTemplates } = require("./d
 const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
 const { getCreatorRuntime } = require("./creator-runtime");
+const jobSearch = require("./job-search");
 
 const REPO = path.resolve(__dirname, "..", "..", "..");
 // User workspace: outside the repo, for user artifacts (resumes, exports, generated docs).
@@ -386,6 +387,44 @@ const REGISTRY = {
         r.routing ? `Routing: ${r.routing.backend} (${r.routing.hasSignal ? "measured outcome" : "cold-start"})` : null,
         `Pending id: ${r.pendingId} — approve via POST /api/coding/approve (operator).`,
       ].filter(Boolean).join("\n");
+    },
+  },
+
+  // Live job-openings search. The user asks the assistant to find jobs (e.g. via the
+  // "🧭 Job search" chip, which just sends such a message) and the model calls this. It
+  // returns REAL current postings with real apply URLs from public job boards — never
+  // invents listings (Σ₀ External Reality Rule). guest_safe: read-only web data, no
+  // per-user state. If the model has no role yet, it should ask the user for one.
+  job_search: {
+    policy: "read",
+    guest_safe: true,
+    desc: "Search LIVE job openings from real job boards (Jobicy + Remotive) and return real apply URLs — never invent listings. A useful search needs a job TITLE or KEYWORD (the `query`): use the user's stated role, or a role you already know from their profile/history; if you don't know it, ask them what role/field they want before calling this. Defaults to REMOTE roles open to US applicants; pass `location` (a US city/state/ZIP, or a region like 'uk'/'europe'/'canada') to narrow. If the tool reports the boards are unreachable, tell the user rather than making up jobs.",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Job title or keywords — REQUIRED, e.g. 'backend engineer', 'registered nurse', 'ux designer'" },
+        location: { type: "string", description: "Optional. US city/state/ZIP for a location, or a region ('uk','europe','canada'). Omit for remote roles open to US applicants (the default)." },
+        limit: { type: "integer", description: "Max postings to return (1–15, default 6)" },
+      },
+      required: ["query"],
+    },
+    async run(i) {
+      const out = await jobSearch.searchJobs({ query: i.query, location: i.location, limit: i.limit });
+      if (out.needQuery) {
+        return "[job_search: no job title/keyword given. Ask the user what role or field they want to search for (and, optionally, a location or ZIP — otherwise it defaults to remote roles open to US applicants).]";
+      }
+      if (out.error) {
+        return `[job_search: the job boards are unreachable right now (${out.error}) — tell the user live search failed and to try again shortly. Do NOT fabricate listings.]`;
+      }
+      const where = out.location ? out.location : `remote · ${out.geo.toUpperCase()}-eligible`;
+      if (!out.count) return `[job_search: no live postings matched "${out.query}" (${where}) — suggest broader keywords or a different location.]`;
+      const lines = [`job_search("${out.query}", ${where}) via ${out.source} — ${out.count} live posting(s):\n`];
+      out.jobs.forEach((j, idx) => {
+        lines.push(`[${idx + 1}] ${j.title} — ${j.company}`);
+        lines.push(`    ${j.location}${j.salary ? ` · ${j.salary}` : ""}${j.posted ? ` · posted ${j.posted}` : ""}`);
+        lines.push(`    apply: ${j.url}`);
+      });
+      return lines.join("\n");
     },
   },
 
