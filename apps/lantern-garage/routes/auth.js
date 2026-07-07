@@ -18,7 +18,8 @@ const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
 const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken } = require("../lib/auth-tokens");
-const { sendVerificationEmail, sendPasswordResetEmail } = require("../lib/mailer");
+const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
+const { isLoopback } = require("../lib/request-auth");
 const { recordTractionEvent } = require("../lib/traction");
 const {
   getProfile,
@@ -176,16 +177,21 @@ module.exports = async function authRoutes(req, res, url, deps) {
   if (method === "POST" && path === "/api/auth/resend-verification") {
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
+    const respBody = { ok: true };
     if (EMAIL_RE.test(email)) {
       const profile = getProfileByEmail(email);
       if (profile && profile.emailVerified !== true) {
         const token = createToken("verify_email", profile.id, null);
         const link = `${originOf(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
         sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
+        // Dev-only self-service: no mail server + direct loopback hit → return the
+        // link so the operator can confirm locally. Never on proxied/public traffic
+        // or when SMTP is configured (mirrors local-auth.devVerifyLink).
+        if (!smtpConfigured() && isLoopback(req)) respBody.devVerifyLink = link;
       }
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ ok: true }));
+    return res.end(JSON.stringify(respBody));
   }
 
   // POST /api/auth/request-password-reset { email } — always 200 (no account
