@@ -248,6 +248,7 @@ const routes = [
   require("./routes/media"), // Video/media streaming (range requests)
   require("./routes/rag"),
   require("./routes/operator"),
+  require("./routes/coding"),           // coding control-plane surface (#2185): route/verify/approve
   require("./routes/api-tools-log"),     // Tool execution logs
   require("./routes/files"),
   require("./routes/files-upload"),
