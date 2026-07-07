@@ -1344,13 +1344,28 @@ theater. The tempting tool — Dwork et al.'s **reusable holdout** (Science 349,
 `n` samples answer `B` adaptive scalar queries at error `~√(log B/n)`) — **does not apply here.** An
 accept/reject gate on a whole **model** is high-leakage **selection**: each acceptance conditions all
 future training on "passed `H`," and each *rejected* candidate still leaks `H` into the optimizer.
-That is sequential model selection, not `B` bounded scalar queries — so the realistic budget is
-**O(1) gates per holdout, not `B`.** **Corrected requirement (what survives):** because a fixed `H`
-goes stale in O(1) adaptive gates, the slow-scale anchor **cannot be a fixed set** — it must be a
-**flow of genuinely fresh verified problems**, and *the safe update rate is bounded by the fresh-
-ground-truth sourcing rate.* This is Part I's "grounding is the safety mechanism" **with a rate
-attached** — a real, harsh, falsifiable design law. **[Dwork bound PROVEN but MISAPPLIED to
-model-gating; the surviving fresh-flow claim is HEURISTIC; §8.6 tests it.]**
+That is sequential model selection, not `B` bounded scalar queries — so the anchor cannot be a
+fixed set: it must be a **flow of genuinely fresh verified problems**, and *the safe update rate is
+bounded by the fresh-ground-truth sourcing rate.* This is Part I's "grounding is the safety
+mechanism" **with a rate attached** — a real, harsh, falsifiable design law.
+
+**[MEASURED 2026-07-07 — §8.6 simulation run, `experiments/sigma_update_holdout_staleness.py`,
+32 seeds.]** The falsification harness (adaptive hill-climb whose only feedback is a holdout of size
+`n`, fixed vs re-drawn per gate) both **refutes the strong form and confirms the operational one**:
+
+- **REFUTED — the strong "O(1) gates regardless of size" claim.** A bigger fixed holdout *does* buy
+  more usable gates; the true quality extractable before selection starts chasing noise grows with `n`
+  (fixed-holdout true quality 0.57 → 59.0 as `n`: 50 → 5000). So the budget is **`n`-graded, not O(1)**.
+- **CONFIRMED + QUANTIFIED — the fresh-flow law.** A fresh-per-gate holdout **strictly dominates** a
+  fixed one at every `n`, and the penalty is **severe exactly in the slow-sourcing (small-`n`) regime
+  Σ_θ lives in**: at `n=50` a fixed holdout extracts **22×** less true improvement than a fresh flow
+  (0.57 vs 12.68); the gap only closes to <10% at `n ≥ 2000`. So sourcing fresh verified truth is
+  worthless to skimp on precisely when it is scarce.
+
+**Net:** the surviving law is **fresh flow > fixed set, with an `n`-graded (not O(1)) staleness
+penalty that is worst when sourcing is slow.** [Dwork bound PROVEN but MISAPPLIED to model-gating;
+the fresh-flow dominance is now **MEASURED-by-simulation** (not a closed-form theorem — the sim shows
+the shape, it does not prove the constant).]
 
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
@@ -1387,8 +1402,13 @@ treating "passed the holdout" as unconditional evidence — without the §8.4 fr
    redundant — this is the whole point.)*
 3. **Forgetting teeth:** plant a held-out regression; confirm leg 1 rejects.
 4. **Budget teeth:** gate repeatedly against a fixed `H`; measure the true generalization gap growing
-   as adaptive gates accumulate; confirm a fixed holdout goes stale in ~O(1), not `~√(log B/n)`.
-   Without this test, §8.4 is unverified.
+   as adaptive gates accumulate; confirm a fixed holdout goes stale, and characterise the rate.
+   **✅ DONE (2026-07-07, `experiments/sigma_update_holdout_staleness.py`, 32 seeds):** a fresh-flow
+   holdout **strictly dominates** a fixed one at every `n`, with a **severe small-`n` penalty (22× less
+   true quality extracted at `n=50`), closing to <10% only at `n ≥ 2000`. This **refutes the strong
+   "O(1) regardless of size"** wording (the budget is `n`-graded) while **confirming the operational
+   fresh-flow law** — see the MEASURED block in §8.4. *(Legs 1–3 still require the model-training A/B/C
+   harness on cloud L4 — this box cannot train locally; that is the remaining empirical gap.)*
 
 ### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
 
