@@ -358,7 +358,20 @@ class IbkrCpapi {
     if (!sym) return null;
     const r = await this._request('POST', '/iserver/secdef/search', { symbol: sym, name: false, secType });
     if (!r.ok || !Array.isArray(r.json) || r.json.length === 0) return null;
-    const match = r.json.find((c) => String(c.symbol || '').toUpperCase() === sym) || r.json[0];
+    // IBKR returns the same symbol on many venues/instrument types — e.g. "GLD"
+    // yields a HK *index* [IND] AND the ARCA *ETF* [STK]. Pick the tradable one:
+    // exact symbol + a section offering the requested secType (STK) + a primary US
+    // venue, degrading gracefully. Prevents ordering an index/foreign listing.
+    const US = /^(NASDAQ|NYSE|ARCA|NYSEARCA|BATS|AMEX|IEX|PINK)$/i;
+    const offers = (c) => Array.isArray(c.sections) && c.sections.some((s) => String(s.secType).toUpperCase() === secType);
+    const exact = (c) => String(c.symbol || '').toUpperCase() === sym;
+    const venue = (c) => String(c.description || '');
+    const match =
+      r.json.find((c) => exact(c) && offers(c) && US.test(venue(c))) ||
+      r.json.find((c) => exact(c) && offers(c)) ||
+      r.json.find(offers) ||
+      r.json.find(exact) ||
+      r.json[0];
     return {
       conid: match.conid != null ? Number(match.conid) : null,
       symbol: match.symbol || sym,

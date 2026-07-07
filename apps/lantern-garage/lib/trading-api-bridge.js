@@ -139,6 +139,47 @@ class TradingAPIBridge {
     };
   }
 
+  /**
+   * Search IBKR's own contract universe for the symbol-search popup — so ANY
+   * tradable US stock/ETF is findable, not just a hardcoded seed list. Returns
+   * tradable STK listings (stocks + ETFs; this account's classes), or null when
+   * no IBKR account is connected (caller falls back to the Yahoo probe).
+   */
+  async searchIBKRSymbols(userId, q) {
+    const client = this.ibkrForUser(userId);
+    if (!client) return null;
+    const status = await client.getStatus();
+    if (!status.connected) return null;
+    const query = String(q || '').trim();
+    if (!query) return [];
+    const US = /^(NASDAQ|NYSE|ARCA|NYSEARCA|BATS|AMEX|IEX|PINK)$/i;
+    const seen = new Set();
+    const out = [];
+    const add = (sym, name, conid) => {
+      const s = String(sym || '').toUpperCase();
+      if (!s || seen.has(s) || !/^[A-Z]{1,6}$/.test(s)) return;
+      seen.add(s);
+      out.push({ symbol: s, name: name || s, exchange: '', class: 'us_equity', conid, tradable: true });
+    };
+    // Symbol search: keep only listings that offer STK on a primary US venue.
+    const rs = await client._request('POST', '/iserver/secdef/search', { symbol: query, name: false, secType: 'STK' }).catch(() => ({}));
+    for (const c of (Array.isArray(rs.json) ? rs.json : [])) {
+      const secs = Array.isArray(c.sections) ? c.sections.map((s) => String(s.secType).toUpperCase()) : [];
+      if (secs.includes('STK') && US.test(String(c.description || ''))) {
+        add(c.symbol, c.companyName || c.companyHeader || '', c.conid);
+      }
+    }
+    // Thin symbol match → add company-name matches (name search has no sections).
+    if (out.length < 5) {
+      const rn = await client._request('POST', '/iserver/secdef/search', { symbol: query, name: true, secType: 'STK' }).catch(() => ({}));
+      for (const c of (Array.isArray(rn.json) ? rn.json : [])) {
+        add(c.symbol, c.companyName || c.companyHeader || c.description || '', c.conid);
+        if (out.length >= 20) break;
+      }
+    }
+    return out;
+  }
+
   /** Broker-authoritative day P&L for a user's account (IBKR `dpl`), or null.
    *  The daily-loss circuit breaker reads this before opening new positions. */
   async getIBKRDayPnl(userId) {

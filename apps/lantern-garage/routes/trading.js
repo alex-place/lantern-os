@@ -609,6 +609,17 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     const klass = (url.searchParams.get('class') || '').trim();   // optional filter: us_equity | crypto
     const limit = Math.min(60, parseInt(url.searchParams.get('limit'), 10) || 30);
     try {
+      // Prefer the connected IBKR account's own contract search — makes ANY tradable
+      // US stock/ETF findable (not just a seed list), and only shows tradable names.
+      // Falls back to the Yahoo probe below when no IBKR account is linked. Skip for
+      // the crypto filter (IBKR crypto isn't tradable on this account).
+      if (q && klass !== 'crypto') {
+        const ibkr = await bridge.searchIBKRSymbols(getEffectiveUserId(req), q).catch(() => null);
+        if (Array.isArray(ibkr) && ibkr.length) {
+          sendJson(res, { results: ibkr.slice(0, limit), total: ibkr.length, query: q, source: 'ibkr' }, 200);
+          return true;
+        }
+      }
       const assets = await traderAgent.getAllAssets();
       let pool = klass ? assets.filter((a) => a.class === klass) : assets;
       let results;
