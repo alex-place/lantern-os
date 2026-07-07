@@ -227,10 +227,20 @@ class IbkrCpapi {
       // (401/403) until the OAuth consumer is activated (up to ~24h). Capture the
       // real HTTP status + any IBKR message so the UI can say which it is.
       const msg = (r.json && (r.json.error || r.json.message)) || r.error || null;
-      this._lstError = {
-        code: r.status === 401 || r.status === 403 ? 'not_activated_or_unauthorized' : (r.status ? `http_${r.status}` : 'unreachable'),
-        status: r.status, detail: msg,
-      };
+      // IBKR encodes the real reason in the body (e.g. "id: 164, error: invalid
+      // consumer"). A 401 with "invalid consumer" means the consumer key was never
+      // registered — waiting will NEVER fix it — so keep it distinct from a
+      // genuinely-pending activation instead of lumping all 401s into "retry later".
+      const lower = String(msg || '').toLowerCase();
+      let code;
+      if (r.status === 401 || r.status === 403) {
+        code = /invalid consumer/.test(lower) ? 'invalid_consumer'
+          : /invalid signature|signature/.test(lower) ? 'lst_signature_mismatch'
+          : 'not_activated_or_unauthorized';
+      } else {
+        code = r.status ? `http_${r.status}` : 'unreachable';
+      }
+      this._lstError = { code, status: r.status, detail: msg };
       return null;
     }
     if (!r.json || !r.json.diffie_hellman_response) { this._lstError = { code: 'no_dh_response' }; return null; }
@@ -405,8 +415,10 @@ class IbkrCpapi {
     };
     if (orderType === 'LMT' && order.price != null) ticket.price = order.price;
 
-    // Body is a JSON ARRAY of tickets (IBKR Web API "New Order Example").
-    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, [ticket]);
+    // Body must be { orders: [ticket, …] }. IBKR's Web API rejects a bare array
+    // with 400 "Missing order parameters" — verified live against a paper account
+    // (a bare [ticket] → 400, { orders:[ticket] } → 200 PreSubmitted).
+    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, { orders: [ticket] });
     // Order reply messages [{id, message, messageIds}] must be confirmed to proceed.
     let confirms = 0;
     while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
@@ -506,6 +518,8 @@ class IbkrCpapi {
 /** Plain-English reason for a not-connected IBKR status (drives the UI banner). */
 function reasonText(reason, lstErr) {
   switch (reason) {
+    case 'invalid_consumer':
+      return "IBKR rejects your consumer key as unknown (error 164, “invalid consumer”). This is NOT an activation delay — waiting won’t help. Register the consumer in IBKR’s Self-Service OAuth portal and enter the EXACT consumer key IBKR accepts.";
     case 'not_activated_or_unauthorized':
       return "IBKR rejected the OAuth handshake — your consumer isn't active yet. IBKR can take up to ~24h to enable a new one; try Recheck later.";
     case 'lst_signature_mismatch':

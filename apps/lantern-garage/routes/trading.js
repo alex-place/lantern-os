@@ -378,8 +378,19 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/positions
-  // Open positions from Alpaca
+  // Prefer the user's connected IBKR account (per-user OAuth, ADR-0022) so the
+  // header equity / Day P&L and the summary row reflect the broker they linked.
+  // Falls back to the legacy Alpaca traderAgent when no IBKR account is connected.
   if (url.pathname === '/api/trading/positions' && req.method === 'GET') {
+    try {
+      const uid = getEffectiveUserId(req);
+      const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
+      if (ibkrAccount) {
+        const ibkrPositions = await bridge.getIBKRPositions(uid).catch(() => []);
+        sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
+        return true;
+      }
+    } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);
       return true;
@@ -548,7 +559,13 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         sendJson(res, { status: 'error', error: 'takeProfit must be a positive number' }, 400);
         return true;
       }
-      const result = await traderAgent.placeOrder({ ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit });
+      // Prefer the user's connected IBKR account (per-user OAuth) so BUY/SELL on the
+      // trader page trades the account shown in the header. Falls back to the legacy
+      // agent when no IBKR account is linked. Order is HARD-GATED inside placeOrder.
+      const uid = getEffectiveUserId(req);
+      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
+      const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
+        || await traderAgent.placeOrder(orderReq);
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,
