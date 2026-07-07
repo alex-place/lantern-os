@@ -16,7 +16,9 @@ import os
 import sys
 
 import numpy as np
-import torch
+import pytest
+
+torch = pytest.importorskip("torch")   # torch-free CI must skip, not fail collection (#862 convention)
 
 from cio_sde.collapse import jsrr_certificate, JsrrCertificate
 
